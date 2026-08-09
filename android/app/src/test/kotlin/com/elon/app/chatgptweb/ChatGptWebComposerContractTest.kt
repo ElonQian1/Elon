@@ -50,6 +50,7 @@ class ChatGptWebComposerContractTest {
 
         assertTrue(activity.contains("override fun onShowFileChooser("))
         assertTrue(activity.contains("fileChooserController.show("))
+        assertTrue(activity.contains("allowContentAccess = true"))
         assertTrue(chooser.contains("Intent.ACTION_OPEN_DOCUMENT"))
         assertTrue(chooser.contains("FileChooserParams.parseResult"))
         assertTrue(chooser.contains("FLAG_GRANT_READ_URI_PERMISSION"))

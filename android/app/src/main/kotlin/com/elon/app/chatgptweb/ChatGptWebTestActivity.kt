@@ -187,7 +187,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 allowFileAccess = false
-                allowContentAccess = false
+                // Required for content:// URIs returned by the system picker. The picker
+                // still grants access only to files explicitly selected by the user.
+                allowContentAccess = true
                 javaScriptCanOpenWindowsAutomatically = false
                 setSupportMultipleWindows(false)
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
