@@ -86,8 +86,9 @@ internal sealed interface ChatGptWebEvent {
 }
 
 internal object ChatGptWebProtocol {
-    fun parse(rawPayload: String): ChatGptWebEvent? {
+    fun parse(rawPayload: String, minimumAdapterVersion: Int = 0): ChatGptWebEvent? {
         val payload = runCatching { JSONObject(rawPayload) }.getOrNull() ?: return null
+        if (payload.optInt("adapterVersion", 0) < minimumAdapterVersion) return null
         if (payload.optString("schema") == SCHEMA) {
             val event = payload.optJSONObject("event") ?: return null
             return when (event.optString("type")) {

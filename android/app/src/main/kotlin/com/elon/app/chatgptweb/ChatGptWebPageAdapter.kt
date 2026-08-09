@@ -47,7 +47,7 @@ internal class ChatGptWebPageAdapter(
         ) { _, message, sourceOrigin, isMainFrame, _ ->
             if (!isMainFrame || !isAllowedOrigin(sourceOrigin)) return@addWebMessageListener
             val payload = message.data ?: return@addWebMessageListener
-            ChatGptWebProtocol.parse(payload)?.let { event ->
+            ChatGptWebProtocol.parse(payload, ADAPTER_VERSION)?.let { event ->
                 if (event.completesHandshake()) handshake.acknowledge()
                 onEvent(event)
             }

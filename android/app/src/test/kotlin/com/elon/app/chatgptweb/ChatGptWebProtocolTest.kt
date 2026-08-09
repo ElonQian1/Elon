@@ -8,6 +8,23 @@ import org.junit.Test
 
 class ChatGptWebProtocolTest {
     @Test
+    fun rejectsEventsFromStalePageAdaptersWhenMinimumVersionIsRequired() {
+        val current =
+            """{"type":"command_result","adapterVersion":4,"action":"snapshot","ok":true}"""
+        val stale =
+            """{"type":"command_result","adapterVersion":3,"action":"snapshot","ok":true}"""
+        val unversioned = """{"type":"command_result","action":"snapshot","ok":true}"""
+
+        assertTrue(
+            ChatGptWebProtocol.parse(current, minimumAdapterVersion = 4) is
+                ChatGptWebEvent.CommandResult
+        )
+        assertNull(ChatGptWebProtocol.parse(stale, minimumAdapterVersion = 4))
+        assertNull(ChatGptWebProtocol.parse(unversioned, minimumAdapterVersion = 4))
+        assertTrue(ChatGptWebProtocol.parse(unversioned) is ChatGptWebEvent.CommandResult)
+    }
+
+    @Test
     fun parsesBoundedConversationSnapshots() {
         val event = ChatGptWebProtocol.parse(
             """
