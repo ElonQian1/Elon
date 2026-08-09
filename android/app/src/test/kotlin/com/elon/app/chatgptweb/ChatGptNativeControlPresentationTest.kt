@@ -43,6 +43,8 @@ class ChatGptNativeControlPresentationTest {
         assertEquals(listOf("more", "sources"),
             ChatGptNativeControlPresentation.headerActions(controls).map(ChatGptWebUiControl::id))
         assertEquals("direct", coverage.getValue("sources").kind.wireName)
+        assertEquals(true, ChatGptNativeControlPresentation.usesHeaderIcon(controls[1]))
+        assertEquals(false, ChatGptNativeControlPresentation.usesHeaderIcon(controls[0]))
         assertEquals("official_fallback", coverage.getValue("future").kind.wireName)
         assertNull(coverage.getValue("future").nativeSelector)
     }

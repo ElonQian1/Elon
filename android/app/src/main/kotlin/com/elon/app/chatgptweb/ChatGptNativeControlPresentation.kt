@@ -87,6 +87,8 @@ internal object ChatGptNativeControlPresentation {
         .take(SUGGESTION_LIMIT)
         .toList()
 
+    fun usesHeaderIcon(control: ChatGptWebUiControl): Boolean = control.semantic == "sources"
+
     fun messageActions(controls: List<ChatGptWebUiControl>): Map<String, List<ChatGptWebUiControl>> =
         controls.asSequence()
             .filter { it.region == ChatGptWebUiRegion.MESSAGE && it.contextId != null }

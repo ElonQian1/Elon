@@ -1,13 +1,14 @@
 package com.elon.app.chatgptweb
 
 import android.graphics.Color
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.text.TextUtils
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatImageButton
 import com.elon.app.R
 import com.google.android.material.button.MaterialButton
 
@@ -43,7 +44,7 @@ internal class ChatGptNativeAdaptiveUiController(
         headerActions.removeAllViews()
         ChatGptNativeControlPresentation.headerActions(controls)
             .asSequence()
-            .forEach { control -> headerActions.addView(compactButton(control)) }
+            .forEach { control -> headerActions.addView(headerActionView(control)) }
         headerActionsScroll.visibility = if (headerActions.childCount > 0) View.VISIBLE else View.GONE
     }
 
@@ -75,6 +76,24 @@ internal class ChatGptNativeAdaptiveUiController(
             contentDescription = control.accessibilityLabel
             tag = control.id
             setOnClickListener { onInvoke(control.id) }
+        }
+
+    private fun headerActionView(control: ChatGptWebUiControl): View =
+        if (ChatGptNativeControlPresentation.usesHeaderIcon(control)) {
+            AppCompatImageButton(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(44), dp(42))
+                background = null
+                setImageResource(R.drawable.ic_side_menu_files)
+                imageTintList = activity.getColorStateList(R.color.elon_icon_primary)
+                setPadding(dp(10), dp(10), dp(10), dp(10))
+                isEnabled = control.enabled
+                contentDescription = control.accessibilityLabel
+                tooltipText = control.label
+                tag = control.id
+                setOnClickListener { onInvoke(control.id) }
+            }
+        } else {
+            compactButton(control)
         }
 
     private fun suggestionButton(control: ChatGptWebUiControl): MaterialButton =
