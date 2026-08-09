@@ -17,6 +17,21 @@
     return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
   }
 
+  function isInViewport(rect) {
+    return rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+  }
+
+  function sameOriginPath(node) {
+    const href = node && node.getAttribute('href');
+    if (!href) return '';
+    try {
+      const url = new URL(href, location.origin);
+      return url.origin === location.origin ? url.pathname : '';
+    } catch {
+      return '';
+    }
+  }
+
   function labelOf(node, fallback) {
     const candidates = [
       node.innerText,
@@ -64,12 +79,20 @@
   }
 
   function semanticFor(node, region, index) {
+    const path = sameOriginPath(node);
     const signal = cleanText([
       node.id,
       node.getAttribute('data-testid'),
       node.getAttribute('aria-label'),
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
+    if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)) return 'conversation';
+    if (/search.chat|搜索聊天/.test(signal)) return 'search';
+    if (/library|文件库|资料库/.test(signal + ' ' + path)) return 'library';
+    if (/scheduled|schedule|已安排|任务/.test(signal + ' ' + path)) return 'tasks';
+    if (/project|项目/.test(signal + ' ' + path)) return 'project';
+    if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(signal + ' ' + path)) return 'gpts';
+    if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
     if (/dictat|microphone|voice|听写|麦克风|语音/.test(signal)) return 'dictation';
@@ -114,16 +137,24 @@
       branch: '创建分支',
       delete: '删除',
       close: '关闭',
-      confirm: '确认'
+      confirm: '确认',
+      conversation: '打开会话',
+      search: '搜索聊天',
+      library: '文件库',
+      tasks: '任务',
+      project: '项目',
+      gpts: 'GPT',
+      settings: '设置'
     })[semantic] || '操作';
   }
 
-  function controlId(semantic, node, label, used, contextId) {
+  function controlId(semantic, node, label, region, used, contextId) {
     const fixed = ['navigation', 'title', 'profile', 'new_conversation', 'attachment', 'model', 'dictation', 'send', 'stop'];
+    const identity = contextId || [node.id, node.getAttribute('data-testid'), label].join('|');
     const base = fixed.includes(semantic) && !contextId
       ? 'control_' + semantic
-      : 'control_' + (contextId ? 'message_' + hash(contextId) + '_' : '')
-        + semantic + '_' + hash([node.id, node.getAttribute('data-testid'), label].join('|'));
+      : 'control_' + (contextId && region === 'message' ? 'message_' + hash(contextId) + '_' : '')
+        + semantic + '_' + hash(identity);
     if (!used.has(base)) return base;
     return base + '_' + hash(label + '|' + used.size);
   }
@@ -133,7 +164,9 @@
       if (filter && !filter(node)) return;
       const semantic = semanticFor(node, region, index);
       const label = labelOf(node, defaultLabel(semantic));
-      const id = controlId(semantic, node, label, used, contextId);
+      const path = sameOriginPath(node);
+      const resolvedContextId = contextId || (semantic === 'conversation' ? path.slice(3) : '');
+      const id = controlId(semantic, node, label, region, used, resolvedContextId);
       const rect = node.getBoundingClientRect();
       used.add(id);
       controlsById.set(id, node);
@@ -145,7 +178,8 @@
         role: roleOf(node),
         enabled: !node.matches(':disabled') && node.getAttribute('aria-disabled') !== 'true',
         selected: node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true',
-        contextId: contextId || undefined,
+        contextId: resolvedContextId || undefined,
+        inViewport: isInViewport(rect),
         xRatio: (rect.left + rect.width / 2) / Math.max(1, window.innerWidth),
         yRatio: (rect.top + rect.height / 2) / Math.max(1, window.innerHeight)
       });
@@ -233,7 +267,7 @@
     const hasComposer = !!composerNode();
     return {
       type: 'ui_manifest_snapshot',
-      version: 2,
+      version: 3,
       pageKind: pageKind(),
       title: pageTitle(controls),
       compatibility: hasHeader && (hasComposer || pageKind() === 'auth')
@@ -257,7 +291,8 @@
         role: control.role,
         enabled: control.enabled,
         selected: control.selected,
-        contextId: control.contextId
+        contextId: control.contextId,
+        inViewport: control.inViewport
       }))
     });
   }
@@ -274,14 +309,24 @@
     discover();
     const node = controlsById.get(String(id || ''));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
-    const rect = node.getBoundingClientRect();
-    const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
-    const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
-    if (xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
-      return result('invoke_ui_control', false, '官网控件当前不在可操作区域。');
+    function dispatch() {
+      if (!node.isConnected || !isVisible(node)) {
+        return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
+      }
+      const rect = node.getBoundingClientRect();
+      const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
+      const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
+      if (!isInViewport(rect) || xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
+        return result('invoke_ui_control', false, '官网控件滚动后仍不在可操作区域。');
+      }
+      emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
+      result('invoke_ui_control', true, '');
+      window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
     }
-    emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
-    result('invoke_ui_control', true, '');
+    const rect = node.getBoundingClientRect();
+    if (isInViewport(rect)) return dispatch();
+    node.scrollIntoView({ block: 'center', inline: 'nearest' });
+    window.setTimeout(dispatch, 120);
   }
 
   window.__elonChatGptLayout = Object.freeze({ emitSnapshot, invoke });

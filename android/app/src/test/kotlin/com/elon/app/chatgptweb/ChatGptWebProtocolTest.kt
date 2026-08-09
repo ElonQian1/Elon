@@ -188,13 +188,14 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"ui_manifest_snapshot",
-                "version":1,
+                "version":3,
                 "pageKind":"home",
                 "title":"工作",
                 "compatibility":"healthy",
                 "controls":[
                   {"id":"control_navigation","semantic":"navigation","label":"打开导航","region":"header","role":"button","enabled":true},
-                  {"id":"control_suggestion_ab12","semantic":"suggestion","label":"帮我整理待办","region":"suggestions","role":"button","enabled":true},
+                  {"id":"control_suggestion_ab12","semantic":"suggestion","label":"帮我整理待办","region":"suggestions","role":"button","enabled":true,"inViewport":false},
+                  {"id":"control_conversation_ab12","semantic":"conversation","label":"桥接验证","region":"overlay","role":"link","enabled":true,"contextId":"demo"},
                   {"id":"control_message_ab12_share_cd34","semantic":"share","label":"分享","region":"message","role":"button","enabled":true,"contextId":"conversation-turn-4","xRatio":0.8,"yRatio":0.6},
                   {"id":"../unsafe","semantic":"action","label":"忽略","region":"header","role":"button","enabled":true},
                   {"id":"control_unknown","semantic":"future_kind","label":"未来功能","region":"overlay","role":"menuitem","enabled":false}
@@ -206,12 +207,15 @@ class ChatGptWebProtocolTest {
 
         assertEquals("工作", event.value.title)
         assertEquals("healthy", event.value.compatibility)
-        assertEquals(4, event.value.controls.size)
+        assertEquals(5, event.value.controls.size)
         assertEquals("suggestion", event.value.controls[1].semantic)
-        assertEquals("conversation-turn-4", event.value.controls[2].contextId)
-        assertEquals("message", event.value.controls[2].region)
-        assertEquals(0.8, event.value.controls[2].webXRatio ?: -1.0, 0.0)
-        assertEquals(0.6, event.value.controls[2].webYRatio ?: -1.0, 0.0)
+        assertFalse(event.value.controls[1].inViewport)
+        assertEquals("conversation", event.value.controls[2].semantic)
+        assertEquals("demo", event.value.controls[2].contextId)
+        assertEquals("conversation-turn-4", event.value.controls[3].contextId)
+        assertEquals("message", event.value.controls[3].region)
+        assertEquals(0.8, event.value.controls[3].webXRatio ?: -1.0, 0.0)
+        assertEquals(0.6, event.value.controls[3].webYRatio ?: -1.0, 0.0)
         assertEquals("action", event.value.controls.last().semantic)
         assertEquals("chatgpt-control:control_navigation:打开导航", event.value.controls.first().accessibilityLabel)
     }

@@ -17,6 +17,7 @@ internal data class ChatGptWebUiControl(
     val enabled: Boolean,
     val selected: Boolean,
     val contextId: String? = null,
+    val inViewport: Boolean = true,
     val webXRatio: Double? = null,
     val webYRatio: Double? = null,
 ) {

@@ -6,6 +6,7 @@ import org.json.JSONObject
 internal class ChatGptWebMcpActions(
     private val snapshot: () -> ChatGptWebSnapshot?,
     private val uiManifest: () -> ChatGptWebUiManifest?,
+    private val observedState: () -> ChatGptWebObservedState.Snapshot,
     private val bridgeState: () -> ChatGptWebPageAdapter.State,
     private val mode: () -> ChatGptWebModeController.Mode,
     private val inputText: () -> String,
@@ -22,6 +23,7 @@ internal class ChatGptWebMcpActions(
 ) {
     fun uiState(): JSONObject {
         val current = snapshot()
+        val observed = observedState()
         return JSONObject()
             .put("surface", "chatgpt_web")
             .put("active_page", "chatgpt_web")
@@ -36,6 +38,8 @@ internal class ChatGptWebMcpActions(
                 .put("text_length", inputText().length)
             )
             .put("ui_manifest", manifestJson(uiManifest()))
+            .put("navigation", navigationSummary(observed))
+            .put("last_command", commandJson(observed))
             .put("available_actions", JSONArray(AVAILABLE_ACTIONS))
     }
 
@@ -59,6 +63,9 @@ internal class ChatGptWebMcpActions(
             "chatgpt_refresh_controls" -> refreshControls()
             "chatgpt_list_conversations" -> listConversations()
             "chatgpt_get_context" -> return contextPage(args)
+            "chatgpt_find_controls" -> return controlsPage(args)
+            "chatgpt_get_conversations" -> return conversationsPage(args)
+            "chatgpt_get_navigation" -> return navigationPage(args)
             "chatgpt_open_conversation" -> {
                 val path = args.optString("conversation_path")
                 if (!CONVERSATION_PATH.matches(path)) return error(action, "invalid_conversation_path")
@@ -75,7 +82,15 @@ internal class ChatGptWebMcpActions(
             }
             else -> return error(action, "unsupported_action")
         }
-        return uiState().put("control_ok", true).put("action", action)
+        return uiState()
+            .put("control_ok", true)
+            .put("action", action)
+            .apply {
+                if (action in ASYNC_ACTIONS) {
+                    put("command_status", "dispatched")
+                    put("poll_hint", "读取 ui_state.last_command 确认官网命令结果")
+                }
+            }
     }
 
     private fun contextPage(args: JSONObject): JSONObject {
@@ -96,6 +111,100 @@ internal class ChatGptWebMcpActions(
             .put("next_message_offset", nextOffset)
             .put("has_more", nextOffset < current.messages.size)
             .put("messages", messagesJson(page, offset, MAX_CONTEXT_MESSAGE_CHARS))
+    }
+
+    private fun controlsPage(args: JSONObject): JSONObject {
+        val manifest = uiManifest() ?: return error("chatgpt_find_controls", "manifest_unavailable")
+        val query = args.optString("query").trim()
+        val semantic = args.optString("semantic").trim().lowercase()
+        val region = args.optString("region").trim().lowercase()
+        val contextId = args.optString("context_id").trim()
+        val matches = manifest.controls.filter { control ->
+            (query.isBlank() || control.label.contains(query, ignoreCase = true)) &&
+                (semantic.isBlank() || control.semantic == semantic) &&
+                (region.isBlank() || control.region == region) &&
+                (contextId.isBlank() || control.contextId == contextId)
+        }
+        val page = page(args, matches.size, DEFAULT_CONTROL_PAGE_SIZE, MAX_CONTROL_PAGE_SIZE)
+        return JSONObject()
+            .put("control_ok", true)
+            .put("action", "chatgpt_find_controls")
+            .put("query", query)
+            .put("semantic", semantic)
+            .put("region", region)
+            .put("context_id", contextId)
+            .put("match_count", matches.size)
+            .put("offset", page.offset)
+            .put("limit", page.limit)
+            .put("next_offset", page.nextOffset)
+            .put("has_more", page.hasMore)
+            .put("controls", JSONArray().apply {
+                matches.drop(page.offset).take(page.limit).forEach { put(controlJson(it)) }
+            })
+    }
+
+    private fun conversationsPage(args: JSONObject): JSONObject {
+        val observed = observedState()
+        val query = args.optString("query").trim()
+        val matches = observed.conversations.filter {
+            query.isBlank() || it.title.contains(query, ignoreCase = true)
+        }
+        val page = page(args, matches.size, DEFAULT_LIST_PAGE_SIZE, MAX_LIST_PAGE_SIZE)
+        return JSONObject()
+            .put("control_ok", true)
+            .put("action", "chatgpt_get_conversations")
+            .put("query", query)
+            .put("cached_at_ms", observed.updatedAtMs)
+            .put("match_count", matches.size)
+            .put("offset", page.offset)
+            .put("limit", page.limit)
+            .put("next_offset", page.nextOffset)
+            .put("has_more", page.hasMore)
+            .put("conversations", JSONArray().apply {
+                matches.drop(page.offset).take(page.limit).forEach { conversation ->
+                    put(JSONObject()
+                        .put("id", conversation.id)
+                        .put("title", conversation.title)
+                        .put("path", conversation.path)
+                        .put("active", conversation.active)
+                    )
+                }
+            })
+    }
+
+    private fun navigationPage(args: JSONObject): JSONObject {
+        val observed = observedState()
+        val section = args.optString("section").trim().lowercase()
+        val optionSections = observed.composerSections
+            .filterKeys { section.isBlank() || it == section }
+        return JSONObject()
+            .put("control_ok", true)
+            .put("action", "chatgpt_get_navigation")
+            .put("cached_at_ms", observed.updatedAtMs)
+            .put("features", JSONArray().apply {
+                observed.features.forEach { feature ->
+                    put(JSONObject()
+                        .put("id", feature.id)
+                        .put("label", feature.label)
+                        .put("kind", feature.kind)
+                        .put("selected", feature.selected)
+                    )
+                }
+            })
+            .put("composer_sections", JSONObject().apply {
+                optionSections.forEach { (name, options) ->
+                    put(name, JSONArray().apply {
+                        options.forEach { option ->
+                            put(JSONObject()
+                                .put("id", option.id)
+                                .put("label", option.label)
+                                .put("kind", option.kind)
+                                .put("selected", option.selected)
+                            )
+                        }
+                    })
+                }
+            })
     }
 
     private fun conversationJson(value: ChatGptWebSnapshot?): Any {
@@ -136,6 +245,21 @@ internal class ChatGptWebMcpActions(
         }
     }
 
+    private fun navigationSummary(value: ChatGptWebObservedState.Snapshot): JSONObject = JSONObject()
+        .put("conversation_count", value.conversations.size)
+        .put("feature_count", value.features.size)
+        .put("composer_sections", JSONArray(value.composerSections.keys.sorted()))
+        .put("cached_at_ms", value.updatedAtMs)
+
+    private fun commandJson(value: ChatGptWebObservedState.Snapshot): Any {
+        val command = value.lastCommand ?: return JSONObject.NULL
+        return JSONObject()
+            .put("action", command.action)
+            .put("ok", command.ok)
+            .put("detail", command.detail)
+            .put("observed_at_ms", value.updatedAtMs)
+    }
+
     private fun manifestJson(value: ChatGptWebUiManifest?): Any {
         if (value == null) return JSONObject.NULL
         return JSONObject()
@@ -149,21 +273,35 @@ internal class ChatGptWebMcpActions(
             .put("web_position_count", value.controls.count { it.webXRatio != null && it.webYRatio != null })
             .put("controls", JSONArray().apply {
                 value.controls.forEach { control ->
-                    put(JSONObject()
-                        .put("control_id", control.id)
-                        .put("semantic", control.semantic)
-                        .put("label", control.label)
-                        .put("region", control.region)
-                        .put("role", control.role)
-                        .put("enabled", control.enabled)
-                        .put("selected", control.selected)
-                        .put("context_id", control.contextId ?: JSONObject.NULL)
-                        .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
-                        .put("web_y_ratio", control.webYRatio ?: JSONObject.NULL)
-                        .put("adb_content_description", control.accessibilityLabel)
-                    )
+                    put(controlJson(control))
                 }
             })
+    }
+
+    private fun controlJson(control: ChatGptWebUiControl): JSONObject = JSONObject()
+        .put("control_id", control.id)
+        .put("semantic", control.semantic)
+        .put("label", control.label)
+        .put("region", control.region)
+        .put("role", control.role)
+        .put("enabled", control.enabled)
+        .put("selected", control.selected)
+        .put("context_id", control.contextId ?: JSONObject.NULL)
+        .put("in_viewport", control.inViewport)
+        .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
+        .put("web_y_ratio", control.webYRatio ?: JSONObject.NULL)
+        .put("adb_content_description", control.accessibilityLabel)
+
+    private fun page(
+        args: JSONObject,
+        total: Int,
+        defaultLimit: Int,
+        maxLimit: Int,
+    ): Page {
+        val offset = args.optInt("offset", 0).coerceIn(0, total)
+        val limit = args.optInt("limit", defaultLimit).coerceIn(1, maxLimit)
+        val nextOffset = (offset + limit).coerceAtMost(total)
+        return Page(offset, limit, nextOffset, nextOffset < total)
     }
 
     private fun error(action: String, code: String): JSONObject = uiState()
@@ -172,12 +310,23 @@ internal class ChatGptWebMcpActions(
         .put("error", code)
 
     private companion object {
+        data class Page(
+            val offset: Int,
+            val limit: Int,
+            val nextOffset: Int,
+            val hasMore: Boolean,
+        )
+
         const val MAX_MESSAGES = 50
         const val MAX_MESSAGE_CHARS = 30_000
         const val MAX_CONTEXT_MESSAGE_CHARS = 40_000
         const val MAX_INPUT_CHARS = 20_000
         const val DEFAULT_CONTEXT_PAGE_SIZE = 20
         const val MAX_CONTEXT_PAGE_SIZE = 40
+        const val DEFAULT_CONTROL_PAGE_SIZE = 30
+        const val MAX_CONTROL_PAGE_SIZE = 80
+        const val DEFAULT_LIST_PAGE_SIZE = 30
+        const val MAX_LIST_PAGE_SIZE = 50
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
         val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
         val AVAILABLE_ACTIONS = listOf(
@@ -191,8 +340,21 @@ internal class ChatGptWebMcpActions(
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",
             "chatgpt_get_context",
+            "chatgpt_find_controls",
+            "chatgpt_get_conversations",
+            "chatgpt_get_navigation",
             "chatgpt_open_conversation",
             "chatgpt_select_view",
+        )
+        val ASYNC_ACTIONS = setOf(
+            "send_input",
+            "chatgpt_invoke_control",
+            "chatgpt_new_conversation",
+            "chatgpt_stop_generation",
+            "chatgpt_refresh",
+            "chatgpt_refresh_controls",
+            "chatgpt_list_conversations",
+            "chatgpt_open_conversation",
         )
     }
 }

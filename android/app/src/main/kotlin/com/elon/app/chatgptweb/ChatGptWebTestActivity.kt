@@ -44,6 +44,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private var latestSnapshot: ChatGptWebSnapshot? = null
     private var latestUiManifest: ChatGptWebUiManifest? = null
+    private val observedMcpState = ChatGptWebObservedState()
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var latestMode = ChatGptWebModeController.Mode.QUICK
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
@@ -52,6 +53,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         ChatGptWebMcpActions(
             snapshot = { latestSnapshot },
             uiManifest = { latestUiManifest },
+            observedState = observedMcpState::snapshot,
             bridgeState = { latestBridgeState },
             mode = { latestMode },
             inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },
@@ -356,6 +358,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun handleBridgeEvent(event: ChatGptWebEvent) {
+        observedMcpState.accept(event)
         when (event) {
             is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
             is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
@@ -577,9 +580,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun applyProductEntryPresentation() {
         if (!intent.getBooleanExtra(EXTRA_PRODUCT_ENTRY, false)) return
+        binding.chatGptWebToolbar.visibility = View.GONE
         binding.chatGptWebStatus.visibility = View.GONE
         binding.chatGptModeToggle.visibility = View.GONE
-        binding.chatGptWebHost.setText(R.string.chatgpt_product_host)
     }
 
     companion object {

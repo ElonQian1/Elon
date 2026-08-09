@@ -13,12 +13,16 @@ class ChatGptWebProductIntegrationContractTest {
         val controller = read("android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt")
         val friendChat = read("android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt")
         val main = read("android/app/src/main/kotlin/com/elon/app/MainActivity.kt")
+        val activity = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt")
+        val layout = read("android/app/src/main/res/layout/activity_chatgpt_web_test.xml")
         val strings = read("android/app/src/main/res/values/strings.xml")
 
         assertTrue(strings.contains("ChatGPT 网页"))
         assertTrue(controller.contains("ChatGptWebTestActivity.createProductIntent"))
         assertTrue(friendChat.contains("onActiveFriendChanged(friend)"))
         assertTrue(main.contains("openChatGptWeb = socialAiChatModeController::openChatGptWeb"))
+        assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
+        assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
     }
 
     @Test
@@ -32,6 +36,9 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(layoutAdapter.contains("invoke_ui_control"))
         assertTrue(layoutAdapter.contains("compatibility:"))
         assertTrue(layoutAdapter.contains("addMessageControls"))
+        assertTrue(layoutAdapter.contains("semantic === 'conversation'"))
+        assertTrue(layoutAdapter.contains("contextId: resolvedContextId"))
+        assertTrue(layoutAdapter.contains("scrollIntoView"))
         val baseAdapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")
         assertTrue(baseAdapter.contains("if (fingerprint !== lastSnapshot)"))
         assertTrue(baseAdapter.indexOf("layoutAdapter.emitSnapshot") > baseAdapter.indexOf("emitEvent(event)"))

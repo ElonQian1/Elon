@@ -274,6 +274,7 @@ internal object ChatGptWebProtocol {
                         enabled = item.optBoolean("enabled", true),
                         selected = item.optBoolean("selected"),
                         contextId = contextId,
+                        inViewport = item.optBoolean("inViewport", true),
                         webXRatio = webXRatio,
                         webYRatio = webYRatio,
                     ),
@@ -435,6 +436,13 @@ internal object ChatGptWebProtocol {
         "delete",
         "close",
         "confirm",
+        "conversation",
+        "search",
+        "library",
+        "tasks",
+        "project",
+        "gpts",
+        "settings",
         "action",
     )
 }

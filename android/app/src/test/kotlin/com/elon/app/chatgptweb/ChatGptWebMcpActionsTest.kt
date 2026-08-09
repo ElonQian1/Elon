@@ -19,6 +19,8 @@ class ChatGptWebMcpActionsTest {
         assertEquals("完整回答内容", conversation.getJSONArray("messages").getJSONObject(0).getString("content"))
         assertEquals("control_suggestion_demo", control.getString("control_id"))
         assertEquals(0.25, control.getDouble("web_x_ratio"), 0.0)
+        assertFalse(control.getBoolean("in_viewport"))
+        assertEquals(1, state.getJSONObject("navigation").getInt("conversation_count"))
         assertEquals(
             "chatgpt-control:control_suggestion_demo:整理待办",
             control.getString("adb_content_description"),
@@ -57,6 +59,26 @@ class ChatGptWebMcpActionsTest {
         assertFalse(result.getBoolean("has_more"))
     }
 
+    @Test
+    fun controlsAndConversationsCanBeFoundWithoutParsingTheWholeUiState() {
+        val actions = actions()
+
+        val controls = actions.control(JSONObject()
+            .put("action", "chatgpt_find_controls")
+            .put("semantic", "suggestion")
+            .put("query", "待办"))
+        val conversations = actions.control(JSONObject()
+            .put("action", "chatgpt_get_conversations")
+            .put("query", "验证"))
+
+        assertEquals(1, controls.getInt("match_count"))
+        assertEquals("control_suggestion_demo", controls.getJSONArray("controls")
+            .getJSONObject(0).getString("control_id"))
+        assertEquals(1, conversations.getInt("match_count"))
+        assertEquals("/c/demo", conversations.getJSONArray("conversations")
+            .getJSONObject(0).getString("path"))
+    }
+
     private fun actions(onInvoke: (String) -> Unit = {}): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
             title = "工作",
@@ -85,6 +107,7 @@ class ChatGptWebMcpActionsTest {
                     role = "button",
                     enabled = true,
                     selected = false,
+                    inViewport = false,
                     webXRatio = 0.25,
                     webYRatio = 0.75,
                 ),
@@ -93,6 +116,19 @@ class ChatGptWebMcpActionsTest {
         return ChatGptWebMcpActions(
             snapshot = { snapshot },
             uiManifest = { manifest },
+            observedState = {
+                ChatGptWebObservedState.Snapshot(
+                    conversations = listOf(
+                        ChatGptWebConversation("demo", "桥接验证", "/c/demo", active = true),
+                    ),
+                    features = listOf(
+                        ChatGptWebFeature("feature_library", "文件库", "library", selected = false),
+                    ),
+                    composerSections = emptyMap(),
+                    lastCommand = ChatGptWebEvent.CommandResult("list_conversations", true, ""),
+                    updatedAtMs = 123L,
+                )
+            },
             bridgeState = { ChatGptWebPageAdapter.State.READY },
             mode = { ChatGptWebModeController.Mode.NATIVE },
             inputText = { "" },

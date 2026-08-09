@@ -20,6 +20,7 @@ internal class ChatGptNativeOverlayControlsController(
     fun render(value: ChatGptWebUiManifest) {
         controls = value.controls.asSequence()
             .filter { it.region == ChatGptWebUiRegion.OVERLAY && it.enabled }
+            .filterNot { it.semantic in DEDICATED_NAVIGATION_SEMANTICS }
             .distinctBy(ChatGptWebUiControl::id)
             .take(MAX_OVERLAY_ACTIONS)
             .toList()
@@ -67,5 +68,6 @@ internal class ChatGptNativeOverlayControlsController(
 
     private companion object {
         const val MAX_OVERLAY_ACTIONS = 40
+        val DEDICATED_NAVIGATION_SEMANTICS = setOf("conversation", "project")
     }
 }
