@@ -1,6 +1,8 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+mod attempt_dispatch;
+
 pub(crate) fn migration_v185(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS compute_attempt_activations (
@@ -64,4 +66,8 @@ pub(crate) fn migration_v185(conn: &Connection) -> Result<()> {
          END;",
     )?;
     Ok(())
+}
+
+pub(crate) fn migration_v211(conn: &Connection) -> Result<()> {
+    attempt_dispatch::migration_v211(conn)
 }

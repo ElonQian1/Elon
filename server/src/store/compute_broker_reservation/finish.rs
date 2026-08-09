@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use rusqlite::Transaction;
+use rusqlite::{params, Transaction};
 
 use crate::compute_federation::{
     capacity::{ComputeCapacityClaimBinding, ComputeCapacityOfferBinding},
@@ -48,6 +48,20 @@ pub(super) fn finish_new_broker_contract_on(
         || source_job.job_digest != source_reservation.reservation.job.job_digest
     {
         bail!("Broker 终态只处理消费者自己的 reserved Job，运行中任务必须走 Attempt 路径");
+    }
+    let unresolved_start: bool = tx.query_row(
+        "SELECT EXISTS(
+            SELECT 1
+              FROM compute_attempt_dispatch_commands c
+              LEFT JOIN compute_attempt_dispatch_acks a ON a.command_id=c.command_id
+             WHERE c.reservation_id=?1
+               AND (a.command_id IS NULL OR a.outcome='accepted')
+        )",
+        params![request.reservation_id],
+        |row| row.get(0),
+    )?;
+    if unresolved_start {
+        bail!("Broker 终态必须等待 Attempt Gateway 的明确拒绝或未来 no-start/cancel 证明");
     }
     let reserve =
         broker_reserve_binding_on(tx, &request.reservation_id, &request.consumer_account_id)?;

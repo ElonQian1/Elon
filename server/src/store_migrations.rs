@@ -245,6 +245,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (208, "节点算力插件显式同意与耐久下发回执", crate::node_compute_plugin_sharing_migration::migration_v208),
     (209, "节点算力插件 InstallPlan 上下文准备账本", crate::node_compute_plugin_sharing_migration::migration_v209),
     (210, "节点算力插件 Planning Snapshot V2 与生成请求账本", crate::node_compute_plugin_sharing_migration::migration_v210),
+    (211, "分布式算力 Attempt Start 派发、Adapter ACK 与原子激活回执", crate::compute_attempt_activation_migration::migration_v211),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

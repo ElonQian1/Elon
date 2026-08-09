@@ -2,13 +2,12 @@ use anyhow::{bail, Result};
 use serde::Deserialize;
 
 use crate::store::{
-    AbortComputeAttemptRequest, ActivateComputeAttemptRequest, ComputeAttemptAbortReceipt,
-    ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
-    ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
-    ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
-    ComputeAttemptUsageDeclarationReceipt, ComputeAttemptUsageTemplateReceipt,
-    ComputeAttemptVerificationDecisionReceipt, ComputeDeclaredResultArtifactInput,
-    ComputeDeclaredUsageInput, ComputeObservedUsageInput,
+    AbortComputeAttemptRequest, ComputeAttemptAbortReceipt, ComputeAttemptActivationReceipt,
+    ComputeAttemptConsumerReviewReceipt, ComputeAttemptLeaseRenewalReceipt,
+    ComputeAttemptLeaseStateReceipt, ComputeAttemptPlatformObservationReceipt,
+    ComputeAttemptTerminalCandidateReceipt, ComputeAttemptUsageDeclarationReceipt,
+    ComputeAttemptUsageTemplateReceipt, ComputeAttemptVerificationDecisionReceipt,
+    ComputeDeclaredResultArtifactInput, ComputeDeclaredUsageInput, ComputeObservedUsageInput,
     ComputePendingAttemptVerificationCandidate, ComputePendingPlatformObservationCandidate,
     ComputeReservationRegistrationReceipt, DecideComputeAttemptVerificationRequest,
     DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
@@ -153,35 +152,8 @@ pub(crate) fn activate_for_provider_owner(
     provider_id: &str,
     request: ActivateMyComputeAttemptRequest,
 ) -> Result<ComputeAttemptActivationReceipt> {
-    if !request.confirm_executor_accepted {
-        bail!("登记 Attempt 激活前必须显式确认外部执行器已经接受任务");
-    }
-    let provider = store.compute_provider(provider_id)?;
-    if provider.provider.owner_account_id != user_id {
-        bail!("算力 Provider 不属于当前登录用户");
-    }
-    store.activate_compute_attempt(&ActivateComputeAttemptRequest {
-        lease_id: request.lease_id,
-        reservation_id: request.reservation_id,
-        provider_id: provider_id.to_string(),
-        executor_id: request.executor_id,
-        shard_id: request.shard_id,
-        attempt_no: request.attempt_no,
-        fencing_generation: request.fencing_generation,
-        executor_acceptance_ref: request.executor_acceptance_ref,
-        lease_credential_ref: request.lease_credential_ref,
-        lease_credential_hint: request.lease_credential_hint,
-        expected_job_revision: request.expected_job_revision,
-        expected_job_digest: request.expected_job_digest,
-        expected_reservation_revision: request.expected_reservation_revision,
-        expected_reservation_digest: request.expected_reservation_digest,
-        expected_claim_revision: request.expected_claim_revision,
-        expected_claim_digest: request.expected_claim_digest,
-        expires_at: request.expires_at,
-        hard_deadline_at: request.hard_deadline_at,
-        idempotency_key: request.idempotency_key,
-        activated_by_user_id: user_id.to_string(),
-    })
+    let _ = (store, user_id, provider_id, request);
+    bail!("COMPUTE_ATTEMPT_EXECUTION_GATEWAY_NOT_READY")
 }
 
 pub(crate) fn list_activation_candidates_for_provider_owner(

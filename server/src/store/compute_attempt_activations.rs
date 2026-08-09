@@ -108,145 +108,9 @@ impl Store {
         &self,
         request: &ActivateComputeAttemptRequest,
     ) -> Result<ComputeAttemptActivationReceipt> {
-        let request = normalize_activation(request)?;
-        let idempotency_scope = format!("compute_attempt_activation:{}", request.provider_id);
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if let Some(receipt) = attempt_activation_on(
-            &tx,
-            &idempotency_scope,
-            &request.idempotency_key,
-            Some(&request.request_digest),
-        )? {
-            tx.commit()?;
-            return Ok(receipt);
-        }
-        if let Some(existing_lease_id) = tx
-            .query_row(
-                "SELECT lease_id FROM compute_attempt_activations WHERE job_id=(
-                    SELECT job_id FROM compute_reservations WHERE reservation_id=?1
-                 ) LIMIT 1",
-                params![request.reservation_id],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?
-        {
-            bail!("该 Job 已存在 Attempt 激活回执：{existing_lease_id}");
-        }
-
-        let source_reservation = current_registered_reservation_on(&tx, &request.reservation_id)?
-            .ok_or_else(|| anyhow!("Attempt 激活引用的 Reservation 不存在"))?;
-        ensure_reservation_matches(&request, &source_reservation)?;
-        let source_job =
-            current_registered_job_on(&tx, &source_reservation.reservation.job.job_id)?
-                .ok_or_else(|| anyhow!("Attempt 激活引用的 Job 不存在"))?;
-        ensure_job_matches(&request, &source_reservation, &source_job)?;
-        ensure_provider_and_offer_live(&tx, &request, &source_reservation)?;
-
-        let broker = broker_reserve_binding_on(
-            &tx,
-            &request.reservation_id,
-            &source_job.job.consumer_account_id,
-        )?;
-        ensure_broker_binding(&broker, &source_reservation, &source_job)?;
-        let activated_at = activation_timestamp(
-            &source_job.job.updated_at,
-            &source_reservation.reservation.updated_at,
-        )?;
-        ensure_budget_reserved(
-            &tx,
-            &broker,
-            &source_job.job.consumer_account_id,
-            &activated_at,
-        )?;
-        ensure_lease_window(
-            &request,
-            &source_reservation.reservation.expires_at,
-            &activated_at,
-        )?;
-
-        let source_claim = source_reservation.reservation.capacity_claim.clone();
-        let lease = ComputeAttemptLease {
-            schema: COMPUTE_ATTEMPT_LEASE_SCHEMA.to_string(),
-            lease_id: request.lease_id.clone(),
-            job_id: source_job.job.job_id.clone(),
-            reservation_id: request.reservation_id.clone(),
-            attempt_no: request.attempt_no,
-            shard_id: request.shard_id.clone(),
-            provider_id: request.provider_id.clone(),
-            executor_id: request.executor_id.clone(),
-            status: ATTEMPT_STATUS_STAGING.to_string(),
-            fencing_generation: request.fencing_generation,
-            lease_credential_ref: request.lease_credential_ref.clone(),
-            lease_credential_hint: request.lease_credential_hint.clone(),
-            latest_checkpoint: None,
-            issued_at: activated_at.clone(),
-            last_heartbeat_at: None,
-            expires_at: request.expires_at.clone(),
-            hard_deadline_at: request.hard_deadline_at.clone(),
-            terminal_reason_code: None,
-        };
-        let active_capacity = activate_reservation_capacity_claim_on(
-            &tx,
-            ActivateReservationCapacityClaim {
-                claim_id: source_claim.claim_id.clone(),
-                expected_revision: source_claim.claim_revision,
-                expected_digest: source_claim.claim_digest.clone(),
-                offer: ComputeCapacityOfferBinding {
-                    offer_id: source_reservation.reservation.offer.offer_id.clone(),
-                    offer_version: source_reservation.reservation.offer.offer_version,
-                    offer_digest: source_reservation.reservation.offer.offer_digest.clone(),
-                },
-                job_id: source_job.job.job_id.clone(),
-                reservation_id: request.reservation_id.clone(),
-                attempt_lease_id: lease.lease_id.clone(),
-                fencing_generation: lease.fencing_generation,
-                request_digest: request.request_digest.clone(),
-                idempotency_scope: idempotency_scope.clone(),
-                idempotency_key: request.idempotency_key.clone(),
-                activated_at: activated_at.clone(),
-            },
-        )?;
-
-        let mut running_job = source_job.job.clone();
-        running_job.status = JOB_STATUS_RUNNING.to_string();
-        running_job.updated_at = activated_at.clone();
-        let running_job = register_compute_job_on(&tx, &running_job, source_job.revision)?;
-
-        let mut active_reservation = source_reservation.reservation.clone();
-        active_reservation.job = ComputeJobVersionBinding {
-            job_id: running_job.job.job_id.clone(),
-            job_revision: running_job.revision,
-            job_digest: running_job.job_digest.clone(),
-        };
-        active_reservation.capacity_claim = active_capacity.claim.clone();
-        active_reservation.updated_at = activated_at.clone();
-        let active_reservation =
-            register_compute_reservation_on(&tx, &active_reservation, source_reservation.revision)?;
-        let lease_digest = compute_attempt_lease_digest(&lease)?;
-        let receipt = persist_attempt_activation_on(
-            &tx,
-            &request,
-            &idempotency_scope,
-            &lease,
-            &lease_digest,
-            &source_job,
-            &running_job,
-            &source_reservation,
-            &active_reservation,
-            &source_claim,
-            &active_capacity,
-            &broker,
-            &activated_at,
-        )?;
-        initialize_compute_attempt_lease_state_on(
-            &tx,
-            &source_job.job.consumer_account_id,
-            &lease,
-            &lease_digest,
-            &request.activated_by_user_id,
-            &activated_at,
-        )?;
+        let receipt = activate_compute_attempt_on(&tx, request)?;
         tx.commit()?;
         Ok(receipt)
     }
@@ -260,6 +124,150 @@ impl Store {
         }
         compute_attempt_activation_on(&*self.conn()?, lease_id)
     }
+}
+
+/// The unique v185 mutation kernel. Callers that must atomically bind external evidence may run
+/// it inside their own `BEGIN IMMEDIATE`; this function never opens or commits a transaction.
+pub(super) fn activate_compute_attempt_on(
+    conn: &Connection,
+    request: &ActivateComputeAttemptRequest,
+) -> Result<ComputeAttemptActivationReceipt> {
+    let request = normalize_activation(request)?;
+    let idempotency_scope = format!("compute_attempt_activation:{}", request.provider_id);
+    if let Some(receipt) = attempt_activation_on(
+        conn,
+        &idempotency_scope,
+        &request.idempotency_key,
+        Some(&request.request_digest),
+    )? {
+        return Ok(receipt);
+    }
+    if let Some(existing_lease_id) = conn
+        .query_row(
+            "SELECT lease_id FROM compute_attempt_activations WHERE job_id=(
+                SELECT job_id FROM compute_reservations WHERE reservation_id=?1
+             ) LIMIT 1",
+            params![request.reservation_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+    {
+        bail!("该 Job 已存在 Attempt 激活回执：{existing_lease_id}");
+    }
+
+    let source_reservation = current_registered_reservation_on(conn, &request.reservation_id)?
+        .ok_or_else(|| anyhow!("Attempt 激活引用的 Reservation 不存在"))?;
+    ensure_reservation_matches(&request, &source_reservation)?;
+    let source_job = current_registered_job_on(conn, &source_reservation.reservation.job.job_id)?
+        .ok_or_else(|| anyhow!("Attempt 激活引用的 Job 不存在"))?;
+    ensure_job_matches(&request, &source_reservation, &source_job)?;
+    ensure_provider_and_offer_live(conn, &request, &source_reservation)?;
+
+    let broker = broker_reserve_binding_on(
+        conn,
+        &request.reservation_id,
+        &source_job.job.consumer_account_id,
+    )?;
+    ensure_broker_binding(&broker, &source_reservation, &source_job)?;
+    let activated_at = activation_timestamp(
+        &source_job.job.updated_at,
+        &source_reservation.reservation.updated_at,
+    )?;
+    ensure_budget_reserved(
+        conn,
+        &broker,
+        &source_job.job.consumer_account_id,
+        &activated_at,
+    )?;
+    ensure_lease_window(
+        &request,
+        &source_reservation.reservation.expires_at,
+        &activated_at,
+    )?;
+
+    let source_claim = source_reservation.reservation.capacity_claim.clone();
+    let lease = ComputeAttemptLease {
+        schema: COMPUTE_ATTEMPT_LEASE_SCHEMA.to_string(),
+        lease_id: request.lease_id.clone(),
+        job_id: source_job.job.job_id.clone(),
+        reservation_id: request.reservation_id.clone(),
+        attempt_no: request.attempt_no,
+        shard_id: request.shard_id.clone(),
+        provider_id: request.provider_id.clone(),
+        executor_id: request.executor_id.clone(),
+        status: ATTEMPT_STATUS_STAGING.to_string(),
+        fencing_generation: request.fencing_generation,
+        lease_credential_ref: request.lease_credential_ref.clone(),
+        lease_credential_hint: request.lease_credential_hint.clone(),
+        latest_checkpoint: None,
+        issued_at: activated_at.clone(),
+        last_heartbeat_at: None,
+        expires_at: request.expires_at.clone(),
+        hard_deadline_at: request.hard_deadline_at.clone(),
+        terminal_reason_code: None,
+    };
+    let active_capacity = activate_reservation_capacity_claim_on(
+        conn,
+        ActivateReservationCapacityClaim {
+            claim_id: source_claim.claim_id.clone(),
+            expected_revision: source_claim.claim_revision,
+            expected_digest: source_claim.claim_digest.clone(),
+            offer: ComputeCapacityOfferBinding {
+                offer_id: source_reservation.reservation.offer.offer_id.clone(),
+                offer_version: source_reservation.reservation.offer.offer_version,
+                offer_digest: source_reservation.reservation.offer.offer_digest.clone(),
+            },
+            job_id: source_job.job.job_id.clone(),
+            reservation_id: request.reservation_id.clone(),
+            attempt_lease_id: lease.lease_id.clone(),
+            fencing_generation: lease.fencing_generation,
+            request_digest: request.request_digest.clone(),
+            idempotency_scope: idempotency_scope.clone(),
+            idempotency_key: request.idempotency_key.clone(),
+            activated_at: activated_at.clone(),
+        },
+    )?;
+
+    let mut running_job = source_job.job.clone();
+    running_job.status = JOB_STATUS_RUNNING.to_string();
+    running_job.updated_at = activated_at.clone();
+    let running_job = register_compute_job_on(conn, &running_job, source_job.revision)?;
+
+    let mut active_reservation = source_reservation.reservation.clone();
+    active_reservation.job = ComputeJobVersionBinding {
+        job_id: running_job.job.job_id.clone(),
+        job_revision: running_job.revision,
+        job_digest: running_job.job_digest.clone(),
+    };
+    active_reservation.capacity_claim = active_capacity.claim.clone();
+    active_reservation.updated_at = activated_at.clone();
+    let active_reservation =
+        register_compute_reservation_on(conn, &active_reservation, source_reservation.revision)?;
+    let lease_digest = compute_attempt_lease_digest(&lease)?;
+    let receipt = persist_attempt_activation_on(
+        conn,
+        &request,
+        &idempotency_scope,
+        &lease,
+        &lease_digest,
+        &source_job,
+        &running_job,
+        &source_reservation,
+        &active_reservation,
+        &source_claim,
+        &active_capacity,
+        &broker,
+        &activated_at,
+    )?;
+    initialize_compute_attempt_lease_state_on(
+        conn,
+        &source_job.job.consumer_account_id,
+        &lease,
+        &lease_digest,
+        &request.activated_by_user_id,
+        &activated_at,
+    )?;
+    Ok(receipt)
 }
 
 pub(super) fn compute_attempt_activation_on(
@@ -355,21 +363,24 @@ fn ensure_budget_reserved(
     consumer_account_id: &str,
     activated_at: &str,
 ) -> Result<()> {
-    let valid = conn
+    let current_expiry = conn
         .query_row(
-            "SELECT 1 FROM billing_reservations
+            "SELECT expires_at FROM billing_reservations
               WHERE id=?1 AND user_id=?2 AND reserved_fen=?3
-                AND status='reserved' AND (expires_at IS NULL OR expires_at>=?4)",
+                AND status='reserved'",
             params![
                 broker.budget_reservation_id,
                 consumer_account_id,
                 broker.budget_reserved_fen,
-                activated_at,
             ],
-            |_| Ok(()),
+            |row| row.get::<_, Option<String>>(0),
         )
-        .optional()?
-        .is_some();
+        .optional()?;
+    let valid = match current_expiry {
+        Some(Some(expires_at)) => parse_utc(&expires_at)? >= parse_utc(activated_at)?,
+        Some(None) => true,
+        None => false,
+    };
     if !valid {
         bail!("Attempt 激活要求原 Broker 平台余额预授权仍有效且未发生资金变化");
     }
