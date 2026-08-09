@@ -1,15 +1,16 @@
 //! Inert C ABI front-half for the future handle-bound SQLite VFS.
 //!
-//! Both tables in this module are deliberately private and unreachable. The VFS table is never
-//! registered, its application-data pointer is null, and `xOpen` can only report unavailable.
-//! The I/O table is not installed into any `sqlite3_file`. This module therefore proves only the
-//! fail-closed ABI shape; it grants no registry, filesystem, SQLite-open, or connection authority.
+//! Both tables in this module are deliberately private and unreachable from production. The VFS
+//! table is never registered, its application-data pointer is null, and `xOpen` can only report
+//! unavailable. Tests may install the I/O table over controlled state to verify callback routing;
+//! this grants no production registry, filesystem, SQLite-open, or connection authority.
 
 use std::{mem::size_of, os::raw::c_int, ptr};
 
 use rusqlite::ffi;
 
 mod boundary;
+mod file_state;
 mod io_core;
 mod io_shm;
 mod raw_state;
@@ -23,8 +24,8 @@ const INERT_VFS_NAME: &[u8] = b"elon-handle-bound-unavailable-v1\0";
 const MAX_LOGICAL_NAME_BYTES: c_int = 64;
 
 /// Version 2 advertises the WAL callback slots but deliberately omits mmap fetch/unfetch.
-/// Production `xOpen` never installs this table. Raw-state tests may install it only to verify
-/// ownership transitions; no callback can perform a managed-file operation in this batch.
+/// Production `xOpen` never installs this table. Tests may install concrete callback state to
+/// verify routing, but no registered VFS or production SQLite-open path exists in this batch.
 static INERT_IO_METHODS: ffi::sqlite3_io_methods = ffi::sqlite3_io_methods {
     iVersion: 2,
     xClose: Some(io_core::close),

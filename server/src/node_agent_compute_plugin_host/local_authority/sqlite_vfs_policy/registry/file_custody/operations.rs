@@ -1,7 +1,7 @@
 //! Registry-routed operations over exact managed-fs file custody.
 //!
 //! Every operation acquires one callback lease before touching physical state. This module does
-//! not expose raw file handles or SHM addresses; a future ABI adapter must remain above this gate.
+//! not expose raw file handles or SHM addresses; the private ABI adapter remains above this gate.
 
 use std::num::NonZeroU32;
 

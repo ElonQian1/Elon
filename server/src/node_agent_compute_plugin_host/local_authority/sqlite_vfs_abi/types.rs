@@ -3,8 +3,8 @@ use std::os::raw::c_void;
 use rusqlite::ffi;
 
 /// SQLite allocates `szOsFile` bytes and passes that storage to `xOpen`. Keeping `base` first is
-/// the only representation fact this inert ABI layer relies on. `state` is always written null in
-/// this batch; no live managed-file value has a constructor here.
+/// the only representation fact this ABI layer relies on. Production `xOpen` initializes `state`
+/// to null; tests may install private callback state, but no production constructor exists.
 #[repr(C)]
 pub(super) struct InertHandleBoundSqliteFile {
     pub(super) base: ffi::sqlite3_file,

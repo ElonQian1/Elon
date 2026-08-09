@@ -1,9 +1,9 @@
 //! Linear pairing between managed-fs handles and exact registry leases.
 //!
-//! A future `sqlite3_file` may own one of these values, but the current inert ABI has no
-//! constructor or callback path to it. Physical close receipts are the only path that retires a
-//! lease. Any abandoned state or failed physical close is retained for process lifetime before its
-//! exact route is quarantined.
+//! The private ABI adapter can own one of these values and route callbacks through its controlled
+//! operations, but production xOpen still has no constructor for that state. Physical close
+//! receipts are the only path that retires a lease. Any abandoned state or failed physical close
+//! is retained for process lifetime before its exact route is quarantined.
 
 use super::{
     owner::{ManagedSqliteRegistryCustody, ManagedSqliteRegistryRouteHandle},
@@ -24,7 +24,14 @@ use crate::{
     },
 };
 
+mod abi;
 mod operations;
+
+pub(in crate::node_agent_compute_plugin_host::local_authority) use abi::{
+    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt,
+    HandleBoundSqliteAbiLockLevel, HandleBoundSqliteAbiShmLockAction, HandleBoundSqliteAbiShmMap,
+    HandleBoundSqliteAbiUnlockLevel,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedSqliteRegistryFilePairRejection {

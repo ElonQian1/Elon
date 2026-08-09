@@ -101,7 +101,7 @@ impl ManagedSqliteShmRegionPointer {
     }
 
     /// The VFS adapter may expose this address only while its SHM connection remains attached.
-    pub(super) unsafe fn as_mut_ptr(&self) -> *mut u8 {
+    pub(crate) unsafe fn as_mut_ptr(&self) -> *mut u8 {
         self.pointer.as_ptr()
     }
 

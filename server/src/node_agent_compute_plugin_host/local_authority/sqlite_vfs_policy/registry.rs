@@ -14,4 +14,9 @@ mod process_owner;
 mod state;
 mod types;
 
+pub(in crate::node_agent_compute_plugin_host::local_authority) use file_custody::{
+    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt,
+    HandleBoundSqliteAbiLockLevel, HandleBoundSqliteAbiShmLockAction, HandleBoundSqliteAbiShmMap,
+    HandleBoundSqliteAbiUnlockLevel,
+};
 pub(in crate::node_agent_compute_plugin_host::local_authority) use owner::ManagedSqliteRegistryCustody;
