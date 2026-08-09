@@ -74,8 +74,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private val mcpNativeControlBinding: McpNativeControlBinding by lazy {
         McpNativeControlBinding(
             activity = this,
-            uiState = mcpActions::uiState,
-            control = mcpActions::control,
+            uiStateProvider = mcpActions::uiState,
+            controlHandler = mcpActions::control,
         )
     }
 

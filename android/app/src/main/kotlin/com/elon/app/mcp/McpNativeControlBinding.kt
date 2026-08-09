@@ -9,17 +9,17 @@ import org.json.JSONObject
 
 internal class McpNativeControlBinding(
     private val activity: Activity,
-    private val uiState: () -> JSONObject,
-    private val control: (JSONObject) -> JSONObject,
+    private val uiStateProvider: () -> JSONObject,
+    private val controlHandler: (JSONObject) -> JSONObject,
 ) {
     private val controller = object : McpNativeControlBridge.Controller {
-        override fun uiState(): JSONObject = runOnMain(DEFAULT_TIMEOUT_MS, uiState)
+        override fun uiState(): JSONObject = runOnMain(DEFAULT_TIMEOUT_MS, uiStateProvider)
 
         override fun control(args: JSONObject): JSONObject = runOnMain(
             args.optLong("main_thread_timeout_ms", DEFAULT_TIMEOUT_MS)
                 .coerceIn(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS),
         ) {
-            control(args)
+            controlHandler(args)
         }
     }
 

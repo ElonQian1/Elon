@@ -41,19 +41,11 @@ internal class SocialAiChatModeController(
 
     fun openSocialAiChat(): Boolean {
         val friend = findSocialAiFriend() ?: return false
-        runNavigationStep("close_group", closeGroupChat)
-        runNavigationStep("close_project", closeProjectChat)
-        runNavigationStep("open_friend") { openFriend(friend) }
-        runNavigationStep("notify_visible", onFriendOpened)
+        closeGroupChat()
+        closeProjectChat()
+        openFriend(friend)
+        onFriendOpened()
         return true
-    }
-
-    private fun runNavigationStep(name: String, action: () -> Unit) {
-        try {
-            action()
-        } catch (failure: Throwable) {
-            throw IllegalStateException("social_ai_navigation_failed:$name", failure)
-        }
     }
 
     private fun showSelector() {

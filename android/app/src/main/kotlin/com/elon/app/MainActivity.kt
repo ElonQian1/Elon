@@ -289,8 +289,8 @@ class MainActivity : AppCompatActivity() {
     private val mcpNativeControlBinding: McpNativeControlBinding by lazy {
         McpNativeControlBinding(
             activity = this,
-            uiState = mcpNativeControlActions::uiState,
-            control = mcpNativeControlActions::control,
+            uiStateProvider = mcpNativeControlActions::uiState,
+            controlHandler = mcpNativeControlActions::control,
         )
     }
 
