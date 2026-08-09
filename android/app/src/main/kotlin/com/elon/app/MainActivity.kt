@@ -14,13 +14,10 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
-import com.elon.app.mcp.McpNativeControlBridge
+import com.elon.app.mcp.McpNativeControlBinding
 import com.elon.app.mcp.rememberPendingMcpConversationSeed
 import com.elon.app.update.AppUpdateManager
-import org.json.JSONObject
 import java.util.Date
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 private const val SOCIAL_SUMMARY_REFRESH_MS = 8_000L
@@ -252,7 +249,7 @@ class MainActivity : AppCompatActivity() {
         messageSelectionActions.setup()
         agentPageController = AgentPageController(this, binding)
         agentPageController.setup()
-        McpNativeControlBridge.register(mcpNativeControlController)
+        mcpNativeControlBinding.register()
     }
 
     private val mcpNativeControlActions: MainMcpNativeControlActions by lazy {
@@ -285,52 +282,12 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private val mcpNativeControlController = object : McpNativeControlBridge.Controller {
-        override fun uiState(): JSONObject = runMcpNativeControlOnMain {
-            mcpNativeControlActions.uiState()
-        }
-
-        override fun control(args: JSONObject): JSONObject =
-            runMcpNativeControlOnMain(mcpControlMainThreadTimeoutMs(args)) {
-                mcpNativeControlActions.control(args)
-            }
-    }
-
-    private fun mcpControlMainThreadTimeoutMs(args: JSONObject): Long =
-        args.optLong("main_thread_timeout_ms", 15_000L).coerceIn(1_000L, 60_000L)
-
-    private fun runMcpNativeControlOnMain(
-        timeoutMs: Long = 15_000L,
-        action: () -> JSONObject
-    ): JSONObject {
-        if (Looper.myLooper() == Looper.getMainLooper()) return action()
-        var result: JSONObject? = null
-        var error: Throwable? = null
-        val latch = CountDownLatch(1)
-        runOnUiThread {
-            try {
-                result = action()
-            } catch (failure: Throwable) {
-                error = failure
-            } finally {
-                latch.countDown()
-            }
-        }
-        if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-            return JSONObject()
-                .put("control_ok", false)
-                .put("error", "main_thread_timeout")
-                .put("timeout_ms", timeoutMs)
-        }
-        error?.let {
-            return JSONObject()
-                .put("control_ok", false)
-                .put("error", it.javaClass.simpleName)
-                .put("message", it.message ?: "")
-        }
-        return result ?: JSONObject()
-            .put("control_ok", false)
-            .put("error", "empty_result")
+    private val mcpNativeControlBinding: McpNativeControlBinding by lazy {
+        McpNativeControlBinding(
+            activity = this,
+            uiState = mcpNativeControlActions::uiState,
+            control = mcpNativeControlActions::control,
+        )
     }
 
     private val createActions: MainCreateActions by lazy {
@@ -1613,7 +1570,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        McpNativeControlBridge.unregister(mcpNativeControlController)
+        mcpNativeControlBinding.unregister()
         stopSocialSummaryPolling()
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
