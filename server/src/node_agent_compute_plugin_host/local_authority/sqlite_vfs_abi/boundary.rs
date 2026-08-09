@@ -16,6 +16,11 @@ pub(super) fn catch_value<T: Copy>(fallback: T, operation: impl FnOnce() -> T) -
     catch_unwind(AssertUnwindSafe(operation)).unwrap_or(fallback)
 }
 
+/// Variant for C callbacks without a return value.
+pub(super) fn catch_void(operation: impl FnOnce()) {
+    let _ = catch_unwind(AssertUnwindSafe(operation));
+}
+
 /// # Safety
 ///
 /// A non-null output pointer must be valid and aligned for one `c_int` write.
