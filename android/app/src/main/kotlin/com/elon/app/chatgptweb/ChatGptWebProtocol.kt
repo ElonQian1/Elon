@@ -444,6 +444,8 @@ internal object ChatGptWebProtocol {
         "project",
         "gpts",
         "settings",
+        "sources",
+        "more",
         "action",
     )
 }
