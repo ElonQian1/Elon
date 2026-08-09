@@ -81,19 +81,20 @@ pub(super) async fn run_with_workspace_mode(
         user_message,
     );
     let development_task = planning_task || !lightweight_chat_task;
+    // 项目请求带有会话作用域时留在云端；无作用域的独立社交回复仍可使用 PC 中转。
+    let allow_pc_relay = native_session_scope.is_none();
     let tiny_chat_task = lightweight_chat_task && is_tiny_chat_message(user_message);
     let prompt_route =
         ai_cli_chat_policy::prompt_route_for_project_chat(lightweight_chat_split_enabled, route);
 
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
-    // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
-    // 利用 PC 性能处理项目开发请求，同时将结果流式返回给 APK。
-    // 只有显式开启轻量聊天分流时，普通聊天才留在轻量通道；默认项目消息直连 PC/Codex。
-    // 通过 PC_CLI_RELAY_ENABLED=false 可禁用此功能，回退到云端本地 CLI。
+    // 只有调用方明确允许时，才把提示委托给在线 PC 上的本地 Copilot CLI。
+    // 云端项目默认留在云端工作区执行，避免误连接用户没有绑定的电脑。
+    // 通过 PC_CLI_RELAY_ENABLED=false 仍可全局禁用 PC 中转，回退到云端本地 CLI。
     let pc_relay_enabled = std::env::var("PC_CLI_RELAY_ENABLED")
         .map(|v| v != "false")
         .unwrap_or(true);
-    if pc_relay_enabled && development_task {
+    if should_relay_to_pc(allow_pc_relay, pc_relay_enabled, development_task) {
         if let Some(agent_id) = state.agent_manager.any_connected_agent_id().await {
             let _ = tx.send(WsMessage::progress("正在连接 PC 开发节点。").to_json());
             match run_via_pc_agent(
@@ -595,4 +596,33 @@ pub(super) async fn run_with_workspace_mode(
     );
 
     Ok(())
+}
+
+fn should_relay_to_pc(
+    allow_pc_relay: bool,
+    pc_relay_enabled: bool,
+    development_task: bool,
+) -> bool {
+    allow_pc_relay && pc_relay_enabled && development_task
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_relay_to_pc;
+
+    #[test]
+    fn cloud_project_cannot_be_relayed_even_when_a_pc_is_online() {
+        assert!(!should_relay_to_pc(false, true, true));
+    }
+
+    #[test]
+    fn explicit_pc_relay_still_requires_the_global_switch() {
+        assert!(!should_relay_to_pc(true, false, true));
+    }
+
+    #[test]
+    fn explicit_pc_relay_is_available_for_development_tasks() {
+        assert!(should_relay_to_pc(true, true, true));
+        assert!(!should_relay_to_pc(true, true, false));
+    }
 }

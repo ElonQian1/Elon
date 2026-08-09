@@ -439,8 +439,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
     }
 
     let _ = tx.send(
-        WsMessage::progress("通用项目工作流已启用：服务器会为本会话准备独立 worktree/分支；同一会话串行，编码阶段可跨会话并行，最终合并、版本号和发布仍串行。"
-                )
+        WsMessage::progress(
+            "云端开发环境已准备：本会话会使用独立工作区执行，不会自动连接其他电脑；同一会话串行，编码阶段可跨会话并行，最终合并、版本号和发布仍串行。",
+        )
         .to_json(),
     );
 
