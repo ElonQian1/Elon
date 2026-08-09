@@ -49,7 +49,7 @@ class ChatGptWebNavigationContractTest {
         assertTrue(controller.contains("ChatGptWebCapabilityId.FEATURE_NAVIGATION"))
         assertTrue(controller.contains("onOpenOfficial"))
         assertTrue(controller.contains("onDismissNavigation"))
-        assertTrue(activity.contains("pageAdapter.collectFeatures"))
+        assertTrue(activity.contains("pageAdapter::collectFeatures"))
         assertTrue(activity.contains("ChatGptWebEvent.FeatureNavigation"))
     }
 

@@ -74,6 +74,7 @@ class ChatGptWebComposerContractTest {
         val layout = readRepositoryFile(
             "android/app/src/main/res/layout/activity_chatgpt_web_test.xml",
         )
+        val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
 
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeModel\""))
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachment\""))
@@ -93,6 +94,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(voiceController.contains("ChatGptWebCapabilityId.DICTATION"))
         assertTrue(permissionController.contains("request.origin.host == \"chatgpt.com\""))
         assertTrue(permissionController.contains("RESOURCE_AUDIO_CAPTURE"))
+        assertTrue(manifest.contains("android.permission.RECORD_AUDIO"))
+        assertTrue(manifest.contains("android.permission.MODIFY_AUDIO_SETTINGS"))
     }
 
     @Test

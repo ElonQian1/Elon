@@ -34,4 +34,16 @@ class ChatGptWebProxyControllerTest {
             "http://127.0.0.1:7890/path",
         ).forEach { assertNull("expected invalid proxy: $it", ChatGptWebProxyController.normalizeEndpoint(it)) }
     }
+
+    @Test
+    fun emitsAWebViewCompatibleHttpProxyRule() {
+        assertEquals(
+            "192.168.1.2:7890",
+            ChatGptWebProxyController.toProxyRule("http://192.168.1.2:7890"),
+        )
+        assertEquals(
+            "[2001:db8::1]:7890",
+            ChatGptWebProxyController.toProxyRule("http://[2001:db8::1]:7890"),
+        )
+    }
 }

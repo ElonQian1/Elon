@@ -81,10 +81,6 @@ class ChatGptWebLabContractTest {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
         )
-        val partRenderer = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeMessagePartRenderer.kt"
-        )
-
         assertTrue(modeController.contains("webView.visibility = View.VISIBLE"))
         assertFalse(modeController.contains("webView.visibility = View.INVISIBLE"))
         assertTrue(modeController.contains("MotionEvent.ACTION_DOWN"))
@@ -135,6 +131,9 @@ class ChatGptWebLabContractTest {
         )
         val adapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeMessageAdapter.kt"
+        )
+        val partRenderer = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeMessagePartRenderer.kt"
         )
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

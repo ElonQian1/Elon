@@ -70,7 +70,7 @@ internal class ChatGptWebProxyController(context: Context) {
             return
         }
         try {
-            val config = ProxyConfig.Builder().addProxyRule(endpoint).build()
+            val config = ProxyConfig.Builder().addProxyRule(toProxyRule(endpoint)).build()
             ProxyController.getInstance().setProxyOverride(config, mainExecutor) {
                 if (persist) preferences.edit().putString(KEY_MANUAL_ENDPOINT, endpoint).apply()
                 onReady(ChatGptWebProxyStatus("手动代理 ${displayEndpoint(endpoint)}", endpoint))
@@ -130,10 +130,13 @@ internal class ChatGptWebProxyController(context: Context) {
             if (uri.rawPath?.let { it.isNotBlank() && it != "/" } == true) return null
             val host = uri.host?.trim()?.takeIf(String::isNotBlank) ?: return null
             if (uri.port !in 1..65535) return null
-            val normalizedHost = if (host.contains(':')) "[$host]" else host.lowercase()
+            val bareHost = host.removeSurrounding("[", "]")
+            val normalizedHost = if (bareHost.contains(':')) "[$bareHost]" else bareHost.lowercase()
             return "http://$normalizedHost:${uri.port}"
         }
 
         fun displayEndpoint(endpoint: String): String = endpoint.removePrefix("http://")
+
+        fun toProxyRule(endpoint: String): String = endpoint.removePrefix("http://")
     }
 }
