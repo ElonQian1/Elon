@@ -6,8 +6,8 @@ use std::{
 
 use super::{
     namespace::PlatformParentRelativeObservation, ManagedSqliteAccess, ManagedSqliteFileKind,
-    ManagedSqliteOpenMode, PlatformFileIdentity, PlatformNamespaceDurabilityReceipt,
-    PlatformNamespaceFlushFailure,
+    ManagedSqliteOpenMode, PlatformFileIdentity, PlatformManagedSqliteLockAttempt,
+    PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
 };
 
 pub(super) struct PlatformManagedSqliteOpen {
@@ -117,6 +117,23 @@ pub(super) fn write_sqlite_file_at(
 }
 
 pub(super) fn flush_sqlite_file(_file: &File) -> std::io::Result<()> {
+    Err(unsupported())
+}
+
+pub(super) fn try_lock_sqlite_byte_range(
+    _file: &File,
+    _offset: u64,
+    _length: u64,
+    _exclusive: bool,
+) -> std::io::Result<PlatformManagedSqliteLockAttempt> {
+    Err(unsupported())
+}
+
+pub(super) fn unlock_sqlite_byte_range(
+    _file: &File,
+    _offset: u64,
+    _length: u64,
+) -> std::io::Result<()> {
     Err(unsupported())
 }
 

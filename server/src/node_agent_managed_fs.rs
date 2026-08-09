@@ -23,6 +23,8 @@ mod open;
 mod platform;
 mod platform_durability;
 mod read;
+#[path = "node_agent_managed_fs/sqlite_api.rs"]
+mod sqlite_api;
 #[allow(dead_code)]
 mod sqlite_namespace;
 mod types;
@@ -48,13 +50,7 @@ use platform_durability::{
 };
 pub(crate) use read::ManagedFileReadCursor;
 #[allow(unused_imports)]
-pub(crate) use sqlite_namespace::{
-    ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,
-    ManagedSqliteDeleteOutcome, ManagedSqliteDirectoryBarrierFailureKind, ManagedSqliteFileKind,
-    ManagedSqliteFileOpenFailure, ManagedSqliteFileOpenFailurePhase,
-    ManagedSqliteNamespaceBindFailure, ManagedSqliteOpenMode, PinnedManagedSqliteFile,
-    PinnedManagedSqliteNamespace, QuarantinedManagedSqliteFile,
-};
+pub(crate) use sqlite_api::*;
 pub(crate) use types::{
     ManagedDirectoryPrepareFailure, ManagedExclusiveFileLockFailure, ManagedFileOpenFailure,
     PinnedManagedDirectory, PinnedManagedExclusiveFileLock, PinnedManagedFile, PinnedManagedRoot,

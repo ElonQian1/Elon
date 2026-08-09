@@ -1,0 +1,15 @@
+pub(crate) use super::sqlite_namespace::{
+    ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,
+    ManagedSqliteDeleteOutcome, ManagedSqliteDirectoryBarrierFailureKind, ManagedSqliteFileKind,
+    ManagedSqliteFileOpenFailure, ManagedSqliteFileOpenFailurePhase, ManagedSqliteLockAttempt,
+    ManagedSqliteLockFailure, ManagedSqliteLockFailureKind, ManagedSqliteLockFailurePhase,
+    ManagedSqliteMainFileBindFailure, ManagedSqliteNamespaceBindFailure, ManagedSqliteObservedLock,
+    ManagedSqliteOpenMode, ManagedSqliteRequestedLock, ManagedSqliteShmBudget,
+    ManagedSqliteShmFailure, ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase,
+    ManagedSqliteShmLockAction, ManagedSqliteShmLockAttempt, ManagedSqliteShmLockRequest,
+    ManagedSqliteShmMapMode, ManagedSqliteShmMapOutcome, ManagedSqliteShmRegionPointer,
+    ManagedSqliteShmUnmapMode, ManagedSqliteUnlockTarget, ManagedSqliteWalMainUnmapFailure,
+    PinnedManagedSqliteFile, PinnedManagedSqliteMainFile, PinnedManagedSqliteNamespace,
+    PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile,
+    PinnedManagedSqliteWalRuntime, PlatformManagedSqliteLockAttempt, QuarantinedManagedSqliteFile,
+};

@@ -47,11 +47,14 @@ use super::{
 
 #[path = "windows_sqlite.rs"]
 mod sqlite;
+#[path = "windows_sqlite_locking.rs"]
+mod sqlite_locking;
 pub(super) use sqlite::{
     flush_sqlite_file, open_sqlite_file_for_access_relative, open_sqlite_file_for_delete_relative,
     open_sqlite_file_relative, read_sqlite_file_at, write_sqlite_file_at,
     PlatformManagedSqliteOpen,
 };
+pub(super) use sqlite_locking::{try_lock_sqlite_byte_range, unlock_sqlite_byte_range};
 
 const MAX_FINAL_PATH_UTF16: usize = 32_768;
 

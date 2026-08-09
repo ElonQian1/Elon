@@ -3,16 +3,39 @@ use std::{fs::File, sync::Arc};
 use anyhow::{anyhow, bail, Result};
 
 use super::{
-    identity_digest, managed_parent_identity_digest, namespace::PlatformParentRelativeObservation,
-    platform, same_file_identity, validate_directory_identity, validate_regular_file_identity,
-    PinnedManagedDirectory,
+    identity_digest, namespace::PlatformParentRelativeObservation, platform, same_file_identity,
+    validate_directory_identity, validate_regular_file_identity, PinnedManagedDirectory,
 };
 
 #[path = "sqlite_namespace_io.rs"]
 mod io;
+#[path = "sqlite_namespace_lock_domain.rs"]
+mod lock_domain;
+#[path = "sqlite_namespace_locking.rs"]
+mod locking;
+#[path = "sqlite_namespace_main.rs"]
+mod main;
+#[path = "sqlite_namespace_shm.rs"]
+mod shm;
 #[path = "sqlite_namespace_types.rs"]
 mod types;
+#[path = "sqlite_namespace_validation.rs"]
+mod validation;
 
+pub(crate) use main::{
+    ManagedSqliteLockAttempt, ManagedSqliteLockFailure, ManagedSqliteLockFailureKind,
+    ManagedSqliteLockFailurePhase, ManagedSqliteMainFileBindFailure, ManagedSqliteObservedLock,
+    ManagedSqliteRequestedLock, ManagedSqliteUnlockTarget, PinnedManagedSqliteMainFile,
+    PlatformManagedSqliteLockAttempt,
+};
+pub(crate) use shm::{
+    ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
+    ManagedSqliteShmFailurePhase, ManagedSqliteShmLockAction, ManagedSqliteShmLockAttempt,
+    ManagedSqliteShmLockRequest, ManagedSqliteShmMapMode, ManagedSqliteShmMapOutcome,
+    ManagedSqliteShmRegionPointer, ManagedSqliteShmUnmapMode, ManagedSqliteWalMainUnmapFailure,
+    PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile,
+    PinnedManagedSqliteWalRuntime,
+};
 use types::ManagedSqliteNamespaceInner;
 pub(crate) use types::{
     ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,
@@ -20,6 +43,10 @@ pub(crate) use types::{
     ManagedSqliteFileOpenFailure, ManagedSqliteFileOpenFailurePhase,
     ManagedSqliteNamespaceBindFailure, ManagedSqliteOpenMode, PinnedManagedSqliteFile,
     PinnedManagedSqliteNamespace, QuarantinedManagedSqliteFile,
+};
+use validation::{
+    reserved_shm_delete_failure, reserved_shm_open_failure, validate_namespace_directory,
+    validate_open_completion,
 };
 
 const FILE_OPENED: usize = 1;
@@ -80,6 +107,18 @@ impl PinnedManagedDirectory {
 
 impl PinnedManagedSqliteNamespace {
     pub(crate) fn open(
+        &self,
+        kind: ManagedSqliteFileKind,
+        access: ManagedSqliteAccess,
+        mode: ManagedSqliteOpenMode,
+    ) -> std::result::Result<PinnedManagedSqliteFile, ManagedSqliteFileOpenFailure> {
+        if kind == ManagedSqliteFileKind::Shm {
+            return Err(reserved_shm_open_failure());
+        }
+        self.open_exact(kind, access, mode)
+    }
+
+    fn open_exact(
         &self,
         kind: ManagedSqliteFileKind,
         access: ManagedSqliteAccess,
@@ -162,6 +201,9 @@ impl PinnedManagedSqliteNamespace {
         kind: ManagedSqliteFileKind,
         access: ManagedSqliteAccess,
     ) -> std::result::Result<bool, ManagedSqliteFileOpenFailure> {
+        if kind == ManagedSqliteFileKind::Shm {
+            return Err(reserved_shm_open_failure());
+        }
         self.validate_parent().map_err(|error| {
             ManagedSqliteFileOpenFailure::not_opened(
                 ManagedSqliteFileOpenFailurePhase::ParentValidation,
@@ -206,6 +248,17 @@ impl PinnedManagedSqliteNamespace {
     }
 
     pub(crate) fn delete(
+        &self,
+        kind: ManagedSqliteFileKind,
+        sync_parent: bool,
+    ) -> std::result::Result<ManagedSqliteDeleteOutcome, ManagedSqliteDeleteFailure> {
+        if kind == ManagedSqliteFileKind::Shm {
+            return Err(reserved_shm_delete_failure());
+        }
+        self.delete_exact(kind, sync_parent)
+    }
+
+    fn delete_exact(
         &self,
         kind: ManagedSqliteFileKind,
         sync_parent: bool,
@@ -421,66 +474,6 @@ impl PinnedManagedSqliteNamespace {
             Err(error) => Err(ManagedSqliteDeleteFailure::new(phase, error, None)),
         }
     }
-}
-
-fn validate_namespace_directory(directory: &PinnedManagedDirectory) -> Result<()> {
-    let binding = directory
-        .binding
-        .as_ref()
-        .ok_or_else(|| anyhow!("NODE_MANAGED_SQLITE_NAMESPACE_BINDING_MISSING"))?;
-    if !binding.is_directory() {
-        bail!("NODE_MANAGED_SQLITE_NAMESPACE_BINDING_NOT_DIRECTORY");
-    }
-    let handle = directory
-        .directory_handles
-        .last()
-        .ok_or_else(|| anyhow!("NODE_MANAGED_SQLITE_NAMESPACE_PARENT_HANDLE_MISSING"))?;
-    let identity = platform::inspect(handle)?;
-    validate_directory_identity(identity, Some(directory.root_volume_serial))?;
-    if identity_digest(&directory.root_identity_digest, None, identity) != binding.identity_digest()
-    {
-        bail!("NODE_MANAGED_SQLITE_NAMESPACE_BINDING_CHANGED");
-    }
-    let parent = directory
-        .directory_handles
-        .get(
-            directory
-                .directory_handles
-                .len()
-                .checked_sub(2)
-                .ok_or_else(|| anyhow!("NODE_MANAGED_SQLITE_NAMESPACE_BINDING_PARENT_MISSING"))?,
-        )
-        .ok_or_else(|| anyhow!("NODE_MANAGED_SQLITE_NAMESPACE_BINDING_PARENT_MISSING"))?;
-    if managed_parent_identity_digest(
-        &directory.root_identity_digest,
-        parent,
-        directory.root_volume_serial,
-    )? != binding.parent_identity_digest()
-    {
-        bail!("NODE_MANAGED_SQLITE_NAMESPACE_PARENT_BINDING_CHANGED");
-    }
-    Ok(())
-}
-
-fn validate_open_completion(
-    call_status: i32,
-    completion_status: i32,
-    information: usize,
-    mode: ManagedSqliteOpenMode,
-) -> Result<()> {
-    if call_status != 0 || completion_status != 0 {
-        bail!("NODE_MANAGED_SQLITE_OPEN_COMPLETION_FAILED");
-    }
-    let valid = match mode {
-        ManagedSqliteOpenMode::Existing => information == FILE_OPENED,
-        ManagedSqliteOpenMode::OpenOrCreate => {
-            information == FILE_OPENED || information == FILE_CREATED
-        }
-    };
-    if !valid {
-        bail!("NODE_MANAGED_SQLITE_OPEN_DISPOSITION_INVALID");
-    }
-    Ok(())
 }
 
 fn io_error(error: anyhow::Error) -> std::io::Error {
