@@ -1,6 +1,6 @@
 # 消费者本人授权状态 MCP V1
 
-状态：已接受；代码已形成，尚未编译或测试。
+状态：已接受；服务端实现和定向 Rust 回归已通过。
 
 ## 决策
 
@@ -34,3 +34,9 @@
 - `server/src/store/open_commerce_authorization_requests.rs`
 - `server/src/store/open_commerce_grants.rs`
 - `docs/open-commerce-consumer-authorization-status-mcp-v1-acceptance.md`
+
+## 验证状态
+
+- 已覆盖本人/他人和跨项目隔离、四种申请状态、有限/耗尽/无限预算、过期/撤销过滤、按 App 筛选、只读无预算写入，以及撤回权限、固定短语、幂等和双侧审计。
+- 撤回结果复用申请列表的最小安全投影；有效 Grant 总览不返回消费者项目、授权人身份或凭据。
+- 历史批准但 Grant 已失效、以及 App 被商户封禁时的最终失败关闭，仍由执行计划定向回归负责。
