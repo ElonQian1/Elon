@@ -3,6 +3,7 @@
 //! This first layer is intentionally disconnected from persistence, HTTP, WebSocket and
 //! scheduling. Existing node LLM routing remains the active compatibility path.
 
+pub(crate) mod attempt;
 pub(crate) mod attempt_gateway;
 pub(crate) mod capacity;
 pub(crate) mod execution;
