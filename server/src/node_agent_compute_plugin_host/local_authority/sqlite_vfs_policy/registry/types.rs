@@ -17,6 +17,15 @@ impl fmt::Debug for ManagedSqliteRegistrySessionId {
     }
 }
 
+#[cfg(test)]
+impl ManagedSqliteRegistrySessionId {
+    pub(super) fn test_value(value: u64) -> Self {
+        Self {
+            value: NonZeroU64::new(value).expect("test session id must be non-zero"),
+        }
+    }
+}
+
 /// A route-removal proof is deliberately impossible to mint in this batch. The future routing
 /// owner must create it only after an exact token, session identity and entry identity all match.
 #[must_use = "route-removal proof must be consumed by the matching session"]
@@ -32,6 +41,14 @@ impl ManagedSqliteRegistryRouteRemovalProof {
 
     pub(super) fn route_epoch(&self) -> NonZeroU64 {
         self.route_epoch
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_value(session_id: ManagedSqliteRegistrySessionId, route_epoch: u64) -> Self {
+        Self {
+            session_id,
+            route_epoch: NonZeroU64::new(route_epoch).expect("test route epoch must be non-zero"),
+        }
     }
 }
 
@@ -98,6 +115,17 @@ impl ManagedSqliteRegistryCloseProof {
 
     pub(super) fn lease_ordinal(&self) -> NonZeroU64 {
         self.lease_ordinal
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_value(
+        session_id: ManagedSqliteRegistrySessionId,
+        lease_ordinal: NonZeroU64,
+    ) -> Self {
+        Self {
+            session_id,
+            lease_ordinal,
+        }
     }
 }
 
