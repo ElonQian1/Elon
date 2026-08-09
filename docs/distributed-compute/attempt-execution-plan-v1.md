@@ -3,14 +3,14 @@ title: 分布式算力 Attempt Execution Plan V1
 status: current
 reviewed_at: 2026-08-09
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_unwired
 ---
 
 # 分布式算力 Attempt Execution Plan V1
 
 ## 1. 当前状态
 
-v212 在源码中增加 Provider-neutral、不可变的 Execution Plan 合同、五张追加式 SQLite 账本和 sealed Store producer。它补齐 v211 只有 `plan_id/schema/digest`、却没有计划权威真源的问题；本批没有编译、执行迁移或运行数据库。
+v212 在源码中增加 Provider-neutral、不可变的 Execution Plan 合同、五张追加式 SQLite 账本和 sealed Store producer。它补齐 v211 只有 `plan_id/schema/digest`、却没有计划权威真源的问题。服务端及测试源码已编译通过，但未执行迁移或运行数据库/生产链路。
 
 当前没有 ReadyCapability V2 上报与服务端验真、endpoint verifier、Adapter registry、Artifact credential issuer 或任何 sealed 输入构造器。因此 Store producer 虽能在拿到不可伪造输入后完成单事务计划生成，生产入口仍不可达；v211 Start、accepted ACK 和远端执行仍保持关闭。
 

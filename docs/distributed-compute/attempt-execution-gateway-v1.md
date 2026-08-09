@@ -3,14 +3,14 @@ title: 分布式算力 Attempt Execution Gateway V1
 status: current
 reviewed_at: 2026-08-10
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_unwired
 ---
 
 # 分布式算力 Attempt Execution Gateway V1
 
 ## 1. 当前状态
 
-v211 的 Provider-neutral Start command、v212 sealed Execution Plan、v213 route/credential/outbox 与 v214 cleanup/recovery 已写入源码。v215 又形成 accepted 的本地原子闭包：authenticated prepare observation、`accepted_applied` ACK、v185、application actor、LeaseAuthorityBinding、commit outbox 与 application 同事务写入并 exact readback；任何既存 ACK-null cleanup pair 都强制走 quarantine。上述批次均未编译、执行迁移或运行真实链路。
+v211 的 Provider-neutral Start command、v212 sealed Execution Plan、v213 route/credential/outbox 与 v214 cleanup/recovery 已写入源码。v215 又形成 accepted 的本地原子闭包：authenticated prepare observation、`accepted_applied` ACK、v185、application actor、LeaseAuthorityBinding、commit outbox 与 application 同事务写入并 exact readback；任何既存 ACK-null cleanup pair 都强制走 quarantine。服务端及测试源码已编译通过，但未执行迁移或运行数据库/真实链路。
 
 旧的 `prepare_start` Adapter trait 会把远端调用放在 durable command 之前，已从源码移除。v213-v215 registry 与 Store 仍只是生产不可达的本地权威核：没有 sealed route/credential/plan/observation 构造器，也没有 resolver、transport 或 worker 消费 send authority。因此真实 Start 和远端 ACK/reconcile 仍不可达，不会由生产事实推进 Job、Reservation、Capacity Claim、Attempt Lease 或余额预授权。
 
