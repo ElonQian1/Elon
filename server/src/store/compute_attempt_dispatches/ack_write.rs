@@ -9,7 +9,10 @@ use crate::{
     },
     store::{
         compute_attempt_activations::activate_compute_attempt_on,
-        compute_attempt_start_outbox::record_verified_observation_on,
+        compute_attempt_start_outbox::{
+            enqueue_quarantined_cleanup_on, record_prepare_rejected_no_start_on,
+            record_verified_observation_on,
+        },
         ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
     },
 };
@@ -46,6 +49,9 @@ pub(super) fn ingest_verified_ack_on(
             .ok_or_else(|| anyhow!("Stored Adapter ACK lost its immutable command"))?;
         ensure_ack_binds_command(&command, verified, prepared)?;
         record_verified_observation_on(connection, verified.prepare_observation())?;
+        if ack.outcome == COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED {
+            record_prepare_rejected_no_start_on(connection, verified)?;
+        }
         return replay_ack_commit(connection, &command, stored);
     }
     if ack_by_command_on(connection, &ack.command_id)?.is_some() {
@@ -73,6 +79,7 @@ pub(super) fn ingest_verified_ack_on(
                 None,
                 &ingested_at,
             )?;
+            record_prepare_rejected_no_start_on(connection, verified)?;
             let stored = ack_by_command_on(connection, &ack.command_id)?
                 .ok_or_else(|| anyhow!("Rejected Adapter ACK is not visible after insert"))?;
             ensure_ack_replay_matches(&stored, verified, prepared)?;
@@ -163,6 +170,7 @@ pub(super) fn ingest_verified_ack_on(
 }
 
 fn ensure_v213_accepted_apply_available(ack: &ComputeAttemptAdapterAckEnvelope) -> Result<()> {
+    // Removing this gate must first route any existing ACK-null cleanup pair to quarantine.
     if ack.outcome == COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED {
         bail!("COMPUTE_ATTEMPT_ACCEPTED_ACK_V213_ISSUER_UNAVAILABLE");
     }
@@ -177,6 +185,7 @@ fn quarantine_ack_on(
     reason: &str,
     created_at: &str,
 ) -> Result<ComputeAttemptDispatchAckCommit> {
+    enqueue_quarantined_cleanup_on(connection, verified, created_at)?;
     insert_ack_on(
         connection,
         command,

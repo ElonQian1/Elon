@@ -4,6 +4,7 @@ use rusqlite::Connection;
 mod attempt_dispatch;
 mod execution_plan;
 mod start_outbox;
+mod start_recovery;
 
 pub(crate) fn migration_v185(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -80,4 +81,8 @@ pub(crate) fn migration_v212(conn: &Connection) -> Result<()> {
 
 pub(crate) fn migration_v213(conn: &Connection) -> Result<()> {
     start_outbox::migration_v213(conn)
+}
+
+pub(crate) fn migration_v214(conn: &Connection) -> Result<()> {
+    start_recovery::migration_v214(conn)
 }

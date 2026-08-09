@@ -22,55 +22,30 @@ pub(crate) struct StartOutboxObservationReceipt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct StartOutboxNoStartProofReceipt {
+pub(crate) struct StartOutboxNoStartProofReceipt {
     pub proof_id: String,
     pub proof_digest: String,
+    pub proof_kind: String,
     pub command_id: String,
     pub replayed: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub(super) enum StartNoStartDerivation<'a> {
-    LocalNeverSent {
-        command_id: &'a str,
-        proven_at: &'a str,
-    },
-    PrepareRejected {
-        command_id: &'a str,
-        observation_id: &'a str,
-        proven_at: &'a str,
-    },
-    RemoteNeverCommitted {
-        command_id: &'a str,
-        observation_id: &'a str,
-        proven_at: &'a str,
-    },
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StartOutboxCleanupReceipt {
+    pub cancel_outbox_id: String,
+    pub cancel_outbox_digest: String,
+    pub reconcile_outbox_id: String,
+    pub reconcile_outbox_digest: String,
+    pub command_id: String,
+    pub ack_bound: bool,
+    pub replayed: bool,
 }
 
-impl<'a> StartNoStartDerivation<'a> {
-    pub(super) fn command_id(self) -> &'a str {
-        match self {
-            Self::LocalNeverSent { command_id, .. }
-            | Self::PrepareRejected { command_id, .. }
-            | Self::RemoteNeverCommitted { command_id, .. } => command_id,
-        }
-    }
-
-    pub(super) fn observation_id(self) -> Option<&'a str> {
-        match self {
-            Self::LocalNeverSent { .. } => None,
-            Self::PrepareRejected { observation_id, .. }
-            | Self::RemoteNeverCommitted { observation_id, .. } => Some(observation_id),
-        }
-    }
-
-    pub(super) fn proven_at(self) -> &'a str {
-        match self {
-            Self::LocalNeverSent { proven_at, .. }
-            | Self::PrepareRejected { proven_at, .. }
-            | Self::RemoteNeverCommitted { proven_at, .. } => proven_at,
-        }
-    }
+/// Recovery receipt only; neither variant grants transport or no-start authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum StartNoStartRecoveryReceipt {
+    ProofRecorded(StartOutboxNoStartProofReceipt),
+    CleanupEnqueued(StartOutboxCleanupReceipt),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

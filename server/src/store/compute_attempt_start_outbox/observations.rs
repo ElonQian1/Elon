@@ -1,4 +1,5 @@
 use anyhow::{bail, ensure, Result};
+use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::compute_federation::start_outbox::{
@@ -6,11 +7,14 @@ use crate::compute_federation::start_outbox::{
     canonical_start_outbox_send_attempt_json_and_digest,
     ComputeStartOutboxRemoteObservationEnvelope, ComputeStartOutboxSendAttemptEnvelope,
     VerifiedComputeStartOutboxRemoteObservation, COMPUTE_OBSERVATION_CANCEL_RESPONSE,
-    COMPUTE_OUTBOX_STATE_DELIVERY_OBSERVED, COMPUTE_OUTBOX_STATE_IN_FLIGHT_UNKNOWN,
-    COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START,
+    COMPUTE_OBSERVATION_RECONCILE_ATTESTATION, COMPUTE_OUTBOX_STATE_DELIVERY_OBSERVED,
+    COMPUTE_OUTBOX_STATE_IN_FLIGHT_UNKNOWN, COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START,
+    COMPUTE_REMOTE_TERMINALITY_FINAL,
 };
 
 use super::{
+    cleanup::unlock_reconcile_after_cancel_on,
+    no_start::record_remote_never_committed_no_start_on,
     read::outbox_by_id_on,
     types::{StartOutboxObservationReceipt, StoredVerifiedObservation},
 };
@@ -27,6 +31,7 @@ pub(in crate::store) fn record_verified_observation_on(
             stored.envelope == *envelope,
             "authenticated Start observation conflicts with immutable replay"
         );
+        apply_observation_effects_on(connection, verified)?;
         return Ok(receipt(envelope, true));
     }
     let (json, digest) = canonical_start_outbox_remote_observation_json_and_digest(envelope)?;
@@ -91,6 +96,20 @@ pub(in crate::store) fn record_verified_observation_on(
         before.projection.state == COMPUTE_OUTBOX_STATE_IN_FLIGHT_UNKNOWN,
         "fresh Start observation does not follow unknown delivery"
     );
+    let transitioned_at = next_store_time_after(&before.projection.updated_at)?;
+    ensure!(
+        envelope.recorded_at.as_str() <= transitioned_at.as_str(),
+        "authenticated Start observation is recorded after Store ingestion"
+    );
+    // A reconcile poll may report a durable but non-terminal state. Preserve that evidence
+    // without consuming the one-shot reconcile operation so a later final attestation from the
+    // same send-attempt can still close the recovery chain.
+    if envelope.observation_kind == COMPUTE_OBSERVATION_RECONCILE_ATTESTATION
+        && envelope.terminality != COMPUTE_REMOTE_TERMINALITY_FINAL
+    {
+        apply_observation_effects_on(connection, verified)?;
+        return Ok(receipt(envelope, false));
+    }
     let changed = connection.execute(
         "UPDATE compute_attempt_start_outbox
             SET state='delivery_observed', state_revision=state_revision+1,
@@ -99,7 +118,7 @@ pub(in crate::store) fn record_verified_observation_on(
           WHERE outbox_id=?2 AND outbox_digest=?3 AND state='in_flight_unknown'
             AND state_revision=?4 AND attempt_count=?5 AND claim_generation=?6",
         params![
-            envelope.recorded_at,
+            transitioned_at,
             envelope.outbox_id,
             envelope.outbox_digest,
             before.projection.state_revision,
@@ -123,6 +142,7 @@ pub(in crate::store) fn record_verified_observation_on(
             && after.projection.claim_expires_at.is_none(),
         "Start observation durable readback failed exact audit"
     );
+    apply_observation_effects_on(connection, verified)?;
     Ok(receipt(envelope, false))
 }
 
@@ -131,6 +151,15 @@ fn ensure_observation_shape(
     envelope: &ComputeStartOutboxRemoteObservationEnvelope,
     expected_send: &ComputeStartOutboxSendAttemptEnvelope,
 ) -> Result<()> {
+    if envelope.remote_execution_state == COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START
+        && (envelope.observation_kind != COMPUTE_OBSERVATION_RECONCILE_ATTESTATION
+            || envelope.response_outcome != "observed"
+            || envelope.terminality != COMPUTE_REMOTE_TERMINALITY_FINAL
+            || envelope.no_commit_tombstone_id.is_none()
+            || envelope.no_commit_tombstone_digest.is_none())
+    {
+        bail!("terminal no-start requires an observed final reconcile tombstone");
+    }
     if envelope.observation_kind == COMPUTE_OBSERVATION_CANCEL_RESPONSE
         && (envelope.remote_execution_state == COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START
             || envelope.terminality != "non_terminal"
@@ -181,6 +210,18 @@ fn ensure_observation_shape(
                 == stored_send.route_authorization_digest,
         "authenticated observation does not bind the exact route and command"
     );
+    Ok(())
+}
+
+fn apply_observation_effects_on(
+    connection: &Connection,
+    verified: &VerifiedComputeStartOutboxRemoteObservation,
+) -> Result<()> {
+    let envelope = verified.envelope();
+    if envelope.observation_kind == COMPUTE_OBSERVATION_CANCEL_RESPONSE {
+        unlock_reconcile_after_cancel_on(connection, envelope)?;
+    }
+    let _ = record_remote_never_committed_no_start_on(connection, verified)?;
     Ok(())
 }
 
@@ -235,4 +276,9 @@ fn receipt(
         outbox_id: envelope.outbox_id.clone(),
         replayed,
     }
+}
+
+fn next_store_time_after(value: &str) -> Result<String> {
+    let floor = DateTime::parse_from_rfc3339(value)?.with_timezone(&Utc) + Duration::nanoseconds(1);
+    Ok(std::cmp::max(Utc::now(), floor).to_rfc3339_opts(SecondsFormat::Nanos, true))
 }

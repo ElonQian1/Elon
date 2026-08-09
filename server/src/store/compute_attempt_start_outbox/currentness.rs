@@ -79,7 +79,7 @@ pub(super) fn ensure_send_current_on(
         }
         StartOutboxCurrentnessPhase::CleanupCancel
         | StartOutboxCurrentnessPhase::CleanupReconcile => {
-            ensure_cleanup_source_exact_on(connection, stored)?
+            super::cleanup::ensure_cleanup_send_source_exact_on(connection, stored)?
         }
     }
     Ok(())
@@ -381,40 +381,6 @@ fn audit_route_rows(
     ensure!(
         !requires_live_registry || !revoked,
         "Start outbox credential has been revoked"
-    );
-    Ok(())
-}
-
-fn ensure_cleanup_source_exact_on(
-    connection: &Connection,
-    stored: &StoredStartOutboxOperation,
-) -> Result<()> {
-    let exact = connection
-        .query_row(
-            "SELECT 1
-               FROM compute_attempt_dispatch_commands command
-               JOIN compute_attempt_dispatch_acks ack ON ack.command_id=command.command_id
-              WHERE command.command_id=?1 AND command.command_digest=?2
-                AND command.provider_id=?3 AND command.adapter_id=?4
-                AND command.adapter_binding_digest=?5
-                AND ack.ack_id=?6 AND ack.ack_digest=?7
-                AND ack.disposition='quarantined'",
-            params![
-                stored.envelope.command_id,
-                stored.envelope.command_digest,
-                stored.provider_id,
-                stored.adapter_id,
-                stored.envelope.adapter_binding_digest,
-                stored.envelope.ack_id,
-                stored.envelope.ack_digest,
-            ],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
-    ensure!(
-        exact,
-        "cleanup operation lacks exact quarantined ACK closure"
     );
     Ok(())
 }

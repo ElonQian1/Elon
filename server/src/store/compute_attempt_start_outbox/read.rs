@@ -26,6 +26,18 @@ pub(super) fn prepare_by_command_on(
     )
 }
 
+pub(super) fn operation_by_command_kind_on(
+    connection: &Connection,
+    command_id: &str,
+    operation_kind: &str,
+) -> Result<Option<StoredStartOutboxOperation>> {
+    stored_outbox_on(
+        connection,
+        "o.command_id=?1 AND o.operation_kind=?2",
+        params![command_id, operation_kind],
+    )
+}
+
 fn stored_outbox_on<P: rusqlite::Params>(
     connection: &Connection,
     predicate: &str,
@@ -322,11 +334,20 @@ pub(super) fn no_start_semantics_exact_on(
                         WHERE observation.observation_id=?8
                           AND observation.observation_digest=?9
                           AND observation.outbox_id=prepare.outbox_id
+                          AND observation.outbox_digest=prepare.outbox_digest
+                          AND observation.operation_kind='prepare'
+                          AND observation.command_id=?3
+                          AND observation.command_digest=?4
+                          AND observation.provider_id=prepare.provider_id
+                          AND observation.adapter_id=prepare.adapter_id
+                          AND observation.adapter_binding_digest=prepare.adapter_binding_digest
                           AND observation.observation_kind='prepare_response'
                           AND observation.response_outcome='rejected'
                           AND observation.remote_execution_state='rejected'
                           AND observation.terminality='final'
                           AND ack.outcome='rejected' AND ack.disposition='rejected'
+                          AND ack.command_id=?3 AND ack.command_digest=?4
+                          AND ack.adapter_binding_digest=prepare.adapter_binding_digest
                           AND ack.adapter_ack_id=observation.adapter_observation_id
                     ))
                     OR (?7='remote_never_committed' AND EXISTS (
@@ -337,9 +358,24 @@ pub(super) fn no_start_semantics_exact_on(
                           ON cancel.outbox_id=reconcile.subject_outbox_id
                         WHERE observation.observation_id=?8
                           AND observation.observation_digest=?9
+                          AND observation.outbox_id=reconcile.outbox_id
+                          AND observation.outbox_digest=reconcile.outbox_digest
+                          AND observation.operation_kind='reconcile'
+                          AND observation.command_id=?3
+                          AND observation.command_digest=?4
+                          AND observation.provider_id=prepare.provider_id
+                          AND observation.adapter_id=prepare.adapter_id
+                          AND observation.adapter_binding_digest=prepare.adapter_binding_digest
                           AND observation.observation_kind='reconcile_attestation'
+                          AND observation.response_outcome='observed'
                           AND observation.remote_execution_state='terminal_no_start'
                           AND observation.terminality='final'
+                          AND cancel.state='delivery_observed'
+                          AND reconcile.state='delivery_observed'
+                          AND cancel.command_id=?3 AND cancel.command_digest=?4
+                          AND reconcile.command_id=?3 AND reconcile.command_digest=?4
+                          AND cancel.ack_id IS reconcile.ack_id
+                          AND cancel.ack_digest IS reconcile.ack_digest
                           AND observation.no_commit_tombstone_id=?10
                           AND observation.no_commit_tombstone_digest=?11
                           AND cancel.subject_outbox_id=prepare.outbox_id

@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Delivery Outbox V1
 status: current
-reviewed_at: 2026-08-09
+reviewed_at: 2026-08-10
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,20 +10,20 @@ implementation_status: implementation_uncompiled
 
 ## 1. 目的与当前边界
 
-v213 在 v211 Start command 和 v212 sealed Execution Plan 之后增加耐久派发 custody 与恢复证据层。它解决的不是“如何发一次 HTTP 请求”，而是四个跨崩溃问题：先落 command 还是先碰远端、哪个 worker 拥有当前工作、网络返回未知时如何恢复，以及什么证据才足以证明远端从未开始执行。
+v213 在 v211 Start command 和 v212 sealed Execution Plan 之后增加耐久派发 custody 与恢复证据层。v214 再形成 rejected observation/ACK/proof、quarantine cancel/reconcile pair、cancel 解锁 reconcile，以及 final reconcile+tombstone/proof 的本地原子闭包。它解决的不是“如何发一次 HTTP 请求”，而是先落 command 还是先碰远端、哪个 worker 拥有工作、网络结果未知时如何恢复，以及什么证据才足以证明远端从未开始执行。
 
-本批只形成本地领域合同、SQLite 账本、Store 状态核和反向门卫；不实现 concrete Adapter、resolver、worker、网络、定时器、公网 ACK ingress、Bearer 凭据解析、Runner 事件或 external-pool onboarding。所有可认证远端 observation、Lease authority 和发送 authority 仍由字段私有、不可 Clone、不可反序列化且没有生产构造器的 sealed 类型承载，因此真实投递继续不可达。本批也未编译、执行迁移或运行数据库。
+v213-v214 只形成本地领域合同、SQLite 账本、Store 状态核和反向门卫；不实现 concrete Adapter、resolver、worker、网络、定时器、公网 ACK ingress、Bearer 凭据解析、Runner 事件或 external-pool onboarding。所有可认证远端 observation、Lease authority 和发送 authority 仍由字段私有、不可 Clone、不可反序列化且没有生产构造器的 sealed 类型承载，因此真实投递与远端恢复继续不可达。accepted happy issuer 也仍固定 unavailable。本批未编译、执行迁移、运行数据库或测试。
 
 ## 2. 先耐久、后远端
 
-生产顺序固定为：
+目标生产顺序固定为：
 
 1. 由 sealed Plan、Provider 授权主体、route authorization 和 dormant lease-authority handle 组装 Start；
 2. 在一个 `BEGIN IMMEDIATE` 中同时写入不可变 command 与 `prepare` outbox；
 3. 后台 worker 领取 outbox 工作租约；claim 只代表本地工作所有权；
 4. 真正外呼前再次重验当前 route、credential、Plan/source、预算、deadline 和 fencing，并先追加 send-attempt；
 5. 事务提交后才允许未来 transport 使用该次不可 Clone send authority；
-6. 远端 provisional prepare 成功后，本地在一个事务内写 authenticated observation、ACK、v185 activation、application、actor receipt、LeaseAuthorityBinding 和 `commit` outbox；
+6. 远端 provisional prepare 成功后，本地在一个事务内写 authenticated observation、ACK、v185 activation、application、actor receipt、LeaseAuthorityBinding 和 `commit` outbox；当前 accepted issuer 在任何 mutation 前固定失败；
 7. commit outbox 耐久后，未来 worker 才可解析并交付真实 Lease authority。
 
 旧的 `Adapter.prepare_start(command) -> validated command -> Store` 顺序被禁止。它会在 command 尚未耐久时产生远端 prepared、平台 absent 的崩溃窗。
@@ -75,11 +75,13 @@ absent -> prepared -> committed -> running / terminal_after_run
 - authenticated final prepare rejection；
 - authenticated final reconcile attestation，且带 durable no-commit tombstone。
 
+v214 已把后两类证据形成 Store-local 原子 issuer：final prepare rejection 会把 authenticated observation、`rejected` ACK 与 `prepare_rejected` proof 同事务写入；final reconcile 会把 authenticated `never_committed` observation、durable no-commit tombstone 与 `remote_never_committed` proof 同事务写入。它们只产 exact proof，不自动调用 v176 Finish。
+
 一旦存在 v185 activation、dispatch application 或 commit send-attempt，就不能回退到 v176 的“从未执行”退款路径。后续即使确认零用量，也必须走独立的可信补偿/终态 kernel。
 
 ## 7. ACK、application 与 commit 闭包
 
-远端 prepare accepted 仍只是 provisional。平台只允许在一个 `BEGIN IMMEDIATE` 中完成：
+远端 prepare accepted 仍只是 provisional。目标平台只允许在一个 `BEGIN IMMEDIATE` 中完成：
 
 1. 写 authenticated `prepare_response(prepared)` observation；
 2. 写 v211 `accepted_applied` ACK；
@@ -91,9 +93,11 @@ absent -> prepared -> committed -> running / terminal_after_run
 8. 写 application；
 9. exact readback 后统一 commit。
 
-DDL 反向门要求新 application 同时看见 LeaseAuthorityBinding、commit outbox 和 actor receipt。这样本地 activation 已成功、却没有恢复 remote commit 的耐久权威，不能提交。
+DDL 反向门要求新 application 同时看见 LeaseAuthorityBinding、commit outbox 和 actor receipt。这样本地 activation 已成功、却没有恢复 remote commit 的耐久权威，不能提交。当前 happy-path issuer 仍固定返回 `COMPUTE_ATTEMPT_ACCEPTED_ACK_V213_ISSUER_UNAVAILABLE`，所以该目标闭包尚不会发生 mutation。
 
-过期或 source/budget 漂移的 accepted ACK 进入 quarantine 时，必须同事务生成 `cancel` pending 与其后的 `reconcile` blocked outbox。cancel observation 只解锁 reconcile；它不解除 v176 门卫。
+v214 已形成 quarantine cleanup scaffold：过期或 source/budget/route 漂移的 accepted ACK 先在同一事务生成 `cancel` pending 与其后的 `reconcile` blocked outbox，再写 `quarantined` ACK。authenticated cancel observation 只把 exact reconcile 从 `blocked` 原子解锁为 `pending`；它不创建 no-start proof，也不解除 v176 门卫。只有后续 authenticated final reconcile+tombstone 产生的 exact proof 才可被 v176 重审计。
+
+Store 派生的 proof `recorded_at` 与 outbox 状态转换 `updated_at` 由本地时钟生成，不接受调用方伪造；observation 行的 `recorded_at` 仍来自不可改摘要的 sealed authenticated envelope，并须通过顺序与有效期校验。
 
 ## 8. Provider owner 与 service actor
 
@@ -118,6 +122,7 @@ external pool 只能使用 `server_adapter + adapter_execution`，不能伪装�
 - Adapter resolver、真实 credential verifier/KMS 与 bearer 解析；
 - user-node、managed-cluster、external-pool transport 和 worker；
 - authenticated ACK/event 公网入口、reconcile/cancel 网络协议与 crash injection；
+- accepted application、actor receipt、LeaseAuthorityBinding 和 commit outbox 的可用 issuer；
 - Lease authority 带外交付、Runner event、Renew 与可信零用量补偿；
 - external-pool onboarding、Provider 激活和 service-managed capacity；
 - 编译、迁移、SQLite trigger、并发、接口和真实远端验证。

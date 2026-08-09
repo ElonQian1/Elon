@@ -9,6 +9,7 @@ use crate::compute_federation::start_outbox::{
 use super::Store;
 
 mod claim;
+mod cleanup;
 mod currentness;
 mod enqueue;
 mod no_start;
@@ -18,15 +19,19 @@ mod replay;
 mod send;
 mod types;
 
+pub(super) use cleanup::enqueue_quarantined_cleanup_on;
 pub(super) use enqueue::enqueue_prepare_on;
-pub(super) use no_start::ensure_start_resolved_for_broker_finish_on;
+pub(super) use no_start::{
+    ensure_start_resolved_for_broker_finish_on, record_prepare_rejected_no_start_on,
+};
 pub(super) use observations::record_verified_observation_on;
 pub(super) use types::{
     BrokerFinishStartResolutionBinding, StartOutboxEnqueueReceipt, StartOutboxObservationReceipt,
     StartResolutionProofReceipt,
 };
 pub(crate) use types::{
-    CommittedStartSendAuthority, PreparedStartSendRequest, StartOutboxClaimHandle,
+    CommittedStartSendAuthority, PreparedStartSendRequest, StartNoStartRecoveryReceipt,
+    StartOutboxClaimHandle, StartOutboxCleanupReceipt, StartOutboxNoStartProofReceipt,
 };
 
 impl Store {
@@ -78,6 +83,18 @@ impl Store {
         let mut connection = self.conn()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let receipt = observations::record_verified_observation_on(&transaction, observation)?;
+        transaction.commit()?;
+        Ok(receipt)
+    }
+
+    /// Store-owned recovery seam. Its receipt grants neither transport nor no-start authority.
+    pub(crate) fn recover_compute_attempt_start_no_start(
+        &self,
+        command_id: &str,
+    ) -> Result<StartNoStartRecoveryReceipt> {
+        let mut connection = self.conn()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let receipt = no_start::recover_no_start_on(&transaction, command_id)?;
         transaction.commit()?;
         Ok(receipt)
     }
