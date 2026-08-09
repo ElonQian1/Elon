@@ -1,6 +1,6 @@
 //! Pure fail-closed policy for the future handle-bound SQLite VFS.
 //!
-//! This module deliberately contains no SQLite connection, callback, registry, or filesystem
+//! This module deliberately contains no SQLite connection, callback, live registry, or filesystem
 //! operation. Possessing one of these values is not proof that a VFS has been registered or that
 //! an authority database has been opened.
 //!
@@ -10,8 +10,10 @@
 
 use std::{ffi::CStr, fmt};
 
+mod abi;
 mod authorizer;
 mod name;
+mod registry;
 mod types;
 
 pub(super) use authorizer::{
@@ -59,6 +61,13 @@ impl SealedHandleBoundSqlitePolicy {
 
     pub(super) fn logical_name(&self, role: ManagedSqliteLogicalFileRole) -> &CStr {
         self.logical_names.get(role)
+    }
+
+    fn classify_logical_name(
+        &self,
+        candidate_name: Option<&[u8]>,
+    ) -> Result<ManagedSqliteLogicalFileRole, ManagedSqliteLogicalNameRejection> {
+        self.logical_names.classify(candidate_name)
     }
 
     /// Validates the name and VFS flags as one inseparable request. A valid name can never bless

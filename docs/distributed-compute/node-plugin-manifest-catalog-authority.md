@@ -34,10 +34,18 @@ managed-fs现已铺设sealed SQLite namespace内核：只接受already-pinned且
 
 普通、被拒、main及WAL-main句柄现在都有消费式显式关闭合同；SHM teardown也在释放view、mapping和DMS后显式关闭exact SHM句柄。成功返回只读receipt；关闭未尝试时失败值保留live custody，Windows `CloseHandle`已调用但失败时只保留不可重试的terminal raw-handle quarantine，锁或SHM结果不确定时还永久保活对应FileId/domain tombstone。短生命周期access/delete/absence观察与SHM初始化失败也必须消费关闭结果或把失败custody留在typed failure/coordinator，不能把Rust `Drop`当成xClose成功证明。非Windows固定失败关闭；这些源码尚未编译或测试，也没有VFS ABI调用点，不能独立代表数据库权限。
 
-本机另有一个完全惰性的SQLite安全策略内核：one-shot nonce只能投影成opaque主逻辑名及exact `-journal`/`-wal` 名；root `sqlite3_open_v2` flags与bundled SQLite 3.45实际传给VFS的main、WAL、hot-journal xOpen矩阵分别校验；NULL/temp、URI、memory、shared-cache、delete-on-close及未知对象固定拒绝。authorizer按Bootstrap、SchemaMigration、Runtime线性降权，固定启动PRAGMA及读回，拒绝ATTACH/DETACH、temp/virtual schema和未知action，Runtime不允许DDL且函数只走小白名单。该策略没有token registry构造方、FFI adapter、回调安装或Connection，不能自行执行任何SQLite操作。
+本机另有一个完全惰性的SQLite安全策略内核：one-shot nonce只能投影成opaque主逻辑名及exact `-journal`/`-wal` 名；root `sqlite3_open_v2` flags与bundled SQLite 3.45实际传给VFS的main、WAL、hot-journal xOpen矩阵分别校验；NULL/temp、URI、memory、shared-cache、delete-on-close及未知对象固定拒绝。authorizer按Bootstrap、SchemaMigration、Runtime线性降权，固定启动PRAGMA及读回，拒绝ATTACH/DETACH、temp/virtual schema和未知action，Runtime不允许DDL且函数只走小白名单。
+
+该策略新增的安全ABI投影只接受未来raw边界已转换出的借用字节：unknown action、非法UTF-8或不符合bundled 3.45的NULL/参数形状直接拒绝；ALTER的effective database取精确arg1，DROP COLUMN的arg3只作列名；transaction/savepoint只接受固定操作词。VFS请求投影只允许exact sidecar的`SQLITE_ACCESS_EXISTS`、Journal/WAL删除矩阵和Main opaque逻辑名原样full-path输出。投影层没有raw pointer、`extern`、Connection、文件系统或注册调用，不能自行执行SQLite操作。
+
+另有不可构造的one-shot session/lease纯状态核，描述`PendingMain → Opening → Active → Closing → AwaitingRouteRetirement → Retired`及无出口`TerminalQuarantine`，并对main/sidecar lease、单一SHM租约、in-flight callback、单调ID和不可伪造的精确关闭证明做checked不变量。Connection关闭后仍须等待exact route-removal proof；未开始open的`PendingMain`也只能在route已移除后取消退休。它没有全局registry、map插入、随机nonce、controller/namespace/Connection或callback，Retired和Terminal都只定义未来exact-token不可复用要求，当前不会生成token。
+
+私有SQLite ABI外壳现定义VFS v1与IO methods v2表；表没有可变或注册入口，`pNext/pAppData`为空，`xOpen`总是先清`pMethods`、state和out-flags再返回`SQLITE_CANTOPEN`。其余I/O、lock、SHM和动态加载回调统一初始化out参数、捕获Rust unwind并返回保守错误，IO表从未安装到任何`sqlite3_file`。这只证明失败关闭ABI形状，不是live callback、registry或数据库打开能力。
 
 现有legacy path facade虽已不可Clone，但尚未退役；`connect/with_deferred/with_immediate`仍可能建目录、按路径开库、切WAL或运行迁移。因此它们禁止用于planning，并必须在VFS启用前迁移到opened-authority内核或永久门禁。真正的VFS还必须拥有SQLite main、journal、WAL、SHM及相关临时对象的句柄生命周期，路径重开、canonicalize或open后FileId复核都不能替代这一能力。
 
 ## 仍不可达
 
-当前仍没有可注册的handle-bound SQLite VFS、`sqlite3_io_methods`及其panic/错误码适配、one-shot token registry、把上述显式关闭映射为xClose的FFI adapter、authorizer/PRAGMA安装与持续门卫、生产trusted-time/rollback provider、opened snapshot producer或consumer。临时文件仍不实现；URI、ATTACH/DETACH等只在纯策略中定义拒绝，尚未接入SQLite执行面。现有locking/SHM/close只是一组不可达managed-fs primitives，策略也不是已安装的安全边界；controller与namespace仍只接到不可打开的sealed intent，生产`open()`继续固定unavailable。下一批需先铺不可注册的ABI/token/callback内核并完成错误码、panic、temp、authorizer与故障矩阵审计，随后才能另批注册非默认VFS并打开SQLite。v11仍固定`context_ready=false`、`snapshot_ready=false`，并保持root/authority、PlanApply、work-admission、下载、安装和Sidecar标志为false。非空库存还缺installed/promotion/signed-manifest provenance、work-admission generation、Ready/Attempt撤销及signed `reauthorize_existing`，不得由本合同推断为已完成。
+当前仍没有可注册或可成功打开的handle-bound SQLite VFS、registry实例与token插入、live `sqlite3_file`状态或非空`pMethods`、把显式关闭失败交给进程寿命quarantine的xClose sink、authorizer/PRAGMA安装与持续门卫、生产trusted-time/rollback provider、opened snapshot producer或consumer。临时文件仍不实现；URI、ATTACH/DETACH等只在纯策略中定义拒绝，尚未接入SQLite执行面。现有locking/SHM/close、请求投影、状态核和ABI表都不可达，controller与namespace仍只接到不可打开的sealed intent，生产`open()`继续固定unavailable。
+
+下一批必须先让sealed session原子持有controller、namespace、policy和永久terminal custody，补齐WAL-main窄facade、live I/O/lock/SHM dispatch及exact lease关闭，再在同一Connection生命周期安装authorizer、关闭extension loading并设置/回读DEFENSIVE、TRUSTED_SCHEMA、DQS、ATTACHED和worker限制。完成故障矩阵审计后才能另批注册非默认VFS并打开SQLite；不能把当前私有失败表直接注册。v11仍固定`context_ready=false`、`snapshot_ready=false`，并保持root/authority、PlanApply、work-admission、下载、安装和Sidecar标志为false。非空库存还缺installed/promotion/signed-manifest provenance、work-admission generation、Ready/Attempt撤销及signed `reauthorize_existing`，不得由本合同推断为已完成。
