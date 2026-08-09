@@ -1,5 +1,8 @@
 use std::{
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -65,6 +68,16 @@ impl ComputePluginFetchProcessFence {
 
     pub(super) fn cancellation_source(&self) -> &ComputePluginFetchCancellationSource {
         &self.cancellation_source
+    }
+
+    /// Checks only the process-owner lifetime, independently of the fetch source. Catalog and
+    /// cleanup receipts may intentionally close fetch cancellation while still requiring the same
+    /// durable process fence for their transaction and later readback.
+    pub(super) fn ensure_process_owner_current(&self) -> Result<()> {
+        if !self.cleanup_deletion_fence_liveness.load(Ordering::Acquire) {
+            bail!("COMPUTE_PLUGIN_PROCESS_OWNER_FENCE_CHANGED");
+        }
+        Ok(())
     }
 }
 

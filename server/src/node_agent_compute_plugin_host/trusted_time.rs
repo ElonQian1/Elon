@@ -1,8 +1,14 @@
-use std::{fmt, time::Instant};
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 
+use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
 mod attestation;
+
+const TRUSTED_TIME_OBSERVATION_LIFETIME: Duration = Duration::from_secs(60);
 
 pub(in crate::node_agent_compute_plugin_host) use attestation::{
     begin_trusted_time_challenge, create_trusted_time_clock_epoch, verify_trusted_time_attestation,
@@ -18,6 +24,7 @@ pub(in crate::node_agent_compute_plugin_host) use attestation::{
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginTrustedTimeObservation {
     trusted_now: DateTime<Utc>,
     observed_at: Instant,
+    expires_at: Instant,
     installation_id_digest: String,
     clock_epoch_digest: String,
     time_authority_id: String,
@@ -31,6 +38,7 @@ impl ComputePluginTrustedTimeObservation {
     fn from_verified_attestation(
         trusted_now: DateTime<Utc>,
         observed_at: Instant,
+        expires_at: Instant,
         installation_id_digest: String,
         clock_epoch_digest: String,
         time_authority_id: String,
@@ -41,6 +49,7 @@ impl ComputePluginTrustedTimeObservation {
         Self {
             trusted_now,
             observed_at,
+            expires_at,
             installation_id_digest,
             clock_epoch_digest,
             time_authority_id,
@@ -56,6 +65,16 @@ impl ComputePluginTrustedTimeObservation {
 
     pub(in crate::node_agent_compute_plugin_host) fn observed_at(&self) -> Instant {
         self.observed_at
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn ensure_live(
+        &self,
+        now: Instant,
+    ) -> Result<()> {
+        if now >= self.expires_at {
+            bail!("COMPUTE_PLUGIN_TRUSTED_TIME_OBSERVATION_EXPIRED");
+        }
+        Ok(())
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
@@ -89,6 +108,7 @@ impl fmt::Debug for ComputePluginTrustedTimeObservation {
             .debug_struct("ComputePluginTrustedTimeObservation")
             .field("trusted_now", &self.trusted_now)
             .field("observed_at", &"<monotonic>")
+            .field("expires_at", &"<monotonic>")
             .field("installation_id_digest", &"<redacted>")
             .field("clock_epoch_digest", &"<redacted>")
             .field("time_authority_id", &self.time_authority_id)

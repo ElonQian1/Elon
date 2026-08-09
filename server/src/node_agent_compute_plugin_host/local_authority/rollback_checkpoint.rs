@@ -4,7 +4,7 @@ use rusqlite::{OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::ComputePluginLocalAuthority;
+use super::{ComputePluginAuthorityInstanceBinding, ComputePluginLocalAuthority};
 use crate::node_agent_compute_plugin_host::{
     identity::ComputePluginInstallationIdentity,
     install_plan_admission_validation::is_identifier,
@@ -15,6 +15,7 @@ use crate::node_agent_compute_plugin_host::{
     local_authority_schema::COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION,
     manifest_validation::is_sha256,
     plugin_manifest::{COMPUTE_PLUGIN_DIGEST_ALGORITHM, COMPUTE_PLUGIN_MANIFEST_CANONICALIZATION},
+    rollback_anchor::v2::HashedComputePluginAuthorityRollbackCheckpointV2,
     signed_artifact_verification::jcs_sha256_hex,
 };
 
@@ -96,8 +97,8 @@ struct RollbackCheckpointRow {
 }
 
 impl ComputePluginLocalAuthority {
-    /// Produces a side-effect-free checkpoint candidate. It is not externally anchored until a
-    /// future witness protocol authenticates and durably acknowledges this exact digest.
+    /// Legacy path-open checkpoint reader. `with_deferred` may initialize or migrate SQLite before
+    /// this read begins, so planning code must not treat it as side-effect-free or handle-bound.
     pub(crate) fn read_rollback_checkpoint(
         &self,
         expected_installation: &ComputePluginInstallationIdentity,
@@ -114,6 +115,25 @@ impl ComputePluginLocalAuthority {
                 checkpoint_digest,
             })
         })
+    }
+}
+
+/// Process-local proof that a V2 checkpoint came from one exact opened authority/root read rather
+/// than from the remote attestation being compared. It is intentionally non-Clone, non-Serialize
+/// and has no constructor until an opened-authority producer can also bind a live process fence.
+/// A future permit consumer must re-read and match the current checkpoint under that same custody.
+pub(in crate::node_agent_compute_plugin_host) struct GuardedLocalComputePluginAuthorityRollbackCheckpointV2
+{
+    checkpoint: HashedComputePluginAuthorityRollbackCheckpointV2,
+    _authority_instance_binding: ComputePluginAuthorityInstanceBinding,
+    _root_identity_digest: String,
+}
+
+impl GuardedLocalComputePluginAuthorityRollbackCheckpointV2 {
+    pub(in crate::node_agent_compute_plugin_host) fn into_checkpoint(
+        self,
+    ) -> HashedComputePluginAuthorityRollbackCheckpointV2 {
+        self.checkpoint
     }
 }
 

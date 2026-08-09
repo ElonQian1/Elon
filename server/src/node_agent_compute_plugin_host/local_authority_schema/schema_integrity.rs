@@ -4,7 +4,10 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 
-use super::{create_schema_objects_v3, create_schema_objects_v4, create_schema_objects_v5};
+use super::{
+    create_schema_objects_v3, create_schema_objects_v4, create_schema_objects_v5,
+    create_schema_objects_v6,
+};
 
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
 struct SchemaObjectKey {
@@ -28,6 +31,10 @@ pub(super) fn verify_schema_objects_v4(connection: &Connection) -> Result<()> {
 
 pub(super) fn verify_schema_objects_v5(connection: &Connection) -> Result<()> {
     verify_schema_objects(connection, create_schema_objects_v5)
+}
+
+pub(super) fn verify_schema_objects_v6(connection: &Connection) -> Result<()> {
+    verify_schema_objects(connection, create_schema_objects_v6)
 }
 
 fn verify_schema_objects(

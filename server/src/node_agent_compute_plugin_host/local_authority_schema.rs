@@ -10,6 +10,7 @@ mod candidate_health_quarantine;
 mod candidate_staging;
 mod candidate_verification;
 mod fetch_claims;
+mod manifest_catalog_binding;
 mod plan_application;
 mod schema_integrity;
 mod sharing_policy_binding;
@@ -76,6 +77,18 @@ fn create_schema_objects_v5_additions(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(sharing_policy_revocation::SHARING_POLICY_REVOCATION_SCHEMA_V5)
         .context("COMPUTE_PLUGIN_AUTHORITY_SHARING_POLICY_REVOCATION_SCHEMA_CREATE_V5")?;
+    Ok(())
+}
+
+fn create_schema_objects_v6(connection: &Connection) -> Result<()> {
+    create_schema_objects_v5(connection)?;
+    create_schema_objects_v6_additions(connection)
+}
+
+fn create_schema_objects_v6_additions(connection: &Connection) -> Result<()> {
+    connection
+        .execute_batch(manifest_catalog_binding::MANIFEST_CATALOG_BINDING_SCHEMA_V6)
+        .context("COMPUTE_PLUGIN_AUTHORITY_MANIFEST_CATALOG_SCHEMA_CREATE_V6")?;
     Ok(())
 }
 

@@ -135,10 +135,41 @@ pub(super) fn verify_install_plan_signature(
     {
         bail!("COMPUTE_PLUGIN_PLAN_SCHEMA: unsupported signed InstallPlan schema");
     }
-    validate_key_lookup(expected_keyring, &signed.signature.signing_key_id)?;
+    let verification_key_fingerprint = verify_control_plane_jcs_signature(
+        &signed.plan,
+        &signed.canonicalization,
+        &signed.plan_digest_algorithm,
+        &signed.plan_digest,
+        &signed.signature,
+        COMPUTE_PLUGIN_INSTALL_PLAN_SIGNATURE_DOMAIN,
+        expected_keyring,
+        trusted_now,
+        resolver,
+    )?;
+    Ok(SignatureVerifiedComputePluginInstallPlan {
+        signed: signed.clone(),
+        verification_key_fingerprint,
+    })
+}
+
+/// Verifies a Control-ring payload under an independent domain. The current V1 Control ring is
+/// shared with InstallPlan verification, but the domain separator prevents cross-protocol replay.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn verify_control_plane_jcs_signature(
+    payload: &impl Serialize,
+    canonicalization: &str,
+    digest_algorithm: &str,
+    declared_digest: &str,
+    signature: &ComputePluginSignature,
+    domain: &str,
+    expected_keyring: &ComputePluginKeyringBinding,
+    trusted_now: DateTime<Utc>,
+    resolver: &dyn ComputePluginControlPlaneKeyResolver,
+) -> Result<String> {
+    validate_key_lookup(expected_keyring, &signature.signing_key_id)?;
     let key = resolver
         .resolve_control_plane_key(
-            &signed.signature.signing_key_id,
+            &signature.signing_key_id,
             expected_keyring,
             trusted_now.clone(),
         )?
@@ -152,22 +183,19 @@ pub(super) fn verify_install_plan_signature(
         expected_keyring,
         KEY_PURPOSE_CONTROL_INSTALL_PLAN,
         None,
-        &signed.signature.signing_key_id,
+        &signature.signing_key_id,
         trusted_now,
     )?;
     verify_jcs_ed25519(
-        &signed.plan,
-        &signed.canonicalization,
-        &signed.plan_digest_algorithm,
-        &signed.plan_digest,
-        &signed.signature,
-        COMPUTE_PLUGIN_INSTALL_PLAN_SIGNATURE_DOMAIN,
+        payload,
+        canonicalization,
+        digest_algorithm,
+        declared_digest,
+        signature,
+        domain,
         key.key(),
     )?;
-    Ok(SignatureVerifiedComputePluginInstallPlan {
-        signed: signed.clone(),
-        verification_key_fingerprint: key.key().fingerprint(),
-    })
+    Ok(key.key().fingerprint())
 }
 
 fn validate_key_lookup(

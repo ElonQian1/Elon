@@ -18,6 +18,7 @@ mod attestation;
 mod comparison;
 mod enrollment;
 mod publication;
+pub(super) mod v2;
 
 pub(in crate::node_agent_compute_plugin_host) use absence::{
     verify_rollback_anchor_absence_attestation, ComputePluginRollbackAnchorAbsenceAttestation,
@@ -33,8 +34,10 @@ pub(in crate::node_agent_compute_plugin_host) use attestation::{
     VerifiedComputePluginRollbackAnchor,
 };
 pub(in crate::node_agent_compute_plugin_host) use comparison::{
-    assess_rollback_anchor, ComputePluginRollbackAnchorAssessment,
-    ComputePluginRollbackAnchorPublishRequired, ComputePluginRollbackAnchorStartupPermit,
+    assess_rollback_anchor, assess_rollback_anchor_v2, ComputePluginRollbackAnchorAssessment,
+    ComputePluginRollbackAnchorAssessmentV2, ComputePluginRollbackAnchorPublishRequired,
+    ComputePluginRollbackAnchorPublishRequiredV2, ComputePluginRollbackAnchorStartupPermit,
+    ComputePluginRollbackAnchorStartupPermitV2,
 };
 pub(in crate::node_agent_compute_plugin_host) use enrollment::{
     begin_rollback_anchor_enrollment, verify_rollback_anchor_enrollment_receipt,
@@ -49,6 +52,15 @@ pub(in crate::node_agent_compute_plugin_host) use publication::{
     ComputePluginRollbackAnchorPublicationReceipt, ComputePluginRollbackAnchorPublicationRequest,
     ComputePluginSignedRollbackAnchorPublicationReceipt,
     ConfirmedComputePluginRollbackAnchorPublication,
+};
+pub(in crate::node_agent_compute_plugin_host) use v2::{
+    begin_rollback_anchor_challenge_v2, verify_rollback_anchor_attestation_v2,
+    ComputePluginAuthorityRollbackCheckpointV2, ComputePluginRollbackAnchorAttestationV2,
+    ComputePluginRollbackAnchorChallengePayloadV2, ComputePluginRollbackAnchorChallengeRequestV2,
+    ComputePluginRollbackAnchorChallengeV2, ComputePluginSignedRollbackAnchorAttestationV2,
+    HashedComputePluginAuthorityRollbackCheckpointV2, VerifiedComputePluginRollbackAnchorV2,
+    COMPUTE_PLUGIN_AUTHORITY_ROLLBACK_CHECKPOINT_V2_SCHEMA,
+    HASHED_COMPUTE_PLUGIN_AUTHORITY_ROLLBACK_CHECKPOINT_V2_SCHEMA,
 };
 
 pub(super) fn validate_checkpoint_envelope(

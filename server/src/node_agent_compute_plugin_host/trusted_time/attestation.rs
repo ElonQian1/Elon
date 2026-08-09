@@ -236,11 +236,15 @@ pub(in crate::node_agent_compute_plugin_host) fn verify_trusted_time_attestation
     )?;
     let observed_at = Instant::now();
     challenge.ensure_live(observed_at)?;
+    let expires_at = observed_at
+        .checked_add(super::TRUSTED_TIME_OBSERVATION_LIFETIME)
+        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_TRUSTED_TIME_DEADLINE_OVERFLOW"))?;
 
     Ok(
         ComputePluginTrustedTimeObservation::from_verified_attestation(
             trusted_now,
             observed_at,
+            expires_at,
             signed.attestation.installation_id_digest,
             signed.attestation.clock_epoch_digest,
             signed.attestation.time_authority_id,

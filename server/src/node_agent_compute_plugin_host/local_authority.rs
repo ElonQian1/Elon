@@ -25,6 +25,8 @@ mod initialization;
 mod keyring_integrity;
 mod keyring_snapshot;
 mod keyring_store;
+mod manifest_catalog_binding;
+mod opened_authority;
 mod plan_application;
 mod plan_application_persistence;
 mod plan_application_projection;
@@ -102,11 +104,21 @@ pub(crate) use initialization::{
 pub(crate) use keyring_store::{
     ComputePluginKeyringInstallDisposition, ComputePluginKeyringInstallResult,
 };
+pub(in crate::node_agent_compute_plugin_host) use manifest_catalog_binding::{
+    ComputePluginManifestCatalogBindingRecovery,
+    ComputePluginManifestCatalogBindingRecoveryOutcome,
+    ComputePluginManifestCatalogBindingStoreResult, DurableComputePluginManifestCatalogBinding,
+    HashedComputePluginManifestCatalogBindingReceipt, RejectedComputePluginManifestCatalogBinding,
+};
+pub(in crate::node_agent_compute_plugin_host) use opened_authority::{
+    ComputePluginHandleBoundAuthorityOpenIntent, OpenedComputePluginLocalAuthority,
+};
 pub(crate) use plan_application::{
     ComputePluginCandidateHandle, ComputePluginPlanApplicationDisposition,
     ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
 };
 pub(crate) use process_ownership::ComputePluginFetchProcessFence;
+pub(in crate::node_agent_compute_plugin_host) use rollback_checkpoint::GuardedLocalComputePluginAuthorityRollbackCheckpointV2;
 pub(crate) use rollback_checkpoint::{
     ComputePluginAuthorityRollbackCheckpoint, HashedComputePluginAuthorityRollbackCheckpoint,
     COMPUTE_PLUGIN_AUTHORITY_ROLLBACK_CHECKPOINT_SCHEMA,
@@ -139,9 +151,9 @@ pub(in crate::node_agent_compute_plugin_host) use verification_store::{
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Non-serializable identity shared only by clones of one in-process authority facade. It prevents
-/// a process fence or recovery handle from being replayed against another facade with matching
-/// scalar facts; it is not a database rollback anchor.
+/// Non-serializable identity shared only by capabilities descended from one in-process authority
+/// facade. It prevents a process fence or recovery handle from being replayed against another
+/// facade with matching scalar facts; it is not a database rollback anchor.
 #[derive(Clone)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginAuthorityInstanceBinding {
     identity: Arc<()>,
@@ -178,9 +190,12 @@ impl fmt::Debug for ComputePluginAuthorityInstanceBinding {
     }
 }
 
-/// Path-based facade for the plugin control-state authority. It is intentionally not wired into
-/// the Host yet; opening the database must happen only after the NodeAgent instance lock is held.
-#[derive(Debug, Clone)]
+/// Dormant path locator and legacy Store facade for the plugin control-state authority.
+///
+/// A value of this type is not a root capability and does not prove that SQLite was opened below a
+/// pinned root. Its path-opening kernels remain intentionally disconnected from the Host. Future
+/// planning and execution code must require `OpenedComputePluginLocalAuthority` instead.
+#[derive(Debug)]
 pub(crate) struct ComputePluginLocalAuthority {
     path: PathBuf,
     instance_binding: ComputePluginAuthorityInstanceBinding,
@@ -200,8 +215,9 @@ impl ComputePluginLocalAuthority {
         }
     }
 
-    /// Derives the one authority location below an already validated node compute-plugin root.
-    /// Construction is path-only: it does not create directories, open SQLite or install schema.
+    /// Derives the dormant authority location below the configured compute-plugin root.
+    /// Construction is path-only: the input is not promoted into a pinned-root capability, and
+    /// this method does not create directories, open SQLite or install schema.
     pub(in crate::node_agent_compute_plugin_host) fn for_compute_plugin_root(root: &Path) -> Self {
         Self::new(root.join(COMPUTE_PLUGIN_STATE_FILE))
     }
@@ -214,7 +230,8 @@ impl ComputePluginLocalAuthority {
         &self.instance_binding
     }
 
-    /// Opens and validates schema only; this does not initialize authority facts or enable sharing.
+    /// Legacy path-open seam only. It may create the database or migrate schema and therefore must
+    /// not be used by Bootstrap planning, even when the caller intends only to validate schema.
     pub(crate) fn ensure_schema(&self) -> Result<()> {
         self.connect().map(drop)
     }
@@ -236,9 +253,9 @@ impl ComputePluginLocalAuthority {
         Ok(value)
     }
 
-    /// Opens a stable, side-effect-free SQLite read snapshot for one authority decision. Only
-    /// nested authority kernels may use this seam; all durable changes still require a
-    /// purpose-specific immediate transaction.
+    /// Opens a stable deferred transaction for legacy nested readers. `connect()` may still create
+    /// directories, switch journal mode or install/migrate schema before this transaction begins,
+    /// so this is not a side-effect-free seam and must not back a planning snapshot producer.
     fn with_deferred<T>(&self, operation: impl FnOnce(&Transaction<'_>) -> Result<T>) -> Result<T> {
         let mut connection = self.connect()?;
         let transaction = connection
