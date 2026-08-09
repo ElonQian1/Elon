@@ -7,6 +7,7 @@ use crate::compute_federation::attempt_gateway::{
 
 use super::Store;
 
+mod ack_write;
 mod read;
 mod replay;
 mod source;
@@ -36,7 +37,7 @@ impl Store {
         let prepared = validation::prepare_verified_ack(verified)?;
         let mut connection = self.conn()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let receipt = write::ingest_verified_ack_on(&transaction, verified, &prepared)?;
+        let receipt = ack_write::ingest_verified_ack_on(&transaction, verified, &prepared)?;
         transaction.commit()?;
         Ok(receipt)
     }
