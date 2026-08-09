@@ -7,7 +7,7 @@ mod validation;
 /// A node binary that understands the planning-only V2 snapshot exchange.
 pub const CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2: &str =
     "compute_plugin_install_plan_planning_snapshot_v2";
-pub const COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_PROTO_VERSION: u32 = 11;
+pub const COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_PROTO_VERSION: u32 = 12;
 pub const COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_REQUEST_V2_SCHEMA: &str =
     "elon.compute_plugin.install_plan_planning_snapshot_request.v2";
 pub const COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2_SCHEMA: &str =
@@ -62,6 +62,16 @@ pub struct ComputePluginInstallPlanPlanningCandidateV2 {
     pub signed_manifest_envelope_digest: String,
 }
 
+/// Content-addressed identity of the work-admission head that still exactly matches the current
+/// active release. Absence is represented by `None` on the installed record; historical or stale
+/// local heads must never be projected as current.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ComputePluginInstallPlanPlanningWorkAdmissionV2 {
+    pub generation: u64,
+    pub receipt_digest: String,
+}
+
 /// Bounded projection sufficient to choose an InstallPlan action. It deliberately excludes local
 /// paths, health logs, download source references and runtime secrets.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -83,8 +93,7 @@ pub struct ComputePluginInstallPlanPlanningInstalledRecordV2 {
     pub runtime_generation: u64,
     pub active_attempts: u64,
     pub permission_grant_digest: Option<String>,
-    pub work_admission_generation: u64,
-    pub work_admission_receipt_digest: String,
+    pub work_admission: Option<ComputePluginInstallPlanPlanningWorkAdmissionV2>,
 }
 
 /// One coherent, planning-only authority report. This is evidence for a future cloud planner, not

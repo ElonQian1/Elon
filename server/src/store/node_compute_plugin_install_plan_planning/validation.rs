@@ -11,6 +11,8 @@ use super::{
     MAX_SAFE_INTEGER,
 };
 
+mod work_admission;
+
 pub(super) fn validate_planning_request(
     request: &homecli_proto::ComputePluginInstallPlanPlanningSnapshotRequestV2,
 ) -> Result<()> {
@@ -306,15 +308,13 @@ fn validate_installed_records(
     let mut plugin_ids = HashSet::new();
     let mut previous: Option<&str> = None;
     for record in &snapshot.installed_records {
+        work_admission::validate(record)?;
         if !bounded_identifier(&record.plugin_id)
             || previous.is_some_and(|value| value >= record.plugin_id.as_str())
             || !plugin_ids.insert(record.plugin_id.as_str())
             || !safe(record.install_generation)
             || !safe(record.runtime_generation)
             || !safe(record.active_attempts)
-            || !safe(record.work_admission_generation)
-            || record.work_admission_generation == 0
-            || !is_sha256(&record.work_admission_receipt_digest)
             || record.active_slot_ref == record.candidate_slot_ref
                 && record.active_slot_ref.is_some()
             || !matches!(record.desired_presence.as_str(), "present" | "absent")

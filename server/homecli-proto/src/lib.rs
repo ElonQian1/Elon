@@ -39,6 +39,7 @@ pub use compute_plugin_install_plan_planning_snapshot::{
     ComputePluginInstallPlanPlanningCandidateV2, ComputePluginInstallPlanPlanningInstalledRecordV2,
     ComputePluginInstallPlanPlanningReleaseV2, ComputePluginInstallPlanPlanningSnapshotObservedV2,
     ComputePluginInstallPlanPlanningSnapshotRequestV2, ComputePluginInstallPlanPlanningSnapshotV2,
+    ComputePluginInstallPlanPlanningWorkAdmissionV2,
     HashedComputePluginInstallPlanPlanningSnapshotV2,
     CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2,
     COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_OBSERVED_V2_SCHEMA,

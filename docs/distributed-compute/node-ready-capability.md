@@ -68,7 +68,7 @@ v216 把内容安装与 active 指针提升固定为同一个本机 `BEGIN IMMED
 
 事务写入互相精确引用且不可单独提交的 `candidate_install_receipts` 与 `candidate_promotion_receipts`，随后一次性把槽从 `staged` 推进为 `installed`、清除 candidate pointer、切换 active slot、推进 install/activation 与 authority/inventory fence，并把 candidate owner 从 `owned` 终结为 `promoted`。旧 active provenance 在升级时由前一对双回执精确承接；首次安装则保持完整空组。结果继续持有原受管文件句柄，提交不确定时只能通过 exact recovery 判定 `NotCreated` 或已存在的双回执，再经 fresh head 与同句柄重哈希恢复 custody。
 
-promotion 刻意保持 runtime 为 `stopped`、runtime generation 不变、active health 为空。候选预热健康只证明安装前内容检查，不会被复制成活动 Runtime 健康；双回执也不替代 work-admission receipt。因此 v11 Planning Snapshot、ReadyCapability V2 与商业调度仍继续失败关闭。本批已随 `elon-pc-node` 编译，v7 authority 全新安装、重开及 v3-v6 原子迁移等 11 项测试和 69 项 SQLite VFS 回归通过；尚未执行生产磁盘迁移或 install/promotion 完整事务夹具。
+promotion 刻意保持 runtime 为 `stopped`、runtime generation 不变、active health 为空。候选预热健康只证明安装前内容检查，不会被复制成活动 Runtime 健康；双回执也不替代 work-admission receipt。协议阈值 12 的 Planning Snapshot V2 因此把 work-admission 改为可选 current-head commitment：新晋升槽可诚实报告 `None`，而不是伪造 generation 1，planner 才能生成首次 `reauthorize_existing`；历史或失配 head 也必须投影为 `None`。这只解除合同自举环，snapshot producer、ReadyCapability V2 与商业调度仍继续失败关闭。v216 增量已随 `elon-pc-node` 编译，v7 authority 全新安装、重开及 v3-v6 原子迁移等 11 项测试和 69 项 SQLite VFS 回归通过；v217/v218 尚未编译、迁移或运行，也尚未执行生产磁盘迁移或 install/promotion 完整事务夹具。
 
 ## 9. Work-admission 仍不是 Ready
 

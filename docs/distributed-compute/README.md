@@ -20,6 +20,8 @@ owners: backend, node, ai-economy
 
 ## 当前事实
 
+> v218 合同修正：下表历史文字中的“v11 Planning Snapshot V2”现以协议阈值 12 解释；V2 schema/capability 名不变。installed record 的 work-admission 是可选 current-head commitment，`None` 允许新晋升槽取得首次 `reauthorize_existing`，`Some` 才承诺正 generation 与 receipt digest。当前仍无 snapshot producer，不能把该修正解释为 Runtime、Ready 或派发已可达。
+
 | 能力 | 2026-08-05 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |

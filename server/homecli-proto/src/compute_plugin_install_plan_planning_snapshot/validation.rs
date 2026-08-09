@@ -129,13 +129,12 @@ fn validate_installed_records(
 ) -> Result<(), &'static str> {
     let mut previous_plugin_id: Option<&str> = None;
     for record in &snapshot.installed_records {
+        validate_work_admission(record)?;
         if !bounded_identifier(&record.plugin_id)
             || previous_plugin_id.is_some_and(|previous| previous >= record.plugin_id.as_str())
             || !safe(record.install_generation)
             || !safe(record.runtime_generation)
             || !safe(record.active_attempts)
-            || !safe_positive(record.work_admission_generation)
-            || !is_sha256(&record.work_admission_receipt_digest)
             || !matches!(record.desired_presence.as_str(), "present" | "absent")
             || !matches!(record.desired_activation.as_str(), "enabled" | "disabled")
             || !matches!(
@@ -158,6 +157,38 @@ fn validate_installed_records(
         validate_active_record(record, &snapshot.target_id)?;
         validate_candidate_record(record, &snapshot.target_id)?;
         previous_plugin_id = Some(&record.plugin_id);
+    }
+    Ok(())
+}
+
+fn validate_work_admission(
+    record: &ComputePluginInstallPlanPlanningInstalledRecordV2,
+) -> Result<(), &'static str> {
+    let Some(work_admission) = record.work_admission.as_ref() else {
+        return Ok(());
+    };
+    let active_provenance_complete = [
+        record.active_slot_ref.is_some(),
+        record.active_release.is_some(),
+        record.active_install_receipt_digest.is_some(),
+        record.active_promotion_receipt_digest.is_some(),
+        record.active_signed_manifest_envelope_digest.is_some(),
+        record.permission_grant_digest.is_some(),
+    ]
+    .into_iter()
+    .all(|present| present);
+    if !active_provenance_complete
+        || record.desired_presence != "present"
+        || record.desired_activation != "enabled"
+        || record.admission != "allowed"
+        || record.runtime_phase != "stopped"
+        || record.active_attempts != 0
+        || record.candidate_slot_ref.is_some()
+        || record.candidate.is_some()
+        || !safe_positive(work_admission.generation)
+        || !is_sha256(&work_admission.receipt_digest)
+    {
+        return Err("COMPUTE_PLUGIN_PLANNING_SNAPSHOT_WORK_ADMISSION_INVALID");
     }
     Ok(())
 }
