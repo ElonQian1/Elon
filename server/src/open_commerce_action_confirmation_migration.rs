@@ -87,4 +87,48 @@ mod tests {
         assert_eq!(table_count, 1);
         assert_eq!(index_count, 1);
     }
+
+    #[test]
+    fn migration_v166_preserves_existing_rows_and_is_idempotent() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE open_commerce_action_confirmations (
+               id TEXT PRIMARY KEY,
+               status TEXT NOT NULL,
+               invocation_id TEXT
+             );
+             INSERT INTO open_commerce_action_confirmations(id, status, invocation_id) VALUES
+               ('pending-1', 'pending', NULL),
+               ('confirmed-1', 'confirmed', NULL),
+               ('consumed-1', 'consumed', 'invocation-1'),
+               ('expired-1', 'expired', NULL);",
+        )
+        .unwrap();
+
+        migration_v166(&conn).unwrap();
+        migration_v166(&conn).unwrap();
+
+        let canceled_column_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('open_commerce_action_confirmations')
+                 WHERE name='canceled_at'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let existing_rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM open_commerce_action_confirmations
+                 WHERE canceled_at IS NULL
+                   AND ((id='pending-1' AND status='pending' AND invocation_id IS NULL)
+                     OR (id='confirmed-1' AND status='confirmed' AND invocation_id IS NULL)
+                     OR (id='consumed-1' AND status='consumed' AND invocation_id='invocation-1')
+                     OR (id='expired-1' AND status='expired' AND invocation_id IS NULL))",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(canceled_column_count, 1);
+        assert_eq!(existing_rows, 4);
+    }
 }

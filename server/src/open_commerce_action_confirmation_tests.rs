@@ -2,6 +2,8 @@ use serde_json::json;
 
 #[path = "open_commerce_action_confirmation_cancellation_tests.rs"]
 mod cancellation_tests;
+#[path = "open_commerce_action_confirmation_read_tests.rs"]
+mod read_tests;
 #[path = "open_commerce_action_confirmation_test_support.rs"]
 mod test_support;
 
