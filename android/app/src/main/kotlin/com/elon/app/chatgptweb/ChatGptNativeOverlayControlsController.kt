@@ -64,10 +64,11 @@ internal class ChatGptNativeOverlayControlsController(
         val current = controls
         if (current.isEmpty() || activity.isFinishing || activity.isDestroyed) return
         dialog?.dismiss()
-        val builder = AlertDialog.Builder(activity)
-            .setTitle(R.string.chatgpt_official_page_actions)
-        contextLabel?.takeIf(String::isNotBlank)?.let(builder::setMessage)
-        dialog = builder
+        val title = contextLabel?.takeIf(String::isNotBlank)?.let { label ->
+            activity.getString(R.string.chatgpt_official_page_actions) + " · " + label
+        } ?: activity.getString(R.string.chatgpt_official_page_actions)
+        dialog = AlertDialog.Builder(activity)
+            .setTitle(title)
             .setItems(current.map(ChatGptWebUiControl::label).toTypedArray()) { opened, which ->
                 opened.dismiss()
                 onInvoke(current[which].id)

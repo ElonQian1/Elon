@@ -212,7 +212,12 @@ class ChatGptWebLabContractTest {
         assertTrue(overlay.contains("it.semantic == \"timestamp\""))
         assertTrue(overlay.contains("filterNot { it.semantic == \"timestamp\" }"))
         assertTrue(overlay.contains("controlsChanged && shouldPresent()"))
-        assertTrue(overlay.contains("contextLabel?.takeIf(String::isNotBlank)"))
+        assertTrue(
+            overlay.contains(
+                "activity.getString(R.string.chatgpt_official_page_actions) + \" · \" + label"
+            )
+        )
+        assertFalse(overlay.contains("setMessage"))
         assertTrue(activity.contains("modeController.isNativeSelected()"))
     }
 
