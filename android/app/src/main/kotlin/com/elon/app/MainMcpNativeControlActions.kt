@@ -31,6 +31,10 @@ internal class MainMcpNativeControlActions(
     private val activeRequestIsDevelopment: () -> Boolean,
     private val runningTaskCount: () -> Int,
     private val currentStage: () -> String,
+    private val activeFriend: () -> AppFriend? = { null },
+    private val activeFriendMessages: () -> List<ChatMessage> = { emptyList() },
+    private val openSocialAiChat: () -> Boolean = { false },
+    private val openChatGptWeb: () -> Unit = {},
     private val rememberMcpConversationSeed: (McpConversationSeed) -> Unit = {}
 ) {
     fun uiState(): JSONObject {
@@ -39,6 +43,7 @@ internal class MainMcpNativeControlActions(
         val lastMessage = conversation.messages.lastOrNull()
         return JSONObject()
             .put("active_page", activePage())
+            .put("active_surface", activeSurface())
             .put("toolbar_title", binding.topTitleText.text?.toString().orEmpty())
             .put("bottom_tab", activeBottomTab())
             .put("project_top_tab", activeProjectTopTab())
@@ -47,6 +52,7 @@ internal class MainMcpNativeControlActions(
             .put("project_count", projects.size)
             .put("projects", projectsJson())
             .put("active_conversation", conversationJson(conversation, activeConversationIndex(), lastMessage))
+            .put("social_chat", socialChatJson())
             .put("input", inputJson())
             .put("runtime", runtimeJson())
     }
@@ -78,6 +84,14 @@ internal class MainMcpNativeControlActions(
             }
             "show_project_plaza" -> {
                 navigationController().showProjectPlaza()
+                uiState()
+            }
+            "open_social_ai_chat" -> {
+                if (!openSocialAiChat()) return errorJson(action, "social_ai_friend_not_found")
+                uiState()
+            }
+            "open_chatgpt_web" -> {
+                openChatGptWeb()
                 uiState()
             }
             "open_project_chat" -> {
@@ -318,6 +332,13 @@ internal class MainMcpNativeControlActions(
         }
     }
 
+    private fun activeSurface(): String = when {
+        activeFriend()?.id == SOCIAL_AI_USER_ID -> "social_ai"
+        activeFriend() != null -> "friend_chat"
+        activePage() == "chat" -> "project_chat"
+        else -> activePage()
+    }
+
     private fun activeBottomTab(): String {
         return when {
             binding.tabChat.isSelected -> "chat"
@@ -387,6 +408,28 @@ internal class MainMcpNativeControlActions(
             .put("codex_thread_uri", conversation.codexThreadUri ?: JSONObject.NULL)
     }
 
+    private fun socialChatJson(): Any {
+        val friend = activeFriend() ?: return JSONObject.NULL
+        val messages = activeFriendMessages()
+        return JSONObject()
+            .put("friend_id", friend.id)
+            .put("friend_name", friend.name)
+            .put("is_social_ai", friend.id == SOCIAL_AI_USER_ID)
+            .put("message_count", messages.size)
+            .put("messages", JSONArray().apply {
+                messages.takeLast(MAX_SOCIAL_MESSAGES).forEachIndexed { offset, message ->
+                    put(JSONObject()
+                        .put("index", (messages.size - MAX_SOCIAL_MESSAGES).coerceAtLeast(0) + offset)
+                        .put("id", message.id ?: JSONObject.NULL)
+                        .put("role", message.role)
+                        .put("content", message.content.take(MAX_SOCIAL_MESSAGE_CHARS))
+                        .put("content_chars", message.content.length)
+                        .put("created_at_ms", message.createdAtMs)
+                    )
+                }
+            })
+    }
+
     private fun messagesJson(messages: List<ChatMessage>): JSONArray {
         val start = (messages.size - 16).coerceAtLeast(0)
         return JSONArray().apply {
@@ -439,5 +482,11 @@ internal class MainMcpNativeControlActions(
             .put("control_ok", false)
             .put("action", action)
             .put("error", code)
+    }
+
+    private companion object {
+        const val SOCIAL_AI_USER_ID = "usr_elon_ai"
+        const val MAX_SOCIAL_MESSAGES = 40
+        const val MAX_SOCIAL_MESSAGE_CHARS = 30_000
     }
 }

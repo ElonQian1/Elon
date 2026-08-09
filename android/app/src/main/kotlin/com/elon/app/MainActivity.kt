@@ -276,6 +276,10 @@ class MainActivity : AppCompatActivity() {
             activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
             runningTaskCount = { s.runningConversationTasks.size },
             currentStage = { projectStateActions.currentStage },
+            activeFriend = friendChatActions::currentFriend,
+            activeFriendMessages = friendChatActions::currentMessages,
+            openSocialAiChat = socialAiChatModeController::openSocialAiChat,
+            openChatGptWeb = socialAiChatModeController::openChatGptWeb,
             rememberMcpConversationSeed = { seed ->
                 rememberPendingMcpConversationSeed(prefs, s.gson, seed)
             }
@@ -339,6 +343,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        mcpNativeControlBinding.register()
         s.appInForeground = true
         applySystemBarColors()
         resumeActions.onResume()
@@ -1025,7 +1030,20 @@ class MainActivity : AppCompatActivity() {
             userId = { AuthManager.effectiveUserId(this) },
             clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
-            onFriendSummariesChanged = { friendActions.loadFriends() }
+            onFriendSummariesChanged = { friendActions.loadFriends() },
+            onActiveFriendChanged = socialAiChatModeController::onFriendChanged,
+        )
+    }
+
+    private val socialAiChatModeController: SocialAiChatModeController by lazy {
+        SocialAiChatModeController(
+            activity = this,
+            binding = binding,
+            findSocialAiFriend = { s.friends.firstOrNull { it.id == SocialAiChatModeController.SOCIAL_AI_USER_ID } },
+            closeGroupChat = { groupChatActions.closeGroupChat() },
+            closeProjectChat = { projectSpaceController.closeChannelChat() },
+            openFriend = { friend -> friendChatActions.openFriend(friend, animate = false) },
+            onFriendOpened = ::syncVisibleChatNotificationState,
         )
     }
 

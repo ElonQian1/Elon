@@ -32,7 +32,8 @@ internal class MainFriendChatActions(
     private val userId: () -> String,
     private val clearPendingAttachments: () -> Unit,
     private val collapseInputComposer: () -> Unit,
-    private val onFriendSummariesChanged: () -> Unit
+    private val onFriendSummariesChanged: () -> Unit,
+    private val onActiveFriendChanged: (AppFriend?) -> Unit = {},
 ) {
     private val messagesByFriend = linkedMapOf<String, MutableList<ChatMessage>>()
     private val pollHandler = Handler(Looper.getMainLooper())
@@ -90,6 +91,7 @@ internal class MainFriendChatActions(
         savedFriendTitle = friend.name
         binding.inputEdit.addTextChangedListener(typingWatcher)
         showFriendChat(friend.name, animate)
+        onActiveFriendChanged(friend)
         loadMessages(friend, silent = false, scrollToBottom = true)
         startPolling()
     }
@@ -100,6 +102,7 @@ internal class MainFriendChatActions(
         typingShowing = false
         savedFriendTitle = ""
         activeFriend = null
+        onActiveFriendChanged(null)
         activeAdapter = null
         stopPolling()
     }
@@ -109,6 +112,11 @@ internal class MainFriendChatActions(
     fun isDirectSocialAiActive(): Boolean = activeFriend?.id == SOCIAL_AI_USER_ID
 
     fun currentFriend(): AppFriend? = activeFriend
+
+    fun currentMessages(): List<ChatMessage> = activeFriend?.id
+        ?.let(messagesByFriend::get)
+        ?.toList()
+        .orEmpty()
 
     fun clearCurrentMessages() {
         val friend = activeFriend ?: return
