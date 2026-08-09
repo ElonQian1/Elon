@@ -12,7 +12,7 @@ implementation_status: implementation_unwired
 
 v213 在 v211 Start command 和 v212 sealed Execution Plan 之后增加耐久派发 custody；v214 形成 rejected/quarantine/reconcile 的 no-start 恢复；v215 再形成 accepted ACK 到 commit outbox 的本地原子闭包。它解决的不是“如何发一次 HTTP 请求”，而是先落 command 还是先碰远端、哪个 worker 拥有工作、网络结果未知时如何恢复，以及什么证据才足以证明远端从未开始执行。
 
-v213-v215 只形成本地领域合同、SQLite 账本、Store 状态核和反向门卫；不实现 concrete Adapter、resolver、worker、网络、定时器、公网 ACK ingress、Bearer 凭据解析、Runner 事件或 external-pool onboarding。所有可认证远端 observation 与发送 authority 仍由字段私有、不可 Clone、不可反序列化且没有生产构造器的 sealed 类型承载，因此真实投递与远端恢复继续不可达。服务端及测试源码已编译通过，但未执行迁移或运行数据库/生产链路。
+v213-v215 只形成本地领域合同、SQLite 账本、Store 状态核和反向门卫；不实现 concrete Adapter、resolver、worker、网络、定时器、公网 ACK ingress、Bearer 凭据解析、Runner 事件或 external-pool onboarding。所有可认证远端 observation 与发送 authority 仍由字段私有、不可 Clone、不可反序列化且没有生产构造器的 sealed 类型承载，因此真实投递与远端恢复继续不可达。服务端及测试源码已编译；内存 SQLite 完整迁移、重复应用、关键对象和 v215 冲突 backfill 门卫已通过 3 项专项测试，但生产磁盘迁移与生产链路未运行。
 
 ## 2. 先耐久、后远端
 
