@@ -93,6 +93,23 @@ class ChatGptWebCapabilityMatrixTest {
         )
     }
 
+    @Test
+    fun treatsCurrentConversationMenuSemanticsAsAdaptedControls() {
+        val controls = listOf("conversation_files", "pin", "archive")
+        controls.forEach { semantic ->
+            val matrix = ChatGptWebCapabilityMatrix.build(
+                snapshot = snapshot(emptySet()),
+                manifest = manifest("healthy", semantic),
+                bridgeState = ChatGptWebPageAdapter.State.READY,
+                mode = ChatGptWebModeController.Mode.NATIVE,
+            )
+
+            assertEquals(0, matrix.getJSONObject("manifest").getInt("generic_control_count"))
+            assertFalse(matrix.getJSONObject("adaptation_review").getBoolean("required"))
+            assertEquals(1, matrix.getJSONObject("observed_semantics").getInt(semantic))
+        }
+    }
+
     private fun snapshot(capabilities: Set<String>) = ChatGptWebSnapshot(
         title = "Work",
         url = "https://chatgpt.com/",

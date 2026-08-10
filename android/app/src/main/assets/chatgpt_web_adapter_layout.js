@@ -99,6 +99,9 @@
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(signal + ' ' + path)) return 'gpts';
     if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
     if (/create.*(?:file|website)|创建.*(?:文件|网站)/.test(signal)) return 'create_asset';
+    if (/view.*files.*chat|在聊天中查看文件/.test(signal)) return 'conversation_files';
+    if (/unpin|pin.chat|取消置顶|置顶聊天/.test(signal)) return 'pin';
+    if (/unarchive|archive|取消归档|归档/.test(signal)) return 'archive';
     if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
@@ -155,6 +158,9 @@
       settings: '设置',
       create_asset: '创建文件或网站',
       sources: '文件和来源',
+      conversation_files: '在聊天中查看文件',
+      pin: '置顶聊天',
+      archive: '归档',
       more: '更多操作',
       timestamp: '消息时间'
     })[semantic] || '操作';

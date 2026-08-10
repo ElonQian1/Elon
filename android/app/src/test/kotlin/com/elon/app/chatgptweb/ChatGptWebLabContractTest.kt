@@ -102,6 +102,12 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("return 'sources'"))
         assertTrue(adapterLayout.contains("return 'create_asset'"))
         assertTrue(adapterLayout.contains("文件和来源|查看来源|来源"))
+        assertTrue(adapterLayout.contains("return 'conversation_files'"))
+        assertTrue(adapterLayout.contains("return 'pin'"))
+        assertTrue(adapterLayout.contains("return 'archive'"))
+        assertTrue(adapterLayout.contains("在聊天中查看文件"))
+        assertTrue(adapterLayout.contains("取消置顶|置顶聊天"))
+        assertTrue(adapterLayout.contains("取消归档|归档"))
         assertTrue(adapterLayout.contains("return 'more'"))
         val semanticFunction = adapterLayout.substring(
             adapterLayout.indexOf("function semanticFor"),
