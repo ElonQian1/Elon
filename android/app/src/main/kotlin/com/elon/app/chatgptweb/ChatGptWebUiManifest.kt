@@ -6,6 +6,8 @@ internal data class ChatGptWebUiManifest(
     val title: String,
     val compatibility: String,
     val controls: List<ChatGptWebUiControl>,
+    val discoveredControlCount: Int = controls.size,
+    val controlsTruncated: Boolean = false,
 )
 
 internal data class ChatGptWebUiControl(

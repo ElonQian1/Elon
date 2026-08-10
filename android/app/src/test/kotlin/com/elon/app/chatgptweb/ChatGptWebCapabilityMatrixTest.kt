@@ -52,6 +52,30 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun treatsAControlDiscoveryTruncationAsAnExplicitMcpGap() {
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = manifest("healthy", "action").copy(
+                discoveredControlCount = 620,
+                controlsTruncated = true,
+            ),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        assertFalse(matrix.getBoolean("ready_for_mcp"))
+        assertEquals(
+            "manifest_controls_truncated",
+            matrix.getJSONArray("blocking_gaps").getString(0),
+        )
+        val manifest = matrix.getJSONObject("manifest")
+        assertEquals(1, manifest.getInt("control_count"))
+        assertEquals(620, manifest.getInt("discovered_control_count"))
+        assertTrue(manifest.getBoolean("controls_truncated"))
+        assertTrue(matrix.getJSONObject("adaptation_review").getBoolean("required"))
+    }
+
+    @Test
     fun reportsAuthenticationAndBridgeFailuresAsBlocking() {
         val snapshot = snapshot(emptySet()).copy(authenticated = false, composerReady = false)
         val matrix = ChatGptWebCapabilityMatrix.build(

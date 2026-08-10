@@ -54,6 +54,7 @@ internal object ChatGptWebCapabilityMatrix {
                 manifest.compatibility != "healthy" &&
                 snapshot?.dictationActive != true
             ) add("manifest_${manifest.compatibility}")
+            if (manifest?.controlsTruncated == true) add("manifest_controls_truncated")
         }
         val reviewReasons = buildList {
             if (semantics[ChatGptWebUiSemantics.GENERIC_ACTION].orZero() > 0) {
@@ -64,6 +65,7 @@ internal object ChatGptWebCapabilityMatrix {
             if (unexpectedFallbackControls.isNotEmpty()) {
                 add("unexpected_official_fallback_controls_present")
             }
+            if (manifest?.controlsTruncated == true) add("manifest_controls_truncated")
         }
         return JSONObject()
             .put("control_ok", true)
@@ -75,13 +77,20 @@ internal object ChatGptWebCapabilityMatrix {
             .put("authenticated", snapshot?.authenticated ?: false)
             .put("dictation_active", snapshot?.dictationActive ?: false)
             .put("ready_for_chat", blockingGaps.isEmpty())
-            .put("ready_for_mcp", bridgeState == ChatGptWebPageAdapter.State.READY && manifest != null)
+            .put(
+                "ready_for_mcp",
+                bridgeState == ChatGptWebPageAdapter.State.READY &&
+                    manifest != null &&
+                    manifest.controlsTruncated.not(),
+            )
             .put("official_fallback", true)
             .put("manifest", JSONObject()
                 .put("version", manifest?.version ?: JSONObject.NULL)
                 .put("page_kind", manifest?.pageKind ?: JSONObject.NULL)
                 .put("compatibility", manifest?.compatibility ?: JSONObject.NULL)
                 .put("control_count", manifest?.controls?.size ?: 0)
+                .put("discovered_control_count", manifest?.discoveredControlCount ?: 0)
+                .put("controls_truncated", manifest?.controlsTruncated ?: false)
                 .put(
                     "generic_control_count",
                     semantics[ChatGptWebUiSemantics.GENERIC_ACTION].orZero(),

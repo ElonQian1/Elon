@@ -287,6 +287,11 @@ internal object ChatGptWebProtocol {
                 )
             }
         }
+        val rawControlCount = rawControls?.length() ?: 0
+        val discoveredControlCount = event
+            .optInt("discoveredControlCount", rawControlCount)
+            .coerceAtLeast(rawControlCount)
+            .coerceIn(controls.size, MAX_DISCOVERED_UI_CONTROLS)
         return ChatGptWebUiManifest(
             version = event.optInt("version", 1).coerceIn(1, MAX_UI_MANIFEST_VERSION),
             pageKind = event.optString("pageKind").takeIf { it in UI_PAGE_KINDS } ?: "unknown",
@@ -294,6 +299,10 @@ internal object ChatGptWebProtocol {
             compatibility = event.optString("compatibility")
                 .takeIf { it in UI_COMPATIBILITY } ?: "partial",
             controls = controls,
+            discoveredControlCount = discoveredControlCount,
+            controlsTruncated = event.optBoolean("controlsTruncated") ||
+                rawControlCount > MAX_UI_CONTROLS ||
+                discoveredControlCount > rawControlCount,
         )
     }
 
@@ -397,10 +406,11 @@ internal object ChatGptWebProtocol {
     private const val MAX_TITLE_LENGTH = 160
     private const val MAX_PATH_LENGTH = 256
     private const val MAX_ID_LENGTH = 160
-    private const val MAX_UI_CONTROLS = 160
+    private const val MAX_UI_CONTROLS = 512
+    private const val MAX_DISCOVERED_UI_CONTROLS = 10_000
     private const val MAX_UI_CONTROL_ID_LENGTH = 72
     private const val MAX_UI_CONTROL_LABEL_LENGTH = 160
-    private const val MAX_UI_MANIFEST_VERSION = 3
+    private const val MAX_UI_MANIFEST_VERSION = 4
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")

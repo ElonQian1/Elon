@@ -219,10 +219,12 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"ui_manifest_snapshot",
-                "version":3,
+                "version":4,
                 "pageKind":"home",
                 "title":"工作",
                 "compatibility":"healthy",
+                "discoveredControlCount":9,
+                "controlsTruncated":false,
                 "controls":[
                   {"id":"control_navigation","semantic":"navigation","label":"打开导航","region":"header","role":"button","enabled":true},
                   {"id":"control_suggestion_ab12","semantic":"suggestion","label":"帮我整理待办","region":"suggestions","role":"button","enabled":true,"inViewport":false},
@@ -241,6 +243,8 @@ class ChatGptWebProtocolTest {
 
         assertEquals("工作", event.value.title)
         assertEquals("healthy", event.value.compatibility)
+        assertEquals(9, event.value.discoveredControlCount)
+        assertFalse(event.value.controlsTruncated)
         assertEquals(8, event.value.controls.size)
         assertEquals("suggestion", event.value.controls[1].semantic)
         assertFalse(event.value.controls[1].inViewport)
@@ -256,6 +260,34 @@ class ChatGptWebProtocolTest {
         assertEquals("create_asset", event.value.controls[6].semantic)
         assertEquals("action", event.value.controls.last().semantic)
         assertEquals("chatgpt-control:control_navigation:打开导航", event.value.controls.first().accessibilityLabel)
+    }
+
+    @Test
+    fun boundsLargeUiManifestsAndReportsDiscoveryTruncation() {
+        val controls = (1..512).joinToString(",") { index ->
+            """{"id":"control_action_$index","semantic":"action","label":"操作 $index","region":"content","role":"button"}"""
+        }
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"ui_manifest_snapshot",
+                "version":4,
+                "pageKind":"feature",
+                "title":"应用",
+                "compatibility":"healthy",
+                "discoveredControlCount":620,
+                "controlsTruncated":true,
+                "controls":[$controls]
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.UiManifest
+
+        assertEquals(512, event.value.controls.size)
+        assertEquals(620, event.value.discoveredControlCount)
+        assertTrue(event.value.controlsTruncated)
     }
 
     @Test

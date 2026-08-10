@@ -37,6 +37,8 @@ class ChatGptWebMcpActionsTest {
         assertEquals(0.25, control.getDouble("web_x_ratio"), 0.0)
         assertFalse(control.getBoolean("in_viewport"))
         assertEquals(1, state.getJSONObject("navigation").getInt("conversation_count"))
+        assertEquals(2, state.getJSONObject("ui_manifest").getInt("discovered_control_count"))
+        assertFalse(state.getJSONObject("ui_manifest").getBoolean("controls_truncated"))
         assertEquals(123L, state.getJSONObject("last_command").getLong("observed_at_ms"))
         assertEquals(
             "chatgpt-control:control_suggestion_demo:整理待办",
@@ -119,6 +121,10 @@ class ChatGptWebMcpActionsTest {
         val conversations = actions.control(JSONObject()
             .put("action", "chatgpt_get_conversations")
             .put("query", "验证"))
+
+        assertEquals(2, controls.getInt("manifest_control_count"))
+        assertEquals(2, controls.getInt("discovered_control_count"))
+        assertFalse(controls.getBoolean("controls_truncated"))
 
         assertEquals(1, controls.getInt("match_count"))
         assertEquals("control_suggestion_demo", controls.getJSONArray("controls")

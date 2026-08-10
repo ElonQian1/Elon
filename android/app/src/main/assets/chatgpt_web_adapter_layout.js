@@ -5,6 +5,7 @@
 
   let controlsById = new Map();
   let lastFingerprint = '';
+  const MAX_DISCOVERED_CONTROLS = 512;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -294,7 +295,11 @@
     addRegionControls(controls, overlay, 'overlay', used);
     addMessageControls(controls, used);
     addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
-    return controls.slice(0, 160);
+    return {
+      controls: controls.slice(0, MAX_DISCOVERED_CONTROLS),
+      totalCount: controls.length,
+      truncated: controls.length > MAX_DISCOVERED_CONTROLS
+    };
   }
 
   function pageKind() {
@@ -321,14 +326,17 @@
   }
 
   function snapshot() {
-    const controls = discover();
+    const discovery = discover();
+    const controls = discovery.controls;
     const kind = pageKind();
     return {
       type: 'ui_manifest_snapshot',
-      version: 3,
+      version: 4,
       pageKind: kind,
       title: pageTitle(controls),
       compatibility: compatibilityFor(controls, kind),
+      discoveredControlCount: discovery.totalCount,
+      controlsTruncated: discovery.truncated,
       controls
     };
   }
@@ -339,6 +347,8 @@
       pageKind: event.pageKind,
       title: event.title,
       compatibility: event.compatibility,
+      discoveredControlCount: event.discoveredControlCount,
+      controlsTruncated: event.controlsTruncated,
       controls: event.controls.map((control) => ({
         id: control.id,
         semantic: control.semantic,

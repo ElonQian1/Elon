@@ -118,6 +118,25 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun coversTheFullProtocolControlBoundaryWithoutDroppingPageActions() {
+        val controls = (1..512).map { index ->
+            control(
+                id = "feature_$index",
+                semantic = "action",
+                label = "功能 $index",
+                region = ChatGptWebUiRegion.CONTENT,
+            )
+        }
+
+        val actions = ChatGptNativeControlPresentation.pageActions(controls)
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(512, actions.size)
+        assertEquals(512, coverage.values.count { it.kind.wireName == "menu" })
+        assertEquals("chatgpt-page-actions:512", coverage.getValue("feature_512").nativeTriggerSelector)
+    }
+
+    @Test
     fun movesSuggestionOverflowIntoTheNativeMenu() {
         val controls = (1..5).map { index ->
             control(

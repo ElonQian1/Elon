@@ -3,7 +3,7 @@ package com.elon.app.chatgptweb
 internal object ChatGptNativeControlPresentation {
     const val HEADER_ACTION_LIMIT = 2
     const val SUGGESTION_LIMIT = 4
-    const val PAGE_ACTION_LIMIT = 160
+    const val PAGE_ACTION_LIMIT = 512
 
     enum class Kind(val wireName: String) {
         DIRECT("direct"),
