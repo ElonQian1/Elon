@@ -3,6 +3,8 @@ title: 开放商业消费者关系人工映射与重新授权 V1
 status: accepted
 date: 2026-08-03
 owners: backend, product
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_http_pc_build
 ---
 
 # 开放商业消费者关系人工映射与重新授权 V1
@@ -22,6 +24,13 @@ owners: backend, product
 7. 映射创建、撤销和重新授权申请都写入审计日志；映射按当前用户和消费者项目隔离。
 8. 对签名可信的 V4 包，若来源与目标商户具有相同的有效持有证明指纹，映射记录保存 `trusted_operator_key_match` 和匹配键。该证据不代替消费者确认。
 
+## 验证证据
+
+- 4 项 Rust/SQLite 与进程内 Axum 专项覆盖明确确认、同目标幂等、冲突映射、撤销、范围子集、本人 App、目标发布状态、旧 Grant 不恢复，以及登录、项目和同项目用户隔离。
+- `cargo check --tests` 与目标测试 `portability_reauthorization` 已通过；目标测试结果为 4 通过、0 失败。
+- PC 已通过严格类型检查、开放商业契约回归和 Vite 生产构建。
+- 上述证据只验证本机 SQLite 和进程内 HTTP 路由，不等同于真实 TCP、浏览器交互、跨运营方身份互认或生产部署。
+
 ## 边界
 
 - 当前没有自动商户身份联邦、域名证明、工商证明、DID、证书链或跨运营方商户签名。
@@ -36,4 +45,6 @@ owners: backend, product
 - `server/src/store/open_commerce_portability_reauthorization.rs`
 - `server/src/open_commerce_portability_reauthorization_api.rs`
 - `server/src/open_commerce_portability_reauthorization_migration.rs`
+- `server/src/open_commerce_portability_reauthorization_service_tests.rs`
+- `server/src/open_commerce_portability_reauthorization_api_tests.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerPortabilityReauthorization.tsx`
