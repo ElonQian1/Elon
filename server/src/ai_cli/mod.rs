@@ -506,8 +506,8 @@ async fn run_via_pc_agent_once(
                         );
                         let _ = state
                             .agent_manager
-                            .close_agent_session(
-                                agent_id,
+                            .close_process_session(
+                                pc_cancel_guard.process_session(),
                                 "lightweight CLI prompt did not receive any node event",
                             )
                             .await;
@@ -661,8 +661,8 @@ async fn run_via_pc_agent_once(
                     );
                     let _ = state
                         .agent_manager
-                        .close_agent_session(
-                            agent_id,
+                        .close_process_session(
+                            pc_cancel_guard.process_session(),
                             "project CLI prompt timed out before terminal event",
                         )
                         .await;

@@ -24,10 +24,10 @@ implementation_status: implementation_unwired
 
 - legacy secret 没有版本、撤销历史或耐久 currentness；
 - Register 中的 owner、install、版本和 capability 都是节点自报事实；
-- 进程内随机 `session_id` 只用于连接替换，不能证明底层 credential 仍是当前版本；
-- `AgentManager` 和 `NodeRegistry` 都以 `agent_id` 为主要键，旧 reader 可能在新会话建立后继续触碰按节点索引的状态；
+- 进程内随机 `session_id` 已被封进不可序列化的 `AgentProcessSessionKey`，它只用于同进程连接替换，不能证明底层 credential 仍是当前版本；
+- `AgentManager` 和 `NodeRegistry` 仍以 `agent_id` 索引，但当前源码已让 entry 保存 exact process key，并让旧 reader 的 touch、capability update、unregister 与 manager mutation 对 key 做比较；
 - 当前公开默认地址仍包含 `ws://` / `http://`，服务器也没有可用于本权威的受信 TLS transport evidence producer；
-- 发送前检查 session UUID 不能替代 ACK 落账事务中的 credential/session currentness 重验。
+- sharing、preparation 与 Planning Snapshot 的 ACK-derived 同步 Store 写已在 process-key read lease 内成组执行，replacement 不能穿越该本地窗口；这仍不能替代 ACK 落账事务中的耐久 credential/session currentness 重验。
 
 因此端点凭据、认证 receipt、会话 current head 与在线 socket 必须分层。只有未来同批桥接完成后，安全传输、当前凭据和当前会话的交集才可能成为 compute endpoint authority。
 
@@ -72,6 +72,8 @@ credential version 只保存验证承诺，不向 API 或协议返回 secret has
 
 当前 sealed domain 的 `NodeEndpointSessionBinding` 已精确携带 agent/credential、credential revision/digest、session ID/generation、receipt ID/digest 与 server instance。未来 `AgentEntry`、`NodeEntry` 应保存该 binding 或由它派生的字段私有 handle；替换、关闭、心跳、capability 更新、敏感 ACK 和断开清理都只能对这个 exact key 做 CAS，不能只传 `agent_id` 或裸 `session_id`。
 
+当前新增的 `AgentProcessSessionKey` 是这一桥接前的窄前置层：`AgentEntry` 与 `NodeEntry` 只保存一份 key，安装连接时固定 `AgentManager.agents -> NodeRegistry.nodes` 锁序；旧 entry 先收到同步 shutdown，再在锁外清理 pending/ACK；旧 reader 的 touch/update/unregister 均为 no-op。`with_current_process_session` 只允许在 manager read guard 内运行无 `await` 的同步操作，三条插件观察链用它保护 ACK-derived Store 写与下一条 durable intent 的准备。该 key 没有 credential revision、receipt、server instance 或跨进程恢复能力，不能进入任何 compute authority digest。
+
 authentication digest 覆盖固定 `bearer_sha256` authentication method、agent version、capability digest 及 sealed WSS verifier evidence；capability 原文只作为物理投影保存，不另进 canonical envelope。当前 sealed contract 把一次认证会话冻结为 15 分钟绝对有效期；后续若需要继续连接，必须形成下一代 receipt/head，不能延长或改写旧 receipt。
 
 session head 的既有 active 只允许精确转为 `closed`、`stale`、`credential_rotated` 或 `credential_revoked`，或者被 generation `+1` 的新 active receipt 取代。服务重启后必须通过 server-instance binding 或启动收口让旧 active head 不再具有 currentness；receipt 只证明认证发生时的绑定，耐久 head 只证明事务检查时的 currentness，两者都不能冒充 live socket。
@@ -99,9 +101,9 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 
 1. `server/src/node_register_api.rs`：把新签发、持有旧凭据的 rotate、显式 recover 和 terminal revoke 分开；凭据签发 HTTP 本身也需要受信 HTTPS proof。credential 事务先使旧 session head 非 current，提交后才 best-effort 关闭 exact 内存会话。
 2. `server/src/homecli_agent.rs::agent_ws_handler` 与 `server/src/homecli_agent/agent_session.rs`：用受信 transport verifier 和单一 Store 认证事务替代 env-first、hash 查询后再查 metadata 的两段判断。
-3. `server/src/homecli_agent.rs::{AgentEntry,AgentManager}`：保存 exact session key；安装、查找、发送、替换和关闭均比较 exact key。现有 agent-id-only `close_agent_session` 不能用于安全撤销。
-4. `server/src/node_registry.rs::{NodeEntry,NodeRegistry}`：让 `register`、`update_capabilities`、`touch` 与 `unregister` 都接收并比较 exact session binding；旧 reader 不得改写新 session 的 entry，所有 online/candidate reader 也只能返回与 current binding 一致的投影。
-5. `server/src/homecli_agent/compute_plugin_sharing.rs` 及其 `install_plan_preparation.rs`、`install_plan_planning_snapshot.rs` 子叶：dispatch 与 ACK 结果携 exact key；敏感 observation 在同一 Store 事务中再次重验 current session head。
+3. `server/src/homecli_agent.rs::{AgentEntry,AgentManager}`：process-local exact key、替换与同步 fence 已铺；未来必须换成或联结耐久 `NodeEndpointSessionBinding`。现有 agent-id-only `close_agent_session` 仍是 legacy facade，不能用于安全撤销。
+4. `server/src/node_registry.rs::{NodeEntry,NodeRegistry}`：process-local `register_exact`、`update_capabilities_exact`、`touch_exact` 与 `unregister_exact` 已铺；未来 online/candidate reader 仍须联结耐久 current binding，不能把本地 map 当认证事实。
+5. `server/src/homecli_agent/compute_plugin_sharing.rs` 及其 `install_plan_preparation.rs`、`install_plan_planning_snapshot.rs` 子叶：dispatch 与 ACK 已携 process key，ACK-derived 同步 Store closure 已阻止本地 replacement 穿越；未来敏感 observation 仍必须在同一 Store 事务中重验耐久 session head。
 6. `server/homecli-proto/src/lib.rs`、`compute_plugin_sharing.rs`、`compute_plugin_install_plan_preparation.rs` 与 `compute_plugin_install_plan_planning_snapshot.rs`：dispatch request 和 observed ACK 都冻结 exact endpoint binding，不能继续只依赖 cloud session UUID 或 authorization 自报。
 7. `server/src/node_agent_registration.rs`、`node_agent_config.rs`、`node_agent_cloud_connection.rs`、`node_agent_session.rs` 与 `server/homecli-proto/src/lib.rs`：注册响应、持久凭据、WS bearer 和 Register 帧均携 credential ID/revision；process-local credential epoch 只防本机换证竞态，不能冒充云端 revision。
 8. `server/src/node_register_api.rs`、`node_agent_config.rs` 与 `node_agent_admin_open.rs` 的生产地址及部署配置：公网凭据签发必须 HTTPS、节点通道必须 WSS；loopback 或显式开发期不安全通道只能进入 legacy/non-compute 分支。
@@ -126,6 +128,7 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 - migration：`server/src/node_compute_sharing_migration.rs` 的 `migration_v216` 与 `server/src/node_compute_sharing_migration/endpoint_authority*.rs`；
 - domain：`server/src/node_compute_sharing/endpoint_authority.rs`；
 - Store：`server/src/store/node_credentials/endpoint_authority.rs`，子叶为 `credentials.rs`、`credentials/{root,rows,write}.rs`、`secret.rs`、`sessions.rs` 与 `sessions/{head_rows,receipt_rows}.rs`；
+- process-local fencing：`server/src/node_registry/session_key.rs`、`server/src/homecli_agent/session_fencing.rs`，以及 exact-key 接线后的 `agent_session.rs` 与三条插件 observation 子叶；
 - migration registry：`server/src/store_migrations.rs`。
 
 当前 Store surface 只有 crate-internal `issue_fresh_node_endpoint_credential`、`rotate_node_endpoint_credential`、`recover_node_endpoint_credential`、`revoke_node_endpoint_credential`、`authenticate_node_endpoint_session`、`close_node_endpoint_session`、`inspect_node_endpoint_session_currentness`、`restart_node_endpoint_sessions` 与 `recover_node_endpoint_session_heads`，且全部限制为 `pub(in crate::store)`。

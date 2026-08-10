@@ -1,16 +1,24 @@
 use super::{ai_cli_pc_execution::record_pc_execution_finished, NativeSessionScope};
-use crate::{homecli_agent::CliPromptCancelHandle, types::AppState};
+use crate::{
+    homecli_agent::CliPromptCancelHandle, node_registry::AgentProcessSessionKey, types::AppState,
+};
 use std::sync::Arc;
 
 pub(super) struct PcCliCancelOnDrop {
+    process_session: AgentProcessSessionKey,
     handle: Option<CliPromptCancelHandle>,
 }
 
 impl PcCliCancelOnDrop {
     pub(super) fn armed(handle: CliPromptCancelHandle) -> Self {
         Self {
+            process_session: handle.process_session().clone(),
             handle: Some(handle),
         }
+    }
+
+    pub(super) fn process_session(&self) -> &AgentProcessSessionKey {
+        &self.process_session
     }
 
     pub(super) fn disarm(&mut self) {

@@ -2,6 +2,7 @@ use tokio::sync::mpsc;
 
 use super::{failure, AgentManager, AgentToServer, ComputePluginSharingDispatchFailure};
 use crate::{
+    node_registry::AgentProcessSessionKey,
     store::{
         NodeComputePluginInstallPlanPlanningDispatchIntentV2, PlanningSnapshotObservationCommitV2,
     },
@@ -13,7 +14,7 @@ impl AgentManager {
         &self,
         agent_id: &str,
         req_id: &str,
-        expected_session_id: &str,
+        expected_process_session: &AgentProcessSessionKey,
         request: homecli_proto::ComputePluginInstallPlanPlanningSnapshotRequestV2,
     ) -> std::result::Result<
         homecli_proto::ComputePluginInstallPlanPlanningSnapshotObservedV2,
@@ -27,7 +28,7 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_PLANNING_SNAPSHOT_AGENT_OFFLINE",
                 ));
             };
-            if agent.session_id != expected_session_id {
+            if &agent.process_session != expected_process_session {
                 return Err(planning_failure(
                     "session_replaced",
                     "COMPUTE_PLUGIN_PLANNING_SNAPSHOT_SESSION_REPLACED",
@@ -99,7 +100,7 @@ impl AgentManager {
 pub(super) async fn dispatch_durable_install_plan_planning_snapshot_v2(
     state: &AppState,
     intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
-    expected_session_id: &str,
+    expected_process_session: &AgentProcessSessionKey,
 ) {
     if !intent.dispatchable {
         return;
@@ -109,7 +110,7 @@ pub(super) async fn dispatch_durable_install_plan_planning_snapshot_v2(
         .dispatch_compute_plugin_install_plan_planning_snapshot_v2(
             &intent.request.node_id,
             &intent.planning_delivery_id,
-            expected_session_id,
+            expected_process_session,
             intent.request.clone(),
         )
         .await
@@ -120,12 +121,27 @@ pub(super) async fn dispatch_durable_install_plan_planning_snapshot_v2(
             return;
         }
     };
-    let committed = match state
-        .store
-        .record_node_compute_plugin_install_plan_planning_observation_v2(intent, &observed)
-    {
-        Ok(committed) => committed,
-        Err(error) => {
+    let committed = state
+        .agent_manager
+        .with_current_process_session(expected_process_session, |_| {
+            state
+                .store
+                .record_node_compute_plugin_install_plan_planning_observation_v2(intent, &observed)
+        })
+        .await;
+    let committed = match committed {
+        None => {
+            record_failure(
+                state,
+                intent,
+                planning_failure(
+                    "session_replaced",
+                    "COMPUTE_PLUGIN_PLANNING_SNAPSHOT_SESSION_REPLACED_BEFORE_ACK_COMMIT",
+                ),
+            );
+            return;
+        }
+        Some(Err(error)) => {
             tracing::warn!(node_id = %intent.request.node_id, error = %error,
                 "failed to persist Planning Snapshot V2 observation");
             record_failure(
@@ -138,6 +154,7 @@ pub(super) async fn dispatch_durable_install_plan_planning_snapshot_v2(
             );
             return;
         }
+        Some(Ok(committed)) => committed,
     };
     let PlanningSnapshotObservationCommitV2::Snapshot(_) = committed else {
         return;

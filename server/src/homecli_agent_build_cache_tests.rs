@@ -12,7 +12,7 @@ async fn registered_build_cache_agent() -> BuildCacheTestAgent {
     manager.agents.write().await.insert(
         "agent".to_string(),
         AgentEntry {
-            session_id: "build-cache-session".to_string(),
+            process_session: AgentProcessSessionKey::new("agent", "build-cache-session"),
             agent_id: "agent".to_string(),
             version: "build-cache-test".to_string(),
             proto_version: homecli_proto::PROTO_VERSION,

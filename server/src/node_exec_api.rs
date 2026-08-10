@@ -264,22 +264,29 @@ async fn dispatch_and_collect_node_exec(
         }
     };
     let (req_id, mut rx, cancel_handle) = dispatch.into_parts();
-    let mut first_cli_event =
-        match wait_for_pc_cli_prompt_acceptance(state, agent_id, node_label, &req_id, cli, &mut rx)
-            .await
-        {
-            Ok(event) => event,
-            Err(e) => {
-                let _ = cancel_handle.cancel();
-                return Ok(NodeExecRun {
-                    req_id,
-                    output: String::new(),
-                    exit_ok: false,
-                    error: Some(e.to_string()),
-                    model: None,
-                });
-            }
-        };
+    let mut first_cli_event = match wait_for_pc_cli_prompt_acceptance(
+        state,
+        agent_id,
+        node_label,
+        &req_id,
+        cli,
+        cancel_handle.process_session(),
+        &mut rx,
+    )
+    .await
+    {
+        Ok(event) => event,
+        Err(e) => {
+            let _ = cancel_handle.cancel();
+            return Ok(NodeExecRun {
+                req_id,
+                output: String::new(),
+                exit_ok: false,
+                error: Some(e.to_string()),
+                model: None,
+            });
+        }
+    };
 
     let mut output = String::new();
     let mut exit_ok = false;

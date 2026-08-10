@@ -26,7 +26,7 @@ async fn registered_approval_agent() -> TestApprovalAgent {
     manager.agents.write().await.insert(
         "agent".to_string(),
         AgentEntry {
-            session_id: "session".to_string(),
+            process_session: AgentProcessSessionKey::new("agent", "session"),
             agent_id: "agent".to_string(),
             version: "test".to_string(),
             proto_version: homecli_proto::PROTO_VERSION,
@@ -93,6 +93,7 @@ fn cli_prompt_cancel_handle_sends_cancel_for_req_id() {
     let handle = CliPromptCancelHandle {
         req_id: "req-123".to_string(),
         cmd_tx,
+        process_session: AgentProcessSessionKey::new("agent", "session"),
     };
 
     assert!(handle.cancel());

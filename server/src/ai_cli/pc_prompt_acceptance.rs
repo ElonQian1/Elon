@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
 use tokio::sync::mpsc::UnboundedReceiver;
 
-use crate::types::AppState;
+use crate::{node_registry::AgentProcessSessionKey, types::AppState};
 
 const PC_AGENT_CLI_ACCEPT_TIMEOUT_ENV: &str = "ELON_PC_AGENT_CLI_ACCEPT_TIMEOUT_SECS";
 const PC_AGENT_CLI_ACCEPT_TIMEOUT_DEFAULT_SECS: u64 = 15;
@@ -60,6 +60,7 @@ pub(crate) async fn wait_for_pc_cli_prompt_acceptance(
     node_label: &str,
     pc_req_id: &str,
     cli_name: &str,
+    process_session: &AgentProcessSessionKey,
     rx: &mut UnboundedReceiver<AgentToServer>,
 ) -> Result<Option<AgentToServer>> {
     let timeout_secs = pc_agent_cli_accept_timeout_secs();
@@ -85,7 +86,7 @@ pub(crate) async fn wait_for_pc_cli_prompt_acceptance(
         Err(_) => {
             let _ = state
                 .agent_manager
-                .close_agent_session(agent_id, "CLI prompt accept timeout")
+                .close_process_session(process_session, "CLI prompt accept timeout")
                 .await;
             Err(PcCliPromptAcceptTimeout::new(agent_id, node_label, cli_name, timeout_secs).into())
         }

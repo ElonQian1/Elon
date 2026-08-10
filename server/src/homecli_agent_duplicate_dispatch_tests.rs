@@ -23,7 +23,7 @@ async fn reconnect_agent() -> ReconnectAgent {
     manager.agents.write().await.insert(
         "agent".to_string(),
         AgentEntry {
-            session_id: "reconnected-session".to_string(),
+            process_session: AgentProcessSessionKey::new("agent", "reconnected-session"),
             agent_id: "agent".to_string(),
             version: "test".to_string(),
             proto_version: homecli_proto::PROTO_VERSION,

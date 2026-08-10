@@ -3,7 +3,10 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
 use super::{AgentManager, AgentToServer, ServerToAgent};
-use crate::{store::NodeComputePluginSharingDispatchIntent, types::AppState};
+use crate::{
+    node_registry::AgentProcessSessionKey, store::NodeComputePluginSharingDispatchIntent,
+    types::AppState,
+};
 
 const ACK_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -12,13 +15,12 @@ mod install_plan_preparation;
 
 pub(crate) struct ComputePluginSharingSessionAck {
     observed: homecli_proto::ComputePluginSharingPolicyObservedV1,
-    session_id: String,
+    process_session: AgentProcessSessionKey,
 }
 
 pub(super) fn spawn_current_compute_plugin_sharing_session_replay(
     state: Arc<AppState>,
-    agent_id: String,
-    session_id: String,
+    process_session: AgentProcessSessionKey,
     proto_version: u32,
     capabilities: &[String],
 ) {
@@ -29,6 +31,7 @@ pub(super) fn spawn_current_compute_plugin_sharing_session_replay(
     {
         return;
     }
+    let agent_id = process_session.agent_id().to_string();
     tokio::spawn(async move {
         match state
             .store
@@ -38,7 +41,7 @@ pub(super) fn spawn_current_compute_plugin_sharing_session_replay(
                 dispatch_durable_compute_plugin_sharing_intent_for_session(
                     &state,
                     &intent,
-                    Some(&session_id),
+                    Some(&process_session),
                 )
                 .await;
             }
@@ -64,11 +67,11 @@ impl AgentManager {
         &self,
         agent_id: &str,
         req_id: &str,
-        expected_session_id: Option<&str>,
+        expected_process_session: Option<&AgentProcessSessionKey>,
         snapshot: homecli_proto::ComputePluginSharingPolicySnapshotV1,
     ) -> std::result::Result<ComputePluginSharingSessionAck, ComputePluginSharingDispatchFailure>
     {
-        let (cmd_tx, pending, session_id) = {
+        let (cmd_tx, pending, process_session) = {
             let agents = self.agents.read().await;
             let Some(agent) = agents.get(agent_id) else {
                 return Err(failure(
@@ -76,7 +79,7 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_SHARING_AGENT_OFFLINE",
                 ));
             };
-            if expected_session_id.is_some_and(|expected| agent.session_id != expected) {
+            if expected_process_session.is_some_and(|expected| &agent.process_session != expected) {
                 return Err(failure(
                     "dispatch_failed",
                     "COMPUTE_PLUGIN_SHARING_SESSION_REPLACED",
@@ -96,7 +99,7 @@ impl AgentManager {
             (
                 agent.cmd_tx.clone(),
                 agent.pending.clone(),
-                agent.session_id.clone(),
+                agent.process_session.clone(),
             )
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -131,7 +134,7 @@ impl AgentManager {
                 observed,
             })) if observed_req_id == req_id => Ok(ComputePluginSharingSessionAck {
                 observed,
-                session_id,
+                process_session,
             }),
             Ok(Some(_)) => Err(failure(
                 "dispatch_failed",
@@ -156,7 +159,7 @@ pub(crate) async fn dispatch_durable_compute_plugin_sharing_intent(
 async fn dispatch_durable_compute_plugin_sharing_intent_for_session(
     state: &AppState,
     intent: &NodeComputePluginSharingDispatchIntent,
-    expected_session_id: Option<&str>,
+    expected_process_session: Option<&AgentProcessSessionKey>,
 ) {
     if !intent.dispatchable {
         return;
@@ -219,7 +222,7 @@ async fn dispatch_durable_compute_plugin_sharing_intent_for_session(
         .dispatch_compute_plugin_sharing_policy(
             &intent.node_id,
             &intent.delivery_id,
-            expected_session_id,
+            expected_process_session,
             snapshot,
         )
         .await
@@ -230,15 +233,6 @@ async fn dispatch_durable_compute_plugin_sharing_intent_for_session(
                 record_failure(state, intent, code);
                 return;
             }
-            if let Err(error) =
-                state
-                    .store
-                    .record_node_compute_plugin_sharing_delivery(intent, "dispatched", None)
-            {
-                tracing::warn!(node_id = %intent.node_id, error = %error,
-                    "failed to persist compute plugin sharing dispatch ACK event");
-                return;
-            }
             let observed_json = match serde_json::to_value(&observed) {
                 Ok(value) => value,
                 Err(error) => {
@@ -247,41 +241,54 @@ async fn dispatch_durable_compute_plugin_sharing_intent_for_session(
                     return;
                 }
             };
-            let observation_persisted =
-                match state.store.record_node_compute_plugin_sharing_observation(
-                    intent,
-                    observed.accepted,
-                    &observed_json,
-                ) {
-                    Ok(()) => true,
-                    Err(error) => {
-                        tracing::warn!(node_id = %intent.node_id, error = %error,
-                        "failed to persist compute plugin sharing observation");
-                        false
-                    }
-                };
-            if observation_persisted && observed.accepted && intent.plugin_runtime_requested {
-                match state
-                    .store
-                    .prepare_node_compute_plugin_install_plan_preparation_delivery(
+            let commit = state
+                .agent_manager
+                .with_current_process_session(&session_ack.process_session, |_| {
+                    state.store.record_node_compute_plugin_sharing_delivery(
                         intent,
-                        &snapshot_digest,
-                    ) {
-                    Ok(Some(preparation)) => {
-                        install_plan_preparation::dispatch_durable_install_plan_preparation(
-                            state,
-                            &preparation,
-                            &session_ack.session_id,
-                        )
-                        .await;
+                        "dispatched",
+                        None,
+                    )?;
+                    state.store.record_node_compute_plugin_sharing_observation(
+                        intent,
+                        observed.accepted,
+                        &observed_json,
+                    )?;
+                    if observed.accepted && intent.plugin_runtime_requested {
+                        state
+                            .store
+                            .prepare_node_compute_plugin_install_plan_preparation_delivery(
+                                intent,
+                                &snapshot_digest,
+                            )
+                    } else {
+                        Ok(None)
                     }
-                    Ok(None) => {}
-                    Err(error) => tracing::warn!(
-                        node_id = %intent.node_id,
-                        error = %error,
-                        "failed to prepare durable InstallPlan context request"
-                    ),
+                })
+                .await;
+            let preparation = match commit {
+                None => {
+                    record_failure(
+                        state,
+                        intent,
+                        "COMPUTE_PLUGIN_SHARING_SESSION_REPLACED_BEFORE_ACK_COMMIT",
+                    );
+                    return;
                 }
+                Some(Err(error)) => {
+                    tracing::warn!(node_id = %intent.node_id, error = %error,
+                        "failed to persist process-session-fenced sharing ACK closure");
+                    return;
+                }
+                Some(Ok(preparation)) => preparation,
+            };
+            if let Some(preparation) = preparation {
+                install_plan_preparation::dispatch_durable_install_plan_preparation(
+                    state,
+                    &preparation,
+                    &session_ack.process_session,
+                )
+                .await;
             }
         }
         Err(failure) => {

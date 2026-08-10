@@ -16,12 +16,14 @@ use uuid::Uuid;
 use sha2::Digest as _;
 
 use crate::{
+    node_registry::AgentProcessSessionKey,
     realtime_metrics::{self, RealtimeChannel},
     types::AppState,
     ws_transport::try_json_text_message,
 };
 
 use super::public_dev_handshake::record_node_public_dev_handshake;
+use super::session_fencing::{apply_current_session_capabilities, install_process_session};
 use super::{
     clean_optional, heartbeat, journal, AgentEntry, AgentManager, AGENT_WS_READ_TIMEOUT,
     DURABLE_CLI_COMPLETION_PROTO_VERSION, PROJECT_STORAGE_PREPARE_TIMEOUT_ENV,
@@ -249,6 +251,7 @@ pub(super) async fn run_agent_session(
     tracing::info!(%agent_id, %version, proto_version, device_name = ?device_name, "agent registered");
     state.agent_manager.ensure_cli_recovery_worker();
     let session_id = Uuid::new_v4().to_string();
+    let process_session = AgentProcessSessionKey::new(agent_id.clone(), session_id.clone());
     let session_version = version.clone();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
@@ -261,7 +264,7 @@ pub(super) async fn run_agent_session(
         Arc::new(Mutex::new(HashMap::new()));
     let (session_shutdown, session_shutdown_rx) = watch::channel(false);
     let entry = AgentEntry {
-        session_id: session_id.clone(),
+        process_session: process_session.clone(),
         agent_id: agent_id.clone(),
         version,
         proto_version,
@@ -285,59 +288,19 @@ pub(super) async fn run_agent_session(
         session_shutdown: session_shutdown.clone(),
     };
 
-    // 若同一 agent_id 已有旧连接，通过旧 cmd_tx 发 Close 消息主动终止它，
-    // 避免两个实例并存导致 WebSocket 资源竞争和 "Connection reset by peer"。
-    {
-        let mut agents = state.agent_manager.agents.write().await;
-        if let Some(old_entry) = agents.get(&agent_id) {
-            tracing::info!(
-                %agent_id,
-                old_session_id = %old_entry.session_id,
-                new_session_id = %session_id,
-                "evicting previous agent session (same agent_id re-registered)"
-            );
-            state
-                .agent_manager
-                .recover_session_pending(
-                    &agent_id,
-                    &old_entry.pending,
-                    &old_entry.cli_pending_ids,
-                    "PC 节点通信临时中断：Win 端正在更新升级/重启或节点重新注册，旧连接已关闭。",
-                )
-                .await;
-            fail_pending_approvals(&old_entry.approval_acks).await;
-            fail_pending_pings(&old_entry.ping_acks).await;
-            let _ = old_entry.session_shutdown.send(true);
-        }
-        agents.insert(agent_id.clone(), entry);
-    }
-
-    // 注册到节点注册表（分布式节点功能）
-    let connected_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
     let session_device_name = device_name.clone();
     let session_owner_user_id = resolved_owner_user_id.clone().unwrap_or_default();
-    state
-        .node_registry
-        .register(
-            agent_id.clone(),
-            session_owner_user_id.clone(),
-            device_name,
-            hardware,
-            storage,
-            dev_runtime,
-            lifecycle,
-            vec![],
-            connected_at,
-        )
-        .await;
+    install_process_session(
+        &state,
+        &process_session,
+        entry,
+        session_owner_user_id.clone(),
+    )
+    .await?;
 
     super::compute_plugin_sharing::spawn_current_compute_plugin_sharing_session_replay(
         Arc::clone(&state),
-        agent_id.clone(),
-        session_id.clone(),
+        process_session.clone(),
         proto_version,
         &capabilities,
     );
@@ -432,15 +395,25 @@ pub(super) async fn run_agent_session(
             match frame {
                 Message::Text(t) => match serde_json::from_str::<AgentToServer>(&t) {
                     Ok(msg) => {
-                        state.node_registry.touch(&agent_id).await;
+                        if !state.node_registry.touch_exact(&process_session).await {
+                            break AgentSessionCloseReason::ReaderShutdown;
+                        }
                         if let AgentToServer::CliCompletionReplay { completion } = &msg {
-                            let ack = crate::ai_cli::pc_completion_replay::handle_pc_cli_completion_replay(
-                                state.as_ref(),
-                                &agent_id,
-                                resolved_owner_user_id.as_deref(),
-                                install_id.as_deref(),
-                                completion.clone(),
-                            );
+                            let ack = state
+                                .agent_manager
+                                .with_current_process_session(&process_session, |_| {
+                                    crate::ai_cli::pc_completion_replay::handle_pc_cli_completion_replay(
+                                        state.as_ref(),
+                                        &agent_id,
+                                        resolved_owner_user_id.as_deref(),
+                                        install_id.as_deref(),
+                                        completion.clone(),
+                                    )
+                                })
+                                .await;
+                            let Some(ack) = ack else {
+                                break AgentSessionCloseReason::ReaderShutdown;
+                            };
                             if matches!(
                                 &ack,
                                 ServerToAgent::CliCompletionAck { accepted: true, .. }
@@ -465,13 +438,21 @@ pub(super) async fn run_agent_session(
                             continue;
                         }
                         if let AgentToServer::CliLocalTaskSync { snapshot } = &msg {
-                            let ack = crate::ai_cli::pc_completion_replay::handle_pc_local_task_sync(
-                                state.as_ref(),
-                                &agent_id,
-                                resolved_owner_user_id.as_deref(),
-                                install_id.as_deref(),
-                                snapshot.clone(),
-                            );
+                            let ack = state
+                                .agent_manager
+                                .with_current_process_session(&process_session, |_| {
+                                    crate::ai_cli::pc_completion_replay::handle_pc_local_task_sync(
+                                        state.as_ref(),
+                                        &agent_id,
+                                        resolved_owner_user_id.as_deref(),
+                                        install_id.as_deref(),
+                                        snapshot.clone(),
+                                    )
+                                })
+                                .await;
+                            let Some(ack) = ack else {
+                                break AgentSessionCloseReason::ReaderShutdown;
+                            };
                             if cmd_tx.send(ack).is_err() {
                                 return (
                                     Err(anyhow!("agent writer closed before local task sync ACK")),
@@ -532,68 +513,24 @@ pub(super) async fn run_agent_session(
                                     dev_runtime,
                                     lifecycle,
                                 } => {
-                                    if let Some(hardware) = hardware.as_ref() {
-                                        if !session_owner_user_id.is_empty() {
-                                            if let Err(e) =
-                                                state.store.upsert_node_hardware_snapshot(
-                                                    &agent_id,
-                                                    &session_owner_user_id,
-                                                    session_device_name.as_deref(),
-                                                    hardware,
-                                                )
-                                            {
-                                                tracing::warn!(
-                                                    %agent_id,
-                                                    error = %e,
-                                                    "failed to update node hardware snapshot"
-                                                );
-                                            }
-                                        }
-                                    }
-                                    if !session_owner_user_id.is_empty() {
-                                        record_node_public_dev_handshake(
-                                            &state,
-                                            &agent_id,
-                                            &session_owner_user_id,
-                                            &session_version,
-                                            &allowed_clis,
-                                            dev_runtime.as_ref(),
-                                            "failed to record node capability handshake",
-                                        )
-                                        .await;
-                                    }
+                                    if !apply_current_session_capabilities(
+                                        &state,
+                                        &process_session,
+                                        &session_owner_user_id,
+                                        session_device_name.as_deref(),
+                                        &session_version,
+                                        models,
+                                        allowed_clis,
+                                        tts_worker_url.as_deref(),
+                                        hardware.as_ref(),
+                                        storage.as_ref(),
+                                        dev_runtime.as_ref(),
+                                        lifecycle.as_ref(),
+                                    )
+                                    .await
                                     {
-                                        let mut agents = state.agent_manager.agents.write().await;
-                                        if let Some(entry) = agents.get_mut(&agent_id) {
-                                            if !allowed_clis.is_empty() {
-                                                entry.allowed_clis = allowed_clis.clone();
-                                            }
-                                            if hardware.is_some() {
-                                                entry.hardware = hardware.clone();
-                                            }
-                                            if storage.is_some() {
-                                                entry.storage = storage.clone();
-                                            }
-                                            if dev_runtime.is_some() {
-                                                entry.dev_runtime = dev_runtime.clone();
-                                            }
-                                            if lifecycle.is_some() {
-                                                entry.lifecycle = lifecycle.clone();
-                                            }
-                                        }
+                                        break AgentSessionCloseReason::ReaderShutdown;
                                     }
-                                    state
-                                        .node_registry
-                                        .update_capabilities(
-                                            &agent_id,
-                                            models.clone(),
-                                            tts_worker_url.clone(),
-                                            hardware.clone(),
-                                            storage.clone(),
-                                            dev_runtime.clone(),
-                                            lifecycle.clone(),
-                                        )
-                                        .await;
                                 }
                                 AgentToServer::Pong { nonce } => {
                                     if let Some(nonce) = nonce.as_deref() {
@@ -601,7 +538,7 @@ pub(super) async fn run_agent_session(
                                             let _ = tx.send(());
                                         }
                                     }
-                                    state.node_registry.touch(&agent_id).await;
+                                    state.node_registry.touch_exact(&process_session).await;
                                 }
                                 _ => {}
                             }
@@ -610,13 +547,13 @@ pub(super) async fn run_agent_session(
                     Err(e) => tracing::warn!("bad agent msg: {e}: {t}"),
                 },
                 Message::Ping(payload) => {
-                    state.node_registry.touch(&agent_id).await;
+                    state.node_registry.touch_exact(&process_session).await;
                     if control_tx.send(Message::Pong(payload)).is_err() {
                         break AgentSessionCloseReason::WriterClosed;
                     }
                 }
                 Message::Pong(_) => {
-                    state.node_registry.touch(&agent_id).await;
+                    state.node_registry.touch_exact(&process_session).await;
                 }
                 Message::Close(_) => break AgentSessionCloseReason::ReaderClosed,
                 Message::Binary(_) => {}
@@ -631,18 +568,16 @@ pub(super) async fn run_agent_session(
         let mut agents = state.agent_manager.agents.write().await;
         let is_current = agents
             .get(&agent_id)
-            .map(|entry| entry.session_id == session_id)
-            .unwrap_or(false);
+            .is_some_and(|entry| entry.process_session == process_session);
         if is_current {
             agents.remove(&agent_id);
+            state.node_registry.unregister_exact(&process_session).await;
             true
         } else {
             false
         }
     };
-    if removed_current_session {
-        state.node_registry.unregister(&agent_id).await;
-    } else {
+    if !removed_current_session {
         tracing::info!(
             %agent_id,
             %session_id,

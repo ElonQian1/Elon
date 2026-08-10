@@ -115,6 +115,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
             &node_progress_name,
             &pc_req_id,
             request.cli_name,
+            cancel_handle.process_session(),
             &mut rx,
         )
         .await;

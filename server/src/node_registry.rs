@@ -17,11 +17,16 @@ use homecli_proto::{
 use serde::Serialize;
 use tokio::sync::RwLock;
 
+mod session_key;
+pub(crate) use session_key::AgentProcessSessionKey;
+
 const NODE_TIMEOUT: Duration = Duration::from_secs(90);
 
 // ── 数据结构 ──────────────────────────────────────────────────────────────────
 
 pub struct NodeEntry {
+    /// Same-process stale-reader fence; never credential/session authority.
+    process_session: AgentProcessSessionKey,
     pub node_id: String,
     /// 节点属主的用户 ID（积分归属）
     pub owner_user_id: String,
@@ -75,9 +80,12 @@ impl NodeRegistry {
     }
 
     /// 节点上线：创建或覆盖注册条目。
-    pub async fn register(
+    ///
+    /// Call only while holding the matching `AgentManager.agents` write guard;
+    /// this preserves the global Manager -> Registry lock order.
+    pub(crate) async fn register_exact(
         &self,
-        node_id: String,
+        process_session: AgentProcessSessionKey,
         owner_user_id: String,
         device_name: Option<String>,
         hardware: Option<NodeHardwareProfile>,
@@ -87,7 +95,9 @@ impl NodeRegistry {
         models: Vec<ModelCapability>,
         connected_at: u64,
     ) {
+        let node_id = process_session.agent_id().to_string();
         let entry = NodeEntry {
+            process_session,
             node_id: node_id.clone(),
             owner_user_id,
             device_name,
@@ -104,47 +114,66 @@ impl NodeRegistry {
     }
 
     /// 节点断开：立即删除注册条目。
-    pub async fn unregister(&self, node_id: &str) {
-        self.nodes.write().await.remove(node_id);
+    pub(crate) async fn unregister_exact(&self, process_session: &AgentProcessSessionKey) -> bool {
+        let mut nodes = self.nodes.write().await;
+        let is_current = nodes
+            .get(process_session.agent_id())
+            .is_some_and(|entry| &entry.process_session == process_session);
+        if is_current {
+            nodes.remove(process_session.agent_id());
+        }
+        is_current
     }
 
     /// 节点更新能力列表（RegisterCapabilities 消息触发）。
-    pub async fn update_capabilities(
+    pub(crate) async fn update_capabilities_exact(
         &self,
-        node_id: &str,
+        process_session: &AgentProcessSessionKey,
         models: Vec<ModelCapability>,
         tts_worker_url: Option<String>,
         hardware: Option<NodeHardwareProfile>,
         storage: Option<NodeStorageProfile>,
         dev_runtime: Option<NodeDevRuntimeProfile>,
         lifecycle: Option<NodeLifecycleReport>,
-    ) {
-        if let Some(entry) = self.nodes.write().await.get_mut(node_id) {
-            entry.models = models;
-            if tts_worker_url.is_some() {
-                entry.tts_worker_url = tts_worker_url;
-            }
-            if hardware.is_some() {
-                entry.hardware = hardware;
-            }
-            if storage.is_some() {
-                entry.storage = storage;
-            }
-            if dev_runtime.is_some() {
-                entry.dev_runtime = dev_runtime;
-            }
-            if lifecycle.is_some() {
-                entry.lifecycle = lifecycle;
-            }
-            entry.last_seen = Instant::now();
+    ) -> bool {
+        let mut nodes = self.nodes.write().await;
+        let Some(entry) = nodes.get_mut(process_session.agent_id()) else {
+            return false;
+        };
+        if &entry.process_session != process_session {
+            return false;
         }
+        entry.models = models;
+        if tts_worker_url.is_some() {
+            entry.tts_worker_url = tts_worker_url;
+        }
+        if hardware.is_some() {
+            entry.hardware = hardware;
+        }
+        if storage.is_some() {
+            entry.storage = storage;
+        }
+        if dev_runtime.is_some() {
+            entry.dev_runtime = dev_runtime;
+        }
+        if lifecycle.is_some() {
+            entry.lifecycle = lifecycle;
+        }
+        entry.last_seen = Instant::now();
+        true
     }
 
     /// 刷新节点最后活跃时间（收到心跳 Pong 时调用）。
-    pub async fn touch(&self, node_id: &str) {
-        if let Some(entry) = self.nodes.write().await.get_mut(node_id) {
-            entry.last_seen = Instant::now();
+    pub(crate) async fn touch_exact(&self, process_session: &AgentProcessSessionKey) -> bool {
+        let mut nodes = self.nodes.write().await;
+        let Some(entry) = nodes.get_mut(process_session.agent_id()) else {
+            return false;
+        };
+        if &entry.process_session != process_session {
+            return false;
         }
+        entry.last_seen = Instant::now();
+        true
     }
 
     /// 为指定模型寻找一个在线节点，返回 node_id。
@@ -311,12 +340,16 @@ mod tests {
         }
     }
 
+    fn process_session(node_id: &str, session_id: &str) -> AgentProcessSessionKey {
+        AgentProcessSessionKey::new(node_id, session_id)
+    }
+
     #[tokio::test]
     async fn target_node_must_be_online_and_support_model() {
         let registry = NodeRegistry::new();
         registry
-            .register(
-                "node-a".to_string(),
+            .register_exact(
+                process_session("node-a", "session-a"),
                 "user-a".to_string(),
                 Some("PC-A".to_string()),
                 None,
@@ -328,8 +361,8 @@ mod tests {
             )
             .await;
         registry
-            .register(
-                "node-b".to_string(),
+            .register_exact(
+                process_session("node-b", "session-b"),
                 "user-b".to_string(),
                 Some("PC-B".to_string()),
                 None,
@@ -359,6 +392,63 @@ mod tests {
                 .find_node_for_model_target("qwen", Some("missing"))
                 .await,
             None
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_process_session_cannot_mutate_replacement() {
+        let registry = NodeRegistry::new();
+        let stale = process_session("node-a", "session-a");
+        let current = process_session("node-a", "session-b");
+        registry
+            .register_exact(
+                stale.clone(),
+                "user-a".to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                vec![model("old")],
+                1,
+            )
+            .await;
+        registry
+            .register_exact(
+                current.clone(),
+                "user-a".to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                vec![model("current")],
+                2,
+            )
+            .await;
+
+        assert!(!registry.touch_exact(&stale).await);
+        assert!(
+            !registry
+                .update_capabilities_exact(
+                    &stale,
+                    vec![model("stale")],
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+        );
+        assert!(!registry.unregister_exact(&stale).await);
+        assert!(registry.touch_exact(&current).await);
+        assert_eq!(
+            registry
+                .find_node_for_model_target("current", Some("node-a"))
+                .await
+                .as_deref(),
+            Some("node-a")
         );
     }
 }

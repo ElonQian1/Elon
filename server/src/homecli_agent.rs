@@ -8,7 +8,7 @@
 //!
 //! Protocol: see [`homecli_proto`].
 
-use crate::types::AppState;
+use crate::{node_registry::AgentProcessSessionKey, types::AppState};
 use anyhow::{anyhow, Result};
 use axum::{
     extract::{
@@ -78,6 +78,7 @@ mod heartbeat;
 mod journal;
 mod pending_recovery;
 mod public_dev_handshake;
+mod session_fencing;
 mod summary;
 pub(crate) use compute_plugin_sharing::dispatch_durable_compute_plugin_sharing_intent;
 use public_dev_handshake::record_node_public_dev_handshake;
@@ -94,7 +95,8 @@ mod homecli_agent_tests;
 /// Snapshot of one connected PC agent.
 #[derive(Clone)]
 pub struct AgentEntry {
-    session_id: String,
+    /// Exact process-local replacement fence; never durable endpoint authority.
+    process_session: AgentProcessSessionKey,
     pub agent_id: String,
     pub version: String,
     pub proto_version: u32,
@@ -141,10 +143,14 @@ impl CliPromptDispatch {
 pub struct CliPromptCancelHandle {
     req_id: String,
     cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
+    process_session: AgentProcessSessionKey,
 }
 impl CliPromptCancelHandle {
     pub fn req_id(&self) -> &str {
         &self.req_id
+    }
+    pub(crate) fn process_session(&self) -> &AgentProcessSessionKey {
+        &self.process_session
     }
     pub fn cancel(&self) -> bool {
         self.cmd_tx
@@ -318,7 +324,7 @@ impl AgentManager {
         if req_id.is_empty() || req_id.len() > 200 || req_id.chars().any(char::is_control) {
             return Err(anyhow!("invalid pre-authorized CLI req_id"));
         }
-        let (cmd_tx, pending, cli_pending_ids, ping_acks) = {
+        let (cmd_tx, pending, cli_pending_ids, ping_acks, process_session) = {
             let agents = self.agents.read().await;
             let agent = agents
                 .get(agent_id)
@@ -345,6 +351,7 @@ impl AgentManager {
                 agent.pending.clone(),
                 agent.cli_pending_ids.clone(),
                 agent.ping_acks.clone(),
+                agent.process_session.clone(),
             )
         };
         if requires_cloud_control && cloud_control_deadline.is_none() {
@@ -361,7 +368,7 @@ impl AgentManager {
             send_protocol_ping(agent_id, &cmd_tx, &ping_acks, AGENT_DISPATCH_PROBE_TIMEOUT).await
         {
             let _ = self
-                .close_agent_session(agent_id, "dispatch probe failed")
+                .close_process_session(&process_session, "dispatch probe failed")
                 .await;
             return Err(anyhow!("agent not connected: {agent_id} ({error})"));
         }
@@ -400,6 +407,7 @@ impl AgentManager {
         let cancel_handle = CliPromptCancelHandle {
             req_id: req_id.clone(),
             cmd_tx: cmd_tx.clone(),
+            process_session,
         };
         if let Err(error) = cmd_tx
             .send(ServerToAgent::CliPrompt {
@@ -525,34 +533,6 @@ impl AgentManager {
                 connected_at: a.connected_at,
             })
             .collect()
-    }
-    /// Close the currently registered session for an agent, forcing the PC client to reconnect.
-    pub async fn close_agent_session(&self, agent_id: &str, reason: &str) -> bool {
-        let shutdown = {
-            let agents = self.agents.read().await;
-            agents.get(agent_id).map(|entry| {
-                (
-                    entry.session_id.clone(),
-                    entry.session_shutdown.clone(),
-                    entry.pending.clone(),
-                    entry.cli_pending_ids.clone(),
-                    entry.approval_acks.clone(),
-                    entry.ping_acks.clone(),
-                )
-            })
-        };
-        let Some((session_id, shutdown, pending, cli_pending_ids, approval_acks, ping_acks)) =
-            shutdown
-        else {
-            return false;
-        };
-        tracing::warn!(%agent_id, %session_id, %reason, "closing PC agent session");
-        self.recover_session_pending(agent_id, &pending, &cli_pending_ids, reason)
-            .await;
-        fail_pending_approvals(&approval_acks).await;
-        fail_pending_pings(&ping_acks).await;
-        let _ = shutdown.send(true);
-        true
     }
     /// 广播 UpdateClient 消息给所有在线节点，触发无感自动更新。
     /// 返回成功发送的节点数量。
@@ -786,9 +766,9 @@ mod agent_session;
 #[cfg(test)]
 use agent_session::route_req_message_to_pending;
 use agent_session::{
-    fail_pending_approvals, fail_pending_pings, project_storage_prepare_timeout,
-    project_workspace_inspect_timeout, project_workspace_provision_timeout, run_agent_session,
-    send_protocol_ping, tool_approval_ack_key,
+    project_storage_prepare_timeout, project_workspace_inspect_timeout,
+    project_workspace_provision_timeout, run_agent_session, send_protocol_ping,
+    tool_approval_ack_key,
 };
 
 mod test_dispatch;
