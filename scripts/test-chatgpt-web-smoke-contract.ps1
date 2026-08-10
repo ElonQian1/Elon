@@ -28,6 +28,8 @@ Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
 Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
 Assert-Contains 'function Get-TopResumedActivity'
+Assert-Contains 'Add-Check "chatgpt_target_bound"'
+Assert-Contains '$opened.target_activity_bound -eq $true'
 Assert-Contains 'Add-Check "chatgpt_activity_foreground"'
 Assert-Contains 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
 Assert-Contains 'Get-ComposerOptions -Section "model"'

@@ -267,6 +267,9 @@ $topResumedActivity = Get-TopResumedActivity
 
 Add-Check "open_chatgpt_web" ($opened.control_ok -eq $true) ([string]$opened.action)
 Add-Check "official_view_selected" ($officialView.control_ok -eq $true) ([string]$officialView.view_mode)
+Add-Check "chatgpt_target_bound" (
+    $opened.target_activity_bound -eq $true -or $opened.surface -eq "chatgpt_web"
+) ([string]$opened.target_surface)
 Add-Check "chatgpt_activity_foreground" (
     $topResumedActivity -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
 ) $topResumedActivity
