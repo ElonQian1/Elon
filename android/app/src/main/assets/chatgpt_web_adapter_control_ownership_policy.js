@@ -7,8 +7,28 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
+  const COMPOSER_SELECTORS = Object.freeze([
+    '[data-testid="prompt-textarea"]',
+    '#prompt-textarea',
+    'form [contenteditable="true"]',
+    'form textarea',
+    'main [contenteditable="true"]',
+    'textarea[placeholder]'
+  ]);
+
   function contains(owner, candidate) {
     return !!owner && typeof owner.contains === 'function' && owner.contains(candidate);
+  }
+
+  function findVisibleComposer(root, isVisible) {
+    if (!root || typeof root.querySelectorAll !== 'function' || typeof isVisible !== 'function') {
+      return null;
+    }
+    for (const selector of COMPOSER_SELECTORS) {
+      const match = Array.from(root.querySelectorAll(selector)).find(isVisible);
+      if (match) return match;
+    }
+    return null;
   }
 
   function isPrimaryComposerTextControl(node, region, composer, describe) {
@@ -18,5 +38,5 @@
     return node === composer || contains(node, composer) || contains(composer, node);
   }
 
-  return Object.freeze({ isPrimaryComposerTextControl });
+  return Object.freeze({ findVisibleComposer, isPrimaryComposerTextControl });
 });

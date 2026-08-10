@@ -109,7 +109,11 @@
   }
 
   function composerNode() {
-    return document.querySelector('[data-testid="prompt-textarea"], #prompt-textarea, form textarea, form [contenteditable="true"]');
+    return controlOwnershipPolicy
+      ? controlOwnershipPolicy.findVisibleComposer(document, isVisible)
+      : Array.from(document.querySelectorAll(
+        '[data-testid="prompt-textarea"], #prompt-textarea, form [contenteditable="true"], form textarea'
+      )).find(isVisible) || null;
   }
 
   function composerRoot() {

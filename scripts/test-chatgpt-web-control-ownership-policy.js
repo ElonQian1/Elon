@@ -17,6 +17,38 @@ function control(role = 'textbox') {
 const describe = (node) => ({ role: node.role });
 const composer = control();
 
+const hiddenComposer = Object.assign(control(), { visible: false });
+const visibleComposer = Object.assign(control(), { visible: true });
+const composerRoot = {
+  querySelectorAll(selector) {
+    return selector === '[data-testid="prompt-textarea"]'
+      ? [hiddenComposer, visibleComposer]
+      : [];
+  }
+};
+assert.equal(
+  policy.findVisibleComposer(composerRoot, (node) => node.visible),
+  visibleComposer,
+  'hidden retained composers do not own the active composer region'
+);
+
+const fallbackComposer = Object.assign(control(), { visible: true });
+assert.equal(
+  policy.findVisibleComposer({
+    querySelectorAll(selector) {
+      return selector === 'form [contenteditable="true"]' ? [fallbackComposer] : [];
+    }
+  }, (node) => node.visible),
+  fallbackComposer,
+  'visible fallback selectors remain supported'
+);
+
+assert.equal(
+  policy.findVisibleComposer(composerRoot, () => false),
+  null,
+  'no hidden composer is selected when every candidate is invisible'
+);
+
 assert.equal(
   policy.isPrimaryComposerTextControl(composer, 'composer', composer, describe),
   true,
