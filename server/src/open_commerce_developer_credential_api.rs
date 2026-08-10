@@ -17,6 +17,7 @@ use crate::{
         RevokeDeveloperProductionCredentialRequest,
     },
     open_commerce_developer_credential_service as service,
+    open_commerce_developer_manifest_service,
     open_commerce_service::OpenCommerceActor,
     project_auth::{auth_from_headers, json_error, project_access},
     types::AppState,
@@ -43,7 +44,7 @@ async fn list_credentials(
     headers: HeaderMap,
     Path((project_id, app_record_id)): Path<(String, String)>,
 ) -> Response {
-    let caller = match project_caller(&state, &headers, &project_id) {
+    let caller = match managed_app_caller(&state, &headers, &project_id, &app_record_id) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -85,7 +86,7 @@ async fn revoke_credential(
     Path((project_id, app_record_id, credential_id)): Path<(String, String, String)>,
     Json(request): Json<RevokeDeveloperProductionCredentialRequest>,
 ) -> Response {
-    let caller = match project_caller(&state, &headers, &project_id) {
+    let caller = match managed_app_caller(&state, &headers, &project_id, &app_record_id) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -111,16 +112,25 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
     Ok(user.id)
 }
 
-fn project_caller(
+fn managed_app_caller(
     state: &AppState,
     headers: &HeaderMap,
     project_id: &str,
+    app_record_id: &str,
 ) -> Result<(String, String), Response> {
     let user = auth_from_headers(state, headers)
         .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error))?;
     let access = project_access(state, &user.id, project_id)
         .map_err(|error| json_error(StatusCode::FORBIDDEN, error))?;
-    Ok((user.id, access.role))
+    let caller = (user.id, access.role);
+    open_commerce_developer_manifest_service::managed_app(
+        &state.store,
+        project_id,
+        app_record_id,
+        &actor(&caller),
+    )
+    .map_err(|error| json_error(StatusCode::FORBIDDEN, error))?;
+    Ok(caller)
 }
 
 fn actor<'a>(caller: &'a (String, String)) -> OpenCommerceActor<'a> {
