@@ -2,8 +2,8 @@
 title: 开放商业能力与内部同步回执来源绑定 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业能力与内部同步回执来源绑定 V1
@@ -14,7 +14,7 @@ implementation_status: implementation_uncompiled
 
 ## 决定
 
-1. V164 新增能力来源绑定表，每项能力最多保留一条当前绑定，重绑时递增修订并保留审计事件。
+1. V164 新增能力来源绑定表，每项能力最多保留一条当前绑定，重绑时递增修订并保留审计事件；绑定、重绑、解绑与各自审计在同一 SQLite 事务内提交，任一步失败均不留下半完成状态。
 2. 能力、数据接入和同步回执必须属于同一项目；能力与数据接入还必须属于同一商户。已停用接入不能新建绑定。
 3. 绑定的数据域必须已经登记在所选接入中。只有 `full` 或 `incremental` 且状态为 `succeeded` 或 `partial` 的回执可作为来源；健康检查和失败回执拒绝绑定。
 4. 绑定固化当前能力版本。能力更新后旧记录继续保留，但 `publishable=false`，公开目录退回普通商户声明，直至编辑者重新确认绑定。
@@ -34,7 +34,8 @@ implementation_status: implementation_uncompiled
 - `succeeded` 和 `partial` 是本项目内部回执状态，不是第三方鉴证结论。
 - SHA-256 证明相同字节得到相同摘要，不证明数据来源身份、完整性或业务真实性。
 - 新鲜度只表示距离所绑定回执完成时间是否仍在商户声明期限内，不保证库存、价格、营业状态或订单实时。
-- 当前代码未编译，未执行 V164 迁移、HTTP、目录、排序凭证、兼容性或 PC 验证，状态为 `implementation_uncompiled`。
+- 已完成定向 Rust/SQLite 验证：V164 重复执行、索引与五条外键、回执级联、资格和隔离失败关闭、修订递增、版本与停用回退、目录公开投影，以及绑定/解绑审计故障时的事务回滚均通过。
+- 既有开放商业集成测试与消费者发现 MCP 回归通过；尚未执行来源绑定 HTTP 实例请求、消费者排序凭证的来源专项一致性、旧客户端兼容和 PC 浏览器交互/视觉验证，状态为 `verified_rust_sqlite`。
 
 ## 实现入口
 
