@@ -20,6 +20,10 @@ internal class ChatGptWebMcpActions(
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
     private val openConversation: (String) -> Unit,
     private val listConversations: () -> Unit,
+    private val requestComposerOptions: (String) -> Unit,
+    private val selectComposerOption: (String, String) -> Unit,
+    private val requestFeatures: () -> Unit,
+    private val selectFeature: (String) -> Unit,
 ) {
     fun uiState(): JSONObject {
         val current = snapshot()
@@ -63,6 +67,27 @@ internal class ChatGptWebMcpActions(
             "chatgpt_refresh" -> refresh()
             "chatgpt_refresh_controls" -> refreshControls()
             "chatgpt_list_conversations" -> listConversations()
+            "chatgpt_list_composer_options" -> {
+                val section = args.optString("section").trim().lowercase()
+                if (section !in COMPOSER_SECTIONS) return error(action, "invalid_section")
+                requestComposerOptions(section)
+            }
+            "chatgpt_select_composer_option" -> {
+                val section = args.optString("section").trim().lowercase()
+                if (section !in COMPOSER_SECTIONS) return error(action, "invalid_section")
+                val optionId = args.optString("option_id").trim()
+                val options = observedState().composerSections[section].orEmpty()
+                if (options.none { it.id == optionId }) return error(action, "stale_option_id")
+                selectComposerOption(section, optionId)
+            }
+            "chatgpt_list_features" -> requestFeatures()
+            "chatgpt_select_feature" -> {
+                val featureId = args.optString("feature_id").trim()
+                if (observedState().features.none { it.id == featureId }) {
+                    return error(action, "stale_feature_id")
+                }
+                selectFeature(featureId)
+            }
             "chatgpt_get_context" -> return contextPage(args)
             "chatgpt_find_controls" -> return controlsPage(args)
             "chatgpt_get_conversations" -> return conversationsPage(args)
@@ -174,6 +199,11 @@ internal class ChatGptWebMcpActions(
                         .put("title", conversation.title)
                         .put("path", conversation.path)
                         .put("active", conversation.active)
+                        .put("native_action", "chatgpt_open_conversation")
+                        .put(
+                            "native_adb_content_description",
+                            ChatGptNativeNavigationSelector.conversation(conversation),
+                        )
                     )
                 }
             })
@@ -187,6 +217,8 @@ internal class ChatGptWebMcpActions(
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_navigation")
+            .put("schema", NAVIGATION_SCHEMA)
+            .put("native_selector_schema", ChatGptNativeNavigationSelector.SCHEMA)
             .put("cached_at_ms", observed.updatedAtMs)
             .put("features", JSONArray().apply {
                 observed.features.forEach { feature ->
@@ -195,6 +227,11 @@ internal class ChatGptWebMcpActions(
                         .put("label", feature.label)
                         .put("kind", feature.kind)
                         .put("selected", feature.selected)
+                        .put("native_action", "chatgpt_select_feature")
+                        .put(
+                            "native_adb_content_description",
+                            ChatGptNativeNavigationSelector.feature(feature),
+                        )
                     )
                 }
             })
@@ -207,6 +244,11 @@ internal class ChatGptWebMcpActions(
                                 .put("label", option.label)
                                 .put("kind", option.kind)
                                 .put("selected", option.selected)
+                                .put("native_action", "chatgpt_select_composer_option")
+                                .put(
+                                    "native_adb_content_description",
+                                    ChatGptNativeNavigationSelector.composerOption(name, option),
+                                )
                             )
                         }
                     })
@@ -347,8 +389,10 @@ internal class ChatGptWebMcpActions(
         const val MAX_CONTROL_PAGE_SIZE = 80
         const val DEFAULT_LIST_PAGE_SIZE = 30
         const val MAX_LIST_PAGE_SIZE = 50
+        const val NAVIGATION_SCHEMA = "elon.chatgpt_web.navigation.v2"
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
         val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
+        val COMPOSER_SECTIONS = setOf("model", "tools")
         val AVAILABLE_ACTIONS = listOf(
             "state",
             "set_input_text",
@@ -359,6 +403,10 @@ internal class ChatGptWebMcpActions(
             "chatgpt_refresh",
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",
+            "chatgpt_list_composer_options",
+            "chatgpt_select_composer_option",
+            "chatgpt_list_features",
+            "chatgpt_select_feature",
             "chatgpt_get_context",
             "chatgpt_find_controls",
             "chatgpt_get_conversations",
@@ -375,6 +423,10 @@ internal class ChatGptWebMcpActions(
             "chatgpt_refresh",
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",
+            "chatgpt_list_composer_options",
+            "chatgpt_select_composer_option",
+            "chatgpt_list_features",
+            "chatgpt_select_feature",
             "chatgpt_open_conversation",
         )
     }

@@ -81,8 +81,13 @@ class ChatGptWebMcpActionsTest {
         assertEquals("control_suggestion_demo", controls.getJSONArray("controls")
             .getJSONObject(0).getString("control_id"))
         assertEquals(1, conversations.getInt("match_count"))
-        assertEquals("/c/demo", conversations.getJSONArray("conversations")
-            .getJSONObject(0).getString("path"))
+        val conversation = conversations.getJSONArray("conversations").getJSONObject(0)
+        assertEquals("/c/demo", conversation.getString("path"))
+        assertEquals("chatgpt_open_conversation", conversation.getString("native_action"))
+        assertEquals(
+            "chatgpt-conversation:demo:桥接验证",
+            conversation.getString("native_adb_content_description"),
+        )
 
         val messageControl = actions.control(JSONObject()
             .put("action", "chatgpt_find_controls")
@@ -95,6 +100,81 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun navigationEntriesShareStableAdbSelectorsWithDirectMcpActions() {
+        var requestedSection = ""
+        var selectedOption = ""
+        var requestedFeatures = false
+        var selectedFeature = ""
+        val actions = actions(
+            onRequestComposerOptions = { requestedSection = it },
+            onSelectComposerOption = { section, id -> selectedOption = "$section:$id" },
+            onRequestFeatures = { requestedFeatures = true },
+            onSelectFeature = { selectedFeature = it },
+        )
+
+        val navigation = actions.control(JSONObject()
+            .put("action", "chatgpt_get_navigation")
+            .put("section", "model"))
+        val feature = navigation.getJSONArray("features").getJSONObject(0)
+        val option = navigation.getJSONObject("composer_sections")
+            .getJSONArray("model").getJSONObject(0)
+
+        assertEquals("elon.chatgpt_web.navigation.v2", navigation.getString("schema"))
+        assertEquals(
+            ChatGptNativeNavigationSelector.SCHEMA,
+            navigation.getString("native_selector_schema"),
+        )
+        assertEquals("chatgpt_select_feature", feature.getString("native_action"))
+        assertEquals(
+            "chatgpt-feature:feature_library:文件库",
+            feature.getString("native_adb_content_description"),
+        )
+        assertEquals("chatgpt_select_composer_option", option.getString("native_action"))
+        assertEquals(
+            "chatgpt-composer-option:model:model_fast:快速",
+            option.getString("native_adb_content_description"),
+        )
+
+        assertTrue(actions.control(JSONObject()
+            .put("action", "chatgpt_list_composer_options")
+            .put("section", "model")).getBoolean("control_ok"))
+        assertTrue(actions.control(JSONObject()
+            .put("action", "chatgpt_select_composer_option")
+            .put("section", "model")
+            .put("option_id", "model_fast")).getBoolean("control_ok"))
+        assertTrue(actions.control(JSONObject()
+            .put("action", "chatgpt_list_features")).getBoolean("control_ok"))
+        assertTrue(actions.control(JSONObject()
+            .put("action", "chatgpt_select_feature")
+            .put("feature_id", "feature_library")).getBoolean("control_ok"))
+
+        assertEquals("model", requestedSection)
+        assertEquals("model:model_fast", selectedOption)
+        assertTrue(requestedFeatures)
+        assertEquals("feature_library", selectedFeature)
+    }
+
+    @Test
+    fun directNavigationActionsRejectInvalidSectionsAndStaleIds() {
+        val actions = actions()
+
+        val invalidSection = actions.control(JSONObject()
+            .put("action", "chatgpt_list_composer_options")
+            .put("section", "attachments"))
+        val staleOption = actions.control(JSONObject()
+            .put("action", "chatgpt_select_composer_option")
+            .put("section", "model")
+            .put("option_id", "model_stale"))
+        val staleFeature = actions.control(JSONObject()
+            .put("action", "chatgpt_select_feature")
+            .put("feature_id", "feature_stale"))
+
+        assertEquals("invalid_section", invalidSection.getString("error"))
+        assertEquals("stale_option_id", staleOption.getString("error"))
+        assertEquals("stale_feature_id", staleFeature.getString("error"))
+    }
+
+    @Test
     fun capabilityMatrixIsAvailableThroughTheStableUiControlTool() {
         val matrix = actions().control(JSONObject().put("action", "chatgpt_get_capability_matrix"))
 
@@ -104,7 +184,13 @@ class ChatGptWebMcpActionsTest {
         assertTrue(matrix.getBoolean("ready_for_chat"))
     }
 
-    private fun actions(onInvoke: (String) -> Unit = {}): ChatGptWebMcpActions {
+    private fun actions(
+        onInvoke: (String) -> Unit = {},
+        onRequestComposerOptions: (String) -> Unit = {},
+        onSelectComposerOption: (String, String) -> Unit = { _, _ -> },
+        onRequestFeatures: () -> Unit = {},
+        onSelectFeature: (String) -> Unit = {},
+    ): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
             title = "工作",
             url = "https://chatgpt.com/c/demo",
@@ -159,7 +245,16 @@ class ChatGptWebMcpActionsTest {
                     features = listOf(
                         ChatGptWebFeature("feature_library", "文件库", "library", selected = false),
                     ),
-                    composerSections = emptyMap(),
+                    composerSections = mapOf(
+                        "model" to listOf(
+                            ChatGptWebComposerOption(
+                                "model_fast",
+                                "快速",
+                                selected = false,
+                                kind = "menuitemradio",
+                            ),
+                        ),
+                    ),
                     lastCommand = ChatGptWebEvent.CommandResult("list_conversations", true, ""),
                     updatedAtMs = 123L,
                 )
@@ -177,6 +272,10 @@ class ChatGptWebMcpActionsTest {
             selectMode = {},
             openConversation = {},
             listConversations = {},
+            requestComposerOptions = onRequestComposerOptions,
+            selectComposerOption = onSelectComposerOption,
+            requestFeatures = onRequestFeatures,
+            selectFeature = onSelectFeature,
         )
     }
 }

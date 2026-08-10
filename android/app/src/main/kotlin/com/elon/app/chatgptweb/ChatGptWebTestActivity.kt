@@ -70,6 +70,16 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             selectMode = modeController::select,
             openConversation = pageAdapter::openConversation,
             listConversations = pageAdapter::listConversations,
+            requestComposerOptions = { section ->
+                if (section == "model") pageAdapter.listModelOptions()
+                else pageAdapter.listComposerTools()
+            },
+            selectComposerOption = { section, optionId ->
+                if (section == "model") pageAdapter.selectModelOption(optionId)
+                else pageAdapter.selectComposerTool(optionId)
+            },
+            requestFeatures = pageAdapter::listFeatures,
+            selectFeature = pageAdapter::selectFeature,
         )
     }
 
