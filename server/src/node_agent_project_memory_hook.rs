@@ -17,6 +17,9 @@ use std::{
     time::SystemTime,
 };
 
+#[path = "node_agent_project_memory_hook_prompt.rs"]
+mod prompt;
+
 const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_PATHS_PER_EVENT: usize = 24;
 const MAX_OBSERVATIONS_PER_TURN: usize = 64;
@@ -71,7 +74,7 @@ pub(crate) fn run_stdio() -> Result<()> {
         "PostToolUse" => record_paths(&workspace, &session_dir, &input),
         "Stop" => handle_stop(&session_dir, &input),
         "SessionEnd" => {
-            let _ = fs::remove_dir_all(session_dir);
+            end_session(&session_dir);
             Ok(())
         }
         // Reserved adapter seam. These official lifecycle events are deliberately
@@ -355,13 +358,17 @@ fn observation_kind(tool_name: &str, input: &Value) -> String {
 }
 
 fn handle_stop(session_dir: &Path, input: &HookInput) -> Result<()> {
+    write_json(&stop_decision(session_dir, input)?)
+}
+
+fn stop_decision(session_dir: &Path, input: &HookInput) -> Result<Value> {
     if input.stop_hook_active || input.turn_id.trim().is_empty() {
-        return write_json(&json!({"continue": true}));
+        return Ok(json!({"continue": true}));
     }
     let turn_hash = short_hash(input.turn_id.as_bytes());
     let prompted = session_dir.join("prompted").join(&turn_hash);
     if prompted.exists() {
-        return write_json(&json!({"continue": true}));
+        return Ok(json!({"continue": true}));
     }
     let observations = read_observations(&session_dir.join("observations").join(&turn_hash));
     let read_count = observations
@@ -369,36 +376,30 @@ fn handle_stop(session_dir: &Path, input: &HookInput) -> Result<()> {
         .filter(|observation| observation.kind == "read")
         .count();
     if observations.len() < 2 || read_count == 0 {
-        return write_json(&json!({"continue": true}));
+        return Ok(json!({"continue": true}));
     }
     if session_prompt_count(session_dir) >= MAX_SESSION_PROMPTS
         || !contains_session_novel_path(session_dir, &turn_hash, &observations)
     {
-        return write_json(&json!({"continue": true}));
+        return Ok(json!({"continue": true}));
     }
     if let Some(parent) = prompted.parent() {
         fs::create_dir_all(parent)?;
     }
     crate::node_agent_atomic_file::write(&prompted, b"prompted")?;
-    let mut path_chars = 0usize;
-    let paths = observations
-        .values()
-        .filter_map(|observation| {
-            let next = path_chars.saturating_add(observation.path.chars().count());
-            if next > MAX_PROMPT_PATH_CHARS {
-                return None;
-            }
-            path_chars = next;
-            Some(observation.path.as_str())
-        })
-        .take(MAX_PROMPT_PATHS)
-        .collect::<Vec<_>>();
+    let paths = prompt::bounded_paths(
+        observations
+            .values()
+            .map(|observation| observation.path.as_str()),
+        MAX_PROMPT_PATHS,
+        MAX_PROMPT_PATH_CHARS,
+    );
     let reason = format!(
         "Project-memory receipt gate: this turn inspected {} distinct repository paths ({}). Only if those native reads established a reusable navigation fact that is not already present, stale, task-local, speculative, or conflicting, call project_docs_record_native_context_receipt from yilong_project_receipt with 1-8 concise candidates. Use evidence paths/locators only; never include source bodies, commands, outputs, prompts, chat, or Codex private memories. If nothing is genuinely novel, finish now without calling it.",
         observations.len(),
         paths.join(", ")
     );
-    write_json(&json!({"decision": "block", "reason": reason}))
+    Ok(json!({"decision": "block", "reason": reason}))
 }
 
 fn session_prompt_count(session_dir: &Path) -> usize {
@@ -455,6 +456,10 @@ fn write_json(value: &Value) -> Result<()> {
     Ok(())
 }
 
+fn end_session(session_dir: &Path) {
+    let _ = fs::remove_dir_all(session_dir);
+}
+
 fn cleanup_expired_sessions() {
     let Ok(workspaces) = fs::read_dir(hook_root()) else {
         return;
@@ -488,3 +493,7 @@ fn short_hash(bytes: &[u8]) -> String {
         .take(24)
         .collect()
 }
+
+#[cfg(test)]
+#[path = "node_agent_project_memory_hook_tests.rs"]
+mod tests;

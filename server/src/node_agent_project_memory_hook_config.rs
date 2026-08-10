@@ -88,4 +88,15 @@ mod tests {
             .iter()
             .any(|value| value == "PostCompact"));
     }
+
+    #[test]
+    fn generated_hook_config_never_bypasses_codex_trust() {
+        let args = codex_config_args().unwrap();
+        let text = args.join("\n");
+        assert_eq!(text.matches("hooks.PostToolUse").count(), 1);
+        assert_eq!(text.matches("hooks.Stop").count(), 1);
+        assert_eq!(text.matches("hooks.SessionEnd").count(), 1);
+        assert!(!text.contains("dangerously-bypass-hook-trust"));
+        assert_eq!(capability_manifest()["trust_bypass_enabled"], false);
+    }
 }

@@ -201,7 +201,11 @@ async function readStdin(limit) {
     if (length > limit) throw new Error('Hook input exceeded the bounded input limit')
     chunks.push(chunk)
   }
-  return Buffer.concat(chunks).toString('utf8')
+  const bytes = Buffer.concat(chunks)
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return bytes.subarray(2).toString('utf16le').replace(/^\uFEFF/, '')
+  }
+  return bytes.toString('utf8').replace(/^\uFEFF/, '')
 }
 
 function fingerprint(value) {

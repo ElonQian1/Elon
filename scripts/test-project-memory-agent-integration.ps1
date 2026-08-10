@@ -95,8 +95,10 @@ try {
             session_id = $hookSession; cwd = $repoRoot; hook_event_name = 'PostToolUse'
             tool_name = 'apply_patch'; tool_input = @{ patch = "*** Update File: server/src/node_agent_project_feature_mcp.rs" }
         } | ConvertTo-Json -Compress -Depth 5
-        $readEvent | & node $hookPath | Out-Null
-        Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook failed to record a bounded read path.'
+        $readEventBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($readEvent))
+        $bomHarness = "const {spawnSync}=require('node:child_process');const input=Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),Buffer.from(process.argv[2],'base64')]);const result=spawnSync(process.execPath,[process.argv[1]],{input,encoding:'utf8'});process.stdout.write(result.stdout||'');process.stderr.write(result.stderr||'');process.exit(result.status??1);"
+        & node -e $bomHarness $hookPath $readEventBase64 | Out-Null
+        Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook failed to record a BOM-prefixed bounded read path.'
         $writeEvent | & node $hookPath | Out-Null
         Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook failed to record a bounded write path.'
         $stopEvent = @{ session_id = $hookSession; cwd = $repoRoot; hook_event_name = 'Stop' } | ConvertTo-Json -Compress

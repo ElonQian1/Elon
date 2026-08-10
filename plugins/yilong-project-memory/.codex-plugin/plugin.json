@@ -1,6 +1,6 @@
 {
   "name": "yilong-project-memory",
-  "version": "0.1.0+codex.20260806191403",
+  "version": "0.1.0+codex.20260810145031",
   "description": "Bounded, evidence-backed project navigation memory for Codex",
   "author": {
     "name": "Yilong Project"
