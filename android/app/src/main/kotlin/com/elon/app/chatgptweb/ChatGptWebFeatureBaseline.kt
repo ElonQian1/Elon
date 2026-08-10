@@ -1,0 +1,377 @@
+package com.elon.app.chatgptweb
+
+import org.json.JSONArray
+import org.json.JSONObject
+
+internal object ChatGptWebFeatureBaseline {
+    const val VERSION = 1
+
+    enum class ImplementationStatus(val wireName: String) {
+        COMPLETE("complete"),
+        PARTIAL("partial"),
+        FALLBACK_ONLY("fallback_only"),
+    }
+
+    enum class Delivery(val wireName: String) {
+        DEDICATED_NATIVE("dedicated_native"),
+        ADAPTIVE_NATIVE("adaptive_native"),
+        MCP_ONLY("mcp_only"),
+        OFFICIAL_WEB_WITH_NATIVE_ENTRY("official_web_with_native_entry"),
+        FULLSCREEN_OFFICIAL("fullscreen_official"),
+    }
+
+    enum class Acceptance(val wireName: String) {
+        READ_ONLY_DEVICE("read_only_device"),
+        INTERACTIVE_DEVICE("interactive_device"),
+        USER_DRIVEN_DEVICE("user_driven_device"),
+    }
+
+    data class Feature(
+        val id: String,
+        val group: String,
+        val status: ImplementationStatus,
+        val delivery: Delivery,
+        val acceptance: Acceptance,
+        val mcpActions: List<String>,
+        val capabilityIds: Set<String> = emptySet(),
+        val semantics: Set<String> = emptySet(),
+        val remainingGap: String? = null,
+    )
+
+    fun describe(
+        snapshot: ChatGptWebSnapshot?,
+        manifest: ChatGptWebUiManifest?,
+        mode: ChatGptWebModeController.Mode,
+    ): JSONObject {
+        val advertised = snapshot?.capabilities?.supported.orEmpty()
+        val semantics = manifest?.controls.orEmpty()
+            .groupingBy(ChatGptWebUiControl::semantic)
+            .eachCount()
+        val rows = FEATURES.map { feature ->
+            val currentPageObserved = when (feature.id) {
+                "official_authentication" -> snapshot?.authenticated == true
+                "official_fullscreen_fallback" -> mode == ChatGptWebModeController.Mode.WEB
+                "native_chat_composer" -> snapshot?.composerReady == true
+                else -> feature.capabilityIds.any(advertised::contains) ||
+                    feature.semantics.any { semantics[it].orZero() > 0 }
+            }
+            JSONObject()
+                .put("id", feature.id)
+                .put("group", feature.group)
+                .put("implementation_status", feature.status.wireName)
+                .put("delivery", feature.delivery.wireName)
+                .put("acceptance", feature.acceptance.wireName)
+                .put("current_page_observed", currentPageObserved)
+                .put("mcp_actions", JSONArray(feature.mcpActions))
+                .put(
+                    "remaining_gap",
+                    feature.remainingGap ?: JSONObject.NULL,
+                )
+        }
+        val incomplete = FEATURES.filter { it.status != ImplementationStatus.COMPLETE }
+        return JSONObject()
+            .put("schema", "elon.chatgpt_web.feature_baseline.v1")
+            .put("version", VERSION)
+            .put("feature_count", FEATURES.size)
+            .put(
+                "summary",
+                JSONObject()
+                    .put(
+                        "complete",
+                        FEATURES.count { it.status == ImplementationStatus.COMPLETE },
+                    )
+                    .put(
+                        "partial",
+                        FEATURES.count { it.status == ImplementationStatus.PARTIAL },
+                    )
+                    .put(
+                        "fallback_only",
+                        FEATURES.count { it.status == ImplementationStatus.FALLBACK_ONLY },
+                    )
+                    .put("remaining", incomplete.size),
+            )
+            .put("features", JSONArray(rows))
+            .put("remaining_feature_ids", JSONArray(incomplete.map(Feature::id)))
+    }
+
+    fun ids(): Set<String> = FEATURES.mapTo(linkedSetOf(), Feature::id)
+
+    private fun Int?.orZero(): Int = this ?: 0
+
+    private val FEATURES = listOf(
+        feature(
+            id = "official_authentication",
+            group = "session",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
+            mcpActions = listOf("chatgpt_select_view", "state"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.GOOGLE_LOGIN_ENTRY),
+            remainingGap = "identity_provider_completion_remains_user_driven",
+        ),
+        feature(
+            id = "official_fullscreen_fallback",
+            group = "session",
+            delivery = Delivery.FULLSCREEN_OFFICIAL,
+            mcpActions = listOf("chatgpt_select_view"),
+        ),
+        feature(
+            id = "native_chat_composer",
+            group = "chat",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("set_input_text", "send_input"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.DRAFT_SYNC),
+            semantics = setOf("send"),
+        ),
+        feature(
+            id = "streaming_and_stop",
+            group = "chat",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("state", "chatgpt_stop_generation"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.STREAMING),
+            semantics = setOf("stop"),
+        ),
+        feature(
+            id = "conversation_context_paging",
+            group = "chat",
+            delivery = Delivery.MCP_ONLY,
+            mcpActions = listOf("chatgpt_get_context"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.CURRENT_CONVERSATION),
+        ),
+        feature(
+            id = "conversation_history",
+            group = "history",
+            mcpActions = listOf("chatgpt_get_conversations", "chatgpt_list_conversations"),
+            capabilityIds = setOf(
+                ChatGptWebCapabilityId.CONVERSATION_LIST,
+                ChatGptWebCapabilityId.CONVERSATION_SEARCH,
+            ),
+            semantics = setOf("conversation", "search"),
+        ),
+        feature(
+            id = "conversation_create_and_switch",
+            group = "history",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_new_conversation", "chatgpt_open_conversation"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.NEW_CONVERSATION),
+            semantics = setOf("new_conversation", "conversation"),
+        ),
+        feature(
+            id = "model_selection",
+            group = "composer",
+            status = ImplementationStatus.PARTIAL,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf(
+                "chatgpt_list_composer_options",
+                "chatgpt_select_composer_option",
+            ),
+            capabilityIds = setOf(ChatGptWebCapabilityId.MODEL_SELECTOR),
+            semantics = setOf("model"),
+            remainingGap = "model_change_interactive_acceptance",
+        ),
+        feature(
+            id = "attachment_lifecycle",
+            group = "composer",
+            status = ImplementationStatus.PARTIAL,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control", "chatgpt_remove_attachment"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.ATTACHMENTS),
+            semantics = setOf("attachment"),
+            remainingGap = "real_file_upload_and_reply_acceptance",
+        ),
+        feature(
+            id = "composer_tools",
+            group = "composer",
+            status = ImplementationStatus.PARTIAL,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf(
+                "chatgpt_list_composer_options",
+                "chatgpt_select_composer_option",
+            ),
+            capabilityIds = setOf(ChatGptWebCapabilityId.COMPOSER_TOOLS),
+            remainingGap = "tool_execution_end_to_end_acceptance",
+        ),
+        feature(
+            id = "web_search",
+            group = "composer",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control"),
+            semantics = setOf("search", "toggle"),
+        ),
+        feature(
+            id = "dictation",
+            group = "voice",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_start_dictation", "chatgpt_invoke_control"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.DICTATION),
+            semantics = setOf(ChatGptWebUiSemantics.DICTATION),
+        ),
+        feature(
+            id = "realtime_voice",
+            group = "voice",
+            status = ImplementationStatus.FALLBACK_ONLY,
+            delivery = Delivery.FULLSCREEN_OFFICIAL,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control", "chatgpt_select_view"),
+            semantics = setOf("voice_mode"),
+            remainingGap = "native_realtime_voice_session",
+        ),
+        feature(
+            id = "rich_message_rendering",
+            group = "messages",
+            status = ImplementationStatus.PARTIAL,
+            mcpActions = listOf("chatgpt_get_context"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.RICH_TEXT),
+            remainingGap = "all_rich_message_variants_device_acceptance",
+        ),
+        feature(
+            id = "complex_output_rendering",
+            group = "messages",
+            status = ImplementationStatus.PARTIAL,
+            mcpActions = listOf("chatgpt_get_context", "chatgpt_invoke_control"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.COMPLEX_OUTPUT),
+            semantics = setOf("open_media", "sources", "reasoning_details"),
+            remainingGap = "all_complex_output_variants_device_acceptance",
+        ),
+        feature(
+            id = "message_copy",
+            group = "messages",
+            status = ImplementationStatus.PARTIAL,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_COPY),
+            semantics = setOf("copy"),
+            remainingGap = "clipboard_device_acceptance_without_content_logging",
+        ),
+        feature(
+            id = "message_regenerate",
+            group = "messages",
+            status = ImplementationStatus.PARTIAL,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE),
+            semantics = setOf("regenerate"),
+            remainingGap = "regenerate_reply_device_acceptance",
+        ),
+        feature(
+            id = "message_actions",
+            group = "messages",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control"),
+            semantics = setOf(
+                "edit",
+                "share",
+                "feedback",
+                "read_aloud",
+                "branch",
+                "delete",
+            ),
+            remainingGap = "destructive_and_external_message_actions_acceptance",
+        ),
+        feature(
+            id = "feature_navigation",
+            group = "navigation",
+            mcpActions = listOf("chatgpt_get_navigation", "chatgpt_select_feature"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.FEATURE_NAVIGATION),
+            semantics = setOf("navigation"),
+        ),
+        featurePage("projects", "project"),
+        featurePage("tasks", "tasks"),
+        featurePage("library", "library"),
+        featurePage("gpts", "gpts"),
+        featurePage("apps", "apps"),
+        featurePage("settings", "settings"),
+        feature(
+            id = "account_menu",
+            group = "account",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control"),
+            semantics = setOf("profile", "personalization", "help", "plan", "logout"),
+            remainingGap = "logout_and_account_mutation_actions_remain_user_driven",
+        ),
+        feature(
+            id = "conversation_management",
+            group = "history",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control"),
+            semantics = setOf("conversation_files", "pin", "archive", "share", "delete"),
+            remainingGap = "conversation_mutation_device_acceptance",
+        ),
+        feature(
+            id = "adaptive_form_controls",
+            group = "adaptation",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf(
+                "chatgpt_invoke_control",
+                "chatgpt_set_control_text",
+                "chatgpt_set_control_selected",
+                "chatgpt_select_control_choice",
+                "chatgpt_set_control_slider",
+            ),
+            semantics = setOf("text_input", "selection", "toggle", "slider", "confirm"),
+            remainingGap = "official_feature_form_matrix_device_acceptance",
+        ),
+        feature(
+            id = "official_change_detection",
+            group = "adaptation",
+            delivery = Delivery.MCP_ONLY,
+            mcpActions = listOf("chatgpt_get_capability_matrix"),
+        ),
+        feature(
+            id = "stable_mcp_and_adb_controls",
+            group = "automation",
+            delivery = Delivery.MCP_ONLY,
+            mcpActions = listOf("state", "chatgpt_get_capability_matrix"),
+        ),
+        feature(
+            id = "session_continuity_and_recovery",
+            group = "recovery",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_select_view", "state"),
+            remainingGap = "long_running_process_and_webview_recreation_acceptance",
+        ),
+    )
+
+    private fun featurePage(id: String, semantic: String): Feature = feature(
+        id = id,
+        group = "features",
+        status = ImplementationStatus.PARTIAL,
+        delivery = Delivery.ADAPTIVE_NATIVE,
+        acceptance = Acceptance.INTERACTIVE_DEVICE,
+        mcpActions = listOf("chatgpt_select_feature", "chatgpt_invoke_control"),
+        semantics = setOf(semantic),
+        remainingGap = "${id}_workflow_end_to_end_acceptance",
+    )
+
+    private fun feature(
+        id: String,
+        group: String,
+        status: ImplementationStatus = ImplementationStatus.COMPLETE,
+        delivery: Delivery = Delivery.DEDICATED_NATIVE,
+        acceptance: Acceptance = Acceptance.READ_ONLY_DEVICE,
+        mcpActions: List<String>,
+        capabilityIds: Set<String> = emptySet(),
+        semantics: Set<String> = emptySet(),
+        remainingGap: String? = null,
+    ) = Feature(
+        id = id,
+        group = group,
+        status = status,
+        delivery = delivery,
+        acceptance = acceptance,
+        mcpActions = mcpActions,
+        capabilityIds = capabilityIds,
+        semantics = semantics,
+        remainingGap = remainingGap,
+    )
+}

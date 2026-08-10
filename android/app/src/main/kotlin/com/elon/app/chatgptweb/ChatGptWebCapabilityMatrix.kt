@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -72,6 +73,12 @@ internal object ChatGptWebCapabilityMatrix {
             .put("action", "chatgpt_get_capability_matrix")
             .put("schema", "elon.chatgpt_web.capability_matrix.v2")
             .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
+            .put(
+                "app",
+                JSONObject()
+                    .put("version_name", BuildConfig.VERSION_NAME)
+                    .put("version_code", BuildConfig.VERSION_CODE),
+            )
             .put("bridge_state", bridgeState.name.lowercase())
             .put("view_mode", mode.name.lowercase())
             .put("authenticated", snapshot?.authenticated ?: false)
@@ -157,6 +164,10 @@ internal object ChatGptWebCapabilityMatrix {
             .put("unknown_capabilities", JSONArray(unknownCapabilities))
             .put("unknown_semantics", JSONArray(unknownSemantics))
             .put("blocking_gaps", JSONArray(blockingGaps))
+            .put(
+                "feature_baseline",
+                ChatGptWebFeatureBaseline.describe(snapshot, manifest, mode),
+            )
             .put("adaptation_review", JSONObject()
                 .put("required", reviewReasons.isNotEmpty())
                 .put("reasons", JSONArray(reviewReasons))

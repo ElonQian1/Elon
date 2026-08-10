@@ -23,6 +23,11 @@ class ChatGptWebCapabilityMatrixTest {
         assertTrue(matrix.getBoolean("ready_for_chat"))
         assertTrue(matrix.getBoolean("ready_for_mcp"))
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, matrix.getInt("adapter_version"))
+        assertTrue(matrix.getJSONObject("app").getInt("version_code") > 0)
+        assertEquals(
+            "elon.chatgpt_web.feature_baseline.v1",
+            matrix.getJSONObject("feature_baseline").getString("schema"),
+        )
         assertEquals(0, matrix.getJSONArray("blocking_gaps").length())
         assertTrue(matrix.getJSONObject("adaptation_review").getBoolean("required"))
         assertEquals(1, matrix.getJSONObject("manifest").getInt("generic_control_count"))
