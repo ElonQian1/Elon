@@ -493,6 +493,8 @@ mod open_commerce_webhook_model;
 mod open_commerce_webhook_replay_migration;
 mod open_commerce_webhook_security;
 mod open_commerce_webhook_service;
+#[cfg(test)]
+mod open_commerce_webhook_store_tests;
 mod open_commerce_webhook_verification;
 mod open_commerce_webhook_verification_migration;
 mod open_commerce_webhook_worker;

@@ -106,6 +106,7 @@ impl Store {
             bail!("Webhook 订阅不存在");
         }
         tx.commit()?;
+        drop(conn);
         self.open_commerce_developer_webhook_for_app(project_id, app_record_id, subscription_id)
     }
 }

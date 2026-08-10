@@ -60,6 +60,7 @@ impl Store {
             params![subscription_id.trim()],
         )?;
         tx.commit()?;
+        drop(conn);
         self.open_commerce_developer_webhook_for_app(project_id, app_record_id, subscription_id)
     }
 }
