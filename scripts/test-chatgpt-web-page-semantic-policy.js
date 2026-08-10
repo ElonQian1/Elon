@@ -62,4 +62,26 @@ expectEqual(policy.classify({
   signal: 'Unknown action'
 }), '', 'scheduled non-content action');
 
+expectEqual(policy.classify({
+  pathname: '/',
+  path: '/c/conversation_123',
+  region: 'overlay',
+  signal: 'Open chat options',
+  isLink: false
+}), 'conversation_options', 'conversation options');
+
+expectEqual(policy.classify({
+  pathname: '/',
+  path: '/g/g-p-project_123/project',
+  region: 'overlay',
+  signal: 'Project row',
+  isLink: true
+}), 'project', 'project navigation row');
+
+expectEqual(policy.classify({ pathname: '/', path: '/', signal: '主页', isLink: true }), 'home', 'home');
+expectEqual(policy.classify({ pathname: '/', signal: '插件' }), 'apps', 'apps');
+expectEqual(policy.classify({ pathname: '/', signal: '已置顶' }), 'pinned', 'pinned');
+expectEqual(policy.classify({ pathname: '/', signal: '下载应用' }), 'download_app', 'download app');
+expectEqual(policy.classify({ pathname: '/', signal: '整理聊天' }), 'conversation_group', 'chat group');
+
 console.log('CHATGPT_WEB_PAGE_SEMANTIC_POLICY=passed');

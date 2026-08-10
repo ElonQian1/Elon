@@ -20,12 +20,28 @@
 
   function classify(input) {
     const pathname = clean(input && input.pathname);
+    const path = clean(input && input.path);
     const region = clean(input && input.region);
     const signal = clean(input && input.signal);
+    const context = clean(input && input.context);
+    const combined = [signal, context, path].filter(Boolean).join(' ');
 
     if (/open[-\s]?sidebar|open sidebar|打开(?:侧边栏|边栏)/.test(signal)) {
       return 'navigation';
     }
+    if (/^\/c\/[a-z0-9_-]{1,160}$/.test(path) && !(input && input.isLink)) {
+      return 'conversation_options';
+    }
+    if (/^\/g\/g-p-[a-z0-9_-]+(?:\/project)?$/.test(path) || /project|项目/.test(context)) {
+      return 'project';
+    }
+    if (path === '/' && input && input.isLink) return 'home';
+    if (/download\s+(?:the\s+)?(?:chatgpt\s+)?app|下载(?:\s*chatgpt)?应用/.test(combined)) {
+      return 'download_app';
+    }
+    if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
+    if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
+    if (/^(?:chats?|聊天|整理聊天)$/.test(signal)) return 'conversation_group';
     if (region === 'content') {
       const route = contentRoutes.find((candidate) => candidate.pattern.test(pathname));
       if (route) return route.semantic;

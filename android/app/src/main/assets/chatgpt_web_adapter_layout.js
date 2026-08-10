@@ -33,6 +33,31 @@
     }
   }
 
+  function relatedSameOriginPath(node) {
+    const direct = sameOriginPath(node);
+    if (direct) return direct;
+    let container = node && node.parentElement;
+    for (let depth = 0; container && depth < 4; depth += 1, container = container.parentElement) {
+      const paths = Array.from(container.querySelectorAll('a[href]'))
+        .map(sameOriginPath)
+        .filter(Boolean);
+      const contextual = paths.filter((path) => /^\/c\//.test(path) || /^\/g\/g-p-/.test(path));
+      if (contextual.length === 1) return contextual[0];
+      if (contextual.length > 1) return '';
+      if (paths.length === 1) return paths[0];
+    }
+    return '';
+  }
+
+  function semanticContext(node) {
+    const values = [];
+    let current = node && node.parentElement;
+    for (let depth = 0; current && depth < 4; depth += 1, current = current.parentElement) {
+      values.push(current.id, current.getAttribute('data-testid'), current.getAttribute('aria-label'));
+    }
+    return cleanText(values.filter(Boolean).join(' '));
+  }
+
   function labelOf(node, fallback) {
     const candidates = [
       node.innerText,
@@ -80,14 +105,14 @@
   }
 
   function semanticFor(node, region, index) {
-    const path = sameOriginPath(node);
+    const path = relatedSameOriginPath(node);
     const signal = cleanText([
       node.id,
       node.getAttribute('data-testid'),
       node.getAttribute('aria-label'),
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
-    if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)) return 'conversation';
+    if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
       region === 'overlay'
       && (/timestamp|消息时间/.test(signal)
@@ -136,8 +161,11 @@
     const pageSemantic = window.__elonChatGptPageSemanticPolicy
       && window.__elonChatGptPageSemanticPolicy.classify({
         pathname: location.pathname,
+        path,
         region,
-        signal
+        signal,
+        context: semanticContext(node),
+        isLink: node.matches('a[href]')
       });
     if (pageSemantic) return pageSemantic;
     return 'action';
@@ -202,8 +230,12 @@
       if (filter && !filter(node)) return;
       const semantic = semanticFor(node, region, index);
       const label = labelOf(node, defaultLabel(semantic));
-      const path = sameOriginPath(node);
-      const resolvedContextId = contextId || (semantic === 'conversation' ? path.slice(3) : '');
+      const path = relatedSameOriginPath(node);
+      const resolvedContextId = contextId || (
+        (semantic === 'conversation' || semantic === 'conversation_options') && /^\/c\//.test(path)
+          ? path.slice(3)
+          : ''
+      );
       const id = controlId(semantic, node, label, region, used, resolvedContextId);
       const rect = node.getBoundingClientRect();
       used.add(id);
