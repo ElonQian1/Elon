@@ -173,21 +173,44 @@ function Wait-NavigationReady {
     throw "Timed out waiting for ChatGPT navigation readiness. Last action=$($last.last_command.action)."
 }
 
+function Wait-ComposerOptionsReady {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section,
+        [Parameter(Mandatory = $true)][long]$AfterMs,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $expectedAction = if ($Section -eq "model") { "collect_model_options" } else { "collect_composer_tools" }
+    $lastState = $null
+    do {
+        $lastState = Invoke-ApkMcp -Tool "ui_state"
+        $navigation = Invoke-UiAction -Action "chatgpt_get_navigation" -Arguments @{ section = $Section }
+        $sectionProperty = $navigation.composer_sections.PSObject.Properties[$Section]
+        $options = if ($null -eq $sectionProperty) { @() } else { @($sectionProperty.Value) }
+        $command = $lastState.last_command
+        $freshCollection = $command.action -eq $expectedAction -and
+            $command.ok -eq $true -and
+            [long]$command.observed_at_ms -gt $AfterMs
+        $cachedSnapshot = $navigation.control_ok -eq $true -and $options.Count -gt 0
+        if ($freshCollection -or $cachedSnapshot) {
+            return [pscustomobject]@{
+                command_state = $lastState
+                options = $options
+            }
+        }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for $Section composer options. Last action=$($lastState.last_command.action)."
+}
+
 function Get-ComposerOptions {
     param([Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section)
 
     $beforeState = Invoke-ApkMcp -Tool "ui_state"
     $afterMs = [long]$beforeState.last_command.observed_at_ms
     Invoke-UiAction -Action "chatgpt_list_composer_options" -Arguments @{ section = $Section } | Out-Null
-    $commandAction = if ($Section -eq "model") { "collect_model_options" } else { "collect_composer_tools" }
-    $commandState = Wait-CommandResult -Action $commandAction -AfterMs $afterMs -TimeoutSec $ReadyTimeoutSec
-    $navigation = Invoke-UiAction -Action "chatgpt_get_navigation" -Arguments @{ section = $Section }
-    $sectionProperty = $navigation.composer_sections.PSObject.Properties[$Section]
-    $options = if ($null -eq $sectionProperty) { @() } else { @($sectionProperty.Value) }
-    return [pscustomobject]@{
-        command_state = $commandState
-        options = $options
-    }
+    return Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs -TimeoutSec $ReadyTimeoutSec
 }
 
 function Get-ForeignComposerLabels {
