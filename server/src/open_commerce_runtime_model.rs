@@ -47,6 +47,7 @@ pub(crate) struct MerchantRuntimeEnvelope {
     pub credential_environment: String,
     pub credential_id: Option<String>,
     pub grant_id: Option<String>,
+    pub action_confirmation_id: Option<String>,
     pub idempotency_key: String,
     pub issued_at_unix: i64,
     pub input: serde_json::Value,

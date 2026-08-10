@@ -150,20 +150,25 @@ async fn invoke_with_provenance(
         unit_price_micros: capability.unit_price_micros,
         currency: &capability.currency,
     };
-    let claim = if capability.kind == "action" {
+    let verified_action_confirmation_id = if capability.kind == "action" {
         let confirmation_id = action_confirmation_id
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or_else(|| anyhow!("动作能力必须先完成服务端一次性确认"))?;
+        Some(confirmation_id)
+    } else {
+        if action_confirmation_id.is_some() {
+            bail!("查询能力不接受动作确认凭证");
+        }
+        None
+    };
+    let claim = if let Some(confirmation_id) = verified_action_confirmation_id {
         store.start_confirmed_open_commerce_invocation_with_provenance(
             invocation_start,
             confirmation_id,
             provenance,
         )?
     } else {
-        if action_confirmation_id.is_some() {
-            bail!("查询能力不接受动作确认凭证");
-        }
         store.start_open_commerce_invocation_with_provenance(invocation_start, provenance)?
     };
     if !claim.created {
@@ -202,6 +207,7 @@ async fn invoke_with_provenance(
         &merchant,
         &capability,
         grant_id.as_deref(),
+        verified_action_confirmation_id,
         &idempotency_key,
         &claim.invocation.id,
         &input,
@@ -285,6 +291,7 @@ async fn execute_handler(
     merchant: &OpenCommerceMerchant,
     capability: &OpenCommerceCapability,
     grant_id: Option<&str>,
+    action_confirmation_id: Option<&str>,
     idempotency_key: &str,
     invocation_id: &str,
     input: &Value,
@@ -304,6 +311,7 @@ async fn execute_handler(
         credential_environment: provenance.environment.to_string(),
         credential_id: provenance.credential_id.map(str::to_string),
         grant_id: grant_id.map(str::to_string),
+        action_confirmation_id: action_confirmation_id.map(str::to_string),
         idempotency_key: idempotency_key.to_string(),
         issued_at_unix: Utc::now().timestamp(),
         input: input.clone(),

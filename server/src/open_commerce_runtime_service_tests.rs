@@ -1,6 +1,6 @@
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use axum::{body::Bytes, extract::State, http::HeaderMap, routing::post, Json, Router};
@@ -8,6 +8,8 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
+    open_commerce_action_confirmation_model::ACTION_CONFIRMATION_PHRASE,
+    open_commerce_action_confirmation_service, open_commerce_invocation_service,
     open_commerce_model::{
         CreateCapabilityRequest, CreateMerchantRequest, InvokeCapabilityRequest, ACCESS_PUBLIC,
         HANDLER_MERCHANT_RUNTIME,
@@ -25,6 +27,7 @@ const MANIFEST_SHA256: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0
 #[derive(Clone)]
 struct RuntimeState {
     invocation_count: Arc<AtomicUsize>,
+    envelopes: Arc<Mutex<Vec<Value>>>,
 }
 
 #[tokio::test]
@@ -32,6 +35,7 @@ async fn verified_runtime_is_signed_metered_audited_and_idempotent() {
     std::env::set_var(SECRET_REF, SECRET);
     let runtime_state = RuntimeState {
         invocation_count: Arc::new(AtomicUsize::new(0)),
+        envelopes: Arc::new(Mutex::new(Vec::new())),
     };
     let app = Router::new()
         .route("/commerce/v1/invoke", post(runtime_handler))
@@ -129,6 +133,59 @@ async fn verified_runtime_is_signed_metered_audited_and_idempotent() {
         .await
         .unwrap();
 
+    open_commerce_service::publish_capability(
+        &store,
+        &project.id,
+        &merchant.id,
+        &actor,
+        CreateCapabilityRequest {
+            capability_key: "order.commit".to_string(),
+            display_name: "提交订单".to_string(),
+            description: String::new(),
+            kind: "action".to_string(),
+            access_level: ACCESS_PUBLIC.to_string(),
+            input_schema: json!({
+                "type":"object",
+                "required":["quote_id"],
+                "properties":{"quote_id":{"type":"string"}},
+                "additionalProperties":false
+            }),
+            output_schema: json!({"type":"object"}),
+            handler_type: HANDLER_MERCHANT_RUNTIME.to_string(),
+            handler_config: None,
+            unit_price_micros: 2_000,
+            currency: "CNY".to_string(),
+            freshness_seconds: 0,
+        },
+    )
+    .unwrap();
+    let action_request = || InvokeCapabilityRequest {
+        merchant_id: merchant.id.clone(),
+        capability_key: "order.commit".to_string(),
+        requester_app_id: "pc-web".to_string(),
+        grant_id: None,
+        idempotency_key: "order-commit-runtime-e2e".to_string(),
+        input: json!({"quote_id":"quote-1"}),
+    };
+    let prepared =
+        open_commerce_action_confirmation_service::prepare(&store, &actor, action_request())
+            .unwrap();
+    let confirmed = open_commerce_action_confirmation_service::confirm(
+        &store,
+        &actor,
+        &prepared.id,
+        ACTION_CONFIRMATION_PHRASE,
+    )
+    .unwrap();
+    let committed = open_commerce_invocation_service::invoke_with_action_confirmation(
+        &store,
+        &actor,
+        action_request(),
+        Some(&confirmed.id),
+    )
+    .await
+    .unwrap();
+
     assert_eq!(first["result"]["items"][0]["product_id"], "coffee-latte");
     assert_eq!(first["metering"]["amount_micros"], 1_000);
     assert_eq!(
@@ -142,7 +199,20 @@ async fn verified_runtime_is_signed_metered_audited_and_idempotent() {
     assert_eq!(first["settlement_receipt"]["funds_moved"], false);
     assert_eq!(first["settlement_receipt"]["amount_micros"], 1_000);
     assert_eq!(replay["replayed"], true);
-    assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 2);
+    assert_eq!(committed["result"]["order_id"], "order-runtime-1");
+    assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 3);
+    let envelopes = runtime_state.envelopes.lock().unwrap();
+    let order_envelope = envelopes
+        .iter()
+        .find(|value| value["capability_key"] == "order.commit")
+        .unwrap();
+    assert_eq!(
+        order_envelope["action_confirmation_id"],
+        confirmed.id.as_str()
+    );
+    assert_eq!(order_envelope["credential_environment"], "platform");
+    assert_eq!(order_envelope["credential_id"], Value::Null);
+    drop(envelopes);
     assert!(store
         .list_project_open_commerce_audit(&project.id, 20)
         .unwrap()
@@ -178,6 +248,7 @@ async fn runtime_handler(
     );
 
     let envelope: Value = serde_json::from_slice(&body).unwrap();
+    state.envelopes.lock().unwrap().push(envelope.clone());
     let capability_key = envelope["capability_key"].as_str().unwrap();
     let result = if capability_key == "system.health" {
         json!({
@@ -185,6 +256,8 @@ async fn runtime_handler(
             "status": "ok",
             "manifest_sha256": MANIFEST_SHA256
         })
+    } else if capability_key == "order.commit" {
+        json!({"order_id":"order-runtime-1","status":"confirmed"})
     } else {
         json!({
             "items":[{

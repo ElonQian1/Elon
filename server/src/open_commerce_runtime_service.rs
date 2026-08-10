@@ -66,6 +66,7 @@ pub(crate) async fn verify_binding(
         credential_environment: "platform".to_string(),
         credential_id: None,
         grant_id: None,
+        action_confirmation_id: None,
         idempotency_key: format!("verify-{}", uuid::Uuid::new_v4().simple()),
         issued_at_unix: Utc::now().timestamp(),
         input: json!({}),
