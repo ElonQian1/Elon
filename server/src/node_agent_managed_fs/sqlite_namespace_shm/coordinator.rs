@@ -43,6 +43,8 @@ pub(crate) struct PinnedManagedSqliteWalRuntime {
 
 pub(super) struct ManagedSqliteShmCoordinator {
     pub(super) state: Mutex<ManagedSqliteShmCoordinatorState>,
+    #[cfg(test)]
+    pub(super) test_faults: Mutex<super::test_faults::ManagedSqliteShmTestFaultController>,
     pub(super) namespace: PinnedManagedSqliteNamespace,
     pub(super) domain_key: ManagedSqliteShmDomainKey,
     pub(super) generation: NonZeroU64,
@@ -130,6 +132,10 @@ impl PinnedManagedSqliteNamespace {
                 poisoned: None,
                 quarantined_file_close: Vec::new(),
             }),
+            #[cfg(test)]
+            test_faults: Mutex::new(
+                super::test_faults::ManagedSqliteShmTestFaultController::default(),
+            ),
             namespace: self,
             domain_key,
             generation,

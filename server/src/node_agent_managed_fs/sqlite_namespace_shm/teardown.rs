@@ -122,23 +122,35 @@ impl ManagedSqliteShmCoordinator {
 
         self.validate_delete_authority(&mut state, &delete)?;
 
+        let mut prior_teardown_mutation = false;
         if state.node.is_some() {
-            if let Err((phase, error, mutation, lock_uncertain)) =
-                teardown_and_close_live_node(&mut state)
-            {
-                self.mark_poisoned(&mut state, phase, mutation, lock_uncertain);
-                return Err(ManagedSqliteShmFailure::poisoned(
-                    phase,
-                    error,
-                    mutation,
-                    lock_uncertain,
-                ));
+            if let Err(failure) = teardown_and_close_live_node(self, &mut state, connection_id) {
+                // Any injected after-success failure has already consumed a platform mutation.
+                // Keep the whole domain terminal so a later unmap cannot retry a closed mapping,
+                // released DMS byte or consumed file-close receipt as if it were a fresh action.
+                if failure.class() == ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+                    || failure.mutation_may_have_occurred()
+                {
+                    self.mark_poisoned(
+                        &mut state,
+                        failure.phase(),
+                        failure.mutation_may_have_occurred(),
+                        failure.lock_outcome_uncertain(),
+                    );
+                }
+                return Err(failure);
             }
+            // A successful joint teardown has consumed at least the SHM file-close receipt.
+            prior_teardown_mutation = true;
         }
 
         if matches!(delete, ManagedSqliteShmDeleteDisposition::Delete { .. }) {
             if let Err(failure) = self.namespace.delete_shm_for_wal() {
-                return Err(self.consume_delete_failure(&mut state, failure));
+                return Err(self.consume_delete_failure(
+                    &mut state,
+                    failure,
+                    prior_teardown_mutation,
+                ));
             }
         }
 
@@ -242,10 +254,13 @@ impl ManagedSqliteShmCoordinator {
             state.connections.remove(&connection_id);
             return;
         }
-        if let Err((phase, _error, mutation, lock_uncertain)) =
-            teardown_and_close_live_node(&mut state)
-        {
-            self.mark_poisoned(&mut state, phase, mutation, lock_uncertain);
+        if let Err(failure) = teardown_and_close_live_node(self, &mut state, connection_id) {
+            self.mark_poisoned(
+                &mut state,
+                failure.phase(),
+                failure.mutation_may_have_occurred(),
+                failure.lock_outcome_uncertain(),
+            );
             return;
         }
         state.connections.remove(&connection_id);
@@ -253,11 +268,24 @@ impl ManagedSqliteShmCoordinator {
 }
 
 fn teardown_and_close_live_node(
+    coordinator: &ManagedSqliteShmCoordinator,
     state: &mut ManagedSqliteShmCoordinatorState,
-) -> Result<(), (ManagedSqliteShmFailurePhase, io::Error, bool, bool)> {
-    teardown_live_node(state)?;
+    connection_id: u64,
+) -> Result<(), ManagedSqliteShmFailure> {
+    let whole_teardown_known_mutation = teardown_live_node(coordinator, state, connection_id)?;
+    #[cfg(test)]
+    let test_fault = coordinator.observe_test_fault(
+        connection_id,
+        ManagedSqliteShmFailurePhase::FileClose,
+        whole_teardown_known_mutation,
+    )?;
+    #[cfg(test)]
+    if let Some(fault) = test_fault.filter(|fault| fault.is_before_call()) {
+        let failure = coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+        return Err(failure);
+    }
     let node = state.node.take().ok_or_else(|| {
-        (
+        ManagedSqliteShmFailure::poisoned(
             ManagedSqliteShmFailurePhase::ConnectionDetach,
             io::Error::other("NODE_MANAGED_SQLITE_SHM_NODE_DISAPPEARED_DURING_TEARDOWN"),
             true,
@@ -276,6 +304,15 @@ fn teardown_and_close_live_node(
     match file.close() {
         Ok(receipt) => {
             let _kind = receipt.kind();
+            #[cfg(test)]
+            {
+                if let Some(fault) = test_fault {
+                    // The real receipt is consumed here and never exposed as a successful joint
+                    // close. The outer coordinator makes every post-success fault terminal.
+                    let failure = coordinator.activate_test_fault(fault, true)?;
+                    return Err(failure);
+                }
+            }
             Ok(())
         }
         Err(failure) => {
@@ -283,10 +320,10 @@ fn teardown_and_close_live_node(
             state
                 .quarantined_file_close
                 .push(ManagedSqliteShmFileCloseCustody::Pinned(failure));
-            Err((
+            Err(ManagedSqliteShmFailure::poisoned(
                 ManagedSqliteShmFailurePhase::FileClose,
                 error,
-                initialization_mutated,
+                initialization_mutated || whole_teardown_known_mutation,
                 false,
             ))
         }
@@ -306,10 +343,13 @@ fn close_failure_report(failure: &ManagedSqliteFileCloseFailure) -> io::Error {
 }
 
 fn teardown_live_node(
+    _coordinator: &ManagedSqliteShmCoordinator,
     state: &mut ManagedSqliteShmCoordinatorState,
-) -> Result<(), (ManagedSqliteShmFailurePhase, io::Error, bool, bool)> {
+    _connection_id: u64,
+) -> Result<bool, ManagedSqliteShmFailure> {
+    let mut whole_teardown_known_mutation = false;
     let node = state.node.as_mut().ok_or_else(|| {
-        (
+        ManagedSqliteShmFailure::poisoned(
             ManagedSqliteShmFailurePhase::ConnectionDetach,
             io::Error::new(
                 io::ErrorKind::NotFound,
@@ -322,37 +362,105 @@ fn teardown_live_node(
 
     for region in node.regions.iter_mut().rev() {
         if let Some(view) = region.view.as_mut() {
-            view.unmap_explicit()
-                .map_err(|error| (ManagedSqliteShmFailurePhase::ViewUnmap, error, true, false))?;
+            #[cfg(test)]
+            let test_fault = _coordinator.observe_test_fault(
+                _connection_id,
+                ManagedSqliteShmFailurePhase::ViewUnmap,
+                whole_teardown_known_mutation,
+            )?;
+            #[cfg(test)]
+            if let Some(fault) = test_fault.filter(|fault| fault.is_before_call()) {
+                let failure =
+                    _coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+                return Err(failure);
+            }
+            view.unmap_explicit().map_err(|error| {
+                ManagedSqliteShmFailure::poisoned(
+                    ManagedSqliteShmFailurePhase::ViewUnmap,
+                    error,
+                    true,
+                    false,
+                )
+            })?;
             region.view = None;
             region.logical_pointer = None;
+            whole_teardown_known_mutation = true;
+            #[cfg(test)]
+            {
+                if let Some(fault) = test_fault {
+                    let failure =
+                        _coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+                    return Err(failure);
+                }
+            }
+        }
+        #[cfg(test)]
+        let test_fault = _coordinator.observe_test_fault(
+            _connection_id,
+            ManagedSqliteShmFailurePhase::MappingClose,
+            whole_teardown_known_mutation,
+        )?;
+        #[cfg(test)]
+        if let Some(fault) = test_fault.filter(|fault| fault.is_before_call()) {
+            let failure = _coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+            return Err(failure);
         }
         region.mapping.close_explicit().map_err(|error| {
-            (
+            ManagedSqliteShmFailure::poisoned(
                 ManagedSqliteShmFailurePhase::MappingClose,
                 error,
                 true,
                 false,
             )
         })?;
+        whole_teardown_known_mutation = true;
+        #[cfg(test)]
+        {
+            if let Some(fault) = test_fault {
+                let failure =
+                    _coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+                return Err(failure);
+            }
+        }
     }
 
     match node.dms {
         ManagedSqliteShmDmsCustody::Shared => {
+            #[cfg(test)]
+            let test_fault = _coordinator.observe_test_fault(
+                _connection_id,
+                ManagedSqliteShmFailurePhase::DmsSharedRelease,
+                whole_teardown_known_mutation,
+            )?;
+            #[cfg(test)]
+            if let Some(fault) = test_fault.filter(|fault| fault.is_before_call()) {
+                let failure =
+                    _coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+                return Err(failure);
+            }
             platform::unlock_sqlite_byte_range(&node.file.file, SHM_DMS_OFFSET, 1).map_err(
                 |error| {
-                    (
+                    ManagedSqliteShmFailure::poisoned(
                         ManagedSqliteShmFailurePhase::DmsSharedRelease,
                         error,
-                        false,
+                        whole_teardown_known_mutation,
                         true,
                     )
                 },
             )?;
             node.dms = ManagedSqliteShmDmsCustody::Released;
+            whole_teardown_known_mutation = true;
+            #[cfg(test)]
+            {
+                if let Some(fault) = test_fault {
+                    let failure =
+                        _coordinator.activate_test_fault(fault, whole_teardown_known_mutation)?;
+                    return Err(failure);
+                }
+            }
         }
         ManagedSqliteShmDmsCustody::ExclusiveOutcomeUncertain => {
-            return Err((
+            return Err(ManagedSqliteShmFailure::poisoned(
                 ManagedSqliteShmFailurePhase::DmsExclusiveRelease,
                 io::Error::other("NODE_MANAGED_SQLITE_SHM_DMS_EXCLUSIVE_UNCERTAIN"),
                 true,
@@ -361,7 +469,7 @@ fn teardown_live_node(
         }
         ManagedSqliteShmDmsCustody::Released => {}
     }
-    Ok(())
+    Ok(whole_teardown_known_mutation)
 }
 
 fn protocol(code: &'static str) -> ManagedSqliteShmFailure {

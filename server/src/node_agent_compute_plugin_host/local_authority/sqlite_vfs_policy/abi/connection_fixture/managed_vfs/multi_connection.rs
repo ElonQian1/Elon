@@ -1,0 +1,131 @@
+//! Test-only two-Connection owner for one VFS registration and managed namespace.
+
+use std::{path::Path, sync::Arc};
+
+use anyhow::anyhow;
+use rusqlite::Connection;
+
+use super::*;
+
+const CONNECTION_COUNT: usize = 2;
+
+pub(super) struct ManagedSqliteMultiConnectionFixture {
+    registration: Option<ManagedTestVfsRegistration>,
+    connections: [Option<ManagedSqliteRoutedConnectionFixture>; CONNECTION_COUNT],
+}
+
+impl ManagedSqliteMultiConnectionFixture {
+    pub(super) fn open(root: &Path, nonce_seed: [u8; 16]) -> anyhow::Result<Self> {
+        let registration = ManagedTestVfsRegistration::register(root, nonce_seed)?;
+        let first = ManagedSqliteRoutedConnectionFixture::open_registered(&registration)?;
+        let second = ManagedSqliteRoutedConnectionFixture::open_registered(&registration)?;
+        Ok(Self {
+            registration: Some(registration),
+            connections: [Some(first), Some(second)],
+        })
+    }
+
+    pub(super) fn connection(&self, index: usize) -> anyhow::Result<&Connection> {
+        self.connections
+            .get(index)
+            .and_then(Option::as_ref)
+            .map(ManagedSqliteRoutedConnectionFixture::connection)
+            .ok_or_else(|| anyhow!("managed SQLite connection {index} is not live"))
+    }
+
+    pub(super) fn route(
+        &self,
+        index: usize,
+    ) -> anyhow::Result<&ManagedSqliteRoutedConnectionFixture> {
+        self.connections
+            .get(index)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| anyhow!("managed SQLite route {index} is not live"))
+    }
+
+    pub(super) fn route_ordinal(&self, index: usize) -> anyhow::Result<ManagedTestRouteOrdinal> {
+        Ok(self.route(index)?.route_ordinal())
+    }
+
+    pub(super) fn install_callback_fault_script(
+        &self,
+        steps: &[ManagedTestCallbackFaultStep],
+    ) -> Result<(), &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .faults()
+            .install(steps)
+    }
+
+    pub(super) fn callback_fault_controller(&self) -> Arc<ManagedTestCallbackFaultController> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .faults()
+    }
+
+    pub(super) fn pending_callback_fault_count(&self) -> Result<usize, &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .faults()
+            .pending_count()
+    }
+
+    pub(super) fn callback_fault_observations(
+        &self,
+    ) -> Result<Vec<ManagedTestCallbackFaultObservation>, &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .faults()
+            .observations()
+    }
+
+    pub(super) fn close_connection(
+        &mut self,
+        index: usize,
+    ) -> anyhow::Result<ManagedTestVfsCounts> {
+        self.connections
+            .get_mut(index)
+            .and_then(Option::take)
+            .ok_or_else(|| anyhow!("managed SQLite connection {index} is not live"))?
+            .close()
+    }
+
+    pub(super) fn live_route_count(&self) -> anyhow::Result<usize> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .live_route_count()
+    }
+
+    pub(super) fn counts(&self) -> ManagedTestVfsCounts {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .counts()
+    }
+
+    pub(super) fn close(mut self) -> anyhow::Result<ManagedTestVfsCounts> {
+        for index in 0..CONNECTION_COUNT {
+            if let Some(connection) = self.connections[index].take() {
+                connection.close()?;
+            }
+        }
+        let registration = self.registration.take().expect("managed VFS registration");
+        let counts = registration.counts();
+        registration.unregister()?;
+        Ok(counts)
+    }
+}
+
+impl Drop for ManagedSqliteMultiConnectionFixture {
+    fn drop(&mut self) {
+        for connection in &mut self.connections {
+            drop(connection.take());
+        }
+        drop(self.registration.take());
+    }
+}

@@ -1,12 +1,10 @@
 use std::{
+    mem,
     os::raw::{c_char, c_int, c_void},
     panic::{catch_unwind, AssertUnwindSafe},
     path::Path,
     ptr,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicUsize, Arc},
 };
 
 use anyhow::{anyhow, Context};
@@ -84,50 +82,72 @@ unsafe extern "C" fn managed_authorizer_callback(
 pub(super) struct ManagedSqliteRoutedConnectionFixture {
     connection: Option<Connection>,
     authorizer: Option<Box<ManagedVfsAuthorizerContext>>,
+    authorizer_installed: bool,
     registration: Option<ManagedTestVfsRegistration>,
+    routes: Arc<ManagedTestVfsRouteCollection>,
+    route_entry: Option<Arc<ManagedTestVfsRouteEntry>>,
     route: Arc<TestRoute>,
-    custody_drops: Arc<AtomicUsize>,
+    counters: Arc<ManagedTestVfsCounters>,
 }
 
 impl ManagedSqliteRoutedConnectionFixture {
     pub(super) fn open(root: &Path, nonce: [u8; 16]) -> anyhow::Result<Self> {
+        let registration = ManagedTestVfsRegistration::register(root, nonce)?;
+        let mut fixture = Self::open_registered(&registration)?;
+        fixture.registration = Some(registration);
+        Ok(fixture)
+    }
+
+    pub(super) fn open_registered(
+        registration: &ManagedTestVfsRegistration,
+    ) -> anyhow::Result<Self> {
+        let vfs_name = registration.name()?.to_owned();
+        let routes = registration.routes();
         let custody_drops = Arc::new(AtomicUsize::new(0));
-        let owner = ManagedSqliteRegistryProcessOwner::leak(FixedNonceSource(nonce));
-        let route = Arc::new(
-            TestRoute::register(owner, TestCustody::tracked(Arc::clone(&custody_drops)))
-                .map_err(|()| anyhow!("register managed VFS route"))?,
-        );
-        let registration = ManagedTestVfsRegistration::register(root, Arc::clone(&route))?;
-        let logical_name = route
-            .main_logical_name()
-            .map_err(|()| anyhow!("read managed VFS logical main name"))?;
-        let logical_name = logical_name
-            .to_str()
-            .context("managed VFS logical main name is UTF-8")?;
+        let route_entry = routes.register_route(custody_drops)?;
+        let route = Arc::clone(route_entry.route());
+        let logical_name = match route_entry.main_name().to_str() {
+            Ok(logical_name) => logical_name.to_owned(),
+            Err(error) => {
+                route.abort_unopened_for_test();
+                routes.retire_route(&route_entry)?;
+                return Err(error).context("managed VFS logical main name is UTF-8");
+            }
+        };
         let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
             | OpenFlags::SQLITE_OPEN_CREATE
             | OpenFlags::SQLITE_OPEN_FULL_MUTEX
             | OpenFlags::SQLITE_OPEN_PRIVATE_CACHE
             | OpenFlags::SQLITE_OPEN_NOFOLLOW;
-        let connection =
-            match Connection::open_with_flags_and_vfs(logical_name, flags, registration.name()?) {
-                Ok(connection) => connection,
-                Err(error) => {
-                    route.abort_unopened_for_test();
-                    return Err(error).context("open managed routed SQLite connection");
-                }
-            };
-        configure_connection(&connection)?;
+        let connection = match Connection::open_with_flags_and_vfs(&logical_name, flags, &vfs_name)
+        {
+            Ok(connection) => connection,
+            Err(error) => {
+                route.abort_unopened_for_test();
+                routes
+                    .retire_route(&route_entry)
+                    .with_context(|| format!("retire route after SQLite open failed: {error}"))?;
+                return Err(error).context("open managed routed SQLite connection");
+            }
+        };
         let mut fixture = Self {
             connection: Some(connection),
             authorizer: Some(Box::new(ManagedVfsAuthorizerContext {
                 route: Arc::clone(&route),
             })),
-            registration: Some(registration),
+            authorizer_installed: false,
+            registration: None,
+            routes,
+            route_entry: Some(route_entry),
             route,
-            custody_drops,
+            counters: registration.counters(),
         };
-        fixture.install_authorizer()?;
+        if let Err(error) = configure_connection(fixture.connection()) {
+            return Err(fixture.cancel_open(error.context("configure managed SQLite connection")));
+        }
+        if let Err(error) = fixture.install_authorizer() {
+            return Err(fixture.cancel_open(error));
+        }
         Ok(fixture)
     }
 
@@ -167,30 +187,58 @@ impl ManagedSqliteRoutedConnectionFixture {
     }
 
     pub(super) fn counts(&self) -> ManagedTestVfsCounts {
-        self.registration
+        self.counters.snapshot()
+    }
+
+    pub(super) fn route_ordinal(&self) -> ManagedTestRouteOrdinal {
+        self.route_entry
             .as_ref()
-            .expect("managed VFS registration")
-            .counts()
+            .expect("managed fixture route entry")
+            .ordinal()
     }
 
     pub(super) fn close(mut self) -> anyhow::Result<ManagedTestVfsCounts> {
-        self.uninstall_authorizer()?;
+        let counts = self.close_connection()?;
+        if let Some(registration) = self.registration.take() {
+            registration.unregister()?;
+        }
+        Ok(counts)
+    }
+
+    fn close_connection(&mut self) -> anyhow::Result<ManagedTestVfsCounts> {
+        if let Err(error) = self.uninstall_authorizer() {
+            if let Some(connection) = self.connection.take() {
+                mem::forget(connection);
+            }
+            return Err(error);
+        }
         drop(self.authorizer.take());
-        let connection = self.connection.take().expect("managed fixture connection");
-        connection
-            .close()
-            .map_err(|(_, error)| anyhow!("close managed routed SQLite connection: {error}"))?;
-        if self.custody_drops.load(Ordering::SeqCst) != 1 {
+        let connection = self
+            .connection
+            .take()
+            .ok_or_else(|| anyhow!("managed routed SQLite connection already consumed"))?;
+        if let Err((connection, error)) = connection.close() {
+            mem::forget(connection);
             return Err(anyhow!(
-                "managed VFS route custody was not retired exactly once"
+                "close managed routed SQLite connection: {error}; connection retained"
             ));
         }
-        let registration = self.registration.take().expect("managed VFS registration");
-        let counts = registration.counts();
-        registration
-            .unregister()
-            .map_err(|code| anyhow!("unregister managed test VFS: SQLite code {code}"))?;
-        Ok(counts)
+        let route_entry = self
+            .route_entry
+            .as_ref()
+            .expect("managed fixture route entry");
+        self.routes.retire_route(route_entry)?;
+        self.route_entry.take();
+        Ok(self.counters.snapshot())
+    }
+
+    fn cancel_open(mut self, open_error: anyhow::Error) -> anyhow::Error {
+        match self.close_connection() {
+            Ok(_) => open_error,
+            Err(close_error) => open_error.context(format!(
+                "managed SQLite open cancellation retained custody: {close_error}"
+            )),
+        }
     }
 
     fn install_authorizer(&mut self) -> anyhow::Result<()> {
@@ -205,6 +253,7 @@ impl ManagedSqliteRoutedConnectionFixture {
             )
         };
         if code == ffi::SQLITE_OK {
+            self.authorizer_installed = true;
             Ok(())
         } else {
             Err(anyhow!(
@@ -214,19 +263,26 @@ impl ManagedSqliteRoutedConnectionFixture {
     }
 
     fn uninstall_authorizer(&mut self) -> anyhow::Result<()> {
-        if self.connection.is_none() || self.authorizer.is_none() {
+        if !self.authorizer_installed {
             return Ok(());
+        }
+        if self.connection.is_none() || self.authorizer.is_none() {
+            return Err(anyhow!(
+                "managed VFS authorizer ownership missing while callback is installed"
+            ));
         }
         // SAFETY: the fixture still owns the live connection and callback context.
         let code = unsafe { ffi::sqlite3_set_authorizer(self.raw_handle(), None, ptr::null_mut()) };
         if code == ffi::SQLITE_OK {
+            self.authorizer_installed = false;
             Ok(())
         } else {
             if let Some(context) = self.authorizer.take() {
                 Box::leak(context);
             }
+            self.authorizer_installed = false;
             Err(anyhow!(
-                "uninstall managed VFS authorizer failed with SQLite code {code}"
+                "uninstall managed VFS authorizer failed with SQLite code {code}; context retained"
             ))
         }
     }
@@ -239,9 +295,8 @@ impl ManagedSqliteRoutedConnectionFixture {
 
 impl Drop for ManagedSqliteRoutedConnectionFixture {
     fn drop(&mut self) {
-        let _ = self.uninstall_authorizer();
-        drop(self.connection.take());
-        drop(self.authorizer.take());
-        drop(self.registration.take());
+        if self.connection.is_some() {
+            let _ = self.close_connection();
+        }
     }
 }

@@ -46,32 +46,34 @@ impl ManagedSqliteShmCoordinator {
         &self,
         state: &mut ManagedSqliteShmCoordinatorState,
         failure: ManagedSqliteDeleteFailure,
+        prior_mutation: bool,
     ) -> ManagedSqliteShmFailure {
         let parts = failure.into_shm_parts();
+        let mutation_may_have_occurred = prior_mutation || parts.mutation_may_have_occurred;
         if let Some(close_error) = self.retain_handle_custody(state, parts.custody) {
             self.mark_poisoned(
                 state,
                 ManagedSqliteShmFailurePhase::FileClose,
-                parts.mutation_may_have_occurred,
+                mutation_may_have_occurred,
                 false,
             );
             return ManagedSqliteShmFailure::poisoned(
                 ManagedSqliteShmFailurePhase::FileClose,
                 close_error,
-                parts.mutation_may_have_occurred,
+                mutation_may_have_occurred,
                 false,
             );
         }
         self.mark_poisoned(
             state,
             ManagedSqliteShmFailurePhase::ExactSiblingDelete,
-            parts.mutation_may_have_occurred,
+            mutation_may_have_occurred,
             false,
         );
         ManagedSqliteShmFailure::poisoned(
             ManagedSqliteShmFailurePhase::ExactSiblingDelete,
             parts.error,
-            parts.mutation_may_have_occurred,
+            mutation_may_have_occurred,
             false,
         )
     }

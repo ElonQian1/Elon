@@ -32,11 +32,15 @@ pub(super) unsafe extern "C" fn open(
     }
     catch_unwind(AssertUnwindSafe(|| {
         let context = unsafe { context(vfs) }.ok_or(())?;
-        let callback = context.route.begin_open_callback()?;
-        let request = context
-            .route
-            .project_x_open(unsafe { name_bytes(name) }, flags)?;
+        let candidate_name = unsafe { name_bytes(name) };
+        let resolved = context.routes.resolve(candidate_name)?;
+        let route = resolved.route();
+        let callback = route.begin_open_callback()?;
+        let request = route.project_x_open(candidate_name, flags)?;
         let role = request.role();
+        if role != resolved.role() {
+            return Err(());
+        }
         let access = match request.access() {
             ManagedSqliteVfsAccess::ReadOnly => ManagedSqliteAccess::ReadOnly,
             ManagedSqliteVfsAccess::ReadWrite => ManagedSqliteAccess::ReadWrite,
@@ -53,14 +57,12 @@ pub(super) unsafe extern "C" fn open(
                     .namespace()
                     .open(ManagedSqliteFileKind::Main, access, mode)
                     .map_err(|failure| {
-                        let _ = context.route.retain_failure(failure);
+                        let _ = route.retain_failure(failure);
                     })?;
                 let main = opened.into_main_file().map_err(|failure| {
-                    let _ = context.route.retain_failure(failure);
+                    let _ = route.retain_failure(failure);
                 })?;
-                context
-                    .route
-                    .bind_main(main, Arc::clone(&context.runtime))?
+                route.bind_main(main, Arc::clone(&context.runtime))?
             }
             ManagedSqliteLogicalFileRole::Journal => {
                 let opened = context
@@ -68,30 +70,42 @@ pub(super) unsafe extern "C" fn open(
                     .namespace()
                     .open(ManagedSqliteFileKind::Journal, access, mode)
                     .map_err(|failure| {
-                        let _ = context.route.retain_failure(failure);
+                        let _ = route.retain_failure(failure);
                     })?;
-                context.route.bind_sidecar(opened, role)?
+                route.bind_sidecar(opened, role)?
             }
             ManagedSqliteLogicalFileRole::Wal => {
-                context.wal_open_attempts.fetch_add(1, Ordering::SeqCst);
+                context
+                    .counters
+                    .wal_open_attempts
+                    .fetch_add(1, Ordering::SeqCst);
                 let opened = context
                     .runtime
                     .namespace()
                     .open(ManagedSqliteFileKind::Wal, access, mode)
                     .map_err(|failure| {
-                        let _ = context.route.retain_failure(failure);
+                        let _ = route.retain_failure(failure);
                     })?;
-                context.route.bind_sidecar(opened, role)?
+                route.bind_sidecar(opened, role)?
             }
         };
+        let operations = ManagedTestFaultingFile::new(
+            operations,
+            Arc::clone(&context.faults),
+            resolved.route_ordinal(),
+            role,
+        );
         // SAFETY: this is the initialized allocation owned by the current xOpen callback.
         unsafe { install_test_vfs_file(file, operations) }?;
         callback.complete()?;
         if role == ManagedSqliteLogicalFileRole::Main {
-            context.route.activate_after_main_open()?;
-            context.main_opens.fetch_add(1, Ordering::SeqCst);
+            route.activate_after_main_open()?;
+            context.counters.main_opens.fetch_add(1, Ordering::SeqCst);
         } else {
-            context.journal_opens.fetch_add(1, Ordering::SeqCst);
+            context
+                .counters
+                .journal_opens
+                .fetch_add(1, Ordering::SeqCst);
         }
         if !output_flags.is_null() {
             let actual = match request.access() {
@@ -120,17 +134,21 @@ pub(super) unsafe extern "C" fn access(
     }
     catch_unwind(AssertUnwindSafe(|| {
         let context = unsafe { context(vfs) }.ok_or(())?;
-        let callback = context.route.begin_access_callback()?;
-        let request = context
-            .route
-            .project_x_access(unsafe { name_bytes(name) }, flag)?;
+        let candidate_name = unsafe { name_bytes(name) };
+        let resolved = context.routes.resolve(candidate_name)?;
+        let route = resolved.route();
+        let callback = route.begin_access_callback()?;
+        let request = route.project_x_access(candidate_name, flag)?;
+        if request.role() != resolved.role() {
+            return Err(());
+        }
         let kind = sidecar_kind(request.role())?;
         let exists = context
             .runtime
             .namespace()
             .access(kind, ManagedSqliteAccess::ReadWrite)
             .map_err(|failure| {
-                let _ = context.route.retain_failure(failure);
+                let _ = route.retain_failure(failure);
             })?;
         if output.is_null() {
             return Err(());
@@ -152,17 +170,21 @@ pub(super) unsafe extern "C" fn delete(
 ) -> c_int {
     catch_unwind(AssertUnwindSafe(|| {
         let context = unsafe { context(vfs) }.ok_or(())?;
-        let callback = context.route.begin_delete_callback()?;
-        let request = context
-            .route
-            .project_x_delete(unsafe { name_bytes(name) }, sync_directory)?;
+        let candidate_name = unsafe { name_bytes(name) };
+        let resolved = context.routes.resolve(candidate_name)?;
+        let route = resolved.route();
+        let callback = route.begin_delete_callback()?;
+        let request = route.project_x_delete(candidate_name, sync_directory)?;
+        if request.role() != resolved.role() {
+            return Err(());
+        }
         let kind = sidecar_kind(request.role())?;
         let _outcome = context
             .runtime
             .namespace()
             .delete(kind, request.sync_parent())
             .map_err(|failure| {
-                let _ = context.route.retain_failure(failure);
+                let _ = route.retain_failure(failure);
             })?;
         callback.complete()?;
         Ok::<(), ()>(())
@@ -184,10 +206,14 @@ pub(super) unsafe extern "C" fn full_pathname(
     }
     catch_unwind(AssertUnwindSafe(|| {
         let context = unsafe { context(vfs) }.ok_or(())?;
-        let callback = context.route.begin_full_pathname_callback()?;
-        let projected = context
-            .route
-            .project_x_full_pathname(unsafe { name_bytes(name) }, output_size)?;
+        let candidate_name = unsafe { name_bytes(name) };
+        let resolved = context.routes.resolve(candidate_name)?;
+        let route = resolved.route();
+        let callback = route.begin_full_pathname_callback()?;
+        if resolved.role() != ManagedSqliteLogicalFileRole::Main {
+            return Err(());
+        }
+        let projected = route.project_x_full_pathname(candidate_name, output_size)?;
         if output.is_null() || output_size <= 0 {
             return Err(());
         }
