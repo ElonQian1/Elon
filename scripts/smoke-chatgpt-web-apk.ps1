@@ -132,6 +132,26 @@ function Get-VisibleNativeSelectors {
     return @(Get-ChatGptNativeSelectorsFromXml -UiXml $UiXml)
 }
 
+function Wait-VisibleNativeSelectors {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$RequiredPrefixes,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $last = @()
+    do {
+        $last = @(Get-VisibleNativeSelectors)
+        $missing = @($RequiredPrefixes | Where-Object {
+            $prefix = $_
+            @($last | Where-Object { $_.StartsWith($prefix) }).Count -eq 0
+        })
+        if ($missing.Count -eq 0) { return $last }
+        Start-Sleep -Milliseconds 500
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for stable native selectors. Visible=$($last.Count), missing=$($missing.Count)."
+}
+
 function Wait-CommandResult {
     param(
         [Parameter(Mandatory = $true)][string]$Action,
@@ -169,13 +189,16 @@ function Wait-NavigationReady {
         $command = $last.last_command
         $fresh = $null -ne $command -and [long]$command.observed_at_ms -gt $AfterMs
         $collected = $command.action -eq "collect_navigation"
-        $cachedSnapshot = $command.action -eq "list_navigation" -and
-            $command.ok -eq $true -and
-            @($last.features).Count -gt 0
+        $navigation = Invoke-UiAction -Action "chatgpt_get_navigation"
+        $features = @($navigation.features | Where-Object { $null -ne $_ })
+        $cachedSnapshot = $navigation.control_ok -eq $true -and $features.Count -gt 0
         $matrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
         $overlayOpen = [int]$matrix.observed_semantics.close -gt 0
         if ($fresh -and ($collected -or $cachedSnapshot) -and $overlayOpen) {
-            return $last
+            return [pscustomobject]@{
+                command_state = $last
+                navigation = $navigation
+            }
         }
         Start-Sleep -Seconds $PollIntervalSec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
@@ -244,6 +267,34 @@ function Get-ForeignComposerLabels {
     return @($Options | Where-Object { [string]$_.label -match $foreignPattern } | ForEach-Object { [string]$_.label })
 }
 
+function Wait-NewConversationReady {
+    param(
+        [string]$PreviousUrl,
+        [int]$PreviousMessageCount,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $last = $null
+    do {
+        $last = Invoke-ApkMcp -Tool "ui_state"
+        $currentUrl = [string]$last.conversation.url
+        $currentCount = [int]$last.conversation.message_count
+        $isolated = $currentUrl -ne $PreviousUrl -or
+            ($PreviousMessageCount -eq 0 -and $currentCount -eq 0)
+        if (
+            $last.bridge_state -eq "ready" -and
+            $last.composer_ready -eq $true -and
+            $last.streaming -eq $false -and
+            $currentCount -eq 0 -and
+            $isolated
+        ) {
+            return $last
+        }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out proving an isolated blank ChatGPT conversation."
+}
 $opened = Invoke-UiAction -Action "open_chatgpt_web" -EnsureMainActivity
 $officialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
 $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT Web readiness" -Predicate {
@@ -314,7 +365,9 @@ $beforeFeaturesState = Invoke-ApkMcp -Tool "ui_state"
 $beforeFeatures = [long]$beforeFeaturesState.last_command.observed_at_ms
 Invoke-UiAction -Action "chatgpt_list_features" | Out-Null
 $featuresState = Wait-NavigationReady -AfterMs $beforeFeatures -TimeoutSec $ReadyTimeoutSec
-Add-Check "composer_contamination_setup" ($featuresState.last_command.ok -eq $true) "official sidebar opened"
+Add-Check "composer_contamination_setup" (
+    $featuresState.command_state.last_command.ok -eq $true
+) "official sidebar opened"
 $navigationMatrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
 $navigationAdaptationRequired = $navigationMatrix.adaptation_review.required -eq $true
 $navigationAdaptationReasons = @($navigationMatrix.adaptation_review.reasons)
@@ -384,11 +437,18 @@ if ($SendProbe) {
     $beforeNew = [long]$beforeNewState.last_command.observed_at_ms
     Invoke-UiAction -Action "chatgpt_new_conversation" | Out-Null
     $newState = Wait-CommandResult -Action "new_conversation" -AfterMs $beforeNew -TimeoutSec $ReadyTimeoutSec
-    $newConversationOk = $newState.last_command.ok -eq $true
-    Add-Check "new_conversation" $newConversationOk ([string]$newState.last_command.detail)
-    if (-not $newConversationOk) {
+    $newConversationAccepted = $newState.last_command.ok -eq $true
+    Add-Check "new_conversation" $newConversationAccepted ([string]$newState.last_command.detail)
+    if (-not $newConversationAccepted) {
         throw "ChatGPT Web new conversation failed; the send probe was not dispatched."
     }
+    $blankState = Wait-NewConversationReady `
+        -PreviousUrl ([string]$beforeNewState.conversation.url) `
+        -PreviousMessageCount ([int]$beforeNewState.conversation.message_count) `
+        -TimeoutSec $ReadyTimeoutSec
+    Add-Check "new_conversation_ready" (
+        [int]$blankState.conversation.message_count -eq 0
+    ) "isolated blank conversation"
 
     $prompt = "Reply only with: $ProbeMarker"
     Invoke-UiAction -Action "set_input_text" -Arguments @{ text = $prompt } | Out-Null
@@ -432,7 +492,8 @@ $requiredSelectors = @(
     "chatgpt-native:dictation:",
     "chatgpt-native:send:"
 )
-$visibleSelectors = Get-VisibleNativeSelectors
+$visibleSelectors = Wait-VisibleNativeSelectors -RequiredPrefixes $requiredSelectors `
+    -TimeoutSec $ReadyTimeoutSec
 foreach ($prefix in $requiredSelectors) {
     $match = @($visibleSelectors | Where-Object { $_.StartsWith($prefix) })
     Add-Check "selector_$($prefix.Split(':')[1])" ($match.Count -gt 0) ($match -join ",")

@@ -22,11 +22,22 @@ $results = [System.Collections.Generic.List[object]]::new()
 
 function Wait-FeatureList {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_list_features" | Out-Null
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "ChatGPT feature navigation" -Predicate {
-            param($state)
-            $state.bridge_state -eq "ready" -and @($state.features).Count -gt 0
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_get_navigation"
+        $features = @($navigation.features | Where-Object { $null -ne $_ })
+        if (
+            $state.bridge_state -eq "ready" -and
+            $navigation.control_ok -eq $true -and
+            $features.Count -gt 0
+        ) {
+            return $navigation
         }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for ChatGPT feature navigation."
 }
 
 function Wait-CommandAndPage {
@@ -49,30 +60,65 @@ function Wait-CommandAndPage {
         }
 }
 
-function Return-Home {
-    $response = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation"
-    $requestId = [string]$response.command_receipt.request_id
-    if (-not $requestId) { throw "New conversation command returned no request receipt." }
-    Wait-CommandAndPage -RequestId $requestId -PageKind "home" `
-        -Description "ChatGPT empty conversation home" | Out-Null
+function Get-ObservedPath {
+    param($State)
+
+    $uri = $null
+    if ([Uri]::TryCreate([string]$State.conversation.url, [UriKind]::Absolute, [ref]$uri)) {
+        return $uri.AbsolutePath
+    }
+    return ""
+}
+
+function Restore-Origin {
+    param(
+        [Parameter(Mandatory = $true)][string]$PageKind,
+        [string]$Path
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min(45, $ReadyTimeoutSec))
+    $nextBackAt = [DateTimeOffset]::MinValue
+    $backAttempts = 0
+    $last = $null
+    do {
+        $last = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        $currentPath = Get-ObservedPath -State $last
+        $pathMatches = -not $Path -or $currentPath -eq $Path
+        if (
+            $last.bridge_state -eq "ready" -and
+            [string]$last.page_kind -eq $PageKind -and
+            $pathMatches
+        ) {
+            return
+        }
+        if ([DateTimeOffset]::UtcNow -ge $nextBackAt -and $backAttempts -lt 3) {
+            Invoke-ChatGptWebSmokeAdb -Runtime $runtime -Arguments @("shell", "input", "keyevent", "4") `
+                -TimeoutSec 10 -Label "restore ChatGPT origin" | Out-Null
+            $backAttempts += 1
+            $nextBackAt = [DateTimeOffset]::UtcNow.AddSeconds(5)
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out restoring the original ChatGPT page. Last page=$($last.page_kind)."
 }
 
 Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
     -EnsureMainActivity | Out-Null
 Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
     -Arguments @{ view_mode = "official" } | Out-Null
-Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+$origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
     -Description "authenticated ChatGPT Web" -Predicate {
         param($state)
         $state.surface -eq "chatgpt_web" -and
             $state.bridge_state -eq "ready" -and
             $state.authenticated -eq $true
-    } | Out-Null
+    }
+$originPageKind = [string]$origin.page_kind
+$originPath = Get-ObservedPath -State $origin
 
-Return-Home
 $initial = Wait-FeatureList
 $availableKinds = @(
-    $initial.features |
+    @($initial.features | Where-Object { $null -ne $_ }) |
         Where-Object { [string]$_.kind -in $safeKinds } |
         ForEach-Object { [string]$_.kind } |
         Sort-Object -Unique |
@@ -84,7 +130,7 @@ if ($availableKinds.Count -eq 0) {
 
 foreach ($kind in $availableKinds) {
     $navigation = Wait-FeatureList
-    $feature = @($navigation.features) |
+    $feature = @($navigation.features | Where-Object { $null -ne $_ }) |
         Where-Object { [string]$_.kind -eq $kind -and $_.selected -ne $true } |
         Select-Object -First 1
     if ($null -eq $feature) {
@@ -116,7 +162,7 @@ foreach ($kind in $availableKinds) {
         unexpected_fallback_count = [int]$audit.unexpected_fallback_count
     })
     Write-Output "CHATGPT_FEATURE_PAGE kind=$kind passed=$($audit.passed) controls=$($audit.control_count) generic=$($audit.generic_control_count) unexpected_fallback=$($audit.unexpected_fallback_count)"
-    Return-Home
+    Restore-Origin -PageKind $originPageKind -Path $originPath
 }
 
 $failed = @($results | Where-Object { $_.passed -ne $true })
@@ -125,6 +171,7 @@ $failed = @($results | Where-Object { $_.passed -ne $true })
     passed = $failed.Count -eq 0
     device_serial = $DeviceSerial
     audited_kinds = @($availableKinds)
+    origin_restored = $true
     results = @($results)
 } | ConvertTo-Json -Depth 12
 

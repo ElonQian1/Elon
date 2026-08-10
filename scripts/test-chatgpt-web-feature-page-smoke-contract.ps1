@@ -26,6 +26,8 @@ foreach ($path in @($smokePath, $runtimePath, $policyPath)) {
 
 Assert-Contains $runtime "physical USB serial" "Runtime must require an explicit physical USB serial."
 Assert-Contains $runtime "Invoke-ElonNativeCommand" "Runtime must bound native adb commands."
+Assert-Contains $runtime "function Invoke-ChatGptWebSmokeAdb" `
+    "Runtime must expose a bounded USB-only adb command helper."
 Assert-Contains $runtime "Verification is deferred" "Missing USB must be reported as deferred."
 if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
     throw "Feature-page smoke runtime must not create a wireless adb connection."
@@ -33,9 +35,18 @@ if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
 Assert-Contains $smoke '$safeKinds = @("library", "tasks", "apps", "projects", "gpts")' `
     "Feature-page smoke must constrain navigation to non-destructive page kinds."
 Assert-Contains $smoke 'chatgpt_select_feature' "Feature-page smoke must use the stable MCP action."
+Assert-Contains $smoke '-Action "chatgpt_get_navigation"' `
+    "Feature-page smoke must read features from the dedicated navigation API."
+Assert-Contains $smoke '$navigation.features | Where-Object { $null -ne $_ }' `
+    "Feature-page smoke must not count a null navigation payload as one feature."
 Assert-Contains $smoke 'command_receipt.request_id' "Feature-page smoke must await durable command receipts."
 Assert-Contains $smoke 'Test-ChatGptWebFeatureMatrix' "Feature-page smoke must use shared structural policy."
-Assert-Contains $smoke 'Return-Home' "Feature-page smoke must restore the empty conversation home."
+Assert-Contains $smoke 'function Restore-Origin' "Feature-page smoke must restore the original page."
+Assert-Contains $smoke 'Invoke-ChatGptWebSmokeAdb' `
+    "Feature-page smoke must use the bounded USB helper for back navigation."
+if ($smoke.Contains('chatgpt_new_conversation')) {
+    throw "Feature-page smoke must not replace or discard the user's current conversation."
+}
 
 . $policyPath
 $healthy = [pscustomobject]@{

@@ -79,16 +79,16 @@ if (!$NoBootstrap) {
     Start-ApkMcpDebug
 }
 
+if ($EnsureMainActivity) {
+    Start-ApkMainActivity
+}
+
 Invoke-Adb forward "tcp:$Port" "tcp:$Port" | Out-Null
 
 $health = Wait-ApkMcpHealth
 $token = [string]$health.auth_token
 if (!$token) {
     throw "MCP health endpoint did not return auth_token."
-}
-
-if ($EnsureMainActivity) {
-    Start-ApkMainActivity
 }
 
 $argumentObject = $Arguments | ConvertFrom-Json

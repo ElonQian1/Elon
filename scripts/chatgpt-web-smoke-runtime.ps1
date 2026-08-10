@@ -56,6 +56,21 @@ function Assert-ChatGptWebSmokeUsbDevice {
     }
 }
 
+function Invoke-ChatGptWebSmokeAdb {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [ValidateRange(1, 60)][int]$TimeoutSec = 10,
+        [string]$Label = "ChatGPT Web adb command"
+    )
+
+    $result = Invoke-ElonNativeCommand -FilePath $Runtime.adb `
+        -ArgumentList (@("-s", $Runtime.device_serial) + $Arguments) `
+        -TimeoutSeconds $TimeoutSec -Label $Label
+    Assert-ElonNativeCommand -Result $result -FailureMessage "$Label failed"
+    return [string]$result.Stdout
+}
+
 function Invoke-ChatGptWebSmokeMcp {
     param(
         [Parameter(Mandatory = $true)]$Runtime,

@@ -16,14 +16,16 @@ function Assert-Contains {
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features"'
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
 Assert-Contains 'function Wait-NavigationReady'
+Assert-Contains 'function Wait-VisibleNativeSelectors'
 Assert-Contains 'function Wait-AccountMenuReady'
 Assert-Contains 'function Wait-ComposerOptionsReady'
+Assert-Contains 'function Wait-NewConversationReady'
 Assert-Contains '$freshCollection = $command.action -eq $expectedAction'
 Assert-Contains '$cachedSnapshot = $navigation.control_ok -eq $true -and $options.Count -gt 0'
 Assert-Contains 'Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs'
 Assert-Contains '$command.action -eq "collect_navigation"'
-Assert-Contains '$command.action -eq "list_navigation"'
-Assert-Contains '@($last.features).Count -gt 0'
+Assert-Contains '$navigation = Invoke-UiAction -Action "chatgpt_get_navigation"'
+Assert-Contains '$features = @($navigation.features | Where-Object { $null -ne $_ })'
 Assert-Contains '$overlayOpen = [int]$matrix.observed_semantics.close -gt 0'
 Assert-Contains '($collected -or $cachedSnapshot) -and $overlayOpen'
 Assert-Contains 'Wait-NavigationReady -AfterMs $beforeFeatures'
@@ -39,7 +41,7 @@ Assert-Contains '$navigationCloseCount = [int]$navigationMatrix.observed_semanti
 Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0)'
 Assert-Contains '$nativeView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "native" }'
 Assert-Contains 'Add-Check "native_view_selected"'
-Assert-Contains '$visibleSelectors = Get-VisibleNativeSelectors'
+Assert-Contains '$visibleSelectors = Wait-VisibleNativeSelectors -RequiredPrefixes $requiredSelectors'
 Assert-Contains '$restoredOfficialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
 Assert-Contains 'Add-Check "official_view_restored"'
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
@@ -55,6 +57,7 @@ Assert-Contains 'Get-ForeignComposerLabels -Options $modelOptions'
 Assert-Contains 'Get-ForeignComposerLabels -Options $toolOptions'
 Assert-Contains 'Add-Check "composer_model_scope"'
 Assert-Contains 'Add-Check "composer_tool_scope"'
+Assert-Contains 'Add-Check "new_conversation_ready"'
 Assert-Contains '$adaptationRequired = $matrix.adaptation_review.required -eq $true'
 Assert-Contains 'Add-Check "adaptation_review" (-not $adaptationRequired)'
 Assert-Contains 'Invoke-Adb shell input keyevent 4'
@@ -147,7 +150,7 @@ $officialIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_select_view" 
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
 $toolsIndex = $source.IndexOf('Get-ComposerOptions -Section "tools"')
 $nativeIndex = $source.IndexOf('$nativeView = Invoke-UiAction -Action "chatgpt_select_view"')
-$selectorsIndex = $source.IndexOf('$visibleSelectors = Get-VisibleNativeSelectors')
+$selectorsIndex = $source.IndexOf('$visibleSelectors = Wait-VisibleNativeSelectors')
 if (-not ($openIndex -lt $officialIndex -and $officialIndex -lt $featuresIndex)) {
     throw "ChatGPT Web smoke must select the official view before readiness and navigation checks."
 }
