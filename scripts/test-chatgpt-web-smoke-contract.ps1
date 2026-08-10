@@ -11,6 +11,13 @@ function Assert-Contains {
 }
 
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features"'
+Assert-Contains 'function Wait-NavigationReady'
+Assert-Contains '$command.action -eq "collect_navigation"'
+Assert-Contains '$command.action -eq "list_navigation"'
+Assert-Contains '@($last.features).Count -gt 0'
+Assert-Contains 'Wait-NavigationReady -AfterMs $beforeFeatures'
+Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
+Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
 Assert-Contains 'function Get-TopResumedActivity'
 Assert-Contains 'Add-Check "chatgpt_activity_foreground"'
 Assert-Contains 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
@@ -22,6 +29,13 @@ Assert-Contains 'Get-ForeignComposerLabels -Options $toolOptions'
 Assert-Contains 'Add-Check "composer_model_scope"'
 Assert-Contains 'Add-Check "composer_tool_scope"'
 Assert-Contains 'Invoke-Adb shell input keyevent 4'
+
+if ($source.Contains('Wait-CommandResult -Action "collect_navigation" -AfterMs $beforeFeatures')) {
+    throw "Navigation smoke must accept the already-collected snapshot path."
+}
+if ($source.Contains('ToUnixTimeMilliseconds()')) {
+    throw "ChatGPT Web smoke must compare bridge timestamps from the same device clock."
+}
 
 $featuresIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_list_features"')
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')

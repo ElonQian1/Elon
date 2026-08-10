@@ -149,6 +149,30 @@ function Wait-CommandResult {
     throw "Timed out waiting for $Action command result. Last action=$($last.last_command.action)."
 }
 
+function Wait-NavigationReady {
+    param(
+        [Parameter(Mandatory = $true)][long]$AfterMs,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $last = $null
+    do {
+        $last = Invoke-ApkMcp -Tool "ui_state"
+        $command = $last.last_command
+        $fresh = $null -ne $command -and [long]$command.observed_at_ms -gt $AfterMs
+        $collected = $command.action -eq "collect_navigation"
+        $cachedSnapshot = $command.action -eq "list_navigation" -and
+            $command.ok -eq $true -and
+            @($last.features).Count -gt 0
+        if ($fresh -and ($collected -or $cachedSnapshot)) {
+            return $last
+        }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for ChatGPT navigation readiness. Last action=$($last.last_command.action)."
+}
+
 function Get-ComposerOptions {
     param([Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section)
 
@@ -254,7 +278,7 @@ foreach ($prefix in $requiredSelectors) {
 $beforeFeaturesState = Invoke-ApkMcp -Tool "ui_state"
 $beforeFeatures = [long]$beforeFeaturesState.last_command.observed_at_ms
 Invoke-UiAction -Action "chatgpt_list_features" | Out-Null
-$featuresState = Wait-CommandResult -Action "collect_navigation" -AfterMs $beforeFeatures -TimeoutSec $ReadyTimeoutSec
+$featuresState = Wait-NavigationReady -AfterMs $beforeFeatures -TimeoutSec $ReadyTimeoutSec
 Add-Check "composer_contamination_setup" ($featuresState.last_command.ok -eq $true) "official sidebar opened"
 
 $modelResult = Get-ComposerOptions -Section "model"
@@ -307,7 +331,8 @@ if ($SendProbe) {
     }
 }
 
-$beforeList = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$beforeListState = Invoke-ApkMcp -Tool "ui_state"
+$beforeList = [long]$beforeListState.last_command.observed_at_ms
 Invoke-UiAction -Action "chatgpt_list_conversations" | Out-Null
 $listState = Wait-CommandResult -Action "list_conversations" -AfterMs $beforeList -TimeoutSec $ReadyTimeoutSec
 Add-Check "conversation_list" ($listState.last_command.ok -eq $true) ([string]$listState.last_command.detail)
