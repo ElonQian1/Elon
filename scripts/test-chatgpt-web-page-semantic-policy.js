@@ -87,6 +87,9 @@ expectEqual(policy.classify({
   pathname: '/', region: 'overlay', signal: 'Personalization'
 }), 'personalization', 'account personalization');
 expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: '个人资料'
+}), 'profile', 'account profile');
+expectEqual(policy.classify({
   pathname: '/', region: 'overlay', signal: '帮助'
 }), 'help', 'account help');
 expectEqual(policy.classify({
@@ -95,6 +98,9 @@ expectEqual(policy.classify({
 expectEqual(policy.classify({
   pathname: '/', region: 'overlay', signal: 'Manage subscription'
 }), 'plan', 'account plan');
+expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: 'Account owner Pro'
+}), 'plan', 'account pro plan');
 expectEqual(policy.classify({
   pathname: '/', region: 'content', signal: 'Manage subscription'
 }), '', 'account semantics stay overlay scoped');

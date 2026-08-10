@@ -43,9 +43,10 @@
     }
     if (region === 'overlay') {
       if (/personalization|personalise|personalize|个性化/.test(combined)) return 'personalization';
+      if (/profile|personal\s+(?:info|details)|个人资料|个人信息/.test(signal)) return 'profile';
       if (/log\s*out|sign\s*out|退出登录|登出/.test(combined)) return 'logout';
       if (/help|support|帮助|支持/.test(combined)) return 'help';
-      if (/upgrade|subscription|manage\s+plan|套餐|订阅/.test(combined)) return 'plan';
+      if (/upgrade|subscription|manage\s+plan|\bpro\b|套餐|订阅/.test(combined)) return 'plan';
     }
     if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
     if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
