@@ -10,6 +10,7 @@ function New-ChatGptWebSmokeRuntime {
     param(
         [Parameter(Mandatory = $true)][string]$Adb,
         [Parameter(Mandatory = $true)][string]$DeviceSerial,
+        [string]$ExpectedHardwareSerial = "",
         [ValidateRange(1, 10)][int]$PollIntervalSec = 2
     )
 
@@ -17,9 +18,13 @@ function New-ChatGptWebSmokeRuntime {
         throw "adb not found: $Adb"
     }
     $serial = $DeviceSerial.Trim()
-    if (-not $serial) { throw "A physical USB device serial is required." }
-    if ($serial -match ':\d+$' -or $serial -match '^emulator-') {
-        throw "ChatGPT Web true-device smoke requires a physical USB serial, not wireless or emulator transport."
+    if (-not $serial) { throw "A device serial is required." }
+    if ($serial -match '^emulator-') {
+        throw "ChatGPT Web true-device smoke does not accept emulator transport."
+    }
+    $hardwareSerial = $ExpectedHardwareSerial.Trim()
+    if ($serial -match ':\d+$' -and -not $hardwareSerial) {
+        throw "Wireless true-device smoke requires an expected hardware serial; use a physical USB serial otherwise."
     }
     $invokeMcp = Join-Path $PSScriptRoot "invoke-apk-mcp.ps1"
     if (-not (Test-Path -LiteralPath $invokeMcp -PathType Leaf)) {
@@ -28,12 +33,13 @@ function New-ChatGptWebSmokeRuntime {
     return [pscustomobject]@{
         adb = [System.IO.Path]::GetFullPath($Adb)
         device_serial = $serial
+        expected_hardware_serial = $hardwareSerial
         invoke_mcp = $invokeMcp
         poll_interval_sec = $PollIntervalSec
     }
 }
 
-function Assert-ChatGptWebSmokeUsbDevice {
+function Assert-ChatGptWebSmokeDevice {
     param([Parameter(Mandatory = $true)]$Runtime)
 
     $devices = Invoke-ElonNativeCommand -FilePath $Runtime.adb `
@@ -45,15 +51,40 @@ function Assert-ChatGptWebSmokeUsbDevice {
             ForEach-Object { ($_ -split '\s+')[0] }
     )
     if ($Runtime.device_serial -notin $connected) {
-        throw "USB device is not connected: $($Runtime.device_serial). Verification is deferred."
+        throw "Device is not connected: $($Runtime.device_serial). Verification is deferred."
     }
     $state = Invoke-ElonNativeCommand -FilePath $Runtime.adb `
         -ArgumentList @("-s", $Runtime.device_serial, "get-state") `
         -TimeoutSeconds 5 -Label "read adb device state"
-    Assert-ElonNativeCommand -Result $state -FailureMessage "Unable to read USB device state"
+    Assert-ElonNativeCommand -Result $state -FailureMessage "Unable to read device state"
     if ([string]$state.Stdout -notmatch '^device\s*$') {
-        throw "USB device is not ready: $($Runtime.device_serial). Verification is deferred."
+        throw "Device is not ready: $($Runtime.device_serial). Verification is deferred."
     }
+    $expectedHardwareSerial = [string]$Runtime.expected_hardware_serial
+    if ($expectedHardwareSerial) {
+        $identity = Invoke-ElonNativeCommand -FilePath $Runtime.adb `
+            -ArgumentList @("-s", $Runtime.device_serial, "shell", "getprop", "ro.serialno") `
+            -TimeoutSeconds 5 -Label "read adb hardware identity"
+        Assert-ElonNativeCommand -Result $identity -FailureMessage "Unable to read device hardware identity"
+        if ([string]$identity.Stdout.Trim() -ine $expectedHardwareSerial) {
+            throw "Device hardware identity does not match the pinned target. Verification is deferred."
+        }
+    }
+}
+
+function Assert-ChatGptWebSmokeUsbDevice {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    if ($Runtime.device_serial -match ':\d+$') {
+        throw "ChatGPT Web USB smoke requires a physical USB serial, not wireless transport."
+    }
+    Assert-ChatGptWebSmokeDevice -Runtime $Runtime
+}
+
+function Assert-ChatGptWebSmokeTrustedDevice {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    Assert-ChatGptWebSmokeDevice -Runtime $Runtime
 }
 
 function Invoke-ChatGptWebSmokeAdb {
