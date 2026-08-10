@@ -14,12 +14,13 @@ internal class MainBottomNavigationController(
     private val showHomeActions: (View, TextView) -> Unit
 ) {
     fun setup() {
-        binding.bottomNavGlass
-            .setupWith(binding.bottomNavBlurTarget)
-            .setFrameClearDrawable(activity.window.decorView.background)
-            .setBlurRadius(18f)
-        binding.bottomNavGlass.outlineProvider = ViewOutlineProvider.BACKGROUND
-        binding.bottomNavGlass.clipToOutline = true
+        listOf(binding.bottomNavGlass, binding.bottomComposeGlass).forEach { glass ->
+            glass.setupWith(binding.bottomNavBlurTarget)
+                .setFrameClearDrawable(activity.window.decorView.background)
+                .setBlurRadius(24f)
+            glass.outlineProvider = ViewOutlineProvider.BACKGROUND
+            glass.clipToOutline = true
+        }
 
         binding.tabChat.setOnClickListener { selectTab(binding.tabChat) }
         binding.tabProject.setOnClickListener { selectTab(binding.tabProject) }
