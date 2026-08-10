@@ -79,6 +79,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("action === 'send_prompt'"))
         assertTrue(adapter.contains("action === 'list_conversations'"))
         assertTrue(adapter.contains("action === 'open_conversation'"))
+        assertTrue(adapter.contains("if (location.pathname === '/')"))
         assertTrue(adapter.contains("action === 'regenerate_response'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
@@ -219,7 +220,7 @@ class ChatGptWebLabContractTest {
         )
 
         assertTrue(overlay.contains("it.semantic == \"timestamp\""))
-        assertTrue(overlay.contains("filterNot { it.semantic == \"timestamp\" }"))
+        assertTrue(overlay.contains("ChatGptNativeControlPresentation.overlayActions(value.controls)"))
         assertTrue(overlay.contains("contentDescription = \"chatgpt-overlay-actions:"))
         assertTrue(overlay.contains("setOnClickListener { showActions() }"))
         assertTrue(overlay.contains("controlsChanged && dialog?.isShowing == true"))

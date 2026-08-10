@@ -337,6 +337,10 @@
       if (comparableText(composerValue(findComposer()))) {
         return result(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
+      if (location.pathname === '/') {
+        result(action, true, '');
+        return scheduleSnapshot();
+      }
       const button = findButton('create-new-chat-button', ['new chat', '新聊天', '新建聊天']);
       const link = Array.from(
         document.querySelectorAll('a[href="/"], a[data-testid="create-new-chat-button"]')
