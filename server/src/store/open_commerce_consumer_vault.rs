@@ -33,8 +33,11 @@ impl Store {
             bail!("每个消费者项目最多保存 100 个加密保险箱条目");
         }
         let exists: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM open_commerce_consumer_data_vault_items WHERE id=?1)",
-            params![id],
+            "SELECT EXISTS(
+               SELECT 1 FROM open_commerce_consumer_data_vault_items
+                WHERE id=?1 AND consumer_project_id=?2 AND consumer_user_id=?3
+             )",
+            params![id, consumer_project_id, consumer_user_id],
             |row| row.get(0),
         )?;
         if exists {
@@ -60,8 +63,11 @@ impl Store {
             ],
         )?;
         let item = tx.query_row(
-            &format!("{VAULT_ITEM_SELECT} WHERE id=?1"),
-            params![id],
+            &format!(
+                "{VAULT_ITEM_SELECT}
+                  WHERE id=?1 AND consumer_project_id=?2 AND consumer_user_id=?3"
+            ),
+            params![id, consumer_project_id, consumer_user_id],
             vault_item_from_row,
         )?;
         tx.commit()?;
@@ -119,8 +125,11 @@ impl Store {
             bail!("消费者数据保险箱条目不存在");
         }
         let item = tx.query_row(
-            &format!("{VAULT_ITEM_SELECT} WHERE id=?1"),
-            params![id],
+            &format!(
+                "{VAULT_ITEM_SELECT}
+                  WHERE id=?1 AND consumer_project_id=?2 AND consumer_user_id=?3"
+            ),
+            params![id, consumer_project_id, consumer_user_id],
             vault_item_from_row,
         )?;
         tx.commit()?;

@@ -37,6 +37,18 @@ fn accepts_the_fixed_v1_envelope_contract() {
 }
 
 #[test]
+fn accepts_the_exact_ciphertext_limit() {
+    let mut envelope = valid_envelope();
+    envelope.ciphertext_base64 = BASE64.encode(vec![11_u8; MAX_CIPHERTEXT_BYTES]);
+    assert_eq!(
+        validate_envelope(&envelope, "record_123456", 1)
+            .unwrap()
+            .len(),
+        MAX_CIPHERTEXT_BYTES
+    );
+}
+
+#[test]
 fn rejects_noncanonical_or_oversized_ciphertext() {
     let mut malformed = valid_envelope();
     malformed.kdf.salt_base64.replace_range(0..1, " ");
