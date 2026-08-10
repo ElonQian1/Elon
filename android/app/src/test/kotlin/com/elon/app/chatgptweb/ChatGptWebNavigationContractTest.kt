@@ -28,6 +28,9 @@ class ChatGptWebNavigationContractTest {
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("lastFeatures.find"))
         assertTrue(adapter.contains("location.origin !== 'https://chatgpt.com'"))
+        val requestList = adapter.substringAfter("function requestList")
+            .substringBefore("function collectList")
+        assertTrue(requestList.indexOf("sidebarButton(true)") < requestList.indexOf("emitSnapshot"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("navigation adapter must not contain $it", adapter.contains(it))
         }

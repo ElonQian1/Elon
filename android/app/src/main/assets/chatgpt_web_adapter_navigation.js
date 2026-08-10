@@ -143,13 +143,16 @@
   }
 
   function requestList(emitEvent, result) {
+    const open = sidebarButton(true);
+    if (open) {
+      if (!emitTouchRequest('list_navigation', open, emitEvent)) {
+        return result('list_navigation', false, '官网功能侧栏入口当前不可见。');
+      }
+      return result('list_navigation', true, '');
+    }
     const existing = emitSnapshot(emitEvent);
     if (existing.length) return result('list_navigation', true, '');
-    const open = sidebarButton(true);
-    if (!open || !emitTouchRequest('list_navigation', open, emitEvent)) {
-      return result('list_navigation', false, '官网功能侧栏入口当前不可见。');
-    }
-    result('list_navigation', true, '');
+    result('list_navigation', false, '官网功能侧栏入口当前不可见。');
   }
 
   function collectList(emitEvent, result) {
