@@ -3,7 +3,7 @@ title: 开放商业消费者客户端加密数据保险箱 V1
 status: accepted
 owner: open-commerce
 reviewed_at: 2026-08-10
-implementation_status: verified_local_crypto_pc_build
+implementation_status: verified_local_crypto_http_migration_pc_build
 ---
 
 # 开放商业消费者客户端加密数据保险箱 V1
@@ -21,6 +21,7 @@ implementation_status: verified_local_crypto_pc_build
 5. 创建固定为修订 1；更新必须携带当前预期修订并上传绑定下一修订的新信封，冲突时失败关闭。删除需要用户确认和当前修订。
 6. 每名用户在每个消费者项目最多保存 100 项，单项密文为 17 字节到 1 MiB；服务端严格校验算法参数、Base64、时间、ID 和修订，但不尝试解密。
 7. 创建、更新和删除审计只记录类型、修订、密文摘要、大小以及 `server_can_decrypt=false`，不记录标签、口令或明文。
+8. 记录 ID 只在同一消费者项目与同一用户范围内唯一。V220 把 V162 的全局 ID 主键升级为 `(consumer_project_id, consumer_user_id, id)`，允许隔离用户或项目安全复用可携带记录 ID。
 
 ## 可见元数据
 
@@ -33,8 +34,9 @@ implementation_status: verified_local_crypto_pc_build
 - 平台不持有解密密钥，不提供密码找回、密钥托管、设备恢复或紧急解锁；口令丢失即无法解密。
 - V1 不向商户、开发者 App 或 AI 自动披露保险箱内容，也没有字段级授权解密和远端代理执行。
 - V1 不是端到端多设备密钥同步、硬件安全模块、跨运营方身份、完整订单迁移或外部数据删除系统。
-- V1 浏览器实际密码学模块已通过 Node 24 Web Crypto 往返、错误口令、密文篡改、跨记录/跨修订替换、严格 Base64、时间和资源上限测试；服务端信封校验已进入真实 `elon-server` Rust 测试，PC TypeScript、开放商业回归和 Vite 生产构建均通过。状态为 `verified_local_crypto_pc_build`。
-- 真实 Chromium 交互、HTTP 权限和项目隔离、V162 全新及既有磁盘迁移、100 项存储上限、下载行为和生产部署仍未验证。
+- 浏览器实际密码学模块已通过 Node 24 Web Crypto 往返、错误口令、密文篡改、跨记录/跨修订替换、严格 Base64、时间和资源上限测试；PC TypeScript、开放商业回归和 Vite 生产构建均通过。
+- 服务端专项已验证 V162 到 V220 的合成磁盘升级与重开、完整 Store 新建迁移、HTTP 鉴权和项目访问、同项目用户隔离、跨用户/项目同 ID 共存、并发修订竞争、删除确认、100 项和 1 MiB 上限以及审计脱敏。状态为 `verified_local_crypto_http_migration_pc_build`。
+- 真实 Chromium 解锁、编辑和密文下载、生产历史库副本迁移、日志脱敏观察和生产部署仍未验证。
 
 ## 实现入口
 
@@ -47,5 +49,8 @@ implementation_status: verified_local_crypto_pc_build
 - `pc-frontend/src/features/open-commerce/consumerDataVaultCrypto.d.ts`
 - `pc-frontend/src/features/open-commerce/ConsumerDataVaultPanel.tsx`
 - `server/src/open_commerce_consumer_vault_service_tests.rs`
+- `server/src/open_commerce_consumer_vault_api_tests.rs`
+- `server/src/open_commerce_consumer_vault_api_test_support.rs`
+- `server/src/open_commerce_consumer_vault_migration_tests.rs`
 - `scripts/test-open-commerce-consumer-data-vault-crypto.mjs`
 - `docs/open-commerce-consumer-data-vault-v1-acceptance.md`
