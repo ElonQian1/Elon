@@ -183,6 +183,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             trigger = binding.chatGptNativeHistory,
             onRequestList = { pageAdapter.listConversations() },
             onOpenConversation = { path -> pageAdapter.openConversation(path) },
+            onNewConversation = { pageAdapter.startNewConversation() },
         )
         featureHubController = ChatGptNativeFeatureHubController(
             activity = this,

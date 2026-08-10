@@ -64,6 +64,9 @@ class ChatGptWebNavigationContractTest {
         val conversations = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationListController.kt",
         )
+        val conversationLayout = readRepositoryFile(
+            "android/app/src/main/res/layout/sheet_chatgpt_conversations.xml",
+        )
         val features = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeFeatureHubController.kt",
         )
@@ -71,6 +74,8 @@ class ChatGptWebNavigationContractTest {
         assertTrue(composer.contains("ChatGptNativeComposerOptionDialog.show"))
         assertTrue(optionDialog.contains("ChatGptNativeNavigationSelector.composerOption"))
         assertTrue(conversations.contains("ChatGptNativeNavigationSelector.conversation"))
+        assertTrue(conversations.contains("ChatGptNativeNavigationSelector.NEW_CONVERSATION"))
+        assertTrue(conversationLayout.contains("android:id=\"@+id/chatGptConversationNew\""))
         assertTrue(features.contains("ChatGptNativeNavigationSelector.feature"))
     }
 

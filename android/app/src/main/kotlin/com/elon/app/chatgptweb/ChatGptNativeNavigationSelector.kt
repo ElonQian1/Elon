@@ -2,6 +2,15 @@ package com.elon.app.chatgptweb
 
 internal object ChatGptNativeNavigationSelector {
     const val SCHEMA = "elon.chatgpt_web.native_navigation.v1"
+    const val CONVERSATION_LIST_TRIGGER = "chatgpt-native:conversation-list:会话历史"
+    const val FEATURE_LIST_TRIGGER = "chatgpt-native:feature-list:ChatGPT 功能"
+    const val NEW_CONVERSATION = "chatgpt-native:new-conversation:新建会话"
+    const val COMPOSER_INPUT = "chatgpt-native:composer-input:消息输入"
+    const val COMPOSER_MODEL_TRIGGER = "chatgpt-native:composer-model:模型与能力"
+    const val COMPOSER_TOOLS_TRIGGER = "chatgpt-native:composer-tools:工具与附件"
+    const val DICTATION = "chatgpt-native:dictation:语音输入"
+    const val SEND = "chatgpt-native:send:发送"
+    const val STOP = "chatgpt-native:stop:停止生成"
 
     fun conversation(value: ChatGptWebConversation): String = selector(
         prefix = "chatgpt-conversation",

@@ -27,6 +27,14 @@ class ChatGptNativeNavigationSelectorTest {
             "chatgpt-composer-options:attachments",
             ChatGptNativeNavigationSelector.composerDialog("attachments"),
         )
+        assertEquals(
+            "chatgpt-native:conversation-list:会话历史",
+            ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER,
+        )
+        assertEquals(
+            "chatgpt-native:new-conversation:新建会话",
+            ChatGptNativeNavigationSelector.NEW_CONVERSATION,
+        )
         assertTrue(ChatGptNativeNavigationSelector.SCHEMA.endsWith(".v1"))
     }
 }

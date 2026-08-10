@@ -40,6 +40,10 @@ internal class ChatGptNativeConversationController(
     private var suggestionsVisible = false
 
     init {
+        composer.contentDescription = ChatGptNativeNavigationSelector.COMPOSER_INPUT
+        sendButton.contentDescription = ChatGptNativeNavigationSelector.SEND
+        stopButton.contentDescription = ChatGptNativeNavigationSelector.STOP
+        newConversationButton.contentDescription = ChatGptNativeNavigationSelector.NEW_CONVERSATION
         messagesView.layoutManager = LinearLayoutManager(messagesView.context)
         messagesView.adapter = adapter
         sendButton.setOnClickListener { submit() }

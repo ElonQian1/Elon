@@ -21,6 +21,7 @@ internal class ChatGptNativeConversationListController(
     private val trigger: ImageButton,
     private val onRequestList: () -> Unit,
     private val onOpenConversation: (String) -> Unit,
+    private val onNewConversation: () -> Unit,
 ) {
     private val content = LayoutInflater.from(activity).inflate(
         R.layout.sheet_chatgpt_conversations,
@@ -28,6 +29,7 @@ internal class ChatGptNativeConversationListController(
         false,
     )
     private val dialog = BottomSheetDialog(activity)
+    private val newButton = content.findViewById<ImageButton>(R.id.chatGptConversationNew)
     private val closeButton = content.findViewById<ImageButton>(R.id.chatGptConversationClose)
     private val countView = content.findViewById<TextView>(R.id.chatGptConversationCount)
     private val searchView = content.findViewById<EditText>(R.id.chatGptConversationSearch)
@@ -42,7 +44,13 @@ internal class ChatGptNativeConversationListController(
         dialog.setContentView(content)
         dialog.window?.navigationBarColor = ContextCompat.getColor(activity, R.color.elon_bg_chrome)
         dialog.setOnShowListener { expandSheet() }
+        trigger.contentDescription = ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER
         trigger.setOnClickListener { show() }
+        newButton.contentDescription = ChatGptNativeNavigationSelector.NEW_CONVERSATION
+        newButton.setOnClickListener {
+            dialog.dismiss()
+            onNewConversation()
+        }
         closeButton.setOnClickListener { dialog.dismiss() }
         searchView.doAfterTextChanged { renderFilteredList() }
         listView.layoutManager = LinearLayoutManager(activity)
@@ -89,6 +97,7 @@ internal class ChatGptNativeConversationListController(
 
     fun dispose() {
         trigger.setOnClickListener(null)
+        newButton.setOnClickListener(null)
         if (dialog.isShowing) dialog.dismiss()
         listView.adapter = null
     }

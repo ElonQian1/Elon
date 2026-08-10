@@ -32,6 +32,9 @@ internal class ChatGptNativeComposerToolsController(
     private var dialog: AlertDialog? = null
 
     init {
+        modelButton.contentDescription = ChatGptNativeNavigationSelector.COMPOSER_MODEL_TRIGGER
+        attachmentButton.contentDescription = ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER
+        toolsButton.contentDescription = ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER
         modelButton.setOnClickListener {
             pendingSection = Section.MODEL
             onRequestModelOptions()

@@ -45,6 +45,7 @@ internal class ChatGptNativeFeatureHubController(
         dialog.setOnDismissListener {
             if (!suppressDismissCommand) onDismissNavigation()
         }
+        trigger.contentDescription = ChatGptNativeNavigationSelector.FEATURE_LIST_TRIGGER
         trigger.setOnClickListener { show() }
         closeButton.setOnClickListener { dialog.dismiss() }
         officialButton.setOnClickListener {

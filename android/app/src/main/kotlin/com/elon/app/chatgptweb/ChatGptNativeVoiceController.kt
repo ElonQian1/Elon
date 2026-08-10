@@ -34,7 +34,8 @@ internal class ChatGptNativeVoiceController(
         button.isEnabled = enabled
         button.alpha = if (enabled) 1f else DISABLED_ALPHA
         button.isSelected = value?.dictationActive == true
-        button.contentDescription = button.context.getString(
+        button.contentDescription = ChatGptNativeNavigationSelector.DICTATION
+        button.tooltipText = button.context.getString(
             if (button.isSelected) R.string.chatgpt_native_dictation_stop else R.string.chatgpt_native_dictation_start,
         )
     }
