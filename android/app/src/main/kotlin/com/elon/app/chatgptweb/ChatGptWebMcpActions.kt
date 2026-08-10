@@ -301,6 +301,20 @@ internal class ChatGptWebMcpActions(
                 .put("content", message.content.take(maxChars))
                 .put("content_chars", message.content.length)
                 .put("content_truncated", message.content.length > maxChars)
+                .put("part_count", message.parts.size)
+                .put("parts_truncated", message.parts.size > MAX_MESSAGE_PARTS)
+                .put("parts", JSONArray().apply {
+                    message.parts.take(MAX_MESSAGE_PARTS).forEach { part ->
+                        put(JSONObject()
+                            .put("type", part.type)
+                            .put("label", part.label.take(MAX_MESSAGE_PART_LABEL_CHARS))
+                            .put(
+                                "label_truncated",
+                                part.label.length > MAX_MESSAGE_PART_LABEL_CHARS,
+                            )
+                        )
+                    }
+                })
             )
         }
     }
@@ -393,6 +407,8 @@ internal class ChatGptWebMcpActions(
         const val MAX_MESSAGES = 50
         const val MAX_MESSAGE_CHARS = 30_000
         const val MAX_CONTEXT_MESSAGE_CHARS = 40_000
+        const val MAX_MESSAGE_PARTS = 16
+        const val MAX_MESSAGE_PART_LABEL_CHARS = 180
         const val MAX_INPUT_CHARS = 20_000
         const val DEFAULT_CONTEXT_PAGE_SIZE = 20
         const val MAX_CONTEXT_PAGE_SIZE = 40

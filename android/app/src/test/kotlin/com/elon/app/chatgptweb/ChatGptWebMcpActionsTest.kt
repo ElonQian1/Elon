@@ -27,6 +27,10 @@ class ChatGptWebMcpActionsTest {
         assertEquals("chatgpt_web", state.getString("surface"))
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, state.getInt("adapter_version"))
         assertEquals("完整回答内容", conversation.getJSONArray("messages").getJSONObject(0).getString("content"))
+        val messageParts = conversation.getJSONArray("messages").getJSONObject(0).getJSONArray("parts")
+        assertEquals(2, messageParts.length())
+        assertEquals("image", messageParts.getJSONObject(0).getString("type"))
+        assertEquals("生成的图片", messageParts.getJSONObject(0).getString("label"))
         assertEquals("control_suggestion_demo", control.getString("control_id"))
         assertEquals(0.25, control.getDouble("web_x_ratio"), 0.0)
         assertFalse(control.getBoolean("in_viewport"))
@@ -71,7 +75,28 @@ class ChatGptWebMcpActionsTest {
         assertEquals(1, result.getInt("message_count"))
         assertEquals(0, result.getJSONArray("messages").getJSONObject(0).getInt("index"))
         assertEquals("完整回答内容", result.getJSONArray("messages").getJSONObject(0).getString("content"))
+        val message = result.getJSONArray("messages").getJSONObject(0)
+        assertEquals(2, message.getInt("part_count"))
+        assertFalse(message.getBoolean("parts_truncated"))
+        assertEquals("file", message.getJSONArray("parts").getJSONObject(1).getString("type"))
         assertFalse(result.getBoolean("has_more"))
+    }
+
+    @Test
+    fun structuredPartsStayBoundedWhileReportingTheOriginalCounts() {
+        val parts = (1..20).map { index ->
+            ChatGptWebMessagePart("file", "x".repeat(200) + index)
+        }
+        val message = actions(messageParts = parts).control(JSONObject()
+            .put("action", "chatgpt_get_context"))
+            .getJSONArray("messages")
+            .getJSONObject(0)
+
+        assertEquals(20, message.getInt("part_count"))
+        assertTrue(message.getBoolean("parts_truncated"))
+        assertEquals(16, message.getJSONArray("parts").length())
+        assertEquals(180, message.getJSONArray("parts").getJSONObject(0).getString("label").length)
+        assertTrue(message.getJSONArray("parts").getJSONObject(0).getBoolean("label_truncated"))
     }
 
     @Test
@@ -218,6 +243,7 @@ class ChatGptWebMcpActionsTest {
 
     private fun actions(
         dictationActive: Boolean = false,
+        messageParts: List<ChatGptWebMessagePart>? = null,
         onInvoke: (String) -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -230,7 +256,16 @@ class ChatGptWebMcpActionsTest {
             title = "工作",
             url = "https://chatgpt.com/c/demo",
             draft = "",
-            messages = listOf(ChatGptWebMessage("a1", "assistant", "完整回答内容", "completed", emptyList())),
+            messages = listOf(ChatGptWebMessage(
+                id = "a1",
+                role = "assistant",
+                content = "完整回答内容",
+                state = "completed",
+                parts = messageParts ?: listOf(
+                    ChatGptWebMessagePart("image", "生成的图片"),
+                    ChatGptWebMessagePart("file", "分析结果.csv"),
+                ),
+            )),
             authenticated = true,
             composerReady = true,
             streaming = false,
