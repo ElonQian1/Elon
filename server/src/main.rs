@@ -387,6 +387,8 @@ mod open_commerce_developer_manifest_api;
 mod open_commerce_developer_manifest_migration;
 mod open_commerce_developer_manifest_service;
 mod open_commerce_developer_model;
+#[cfg(test)]
+mod open_commerce_developer_production_state_tests;
 mod open_commerce_developer_readiness_api;
 mod open_commerce_developer_readiness_model;
 mod open_commerce_developer_readiness_service;
