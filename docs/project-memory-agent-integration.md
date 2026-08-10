@@ -181,6 +181,8 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 随后 `native_context` 回归扩展为 13 项并全部通过，验证指纹为 `cf1b8197aded0ff776d48ef226a93acd71f6a197799aa14381bf41d82852fd86`。新增真实临时工作区与外部 SQLite 场景确认：attested receipt 只返回 24 位不可逆会话指纹，不返回原始 session ID；人工修订必须匹配当前 `updated_at_ms`，过期 CAS 会失败；同一证据的后续代理回执会去重并保留人工摘要和 `pc_document_review` 编辑来源。候选分页仍只有一条 pending 记录且不返回源码正文。该证据验证服务端生命周期，不替代真实 Codex Hook 信任、跨 PC 并发或 PC 浏览器交互。
 
+同日节点 Hook 定向 Rust 回归 4 项全部通过，验证指纹为 `1af6882094023c83bfb12c7804dc2f2cb9d486da2205bb07f35d8ffa3749c6d7`。临时工作区场景验证了响应、prompt、命令、敏感路径和原始 session 不进入账本，同 turn 不重复提示，相同旧路径不再提示，新路径最多触发三次，提示路径连分隔符不超过 360 字符，`SessionEnd` 删除会话目录；生成的 Codex 配置不含 hook trust bypass。代理集成合同还在日志包装器下显式注入 UTF-8 BOM 并通过，修复了 Windows PowerShell 重定向管道下插件 Hook 无法解析 JSON 的问题。仓库插件版本 cachebuster 已更新，但本批未重装当前 Codex cache，也没有伪造 `/hooks` 人工信任或真实任务触发结果。
+
 ## 仍需真实验收的项目
 
 以下项目仍需要生产环境或人工安全确认，不能由本轮自动化替代：
