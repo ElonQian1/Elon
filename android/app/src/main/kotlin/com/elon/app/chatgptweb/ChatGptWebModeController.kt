@@ -12,6 +12,7 @@ import com.google.android.material.button.MaterialButtonToggleGroup
 internal class ChatGptWebModeController(
     private val window: Window,
     private val root: View,
+    private val chromeViews: List<View>,
     private val toggle: MaterialButtonToggleGroup,
     private val quickButton: MaterialButton,
     private val webButton: MaterialButton,
@@ -57,8 +58,18 @@ internal class ChatGptWebModeController(
 
     fun isQuickSelected(): Boolean = toggle.checkedButtonId == R.id.chatGptModeQuick
 
+    fun isWebSelected(): Boolean = toggle.checkedButtonId == R.id.chatGptModeWeb
+
+    fun exitOfficialView(): Boolean {
+        if (!isWebSelected()) return false
+        select(if (nativeButton.isEnabled) Mode.NATIVE else Mode.QUICK)
+        return true
+    }
+
     private fun render(mode: Mode) {
         hideKeyboard()
+        val chromeVisibility = if (mode == Mode.WEB) View.GONE else View.VISIBLE
+        chromeViews.forEach { it.visibility = chromeVisibility }
         webView.visibility = View.VISIBLE
         quickRoot.visibility = if (mode == Mode.QUICK) View.VISIBLE else View.GONE
         nativeRoot.visibility = if (mode == Mode.NATIVE) View.VISIBLE else View.GONE

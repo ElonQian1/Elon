@@ -182,8 +182,13 @@ class ChatGptWebLabContractTest {
         )
         assertTrue(modeController.contains("webView.visibility = View.VISIBLE"))
         assertFalse(modeController.contains("webView.visibility = View.INVISIBLE"))
+        assertTrue(modeController.contains("chromeViews.forEach { it.visibility = chromeVisibility }"))
+        assertTrue(modeController.contains("if (mode == Mode.WEB) View.GONE else View.VISIBLE"))
+        assertTrue(modeController.contains("fun exitOfficialView(): Boolean"))
         assertTrue(modeController.contains("MotionEvent.ACTION_DOWN"))
         assertTrue(modeController.contains("WindowInsetsCompat.Type.ime()"))
+        assertTrue(activity.contains("binding.chatGptWebToolbar"))
+        assertTrue(activity.contains("ChatGptWebBackNavigation.Action.EXIT_OFFICIAL_VIEW"))
         assertTrue(activity.contains("modeController.select(ChatGptWebModeController.Mode.NATIVE)"))
         assertTrue(activity.contains("loginController.onAuthenticated() || modeController.isQuickSelected()"))
     }

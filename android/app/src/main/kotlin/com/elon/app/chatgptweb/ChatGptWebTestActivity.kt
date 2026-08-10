@@ -259,6 +259,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         modeController = ChatGptWebModeController(
             window = window,
             root = binding.root,
+            chromeViews = listOf(
+                binding.chatGptWebToolbar,
+                binding.chatGptWebStatus,
+                binding.chatGptModeToggle,
+            ),
             toggle = binding.chatGptModeToggle,
             quickButton = binding.chatGptModeQuick,
             webButton = binding.chatGptModeWeb,
@@ -390,9 +395,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun navigateBack() {
         if (dictationSessionController.handleBack()) return
-        when (ChatGptWebBackNavigation.decide(latestUiManifest, binding.chatGptWebView.canGoBack())) {
+        when (ChatGptWebBackNavigation.decide(
+            latestUiManifest,
+            binding.chatGptWebView.canGoBack(),
+            modeController.isWebSelected(),
+        )) {
             ChatGptWebBackNavigation.Action.DISMISS_OFFICIAL_OVERLAY -> officialOverlayController.dismissTop()
             ChatGptWebBackNavigation.Action.NAVIGATE_WEB_HISTORY -> binding.chatGptWebView.goBack()
+            ChatGptWebBackNavigation.Action.EXIT_OFFICIAL_VIEW -> modeController.exitOfficialView()
             ChatGptWebBackNavigation.Action.FINISH_ACTIVITY -> finish()
         }
     }
