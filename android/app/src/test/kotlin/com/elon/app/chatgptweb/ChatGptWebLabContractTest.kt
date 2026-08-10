@@ -189,6 +189,30 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun mcpCommandsCarryTheirReceiptIdToTheOfficialPage() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val actions = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt"
+        )
+        val commandPort = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpCommandPort.kt"
+        )
+        val conversation = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationController.kt"
+        )
+
+        assertTrue(actions.contains("private val commands: ChatGptWebMcpCommandPort"))
+        assertTrue(actions.contains("block(request.id)"))
+        assertTrue(activity.contains("commands = mcpCommandPort"))
+        assertTrue(activity.contains("nativeController.submitFromMcp(requestId)"))
+        assertTrue(conversation.contains("fun submitFromMcp(requestId: String)"))
+        assertTrue(commandPort.contains("fun sendInput(requestId: String)"))
+        assertTrue(commandPort.contains("fun invokeControl(controlId: String, requestId: String)"))
+    }
+
+    @Test
     fun bridgeInstallationWaitsUntilEveryStateConsumerIsInitialized() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

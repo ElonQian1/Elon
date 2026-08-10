@@ -12,21 +12,9 @@ internal class ChatGptWebMcpActions(
     private val mode: () -> ChatGptWebModeController.Mode,
     private val inputText: () -> String,
     private val setInputText: (String) -> Unit,
-    private val sendInput: () -> Unit,
-    private val invokeControl: (String) -> Unit,
-    private val newConversation: () -> Unit,
-    private val stopGeneration: () -> Unit,
-    private val cancelDictation: () -> Unit,
-    private val submitDictation: () -> Unit,
+    private val commands: ChatGptWebMcpCommandPort,
     private val refresh: () -> Unit,
-    private val refreshControls: () -> Unit,
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
-    private val openConversation: (String) -> Unit,
-    private val listConversations: () -> Unit,
-    private val requestComposerOptions: (String) -> Unit,
-    private val selectComposerOption: (String, String) -> Unit,
-    private val requestFeatures: () -> Unit,
-    private val selectFeature: (String) -> Unit,
 ) {
     fun uiState(): JSONObject {
         val current = snapshot()
@@ -58,40 +46,43 @@ internal class ChatGptWebMcpActions(
     fun control(args: JSONObject): JSONObject {
         val action = args.optString("action", "state").trim().lowercase()
         var commandRequest: ChatGptWebObservedState.CommandRequest? = null
-        fun dispatch(expectedAction: String, block: () -> Unit) {
-            commandRequest = beginCommand(expectedAction)
-            block()
+        fun dispatch(expectedAction: String, block: (String) -> Unit) {
+            val request = beginCommand(expectedAction)
+            commandRequest = request
+            block(request.id)
         }
         when (action) {
             "state", "open_chatgpt_web" -> Unit
             "set_input_text" -> setInputText(args.optString("text").take(MAX_INPUT_CHARS))
-            "send_input" -> dispatch("send_prompt", sendInput)
+            "send_input" -> dispatch("send_prompt", commands::sendInput)
             "chatgpt_invoke_control" -> {
                 val controlId = args.optString("control_id")
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
                 if (uiManifest()?.controls?.none { it.id == controlId } != false) {
                     return error(action, "stale_control_id")
                 }
-                dispatch("invoke_ui_control") { invokeControl(controlId) }
+                dispatch("invoke_ui_control") { requestId ->
+                    commands.invokeControl(controlId, requestId)
+                }
             }
-            "chatgpt_new_conversation" -> dispatch("new_conversation", newConversation)
-            "chatgpt_stop_generation" -> dispatch("stop_generation", stopGeneration)
+            "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
+            "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
             "chatgpt_cancel_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
-                dispatch("cancel_dictation", cancelDictation)
+                dispatch("cancel_dictation", commands::cancelDictation)
             }
             "chatgpt_submit_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
-                dispatch("submit_dictation", submitDictation)
+                dispatch("submit_dictation", commands::submitDictation)
             }
             "chatgpt_refresh" -> refresh()
-            "chatgpt_refresh_controls" -> dispatch("snapshot_ui_manifest", refreshControls)
-            "chatgpt_list_conversations" -> dispatch("list_conversations", listConversations)
+            "chatgpt_refresh_controls" -> dispatch("snapshot_ui_manifest", commands::refreshControls)
+            "chatgpt_list_conversations" -> dispatch("list_conversations", commands::listConversations)
             "chatgpt_list_composer_options" -> {
                 val section = args.optString("section").trim().lowercase()
                 if (section !in COMPOSER_SECTIONS) return error(action, "invalid_section")
-                dispatch(if (section == "model") "list_model_options" else "list_composer_tools") {
-                    requestComposerOptions(section)
+                dispatch(if (section == "model") "list_model_options" else "list_composer_tools") { requestId ->
+                    commands.requestComposerOptions(section, requestId)
                 }
             }
             "chatgpt_select_composer_option" -> {
@@ -100,17 +91,19 @@ internal class ChatGptWebMcpActions(
                 val optionId = args.optString("option_id").trim()
                 val options = observedState().composerSections[section].orEmpty()
                 if (options.none { it.id == optionId }) return error(action, "stale_option_id")
-                dispatch(if (section == "model") "select_model_option" else "select_composer_tool") {
-                    selectComposerOption(section, optionId)
+                dispatch(if (section == "model") "select_model_option" else "select_composer_tool") { requestId ->
+                    commands.selectComposerOption(section, optionId, requestId)
                 }
             }
-            "chatgpt_list_features" -> dispatch("list_navigation", requestFeatures)
+            "chatgpt_list_features" -> dispatch("list_navigation", commands::requestFeatures)
             "chatgpt_select_feature" -> {
                 val featureId = args.optString("feature_id").trim()
                 if (observedState().features.none { it.id == featureId }) {
                     return error(action, "stale_feature_id")
                 }
-                dispatch("select_navigation") { selectFeature(featureId) }
+                dispatch("select_navigation") { requestId ->
+                    commands.selectFeature(featureId, requestId)
+                }
             }
             "chatgpt_get_context" -> return contextPage(args)
             "chatgpt_find_controls" -> return controlsPage(args)
@@ -122,7 +115,9 @@ internal class ChatGptWebMcpActions(
             "chatgpt_open_conversation" -> {
                 val path = args.optString("conversation_path")
                 if (!CONVERSATION_PATH.matches(path)) return error(action, "invalid_conversation_path")
-                dispatch("open_conversation") { openConversation(path) }
+                dispatch("open_conversation") { requestId ->
+                    commands.openConversation(path, requestId)
+                }
             }
             "chatgpt_select_view" -> {
                 val next = when (args.optString("view_mode").lowercase()) {

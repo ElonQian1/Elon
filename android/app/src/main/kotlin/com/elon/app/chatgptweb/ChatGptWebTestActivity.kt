@@ -52,6 +52,42 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var latestMode = ChatGptWebModeController.Mode.QUICK
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
+    private val mcpCommandPort: ChatGptWebMcpCommandPort by lazy {
+        object : ChatGptWebMcpCommandPort {
+            override fun sendInput(requestId: String) = nativeController.submitFromMcp(requestId)
+
+            override fun invokeControl(controlId: String, requestId: String) =
+                invokeUiControl(controlId, requestId)
+
+            override fun newConversation(requestId: String) = pageAdapter.startNewConversation(requestId)
+
+            override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)
+
+            override fun cancelDictation(requestId: String) = pageAdapter.cancelDictation(requestId)
+
+            override fun submitDictation(requestId: String) = pageAdapter.submitDictation(requestId)
+
+            override fun refreshControls(requestId: String) = pageAdapter.requestUiManifest(requestId)
+
+            override fun listConversations(requestId: String) = pageAdapter.listConversations(requestId)
+
+            override fun requestComposerOptions(section: String, requestId: String) =
+                this@ChatGptWebTestActivity.requestComposerOptions(section, requestId)
+
+            override fun selectComposerOption(section: String, optionId: String, requestId: String) {
+                if (section == "model") pageAdapter.selectModelOption(optionId, requestId)
+                else pageAdapter.selectComposerTool(optionId, requestId)
+            }
+
+            override fun requestFeatures(requestId: String) = pageAdapter.listFeatures(requestId)
+
+            override fun selectFeature(featureId: String, requestId: String) =
+                pageAdapter.selectFeature(featureId, requestId)
+
+            override fun openConversation(path: String, requestId: String) =
+                pageAdapter.openConversation(path, requestId)
+        }
+    }
 
     private val mcpActions: ChatGptWebMcpActions by lazy {
         ChatGptWebMcpActions(
@@ -66,26 +102,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 binding.chatGptNativeComposer.setText(text)
                 binding.chatGptNativeComposer.setSelection(text.length)
             },
-            sendInput = { binding.chatGptNativeSend.performClick() },
-            invokeControl = ::invokeUiControl,
-            newConversation = pageAdapter::startNewConversation,
-            stopGeneration = pageAdapter::stopGeneration,
-            cancelDictation = pageAdapter::cancelDictation,
-            submitDictation = pageAdapter::submitDictation,
+            commands = mcpCommandPort,
             refresh = { binding.chatGptWebView.reload() },
-            refreshControls = pageAdapter::requestUiManifest,
             selectMode = modeController::select,
-            openConversation = pageAdapter::openConversation,
-            listConversations = pageAdapter::listConversations,
-            requestComposerOptions = { section ->
-                requestComposerOptions(section)
-            },
-            selectComposerOption = { section, optionId ->
-                if (section == "model") pageAdapter.selectModelOption(optionId)
-                else pageAdapter.selectComposerTool(optionId)
-            },
-            requestFeatures = pageAdapter::listFeatures,
-            selectFeature = pageAdapter::selectFeature,
         )
     }
 
@@ -154,7 +173,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             sendButton = binding.chatGptNativeSend,
             stopButton = binding.chatGptNativeComposerStop,
             newConversationButton = binding.chatGptNativeNew,
-            onSend = { prompt, expectedDraft -> pageAdapter.sendPrompt(prompt, expectedDraft) },
+            onSend = { prompt, expectedDraft, requestId ->
+                pageAdapter.sendPrompt(prompt, expectedDraft, requestId)
+            },
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
             onRegenerate = { pageAdapter.regenerateResponse() },
@@ -376,10 +397,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestComposerOptions(section: String) {
+    private fun requestComposerOptions(section: String) = requestComposerOptions(section, null)
+
+    private fun requestComposerOptions(section: String, requestId: String?) {
         observedMcpState.beginComposerRequest(section)
         officialOverlayController.dismissAllThen {
-            if (section == "model") pageAdapter.listModelOptions() else pageAdapter.listComposerTools()
+            if (section == "model") pageAdapter.listModelOptions(requestId)
+            else pageAdapter.listComposerTools(requestId)
         }
     }
 
@@ -388,11 +412,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         pageAdapter.startDictation()
     }
 
-    private fun invokeUiControl(id: String) {
+    private fun invokeUiControl(id: String) = invokeUiControl(id, null)
+
+    private fun invokeUiControl(id: String, requestId: String?) {
         if (latestUiManifest?.controls?.firstOrNull { it.id == id }?.semantic == ChatGptWebUiSemantics.DICTATION) {
             prepareDictationStart()
         }
-        pageAdapter.invokeUiControl(id)
+        pageAdapter.invokeUiControl(id, requestId)
     }
 
     private fun prepareDictationStart() {

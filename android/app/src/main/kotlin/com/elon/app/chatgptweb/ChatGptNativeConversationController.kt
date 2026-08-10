@@ -20,7 +20,7 @@ internal class ChatGptNativeConversationController(
     private val sendButton: ImageButton,
     private val stopButton: ImageButton,
     private val newConversationButton: ImageButton,
-    private val onSend: (String, String) -> Unit,
+    private val onSend: (String, String, String?) -> Unit,
     onStop: () -> Unit,
     onNewConversation: () -> Unit,
     onRegenerate: () -> Unit,
@@ -141,12 +141,16 @@ internal class ChatGptNativeConversationController(
         snapshot?.let(::setControls)
     }
 
-    private fun submit() {
+    fun submitFromMcp(requestId: String) {
+        submit(requestId)
+    }
+
+    private fun submit(requestId: String? = null) {
         val prompt = composer.text.toString().trim()
         val hasAttachments = snapshot?.attachments?.isNotEmpty() == true
         if ((prompt.isEmpty() && !hasAttachments) || !sendButton.isEnabled) return
         pendingPrompt = prompt.takeIf(String::isNotEmpty)
-        onSend(prompt, snapshot?.draft.orEmpty())
+        onSend(prompt, snapshot?.draft.orEmpty(), requestId)
         setAvailable(false)
     }
 

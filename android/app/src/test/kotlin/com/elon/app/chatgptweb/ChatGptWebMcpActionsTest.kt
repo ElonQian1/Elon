@@ -54,7 +54,13 @@ class ChatGptWebMcpActionsTest {
     @Test
     fun controlInvokesOnlyIdsPresentInTheCurrentManifest() {
         var invoked = ""
-        val actions = actions(onInvoke = { invoked = it })
+        var dispatchedRequestId = ""
+        val actions = actions(
+            onInvoke = { invoked = it },
+            onDispatch = { action, requestId ->
+                if (action == "invoke_ui_control") dispatchedRequestId = requestId
+            },
+        )
 
         val ok = actions.control(JSONObject()
             .put("action", "chatgpt_invoke_control")
@@ -71,8 +77,51 @@ class ChatGptWebMcpActionsTest {
             ok.getJSONObject("command_receipt").getString("expected_web_action"),
         )
         assertEquals("pending", ok.getJSONObject("command_receipt").getString("status"))
+        assertEquals(
+            ok.getJSONObject("command_receipt").getString("request_id"),
+            dispatchedRequestId,
+        )
         assertFalse(stale.getBoolean("control_ok"))
         assertEquals("stale_control_id", stale.getString("error"))
+    }
+
+    @Test
+    fun everyAcknowledgedWebCommandPassesItsReceiptIdToTheCommandPort() {
+        val dispatched = mutableListOf<Pair<String, String>>()
+        val actions = actions(
+            dictationActive = true,
+            onDispatch = { action, requestId -> dispatched += action to requestId },
+        )
+        val commands = listOf(
+            JSONObject().put("action", "send_input") to "send_prompt",
+            JSONObject().put("action", "chatgpt_invoke_control")
+                .put("control_id", "control_suggestion_demo") to "invoke_ui_control",
+            JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
+            JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
+            JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
+            JSONObject().put("action", "chatgpt_submit_dictation") to "submit_dictation",
+            JSONObject().put("action", "chatgpt_refresh_controls") to "snapshot_ui_manifest",
+            JSONObject().put("action", "chatgpt_list_conversations") to "list_conversations",
+            JSONObject().put("action", "chatgpt_list_composer_options")
+                .put("section", "model") to "list_model_options",
+            JSONObject().put("action", "chatgpt_select_composer_option")
+                .put("section", "model")
+                .put("option_id", "model_fast") to "select_model_option",
+            JSONObject().put("action", "chatgpt_list_features") to "list_navigation",
+            JSONObject().put("action", "chatgpt_select_feature")
+                .put("feature_id", "feature_library") to "select_navigation",
+            JSONObject().put("action", "chatgpt_open_conversation")
+                .put("conversation_path", "/c/demo") to "open_conversation",
+        )
+
+        commands.forEach { (args, expectedAction) ->
+            val response = actions.control(args)
+            val receipt = response.getJSONObject("command_receipt")
+            assertTrue(response.getBoolean("control_ok"))
+            assertEquals(expectedAction, receipt.getString("expected_web_action"))
+            assertEquals(expectedAction, dispatched.last().first)
+            assertEquals(receipt.getString("request_id"), dispatched.last().second)
+        }
     }
 
     @Test
@@ -292,6 +341,7 @@ class ChatGptWebMcpActionsTest {
         onSelectComposerOption: (String, String) -> Unit = { _, _ -> },
         onRequestFeatures: () -> Unit = {},
         onSelectFeature: (String) -> Unit = {},
+        onDispatch: (String, String) -> Unit = { _, _ -> },
     ): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
             title = "工作",
@@ -390,21 +440,71 @@ class ChatGptWebMcpActionsTest {
             mode = { ChatGptWebModeController.Mode.NATIVE },
             inputText = { "" },
             setInputText = {},
-            sendInput = {},
-            invokeControl = onInvoke,
-            newConversation = {},
-            stopGeneration = {},
-            cancelDictation = onCancelDictation,
-            submitDictation = onSubmitDictation,
+            commands = object : ChatGptWebMcpCommandPort {
+                override fun sendInput(requestId: String) = onDispatch("send_prompt", requestId)
+
+                override fun invokeControl(controlId: String, requestId: String) {
+                    onInvoke(controlId)
+                    onDispatch("invoke_ui_control", requestId)
+                }
+
+                override fun newConversation(requestId: String) =
+                    onDispatch("new_conversation", requestId)
+
+                override fun stopGeneration(requestId: String) =
+                    onDispatch("stop_generation", requestId)
+
+                override fun cancelDictation(requestId: String) {
+                    onCancelDictation()
+                    onDispatch("cancel_dictation", requestId)
+                }
+
+                override fun submitDictation(requestId: String) {
+                    onSubmitDictation()
+                    onDispatch("submit_dictation", requestId)
+                }
+
+                override fun refreshControls(requestId: String) =
+                    onDispatch("snapshot_ui_manifest", requestId)
+
+                override fun listConversations(requestId: String) =
+                    onDispatch("list_conversations", requestId)
+
+                override fun requestComposerOptions(section: String, requestId: String) {
+                    onRequestComposerOptions(section)
+                    onDispatch(
+                        if (section == "model") "list_model_options" else "list_composer_tools",
+                        requestId,
+                    )
+                }
+
+                override fun selectComposerOption(
+                    section: String,
+                    optionId: String,
+                    requestId: String,
+                ) {
+                    onSelectComposerOption(section, optionId)
+                    onDispatch(
+                        if (section == "model") "select_model_option" else "select_composer_tool",
+                        requestId,
+                    )
+                }
+
+                override fun requestFeatures(requestId: String) {
+                    onRequestFeatures()
+                    onDispatch("list_navigation", requestId)
+                }
+
+                override fun selectFeature(featureId: String, requestId: String) {
+                    onSelectFeature(featureId)
+                    onDispatch("select_navigation", requestId)
+                }
+
+                override fun openConversation(path: String, requestId: String) =
+                    onDispatch("open_conversation", requestId)
+            },
             refresh = {},
-            refreshControls = {},
             selectMode = {},
-            openConversation = {},
-            listConversations = {},
-            requestComposerOptions = onRequestComposerOptions,
-            selectComposerOption = onSelectComposerOption,
-            requestFeatures = onRequestFeatures,
-            selectFeature = onSelectFeature,
         )
     }
 }
