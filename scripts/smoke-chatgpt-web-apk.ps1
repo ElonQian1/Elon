@@ -306,6 +306,12 @@ $beforeFeatures = [long]$beforeFeaturesState.last_command.observed_at_ms
 Invoke-UiAction -Action "chatgpt_list_features" | Out-Null
 $featuresState = Wait-NavigationReady -AfterMs $beforeFeatures -TimeoutSec $ReadyTimeoutSec
 Add-Check "composer_contamination_setup" ($featuresState.last_command.ok -eq $true) "official sidebar opened"
+$navigationMatrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
+$navigationAdaptationRequired = $navigationMatrix.adaptation_review.required -eq $true
+$navigationAdaptationReasons = @($navigationMatrix.adaptation_review.reasons)
+Add-Check "navigation_adaptation_review" (
+    -not $navigationAdaptationRequired
+) ($navigationAdaptationReasons -join ",")
 
 $modelResult = Get-ComposerOptions -Section "model"
 $modelOptions = @($modelResult.options)
