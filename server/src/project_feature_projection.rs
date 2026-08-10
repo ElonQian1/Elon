@@ -278,3 +278,7 @@ fn now_millis() -> u64 {
         .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+#[path = "project_feature_projection_tests.rs"]
+mod tests;

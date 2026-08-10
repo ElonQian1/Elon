@@ -6,8 +6,6 @@ use std::{
 };
 
 use crate::{
-    node_agent_project_docs_mcp::McpRequest,
-    node_agent_project_feature_mcp,
     project_feature_projection::context_projection,
     project_feature_registry::{ProjectFeaturePriority, ProjectFeatureStatus},
     project_feature_registry_service::{
@@ -19,41 +17,6 @@ use crate::{
         rebind_requirement, update_feature, RebindRequirementRequest, UpdateFeatureRequest,
     },
 };
-
-#[test]
-fn feature_mcp_list_accepts_missing_payload_and_returns_standard_result() {
-    let workspace = TestWorkspace::new("mcp-list");
-    workspace.write("docs/feature.md", &current_requirement("MCP list"));
-    register(
-        workspace.path(),
-        "mcp-list",
-        "docs/feature.md",
-        vec![],
-        None,
-    );
-    let request: McpRequest = serde_json::from_value(serde_json::json!({
-        "jsonrpc":"2.0",
-        "id":1,
-        "method":"tools/call",
-        "params":{
-            "name":"project_feature_workflow",
-            "arguments":{"action":"list"}
-        }
-    }))
-    .unwrap();
-    let response = node_agent_project_feature_mcp::handle_request(workspace.path(), &request)
-        .expect("list without payload should use an empty object");
-    assert_eq!(response["isError"], false);
-    assert!(response["content"]
-        .as_array()
-        .is_some_and(|items| items.len() == 1));
-    assert_eq!(response["structuredContent"]["total"], 1);
-    assert_eq!(
-        response["structuredContent"]["features"][0]["id"],
-        "mcp-list"
-    );
-    assert!(response["structuredContent"]["response_budget"].is_object());
-}
 
 struct TestWorkspace(PathBuf);
 

@@ -108,3 +108,7 @@ fn operation_tool_name(action: &str) -> Result<&'static str> {
         _ => bail!("未知功能动作：{action}；不确定字段时先调用 describe"),
     }
 }
+
+#[cfg(test)]
+#[path = "node_agent_project_feature_mcp_tests.rs"]
+mod tests;
