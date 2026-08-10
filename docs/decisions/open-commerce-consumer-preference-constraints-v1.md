@@ -2,8 +2,8 @@
 title: 开放商业消费者偏好硬约束 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者偏好硬约束 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - 匹配基于商户项目公开资料，不证明地址、类别或标签经过外部机构验证。
 - 标签匹配不自动推断同义词、过敏原、法律资格或服务质量。
 - 硬约束只影响发现候选，不代表授权、库存、下单或履约完成。
-- 当前代码未编译，未执行接口、资料缺失、组合筛选、凭证、浏览器或 UI 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证默认软偏好、缺值失败关闭、资料缺失或类型错误排除、ASCII 大小写、任一类别、全部标签、三个约束组合和排序凭证；状态为 `verified_rust_sqlite`。
+- 尚未执行携带硬约束的 HTTP 实例请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 

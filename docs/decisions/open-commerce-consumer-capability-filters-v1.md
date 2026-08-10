@@ -2,8 +2,8 @@
 title: 开放商业消费者能力类型与访问级别筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者能力类型与访问级别筛选 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - `action` 只表示商户项目声明的能力类型，不证明操作已经执行。
 - `authorized` 只表示能力要求授权，不代表当前应用已经获批。
 - 筛选不能绕过短时动作确认、人工确认、授权范围或预算限制。
-- 当前代码未编译，未执行接口、组合筛选、凭证、兼容性、浏览器或 UI 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证 `query/action` 与 `public/authorized` 四种组合、空白规范化、非法值和 `owner_only` 失败关闭、授权状态、组合筛选和排序凭证；状态为 `verified_rust_sqlite`。
+- 尚未执行携带能力条件的 HTTP 实例请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 

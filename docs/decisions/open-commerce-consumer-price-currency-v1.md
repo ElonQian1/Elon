@@ -2,8 +2,8 @@
 title: 开放商业消费者价格币种筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者价格币种筛选 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - 三位代码只进行结构校验，不证明其属于完整 ISO 4217 注册表。
 - 能力价格和币种仍由商户项目声明，不证明结算汇率、税费或最终成交金额。
 - 本批不提供汇率换算、多币种预算、价格锁定或支付结算。
-- 当前代码未编译，未执行接口、兼容性、排序凭证、浏览器或 UI 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证无条件、仅币种、仅上限兼容 CNY、币种加上限、等于/低于/高于边界、跨币种隔离、非法值失败关闭、五种排序器和排序凭证；状态为 `verified_rust_sqlite`。
+- 尚未执行携带价格条件的 HTTP 实例请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 
