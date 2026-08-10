@@ -95,11 +95,14 @@ class BottomNavigationInsetsContractTest {
 
     @Test
     fun primaryPanelUsesMatchingDarkBackdropGlassOnAndroidAndWeb() {
+        val settings = readRepositoryFile("android/settings.gradle")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         val controller = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt"
         )
         val glass = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_glass.xml")
+        assertTrue(settings.contains("url = uri('https://jitpack.io')"))
+        assertTrue(settings.contains("includeGroup('com.github.Dimezis')"))
         assertTrue(layout.contains("<eightbitlab.com.blurview.BlurTarget"))
         assertTrue(layout.contains("android:id=\"@+id/bottomNavGlass\""))
         assertTrue(layout.contains("app:blurOverlayColor=\"#99121418\""))
