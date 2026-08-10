@@ -116,6 +116,24 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun contextReportsTheObservedWindowWithoutRenumberingMessages() {
+        val result = actions(
+            messageWindowStart = 80,
+            observedMessageCount = 81,
+        ).control(JSONObject().put("action", "chatgpt_get_context"))
+
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals(81, result.getInt("message_count"))
+        assertEquals(1, result.getInt("available_message_count"))
+        assertEquals(80, result.getInt("message_window_start"))
+        assertEquals(81, result.getInt("message_window_end"))
+        assertTrue(result.getBoolean("history_truncated"))
+        assertTrue(result.getBoolean("has_more_before"))
+        assertFalse(result.getBoolean("context_complete"))
+        assertEquals(80, result.getJSONArray("messages").getJSONObject(0).getInt("index"))
+    }
+
+    @Test
     fun controlsAndConversationsCanBeFoundWithoutParsingTheWholeUiState() {
         val actions = actions()
 
@@ -265,6 +283,8 @@ class ChatGptWebMcpActionsTest {
     private fun actions(
         dictationActive: Boolean = false,
         messageParts: List<ChatGptWebMessagePart>? = null,
+        messageWindowStart: Int = 0,
+        observedMessageCount: Int = messageWindowStart + 1,
         onInvoke: (String) -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -296,6 +316,8 @@ class ChatGptWebMcpActionsTest {
             capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.DRAFT_SYNC)),
             pageKind = "conversation",
             loginRequired = false,
+            messageWindowStart = messageWindowStart,
+            observedMessageCount = observedMessageCount,
         )
         val manifest = ChatGptWebUiManifest(
             version = 1,

@@ -15,14 +15,21 @@ internal object ChatGptWebContextPager {
     ): Result {
         val revision = revision(snapshot)
         val decoded = if (cursor.isBlank()) null else decode(cursor)
-            ?: return Result.Failure(INVALID_CURSOR, revision, snapshot.messages.size)
+            ?: return failure(INVALID_CURSOR, revision, snapshot)
         if (decoded != null && decoded.revision != revision) {
-            return Result.Failure(STALE_CURSOR, revision, snapshot.messages.size)
+            return failure(STALE_CURSOR, revision, snapshot)
         }
 
-        val offset = (decoded?.offset ?: requestedOffset).coerceIn(0, snapshot.messages.size)
+        val windowStart = snapshot.messageWindowStart
+        val windowEnd = windowStart + snapshot.messages.size
+        val requestedGlobalOffset = decoded?.offset ?: requestedOffset
+        if (requestedGlobalOffset < windowStart) {
+            return failure(HISTORY_UNAVAILABLE, revision, snapshot)
+        }
+        val offset = requestedGlobalOffset.coerceIn(windowStart, windowEnd)
+        val localOffset = offset - windowStart
         val limit = requestedLimit.coerceIn(1, maxLimit)
-        val messages = snapshot.messages.drop(offset).take(limit)
+        val messages = snapshot.messages.drop(localOffset).take(limit)
         val nextOffset = offset + messages.size
         return Result.Success(
             Page(
@@ -30,9 +37,10 @@ internal object ChatGptWebContextPager {
                 offset = offset,
                 limit = limit,
                 nextOffset = nextOffset,
-                hasMore = nextOffset < snapshot.messages.size,
+                hasMore = nextOffset < windowEnd,
+                hasMoreBefore = windowStart > 0,
                 cursor = encode(revision, offset),
-                nextCursor = if (nextOffset < snapshot.messages.size) {
+                nextCursor = if (nextOffset < windowEnd) {
                     encode(revision, nextOffset)
                 } else {
                     null
@@ -45,6 +53,8 @@ internal object ChatGptWebContextPager {
     internal fun revision(snapshot: ChatGptWebSnapshot): String {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.addField(snapshot.url)
+        digest.addField(snapshot.messageWindowStart.toString())
+        digest.addField(snapshot.observedMessageCount.toString())
         snapshot.messages.forEach { message ->
             digest.addField(message.id)
             digest.addField(message.role)
@@ -62,6 +72,18 @@ internal object ChatGptWebContextPager {
 
     private fun encode(revision: String, offset: Int): String =
         "$CURSOR_PREFIX.$revision.${offset.toString(RADIX)}"
+
+    private fun failure(
+        code: String,
+        revision: String,
+        snapshot: ChatGptWebSnapshot,
+    ): Result.Failure = Result.Failure(
+        code = code,
+        currentRevision = revision,
+        observedMessageCount = snapshot.observedMessageCount,
+        messageWindowStart = snapshot.messageWindowStart,
+        messageWindowEnd = snapshot.messageWindowStart + snapshot.messages.size,
+    )
 
     private fun decode(value: String): Cursor? {
         if (!CURSOR.matches(value)) return null
@@ -87,7 +109,9 @@ internal object ChatGptWebContextPager {
         data class Failure(
             val code: String,
             val currentRevision: String,
-            val messageCount: Int,
+            val observedMessageCount: Int,
+            val messageWindowStart: Int,
+            val messageWindowEnd: Int,
         ) : Result
     }
 
@@ -97,6 +121,7 @@ internal object ChatGptWebContextPager {
         val limit: Int,
         val nextOffset: Int,
         val hasMore: Boolean,
+        val hasMoreBefore: Boolean,
         val cursor: String,
         val nextCursor: String?,
         val messages: List<ChatGptWebMessage>,
@@ -112,5 +137,6 @@ internal object ChatGptWebContextPager {
     private const val RADIX = 36
     private const val INVALID_CURSOR = "invalid_context_cursor"
     private const val STALE_CURSOR = "stale_context_cursor"
+    private const val HISTORY_UNAVAILABLE = "context_history_unavailable"
     private val CURSOR = Regex("$CURSOR_PREFIX\\.[a-f0-9]{24}\\.[a-z0-9]{1,7}")
 }

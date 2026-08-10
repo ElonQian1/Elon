@@ -71,12 +71,42 @@ class ChatGptWebContextPagerTest {
         assertNotEquals(first, second)
     }
 
+    @Test
+    fun longConversationUsesGlobalOffsetsAndRejectsUnavailableHistory() {
+        val snapshot = snapshot(
+            "/c/long",
+            "eighty",
+            "eighty-one",
+            messageWindowStart = 80,
+            observedMessageCount = 82,
+        )
+
+        val page = success(ChatGptWebContextPager.page(snapshot, "", 80, 1, 40))
+        assertEquals(80, page.offset)
+        assertEquals(81, page.nextOffset)
+        assertTrue(page.hasMore)
+        assertTrue(page.hasMoreBefore)
+
+        val unavailable = ChatGptWebContextPager.page(snapshot, "", 0, 1, 40)
+        assertEquals(
+            "context_history_unavailable",
+            (unavailable as ChatGptWebContextPager.Result.Failure).code,
+        )
+        assertEquals(80, unavailable.messageWindowStart)
+        assertEquals(82, unavailable.messageWindowEnd)
+    }
+
     private fun success(result: ChatGptWebContextPager.Result): ChatGptWebContextPager.Page {
         assertTrue(result is ChatGptWebContextPager.Result.Success)
         return (result as ChatGptWebContextPager.Result.Success).page
     }
 
-    private fun snapshot(path: String, vararg content: String): ChatGptWebSnapshot = ChatGptWebSnapshot(
+    private fun snapshot(
+        path: String,
+        vararg content: String,
+        messageWindowStart: Int = 0,
+        observedMessageCount: Int = messageWindowStart + content.size,
+    ): ChatGptWebSnapshot = ChatGptWebSnapshot(
         title = "测试会话",
         url = "https://chatgpt.com$path",
         draft = "",
@@ -96,5 +126,7 @@ class ChatGptWebContextPagerTest {
         attachments = emptyList(),
         dictationActive = false,
         capabilities = ChatGptWebCapabilities.EMPTY,
+        messageWindowStart = messageWindowStart,
+        observedMessageCount = observedMessageCount,
     )
 }

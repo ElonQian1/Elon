@@ -168,7 +168,7 @@ internal class ChatGptWebMcpActions(
         val result = ChatGptWebContextPager.page(
             snapshot = current,
             cursor = args.optString("message_cursor").take(MAX_CONTEXT_CURSOR_CHARS),
-            requestedOffset = args.optInt("message_offset", 0),
+            requestedOffset = args.optInt("message_offset", current.messageWindowStart),
             requestedLimit = limit,
             maxLimit = MAX_CONTEXT_PAGE_SIZE,
         )
@@ -176,8 +176,12 @@ internal class ChatGptWebMcpActions(
             return error("chatgpt_get_context", result.code)
                 .put("schema", ChatGptWebContextPager.SCHEMA)
                 .put("current_context_revision", result.currentRevision)
-                .put("message_count", result.messageCount)
-                .put("retry_from_message_offset", 0)
+                .put("message_count", result.observedMessageCount)
+                .put("available_message_count", result.messageWindowEnd - result.messageWindowStart)
+                .put("message_window_start", result.messageWindowStart)
+                .put("message_window_end", result.messageWindowEnd)
+                .put("history_truncated", result.messageWindowStart > 0)
+                .put("retry_from_message_offset", result.messageWindowStart)
         }
         val page = (result as ChatGptWebContextPager.Result.Success).page
         return JSONObject()
@@ -186,7 +190,16 @@ internal class ChatGptWebMcpActions(
             .put("schema", ChatGptWebContextPager.SCHEMA)
             .put("conversation_title", current.title)
             .put("conversation_url", current.url)
-            .put("message_count", current.messages.size)
+            .put("message_count", current.observedMessageCount)
+            .put("available_message_count", current.messages.size)
+            .put("message_window_start", current.messageWindowStart)
+            .put("message_window_end", current.messageWindowStart + current.messages.size)
+            .put("history_truncated", current.messageWindowStart > 0)
+            .put("has_more_before", page.hasMoreBefore)
+            .put(
+                "context_complete",
+                current.messageWindowStart == 0 && current.messages.size >= current.observedMessageCount,
+            )
             .put("context_revision", page.revision)
             .put("context_streaming", current.streaming)
             .put("cursor_stable", current.streaming.not())
