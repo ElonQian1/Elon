@@ -10,6 +10,7 @@ Import-Module "$ModulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
+Import-Module "$ModulesRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
 
 $script:Assertions = 0
 function Assert-True {
@@ -47,6 +48,8 @@ try {
     $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -CargoArgs @("check") -ToolchainEpoch "rustc-test"
     Assert-True $context.registered "project manifest should register the project"
     Assert-Equal "test-project" $context.project_id "registered project id"
+    Assert-Equal "workspace" $context.cache_scope "default registered builds should remain workspace-scoped"
+    Assert-Equal $context.workspace_hash $context.cache_partition "workspace scope should use the workspace hash"
     Assert-True ($context.build_dir -like "*\build\rustc-test\test-project\dev-host\*") "registered build path should be compatibility-scoped"
     Assert-Equal (Join-Path $context.project_root "target") $context.target_dir "final artifacts should remain workspace-local by default"
     $unknownDomain = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "one-off-task-name" -CargoArgs @("check") -ToolchainEpoch "rustc-test"
@@ -56,6 +59,10 @@ try {
     $unknown = Resolve-RustCacheInvocation -ProjectRoot $UnknownRoot -CacheRoot $CacheRoot -CargoArgs @("check") -ToolchainEpoch "rustc-test"
     Assert-True (-not $unknown.registered) "unknown project should not enter the registered pool"
     Assert-True ($unknown.build_dir -like "*\quarantine\*") "unknown project should route to quarantine"
+    Assert-Equal "quarantine" $unknown.cache_scope "unknown projects should report quarantine scope"
+    $unknownSharedRejected = $false
+    try { Resolve-RustCacheInvocation -ProjectRoot $UnknownRoot -CacheRoot $CacheRoot -CargoArgs @("check") -ToolchainEpoch "rustc-test" -SharedBuildPartition "unsafe" | Out-Null } catch { $unknownSharedRejected = $true }
+    Assert-True $unknownSharedRejected "unknown projects must not opt into managed shared partitions"
 
     $nestedContext = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -CargoArgs @("check", "--manifest-path", "server\Cargo.toml") -ToolchainEpoch "rustc-test"
     $baseDirs = Get-RustCacheSccacheBaseDirs -ProjectRoot $nestedContext.project_root -WorkspaceRoot $nestedContext.workspace_root
@@ -73,6 +80,32 @@ try {
     Assert-True $release.release "release invocation should be detected"
     $sharedRelease = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "node-agent-release" -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test" -SharedBuildPartition "node-agent-windows"
     Assert-True ($sharedRelease.build_dir -like "*\build\rustc-test\test-project\node-agent-release\shared-node-agent-windows") "explicit release partition should be stable across isolated worktrees"
+    Assert-Equal "shared" $sharedRelease.cache_scope "named build partitions should report shared scope"
+    Assert-Equal "shared-node-agent-windows" $sharedRelease.cache_partition "shared partition identity should be observable"
+    $SecondProjectRoot = Join-Path $TempRoot "registered-project-second-worktree"
+    New-Item -ItemType Directory -Force -Path $SecondProjectRoot | Out-Null
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot "rust-cache.project.json") -Destination $SecondProjectRoot
+    $secondSharedRelease = Resolve-RustCacheInvocation -ProjectRoot $SecondProjectRoot -CacheRoot $CacheRoot -Domain "node-agent-release" -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test" -SharedBuildPartition "node-agent-windows"
+    Assert-Equal $sharedRelease.build_dir $secondSharedRelease.build_dir "same named partition should converge across different worktree roots"
+    Assert-True ($sharedRelease.workspace_hash -ne $secondSharedRelease.workspace_hash) "shared partition regression needs distinct workspace identities"
+    $invalidSharedRejected = $false
+    try { Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "node-agent-release" -SharedBuildPartition "Worktree 1" -CargoArgs @("check") -ToolchainEpoch "rustc-test" | Out-Null } catch { $invalidSharedRejected = $_.Exception.Message -match "stable slug" }
+    Assert-True $invalidSharedRejected "shared partition names should reject path- or session-like normalization collisions"
+    $sharedNoLockRejected = $false
+    try { Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "node-agent-release" -SharedBuildPartition "node-agent-windows" -NoLock -DisableSccache -CargoCommand "missing-cargo" -ToolchainEpoch "rustc-test" -CargoArgs @("check") } catch { $sharedNoLockRejected = $_.Exception.Message -match "require.*lock" }
+    Assert-True $sharedNoLockRejected "shared partitions must reject lock bypass"
+
+    $registryUpgradeRoot = Join-Path $TempRoot "registry-upgrade"
+    New-Item -ItemType Directory -Force -Path (Join-Path $registryUpgradeRoot "state") | Out-Null
+    $legacyRegistry = @{ schema_version = 1; workspaces = @(@{ project_id = "test-project"; workspace_hash = "legacy-hash"; domain = "dev-host"; build_dir = $sharedRelease.build_dir }) }
+    $legacyRegistry | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $registryUpgradeRoot "state\registry.json") -Encoding UTF8
+    Update-RustCacheRegistry -CacheRoot $registryUpgradeRoot -ProjectId "test-project" -ProjectRoot $ProjectRoot -WorkspaceRoot $ProjectRoot -WorkspaceHash "legacy-hash" -CacheScope "shared" -CachePartition "shared-dev" -Domain "dev-host" -ToolchainEpoch "rustc-test" -BuildDir $sharedRelease.build_dir -TargetDir $sharedRelease.target_dir -Registered $true
+    $upgradedRegistry = Read-RustCacheRegistry -CacheRoot $registryUpgradeRoot
+    Assert-Equal "shared" $upgradedRegistry.workspaces[0].cache_scope "registry updates should add scope fields to existing v1 rows"
+    Assert-Equal "shared-dev" $upgradedRegistry.workspaces[0].cache_partition "registry updates should add partition fields to existing v1 rows"
+    Update-RustCacheRegistry -CacheRoot $registryUpgradeRoot -ProjectId "test-project" -ProjectRoot $ProjectRoot -WorkspaceRoot $ProjectRoot -WorkspaceHash "legacy-hash" -CacheScope "shared" -CachePartition "shared-other" -Domain "dev-host" -ToolchainEpoch "rustc-test" -BuildDir (Join-Path $CacheRoot "shared-other") -TargetDir $sharedRelease.target_dir -Registered $true
+    $partitionedRegistry = Read-RustCacheRegistry -CacheRoot $registryUpgradeRoot
+    Assert-Equal 2 @($partitionedRegistry.workspaces).Count "registry should preserve multiple named partitions for one workspace and domain"
     $missingReadiness = Get-RustCacheSccacheReadiness -Disabled
     Assert-Equal "unavailable" $missingReadiness.status "disabled sccache must be explicit"
     Assert-Equal "disabled_by_caller" $missingReadiness.reason "sccache degradation reason"
@@ -249,6 +282,8 @@ retry = 3
 
     $install = Install-RustCachePlatform -SourceScriptsRoot $PSScriptRoot -CacheRoot (Join-Path $TempRoot "installed") -RepoRoot $ProjectRoot
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
+    $installedCommand = Get-Command -Name $install.entry_path -ErrorAction Stop
+    Assert-True ($installedCommand.Parameters.ContainsKey("SharedBuildPartition")) "installed machine entry should expose named shared partitions"
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
     Assert-True (Test-Path -LiteralPath $install.sccache_config_path) "installer should generate managed sccache config"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path

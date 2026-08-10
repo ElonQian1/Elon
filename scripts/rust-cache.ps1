@@ -14,6 +14,7 @@ param(
     [string]$ProjectRoot,
     [string]$Domain,
     [string]$TargetDir,
+    [string]$SharedBuildPartition,
     [string]$CacheRoot,
     [string]$CargoConfigPath,
     [string]$LegacyPath,
@@ -78,7 +79,7 @@ switch ($Command) {
             throw "run requires Cargo arguments."
         }
         Invoke-RustCachePreflightGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Skip:$SkipCacheGc | Out-Null
-        Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -CargoArgs $RemainingArgs
+        Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -SharedBuildPartition $SharedBuildPartition -CargoArgs $RemainingArgs
         exit $LASTEXITCODE
     }
     "gc" {

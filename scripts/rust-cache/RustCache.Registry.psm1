@@ -69,6 +69,8 @@ function Update-RustCacheRegistry {
         [Parameter(Mandatory)][string]$ProjectRoot,
         [Parameter(Mandatory)][string]$WorkspaceRoot,
         [Parameter(Mandatory)][string]$WorkspaceHash,
+        [string]$CacheScope,
+        [string]$CachePartition,
         [Parameter(Mandatory)][string]$Domain,
         [Parameter(Mandatory)][string]$ToolchainEpoch,
         [Parameter(Mandatory)][string]$BuildDir,
@@ -80,12 +82,21 @@ function Update-RustCacheRegistry {
     try {
         $registry = Read-RustCacheRegistry -CacheRoot $CacheRoot
         $items = @($registry.workspaces)
-        $existing = $items | Where-Object { $_.workspace_hash -eq $WorkspaceHash -and $_.domain -eq $Domain } | Select-Object -First 1
+        $existing = $items | Where-Object {
+            if ($_.workspace_hash -ne $WorkspaceHash -or $_.domain -ne $Domain) { return $false }
+            if ([string]::IsNullOrWhiteSpace($CachePartition)) { return $true }
+            if ($_.PSObject.Properties.Name -contains "cache_partition" -and -not [string]::IsNullOrWhiteSpace([string]$_.cache_partition)) {
+                return $_.cache_partition -eq $CachePartition
+            }
+            return $_.build_dir -eq $BuildDir
+        } | Select-Object -First 1
         $values = [ordered]@{
             project_id = $ProjectId
             project_root = $ProjectRoot
             workspace_root = $WorkspaceRoot
             workspace_hash = $WorkspaceHash
+            cache_scope = $CacheScope
+            cache_partition = $CachePartition
             domain = $Domain
             toolchain_epoch = $ToolchainEpoch
             build_dir = $BuildDir
@@ -94,11 +105,17 @@ function Update-RustCacheRegistry {
             last_seen_utc = [DateTime]::UtcNow.ToString("o")
         }
         if ($existing) {
-            foreach ($key in $values.Keys) { $existing.$key = $values[$key] }
+            foreach ($key in $values.Keys) {
+                if ($existing.PSObject.Properties.Name -contains $key) {
+                    $existing.$key = $values[$key]
+                } else {
+                    $existing | Add-Member -NotePropertyName $key -NotePropertyValue $values[$key]
+                }
+            }
         } else {
             $items += [pscustomobject]$values
         }
-        $registry.workspaces = @($items | Sort-Object project_id, domain, workspace_hash)
+        $registry.workspaces = @($items | Sort-Object project_id, domain, workspace_hash, cache_partition)
         Write-RustCacheRegistry -CacheRoot $CacheRoot -Registry $registry | Out-Null
     } finally {
         if ($lock) { $lock.Dispose() }

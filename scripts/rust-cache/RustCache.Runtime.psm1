@@ -2,6 +2,7 @@ Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Scope.psm1" -Force -DisableNameChecking
 
 function Resolve-RustCacheWorkspaceRoot {
     param(
@@ -68,13 +69,9 @@ function Resolve-RustCacheInvocation {
     $workspace = Resolve-RustCacheWorkspaceRoot -ProjectRoot $project -CargoArgs $CargoArgs
     $workspaceHash = Get-RustCacheWorkspaceHash -WorkspaceRoot $workspace
     $epoch = if ([string]::IsNullOrWhiteSpace($ToolchainEpoch)) { Get-RustCacheToolchainEpoch } else { ConvertTo-RustCacheSlug $ToolchainEpoch }
+    $scope = Resolve-RustCacheBuildScope -Registered $manifest.registered -WorkspaceHash $workspaceHash -SharedBuildPartition $SharedBuildPartition
     if ($manifest.registered) {
-        $partition = if ([string]::IsNullOrWhiteSpace($SharedBuildPartition)) {
-            $workspaceHash
-        } else {
-            "shared-" + (ConvertTo-RustCacheSlug $SharedBuildPartition)
-        }
-        $buildDir = Join-Path $root "build\$epoch\$($manifest.project_id)\$resolvedDomain\$partition"
+        $buildDir = Join-Path $root "build\$epoch\$($manifest.project_id)\$resolvedDomain\$($scope.partition_name)"
     } else {
         $buildDir = Join-Path $root "quarantine\$workspaceHash"
     }
@@ -92,6 +89,9 @@ function Resolve-RustCacheInvocation {
         project_root = $project
         workspace_root = $workspace
         workspace_hash = $workspaceHash
+        cache_scope = $scope.cache_scope
+        cache_partition = $scope.partition_name
+        shared_build_partition = $scope.shared_partition
         requested_domain = $requestedDomain
         domain = $resolvedDomain
         domain_fallback = $requestedDomain -ne $resolvedDomain
@@ -236,7 +236,7 @@ function Set-RustCacheBuildEnvironment {
     if ($context.release -or $context.domain -match '(^|-)validation($|-)|agent-validation') {
         $env:CARGO_INCREMENTAL = "0"
     }
-    Update-RustCacheRegistry -CacheRoot $context.cache_root -ProjectId $context.project_id -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root -WorkspaceHash $context.workspace_hash -Domain $context.domain -ToolchainEpoch $context.toolchain_epoch -BuildDir $context.build_dir -TargetDir $context.target_dir -Registered $context.registered
+    Update-RustCacheRegistry -CacheRoot $context.cache_root -ProjectId $context.project_id -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root -WorkspaceHash $context.workspace_hash -CacheScope $context.cache_scope -CachePartition $context.cache_partition -Domain $context.domain -ToolchainEpoch $context.toolchain_epoch -BuildDir $context.build_dir -TargetDir $context.target_dir -Registered $context.registered
     $sccache = if ($DisableSccache) { $null } else { Get-Command sccache -ErrorAction SilentlyContinue }
     if ($sccache) {
         $sync = Sync-RustCacheSccacheConfiguration -CacheRoot $context.cache_root -AdditionalBaseDirs @($context.build_dir, $context.target_dir, $context.workspace_root, $context.project_root) -ConfigureProcessEnvironment -RestartIfChanged
@@ -251,6 +251,8 @@ function Set-RustCacheBuildEnvironment {
     $marker = [ordered]@{
         project_id = $context.project_id
         workspace_root = $context.workspace_root
+        cache_scope = $context.cache_scope
+        cache_partition = $context.cache_partition
         domain = $context.domain
         toolchain_epoch = $context.toolchain_epoch
         last_used_utc = [DateTime]::UtcNow.ToString("o")
@@ -292,6 +294,7 @@ function Invoke-RustCacheCargo {
         [Parameter(Mandatory)][string[]]$CargoArgs
     )
 
+    if ($NoLock -and -not [string]::IsNullOrWhiteSpace($SharedBuildPartition)) { throw "Shared Rust build partitions require the platform partition lock; remove -NoLock." }
     $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition
     New-Item -ItemType Directory -Force -Path $context.build_dir | Out-Null
     $lockPath = $null
@@ -312,6 +315,8 @@ function Invoke-RustCacheCargo {
         Write-Host "RUST_CACHE_DOMAIN_REQUESTED=$($context.requested_domain)"
         Write-Host "RUST_CACHE_DOMAIN=$($context.domain)"
         Write-Host "RUST_CACHE_DOMAIN_FALLBACK=$($context.domain_fallback)"
+        Write-Host "RUST_CACHE_SCOPE=$($context.cache_scope)"
+        Write-Host "RUST_CACHE_PARTITION=$($context.cache_partition)"
         Write-Host "CARGO_BUILD_BUILD_DIR=$($context.build_dir)"
         Write-Host "CARGO_TARGET_DIR=$($context.target_dir)"
         $alternative = if ($env:ELON_NODE_DATA_ROOT) { Join-Path $env:ELON_NODE_DATA_ROOT "cache\rust-cache-v2" } else { $null }
