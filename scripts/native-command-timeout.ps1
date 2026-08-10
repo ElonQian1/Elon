@@ -36,8 +36,21 @@ function Stop-ElonProcessTree {
 
     $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if (-not $process) { return }
-    & taskkill.exe /PID $ProcessId /T /F 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+
+    $killer = $null
+    try {
+        $killer = Start-Process -FilePath "taskkill.exe" `
+            -ArgumentList @("/PID", "$ProcessId", "/T", "/F") `
+            -WindowStyle Hidden -PassThru
+        if (-not $killer.WaitForExit(3000)) {
+            Stop-Process -Id $killer.Id -Force -ErrorAction SilentlyContinue
+        }
+    } finally {
+        if ($null -ne $killer -and -not $killer.HasExited) {
+            Stop-Process -Id $killer.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) {
         Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
     }
 }

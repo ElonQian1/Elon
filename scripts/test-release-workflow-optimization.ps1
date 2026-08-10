@@ -16,6 +16,11 @@ $apkTransportHelper = Join-Path $repoRoot 'scripts\apk-publish-transport.ps1'
 . $runtimeTemplateHelper
 . $apkTransportHelper
 
+$nativeCommandSource = Get-Content -LiteralPath $nativeCommandHelper -Raw
+if (-not $nativeCommandSource.Contains('$killer.WaitForExit(3000)')) {
+    throw 'Native command process-tree termination must have its own hard timeout.'
+}
+
 if (-not (Get-Command New-ElonApkAtomicDeployScript -ErrorAction SilentlyContinue)) {
     throw 'APK publish transport functions were not loaded.'
 }
