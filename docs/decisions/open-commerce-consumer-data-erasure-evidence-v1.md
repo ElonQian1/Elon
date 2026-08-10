@@ -3,7 +3,7 @@ title: 开放商业消费者删除请求外部证明 V1
 status: accepted
 date: 2026-08-03
 owners: backend, product
-implementation_status: implementation_uncompiled
+implementation_status: verified_local_http_pc_build
 ---
 
 # 开放商业消费者删除请求外部证明 V1
@@ -41,4 +41,4 @@ V1 不连接美团、抖音、ERP、CRM 或会员系统执行删除，不下载�
 
 ## 当前状态
 
-代码已提交，但按快速开发策略未运行 Rust 编译、PC 构建、TypeScript 检查、V160 迁移、接口、权限、幂等或界面验证。当前状态只能标记为 `implementation_uncompiled`。
+V160 迁移约束与级联、服务端权限、幂等审计、消费者隔离和固定未核验来源已通过真实 SQLite 与本地 Axum Router 测试；删除证明相关可携带包专项、PC 静态契约、TypeScript、Vite 构建和全目标 Rust 检查均通过。当前状态为 `verified_local_http_pc_build`。绑定真实 TCP 端口、生产迁移、PC 浏览器、外部签名、官方回读和真实删除适配器仍未验证。
