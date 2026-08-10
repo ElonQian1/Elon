@@ -169,6 +169,7 @@
       conversation: '打开会话',
       search: '搜索聊天',
       library: '文件库',
+      apps: '应用',
       tasks: '任务',
       project: '项目',
       gpts: 'GPT',

@@ -31,6 +31,7 @@ internal object ChatGptWebUiSemantics {
         "conversation",
         "search",
         "library",
+        "apps",
         "tasks",
         "project",
         "gpts",

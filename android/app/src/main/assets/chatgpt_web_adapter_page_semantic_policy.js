@@ -11,6 +11,13 @@
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  const contentRoutes = Object.freeze([
+    { pattern: /^\/scheduled(?:\/|$)/, semantic: 'tasks' },
+    { pattern: /^\/library(?:\/|$)/, semantic: 'library' },
+    { pattern: /^\/plugins(?:\/|$)/, semantic: 'apps' },
+    { pattern: /^\/g\/g-p-[a-z0-9_-]+\/project(?:\/|$)/, semantic: 'project' }
+  ]);
+
   function classify(input) {
     const pathname = clean(input && input.pathname);
     const region = clean(input && input.region);
@@ -19,8 +26,9 @@
     if (/open[-\s]?sidebar|open sidebar|打开(?:侧边栏|边栏)/.test(signal)) {
       return 'navigation';
     }
-    if (region === 'content' && /^\/scheduled(?:\/|$)/.test(pathname)) {
-      return 'tasks';
+    if (region === 'content') {
+      const route = contentRoutes.find((candidate) => candidate.pattern.test(pathname));
+      if (route) return route.semantic;
     }
     return '';
   }
