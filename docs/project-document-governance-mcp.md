@@ -73,6 +73,8 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 `performance_receipt.transport` 在最终 MCP tool result 组装后报告 `structured_content_bytes`、`mcp_tool_result_bytes` 和 UTF-8 字节除以 4 的估算 token；规划回执的基线只指同一次本地生成的完整计划在投影前后的差值。两者固定标注 `measurement_kind=local_structural_estimate`、`not_vendor_billing=true` 和 `not_total_task_tokens=true`，不是供应商账单，也不代表完整任务输入/输出 token。context/feature/receipt/governance profile 固化在会话凭证中，修改 URL 查询参数不能升级权限。
 
+2026-08-10 的 `node_agent_project_context` 定向 Rust 回归共 13 项，已验证首次完整投递、同会话自动 `not_modified`、`force_refresh` 完整重发、profile 隔离、响应预算、传输字节回执，以及会话账本不保存查询文本和文档正文；验证指纹为 `f15400a9ce832d8a2da2b6dc5d9573ab9e2c513a9e72bce17a8b7c6274cfd6c4`。该回归使用临时项目和本机 streamable HTTP 服务，不代表生产负载、跨 PC 或所有第三方代理均已验收。
+
 `source_policy.precedence` 明确实现真源、接受方向和仅导航信源；`source_conflict_summary` 只根据元数据报告歧义、非当前、非权威和 dirty worktree 风险，并明确 `semantic_content_compared=false`，不得冒充已经比较过正文冲突。dirty 状态即使成功指纹化也必须用原生 Git/文件工具核对；指纹只允许安全复用导航计划。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。Git HEAD、worktree 指纹、catalog revision 或任务范围变化后重新规划；否则复用回执。本工具减少首次宽搜和重复读取，不替代供应商自己的文件工具。
 
 `verified_project_memory` 最多返回 3 条与当前 query 相关的已审核导航摘要。共享 manifest 最多 256 条；每条只含 topic、owner、repository/path scope、可选 scope IDs/branches/releases/worktree state、复核生命周期、工作区相对证据路径、可选 symbol/heading 定位符、工作区 SHA-256 与可用时的 Git HEAD/blob/worktree 对象身份，不含源码正文。服务端先按任务范围失败关闭，再做零 I/O 相关性排序，只对前 24 个候选验证；原始字节 hash 相同即停止，字节不同时才用 Git 对象容忍跨 PC 行尾差异。任一证据漂移、记忆到期或共享事实潜在冲突都会令相关记忆失效；相同 HEAD blob 出现在新路径时只返回最多三个重定位候选，必须由原生工具重读并走新候选审核，不能自动改写。旧 manifest 缺少 owner/scope/review/expiry 时继续兼容读取，但 Memory CI 标为治理信息不完整。该层随 `.elon/document-sections.json` 进入 Git，因此换 PC 后可以复用，但每次编辑前仍须核对当前实现。Codex 的 `~/.codex/memories`、聊天记录和命令输出不导入这里，也不是该功能的备份源。
