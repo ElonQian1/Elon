@@ -32,6 +32,7 @@ mod plan_application_persistence;
 mod plan_application_projection;
 mod plan_application_replay_children;
 mod plan_application_writes;
+mod planning_snapshot;
 mod process_ownership;
 mod promotion_store;
 mod rollback_checkpoint;
@@ -122,6 +123,10 @@ pub(in crate::node_agent_compute_plugin_host) use opened_authority::{
 pub(crate) use plan_application::{
     ComputePluginCandidateHandle, ComputePluginPlanApplicationDisposition,
     ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
+};
+pub(in crate::node_agent_compute_plugin_host) use planning_snapshot::{
+    ComputePluginPlanningAuthorityProjection, ComputePluginPlanningAuthorityProjectionBlocked,
+    ComputePluginPlanningAuthorityProjectionOutcome, ComputePluginPlanningSnapshotReadCustody,
 };
 pub(crate) use process_ownership::ComputePluginFetchProcessFence;
 pub(in crate::node_agent_compute_plugin_host) use promotion_store::{

@@ -20,12 +20,17 @@ use crate::node_agent_compute_plugin_host::{
 
 mod binding;
 mod meta;
+mod planning;
 mod projection;
 mod readback;
 mod recovery;
 mod write;
 
 pub(in crate::node_agent_compute_plugin_host) use recovery::ComputePluginCandidatePromotionRecoveryAuthoritySession;
+pub(super) use planning::{
+    read_planning_active_promotion_on, read_planning_candidate_manifest_on,
+    PlanningActivePromotionProjection, PlanningCandidateManifestProjection,
+};
 pub(in crate::node_agent_compute_plugin_host) use crate::node_agent_compute_plugin_host::candidate_promotion_contract::{
     ComputePluginCandidatePromotionRecoveryOutcome, HashedComputePluginInstallReceipt,
     HashedComputePluginPromotionReceipt,

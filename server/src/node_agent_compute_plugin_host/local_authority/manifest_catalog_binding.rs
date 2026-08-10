@@ -10,6 +10,7 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod planning;
 mod recovery;
 #[cfg(test)]
 mod test_support;
@@ -17,6 +18,9 @@ mod types;
 mod validation;
 mod write;
 
+pub(in crate::node_agent_compute_plugin_host::local_authority) use planning::{
+    read_planning_catalog_binding_on, PlanningCatalogBinding,
+};
 use types::ComputePluginManifestCatalogBindingRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginManifestCatalogBindingReceipt, HashedComputePluginManifestCatalogBindingReceipt,

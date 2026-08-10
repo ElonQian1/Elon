@@ -6,6 +6,15 @@ mod projection_guards;
 mod receipt_projection_guards;
 mod replacement_guards;
 
+pub(super) fn schema_definition_batches_v7() -> [&'static str; 4] {
+    [
+        core::CANDIDATE_PROMOTION_CORE_SCHEMA_V7,
+        projection_guards::CANDIDATE_PROMOTION_PROJECTION_SCHEMA_V7,
+        receipt_projection_guards::CANDIDATE_PROMOTION_RECEIPT_PROJECTION_SCHEMA_V7,
+        replacement_guards::CANDIDATE_PROMOTION_REPLACEMENT_GUARDS_V7,
+    ]
+}
+
 pub(super) fn create_schema_objects_v7(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(core::CANDIDATE_PROMOTION_CORE_SCHEMA_V7)

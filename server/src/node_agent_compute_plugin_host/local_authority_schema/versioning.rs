@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, TransactionBehavior};
 
+#[path = "planning_schema_integrity.rs"]
+mod planning_integrity;
+
 use super::{
     create_schema_objects_v4_additions, create_schema_objects_v5_additions,
     create_schema_objects_v6_additions, create_schema_objects_v7,
@@ -74,6 +77,30 @@ pub(in crate::node_agent_compute_plugin_host) fn ensure_schema(
             "COMPUTE_PLUGIN_AUTHORITY_SCHEMA_UNSUPPORTED: database version {other} is not supported"
         ),
     }
+}
+
+/// Verifies the exact V8 fingerprint without installing, migrating or repairing anything.
+///
+/// Planning is only allowed on a connection whose file lifecycle has already been proven by the
+/// handle-bound authority opener. Keeping this verifier separate from [`ensure_schema`] prevents a
+/// read path from silently claiming an empty database or advancing an older authority schema.
+pub(in crate::node_agent_compute_plugin_host) fn verify_schema_v8_read_only(
+    connection: &Connection,
+) -> Result<()> {
+    let version = connection
+        .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+        .context("COMPUTE_PLUGIN_AUTHORITY_READ_SCHEMA_VERSION")?;
+    let application_id = connection
+        .pragma_query_value(None, "application_id", |row| row.get::<_, i64>(0))
+        .context("COMPUTE_PLUGIN_AUTHORITY_READ_APPLICATION_ID")?;
+    if version != COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION_V8 {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_READ_SCHEMA_NOT_V8");
+    }
+    if application_id != COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_READ_APPLICATION_ID_CHANGED");
+    }
+    planning_integrity::verify_schema_objects_v8_read_only(connection)?;
+    verify_foreign_keys(connection)
 }
 
 fn install_schema_v8(connection: &mut Connection) -> Result<()> {

@@ -25,12 +25,14 @@ mod current;
 mod head;
 mod insert;
 mod installed;
+mod planning;
 mod readback;
 mod recovery;
 mod source;
 mod validation;
 mod write;
 
+pub(super) use planning::read_planning_work_admission_on;
 pub(in crate::node_agent_compute_plugin_host) use recovery::ComputePluginWorkAdmissionRecoveryAuthoritySession;
 
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPostRevalidationWorkAdmissionAuthoritySession<

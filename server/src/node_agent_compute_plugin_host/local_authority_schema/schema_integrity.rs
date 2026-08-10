@@ -60,8 +60,26 @@ fn verify_schema_objects(
 
     let expected = load_schema_objects(&reference, "reference")?;
     let actual = load_schema_objects(connection, "authority")?;
+    compare_schema_objects(&expected, &actual)
+}
 
-    for (key, expected_fingerprint) in &expected {
+/// Verifies one already-opened authority using only source-frozen DDL tokens and reads from that
+/// same connection. Unlike the migration verifier above, this never opens a reference database or
+/// executes schema SQL and is therefore safe inside the planning query-only transaction.
+pub(super) fn verify_schema_objects_from_definitions<'a>(
+    connection: &Connection,
+    definition_batches: impl IntoIterator<Item = &'a str>,
+) -> Result<()> {
+    let expected = load_schema_objects_from_definitions(definition_batches)?;
+    let actual = load_schema_objects(connection, "authority")?;
+    compare_schema_objects(&expected, &actual)
+}
+
+fn compare_schema_objects(
+    expected: &BTreeMap<SchemaObjectKey, SchemaObjectFingerprint>,
+    actual: &BTreeMap<SchemaObjectKey, SchemaObjectFingerprint>,
+) -> Result<()> {
+    for (key, expected_fingerprint) in expected {
         let Some(actual_fingerprint) = actual.get(key) else {
             bail!(
                 "COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INCOMPLETE: missing {} {}",
@@ -92,6 +110,119 @@ fn verify_schema_objects(
         }
     }
 
+    Ok(())
+}
+
+fn load_schema_objects_from_definitions<'a>(
+    definition_batches: impl IntoIterator<Item = &'a str>,
+) -> Result<BTreeMap<SchemaObjectKey, SchemaObjectFingerprint>> {
+    let mut objects = BTreeMap::new();
+    for batch in definition_batches {
+        for tokens in split_schema_statements(tokenize_sql(batch)?)? {
+            apply_schema_statement(&mut objects, &tokens)?;
+        }
+    }
+    Ok(objects)
+}
+
+fn split_schema_statements(tokens: Vec<String>) -> Result<Vec<Vec<String>>> {
+    let mut statements = Vec::new();
+    let mut start = 0;
+    for (index, token) in tokens.iter().enumerate() {
+        if token != ";" {
+            continue;
+        }
+        let next = tokens.get(index + 1).map(String::as_str);
+        if next.is_none() || next.is_some_and(|value| matches!(value, "CREATE" | "DROP")) {
+            if start == index {
+                bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_EMPTY_STATEMENT");
+            }
+            statements.push(tokens[start..index].to_vec());
+            start = index + 1;
+        }
+    }
+    if start < tokens.len() {
+        statements.push(tokens[start..].to_vec());
+    }
+    if statements.is_empty() {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_EMPTY");
+    }
+    Ok(statements)
+}
+
+fn apply_schema_statement(
+    objects: &mut BTreeMap<SchemaObjectKey, SchemaObjectFingerprint>,
+    tokens: &[String],
+) -> Result<()> {
+    match tokens.first().map(String::as_str) {
+        Some("CREATE") => insert_schema_statement(objects, tokens),
+        Some("DROP") => drop_schema_statement(objects, tokens),
+        _ => bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_STATEMENT_INVALID"),
+    }
+}
+
+fn insert_schema_statement(
+    objects: &mut BTreeMap<SchemaObjectKey, SchemaObjectFingerprint>,
+    tokens: &[String],
+) -> Result<()> {
+    let object_index = if tokens.get(1).map(String::as_str) == Some("UNIQUE") {
+        2
+    } else {
+        1
+    };
+    let object_type = tokens
+        .get(object_index)
+        .map(|value| value.to_ascii_lowercase())
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_TYPE_MISSING")?;
+    let name = tokens
+        .get(object_index + 1)
+        .cloned()
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_NAME_MISSING")?;
+    if !matches!(object_type.as_str(), "table" | "index" | "trigger") {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_TYPE_INVALID");
+    }
+    let table_name = if object_type == "table" {
+        name.clone()
+    } else {
+        let on_index = tokens
+            .iter()
+            .enumerate()
+            .skip(object_index + 2)
+            .find_map(|(index, token)| (token == "ON").then_some(index))
+            .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_TABLE_MISSING")?;
+        tokens
+            .get(on_index + 1)
+            .cloned()
+            .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_TABLE_MISSING")?
+    };
+    let key = SchemaObjectKey { object_type, name };
+    let fingerprint = SchemaObjectFingerprint {
+        table_name: table_name.clone(),
+        definition_sha256: definition_digest_from_tokens(&key, &table_name, tokens),
+    };
+    if objects.insert(key, fingerprint).is_some() {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_DUPLICATE");
+    }
+    Ok(())
+}
+
+fn drop_schema_statement(
+    objects: &mut BTreeMap<SchemaObjectKey, SchemaObjectFingerprint>,
+    tokens: &[String],
+) -> Result<()> {
+    let key = SchemaObjectKey {
+        object_type: tokens
+            .get(1)
+            .map(|value| value.to_ascii_lowercase())
+            .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_DROP_TYPE_MISSING")?,
+        name: tokens
+            .get(2)
+            .cloned()
+            .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_DROP_NAME_MISSING")?,
+    };
+    if objects.remove(&key).is_none() {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_SOURCE_DROP_MISSING");
+    }
     Ok(())
 }
 
@@ -152,6 +283,14 @@ fn definition_digest(key: &SchemaObjectKey, table_name: &str, definition: &str) 
             key.object_type, key.name
         )
     })?;
+    Ok(definition_digest_from_tokens(key, table_name, &tokens))
+}
+
+fn definition_digest_from_tokens(
+    key: &SchemaObjectKey,
+    table_name: &str,
+    tokens: &[String],
+) -> String {
     let mut digest = Sha256::new();
     hash_component(&mut digest, key.object_type.as_bytes());
     hash_component(&mut digest, key.name.as_bytes());
@@ -159,7 +298,7 @@ fn definition_digest(key: &SchemaObjectKey, table_name: &str, definition: &str) 
     for token in tokens {
         hash_component(&mut digest, token.as_bytes());
     }
-    Ok(hex::encode(digest.finalize()))
+    hex::encode(digest.finalize())
 }
 
 fn hash_component(digest: &mut Sha256, value: &[u8]) {

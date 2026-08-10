@@ -109,6 +109,10 @@ pub(in crate::node_agent_compute_plugin_host) struct OpenedComputePluginLocalAut
 }
 
 impl OpenedComputePluginLocalAuthority {
+    pub(super) fn ensure_current(&self) -> Result<()> {
+        self.intent.ensure_current()
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
         self.intent.installation_id_digest()
     }
@@ -144,6 +148,55 @@ impl OpenedComputePluginLocalAuthority {
             .commit()
             .context("COMPUTE_PLUGIN_OPENED_AUTHORITY_COMMIT")?;
         Ok(value)
+    }
+
+    /// Runs one purpose-specific, SQLite-enforced read snapshot on the already-open handle-bound
+    /// connection. The previous connection-local `query_only` state is restored even when the
+    /// operation or commit fails. This seam never opens a path or invokes schema installation.
+    pub(super) fn with_deferred_read<T>(
+        &mut self,
+        operation: impl FnOnce(&Transaction<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.ensure_current()?;
+        let query_only_before = self
+            .backend
+            .connection
+            .pragma_query_value(None, "query_only", |row| row.get::<_, i64>(0))
+            .context("COMPUTE_PLUGIN_OPENED_AUTHORITY_QUERY_ONLY_READ")?;
+        if !matches!(query_only_before, 0 | 1) {
+            bail!("COMPUTE_PLUGIN_OPENED_AUTHORITY_QUERY_ONLY_INVALID");
+        }
+        self.backend
+            .connection
+            .pragma_update(None, "query_only", true)
+            .context("COMPUTE_PLUGIN_OPENED_AUTHORITY_QUERY_ONLY_ENABLE")?;
+
+        let operation_result = (|| {
+            let transaction = self
+                .backend
+                .connection
+                .transaction_with_behavior(TransactionBehavior::Deferred)
+                .context("COMPUTE_PLUGIN_OPENED_AUTHORITY_BEGIN_DEFERRED")?;
+            let value = operation(&transaction)?;
+            transaction
+                .commit()
+                .context("COMPUTE_PLUGIN_OPENED_AUTHORITY_READ_COMMIT")?;
+            Ok(value)
+        })();
+        let restore_result = self
+            .backend
+            .connection
+            .pragma_update(None, "query_only", query_only_before == 1)
+            .context("COMPUTE_PLUGIN_OPENED_AUTHORITY_QUERY_ONLY_RESTORE");
+
+        match (operation_result, restore_result) {
+            (Ok(value), Ok(())) => Ok(value),
+            (Err(error), Ok(())) => Err(error),
+            (Ok(_), Err(error)) => Err(error),
+            (Err(error), Err(_)) => {
+                Err(error.context("COMPUTE_PLUGIN_OPENED_AUTHORITY_QUERY_ONLY_RESTORE_FAILED"))
+            }
+        }
     }
 
     /// Reserved for the future VFS implementation in this private module. Requiring both the

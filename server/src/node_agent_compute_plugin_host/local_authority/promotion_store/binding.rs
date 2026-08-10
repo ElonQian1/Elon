@@ -14,7 +14,6 @@ use crate::node_agent_compute_plugin_host::{
     lifecycle::{RUNTIME_STOPPED, SLOT_INSTALLED, SLOT_STAGED},
     local_authority::plan_application::read_authority_plan_application_state,
     manifest_validation::is_sha256,
-    plugin_manifest::SignedComputePluginManifest,
     signed_artifact_verification::jcs_sha256_hex,
 };
 
@@ -301,28 +300,7 @@ fn read_signed_manifest_envelope_digest(
     if promoted_at_ms >= expires_at_ms {
         bail!("COMPUTE_PLUGIN_CANDIDATE_PROMOTION_PLAN_EXPIRED");
     }
-    let manifests: Vec<SignedComputePluginManifest> = serde_json::from_str(&json)
-        .context("COMPUTE_PLUGIN_CANDIDATE_PROMOTION_MANIFEST_SET_PARSE")?;
-    if serde_json::to_string(&manifests)? != json {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_PROMOTION_MANIFEST_SET_CHANGED");
-    }
-    let mut matches = manifests.iter().filter(|signed| {
-        signed.manifest.plugin_id == release.plugin_id
-            && signed.manifest.plugin_version == release.plugin_version
-            && signed.manifest.target.target_id == release.target_id
-            && signed.manifest_digest == release.manifest_digest
-            && signed.manifest.package.package_digest == release.package_digest
-    });
-    let signed = matches
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_PROMOTION_MANIFEST_MISSING"))?;
-    if matches.next().is_some()
-        || jcs_sha256_hex(&signed.manifest)? != signed.manifest_digest
-        || !is_sha256(&signed.manifest_digest)
-    {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_PROMOTION_MANIFEST_CHANGED");
-    }
-    jcs_sha256_hex(signed)
+    super::planning::signed_manifest_envelope_digest_from_canonical_set(&json, release)
 }
 
 fn validate_no_conflicting_work(

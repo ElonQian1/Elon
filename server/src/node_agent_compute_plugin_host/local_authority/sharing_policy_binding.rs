@@ -8,6 +8,7 @@ use crate::node_agent_compute_plugin_host::{
     root_lock::ComputePluginRootLockLease, trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod planning;
 mod recovery;
 mod revocation;
 #[cfg(test)]
@@ -16,6 +17,9 @@ mod types;
 mod validation;
 mod write;
 
+pub(in crate::node_agent_compute_plugin_host::local_authority) use planning::{
+    read_planning_policy_binding_on, PlanningPolicyBinding,
+};
 pub(in crate::node_agent_compute_plugin_host) use revocation::{
     ComputePluginSharingPolicyCapabilityRevocationReceipt,
     HashedComputePluginSharingPolicyCapabilityRevocationReceipt,

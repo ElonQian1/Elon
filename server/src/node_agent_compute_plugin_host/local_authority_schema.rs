@@ -19,7 +19,7 @@ mod sharing_policy_revocation;
 mod versioning;
 mod work_admission;
 
-pub(super) use versioning::{ensure_schema, COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION};
+pub(super) use versioning::*;
 
 fn create_schema_objects_v3(connection: &Connection) -> Result<()> {
     connection

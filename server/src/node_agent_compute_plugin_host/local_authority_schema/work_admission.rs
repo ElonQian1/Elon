@@ -7,6 +7,16 @@ mod head_guards;
 mod receipt_projection;
 mod source_projection;
 
+pub(super) fn schema_definition_batches_v8() -> [&'static str; 5] {
+    [
+        core::WORK_ADMISSION_CORE_SCHEMA_V8,
+        head_guards::WORK_ADMISSION_HEAD_GUARDS_SCHEMA_V8,
+        source_projection::WORK_ADMISSION_SOURCE_PROJECTION_SCHEMA_V8,
+        receipt_projection::WORK_ADMISSION_RECEIPT_PROJECTION_SCHEMA_V8,
+        authority_fences::WORK_ADMISSION_AUTHORITY_FENCES_SCHEMA_V8,
+    ]
+}
+
 pub(super) fn create_schema_objects_v8(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(core::WORK_ADMISSION_CORE_SCHEMA_V8)
