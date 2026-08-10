@@ -309,18 +309,26 @@
     return title ? title.label : cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')) || 'ChatGPT';
   }
 
-  function snapshot() {
-    const controls = discover();
+  function compatibilityFor(controls, kind) {
     const hasHeader = controls.some((item) => item.region === 'header');
     const hasComposer = !!composerNode();
+    const hasFeatureContent = kind === 'feature'
+      && controls.some((item) => item.region === 'content');
+    if ((hasHeader && (hasComposer || kind === 'auth' || kind === 'feature')) || hasFeatureContent) {
+      return 'healthy';
+    }
+    return hasHeader || hasComposer || controls.length > 0 ? 'partial' : 'fallback_required';
+  }
+
+  function snapshot() {
+    const controls = discover();
+    const kind = pageKind();
     return {
       type: 'ui_manifest_snapshot',
       version: 3,
-      pageKind: pageKind(),
+      pageKind: kind,
       title: pageTitle(controls),
-      compatibility: hasHeader && (hasComposer || pageKind() === 'auth' || pageKind() === 'feature')
-        ? 'healthy'
-        : hasHeader || hasComposer ? 'partial' : 'fallback_required',
+      compatibility: compatibilityFor(controls, kind),
       controls
     };
   }
