@@ -78,13 +78,15 @@ v221 目前只是未编译、未执行的迁移源码，Store 也没有生产调
 
 专用 application source 形成后，仍须另批依次实现并验证：
 
-1. Adapter registry/version 的平台来源、实现摘要和 lifecycle；
+1. Adapter release 先走独立平台管理员四眼复核与 immutable staged admission，再由 purpose-bound resolver 重算 artifact 摘要并形成 Adapter registry/version 的平台来源、实现摘要和 lifecycle；staging 权威见 [`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)；
 2. credential verifier/KMS 或专用网关，以及只返回 sealed verification custody 的真实 producer；
 3. credential TTL、revocation 与 cleanup-only horizon；
 4. exact 六能力 revision、route authorization/seal、currentness 与历史重放；
 5. resolver、transport、prepare/commit/reconcile/cancel、authenticated ACK/event ingress 和 crash recovery。
 
 只有第 1 至 4 项在同一 Store 权威中闭合后，未来 route producer 才能引用 onboarding application 写入 v213 rows。管理员审批、Provider adapter ref 或数据库中存在 non-bearer ref 都不能替代 credential proof。
+
+Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。任何一条都不能单独写 v213；声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
 
 ## 6. 明确禁线
 
