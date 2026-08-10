@@ -6,9 +6,10 @@
     Use this before the final AI report. CodePushed/CodeSync verifies that
     local HEAD is already contained in origin/main, even if newer commits have
     landed. AndroidFeature verifies that local HEAD is contained in
-    origin/main and that server /app/version.json points at this task commit
-    or a newer published descendant. It never forces an already-published
-    task to rebuild merely because another task advanced main.
+    origin/main and that server /app/version.json covers this task's Android
+    inputs through this commit, a newer published descendant, or an earlier
+    commit with identical Android inputs. It never forces an already-published
+    task to rebuild merely because a tooling/docs task advanced main.
     Server verifies /health and that /api/server/version.gitSha points at
     the pushed source commit. PcFrontend performs the same server release
     provenance check and also verifies that /pc serves the built frontend
@@ -276,8 +277,9 @@ if ($Kind -eq "AndroidFeature") {
 
     $provenance = Get-AndroidTaskPublicationProvenance -RepoPath $RepoRoot `
         -TaskHead $head -OriginMain $originMain -PublishedSha $remoteGitSha
-    if (-not $provenance.PublishedContainsTask) {
-        Stop-Check "Server APK does not contain this Android task commit: task HEAD=$($head.Substring(0, 7)), server gitSha=$remoteGitSha."
+    if (-not $provenance.PublishedCoversTask) {
+        $changedPaths = @($provenance.ChangedAndroidPaths) -join ","
+        Stop-Check "Server APK does not cover this task's Android inputs: task HEAD=$($head.Substring(0, 7)), server gitSha=$remoteGitSha, reason=$($provenance.CoverageReason), changed=$changedPaths."
     }
 
     try {
@@ -318,7 +320,7 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     Write-Host "  version:     v$($remoteVersion.versionName) (build $($remoteVersion.versionCode))"
     Write-Host "  APK gitSha:  $remoteGitSha"
-    Write-Host "  APK_PROVENANCE_STATUS=$(if ($provenance.PublishedExactTask) { 'exact_task_commit' } else { 'newer_descendant_contains_task' })"
+    Write-Host "  APK_PROVENANCE_STATUS=$($provenance.CoverageReason)"
     Write-Host "  download:    $ServerUrl/app/ElonSpeed-latest.apk"
     exit 0
 }

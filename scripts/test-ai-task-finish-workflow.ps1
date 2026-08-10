@@ -46,6 +46,7 @@ if ($androidGateStart -lt 0 -or $androidGateEnd -lt 0) {
 }
 $androidGate = $checkSource.Substring($androidGateStart, $androidGateEnd - $androidGateStart)
 if (-not $androidGate.Contains('Get-AndroidTaskPublicationProvenance') -or
+    -not $androidGate.Contains('PublishedCoversTask') -or
     $androidGate.Contains('$head -ne $originMain')) {
     throw "Android completion must accept a published task already contained in newer main."
 }

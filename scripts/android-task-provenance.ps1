@@ -25,9 +25,32 @@ function Get-AndroidTaskPublicationProvenance {
         -Ancestor $TaskHead -Descendant $OriginMain
     $publishedContainsTask = Test-GitCommitAncestor -RepoPath $RepoPath `
         -Ancestor $TaskHead -Descendant $PublishedSha
+    $publishedPrecedesTask = Test-GitCommitAncestor -RepoPath $RepoPath `
+        -Ancestor $PublishedSha -Descendant $TaskHead
+    $androidChanges = @()
+    $sameAndroidInputs = $false
+    if (-not $publishedContainsTask -and $publishedPrecedesTask) {
+        $androidChanges = @(& git -C $RepoPath diff --name-only "$PublishedSha..$TaskHead" -- android 2>$null)
+        $sameAndroidInputs = $LASTEXITCODE -eq 0 -and $androidChanges.Count -eq 0
+    }
+    $publishedExactTask = $TaskHead.StartsWith($PublishedSha) -or $PublishedSha.StartsWith($TaskHead)
+    $coverageReason = if ($publishedExactTask) {
+        "exact_task_commit"
+    } elseif ($publishedContainsTask) {
+        "deployed_descendant"
+    } elseif ($sameAndroidInputs) {
+        "same_android_inputs"
+    } elseif ($publishedPrecedesTask) {
+        "android_inputs_changed"
+    } else {
+        "diverged_history"
+    }
     [pscustomobject]@{
         TaskPushed = $taskPushed
         PublishedContainsTask = $publishedContainsTask
-        PublishedExactTask = $TaskHead.StartsWith($PublishedSha) -or $PublishedSha.StartsWith($TaskHead)
+        PublishedCoversTask = $publishedContainsTask -or $sameAndroidInputs
+        PublishedExactTask = $publishedExactTask
+        CoverageReason = $coverageReason
+        ChangedAndroidPaths = $androidChanges
     }
 }
