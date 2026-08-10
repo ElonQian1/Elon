@@ -183,6 +183,8 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 同日节点 Hook 定向 Rust 回归 4 项全部通过，验证指纹为 `1af6882094023c83bfb12c7804dc2f2cb9d486da2205bb07f35d8ffa3749c6d7`。临时工作区场景验证了响应、prompt、命令、敏感路径和原始 session 不进入账本，同 turn 不重复提示，相同旧路径不再提示，新路径最多触发三次，提示路径连分隔符不超过 360 字符，`SessionEnd` 删除会话目录；生成的 Codex 配置不含 hook trust bypass。代理集成合同还在日志包装器下显式注入 UTF-8 BOM 并通过，修复了 Windows PowerShell 重定向管道下插件 Hook 无法解析 JSON 的问题。仓库插件版本 cachebuster 已更新，但本批未重装当前 Codex cache，也没有伪造 `/hooks` 人工信任或真实任务触发结果。
 
+随后 `native_context` 完整回归扩展为 14 项并全部通过，验证指纹为 `00146108cb99affaac0fefd713bd60df9f938e23f5c6c1e9844b8659ebaf8fa6`。新增场景在临时 Git 仓库中提交并搬迁证据文件，同时构造旧版缺治理字段、已到期、复核逾期、两条潜在冲突和健康记忆，验证 Memory CI v2 的全部计数、分页及 advisory/fail_on_drift/strict 退出建议。旧版记忆继续可读但提示补齐治理；到期、漂移和冲突项不进入代理上下文；同 blob 新路径只作为人工重定位候选；所有 repair action 均 `automatic=false`、不返回正文，检查前后 manifest 字节和 Git 状态完全不变。该证据不替代 PC 浏览器修复交互、跨 PC 并发或长期容量验收。
+
 ## 仍需真实验收的项目
 
 以下项目仍需要生产环境或人工安全确认，不能由本轮自动化替代：
