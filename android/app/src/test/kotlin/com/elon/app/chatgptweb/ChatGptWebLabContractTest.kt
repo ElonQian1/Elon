@@ -50,6 +50,9 @@ class ChatGptWebLabContractTest {
         val formControls = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_form_controls.js"
         )
+        val controlOwnershipPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_control_ownership_policy.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
@@ -61,6 +64,8 @@ class ChatGptWebLabContractTest {
             bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") &&
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") <
+                bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") &&
+                bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") <
                 bridge.indexOf("chatgpt_web_adapter_layout.js")
         )
         assertFalse(bridge.contains("addJavascriptInterface"))
@@ -116,6 +121,8 @@ class ChatGptWebLabContractTest {
         assertTrue(formControls.contains("function setText"))
         assertTrue(formControls.contains("kind === 'password'"))
         assertFalse(formControls.contains("node.value ||"))
+        assertTrue(controlOwnershipPolicy.contains("isPrimaryComposerTextControl"))
+        assertTrue(adapterLayout.contains("controlOwnershipPolicy.isPrimaryComposerTextControl"))
         assertTrue(conversations.contains("CONVERSATION_PATH"))
         assertTrue(conversations.contains("location.assign(new URL(path, location.origin).href)"))
         assertFalse(conversations.contains("location.href ="))

@@ -4,6 +4,7 @@
   if (window.__elonChatGptLayout || location.origin !== 'https://chatgpt.com') return;
 
   const formAdapter = window.__elonChatGptFormControls;
+  const controlOwnershipPolicy = window.__elonChatGptControlOwnershipPolicy;
   let controlsById = new Map();
   let lastFingerprint = '';
   const MAX_DISCOVERED_CONTROLS = 512;
@@ -265,9 +266,17 @@
   }
 
   function addRegionControls(target, root, region, used, filter, contextId) {
+    const activeComposer = region === 'composer' ? composerNode() : null;
     actionableNodes(root).forEach((node, index) => {
       if (filter && !filter(node)) return;
-      if (region === 'composer' && node === composerNode()) return;
+      if (
+        controlOwnershipPolicy && controlOwnershipPolicy.isPrimaryComposerTextControl(
+          node,
+          region,
+          activeComposer,
+          formAdapter && formAdapter.describe
+        )
+      ) return;
       const semantic = semanticFor(node, region, index);
       const label = labelOf(node, defaultLabel(semantic));
       const path = relatedSameOriginPath(node);
