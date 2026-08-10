@@ -187,3 +187,7 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
         Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
     }
 }
+
+#[cfg(test)]
+#[path = "open_commerce_data_request_api_tests.rs"]
+mod tests;
