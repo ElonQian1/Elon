@@ -3,7 +3,7 @@ title: 开放商业消费者删除请求催办与升级关注 V1
 status: accepted
 owner: open-commerce
 reviewed_at: 2026-08-10
-implementation_status: verified_rust_sqlite
+implementation_status: verified_local_http_pc_build
 ---
 
 # 开放商业消费者删除请求催办与升级关注 V1
@@ -30,8 +30,8 @@ implementation_status: verified_rust_sqlite
 - 升级关注不会创建平台客服工单、争议、仲裁、处罚、赔付、退款或信誉分。
 - 催办和升级不证明商户、ERP、CRM、美团或会员系统已删除数据。
 - 跟进记录当前不进入 V5 可携带包，也不跨运营方迁移。
-- 已通过真实 SQLite 夹具验证 V163 重复迁移与级联删除、24 小时和 7 天边界、跨时区与错误时间失败关闭、三次催办、幂等冲突、终态重放、并发催办与升级、隔离、审计元数据和商户限量前优先级；状态为 `verified_rust_sqlite`。
-- 全 Rust 目标检查通过。后续独立任务已修正开发者终态事件测试的沙箱调用夹具，并验证同 App 平台事件不会进入沙箱事件流；开放商业广域 Rust 回归已恢复通过。HTTP 实例、真实 V162 磁盘升级、完整 V5 历史包字节、PC 浏览器和窄屏布局仍未验证。
+- 已通过真实 SQLite 夹具验证 V163 重复迁移与级联删除、24 小时和 7 天边界、跨时区与错误时间失败关闭、三次催办、幂等冲突、终态重放、并发催办与升级、隔离、审计元数据和商户限量前优先级。
+- 本地 Axum Router 已验证鉴权、项目隔离、冷却拒绝、幂等重放和商户匿名列表；PC 静态契约、TypeScript 与 Vite 构建以及全目标 Rust 检查均通过，状态为 `verified_local_http_pc_build`。后续独立任务还验证了开发者终态事件的沙箱环境隔离。绑定真实 TCP 端口的 HTTP 服务、生产部署、真实 V162 磁盘升级、完整 V5 历史包字节、PC 浏览器和窄屏布局仍未验证。
 
 ## 实现入口
 
@@ -40,6 +40,7 @@ implementation_status: verified_rust_sqlite
 - `server/src/open_commerce_data_request_model.rs`
 - `server/src/open_commerce_data_request_service.rs`
 - `server/src/open_commerce_data_request_api.rs`
+- `server/src/open_commerce_data_request_api_tests.rs`
 - `server/src/open_commerce_data_request_followup_tests.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerDataRequestManager.tsx`
 - `pc-frontend/src/features/open-commerce/MerchantDataRequestInbox.tsx`

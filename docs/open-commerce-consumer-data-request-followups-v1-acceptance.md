@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-`verified_rust_sqlite`
+`verified_local_http_pc_build`
 
 ## 已形成代码
 
@@ -25,16 +25,22 @@
 - 商户列表在执行 `LIMIT` 前优先选择未终结升级请求和逾期请求。
 - 审计 metadata 不包含消费者账号、项目 ID、幂等键或原始说明，并固定保留非法律、非仲裁标志。
 - 原始删除请求查询不补充零值运营字段，维持 V5 原查询序列化形状。
+- 真实 Axum Router 路径验证未登录 `401`、跨项目 `403`、24 小时冷却拒绝、同幂等键重放只写一次，以及商户列表只返回匿名请求状态。
+- PC 静态契约覆盖消费者催办/升级入口、三次上限、非仲裁提示和商户状态展示；完整 TypeScript 检查与 Vite 构建通过。
 
 ## 验证证据
 
 - 删除请求、跟进与 V163 SQLite 回归 12 项：`bc3afefee6cd7d0dfd7638079ae6098eba346895ae255131de4474ef2ff4acf0`。
 - Rust 全目标检查：`b649a91b2aaf79a3237ec2f26d8a63f7ab181bce82ba8e73196b2f8cf0c1fab0`。
 - 后续独立任务已把开发者事件测试切换到真实沙箱凭据调用链，并增加同 App 平台事件隔离断言；开发者事件模块回归 `d78571bc0de87a1793a812d1026b88ac98b5ad702b0219a34f9f6b461e1c0669` 与开放商业广域回归 `5eb216be17647b54bcdc8de86b6ab0d83047bcf6a09b631fe63caae60c3fd551` 均已通过。
+- 本地 Axum 路由回归：`1ac763c9763d87862465de924864f46003537da09b381777e7f699d973ab3561`。
+- 删除请求模块回归：`7492c3f567249b18a8b41d9f5fa203fd19d37d6606eaa10a3a854b9425e72d09`。
+- 当前全目标 Rust 检查：`a4cbe1a72e80e22a2ddf2b83e30b00e0e92a3d737effb946b0fd71a0bb1a425b`。
+- PC 开放商业静态契约：`node scripts/test-open-commerce-pc-workspace.js`；PC 正式构建：`npm --prefix pc-frontend run build`，均通过。
 
 ## 未完成
 
 - 真实 V162 磁盘数据库升级、生产数据库迁移和完整历史 V5 包字节回归。
-- HTTP 实例、TypeScript、PC 操作、窄屏布局和用户错误提示验证。
+- 绑定真实 TCP 端口的 HTTP 服务、生产部署、PC 浏览器人工操作、窄屏布局和用户错误提示验证。
 - 自动通知、平台工单、客服处置、争议仲裁、处罚赔付和法律期限策略。
 - 跟进记录导出、跨运营方迁移、外部平台删除适配器和回执核验。
