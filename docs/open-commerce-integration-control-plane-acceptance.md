@@ -22,8 +22,8 @@ source: docs/decisions/open-commerce-integration-control-plane.md
 ## 验证命令
 
 ```powershell
-$env:CARGO_TARGET_DIR='D:\rust\shared\target'
-cargo test --manifest-path server/Cargo.toml open_commerce --bin elon-server
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- test `
+  --manifest-path server\Cargo.toml open_commerce --bin elon-server
 Set-Location pc-frontend
 npm run typecheck
 ```

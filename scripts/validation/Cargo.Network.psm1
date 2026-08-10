@@ -45,6 +45,7 @@ function Invoke-CargoManagedAttempt {
         [string]$CacheRoot,
         [string]$Domain='agent-validation',
         [string]$TargetDir,
+        [string]$SharedBuildPartition,
         [string]$CargoHome,
         [int]$TimeoutSeconds=3600,
         [switch]$DisableSccache
@@ -52,6 +53,7 @@ function Invoke-CargoManagedAttempt {
     $arguments=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$CargoDevPath,'-BypassValidationOrchestrator','-SkipCacheGc','-Domain',$Domain)
     if($CacheRoot){$arguments += @('-CacheRoot',$CacheRoot)}
     if($TargetDir){$arguments += @('-TargetDir',$TargetDir)}
+    if($SharedBuildPartition){$arguments += @('-SharedBuildPartition',$SharedBuildPartition)}
     if($DisableSccache){$arguments += '-DisableSccache'}
     $arguments += '--'; $arguments += @($CargoArguments)
     $priorCargoHome=[Environment]::GetEnvironmentVariable('CARGO_HOME','Process')
@@ -163,6 +165,7 @@ function Invoke-CargoNetworkValidation {
         [string]$PolicyPath=(Join-Path $PSScriptRoot 'cargo-sources.json'),
         [string]$Domain='agent-validation',
         [string]$TargetDir,
+        [string]$SharedBuildPartition,
         [int]$CompileTimeoutSeconds=3600,
         [switch]$DisableSccache,
         [switch]$SkipOfflineFirst,
@@ -182,7 +185,7 @@ function Invoke-CargoNetworkValidation {
 
     if(-not $SkipOfflineFirst){
         $offline=Add-CargoArgumentOnce $locked '--offline'
-        $result=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot 'offline') $offline $ResolvedCacheRoot $Domain $TargetDir -TimeoutSeconds $CompileTimeoutSeconds -DisableSccache:$DisableSccache
+        $result=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot 'offline') $offline $ResolvedCacheRoot $Domain $TargetDir $SharedBuildPartition -TimeoutSeconds $CompileTimeoutSeconds -DisableSccache:$DisableSccache
         $attempts.Add((New-CargoAttemptRecord 'local-cache' 'locked_offline_check' $result.diagnostic $result.exit_code $result.duration_ms $result.stderr_path))
         Write-CargoMachineStatus $result.diagnostic
         if($result.exit_code -eq 0){
@@ -216,11 +219,11 @@ function Invoke-CargoNetworkValidation {
         $sourceHome=Join-Path $ResolvedCacheRoot ("cargo-home\"+[string]$source.id)
         New-CargoSourceHomeConfig $source $sourceHome ([int]$policy.fetch_timeout_seconds)|Out-Null
         $fetchTimeout=[Math]::Max(1,[Math]::Min([int]$policy.fetch_timeout_seconds,$remaining))
-        $fetch=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot ("fetch-"+$source.id)) (Get-CargoFetchArguments $RepoRoot $locked) $ResolvedCacheRoot $Domain $TargetDir $sourceHome $fetchTimeout -DisableSccache
+        $fetch=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot ("fetch-"+$source.id)) (Get-CargoFetchArguments $RepoRoot $locked) $ResolvedCacheRoot $Domain $TargetDir $SharedBuildPartition $sourceHome $fetchTimeout -DisableSccache
         $attempts.Add((New-CargoAttemptRecord ([string]$source.id) 'locked_fetch' $fetch.diagnostic $fetch.exit_code $fetch.duration_ms $fetch.stderr_path $fresh))
         if($fetch.exit_code -ne 0){Write-CargoAttemptFailureEvidence $fetch ("locked_fetch_"+[string]$source.id);Update-CargoSourceHealthState $healthPath ([string]$source.id) $false $fetch.diagnostic.code ([int]$policy.circuit_failure_threshold) ([int]$policy.circuit_open_seconds)|Out-Null;$health=Get-CargoSourceHealthState $healthPath;if(-not $fetch.diagnostic.retryable){break};continue}
         Update-CargoSourceHealthState $healthPath ([string]$source.id) $true 'CARGO_SOURCE_HEALTHY' ([int]$policy.circuit_failure_threshold) ([int]$policy.circuit_open_seconds)|Out-Null
-        $check=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot ("check-"+$source.id)) (Add-CargoArgumentOnce $locked '--offline') $ResolvedCacheRoot $Domain $TargetDir $sourceHome $CompileTimeoutSeconds -DisableSccache:$DisableSccache
+        $check=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot ("check-"+$source.id)) (Add-CargoArgumentOnce $locked '--offline') $ResolvedCacheRoot $Domain $TargetDir $SharedBuildPartition $sourceHome $CompileTimeoutSeconds -DisableSccache:$DisableSccache
         $attempts.Add((New-CargoAttemptRecord ([string]$source.id) 'locked_offline_check_after_fetch' $check.diagnostic $check.exit_code $check.duration_ms $check.stderr_path))
         Write-CargoMachineStatus $check.diagnostic
         if($check.exit_code -eq 0){$report=[ordered]@{schema='elon.cargo_network_report.v1';status='success';strategy='trusted_failover';started_utc=$started.ToString('o');finished_utc=[DateTime]::UtcNow.ToString('o');attempts=$attempts.ToArray();selected_source=[string]$source.id};Write-CargoNetworkReport $reportPath $report|Out-Null;Write-Host "CARGO_SOURCE_SELECTED=$($source.id)";Write-Host "CARGO_NETWORK_REPORT=$reportPath";return [pscustomobject]@{exit_code=0;status='success';source=[string]$source.id;report_path=$reportPath;attempts=$attempts.ToArray()}

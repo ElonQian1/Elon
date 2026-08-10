@@ -16,9 +16,9 @@ if (-not (Get-Command link.exe -CommandType Application -ErrorAction SilentlyCon
 $argumentModule = Join-Path $PSScriptRoot "validation\Validation.Arguments.psm1"
 Import-Module $argumentModule -Force -DisableNameChecking
 $parsed = Split-ValidationCargoArguments -Arguments $args -ValueOptions @{
-    '-TargetDir'='TargetDir'; '-CacheRoot'='CacheRoot'; '-Domain'='Domain'; '-LightSlots'='LightSlots'; '-WaitTimeoutSeconds'='WaitTimeoutSeconds'; '-LockTimeoutSeconds'='LockTimeoutSeconds'
+    '-TargetDir'='TargetDir'; '-CacheRoot'='CacheRoot'; '-Domain'='Domain'; '-LightSlots'='LightSlots'; '-WaitTimeoutSeconds'='WaitTimeoutSeconds'; '-LockTimeoutSeconds'='LockTimeoutSeconds'; '-SharedBuildPartition'='SharedBuildPartition'
 } -SwitchOptions @('-NoLock','-DisableSccache','-SkipCacheGc','-BypassValidationOrchestrator','-RefreshValidationEvidence','-SkipCheapGates')
-$TargetDir=$parsed.wrapper.TargetDir; $CacheRoot=$parsed.wrapper.CacheRoot
+$TargetDir=$parsed.wrapper.TargetDir; $CacheRoot=$parsed.wrapper.CacheRoot; $SharedBuildPartition=$parsed.wrapper.SharedBuildPartition
 $Domain=if($parsed.wrapper.Domain){$parsed.wrapper.Domain}else{'dev-windows-msvc'}
 $LightSlots=if($parsed.wrapper.LightSlots){[int]$parsed.wrapper.LightSlots}else{2}
 $WaitTimeoutSeconds=if($parsed.wrapper.WaitTimeoutSeconds){[int]$parsed.wrapper.WaitTimeoutSeconds}else{3600}
@@ -87,7 +87,7 @@ $modulePath = Join-Path $RepoRoot "scripts\rust-cache\RustCache.Runtime.psm1"
 Import-Module (Join-Path $RepoRoot "scripts\rust-cache\RustCache.Inventory.psm1") -Force -DisableNameChecking
 Import-Module $modulePath -Force -DisableNameChecking
 Invoke-RustCachePreflightGc -CacheRoot $CacheRoot -RepoRoot $RepoRoot -Skip:$SkipCacheGc | Out-Null
-Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -CargoArgs $CargoArgs
+Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -SharedBuildPartition $SharedBuildPartition -CargoArgs $CargoArgs
 $cargoExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
 if ($cargoExitCode -ne 0) {
     # `exit` only leaves this script when cargo-dev.ps1 is invoked from another

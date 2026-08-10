@@ -91,33 +91,22 @@ if (-not $env:ELON_AGENT_SECRETS) {
 }
 
 # ── 编译 ──────────────────────────────────────────────────────────────────────
+$buildMode = if ($Debug) { "debug" } else { "release" }
+$localTarget = Join-Path $serverDir "target"
 if (-not $NoBuild) {
-    Push-Location $serverDir
-    try {
-        $buildMode = if ($Debug) { "debug" } else { "release" }
-        Write-Host "`n编译 elon-server ($buildMode)..." -ForegroundColor Cyan
-
-        # 注意：全局 target 目录在 D:\rust\shared\target（.cargo/config.toml 配置）
-        # 发布脚本屏蔽 native 优化，本地运行无限制
-        if ($Debug) {
-            cargo build -p server 2>&1
-        } else {
-            cargo build -p server --release 2>&1
-        }
-        if ($LASTEXITCODE -ne 0) { throw "编译失败！" }
-        Write-Host "编译成功" -ForegroundColor Green
-    } finally {
-        Pop-Location
-    }
+    Write-Host "`n编译 elon-server ($buildMode)..." -ForegroundColor Cyan
+    $cargoDev = Join-Path $PSScriptRoot "cargo-dev.ps1"
+    $cargoArgs = @("build", "--manifest-path", (Join-Path $serverDir "Cargo.toml"), "-p", "server")
+    if (-not $Debug) { $cargoArgs += "--release" }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $cargoDev `
+        -BypassValidationOrchestrator -Domain dev-windows-msvc `
+        -SharedBuildPartition local-server -- @cargoArgs
+    if ($LASTEXITCODE -ne 0) { throw "编译失败！" }
+    Write-Host "编译成功" -ForegroundColor Green
 }
 
 # ── 确定 binary 路径 ──────────────────────────────────────────────────────────
-$sharedTarget = "D:\rust\shared\target"
-if ($Debug) {
-    $binary = Join-Path $sharedTarget "debug\server.exe"
-} else {
-    $binary = Join-Path $sharedTarget "release\server.exe"
-}
+$binary = Join-Path $localTarget "$buildMode\server.exe"
 
 if (-not (Test-Path $binary)) {
     Write-Error "找不到 binary: $binary`n请先运行 scripts\start-local-elon-server.ps1（不加 -NoBuild）"

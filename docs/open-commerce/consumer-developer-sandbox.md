@@ -96,8 +96,7 @@ MCP 消费者 AI 可使用 `open_commerce_discover_for_consumer` 获取与上述
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 `
-  -TargetDir D:\rust\shared\target -- test `
-  --manifest-path server\Cargo.toml `
+  -- test --manifest-path server\Cargo.toml `
   open_commerce_client_service_tests::consumer_discovery_request_approval_and_test_token_invocation_form_a_loop
 
 Set-Location pc-frontend

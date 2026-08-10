@@ -289,9 +289,12 @@ function Invoke-RustCacheGc {
     }
 
     $activeBuilds = @(Test-RustCacheBuildProcesses)
-    if ($Apply -and $activeBuilds.Count -gt 0) {
-        $summary = ($activeBuilds | ForEach-Object { "$($_.ProcessName):$($_.Id)" }) -join ", "
-        throw "Refusing Rust cache GC while Cargo/rustc processes are active: $summary"
+    if ($activeBuilds.Count -gt 0) {
+        foreach ($partition in $partitions | Where-Object { $_.kind -eq "quarantine" }) {
+            $partition.selected = $false
+            $partition.action = "preserve"
+            $partition.reason = "unmanaged-build-process-active"
+        }
     }
 
     $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.retired_domain) { 0 } elseif ($_.old_epoch) { 1 } elseif ($_.kind -eq "quarantine") { 2 } else { 3 } } }, last_used_utc)
@@ -336,6 +339,9 @@ function Invoke-RustCacheGc {
         volume_before = $volumeBefore
         volume_after = $volumeAfter
         estimated_free_bytes_after_plan = $estimatedFree
+        active_build_processes = @($activeBuilds | ForEach-Object {
+            [pscustomobject]@{ process_name = $_.ProcessName; pid = $_.Id }
+        })
         actions = @($partitions | Where-Object { $_.action -ne "preserve" -or $_.reason -ne "active-or-recent" })
         legacy_caches = @($policy.legacy_caches | ForEach-Object {
             [pscustomobject]@{ path = $_.path; label = $_.label; retired = [bool]$_.retired; action = "external-report-only" }

@@ -48,8 +48,7 @@ POST  /api/projects/{project_id}/ai-resources/preview
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 `
-  -TargetDir D:\rust\shared\target -- test `
-  --manifest-path server\Cargo.toml `
+  -- test --manifest-path server\Cargo.toml `
   ai_resource_control::tests
 
 Set-Location pc-frontend

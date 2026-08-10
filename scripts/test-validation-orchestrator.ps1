@@ -97,10 +97,13 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     $resourceRoot=Join-Path $CacheRoot 'resource-contract'
     $lightA=Enter-ValidationResource $resourceRoot 'light' 2 2; $lightB=Enter-ValidationResource $resourceRoot 'light' 2 2
     Assert-Equal 2 @($lightA,$lightB).Count "two light tasks may overlap"
+    Assert-Equal 'validation-light-0' $lightA.cache_partition "first light slot should own a stable shared cache partition"
+    Assert-Equal 'validation-light-1' $lightB.cache_partition "second light slot should own a distinct shared cache partition"
     $heavyBlocked=$false; try { Enter-ValidationResource $resourceRoot 'heavy' 2 0 | Out-Null } catch {$heavyBlocked=$true}
     Assert-True $heavyBlocked "heavy must exclude active light tasks"
     Exit-ValidationResource $lightA; Exit-ValidationResource $lightB
     $heavy=Enter-ValidationResource $resourceRoot 'heavy' 2 2
+    Assert-Equal 'validation-heavy' $heavy.cache_partition "heavy validation should own its stable shared cache partition"
     $lightBlocked=$false; try { Enter-ValidationResource $resourceRoot 'light' 2 0 | Out-Null } catch {$lightBlocked=$true}
     Assert-True $lightBlocked "light must exclude an active heavy task"; Exit-ValidationResource $heavy
     $capture = Invoke-ValidationCapturedProcess -FilePath "cmd.exe" -ArgumentList @("/d","/c","echo failure-marker 1>&2 & exit /b 23") -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot "capture")
@@ -182,6 +185,8 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     Assert-True ((Get-Content -Raw $stdout1) -match 'VALIDATION_RECEIPT=') "successful validation must issue a reusable receipt"
     Assert-Equal 1 @(Get-Content $Counter).Count "same in-flight fingerprint must launch once"
     Assert-True ((Get-Content -Raw $stdout2) -match 'VALIDATION_REUSED=coalesced_wait') "waiter must report coalesced_wait, not completed reuse"
+    $sharedValidationPartitions=@(Get-ChildItem (Join-Path $CacheRoot 'build\*\elon-cli\agent-validation\shared-validation-*') -Directory -ErrorAction SilentlyContinue)
+    Assert-Equal 1 $sharedValidationPartitions.Count "coalesced validation should create one scheduler-owned shared build partition"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $validator -CacheRoot $CacheRoot -SkipCheapGates -DisableSccache check --manifest-path server\Cargo.toml | Out-Null
     Assert-Equal 1 @(Get-Content $Counter).Count "successful exact fingerprint must be reused"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $validator -CacheRoot $CacheRoot -SkipCheapGates -DisableSccache check --manifest-path server\Cargo.toml --features distinct | Out-Null

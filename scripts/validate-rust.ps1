@@ -85,9 +85,14 @@ try {
     Write-Host "VALIDATION_OWNER_LEASE=$($runLease.owner.lease_id)"
     Write-Host "VALIDATION_RESOURCE=$class"
     Write-Host "VALIDATION_QUEUE_WAIT_MS=$($resourceLease.wait_ms)"
+    $sharedBuildPartition = [string]$resourceLease.cache_partition
+    if ([string]::IsNullOrWhiteSpace($sharedBuildPartition)) {
+        throw "Validation scheduler did not provide a shared build partition."
+    }
+    Write-Host "VALIDATION_SHARED_BUILD_PARTITION=$sharedBuildPartition"
     $cargoNetwork = Join-Path $RepoRoot "scripts\cargo-network.ps1"
     $networkRoot = Join-Path $resultDir 'network'
-    $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$cargoNetwork,"-Domain",$Domain,"-ReportRoot",$networkRoot,"-CompileTimeoutSeconds",$WaitTimeoutSeconds)
+    $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$cargoNetwork,"-Domain",$Domain,"-ReportRoot",$networkRoot,"-CompileTimeoutSeconds",$WaitTimeoutSeconds,"-SharedBuildPartition",$sharedBuildPartition)
     if ($DisableSccache) { $args += "-DisableSccache" }
     if ($CacheRoot) { $args += @("-CacheRoot",$CacheRoot) }
     if ($TargetDir) { $args += @("-TargetDir",$TargetDir) }
@@ -96,7 +101,7 @@ try {
     $startedAt = [DateTime]::UtcNow.ToString("o")
     Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint; status="running"
-        owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id; resource_class=$class; queue_wait_ms=$resourceLease.wait_ms; coalesced_waiters_path=(Join-Path $resultDir '.run.lock.waiters'); command=@($CargoArgs)
+        owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id; resource_class=$class; shared_build_partition=$sharedBuildPartition; queue_wait_ms=$resourceLease.wait_ms; coalesced_waiters_path=(Join-Path $resultDir '.run.lock.waiters'); command=@($CargoArgs)
         fingerprint_inputs=$fingerprint.payload; started_utc=$startedAt
         stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
     })
@@ -106,7 +111,7 @@ try {
         $failedAt = [DateTime]::UtcNow.ToString("o")
         Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
             schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint; status="failed"; exit_code=1
-            resource_class=$class; owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id
+            resource_class=$class; shared_build_partition=$sharedBuildPartition; owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id
             queue_wait_ms=$resourceLease.wait_ms; command=@($CargoArgs); fingerprint_inputs=$fingerprint.payload
             started_utc=$startedAt; finished_utc=$failedAt; duration_ms=[int](([DateTime]::Parse($failedAt)-[DateTime]::Parse($startedAt)).TotalMilliseconds); timed_out=$false
             stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
@@ -119,7 +124,7 @@ try {
     $summary = [ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint
         status=if ($result.exit_code -eq 0) { "success" } else { "failed" }
-        exit_code=$result.exit_code; resource_class=$class; owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id
+        exit_code=$result.exit_code; resource_class=$class; shared_build_partition=$sharedBuildPartition; owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id
         queue_wait_ms=$resourceLease.wait_ms; command=@($CargoArgs); fingerprint_inputs=$fingerprint.payload
         started_utc=$result.started_utc; finished_utc=$result.finished_utc; duration_ms=$result.duration_ms
         stdout_path=$result.stdout_path; stderr_path=$result.stderr_path

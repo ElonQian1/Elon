@@ -20,7 +20,7 @@ NodeAgent 发布为 Windows、显式 Linux 和 Desktop 壳分别使用稳定命�
 |---|---|---|
 | Cargo registry/git | 当前用户所有 Rust 项目 | Cargo 自身管理 |
 | sccache | 所有兼容 rustc 调用 | 内容寻址、LRU，独立容量设置 |
-| Cargo build-dir | 默认：工具链 + 项目 + domain + workspace hash；串行发布可显式使用命名共享分区 | 平台磁盘水位、LRU/TTL 治理 |
+| Cargo build-dir | 默认：工具链 + 项目 + domain + workspace hash；串行发布和受调度验证可使用命名共享分区 | 平台磁盘水位、LRU/TTL 治理 |
 | Cargo target-dir | 当前 workspace，发布脚本可显式覆盖 | 只承载最终产物，不作为全局缓存池 |
 | 历史 target | 外部 legacy | 只读登记；不会被平台自动删除 |
 
@@ -106,6 +106,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 ```
 
+正式验证不再为每个 worktree 永久保留一套完整中间产物。调度器把两个轻任务槽分别绑定到
+`shared-validation-light-0`、`shared-validation-light-1`，重任务绑定到
+`shared-validation-heavy`；资源租约与缓存分区锁共同保证同一共享目录不会并发写入。
+最终产物仍留在各 workspace 的 `target`，共享分区只承载可重建的 Cargo build-dir。
+
 `--` 是包装器参数与 Cargo 参数的强制边界；边界后的 `-p`、`-F`、`-r`、`-j`、`-q`、`-v` 等短选项和值逐项原样透传。包装器自身选项必须写在边界之前。`validate-rust.ps1` 使用相同契约，并在委托 `cargo-dev.ps1` 时保留该边界。
 
 安装到机器缓存根，但不修改 Cargo 父级配置：
@@ -163,7 +168,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -Apply
 ```
 
-任何 Cargo/rustc 进程活动时，实际 GC 会拒绝执行。每次计划或执行都写入 `reports\gc-*.json`。
+托管项目的每个构建分区都有独立写锁；GC 只会取得目标分区锁后再原子移入回收区，因此其他分区正在构建时仍可回收冷分区。裸 Cargo 没有平台分区锁，所以只要检测到任意 Cargo/rustc 进程，quarantine 分区就全部保留。每次计划或执行都写入 `reports\gc-*.json`，并记录检测到的构建进程。
 
 ## release 与 sccache
 

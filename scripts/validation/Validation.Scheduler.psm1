@@ -105,11 +105,11 @@ function Enter-ValidationResource {
     if($Class -eq 'heavy') {
         $gate=Enter-ValidationLock (Join-Path $resourceRoot 'heavy.lock') 'heavy' $TimeoutSeconds
         $slots=@()
-        try { for($i=0;$i -lt $LightSlots;$i++){ $remaining=[Math]::Max(0,[int]($deadline-[DateTime]::UtcNow).TotalSeconds); $slots+=Enter-ValidationLock (Join-Path $resourceRoot "light-$i.lock") "heavy-reserved-$i" $remaining }; return [pscustomobject]@{class='heavy';leases=@($gate)+$slots;wait_ms=[int](@($gate)+$slots|Measure-Object wait_ms -Sum).Sum} } catch { @($slots)+@($gate)|ForEach-Object{Exit-ValidationLock $_}; throw }
+        try { for($i=0;$i -lt $LightSlots;$i++){ $remaining=[Math]::Max(0,[int]($deadline-[DateTime]::UtcNow).TotalSeconds); $slots+=Enter-ValidationLock (Join-Path $resourceRoot "light-$i.lock") "heavy-reserved-$i" $remaining }; return [pscustomobject]@{class='heavy';cache_partition='validation-heavy';leases=@($gate)+$slots;wait_ms=[int](@($gate)+$slots|Measure-Object wait_ms -Sum).Sum} } catch { @($slots)+@($gate)|ForEach-Object{Exit-ValidationLock $_}; throw }
     }
     while([DateTime]::UtcNow -lt $deadline) {
         if(Test-Path (Join-Path $resourceRoot 'heavy.lock')) { Start-Sleep -Milliseconds 100; continue }
-        for($i=0;$i -lt $LightSlots;$i++) { try { $slot=Enter-ValidationLock (Join-Path $resourceRoot "light-$i.lock") "light-$i" 0; if(Test-Path (Join-Path $resourceRoot 'heavy.lock')){Exit-ValidationLock $slot;break}; return [pscustomobject]@{class='light';leases=@($slot);wait_ms=$slot.wait_ms} } catch {} }
+        for($i=0;$i -lt $LightSlots;$i++) { try { $slot=Enter-ValidationLock (Join-Path $resourceRoot "light-$i.lock") "light-$i" 0; if(Test-Path (Join-Path $resourceRoot 'heavy.lock')){Exit-ValidationLock $slot;break}; return [pscustomobject]@{class='light';cache_partition="validation-light-$i";leases=@($slot);wait_ms=$slot.wait_ms} } catch {} }
         Start-Sleep -Milliseconds 100
     }; throw 'Timed out waiting for a lightweight validation slot.'
 }

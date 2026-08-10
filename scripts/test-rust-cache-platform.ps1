@@ -158,8 +158,9 @@ exit /b 0
     Assert-True ($captured -match 'CARGO_INCREMENTAL=0') "release should force incremental off"
     Assert-True ($captured -match "CARGO_CWD=$([regex]::Escape($release.project_root))") "Cargo should execute from the declared project root"
     Assert-True ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_BUILD_DIR)) "Cargo environment should be restored after execution"
-    Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "agent-validation" -DisableSccache -CargoCommand $FakeCargo -ToolchainEpoch "rustc-test" -CargoArgs @("check")
+    Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "agent-validation" -SharedBuildPartition "validation-light-0" -DisableSccache -CargoCommand $FakeCargo -ToolchainEpoch "rustc-test" -CargoArgs @("check")
     $agentCaptured = Get-Content -Raw -LiteralPath $EnvironmentCapture
+    Assert-True ($agentCaptured -match 'CARGO_BUILD_BUILD_DIR=.*agent-validation\\shared-validation-light-0') "scheduled validation should receive its stable shared build partition"
     Assert-True ($agentCaptured -match 'CARGO_INCREMENTAL=0') "agent validation should disable incremental"
 
     $staleBuildDir = Join-Path $CacheRoot "build\rustc-test\test-project\stale\0123456789abcdef"
@@ -267,6 +268,10 @@ retry = 3
     $bashAdapter = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "cargo-dev.sh")
     Assert-True ($bashAdapter -match 'powershell\.exe' -and $bashAdapter -match 'ps_script=.*cargo-dev\.ps1') "Git Bash should delegate to the PowerShell cache platform on Windows"
     Assert-True ($bashAdapter -notmatch 'ELON_DEV_CARGO_TARGET_DIR') "Git Bash must not route back to the retired shared target"
+    $localServerScript = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "start-local-elon-server.ps1")
+    Assert-True ($localServerScript -match 'cargo-dev\.ps1') "local server builds should use the managed Rust cache entry"
+    Assert-True ($localServerScript -match 'SharedBuildPartition local-server') "local server builds should reuse one named build partition"
+    Assert-True ($localServerScript -notmatch [regex]::Escape('D:\rust\shared\target')) "local server builds must not recreate the retired universal target"
     $installedEntry = $install.entry_path
     $legacyTarget = Join-Path $TempRoot "legacy-target"
     New-Item -ItemType Directory -Force -Path $legacyTarget | Out-Null
@@ -281,6 +286,32 @@ retry = 3
     $unregisteredRejected = $false
     try { Invoke-RustCacheLegacyPurge -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -LegacyPath (Join-Path $TempRoot "unregistered-target") } catch { $unregisteredRejected = $true }
     Assert-True $unregisteredRejected "legacy purge should reject unregistered paths"
+
+    $activeGcPartition = Join-Path $CacheRoot "build\rustc-old\test-project\dev-host\eeeeeeeeeeeeeeee"
+    New-Item -ItemType Directory -Force -Path $activeGcPartition | Out-Null
+    '{"last_used_utc":"2000-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $activeGcPartition ".last-used.json") -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $activeGcPartition "artifact.bin") -Value "managed-old"
+    $activeGcQuarantine = Join-Path $CacheRoot "quarantine\ff\ffffffffffffff"
+    New-Item -ItemType Directory -Force -Path $activeGcQuarantine | Out-Null
+    '{"last_used_utc":"2000-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $activeGcQuarantine ".last-used.json") -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $activeGcQuarantine "artifact.bin") -Value "unmanaged-old"
+    $fakeCargoPath = Join-Path $TempRoot "cargo.exe"
+    Copy-Item -LiteralPath (Join-Path $PSHOME "powershell.exe") -Destination $fakeCargoPath
+    $fakeCargo = Start-Process -FilePath $fakeCargoPath -ArgumentList @('-NoProfile','-Command','Start-Sleep 60') -PassThru
+    try {
+        $activeDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while (-not (Get-Process -Name cargo -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $activeDeadline) { Start-Sleep -Milliseconds 20 }
+        Assert-True ($null -ne (Get-Process -Name cargo -ErrorAction SilentlyContinue)) "active-build GC regression needs a visible Cargo process"
+        $activeGc = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -ForceAged -Apply
+        Assert-True (-not (Test-Path -LiteralPath $activeGcPartition)) "GC should reclaim an unlocked managed partition while unrelated Cargo is active"
+        Assert-True (Test-Path -LiteralPath $activeGcQuarantine) "GC must preserve quarantine while unmanaged Cargo may be writing"
+        $quarantineAction = $activeGc.actions | Where-Object { $_.path -eq $activeGcQuarantine } | Select-Object -First 1
+        Assert-Equal "unmanaged-build-process-active" $quarantineAction.reason "active Cargo should explain quarantine preservation"
+        Assert-True (@($activeGc.active_build_processes).Count -gt 0) "GC report should audit active build processes"
+    } finally {
+        if ($fakeCargo -and -not $fakeCargo.HasExited) { Stop-Process -Id $fakeCargo.Id -Force -ErrorAction SilentlyContinue }
+        if ($fakeCargo) { $fakeCargo.Dispose() }
+    }
 
     Write-Host "PASS: Rust cache platform tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {
