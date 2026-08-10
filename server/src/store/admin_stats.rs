@@ -227,6 +227,10 @@ impl Store {
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )?;
 
+        // The aggregate helpers acquire Store's single SQLite mutex themselves.
+        // Release this guard first or the non-reentrant mutex deadlocks the runtime.
+        drop(conn);
+
         // 估算费用：按模型聚合，分别估算
         let cost = self.admin_estimate_period_cost_cny(days)?;
         let reconciliation = self.admin_billing_reconciliation_summary(days)?;

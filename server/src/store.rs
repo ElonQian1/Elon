@@ -16,6 +16,8 @@ pub(crate) use account_security::*;
 pub(crate) use account_security_events::*;
 mod admin_stats;
 mod admin_stats_quotas;
+#[cfg(test)]
+mod admin_stats_tests;
 mod ai_resource_policies;
 mod billing;
 mod billing_alerts;
