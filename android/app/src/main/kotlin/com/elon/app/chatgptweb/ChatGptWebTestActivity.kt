@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -343,11 +344,17 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun navigateBack() {
-        if (binding.chatGptWebView.canGoBack()) {
-            binding.chatGptWebView.goBack()
-        } else {
-            finish()
+        when (ChatGptWebBackNavigation.decide(latestUiManifest, binding.chatGptWebView.canGoBack())) {
+            ChatGptWebBackNavigation.Action.DISMISS_OFFICIAL_OVERLAY -> dismissOfficialOverlay()
+            ChatGptWebBackNavigation.Action.NAVIGATE_WEB_HISTORY -> binding.chatGptWebView.goBack()
+            ChatGptWebBackNavigation.Action.FINISH_ACTIVITY -> finish()
         }
+    }
+
+    private fun dismissOfficialOverlay() {
+        binding.chatGptWebView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE))
+        binding.chatGptWebView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE))
+        binding.chatGptWebView.postDelayed(pageAdapter::requestUiManifest, OVERLAY_DISMISS_REFRESH_MS)
     }
 
     private fun showLoading(url: String) {
@@ -598,6 +605,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     companion object {
         private const val EXTRA_PRODUCT_ENTRY = "chatgpt_product_entry"
+        private const val OVERLAY_DISMISS_REFRESH_MS = 250L
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
         const val ADAPTIVE_CONTROL_SETTLE_MS = 360L

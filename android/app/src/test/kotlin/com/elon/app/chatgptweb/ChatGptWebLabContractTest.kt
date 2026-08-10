@@ -241,6 +241,17 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun androidBackDismissesTheOfficialOverlayBeforeLeavingChatGpt() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+
+        assertTrue(activity.contains("ChatGptWebBackNavigation.decide"))
+        assertTrue(activity.contains("KeyEvent.KEYCODE_ESCAPE"))
+        assertTrue(activity.contains("pageAdapter::requestUiManifest"))
+    }
+
+    @Test
     fun quickLoginUsesOurShellAndKeepsCredentialsOnOfficialPages() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
