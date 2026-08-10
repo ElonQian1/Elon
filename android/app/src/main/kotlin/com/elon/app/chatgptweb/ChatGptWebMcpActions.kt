@@ -51,7 +51,7 @@ internal class ChatGptWebMcpActions(
     fun control(args: JSONObject): JSONObject {
         val action = args.optString("action", "state").trim().lowercase()
         when (action) {
-            "state" -> Unit
+            "state", "open_chatgpt_web" -> Unit
             "set_input_text" -> setInputText(args.optString("text").take(MAX_INPUT_CHARS))
             "send_input" -> sendInput()
             "chatgpt_invoke_control" -> {

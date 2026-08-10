@@ -8,6 +8,15 @@ import org.junit.Test
 
 class ChatGptWebMcpActionsTest {
     @Test
+    fun openingChatGptWebIsIdempotentWhenTheSurfaceIsAlreadyActive() {
+        val result = actions().control(JSONObject().put("action", "open_chatgpt_web"))
+
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals("open_chatgpt_web", result.getString("action"))
+        assertEquals("chatgpt_web", result.getString("surface"))
+    }
+
+    @Test
     fun stateExportsConversationContextAndStableControlMetadata() {
         val actions = actions()
 
