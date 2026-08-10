@@ -683,3 +683,11 @@ fn contains_ignore_case(values: &[String], needle: &str) -> bool {
 #[cfg(test)]
 #[path = "open_commerce_consumer_input_tests.rs"]
 mod input_tests;
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_source_test_support.rs"]
+mod source_test_support;
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_source_tests.rs"]
+mod source_tests;
