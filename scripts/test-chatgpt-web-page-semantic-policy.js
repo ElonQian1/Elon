@@ -83,5 +83,10 @@ expectEqual(policy.classify({ pathname: '/', signal: '插件' }), 'apps', 'apps'
 expectEqual(policy.classify({ pathname: '/', signal: '已置顶' }), 'pinned', 'pinned');
 expectEqual(policy.classify({ pathname: '/', signal: '下载应用' }), 'download_app', 'download app');
 expectEqual(policy.classify({ pathname: '/', signal: '整理聊天' }), 'conversation_group', 'chat group');
+expectEqual(policy.classify({
+  pathname: '/',
+  signal: 'Dynamic account-owned name',
+  section: '项目'
+}), 'project', 'dynamic project row');
 
 console.log('CHATGPT_WEB_PAGE_SEMANTIC_POLICY=passed');

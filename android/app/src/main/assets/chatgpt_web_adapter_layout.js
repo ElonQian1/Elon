@@ -58,6 +58,22 @@
     return cleanText(values.filter(Boolean).join(' '));
   }
 
+  function navigationSection(node) {
+    const scope = node && node.closest(
+      'aside, nav, [data-testid*="sidebar" i], [role="navigation"], [role="dialog"]'
+    );
+    if (!scope) return '';
+    const targetTop = node.getBoundingClientRect().top;
+    const sectionPattern = /^(?:projects?|项目|chats?|聊天|整理聊天|pinned|已置顶)$/i;
+    return actionableNodes(scope)
+      .map((candidate) => ({
+        label: cleanText(candidate.textContent || candidate.getAttribute('aria-label')),
+        top: candidate.getBoundingClientRect().top
+      }))
+      .filter((candidate) => candidate.top <= targetTop + 1 && sectionPattern.test(candidate.label))
+      .sort((left, right) => right.top - left.top)[0]?.label || '';
+  }
+
   function labelOf(node, fallback) {
     const candidates = [
       node.innerText,
@@ -165,6 +181,7 @@
         region,
         signal,
         context: semanticContext(node),
+        section: navigationSection(node),
         isLink: node.matches('a[href]')
       });
     if (pageSemantic) return pageSemantic;

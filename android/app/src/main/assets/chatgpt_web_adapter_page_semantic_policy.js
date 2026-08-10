@@ -24,6 +24,7 @@
     const region = clean(input && input.region);
     const signal = clean(input && input.signal);
     const context = clean(input && input.context);
+    const section = clean(input && input.section);
     const combined = [signal, context, path].filter(Boolean).join(' ');
 
     if (/open[-\s]?sidebar|open sidebar|打开(?:侧边栏|边栏)/.test(signal)) {
@@ -42,6 +43,7 @@
     if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
     if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
     if (/^(?:chats?|聊天|整理聊天)$/.test(signal)) return 'conversation_group';
+    if (/^(?:projects?|项目)$/.test(section)) return 'project';
     if (region === 'content') {
       const route = contentRoutes.find((candidate) => candidate.pattern.test(pathname));
       if (route) return route.semantic;
