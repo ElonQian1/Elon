@@ -214,6 +214,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("section", stringProperty("ChatGPT composer section model or tools; also filters chatgpt_get_navigation."))
                         .put("offset", intProperty("Zero-based page offset for ChatGPT control and conversation queries."))
                         .put("limit", intProperty("Page size for ChatGPT control and conversation queries."))
+                        .put("message_cursor", stringProperty("Stable cursor returned by chatgpt_get_context for the next context page."))
                         .put("message_offset", intProperty("Zero-based message offset for chatgpt_get_context."))
                         .put("message_limit", intProperty("Page size from 1 to 40 for chatgpt_get_context."))
                         .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false."))
