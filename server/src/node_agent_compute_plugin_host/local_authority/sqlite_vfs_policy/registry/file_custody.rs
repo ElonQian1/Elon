@@ -27,6 +27,8 @@ use crate::{
 mod abi;
 mod operations;
 mod promotion;
+#[cfg(test)]
+mod test_faults;
 
 pub(in crate::node_agent_compute_plugin_host::local_authority) use abi::{
     ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,

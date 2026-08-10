@@ -1,3 +1,5 @@
+#[cfg(test)]
+pub(crate) use super::sqlite_namespace::ManagedSqliteShmTestFaultProbe;
 pub(crate) use super::sqlite_namespace::{
     ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,
     ManagedSqliteDeleteOutcome, ManagedSqliteDirectoryBarrierFailureKind,

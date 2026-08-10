@@ -16,8 +16,16 @@ use crate::node_agent_managed_fs::{
 use super::super::{
     owner::ManagedSqliteRegistryCustody,
     process_owner::{ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessRouteRejection},
-    types::ManagedSqliteRegistryCallbackKind,
+    types::{ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryTerminalReason},
 };
+
+#[derive(Debug, Clone, Copy)]
+struct ManagedSqliteRegistryUnsafeShmFailureMarker {
+    phase: crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
+    class: crate::node_agent_managed_fs::ManagedSqliteShmFailureClass,
+    mutation_may_have_occurred: bool,
+    lock_outcome_uncertain: bool,
+}
 
 #[derive(Debug)]
 pub(super) enum ManagedSqliteRegistryPinnedFileOperationRejection {
@@ -204,6 +212,9 @@ where
             .begin_callback(self.route, ManagedSqliteRegistryCallbackKind::Shm)
             .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
         let result = self.unmap_shm_custody(mode);
+        if let Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(failure)) = &result {
+            self.quarantine_unsafe_shm_failure(failure);
+        }
         match (result, callback.complete()) {
             (Err(rejection), _) => Err(rejection),
             (Ok(()), Err(rejection)) => Err(
@@ -239,7 +250,15 @@ where
             &mut crate::node_agent_managed_fs::PinnedManagedSqliteShmConnection,
         ) -> Result<T, ManagedSqliteShmFailure>,
     ) -> Result<T, ManagedSqliteRegistryPinnedFileOperationRejection> {
-        self.with_callback(ManagedSqliteRegistryCallbackKind::Shm, |custody| {
+        let callback = self
+            .owner
+            .begin_callback(self.route, ManagedSqliteRegistryCallbackKind::Shm)
+            .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
+        let result = (|| {
+            let custody = self
+                .custody
+                .as_mut()
+                .expect("live pinned file operation must retain exact custody");
             let ManagedSqliteRegistryPinnedFileCustody::WalMain { file, .. } = custody else {
                 return Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole);
             };
@@ -247,7 +266,34 @@ where
                 return Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached);
             };
             operation(shm).map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm)
-        })
+        })();
+        if let Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(failure)) = &result {
+            self.quarantine_unsafe_shm_failure(failure);
+        }
+        match (result, callback.complete()) {
+            (Err(rejection), _) => Err(rejection),
+            (Ok(value), Err(rejection)) => Err(
+                ManagedSqliteRegistryPinnedFileOperationRejection::Registry(rejection),
+            ),
+            (Ok(value), Ok(())) => Ok(value),
+        }
+    }
+
+    fn quarantine_unsafe_shm_failure(&self, failure: &ManagedSqliteShmFailure) {
+        if !failure.mutation_may_have_occurred() && !failure.lock_outcome_uncertain() {
+            return;
+        }
+        let marker = ManagedSqliteRegistryUnsafeShmFailureMarker {
+            phase: failure.phase(),
+            class: failure.class(),
+            mutation_may_have_occurred: failure.mutation_may_have_occurred(),
+            lock_outcome_uncertain: failure.lock_outcome_uncertain(),
+        };
+        let _ = self.owner.retain_terminal_custody(
+            self.route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            marker,
+        );
     }
 
     fn with_callback<T>(

@@ -130,7 +130,7 @@ fn script_rejects_ambiguous_or_incompatible_steps() {
     assert!(ManagedSqliteShmTestFaultController::default()
         .install(
             exact,
-            &[(ManagedSqliteShmFailurePhase::LockRelease, 1)],
+            &[(ManagedSqliteShmFailurePhase::RequestValidation, 1)],
             &[],
         )
         .is_err());

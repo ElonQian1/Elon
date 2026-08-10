@@ -24,19 +24,23 @@ use crate::{
     node_agent_compute_plugin_host::local_authority::{
         sqlite_vfs_abi::test_vfs_file_size,
         sqlite_vfs_policy::registry::{
-            ManagedSqliteRegistryProcessOwner, ManagedSqliteTestVfsRoute,
+            ManagedSqliteRegistryProcessOwner, ManagedSqliteTestVfsFile, ManagedSqliteTestVfsRoute,
         },
     },
     node_agent_managed_fs::PinnedManagedSqliteWalRuntime,
 };
 
+#[cfg(test)]
+mod a2b1_cases;
 mod callbacks;
 mod connection;
 #[cfg(test)]
 mod fault_matrix;
 mod fault_script;
 mod multi_connection;
+mod route_file;
 mod shared_namespace;
+mod shm_fault_script;
 #[cfg(test)]
 mod tests;
 
@@ -47,8 +51,12 @@ use fault_script::{
     ManagedTestCallbackFaultTiming, ManagedTestFaultingFile, ManagedTestRouteOrdinal,
 };
 use multi_connection::ManagedSqliteMultiConnectionFixture;
+use route_file::ManagedTestRouteFile;
 use shared_namespace::{
     ManagedTestNonceSource, ManagedTestVfsRouteCollection, ManagedTestVfsRouteEntry,
+};
+use shm_fault_script::{
+    ManagedTestRegistrationId, ManagedTestShmFaultPlanBinding, ManagedTestShmFaultPlanSlot,
 };
 
 type TestProcessOwner = ManagedSqliteRegistryProcessOwner<TestCustody, ManagedTestNonceSource>;
@@ -93,6 +101,7 @@ impl ManagedTestVfsRegistration {
                 current.checked_add(1)
             })
             .map_err(|_| anyhow!("managed test VFS registration identity exhausted"))?;
+        let id = ManagedTestRegistrationId::from_counter(id).map_err(anyhow::Error::msg)?;
         let shared = shared_namespace::ManagedTestSharedNamespace::pin(root, id)?;
         // SAFETY: SQLite owns the default VFS for process lifetime. It is used only for entropy,
         // sleep and wall-clock callbacks; all database files stay in the managed namespace.
@@ -100,8 +109,12 @@ impl ManagedTestVfsRegistration {
         if backing.is_null() {
             return Err(anyhow!("SQLite default VFS unavailable"));
         }
-        let name = CString::new(format!("elon-test-managed-vfs-{}-{id}", std::process::id()))
-            .context("construct managed test VFS name")?;
+        let name = CString::new(format!(
+            "elon-test-managed-vfs-{}-{}",
+            std::process::id(),
+            id.counter_value()
+        ))
+        .context("construct managed test VFS name")?;
         let counters = Arc::new(ManagedTestVfsCounters {
             main_opens: AtomicUsize::new(0),
             journal_opens: AtomicUsize::new(0),

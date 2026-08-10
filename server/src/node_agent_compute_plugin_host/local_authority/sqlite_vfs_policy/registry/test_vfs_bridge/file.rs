@@ -12,6 +12,9 @@ use crate::node_agent_compute_plugin_host::local_authority::{
         HandleBoundSqliteAbiUnlockLevel,
     },
 };
+use crate::node_agent_managed_fs::{
+    ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase, ManagedSqliteShmTestFaultProbe,
+};
 
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteTestVfsFile<
     Custody,
@@ -46,6 +49,47 @@ where
             role,
             wal_runtime,
         }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn prepare_wal_main_shm_test_fault_script(
+        &mut self,
+        before_call: &[(ManagedSqliteShmFailurePhase, u32)],
+        after_success: &[(
+            ManagedSqliteShmFailurePhase,
+            u32,
+            ManagedSqliteShmFailureClass,
+        )],
+    ) -> Result<ManagedSqliteShmTestFaultProbe, ()> {
+        if self.role != ManagedSqliteLogicalFileRole::Main {
+            return Err(());
+        }
+        let runtime = self.wal_runtime.as_deref().ok_or(())?;
+        self.file.promote_main_to_wal(runtime)?;
+        self.file
+            .install_exact_wal_main_shm_test_fault_script(before_call, after_success)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn promote_main_to_wal_for_shm(
+        &mut self,
+    ) -> Result<(), ()> {
+        if self.role != ManagedSqliteLogicalFileRole::Main {
+            return Err(());
+        }
+        let runtime = self.wal_runtime.as_deref().ok_or(())?;
+        self.file.promote_main_to_wal(runtime)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn retain_test_fault_bridge_failure(
+        &self,
+        code: &'static str,
+    ) -> Result<(), ()> {
+        self.owner
+            .retain_terminal_custody(
+                self.route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                code,
+            )
+            .map_err(drop)
     }
 }
 
@@ -96,8 +140,6 @@ where
         region_size: NonZeroU32,
         extend: bool,
     ) -> Result<HandleBoundSqliteAbiShmMap, ()> {
-        let runtime = self.wal_runtime.as_deref().ok_or(())?;
-        self.file.promote_main_to_wal(runtime)?;
         self.file.shm_map(region, region_size, extend)
     }
 

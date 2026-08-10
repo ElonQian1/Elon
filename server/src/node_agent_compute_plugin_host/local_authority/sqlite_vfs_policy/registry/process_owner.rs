@@ -329,7 +329,7 @@ impl ComputePluginHandleBoundSqliteProcessOwner {
     }
 }
 
-#[must_use = "the routed callback lease must be completed or dropped"]
+#[must_use = "the routed callback lease must be explicitly completed; drop quarantines its route"]
 pub(super) struct ManagedSqliteRegistryRoutedCallbackLease<Custody, NonceSource>
 where
     Custody: ManagedSqliteRegistryCustody + 'static,
@@ -361,7 +361,13 @@ where
 {
     fn drop(&mut self) {
         if let Some(lease) = self.lease.take() {
-            let _ = self.owner.finish_callback(self.route, lease);
+            // Stack unwinding or an abandoned callback is not normal completion evidence. Keep
+            // the exact lease forever and quarantine its route before any custody can be reused.
+            let _ = self.owner.retain_terminal_custody(
+                self.route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                lease,
+            );
         }
     }
 }

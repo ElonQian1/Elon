@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::{
     super::{
         coordinator::{ManagedSqliteShmCoordinator, PinnedManagedSqliteWalMainFile},
@@ -9,6 +11,44 @@ use super::{
 };
 
 const CONTROLLER_POISONED: &str = "NODE_MANAGED_SQLITE_SHM_TEST_FAULT_CONTROLLER_POISONED";
+
+/// Move-only observation authority for one exact installed SHM fault script.
+///
+/// The exact runtime generation and connection target remain private to this module.
+pub(crate) struct ManagedSqliteShmTestFaultProbe {
+    coordinator: Arc<ManagedSqliteShmCoordinator>,
+    target: ManagedSqliteShmTestFaultTarget,
+}
+
+impl ManagedSqliteShmTestFaultProbe {
+    pub(crate) fn pending_count(&self) -> Result<usize, &'static str> {
+        match self.coordinator.test_faults.lock() {
+            Ok(faults) => Ok(faults.pending_count(self.target)),
+            Err(poison) => {
+                drop(poison.into_inner());
+                self.coordinator
+                    .poison_test_fault_controller_from_external_access();
+                Err(CONTROLLER_POISONED)
+            }
+        }
+    }
+
+    pub(crate) fn was_triggered(
+        &self,
+        phase: ManagedSqliteShmFailurePhase,
+        ordinal: u32,
+    ) -> Result<bool, &'static str> {
+        match self.coordinator.test_faults.lock() {
+            Ok(faults) => Ok(faults.was_triggered(self.target, phase, ordinal)),
+            Err(poison) => {
+                drop(poison.into_inner());
+                self.coordinator
+                    .poison_test_fault_controller_from_external_access();
+                Err(CONTROLLER_POISONED)
+            }
+        }
+    }
+}
 
 impl ManagedSqliteShmCoordinator {
     pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) fn observe_test_fault(
@@ -43,11 +83,11 @@ impl ManagedSqliteShmCoordinator {
         Ok(triggered.into_failure(known_mutation))
     }
 
-    fn test_fault_target(&self, connection_id: u64) -> ManagedSqliteShmTestFaultTarget {
+    pub(super) fn test_fault_target(&self, connection_id: u64) -> ManagedSqliteShmTestFaultTarget {
         ManagedSqliteShmTestFaultTarget::new(self.generation, connection_id)
     }
 
-    fn test_fault_internal_failure(
+    pub(super) fn test_fault_internal_failure(
         &self,
         phase: ManagedSqliteShmFailurePhase,
         known_mutation: bool,
@@ -77,7 +117,7 @@ impl PinnedManagedSqliteWalMainFile {
             u32,
             ManagedSqliteShmFailureClass,
         )],
-    ) -> Result<(), &'static str> {
+    ) -> Result<ManagedSqliteShmTestFaultProbe, &'static str> {
         let (coordinator, target) = self.exact_test_fault_target()?;
         let mut faults = match coordinator.test_faults.lock() {
             Ok(faults) => faults,
@@ -87,42 +127,20 @@ impl PinnedManagedSqliteWalMainFile {
                 return Err(CONTROLLER_POISONED);
             }
         };
-        faults.install(target, before_call, after_success)
-    }
-
-    pub(crate) fn pending_shm_test_fault_count(&self) -> Result<usize, &'static str> {
-        let (coordinator, target) = self.exact_test_fault_target()?;
-        match coordinator.test_faults.lock() {
-            Ok(faults) => Ok(faults.pending_count(target)),
-            Err(poison) => {
-                drop(poison.into_inner());
-                coordinator.poison_test_fault_controller_from_external_access();
-                Err(CONTROLLER_POISONED)
-            }
-        }
-    }
-
-    pub(crate) fn shm_test_fault_was_triggered(
-        &self,
-        phase: ManagedSqliteShmFailurePhase,
-        ordinal: u32,
-    ) -> Result<bool, &'static str> {
-        let (coordinator, target) = self.exact_test_fault_target()?;
-        match coordinator.test_faults.lock() {
-            Ok(faults) => Ok(faults.was_triggered(target, phase, ordinal)),
-            Err(poison) => {
-                drop(poison.into_inner());
-                coordinator.poison_test_fault_controller_from_external_access();
-                Err(CONTROLLER_POISONED)
-            }
-        }
+        let installed = faults.install(target, before_call, after_success);
+        drop(faults);
+        installed?;
+        Ok(ManagedSqliteShmTestFaultProbe {
+            coordinator,
+            target,
+        })
     }
 
     fn exact_test_fault_target(
         &self,
     ) -> Result<
         (
-            &ManagedSqliteShmCoordinator,
+            Arc<ManagedSqliteShmCoordinator>,
             ManagedSqliteShmTestFaultTarget,
         ),
         &'static str,
@@ -134,10 +152,8 @@ impl PinnedManagedSqliteWalMainFile {
         if !connection.active || self.runtime_generation != connection.coordinator.generation {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_TARGET_MISMATCH");
         }
-        let coordinator = connection.coordinator.as_ref();
-        Ok((
-            coordinator,
-            coordinator.test_fault_target(connection.connection_id),
-        ))
+        let coordinator = Arc::clone(&connection.coordinator);
+        let target = coordinator.test_fault_target(connection.connection_id);
+        Ok((coordinator, target))
     }
 }

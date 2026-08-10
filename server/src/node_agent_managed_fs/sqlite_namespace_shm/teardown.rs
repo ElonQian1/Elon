@@ -459,6 +459,14 @@ fn teardown_live_node(
                 }
             }
         }
+        ManagedSqliteShmDmsCustody::ExclusiveKnown => {
+            return Err(ManagedSqliteShmFailure::poisoned(
+                ManagedSqliteShmFailurePhase::DmsExclusiveRelease,
+                io::Error::other("NODE_MANAGED_SQLITE_SHM_DMS_EXCLUSIVE_RETAINED"),
+                true,
+                false,
+            ));
+        }
         ManagedSqliteShmDmsCustody::ExclusiveOutcomeUncertain => {
             return Err(ManagedSqliteShmFailure::poisoned(
                 ManagedSqliteShmFailurePhase::DmsExclusiveRelease,

@@ -84,6 +84,7 @@ pub(super) struct ManagedSqliteShmNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedSqliteShmDmsCustody {
     Shared,
+    ExclusiveKnown,
     ExclusiveOutcomeUncertain,
     Released,
 }
@@ -244,11 +245,12 @@ impl ManagedSqliteShmCoordinator {
         mutation_may_have_occurred: bool,
         lock_outcome_uncertain: bool,
     ) {
-        state.poisoned.get_or_insert(ManagedSqliteShmPoison {
+        merge_poison(
+            &mut state.poisoned,
             phase,
             mutation_may_have_occurred,
             lock_outcome_uncertain,
-        });
+        );
         self.mark_domain_terminal();
     }
 
@@ -261,6 +263,29 @@ impl ManagedSqliteShmCoordinator {
             .entry(self.domain_key)
             .and_modify(|entry| entry.terminal = true)
             .or_insert_with(|| ManagedSqliteShmDomainEntry { terminal: true });
+    }
+}
+
+fn merge_poison(
+    stored: &mut Option<ManagedSqliteShmPoison>,
+    phase: ManagedSqliteShmFailurePhase,
+    mutation_may_have_occurred: bool,
+    lock_outcome_uncertain: bool,
+) {
+    let Some(current) = stored.as_mut() else {
+        *stored = Some(ManagedSqliteShmPoison {
+            phase,
+            mutation_may_have_occurred,
+            lock_outcome_uncertain,
+        });
+        return;
+    };
+    let stronger_mutation = mutation_may_have_occurred && !current.mutation_may_have_occurred;
+    let stronger_lock = lock_outcome_uncertain && !current.lock_outcome_uncertain;
+    current.mutation_may_have_occurred |= mutation_may_have_occurred;
+    current.lock_outcome_uncertain |= lock_outcome_uncertain;
+    if stronger_mutation || stronger_lock {
+        current.phase = phase;
     }
 }
 
@@ -391,4 +416,54 @@ fn register_shm_domain(
         ManagedSqliteShmDomainEntry { terminal: false },
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod poison_merge_tests {
+    use super::{merge_poison, ManagedSqliteShmPoison};
+    use crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase;
+
+    #[test]
+    fn poison_flags_only_move_forward_and_stronger_failure_updates_phase() {
+        let mut stored: Option<ManagedSqliteShmPoison> = None;
+        merge_poison(
+            &mut stored,
+            ManagedSqliteShmFailurePhase::FileSize,
+            false,
+            false,
+        );
+        merge_poison(
+            &mut stored,
+            ManagedSqliteShmFailurePhase::FileGrow,
+            true,
+            false,
+        );
+        merge_poison(
+            &mut stored,
+            ManagedSqliteShmFailurePhase::MappingClose,
+            true,
+            false,
+        );
+        let after_mutation = stored.expect("poison is retained after mutation escalation");
+        assert_eq!(after_mutation.phase, ManagedSqliteShmFailurePhase::FileGrow);
+        assert!(after_mutation.mutation_may_have_occurred);
+        assert!(!after_mutation.lock_outcome_uncertain);
+
+        merge_poison(
+            &mut stored,
+            ManagedSqliteShmFailurePhase::LockRelease,
+            false,
+            true,
+        );
+        merge_poison(
+            &mut stored,
+            ManagedSqliteShmFailurePhase::FileClose,
+            false,
+            false,
+        );
+        let after_lock = stored.expect("poison is retained after lock escalation");
+        assert_eq!(after_lock.phase, ManagedSqliteShmFailurePhase::LockRelease);
+        assert!(after_lock.mutation_may_have_occurred);
+        assert!(after_lock.lock_outcome_uncertain);
+    }
 }

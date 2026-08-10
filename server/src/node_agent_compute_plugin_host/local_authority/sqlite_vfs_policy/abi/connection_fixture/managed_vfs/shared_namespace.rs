@@ -29,9 +29,9 @@ pub(super) struct ManagedTestNonceSource {
 }
 
 impl ManagedTestNonceSource {
-    fn new(registration_id: u64) -> Self {
+    fn new(registration_id: ManagedTestRegistrationId) -> Self {
         Self {
-            prefix: registration_id.to_be_bytes(),
+            prefix: registration_id.counter_value().to_be_bytes(),
             next: AtomicU64::new(1),
         }
     }
@@ -57,7 +57,10 @@ pub(super) struct ManagedTestSharedNamespace {
 }
 
 impl ManagedTestSharedNamespace {
-    pub(super) fn pin(root: &Path, registration_id: u64) -> anyhow::Result<Self> {
+    pub(super) fn pin(
+        root: &Path,
+        registration_id: ManagedTestRegistrationId,
+    ) -> anyhow::Result<Self> {
         fs::create_dir_all(root.join("db"))
             .with_context(|| format!("create managed VFS fixture root at {}", root.display()))?;
         let pinned_root = PinnedManagedRoot::pin(root, &"b".repeat(64))
@@ -78,6 +81,7 @@ impl ManagedTestSharedNamespace {
         Ok(Self {
             routes: Arc::new(ManagedTestVfsRouteCollection {
                 owner,
+                registration_id,
                 by_name: Mutex::new(HashMap::new()),
                 live_routes: AtomicUsize::new(0),
                 next_route_ordinal: AtomicU64::new(1),
@@ -89,7 +93,9 @@ impl ManagedTestSharedNamespace {
 
 pub(super) struct ManagedTestVfsRouteEntry {
     route: Arc<TestRoute>,
+    registration_id: ManagedTestRegistrationId,
     ordinal: ManagedTestRouteOrdinal,
+    shm_faults: Arc<ManagedTestShmFaultPlanSlot>,
     main_name: CString,
     exact_names: [Vec<u8>; 3],
     custody_drops: Arc<AtomicUsize>,
@@ -111,6 +117,58 @@ impl ManagedTestVfsRouteEntry {
     pub(super) fn custody_drops(&self) -> usize {
         self.custody_drops.load(Ordering::SeqCst)
     }
+
+    pub(super) fn install_shm_fault_script(
+        &self,
+        before_call: &[(
+            crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
+            u32,
+        )],
+        after_success: &[(
+            crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
+            u32,
+            crate::node_agent_managed_fs::ManagedSqliteShmFailureClass,
+        )],
+    ) -> Result<(), &'static str> {
+        let binding = self.main_shm_fault_binding()?;
+        binding.install(before_call, after_success).map_err(|code| {
+            let _ = self.route.retain_failure(code);
+            code
+        })
+    }
+
+    pub(super) fn pending_shm_fault_count(&self) -> Result<usize, &'static str> {
+        let binding = self.main_shm_fault_binding()?;
+        binding.pending_count().map_err(|code| {
+            let _ = self.route.retain_failure(code);
+            code
+        })
+    }
+
+    pub(super) fn shm_fault_was_triggered(
+        &self,
+        phase: crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
+        occurrence: u32,
+    ) -> Result<bool, &'static str> {
+        let binding = self.main_shm_fault_binding()?;
+        binding.was_triggered(phase, occurrence).map_err(|code| {
+            let _ = self.route.retain_failure(code);
+            code
+        })
+    }
+
+    fn main_shm_fault_binding(&self) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {
+        self.shm_faults
+            .binding(
+                self.registration_id,
+                self.ordinal,
+                ManagedSqliteLogicalFileRole::Main,
+            )
+            .map_err(|code| {
+                let _ = self.route.retain_failure(code);
+                code
+            })
+    }
 }
 
 #[derive(Clone)]
@@ -131,10 +189,18 @@ impl ManagedTestVfsResolvedRoute {
     pub(super) fn route_ordinal(&self) -> ManagedTestRouteOrdinal {
         self.entry.ordinal()
     }
+
+    pub(super) fn shm_fault_binding(&self) -> Result<ManagedTestShmFaultPlanBinding, ()> {
+        self.entry
+            .shm_faults
+            .binding(self.entry.registration_id, self.entry.ordinal, self.role)
+            .map_err(drop)
+    }
 }
 
 pub(super) struct ManagedTestVfsRouteCollection {
     owner: &'static TestProcessOwner,
+    registration_id: ManagedTestRegistrationId,
     by_name: Mutex<HashMap<Vec<u8>, ManagedTestVfsResolvedRoute>>,
     live_routes: AtomicUsize,
     next_route_ordinal: AtomicU64,
@@ -153,6 +219,7 @@ impl ManagedTestVfsRouteCollection {
             .map_err(|_| anyhow!("managed VFS route ordinal exhausted"))?;
         let ordinal = ManagedTestRouteOrdinal::from_counter(ordinal)
             .map_err(|()| anyhow!("managed VFS route ordinal was zero"))?;
+        let shm_faults = ManagedTestShmFaultPlanSlot::new(self.registration_id, ordinal);
         let route = Arc::new(
             TestRoute::register(self.owner, TestCustody::tracked(Arc::clone(&custody_drops)))
                 .map_err(|()| anyhow!("register managed VFS route"))?,
@@ -171,7 +238,9 @@ impl ManagedTestVfsRouteCollection {
         wal.extend_from_slice(b"-wal");
         let entry = Arc::new(ManagedTestVfsRouteEntry {
             route,
+            registration_id: self.registration_id,
             ordinal,
+            shm_faults,
             main_name,
             exact_names: [main, journal, wal],
             custody_drops,

@@ -63,8 +63,8 @@ impl ManagedSqliteShmCoordinator {
             return Err(poison.failure());
         }
 
-        let (current_size, initialization_mutated) = {
-            let (node, initialization_mutated) = self.ensure_node(&mut state)?;
+        let initialization_mutated = {
+            let (node, initialization_mutated) = self.ensure_node(&mut state, connection_id)?;
             match node.region_size {
                 Some(expected) if expected != region_size => {
                     return Err(protocol("NODE_MANAGED_SQLITE_SHM_REGION_SIZE_CHANGED"));
@@ -72,7 +72,22 @@ impl ManagedSqliteShmCoordinator {
                 None => node.region_size = Some(region_size),
                 Some(_) => {}
             }
-            let current_size = node.file.size().map_err(|error| {
+            initialization_mutated
+        };
+        #[cfg(test)]
+        let file_size_fault = self.begin_test_fault(
+            &mut state,
+            connection_id,
+            ManagedSqliteShmFailurePhase::FileSize,
+            initialization_mutated,
+        )?;
+        let current_size = state
+            .node
+            .as_mut()
+            .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_BEFORE_SIZE"))?
+            .file
+            .size()
+            .map_err(|error| {
                 let error = io::Error::other(error);
                 ManagedSqliteShmFailure::new(
                     ManagedSqliteShmFailurePhase::FileSize,
@@ -80,8 +95,12 @@ impl ManagedSqliteShmCoordinator {
                     error,
                 )
             })?;
-            (current_size, initialization_mutated)
-        };
+        #[cfg(test)]
+        if let Some(failure) =
+            self.finish_test_fault(&mut state, file_size_fault, initialization_mutated)
+        {
+            return Err(failure);
+        }
         self.budget
             .validate_existing_size(current_size)
             .map_err(request_failure)?;
@@ -90,6 +109,13 @@ impl ManagedSqliteShmCoordinator {
             if mode == ManagedSqliteShmMapMode::Observe {
                 return Ok(ManagedSqliteShmMapOutcome::NotPresent);
             }
+            #[cfg(test)]
+            let file_grow_fault = self.begin_test_fault(
+                &mut state,
+                connection_id,
+                ManagedSqliteShmFailurePhase::FileGrow,
+                initialization_mutated,
+            )?;
             let grow = state
                 .node
                 .as_mut()
@@ -111,14 +137,27 @@ impl ManagedSqliteShmCoordinator {
                 ));
             }
             file_grew = true;
+            #[cfg(test)]
+            if let Some(failure) = self.finish_test_fault(&mut state, file_grow_fault, true) {
+                return Err(failure);
+            }
         }
 
-        let node = state
+        while state
             .node
-            .as_mut()
-            .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_BEFORE_MAP"))?;
-        while node.regions.len() <= region as usize {
-            let index = u32::try_from(node.regions.len()).map_err(|_| {
+            .as_ref()
+            .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_BEFORE_MAP"))?
+            .regions
+            .len()
+            <= region as usize
+        {
+            let existing_regions = state
+                .node
+                .as_ref()
+                .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_DURING_MAP"))?
+                .regions
+                .len();
+            let index = u32::try_from(existing_regions).map_err(|_| {
                 request_failure(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "NODE_MANAGED_SQLITE_SHM_REGION_INDEX_OVERFLOW",
@@ -151,7 +190,10 @@ impl ManagedSqliteShmCoordinator {
                     "NODE_MANAGED_SQLITE_SHM_VIEW_LENGTH_OVERFLOW",
                 ))
             })?;
-            let mapped_total = node
+            let mapped_total = state
+                .node
+                .as_ref()
+                .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_BEFORE_BUDGET"))?
                 .mapped_bytes
                 .checked_add(mapped_length as u64)
                 .ok_or_else(|| {
@@ -164,29 +206,124 @@ impl ManagedSqliteShmCoordinator {
                 .validate_mapped_total(mapped_total)
                 .map_err(request_failure)?;
 
-            let mut mapping =
-                platform_shm::create_mapping(&node.file.file, logical_end).map_err(|error| {
-                    ManagedSqliteShmFailure::new(
-                        ManagedSqliteShmFailurePhase::MappingCreate,
-                        mutation_class(
-                            initialization_mutated || file_grew || !node.regions.is_empty(),
-                            &error,
-                        ),
-                        error,
-                    )
+            let prior_mapping_mutation =
+                initialization_mutated || file_grew || existing_regions != 0;
+            #[cfg(test)]
+            let mapping_fault = self.begin_test_fault(
+                &mut state,
+                connection_id,
+                ManagedSqliteShmFailurePhase::MappingCreate,
+                prior_mapping_mutation,
+            )?;
+            let mut mapping = {
+                let node = state.node.as_ref().ok_or_else(|| {
+                    protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_BEFORE_MAPPING_CREATE")
                 })?;
+                platform_shm::create_mapping(&node.file.file, logical_end)
+            }
+            .map_err(|error| {
+                ManagedSqliteShmFailure::new(
+                    ManagedSqliteShmFailurePhase::MappingCreate,
+                    mutation_class(prior_mapping_mutation, &error),
+                    error,
+                )
+            })?;
+            #[cfg(test)]
+            if mapping_fault.is_some() {
+                self.retain_test_mapping_custody(
+                    &mut state,
+                    mapping,
+                    None,
+                    None,
+                    logical_length,
+                    mapped_length,
+                    aligned_offset,
+                )?;
+                if let Some(failure) = self.finish_test_fault(&mut state, mapping_fault, true) {
+                    return Err(failure);
+                }
+                self.mark_poisoned(
+                    &mut state,
+                    ManagedSqliteShmFailurePhase::MappingCreate,
+                    true,
+                    false,
+                );
+                return Err(ManagedSqliteShmFailure::poisoned_code(
+                    ManagedSqliteShmFailurePhase::MappingCreate,
+                    "NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_MATCH_LOST",
+                    true,
+                    false,
+                ));
+            }
+            #[cfg(test)]
+            let view_fault = match self.begin_test_fault(
+                &mut state,
+                connection_id,
+                ManagedSqliteShmFailurePhase::ViewMap,
+                true,
+            ) {
+                Ok(fault) => fault,
+                Err(failure)
+                    if failure.class()
+                        == ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned =>
+                {
+                    self.retain_test_mapping_custody(
+                        &mut state,
+                        mapping,
+                        None,
+                        None,
+                        logical_length,
+                        mapped_length,
+                        aligned_offset,
+                    )?;
+                    return Err(failure);
+                }
+                Err(failure) => {
+                    if let Err(close_error) = mapping.close_explicit() {
+                        self.retain_test_mapping_custody(
+                            &mut state,
+                            mapping,
+                            None,
+                            None,
+                            logical_length,
+                            mapped_length,
+                            aligned_offset,
+                        )?;
+                        self.mark_poisoned(
+                            &mut state,
+                            ManagedSqliteShmFailurePhase::MappingClose,
+                            true,
+                            false,
+                        );
+                        return Err(ManagedSqliteShmFailure::poisoned(
+                            ManagedSqliteShmFailurePhase::MappingClose,
+                            close_error,
+                            true,
+                            false,
+                        ));
+                    }
+                    return Err(failure);
+                }
+            };
             let view = match platform_shm::map_view(&mapping, aligned_offset, mapped_length) {
                 Ok(view) => view,
                 Err(error) => {
                     if let Err(close_error) = mapping.close_explicit() {
-                        node.regions.push(ManagedSqliteShmRegionMapping {
-                            mapping,
-                            view: None,
-                            logical_pointer: None,
-                            logical_length,
-                            mapped_length,
-                            aligned_offset,
-                        });
+                        state
+                            .node
+                            .as_mut()
+                            .ok_or_else(|| {
+                                protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_AT_MAP_FAILURE")
+                            })?
+                            .regions
+                            .push(ManagedSqliteShmRegionMapping {
+                                mapping,
+                                view: None,
+                                logical_pointer: None,
+                                logical_length,
+                                mapped_length,
+                                aligned_offset,
+                            });
                         self.mark_poisoned(
                             &mut state,
                             ManagedSqliteShmFailurePhase::MappingClose,
@@ -202,23 +339,25 @@ impl ManagedSqliteShmCoordinator {
                     }
                     return Err(ManagedSqliteShmFailure::new(
                         ManagedSqliteShmFailurePhase::ViewMap,
-                        mutation_class(
-                            initialization_mutated || file_grew || !node.regions.is_empty(),
-                            &error,
-                        ),
+                        mutation_class(prior_mapping_mutation, &error),
                         error,
                     ));
                 }
             };
             let Some(base) = view.base() else {
-                node.regions.push(ManagedSqliteShmRegionMapping {
-                    mapping,
-                    view: Some(view),
-                    logical_pointer: None,
-                    logical_length,
-                    mapped_length,
-                    aligned_offset,
-                });
+                state
+                    .node
+                    .as_mut()
+                    .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_AT_NULL_VIEW"))?
+                    .regions
+                    .push(ManagedSqliteShmRegionMapping {
+                        mapping,
+                        view: Some(view),
+                        logical_pointer: None,
+                        logical_length,
+                        mapped_length,
+                        aligned_offset,
+                    });
                 self.mark_poisoned(
                     &mut state,
                     ManagedSqliteShmFailurePhase::ViewMap,
@@ -235,6 +374,10 @@ impl ManagedSqliteShmCoordinator {
             // SAFETY: `mapped_length` was checked as shift + logical length, and the view owns
             // exactly that many bytes beginning at `base`.
             let logical_pointer = unsafe { NonNull::new_unchecked(base.as_ptr().add(shift)) };
+            let node = state
+                .node
+                .as_mut()
+                .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_AFTER_VIEW_MAP"))?;
             node.regions.push(ManagedSqliteShmRegionMapping {
                 mapping,
                 view: Some(view),
@@ -244,8 +387,16 @@ impl ManagedSqliteShmCoordinator {
                 aligned_offset,
             });
             node.mapped_bytes = mapped_total;
+            #[cfg(test)]
+            if let Some(failure) = self.finish_test_fault(&mut state, view_fault, true) {
+                return Err(failure);
+            }
         }
 
+        let node = state
+            .node
+            .as_mut()
+            .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_AFTER_MAP"))?;
         let selected = node.regions.get(region as usize).and_then(|selected| {
             selected
                 .logical_pointer

@@ -36,6 +36,8 @@ pub(crate) use main::{
     ManagedSqliteRequestedLock, ManagedSqliteUnlockTarget, PinnedManagedSqliteMainFile,
     PlatformManagedSqliteLockAttempt,
 };
+#[cfg(test)]
+pub(crate) use shm::ManagedSqliteShmTestFaultProbe;
 pub(crate) use shm::{
     ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
     ManagedSqliteShmFailurePhase, ManagedSqliteShmLockAction, ManagedSqliteShmLockAttempt,

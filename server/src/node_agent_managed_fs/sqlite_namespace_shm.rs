@@ -19,6 +19,8 @@ mod failure_custody;
 mod locking;
 #[path = "sqlite_namespace_shm/mapping.rs"]
 mod mapping;
+#[path = "sqlite_namespace_shm/node_initialization.rs"]
+mod node_initialization;
 #[path = "sqlite_namespace_shm/teardown.rs"]
 mod teardown;
 #[cfg(test)]
@@ -107,6 +109,8 @@ pub(crate) use close::{
 pub(crate) use coordinator::{
     PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile, PinnedManagedSqliteWalRuntime,
 };
+#[cfg(test)]
+pub(crate) use test_faults::ManagedSqliteShmTestFaultProbe;
 pub(crate) use types::{
     ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
     ManagedSqliteShmFailurePhase, ManagedSqliteShmLockAction, ManagedSqliteShmLockAttempt,

@@ -36,68 +36,76 @@ pub(super) unsafe extern "C" fn open(
         let resolved = context.routes.resolve(candidate_name)?;
         let route = resolved.route();
         let callback = route.begin_open_callback()?;
-        let request = route.project_x_open(candidate_name, flags)?;
-        let role = request.role();
-        if role != resolved.role() {
-            return Err(());
-        }
-        let access = match request.access() {
-            ManagedSqliteVfsAccess::ReadOnly => ManagedSqliteAccess::ReadOnly,
-            ManagedSqliteVfsAccess::ReadWrite => ManagedSqliteAccess::ReadWrite,
-        };
-        let mode = if request.create() {
-            ManagedSqliteOpenMode::OpenOrCreate
-        } else {
-            ManagedSqliteOpenMode::Existing
-        };
-        let operations = match role {
-            ManagedSqliteLogicalFileRole::Main => {
-                let opened = context
-                    .runtime
-                    .namespace()
-                    .open(ManagedSqliteFileKind::Main, access, mode)
-                    .map_err(|failure| {
+        let operation = (|| {
+            let request = route.project_x_open(candidate_name, flags)?;
+            let role = request.role();
+            if role != resolved.role() {
+                return Err(());
+            }
+            let access = match request.access() {
+                ManagedSqliteVfsAccess::ReadOnly => ManagedSqliteAccess::ReadOnly,
+                ManagedSqliteVfsAccess::ReadWrite => ManagedSqliteAccess::ReadWrite,
+            };
+            let mode = if request.create() {
+                ManagedSqliteOpenMode::OpenOrCreate
+            } else {
+                ManagedSqliteOpenMode::Existing
+            };
+            let operations = match role {
+                ManagedSqliteLogicalFileRole::Main => {
+                    let opened = context
+                        .runtime
+                        .namespace()
+                        .open(ManagedSqliteFileKind::Main, access, mode)
+                        .map_err(|failure| {
+                            let _ = route.retain_failure(failure);
+                        })?;
+                    let main = opened.into_main_file().map_err(|failure| {
                         let _ = route.retain_failure(failure);
                     })?;
-                let main = opened.into_main_file().map_err(|failure| {
-                    let _ = route.retain_failure(failure);
-                })?;
-                route.bind_main(main, Arc::clone(&context.runtime))?
-            }
-            ManagedSqliteLogicalFileRole::Journal => {
-                let opened = context
-                    .runtime
-                    .namespace()
-                    .open(ManagedSqliteFileKind::Journal, access, mode)
-                    .map_err(|failure| {
-                        let _ = route.retain_failure(failure);
-                    })?;
-                route.bind_sidecar(opened, role)?
-            }
-            ManagedSqliteLogicalFileRole::Wal => {
-                context
-                    .counters
-                    .wal_open_attempts
-                    .fetch_add(1, Ordering::SeqCst);
-                let opened = context
-                    .runtime
-                    .namespace()
-                    .open(ManagedSqliteFileKind::Wal, access, mode)
-                    .map_err(|failure| {
-                        let _ = route.retain_failure(failure);
-                    })?;
-                route.bind_sidecar(opened, role)?
-            }
+                    route.bind_main(main, Arc::clone(&context.runtime))?
+                }
+                ManagedSqliteLogicalFileRole::Journal => {
+                    let opened = context
+                        .runtime
+                        .namespace()
+                        .open(ManagedSqliteFileKind::Journal, access, mode)
+                        .map_err(|failure| {
+                            let _ = route.retain_failure(failure);
+                        })?;
+                    route.bind_sidecar(opened, role)?
+                }
+                ManagedSqliteLogicalFileRole::Wal => {
+                    context
+                        .counters
+                        .wal_open_attempts
+                        .fetch_add(1, Ordering::SeqCst);
+                    let opened = context
+                        .runtime
+                        .namespace()
+                        .open(ManagedSqliteFileKind::Wal, access, mode)
+                        .map_err(|failure| {
+                            let _ = route.retain_failure(failure);
+                        })?;
+                    route.bind_sidecar(opened, role)?
+                }
+            };
+            let operations =
+                ManagedTestRouteFile::new(operations, resolved.shm_fault_binding()?, role)?;
+            let operations = ManagedTestFaultingFile::new(
+                operations,
+                Arc::clone(&context.faults),
+                resolved.route_ordinal(),
+                role,
+            );
+            // SAFETY: this is the initialized allocation owned by the current xOpen callback.
+            unsafe { install_test_vfs_file(file, operations) }?;
+            Ok::<_, ()>((request, role))
+        })();
+        let (request, role) = match (operation, callback.complete()) {
+            (Ok(value), Ok(())) => value,
+            _ => return Err(()),
         };
-        let operations = ManagedTestFaultingFile::new(
-            operations,
-            Arc::clone(&context.faults),
-            resolved.route_ordinal(),
-            role,
-        );
-        // SAFETY: this is the initialized allocation owned by the current xOpen callback.
-        unsafe { install_test_vfs_file(file, operations) }?;
-        callback.complete()?;
         if role == ManagedSqliteLogicalFileRole::Main {
             route.activate_after_main_open()?;
             context.counters.main_opens.fetch_add(1, Ordering::SeqCst);
@@ -138,24 +146,29 @@ pub(super) unsafe extern "C" fn access(
         let resolved = context.routes.resolve(candidate_name)?;
         let route = resolved.route();
         let callback = route.begin_access_callback()?;
-        let request = route.project_x_access(candidate_name, flag)?;
-        if request.role() != resolved.role() {
+        let operation = (|| {
+            let request = route.project_x_access(candidate_name, flag)?;
+            if request.role() != resolved.role() {
+                return Err(());
+            }
+            let kind = sidecar_kind(request.role())?;
+            let exists = context
+                .runtime
+                .namespace()
+                .access(kind, ManagedSqliteAccess::ReadWrite)
+                .map_err(|failure| {
+                    let _ = route.retain_failure(failure);
+                })?;
+            if output.is_null() {
+                return Err(());
+            }
+            // SAFETY: null was rejected above and SQLite owns this output allocation.
+            unsafe { output.write(c_int::from(exists)) };
+            Ok::<(), ()>(())
+        })();
+        if !matches!((operation, callback.complete()), (Ok(()), Ok(()))) {
             return Err(());
         }
-        let kind = sidecar_kind(request.role())?;
-        let exists = context
-            .runtime
-            .namespace()
-            .access(kind, ManagedSqliteAccess::ReadWrite)
-            .map_err(|failure| {
-                let _ = route.retain_failure(failure);
-            })?;
-        if output.is_null() {
-            return Err(());
-        }
-        // SAFETY: null was rejected above and SQLite owns this output allocation.
-        unsafe { output.write(c_int::from(exists)) };
-        callback.complete()?;
         Ok::<(), ()>(())
     }))
     .map_or(ffi::SQLITE_IOERR_ACCESS, |result| {
@@ -174,19 +187,24 @@ pub(super) unsafe extern "C" fn delete(
         let resolved = context.routes.resolve(candidate_name)?;
         let route = resolved.route();
         let callback = route.begin_delete_callback()?;
-        let request = route.project_x_delete(candidate_name, sync_directory)?;
-        if request.role() != resolved.role() {
+        let operation = (|| {
+            let request = route.project_x_delete(candidate_name, sync_directory)?;
+            if request.role() != resolved.role() {
+                return Err(());
+            }
+            let kind = sidecar_kind(request.role())?;
+            let _outcome = context
+                .runtime
+                .namespace()
+                .delete(kind, request.sync_parent())
+                .map_err(|failure| {
+                    let _ = route.retain_failure(failure);
+                })?;
+            Ok::<(), ()>(())
+        })();
+        if !matches!((operation, callback.complete()), (Ok(()), Ok(()))) {
             return Err(());
         }
-        let kind = sidecar_kind(request.role())?;
-        let _outcome = context
-            .runtime
-            .namespace()
-            .delete(kind, request.sync_parent())
-            .map_err(|failure| {
-                let _ = route.retain_failure(failure);
-            })?;
-        callback.complete()?;
         Ok::<(), ()>(())
     }))
     .map_or(ffi::SQLITE_IOERR_DELETE, |result| {
@@ -210,20 +228,25 @@ pub(super) unsafe extern "C" fn full_pathname(
         let resolved = context.routes.resolve(candidate_name)?;
         let route = resolved.route();
         let callback = route.begin_full_pathname_callback()?;
-        if resolved.role() != ManagedSqliteLogicalFileRole::Main {
+        let operation = (|| {
+            if resolved.role() != ManagedSqliteLogicalFileRole::Main {
+                return Err(());
+            }
+            let projected = route.project_x_full_pathname(candidate_name, output_size)?;
+            if output.is_null() || output_size <= 0 {
+                return Err(());
+            }
+            let bytes = projected.as_bytes_with_nul();
+            if bytes.len() > output_size as usize {
+                return Err(());
+            }
+            // SAFETY: capacity was checked and regions do not overlap.
+            unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), output.cast::<u8>(), bytes.len()) };
+            Ok::<(), ()>(())
+        })();
+        if !matches!((operation, callback.complete()), (Ok(()), Ok(()))) {
             return Err(());
         }
-        let projected = route.project_x_full_pathname(candidate_name, output_size)?;
-        if output.is_null() || output_size <= 0 {
-            return Err(());
-        }
-        let bytes = projected.as_bytes_with_nul();
-        if bytes.len() > output_size as usize {
-            return Err(());
-        }
-        // SAFETY: capacity was checked and regions do not overlap.
-        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), output.cast::<u8>(), bytes.len()) };
-        callback.complete()?;
         Ok::<(), ()>(())
     }))
     .map_or(ffi::SQLITE_CANTOPEN, |result| {

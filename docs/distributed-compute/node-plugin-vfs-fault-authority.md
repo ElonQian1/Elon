@@ -1,7 +1,7 @@
 ---
 title: 节点插件测试 VFS 故障合同权威
 status: current
-reviewed_at: 2026-08-10
+reviewed_at: 2026-08-11
 owners: node, security
 ---
 
@@ -11,7 +11,7 @@ owners: node, security
 
 本文是节点插件 A2 阶段的单一权威，只定义测试专用受管 SQLite VFS 的 SHM、联合关闭、同 namespace 多 Connection 和确定性故障注入合同。生产 SQLite 文件/目录、catalog 与 rollback 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；Planning Snapshot 的依赖顺序仍由 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 维护；本机 schema 与 Store 仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护。
 
-A2 总合同已经冻结；本批源码截止在 `implementation_uncompiled` 的 A2a：建立单 registration 的 exact route 集合、共享 runtime 的多 Connection fixture、route/role/ordinal 精确且只在调用前触发的 one-shot callback fault，以及 exact connection 上的四个 SHM teardown phase fault。A2a 未编译、未运行，也没有完成 A2 全矩阵；map 初始化内部阶段、lock acquire/release、main unlock/file close、callback completion、route observe/retire 与 after-success ABI fault 仍属于 A2b。本批不执行 SQLite Connection、Win32 故障注入、并发竞争、迁移或跨重启验证；既有 69 项 SQLite 专项与 3 项真实 Connection 成功路径证据不覆盖该增量。
+A2 总合同已经冻结。源码现截止在 `implementation_uncompiled` 的 A2b1：A2a 的单 registration exact route 集合、共享 runtime 多 Connection fixture、callback-before-call 与四个 SHM teardown phase 仍保留；A2b1 又增加 exact registration/route 到 live WAL-main 的私有脚本安装桥，以及 `xShmMap` 初始化内部 phase、`xShmLock` acquire/release 的 before-call/after-success test-only seam 和 typed phase case。它未编译、未运行，也不是完整 A2；完整 `xShmUnmap` case、`xShmBarrier` 失败终态、联合 `xClose`、callback completion、route observe/retire、VFS unregister after-success 与逐 case 全量 custody 表仍属于 A2b2。本批不执行 SQLite Connection、Win32 故障注入、并发竞争、迁移或跨重启验证；既有 69 项 SQLite 专项与 3 项真实 Connection 成功路径证据不覆盖该增量。
 
 生产 `ComputePluginHandleBoundAuthorityOpenIntent::open()` 必须继续固定返回 `COMPUTE_PLUGIN_HANDLE_BOUND_SQLITE_VFS_UNAVAILABLE`。A2 不提供生产 VFS 注册、process owner、live `sqlite3_file`、opened authority、A1 producer 或 v15 能力，也不改变 v14 blocked-only、Runtime stopped、`snapshot_ready=false` 与全部 side-effect false 的事实。
 
@@ -24,7 +24,7 @@ A2 总合同已经冻结；本批源码截止在 `implementation_uncompiled` 的
 - registry/file-custody 已把 main、Journal/WAL sidecar、SHM lease、route 与 callback lease 不可拆持有；物理关闭失败会保留 exact custody，不能把 `Drop` 当作成功回执；
 - 测试受管 VFS 已让单个真实 SQLite Connection 经 main、Journal/WAL、SHM 和 `xClose` 进入 exact route，并在正常关闭后退休 route、注销 VFS 和删除测试根。
 
-A2a 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；同时增加 callback-before-call 与 SHM teardown 的 test-only one-shot fault 形状。它仍只是静态 fixture：未形成完整 Win32 平台阶段矩阵，未动态证明非末连接关闭不会拆掉共享 SHM，也未证明一条 route 或 domain 故障时其余 Connection 的全部竞争与保活结果。
+A2a 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；同时增加 callback-before-call 与 SHM teardown 的 test-only one-shot fault 形状。A2b1 只把 exact route 上的 plan 经刚提升的 live WAL-main 绑定到 runtime generation + SHM connection ID，并把 map 初始化与 lock 平台动作放进相邻 test-only hook；typed records 固定两 Connection、两 route、六 logical-name，并声明 phase occurrence、map mode/region、lock action/range/pre-mask 与 DMS custody 的静态预期。它仍只是源码合同：没有完整 close/retirement 矩阵，也未动态证明非末连接关闭、domain terminal 后 sibling 行为或真实 Win32 custody 结果。
 
 ## 3. Test-only 拓扑与寿命
 
@@ -40,7 +40,7 @@ A2 fixture 必须保持以下所有权拓扑：
 
 ## 4. 确定性故障脚本
 
-故障脚本只能存在于 `cfg(test)` 可达边界，并由 exact fixture/runtime/route 保管。以下是完整 A2 的目标合同；A2a 的 callback 脚本只支持 `before_call`，低层脚本只能经 live WAL-main custody 安装，并以 runtime generation + SHM connection ID 锁定 `ViewUnmap`、`MappingClose`、`DmsSharedRelease` 与 SHM `FileClose`。这条低层 seam 尚未桥接到 route fixture，因此不能推导出 route→SHM connection 的完整注入矩阵；未覆盖字段和阶段也不得从 A2a 推断为已实现。每个完整注入点至少绑定：
+故障脚本只能存在于 `cfg(test)` 可达边界，并由 exact fixture/runtime/route 保管。以下是完整 A2 的目标合同。callback wrapper 仍只支持 `before_call`；低层脚本只能由 exact route 的 main wrapper 在 `promote_main_to_wal` 后、真实 `shm_map` 前，经私有 file-custody delegate 安装，target 只能从 live WAL-main 推导 runtime generation + SHM connection ID。A2b1 在原四个 teardown phase 外覆盖 `ExactSiblingOpen`、DMS exclusive/truncate/release/shared、`FileSize`/`FileGrow`、`MappingCreate`/`ViewMap` 与 `LockAcquire`/`LockRelease`；其中只读 `FileSize` 明确只允许 `before_call`，不能伪造 after-success mutation。它不暴露 raw custody、connection ID 或 pointer。未覆盖的 close/route/registration phase 不得从 A2b1 推断为已实现。每个完整注入点至少绑定：
 
 - 不透明 fault ID、runtime generation、route/Connection 身份与 main/Journal/WAL/SHM role；
 - callback kind、`ManagedSqliteShmFailurePhase`、同阶段 occurrence ordinal 与 `before_call` 或 `after_success` 时点；
@@ -53,12 +53,13 @@ A2 fixture 必须保持以下所有权拓扑：
 
 ## 5. A2 静态矩阵
 
-完整 A2 源码合同至少逐项表达下表。当前 A2a 只覆盖其中的 route 解析、多 Connection 成功/竞争形状、callback-before-call 与四个 teardown phase；其余单元格仍是 A2b 待实现。以后即使全部“表达”，也只表示存在静态 case/fixture 形状，不表示已经执行：
+完整 A2 源码合同至少逐项表达下表。当前 A2b1 覆盖 route 解析、多 Connection 成功/竞争形状、callback-before-call、四个 teardown phase、map 初始化与 lock acquire/release 的注入 seam，并为后一组写入固定拓扑的 typed phase records；它仍未覆盖表中完整 native-error/cleanup/close/registration case inventory。以后即使全部“表达”，也只表示存在静态 case/fixture 形状，不表示已经执行：
 
 | 路径 | 必须覆盖的阶段 | 静态不变量 |
 |---|---|---|
 | `xShmMap` observe/extend | exact sibling open、DMS exclusive acquire/truncate/release、DMS shared acquire、file size/grow、mapping create、view map | 输出指针失败时清零；before-mutation 可分类失败；已知 mutation 不被改写为空操作；结果不确定永久 poison 并保留 node/mapping/file custody |
 | `xShmLock` shared/exclusive | request validation、local sibling contention、OS lock acquire/release | 合法 contention 只返回 `SQLITE_BUSY` 且不 poison；非法 range/action 不调用平台；unlock 结果不确定不能清本地 mask或释放 custody |
+| `xShmBarrier` | callback admission、barrier、callback completion | 无 SQLite result-code 返回通道；失败必须清 raw state一次并保留 terminal custody，不能伪造为 `SQLITE_IOERR` 或正常完成；当前属于 A2b2 |
 | `xShmUnmap` 非末/末连接 | held-lock gate、connection detach、view unmap、mapping close、DMS shared release、SHM file close、delete authorization/delete | 持锁 unmap 拒绝；非末连接只 detach 自己；末连接才 teardown；delete 只在 exact runtime/main identity 与 Main-EXCLUSIVE gate 下成立 |
 | WAL-main 联合 `xClose` | SHM unmap、main unlock、main file close、close callback completion、route observation/retirement | 顺序固定先 SHM 后 main；任一步失败都不继续伪造后继回执；raw state只消费一次；exact leases/custody 保留或隔离 |
 | registration shutdown | outstanding callback、live route、quarantined custody、VFS unregister | 任一未闭合对象阻止正常释放；注销失败保留 table/name/context；测试根只有完整成功证明后才可删除 |
@@ -97,6 +98,6 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 ## 9. 静态验收与后续门槛
 
-A2a 本批可接受的结论仅是：权威总合同先行；test-only API 不可从生产构造；callback-before-call 与 SHM teardown 子集具备 one-shot/fenced 形状；多 Connection 共享 runtime 而 route 隔离；失败析构不伪造正常 route/VFS retirement；生产 `open()`、A1 producer 与协议均保持不可达。不得宣称完整 A2 matrix/source 已形成。验收仅允许文档检查、rustfmt 与静态 diff/搜索。
+A2b1 本批可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；map 初始化、lock acquire/release 与既有 teardown 子集具备 one-shot/fenced 形状；after-success 只在平台成功和本地 custody/mask 同步后终态化；typed records 是固定拓扑的静态 phase evidence；生产 `open()`、A1 producer 与协议均保持不可达。不得宣称完整 A2 matrix/source 已形成。验收仅允许文档检查、rustfmt 与静态 diff/搜索。
 
-进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，必须先由 A2b 补齐上述内部 phase、after-success terminalization 与逐 case custody 断言，再另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，逐项证明 SQLite code、custody、route、domain tombstone 与资源释放。静态 A2b 和动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。
+进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，必须先由 A2b2 补齐 `xShmBarrier`、完整 unmap、联合 close、callback/route/registration after-success 与全量逐 case custody 断言，再另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，逐项证明 SQLite code、custody、route、domain tombstone 与资源释放。静态 A2b2 和动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。

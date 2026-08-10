@@ -15,6 +15,10 @@ use crate::node_agent_managed_fs::{
     ManagedSqliteShmMapOutcome, ManagedSqliteShmUnmapMode, ManagedSqliteUnlockTarget,
     PinnedManagedSqliteWalRuntime,
 };
+#[cfg(test)]
+use crate::node_agent_managed_fs::{
+    ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase, ManagedSqliteShmTestFaultProbe,
+};
 
 use super::{
     ManagedSqliteRegistryCustody, ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryPinnedFile,
@@ -157,6 +161,21 @@ where
         runtime: &PinnedManagedSqliteWalRuntime,
     ) -> Result<(), ()> {
         self.file.promote_main_to_wal(runtime).map_err(drop)
+    }
+
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn install_exact_wal_main_shm_test_fault_script(
+        &mut self,
+        before_call: &[(ManagedSqliteShmFailurePhase, u32)],
+        after_success: &[(
+            ManagedSqliteShmFailurePhase,
+            u32,
+            ManagedSqliteShmFailureClass,
+        )],
+    ) -> Result<ManagedSqliteShmTestFaultProbe, ()> {
+        self.file
+            .install_exact_wal_main_shm_test_fault_script(before_call, after_success)
+            .map_err(drop)
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority) fn shm_map(

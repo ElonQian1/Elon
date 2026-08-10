@@ -176,10 +176,10 @@ fn routed_callback_lease_blocks_close_until_explicit_completion() {
 }
 
 #[test]
-fn dropped_callback_lease_is_returned_to_the_exact_route() {
+fn dropped_callback_lease_quarantines_the_exact_route() {
     let process =
         ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
-    let (custody, _) = probe();
+    let (custody, drops) = probe();
     let route = process.register(custody).expect("route");
     process.begin_open_attempt(route).expect("opening");
     {
@@ -187,9 +187,13 @@ fn dropped_callback_lease_is_returned_to_the_exact_route() {
             .begin_callback(route, ManagedSqliteRegistryCallbackKind::FullPathname)
             .expect("callback lease");
     }
-    process
-        .begin_connection_close(route)
-        .expect("drop must drain callback");
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    assert!(matches!(
+        process.begin_connection_close(route),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+        ))
+    ));
 }
 
 #[test]

@@ -86,6 +86,9 @@ impl ManagedSqliteShmTestFaultController {
             )?;
         }
         for &(phase, ordinal, class) in after_success {
+            if !supports_after_success(phase) {
+                return Err("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_PHASE_UNSUPPORTED");
+            }
             if !matches!(
                 class,
                 ManagedSqliteShmFailureClass::MutatedButKnown
@@ -234,7 +237,7 @@ impl ManagedSqliteShmTriggeredTestFault {
                 phase,
                 io::Error::other("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_OUTCOME_UNCERTAIN"),
                 true,
-                phase == ManagedSqliteShmFailurePhase::DmsSharedRelease,
+                lock_phase(phase),
             ),
             _ => ManagedSqliteShmFailure::poisoned_code(
                 phase,
@@ -275,10 +278,37 @@ fn push_step(
 
 fn phase_index(phase: ManagedSqliteShmFailurePhase) -> Option<usize> {
     match phase {
-        ManagedSqliteShmFailurePhase::ViewUnmap => Some(0),
-        ManagedSqliteShmFailurePhase::MappingClose => Some(1),
-        ManagedSqliteShmFailurePhase::DmsSharedRelease => Some(2),
-        ManagedSqliteShmFailurePhase::FileClose => Some(3),
+        ManagedSqliteShmFailurePhase::ExactSiblingOpen => Some(0),
+        ManagedSqliteShmFailurePhase::DmsExclusiveAcquire => Some(1),
+        ManagedSqliteShmFailurePhase::DmsTruncate => Some(2),
+        ManagedSqliteShmFailurePhase::DmsExclusiveRelease => Some(3),
+        ManagedSqliteShmFailurePhase::DmsSharedAcquire => Some(4),
+        ManagedSqliteShmFailurePhase::FileSize => Some(5),
+        ManagedSqliteShmFailurePhase::FileGrow => Some(6),
+        ManagedSqliteShmFailurePhase::MappingCreate => Some(7),
+        ManagedSqliteShmFailurePhase::ViewMap => Some(8),
+        ManagedSqliteShmFailurePhase::LockAcquire => Some(9),
+        ManagedSqliteShmFailurePhase::LockRelease => Some(10),
+        ManagedSqliteShmFailurePhase::ViewUnmap => Some(11),
+        ManagedSqliteShmFailurePhase::MappingClose => Some(12),
+        ManagedSqliteShmFailurePhase::DmsSharedRelease => Some(13),
+        ManagedSqliteShmFailurePhase::FileClose => Some(14),
         _ => None,
     }
+}
+
+fn supports_after_success(phase: ManagedSqliteShmFailurePhase) -> bool {
+    phase_index(phase).is_some() && phase != ManagedSqliteShmFailurePhase::FileSize
+}
+
+fn lock_phase(phase: ManagedSqliteShmFailurePhase) -> bool {
+    matches!(
+        phase,
+        ManagedSqliteShmFailurePhase::DmsExclusiveAcquire
+            | ManagedSqliteShmFailurePhase::DmsExclusiveRelease
+            | ManagedSqliteShmFailurePhase::DmsSharedAcquire
+            | ManagedSqliteShmFailurePhase::DmsSharedRelease
+            | ManagedSqliteShmFailurePhase::LockAcquire
+            | ManagedSqliteShmFailurePhase::LockRelease
+    )
 }

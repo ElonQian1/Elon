@@ -30,4 +30,6 @@ pub(super) use owner::ManagedSqliteRegistryRouteHandle;
 #[cfg(test)]
 pub(super) use process_owner::ManagedSqliteRegistryProcessOwner;
 #[cfg(all(test, windows))]
-pub(super) use test_vfs_bridge::{ManagedSqliteTestVfsCallback, ManagedSqliteTestVfsRoute};
+pub(super) use test_vfs_bridge::{
+    ManagedSqliteTestVfsCallback, ManagedSqliteTestVfsFile, ManagedSqliteTestVfsRoute,
+};
