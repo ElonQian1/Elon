@@ -175,6 +175,21 @@ function Wait-NavigationReady {
     throw "Timed out waiting for ChatGPT navigation readiness. Last action=$($last.last_command.action)."
 }
 
+function Wait-AccountMenuReady {
+    param([Parameter(Mandatory = $true)][int]$TimeoutSec)
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $last = $null
+    do {
+        $last = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
+        $settings = [int]$last.observed_semantics.settings
+        $logout = [int]$last.observed_semantics.logout
+        if ($settings -gt 0 -and $logout -gt 0) { return $last }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for the ChatGPT account menu semantic manifest."
+}
+
 function Wait-ComposerOptionsReady {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section,
@@ -306,6 +321,35 @@ Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0) ([string]$navi
 Add-Check "navigation_adaptation_review" (
     -not $navigationAdaptationRequired
 ) ($navigationAdaptationReasons -join ",")
+
+$profileControls = @(
+    $navigationMatrix.control_coverage |
+        Where-Object { $_.semantic -eq "profile" -and $_.region -eq "overlay" }
+)
+Add-Check "account_menu_entry" ($profileControls.Count -gt 0) ([string]$profileControls.Count)
+$accountMenuMatrix = $null
+if ($profileControls.Count -gt 0) {
+    $accountMenuOpen = Invoke-UiAction -Action "chatgpt_invoke_control" -Arguments @{
+        control_id = [string]$profileControls[0].control_id
+    }
+    Add-Check "account_menu_open" ($accountMenuOpen.control_ok -eq $true) ([string]$accountMenuOpen.action)
+    $accountMenuMatrix = Wait-AccountMenuReady -TimeoutSec $ReadyTimeoutSec
+    $accountMenuReasons = @($accountMenuMatrix.adaptation_review.reasons)
+    Add-Check "account_menu_settings" (
+        [int]$accountMenuMatrix.observed_semantics.settings -gt 0
+    ) ([string]$accountMenuMatrix.observed_semantics.settings)
+    Add-Check "account_menu_logout" (
+        [int]$accountMenuMatrix.observed_semantics.logout -gt 0
+    ) ([string]$accountMenuMatrix.observed_semantics.logout)
+    Add-Check "account_menu_generic_controls" (
+        [int]$accountMenuMatrix.manifest.generic_control_count -eq 0
+    ) ([string]$accountMenuMatrix.manifest.generic_control_count)
+    Add-Check "account_menu_adaptation_review" (
+        $accountMenuMatrix.adaptation_review.required -ne $true
+    ) ($accountMenuReasons -join ",")
+    Invoke-Adb shell input keyevent 4 | Out-Null
+    Start-Sleep -Milliseconds 500
+}
 
 $modelResult = Get-ComposerOptions -Section "model"
 $modelOptions = @($modelResult.options)
