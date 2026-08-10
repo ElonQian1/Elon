@@ -1,5 +1,7 @@
 #[path = "open_commerce_webhook_api_tests.rs"]
 mod webhook_api_tests;
+#[path = "open_commerce_webhook_dead_letter_api_tests.rs"]
+mod webhook_dead_letter_api_tests;
 
 use serde_json::{json, Value};
 use uuid::Uuid;
