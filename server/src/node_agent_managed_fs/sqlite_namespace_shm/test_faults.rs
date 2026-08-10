@@ -1,8 +1,11 @@
-//! Exact-connection deterministic SHM operation and teardown faults for tests.
+//! Exact-connection deterministic SHM operation, barrier and teardown faults for tests.
 //!
 //! Installation requires a live WAL-main holder, so every step is fenced to its runtime
 //! generation and SHM connection id. No constructor or state exists in non-test builds.
 
+#[cfg(test)]
+#[path = "test_faults/a2b2_phase_tests.rs"]
+mod a2b2_phase_tests;
 #[path = "test_faults/api.rs"]
 mod api;
 #[path = "test_faults/controller.rs"]

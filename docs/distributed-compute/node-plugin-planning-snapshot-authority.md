@@ -11,7 +11,7 @@ owners: node, server
 
 本文是节点插件 Planning Snapshot 的本机一致性投影、生产启用顺序和协议换代边界的主权威。SQLite 文件与 VFS 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；本机 schema、Store 和恢复语义仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护；endpoint 会话 currentness 仍由 [`node-endpoint-session-authority.md`](node-endpoint-session-authority.md) 维护。
 
-当前已形成未编译的 A1 sealed projector 源码合同，不宣称 producer 已实现或可达。A2 总合同已经冻结；未编译、未运行的 A2b1 已在 A2a route/多 Connection/teardown 基础上增加 exact route→live WAL-main 私有安装桥，以及 map 初始化与 lock acquire/release 的内部 fault seam/typed phase records，但 A2b2 close/route/registration 全矩阵和全部 Windows 动态证据仍缺，精确边界见 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md)。生产 `OpenedComputePluginLocalAuthority` 仍不能成功打开，生产 VFS、process owner/fence、root/currentness、trusted-time、rollback 与 node-profile provider 均未接线，因此不存在可生产的 snapshot custody。所有现有节点继续诚实报告 `context_ready=false`、`snapshot_ready=false`，并保持 Runtime stopped。
+当前已形成未编译的 A1 sealed projector 源码合同，不宣称 producer 已实现或可达。A2 总合同已经冻结；未编译、未运行的 A2b2 静态源码已在 exact route→live WAL-main 与 map/lock 基础上补入 barrier、完整 unmap、联合 close、callback/registry route/logical route/registration lifecycle 和 typed custody/count inventory，但全部逐 case Windows 动态证据仍缺，精确边界见 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md)。生产 `OpenedComputePluginLocalAuthority` 仍不能成功打开，生产 VFS、process owner/fence、root/currentness、trusted-time、rollback 与 node-profile provider 均未接线，因此不存在可生产的 snapshot custody。所有现有节点继续诚实报告 `context_ready=false`、`snapshot_ready=false`，并保持 Runtime stopped。
 
 ## 2. A1 的唯一入口
 
@@ -55,7 +55,7 @@ A1 只允许两类内部结果：
 后续实现必须依次推进，不得跨级接线：
 
 1. A1：先落 sealed、handle-bound、单只读事务 projector 形状；保持生产 open 和所有协议 producer 不可达。
-2. A2 先按 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 完成测试 VFS 的 SHM map/lock/unmap、联合 close 确定性平台故障矩阵和同 namespace 多 Connection custody；当前只到未编译、未运行的 A2b1 子集，仍须 A2b2 静态闭合及逐 case Windows 动态证据才可进入第 3 步，且这些证据也不能自动提升为生产入口。
+2. A2 先按 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 完成测试 VFS 的 SHM map/lock/unmap、联合 close 确定性平台故障矩阵和同 namespace 多 Connection custody；当前 A2b2 只有未编译、未运行的静态闭合，仍须逐 case Windows 动态证据才可进入第 3 步，且这些证据也不能自动提升为生产入口。
 3. 建立生产 process owner、VFS 注册/注销所有权、live `sqlite3_file`/route、持续 authorizer/PRAGMA 门卫、handle-bound open/close 和 exact root/process fence 生命周期。
 4. 接入生产 root/keyring、trusted-time、rollback 与 node-profile provider；用真实 opened authority 证明 A1 全字段同快照投影及全部 typed blocker。
 5. 另建协议 v15 producer、会话账本和节点接收链；完成版本隔离、兼容失败关闭及动态验收后，才讨论 `snapshot_ready=true`。

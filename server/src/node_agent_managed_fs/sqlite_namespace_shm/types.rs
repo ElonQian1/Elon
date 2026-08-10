@@ -233,6 +233,7 @@ pub(crate) enum ManagedSqliteShmFailurePhase {
     ViewMap,
     LockAcquire,
     LockRelease,
+    Barrier,
     ConnectionDetach,
     ViewUnmap,
     MappingClose,

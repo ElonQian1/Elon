@@ -5,6 +5,10 @@ use std::{
 
 use ring::rand::{SecureRandom, SystemRandom};
 
+#[cfg(test)]
+use super::types::{
+    ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryConnectionClosedReceipt,
+};
 use super::{
     owner::{
         ManagedSqliteRegistryCustody, ManagedSqliteRegistryOwner,
@@ -258,6 +262,20 @@ where
         })
     }
 
+    #[cfg(test)]
+    fn finish_callback_with_receipt(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        lease: ManagedSqliteRegistryCallbackLease,
+    ) -> Result<
+        ManagedSqliteRegistryCallbackCompletionReceipt,
+        ManagedSqliteRegistryProcessRouteRejection,
+    > {
+        self.apply_route_retaining_failure(route, lease, |routes, lease| {
+            routes.finish_callback_with_receipt(route, lease)
+        })
+    }
+
     fn apply_route<T>(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
@@ -351,6 +369,20 @@ where
             .take()
             .expect("live routed callback lease must contain state custody");
         self.owner.finish_callback(self.route, lease)
+    }
+
+    #[cfg(test)]
+    pub(super) fn complete_with_receipt(
+        mut self,
+    ) -> Result<
+        ManagedSqliteRegistryCallbackCompletionReceipt,
+        ManagedSqliteRegistryProcessRouteRejection,
+    > {
+        let lease = self
+            .lease
+            .take()
+            .expect("live routed callback lease must contain state custody");
+        self.owner.finish_callback_with_receipt(self.route, lease)
     }
 }
 

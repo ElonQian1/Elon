@@ -67,7 +67,23 @@ impl ManagedSqliteShmCoordinator {
             .map_err(|_| self.test_fault_internal_failure(phase, known_mutation))
     }
 
-    pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) fn activate_test_fault(
+    pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) fn trigger_before_test_fault(
+        &self,
+        matched: ManagedSqliteShmMatchedTestFault,
+        prior_mutation: bool,
+    ) -> Result<ManagedSqliteShmFailure, ManagedSqliteShmFailure> {
+        let phase = matched.phase();
+        let mut faults = self
+            .test_faults
+            .lock()
+            .map_err(|_| self.test_fault_internal_failure(phase, prior_mutation))?;
+        let triggered = faults
+            .activate_before(matched)
+            .map_err(|_| self.test_fault_internal_failure(phase, prior_mutation))?;
+        Ok(triggered.into_before_failure(prior_mutation))
+    }
+
+    pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) fn trigger_after_test_fault(
         &self,
         matched: ManagedSqliteShmMatchedTestFault,
         known_mutation: bool,
@@ -78,9 +94,9 @@ impl ManagedSqliteShmCoordinator {
             .lock()
             .map_err(|_| self.test_fault_internal_failure(phase, known_mutation))?;
         let triggered = faults
-            .activate(matched, known_mutation)
+            .activate_after(matched, known_mutation)
             .map_err(|_| self.test_fault_internal_failure(phase, known_mutation))?;
-        Ok(triggered.into_failure(known_mutation))
+        Ok(triggered.into_after_failure(known_mutation))
     }
 
     pub(super) fn test_fault_target(&self, connection_id: u64) -> ManagedSqliteShmTestFaultTarget {

@@ -20,7 +20,7 @@ owners: backend, node, ai-economy
 
 ## 当前事实
 
-> v218 合同修正：历史“v11 Planning Snapshot V2”现以协议阈值 12 解释；work-admission `None` 允许新晋升槽首次重授权，`Some` 才承诺 current head。当前 A1 只有未编译的同事务 projector；A2 总合同已冻结，源码只到未编译、未运行的 A2b1 route→WAL-main 与内部 map/lock fault 子集，A2b2 与动态证据仍缺。无 producer，v14 永久 blocked-only，Runtime/Ready/派发不可达。
+> v218 合同修正：历史“v11 Planning Snapshot V2”现以协议阈值 12 解释；work-admission `None` 允许新晋升槽首次重授权，`Some` 才承诺 current head。当前 A1 只有未编译的同事务 projector；A2 总合同已冻结，未编译、未运行的 A2b2 静态源码已覆盖 route→WAL-main、map/lock、barrier、完整 unmap、联合 close、route/registration typed custody/count inventory，但逐 case Windows 动态证据仍缺。无 producer，v14 永久 blocked-only，Runtime/Ready/派发不可达。
 
 | 能力 | 2026-08-05 状态 |
 |---|---|
@@ -32,7 +32,7 @@ owners: backend, node, ai-economy
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；PC 已写入单 Bucket 追加/撤出源码。服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易；尚未编译和运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；v203 强制 prepared 激活计划第二人复核，v204 增加隔离恢复计划、第二人复核、预检和原子应用回执，v205 增加恢复计划追加式废止和重做入口。PC `/compute-supply` 已写入本人申请、历史、预检和取消，`/compute-activation` 已写入激活、隔离、恢复和恢复计划废止管理。恢复前旧 active Offer 必须先退场且不会自动重发；所有流程均不发送节点命令、不退款、不付款或移动资金，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
-| 节点插件治理合同 | Signed Manifest/InstallPlan、双 keyring、authority、受管取数/验证/staging/cleanup 与 v216 install/promotion 双回执已形成；v216 已随节点编译并通过 11 项版本链及既有 69 项 SQLite 回归，其中 3 项为单 Connection 成功路径。v217/v218 work-admission、Planning A1 尚未编译；A2 只落了未编译、未运行的 A2b1 exact bridge、内部 map/lock fault 与既有 teardown/多 Connection fixture，A2b2 完整静态矩阵和动态证据仍缺。生产 VFS/register/live `sqlite3_file`/process owner/open、A1 producer、root/keyring/time/rollback、Signer、Host、downloader、Sidecar、Runtime、Ready 与 Attempt 接线不可达；v14 永久 blocked-only。精确边界见阅读顺序第 4 项 |
+| 节点插件治理合同 | Signed Manifest/InstallPlan、双 keyring、authority、受管取数/验证/staging/cleanup 与 v216 install/promotion 双回执已形成；v216 已随节点编译并通过 11 项版本链及既有 69 项 SQLite 回归，其中 3 项为单 Connection 成功路径。v217/v218 work-admission、Planning A1 尚未编译；A2b2 已形成未编译、未运行的 exact bridge、map/lock/barrier/unmap/联合 close/route/registration 静态源码和 typed custody/count inventory，但它不是逐 case Windows 动态证据。生产 VFS/register/live `sqlite3_file`/process owner/open、A1 producer、root/keyring/time/rollback、Signer、Host、downloader、Sidecar、Runtime、Ready 与 Attempt 接线不可达；v14 永久 blocked-only。精确边界见阅读顺序第 4 项 |
 | 节点端点凭据与认证会话权威 | 服务端 v216-v218 已铺 endpoint credential/session、目标绑定 owner 重认证与单次消费；direct-TLS owner API、Windows DPAPI bootstrap、legacy no-downgrade 及 v13 auth-only WSS 均默认关闭。当前批次新增独立 v14 Planning bootstrap profile：固定单一 capability，在同一 exact endpoint generation 内只允许 sharing→preparation→Planning 六消息摘要链；每段观察与下一 intent 同事务重验耐久 session/credential并写 v219 provenance。NodeAgent 始终 `connected=false`，Planning 终点仍 `snapshot_ready=false`；无 signed Plan、work-admission、Runtime、Ready、route、outbox、Lease 或派发。源码尚未编译、测试、运行或执行迁移，状态仍为 `implementation_unwired`。见 `node-endpoint-session-authority.md` |
 | Attempt Execution Plan / Gateway | v211-v214 已铺 sealed Plan、Provider-neutral Start、route/credential/actor authority、outbox 与 no-start recovery；v215 又形成 accepted observation→ACK→v185→actor/LeaseAuthority/commit→application 的 Store-local 原子闭包，并把既有 ACK-null cleanup pair 固定送往 quarantine。服务端及测试源码已编译通过；内存 SQLite 已完整迁移到 v215，并以 3 项专项测试覆盖重复应用、关键对象及冲突 backfill 门卫，但未执行生产磁盘迁移或运行生产链路。旧人工激活/Renew/Abort 仍固定失败，可信输入、发送和远端证据 capability 无构造器，也无网络、worker、ACK ingress 或真实派发。见 `attempt-execution-plan-v1.md`、`attempt-execution-gateway-v1.md`、`attempt-delivery-outbox-v1.md` |
 | 节点本机 Attempt 执行合同 | Start / RenewLease / Cancel、Runner typed events 与 Host 盖章事件合同已写；它不是 Provider-neutral wire，尚未编译或接入云端协议 |
@@ -134,7 +134,7 @@ owners: backend, node, ai-economy
 
 NodeRuntime 已挂载默认关闭的 Compute Bootstrap，只派生 installation/data-root/authority 身份与路径并绑定节点状态目录实例锁 weak witness；该 witness 只作为进程存活前提，不能替代工件根锁。现有 `pin_compute_plugin_root()` 已能返回同时持有 canonical pinned root 与 share-none 锁句柄的非 Clone capability，但 Bootstrap 尚无 sharing-on transition，因此管理状态仍如实显示根锁未取得，生产 trusted-time、生产回滚见证、root pin、authority open 和 process fence 也不可用。数据根变化要求重启；默认关闭不会打开数据库、执行下载或启动 Sidecar。后续 Runner/节点 Attempt 持久化将使用 schema v4 的独立执行 fence 域，不把高频 run 状态塞入 inventory，也不复用下载 cancellation。
 
-F1 的下一硬门槛是先补齐 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的 A2b2 barrier/unmap/联合 close/route/registration 全量静态矩阵，再实际执行 Windows SHM、联合关闭与多 Connection 逐 case 验证。A2b1 未编译、未运行，不能据此进入生产 VFS/open、Planning producer、v15、Runtime 或 Ready。
+F1 的下一硬门槛是实际执行 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的 Windows SHM、联合关闭、route/registration 与多 Connection 逐 case 验证，并把动态观察逐条对齐 A2b2 静态 key。A2b2 仍未编译、未运行，不能据此进入生产 VFS/open、Planning producer、v15、Runtime 或 Ready。
 
 ### F2：Broker、验证和真实结算
 

@@ -63,7 +63,13 @@ pub(super) unsafe extern "C" fn open(
                     let main = opened.into_main_file().map_err(|failure| {
                         let _ = route.retain_failure(failure);
                     })?;
-                    route.bind_main(main, Arc::clone(&context.runtime))?
+                    let lifecycle = resolved.lifecycle();
+                    route.bind_main(
+                        main,
+                        Arc::clone(&context.runtime),
+                        Arc::new(lifecycle.clone()),
+                        Arc::new(lifecycle),
+                    )?
                 }
                 ManagedSqliteLogicalFileRole::Journal => {
                     let opened = context

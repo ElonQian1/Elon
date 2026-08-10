@@ -119,9 +119,9 @@ fn uncertain_lock_phase_faults_report_uncertain_lock_custody() {
             .expect("observe uncertain lock phase")
             .expect("match uncertain lock phase");
         let failure = faults
-            .activate(matched, true)
+            .activate_after(matched, true)
             .expect("activate uncertain lock phase")
-            .into_failure(true);
+            .into_after_failure(true);
         assert!(failure.lock_outcome_uncertain());
     }
 }

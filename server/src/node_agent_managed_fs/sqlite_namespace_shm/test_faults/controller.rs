@@ -86,7 +86,7 @@ impl ManagedSqliteShmTestFaultController {
             )?;
         }
         for &(phase, ordinal, class) in after_success {
-            if !supports_after_success(phase) {
+            if !supports_after_success(phase, class) {
                 return Err("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_PHASE_UNSUPPORTED");
             }
             if !matches!(
@@ -144,14 +144,37 @@ impl ManagedSqliteShmTestFaultController {
             .map(ManagedSqliteShmMatchedTestFault))
     }
 
-    pub(super) fn activate(
+    pub(super) fn activate_before(
+        &mut self,
+        matched: ManagedSqliteShmMatchedTestFault,
+    ) -> Result<ManagedSqliteShmTriggeredTestFault, &'static str> {
+        if !matched.is_before_call() {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_BEFORE_TIMING_INVALID");
+        }
+        self.consume_matched(matched)
+    }
+
+    pub(super) fn activate_after(
         &mut self,
         matched: ManagedSqliteShmMatchedTestFault,
         known_mutation: bool,
     ) -> Result<ManagedSqliteShmTriggeredTestFault, &'static str> {
-        if !matched.is_before_call() && !known_mutation {
+        if matched.is_before_call() {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_TIMING_INVALID");
+        }
+        if !known_mutation
+            && (matched.phase() != ManagedSqliteShmFailurePhase::Barrier
+                || matched.0.class != ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned)
+        {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_WITHOUT_MUTATION");
         }
+        self.consume_matched(matched)
+    }
+
+    fn consume_matched(
+        &mut self,
+        matched: ManagedSqliteShmMatchedTestFault,
+    ) -> Result<ManagedSqliteShmTriggeredTestFault, &'static str> {
         let index = self
             .pending
             .iter()
@@ -202,10 +225,10 @@ impl ManagedSqliteShmMatchedTestFault {
 pub(super) struct ManagedSqliteShmTriggeredTestFault(ManagedSqliteShmTestFaultStep);
 
 impl ManagedSqliteShmTriggeredTestFault {
-    pub(super) fn into_failure(self, known_mutation: bool) -> ManagedSqliteShmFailure {
+    pub(super) fn into_before_failure(self, prior_mutation: bool) -> ManagedSqliteShmFailure {
         let phase = self.0.phase;
         match (self.0.timing, self.0.class) {
-            (ManagedSqliteShmTestFaultTiming::BeforeCall, _) if known_mutation => {
+            (ManagedSqliteShmTestFaultTiming::BeforeCall, _) if prior_mutation => {
                 ManagedSqliteShmFailure::new(
                     phase,
                     ManagedSqliteShmFailureClass::MutatedButKnown,
@@ -222,10 +245,22 @@ impl ManagedSqliteShmTriggeredTestFault {
                 ManagedSqliteShmFailureClass::IoBeforeMutation,
                 io::Error::other("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_BEFORE_MUTATION"),
             ),
+            _ => ManagedSqliteShmFailure::poisoned_code(
+                phase,
+                "NODE_MANAGED_SQLITE_SHM_TEST_FAULT_CONTRACT_INVALID",
+                prior_mutation,
+                false,
+            ),
+        }
+    }
+
+    pub(super) fn into_after_failure(self, known_mutation: bool) -> ManagedSqliteShmFailure {
+        let phase = self.0.phase;
+        match (self.0.timing, self.0.class) {
             (
                 ManagedSqliteShmTestFaultTiming::AfterSuccess,
                 ManagedSqliteShmFailureClass::MutatedButKnown,
-            ) => ManagedSqliteShmFailure::new(
+            ) if known_mutation => ManagedSqliteShmFailure::new(
                 phase,
                 ManagedSqliteShmFailureClass::MutatedButKnown,
                 io::Error::other("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_KNOWN_MUTATION"),
@@ -236,7 +271,7 @@ impl ManagedSqliteShmTriggeredTestFault {
             ) => ManagedSqliteShmFailure::poisoned(
                 phase,
                 io::Error::other("NODE_MANAGED_SQLITE_SHM_TEST_FAULT_AFTER_OUTCOME_UNCERTAIN"),
-                true,
+                known_mutation,
                 lock_phase(phase),
             ),
             _ => ManagedSqliteShmFailure::poisoned_code(
@@ -289,16 +324,25 @@ fn phase_index(phase: ManagedSqliteShmFailurePhase) -> Option<usize> {
         ManagedSqliteShmFailurePhase::ViewMap => Some(8),
         ManagedSqliteShmFailurePhase::LockAcquire => Some(9),
         ManagedSqliteShmFailurePhase::LockRelease => Some(10),
-        ManagedSqliteShmFailurePhase::ViewUnmap => Some(11),
-        ManagedSqliteShmFailurePhase::MappingClose => Some(12),
-        ManagedSqliteShmFailurePhase::DmsSharedRelease => Some(13),
-        ManagedSqliteShmFailurePhase::FileClose => Some(14),
+        ManagedSqliteShmFailurePhase::Barrier => Some(11),
+        ManagedSqliteShmFailurePhase::ConnectionDetach => Some(12),
+        ManagedSqliteShmFailurePhase::ViewUnmap => Some(13),
+        ManagedSqliteShmFailurePhase::MappingClose => Some(14),
+        ManagedSqliteShmFailurePhase::DmsSharedRelease => Some(15),
+        ManagedSqliteShmFailurePhase::FileClose => Some(16),
+        ManagedSqliteShmFailurePhase::ExactSiblingDelete => Some(17),
         _ => None,
     }
 }
 
-fn supports_after_success(phase: ManagedSqliteShmFailurePhase) -> bool {
-    phase_index(phase).is_some() && phase != ManagedSqliteShmFailurePhase::FileSize
+fn supports_after_success(
+    phase: ManagedSqliteShmFailurePhase,
+    class: ManagedSqliteShmFailureClass,
+) -> bool {
+    phase_index(phase).is_some()
+        && phase != ManagedSqliteShmFailurePhase::FileSize
+        && (phase != ManagedSqliteShmFailurePhase::Barrier
+            || class == ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned)
 }
 
 fn lock_phase(phase: ManagedSqliteShmFailurePhase) -> bool {

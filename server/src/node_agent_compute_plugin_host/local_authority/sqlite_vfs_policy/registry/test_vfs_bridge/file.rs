@@ -3,6 +3,9 @@ use std::{
     sync::Arc,
 };
 
+use super::super::file_custody::{
+    ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
+};
 use super::*;
 use crate::node_agent_compute_plugin_host::local_authority::{
     sqlite_vfs_abi::HandleBoundSqliteFileOperations,
@@ -28,6 +31,7 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     route: ManagedSqliteRegistryRouteHandle,
     role: ManagedSqliteLogicalFileRole,
     wal_runtime: Option<Arc<PinnedManagedSqliteWalRuntime>>,
+    close_faults: Option<Arc<dyn ManagedSqliteRegistryCloseLifecycleFaults>>,
 }
 
 impl<Custody, NonceSource> ManagedSqliteTestVfsFile<Custody, NonceSource>
@@ -41,6 +45,7 @@ where
         route: ManagedSqliteRegistryRouteHandle,
         role: ManagedSqliteLogicalFileRole,
         wal_runtime: Option<Arc<PinnedManagedSqliteWalRuntime>>,
+        close_faults: Option<Arc<dyn ManagedSqliteRegistryCloseLifecycleFaults>>,
     ) -> Self {
         Self {
             file,
@@ -48,6 +53,7 @@ where
             route,
             role,
             wal_runtime,
+            close_faults,
         }
     }
 
@@ -167,15 +173,74 @@ where
             route,
             role,
             wal_runtime: _,
+            close_faults,
         } = *self;
-        if role == ManagedSqliteLogicalFileRole::Main {
-            owner.begin_connection_close(route).map_err(drop)?;
+        if role != ManagedSqliteLogicalFileRole::Main {
+            return file.close();
         }
-        file.close()?;
-        if role == ManagedSqliteLogicalFileRole::Main {
-            owner.observe_connection_closed(route).map_err(drop)?;
-            let _receipt = owner.retire_closed(route).map_err(drop)?;
+        let close_faults = close_faults.ok_or(())?;
+        owner.begin_connection_close(route).map_err(drop)?;
+        let callback = file.close_with_callback_receipt()?;
+        if close_faults
+            .before(ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation)
+            .unwrap_or(true)
+        {
+            let _ = owner.retain_terminal_custody(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                callback,
+            );
+            return Err(());
         }
+        let observed = match owner.observe_connection_closed_after_callback(route, callback) {
+            Ok(observed) => observed,
+            Err(rejection) => {
+                close_faults.native_failure(
+                    ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation,
+                );
+                drop(rejection);
+                return Err(());
+            }
+        };
+        if close_faults
+            .after_success(ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation)
+            .unwrap_or(true)
+        {
+            let _ = owner.retain_terminal_custody(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                observed,
+            );
+            return Err(());
+        }
+        if close_faults
+            .before(ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement)
+            .unwrap_or(true)
+        {
+            let _ = owner.retain_terminal_custody(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                observed,
+            );
+            return Err(());
+        }
+        let retirement = match owner.retire_closed_after_observation(route, observed) {
+            Ok(retirement) => retirement,
+            Err(rejection) => {
+                close_faults
+                    .native_failure(ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement);
+                drop(rejection);
+                return Err(());
+            }
+        };
+        if close_faults
+            .after_success(ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement)
+            .unwrap_or(true)
+        {
+            close_faults.retain_retirement_failure(retirement);
+            return Err(());
+        }
+        close_faults.publish_retirement(retirement)?;
         Ok(())
     }
 }

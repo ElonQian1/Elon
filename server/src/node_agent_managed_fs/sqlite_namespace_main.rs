@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::sync::Arc;
 use std::{error::Error as StdError, fmt};
 
 use anyhow::{bail, Result};
@@ -122,6 +124,8 @@ pub(super) fn platform_lock_failure(
 pub(crate) struct PinnedManagedSqliteMainFile {
     pub(super) file: PinnedManagedSqliteFile,
     pub(super) lock_owner: ManagedSqliteLockOwner,
+    #[cfg(test)]
+    pub(super) close_test_faults: Option<Arc<dyn super::close::ManagedSqliteMainCloseTestFaults>>,
 }
 
 #[must_use = "the rejected pinned file remains retained by this failure"]
@@ -150,11 +154,25 @@ impl PinnedManagedSqliteFile {
         Ok(PinnedManagedSqliteMainFile {
             file: self,
             lock_owner,
+            #[cfg(test)]
+            close_test_faults: None,
         })
     }
 }
 
 impl PinnedManagedSqliteMainFile {
+    #[cfg(test)]
+    pub(crate) fn install_close_test_faults(
+        &mut self,
+        faults: Arc<dyn super::close::ManagedSqliteMainCloseTestFaults>,
+    ) -> Result<()> {
+        if self.close_test_faults.is_some() {
+            bail!("NODE_MANAGED_SQLITE_MAIN_CLOSE_TEST_FAULTS_ALREADY_INSTALLED");
+        }
+        self.close_test_faults = Some(faults);
+        Ok(())
+    }
+
     pub(super) fn live_lock_domain(
         &self,
     ) -> std::result::Result<ManagedSqliteLockDomainGuard<'_>, ManagedSqliteLockFailure> {

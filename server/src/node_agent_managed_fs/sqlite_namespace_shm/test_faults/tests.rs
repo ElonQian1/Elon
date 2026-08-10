@@ -59,9 +59,9 @@ fn exact_connection_ordinals_and_whole_teardown_mutation_are_fenced() {
         .expect("match mapping ordinal one");
     assert!(!mapping.is_before_call());
     let mapping_failure = faults
-        .activate(mapping, true)
+        .activate_after(mapping, true)
         .expect("activate post-success mapping fault")
-        .into_failure(true);
+        .into_after_failure(true);
     assert_eq!(
         mapping_failure.class(),
         ManagedSqliteShmFailureClass::MutatedButKnown
@@ -73,9 +73,9 @@ fn exact_connection_ordinals_and_whole_teardown_mutation_are_fenced() {
         .expect("match exact second view");
     assert!(view.is_before_call());
     let view_failure = faults
-        .activate(view, false)
+        .activate_before(view)
         .expect("activate mutation-free before-call fault")
-        .into_failure(false);
+        .into_before_failure(false);
     assert_eq!(
         view_failure.class(),
         ManagedSqliteShmFailureClass::IoBeforeMutation
@@ -87,9 +87,9 @@ fn exact_connection_ordinals_and_whole_teardown_mutation_are_fenced() {
         .expect("observe DMS phase")
         .expect("match DMS ordinal one");
     let dms_failure = faults
-        .activate(dms, true)
+        .activate_after(dms, true)
         .expect("activate post-success DMS fault")
-        .into_failure(true);
+        .into_after_failure(true);
     assert_eq!(
         dms_failure.class(),
         ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
@@ -101,9 +101,9 @@ fn exact_connection_ordinals_and_whole_teardown_mutation_are_fenced() {
         .expect("observe file close")
         .expect("match file close ordinal one");
     let file_failure = faults
-        .activate(file, true)
+        .activate_before(file)
         .expect("activate before-call with prior mutation")
-        .into_failure(true);
+        .into_before_failure(true);
     assert_eq!(
         file_failure.class(),
         ManagedSqliteShmFailureClass::MutatedButKnown
@@ -166,7 +166,7 @@ fn after_success_cannot_activate_without_a_recorded_mutation() {
         .observe(exact, ManagedSqliteShmFailurePhase::ViewUnmap)
         .expect("observe exact view")
         .expect("match exact view");
-    assert!(faults.activate(matched, false).is_err());
+    assert!(faults.activate_after(matched, false).is_err());
     assert_eq!(faults.pending_count(exact), 1);
     assert!(!faults.was_triggered(exact, ManagedSqliteShmFailurePhase::ViewUnmap, 1));
 }

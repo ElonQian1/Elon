@@ -35,6 +35,8 @@ pub(super) enum ManagedSqliteRegistryPinnedFileOperationRejection {
     Shm(ManagedSqliteShmFailure),
     UnsupportedFileRole,
     ShmDetached,
+    #[cfg(test)]
+    InjectedLifecycle,
 }
 
 impl<Custody, NonceSource> ManagedSqliteRegistryPinnedFile<Custody, NonceSource>
@@ -191,16 +193,76 @@ where
     pub(super) fn shm_barrier(
         &mut self,
     ) -> Result<(), ManagedSqliteRegistryPinnedFileOperationRejection> {
-        self.with_callback(ManagedSqliteRegistryCallbackKind::Shm, |custody| {
+        let callback = self
+            .owner
+            .begin_callback(self.route, ManagedSqliteRegistryCallbackKind::Shm)
+            .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
+        let result = {
+            let custody = self
+                .custody
+                .as_mut()
+                .expect("live pinned file operation must retain exact custody");
             let ManagedSqliteRegistryPinnedFileCustody::WalMain { file, .. } = custody else {
                 return Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole);
             };
             let Some(shm) = file.shm_mut() else {
                 return Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached);
             };
-            shm.barrier();
-            Ok(())
-        })
+            shm.barrier()
+        };
+        match result {
+            Err(failure) => {
+                drop(callback);
+                Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(
+                    failure,
+                ))
+            }
+            Ok(()) => {
+                #[cfg(test)]
+                if self.close_faults.as_ref().is_some_and(|faults| {
+                    faults
+                        .before(super::ManagedSqliteRegistryCloseLifecyclePhase::BarrierCallbackCompletion)
+                        .unwrap_or(true)
+                }) {
+                    drop(callback);
+                    return Err(ManagedSqliteRegistryPinnedFileOperationRejection::InjectedLifecycle);
+                }
+                #[cfg(test)]
+                let completed = match callback.complete_with_receipt() {
+                    Ok(completed) => completed,
+                    Err(rejection) => {
+                        if let Some(faults) = self.close_faults.as_ref() {
+                            faults.native_failure(
+                                super::ManagedSqliteRegistryCloseLifecyclePhase::BarrierCallbackCompletion,
+                            );
+                        }
+                        return Err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry(
+                            rejection,
+                        ));
+                    }
+                };
+                #[cfg(not(test))]
+                callback
+                    .complete()
+                    .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
+                #[cfg(test)]
+                if self.close_faults.as_ref().is_some_and(|faults| {
+                    faults
+                        .after_success(
+                            super::ManagedSqliteRegistryCloseLifecyclePhase::BarrierCallbackCompletion,
+                        )
+                        .unwrap_or(true)
+                }) {
+                    let _ = self.owner.retain_terminal_custody(
+                        self.route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        completed,
+                    );
+                    return Err(ManagedSqliteRegistryPinnedFileOperationRejection::InjectedLifecycle);
+                }
+                Ok(())
+            }
+        }
     }
 
     pub(super) fn shm_unmap(
@@ -280,7 +342,11 @@ where
     }
 
     fn quarantine_unsafe_shm_failure(&self, failure: &ManagedSqliteShmFailure) {
-        if !failure.mutation_may_have_occurred() && !failure.lock_outcome_uncertain() {
+        if failure.class()
+            != crate::node_agent_managed_fs::ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+            && !failure.mutation_may_have_occurred()
+            && !failure.lock_outcome_uncertain()
+        {
             return;
         }
         let marker = ManagedSqliteRegistryUnsafeShmFailureMarker {

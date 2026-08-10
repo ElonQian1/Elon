@@ -120,6 +120,32 @@ where
         self.apply_route(route, |routes| routes.observe_connection_closed(route))
     }
 
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn observe_connection_closed_after_callback(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        callback: ManagedSqliteRegistryCallbackCompletionReceipt,
+    ) -> Result<
+        ManagedSqliteRegistryConnectionClosedReceipt,
+        ManagedSqliteRegistryProcessRouteRejection,
+    > {
+        self.apply_route_retaining_failure(route, callback, |routes, callback| {
+            routes.observe_connection_closed_after_callback(route, callback)
+        })
+    }
+
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retire_closed_after_observation(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        observed: ManagedSqliteRegistryConnectionClosedReceipt,
+    ) -> Result<ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistryProcessRouteRejection>
+    {
+        self.apply_route_retaining_failure(route, observed, |routes, observed| {
+            routes.retire_closed_after_observation(route, observed)
+        })
+    }
+
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retire_closed(
         &self,
         route: ManagedSqliteRegistryRouteHandle,

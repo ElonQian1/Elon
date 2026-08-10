@@ -227,7 +227,8 @@ impl ManagedSqliteRoutedConnectionFixture {
             .route_entry
             .as_ref()
             .expect("managed fixture route entry");
-        self.routes.retire_route(route_entry)?;
+        let logical_removal = self.routes.retire_closed_route(route_entry)?;
+        drop(logical_removal);
         self.route_entry.take();
         Ok(self.counters.snapshot())
     }

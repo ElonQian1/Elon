@@ -30,6 +30,8 @@ pub(crate) use close::{
     ManagedSqliteMainFileCloseFailurePhase, ManagedSqliteMainFileCloseReceipt,
     ManagedSqliteQuarantinedFileCloseFailure,
 };
+#[cfg(test)]
+pub(crate) use close::{ManagedSqliteMainCloseTestFaultPhase, ManagedSqliteMainCloseTestFaults};
 pub(crate) use main::{
     ManagedSqliteLockAttempt, ManagedSqliteLockFailure, ManagedSqliteLockFailureKind,
     ManagedSqliteLockFailurePhase, ManagedSqliteMainFileBindFailure, ManagedSqliteObservedLock,

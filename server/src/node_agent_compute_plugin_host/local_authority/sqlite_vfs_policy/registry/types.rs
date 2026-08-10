@@ -252,6 +252,59 @@ pub(super) struct ManagedSqliteRegistryCallbackLease {
     pub(super) kind: ManagedSqliteRegistryCallbackKind,
 }
 
+#[cfg(test)]
+#[must_use = "close-callback completion must feed exact Connection-close observation"]
+pub(super) struct ManagedSqliteRegistryCallbackCompletionReceipt {
+    session_id: ManagedSqliteRegistrySessionId,
+    kind: ManagedSqliteRegistryCallbackKind,
+}
+
+#[cfg(test)]
+impl ManagedSqliteRegistryCallbackCompletionReceipt {
+    pub(super) fn from_completed(lease: &ManagedSqliteRegistryCallbackLease) -> Self {
+        Self {
+            session_id: lease.session_id,
+            kind: lease.kind,
+        }
+    }
+
+    pub(super) fn session_id(&self) -> ManagedSqliteRegistrySessionId {
+        self.session_id
+    }
+
+    pub(super) fn kind(&self) -> ManagedSqliteRegistryCallbackKind {
+        self.kind
+    }
+}
+
+#[cfg(test)]
+#[must_use = "Connection-close observation must feed exact route retirement"]
+pub(super) struct ManagedSqliteRegistryConnectionClosedReceipt {
+    session_id: ManagedSqliteRegistrySessionId,
+    route_epoch: NonZeroU64,
+}
+
+#[cfg(test)]
+impl ManagedSqliteRegistryConnectionClosedReceipt {
+    pub(super) fn from_observed(
+        session_id: ManagedSqliteRegistrySessionId,
+        route_epoch: NonZeroU64,
+    ) -> Self {
+        Self {
+            session_id,
+            route_epoch,
+        }
+    }
+
+    pub(super) fn session_id(&self) -> ManagedSqliteRegistrySessionId {
+        self.session_id
+    }
+
+    pub(super) fn route_epoch(&self) -> NonZeroU64 {
+        self.route_epoch
+    }
+}
+
 /// Linear record for one live SHM attachment. SHM never has a logical registry filename.
 #[must_use = "an SHM lease must be consumed after exact teardown"]
 pub(super) struct ManagedSqliteRegistryShmLease {

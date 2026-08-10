@@ -7,7 +7,10 @@
 use std::{ffi::CString, sync::Arc};
 
 use super::{
-    file_custody::{HandleBoundSqliteAbiFile, ManagedSqliteRegistryPinnedFile},
+    file_custody::{
+        HandleBoundSqliteAbiFile, ManagedSqliteRegistryCloseLifecycleFaults,
+        ManagedSqliteRegistryPinnedFile,
+    },
     owner::{ManagedSqliteRegistryCustody, ManagedSqliteRegistryRouteHandle},
     process_owner::{
         ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessOwner,
@@ -22,7 +25,8 @@ use crate::{
         ManagedSqliteLogicalFileRole, ManagedSqliteVfsOpenRequest,
     },
     node_agent_managed_fs::{
-        PinnedManagedSqliteFile, PinnedManagedSqliteMainFile, PinnedManagedSqliteWalRuntime,
+        ManagedSqliteMainCloseTestFaults, PinnedManagedSqliteFile, PinnedManagedSqliteMainFile,
+        PinnedManagedSqliteWalRuntime,
     },
 };
 
@@ -140,9 +144,13 @@ where
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn bind_main(
         &self,
-        file: PinnedManagedSqliteMainFile,
+        mut file: PinnedManagedSqliteMainFile,
         wal_runtime: Arc<PinnedManagedSqliteWalRuntime>,
+        close_faults: Arc<dyn ManagedSqliteRegistryCloseLifecycleFaults>,
+        main_close_faults: Arc<dyn ManagedSqliteMainCloseTestFaults>,
     ) -> Result<ManagedSqliteTestVfsFile<Custody, NonceSource>, ()> {
+        file.install_close_test_faults(main_close_faults)
+            .map_err(drop)?;
         let lease = match self.owner.claim_main(self.route) {
             Ok(lease) => lease,
             Err(_) => {
@@ -150,15 +158,17 @@ where
                 return Err(());
             }
         };
-        let pinned =
+        let mut pinned =
             ManagedSqliteRegistryPinnedFile::bind_main(self.owner, self.route, file, lease)
                 .map_err(drop)?;
+        pinned.install_close_lifecycle_faults(Arc::clone(&close_faults))?;
         Ok(ManagedSqliteTestVfsFile::new(
             HandleBoundSqliteAbiFile::from_pinned(pinned),
             self.owner,
             self.route,
             ManagedSqliteLogicalFileRole::Main,
             Some(wal_runtime),
+            Some(close_faults),
         ))
     }
 
@@ -182,6 +192,7 @@ where
             self.owner,
             self.route,
             role,
+            None,
             None,
         ))
     }

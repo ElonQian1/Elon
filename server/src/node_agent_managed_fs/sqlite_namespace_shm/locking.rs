@@ -1,4 +1,4 @@
-use std::{io, sync::atomic};
+use std::io;
 
 use super::super::{platform, PlatformManagedSqliteLockAttempt};
 use super::{
@@ -256,15 +256,6 @@ impl PinnedManagedSqliteShmConnection {
         }
         self.coordinator
             .lock_connection(self.connection_id, request)
-    }
-
-    pub(crate) fn barrier(&self) {
-        atomic::fence(atomic::Ordering::SeqCst);
-        match self.coordinator.state.lock() {
-            Ok(guard) => drop(guard),
-            Err(_) => self.coordinator.mark_domain_terminal(),
-        }
-        atomic::fence(atomic::Ordering::SeqCst);
     }
 }
 

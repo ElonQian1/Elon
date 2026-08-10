@@ -60,6 +60,7 @@ impl ManagedTestSharedNamespace {
     pub(super) fn pin(
         root: &Path,
         registration_id: ManagedTestRegistrationId,
+        lifecycle: Arc<ManagedTestLifecycleFaultController>,
     ) -> anyhow::Result<Self> {
         fs::create_dir_all(root.join("db"))
             .with_context(|| format!("create managed VFS fixture root at {}", root.display()))?;
@@ -85,6 +86,7 @@ impl ManagedTestSharedNamespace {
                 by_name: Mutex::new(HashMap::new()),
                 live_routes: AtomicUsize::new(0),
                 next_route_ordinal: AtomicU64::new(1),
+                lifecycle,
             }),
             runtime,
         })
@@ -99,6 +101,7 @@ pub(super) struct ManagedTestVfsRouteEntry {
     main_name: CString,
     exact_names: [Vec<u8>; 3],
     custody_drops: Arc<AtomicUsize>,
+    lifecycle: ManagedTestLifecycleFaultBinding,
 }
 
 impl ManagedTestVfsRouteEntry {
@@ -116,6 +119,10 @@ impl ManagedTestVfsRouteEntry {
 
     pub(super) fn custody_drops(&self) -> usize {
         self.custody_drops.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn lifecycle(&self) -> ManagedTestLifecycleFaultBinding {
+        self.lifecycle.clone()
     }
 
     pub(super) fn install_shm_fault_script(
@@ -196,6 +203,10 @@ impl ManagedTestVfsResolvedRoute {
             .binding(self.entry.registration_id, self.entry.ordinal, self.role)
             .map_err(drop)
     }
+
+    pub(super) fn lifecycle(&self) -> ManagedTestLifecycleFaultBinding {
+        self.entry.lifecycle()
+    }
 }
 
 pub(super) struct ManagedTestVfsRouteCollection {
@@ -204,6 +215,15 @@ pub(super) struct ManagedTestVfsRouteCollection {
     by_name: Mutex<HashMap<Vec<u8>, ManagedTestVfsResolvedRoute>>,
     live_routes: AtomicUsize,
     next_route_ordinal: AtomicU64,
+    lifecycle: Arc<ManagedTestLifecycleFaultController>,
+}
+
+#[must_use = "logical route removal must be consumed before registration shutdown"]
+pub(super) struct ManagedTestLogicalRouteRemovalReceipt {
+    _registry: crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::ManagedSqliteRegistryRetirementReceipt,
+    _removed: [ManagedTestVfsResolvedRoute; 3],
+    _live_before: usize,
+    _live_after: usize,
 }
 
 impl ManagedTestVfsRouteCollection {
@@ -244,6 +264,7 @@ impl ManagedTestVfsRouteCollection {
             main_name,
             exact_names: [main, journal, wal],
             custody_drops,
+            lifecycle: self.lifecycle.binding(ordinal),
         });
 
         let insert = self.insert_exact_names(&entry);
@@ -294,6 +315,86 @@ impl ManagedTestVfsRouteCollection {
         }
         self.live_routes.store(next_live_routes, Ordering::SeqCst);
         Ok(())
+    }
+
+    pub(super) fn retire_closed_route(
+        &self,
+        entry: &Arc<ManagedTestVfsRouteEntry>,
+    ) -> anyhow::Result<ManagedTestLogicalRouteRemovalReceipt> {
+        let lifecycle = entry.lifecycle();
+        let retirement = lifecycle
+            .claim_retirement()
+            .map_err(|()| anyhow!("managed VFS registry retirement receipt missing"))?;
+        if lifecycle
+            .before(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval)
+            .unwrap_or(true)
+        {
+            lifecycle.retain_terminal(retirement);
+            return Err(anyhow!("injected before managed VFS logical route removal"));
+        }
+        if entry.custody_drops() != 1 {
+            lifecycle.native_failure(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval);
+            lifecycle.retain_terminal(retirement);
+            return Err(anyhow!(
+                "managed VFS route custody was not retired exactly once"
+            ));
+        }
+        let mut routes = match self.by_name.lock() {
+            Ok(routes) => routes,
+            Err(_) => {
+                lifecycle.native_failure(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval);
+                lifecycle.retain_terminal(retirement);
+                return Err(anyhow!("managed VFS logical route index poisoned"));
+            }
+        };
+        for name in &entry.exact_names {
+            let Some(candidate) = routes.get(name.as_slice()) else {
+                drop(routes);
+                lifecycle.native_failure(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval);
+                lifecycle.retain_terminal(retirement);
+                return Err(anyhow!("managed VFS exact route name already retired"));
+            };
+            if !Arc::ptr_eq(&candidate.entry, entry) {
+                drop(routes);
+                lifecycle.native_failure(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval);
+                lifecycle.retain_terminal(retirement);
+                return Err(anyhow!("managed VFS exact route identity mismatch"));
+            }
+        }
+        let live_before = self.live_routes.load(Ordering::SeqCst);
+        let Some(live_after) = live_before.checked_sub(1) else {
+            drop(routes);
+            lifecycle.native_failure(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval);
+            lifecycle.retain_terminal(retirement);
+            return Err(anyhow!("managed VFS live route count underflow"));
+        };
+        let removed = [
+            routes
+                .remove(entry.exact_names[0].as_slice())
+                .expect("validated main route remains present"),
+            routes
+                .remove(entry.exact_names[1].as_slice())
+                .expect("validated journal route remains present"),
+            routes
+                .remove(entry.exact_names[2].as_slice())
+                .expect("validated WAL route remains present"),
+        ];
+        self.live_routes.store(live_after, Ordering::SeqCst);
+        drop(routes);
+        let receipt = ManagedTestLogicalRouteRemovalReceipt {
+            _registry: retirement,
+            _removed: removed,
+            _live_before: live_before,
+            _live_after: live_after,
+        };
+        if lifecycle
+            .after_success(ManagedTestLifecycleFaultPhase::LogicalRouteRemoval)
+            .unwrap_or(true)
+        {
+            lifecycle.retain_terminal(receipt);
+            return Err(anyhow!("injected after managed VFS logical route removal"));
+        }
+        Ok(receipt)
     }
 
     pub(super) fn live_route_count(&self) -> anyhow::Result<usize> {

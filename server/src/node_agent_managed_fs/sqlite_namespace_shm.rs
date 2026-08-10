@@ -9,6 +9,8 @@ use super::{
     PinnedManagedSqliteFile, PinnedManagedSqliteNamespace,
 };
 
+#[path = "sqlite_namespace_shm/barrier.rs"]
+mod barrier;
 #[path = "sqlite_namespace_shm/close.rs"]
 mod close;
 #[path = "sqlite_namespace_shm/coordinator.rs"]
@@ -31,6 +33,8 @@ mod test_faults;
 mod test_support;
 #[path = "sqlite_namespace_shm/types.rs"]
 mod types;
+#[path = "sqlite_namespace_shm/unmap.rs"]
+mod unmap;
 
 #[cfg(windows)]
 #[path = "windows_sqlite_shm.rs"]

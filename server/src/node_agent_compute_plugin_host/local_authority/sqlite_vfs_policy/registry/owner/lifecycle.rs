@@ -90,6 +90,19 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
             .map_err(ManagedSqliteRegistryRouteRejection::State)
     }
 
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn observe_connection_closed_after_callback(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        callback: &ManagedSqliteRegistryCallbackCompletionReceipt,
+    ) -> Result<ManagedSqliteRegistryConnectionClosedReceipt, ManagedSqliteRegistryRouteRejection>
+    {
+        self.exact_entry_mut(handle)?
+            .state
+            .observe_connection_closed_after_callback(callback)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retire_closed(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,
@@ -113,5 +126,18 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
                 Err(ManagedSqliteRegistryRouteRejection::State(rejection))
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retire_closed_after_observation(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        observed: &ManagedSqliteRegistryConnectionClosedReceipt,
+    ) -> Result<ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .validate_connection_closed_receipt(observed)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)?;
+        self.retire_closed(handle)
     }
 }

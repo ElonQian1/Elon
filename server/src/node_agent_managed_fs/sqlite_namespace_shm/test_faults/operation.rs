@@ -34,7 +34,7 @@ impl ManagedSqliteShmCoordinator {
         if !matched.is_before_call() {
             return Ok(Some(ManagedSqliteShmAfterTestFault(matched)));
         }
-        match self.activate_test_fault(matched, known_mutation) {
+        match self.trigger_before_test_fault(matched, known_mutation) {
             Ok(failure) => {
                 if failure.mutation_may_have_occurred() || failure.lock_outcome_uncertain() {
                     self.terminalize_test_fault(state, &failure);
@@ -66,7 +66,7 @@ impl ManagedSqliteShmCoordinator {
         known_mutation: bool,
     ) -> ManagedSqliteShmFailure {
         let ManagedSqliteShmAfterTestFault(matched) = matched;
-        let failure = match self.activate_test_fault(matched, known_mutation) {
+        let failure = match self.trigger_after_test_fault(matched, known_mutation) {
             Ok(failure) | Err(failure) => failure,
         };
         self.terminalize_test_fault(state, &failure);

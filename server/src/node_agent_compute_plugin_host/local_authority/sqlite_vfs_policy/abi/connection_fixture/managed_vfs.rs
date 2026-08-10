@@ -32,11 +32,14 @@ use crate::{
 
 #[cfg(test)]
 mod a2b1_cases;
+#[cfg(test)]
+mod a2b2_cases;
 mod callbacks;
 mod connection;
 #[cfg(test)]
 mod fault_matrix;
 mod fault_script;
+mod lifecycle_faults;
 mod multi_connection;
 mod route_file;
 mod shared_namespace;
@@ -49,6 +52,11 @@ use fault_script::{
     ManagedTestCallbackFaultController, ManagedTestCallbackFaultObservation,
     ManagedTestCallbackFaultOperation, ManagedTestCallbackFaultStep,
     ManagedTestCallbackFaultTiming, ManagedTestFaultingFile, ManagedTestRouteOrdinal,
+};
+use lifecycle_faults::{
+    ManagedTestLifecycleFaultBinding, ManagedTestLifecycleFaultController,
+    ManagedTestLifecycleFaultObservation, ManagedTestLifecycleFaultPhase,
+    ManagedTestLifecycleFaultStep, ManagedTestLifecycleFaultTiming,
 };
 use multi_connection::ManagedSqliteMultiConnectionFixture;
 use route_file::ManagedTestRouteFile;
@@ -68,6 +76,7 @@ struct ManagedTestVfsContext {
     routes: Arc<ManagedTestVfsRouteCollection>,
     runtime: Arc<PinnedManagedSqliteWalRuntime>,
     faults: Arc<ManagedTestCallbackFaultController>,
+    lifecycle: Arc<ManagedTestLifecycleFaultController>,
     backing: *mut ffi::sqlite3_vfs,
     counters: Arc<ManagedTestVfsCounters>,
 }
@@ -92,6 +101,18 @@ struct ManagedTestVfsRegistration {
     registered: bool,
 }
 
+enum ManagedTestVfsRegistrationDisposition {
+    Registered,
+    Unregistered,
+}
+
+struct ManagedTestVfsRegistrationCustody {
+    _table: Option<Box<ffi::sqlite3_vfs>>,
+    _name: Option<CString>,
+    _context: Option<Box<ManagedTestVfsContext>>,
+    _disposition: ManagedTestVfsRegistrationDisposition,
+}
+
 impl ManagedTestVfsRegistration {
     fn register(root: &Path, _nonce_seed: [u8; 16]) -> anyhow::Result<Self> {
         // The legacy seed stays in the single-connection API only as a test label. Cross-
@@ -102,7 +123,9 @@ impl ManagedTestVfsRegistration {
             })
             .map_err(|_| anyhow!("managed test VFS registration identity exhausted"))?;
         let id = ManagedTestRegistrationId::from_counter(id).map_err(anyhow::Error::msg)?;
-        let shared = shared_namespace::ManagedTestSharedNamespace::pin(root, id)?;
+        let lifecycle = ManagedTestLifecycleFaultController::new();
+        let shared =
+            shared_namespace::ManagedTestSharedNamespace::pin(root, id, Arc::clone(&lifecycle))?;
         // SAFETY: SQLite owns the default VFS for process lifetime. It is used only for entropy,
         // sleep and wall-clock callbacks; all database files stay in the managed namespace.
         let backing = unsafe { ffi::sqlite3_vfs_find(ptr::null()) };
@@ -125,6 +148,7 @@ impl ManagedTestVfsRegistration {
             routes: shared.routes,
             runtime: shared.runtime,
             faults,
+            lifecycle,
             backing,
             counters,
         });
@@ -210,6 +234,16 @@ impl ManagedTestVfsRegistration {
         )
     }
 
+    fn lifecycle(&self) -> Arc<ManagedTestLifecycleFaultController> {
+        Arc::clone(
+            &self
+                .context
+                .as_ref()
+                .expect("registered VFS context")
+                .lifecycle,
+        )
+    }
+
     fn live_route_count(&self) -> anyhow::Result<usize> {
         self.context
             .as_ref()
@@ -226,6 +260,17 @@ impl ManagedTestVfsRegistration {
         if !self.registered {
             return Ok(());
         }
+        let lifecycle = Arc::clone(
+            &self
+                .context
+                .as_ref()
+                .expect("registered VFS context")
+                .lifecycle,
+        );
+        if lifecycle.is_terminal() {
+            self.retain_registered_parts();
+            return Err(anyhow!("managed test VFS lifecycle is terminal"));
+        }
         let live_routes = match self.live_route_count() {
             Ok(live_routes) => live_routes,
             Err(error) => {
@@ -239,14 +284,33 @@ impl ManagedTestVfsRegistration {
                 "refuse to unregister managed test VFS with {live_routes} live routes"
             ));
         }
+        if lifecycle
+            .before_registration(ManagedTestLifecycleFaultPhase::VfsUnregister)
+            .unwrap_or(true)
+        {
+            lifecycle.retain_terminal(());
+            self.retain_registered_parts();
+            return Err(anyhow!("injected before managed test VFS unregister"));
+        }
         let table = self.table.as_mut().expect("registered VFS table");
         // SAFETY: an empty route collection proves that every SQLite connection closed and its
         // exact route custody retired before the shared callback context is released.
         let code = unsafe { ffi::sqlite3_vfs_unregister(&mut **table) };
         if code == ffi::SQLITE_OK {
             self.registered = false;
-            Ok(())
+            if lifecycle
+                .after_registration_success(ManagedTestLifecycleFaultPhase::VfsUnregister)
+                .unwrap_or(true)
+            {
+                lifecycle.retain_terminal(());
+                self.retain_registered_parts();
+                Err(anyhow!("injected after managed test VFS unregister"))
+            } else {
+                Ok(())
+            }
         } else {
+            lifecycle.native_failure(None, ManagedTestLifecycleFaultPhase::VfsUnregister);
+            lifecycle.retain_terminal(());
             self.retain_registered_parts();
             Err(anyhow!(
                 "unregister managed test VFS failed with SQLite code {code}"
@@ -255,16 +319,18 @@ impl ManagedTestVfsRegistration {
     }
 
     fn retain_registered_parts(&mut self) {
+        let disposition = if self.registered {
+            ManagedTestVfsRegistrationDisposition::Registered
+        } else {
+            ManagedTestVfsRegistrationDisposition::Unregistered
+        };
         self.registered = false;
-        if let Some(table) = self.table.take() {
-            Box::leak(table);
-        }
-        if let Some(name) = self.name.take() {
-            let _ = Box::leak(Box::new(name));
-        }
-        if let Some(context) = self.context.take() {
-            Box::leak(context);
-        }
+        let _custody = Box::leak(Box::new(ManagedTestVfsRegistrationCustody {
+            _table: self.table.take(),
+            _name: self.name.take(),
+            _context: self.context.take(),
+            _disposition: disposition,
+        }));
     }
 }
 

@@ -254,6 +254,13 @@ where
     ) -> Result<(), ()> {
         self.file.close().map_err(drop)
     }
+
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_with_callback_receipt(
+        self,
+    ) -> Result<super::super::types::ManagedSqliteRegistryCallbackCompletionReceipt, ()> {
+        self.file.close_with_callback_receipt().map_err(drop)
+    }
 }
 
 fn map_lock_attempt(attempt: ManagedSqliteLockAttempt) -> HandleBoundSqliteAbiAttempt {

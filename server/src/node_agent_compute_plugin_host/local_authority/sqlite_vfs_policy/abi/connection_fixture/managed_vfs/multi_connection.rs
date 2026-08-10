@@ -65,6 +65,35 @@ impl ManagedSqliteMultiConnectionFixture {
             .faults()
     }
 
+    pub(super) fn install_lifecycle_fault_script(
+        &self,
+        steps: &[ManagedTestLifecycleFaultStep],
+    ) -> Result<(), &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .install(steps)
+    }
+
+    pub(super) fn pending_lifecycle_fault_count(&self) -> Result<usize, &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .pending_count()
+    }
+
+    pub(super) fn lifecycle_fault_observations(
+        &self,
+    ) -> Result<Vec<ManagedTestLifecycleFaultObservation>, &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .observations()
+    }
+
     pub(super) fn pending_callback_fault_count(&self) -> Result<usize, &'static str> {
         self.registration
             .as_ref()

@@ -1,11 +1,22 @@
-use std::{error::Error as StdError, fmt, mem::ManuallyDrop, ptr};
+use std::{error::Error as StdError, fmt, mem::ManuallyDrop};
 
 use super::{
     lock_domain::ManagedSqliteLockOwner, platform, ManagedSqliteAccess, ManagedSqliteFileKind,
-    ManagedSqliteLockFailure, ManagedSqliteNamespaceInner, ManagedSqliteUnlockTarget,
-    PinnedManagedSqliteFile, PinnedManagedSqliteMainFile, QuarantinedManagedSqliteFile,
+    ManagedSqliteLockFailure, ManagedSqliteNamespaceInner, PinnedManagedSqliteFile,
+    PinnedManagedSqliteMainFile, QuarantinedManagedSqliteFile,
 };
 use crate::node_agent_managed_fs::PlatformFileIdentity;
+
+#[path = "sqlite_namespace_close/main_close.rs"]
+mod main_close;
+#[cfg(test)]
+#[path = "sqlite_namespace_close/test_faults.rs"]
+mod test_faults;
+#[cfg(test)]
+pub(crate) use test_faults::{
+    ManagedSqliteMainCloseTestFault, ManagedSqliteMainCloseTestFaultPhase,
+    ManagedSqliteMainCloseTestFaultTiming, ManagedSqliteMainCloseTestFaults,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagedSqliteFileCloseFailureClass {
@@ -103,6 +114,14 @@ pub(crate) struct ManagedSqliteMainFileCloseFailure {
     terminal_owner: Option<ManuallyDrop<ManagedSqliteLockOwner>>,
     live_owner: Option<ManagedSqliteLockOwner>,
     main: Option<PinnedManagedSqliteMainFile>,
+    #[cfg(test)]
+    test_fault: Option<ManagedSqliteMainCloseTestFault>,
+    #[cfg(test)]
+    _completed_unlock_main: Option<ManuallyDrop<PinnedManagedSqliteMainFile>>,
+    #[cfg(test)]
+    completed_file: Option<ManagedSqliteMainFileCloseReceipt>,
+    #[cfg(test)]
+    close_test_faults: Option<std::sync::Arc<dyn ManagedSqliteMainCloseTestFaults>>,
 }
 
 impl PinnedManagedSqliteFile {
@@ -205,69 +224,6 @@ impl QuarantinedManagedSqliteFile {
     }
 }
 
-impl PinnedManagedSqliteMainFile {
-    pub(crate) fn close(
-        mut self,
-    ) -> Result<ManagedSqliteMainFileCloseReceipt, ManagedSqliteMainFileCloseFailure> {
-        if let Err(lock_failure) = self.unlock_to(ManagedSqliteUnlockTarget::None) {
-            let terminal = lock_failure.is_terminal();
-            let (terminal_main_file, terminal_owner, main) = if terminal {
-                let (file, owner) = into_main_parts(self);
-                (
-                    Some(ManuallyDrop::new(file)),
-                    Some(owner.into_terminal_tombstone()),
-                    None,
-                )
-            } else {
-                (None, None, Some(self))
-            };
-            return Err(ManagedSqliteMainFileCloseFailure {
-                phase: ManagedSqliteMainFileCloseFailurePhase::LockRelease,
-                lock_failure: Some(lock_failure),
-                file_failure: None,
-                terminal_main_file,
-                terminal_owner,
-                live_owner: None,
-                main,
-            });
-        }
-
-        let (file, owner) = into_main_parts(self);
-        match file.close() {
-            Ok(file) => {
-                drop(owner);
-                Ok(ManagedSqliteMainFileCloseReceipt { file })
-            }
-            Err(file_failure) => {
-                let outcome_uncertain = file_failure.close_outcome_uncertain();
-                let (terminal_owner, live_owner) = if outcome_uncertain {
-                    (Some(owner.into_terminal_tombstone()), None)
-                } else {
-                    (None, Some(owner))
-                };
-                Err(ManagedSqliteMainFileCloseFailure {
-                    phase: ManagedSqliteMainFileCloseFailurePhase::FileClose,
-                    lock_failure: None,
-                    file_failure: Some(file_failure),
-                    terminal_main_file: None,
-                    terminal_owner,
-                    live_owner,
-                    main: None,
-                })
-            }
-        }
-    }
-}
-
-fn into_main_parts(
-    main: PinnedManagedSqliteMainFile,
-) -> (PinnedManagedSqliteFile, ManagedSqliteLockOwner) {
-    let main = ManuallyDrop::new(main);
-    // SAFETY: ManuallyDrop suppresses the Drop body and field destruction. Each field is read once
-    // and returned as the unique owner; no reference into `main` escapes.
-    unsafe { (ptr::read(&main.file), ptr::read(&main.lock_owner)) }
-}
-
 impl ManagedSqliteFileCloseFailure {
     pub(crate) fn class(&self) -> ManagedSqliteFileCloseFailureClass {
         self.class
@@ -332,55 +288,6 @@ impl ManagedSqliteQuarantinedFileCloseFailure {
                 class,
                 custody,
             }),
-        }
-    }
-}
-
-impl ManagedSqliteMainFileCloseFailure {
-    pub(crate) fn phase(&self) -> ManagedSqliteMainFileCloseFailurePhase {
-        self.phase
-    }
-
-    pub(crate) fn close_outcome_uncertain(&self) -> bool {
-        self.terminal_main_file.is_some()
-            || self
-                .lock_failure
-                .as_ref()
-                .is_some_and(ManagedSqliteLockFailure::is_terminal)
-            || self
-                .file_failure
-                .as_ref()
-                .is_some_and(ManagedSqliteFileCloseFailure::close_outcome_uncertain)
-    }
-
-    pub(crate) fn into_main(mut self) -> Result<PinnedManagedSqliteMainFile, Self> {
-        if let Some(main) = self.main.take() {
-            return Ok(main);
-        }
-        if self.terminal_owner.is_some() {
-            return Err(self);
-        }
-        let Some(file_failure) = self.file_failure.take() else {
-            return Err(self);
-        };
-        match file_failure.into_file() {
-            Ok(file) => {
-                let Some(lock_owner) = self.live_owner.take() else {
-                    self.file_failure = Some(ManagedSqliteFileCloseFailure {
-                        error: std::io::Error::other(
-                            "NODE_MANAGED_SQLITE_CLOSE_LIVE_OWNER_MISSING",
-                        ),
-                        class: ManagedSqliteFileCloseFailureClass::PlatformUnsupported,
-                        custody: ManagedSqliteFileCloseCustody::Live(file),
-                    });
-                    return Err(self);
-                };
-                Ok(PinnedManagedSqliteMainFile { file, lock_owner })
-            }
-            Err(file_failure) => {
-                self.file_failure = Some(file_failure);
-                Err(self)
-            }
         }
     }
 }

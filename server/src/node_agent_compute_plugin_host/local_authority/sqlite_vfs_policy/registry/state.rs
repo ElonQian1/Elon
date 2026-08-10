@@ -12,6 +12,8 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::t
 
 mod owner;
 #[cfg(test)]
+mod test_lifecycle;
+#[cfg(test)]
 mod tests;
 /// Pure lifecycle state constructed only while its owning route entry is atomically inserted.
 /// A future owner must quarantine complete custody whenever a session is abandoned before retire.

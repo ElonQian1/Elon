@@ -11,7 +11,7 @@ owners: node, security
 
 本文是节点插件 A2 阶段的单一权威，只定义测试专用受管 SQLite VFS 的 SHM、联合关闭、同 namespace 多 Connection 和确定性故障注入合同。生产 SQLite 文件/目录、catalog 与 rollback 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；Planning Snapshot 的依赖顺序仍由 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 维护；本机 schema 与 Store 仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护。
 
-A2 总合同已经冻结。源码现截止在 `implementation_uncompiled` 的 A2b1：A2a 的单 registration exact route 集合、共享 runtime 多 Connection fixture、callback-before-call 与四个 SHM teardown phase 仍保留；A2b1 又增加 exact registration/route 到 live WAL-main 的私有脚本安装桥，以及 `xShmMap` 初始化内部 phase、`xShmLock` acquire/release 的 before-call/after-success test-only seam 和 typed phase case。它未编译、未运行，也不是完整 A2；完整 `xShmUnmap` case、`xShmBarrier` 失败终态、联合 `xClose`、callback completion、route observe/retire、VFS unregister after-success 与逐 case 全量 custody 表仍属于 A2b2。本批不执行 SQLite Connection、Win32 故障注入、并发竞争、迁移或跨重启验证；既有 69 项 SQLite 专项与 3 项真实 Connection 成功路径证据不覆盖该增量。
+A2 总合同已经冻结。源码现推进到 `implementation_uncompiled`、`implementation_unrun` 的 A2b2 静态闭合：A2a/A2b1 的 registration exact route、共享 runtime 多 Connection、exact route→live WAL-main 私有脚本桥与 map/lock 内部 phase 仍保留；本批又为 `xShmBarrier` 无返回码失败、非末/末 `xShmUnmap`、WAL-main 联合 `xClose`、callback completion、connection observation、registry route retirement、三 logical-name removal 与 VFS unregister 建立 exact fault/custody 形状和 typed case inventory。该增量未编译、未测试、未运行，也没有执行 SQLite Connection、Win32 故障注入、并发竞争、迁移或跨重启验证；既有 69 项 SQLite 专项与 3 项真实 Connection 成功路径证据不覆盖 A2b2，更不能替代逐 case Windows 动态证据。
 
 生产 `ComputePluginHandleBoundAuthorityOpenIntent::open()` 必须继续固定返回 `COMPUTE_PLUGIN_HANDLE_BOUND_SQLITE_VFS_UNAVAILABLE`。A2 不提供生产 VFS 注册、process owner、live `sqlite3_file`、opened authority、A1 producer 或 v15 能力，也不改变 v14 blocked-only、Runtime stopped、`snapshot_ready=false` 与全部 side-effect false 的事实。
 
@@ -24,7 +24,7 @@ A2 总合同已经冻结。源码现截止在 `implementation_uncompiled` 的 A2
 - registry/file-custody 已把 main、Journal/WAL sidecar、SHM lease、route 与 callback lease 不可拆持有；物理关闭失败会保留 exact custody，不能把 `Drop` 当作成功回执；
 - 测试受管 VFS 已让单个真实 SQLite Connection 经 main、Journal/WAL、SHM 和 `xClose` 进入 exact route，并在正常关闭后退休 route、注销 VFS 和删除测试根。
 
-A2a 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；同时增加 callback-before-call 与 SHM teardown 的 test-only one-shot fault 形状。A2b1 只把 exact route 上的 plan 经刚提升的 live WAL-main 绑定到 runtime generation + SHM connection ID，并把 map 初始化与 lock 平台动作放进相邻 test-only hook；typed records 固定两 Connection、两 route、六 logical-name，并声明 phase occurrence、map mode/region、lock action/range/pre-mask 与 DMS custody 的静态预期。它仍只是源码合同：没有完整 close/retirement 矩阵，也未动态证明非末连接关闭、domain terminal 后 sibling 行为或真实 Win32 custody 结果。
+A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 上的 plan 经刚提升的 live WAL-main 绑定到 runtime generation + SHM connection ID，map 初始化与 lock 平台动作也进入相邻 test-only hook。A2b2 静态源码继续把 barrier、unmap、联合 close、registry lifecycle 与 registration shutdown 分成独立 typed leaves；它仍只是未执行源码合同，尚未动态证明非末连接分离、末连接 teardown、domain terminal 后 sibling 行为、物理关闭一次性、注销结果或真实 Win32 custody。
 
 ## 3. Test-only 拓扑与寿命
 
@@ -49,11 +49,11 @@ A2 fixture 必须保持以下所有权拓扑：
 
 禁止使用进程全局可变布尔值、环境变量、时间竞态、随机 panic 或裸 Win32 handle 作为注入选择器。`before_call` 只能表达本次平台动作尚未发生；`after_success` 只能在真实平台成功且本地 custody 已同步后激活，并按 seam 能证明的事实分类为 `MutatedButKnown` 或 `OutcomeUncertainPoisoned`，两者都必须终态化且不能声称回滚了已执行的 OS 动作。锁竞争是正常 `BUSY`，不得用故障脚本伪造成 I/O 成功、mutation 或 poison。
 
-脚本只控制测试平台 seam，不能改变生产分支、放宽请求校验、跳过 callback lease、直接改 coordinator state，或为测试暴露可复用的 main/SHM/file custody 构造器。
+脚本只控制测试平台 seam，不能改变生产分支、放宽请求校验、跳过 callback lease、直接改 coordinator state，或为测试暴露可复用的 main/SHM/file custody 构造器。A2b2 lifecycle selector 必须继续绑定 exact registration、route、role、callback/phase、occurrence 与 before/after 时点；允许 after-success 的前提是对应物理或 registry mutation 已先同步，随后立即隔离 exact route 并保留线性证据。direct unmap 的 unsafe/domain-terminal failure 与 joint-close 物理 failure 都先隔离 exact route，再尝试完成 callback；该 completion 必须记为 attempt=1/success=0，并保留一份 callback lease。`domain_terminal` 只记录 managed SHM/FileId coordinator tombstone；纯 registry rejection，以及已成功清空 SHM 后的 main unlock/file-close failure，只能 terminalize exact route/custody，不得虚报 SHM domain poison。
 
 ## 5. A2 静态矩阵
 
-完整 A2 源码合同至少逐项表达下表。当前 A2b1 覆盖 route 解析、多 Connection 成功/竞争形状、callback-before-call、四个 teardown phase、map 初始化与 lock acquire/release 的注入 seam，并为后一组写入固定拓扑的 typed phase records；它仍未覆盖表中完整 native-error/cleanup/close/registration case inventory。以后即使全部“表达”，也只表示存在静态 case/fixture 形状，不表示已经执行：
+完整 A2 源码合同至少逐项表达下表。当前 A2b2 已为表中 barrier/unmap/close/registration 建立 typed static inventory；即使这些记录在源码中全部“表达”，也只表示静态 case/fixture 形状存在，不表示它们已经编译或执行：
 
 | 路径 | 必须覆盖的阶段 | 静态不变量 |
 |---|---|---|
@@ -66,6 +66,20 @@ A2 fixture 必须保持以下所有权拓扑：
 
 每个 case 必须静态声明预期 phase、class、SQLite code、route phase、domain terminal bit、剩余 Connection 数、是否保留 node/mapping/file/main/SHM lease、是否允许后续 callback，以及 raw state/route/custody 的精确一次性计数。只断言“返回非 OK”不足以验收。
 
+### 5.1 A2b2 typed case schema 与完整 inventory
+
+A2b2 不复用 A2b1 含混的单一 `remaining_connections`。每条 record 必须分开保存 `sqlite_connections`、`shm_connections`、`registry_routes` 与 `logical_names`，并包含：
+
+- target scope 与 exact identity：route-scoped case 保存 registration ID、route ordinal、runtime generation、SHM connection ID、Main role、callback kind 与 phase occurrence；registration shutdown 只保存 registration identity，不虚构 route/runtime/SHM connection；另存 unmap mode、非末/末 topology 与 fault timing；
+- SQLite channel（`xShmBarrier=VoidNoResultCode`，unmap failure=`SQLITE_IOERR`，close/close-lifecycle failure=`SQLITE_IOERR_CLOSE`，registration shutdown 与 logical-name removal 无 SQLite channel）、failure class、mutation/lock uncertainty、physical domain terminal、独立 registry route terminal、logical route 与 registration phase；
+- node、view、mapping、DMS、SHM file、main file/lock owner、main/SHM/callback lease、registry entry、三 logical-name、VFS table/name/context 与 root-deletable custody；
+- raw-state take/abandon/`pMethods` clear、callback begin/complete、selected action、SHM detach、main unlock/file close、registry close、connection observe、registry route remove、logical-name remove、VFS unregister 与 custody retain 的 attempt/success 精确计数；logical-name 另保存恰好三项的 removal count，fault selector 另保存 observe/trigger/pending 三项 one-shot 计数，`physical_retry` 必须恒为零；
+- `StaticContract` 与 `WindowsDynamic` 是互斥 evidence kind；本批所有 record 只能是前者。
+
+静态 inventory 必须按集合相等验收，而不是只检查某 phase 至少出现一次：barrier 覆盖 callback admission、fence before/after、completion 与 success；非末 unmap 覆盖输入校验、shared/exclusive held-lock、`delete=true` 仍只 detach、detach before/after 与 completion；末连接覆盖 ViewUnmap、MappingClose、DMS shared release、SHM file close 的 before/native/after、Keep/Delete、delete authority、exact sibling delete、detach 与 completion；联合 close 必须把每条 managed-fs Keep/final 物理 unmap failure 一一投影为 `ShmUnmapLift` 并断言 main close 未开始，不得虚构 registry SHM callback-completion 投影，再覆盖 main unlock、main handle close、registry WAL-main close、唯一 close callback completion、connection observation、registry route removal 与 logical route removal；registration 覆盖 outstanding callback、live route、quarantined custody、route-index observation、unregister before/native/after 与完整成功。成功卸载后只有 registry route 和 logical-name 均为零、全部物理/lease custody 与 table/name/context 已释放时，测试根才可删除。
+
+冻结源码由 `a2b2_cases.rs` 与十个叶模块组成，每叶继续受 `<500` 行硬预算约束；source-exhaustive case 总数固定为 117，其中 Barrier 8、Unmap 49、JointClose 36、Registry lifecycle 16、Registration shutdown 8。Barrier 单列 inner registry callback 前的 generic callback-wrapper before fault，联合 close 单列 begin-close 成功后的 Close callback admission rejection；Barrier/close callback completion 均覆盖 before/native/after，non-final Keep、final Keep/Delete 与 joint-close lift 均单列 ConnectionDetach after-success-uncertain；registry retirement 分开保存 owner-retire native failure 与 retire 成功后 receipt 发布失败，logical-name removal 分开保存 retirement receipt claim 失败与 claim 后 index/custody native failure。入口已通过 `managed_vfs.rs` 的 `cfg(test)` 模块声明接入，但本批没有编译或运行这份静态 inventory。
+
 ## 6. 同 namespace 多 Connection
 
 多 Connection 合同固定为：
@@ -75,7 +89,7 @@ A2 fixture 必须保持以下所有权拓扑：
 - 同 Connection 的 shared/exclusive mask 与 sibling mask 分开记录；同槽冲突返回 `SQLITE_BUSY`，释放只能消费自己确实持有的 exact range；
 - 非末 Connection 的 `xShmUnmap(delete=true)` 也只分离该 Connection，不删除、关闭或重建共享 SHM；另一 Connection 的映射、锁和 route 保持可用；
 - 最后一条 Connection 只有在无本地 SHM 锁时才可 teardown。SHM delete 还必须携带同一 WAL-main、runtime generation、main identity 与 Main-EXCLUSIVE 事实；
-- 任一结果不确定的 map/lock/unmap/close 必须把整个 FileId/domain 置为 terminal。其他 route 不能因为自身标量仍匹配而继续使用或另建 runtime；
+- 任一 managed SHM/FileId coordinator 内结果不确定的 map/lock/unmap/SHM close 必须把整个 FileId/domain 置为 terminal。SHM 已清空后的 main close 或纯 registry lifecycle failure 只隔离 exact route/custody，不得虚报 domain tombstone；其他 route 也不能越过真实 tombstone 继续使用或另建 runtime；
 - 一条 Connection 成功关闭只退休其 exact route；不得减少另一 route 的 callback/lease 计数，也不得提前注销共享 VFS。
 
 本批不承诺线程调度公平性、跨进程 WAL、shared-cache、临时文件、崩溃恢复或真实 SQLite 并发语句行为；这些只能由以后实际运行证据证明。
@@ -98,6 +112,6 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 ## 9. 静态验收与后续门槛
 
-A2b1 本批可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；map 初始化、lock acquire/release 与既有 teardown 子集具备 one-shot/fenced 形状；after-success 只在平台成功和本地 custody/mask 同步后终态化；typed records 是固定拓扑的静态 phase evidence；生产 `open()`、A1 producer 与协议均保持不可达。不得宣称完整 A2 matrix/source 已形成。验收仅允许文档检查、rustfmt 与静态 diff/搜索。
+A2b2 本批可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；barrier/unmap/joint close/registry/registration 具备 one-shot/fenced 静态形状；after-success 只在平台或 registry mutation 成功并同步 custody 后终态化；typed records 是固定拓扑的静态 source evidence；生产 `open()`、A1 producer 与协议均保持不可达。验收仅允许文档检查、rustfmt 与静态 diff/搜索，不得宣称 A2 已完成动态验收。
 
-进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，必须先由 A2b2 补齐 `xShmBarrier`、完整 unmap、联合 close、callback/route/registration after-success 与全量逐 case custody 断言，再另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，逐项证明 SQLite code、custody、route、domain tombstone 与资源释放。静态 A2b2 和动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。
+进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，仍必须另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，并把每条动态观察与静态 case key 一一对应，逐项证明 SQLite code或无返回码通道、custody、route、domain tombstone 与资源释放。当前 A2b2 未编译、未运行；静态源码和 Windows 动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。

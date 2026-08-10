@@ -5,6 +5,10 @@ use std::{
     num::NonZeroU64,
 };
 
+#[cfg(test)]
+use super::types::{
+    ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryConnectionClosedReceipt,
+};
 use super::{
     state::ManagedSqliteRegistrySessionState,
     types::{
@@ -274,6 +278,19 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
         self.exact_entry_mut(handle)?
             .state
             .finish_callback(lease)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    #[cfg(test)]
+    pub(super) fn finish_callback_with_receipt(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        lease: &ManagedSqliteRegistryCallbackLease,
+    ) -> Result<ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryRouteRejection>
+    {
+        self.exact_entry_mut(handle)?
+            .state
+            .finish_callback_with_receipt(lease)
             .map_err(ManagedSqliteRegistryRouteRejection::State)
     }
 

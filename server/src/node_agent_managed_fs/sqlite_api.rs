@@ -1,5 +1,3 @@
-#[cfg(test)]
-pub(crate) use super::sqlite_namespace::ManagedSqliteShmTestFaultProbe;
 pub(crate) use super::sqlite_namespace::{
     ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,
     ManagedSqliteDeleteOutcome, ManagedSqliteDirectoryBarrierFailureKind,
@@ -19,4 +17,9 @@ pub(crate) use super::sqlite_namespace::{
     ManagedSqliteWalMainUnmapFailure, PinnedManagedSqliteFile, PinnedManagedSqliteMainFile,
     PinnedManagedSqliteNamespace, PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile,
     PinnedManagedSqliteWalRuntime, PlatformManagedSqliteLockAttempt, QuarantinedManagedSqliteFile,
+};
+#[cfg(test)]
+pub(crate) use super::sqlite_namespace::{
+    ManagedSqliteMainCloseTestFaultPhase, ManagedSqliteMainCloseTestFaults,
+    ManagedSqliteShmTestFaultProbe,
 };
