@@ -11,6 +11,7 @@ function Assert-Contains {
 }
 
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features"'
+Assert-Contains 'Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
 Assert-Contains 'function Wait-NavigationReady'
 Assert-Contains 'function Wait-ComposerOptionsReady'
 Assert-Contains '$freshCollection = $command.action -eq $expectedAction'
@@ -22,6 +23,8 @@ Assert-Contains '@($last.features).Count -gt 0'
 Assert-Contains 'Wait-NavigationReady -AfterMs $beforeFeatures'
 Assert-Contains '$navigationMatrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"'
 Assert-Contains 'Add-Check "navigation_adaptation_review"'
+Assert-Contains '$navigationCloseCount = [int]$navigationMatrix.observed_semantics.close'
+Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0)'
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
 Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
 Assert-Contains 'function Get-TopResumedActivity'
@@ -48,8 +51,13 @@ if ($source.Contains('ToUnixTimeMilliseconds()')) {
 }
 
 $featuresIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_list_features"')
+$openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_web"')
+$officialIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }')
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
 $toolsIndex = $source.IndexOf('Get-ComposerOptions -Section "tools"')
+if (-not ($openIndex -lt $officialIndex -and $officialIndex -lt $featuresIndex)) {
+    throw "ChatGPT Web smoke must select the official view before readiness and navigation checks."
+}
 if (-not ($featuresIndex -lt $modelIndex -and $modelIndex -lt $toolsIndex)) {
     throw "Composer contamination smoke must open the sidebar before model and tools checks."
 }

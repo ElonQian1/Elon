@@ -4,7 +4,7 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [string]$DeviceSerial = "",
-    [int]$ReadyTimeoutSec = 45,
+    [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
     [switch]$SendProbe,
@@ -256,6 +256,7 @@ function Wait-ProbeReply {
 }
 
 $opened = Invoke-UiAction -Action "open_chatgpt_web" -EnsureMainActivity
+$officialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
 $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT Web readiness" -Predicate {
     param($value)
     $value.surface -eq "chatgpt_web" -and
@@ -265,6 +266,7 @@ $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT We
 $topResumedActivity = Get-TopResumedActivity
 
 Add-Check "open_chatgpt_web" ($opened.control_ok -eq $true) ([string]$opened.action)
+Add-Check "official_view_selected" ($officialView.control_ok -eq $true) ([string]$officialView.view_mode)
 Add-Check "chatgpt_activity_foreground" (
     $topResumedActivity -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
 ) $topResumedActivity
@@ -309,6 +311,8 @@ Add-Check "composer_contamination_setup" ($featuresState.last_command.ok -eq $tr
 $navigationMatrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
 $navigationAdaptationRequired = $navigationMatrix.adaptation_review.required -eq $true
 $navigationAdaptationReasons = @($navigationMatrix.adaptation_review.reasons)
+$navigationCloseCount = [int]$navigationMatrix.observed_semantics.close
+Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0) ([string]$navigationCloseCount)
 Add-Check "navigation_adaptation_review" (
     -not $navigationAdaptationRequired
 ) ($navigationAdaptationReasons -join ",")
