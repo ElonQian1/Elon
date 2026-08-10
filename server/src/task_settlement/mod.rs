@@ -17,8 +17,14 @@ mod sui_correction_projection;
 mod sui_correction_projection_service;
 mod sui_preflight_api;
 mod sui_preflight_job_api;
+#[cfg(test)]
+mod sui_preflight_job_api_tests;
 pub(crate) mod sui_preflight_job_model;
 mod sui_preflight_job_service;
+#[cfg(test)]
+mod sui_preflight_job_service_tests;
+#[cfg(test)]
+mod sui_preflight_job_test_support;
 pub(crate) mod sui_preflight_model;
 mod sui_preflight_service;
 mod sui_projection;
