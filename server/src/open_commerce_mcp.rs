@@ -313,6 +313,7 @@ pub(crate) async fn call_tool(
     }
     if let Some(value) = crate::open_commerce_consumer_discovery_mcp::call_if_handled(
         store,
+        project_id,
         user_id,
         app_id,
         app_id == DEFAULT_MCP_APP_ID,

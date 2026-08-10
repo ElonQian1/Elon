@@ -18,6 +18,7 @@ fn call(
 ) -> Result<Value> {
     Ok(super::call_if_handled(
         &fixture.store,
+        &fixture.consumer_project_id,
         user_id,
         app_id,
         uses_default_mcp_identity,

@@ -19,6 +19,7 @@ pub(crate) struct ConsumerPreferences {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub query: Option<String>,

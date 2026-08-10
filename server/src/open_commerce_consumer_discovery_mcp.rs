@@ -141,16 +141,29 @@ pub(crate) fn definitions() -> Vec<Value> {
 
 pub(crate) fn call_if_handled(
     store: &Store,
+    project_id: &str,
     user_id: &str,
     app_id: &str,
     uses_default_mcp_identity: bool,
     name: &str,
     arguments: Value,
 ) -> Result<Option<Value>> {
+    if !matches!(
+        name,
+        DISCOVER_FOR_CONSUMER | PLAN_CONSUMER_CAPABILITY | REQUEST_CONSUMER_AUTHORIZATION
+    ) {
+        return Ok(None);
+    }
+    if !uses_default_mcp_identity {
+        ensure_app_identity_in_project(store, project_id, user_id, app_id)?;
+    }
     match name {
         DISCOVER_FOR_CONSUMER => {
             let mut request: ConsumerDiscoveryRequest = serde_json::from_value(arguments)
                 .with_context(|| format!("{DISCOVER_FOR_CONSUMER} 参数无效"))?;
+            if !(1..=50).contains(&request.limit) {
+                bail!("消费者发现返回数量必须在 1 到 50 之间");
+            }
             request.requester_app_id = if uses_default_mcp_identity {
                 "pc-web".to_string()
             } else {
@@ -244,6 +257,19 @@ pub(crate) fn call_if_handled(
     }
 }
 
+fn ensure_app_identity_in_project(
+    store: &Store,
+    project_id: &str,
+    user_id: &str,
+    app_id: &str,
+) -> Result<()> {
+    let app = store.ensure_open_commerce_developer_app_owned_by_user(app_id, user_id)?;
+    if app.project_id != project_id {
+        bail!("当前 MCP App 不属于当前项目");
+    }
+    Ok(())
+}
+
 fn empty_object() -> Value {
     json!({})
 }
@@ -251,6 +277,9 @@ fn empty_object() -> Value {
 #[cfg(test)]
 #[path = "open_commerce_consumer_authorization_request_mcp_tests.rs"]
 mod authorization_tests;
+#[cfg(test)]
+#[path = "open_commerce_consumer_discovery_mcp_tests.rs"]
+mod discovery_tests;
 #[cfg(test)]
 #[path = "open_commerce_consumer_mcp_test_support.rs"]
 mod test_support;
