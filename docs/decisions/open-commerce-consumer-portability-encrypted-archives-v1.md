@@ -1,11 +1,14 @@
 ---
 title: 开放商业消费者可携带数据离线加密归档 V1
-status: accepted
+status: superseded
 date: 2026-08-03
 owners: sdk, pc, security
+superseded_by: open-commerce-consumer-portability-archive-v2
 ---
 
 # 开放商业消费者可携带数据离线加密归档 V1
+
+> 本决定仅保留为 V1 兼容历史。新归档写入和当前安全边界以 `open-commerce-consumer-portability-archive-v2.md` 为准；V1 只读解密继续保留。
 
 ## 背景
 
@@ -25,11 +28,11 @@ owners: sdk, pc, security
 - 当前没有口令找回、云端密钥托管、硬件密钥、多人恢复或社会恢复。
 - 弱口令仍可能被离线猜测；PBKDF2 参数不是对所有未来硬件永久安全。
 - 解密后的数据仍遵守隔离导入、签名信任和迁移采用边界，不自动恢复任何业务状态。
-- 当前批次未进行跨端互操作、性能、内存峰值或大文件验证。
+- V1 批次当时未进行跨端互操作、性能、内存峰值或大文件验证；后续 V2 已完成 PC/SDK 双向互操作和 6 MiB 边界回归，但不追溯改变 V1 的认证范围。
 
 ## 实现入口
 
 - `sdk/open-commerce-connector/src/portability-archive.js`
-- `pc-frontend/src/features/open-commerce/portabilityArchive.ts`
+- `pc-frontend/src/features/open-commerce/portabilityArchive.js`
 - `pc-frontend/src/features/open-commerce/ConsumerPortabilityExports.tsx`
 - `pc-frontend/src/features/open-commerce/ConsumerPortabilityImports.tsx`

@@ -173,6 +173,8 @@
 163. `docs/open-commerce-consumer-app-directory-mcp-v1-acceptance.md`：查看本人 App 目录代码状态及后置统一回归矩阵。
 164. `docs/decisions/open-commerce-consumer-authorization-status-mcp-v1.md`：查看消费者本人授权申请状态和隔离边界。
 165. `docs/open-commerce-consumer-authorization-status-mcp-v1-acceptance.md`：查看授权状态查询代码及后置统一回归矩阵。
+166. `docs/decisions/open-commerce-consumer-portability-archive-v2.md`：查看消费者离线归档 V2 的固定 AAD、资源边界和 V1 只读兼容决定。
+167. `docs/open-commerce-consumer-portability-crypto-v2-acceptance.md`：查看运营方签名、PC/SDK 加密归档双向互操作和生产构建证据。
 
 ## 专题地图
 
