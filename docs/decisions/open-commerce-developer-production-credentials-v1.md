@@ -2,8 +2,8 @@
 title: 开放商业开发者 App 限权生产凭据 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-11
+implementation_status: implementation_compiled_local_state_and_http_subset
 ---
 
 # 开放商业开发者 App 限权生产凭据 V1
@@ -28,7 +28,7 @@ implementation_status: implementation_uncompiled
 - 本能力只建立可撤销的应用鉴权层，不代表商户已经授权具体能力；受限能力仍需独立 Grant、预算、期限和动作确认。
 - `production` 表示凭据环境，不表示真实支付、清算、链上资产、外部平台授权、工商认证或生产部署已经完成。
 - V1 没有硬件密钥、mTLS、IP 约束、自动风险评分、密钥托管、跨运营方信任根和完整生产运维验证。
-- 当前代码按快速开发策略尚未编译、迁移、运行接口或验证 PC 交互。
+- 当前代码已完成本地状态和进程内 HTTP 子集验证；历史迁移、真实生产开关、生产鉴权、真实网络和 PC 交互仍未验证。
 
 ## 实现引用
 
