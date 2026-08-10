@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 
 export type PanelSide = 'channel' | 'member'
@@ -27,10 +27,33 @@ const MEMBER_DEFAULT = 328
 export function useWorkspacePanels() {
   const [state, setState] = useState<WorkspacePanelState>(initialWorkspacePanelState)
   const [resizingSide, setResizingSide] = useState<PanelSide | null>(null)
+  const compactViewportHandledRef = useRef(false)
 
   useEffect(() => {
     writeWorkspacePanelState(state)
   }, [state])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mediaQuery = window.matchMedia('(max-width: 1440px)')
+    const syncCompactViewport = () => {
+      if (mediaQuery.matches) {
+        if (compactViewportHandledRef.current) return
+        compactViewportHandledRef.current = true
+        setState((current) => current.memberCollapsed
+          ? current
+          : { ...current, memberCollapsed: true })
+        return
+      }
+
+      compactViewportHandledRef.current = false
+    }
+
+    syncCompactViewport()
+    mediaQuery.addEventListener?.('change', syncCompactViewport)
+    return () => mediaQuery.removeEventListener?.('change', syncCompactViewport)
+  }, [])
 
   const layoutStyle = useMemo(() => ({
     '--conversation-channel-width': `${state.channelWidth}px`,
