@@ -427,7 +427,7 @@ export interface ConsumerPortabilityAdoptionPlan {
   import_trust_status: ConsumerPortabilityImportTrustStatus
   source_package_schema: string
   imported_profile_available: boolean
-  current_profile_revision?: number
+  current_profile_revision: number | null
   preference_changes: ConsumerPortabilityPreferenceChange[]
   relationship_candidates: ConsumerPortabilityRelationshipCandidate[]
   automatic_relationship_restore: false
@@ -439,15 +439,15 @@ export interface ConsumerPortabilityAdoption {
   id: string
   import_id: string
   kind: 'preferences'
-  before_preferences?: ConsumerPreferences
-  before_revision?: number
+  before_preferences: ConsumerPreferences | null
+  before_revision: number | null
   applied_preferences: ConsumerPreferences
   selected_fields: string[]
   resulting_revision: number
   status: 'applied' | 'rolled_back'
   applied_at: string
-  rolled_back_at?: string
-  rollback_revision?: number
+  rolled_back_at: string | null
+  rollback_revision: number | null
 }
 
 export interface ConsumerPortabilityAdoptionList {

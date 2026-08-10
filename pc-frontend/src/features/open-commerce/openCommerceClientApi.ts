@@ -275,7 +275,7 @@ export const openCommerceClientApi = {
   applyConsumerPortabilityPreferences: (
     projectId: string,
     importId: string,
-    expectedCurrentRevision?: number,
+    expectedCurrentRevision: number | null,
     selectedFields: string[] = [],
   ) => api.post<ConsumerPortabilityAdoption>(
     `${projectBase(projectId)}/consumer-portability-imports/${encodeURIComponent(importId)}/adopt-preferences`,
