@@ -11,7 +11,7 @@
 - 一旦 `endpoint_required` tombstone 已耐久，NodeAgent 启动、登录失败、网络失败、响应丢失、退出或更新重启都必须清空并忽略 `node.json` 与 `NODE_AGENT_*`/`NODE_USER_TOKEN` 的 legacy authority。普通 credential epoch 溢出后进入永久 poison，进程内不能从 0 重新计数。
 - secure bootstrap 固定为账号+密码 fresh login，再写 tombstone、清 legacy、secure register，最后 issue/recover。注册成功响应只允许 agent/owner 元数据，不得接收或持久化 legacy secret、cloud WebSocket URL；mutation request ID 必须先持久化，exact replay不返 secret，只能用新的 recovery request继续。
 - 服务端已有 endpoint root 时，旧 install renew、existing-secret renew、device merge、DB/env WebSocket 与 Codex Vault hash proof都必须失败关闭；root mutation提交前后旧 process session、Registry 与 waiter按 exact key摘除。升级不得因 legacy socket仍在线、Ping/Pong或 NodeRegistry `online` 就重新启用它。
-- 当前源码新增独立 v13 compute-inert `/agent/ws`：NodeAgent 只从 `NODE_ENDPOINT_HTTPS_ORIGIN` 派生同 authority 的 `wss` URL，携 DPAPI current credential triple 建立一次新的耐久认证 receipt/head，并严格核对服务端 accepted binding。该模式不调用 legacy session，不设置 `connected=true`，不启动 capability、插件、CLI、任务或 replay；凭据缺失、pending mutation、origin 漂移、epoch poison、ACK 不匹配或到期均失败关闭。它仍未编译、测试或真实连网，不得宣称 Planning、Ready、route、Lease 或派发可用。
+- v13 `/agent/ws` 保持历史 auth-only/空 capability 语义；新增节点使用独立 v14 `planning_snapshot_bootstrap_only` Register/Accepted，固定唯一 Planning bootstrap capability，并只接受 sharing→preparation→Planning 六消息摘要链。NodeAgent 仍只从 `NODE_ENDPOINT_HTTPS_ORIGIN` 派生 WSS、核对 exact credential/session binding，保持 `connected=false`，不调用 legacy session，也不启动 CLI、任务或通用 replay。凭据缺失、pending mutation、origin/epoch/session漂移、摘要或序号冲突及到期均失败关闭；最终 `snapshot_ready=false`，不得宣称 signed Plan、Ready、route、Lease 或派发可用。
 
 ## Desktop review v3 升级边界
 
@@ -94,7 +94,7 @@ Linux 交叉编译延长 Windows 发布。该开关不影响 `publish-server.*` 
 全量发布前至少验证：
 
 - 最近三个已发布版本的 `node.json` fixture：缺字段、空字段、未知字段、旧 workspace/storage、自定义路径、损坏显式配置。
-- endpoint-session fixture：DPAPI 状态与唯一 HTTPS origin跨升级原样保留；pending/缺secret/origin漂移/epoch溢出永不回退legacy；v13 Register/Accepted exact triple与安装摘要匹配；旧boot head、replacement、rotate/revoke、15分钟到期和响应丢失都只关闭exact socket；`connected`、NodeRegistry、capability、CLI、插件、任务与ACK始终不被compute-inert会话开启。旧server固定503或不识别v13时，新节点保持安全等待而不是改连`ws://`。
+- endpoint-session fixture：DPAPI 状态与唯一 HTTPS origin跨升级原样保留；pending/缺secret/origin漂移/epoch溢出永不回退legacy；v13 auth-only与v14 Planning profile均核 exact triple、安装摘要和固定 capability；旧boot head、replacement、rotate/revoke、15分钟到期和响应丢失只关闭exact socket。v14仅开放三阶段 bootstrap，`connected`、NodeRegistry、CLI、通用插件/任务与Ready始终关闭；旧server固定503或不识别v14时，新节点安全等待而不改连`ws://`。
 - 缓存 fixture：环境变量共享 target、`.env.local`、Windows 默认开发/发布目录、项目祖先 `shared`、仓库内部 target。
 - 空盘、低空间、只有 C 盘、项目在 D/E 盘、名称占用、junction、脏 worktree、未 push 提交和多项目绑定。
 - 更新中断、原子写失败、EXE 重启和重复迁移；原子写还要覆盖并发 writer、临时文件名冲突、Windows 目标文件短时占用、低空间/磁盘写满、主文件损坏与备份恢复。任何失败都不能丢失身份、绑定、task journal、sidecar 输出或覆盖项目，持续损坏必须保留完整 IO/Win32 错误链并显式失败。

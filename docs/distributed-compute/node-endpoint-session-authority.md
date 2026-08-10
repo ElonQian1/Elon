@@ -84,17 +84,17 @@ secure register 的成功响应严格只有 `agent_id + owner_user_id`；服务�
 
 ## 5. 认证会话与 exact CAS
 
-认证 receipt 由 Store 从字段私有、不可反序列化且无公共构造器的输入生成。当前 compute-inert issuer 在一个事务中完成：
+认证 receipt 由 Store 从字段私有、不可反序列化且无公共构造器的输入生成。issuer 在一个事务中完成：
 
 1. 验证受信 WSS/TLS transport proof；不得把 URL scheme 或普通代理头当证明；
 2. 重验 credential current revision/digest、未撤销状态及 owner/install exact binding；
-3. 精确核对 v13 Register 声明的 owner/install/credential triple，并把 capability set固定为空；
+3. 精确核对 Register 声明的 owner/install/credential triple 与会话 profile：v13 只能是 `compute_inert + []`，v14 只能是 `planning_snapshot_bootstrap_only + [node_endpoint_planning_snapshot_bootstrap_v1]`；
 4. 绑定当前 server instance，生成 session ID；
 5. 以 previous generation/receipt 为前提追加 authentication receipt；
 6. 用 generation `+1` CAS 把 session head 推进为新的 active head；
 7. exact readback 后提交。
 
-sealed domain 的 `NodeEndpointSessionBinding` 精确携带 agent/credential、credential revision/digest、session ID/generation、receipt ID/digest 与 server instance。当前只把它安装进独立、不可派发任务的 endpoint socket supervisor；替换、关闭、currentness 检查和断开清理只能对 exact binding 做 CAS。它不会进入 legacy `AgentEntry`、`NodeEntry` 或 capability map。
+sealed domain 的 `NodeEndpointSessionBinding` 精确携带 agent/credential、credential revision/digest、session ID/generation、receipt ID/digest 与 server instance；Store permit 另封存不可混用的 v13/v14 profile。它只安装进独立 endpoint socket supervisor，替换、关闭、currentness 检查和断开清理只能对 exact binding 做 CAS。v14 supervisor只能运行固定 Planning bootstrap driver；两种 profile都不会进入 legacy `AgentEntry`、`NodeEntry` 或 capability map。
 
 当前新增的 `AgentProcessSessionKey` 是这一桥接前的窄前置层：`AgentEntry` 与 `NodeEntry` 只保存一份 key，安装连接时固定 `AgentManager.agents -> NodeRegistry.nodes` 锁序；旧 entry 先收到同步 shutdown，再在锁外清理 pending/ACK；旧 reader 的 touch/update/unregister 均为 no-op。`with_current_process_session` 只允许在 manager read guard 内运行无 `await` 的同步操作，三条插件观察链用它保护 ACK-derived Store 写与下一条 durable intent 的准备。该 key 没有 credential revision、receipt、server instance 或跨进程恢复能力，不能进入任何 compute authority digest。
 
@@ -106,7 +106,7 @@ session head 的既有 active 只允许精确转为 `closed`、`stale`、`creden
 
 direct TLS 通过独立、默认关闭的 listener 提供唯一当前可构造的 secure transport proof。只有 `NODE_ENDPOINT_DIRECT_TLS_ENABLED=true` 才启用，并要求 `NODE_ENDPOINT_DIRECT_TLS_LISTEN_ADDR`、`NODE_ENDPOINT_DIRECT_TLS_CERT_CHAIN_PATH`、`NODE_ENDPOINT_DIRECT_TLS_PRIVATE_KEY_PATH` 与 `NODE_ENDPOINT_DIRECT_TLS_VERIFIER_REVISION` 作为完整组出现；owner credential routes 还要求独立的 `NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED=true`。一旦显式启用，证书、私钥、verifier revision、监听地址或 bind 任一无效都会让启动失败，不能静默回退为“已验证”。该 listener 固定 TLS 1.3 与 HTTP/1.1，握手后从 rustls 的同一 `ServerConnection` 读取 negotiated protocol、cipher 和 ALPN，并把 boot-scoped server instance、leaf certificate digest、verifier policy digest、连接 evidence ID 与握手时间纳入 canonical evidence digest。它不读取也不信任请求头、URI scheme、SNI、代理声明或 plain listener 状态。
 
-每条 TLS 连接只得到一个 30 秒内可取走一次的中性 proof slot；重复、过期或 poisoned take 均失败。secure Router 在 credential gate 下挂四个 owner credential POST；只有再显式启用 `NODE_ENDPOINT_SESSION_API_ENABLED=true` 才允许 `/agent/ws` upgrade，而 bootstrap gate 还要求 credential 与 session 两个 gate同时开启，避免签发后没有安全登录通道。owner 路径把 evidence、POST、精确路径和 canonical mutation digest绑定为 owner transport + response permit；WSS 路径则把同一 evidence一次性绑定为 node-endpoint audience，10 秒内读取独立 v13 Register并让 Store消费 proof。proof绑定当前 boot的 `server_instance_id`，OpenRequest必须与它精确一致且在30秒内认证；Hyper的30秒限制只覆盖握手与upgrade前阶段，不截断已升级socket。
+每条 TLS 连接只得到一个 30 秒内可取走一次的中性 proof slot；重复、过期或 poisoned take 均失败。secure Router 在 credential gate 下挂四个 owner credential POST；只有再显式启用 `NODE_ENDPOINT_SESSION_API_ENABLED=true` 才允许 `/agent/ws` upgrade，而 bootstrap gate 还要求 credential 与 session 两个 gate同时开启，避免签发后没有安全登录通道。owner 路径把 evidence、POST、精确路径和 canonical mutation digest绑定为 owner transport + response permit；WSS 路径则把同一 evidence一次性绑定为 node-endpoint audience，10 秒内读取独立 v13/V1 或 v14/V2 Register并让 Store消费 proof。proof绑定当前 boot的 `server_instance_id`，OpenRequest必须与它精确一致且在30秒内认证；Hyper的30秒限制只覆盖握手与upgrade前阶段，不截断已升级socket。
 
 因此该 seam 证明的是“此请求来自本进程直接终止的特定 TLS 握手”，不是 bearer、owner、节点、在线状态或计算能力。可信反向代理模式仍不存在；未来若采用代理，必须先有仓库管理的受信 hop 与不可伪造 TLS evidence（例如受控 UDS/mTLS 或经验证的 PROXYv2 SSL TLV），普通转发头永远不够。
 
@@ -127,17 +127,19 @@ direct TLS 通过独立、默认关闭的 listener 提供唯一当前可构造�
 
 legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时剥离 compute-sensitive effective capabilities。不能因为旧节点声明了新 capability 就发送或接受插件规划、Ready 或 Attempt 权威事实。
 
-## 7. compute-inert WSS 截止线与后续桥接
+## 7. v14 Planning bootstrap 截止线
 
-当前增量只闭合认证 socket，不开放计算控制面：
+v13/V1 保持 auth-only、空 capability 与 Ping/Pong/Close 语义，不原地扩义。v14/V2 增加的仍不是通用计算控制面：
 
-1. `homecli-proto` 使用独立、严格拒绝未知字段的 v13 Register/Accepted DTO；wire 只携 owner/install/current credential triple 与服务端返回的 exact receipt/head binding，不携硬件、模型、CLI、插件、Runtime 或客户端 session ID。
-2. Windows NodeAgent 以 DPAPI current secret 生成短命线性 lease，只从唯一 HTTPS origin 派生 WSS；pending mutation、epoch/origin漂移或 accepted不匹配都会断开。它不调用 legacy `run_session`，并保持 `connected=false`。
-3. direct-TLS handler消费同一连接的一次性 proof，服务端生成 session ID；Store在一个 IMMEDIATE事务内精确核对 Register triple、current credential与owner/install，追加receipt并推进head，exact readback后才返回Accepted。
-4. 独立 endpoint supervisor 只保存 exact durable binding与shutdown；它不创建 `AgentEntry`、不注册 `NodeRegistry`、不提供 `cmd_tx`，新代、凭据 mutation、断开、重启或15分钟绝对到期都会精确终结旧socket。Ping/Pong不续期。
-5. legacy `node_credentials` 的 duplicate merge/delete在endpoint child row存在时继续失败关闭；legacy process key只保护旧控制链，不能转换为耐久binding。
+1. v14 固定 `session_mode=planning_snapshot_bootstrap_only`、`compute_authority=false` 与唯一 capability `node_endpoint_planning_snapshot_bootstrap_v1`；V2 Register/Accepted 使用私有 wire 字段和全量校验，不能转换成 V1。
+2. Accepted 后只允许六条独立消息：sharing request/observed、preparation request/observed、Planning request/observed。每条封存 exact session binding、bootstrap ID、1–6 sequence、delivery ID、前序消息摘要与自身 JCS/SHA-256 摘要；第一条以前述 authentication digest 为前驱。
+3. 每个 exact session 最多一个 chain、一个 in-flight request。sharing disabled/rejected可在第二条结束，preparation rejected可在第四条结束，Planning始终在第六条结束；重复只接受同位置同摘要，冲突永久失败关闭。
+4. v219 append-only provenance把三段来源与 exact v216 authentication receipt/head/current credential绑定。每段 observation 与下一 intent必须在同一 `BEGIN IMMEDIATE` 中完成 transaction-local currentness重验、写入、exact readback与提交；发送前 supervisor 检查不能代替该门卫。
+5. Windows NodeAgent 在 Accepted V2 后建立 non-Clone typed session witness，并只复用本机纯 Bootstrap 状态机。credential replacement重绑 account并撤销旧 controller/witness；同 credential普通 socket replacement只换 session provenance。每阶段执行前后与发送 observation 前都重验 endpoint epoch/currentness。
+6. Planning observation可 `accepted=true`，但当前必须保持 `snapshot_ready=false`、`snapshot=None`、`phase=blocked` 及全部副作用标志为 false。生产 handle-bound SQLite VFS、可信时间、rollback、policy/revocation、inventory/profile、catalog/keyring、installed/work-admission同快照 projector齐备前，不得生成 signed Plan或调用既有 generation/signer路径。
+7. endpoint supervisor不创建 `AgentEntry`、不注册 `NodeRegistry`、不提供通用 `cmd_tx`。非法/超时消息、replacement、credential mutation、断开、重启或15分钟到期只终结 exact socket/chain；Ping不续期，节点 `connected=false`。
 
-下一批若要让该会话承载 Planning 或其他敏感消息，必须把 dispatch、ACK observation 与后续 intent写入同一Store事务，并在其中重验 exact v216 head/receipt/current credential、协议和不可变capability集合；不得只在发送前inspect，也不得把独立supervisor并入宽泛的legacy reader。其后严格顺序仍是：session-bound Planning Snapshot→Control-signed reauthorization与本机v8 work-admission/Host enforcement→Sidecar与active health→Ready V2服务端验真→route/ArtifactAccess→outbox/ACK/Lease。NodeAgent rotate/revoke管理面及任何Google reauth另行闭合，不得恢复silent install renew。
+严格后续顺序仍是：生产 VFS 与 honest Planning Snapshot→Control-signed reauthorization及本机v8 work-admission/Host enforcement→Sidecar与active health→Ready V2服务端验真→route/ArtifactAccess→outbox/ACK/Lease。NodeAgent rotate/revoke管理面及任何Google reauth另行闭合，不得恢复silent install renew。
 
 ## 8. 与 Ready、Route 和派发的关系
 
@@ -160,7 +162,7 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 - process-local fencing：`server/src/node_registry/session_key.rs`、`server/src/homecli_agent/session_fencing.rs`，以及 exact-key 接线后的 `agent_session.rs` 与三条插件 observation 子叶；
 - legacy no-downgrade：`server/src/store/node_credentials/legacy_registration.rs`、`endpoint_authority/legacy_currentness.rs`、`server/src/homecli_agent/{legacy_session_authority,endpoint_credential_fencing,legacy_message_fencing}.rs`；
 - direct TLS verifier/API：`server/src/node_endpoint_transport.rs`、`server/src/node_endpoint_transport/{config,direct_tls,evidence_slot,secure_router,owner_api}.rs`、`owner_api/{contracts,handlers,ingress,response,bootstrap}.rs`，以及 endpoint authority 的 `session/direct_tls.rs` 与 `owner_reauthentication/direct_tls.rs`；
-- compute-inert WSS：`server/homecli-proto/src/node_endpoint_session.rs`、`server/src/node_endpoint_transport/endpoint_session/*`、endpoint authority/session Store子叶与独立endpoint supervisor；
+- endpoint WSS：`server/homecli-proto/src/node_endpoint_session*.rs`、`node_endpoint_planning_bootstrap/*`、`server/src/node_endpoint_transport/endpoint_session/*`、v216 session Store与v219 endpoint Planning provenance、独立endpoint supervisor；
 - Windows NodeAgent：`server/src/node_agent_endpoint_credentials.rs` 与其 `admin/bootstrap/login/owner_api/persistence/secure_store/startup/types/session` 子叶，以及独立 `node_agent_endpoint_session.rs`；
 - migration registry：`server/src/store_migrations.rs`。
 
@@ -168,4 +170,4 @@ Store-owned `mutate_node_endpoint_credential_as_owner` 是四个owner路径唯�
 
 credential Store commit 不直接暴露明文；只有消费与实际 Store transport 成对的 `OwnerApiResponsePermit` 后才形成 response delivery。底层 `NodeEndpointCredentialMutationReceipt` 与 `VerifiedCurrentNodeEndpointSession` 没有网络构造器、`Deserialize` 或 `Clone`。未来 WS 桥接必须继续通过 Store-owned facade 注入 sealed transport/session 输入。
 
-当前已有默认关闭、direct-TLS-only 的 owner credential HTTP producer、Windows NodeAgent issue/recover bootstrap，以及源码级 v13 compute-inert WSS→v216 session Store→独立 supervisor 闭包；没有 legacy backfill，也没有 AgentEntry/NodeRegistry compute binding或敏感ACK事务桥。整体仍只能报告为 `implementation_unwired`：取得endpoint credential或认证socket不等于compute online，更不等于Planning、Ready或派发权威。本增量尚未编译、测试或运行，也未执行内存/磁盘迁移或真实TLS、网络、并发、崩溃恢复与节点验证。
+当前已有默认关闭、direct-TLS-only 的 owner credential HTTP producer、Windows NodeAgent issue/recover bootstrap及源码级 v13 auth-only WSS；本批再加入 v14 三阶段 Planning bootstrap与v219事务 provenance，但仍没有 honest snapshot producer、AgentEntry/NodeRegistry compute binding或任何通用敏感 ACK。整体仍只能报告 `implementation_unwired`：取得 endpoint credential、认证 socket或 blocked Planning observation都不等于compute online、Ready或派发权威。本增量尚未编译、测试或运行，也未执行内存/磁盘迁移或真实TLS、网络、并发、崩溃恢复与节点验证。
