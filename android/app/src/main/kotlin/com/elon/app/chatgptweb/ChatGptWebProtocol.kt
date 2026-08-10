@@ -415,7 +415,14 @@ internal object ChatGptWebProtocol {
         "navigation",
     )
     private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
-    private val UI_REGIONS = setOf("header", "suggestions", "composer", "overlay", "message")
+    private val UI_REGIONS = setOf(
+        ChatGptWebUiRegion.HEADER,
+        ChatGptWebUiRegion.SUGGESTIONS,
+        ChatGptWebUiRegion.COMPOSER,
+        ChatGptWebUiRegion.OVERLAY,
+        ChatGptWebUiRegion.MESSAGE,
+        ChatGptWebUiRegion.CONTENT,
+    )
     private val UI_ROLES = setOf("button", "link", "menuitem", "switch", "tab")
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")

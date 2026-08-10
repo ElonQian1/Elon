@@ -216,6 +216,7 @@ class ChatGptWebProtocolTest {
                   {"id":"control_message_ab12_share_cd34","semantic":"share","label":"分享","region":"message","role":"button","enabled":true,"contextId":"conversation-turn-4","xRatio":0.8,"yRatio":0.6},
                   {"id":"control_sources_ab12","semantic":"sources","label":"文件和来源","region":"header","role":"button","enabled":true},
                   {"id":"control_more_ab12","semantic":"more","label":"更多操作","region":"message","role":"button","enabled":true,"contextId":"conversation-turn-4"},
+                  {"id":"control_create_asset_ab12","semantic":"create_asset","label":"创建图片","region":"content","role":"button","enabled":true},
                   {"id":"../unsafe","semantic":"action","label":"忽略","region":"header","role":"button","enabled":true},
                   {"id":"control_unknown","semantic":"future_kind","label":"未来功能","region":"overlay","role":"menuitem","enabled":false}
                 ]
@@ -226,7 +227,7 @@ class ChatGptWebProtocolTest {
 
         assertEquals("工作", event.value.title)
         assertEquals("healthy", event.value.compatibility)
-        assertEquals(7, event.value.controls.size)
+        assertEquals(8, event.value.controls.size)
         assertEquals("suggestion", event.value.controls[1].semantic)
         assertFalse(event.value.controls[1].inViewport)
         assertEquals("conversation", event.value.controls[2].semantic)
@@ -237,6 +238,8 @@ class ChatGptWebProtocolTest {
         assertEquals(0.6, event.value.controls[3].webYRatio ?: -1.0, 0.0)
         assertEquals("sources", event.value.controls[4].semantic)
         assertEquals("more", event.value.controls[5].semantic)
+        assertEquals(ChatGptWebUiRegion.CONTENT, event.value.controls[6].region)
+        assertEquals("create_asset", event.value.controls[6].semantic)
         assertEquals("action", event.value.controls.last().semantic)
         assertEquals("chatgpt-control:control_navigation:打开导航", event.value.controls.first().accessibilityLabel)
     }

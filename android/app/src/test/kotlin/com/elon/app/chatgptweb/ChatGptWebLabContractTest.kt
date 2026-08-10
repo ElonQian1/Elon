@@ -115,6 +115,12 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("取消置顶|置顶聊天"))
         assertTrue(adapterLayout.contains("取消归档|归档"))
         assertTrue(adapterLayout.contains("return 'more'"))
+        assertTrue(adapterLayout.contains("function addPageContentControls"))
+        assertTrue(adapterLayout.contains("pageKind() !== 'feature'"))
+        assertTrue(adapterLayout.contains("addRegionControls(target, content, 'content'"))
+        assertTrue(adapterLayout.contains("turns.some((turn) => turn.contains(node))"))
+        assertTrue(adapterLayout.contains("node.closest('aside, nav, [role=\"navigation\"]')"))
+        assertTrue(adapterLayout.contains("[header, composer, suggestions].concat(overlays)"))
         val semanticFunction = adapterLayout.substring(
             adapterLayout.indexOf("function semanticFor"),
             adapterLayout.indexOf("function defaultLabel"),

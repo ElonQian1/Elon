@@ -31,4 +31,5 @@ internal object ChatGptWebUiRegion {
     const val COMPOSER = "composer"
     const val OVERLAY = "overlay"
     const val MESSAGE = "message"
+    const val CONTENT = "content"
 }

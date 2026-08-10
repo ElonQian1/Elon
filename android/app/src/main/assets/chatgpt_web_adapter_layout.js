@@ -257,6 +257,23 @@
     return candidates.length ? main : null;
   }
 
+  function pageContentRoot() {
+    if (pageKind() !== 'feature') return null;
+    return document.querySelector('main, #main');
+  }
+
+  function addPageContentControls(target, used, excludedRoots) {
+    const content = pageContentRoot();
+    if (!content) return;
+    const turns = messageNodes();
+    addRegionControls(target, content, 'content', used, (node) => {
+      if (excludedRoots.some((root) => root && root.contains(node))) return false;
+      if (turns.some((turn) => turn.contains(node))) return false;
+      if (node.closest('aside, nav, [role="navigation"]')) return false;
+      return true;
+    });
+  }
+
   function discover() {
     controlsById = new Map();
     const controls = [];
@@ -272,9 +289,11 @@
       return label.length >= 2 && label.length <= 120 && node.getBoundingClientRect().top > window.innerHeight * 0.45;
     });
     addRegionControls(controls, composer, 'composer', used);
-    const overlay = Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).find(isVisible);
+    const overlays = Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
+    const overlay = overlays[0];
     addRegionControls(controls, overlay, 'overlay', used);
     addMessageControls(controls, used);
+    addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
     return controls.slice(0, 160);
   }
 
@@ -299,7 +318,7 @@
       version: 3,
       pageKind: pageKind(),
       title: pageTitle(controls),
-      compatibility: hasHeader && (hasComposer || pageKind() === 'auth')
+      compatibility: hasHeader && (hasComposer || pageKind() === 'auth' || pageKind() === 'feature')
         ? 'healthy'
         : hasHeader || hasComposer ? 'partial' : 'fallback_required',
       controls
