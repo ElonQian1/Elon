@@ -37,11 +37,13 @@ implementation_status: implementation_compiled_local_store_and_http_subset
 - `POST .../webhooks/:subscription_id/rotate-secret`
 - `GET .../webhooks/:subscription_id/deliveries`
 - `POST .../webhooks/:subscription_id/deliveries/:delivery_id/retry`
+- `POST .../webhooks/:subscription_id/deliveries/:delivery_id/acknowledge`
 - `POST .../webhooks/:subscription_id/replay-history`
 
 ## 实现引用
 
 - `server/src/open_commerce_webhook_*.rs`
+- `server/src/open_commerce_webhook_{api,dead_letter_api}_tests.rs`
 - `server/src/store/open_commerce_developer_webhooks.rs`
 - `pc-frontend/src/features/open-commerce/DeveloperWebhookPanel.tsx`
 - `sdk/open-commerce-connector/src/webhook-signature.js`
