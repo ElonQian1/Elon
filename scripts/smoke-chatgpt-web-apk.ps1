@@ -105,6 +105,13 @@ function Invoke-Adb {
     & $Adb @serialArgs @args
 }
 
+function Get-TopResumedActivity {
+    $line = @(Invoke-Adb shell dumpsys activity activities) |
+        Where-Object { $_ -match 'topResumedActivity=' } |
+        Select-Object -First 1
+    return ([string]$line).Trim()
+}
+
 function Get-VisibleNativeSelectors {
     $remotePath = "/sdcard/elon-chatgpt-web-smoke.xml"
     Invoke-Adb shell uiautomator dump $remotePath | Out-Null
@@ -208,8 +215,12 @@ $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT We
         $value.bridge_state -eq "ready" -and
         $value.activity_bound -eq $true
 }
+$topResumedActivity = Get-TopResumedActivity
 
 Add-Check "open_chatgpt_web" ($opened.control_ok -eq $true) ([string]$opened.action)
+Add-Check "chatgpt_activity_foreground" (
+    $topResumedActivity -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
+) $topResumedActivity
 Add-Check "chatgpt_surface" ($state.surface -eq "chatgpt_web") ([string]$state.surface)
 Add-Check "bridge_ready" ($state.bridge_state -eq "ready") ([string]$state.bridge_state)
 Add-Check "authenticated" ($state.authenticated -eq $true) ([string]$state.authenticated)

@@ -11,6 +11,9 @@ function Assert-Contains {
 }
 
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features"'
+Assert-Contains 'function Get-TopResumedActivity'
+Assert-Contains 'Add-Check "chatgpt_activity_foreground"'
+Assert-Contains 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
 Assert-Contains 'Get-ComposerOptions -Section "model"'
 Assert-Contains 'Get-ComposerOptions -Section "tools"'
 Assert-Contains 'Wait-CommandResult -Action $commandAction'
