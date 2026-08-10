@@ -15,7 +15,7 @@
     "test:runtime-draft": "node scripts/test-runtime-draft-model.cjs",
     "test:ui-tuner-workspace": "node scripts/test-ui-tuner-workspace.cjs && node scripts/test-headless-design-regression.cjs && node scripts/test-source-preview-header.cjs && node scripts/test-pwa-color-picker.cjs && node scripts/test-pwa-style-inspector.cjs",
     "test:pwa-design": "node scripts/test-pwa-design.cjs && node scripts/test-pwa-device-viewport.cjs && node scripts/test-pwa-runtime-capture.cjs && node scripts/test-fit-run-events.cjs && node ../scripts/test-pwa-ui-tuner-bridge.js",
-    "test:project-docs": "node scripts/test-project-document-sections.cjs && node scripts/test-project-document-discussions.cjs",
+    "test:project-docs": "node scripts/test-project-document-sections.cjs && node scripts/test-project-document-discussions.cjs && node scripts/test-project-document-native-context.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
     "test:open-commerce": "node scripts/test-capability-invocation-schema.cjs && node ../scripts/test-open-commerce-pc-workspace.js && node ../scripts/test-erp-blueprint-pc-workspace.js && node ../scripts/test-open-commerce-portability-crypto-interop.mjs && node ../scripts/test-open-commerce-consumer-data-vault-crypto.mjs",
     "test:user-browser": "node scripts/test-local-ai-browser-contract.cjs && node ../scripts/test-chatgpt-account-entry.js",
