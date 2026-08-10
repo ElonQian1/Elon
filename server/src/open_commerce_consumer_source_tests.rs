@@ -115,8 +115,16 @@ fn provider_and_domain_filters_are_exact_normalized_and_fail_closed() {
     filtered_request.source_data_domain = Some("  CATALOG  ".to_string());
     filtered_request.capability_key = Some("  CATALOG.SEARCH  ".to_string());
     filtered_request.price_currency = Some(" cny ".to_string());
+    filtered_request.capability_kind = Some(" query ".to_string());
+    filtered_request.access_level = Some(" public ".to_string());
+    filtered_request.preferences.city = Some("吉安".to_string());
+    filtered_request.preferences.categories = vec!["retail".to_string()];
+    filtered_request.preferences.tags = vec!["open".to_string()];
     filtered_request.preferences.max_unit_price_micros = Some(0);
     filtered_request.require_current_declaration = true;
+    filtered_request.require_city_match = true;
+    filtered_request.require_category_match = true;
+    filtered_request.require_all_tags_match = true;
     let filtered = fixture.discover(filtered_request).unwrap();
 
     assert_eq!(merchant_names(&filtered), vec![RECENT_NAME.to_string()]);
@@ -129,6 +137,14 @@ fn provider_and_domain_filters_are_exact_normalized_and_fail_closed() {
         filtered.source_filter.data_domain.as_deref(),
         Some("catalog")
     );
+    assert_eq!(filtered.capability_filter.kind.as_deref(), Some("query"));
+    assert_eq!(
+        filtered.capability_filter.access_level.as_deref(),
+        Some("public")
+    );
+    assert!(filtered.preference_constraints.require_city_match);
+    assert!(filtered.preference_constraints.require_category_match);
+    assert!(filtered.preference_constraints.require_all_tags_match);
     let matched = &filtered.matches[0];
     assert_eq!(
         matched.capability.source.provider_key.as_deref(),

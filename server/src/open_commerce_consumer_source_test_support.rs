@@ -441,7 +441,7 @@ fn create_merchant(
             slug: Some(slug.to_string()),
             description: "消费者可信来源筛选验证".to_string(),
             node_mode: "platform_hosted".to_string(),
-            public_profile: json!({"category":"retail","city":"吉安"}),
+            public_profile: json!({"category":"retail","city":"吉安","tags":["open"]}),
         },
     )
     .unwrap()

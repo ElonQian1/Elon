@@ -691,3 +691,11 @@ mod source_test_support;
 #[cfg(test)]
 #[path = "open_commerce_consumer_source_tests.rs"]
 mod source_tests;
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_filter_test_support.rs"]
+mod filter_test_support;
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_filter_tests.rs"]
+mod filter_tests;
