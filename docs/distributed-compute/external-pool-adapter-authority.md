@@ -3,7 +3,7 @@ title: 外部算力池 Adapter Onboarding 来源权威
 status: current
 reviewed_at: 2026-08-11
 owners: backend, ai-economy, security
-implementation_status: documentation_only_unimplemented
+implementation_status: implementation_uncompiled
 ---
 
 # 外部算力池 Adapter Onboarding 来源权威
@@ -12,7 +12,7 @@ implementation_status: documentation_only_unimplemented
 
 本文冻结 `external_pool` 的第一段服务端接入权威：Provider owner 发起 request，独立平台管理员复核，Store 再按精确摘要执行 immutable apply。该段只建立未来 Adapter route 可以引用的 owner-approved、admin-reviewed 来源；它不实现 concrete Adapter、credential verifier、route resolver、网络或任务执行。
 
-当前只有文档权威，没有 Rust、v221 migration、HTTP、Store 或测试源码，也没有执行编译、迁移或运行验证。未来 apply 的最大效果固定为：
+当前 owner request 领域 DTO、Store-private submit/review/apply 与 v221 三账本源码已经写入，并把通用 Provider 注册对 `external_pool` 封死；没有 HTTP/MCP/PC 入口、测试源码、编译、迁移或运行验证。apply 的最大效果固定为：
 
 - 登记一份 `provider_kind=external_pool`、`status=registering`、`trust_tier=self_declared` 的 Provider 当前版本与不可变历史；
 - 登记一份专用 `external_pool_onboarding` application source；
@@ -44,7 +44,7 @@ request 只允许携带：
 
 ### 2.3 Immutable apply
 
-apply 只接受仍为 approved 的 exact request、不可变 review receipt、稳定幂等键、当前摘要和显式确认。未来 Store 必须在一个 `BEGIN IMMEDIATE` 内重新验证 owner、reviewer 分离、Provider ID 未占用、request/review 摘要、目标 Provider 规范 JSON 与全部时间/上限，再原子完成：
+apply 只接受仍为 approved 的 exact request、不可变 review receipt、稳定幂等键、当前摘要和显式确认。当前 Store-private 源码在一个 `BEGIN IMMEDIATE` 内重新验证 owner、reviewer 分离、Provider ID 未占用、request/review 摘要、目标 Provider 规范 JSON 与全部时间/上限，再原子完成：
 
 1. 以 policy revision 1 登记 `external_pool/registering/self_declared` Provider；
 2. Provider `endpoint=None`，`adapter=Some(exact approved ref)`，observed/verified evidence 继续为空；
@@ -55,22 +55,22 @@ apply 只接受仍为 approved 的 exact request、不可变 review receipt、�
 
 apply 不接收新业务字段，不能在最后一步改写已审批内容。它可以由复核管理员触发，但只消费既有 exact review；不会因此获得新增裁量权。
 
-## 3. Future v221 来源绑定
+## 3. v221 来源绑定
 
-后续代码批若当前全局 schema 版本仍以 v220 为末尾，可使用 v221；实际实现前必须重新读取 `store_migrations.rs` 并占用当时下一空闲版本。目标 migration 只增加 `compute_external_pool_onboarding_requests`、`compute_external_pool_onboarding_reviews`、`compute_external_pool_onboarding_applications` 三类账本及其幂等、投影、不可变和状态门卫。
+当前 v221 源码增加 `compute_external_pool_onboarding_requests`、`compute_external_pool_onboarding_reviews`、`compute_external_pool_onboarding_applications` 三类账本及其幂等、投影、不可变和状态门卫；整批 DDL 与来源 trigger 替换位于同一 `BEGIN IMMEDIATE` 迁移事务。
 
-v221 还必须替换 v213 的 `trg_compute_route_authorization_exact_source`：
+v221 同时替换 v213 的 `trg_compute_route_authorization_exact_source`：
 
 - `provider_activation_application` 继续精确引用既有 endpoint activation application；
 - `provider_recovery_application` 继续精确引用既有 recovery application；
-- `external_pool_onboarding` 改为精确引用专用 onboarding application 的 `application_id/application_digest/provider_id/reviewed_by_user_id`；
+- `external_pool_onboarding` 精确引用专用 onboarding application 的 `application_id/application_digest/provider_id`，`approved_by_user_id` 继续绑定 Provider owner，并另行闭合独立 reviewer 与 approved review；
 - 禁止继续借用 endpoint-only `compute_activation_applications` 伪装外部矿池来源。
 
-本 docs-first 批不创建 v221，也不触发该 route source 分支。即使未来 application 已存在，也只说明 route 获得了一个可审核来源；没有后续 sealed credential verification 与 route currentness custody 时，仍不得写或采用 v213 route rows。
+v221 目前只是未编译、未执行的迁移源码，Store 也没有生产调用入口，因此不会触发该 route source 分支。即使未来 application 已存在，也只说明 route 获得了一个可审核来源；没有后续 sealed credential verification 与 route currentness custody 时，仍不得写或采用 v213 route rows。
 
 ## 4. Generic registration 必须封死
 
-本人 Provider HTTP/MCP 继续只接受 `user_node` 与 `managed_cluster`。未来实现还必须在通用 `Store::register_compute_provider` 边界再次拒绝 `external_pool`，不能只依赖 HTTP service 的字符串检查。
+本人 Provider HTTP/MCP 继续只接受 `user_node` 与 `managed_cluster`；通用 `Store::register_compute_provider` 现也直接拒绝 `external_pool`，不会只依赖 HTTP service 的字符串检查。
 
 唯一允许写入首版 external-pool Provider 的入口是 onboarding apply 事务内部的 store-private registration kernel。不得新增 generic admin create、直接表写、通用 Store DTO、MCP 工具或测试 constructor 作为旁路。低层历史登记 kernel可以供已有受控事务复用，但不能独立公开成 external-pool 授权。
 
@@ -120,6 +120,6 @@ v221 还必须替换 v213 的 `trg_compute_route_authorization_exact_source`：
 
 ## 9. 本批静态验收边界
 
-本批只能证明权威文档已经冻结并由索引文档命中。允许的证据是文档模块化、链接/术语检查与 `git diff --check`；不得以本文、future v221 名称或 API 表宣称 onboarding 已实现。
+本批只能证明领域合同、Store-private 事务、v221 DDL/trigger 与静态 readback 源码已经形成。允许的证据是定向 rustfmt、模块化、链接/术语检查与 `git diff --check`；未执行编译、迁移、权限、并发、幂等、触发器或 HTTP 验收，状态固定为 `implementation_uncompiled`、`implementation_unrun`。
 
-后续代码批即使完成 Rust 与 migration 源码，在统一集成阶段实际编译、迁移、权限、并发、幂等、触发器和真实 credential verifier 验收前，也只能标记 `implementation_uncompiled`、`implementation_unrun`。
+真实 credential verifier、v213 producer、Adapter、网络与 worker 仍未实现；不得以本源码、v221 名称或未来 API 表宣称 onboarding 已可用。

@@ -44,6 +44,9 @@ impl Store {
         &self,
         provider: &ComputeProvider,
     ) -> Result<ComputeProviderRegistrationReceipt> {
+        if provider.provider_kind == PROVIDER_KIND_EXTERNAL_POOL {
+            bail!("external_pool Provider 只能由专用 onboarding apply 登记");
+        }
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let receipt = register_compute_provider_on(&tx, provider)?;

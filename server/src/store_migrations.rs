@@ -255,6 +255,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (218, "节点算力 Endpoint 所有者重新认证消费闭包", crate::node_compute_sharing_migration::migration_v218),
     (219, "节点算力 Endpoint Planning 六消息原子来源链", crate::node_compute_plugin_sharing_migration::migration_v219),
     (220, "消费者加密保险箱按项目和用户隔离条目 ID", crate::open_commerce_consumer_vault_migration::migration_v220),
+    (221, "外部矿池所有者申请、独立复核与不可变登记来源", crate::compute_external_pool_onboarding_migration::migration_v221),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

@@ -75,6 +75,7 @@ mod compute_capacity_claim_history_migration;
 mod compute_capacity_epoch_migration;
 mod compute_capacity_lifecycle_migration;
 mod compute_capacity_migration;
+mod compute_external_pool_onboarding_migration;
 mod compute_federation;
 mod compute_federation_activation_api;
 mod compute_federation_activation_application_model;
