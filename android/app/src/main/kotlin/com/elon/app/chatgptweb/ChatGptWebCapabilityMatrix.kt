@@ -95,6 +95,22 @@ internal object ChatGptWebCapabilityMatrix {
                             "native_trigger_content_description",
                             coverage.nativeTriggerSelector ?: JSONObject.NULL,
                         )
+                        .put(
+                            "mcp_action",
+                            if (coverage.kind == ChatGptNativeControlPresentation.Kind.METADATA) {
+                                JSONObject.NULL
+                            } else {
+                                "chatgpt_invoke_control"
+                            },
+                        )
+                        .put(
+                            "mcp_arguments",
+                            if (coverage.kind == ChatGptNativeControlPresentation.Kind.METADATA) {
+                                JSONObject.NULL
+                            } else {
+                                JSONObject().put("control_id", control.id)
+                            },
+                        )
                         .put("official_fallback", true)
                     )
                 }

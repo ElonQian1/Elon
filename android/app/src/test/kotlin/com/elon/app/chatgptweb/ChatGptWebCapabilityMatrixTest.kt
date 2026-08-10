@@ -28,6 +28,9 @@ class ChatGptWebCapabilityMatrixTest {
         assertEquals(1, matrix.getJSONObject("manifest").getInt("generic_control_count"))
         assertEquals(1, matrix.getJSONObject("manifest").getInt("native_menu_control_count"))
         assertEquals(0, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
+        val control = matrix.getJSONArray("control_coverage").getJSONObject(0)
+        assertEquals("chatgpt_invoke_control", control.getString("mcp_action"))
+        assertEquals("control_demo", control.getJSONObject("mcp_arguments").getString("control_id"))
     }
 
     @Test

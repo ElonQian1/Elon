@@ -65,6 +65,49 @@ class ChatGptNativeControlPresentationTest {
         assertEquals("chatgpt-overlay-actions:2", coverage.getValue("sources").nativeTriggerSelector)
     }
 
+    @Test
+    fun mapsDedicatedControlsToTheirRealNativeSurfaceAndRequiredTrigger() {
+        val controls = listOf(
+            control("navigation", "navigation", "会话", ChatGptWebUiRegion.HEADER),
+            control("new", "new_conversation", "新聊天", ChatGptWebUiRegion.HEADER),
+            control("attachment", "attachment", "添加", ChatGptWebUiRegion.COMPOSER),
+            control("model", "model", "模型", ChatGptWebUiRegion.COMPOSER),
+            control("conversation", "conversation", "工作", ChatGptWebUiRegion.OVERLAY),
+            control("project", "project", "项目", ChatGptWebUiRegion.OVERLAY),
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(
+            ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER,
+            coverage.getValue("navigation").nativeSelector,
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.NEW_CONVERSATION,
+            coverage.getValue("new").nativeSelector,
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER,
+            coverage.getValue("new").nativeTriggerSelector,
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER,
+            coverage.getValue("attachment").nativeSelector,
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.COMPOSER_MODEL_TRIGGER,
+            coverage.getValue("model").nativeSelector,
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER,
+            coverage.getValue("conversation").nativeTriggerSelector,
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.FEATURE_LIST_TRIGGER,
+            coverage.getValue("project").nativeTriggerSelector,
+        )
+    }
+
     private fun control(
         id: String,
         semantic: String,

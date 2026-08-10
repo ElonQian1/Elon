@@ -40,9 +40,9 @@ internal object ChatGptNativeControlPresentation {
                     nativeSelector = control.accessibilityLabel,
                 )
                 control.region == ChatGptWebUiRegion.HEADER &&
-                    control.semantic in HEADER_DEDICATED_SEMANTICS -> Coverage(control.id, Kind.DEDICATED)
+                    control.semantic in HEADER_DEDICATED_SEMANTICS -> headerDedicatedCoverage(control)
                 control.region == ChatGptWebUiRegion.COMPOSER &&
-                    control.semantic in COMPOSER_DEDICATED_SEMANTICS -> Coverage(control.id, Kind.DEDICATED)
+                    control.semantic in COMPOSER_DEDICATED_SEMANTICS -> composerDedicatedCoverage(control)
                 control.id in primaryCopyIds -> Coverage(
                     control.id,
                     Kind.DEDICATED,
@@ -60,7 +60,7 @@ internal object ChatGptNativeControlPresentation {
                 control.region == ChatGptWebUiRegion.OVERLAY && control.semantic == "timestamp" ->
                     Coverage(control.id, Kind.METADATA)
                 control.region == ChatGptWebUiRegion.OVERLAY &&
-                    control.semantic in OVERLAY_DEDICATED_SEMANTICS -> Coverage(control.id, Kind.DEDICATED)
+                    control.semantic in OVERLAY_DEDICATED_SEMANTICS -> overlayDedicatedCoverage(control)
                 control.id in overlayIds -> Coverage(
                     control.id,
                     Kind.MENU,
@@ -118,6 +118,47 @@ internal object ChatGptNativeControlPresentation {
     fun stableContextId(value: String): String = value
         .replace(Regex("[^A-Za-z0-9_.:-]"), "_")
         .take(MAX_CONTEXT_ID_LENGTH)
+
+    private fun headerDedicatedCoverage(control: ChatGptWebUiControl): Coverage = when (control.semantic) {
+        "navigation" -> Coverage(
+            control.id,
+            Kind.DEDICATED,
+            nativeSelector = ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER,
+        )
+        "new_conversation" -> Coverage(
+            control.id,
+            Kind.DEDICATED,
+            nativeSelector = ChatGptNativeNavigationSelector.NEW_CONVERSATION,
+            nativeTriggerSelector = ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER,
+        )
+        else -> Coverage(
+            control.id,
+            Kind.DEDICATED,
+            nativeSelector = ChatGptNativeNavigationSelector.STOP,
+        )
+    }
+
+    private fun composerDedicatedCoverage(control: ChatGptWebUiControl): Coverage = Coverage(
+        control.id,
+        Kind.DEDICATED,
+        nativeSelector = when (control.semantic) {
+            "attachment" -> ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER
+            "model" -> ChatGptNativeNavigationSelector.COMPOSER_MODEL_TRIGGER
+            "dictation" -> ChatGptNativeNavigationSelector.DICTATION
+            "send" -> ChatGptNativeNavigationSelector.SEND
+            else -> ChatGptNativeNavigationSelector.STOP
+        },
+    )
+
+    private fun overlayDedicatedCoverage(control: ChatGptWebUiControl): Coverage = Coverage(
+        control.id,
+        Kind.DEDICATED,
+        nativeTriggerSelector = if (control.semantic == "conversation") {
+            ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER
+        } else {
+            ChatGptNativeNavigationSelector.FEATURE_LIST_TRIGGER
+        },
+    )
 
     private fun primaryMessageCopies(controls: List<ChatGptWebUiControl>): List<ChatGptWebUiControl> =
         controls.asSequence()
