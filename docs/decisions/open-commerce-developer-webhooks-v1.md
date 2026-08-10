@@ -43,7 +43,7 @@ implementation_status: implementation_compiled_local_store_and_http_subset
 ## 实现引用
 
 - `server/src/open_commerce_webhook_*.rs`
-- `server/src/open_commerce_webhook_{api,dead_letter_api}_tests.rs`
+- `server/src/open_commerce_webhook_{api,dead_letter_api,history_api}_tests.rs`
 - `server/src/store/open_commerce_developer_webhooks.rs`
 - `pc-frontend/src/features/open-commerce/DeveloperWebhookPanel.tsx`
 - `sdk/open-commerce-connector/src/webhook-signature.js`
