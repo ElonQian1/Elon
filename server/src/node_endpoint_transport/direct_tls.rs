@@ -100,6 +100,7 @@ pub(super) struct DirectTlsServer {
     acceptor: TlsAcceptor,
     verifier: Arc<DirectTlsVerifierSeal>,
     owner_credential_api_enabled: bool,
+    owner_bootstrap_api_enabled: bool,
 }
 
 impl DirectTlsServer {
@@ -139,6 +140,7 @@ impl DirectTlsServer {
             acceptor: TlsAcceptor::from(Arc::new(server_config)),
             verifier,
             owner_credential_api_enabled: config.owner_credential_api_enabled,
+            owner_bootstrap_api_enabled: config.owner_bootstrap_api_enabled,
         })
     }
 
@@ -149,6 +151,7 @@ impl DirectTlsServer {
             let verifier = Arc::clone(&self.verifier);
             let state = Arc::clone(&state);
             let owner_credential_api_enabled = self.owner_credential_api_enabled;
+            let owner_bootstrap_api_enabled = self.owner_bootstrap_api_enabled;
             tokio::spawn(async move {
                 if let Err(error) = serve_connection(
                     stream,
@@ -156,6 +159,7 @@ impl DirectTlsServer {
                     verifier,
                     state,
                     owner_credential_api_enabled,
+                    owner_bootstrap_api_enabled,
                     DirectTlsPeerAddress::from_socket(peer_address),
                 )
                 .await
@@ -173,6 +177,7 @@ async fn serve_connection(
     verifier: Arc<DirectTlsVerifierSeal>,
     state: Arc<AppState>,
     owner_credential_api_enabled: bool,
+    owner_bootstrap_api_enabled: bool,
     peer_address: DirectTlsPeerAddress,
 ) -> Result<()> {
     stream.set_nodelay(true)?;
@@ -185,6 +190,7 @@ async fn serve_connection(
         VerifiedSecureTransportSlot::new(evidence),
         state,
         owner_credential_api_enabled,
+        owner_bootstrap_api_enabled,
         peer_address,
     );
     let service = TowerToHyperService::new(app);

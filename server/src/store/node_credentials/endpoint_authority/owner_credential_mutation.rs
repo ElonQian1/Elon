@@ -119,6 +119,15 @@ impl NodeEndpointOwnerCredentialMutationDelivery {
 }
 
 impl Store {
+    pub(crate) fn preflight_node_endpoint_owner_credential_mutation(
+        &self,
+        bearer_token: &str,
+        current_password: &str,
+        request: &NodeEndpointOwnerCredentialMutationRequest,
+    ) -> Result<String> {
+        transaction::preflight_owned_target(self, bearer_token, current_password, request)
+    }
+
     pub(crate) fn mutate_node_endpoint_credential_as_owner(
         &self,
         bearer_token: &str,

@@ -2,9 +2,8 @@
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
@@ -16,6 +15,9 @@ pub struct NodeConfig {
     /// 云端 HTTP/HTTPS 地址（用于 REST API 调用，如登录、注册节点、注册外部项目）。
     /// 默认从 cloud_url 派生：ws://X → http://X，wss://X → https://X。
     pub cloud_http_url: String,
+    /// Direct-TLS owner/bootstrap origin. This is the sole secure endpoint
+    /// origin and is never derived from legacy cloud URLs or response data.
+    pub endpoint_https_origin: Option<String>,
     /// 本地 Ollama 地址
     pub ollama_url: String,
     /// 可选：LM Studio 地址
@@ -509,41 +511,14 @@ pub(super) fn initial_storage_settings(
     }
 }
 
-/// 账号 + 密码登录云端，换取 token。
-pub(super) async fn cloud_login(cfg: &NodeConfig, account: &str, password: &str) -> Result<String> {
-    let url = format!(
-        "{}/api/auth/login",
-        cfg.cloud_http_url.trim_end_matches('/')
-    );
-    let client =
-        super::node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15));
-    let resp = client
-        .post(&url)
-        .json(&serde_json::json!({
-            "account": account,
-            "password": password,
-            "device_name": machine_label(),
-        }))
-        .send()
-        .await?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("登录失败 {}: {}", status, body));
-    }
-    let j: serde_json::Value = resp.json().await?;
-    j.get("token")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| anyhow!("登录响应缺少 token"))
-}
-
 impl NodeConfig {
     pub(super) fn from_env() -> Result<Self> {
         let cloud_url = std::env::var("NODE_CLOUD_URL")
             .unwrap_or_else(|_| "ws://43.139.149.158:8080/agent/ws".into());
         let cloud_http_url =
             std::env::var("NODE_CLOUD_HTTP_URL").unwrap_or_else(|_| derive_http_url(&cloud_url));
+        let endpoint_https_origin =
+            crate::node_agent_endpoint_credentials::endpoint_origin_from_env()?;
         let ollama_url =
             std::env::var("NODE_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
         let lm_studio_url = std::env::var("NODE_LM_STUDIO_URL")
@@ -560,6 +535,7 @@ impl NodeConfig {
         Ok(Self {
             cloud_url,
             cloud_http_url,
+            endpoint_https_origin,
             ollama_url,
             lm_studio_url,
             custom_url,

@@ -39,6 +39,7 @@ async fn supervised_submit_requires_exact_grant_then_persists_dispatch_authority
         crate::node_agent_config::NodeConfig {
             cloud_url: "ws://127.0.0.1".into(),
             cloud_http_url: "http://127.0.0.1".into(),
+            endpoint_https_origin: None,
             ollama_url: "http://127.0.0.1".into(),
             lm_studio_url: None,
             custom_url: None,

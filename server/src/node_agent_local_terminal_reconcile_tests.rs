@@ -386,11 +386,11 @@ impl Fixture {
         let base = base.canonicalize().unwrap();
         let active = active.canonicalize().unwrap();
         crate::node_agent_supervision_worktree_lease::acquire(&base, &active, ROOT).unwrap();
-
         let mut runtime = NodeRuntime::new(
             crate::node_agent_config::NodeConfig {
                 cloud_url: "ws://127.0.0.1".into(),
                 cloud_http_url: "http://127.0.0.1".into(),
+                endpoint_https_origin: None,
                 ollama_url: "http://127.0.0.1".into(),
                 lm_studio_url: None,
                 custom_url: None,

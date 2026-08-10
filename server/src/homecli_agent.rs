@@ -34,7 +34,6 @@ use std::{
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 use uuid::Uuid;
 // ── manager state ────────────────────────────────────────────────────────────
-const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(40);
 const AGENT_DISPATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
@@ -74,14 +73,15 @@ fn freeze_cloud_control_dispatch_window_at(
 }
 mod android_device_host;
 mod compute_plugin_sharing;
+mod endpoint_credential_fencing;
 mod heartbeat;
 mod journal;
+mod legacy_message_fencing;
+mod legacy_session_authority;
 mod pending_recovery;
-mod public_dev_handshake;
 mod session_fencing;
 mod summary;
 pub(crate) use compute_plugin_sharing::dispatch_durable_compute_plugin_sharing_intent;
-use public_dev_handshake::record_node_public_dev_handshake;
 pub use summary::AgentSummary;
 #[cfg(test)]
 #[path = "homecli_agent_build_cache_tests.rs"]
@@ -398,19 +398,13 @@ impl AgentManager {
             })
             .transpose()?;
         let (tx, rx) = mpsc::unbounded_channel();
-        {
-            let mut pending = pending.lock().await;
-            let mut cli_pending_ids = cli_pending_ids.lock().await;
-            pending.insert(req_id.clone(), tx);
-            cli_pending_ids.insert(req_id.clone());
-        }
-        let cancel_handle = CliPromptCancelHandle {
-            req_id: req_id.clone(),
-            cmd_tx: cmd_tx.clone(),
-            process_session,
-        };
-        if let Err(error) = cmd_tx
-            .send(ServerToAgent::CliPrompt {
+        self.install_current_cli_waiter_and_dispatch(
+            &process_session,
+            &pending,
+            &cli_pending_ids,
+            &req_id,
+            tx,
+            ServerToAgent::CliPrompt {
                 req_id: req_id.clone(),
                 cli,
                 extra_args,
@@ -422,15 +416,25 @@ impl AgentManager {
                 cloud_control_issued_at,
                 cloud_control_ttl_ms,
                 prompt,
-            })
-            .map_err(|_| anyhow!("agent writer closed"))
-        {
-            let mut pending = pending.lock().await;
-            let mut cli_pending_ids = cli_pending_ids.lock().await;
-            pending.remove(&req_id);
-            cli_pending_ids.remove(&req_id);
-            return Err(error);
-        }
+            },
+        )
+        .await
+        .map_err(|error| match error {
+            legacy_message_fencing::LegacyMessageDispatchError::SessionChanged => {
+                anyhow!("agent session changed before CLI dispatch")
+            }
+            legacy_message_fencing::LegacyMessageDispatchError::RequestAlreadyPending => {
+                anyhow!("CLI request is already pending: {req_id}")
+            }
+            legacy_message_fencing::LegacyMessageDispatchError::WriterClosed => {
+                anyhow!("agent writer closed")
+            }
+        })?;
+        let cancel_handle = CliPromptCancelHandle {
+            req_id: req_id.clone(),
+            cmd_tx: cmd_tx.clone(),
+            process_session,
+        };
         if let Some(cancel_at) = server_cancel_at {
             let deadline_cmd_tx = cmd_tx.clone();
             let deadline_req_id = req_id.clone();
@@ -459,59 +463,6 @@ impl AgentManager {
             rx,
             cancel_handle,
         })
-    }
-    pub async fn send_tool_approval_decision(
-        &self,
-        req_id: &str,
-        approval_id: &str,
-        decision: &str,
-    ) -> Result<bool> {
-        let target = {
-            let agents = self.agents.read().await;
-            let mut target = None;
-            for agent in agents.values() {
-                let has_pending_req = agent.pending.lock().await.contains_key(req_id);
-                if !has_pending_req {
-                    continue;
-                }
-                target = Some((agent.cmd_tx.clone(), agent.approval_acks.clone()));
-                break;
-            }
-            target
-        };
-        let Some((cmd_tx, approval_acks)) = target else {
-            return Err(anyhow!(
-                "pending CLI request not found for tool approval: {req_id}"
-            ));
-        };
-        let dispatch_id = Uuid::new_v4().to_string();
-        let ack_key = tool_approval_ack_key(req_id, approval_id, &dispatch_id);
-        let (ack_tx, ack_rx) = oneshot::channel();
-        approval_acks.lock().await.insert(ack_key.clone(), ack_tx);
-        if cmd_tx
-            .send(ServerToAgent::ToolApprovalDecision {
-                req_id: req_id.to_string(),
-                approval_id: approval_id.to_string(),
-                dispatch_id,
-                decision: decision.to_string(),
-            })
-            .is_err()
-        {
-            approval_acks.lock().await.remove(&ack_key);
-            return Err(anyhow!("agent writer closed"));
-        }
-        match tokio::time::timeout(TOOL_APPROVAL_ACK_TIMEOUT, ack_rx).await {
-            Ok(Ok(accepted)) => Ok(accepted),
-            Ok(Err(_)) => Err(anyhow!(
-                "tool approval ack channel closed: req_id={req_id}, approval_id={approval_id}"
-            )),
-            Err(_) => {
-                approval_acks.lock().await.remove(&ack_key);
-                Err(anyhow!(
-                    "tool approval ack timeout: req_id={req_id}, approval_id={approval_id}"
-                ))
-            }
-        }
     }
     pub async fn list(&self) -> Vec<AgentSummary> {
         self.agents
@@ -744,10 +695,6 @@ pub async fn agent_ws_handler(
         }
     };
     let secrets = load_secrets();
-    if secrets.is_empty() {
-        tracing::warn!("/agent/ws rejected: ELON_AGENT_SECRETS is empty");
-        return (StatusCode::UNAUTHORIZED, "agent auth not configured").into_response();
-    }
     ws.on_upgrade(move |socket| handle_agent_socket(socket, state, secrets, token))
 }
 

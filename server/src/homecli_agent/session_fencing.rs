@@ -10,6 +10,7 @@ use crate::{node_registry::AgentProcessSessionKey, types::AppState};
 
 use super::{
     agent_session::{fail_pending_approvals, fail_pending_pings},
+    legacy_session_authority::LegacySessionCredentialProof,
     AgentEntry, AgentManager,
 };
 
@@ -97,6 +98,8 @@ pub(super) async fn install_process_session(
     process_session: &AgentProcessSessionKey,
     entry: AgentEntry,
     owner_user_id: String,
+    install_id: Option<String>,
+    credential_proof: LegacySessionCredentialProof,
 ) -> Result<()> {
     if &entry.process_session != process_session || entry.agent_id != process_session.agent_id() {
         tracing::error!(
@@ -117,7 +120,20 @@ pub(super) async fn install_process_session(
     // pending queues are drained only after both current projections are installed.
     let old_entry = {
         let mut agents = state.agent_manager.agents.write().await;
-        let old_entry = agents.insert(process_session.agent_id().to_string(), entry);
+        state
+            .store
+            .require_legacy_node_websocket_install_current(
+                process_session.agent_id(),
+                Some(&owner_user_id),
+                install_id.as_deref(),
+                credential_proof.database_secret_hash(),
+            )
+            .map_err(|error| {
+                anyhow!(
+                    "legacy endpoint authority final install gate for {}: {error}",
+                    process_session.agent_id()
+                )
+            })?;
         state
             .node_registry
             .register_exact(
@@ -132,7 +148,9 @@ pub(super) async fn install_process_session(
                 connected_at,
             )
             .await;
-        old_entry
+        // `register_exact` has no suspension point after its Registry insert. Once it returns,
+        // install the Manager entry synchronously so cancellation cannot split the projections.
+        agents.insert(process_session.agent_id().to_string(), entry)
     };
 
     if let Some(old_entry) = old_entry {

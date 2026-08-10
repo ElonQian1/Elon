@@ -402,7 +402,6 @@ mod tests {
         assert!(validate_requested_workspace("C:/unrelated-root", &root, &resolved).is_err());
         let _ = std::fs::remove_dir_all(base);
     }
-
     #[test]
     fn resume_request_resolves_inherited_worktree_to_authoritative_base_before_grant_check() {
         let root = std::env::temp_dir().join(format!(
@@ -423,6 +422,7 @@ mod tests {
             crate::node_agent_config::NodeConfig {
                 cloud_url: "ws://127.0.0.1".into(),
                 cloud_http_url: "http://127.0.0.1".into(),
+                endpoint_https_origin: None,
                 ollama_url: "http://127.0.0.1".into(),
                 lm_studio_url: None,
                 custom_url: None,

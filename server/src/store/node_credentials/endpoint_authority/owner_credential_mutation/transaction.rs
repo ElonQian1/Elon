@@ -14,6 +14,31 @@ use super::{
     NodeEndpointOwnerCredentialMutationCommit,
 };
 
+pub(super) fn preflight_owned_target(
+    store: &Store,
+    bearer_token: &str,
+    current_password: &str,
+    request: &NodeEndpointOwnerCredentialMutationRequest,
+) -> Result<String> {
+    request.canonical_json_and_digest()?;
+    let mut connection = store.conn()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let account = current_account::verify_current_owner_account_on(
+        &transaction,
+        bearer_token,
+        current_password,
+        Utc::now(),
+    )?;
+    current_target::require_owned_legacy_target_on(
+        &transaction,
+        &account,
+        request.agent_id(),
+        request.install_id(),
+    )?;
+    transaction.commit()?;
+    Ok(request.agent_id().to_string())
+}
+
 pub(super) fn mutate(
     store: &Store,
     bearer_token: &str,

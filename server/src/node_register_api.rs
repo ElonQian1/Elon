@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest as _;
 use std::sync::Arc;
 
-use crate::{project_auth::auth_from_headers, types::AppState};
+use crate::{
+    project_auth::{auth_from_headers, bearer_token},
+    store::node_credentials::{LegacyNodeRegistrationOutcome, LegacyNodeRegistrationRequest},
+    types::AppState,
+};
 
 #[derive(Deserialize)]
 pub struct RegisterNodeRequest {
@@ -36,7 +40,7 @@ pub struct RegisterNodeResponse {
     pub owner_user_id: String,
 }
 
-fn node_cloud_ws_url() -> String {
+pub(crate) fn legacy_node_cloud_ws_url() -> String {
     format!(
         "ws://{}",
         std::env::var("ELON_PUBLIC_HOST").unwrap_or_else(|_| "43.139.149.158:8080".to_string())
@@ -67,119 +71,28 @@ pub async fn register_node(
                 .into_response();
         }
     };
+    let current_bearer_token = bearer_token(&headers)
+        .filter(|token| state.owner_token.as_deref() != Some(*token))
+        .map(str::to_string);
 
     let new_secret = uuid::Uuid::new_v4().to_string().replace('-', "")
         + &uuid::Uuid::new_v4().to_string().replace('-', "");
     let new_secret_hash = hex::encode(sha2::Sha256::digest(new_secret.as_bytes()));
 
-    let existing_id = req
+    let existing_agent_id = req
         .existing_agent_id
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty());
-    let existing_secret = req
+    let existing_secret_hash = req
         .existing_secret
         .as_deref()
         .map(str::trim)
-        .filter(|s| !s.is_empty());
+        .filter(|s| !s.is_empty())
+        .map(|secret| hex::encode(sha2::Sha256::digest(secret.as_bytes())));
     let install_id = normalize_register_field(req.install_id.as_deref());
     let device_name = normalize_register_field(req.device_name.as_deref());
     let label = normalize_register_field(req.label.as_deref());
-
-    if let Some(install_id) = install_id {
-        match state.store.renew_node_credential_by_install_id(
-            &user.id,
-            install_id,
-            &new_secret_hash,
-            label,
-            device_name,
-        ) {
-            Ok(Some(agent_id)) => {
-                return Json(RegisterNodeResponse {
-                    agent_id,
-                    agent_secret: new_secret,
-                    cloud_ws_url: node_cloud_ws_url(),
-                    owner_user_id: user.id,
-                })
-                .into_response();
-            }
-            Ok(None) => {}
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("安装实例续约失败: {e}")})),
-                )
-                    .into_response();
-            }
-        }
-    }
-
-    if let (Some(eid), Some(esec)) = (existing_id, existing_secret) {
-        let old_hash = hex::encode(sha2::Sha256::digest(esec.as_bytes()));
-        match state
-            .store
-            .renew_node_credential_secret(eid, &old_hash, &new_secret_hash, &user.id)
-        {
-            Ok(true) => {
-                if let Err(e) = state.store.update_node_credential_registration_info(
-                    eid,
-                    &user.id,
-                    install_id,
-                    device_name,
-                ) {
-                    tracing::warn!(
-                        agent_id = %eid,
-                        user_id = %user.id,
-                        error = %e,
-                        "failed to update node credential registration info"
-                    );
-                }
-                return Json(RegisterNodeResponse {
-                    agent_id: eid.to_string(),
-                    agent_secret: new_secret,
-                    cloud_ws_url: node_cloud_ws_url(),
-                    owner_user_id: user.id,
-                })
-                .into_response();
-            }
-            Ok(false) => {}
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("续约失败: {e}")})),
-                )
-                    .into_response();
-            }
-        }
-    }
-
-    if let (Some(install_id), Some(device_name)) = (install_id, device_name) {
-        match state.store.renew_legacy_node_credential_by_device_name(
-            &user.id,
-            install_id,
-            &new_secret_hash,
-            label,
-            Some(device_name),
-        ) {
-            Ok(Some(agent_id)) => {
-                return Json(RegisterNodeResponse {
-                    agent_id,
-                    agent_secret: new_secret,
-                    cloud_ws_url: node_cloud_ws_url(),
-                    owner_user_id: user.id,
-                })
-                .into_response();
-            }
-            Ok(None) => {}
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("旧设备凭证合并失败: {e}")})),
-                )
-                    .into_response();
-            }
-        }
-    }
 
     let random_suffix = uuid::Uuid::new_v4()
         .to_string()
@@ -187,32 +100,54 @@ pub async fn register_node(
         .chars()
         .take(8)
         .collect::<String>();
-    let agent_id = format!(
+    let proposed_agent_id = format!(
         "node-{}-{}",
         &user.id.chars().take(6).collect::<String>(),
         random_suffix
     );
-
-    if let Err(e) = state.store.create_node_credential(
-        &agent_id,
-        &new_secret_hash,
+    let request = LegacyNodeRegistrationRequest::new(
         &user.id,
+        &proposed_agent_id,
+        &new_secret_hash,
+        existing_agent_id,
+        existing_secret_hash.as_deref(),
+        install_id,
         label,
         device_name,
-        install_id,
-    ) {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("创建凭证失败: {e}")})),
+    );
+    let request = match current_bearer_token.as_deref() {
+        Some(bearer_token) => request.with_current_bearer_token(bearer_token),
+        None => request,
+    };
+    let outcome = state
+        .agent_manager
+        .run_legacy_registration_and_close_process_session(&state, || {
+            state
+                .store
+                .register_or_renew_legacy_node_credential(request)
+        })
+        .await;
+    match outcome {
+        Ok(LegacyNodeRegistrationOutcome::Renewed { agent_id })
+        | Ok(LegacyNodeRegistrationOutcome::Created { agent_id }) => Json(RegisterNodeResponse {
+            agent_id,
+            agent_secret: new_secret,
+            cloud_ws_url: legacy_node_cloud_ws_url(),
+            owner_user_id: user.id,
+        })
+        .into_response(),
+        Ok(LegacyNodeRegistrationOutcome::EndpointAuthorityRequired { endpoint_authority }) => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "error": "NODE_ENDPOINT_AUTHORITY_REQUIRED",
+                "endpoint_authority": endpoint_authority,
+            })),
         )
-            .into_response();
+            .into_response(),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("节点注册失败: {error}")})),
+        )
+            .into_response(),
     }
-
-    Json(RegisterNodeResponse {
-        agent_id,
-        agent_secret: new_secret,
-        cloud_ws_url: node_cloud_ws_url(),
-        owner_user_id: user.id,
-    })
-    .into_response()
 }

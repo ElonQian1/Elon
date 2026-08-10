@@ -7,22 +7,37 @@ use crate::node_compute_sharing::endpoint_authority::{
 
 use super::{super::credentials, current_account::CurrentOwnerAccountSource};
 
+pub(super) fn require_owned_legacy_target_on(
+    transaction: &Transaction<'_>,
+    account: &CurrentOwnerAccountSource,
+    agent_id: &str,
+    install_id: &str,
+) -> Result<()> {
+    let legacy = transaction
+        .query_row(
+            "SELECT owner_user_id, install_id FROM node_credentials WHERE agent_id=?1",
+            params![agent_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_OWNER_TARGET_NOT_FOUND"))?;
+    if legacy.0 != account.owner_user_id() || legacy.1.as_deref() != Some(install_id) {
+        bail!("NODE_ENDPOINT_OWNER_TARGET_NOT_FOUND");
+    }
+    Ok(())
+}
+
 pub(super) fn require_current_target_on(
     transaction: &Transaction<'_>,
     account: &CurrentOwnerAccountSource,
     request: &NodeEndpointOwnerCredentialMutationRequest,
 ) -> Result<Option<NodeEndpointCredentialBinding>> {
-    let legacy = transaction
-        .query_row(
-            "SELECT owner_user_id, install_id FROM node_credentials WHERE agent_id=?1",
-            params![request.agent_id()],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
-        )
-        .optional()?
-        .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_OWNER_TARGET_NOT_FOUND"))?;
-    if legacy.0 != account.owner_user_id() || legacy.1.as_deref() != Some(request.install_id()) {
-        bail!("NODE_ENDPOINT_OWNER_TARGET_NOT_FOUND");
-    }
+    require_owned_legacy_target_on(
+        transaction,
+        account,
+        request.agent_id(),
+        request.install_id(),
+    )?;
 
     let current = credentials::current_binding_by_agent_on(transaction, request.agent_id())?;
     match (request.authorization_action(), request.expected(), current) {

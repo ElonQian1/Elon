@@ -17,7 +17,6 @@ use tracing::{info, warn};
 
 use node_agent_cli_done::{cli_done_message, latest_codex_session_id};
 use node_agent_cli_env::apply_env;
-use node_agent_registration::provision_node;
 
 const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(35);
 
@@ -95,7 +94,7 @@ mod node_agent_codex_vault_consent;
 mod node_agent_codex_vault_emergency;
 mod node_agent_config;
 use node_agent_config::{
-    ensure_debug_package_identity, ensure_install_id, initial_credentials, initial_node_data_root,
+    ensure_debug_package_identity, ensure_install_id, initial_node_data_root,
     initial_storage_settings, load_persisted, save_persisted,
 };
 pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
@@ -103,6 +102,7 @@ mod node_agent_cli_redaction;
 mod node_agent_cli_runner;
 mod node_agent_data_root;
 mod node_agent_download_router;
+mod node_agent_endpoint_credentials;
 mod node_agent_env;
 use node_agent_cli_runner::*;
 pub use node_agent_cli_runner::{prepare_cli_prompt_cwd, PreparedCliPromptCwd};
@@ -364,6 +364,9 @@ pub(crate) use node_agent_cli_prompt_runner::{
 async fn run_loop(runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);
     loop {
+        if node_agent_endpoint_credentials::wait_if_legacy_connection_forbidden(&runtime).await {
+            continue;
+        }
         let (creds, credential_epoch) = runtime.credential_session().await;
         let creds = match creds {
             Some(c) => c,
@@ -462,15 +465,18 @@ async fn run_agent_runtime() -> Result<()> {
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
         .init();
 
-    let cfg = NodeConfig::from_env()?;
+    let mut cfg = NodeConfig::from_env()?;
     node_agent_proxy::ensure_localhost_no_proxy();
-    node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
     let _instance_lock = node_agent_instance_lock::acquire_configured()?;
     info!(
         path = %_instance_lock.path().display(),
         "已独占 PC 节点状态目录"
     );
+    let endpoint_credentials =
+        node_agent_endpoint_credentials::load_and_bind_startup(&mut cfg).await?;
+    node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
     let mut persisted = load_persisted()?;
+    node_agent_endpoint_credentials::clear_legacy_credentials_before_startup(&cfg, &mut persisted)?;
     let install_id = ensure_install_id(&mut persisted);
     ensure_debug_package_identity(&mut persisted, &install_id)?;
     // Persist the installation identity before binding a data-root marker. If
@@ -490,29 +496,12 @@ async fn run_agent_runtime() -> Result<()> {
         persisted.set_storage_settings(&storage_settings);
         save_persisted(&persisted)?;
     }
-    let mut creds = initial_credentials(&persisted);
-
-    // 有登录 token 但还没有节点凭证 → 自动注册一次
-    if creds.is_none() {
-        let token = std::env::var("NODE_USER_TOKEN")
-            .ok()
-            .filter(|v| !v.is_empty())
-            .or_else(|| persisted.user_token.clone());
-        if let Some(tok) = token {
-            info!("检测到登录 token，正在自动注册节点…");
-            match provision_node(&cfg, &tok, None, &install_id).await {
-                Ok(c) => {
-                    info!("✅ 节点已自动注册: {}", c.agent_id);
-                    let mut next_persisted = load_persisted()?;
-                    next_persisted.set_install_id(&install_id);
-                    next_persisted.set_credentials(Some(&c));
-                    save_persisted(&next_persisted)?;
-                    creds = Some(c);
-                }
-                Err(e) => warn!("自动注册失败（可在管理页重新登录）: {e:#}"),
-            }
-        }
-    }
+    let creds = node_agent_endpoint_credentials::initial_runtime_credentials(
+        &cfg,
+        &mut persisted,
+        &install_id,
+    )
+    .await?;
 
     match &creds {
         Some(c) => info!(
@@ -538,13 +527,9 @@ async fn run_agent_runtime() -> Result<()> {
         );
     }
 
-    let runtime = Arc::new(NodeRuntime::new(
-        cfg,
-        creds,
-        storage_settings,
-        node_data_root,
-        install_id,
-    ));
+    let mut runtime = NodeRuntime::new(cfg, creds, storage_settings, node_data_root, install_id);
+    runtime.endpoint_credentials = endpoint_credentials;
+    let runtime = Arc::new(runtime);
     runtime
         .compute_plugin_bootstrap
         .bind_instance_lock(_instance_lock.liveness_witness())?;

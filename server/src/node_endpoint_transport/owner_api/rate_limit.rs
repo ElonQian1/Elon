@@ -24,10 +24,9 @@ struct FailClosedLimiter {
 impl FailClosedLimiter {
     fn check(&self, key: String, limit: usize) -> Result<(), u64> {
         let now = Instant::now();
-        let mut buckets = self
-            .buckets
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Ok(mut buckets) = self.buckets.lock() else {
+            return Err(WINDOW.as_secs());
+        };
         buckets.retain(|_, bucket| {
             prune(&mut bucket.attempts, now);
             !bucket.attempts.is_empty()

@@ -13,8 +13,6 @@ use homecli_proto::{
 use tokio::sync::{mpsc, oneshot, watch, Mutex};
 use uuid::Uuid;
 
-use sha2::Digest as _;
-
 use crate::{
     node_registry::AgentProcessSessionKey,
     realtime_metrics::{self, RealtimeChannel},
@@ -22,13 +20,11 @@ use crate::{
     ws_transport::try_json_text_message,
 };
 
-use super::public_dev_handshake::record_node_public_dev_handshake;
 use super::session_fencing::{apply_current_session_capabilities, install_process_session};
 use super::{
     clean_optional, heartbeat, journal, AgentEntry, AgentManager, AGENT_WS_READ_TIMEOUT,
     DURABLE_CLI_COMPLETION_PROTO_VERSION, PROJECT_STORAGE_PREPARE_TIMEOUT_ENV,
     PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV, PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV,
-    TOOL_APPROVAL_ACK_TIMEOUT,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -134,120 +130,24 @@ pub(super) async fn run_agent_session(
         ),
         _ => return Err(anyhow!("first frame must be register")),
     };
-    // Auth check: presented token must equal the secret bound to agent_id.
-    // Priority: env var secrets (static, for legacy/admin agents) → DB credentials (dynamic, user-registered nodes).
-    let auth_ok = if let Some(expected) = secrets.get(&agent_id) {
-        constant_time_eq(expected.as_bytes(), presented_token.as_bytes())
-    } else {
-        // Check DB-stored node credentials (secret stored as SHA-256 hex)
-        let presented_hash = hex::encode(sha2::Sha256::digest(presented_token.as_bytes()));
-        matches!(
-            state.store.get_node_credential_hash(&agent_id),
-            Ok(Some(ref stored)) if stored == &presented_hash
-        )
-    };
-    if !auth_ok {
-        return Err(anyhow!("auth failed for agent_id={agent_id}"));
-    }
-    // DB-bound node credentials are authoritative. Never let a node select a
-    // different owner in its Register payload; local offline replay relies on
-    // this identity boundary.
-    let stored_credential = state
-        .store
-        .get_node_credential(&agent_id)
-        .map_err(|error| anyhow!("resolve node credential for {agent_id}: {error}"))?;
-    let stored_owner_user_id = stored_credential
-        .as_ref()
-        .map(|credential| credential.owner_user_id.clone());
-    if let (Some(claimed), Some(stored)) =
-        (owner_user_id.as_deref(), stored_owner_user_id.as_deref())
-    {
-        if claimed != stored {
-            return Err(anyhow!(
-                "registered owner does not match credential owner for agent_id={agent_id}"
-            ));
-        }
-    }
-    if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION {
-        let claimed_install_id = install_id.as_deref().ok_or_else(|| {
-            anyhow!("durable completion protocol requires install_id for agent_id={agent_id}")
-        })?;
-        if let Some(stored_install_id) = stored_credential
-            .as_ref()
-            .and_then(|credential| credential.install_id.as_deref())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            if claimed_install_id != stored_install_id {
-                return Err(anyhow!(
-                    "registered install_id does not match credential installation for agent_id={agent_id}"
-                ));
-            }
-        }
-    }
-    let resolved_owner_user_id = stored_owner_user_id.or(owner_user_id.clone());
-    if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION
-        && resolved_owner_user_id
-            .as_deref()
-            .map(str::trim)
-            .is_none_or(str::is_empty)
-    {
-        return Err(anyhow!(
-            "durable completion protocol requires an authoritative owner for agent_id={agent_id}"
-        ));
-    }
-    if let Some(owner) = &resolved_owner_user_id {
-        if let Err(e) = state.store.update_node_credential_registration_info(
-            &agent_id,
-            owner,
-            install_id.as_deref(),
-            device_name.as_deref(),
-        ) {
-            if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION && stored_credential.is_some()
-            {
-                return Err(anyhow!(
-                    "failed to bind durable node installation for agent_id={agent_id}: {e}"
-                ));
-            }
-            tracing::warn!(%agent_id, error = %e, "failed to update node registration info");
-        }
-    }
-    if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION && stored_credential.is_some() {
-        let verified = state
-            .store
-            .get_node_credential(&agent_id)
-            .map_err(|error| anyhow!("verify node installation for {agent_id}: {error}"))?
-            .ok_or_else(|| anyhow!("node credential disappeared for agent_id={agent_id}"))?;
-        if Some(verified.owner_user_id.as_str()) != resolved_owner_user_id.as_deref()
-            || verified.install_id.as_deref() != install_id.as_deref()
-        {
-            return Err(anyhow!(
-                "durable node owner/install binding was not persisted for agent_id={agent_id}"
-            ));
-        }
-    }
-    if let (Some(owner), Some(hardware)) = (&resolved_owner_user_id, hardware.as_ref()) {
-        if let Err(e) = state.store.upsert_node_hardware_snapshot(
-            &agent_id,
-            owner,
-            device_name.as_deref(),
-            hardware,
-        ) {
-            tracing::warn!(%agent_id, error = %e, "failed to update node hardware snapshot");
-        }
-    }
-    if let Some(owner) = &resolved_owner_user_id {
-        record_node_public_dev_handshake(
-            &state,
-            &agent_id,
-            owner,
-            &version,
-            &allowed_clis,
-            dev_runtime.as_ref(),
-            "failed to record node handshake",
-        )
-        .await;
-    }
+    let authorized = super::legacy_session_authority::authenticate_and_prepare(
+        &state,
+        &secrets,
+        &presented_token,
+        &agent_id,
+        &version,
+        proto_version,
+        &allowed_clis,
+        owner_user_id.as_deref(),
+        device_name.as_deref(),
+        install_id.as_deref(),
+        hardware.as_ref(),
+        dev_runtime.as_ref(),
+    )
+    .await?;
+    let resolved_owner_user_id = authorized.owner_user_id;
+    let resolved_install_id = authorized.install_id;
+    let credential_proof = authorized.credential_proof;
     tracing::info!(%agent_id, %version, proto_version, device_name = ?device_name, "agent registered");
     state.agent_manager.ensure_cli_recovery_worker();
     let session_id = Uuid::new_v4().to_string();
@@ -295,6 +195,8 @@ pub(super) async fn run_agent_session(
         &process_session,
         entry,
         session_owner_user_id.clone(),
+        resolved_install_id,
+        credential_proof,
     )
     .await?;
 
@@ -469,38 +371,52 @@ pub(super) async fn run_agent_session(
                         } = &msg
                         {
                             let ack_key = tool_approval_ack_key(req_id, approval_id, dispatch_id);
-                            if let Some(tx) = approval_acks_r.lock().await.remove(&ack_key) {
-                                let _ = tx.send(*accepted);
-                            } else {
-                                tracing::warn!(
-                                    %req_id,
-                                    %approval_id,
-                                    %dispatch_id,
-                                    "unexpected tool approval ACK"
-                                );
+                            match state
+                                .agent_manager
+                                .deliver_current_tool_approval_ack(
+                                    &process_session,
+                                    &approval_acks_r,
+                                    &ack_key,
+                                    *accepted,
+                                )
+                                .await
+                            {
+                                Some(true) => {}
+                                Some(false) => {
+                                    tracing::warn!(
+                                        %req_id,
+                                        %approval_id,
+                                        %dispatch_id,
+                                        "unexpected tool approval ACK"
+                                    );
+                                }
+                                None => break AgentSessionCloseReason::ReaderShutdown,
                             }
                             continue;
                         }
-                        if let Some(task_id) = msg.task_id() {
-                            let task_id = task_id.to_string();
-                            let mut p = pending_r.lock().await;
-                            let drop_after = matches!(
-                                &msg,
-                                AgentToServer::TaskExit { .. } | AgentToServer::TaskError { .. }
-                            );
-                            if let Some(tx) = p.get(&task_id) {
-                                let _ = tx.send(msg);
-                            }
-                            if drop_after {
-                                p.remove(&task_id);
+                        if msg.task_id().is_some() {
+                            if state
+                                .agent_manager
+                                .deliver_current_task_message(&process_session, &pending_r, msg)
+                                .await
+                                .is_none()
+                            {
+                                break AgentSessionCloseReason::ReaderShutdown;
                             }
                         } else if msg.req_id().is_some() {
-                            route_req_message_to_pending(
-                                &pending_r,
-                                &cli_pending_ids_r,
-                                msg,
-                            )
-                            .await;
+                            if state
+                                .agent_manager
+                                .deliver_current_req_message(
+                                    &process_session,
+                                    &pending_r,
+                                    &cli_pending_ids_r,
+                                    msg,
+                                )
+                                .await
+                                .is_none()
+                            {
+                                break AgentSessionCloseReason::ReaderShutdown;
+                            }
                         } else {
                             // Register/Pong without task_id — 处理节点专属消息
                             match &msg {
@@ -625,6 +541,7 @@ pub(super) async fn run_agent_session(
 /// Route one req_id-scoped message through the session's transient waiter map.
 /// Final messages remove the waiter before delivery so deadline tasks cannot
 /// emit a stale Cancel after the CLI process has already completed.
+#[cfg(test)]
 pub(super) async fn route_req_message_to_pending(
     pending: &Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
     cli_pending_ids: &Arc<Mutex<HashSet<String>>>,
@@ -718,16 +635,6 @@ pub(super) fn env_timeout(name: &str, default_secs: u64, min_secs: u64, max_secs
         .unwrap_or(default_secs)
         .clamp(min_secs, max_secs);
     Duration::from_secs(seconds)
-}
-
-pub(super) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.iter()
-        .zip(b.iter())
-        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
-        == 0
 }
 
 // ── /api/_test_dispatch handler (Phase 1 smoke test) ─────────────────────────

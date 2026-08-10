@@ -19,11 +19,15 @@ use crate::node_compute_sharing::endpoint_authority::{
 use super::super::Store;
 
 mod credentials;
+mod legacy_currentness;
 mod owner_credential_mutation;
 mod owner_reauthentication;
 mod secret;
 mod sessions;
 
+pub(super) use legacy_currentness::{
+    current_node_endpoint_root_by_agent_on, current_node_endpoint_root_by_owner_install_on,
+};
 pub(crate) use owner_credential_mutation::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
     NodeEndpointOwnerCredentialMutationDelivery,

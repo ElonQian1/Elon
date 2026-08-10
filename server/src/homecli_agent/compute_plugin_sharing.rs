@@ -71,7 +71,7 @@ impl AgentManager {
         snapshot: homecli_proto::ComputePluginSharingPolicySnapshotV1,
     ) -> std::result::Result<ComputePluginSharingSessionAck, ComputePluginSharingDispatchFailure>
     {
-        let (cmd_tx, pending, process_session) = {
+        let (pending, process_session) = {
             let agents = self.agents.read().await;
             let Some(agent) = agents.get(agent_id) else {
                 return Err(failure(
@@ -96,35 +96,37 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_SHARING_CAPABILITY_MISSING",
                 ));
             }
-            (
-                agent.cmd_tx.clone(),
-                agent.pending.clone(),
-                agent.process_session.clone(),
-            )
+            (agent.pending.clone(), agent.process_session.clone())
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
+        if let Err(error) = self
+            .install_current_req_waiter_and_dispatch(
+                &process_session,
+                &pending,
+                req_id,
+                tx,
+                ServerToAgent::ApplyComputePluginSharingPolicyV1 {
+                    req_id: req_id.to_string(),
+                    snapshot,
+                },
+            )
+            .await
         {
-            let mut waiters = pending.lock().await;
-            if waiters.contains_key(req_id) {
-                return Err(failure(
+            return Err(match error {
+                super::legacy_message_fencing::LegacyMessageDispatchError::SessionChanged => {
+                    failure(
+                        "dispatch_failed",
+                        "COMPUTE_PLUGIN_SHARING_SESSION_REPLACED",
+                    )
+                }
+                super::legacy_message_fencing::LegacyMessageDispatchError::RequestAlreadyPending => failure(
                     "dispatch_failed",
                     "COMPUTE_PLUGIN_SHARING_REQUEST_ALREADY_PENDING",
-                ));
-            }
-            waiters.insert(req_id.to_string(), tx);
-        }
-        if cmd_tx
-            .send(ServerToAgent::ApplyComputePluginSharingPolicyV1 {
-                req_id: req_id.to_string(),
-                snapshot,
-            })
-            .is_err()
-        {
-            pending.lock().await.remove(req_id);
-            return Err(failure(
-                "writer_closed",
-                "COMPUTE_PLUGIN_SHARING_WRITER_CLOSED",
-            ));
+                ),
+                super::legacy_message_fencing::LegacyMessageDispatchError::WriterClosed => {
+                    failure("writer_closed", "COMPUTE_PLUGIN_SHARING_WRITER_CLOSED")
+                }
+            });
         }
         let received = tokio::time::timeout(ACK_TIMEOUT, rx.recv()).await;
         pending.lock().await.remove(req_id);

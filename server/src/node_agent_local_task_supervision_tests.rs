@@ -440,7 +440,6 @@ async fn desktop_review_v3_is_enforced_by_the_production_post_route() {
         let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         (status, serde_json::from_slice(&bytes).unwrap())
     }
-
     let root = std::env::temp_dir().join(format!(
         "elon-desktop-review-route-{}-{}",
         std::process::id(),
@@ -457,6 +456,7 @@ async fn desktop_review_v3_is_enforced_by_the_production_post_route() {
         crate::node_agent_config::NodeConfig {
             cloud_url: "ws://127.0.0.1".to_string(),
             cloud_http_url: "http://127.0.0.1".to_string(),
+            endpoint_https_origin: None,
             ollama_url: "http://127.0.0.1".to_string(),
             lm_studio_url: None,
             custom_url: None,

@@ -17,6 +17,7 @@ pub(super) fn build(
     slot: VerifiedSecureTransportSlot,
     state: Arc<AppState>,
     owner_credential_api_enabled: bool,
+    owner_bootstrap_api_enabled: bool,
     peer_address: DirectTlsPeerAddress,
 ) -> Router {
     let router = Router::new().route("/agent/ws", get(reject_unwired_endpoint_session));
@@ -37,6 +38,16 @@ pub(super) fn build(
             .route(
                 "/api/me/node-endpoint-credentials/:agent_id/revoke",
                 post(owner_api::revoke),
+            )
+    } else {
+        router
+    };
+    let router = if owner_credential_api_enabled && owner_bootstrap_api_enabled {
+        router
+            .route("/api/auth/login", post(owner_api::bootstrap_login))
+            .route(
+                "/api/me/nodes/register",
+                post(owner_api::bootstrap_register_node),
             )
     } else {
         router

@@ -12,7 +12,7 @@ implementation_status: implementation_unwired
 
 服务端 schema v216 已形成节点端点凭据与认证会话账本及 sealed Store 内核；v217 追加目标绑定的所有者近期重认证回执，v218 再追加每次 mutation 只能消费一次的回执账本。这里的“服务端 v216-v218”属于云端 SQLite 迁移序列；它与节点本机插件 authority 的 v7/v8 schema、以及形成节点源码的历史实现批次不是同一个版本域。
 
-服务端 v216 不从 `node_credentials` 或 `ELON_AGENT_SECRETS` 回填，也不修改 legacy 节点注册、`/agent/ws`、`AgentManager`、`NodeRegistry`、NodeAgent、`homecli-proto` 或协议阈值。默认关闭的 direct-TLS-only listener 现在可把同一 rustls TLS 1.3 连接的一次性中性 evidence 消费为 request-bound owner API proof；plain listener、legacy `/agent/ws`、URL/Host、`Forwarded`/`X-Forwarded-Proto` 和静态配置标记均拿不到 proof。现有节点不会自动进入新账本，legacy 登录、续约、连接或断开行为也不改变。
+v216 migration 本身不从 `node_credentials` 或 `ELON_AGENT_SECRETS` 回填，也不在 legacy 表上安装反向 trigger。后续增量已经显式接入 secure owner/bootstrap API、Windows NodeAgent issue/recover client，以及 legacy 注册、WS、Manager/Registry 和 waiter 的 no-downgrade 栅栏，但仍未修改 `homecli-proto` 或协议阈值。默认关闭的 direct-TLS-only listener 把同一 rustls TLS 1.3 连接的一次性中性 evidence 消费为 request-bound owner API proof；plain listener、legacy `/agent/ws`、URL/Host、`Forwarded`/`X-Forwarded-Proto` 和静态配置标记均拿不到 proof。只有 owner 明确启用安全配置并完成 mutation，节点才会进入新凭据账本。
 
 `store_migrations.rs` 已连续登记 v216-v218，所以部署包含该源码的新二进制时会尝试创建这些 schema。DDL 或 migration 失败仍可能让服务启动失败；本批未执行 migration，不能宣称磁盘兼容已验证。新表不在 legacy 表上安装反向 trigger；只有 owner 明确调用 secure API 后才会创建 endpoint child row，随后 legacy duplicate delete 会被外键按设计拒绝。
 
@@ -70,7 +70,17 @@ v218 新增 `node_endpoint_owner_reauthentication_consumptions`。它以 24 个�
 
 四个 direct-TLS-only `POST /api/me/node-endpoint-credentials/...` 路径共用一个 `BEGIN IMMEDIATE`：重验真实 DB bearer session、active user、当前 password factor、legacy owner/install anchor 与 expected endpoint head；派生并 readback v217；先写 v218 consumption；再执行 v216 issue/rotate/recover/revoke CAS、exact readback并提交。rotate 额外从不进入 JSON/Debug 的专用敏感头接收旧 endpoint secret并固定时序校验。请求与响应分别消费同一 TLS evidence 派生的 transport/response permit，Store commit 不提供绕过 permit 的明文 getter。`NodeEndpointOwnerAuthorizationBasis` 虽可序列化，credential mutation 仍只接受由 exact v217/v218 闭包派生的 sealed authorization。
 
-API 默认不可达；除完整配置并显式启用 direct TLS listener 外，还必须独立设置 `NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED=true`，避免既有 verifier-only 配置自动扩大权限。它拒绝 query credential、`OWNER_TOKEN`、plain HTTP 与 proxy header；密码 step-up 先按 direct listener 实际 peer IP、再按 bearer 摘要走两级 process-local 限流，容量压力下拒绝新桶而不驱逐已有桶，所有响应 `no-store`。Google、trusted-device 与可信代理 producer尚未实现。
+API 默认不可达；除完整配置并显式启用 direct TLS listener 外，还必须独立设置 `NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED=true`，避免既有 verifier-only 配置自动扩大权限。它拒绝 query credential、`OWNER_TOKEN` 与 plain HTTP，且任何 proxy header 都不参与 transport、peer 或 owner 证明；密码 step-up 先按 direct listener 实际 peer IP、再按 bearer 摘要走两级 process-local 限流，容量压力下拒绝新桶而不驱逐已有桶，所有响应 `no-store`。Google、trusted-device 与可信代理 producer尚未实现。
+
+### Windows NodeAgent bootstrap 与 no-downgrade
+
+`NODE_ENDPOINT_HTTPS_ORIGIN` 是 NodeAgent 唯一安全端点真源：必须是无 userinfo、path、query 或 fragment 的 `https` origin，owner API 与未来同 authority 的 WSS 地址只能从它派生，不能再持久化一条可独立漂移的 WSS URL。配置值与已持久化 origin 不一致时失败关闭；非 Windows 构建在注册或 mutation 前拒绝，因为当前 secret custody 只实现 Windows DPAPI CurrentUser。
+
+secure 管理端登录只接受账号+密码并重新取得短期 DB bearer；token-only、无账号的 token+password、`NODE_USER_TOKEN` 和旧 `node.json` 凭据都不能进入该分支。NodeAgent 先把 `endpoint_required=true` tombstone 原子写入独立 `%APPDATA%\elon-node-agent\node-endpoint-credential.v1.json`，再清除内存与 `node.json` 的 legacy secret/token，随后才调用 gated secure register。即使旧状态文件清理失败，进程内 legacy credential、credential epoch、watch 与插件 bootstrap 仍立即失效，且不会继续 register。
+
+secure register 的成功响应严格只有 `agent_id + owner_user_id`；服务端生成的 legacy anchor secret 不返回也不广告 `ws://`。若 owner/install 已有 endpoint root，409 返回 exact credential binding，NodeAgent 只能进入 recovery。issue/recover 的 authorization 与 mutation request ID 在发网前持久化；exact replay 只恢复元数据、不重返明文，并触发新的 recovery request。新 secret 只在首回响应中出现，随即进入独立 DPAPI 文件；本地类型不实现 `Clone`、`Debug` 或序列化，响应缓冲在解析后清零。endpoint tombstone、pending request、current binding 或加密 secret 损坏时均失败关闭，不回退 legacy。
+
+服务端 legacy 注册现在在一个 `BEGIN IMMEDIATE` 中重验 bearer、agent/owner/install endpoint root 和最终 currentness；endpoint root 命中返回 409，不再 silent renew。legacy WS 以 DB row 为先，只有无 DB row 时才允许 `ELON_AGENT_SECRETS`，并在 side effect 前和 Manager 安装前两次重验 root 与 DB secret。root mutation 在 Manager write fence 中先完成目标 owner preauthorization，再取消安全地摘除旧 Registry/Manager/pending；Codex Vault legacy hash proof也在同一类 root gate后才核 secret。ToolApproval、task/req、CLI 与三条插件 dispatch/ACK 继续只由 exact `AgentProcessSessionKey` 线性化；该 key 仍不是耐久 endpoint authority。
 
 ## 5. 认证会话与 exact CAS
 
@@ -96,7 +106,7 @@ session head 的既有 active 只允许精确转为 `closed`、`stale`、`creden
 
 direct TLS 通过独立、默认关闭的 listener 提供唯一当前可构造的 secure transport proof。只有 `NODE_ENDPOINT_DIRECT_TLS_ENABLED=true` 才启用，并要求 `NODE_ENDPOINT_DIRECT_TLS_LISTEN_ADDR`、`NODE_ENDPOINT_DIRECT_TLS_CERT_CHAIN_PATH`、`NODE_ENDPOINT_DIRECT_TLS_PRIVATE_KEY_PATH` 与 `NODE_ENDPOINT_DIRECT_TLS_VERIFIER_REVISION` 作为完整组出现；owner credential routes 还要求独立的 `NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED=true`。一旦显式启用，证书、私钥、verifier revision、监听地址或 bind 任一无效都会让启动失败，不能静默回退为“已验证”。该 listener 固定 TLS 1.3 与 HTTP/1.1，握手后从 rustls 的同一 `ServerConnection` 读取 negotiated protocol、cipher 和 ALPN，并把 boot-scoped server instance、leaf certificate digest、verifier policy digest、连接 evidence ID 与握手时间纳入 canonical evidence digest。它不读取也不信任请求头、URI scheme、SNI、代理声明或 plain listener 状态。
 
-每条 TLS 连接只得到一个 30 秒内可取走一次的中性 proof slot；重复、过期或 poisoned take 均失败。secure Router 只挂四个 owner credential POST 与同名 `/agent/ws` seam。owner 路径把 evidence、POST、精确路径和 canonical mutation digest 绑定为 owner transport + response permit；`/agent/ws` 仍取走 proof 后固定返回 `503 NODE_ENDPOINT_CREDENTIAL_BRIDGE_UNWIRED`，不会 WebSocket upgrade、调用 legacy handler或写入 v216 session Store。proof 绑定当前 boot 的 `server_instance_id`，未来 `NodeEndpointSessionOpenRequest` 仍必须与它精确一致且在 30 秒内认证。
+每条 TLS 连接只得到一个 30 秒内可取走一次的中性 proof slot；重复、过期或 poisoned take 均失败。secure Router 在 credential gate 下挂四个 owner credential POST；只有再显式启用 `NODE_ENDPOINT_OWNER_BOOTSTRAP_API_ENABLED=true` 才增加 secure login/register 两个 POST。owner 路径把 evidence、POST、精确路径和 canonical mutation digest 绑定为 owner transport + response permit；`/agent/ws` 仍取走 proof 后固定返回 `503 NODE_ENDPOINT_CREDENTIAL_BRIDGE_UNWIRED`，不会 WebSocket upgrade、调用 legacy handler或写入 v216 session Store。proof 绑定当前 boot 的 `server_instance_id`，未来 `NodeEndpointSessionOpenRequest` 仍必须与它精确一致且在 30 秒内认证。
 
 因此该 seam 证明的是“此请求来自本进程直接终止的特定 TLS 握手”，不是 bearer、owner、节点、在线状态或计算能力。可信反向代理模式仍不存在；未来若采用代理，必须先有仓库管理的受信 hop 与不可伪造 TLS evidence（例如受控 UDS/mTLS 或经验证的 PROXYv2 SSL TLV），普通转发头永远不够。
 
@@ -121,7 +131,7 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 
 不得先接其中一半再开放 producer。一次可启用的桥接批必须同时覆盖：
 
-1. NodeAgent credential client：持久化首次/recovery 返回的 credential ID/revision/digest/secret；rotate 必须提供旧 secret，response 丢失只能发起新 recovery，不能回退到 silent install renew。
+1. NodeAgent 已有 Windows DPAPI issue/recover bootstrap；未来补 rotate/revoke 管理面时仍必须携旧 secret或显式 recovery确认，并保留相同 pending/replay/no-downgrade 语义，不能恢复 silent install renew。
 2. `server/src/homecli_agent.rs::agent_ws_handler` 与 `server/src/homecli_agent/agent_session.rs`：用受信 transport verifier 和单一 Store 认证事务替代 env-first、hash 查询后再查 metadata 的两段判断。
 3. `server/src/homecli_agent.rs::{AgentEntry,AgentManager}`：process-local exact key、替换与同步 fence 已铺；未来必须换成或联结耐久 `NodeEndpointSessionBinding`。现有 agent-id-only `close_agent_session` 仍是 legacy facade，不能用于安全撤销。
 4. `server/src/node_registry.rs::{NodeEntry,NodeRegistry}`：process-local `register_exact`、`update_capabilities_exact`、`touch_exact` 与 `unregister_exact` 已铺；未来 online/candidate reader 仍须联结耐久 current binding，不能把本地 map 当认证事实。
@@ -151,11 +161,13 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 - domain：`server/src/node_compute_sharing/endpoint_authority.rs`；
 - Store：`server/src/store/node_credentials/endpoint_authority.rs`，子叶包括 `credentials/mutations/*`、`owner_reauthentication/{currentness,rows,consumption_rows}*` 与 `owner_credential_mutation/{current_account,current_target,authorization,execute,replay,secret,transaction}.rs`；
 - process-local fencing：`server/src/node_registry/session_key.rs`、`server/src/homecli_agent/session_fencing.rs`，以及 exact-key 接线后的 `agent_session.rs` 与三条插件 observation 子叶；
-- direct TLS verifier/API：`server/src/node_endpoint_transport.rs`、`server/src/node_endpoint_transport/{config,direct_tls,evidence_slot,secure_router,owner_api}.rs`、`owner_api/{contracts,handlers,response}.rs`，以及 endpoint authority 的 `session/direct_tls.rs` 与 `owner_reauthentication/direct_tls.rs`；
+- legacy no-downgrade：`server/src/store/node_credentials/legacy_registration.rs`、`endpoint_authority/legacy_currentness.rs`、`server/src/homecli_agent/{legacy_session_authority,endpoint_credential_fencing,legacy_message_fencing}.rs`；
+- direct TLS verifier/API：`server/src/node_endpoint_transport.rs`、`server/src/node_endpoint_transport/{config,direct_tls,evidence_slot,secure_router,owner_api}.rs`、`owner_api/{contracts,handlers,ingress,response,bootstrap}.rs`，以及 endpoint authority 的 `session/direct_tls.rs` 与 `owner_reauthentication/direct_tls.rs`；
+- Windows NodeAgent：`server/src/node_agent_endpoint_credentials.rs` 与其 `admin/bootstrap/login/owner_api/persistence/secure_store/startup/types` 子叶；
 - migration registry：`server/src/store_migrations.rs`。
 
 Store-owned `mutate_node_endpoint_credential_as_owner` 是四个 owner 路径唯一生产 facade；底层 `record_node_endpoint_owner_reauthentication` 与 issue/rotate/recover/revoke fixed-time kernel 仅供该事务组合或受限内部恢复，网络层不得分事务串联。session 侧 `authenticate_node_endpoint_session`、close/currentness/restart/recovery 内核仍无 WS caller。
 
 credential Store commit 不直接暴露明文；只有消费与实际 Store transport 成对的 `OwnerApiResponsePermit` 后才形成 response delivery。底层 `NodeEndpointCredentialMutationReceipt` 与 `VerifiedCurrentNodeEndpointSession` 没有网络构造器、`Deserialize` 或 `Clone`。未来 WS 桥接必须继续通过 Store-owned facade 注入 sealed transport/session 输入。
 
-当前已有默认关闭、direct-TLS-only 的 owner credential HTTP producer，但仍没有 secure WebSocket upgrade、v216 session Store caller、AgentManager/NodeRegistry durable binding、NodeAgent 或协议调用点，也没有 legacy backfill。整体仍只能报告为 `implementation_unwired`：owner credential 可达不等于 compute endpoint authority。本增量尚未编译、测试或运行，也未执行内存/磁盘迁移或真实 TLS、网络、并发、崩溃恢复与节点验证。
+当前已有默认关闭、direct-TLS-only 的 owner credential HTTP producer和 Windows NodeAgent issue/recover bootstrap；legacy no-downgrade fence也已接入，但仍没有 secure WebSocket upgrade、v216 session Store caller、AgentManager/NodeRegistry 耐久 binding或协议 credential triple，也没有 legacy backfill。整体仍只能报告为 `implementation_unwired`：取得 endpoint credential 不等于在线，更不等于 compute authority。本增量尚未编译、测试或运行，也未执行内存/磁盘迁移或真实 TLS、网络、并发、崩溃恢复与节点验证。

@@ -61,10 +61,13 @@ impl NodeRuntime {
     pub(crate) async fn set_creds(&self, next: Option<Credentials>) -> anyhow::Result<()> {
         let _transition = self.persisted_state_transition.lock().await;
         let mut current = self.creds.write().await;
+        let old_epoch = self.credential_epoch.load(Ordering::Acquire);
+        if old_epoch == 0 {
+            anyhow::bail!("NODE_AGENT_CREDENTIAL_SESSION_EPOCH_EXHAUSTED");
+        }
         if same_optional_credentials(current.as_ref(), next.as_ref()) {
             return Ok(());
         }
-        let old_epoch = self.credential_epoch.load(Ordering::Acquire);
         let next_epoch = old_epoch
             .checked_add(1)
             .ok_or_else(|| anyhow::anyhow!("NODE_AGENT_CREDENTIAL_SESSION_EPOCH_EXHAUSTED"))?;
@@ -89,6 +92,33 @@ impl NodeRuntime {
         *current = next;
         self.wake.notify_waiters();
         Ok(())
+    }
+
+    /// The endpoint no-downgrade tombstone is already durable when this is
+    /// called. A node.json failure must therefore be reported without leaving
+    /// the process-local legacy authority usable.
+    pub(crate) async fn clear_legacy_creds_after_endpoint_arm(&self) -> anyhow::Result<()> {
+        let _transition = self.persisted_state_transition.lock().await;
+        let mut current = self.creds.write().await;
+        let old_epoch = self.credential_epoch.load(Ordering::Acquire);
+        let next_epoch = match (old_epoch, old_epoch.checked_add(1)) {
+            (0, _) | (_, None) => 0,
+            (_, Some(value)) => value,
+        };
+        let persistence_result = (|| -> anyhow::Result<()> {
+            let mut persisted = load_persisted()?;
+            persisted.set_install_id(&self.install_id);
+            persisted.set_credentials(None);
+            save_persisted(&persisted)
+        })();
+
+        self.compute_plugin_bootstrap
+            .note_credentials_replaced(None);
+        self.credential_epoch.store(next_epoch, Ordering::Release);
+        self.credential_epoch_tx.send_replace(next_epoch);
+        *current = None;
+        self.wake.notify_waiters();
+        persistence_result
     }
 }
 

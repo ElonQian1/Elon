@@ -20,7 +20,7 @@ impl AgentManager {
         homecli_proto::ComputePluginInstallPlanPreparationObservedV1,
         ComputePluginSharingDispatchFailure,
     > {
-        let (cmd_tx, pending) = {
+        let pending = {
             let agents = self.agents.read().await;
             let Some(agent) = agents.get(agent_id) else {
                 return Err(preparation_failure(
@@ -45,33 +45,36 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_CAPABILITY_MISSING",
                 ));
             }
-            (agent.cmd_tx.clone(), agent.pending.clone())
+            agent.pending.clone()
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
-        {
-            let mut waiters = pending.lock().await;
-            if waiters.contains_key(req_id) {
-                return Err(preparation_failure(
-                    "dispatch_failed",
-                    "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_REQUEST_ALREADY_PENDING",
-                ));
-            }
-            waiters.insert(req_id.to_string(), tx);
-        }
-        if cmd_tx
-            .send(
+        if let Err(error) = self
+            .install_current_req_waiter_and_dispatch(
+                expected_process_session,
+                &pending,
+                req_id,
+                tx,
                 homecli_proto::ServerToAgent::PrepareComputePluginInstallPlanV1 {
                     req_id: req_id.to_string(),
                     request,
                 },
             )
-            .is_err()
+            .await
         {
-            pending.lock().await.remove(req_id);
-            return Err(preparation_failure(
-                "writer_closed",
-                "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_WRITER_CLOSED",
-            ));
+            return Err(match error {
+                super::super::legacy_message_fencing::LegacyMessageDispatchError::SessionChanged => preparation_failure(
+                    "dispatch_failed",
+                    "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_SESSION_REPLACED",
+                ),
+                super::super::legacy_message_fencing::LegacyMessageDispatchError::RequestAlreadyPending => preparation_failure(
+                    "dispatch_failed",
+                    "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_REQUEST_ALREADY_PENDING",
+                ),
+                super::super::legacy_message_fencing::LegacyMessageDispatchError::WriterClosed => preparation_failure(
+                    "writer_closed",
+                    "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_WRITER_CLOSED",
+                ),
+            });
         }
         let received = tokio::time::timeout(super::ACK_TIMEOUT, rx.recv()).await;
         pending.lock().await.remove(req_id);

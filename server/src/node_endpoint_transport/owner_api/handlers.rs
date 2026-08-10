@@ -1,18 +1,16 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Extension, OriginalUri, Path, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Extension, FromRequest, OriginalUri, Request, State},
+    http::StatusCode,
     response::Response,
     Json,
 };
-use sha2::{Digest, Sha256};
 
 use crate::{
     node_compute_sharing::endpoint_authority::{
         bind_direct_tls_owner_api_transport, NodeEndpointOwnerCredentialMutationRequest,
     },
-    project_auth::bearer_token,
     types::AppState,
 };
 
@@ -21,27 +19,42 @@ use super::{
         IssueCredentialRequest, RecoverCredentialRequest, RevokeCredentialRequest,
         RotateCredentialRequest,
     },
-    rate_limit, response,
+    ingress::{prepare as prepare_ingress, OwnerApiIngress, OwnerApiRoute},
+    response,
 };
 use crate::node_endpoint_transport::{
     direct_tls::DirectTlsPeerAddress, evidence_slot::VerifiedSecureTransportSlot,
 };
 
 const REQUEST_METHOD: &str = "POST";
-const PRESENTED_ENDPOINT_SECRET_HEADER: &str = "x-elon-node-endpoint-secret";
+
 pub(in crate::node_endpoint_transport) async fn issue(
     State(state): State<Arc<AppState>>,
     Extension(slot): Extension<VerifiedSecureTransportSlot>,
     Extension(peer): Extension<DirectTlsPeerAddress>,
     OriginalUri(uri): OriginalUri,
-    headers: HeaderMap,
-    Json(body): Json<IssueCredentialRequest>,
+    http_request: Request,
 ) -> Response {
+    let ingress = match prepare_ingress(
+        &state,
+        slot,
+        peer,
+        &uri,
+        http_request.headers(),
+        OwnerApiRoute::Issue,
+    ) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let body = match Json::<IssueCredentialRequest>::from_request(http_request, &state).await {
+        Ok(Json(value)) => value,
+        Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
+    };
     let (request, password) = match body.into_parts() {
         Ok(value) => value,
         Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
     };
-    execute(state, slot, peer, uri, headers, request, password, None).await
+    execute(state, ingress, request, password).await
 }
 
 pub(in crate::node_endpoint_transport) async fn rotate(
@@ -49,34 +62,37 @@ pub(in crate::node_endpoint_transport) async fn rotate(
     Extension(slot): Extension<VerifiedSecureTransportSlot>,
     Extension(peer): Extension<DirectTlsPeerAddress>,
     OriginalUri(uri): OriginalUri,
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    Json(body): Json<RotateCredentialRequest>,
+    http_request: Request,
 ) -> Response {
-    let presented_secret = match sensitive_header(&headers, PRESENTED_ENDPOINT_SECRET_HEADER) {
-        Ok(Some(value)) => value,
-        _ => {
+    let ingress = match prepare_ingress(
+        &state,
+        slot,
+        peer,
+        &uri,
+        http_request.headers(),
+        OwnerApiRoute::Rotate,
+    ) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let agent_id = match ingress.agent_id() {
+        Some(value) => value.to_string(),
+        None => {
             return response::error(
-                StatusCode::BAD_REQUEST,
-                "NODE_ENDPOINT_CREDENTIAL_POSSESSION_REQUIRED",
+                StatusCode::UNAUTHORIZED,
+                "NODE_ENDPOINT_SECURE_TRANSPORT_INVALID",
             )
         }
+    };
+    let body = match Json::<RotateCredentialRequest>::from_request(http_request, &state).await {
+        Ok(Json(value)) => value,
+        Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
     };
     let (request, password) = match body.into_parts(agent_id) {
         Ok(value) => value,
         Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
     };
-    execute(
-        state,
-        slot,
-        peer,
-        uri,
-        headers,
-        request,
-        password,
-        Some(presented_secret),
-    )
-    .await
+    execute(state, ingress, request, password).await
 }
 
 pub(in crate::node_endpoint_transport) async fn recover(
@@ -84,15 +100,37 @@ pub(in crate::node_endpoint_transport) async fn recover(
     Extension(slot): Extension<VerifiedSecureTransportSlot>,
     Extension(peer): Extension<DirectTlsPeerAddress>,
     OriginalUri(uri): OriginalUri,
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    Json(body): Json<RecoverCredentialRequest>,
+    http_request: Request,
 ) -> Response {
+    let ingress = match prepare_ingress(
+        &state,
+        slot,
+        peer,
+        &uri,
+        http_request.headers(),
+        OwnerApiRoute::Recover,
+    ) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let agent_id = match ingress.agent_id() {
+        Some(value) => value.to_string(),
+        None => {
+            return response::error(
+                StatusCode::UNAUTHORIZED,
+                "NODE_ENDPOINT_SECURE_TRANSPORT_INVALID",
+            )
+        }
+    };
+    let body = match Json::<RecoverCredentialRequest>::from_request(http_request, &state).await {
+        Ok(Json(value)) => value,
+        Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
+    };
     let (request, password) = match body.into_parts(agent_id) {
         Ok(value) => value,
         Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
     };
-    execute(state, slot, peer, uri, headers, request, password, None).await
+    execute(state, ingress, request, password).await
 }
 
 pub(in crate::node_endpoint_transport) async fn revoke(
@@ -100,59 +138,54 @@ pub(in crate::node_endpoint_transport) async fn revoke(
     Extension(slot): Extension<VerifiedSecureTransportSlot>,
     Extension(peer): Extension<DirectTlsPeerAddress>,
     OriginalUri(uri): OriginalUri,
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    Json(body): Json<RevokeCredentialRequest>,
+    http_request: Request,
 ) -> Response {
+    let ingress = match prepare_ingress(
+        &state,
+        slot,
+        peer,
+        &uri,
+        http_request.headers(),
+        OwnerApiRoute::Revoke,
+    ) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let agent_id = match ingress.agent_id() {
+        Some(value) => value.to_string(),
+        None => {
+            return response::error(
+                StatusCode::UNAUTHORIZED,
+                "NODE_ENDPOINT_SECURE_TRANSPORT_INVALID",
+            )
+        }
+    };
+    let body = match Json::<RevokeCredentialRequest>::from_request(http_request, &state).await {
+        Ok(Json(value)) => value,
+        Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
+    };
     let (request, password) = match body.into_parts(agent_id) {
         Ok(value) => value,
         Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
     };
-    execute(state, slot, peer, uri, headers, request, password, None).await
+    execute(state, ingress, request, password).await
 }
 
 async fn execute(
     state: Arc<AppState>,
-    slot: VerifiedSecureTransportSlot,
-    peer: DirectTlsPeerAddress,
-    uri: axum::http::Uri,
-    headers: HeaderMap,
+    ingress: OwnerApiIngress,
     request: NodeEndpointOwnerCredentialMutationRequest,
     password: String,
-    presented_endpoint_secret: Option<String>,
 ) -> Response {
-    if uri.query().is_some() {
-        return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_QUERY_FORBIDDEN");
-    }
-    if let Err(retry_after_seconds) = rate_limit::check_peer(peer) {
-        return response::rate_limited(retry_after_seconds);
-    }
-    let exact_path = uri.path();
-    let bearer = match bearer_token(&headers) {
-        Some(value) if state.owner_token.as_deref() != Some(value) => value,
-        _ => return response::error(StatusCode::UNAUTHORIZED, "NODE_ENDPOINT_BEARER_REQUIRED"),
-    };
-    let bearer_rate_key = format!("bearer:{}", hex::encode(Sha256::digest(bearer.as_bytes())));
-    if let Err(retry_after_seconds) = rate_limit::check_bearer(&bearer_rate_key) {
-        return response::rate_limited(retry_after_seconds);
-    }
     let (_, mutation_digest) = match request.canonical_json_and_digest() {
         Ok(value) => value,
         Err(_) => return response::error(StatusCode::BAD_REQUEST, "NODE_ENDPOINT_REQUEST_INVALID"),
     };
-    let evidence = match slot.take() {
-        Ok(value) => value,
-        Err(_) => {
-            return response::error(
-                StatusCode::UNAUTHORIZED,
-                "NODE_ENDPOINT_SECURE_TRANSPORT_REQUIRED",
-            )
-        }
-    };
+    let (evidence, exact_path, bearer, presented_endpoint_secret) = ingress.into_request_parts();
     let (transport, response_permit) = match bind_direct_tls_owner_api_transport(
         evidence,
         REQUEST_METHOD,
-        exact_path,
+        &exact_path,
         &mutation_digest,
     ) {
         Ok(value) => value,
@@ -164,14 +197,29 @@ async fn execute(
         }
     };
     let requested_secret = request.returns_secret();
-    let commit = match state.store.mutate_node_endpoint_credential_as_owner(
-        bearer,
-        &password,
-        presented_endpoint_secret.as_deref(),
-        request,
-        transport,
-        response_permit,
-    ) {
+    let commit = match state
+        .agent_manager
+        .run_endpoint_root_mutation_and_close_process_session(
+            &state,
+            request,
+            |request| {
+                state
+                    .store
+                    .preflight_node_endpoint_owner_credential_mutation(&bearer, &password, request)
+            },
+            |request| {
+                state.store.mutate_node_endpoint_credential_as_owner(
+                    &bearer,
+                    &password,
+                    presented_endpoint_secret.as_deref(),
+                    request,
+                    transport,
+                    response_permit,
+                )
+            },
+        )
+        .await
+    {
         Ok(value) => value,
         Err(_) => {
             return response::error(
@@ -180,28 +228,15 @@ async fn execute(
             )
         }
     };
-    let delivery = match commit.into_response_delivery(REQUEST_METHOD, exact_path, &mutation_digest)
-    {
-        Ok(value) => value,
-        Err(_) => {
-            return response::error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "NODE_ENDPOINT_RESPONSE_BINDING_FAILED",
-            )
-        }
-    };
-    response::success(delivery, requested_secret)
-}
-
-fn sensitive_header(headers: &HeaderMap, name: &'static str) -> anyhow::Result<Option<String>> {
-    headers
-        .get(name)
-        .map(|value| {
-            let value = value.to_str()?.trim();
-            if value.is_empty() || value.len() > 512 {
-                anyhow::bail!("NODE_ENDPOINT_SENSITIVE_HEADER_INVALID");
+    let delivery =
+        match commit.into_response_delivery(REQUEST_METHOD, &exact_path, &mutation_digest) {
+            Ok(value) => value,
+            Err(_) => {
+                return response::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "NODE_ENDPOINT_RESPONSE_BINDING_FAILED",
+                )
             }
-            Ok(value.to_string())
-        })
-        .transpose()
+        };
+    response::success(delivery, requested_secret)
 }

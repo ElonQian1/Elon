@@ -1,7 +1,3 @@
-// server/src/node_agent_runtime.rs
-//! NodeRuntime — PC 节点的核心运行时状态：凭证、CLI 状态、任务注册表、lifecycle。
-//! 从 node_agent_main.rs 抽取，保持原有公共接口不变。
-
 use anyhow::Context;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -25,6 +21,7 @@ use crate::node_agent_config::{
     load_persisted, save_persisted, Credentials, NodeConfig, PersistedState,
 };
 use crate::node_agent_data_root::{self, NodeDataRootState};
+use crate::node_agent_endpoint_credentials::EndpointCredentialManager;
 use crate::node_agent_full_access;
 use crate::node_agent_lifecycle;
 use crate::node_agent_local_admin;
@@ -59,6 +56,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) compute_plugin_bootstrap:
         crate::node_agent_compute_plugin_host::ComputePluginBootstrap,
     pub(crate) install_id: String,
+    pub(crate) endpoint_credentials: EndpointCredentialManager,
     pub(crate) creds: RwLock<Option<Credentials>>,
     credential_epoch: AtomicU64,
     credential_epoch_tx: watch::Sender<u64>,
@@ -103,6 +101,7 @@ impl NodeRuntime {
         node_data_root: NodeDataRootState,
         install_id: String,
     ) -> Self {
+        let endpoint_credentials = EndpointCredentialManager::absent();
         let tts_url = std::env::var("NODE_TTS_WORKER_URL")
             .ok()
             .map(|v| v.trim().to_string())
@@ -169,6 +168,7 @@ impl NodeRuntime {
             compute_plugin_host,
             compute_plugin_bootstrap,
             install_id,
+            endpoint_credentials,
             creds: RwLock::new(creds),
             credential_epoch: AtomicU64::new(1),
             credential_epoch_tx,

@@ -1,8 +1,17 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-08-04
+最后更新：2026-08-10
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
+
+## Endpoint credential bootstrap 升级边界
+
+- 安全端点只有一个配置真源 `NODE_ENDPOINT_HTTPS_ORIGIN`，必须是无 path/query/fragment/userinfo 的 `https` origin。升级不得从旧 `cloud_url`、注册响应、`ws://` 地址或代理头推导它，也不得另存一条可独立漂移的 WSS URL。
+- endpoint credential 独立保存在 `%APPDATA%\elon-node-agent\node-endpoint-credential.v1.json`；secret 只以 Windows DPAPI CurrentUser 密文存在，不回写 `node.json`、环境变量、日志、诊断包或管理响应。更新必须原样保留该文件；损坏、重解析点、origin/identity 漂移或 DPAPI 不可用均失败关闭，不能删除后回退 legacy。
+- 一旦 `endpoint_required` tombstone 已耐久，NodeAgent 启动、登录失败、网络失败、响应丢失、退出或更新重启都必须清空并忽略 `node.json` 与 `NODE_AGENT_*`/`NODE_USER_TOKEN` 的 legacy authority。普通 credential epoch 溢出后进入永久 poison，进程内不能从 0 重新计数。
+- secure bootstrap 固定为账号+密码 fresh login，再写 tombstone、清 legacy、secure register，最后 issue/recover。注册成功响应只允许 agent/owner 元数据，不得接收或持久化 legacy secret、cloud WebSocket URL；mutation request ID 必须先持久化，exact replay不返 secret，只能用新的 recovery request继续。
+- 服务端已有 endpoint root 时，旧 install renew、existing-secret renew、device merge、DB/env WebSocket 与 Codex Vault hash proof都必须失败关闭；root mutation提交前后旧 process session、Registry 与 waiter按 exact key摘除。升级不得因 legacy socket仍在线、Ping/Pong或 NodeRegistry `online` 就重新启用它。
+- 当前 secure `/agent/ws` 仍固定返回 503，协议尚无 credential triple/accepted ACK。因而完成 endpoint bootstrap 的节点应保持“等待安全 WSS 协议接线”，不得改连 legacy `ws://`，也不得宣称 Ready、route、Lease 或派发可用。
 
 ## Desktop review v3 升级边界
 

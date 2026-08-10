@@ -224,22 +224,10 @@ pub(crate) fn verify_node_proof(
     if agent_id.is_empty() || agent_secret.is_empty() {
         anyhow::bail!("节点凭证不能为空");
     }
-    let owner = state
-        .store
-        .get_node_credential_owner(agent_id)?
-        .ok_or_else(|| anyhow::anyhow!("节点凭证不存在"))?;
-    if owner != user_id {
-        anyhow::bail!("节点不属于当前用户");
-    }
-    let expected_hash = state
-        .store
-        .get_node_credential_hash(agent_id)?
-        .ok_or_else(|| anyhow::anyhow!("节点凭证不存在"))?;
     let actual_hash = hex::encode(Sha256::digest(agent_secret.as_bytes()));
-    if actual_hash != expected_hash {
-        anyhow::bail!("节点 secret 不匹配");
-    }
-    Ok(())
+    state
+        .store
+        .verify_legacy_node_secret_proof(agent_id, user_id, &actual_hash)
 }
 
 pub(super) fn hash_hint(value: &str) -> String {

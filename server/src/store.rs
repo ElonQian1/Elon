@@ -136,7 +136,7 @@ mod node_compute_replay;
 mod node_compute_runs;
 mod node_compute_sharing;
 mod node_compute_sharing_health;
-mod node_credentials;
+pub(crate) mod node_credentials;
 pub(crate) use node_credentials::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
     NodeEndpointOwnerCredentialMutationDelivery,

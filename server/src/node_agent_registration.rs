@@ -1,27 +1,50 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
+use serde::Deserialize;
 use std::time::Duration;
 
-use crate::{machine_label, node_agent_cloud_net, Credentials, NodeConfig};
+use crate::{
+    machine_label, node_agent_cloud_net, node_agent_endpoint_credentials::EndpointAuthorityBinding,
+    Credentials, NodeConfig,
+};
 
-/// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
-/// 若 `existing` 不为空，则带上旧凭证让服务器续约（保留原 agent_id）。
+pub(crate) enum ProvisionNodeOutcome {
+    Legacy(Credentials),
+    SecureBootstrapAnchor(SecureBootstrapAnchor),
+    EndpointAuthorityRequired(EndpointAuthorityBinding),
+}
+
+pub(crate) struct SecureBootstrapAnchor {
+    pub(crate) agent_id: String,
+    pub(crate) owner_user_id: String,
+}
+
+/// 注册 legacy 节点锚；secure bootstrap 只接收 agent/owner 元数据，
+/// legacy 模式才接收并返回旧式 secret。
 pub(crate) async fn provision_node(
     cfg: &NodeConfig,
     token: &str,
     existing: Option<&Credentials>,
     install_id: &str,
-) -> Result<Credentials> {
-    let url = registration_endpoint(&cfg.cloud_http_url)?;
-    let client = node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15));
+) -> Result<ProvisionNodeOutcome> {
+    let secure_endpoint = cfg.endpoint_https_origin.as_deref();
+    let base = secure_endpoint.unwrap_or(&cfg.cloud_http_url);
+    let url = registration_endpoint(base)?;
+    let client = if secure_endpoint.is_some() {
+        crate::node_agent_endpoint_credentials::secure_https_client(Duration::from_secs(15))?
+    } else {
+        node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15))
+    };
     let device_name = machine_label();
     let mut body = serde_json::json!({
         "label": device_name,
         "device_name": device_name,
         "install_id": install_id,
     });
-    if let Some(creds) = existing {
-        body["existing_agent_id"] = serde_json::Value::String(creds.agent_id.clone());
-        body["existing_secret"] = serde_json::Value::String(creds.agent_secret.clone());
+    if secure_endpoint.is_none() {
+        if let Some(creds) = existing {
+            body["existing_agent_id"] = serde_json::Value::String(creds.agent_id.clone());
+            body["existing_secret"] = serde_json::Value::String(creds.agent_secret.clone());
+        }
     }
     let resp = client
         .post(&url)
@@ -32,37 +55,100 @@ pub(crate) async fn provision_node(
         .map_err(|error| {
             anyhow!(
                 "无法连接一龙云端注册节点（{}）。首次绑定必须联网；已有节点凭证不会因此失效，仍可使用本机离线任务。底层错误: {}",
-                cfg.cloud_http_url,
+                base,
                 error
             )
         })?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("注册节点失败 {}: {}", status, body));
+    let status = resp.status();
+    if secure_endpoint.is_some() && status == reqwest::StatusCode::CONFLICT {
+        let conflict: EndpointAuthorityRequiredResponse =
+            crate::node_agent_endpoint_credentials::read_https_json_limited(resp).await?;
+        if conflict.error != "NODE_ENDPOINT_AUTHORITY_REQUIRED" {
+            bail!("secure 节点注册冲突响应无效");
+        }
+        conflict.endpoint_authority.validate()?;
+        if conflict.endpoint_authority.install_id != install_id {
+            bail!("NODE_ENDPOINT_BOOTSTRAP_IDENTITY_DRIFT");
+        }
+        return Ok(ProvisionNodeOutcome::EndpointAuthorityRequired(
+            conflict.endpoint_authority,
+        ));
     }
-    let j: serde_json::Value = resp.json().await?;
-    let agent_id = j
-        .get("agent_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("响应缺少 agent_id"))?
-        .to_string();
-    let agent_secret = j
-        .get("agent_secret")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("响应缺少 agent_secret"))?
-        .to_string();
-    let owner_user_id = j
-        .get("owner_user_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string();
-    Ok(Credentials {
-        agent_id,
-        agent_secret,
-        owner_user_id,
+    if !status.is_success() {
+        if secure_endpoint.is_some() {
+            let error: serde_json::Value =
+                crate::node_agent_endpoint_credentials::read_https_json_limited(resp)
+                    .await
+                    .unwrap_or_default();
+            let code = error
+                .get("error")
+                .and_then(|value| value.as_str())
+                .unwrap_or("NODE_ENDPOINT_BOOTSTRAP_REGISTRATION_DENIED");
+            return Err(anyhow!("secure 节点注册失败 {status}: {code}"));
+        }
+        let body = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("注册节点失败 {status}: {body}"));
+    }
+    if secure_endpoint.is_some() {
+        let registered: SecureRegistrationResponse =
+            crate::node_agent_endpoint_credentials::read_https_json_limited(resp).await?;
+        validate_registration_identity(&registered.agent_id, &registered.owner_user_id)?;
+        return Ok(ProvisionNodeOutcome::SecureBootstrapAnchor(
+            SecureBootstrapAnchor {
+                agent_id: registered.agent_id,
+                owner_user_id: registered.owner_user_id,
+            },
+        ));
+    }
+    let registered: LegacyRegistrationResponse = resp.json().await?;
+    validate_registration_identity(&registered.agent_id, &registered.owner_user_id)?;
+    if registered.agent_secret.trim().is_empty() {
+        bail!("节点注册响应缺少 legacy anchor secret");
+    }
+    Ok(ProvisionNodeOutcome::Legacy(Credentials {
+        agent_id: registered.agent_id,
+        agent_secret: registered.agent_secret,
+        owner_user_id: registered.owner_user_id,
         user_token: Some(token.to_string()),
-    })
+    }))
+}
+
+#[derive(Deserialize)]
+struct LegacyRegistrationResponse {
+    agent_id: String,
+    agent_secret: String,
+    owner_user_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SecureRegistrationResponse {
+    agent_id: String,
+    owner_user_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EndpointAuthorityRequiredResponse {
+    error: String,
+    endpoint_authority: EndpointAuthorityBinding,
+}
+
+fn validate_registration_identity(agent_id: &str, owner_user_id: &str) -> Result<()> {
+    if agent_id.is_empty()
+        || agent_id != agent_id.trim()
+        || agent_id.len() > 160
+        || owner_user_id.is_empty()
+        || owner_user_id != owner_user_id.trim()
+        || owner_user_id.len() > 160
+        || agent_id.chars().any(|character| character.is_control())
+        || owner_user_id
+            .chars()
+            .any(|character| character.is_control())
+    {
+        bail!("NODE_ENDPOINT_BOOTSTRAP_REGISTRATION_IDENTITY_INVALID");
+    }
+    Ok(())
 }
 
 fn registration_endpoint(cloud_http_url: &str) -> Result<String> {

@@ -8,20 +8,18 @@ use std::time::Duration;
 use serde::Deserialize;
 use tracing::{info, warn};
 
-use super::node_agent_config::cloud_login;
 use super::node_agent_env::node_agent_env_file_path;
-use super::node_agent_registration::provision_node;
 use super::{
     node_agent_admin_status, node_agent_android_inspector, node_agent_android_live,
     node_agent_api_runtime_config, node_agent_cli_sidecar_admin, node_agent_client_diagnostics,
     node_agent_client_maintenance, node_agent_cloud_net, node_agent_cloud_projects,
     node_agent_codex_vault, node_agent_data_root, node_agent_download_router,
-    node_agent_full_access, node_agent_install_env, node_agent_local_admin,
-    node_agent_local_pc_frontend, node_agent_local_tasks, node_agent_project_agent_runs,
-    node_agent_project_docs_mcp, node_agent_project_picker, node_agent_provider_accounts,
-    node_agent_pwa_auth_profile, node_agent_source_preview, node_agent_task_journal_api,
-    node_agent_win_codex_control, pc_storage_git_http, pc_storage_repo, project_landing,
-    project_workspace_inspect, windows_doctor, NodeRuntime,
+    node_agent_endpoint_credentials, node_agent_full_access, node_agent_install_env,
+    node_agent_local_admin, node_agent_local_pc_frontend, node_agent_local_tasks,
+    node_agent_project_agent_runs, node_agent_project_docs_mcp, node_agent_project_picker,
+    node_agent_provider_accounts, node_agent_pwa_auth_profile, node_agent_source_preview,
+    node_agent_task_journal_api, node_agent_win_codex_control, pc_storage_git_http,
+    pc_storage_repo, project_landing, project_workspace_inspect, windows_doctor, NodeRuntime,
 };
 
 pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
@@ -85,8 +83,14 @@ pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/save-openai-key",
                 axum::routing::post(admin_save_openai_key),
             )
-            .route("/api/login", axum::routing::post(admin_login))
-            .route("/api/logout", axum::routing::post(admin_logout))
+            .route(
+                "/api/login",
+                axum::routing::post(node_agent_endpoint_credentials::admin_login),
+            )
+            .route(
+                "/api/logout",
+                axum::routing::post(node_agent_endpoint_credentials::admin_logout),
+            )
             .route(
                 "/api/register-project",
                 axum::routing::post(admin_register_project),

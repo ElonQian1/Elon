@@ -4,9 +4,14 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use super::{clean_optional, now, Store};
 
 mod endpoint_authority;
+mod legacy_registration;
 pub(crate) use endpoint_authority::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
     NodeEndpointOwnerCredentialMutationDelivery,
+};
+pub(crate) use legacy_registration::{
+    LegacyNodeEndpointAuthority, LegacyNodeRegistrationOutcome, LegacyNodeRegistrationRequest,
+    LegacyNodeWebSocketAuthCandidate,
 };
 
 impl Store {
