@@ -68,6 +68,8 @@ class ChatGptWebObservedStateTest {
         assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, completed.status)
         assertFalse(completed.result?.ok == true)
         assertEquals("官网变化", completed.result?.detail)
+        assertEquals(now, completed.completedAtMs)
+        assertEquals(now, state.snapshot().lastCommandObservedAtMs)
     }
 
     @Test

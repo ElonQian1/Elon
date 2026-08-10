@@ -14,17 +14,18 @@ internal object ChatGptWebCommandReceipts {
         .put("status", value.status)
         .put("started_at_ms", value.startedAtMs)
         .put("completed_at_ms", value.completedAtMs ?: JSONObject.NULL)
-        .put("result", resultJson(value.result))
+        .put("result", resultJson(value.result, observedAtMs = value.completedAtMs))
 
     fun lastResultJson(value: ChatGptWebObservedState.Snapshot): Any {
         val command = value.lastCommand ?: return JSONObject.NULL
         val request = value.commandRequests.lastOrNull { it.result == command }
-        return resultJson(command, request?.id)
+        return resultJson(command, request?.id, value.lastCommandObservedAtMs)
     }
 
     private fun resultJson(
         value: ChatGptWebEvent.CommandResult?,
         requestId: String? = null,
+        observedAtMs: Long? = null,
     ): Any {
         if (value == null) return JSONObject.NULL
         return JSONObject()
@@ -32,5 +33,6 @@ internal object ChatGptWebCommandReceipts {
             .put("ok", value.ok)
             .put("detail", value.detail)
             .put("request_id", requestId ?: JSONObject.NULL)
+            .put("observed_at_ms", observedAtMs ?: JSONObject.NULL)
     }
 }

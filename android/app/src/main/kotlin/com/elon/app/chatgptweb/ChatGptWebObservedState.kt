@@ -7,11 +7,13 @@ internal class ChatGptWebObservedState(
     private var features: List<ChatGptWebFeature> = emptyList()
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
     private var lastCommand: ChatGptWebEvent.CommandResult? = null
+    private var lastCommandObservedAtMs: Long? = null
     private var commandRequests: List<CommandRequest> = emptyList()
     private var nextCommandId = 0L
     private var updatedAtMs: Long = 0L
 
     fun accept(event: ChatGptWebEvent) {
+        val observedAtMs = nowMs()
         when (event) {
             is ChatGptWebEvent.ConversationList -> conversations = event.conversations
             is ChatGptWebEvent.FeatureNavigation -> features = event.features
@@ -20,11 +22,12 @@ internal class ChatGptWebObservedState(
             }
             is ChatGptWebEvent.CommandResult -> {
                 lastCommand = event
-                completeOldestRequest(event)
+                lastCommandObservedAtMs = observedAtMs
+                completeOldestRequest(event, observedAtMs)
             }
             else -> return
         }
-        updatedAtMs = nowMs()
+        updatedAtMs = observedAtMs
     }
 
     fun beginComposerRequest(section: String) {
@@ -54,10 +57,14 @@ internal class ChatGptWebObservedState(
             lastCommand = lastCommand,
             commandRequests = commandRequests,
             updatedAtMs = updatedAtMs,
+            lastCommandObservedAtMs = lastCommandObservedAtMs,
         )
     }
 
-    private fun completeOldestRequest(event: ChatGptWebEvent.CommandResult) {
+    private fun completeOldestRequest(
+        event: ChatGptWebEvent.CommandResult,
+        observedAtMs: Long,
+    ) {
         val index = commandRequests.indexOfFirst {
             it.status == CommandRequest.PENDING && it.expectedAction == event.action
         }
@@ -66,7 +73,7 @@ internal class ChatGptWebObservedState(
             this[index] = this[index].copy(
                 status = if (event.ok) CommandRequest.SUCCEEDED else CommandRequest.FAILED,
                 result = event,
-                completedAtMs = nowMs(),
+                completedAtMs = observedAtMs,
             )
         }
     }
@@ -95,6 +102,7 @@ internal class ChatGptWebObservedState(
         val lastCommand: ChatGptWebEvent.CommandResult?,
         val commandRequests: List<CommandRequest>,
         val updatedAtMs: Long,
+        val lastCommandObservedAtMs: Long? = null,
     ) {
         companion object {
             val EMPTY = Snapshot(emptyList(), emptyList(), emptyMap(), null, emptyList(), 0L)

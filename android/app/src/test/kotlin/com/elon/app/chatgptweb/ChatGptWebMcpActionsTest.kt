@@ -37,6 +37,7 @@ class ChatGptWebMcpActionsTest {
         assertEquals(0.25, control.getDouble("web_x_ratio"), 0.0)
         assertFalse(control.getBoolean("in_viewport"))
         assertEquals(1, state.getJSONObject("navigation").getInt("conversation_count"))
+        assertEquals(123L, state.getJSONObject("last_command").getLong("observed_at_ms"))
         assertEquals(
             "chatgpt-control:control_suggestion_demo:整理待办",
             control.getString("adb_content_description"),
@@ -339,6 +340,7 @@ class ChatGptWebMcpActionsTest {
                     lastCommand = ChatGptWebEvent.CommandResult("list_conversations", true, ""),
                     commandRequests = emptyList(),
                     updatedAtMs = 123L,
+                    lastCommandObservedAtMs = 123L,
                 )
             },
             beginCommand = { expectedAction ->
