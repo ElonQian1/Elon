@@ -20,6 +20,11 @@ internal class ChatGptWebObservedState {
         updatedAtMs = System.currentTimeMillis()
     }
 
+    fun beginComposerRequest(section: String) {
+        composerSections = composerSections - section
+        updatedAtMs = System.currentTimeMillis()
+    }
+
     fun snapshot(): Snapshot = Snapshot(
         conversations = conversations,
         features = features,

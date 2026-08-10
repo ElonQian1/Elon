@@ -28,4 +28,22 @@ class ChatGptWebObservedStateTest {
         assertTrue(snapshot.lastCommand?.ok == true)
         assertTrue(snapshot.updatedAtMs > 0)
     }
+
+    @Test
+    fun composerRequestClearsOnlyTheRequestedStaleSection() {
+        val state = ChatGptWebObservedState()
+        state.accept(composerEvent("model", "快速"))
+        state.accept(composerEvent("tools", "网页搜索"))
+
+        state.beginComposerRequest("model")
+
+        assertTrue("model" !in state.snapshot().composerSections)
+        assertEquals("网页搜索", state.snapshot().composerSections.getValue("tools").single().label)
+    }
+
+    private fun composerEvent(section: String, label: String) = ChatGptWebEvent.ComposerControls(
+        section = section,
+        currentModel = "5.6 Sol 轻度",
+        options = listOf(ChatGptWebComposerOption("${section}_option", label, false, "menuitem")),
+    )
 }

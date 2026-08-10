@@ -35,6 +35,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var featureHubController: ChatGptNativeFeatureHubController
     private lateinit var adaptiveUiController: ChatGptNativeAdaptiveUiController
     private lateinit var overlayControlsController: ChatGptNativeOverlayControlsController
+    private lateinit var officialOverlayController: ChatGptWebOfficialOverlayController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var modeController: ChatGptWebModeController
@@ -72,8 +73,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             openConversation = pageAdapter::openConversation,
             listConversations = pageAdapter::listConversations,
             requestComposerOptions = { section ->
-                if (section == "model") pageAdapter.listModelOptions()
-                else pageAdapter.listComposerTools()
+                requestComposerOptions(section)
             },
             selectComposerOption = { section, optionId ->
                 if (section == "model") pageAdapter.selectModelOption(optionId)
@@ -160,8 +160,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             modelButton = binding.chatGptNativeModel,
             attachmentButton = binding.chatGptNativeAttachment,
             toolsButton = binding.chatGptNativeTools,
-            onRequestModelOptions = { pageAdapter.listModelOptions() },
-            onRequestTools = { pageAdapter.listComposerTools() },
+            onRequestModelOptions = { requestComposerOptions("model") },
+            onRequestTools = { requestComposerOptions("tools") },
             onSelectModelOption = { pageAdapter.selectModelOption(it) },
             onSelectTool = { pageAdapter.selectComposerTool(it) },
             onDismissMenu = { pageAdapter.dismissComposerMenu() },
@@ -216,6 +216,18 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onStateChanged = ::handleBridgeState,
         )
         touchDispatcher = ChatGptWebTouchDispatcher(binding.chatGptWebView)
+        officialOverlayController = ChatGptWebOfficialOverlayController(
+            dispatchEscape = {
+                binding.chatGptWebView.dispatchKeyEvent(
+                    KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE),
+                )
+                binding.chatGptWebView.dispatchKeyEvent(
+                    KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE),
+                )
+            },
+            schedule = { delayMs, action -> binding.chatGptWebView.postDelayed(action, delayMs) },
+            refreshManifest = pageAdapter::requestUiManifest,
+        )
 
         modeController = ChatGptWebModeController(
             window = window,
@@ -345,16 +357,17 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun navigateBack() {
         when (ChatGptWebBackNavigation.decide(latestUiManifest, binding.chatGptWebView.canGoBack())) {
-            ChatGptWebBackNavigation.Action.DISMISS_OFFICIAL_OVERLAY -> dismissOfficialOverlay()
+            ChatGptWebBackNavigation.Action.DISMISS_OFFICIAL_OVERLAY -> officialOverlayController.dismissTop()
             ChatGptWebBackNavigation.Action.NAVIGATE_WEB_HISTORY -> binding.chatGptWebView.goBack()
             ChatGptWebBackNavigation.Action.FINISH_ACTIVITY -> finish()
         }
     }
 
-    private fun dismissOfficialOverlay() {
-        binding.chatGptWebView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE))
-        binding.chatGptWebView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE))
-        binding.chatGptWebView.postDelayed(pageAdapter::requestUiManifest, OVERLAY_DISMISS_REFRESH_MS)
+    private fun requestComposerOptions(section: String) {
+        observedMcpState.beginComposerRequest(section)
+        officialOverlayController.dismissAllThen {
+            if (section == "model") pageAdapter.listModelOptions() else pageAdapter.listComposerTools()
+        }
     }
 
     private fun showLoading(url: String) {
@@ -584,6 +597,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         conversationListController.dispose()
         featureHubController.dispose()
         overlayControlsController.dispose()
+        officialOverlayController.dispose()
         composerToolsController.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()
@@ -605,7 +619,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     companion object {
         private const val EXTRA_PRODUCT_ENTRY = "chatgpt_product_entry"
-        private const val OVERLAY_DISMISS_REFRESH_MS = 250L
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
         const val ADAPTIVE_CONTROL_SETTLE_MS = 360L
