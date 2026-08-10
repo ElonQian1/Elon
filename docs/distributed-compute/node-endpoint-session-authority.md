@@ -10,11 +10,11 @@ implementation_status: implementation_unwired
 
 ## 1. 当前状态
 
-服务端 schema v216 已形成一组默认空、生产不可达的节点端点凭据与认证会话账本，以及只接受 sealed 输入的 Store 内核。这里的“服务端 v216”属于云端 SQLite 迁移序列；它与节点本机插件 authority 的 v7 schema、以及形成该节点源码的历史 v216 实现批次不是同一个版本域。
+服务端 schema v216 已形成一组默认空、生产不可达的节点端点凭据与认证会话账本，以及只接受 sealed 输入的 Store 内核；v217 又追加目标绑定的所有者近期重认证回执。这里的“服务端 v216/v217”属于云端 SQLite 迁移序列；它与节点本机插件 authority 的 v7/v8 schema、以及形成节点源码的历史实现批次不是同一个版本域。
 
 服务端 v216 只铺耐久 currentness：不从 `node_credentials` 或 `ELON_AGENT_SECRETS` 回填，不修改节点注册 HTTP、legacy `/agent/ws`、`AgentManager`、`NodeRegistry`、NodeAgent、`homecli-proto` 或协议阈值。后续源码新增了默认关闭的 direct-TLS-only verifier seam：只有由专用 rustls listener 完成的同一连接 TLS 1.3 握手才能形成一次性 sealed transport proof；plain listener、legacy `/agent/ws`、URL/Host、`Forwarded`/`X-Forwarded-Proto` 和静态配置标记均拿不到 proof。现有节点仍不会自动进入新账本，新表也不改变 legacy 登录、续约、连接或断开行为。
 
-`store_migrations.rs` 已登记 v216，所以部署包含该源码的新二进制时会尝试创建空 schema；“dormant”不是“不运行 migration”，而是 migration 成功后没有 producer 或调用方。DDL 或 migration 失败仍可能让服务启动失败，本批未执行 migration，不能宣称磁盘兼容已验证；成功建表且 child row 仍为空时，新表不在 legacy 表上安装 trigger，也不参与 legacy auth 查询或写事务，不会选择性拒绝旧路径。
+`store_migrations.rs` 已登记 v216/v217，所以部署包含该源码的新二进制时会尝试创建空 schema；“dormant”不是“不运行 migration”，而是 migration 成功后没有 producer 或调用方。DDL 或 migration 失败仍可能让服务启动失败，本批未执行 migration，不能宣称磁盘兼容已验证；成功建表且 child row 仍为空时，新表不在 legacy 表上安装 trigger，也不参与 legacy auth 查询或写事务，不会选择性拒绝旧路径。
 
 该源码尚未编译、执行迁移、测试或运行验证。它不表示节点在线，不表示某个 WebSocket 可用于算力控制，也不签发 ReadyCapability、Provider route、Start outbox、command、Lease 或派发权限。
 
@@ -26,7 +26,7 @@ implementation_status: implementation_unwired
 - Register 中的 owner、install、版本和 capability 都是节点自报事实；
 - 进程内随机 `session_id` 已被封进不可序列化的 `AgentProcessSessionKey`，它只用于同进程连接替换，不能证明底层 credential 仍是当前版本；
 - `AgentManager` 和 `NodeRegistry` 仍以 `agent_id` 索引，但当前源码已让 entry 保存 exact process key，并让旧 reader 的 touch、capability update、unregister 与 manager mutation 对 key 做比较；
-- 当前公开默认地址仍包含 `ws://` / `http://`，服务器也没有可用于本权威的受信 TLS transport evidence producer；
+- 当前公开默认地址仍包含 `ws://` / `http://`；新增 direct-TLS proof 只面向固定失败关闭的 secure `/agent/ws` seam，不能转换成 owner HTTP 的 HTTPS proof；
 - sharing、preparation 与 Planning Snapshot 的 ACK-derived 同步 Store 写已在 process-key read lease 内成组执行，replacement 不能穿越该本地窗口；这仍不能替代 ACK 落账事务中的耐久 credential/session currentness 重验。
 
 因此端点凭据、认证 receipt、会话 current head 与在线 socket 必须分层。只有未来同批桥接完成后，安全传输、当前凭据和当前会话的交集才可能成为 compute endpoint authority。
@@ -57,6 +57,14 @@ terminal revoked revision N -> active recovery revision N+1 using that exact ter
 rotate 与 recover 各自必须保留 owner authorization basis，并把 kind/ID/digest 写进 canonical version 与 revocation envelope；“知道 install_id”不能自动等价于持有旧端点凭据。active head 上推进新版本时必须同时看见旧 revision 的 `rotated`/`recovered` revocation、新 revision 以及不再 active 的旧 session head。若旧 head 已因 exact `owner_revoked`/`security_revoked` revocation 进入 terminal revoked，recovery 必须复用该终态撤销来签发 N+1，不能为同一 N 伪造第二条 `recovered` revocation。终态 revoke 必须绑定相同 revision/digest，不能用 later mutable head 改写历史。
 
 credential version 只保存验证承诺，不向 API 或协议返回 secret hash。完整明文 secret 仍只能在未来安全签发响应中显示一次；当前 HTTP 注册路径没有接入这里。
+
+### v217 所有者近期重认证回执
+
+v217 新增 `node_endpoint_owner_reauthentication_receipts`，保存一条不可变、目标绑定的近期重认证事实。回执同时封存 account session 与账号状态摘要、认证方法及 factor/evidence 摘要、endpoint mutation action/request/target、预期 credential head，以及独立的 secure owner-API transport evidence；fresh registration 要求 endpoint root 尚不存在，rotate/recover/revoke 则要求预期 revision/digest 与当前 root 精确一致。回执固定五分钟绝对有效期，secure transport evidence 到重认证最多相隔 30 秒，使用 RFC 8785 JCS 与 SHA-256，按 owner + issuance request 精确重放。表为 `WITHOUT ROWID`，拒绝所有唯一键 replacement、UPDATE 与 DELETE，并以外键和触发器锚定当前 owner/session/node target。
+
+这张表当前仍不可达。`VerifiedCurrentAccountSession`、`VerifiedRecentOwnerReauthentication`、`VerifiedSecureOwnerApiTransport` 与最终 authorized wrapper 均无生产构造器；普通 bearer 登录、`trusted_device`、`last_seen_at`、`OWNER_TOKEN`、密码登录结果、Google login/bind challenge、恢复码或 direct-TLS endpoint WSS proof 都不能升级为该回执。Google 以后必须使用专用 reauth challenge，创建时就绑定当前 session、action、target 与 mutation request，并在完成时精确核对已绑定 identity；恢复码只恢复密码并撤销 session，不能产生近期重认证。
+
+单表回执不等于“已消费”，也不授权 standalone credential mutation。未来必须新增追加式 consumption ledger，并把 current session/factor/transport 重验、回执 insert/readback、credential version/revocation/root CAS 和 consumption 写入同一个 `BEGIN IMMEDIATE` facade；禁止先调用 `record_node_endpoint_owner_reauthentication` 提交，再另起事务调用 issue/rotate/recover/revoke。`NodeEndpointOwnerAuthorizationBasis` 只是 credential envelope 内的可序列化值，不是 sealed authority；未来只能由上述复合 Store 事务从 exact v217 receipt 内部派生。返回一次性 endpoint secret 的 HTTP 请求和响应还必须各自消费当次 secure owner-API transport proof，不能拿五分钟前的重认证 TLS evidence 冒充 secret delivery channel。
 
 ## 5. 认证会话与 exact CAS
 
@@ -133,14 +141,14 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 
 ## 9. 实现入口与验证边界
 
-- migration：`server/src/node_compute_sharing_migration.rs` 的 `migration_v216` 与 `server/src/node_compute_sharing_migration/endpoint_authority*.rs`；
+- migration：`server/src/node_compute_sharing_migration.rs` 的 `migration_v216`/`migration_v217` 与 `server/src/node_compute_sharing_migration/endpoint_authority*.rs`；
 - domain：`server/src/node_compute_sharing/endpoint_authority.rs`；
-- Store：`server/src/store/node_credentials/endpoint_authority.rs`，子叶为 `credentials.rs`、`credentials/{root,rows,write}.rs`、`secret.rs`、`sessions.rs` 与 `sessions/{head_rows,receipt_rows}.rs`；
+- Store：`server/src/store/node_credentials/endpoint_authority.rs`，子叶为 `credentials.rs`、`credentials/{root,rows,write}.rs`、`secret.rs`、`sessions.rs`、`sessions/{head_rows,receipt_rows}.rs` 与 `owner_reauthentication/{currentness,rows}.rs`；
 - process-local fencing：`server/src/node_registry/session_key.rs`、`server/src/homecli_agent/session_fencing.rs`，以及 exact-key 接线后的 `agent_session.rs` 与三条插件 observation 子叶；
 - direct TLS verifier：`server/src/node_endpoint_transport.rs`、`server/src/node_endpoint_transport/{config,direct_tls,evidence_slot,secure_router}.rs` 与 `server/src/node_compute_sharing/endpoint_authority/session/direct_tls.rs`；
 - migration registry：`server/src/store_migrations.rs`。
 
-当前 Store surface 只有 crate-internal `issue_fresh_node_endpoint_credential`、`rotate_node_endpoint_credential`、`recover_node_endpoint_credential`、`revoke_node_endpoint_credential`、`authenticate_node_endpoint_session`、`close_node_endpoint_session`、`inspect_node_endpoint_session_currentness`、`restart_node_endpoint_sessions` 与 `recover_node_endpoint_session_heads`，且全部限制为 `pub(in crate::store)`。
+当前 Store surface 另有 crate-internal `record_node_endpoint_owner_reauthentication`，以及 `issue_fresh_node_endpoint_credential`、`rotate_node_endpoint_credential`、`recover_node_endpoint_credential`、`revoke_node_endpoint_credential`、`authenticate_node_endpoint_session`、`close_node_endpoint_session`、`inspect_node_endpoint_session_currentness`、`restart_node_endpoint_sessions` 与 `recover_node_endpoint_session_heads`；全部限制为 `pub(in crate::store)`。record kernel 只写/重放审计事实，不能与后面的 credential mutation 分事务串联。
 
 输出 `NodeEndpointCredentialMutationReceipt` 与 `VerifiedCurrentNodeEndpointSession` 也保持相同可见性，没有 constructor、`Deserialize` 或 `Clone`；WS/HTTP 所在模块当前不可见。未来 HTTP/WS 桥接必须通过 Store-owned facade 注入 sealed authorization/transport 输入，不得直接公开 domain 构造器或把这些 kernel 提升为网络 API。
 

@@ -9,8 +9,9 @@ use anyhow::Result;
 use crate::node_compute_sharing::endpoint_authority::{
     AuthorizedFreshNodeEndpointCredentialIssuance, AuthorizedNodeEndpointCredentialRecovery,
     AuthorizedNodeEndpointCredentialRevocation, AuthorizedNodeEndpointCredentialRotation,
-    NodeEndpointCredentialBinding, NodeEndpointCredentialRevocationEnvelope,
-    NodeEndpointCredentialVersionEnvelope, NodeEndpointSessionAuthenticationReceiptEnvelope,
+    AuthorizedNodeEndpointOwnerReauthentication, NodeEndpointCredentialBinding,
+    NodeEndpointCredentialRevocationEnvelope, NodeEndpointCredentialVersionEnvelope,
+    NodeEndpointOwnerReauthenticationEnvelope, NodeEndpointSessionAuthenticationReceiptEnvelope,
     NodeEndpointSessionHeadSnapshot, NodeEndpointSessionOpenRequest,
     PresentedNodeEndpointCredentialSecret, VerifiedSecureNodeEndpointTransport,
 };
@@ -18,8 +19,29 @@ use crate::node_compute_sharing::endpoint_authority::{
 use super::super::Store;
 
 mod credentials;
+mod owner_reauthentication;
 mod secret;
 mod sessions;
+
+pub(in crate::store) struct NodeEndpointOwnerReauthenticationReceipt {
+    envelope: NodeEndpointOwnerReauthenticationEnvelope,
+    receipt_digest: String,
+    replayed: bool,
+}
+
+impl NodeEndpointOwnerReauthenticationReceipt {
+    pub(in crate::store) fn envelope(&self) -> &NodeEndpointOwnerReauthenticationEnvelope {
+        &self.envelope
+    }
+
+    pub(in crate::store) fn receipt_digest(&self) -> &str {
+        &self.receipt_digest
+    }
+
+    pub(in crate::store) fn replayed(&self) -> bool {
+        self.replayed
+    }
+}
 
 pub(in crate::store) struct NodeEndpointCredentialMutationReceipt {
     current: NodeEndpointCredentialBinding,
@@ -73,6 +95,13 @@ impl VerifiedCurrentNodeEndpointSession {
 }
 
 impl Store {
+    pub(in crate::store) fn record_node_endpoint_owner_reauthentication(
+        &self,
+        authorized: &AuthorizedNodeEndpointOwnerReauthentication,
+    ) -> Result<NodeEndpointOwnerReauthenticationReceipt> {
+        owner_reauthentication::record(self, authorized)
+    }
+
     pub(in crate::store) fn issue_fresh_node_endpoint_credential(
         &self,
         authorized: &AuthorizedFreshNodeEndpointCredentialIssuance,
@@ -134,6 +163,18 @@ impl Store {
         &self,
     ) -> Result<Vec<NodeEndpointSessionHeadSnapshot>> {
         sessions::recover_heads(self)
+    }
+}
+
+pub(super) fn owner_reauthentication_receipt(
+    envelope: NodeEndpointOwnerReauthenticationEnvelope,
+    receipt_digest: String,
+    replayed: bool,
+) -> NodeEndpointOwnerReauthenticationReceipt {
+    NodeEndpointOwnerReauthenticationReceipt {
+        envelope,
+        receipt_digest,
+        replayed,
     }
 }
 

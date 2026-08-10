@@ -6,6 +6,7 @@
 
 mod canonical;
 mod credential;
+mod owner_reauthentication;
 mod session;
 mod types;
 
@@ -15,6 +16,13 @@ pub(crate) use credential::{
     NodeEndpointCredentialRevocationEnvelope, NodeEndpointCredentialVersionEnvelope,
     PreparedNodeEndpointCredentialRevocation, PreparedNodeEndpointCredentialVersion,
     PresentedNodeEndpointCredentialSecret,
+};
+pub(crate) use owner_reauthentication::{
+    derive_owner_account_auth_state_digest, derive_owner_account_session_binding_digest,
+    derive_owner_google_factor_binding_digest, derive_owner_password_factor_binding_digest,
+    AuthorizedNodeEndpointOwnerReauthentication, NodeEndpointOwnerReauthenticationEnvelope,
+    PreparedNodeEndpointOwnerReauthentication, VerifiedCurrentAccountSession,
+    VerifiedRecentOwnerReauthentication, VerifiedSecureOwnerApiTransport,
 };
 pub(crate) use session::{
     canonical_direct_tls_verifier_digest, canonical_node_endpoint_capability_set,

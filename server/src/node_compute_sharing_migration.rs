@@ -31,6 +31,10 @@ pub(crate) fn migration_v216(conn: &Connection) -> Result<()> {
     endpoint_authority::migration_v216(conn)
 }
 
+pub(crate) fn migration_v217(conn: &Connection) -> Result<()> {
+    endpoint_authority::migration_v217(conn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
