@@ -103,10 +103,18 @@
     if (/unpin|pin.chat|取消置顶|置顶聊天/.test(signal)) return 'pin';
     if (/unarchive|archive|取消归档|归档/.test(signal)) return 'archive';
     if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
+    if (/open.*(?:image|photo|media)|打开.*(?:图片|照片|媒体)/.test(signal)) return 'open_media';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
+    if (
+      region === 'composer'
+      && (/(?:reasoning|thinking).*(?:effort|level)|推理|思考强度/.test(signal)
+        || /(^|\s)(?:轻度|标准|中度|重度|极高)($|\s)/.test(signal))
+    ) return 'model';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
     if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
-    if (/dictat|microphone|voice|听写|麦克风|语音/.test(signal)) return 'dictation';
+    if (/dictat|听写|语音输入/.test(signal)) return 'dictation';
+    if (/voice.mode|start.voice|microphone|启动语音|语音功能|麦克风/.test(signal)) return 'voice_mode';
+    if (/thought.for|reasoning|思考了|思考过程|推理过程/.test(signal)) return 'reasoning_details';
     if (/send|submit|发送/.test(signal)) return 'send';
     if (/stop|停止/.test(signal)) return 'stop';
     if (/copy|复制/.test(signal)) return 'copy';
@@ -136,6 +144,7 @@
       attachment: '添加附件',
       model: '选择模型',
       dictation: '开始听写',
+      voice_mode: '启动语音功能',
       send: '发送',
       stop: '停止生成',
       suggestion: '使用建议',
@@ -162,6 +171,8 @@
       pin: '置顶聊天',
       archive: '归档',
       more: '更多操作',
+      open_media: '打开媒体',
+      reasoning_details: '查看思考过程',
       timestamp: '消息时间'
     })[semantic] || '操作';
   }

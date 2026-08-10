@@ -77,6 +77,24 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun exposesMediaAndReasoningAsMessageActionsWhileVoiceModeUsesOfficialFallback() {
+        val controls = listOf(
+            control("media", "open_media", "打开图片", ChatGptWebUiRegion.MESSAGE, CONTEXT),
+            control("reasoning", "reasoning_details", "思考了 1m 48s", ChatGptWebUiRegion.MESSAGE, CONTEXT),
+            control("voice", "voice_mode", "启动语音功能", ChatGptWebUiRegion.COMPOSER),
+        )
+
+        val actions = ChatGptNativeControlPresentation.messageActions(controls).getValue(CONTEXT)
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(listOf("media", "reasoning"), actions.map(ChatGptWebUiControl::id))
+        assertEquals("menu", coverage.getValue("media").kind.wireName)
+        assertEquals("menu", coverage.getValue("reasoning").kind.wireName)
+        assertEquals("official_fallback", coverage.getValue("voice").kind.wireName)
+        assertNull(coverage.getValue("voice").nativeSelector)
+    }
+
+    @Test
     fun mapsDedicatedControlsToTheirRealNativeSurfaceAndRequiredTrigger() {
         val controls = listOf(
             control("navigation", "navigation", "会话", ChatGptWebUiRegion.HEADER),
