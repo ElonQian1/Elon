@@ -179,6 +179,8 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 同日 PC `test:project-docs` 新增并通过候选模型合同：可控 `nodeApi` 响应验证了越界证据丢弃、Windows 路径规范化、候选去重，以及分页、审核、CAS 修订和单一重定位修复的请求字段；组件源码门禁确保漂移项不能接受、缺 catalog revision 不能并入建议、UI 不直接拼接候选 API。独立 `npm run typecheck` 与 `npm run build` 通过。该测试使用 mock `nodeApi` 和源码合同，不等于真实浏览器、真实 loopback API 或视觉交互验收。
 
+随后 `native_context` 回归扩展为 13 项并全部通过，验证指纹为 `cf1b8197aded0ff776d48ef226a93acd71f6a197799aa14381bf41d82852fd86`。新增真实临时工作区与外部 SQLite 场景确认：attested receipt 只返回 24 位不可逆会话指纹，不返回原始 session ID；人工修订必须匹配当前 `updated_at_ms`，过期 CAS 会失败；同一证据的后续代理回执会去重并保留人工摘要和 `pc_document_review` 编辑来源。候选分页仍只有一条 pending 记录且不返回源码正文。该证据验证服务端生命周期，不替代真实 Codex Hook 信任、跨 PC 并发或 PC 浏览器交互。
+
 ## 仍需真实验收的项目
 
 以下项目仍需要生产环境或人工安全确认，不能由本轮自动化替代：
