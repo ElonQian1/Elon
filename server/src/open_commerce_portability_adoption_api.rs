@@ -128,3 +128,7 @@ fn with_caller<T: serde::Serialize>(
         Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
     }
 }
+
+#[cfg(test)]
+#[path = "open_commerce_portability_adoption_api_tests.rs"]
+mod tests;
