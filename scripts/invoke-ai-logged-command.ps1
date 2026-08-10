@@ -135,34 +135,38 @@ $stdoutLog = Join-Path $logRoot "$LogName-$stamp.stdout.log"
 $stderrLog = Join-Path $logRoot "$LogName-$stamp.stderr.log"
 $pidFile = Join-Path $logRoot "$LogName-$stamp.job.pid"
 $resultFile = Join-Path $logRoot "$LogName-$stamp.result.json"
+$commandRoot = Join-Path $logRoot "command-files"
+New-Item -ItemType Directory -Path $commandRoot -Force | Out-Null
+$commandToken = "$stamp-$([Guid]::NewGuid().ToString('N'))"
+$commandFile = Join-Path $commandRoot "$commandToken.cmd"
+$commandExitFile = Join-Path $commandRoot "$commandToken.exit"
+[System.IO.File]::WriteAllText(
+    $commandFile,
+    "@echo off`r`nchcp 65001>nul`r`n" +
+        "call $CommandLine 1>`"$stdoutLog`" 2>`"$stderrLog`"`r`n" +
+        "set `"ELON_COMMAND_EXIT=%errorlevel%`"`r`n" +
+        ">`"$commandExitFile`" echo %ELON_COMMAND_EXIT%`r`n" +
+        "exit /b %ELON_COMMAND_EXIT%`r`n",
+    [System.Text.UTF8Encoding]::new($false)
+)
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
 $logPaths = @($stdoutLog, $stderrLog)
 $lastLogBytes = [long]0
 $lastLogActivityAt = [DateTimeOffset]::UtcNow
 
-$job = Start-Job -ArgumentList @(
-    $workingPath,
-    $CommandLine,
-    $stdoutLog,
-    $stderrLog,
-    $pidFile
-) -ScriptBlock {
-    param($CommandWorkingPath, $CommandText, $StdoutPath, $StderrPath, $PidPath)
-    [System.IO.File]::WriteAllText($PidPath, [string]$PID, [System.Text.Encoding]::ASCII)
-    Set-Location -LiteralPath $CommandWorkingPath
-    $redirectedCommand = "chcp 65001>nul & $CommandText 1>`"$StdoutPath`" 2>`"$StderrPath`""
-    & $env:ComSpec /d /s /c $redirectedCommand
-    [pscustomobject]@{
-        ExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
-    }
-}
+$process = Start-Process -FilePath $env:ComSpec `
+    -ArgumentList @("/d", "/s", "/c", "`"`"$commandFile`"`"") `
+    -WorkingDirectory $workingPath `
+    -WindowStyle Hidden `
+    -PassThru
+[System.IO.File]::WriteAllText($pidFile, [string]$process.Id, [System.Text.Encoding]::ASCII)
 
 try {
     $heartbeatInterval = $HeartbeatSeconds
     $heartbeatCount = 0
     $timedOut = $false
     $stalled = $false
-    while ($job.State -in @("NotStarted", "Running")) {
+    while (-not $process.HasExited) {
         $now = [DateTimeOffset]::UtcNow
         $currentLogBytes = Get-LogByteCount -Paths $logPaths
         if ($currentLogBytes -ne $lastLogBytes) {
@@ -188,8 +192,9 @@ try {
             $stallRemaining = $StallTimeoutSeconds - $idleSeconds
             $waitSeconds = [Math]::Max(1, [Math]::Min($waitSeconds, [Math]::Ceiling($stallRemaining)))
         }
-        Wait-Job -Job $job -Timeout $waitSeconds | Out-Null
-        if ($job.State -in @("NotStarted", "Running")) {
+        [void]$process.WaitForExit([int]($waitSeconds * 1000))
+        $process.Refresh()
+        if (-not $process.HasExited) {
             $now = [DateTimeOffset]::UtcNow
             $currentLogBytes = Get-LogByteCount -Paths $logPaths
             if ($currentLogBytes -ne $lastLogBytes) {
@@ -205,24 +210,26 @@ try {
         }
     }
     if ($timedOut -or $stalled) {
-        $jobPid = if (Test-Path -LiteralPath $pidFile) {
-            [int](Get-Content -LiteralPath $pidFile -Raw)
-        } else { 0 }
-        Stop-CommandProcessTree -RootPid $jobPid
-        Stop-Job -Job $job -ErrorAction SilentlyContinue
+        Stop-CommandProcessTree -RootPid $process.Id
+        [void]$process.WaitForExit(5000)
         $exitCode = if ($timedOut) { 124 } else { 125 }
     } else {
-        $jobResult = @(Receive-Job -Job $job)
-        $resultRecord = $jobResult |
-            Where-Object { $_.PSObject.Properties.Name -contains "ExitCode" } |
-            Select-Object -Last 1
-        $exitCode = if ($resultRecord) { [int]$resultRecord.ExitCode } else { 1 }
-        if ($job.State -eq "Failed") { $exitCode = 1 }
+        $process.WaitForExit()
+        $recordedExitCode = 0
+        $hasRecordedExitCode = (Test-Path -LiteralPath $commandExitFile -PathType Leaf) -and
+            [int]::TryParse(
+                (Get-Content -LiteralPath $commandExitFile -Raw).Trim(),
+                [ref]$recordedExitCode
+            )
+        $exitCode = if ($hasRecordedExitCode) { $recordedExitCode } else { [int]$process.ExitCode }
     }
 } finally {
     $watch.Stop()
-    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    if ($null -ne $process -and -not $process.HasExited) {
+        Stop-CommandProcessTree -RootPid $process.Id
+    }
     Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $commandFile, $commandExitFile -Force -ErrorAction SilentlyContinue
 }
 
 $stdoutLines = Get-LineCount -Path $stdoutLog

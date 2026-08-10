@@ -16,6 +16,11 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
 }
 $runner = Join-Path $repoRoot "scripts\invoke-ai-logged-command.ps1"
 $statusReader = Join-Path $repoRoot "scripts\get-ai-command-status.ps1"
+$runnerSource = Get-Content -LiteralPath $runner -Raw
+Assert-True (-not $runnerSource.Contains("Start-Job")) `
+    "Command runner must monitor the native process instead of a PowerShell job."
+Assert-True ($runnerSource.Contains('while (-not $process.HasExited)')) `
+    "Command runner must stop waiting as soon as the native parent process exits."
 $gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
 if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
     $gitCommonDir = Join-Path $repoRoot $gitCommonDir
