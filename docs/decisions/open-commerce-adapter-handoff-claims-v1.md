@@ -39,4 +39,4 @@ date: 2026-08-03
 - HTTP：`server/src/open_commerce_adapter_claim_api.rs`
 - MCP：`server/src/open_commerce_adapter_mcp.rs`
 - PC：`pc-frontend/src/features/open-commerce/OpenCommerceAdapterClaimMonitor.tsx`
-- 测试：`server/src/open_commerce_adapter_claim_tests.rs`
+- 测试：`server/src/open_commerce_adapter_claim_tests.rs`、`server/src/open_commerce_adapter_claim_api_tests.rs`

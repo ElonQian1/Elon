@@ -30,4 +30,4 @@ reviewed_at: 2026-08-03
 
 ## 后续兼容说明
 
-任务领取能力由后续 `docs/decisions/open-commerce-adapter-handoff-claims-v1.md` 单独约束。它不静默修改本次已经验收的只写凭据：旧 Token 和默认签发仍保持只写，只有项目编辑者明确轮换并选择 `business_handoff.claim` 后，机器才可通过一次一条、短时租约的专用入口取得待办结果。该后续代码仍等待统一验证和发布。
+任务领取能力由后续 `docs/decisions/open-commerce-adapter-handoff-claims-v1.md` 单独约束。它不静默修改本次已经验收的只写凭据：旧 Token 和默认签发仍保持只写，只有项目编辑者明确轮换并选择 `business_handoff.claim` 后，机器才可通过一次一条、短时租约的专用入口取得待办结果。该后续能力的全新 SQLite 与进程内 HTTP 子集已验证，但仍未发布或完成生产凭据演练。
