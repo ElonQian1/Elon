@@ -300,6 +300,8 @@ internal object ChatGptWebProtocol {
                 val selectedChoiceIndex = item.optInt("selectedChoiceIndex", -1)
                     .takeIf { it in choiceLabels.indices }
                 val slider = parseSlider(item, role, inputKind)
+                val expanded = item.opt("expanded") as? Boolean
+                val expandable = item.optBoolean("expandable") && expanded != null
                 val contextId = item.optString("contextId")
                     .takeIf { it.isNotBlank() && UI_CONTEXT_ID.matches(it) }
                 val webXRatio = boundedRatio(item, "xRatio")
@@ -320,6 +322,8 @@ internal object ChatGptWebProtocol {
                         choiceLabels = choiceLabels,
                         selectedChoiceIndex = selectedChoiceIndex,
                         slider = slider,
+                        expanded = expanded,
+                        expandable = expandable,
                         contextId = contextId,
                         inViewport = item.optBoolean("inViewport", true),
                         webXRatio = webXRatio,
@@ -469,7 +473,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_UI_CONTROL_LABEL_LENGTH = 160
     private const val MAX_UI_CHOICE_OPTIONS = 50
     private const val MAX_UI_CHOICE_LABEL_LENGTH = 120
-    private const val MAX_UI_MANIFEST_VERSION = 7
+    private const val MAX_UI_MANIFEST_VERSION = 8
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
@@ -501,6 +505,9 @@ internal object ChatGptWebProtocol {
         "button",
         "link",
         "menuitem",
+        "menuitemcheckbox",
+        "menuitemradio",
+        "option",
         "switch",
         "tab",
         "textbox",
@@ -508,6 +515,7 @@ internal object ChatGptWebProtocol {
         "checkbox",
         "radio",
         "slider",
+        "treeitem",
     )
     private val UI_INPUT_KINDS = setOf(
         "text",
@@ -538,7 +546,9 @@ internal object ChatGptWebProtocol {
         "switch",
         "range",
     )
-    private val STATE_SETTABLE_UI_ROLES = setOf("checkbox", "radio", "switch")
+    private val STATE_SETTABLE_UI_ROLES = setOf(
+        "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch",
+    )
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
     private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")

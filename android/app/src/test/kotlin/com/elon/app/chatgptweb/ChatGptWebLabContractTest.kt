@@ -56,6 +56,9 @@ class ChatGptWebLabContractTest {
         val formCommands = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_form_commands.js"
         )
+        val disclosureControls = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_disclosure_controls.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
@@ -71,6 +74,8 @@ class ChatGptWebLabContractTest {
                 bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") <
                 bridge.indexOf("chatgpt_web_adapter_form_commands.js") &&
                 bridge.indexOf("chatgpt_web_adapter_form_commands.js") <
+                bridge.indexOf("chatgpt_web_adapter_disclosure_controls.js") &&
+                bridge.indexOf("chatgpt_web_adapter_disclosure_controls.js") <
                 bridge.indexOf("chatgpt_web_adapter_layout.js")
         )
         assertFalse(bridge.contains("addJavascriptInterface"))
@@ -114,6 +119,9 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("action === 'open_conversation'"))
         assertTrue(adapter.contains("action === 'set_ui_control_text'"))
         assertTrue(adapter.contains("action === 'set_ui_control_slider'"))
+        assertTrue(adapter.contains("action === 'set_ui_control_expanded'"))
+        assertTrue(composer.contains("function ownsOptionNode"))
+        assertTrue(adapterLayout.contains("composerAdapter.ownsOptionNode(node)"))
         assertTrue(conversations.contains("if (location.pathname === '/')"))
         assertTrue(adapter.contains("action === 'regenerate_response'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
@@ -123,7 +131,10 @@ class ChatGptWebLabContractTest {
             assertFalse("message adapter must not contain $it", messages.contains(it))
             assertFalse("form adapter must not contain $it", formControls.contains(it))
             assertFalse("form command adapter must not contain $it", formCommands.contains(it))
+            assertFalse("disclosure adapter must not contain $it", disclosureControls.contains(it))
         }
+        assertTrue(disclosureControls.contains("function setExpanded"))
+        assertTrue(disclosureControls.contains("purpose: 'invoke_ui_control'"))
         assertTrue(formControls.contains("ACTIONABLE_SELECTOR"))
         assertTrue(formControls.contains("function setText"))
         assertTrue(formControls.contains("function planSelectedState"))
@@ -248,6 +259,7 @@ class ChatGptWebLabContractTest {
         assertTrue(commandPort.contains("fun setControlSelected(controlId: String, selected: Boolean, requestId: String)"))
         assertTrue(commandPort.contains("fun selectControlChoice(controlId: String, choiceIndex: Int, requestId: String)"))
         assertTrue(commandPort.contains("fun setControlSlider(controlId: String, value: Double, requestId: String)"))
+        assertTrue(commandPort.contains("fun setControlExpanded(controlId: String, expanded: Boolean, requestId: String)"))
     }
 
     @Test

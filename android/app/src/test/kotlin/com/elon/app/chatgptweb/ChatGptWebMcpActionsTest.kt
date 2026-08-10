@@ -229,6 +229,33 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun disclosureControlsDispatchDesiredExpandedState() {
+        var expandedTarget: Pair<String, Boolean>? = null
+        val actions = actions(
+            includeExpandedControl = true,
+            onSetControlExpanded = { id, expanded -> expandedTarget = id to expanded },
+        )
+
+        val result = actions.control(JSONObject()
+            .put("action", "chatgpt_set_control_expanded")
+            .put("control_id", "control_projects_demo")
+            .put("expanded", true))
+        val control = actions.uiState().getJSONObject("ui_manifest")
+            .getJSONArray("controls").getJSONObject(2)
+
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals("control_projects_demo" to true, expandedTarget)
+        assertFalse(control.getBoolean("expanded"))
+        assertTrue(control.getBoolean("expandable"))
+
+        val missing = actions.control(JSONObject()
+            .put("action", "chatgpt_set_control_expanded")
+            .put("control_id", "control_projects_demo"))
+        assertFalse(missing.getBoolean("control_ok"))
+        assertEquals("missing_expanded", missing.getString("error"))
+    }
+
+    @Test
     fun everyAcknowledgedWebCommandPassesItsReceiptIdToTheCommandPort() {
         val dispatched = mutableListOf<Pair<String, String>>()
         val actions = actions(
@@ -236,6 +263,7 @@ class ChatGptWebMcpActionsTest {
             includeWritableControl = true,
             includeFormControls = true,
             includeSliderControl = true,
+            includeExpandedControl = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
         val commands = listOf(
@@ -254,6 +282,9 @@ class ChatGptWebMcpActionsTest {
             JSONObject().put("action", "chatgpt_set_control_slider")
                 .put("control_id", "control_effort_demo")
                 .put("value", 1.5) to "set_ui_control_slider",
+            JSONObject().put("action", "chatgpt_set_control_expanded")
+                .put("control_id", "control_projects_demo")
+                .put("expanded", true) to "set_ui_control_expanded",
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
@@ -609,10 +640,12 @@ class ChatGptWebMcpActionsTest {
         includeFormControls: Boolean = false,
         includeSliderControl: Boolean = false,
         includeUnsupportedSlider: Boolean = false,
+        includeExpandedControl: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
         onSetControlSelected: (String, Boolean) -> Unit = { _, _ -> },
         onSelectControlChoice: (String, Int) -> Unit = { _, _ -> },
         onSetControlSlider: (String, Double) -> Unit = { _, _ -> },
+        onSetControlExpanded: (String, Boolean) -> Unit = { _, _ -> },
         onStartDictation: () -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -751,6 +784,19 @@ class ChatGptWebMcpActionsTest {
                         inputKind = "range",
                     ))
                 }
+                if (includeExpandedControl) {
+                    add(ChatGptWebUiControl(
+                        id = "control_projects_demo",
+                        semantic = "navigation",
+                        label = "项目",
+                        region = ChatGptWebUiRegion.CONTENT,
+                        role = "treeitem",
+                        enabled = true,
+                        selected = false,
+                        expanded = false,
+                        expandable = true,
+                    ))
+                }
             },
         )
         var nextCommandId = 0
@@ -832,6 +878,15 @@ class ChatGptWebMcpActionsTest {
                 ) {
                     onSetControlSlider(controlId, value)
                     onDispatch("set_ui_control_slider", requestId)
+                }
+
+                override fun setControlExpanded(
+                    controlId: String,
+                    expanded: Boolean,
+                    requestId: String,
+                ) {
+                    onSetControlExpanded(controlId, expanded)
+                    onDispatch("set_ui_control_expanded", requestId)
                 }
 
                 override fun newConversation(requestId: String) =

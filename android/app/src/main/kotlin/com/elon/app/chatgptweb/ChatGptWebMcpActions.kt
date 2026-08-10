@@ -129,6 +129,18 @@ internal class ChatGptWebMcpActions(
                     commands.setControlSlider(controlId, value, requestId)
                 }
             }
+            "chatgpt_set_control_expanded" -> {
+                val controlId = args.optString("control_id")
+                if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
+                val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
+                    ?: return error(action, "stale_control_id")
+                if (!control.supportsExpandedState) return error(action, "control_expansion_unavailable")
+                val expanded = args.opt("expanded") as? Boolean
+                    ?: return error(action, "missing_expanded")
+                dispatch("set_ui_control_expanded") { requestId ->
+                    commands.setControlExpanded(controlId, expanded, requestId)
+                }
+            }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
             "chatgpt_start_dictation" -> {
@@ -520,6 +532,8 @@ internal class ChatGptWebMcpActions(
         .put("input_kind", control.inputKind ?: JSONObject.NULL)
         .put("writable", control.writable)
         .put("state_settable", control.supportsSelectedState)
+        .put("expanded", control.expanded ?: JSONObject.NULL)
+        .put("expandable", control.supportsExpandedState)
         .put("choice_labels", JSONArray(control.choiceLabels))
         .put("selected_choice_index", control.selectedChoiceIndex ?: JSONObject.NULL)
         .put(
@@ -629,6 +643,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_control_selected",
             "chatgpt_select_control_choice",
             "chatgpt_set_control_slider",
+            "chatgpt_set_control_expanded",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",

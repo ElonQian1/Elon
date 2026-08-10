@@ -82,6 +82,15 @@ const switchControl = control({
 assert.equal(forms.describe(switchControl).role, 'switch');
 assert.equal(forms.describe(switchControl).stateSettable, true);
 
+const menuRadio = control({
+  tagName: 'DIV',
+  attributes: { role: 'menuitemradio', 'aria-checked': 'true', 'aria-label': 'Fast' }
+});
+assert.equal(forms.describe(menuRadio).role, 'menuitemradio');
+assert.equal(forms.describe(menuRadio).inputKind, 'radio');
+assert.equal(forms.describe(menuRadio).stateSettable, true);
+assert.equal(forms.planSelectedState(menuRadio, false).reason, 'radio_cannot_clear');
+
 const modelSelect = control({
   tagName: 'SELECT',
   selectedIndex: 0,
@@ -129,4 +138,5 @@ assert.equal(richText.textContent, 'Updated description');
 assert.match(forms.ACTIONABLE_SELECTOR, /role="textbox"/);
 assert.match(forms.ACTIONABLE_SELECTOR, /role="slider"/);
 assert.match(forms.ACTIONABLE_SELECTOR, /role="switch"/);
+assert.match(forms.ACTIONABLE_SELECTOR, /role="menuitemradio"/);
 process.stdout.write('CHATGPT_FORM_CONTROLS=passed\n');

@@ -359,6 +359,11 @@
         String(command.controlId || ''), Number(command.numericValue), emitEvent, respond
       );
     }
+    if (action === 'set_ui_control_expanded' && layoutAdapter) {
+      return layoutAdapter.setExpanded(
+        String(command.controlId || ''), command.expanded === true, emitEvent, respond
+      );
+    }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, respond);
     }

@@ -375,6 +375,12 @@
     window.setTimeout(scheduleSnapshot, 240);
   }
 
+  function ownsOptionNode(node) {
+    return ['model', 'tools'].some((section) =>
+      lastOptions[section].some((option) => option.node === node && isVisible(option.node))
+    );
+  }
+
   function startDictation(composer, emitEvent, result) {
     const button = findDictationButton(composer);
     if (!button) return result('start_dictation', false, '官网当前没有听写入口。');
@@ -431,6 +437,7 @@
     dictationActive,
     requestOptions,
     collectRequestedOptions,
+    ownsOptionNode,
     selectOption,
     startDictation,
     cancelDictation: (emitEvent, result) => finishDictation('cancel', emitEvent, result),

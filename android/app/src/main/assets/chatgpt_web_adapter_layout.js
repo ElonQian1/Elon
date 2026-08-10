@@ -4,8 +4,10 @@
   if (window.__elonChatGptLayout || location.origin !== 'https://chatgpt.com') return;
 
   const formAdapter = window.__elonChatGptFormControls;
+  const composerAdapter = window.__elonChatGptComposer;
   const controlOwnershipPolicy = window.__elonChatGptControlOwnershipPolicy;
   const formCommands = window.__elonChatGptFormCommands;
+  const disclosureAdapter = window.__elonChatGptDisclosureControls;
   let controlsById = new Map();
   let lastFingerprint = '';
   const MAX_DISCOVERED_CONTROLS = 512;
@@ -104,7 +106,11 @@
     const form = formAdapter && formAdapter.describe(node);
     if (form && form.role) return form.role;
     const role = String(node.getAttribute('role') || '').toLowerCase();
-    if (['button', 'link', 'menuitem', 'switch', 'tab'].includes(role)) return role;
+    if ([
+      'button', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
+      'option', 'switch', 'tab', 'treeitem'
+    ].includes(role)) return role;
+    if (node.matches('summary')) return 'button';
     return node.matches('a[href]') ? 'link' : 'button';
   }
 
@@ -127,7 +133,11 @@
 
   function actionableNodes(root) {
     if (!root) return [];
-    const selector = 'button, a[href], [role="button"], [role="menuitem"], [role="switch"], [role="tab"]' +
+    const selector = [
+      'button', 'a[href]', 'summary', '[role="button"]', '[role="menuitem"]',
+      '[role="menuitemcheckbox"]', '[role="menuitemradio"]', '[role="option"]',
+      '[role="switch"]', '[role="tab"]', '[role="treeitem"]'
+    ].join(', ') +
       (formAdapter ? ', ' + formAdapter.ACTIONABLE_SELECTOR : '');
     return Array.from(root.querySelectorAll(selector))
       .filter(isVisible);
@@ -145,7 +155,9 @@
     if (form && (form.inputKind === 'search' || /search|搜索/.test(signal))) return 'search';
     if (form && form.role === 'textbox') return 'text_input';
     if (form && form.role === 'combobox') return 'selection';
-    if (form && (form.role === 'checkbox' || form.role === 'radio')) return 'toggle';
+    if (form && [
+      'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio'
+    ].includes(form.role)) return 'toggle';
     if (form && form.role === 'slider') return 'slider';
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
@@ -274,6 +286,7 @@
     const activeComposer = region === 'composer' ? composerNode() : null;
     actionableNodes(root).forEach((node, index) => {
       if (filter && !filter(node)) return;
+      if (composerAdapter && composerAdapter.ownsOptionNode(node)) return;
       if (
         controlOwnershipPolicy && controlOwnershipPolicy.isPrimaryComposerTextControl(
           node,
@@ -293,6 +306,7 @@
       const id = controlId(semantic, node, label, region, used, resolvedContextId);
       const rect = node.getBoundingClientRect();
       const form = formAdapter && formAdapter.describe(node);
+      const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
       used.add(id);
       controlsById.set(id, node);
       target.push({
@@ -316,6 +330,8 @@
         sliderMax: form && form.sliderSettable ? form.sliderMax : undefined,
         sliderStep: form && form.sliderSettable ? form.sliderStep : undefined,
         sliderValue: form && form.sliderSettable ? form.sliderValue : undefined,
+        expanded: disclosure ? disclosure.expanded : undefined,
+        expandable: !!(disclosure && disclosure.expandable),
         contextId: resolvedContextId || undefined,
         inViewport: isInViewport(rect),
         xRatio: (rect.left + rect.width / 2) / Math.max(1, window.innerWidth),
@@ -439,7 +455,7 @@
     const kind = pageKind();
     return {
       type: 'ui_manifest_snapshot',
-      version: 7,
+      version: 8,
       pageKind: kind,
       title: pageTitle(controls),
       compatibility: compatibilityFor(controls, kind),
@@ -475,6 +491,8 @@
         sliderMax: control.sliderMax,
         sliderStep: control.sliderStep,
         sliderValue: control.sliderValue,
+        expanded: control.expanded,
+        expandable: control.expandable,
         contextId: control.contextId,
         inViewport: control.inViewport
       }))
@@ -584,12 +602,25 @@
     );
   }
 
+  function setExpanded(id, expanded, emitEvent, result) {
+    discover();
+    const node = controlsById.get(String(id || ''));
+    if (!node || !isVisible(node) || !disclosureAdapter) {
+      return result('set_ui_control_expanded', false, '官网控件已变化，请刷新结构后重试。');
+    }
+    return disclosureAdapter.setExpanded(
+      node, id, expanded, emitEvent, result,
+      () => emitSnapshot(emitEvent, true)
+    );
+  }
+
   window.__elonChatGptLayout = Object.freeze({
     emitSnapshot,
     invoke,
     pageKind,
     requestSemanticTouch,
     selectChoice,
+    setExpanded,
     setSelected,
     setSliderValue,
     setText

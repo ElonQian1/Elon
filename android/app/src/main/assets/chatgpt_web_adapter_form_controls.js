@@ -16,6 +16,8 @@
     '[role="combobox"]',
     '[role="checkbox"]',
     '[role="radio"]',
+    '[role="menuitemcheckbox"]',
+    '[role="menuitemradio"]',
     '[role="switch"]',
     '[role="slider"]'
   ].join(', ');
@@ -43,8 +45,8 @@
     const tag = tagName(node);
     if (explicitRole === 'slider') return 'range';
     if (explicitRole === 'switch') return 'switch';
-    if (explicitRole === 'checkbox') return 'checkbox';
-    if (explicitRole === 'radio') return 'radio';
+    if (explicitRole === 'checkbox' || explicitRole === 'menuitemcheckbox') return 'checkbox';
+    if (explicitRole === 'radio' || explicitRole === 'menuitemradio') return 'radio';
     if (explicitRole === 'combobox' || tag === 'select') return 'select';
     if (node && node.isContentEditable) return 'contenteditable';
     if (tag === 'textarea') return 'textarea';
@@ -54,7 +56,10 @@
 
   function role(node) {
     const explicit = attribute(node, 'role').toLowerCase();
-    if (['textbox', 'combobox', 'checkbox', 'radio', 'switch', 'slider'].includes(explicit)) return explicit;
+    if ([
+      'textbox', 'combobox', 'checkbox', 'radio', 'menuitemcheckbox',
+      'menuitemradio', 'switch', 'slider'
+    ].includes(explicit)) return explicit;
     const kind = inputKind(node);
     if (kind === 'select') return 'combobox';
     if (kind === 'checkbox') return 'checkbox';
@@ -122,7 +127,9 @@
       writable,
       sensitive,
       selected: !!(node && node.checked) || attribute(node, 'aria-checked') === 'true',
-      stateSettable: ['checkbox', 'radio', 'switch'].includes(resolvedRole) && !isDisabled(node),
+      stateSettable: [
+        'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio', 'switch'
+      ].includes(resolvedRole) && !isDisabled(node),
       choiceLabels,
       selectedChoiceIndex,
       sliderSettable: !!slider && !isDisabled(node) && !isReadOnly(node),
@@ -157,7 +164,9 @@
     const details = describe(node);
     if (!details || !details.stateSettable) return { ok: false, reason: 'not_settable' };
     const selected = rawSelected === true;
-    if (details.role === 'radio' && !selected) return { ok: false, reason: 'radio_cannot_clear' };
+    if (['radio', 'menuitemradio'].includes(details.role) && !selected) {
+      return { ok: false, reason: 'radio_cannot_clear' };
+    }
     return {
       ok: true,
       reason: '',

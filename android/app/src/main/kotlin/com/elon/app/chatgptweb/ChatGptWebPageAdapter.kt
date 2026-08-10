@@ -220,6 +220,13 @@ internal class ChatGptWebPageAdapter(
         numericValue = value,
     )
 
+    fun setUiControlExpanded(id: String, expanded: Boolean, requestId: String? = null) = runCommand(
+        action = "set_ui_control_expanded",
+        requestId = requestId,
+        controlId = id.take(MAX_UI_CONTROL_ID_LENGTH),
+        expanded = expanded,
+    )
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)
@@ -263,6 +270,7 @@ internal class ChatGptWebPageAdapter(
         selected: Boolean? = null,
         choiceIndex: Int? = null,
         numericValue: Double? = null,
+        expanded: Boolean? = null,
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
@@ -275,6 +283,7 @@ internal class ChatGptWebPageAdapter(
                 if (selected != null) put("selected", selected)
                 if (choiceIndex != null) put("choiceIndex", choiceIndex)
                 if (numericValue != null && numericValue.isFinite()) put("numericValue", numericValue)
+                if (expanded != null) put("expanded", expanded)
             }
             .toString()
         val encoded = JSONObject.quote(command)
@@ -288,7 +297,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 33
+        internal const val ADAPTER_VERSION = 34
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -301,6 +310,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_form_controls.js",
             "chatgpt_web_adapter_control_ownership_policy.js",
             "chatgpt_web_adapter_form_commands.js",
+            "chatgpt_web_adapter_disclosure_controls.js",
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_adapter.js",
         )

@@ -314,7 +314,7 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"ui_manifest_snapshot",
-                "version":7,
+                "version":8,
                 "pageKind":"feature",
                 "title":"设置",
                 "compatibility":"healthy",
@@ -323,7 +323,9 @@ class ChatGptWebProtocolTest {
                   {"id":"control_password_cd34","semantic":"text_input","label":"密码","region":"content","role":"textbox","inputKind":"password","writable":true},
                   {"id":"control_toggle_ef56","semantic":"toggle","label":"启用","region":"content","role":"checkbox","inputKind":"checkbox","writable":true,"stateSettable":true,"selected":true},
                   {"id":"control_model_gh78","semantic":"selection","label":"模型","region":"content","role":"combobox","inputKind":"select","choiceLabels":["快速","思考"],"selectedChoiceIndex":1},
-                  {"id":"control_effort_ij90","semantic":"slider","label":"思考强度","region":"content","role":"slider","inputKind":"range","sliderSettable":true,"sliderMin":0,"sliderMax":2,"sliderStep":0.5,"sliderValue":1.5}
+                  {"id":"control_effort_ij90","semantic":"slider","label":"思考强度","region":"content","role":"slider","inputKind":"range","sliderSettable":true,"sliderMin":0,"sliderMax":2,"sliderStep":0.5,"sliderValue":1.5},
+                  {"id":"control_menu_kl12","semantic":"toggle","label":"快速","region":"overlay","role":"menuitemradio","inputKind":"radio","stateSettable":true,"selected":true},
+                  {"id":"control_tree_mn34","semantic":"navigation","label":"项目","region":"content","role":"treeitem","expanded":false,"expandable":true}
                 ]
               }
             }
@@ -335,6 +337,8 @@ class ChatGptWebProtocolTest {
         val toggle = event.value.controls[2]
         val selection = event.value.controls[3]
         val slider = event.value.controls[4]
+        val menuRadio = event.value.controls[5]
+        val disclosure = event.value.controls[6]
         assertEquals("search", search.inputKind)
         assertTrue(search.supportsTextEntry)
         assertFalse(password.writable)
@@ -351,6 +355,9 @@ class ChatGptWebProtocolTest {
         assertEquals(2.0, slider.slider?.max ?: -1.0, 0.0)
         assertEquals(0.5, slider.slider?.step ?: -1.0, 0.0)
         assertEquals(1.5, slider.slider?.value ?: -1.0, 0.0)
+        assertTrue(menuRadio.supportsSelectedState)
+        assertEquals(false, disclosure.expanded)
+        assertTrue(disclosure.supportsExpandedState)
     }
 
     @Test
