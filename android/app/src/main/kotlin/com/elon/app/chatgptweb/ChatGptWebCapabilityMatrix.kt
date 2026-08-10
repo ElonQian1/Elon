@@ -19,9 +19,13 @@ internal object ChatGptWebCapabilityMatrix {
         val unknownCapabilities = (advertised - knownCapabilityIds).sorted()
         val unknownSemantics = (semantics.keys - ChatGptWebUiSemantics.KNOWN).sorted()
         val controlCoverage = ChatGptNativeControlPresentation.describe(manifest?.controls.orEmpty())
-        val fallbackControls = controlCoverage.values.count {
-            it.kind == ChatGptNativeControlPresentation.Kind.OFFICIAL_FALLBACK
+        val fallbackControls = manifest?.controls.orEmpty().filter { control ->
+            controlCoverage.getValue(control.id).kind == ChatGptNativeControlPresentation.Kind.OFFICIAL_FALLBACK
         }
+        val expectedFallbackControls = fallbackControls.filter(
+            ChatGptNativeControlPresentation::isExpectedOfficialFallback,
+        )
+        val unexpectedFallbackControls = fallbackControls - expectedFallbackControls.toSet()
         val rows = DEFINITIONS.map { definition ->
             val observed = when (definition.id) {
                 SESSION_LOGIN -> snapshot?.authenticated == true
@@ -57,7 +61,9 @@ internal object ChatGptWebCapabilityMatrix {
             }
             if (unknownCapabilities.isNotEmpty()) add("unknown_capabilities")
             if (unknownSemantics.isNotEmpty()) add("unknown_semantics")
-            if (fallbackControls > 0) add("official_fallback_controls_present")
+            if (unexpectedFallbackControls.isNotEmpty()) {
+                add("unexpected_official_fallback_controls_present")
+            }
         }
         return JSONObject()
             .put("control_ok", true)
@@ -88,7 +94,9 @@ internal object ChatGptWebCapabilityMatrix {
                     "native_menu_control_count",
                     controlCoverage.values.count { it.kind == ChatGptNativeControlPresentation.Kind.MENU },
                 )
-                .put("official_fallback_control_count", fallbackControls)
+                .put("official_fallback_control_count", fallbackControls.size)
+                .put("expected_official_fallback_control_count", expectedFallbackControls.size)
+                .put("unexpected_official_fallback_control_count", unexpectedFallbackControls.size)
             )
             .put("capabilities", JSONArray(rows))
             .put("control_coverage", JSONArray().apply {
@@ -99,6 +107,16 @@ internal object ChatGptWebCapabilityMatrix {
                         .put("semantic", control.semantic)
                         .put("region", control.region)
                         .put("presentation", coverage.kind.wireName)
+                        .put(
+                            "official_fallback_policy",
+                            when {
+                                coverage.kind != ChatGptNativeControlPresentation.Kind.OFFICIAL_FALLBACK ->
+                                    JSONObject.NULL
+                                ChatGptNativeControlPresentation.isExpectedOfficialFallback(control) ->
+                                    "expected"
+                                else -> "review_required"
+                            },
+                        )
                         .put("native_adb_content_description", coverage.nativeSelector ?: JSONObject.NULL)
                         .put(
                             "native_trigger_content_description",

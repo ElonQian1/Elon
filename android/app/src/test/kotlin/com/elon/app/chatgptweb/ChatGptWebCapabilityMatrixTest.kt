@@ -15,7 +15,7 @@ class ChatGptWebCapabilityMatrixTest {
                     ChatGptWebCapabilityId.CURRENT_CONVERSATION,
                 ),
             ),
-            manifest = manifest("partial", "action"),
+            manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
             mode = ChatGptWebModeController.Mode.NATIVE,
         )
@@ -78,7 +78,7 @@ class ChatGptWebCapabilityMatrixTest {
 
         val matrix = ChatGptWebCapabilityMatrix.build(
             snapshot = dictating,
-            manifest = manifest("healthy", "action"),
+            manifest = manifest("partial", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
             mode = ChatGptWebModeController.Mode.WEB,
         )
@@ -102,14 +102,43 @@ class ChatGptWebCapabilityMatrixTest {
         )
 
         assertEquals(1, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
+        assertEquals(0, matrix.getJSONObject("manifest").getInt("expected_official_fallback_control_count"))
+        assertEquals(1, matrix.getJSONObject("manifest").getInt("unexpected_official_fallback_control_count"))
         assertEquals(
             "official_fallback",
             matrix.getJSONArray("control_coverage").getJSONObject(0).getString("presentation"),
         )
         assertEquals(
-            "official_fallback_controls_present",
+            "unexpected_official_fallback_controls_present",
             matrix.getJSONObject("adaptation_review").getJSONArray("reasons").getString(0),
         )
+    }
+
+    @Test
+    fun acceptsRealtimeVoiceAsAnIntentionalOfficialFallback() {
+        val voiceManifest = manifest("healthy", "voice_mode").copy(
+            controls = manifest("healthy", "voice_mode").controls.map {
+                it.copy(region = ChatGptWebUiRegion.COMPOSER)
+            },
+        )
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = voiceManifest,
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        val manifest = matrix.getJSONObject("manifest")
+        assertEquals(1, manifest.getInt("official_fallback_control_count"))
+        assertEquals(1, manifest.getInt("expected_official_fallback_control_count"))
+        assertEquals(0, manifest.getInt("unexpected_official_fallback_control_count"))
+        assertEquals(
+            "expected",
+            matrix.getJSONArray("control_coverage").getJSONObject(0)
+                .getString("official_fallback_policy"),
+        )
+        assertFalse(matrix.getJSONObject("adaptation_review").getBoolean("required"))
     }
 
     @Test

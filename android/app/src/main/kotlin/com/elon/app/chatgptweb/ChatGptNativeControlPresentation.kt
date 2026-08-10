@@ -91,6 +91,9 @@ internal object ChatGptNativeControlPresentation {
 
     fun usesHeaderIcon(control: ChatGptWebUiControl): Boolean = control.semantic == "sources"
 
+    fun isExpectedOfficialFallback(control: ChatGptWebUiControl): Boolean =
+        control.region == ChatGptWebUiRegion.COMPOSER && control.semantic == "voice_mode"
+
     fun messageActions(controls: List<ChatGptWebUiControl>): Map<String, List<ChatGptWebUiControl>> =
         controls.asSequence()
             .filter { it.region == ChatGptWebUiRegion.MESSAGE && it.contextId != null }
