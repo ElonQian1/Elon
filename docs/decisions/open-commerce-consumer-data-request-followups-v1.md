@@ -2,8 +2,8 @@
 title: 开放商业消费者删除请求催办与升级关注 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者删除请求催办与升级关注 V1
@@ -30,7 +30,8 @@ implementation_status: implementation_uncompiled
 - 升级关注不会创建平台客服工单、争议、仲裁、处罚、赔付、退款或信誉分。
 - 催办和升级不证明商户、ERP、CRM、美团或会员系统已删除数据。
 - 跟进记录当前不进入 V5 可携带包，也不跨运营方迁移。
-- 当前代码未编译，未执行 V163 迁移、并发、时间边界、HTTP 或 PC 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证 V163 重复迁移与级联删除、24 小时和 7 天边界、跨时区与错误时间失败关闭、三次催办、幂等冲突、终态重放、并发催办与升级、隔离、审计元数据和商户限量前优先级；状态为 `verified_rust_sqlite`。
+- 全 Rust 目标检查通过。HTTP 实例、真实 V162 磁盘升级、完整 V5 历史包字节、PC 浏览器和窄屏布局仍未验证；开放商业广域回归还存在与本批无改动路径的开发者事件流既有失败。
 
 ## 实现入口
 
@@ -39,6 +40,7 @@ implementation_status: implementation_uncompiled
 - `server/src/open_commerce_data_request_model.rs`
 - `server/src/open_commerce_data_request_service.rs`
 - `server/src/open_commerce_data_request_api.rs`
+- `server/src/open_commerce_data_request_followup_tests.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerDataRequestManager.tsx`
 - `pc-frontend/src/features/open-commerce/MerchantDataRequestInbox.tsx`
 - `docs/open-commerce-consumer-data-request-followups-v1-acceptance.md`
