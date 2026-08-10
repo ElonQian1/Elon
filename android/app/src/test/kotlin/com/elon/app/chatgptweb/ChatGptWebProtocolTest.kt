@@ -202,6 +202,11 @@ class ChatGptWebProtocolTest {
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"list_navigation","xRatio":0.5,"yRatio":0.5}}""",
             ) is ChatGptWebEvent.WebTouchRequest,
         )
+        assertTrue(
+            ChatGptWebProtocol.parse(
+                """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"open_model_submenu","xRatio":0.5,"yRatio":0.5}}""",
+            ) is ChatGptWebEvent.WebTouchRequest,
+        )
         assertNull(
             ChatGptWebProtocol.parse(
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"list_composer_tools","xRatio":1.5,"yRatio":0.5}}""",

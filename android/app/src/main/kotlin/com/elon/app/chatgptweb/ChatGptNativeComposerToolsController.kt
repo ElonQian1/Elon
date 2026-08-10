@@ -112,11 +112,11 @@ internal class ChatGptNativeComposerToolsController(
             title = title,
             section = section.wireName,
             options = options,
-            singleChoice = section == Section.MODEL,
+            singleChoice = usesSingleChoice(section, options),
             cancelLabel = R.string.chatgpt_web_cancel,
             officialLabel = R.string.chatgpt_native_open_official,
             onSelected = { option ->
-                pendingSection = null
+                pendingSection = if (option.opensSubmenu) section else null
                 if (section == Section.MODEL) {
                     onSelectModelOption(option.id)
                 } else {
@@ -138,6 +138,13 @@ internal class ChatGptNativeComposerToolsController(
 
     private fun isAttachmentOption(option: ChatGptWebComposerOption): Boolean {
         return ChatGptWebComposerOptionSemantics.isAttachment(option.semantic)
+    }
+
+    private fun usesSingleChoice(
+        section: Section,
+        options: List<ChatGptWebComposerOption>,
+    ): Boolean = section == Section.MODEL && options.isNotEmpty() && options.all {
+        !it.opensSubmenu && it.kind in SINGLE_CHOICE_ROLES
     }
 
     private fun updateControls() {
@@ -163,5 +170,6 @@ internal class ChatGptNativeComposerToolsController(
             "collect_model_options",
             "collect_composer_tools",
         )
+        val SINGLE_CHOICE_ROLES = setOf("menuitemradio", "option")
     }
 }

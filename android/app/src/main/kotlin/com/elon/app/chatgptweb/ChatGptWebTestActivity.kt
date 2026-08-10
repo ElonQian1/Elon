@@ -232,8 +232,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onSelectModelOption = { pageAdapter.selectModelOption(it) },
             onSelectTool = { pageAdapter.selectComposerTool(it) },
             onDismissMenu = { pageAdapter.dismissComposerMenu() },
-            onOpenOfficialModelSelector = { modeController.select(ChatGptWebModeController.Mode.WEB) },
-            onOpenOfficialTools = { modeController.select(ChatGptWebModeController.Mode.WEB) },
+            onOpenOfficialModelSelector = { openOfficialComposerOptions("model") },
+            onOpenOfficialTools = { openOfficialComposerOptions("tools") },
         )
         attachmentController = ChatGptNativeAttachmentController(
             scrollView = binding.chatGptNativeAttachmentsScroll,
@@ -587,6 +587,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::collectComposerTools,
                     COMPOSER_MENU_SETTLE_MS,
                 )
+                "open_model_submenu" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::collectModelOptions,
+                    COMPOSER_MENU_SETTLE_MS,
+                )
+                "open_composer_tools_submenu" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::collectComposerTools,
+                    COMPOSER_MENU_SETTLE_MS,
+                )
                 "list_navigation" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::collectFeatures,
                     NAVIGATION_SETTLE_MS,
@@ -641,6 +649,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 ChatGptWebModeController.Mode.WEB -> R.string.chatgpt_web_ready
             },
         )
+    }
+
+    private fun openOfficialComposerOptions(section: String) {
+        modeController.select(ChatGptWebModeController.Mode.WEB)
+        binding.chatGptWebView.postDelayed({
+            if (section == "model") pageAdapter.listModelOptions()
+            else pageAdapter.listComposerTools()
+        }, COMPOSER_MENU_SETTLE_MS)
     }
 
     private fun statusWithProxy(messageResource: Int): String =

@@ -38,6 +38,10 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
         assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
         assertTrue(adapter.contains("semantic: optionSemantic(section, node, label)"))
+        assertTrue(adapter.contains("opensSubmenu: opensSubmenu(node)"))
+        assertTrue(adapter.contains("open_model_submenu"))
+        assertTrue(adapter.contains("open_composer_tools_submenu"))
+        assertTrue(adapter.contains("if (!target.opensSubmenu) window.setTimeout(scheduleSnapshot"))
         assertTrue(adapter.contains("deep_research"))
         assertTrue(adapter.contains("attachment_camera"))
         assertTrue(adapter.contains("web_search"))
@@ -109,6 +113,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(controller.contains("ChatGptWebCapabilityId.ATTACHMENTS"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.COMPOSER_TOOLS"))
         assertTrue(controller.contains("ChatGptWebComposerOptionSemantics.isAttachment"))
+        assertTrue(controller.contains("usesSingleChoice(section, options)"))
+        assertTrue(controller.contains("pendingSection = if (option.opensSubmenu) section else null"))
         assertFalse(controller.contains("ATTACHMENT_LABELS"))
         assertTrue(controller.contains("bridgeReady && capabilities.supports"))
         val voiceController = readRepositoryFile(
@@ -137,10 +143,13 @@ class ChatGptWebComposerContractTest {
         assertTrue(dispatcher.contains("supportsEnhancedMode(webView.url)"))
         assertTrue(dispatcher.contains("webView.dispatchTouchEvent(down)"))
         assertTrue(dispatcher.contains("webView.dispatchTouchEvent(up)"))
+        assertTrue(dispatcher.contains("open_model_submenu"))
+        assertTrue(dispatcher.contains("open_composer_tools_submenu"))
         assertFalse(dispatcher.contains("Instrumentation"))
         assertFalse(dispatcher.contains("AccessibilityService"))
         assertTrue(activity.contains("pageAdapter::collectModelOptions"))
         assertTrue(activity.contains("pageAdapter::collectComposerTools"))
+        assertTrue(activity.contains("openOfficialComposerOptions(\"model\")"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

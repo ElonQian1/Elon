@@ -39,6 +39,8 @@ internal class ChatGptWebTouchDispatcher(
             "list_composer_tools",
             "select_model_option",
             "select_composer_tool",
+            "open_model_submenu",
+            "open_composer_tools_submenu",
             "open_model_selector",
             "open_composer_tools",
             "start_dictation",

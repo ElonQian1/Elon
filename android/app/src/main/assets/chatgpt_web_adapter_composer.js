@@ -212,7 +212,9 @@
   }
 
   function currentModel(composer) {
-    return nodeLabel(findModelButton(composer)).slice(0, 80);
+    const button = findModelButton(composer);
+    const visibleLabel = cleanText(button && button.textContent);
+    return (visibleLabel || nodeLabel(button)).slice(0, 80);
   }
 
   function optionId(section, label, occurrence) {
@@ -375,11 +377,20 @@
     if (!target || !isVisible(target.node)) {
       return result(action, false, '官网菜单已经关闭，请重新选择。');
     }
-    if (!emitTouchRequest(action, target.node, emitEvent)) {
+    const submenuPurpose = section === 'model' ? 'open_model_submenu' : 'open_composer_tools_submenu';
+    const purpose = target.opensSubmenu ? submenuPurpose : action;
+    if (target.opensSubmenu) {
+      pendingOptions[section] = {
+        baseline: new Set(visibleOptionNodes()),
+        trigger: target.node
+      };
+    }
+    if (!emitTouchRequest(purpose, target.node, emitEvent)) {
+      if (target.opensSubmenu) pendingOptions[section] = null;
       return result(action, false, '官网选项当前不可见。');
     }
     result(action, true, '');
-    window.setTimeout(scheduleSnapshot, 240);
+    if (!target.opensSubmenu) window.setTimeout(scheduleSnapshot, 240);
   }
 
   function ownsOptionNode(node) {
