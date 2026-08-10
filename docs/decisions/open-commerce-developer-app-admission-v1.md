@@ -2,8 +2,8 @@
 title: 开放商业开发者 App 可撤销准入审查 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-11
+implementation_status: implementation_compiled_local_state_and_http_subset
 ---
 
 # 开放商业开发者 App 可撤销准入审查 V1
