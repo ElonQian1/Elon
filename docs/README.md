@@ -24,6 +24,7 @@
 | PC Web 工作台 | `docs/pc-frontend-migration.md` | `/pc`、React/Vite、项目文档工作台 |
 | 后台多端 UI 设计 | `docs/headless-ui-design-mcp.md` | AI 无需打开画布即可发现、捕获和读取 Web/PWA/Tauri/Android 页面 |
 | Windows 节点 | `docs/node-agent-upgrade-compatibility.md` | 本机节点、数据目录、升级和离线行为 |
+| 跨项目 Rust 缓存 | `docs/rust-cache-on-demand-adoption.md` | 重复 worktree 缓存、命名共享分区、渐进启用与回滚 |
 | Android 客户端 | `docs/android-setup.md` | APK、Compose、真机渲染与发布 |
 | 分布式算力联邦 | `docs/distributed-compute/README.md` | 用户节点、外部矿池、按需插件、任务调度和期货锁价结算 |
 | AI 与上下文 | `AGENTS.md` | 跨供应商入口、按需指令、Prompt/Agent/Skill |

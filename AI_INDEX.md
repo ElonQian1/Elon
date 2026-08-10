@@ -110,6 +110,7 @@
 | 任务 | 命令 |
 |---|---|
 | 任务预检并创建隔离 worktree | `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree` |
+| 跨项目 Rust 缓存、重复 worktree 分区、按需共享接入与回滚 | `docs/rust-cache-on-demand-adoption.md`、`docs/rust-cache-platform.md`、`scripts/rust-cache.ps1` |
 | 发布前代码已推送检查 | `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed` |
 | 后端发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-server.ps1` |
 | PC 前端本地预览 | `powershell -ExecutionPolicy Bypass -File scripts\start-pc-frontend-dev.ps1` |

@@ -1,6 +1,6 @@
 # Windows 多项目 Rust 编译缓存平台
 
-最后更新：2026-07-17
+最后更新：2026-08-10
 
 ## 目标
 
@@ -11,6 +11,8 @@
 3. 旧缓存失去写入者后没有登记、退役和安全清理流程。
 
 `bb64a` 和 `elon cli` 是首批参考接入项目，不是平台边界。任何项目都可通过根目录的 `rust-cache.project.json` 注册。
+
+新增项目、处理大量 worktree 重复缓存或逐步启用命名共享分区时，按需读取 `docs/rust-cache-on-demand-adoption.md`。该文档是跨项目接入、风险、启用顺序与回滚的唯一事实源；项目仓库只维护本地状态和入口。
 
 NodeAgent 发布为 Windows、显式 Linux 和 Desktop 壳分别使用稳定命名分区，并由同一分区锁串行化。这样即使 `sccache` 暂时不可用，依赖编译产物也能跨 worktree 复用；普通开发构建仍保持 worktree 隔离。
 
@@ -99,6 +101,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
   -ProjectRoot . -Domain dev-windows-msvc `
   check --manifest-path server\Cargo.toml --locked
 ```
+
+默认仍按 workspace 隔离。只有完成按需接入审查的入口才传稳定命名分区：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
+  -ProjectRoot . -Domain dev-windows-msvc `
+  -SharedBuildPartition dev-windows `
+  check --manifest-path server\Cargo.toml --locked
+```
+
+命名共享分区必须持有平台锁，不能和 `-NoLock` 同用。运行时会输出 `RUST_CACHE_SCOPE` 与 `RUST_CACHE_PARTITION` 供日志审计。
 
 一龙仓库日常验证继续使用稳定入口，它已委托给平台：
 
