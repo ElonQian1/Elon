@@ -195,15 +195,40 @@ fn apply_operational_fields(
 ) -> Result<()> {
     let requested_at = parse_time(&request.requested_at, "requested_at")?;
     let now_at = parse_time(current_time, "current_time")?;
-    let target_at = requested_at + Duration::days(OPERATIONAL_TARGET_DAYS);
-    let first_reminder_at = requested_at + Duration::hours(FIRST_REMINDER_DELAY_HOURS);
+    if requested_at > now_at {
+        bail!("消费者数据请求 requested_at 时间不能晚于当前时间");
+    }
+    if summary.reminder_count > MAX_REMINDERS {
+        bail!("消费者数据请求 reminder_count 超出有效范围");
+    }
+    let target_at = requested_at
+        .checked_add_signed(Duration::days(OPERATIONAL_TARGET_DAYS))
+        .context("消费者数据请求 operational_target_at 时间超出有效范围")?;
+    let first_reminder_at = requested_at
+        .checked_add_signed(Duration::hours(FIRST_REMINDER_DELAY_HOURS))
+        .context("消费者数据请求 first_reminder_at 时间超出有效范围")?;
     let next_reminder = summary
         .last_reminded_at
         .as_deref()
         .map(|value| parse_time(value, "last_reminded_at"))
         .transpose()?
-        .map(|value| value + Duration::hours(REMINDER_COOLDOWN_HOURS))
+        .map(|value| {
+            ensure_followup_time_in_range(&value, &requested_at, &now_at, "last_reminded_at")?;
+            value
+                .checked_add_signed(Duration::hours(REMINDER_COOLDOWN_HOURS))
+                .context("消费者数据请求 next_reminder_at 时间超出有效范围")
+        })
+        .transpose()?
         .unwrap_or(first_reminder_at);
+    if let Some(escalated_at) = summary.escalated_at.as_deref() {
+        let escalated_at = parse_time(escalated_at, "consumer_escalated_at")?;
+        ensure_followup_time_in_range(
+            &escalated_at,
+            &requested_at,
+            &now_at,
+            "consumer_escalated_at",
+        )?;
+    }
     let open = is_open(&request.status);
 
     request.operational_target_at = Some(target_at.to_rfc3339());
@@ -234,4 +259,16 @@ fn parse_time(value: &str, label: &str) -> Result<DateTime<Utc>> {
     Ok(DateTime::parse_from_rfc3339(value.trim())
         .with_context(|| format!("消费者数据请求 {label} 时间无效"))?
         .with_timezone(&Utc))
+}
+
+fn ensure_followup_time_in_range(
+    value: &DateTime<Utc>,
+    requested_at: &DateTime<Utc>,
+    current_time: &DateTime<Utc>,
+    label: &str,
+) -> Result<()> {
+    if value < requested_at || value > current_time {
+        bail!("消费者数据请求 {label} 时间超出有效范围");
+    }
+    Ok(())
 }

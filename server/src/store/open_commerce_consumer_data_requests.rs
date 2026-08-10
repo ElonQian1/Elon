@@ -118,14 +118,25 @@ impl Store {
         let mut stmt = conn.prepare(&format!(
             "{DATA_REQUEST_SELECT}
               WHERE merchant_project_id=?1 AND merchant_id=?2
-              ORDER BY CASE status
-                WHEN 'requested' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
-                updated_at DESC, rowid DESC LIMIT ?3"
+              ORDER BY CASE
+                WHEN status IN ('requested', 'in_progress') AND EXISTS (
+                  SELECT 1 FROM open_commerce_data_request_followups followup
+                   WHERE followup.data_request_id=open_commerce_consumer_data_requests.id
+                     AND followup.action_kind='escalate_attention'
+                ) THEN 0
+                WHEN status IN ('requested', 'in_progress')
+                 AND julianday(requested_at) <= julianday(?3, '-7 days') THEN 1
+                WHEN status='requested' THEN 2
+                WHEN status='in_progress' THEN 3
+                ELSE 4
+              END,
+              updated_at DESC, rowid DESC LIMIT ?4"
         ))?;
         let rows = stmt.query_map(
             params![
                 merchant_project_id.trim(),
                 merchant_id.trim(),
+                now(),
                 limit.clamp(1, 200) as i64
             ],
             data_request_from_row,

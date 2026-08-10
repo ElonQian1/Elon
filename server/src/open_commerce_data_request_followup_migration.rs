@@ -35,3 +35,65 @@ pub(crate) fn migration_v163(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migration_upgrades_predecessor_schema_idempotently_and_cascades() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+             CREATE TABLE users(id TEXT PRIMARY KEY);
+             CREATE TABLE projects(id TEXT PRIMARY KEY);
+             CREATE TABLE open_commerce_merchants(id TEXT PRIMARY KEY);
+             CREATE TABLE open_commerce_consumer_data_requests(id TEXT PRIMARY KEY);
+             INSERT INTO users(id) VALUES ('consumer');
+             INSERT INTO projects(id) VALUES ('consumer-project'), ('merchant-project');
+             INSERT INTO open_commerce_merchants(id) VALUES ('merchant');
+             INSERT INTO open_commerce_consumer_data_requests(id) VALUES ('request');",
+        )
+        .unwrap();
+
+        migration_v163(&conn).unwrap();
+        migration_v163(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO open_commerce_data_request_followups (
+               id, data_request_id, consumer_project_id, consumer_user_id,
+               merchant_project_id, merchant_id, action_kind, idempotency_key,
+               note, created_at
+             ) VALUES (
+               'followup', 'request', 'consumer-project', 'consumer',
+               'merchant-project', 'merchant', 'reminder', 'key', NULL,
+               '2026-08-01T00:00:00Z'
+             )",
+            [],
+        )
+        .unwrap();
+
+        let index_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                  WHERE type='index'
+                    AND name LIKE 'idx_open_commerce_data_request_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 3);
+        conn.execute(
+            "DELETE FROM open_commerce_consumer_data_requests WHERE id='request'",
+            [],
+        )
+        .unwrap();
+        let followup_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM open_commerce_data_request_followups",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(followup_count, 0);
+    }
+}

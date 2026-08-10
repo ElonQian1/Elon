@@ -390,3 +390,6 @@ fn assert_no_private_identity(value: &Value, user_id: &str, project_id: &str) {
     assert!(!serialized.contains(user_id));
     assert!(!serialized.contains(project_id));
 }
+
+#[path = "open_commerce_data_request_followup_tests.rs"]
+mod followup_tests;
