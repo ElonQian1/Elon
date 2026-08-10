@@ -74,6 +74,7 @@ impl ConsumerRankingPolicy {
         capabilities.into_iter().min_by(|left, right| match self {
             Self::PreferenceMatch => preference_score(right, preferences)
                 .cmp(&preference_score(left, preferences))
+                .then_with(|| left.unit_price_micros.cmp(&right.unit_price_micros))
                 .then_with(|| capability_tie_break(left, right)),
             Self::LowestUnitPrice => left
                 .unit_price_micros
@@ -84,13 +85,23 @@ impl ConsumerRankingPolicy {
                 .then_with(|| capability_tie_break(left, right)),
             Self::PublicAccessFirst => access_rank(&left.access_level)
                 .cmp(&access_rank(&right.access_level))
+                .then_with(|| {
+                    preference_score(right, preferences).cmp(&preference_score(left, preferences))
+                })
                 .then_with(|| left.unit_price_micros.cmp(&right.unit_price_micros))
                 .then_with(|| capability_tie_break(left, right)),
             Self::RecentlyUpdated => right
                 .updated_at
                 .cmp(&left.updated_at)
+                .then_with(|| {
+                    preference_score(right, preferences).cmp(&preference_score(left, preferences))
+                })
+                .then_with(|| left.unit_price_micros.cmp(&right.unit_price_micros))
                 .then_with(|| capability_tie_break(left, right)),
-            Self::MerchantName => capability_tie_break(left, right),
+            Self::MerchantName => preference_score(right, preferences)
+                .cmp(&preference_score(left, preferences))
+                .then_with(|| left.unit_price_micros.cmp(&right.unit_price_micros))
+                .then_with(|| capability_tie_break(left, right)),
         })
     }
 

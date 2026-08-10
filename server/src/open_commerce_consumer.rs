@@ -699,3 +699,11 @@ mod filter_test_support;
 #[cfg(test)]
 #[path = "open_commerce_consumer_filter_tests.rs"]
 mod filter_tests;
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_ranking_test_support.rs"]
+mod ranking_test_support;
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_ranking_tests.rs"]
+mod ranking_tests;

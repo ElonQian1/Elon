@@ -167,7 +167,7 @@ impl Store {
                      AND c.access_level != 'owner_only'
                      AND (?2 IS NULL OR c.capability_key = ?2)
                 )
-              ORDER BY p.updated_at DESC, m.updated_at DESC LIMIT ?3",
+              ORDER BY p.updated_at DESC, m.updated_at DESC, m.id ASC LIMIT ?3",
         )?;
         let merchant_ids = stmt
             .query_map(
