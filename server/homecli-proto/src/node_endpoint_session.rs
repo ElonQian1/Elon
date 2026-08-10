@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-pub const NODE_ENDPOINT_SESSION_PROTO_VERSION: u32 = 13;
+/// Historical authentication-only endpoint protocol. Its wire meaning is frozen.
+pub const NODE_ENDPOINT_SESSION_V1_PROTO_VERSION: u32 = 13;
 pub const NODE_ENDPOINT_SESSION_REGISTER_V1_TYPE: &str = "node_endpoint_session_register_v1";
 pub const NODE_ENDPOINT_SESSION_ACCEPTED_V1_TYPE: &str = "node_endpoint_session_accepted_v1";
 pub const NODE_ENDPOINT_SESSION_REGISTER_V1_SCHEMA: &str = "elon.node_endpoint_session.register.v1";
@@ -57,7 +58,7 @@ impl NodeEndpointSessionRegisterV1 {
             credential_revision: fields.credential_revision,
             credential_digest: fields.credential_digest,
             agent_version: fields.agent_version,
-            protocol_version: NODE_ENDPOINT_SESSION_PROTO_VERSION,
+            protocol_version: NODE_ENDPOINT_SESSION_V1_PROTO_VERSION,
         })
     }
 
@@ -65,7 +66,7 @@ impl NodeEndpointSessionRegisterV1 {
         if self.message_type != NODE_ENDPOINT_SESSION_REGISTER_V1_TYPE
             || self.schema != NODE_ENDPOINT_SESSION_REGISTER_V1_SCHEMA
             || self.session_mode != NODE_ENDPOINT_SESSION_MODE_COMPUTE_INERT
-            || self.protocol_version != NODE_ENDPOINT_SESSION_PROTO_VERSION
+            || self.protocol_version != NODE_ENDPOINT_SESSION_V1_PROTO_VERSION
         {
             return Err("NODE_ENDPOINT_SESSION_REGISTER_CONTRACT_INVALID");
         }
@@ -164,7 +165,7 @@ impl NodeEndpointSessionAcceptedV1 {
             credential_digest: fields.credential_digest,
             installation_binding_digest: fields.installation_binding_digest,
             agent_version: fields.agent_version,
-            protocol_version: NODE_ENDPOINT_SESSION_PROTO_VERSION,
+            protocol_version: NODE_ENDPOINT_SESSION_V1_PROTO_VERSION,
             session_id: fields.session_id,
             session_generation: fields.session_generation,
             authentication_receipt_id: fields.authentication_receipt_id,
@@ -184,7 +185,7 @@ impl NodeEndpointSessionAcceptedV1 {
             || !self.accepted
             || self.session_mode != NODE_ENDPOINT_SESSION_MODE_COMPUTE_INERT
             || self.compute_authority
-            || self.protocol_version != NODE_ENDPOINT_SESSION_PROTO_VERSION
+            || self.protocol_version != NODE_ENDPOINT_SESSION_V1_PROTO_VERSION
             || self.capability_count != 0
         {
             return Err("NODE_ENDPOINT_SESSION_ACCEPTED_CONTRACT_INVALID");

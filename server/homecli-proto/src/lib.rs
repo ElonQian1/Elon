@@ -61,9 +61,14 @@ pub use node_endpoint_session::{
     NodeEndpointSessionRegisterV1, NodeEndpointSessionRegisterV1Fields,
     NODE_ENDPOINT_SESSION_ACCEPTED_V1_SCHEMA, NODE_ENDPOINT_SESSION_ACCEPTED_V1_TYPE,
     NODE_ENDPOINT_SESSION_MAX_LIFETIME_MS, NODE_ENDPOINT_SESSION_MODE_COMPUTE_INERT,
-    NODE_ENDPOINT_SESSION_PROTO_VERSION, NODE_ENDPOINT_SESSION_REGISTER_V1_SCHEMA,
-    NODE_ENDPOINT_SESSION_REGISTER_V1_TYPE, NODE_ENDPOINT_SESSION_RENEWAL_MARGIN_MS,
+    NODE_ENDPOINT_SESSION_REGISTER_V1_SCHEMA, NODE_ENDPOINT_SESSION_REGISTER_V1_TYPE,
+    NODE_ENDPOINT_SESSION_RENEWAL_MARGIN_MS, NODE_ENDPOINT_SESSION_V1_PROTO_VERSION,
 };
+mod node_endpoint_session_v2;
+pub use node_endpoint_session_v2::*;
+mod node_endpoint_planning_bootstrap;
+pub use node_endpoint_planning_bootstrap::*;
+mod node_endpoint_wire;
 pub const PROTO_VERSION: u32 = NODE_ENDPOINT_SESSION_PROTO_VERSION;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
