@@ -1,12 +1,14 @@
 # 消费者 AI 本人 App 目录 MCP V1
 
-状态：已接受；代码已形成，尚未编译或测试。
+状态：已接受、已实现，并通过本地 Rust、SQLite 与 MCP 假数据验收。
 
 ## 决策
 
 新增只读工具 `open_commerce_list_my_consumer_apps`，让消费者 AI 查看当前项目中由当前用户拥有的开发者 App，并选择后续 MCP 连接应固定的 `x-elon-app-id`。
 
 响应只包含 App 记录 ID、App ID、显示名、启停状态、沙箱/生产环境、资料状态、已声明范围和更新时间，并标记当前 MCP 身份及 App 是否可用于沙箱 MCP。其他项目成员拥有的 App 被过滤。
+
+默认 MCP 身份可以读取本人目录但不会被标记为注册 App。显式 `x-elon-app-id` 必须属于当前用户和当前项目，否则失败关闭；停用 App 仍可作为本人目录中的当前项展示，但只有 `active + sandbox` 的 App 才标记为可用于沙箱 MCP。
 
 ## 秘密边界
 
