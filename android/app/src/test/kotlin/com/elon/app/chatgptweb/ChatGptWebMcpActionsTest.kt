@@ -183,6 +183,30 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun uiStateConversationReportsGlobalWindowBoundsAndExportOffsets() {
+        val conversation = actions(
+            messageWindowStart = 20,
+            availableMessageCount = 80,
+            observedMessageCount = 100,
+        ).uiState().getJSONObject("conversation")
+        val messages = conversation.getJSONArray("messages")
+
+        assertEquals("elon.chatgpt_web.conversation_summary.v2", conversation.getString("schema"))
+        assertEquals(100, conversation.getInt("message_count"))
+        assertEquals(80, conversation.getInt("available_message_count"))
+        assertEquals(20, conversation.getInt("message_window_start"))
+        assertEquals(100, conversation.getInt("message_window_end"))
+        assertTrue(conversation.getBoolean("history_truncated"))
+        assertFalse(conversation.getBoolean("context_complete"))
+        assertEquals(50, conversation.getInt("exported_message_count"))
+        assertEquals(50, conversation.getInt("exported_message_offset"))
+        assertTrue(conversation.getBoolean("messages_truncated"))
+        assertEquals("chatgpt_get_context", conversation.getString("context_action"))
+        assertEquals(50, messages.getJSONObject(0).getInt("index"))
+        assertEquals(99, messages.getJSONObject(messages.length() - 1).getInt("index"))
+    }
+
+    @Test
     fun controlsAndConversationsCanBeFoundWithoutParsingTheWholeUiState() {
         val actions = actions()
 
@@ -333,7 +357,8 @@ class ChatGptWebMcpActionsTest {
         dictationActive: Boolean = false,
         messageParts: List<ChatGptWebMessagePart>? = null,
         messageWindowStart: Int = 0,
-        observedMessageCount: Int = messageWindowStart + 1,
+        availableMessageCount: Int = 1,
+        observedMessageCount: Int = messageWindowStart + availableMessageCount,
         onInvoke: (String) -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -347,16 +372,22 @@ class ChatGptWebMcpActionsTest {
             title = "工作",
             url = "https://chatgpt.com/c/demo",
             draft = "",
-            messages = listOf(ChatGptWebMessage(
-                id = "a1",
-                role = "assistant",
-                content = "完整回答内容",
-                state = "completed",
-                parts = messageParts ?: listOf(
-                    ChatGptWebMessagePart("image", "生成的图片"),
-                    ChatGptWebMessagePart("file", "分析结果.csv"),
-                ),
-            )),
+            messages = List(availableMessageCount) { index ->
+                ChatGptWebMessage(
+                    id = "a$index",
+                    role = "assistant",
+                    content = if (index == 0) "完整回答内容" else "回答 $index",
+                    state = "completed",
+                    parts = if (index == 0) {
+                        messageParts ?: listOf(
+                            ChatGptWebMessagePart("image", "生成的图片"),
+                            ChatGptWebMessagePart("file", "分析结果.csv"),
+                        )
+                    } else {
+                        emptyList()
+                    },
+                )
+            },
             authenticated = true,
             composerReady = true,
             streaming = false,
