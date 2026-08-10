@@ -339,6 +339,11 @@
     if (action === 'dismiss_navigation' && navigationAdapter) {
       return navigationAdapter.dismiss(emitEvent, respond);
     }
+    if (action === 'set_ui_control_text' && layoutAdapter) {
+      return layoutAdapter.setText(
+        String(command.controlId || ''), String(command.value || ''), emitEvent, respond
+      );
+    }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, respond);
     }

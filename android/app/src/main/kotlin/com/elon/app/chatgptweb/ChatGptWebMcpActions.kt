@@ -65,6 +65,18 @@ internal class ChatGptWebMcpActions(
                     commands.invokeControl(controlId, requestId)
                 }
             }
+            "chatgpt_set_control_text" -> {
+                val controlId = args.optString("control_id")
+                if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
+                val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
+                    ?: return error(action, "stale_control_id")
+                if (!control.supportsTextEntry) return error(action, "control_not_writable")
+                if (!args.has("text") || args.isNull("text")) return error(action, "missing_text")
+                val text = args.optString("text").take(MAX_INPUT_CHARS)
+                dispatch("set_ui_control_text") { requestId ->
+                    commands.setControlText(controlId, text, requestId)
+                }
+            }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
             "chatgpt_cancel_dictation" -> {
@@ -433,6 +445,8 @@ internal class ChatGptWebMcpActions(
         .put("role", control.role)
         .put("enabled", control.enabled)
         .put("selected", control.selected)
+        .put("input_kind", control.inputKind ?: JSONObject.NULL)
+        .put("writable", control.writable)
         .put("context_id", control.contextId ?: JSONObject.NULL)
         .put("in_viewport", control.inViewport)
         .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
@@ -496,6 +510,7 @@ internal class ChatGptWebMcpActions(
             "set_input_text",
             "send_input",
             "chatgpt_invoke_control",
+            "chatgpt_set_control_text",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
             "chatgpt_cancel_dictation",

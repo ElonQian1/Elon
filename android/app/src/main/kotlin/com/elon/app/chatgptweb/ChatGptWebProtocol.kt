@@ -283,6 +283,10 @@ internal object ChatGptWebProtocol {
                 val label = item.optString("label").trim().take(MAX_UI_CONTROL_LABEL_LENGTH)
                 val region = item.optString("region").takeIf { it in UI_REGIONS } ?: continue
                 val role = item.optString("role").takeIf { it in UI_ROLES } ?: "button"
+                val inputKind = item.optString("inputKind")
+                    .takeIf { it.isNotBlank() && it in UI_INPUT_KINDS }
+                val writable = item.optBoolean("writable") &&
+                    role == "textbox" && inputKind != null && inputKind in WRITABLE_UI_INPUT_KINDS
                 val contextId = item.optString("contextId")
                     .takeIf { it.isNotBlank() && UI_CONTEXT_ID.matches(it) }
                 val webXRatio = boundedRatio(item, "xRatio")
@@ -297,6 +301,8 @@ internal object ChatGptWebProtocol {
                         role = role,
                         enabled = item.optBoolean("enabled", true),
                         selected = item.optBoolean("selected"),
+                        inputKind = inputKind,
+                        writable = writable,
                         contextId = contextId,
                         inViewport = item.optBoolean("inViewport", true),
                         webXRatio = webXRatio,
@@ -430,7 +436,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_DISCOVERED_UI_CONTROLS = 10_000
     private const val MAX_UI_CONTROL_ID_LENGTH = 72
     private const val MAX_UI_CONTROL_LABEL_LENGTH = 160
-    private const val MAX_UI_MANIFEST_VERSION = 4
+    private const val MAX_UI_MANIFEST_VERSION = 5
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
@@ -458,7 +464,45 @@ internal object ChatGptWebProtocol {
         ChatGptWebUiRegion.MESSAGE,
         ChatGptWebUiRegion.CONTENT,
     )
-    private val UI_ROLES = setOf("button", "link", "menuitem", "switch", "tab")
+    private val UI_ROLES = setOf(
+        "button",
+        "link",
+        "menuitem",
+        "switch",
+        "tab",
+        "textbox",
+        "combobox",
+        "checkbox",
+        "radio",
+        "slider",
+    )
+    private val UI_INPUT_KINDS = setOf(
+        "text",
+        "search",
+        "email",
+        "url",
+        "tel",
+        "number",
+        "date",
+        "time",
+        "datetime-local",
+        "month",
+        "week",
+        "textarea",
+        "contenteditable",
+        "password",
+        "select",
+        "checkbox",
+        "radio",
+        "range",
+    )
+    private val WRITABLE_UI_INPUT_KINDS = UI_INPUT_KINDS - setOf(
+        "password",
+        "select",
+        "checkbox",
+        "radio",
+        "range",
+    )
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
     private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")

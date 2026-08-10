@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 internal interface ChatGptWebMcpCommandPort {
     fun sendInput(requestId: String)
     fun invokeControl(controlId: String, requestId: String)
+    fun setControlText(controlId: String, text: String, requestId: String)
     fun newConversation(requestId: String)
     fun stopGeneration(requestId: String)
     fun cancelDictation(requestId: String)

@@ -86,16 +86,61 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun writablePageTextControlsUseAReceiptWithoutExposingExistingValues() {
+        var target = ""
+        var written = ""
+        var dispatched = ""
+        val actions = actions(
+            includeWritableControl = true,
+            onSetControlText = { controlId, text ->
+                target = controlId
+                written = text
+            },
+            onDispatch = { action, _ -> dispatched = action },
+        )
+
+        val result = actions.control(
+            JSONObject()
+                .put("action", "chatgpt_set_control_text")
+                .put("control_id", "control_search_demo")
+                .put("text", "release notes"),
+        )
+        val control = actions.uiState().getJSONObject("ui_manifest")
+            .getJSONArray("controls").getJSONObject(2)
+
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals("control_search_demo", target)
+        assertEquals("release notes", written)
+        assertEquals("set_ui_control_text", dispatched)
+        assertEquals("search", control.getString("input_kind"))
+        assertTrue(control.getBoolean("writable"))
+        assertFalse(control.has("value"))
+
+        val rejected = actions.control(
+            JSONObject()
+                .put("action", "chatgpt_set_control_text")
+                .put("control_id", "control_suggestion_demo")
+                .put("text", "blocked"),
+        )
+        assertFalse(rejected.getBoolean("control_ok"))
+        assertEquals("control_not_writable", rejected.getString("error"))
+    }
+
+    @Test
     fun everyAcknowledgedWebCommandPassesItsReceiptIdToTheCommandPort() {
         val dispatched = mutableListOf<Pair<String, String>>()
         val actions = actions(
             dictationActive = true,
+            includeWritableControl = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
         val commands = listOf(
             JSONObject().put("action", "send_input") to "send_prompt",
             JSONObject().put("action", "chatgpt_invoke_control")
                 .put("control_id", "control_suggestion_demo") to "invoke_ui_control",
+            JSONObject().put("action", "chatgpt_set_control_text")
+                .put("control_id", "control_search_demo")
+                .put("text", "release notes") to "set_ui_control_text",
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
@@ -360,6 +405,8 @@ class ChatGptWebMcpActionsTest {
         availableMessageCount: Int = 1,
         observedMessageCount: Int = messageWindowStart + availableMessageCount,
         onInvoke: (String) -> Unit = {},
+        includeWritableControl: Boolean = false,
+        onSetControlText: (String, String) -> Unit = { _, _ -> },
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
         onRequestComposerOptions: (String) -> Unit = {},
@@ -405,8 +452,8 @@ class ChatGptWebMcpActionsTest {
             pageKind = "conversation",
             title = "工作",
             compatibility = "healthy",
-            controls = listOf(
-                ChatGptWebUiControl(
+            controls = buildList {
+                add(ChatGptWebUiControl(
                     id = "control_suggestion_demo",
                     semantic = "suggestion",
                     label = "整理待办",
@@ -417,8 +464,8 @@ class ChatGptWebMcpActionsTest {
                     inViewport = false,
                     webXRatio = 0.25,
                     webYRatio = 0.75,
-                ),
-                ChatGptWebUiControl(
+                ))
+                add(ChatGptWebUiControl(
                     id = "control_share_demo",
                     semantic = "share",
                     label = "分享",
@@ -427,8 +474,23 @@ class ChatGptWebMcpActionsTest {
                     enabled = true,
                     selected = false,
                     contextId = "conversation-turn-1",
-                ),
-            ),
+                ))
+                if (includeWritableControl) {
+                    add(
+                        ChatGptWebUiControl(
+                            id = "control_search_demo",
+                            semantic = "search",
+                            label = "搜索聊天",
+                            region = ChatGptWebUiRegion.CONTENT,
+                            role = "textbox",
+                            enabled = true,
+                            selected = false,
+                            inputKind = "search",
+                            writable = true,
+                        ),
+                    )
+                }
+            },
         )
         var nextCommandId = 0
         return ChatGptWebMcpActions(
@@ -477,6 +539,11 @@ class ChatGptWebMcpActionsTest {
                 override fun invokeControl(controlId: String, requestId: String) {
                     onInvoke(controlId)
                     onDispatch("invoke_ui_control", requestId)
+                }
+
+                override fun setControlText(controlId: String, text: String, requestId: String) {
+                    onSetControlText(controlId, text)
+                    onDispatch("set_ui_control_text", requestId)
                 }
 
                 override fun newConversation(requestId: String) =

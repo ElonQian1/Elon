@@ -307,6 +307,40 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun parsesWritableFormControlsWithoutAllowingCredentialInjection() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"ui_manifest_snapshot",
+                "version":5,
+                "pageKind":"feature",
+                "title":"设置",
+                "compatibility":"healthy",
+                "controls":[
+                  {"id":"control_search_ab12","semantic":"search","label":"搜索","region":"content","role":"textbox","inputKind":"search","writable":true},
+                  {"id":"control_password_cd34","semantic":"text_input","label":"密码","region":"content","role":"textbox","inputKind":"password","writable":true},
+                  {"id":"control_toggle_ef56","semantic":"toggle","label":"启用","region":"content","role":"checkbox","inputKind":"checkbox","writable":true,"selected":true}
+                ]
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.UiManifest
+
+        val search = event.value.controls[0]
+        val password = event.value.controls[1]
+        val toggle = event.value.controls[2]
+        assertEquals("search", search.inputKind)
+        assertTrue(search.supportsTextEntry)
+        assertFalse(password.writable)
+        assertFalse(password.supportsTextEntry)
+        assertEquals("checkbox", toggle.role)
+        assertTrue(toggle.selected)
+        assertFalse(toggle.writable)
+    }
+
+    @Test
     fun boundsLargeUiManifestsAndReportsDiscoveryTruncation() {
         val controls = (1..512).joinToString(",") { index ->
             """{"id":"control_action_$index","semantic":"action","label":"操作 $index","region":"content","role":"button"}"""

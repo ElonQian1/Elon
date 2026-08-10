@@ -59,6 +59,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             override fun invokeControl(controlId: String, requestId: String) =
                 invokeUiControl(controlId, requestId)
 
+            override fun setControlText(controlId: String, text: String, requestId: String) =
+                pageAdapter.setUiControlText(controlId, text, requestId)
+
             override fun newConversation(requestId: String) = pageAdapter.startNewConversation(requestId)
 
             override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)

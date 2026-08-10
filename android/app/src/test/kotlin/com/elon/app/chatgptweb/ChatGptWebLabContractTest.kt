@@ -47,6 +47,9 @@ class ChatGptWebLabContractTest {
         val pageSemanticPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js"
         )
+        val formControls = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_form_controls.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
@@ -56,6 +59,8 @@ class ChatGptWebLabContractTest {
         )
         assertTrue(
             bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_form_controls.js") &&
+                bridge.indexOf("chatgpt_web_adapter_form_controls.js") <
                 bridge.indexOf("chatgpt_web_adapter_layout.js")
         )
         assertFalse(bridge.contains("addJavascriptInterface"))
@@ -97,6 +102,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("action === 'send_prompt'"))
         assertTrue(adapter.contains("action === 'list_conversations'"))
         assertTrue(adapter.contains("action === 'open_conversation'"))
+        assertTrue(adapter.contains("action === 'set_ui_control_text'"))
         assertTrue(conversations.contains("if (location.pathname === '/')"))
         assertTrue(adapter.contains("action === 'regenerate_response'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
@@ -104,7 +110,12 @@ class ChatGptWebLabContractTest {
             assertFalse("page adapter must not contain $it", adapter.contains(it))
             assertFalse("conversation adapter must not contain $it", conversations.contains(it))
             assertFalse("message adapter must not contain $it", messages.contains(it))
+            assertFalse("form adapter must not contain $it", formControls.contains(it))
         }
+        assertTrue(formControls.contains("ACTIONABLE_SELECTOR"))
+        assertTrue(formControls.contains("function setText"))
+        assertTrue(formControls.contains("kind === 'password'"))
+        assertFalse(formControls.contains("node.value ||"))
         assertTrue(conversations.contains("CONVERSATION_PATH"))
         assertTrue(conversations.contains("location.assign(new URL(path, location.origin).href)"))
         assertFalse(conversations.contains("location.href ="))
@@ -215,6 +226,7 @@ class ChatGptWebLabContractTest {
         assertTrue(conversation.contains("fun submitFromMcp(requestId: String)"))
         assertTrue(commandPort.contains("fun sendInput(requestId: String)"))
         assertTrue(commandPort.contains("fun invokeControl(controlId: String, requestId: String)"))
+        assertTrue(commandPort.contains("fun setControlText(controlId: String, text: String, requestId: String)"))
     }
 
     @Test

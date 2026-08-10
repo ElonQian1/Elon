@@ -3,6 +3,7 @@
 
   if (window.__elonChatGptLayout || location.origin !== 'https://chatgpt.com') return;
 
+  const formAdapter = window.__elonChatGptFormControls;
   let controlsById = new Map();
   let lastFingerprint = '';
   const MAX_DISCOVERED_CONTROLS = 512;
@@ -75,11 +76,13 @@
   }
 
   function labelOf(node, fallback) {
+    const form = formAdapter && formAdapter.describe(node);
     const candidates = [
       node.innerText,
       node.getAttribute('aria-label'),
       node.getAttribute('title'),
-      node.getAttribute('data-testid')
+      node.getAttribute('data-testid'),
+      form && form.label
     ];
     const value = candidates.map(cleanText).find(Boolean);
     return (value || fallback || '操作').slice(0, 160);
@@ -96,6 +99,8 @@
   }
 
   function roleOf(node) {
+    const form = formAdapter && formAdapter.describe(node);
+    if (form && form.role) return form.role;
     const role = String(node.getAttribute('role') || '').toLowerCase();
     if (['button', 'link', 'menuitem', 'switch', 'tab'].includes(role)) return role;
     return node.matches('a[href]') ? 'link' : 'button';
@@ -116,11 +121,14 @@
 
   function actionableNodes(root) {
     if (!root) return [];
-    return Array.from(root.querySelectorAll('button, a[href], [role="button"], [role="menuitem"], [role="switch"], [role="tab"]'))
+    const selector = 'button, a[href], [role="button"], [role="menuitem"], [role="switch"], [role="tab"]' +
+      (formAdapter ? ', ' + formAdapter.ACTIONABLE_SELECTOR : '');
+    return Array.from(root.querySelectorAll(selector))
       .filter(isVisible);
   }
 
   function semanticFor(node, region, index) {
+    const form = formAdapter && formAdapter.describe(node);
     const path = relatedSameOriginPath(node);
     const signal = cleanText([
       node.id,
@@ -128,6 +136,11 @@
       node.getAttribute('aria-label'),
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
+    if (form && (form.inputKind === 'search' || /search|搜索/.test(signal))) return 'search';
+    if (form && form.role === 'textbox') return 'text_input';
+    if (form && form.role === 'combobox') return 'selection';
+    if (form && (form.role === 'checkbox' || form.role === 'radio')) return 'toggle';
+    if (form && form.role === 'slider') return 'slider';
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
       region === 'overlay'
@@ -214,6 +227,10 @@
       confirm: '确认',
       conversation: '打开会话',
       search: '搜索聊天',
+      text_input: '输入内容',
+      selection: '选择选项',
+      toggle: '切换选项',
+      slider: '调整数值',
       library: '文件库',
       apps: '应用',
       tasks: '任务',
@@ -250,6 +267,7 @@
   function addRegionControls(target, root, region, used, filter, contextId) {
     actionableNodes(root).forEach((node, index) => {
       if (filter && !filter(node)) return;
+      if (region === 'composer' && node === composerNode()) return;
       const semantic = semanticFor(node, region, index);
       const label = labelOf(node, defaultLabel(semantic));
       const path = relatedSameOriginPath(node);
@@ -260,6 +278,7 @@
       );
       const id = controlId(semantic, node, label, region, used, resolvedContextId);
       const rect = node.getBoundingClientRect();
+      const form = formAdapter && formAdapter.describe(node);
       used.add(id);
       controlsById.set(id, node);
       target.push({
@@ -269,7 +288,10 @@
         region,
         role: roleOf(node),
         enabled: !node.matches(':disabled') && node.getAttribute('aria-disabled') !== 'true',
-        selected: node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true',
+        selected: form ? form.selected :
+          node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true',
+        inputKind: form && form.inputKind || undefined,
+        writable: !!(form && form.writable),
         contextId: resolvedContextId || undefined,
         inViewport: isInViewport(rect),
         xRatio: (rect.left + rect.width / 2) / Math.max(1, window.innerWidth),
@@ -393,7 +415,7 @@
     const kind = pageKind();
     return {
       type: 'ui_manifest_snapshot',
-      version: 4,
+      version: 5,
       pageKind: kind,
       title: pageTitle(controls),
       compatibility: compatibilityFor(controls, kind),
@@ -419,6 +441,8 @@
         role: control.role,
         enabled: control.enabled,
         selected: control.selected,
+        inputKind: control.inputKind,
+        writable: control.writable,
         contextId: control.contextId,
         inViewport: control.inViewport
       }))
@@ -474,10 +498,29 @@
     window.setTimeout(dispatch, 120);
   }
 
+  function setText(id, value, emitEvent, result) {
+    discover();
+    const node = controlsById.get(String(id || ''));
+    if (!node || !isVisible(node)) {
+      return result('set_ui_control_text', false, '官网文本框已变化，请刷新结构后重试。');
+    }
+    if (!formAdapter) return result('set_ui_control_text', false, '官网表单适配器尚未就绪。');
+    const update = formAdapter.setText(node, value);
+    if (!update.ok) {
+      const detail = update.reason === 'sensitive'
+        ? '密码和登录凭证只允许在官方网页中输入。'
+        : '该官网控件不是可写文本框。';
+      return result('set_ui_control_text', false, detail);
+    }
+    result('set_ui_control_text', true, '');
+    window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
+  }
+
   window.__elonChatGptLayout = Object.freeze({
     emitSnapshot,
     invoke,
     pageKind,
-    requestSemanticTouch
+    requestSemanticTouch,
+    setText
   });
 })();

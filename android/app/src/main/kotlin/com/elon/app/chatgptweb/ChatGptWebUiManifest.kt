@@ -18,11 +18,16 @@ internal data class ChatGptWebUiControl(
     val role: String,
     val enabled: Boolean,
     val selected: Boolean,
+    val inputKind: String? = null,
+    val writable: Boolean = false,
     val contextId: String? = null,
     val inViewport: Boolean = true,
     val webXRatio: Double? = null,
     val webYRatio: Double? = null,
 ) {
+    val supportsTextEntry: Boolean
+        get() = role == "textbox" && writable && inputKind != "password"
+
     val accessibilityLabel: String
         get() = "chatgpt-control:$id:$label"
 }
