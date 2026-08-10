@@ -240,7 +240,9 @@
     if (/agent|代理模式|智能体/.test(signal)) return 'agent';
     if (/camera|take.?photo|相机|拍照/.test(signal)) return 'attachment_camera';
     if (/photos?|gallery|照片|相册/.test(signal)) return 'attachment_photos';
-    if (/upload|files?|documents?|文件|文档|上传/.test(signal)) return 'attachment_file';
+    if (/(^|[\s_/-])(upload|files?)($|[\s_/-])|文件|上传/.test(signal)) {
+      return 'attachment_file';
+    }
     if (/(^|[\s_-])search($|[\s_-])|web.*search|search.*web|browse|搜索/.test(signal)) {
       return 'web_search';
     }

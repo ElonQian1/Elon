@@ -41,6 +41,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("deep_research"))
         assertTrue(adapter.contains("attachment_camera"))
         assertTrue(adapter.contains("web_search"))
+        assertFalse(adapter.contains("documents?"))
+        assertFalse(adapter.contains("|文档|"))
         assertTrue(adapter.contains("dismiss_composer_menu"))
         assertTrue(adapter.contains("optionPolicy.filter(section, candidates)"))
         assertTrue(optionPolicy.contains("isForeignMenuLabel"))
