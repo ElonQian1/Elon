@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-08-06
+reviewed_at: 2026-08-10
 implementation_status: verified
 ---
 
@@ -84,7 +84,7 @@ PC 项目文档工作台的“功能需求”分区读取同一 loopback API，�
 
 ## 当前边界
 
-- Rust 状态机、漂移、依赖、revision、租约、历史、证据刷新和并发写者回归已通过；真实 Codex app-server、clone/worktree 和 PC 浏览器也已验收。不同 PC/操作系统、真实远端协作和长期生产负载仍需现场验证。
+- Rust 状态机、漂移、依赖、revision、租约、历史、证据刷新和并发写者回归已通过；新增定向回归还证明单工具目录不会提前携带详细动作 schema，只有显式 `describe` 才按需返回，直接内部工具调用会被拒绝；上下文投影遇到高优先级漂移需求时会将其放入有界 `invalidated`，并继续补足最多 3 个当前有效功能，全程不返回需求正文。`project_feature` 5 项与 `profiles` 7 项最新回归指纹分别为 `9508cc9f8541a47858d9a0b35e7023e3380592649e3daf37e87e1ce049fffc61` 和 `63432e09754583ef1710d6c3fbf5fcd8798839ee9db3815a7d79690fa69cdd25`。真实 Codex app-server、clone/worktree 和 PC 浏览器已有既往验收；不同 PC/操作系统、真实远端协作和长期生产负载仍需现场验证。
 - Git 中的 claim 只对同步到同一提交谱系的参与者可见；跨进程与同仓库 worktree 写锁会失败关闭，但离线分支仍可能各自合法认领，最终必须通过 Git 合并冲突或团队协调裁决，不能把本地租约冒充全网分布式锁。
 - 注册表不会自动创建 Markdown；这样保留 Codex 原生编辑、Git diff 和用户审核能力。
 - 注册表不会自动修改 `AI_CURRENT.md`、`AI_INDEX.md` 或知识图谱；稳定项目入口仍由文档治理流程审核，避免一次需求登记同时改写多份权威信源。
