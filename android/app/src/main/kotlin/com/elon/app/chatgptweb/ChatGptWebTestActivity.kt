@@ -57,6 +57,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             snapshot = { latestSnapshot },
             uiManifest = { latestUiManifest },
             observedState = observedMcpState::snapshot,
+            beginCommand = observedMcpState::beginCommand,
             bridgeState = { latestBridgeState },
             mode = { latestMode },
             inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },

@@ -60,6 +60,12 @@ class ChatGptWebMcpActionsTest {
 
         assertTrue(ok.getBoolean("control_ok"))
         assertEquals("control_suggestion_demo", invoked)
+        assertEquals("dispatched", ok.getString("command_status"))
+        assertEquals(
+            "invoke_ui_control",
+            ok.getJSONObject("command_receipt").getString("expected_web_action"),
+        )
+        assertEquals("pending", ok.getJSONObject("command_receipt").getString("status"))
         assertFalse(stale.getBoolean("control_ok"))
         assertEquals("stale_control_id", stale.getString("error"))
     }
@@ -304,6 +310,7 @@ class ChatGptWebMcpActionsTest {
                 ),
             ),
         )
+        var nextCommandId = 0
         return ChatGptWebMcpActions(
             snapshot = { snapshot },
             uiManifest = { manifest },
@@ -326,7 +333,16 @@ class ChatGptWebMcpActionsTest {
                         ),
                     ),
                     lastCommand = ChatGptWebEvent.CommandResult("list_conversations", true, ""),
+                    commandRequests = emptyList(),
                     updatedAtMs = 123L,
+                )
+            },
+            beginCommand = { expectedAction ->
+                ChatGptWebObservedState.CommandRequest(
+                    id = "mcp_${++nextCommandId}",
+                    expectedAction = expectedAction,
+                    status = ChatGptWebObservedState.CommandRequest.PENDING,
+                    startedAtMs = 123L,
                 )
             },
             bridgeState = { ChatGptWebPageAdapter.State.READY },

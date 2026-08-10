@@ -7,6 +7,7 @@ internal class ChatGptWebMcpActions(
     private val snapshot: () -> ChatGptWebSnapshot?,
     private val uiManifest: () -> ChatGptWebUiManifest?,
     private val observedState: () -> ChatGptWebObservedState.Snapshot,
+    private val beginCommand: (String) -> ChatGptWebObservedState.CommandRequest,
     private val bridgeState: () -> ChatGptWebPageAdapter.State,
     private val mode: () -> ChatGptWebModeController.Mode,
     private val inputText: () -> String,
@@ -47,41 +48,49 @@ internal class ChatGptWebMcpActions(
             )
             .put("ui_manifest", manifestJson(uiManifest()))
             .put("navigation", navigationSummary(observed))
-            .put("last_command", commandJson(observed))
+            .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
+            .put("command_requests", ChatGptWebCommandReceipts.requestsJson(observed))
             .put("available_actions", JSONArray(AVAILABLE_ACTIONS))
     }
 
     fun control(args: JSONObject): JSONObject {
         val action = args.optString("action", "state").trim().lowercase()
+        var commandRequest: ChatGptWebObservedState.CommandRequest? = null
+        fun dispatch(expectedAction: String, block: () -> Unit) {
+            commandRequest = beginCommand(expectedAction)
+            block()
+        }
         when (action) {
             "state", "open_chatgpt_web" -> Unit
             "set_input_text" -> setInputText(args.optString("text").take(MAX_INPUT_CHARS))
-            "send_input" -> sendInput()
+            "send_input" -> dispatch("send_prompt", sendInput)
             "chatgpt_invoke_control" -> {
                 val controlId = args.optString("control_id")
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
                 if (uiManifest()?.controls?.none { it.id == controlId } != false) {
                     return error(action, "stale_control_id")
                 }
-                invokeControl(controlId)
+                dispatch("invoke_ui_control") { invokeControl(controlId) }
             }
-            "chatgpt_new_conversation" -> newConversation()
-            "chatgpt_stop_generation" -> stopGeneration()
+            "chatgpt_new_conversation" -> dispatch("new_conversation", newConversation)
+            "chatgpt_stop_generation" -> dispatch("stop_generation", stopGeneration)
             "chatgpt_cancel_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
-                cancelDictation()
+                dispatch("cancel_dictation", cancelDictation)
             }
             "chatgpt_submit_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
-                submitDictation()
+                dispatch("submit_dictation", submitDictation)
             }
             "chatgpt_refresh" -> refresh()
-            "chatgpt_refresh_controls" -> refreshControls()
-            "chatgpt_list_conversations" -> listConversations()
+            "chatgpt_refresh_controls" -> dispatch("snapshot_ui_manifest", refreshControls)
+            "chatgpt_list_conversations" -> dispatch("list_conversations", listConversations)
             "chatgpt_list_composer_options" -> {
                 val section = args.optString("section").trim().lowercase()
                 if (section !in COMPOSER_SECTIONS) return error(action, "invalid_section")
-                requestComposerOptions(section)
+                dispatch(if (section == "model") "list_model_options" else "list_composer_tools") {
+                    requestComposerOptions(section)
+                }
             }
             "chatgpt_select_composer_option" -> {
                 val section = args.optString("section").trim().lowercase()
@@ -89,15 +98,17 @@ internal class ChatGptWebMcpActions(
                 val optionId = args.optString("option_id").trim()
                 val options = observedState().composerSections[section].orEmpty()
                 if (options.none { it.id == optionId }) return error(action, "stale_option_id")
-                selectComposerOption(section, optionId)
+                dispatch(if (section == "model") "select_model_option" else "select_composer_tool") {
+                    selectComposerOption(section, optionId)
+                }
             }
-            "chatgpt_list_features" -> requestFeatures()
+            "chatgpt_list_features" -> dispatch("list_navigation", requestFeatures)
             "chatgpt_select_feature" -> {
                 val featureId = args.optString("feature_id").trim()
                 if (observedState().features.none { it.id == featureId }) {
                     return error(action, "stale_feature_id")
                 }
-                selectFeature(featureId)
+                dispatch("select_navigation") { selectFeature(featureId) }
             }
             "chatgpt_get_context" -> return contextPage(args)
             "chatgpt_find_controls" -> return controlsPage(args)
@@ -109,7 +120,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_open_conversation" -> {
                 val path = args.optString("conversation_path")
                 if (!CONVERSATION_PATH.matches(path)) return error(action, "invalid_conversation_path")
-                openConversation(path)
+                dispatch("open_conversation") { openConversation(path) }
             }
             "chatgpt_select_view" -> {
                 val next = when (args.optString("view_mode").lowercase()) {
@@ -126,9 +137,24 @@ internal class ChatGptWebMcpActions(
             .put("control_ok", true)
             .put("action", action)
             .apply {
-                if (action in ASYNC_ACTIONS) {
+                commandRequest?.let { started ->
+                    val current = observedState().commandRequests
+                        .lastOrNull { it.id == started.id } ?: started
+                    put(
+                        "command_status",
+                        if (current.status == ChatGptWebObservedState.CommandRequest.PENDING) {
+                            "dispatched"
+                        } else {
+                            current.status
+                        },
+                    )
+                    put("command_receipt", ChatGptWebCommandReceipts.requestJson(current))
+                    put("poll_hint", "按 request_id 读取 ui_state.command_requests 确认官网命令结果")
+                }
+                if (action == "chatgpt_refresh") {
                     put("command_status", "dispatched")
-                    put("poll_hint", "读取 ui_state.last_command 确认官网命令结果")
+                    put("completion_signal", "bridge_state")
+                    put("poll_hint", "读取 ui_state.bridge_state 确认页面重新连接")
                 }
             }
     }
@@ -325,15 +351,6 @@ internal class ChatGptWebMcpActions(
         .put("composer_sections", JSONArray(value.composerSections.keys.sorted()))
         .put("cached_at_ms", value.updatedAtMs)
 
-    private fun commandJson(value: ChatGptWebObservedState.Snapshot): Any {
-        val command = value.lastCommand ?: return JSONObject.NULL
-        return JSONObject()
-            .put("action", command.action)
-            .put("ok", command.ok)
-            .put("detail", command.detail)
-            .put("observed_at_ms", value.updatedAtMs)
-    }
-
     private fun manifestJson(value: ChatGptWebUiManifest?): Any {
         if (value == null) return JSONObject.NULL
         val presentations = ChatGptNativeControlPresentation.describe(value.controls)
@@ -443,22 +460,6 @@ internal class ChatGptWebMcpActions(
             "chatgpt_get_capability_matrix",
             "chatgpt_open_conversation",
             "chatgpt_select_view",
-        )
-        val ASYNC_ACTIONS = setOf(
-            "send_input",
-            "chatgpt_invoke_control",
-            "chatgpt_new_conversation",
-            "chatgpt_stop_generation",
-            "chatgpt_cancel_dictation",
-            "chatgpt_submit_dictation",
-            "chatgpt_refresh",
-            "chatgpt_refresh_controls",
-            "chatgpt_list_conversations",
-            "chatgpt_list_composer_options",
-            "chatgpt_select_composer_option",
-            "chatgpt_list_features",
-            "chatgpt_select_feature",
-            "chatgpt_open_conversation",
         )
     }
 }

@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,6 +40,48 @@ class ChatGptWebObservedStateTest {
 
         assertTrue("model" !in state.snapshot().composerSections)
         assertEquals("网页搜索", state.snapshot().composerSections.getValue("tools").single().label)
+    }
+
+    @Test
+    fun aNewRequestIgnoresStaleAndUnrelatedCommandResults() {
+        var now = 1_000L
+        val state = ChatGptWebObservedState { now }
+        state.accept(ChatGptWebEvent.CommandResult("list_conversations", true, "旧结果"))
+
+        val request = state.beginCommand("list_conversations")
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.PENDING,
+            state.snapshot().commandRequests.single().status,
+        )
+
+        now += 10
+        state.accept(ChatGptWebEvent.CommandResult("snapshot", true, ""))
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.PENDING,
+            state.snapshot().commandRequests.single().status,
+        )
+
+        now += 10
+        state.accept(ChatGptWebEvent.CommandResult("list_conversations", false, "官网变化"))
+        val completed = state.snapshot().commandRequests.single()
+        assertEquals(request.id, completed.id)
+        assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, completed.status)
+        assertFalse(completed.result?.ok == true)
+        assertEquals("官网变化", completed.result?.detail)
+    }
+
+    @Test
+    fun pendingRequestsExpireAndHistoryStaysBounded() {
+        var now = 10_000L
+        val state = ChatGptWebObservedState { now }
+        repeat(25) { state.beginCommand("invoke_ui_control") }
+
+        assertEquals(20, state.snapshot().commandRequests.size)
+        now += 20_000L
+        val requests = state.snapshot().commandRequests
+
+        assertTrue(requests.all { it.status == ChatGptWebObservedState.CommandRequest.TIMED_OUT })
+        assertTrue(requests.all { it.completedAtMs == now })
     }
 
     private fun composerEvent(section: String, label: String) = ChatGptWebEvent.ComposerControls(
