@@ -18,11 +18,11 @@ param(
     [ValidateRange(1, 30)]
     [int]$FailureTailLines = 30,
 
-    [ValidateRange(0, 86400)]
-    [int]$TimeoutSeconds = 0,
+    [ValidateRange(1, 86400)]
+    [int]$TimeoutSeconds = 3600,
 
-    [ValidateRange(0, 86400)]
-    [int]$StallTimeoutSeconds = 0,
+    [ValidateRange(1, 86400)]
+    [int]$StallTimeoutSeconds = 900,
 
     [switch]$RequireOutput
 )
@@ -66,6 +66,56 @@ function Get-LogByteCount {
         }
     }
     return $total
+}
+
+function Write-JsonAtomically {
+    param(
+        [string]$Path,
+        [object]$Value
+    )
+
+    $temporaryPath = "$Path.$PID.tmp"
+    [System.IO.File]::WriteAllText(
+        $temporaryPath,
+        ($Value | ConvertTo-Json -Depth 5 -Compress),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Move-Item -LiteralPath $temporaryPath -Destination $Path -Force
+}
+
+function Write-CommandState {
+    param(
+        [string]$Path,
+        [string]$Name,
+        [string]$Status,
+        [int]$ProcessId,
+        [DateTimeOffset]$StartedAt,
+        [double]$ElapsedSeconds,
+        [long]$LogBytes,
+        [double]$IdleSeconds,
+        [int]$TotalTimeoutSeconds,
+        [int]$OutputStallTimeoutSeconds,
+        [string]$StdoutLog,
+        [string]$StderrLog,
+        [string]$ResultFile
+    )
+
+    Write-JsonAtomically -Path $Path -Value ([ordered]@{
+        schema = "elon.ai_command_state.v1"
+        name = $Name
+        status = $Status
+        pid = $ProcessId
+        started_at = $StartedAt.ToString("o")
+        last_progress_at = [DateTimeOffset]::UtcNow.ToString("o")
+        elapsed_seconds = [Math]::Round($ElapsedSeconds, 1)
+        log_bytes = $LogBytes
+        idle_seconds = [Math]::Round($IdleSeconds, 1)
+        timeout_seconds = $TotalTimeoutSeconds
+        stall_timeout_seconds = $OutputStallTimeoutSeconds
+        stdout_log = $StdoutLog
+        stderr_log = $StderrLog
+        result_file = $ResultFile
+    })
 }
 
 function Stop-CommandProcessTree {
@@ -134,6 +184,7 @@ $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
 $stdoutLog = Join-Path $logRoot "$LogName-$stamp.stdout.log"
 $stderrLog = Join-Path $logRoot "$LogName-$stamp.stderr.log"
 $pidFile = Join-Path $logRoot "$LogName-$stamp.job.pid"
+$stateFile = Join-Path $logRoot "$LogName-$stamp.state.json"
 $resultFile = Join-Path $logRoot "$LogName-$stamp.result.json"
 $commandRoot = Join-Path $logRoot "command-files"
 New-Item -ItemType Directory -Path $commandRoot -Force | Out-Null
@@ -149,6 +200,7 @@ $commandExitFile = Join-Path $commandRoot "$commandToken.exit"
         "exit /b %ELON_COMMAND_EXIT%`r`n",
     [System.Text.UTF8Encoding]::new($false)
 )
+$startedAt = [DateTimeOffset]::UtcNow
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
 $logPaths = @($stdoutLog, $stderrLog)
 $lastLogBytes = [long]0
@@ -160,10 +212,12 @@ $process = Start-Process -FilePath $env:ComSpec `
     -WindowStyle Hidden `
     -PassThru
 [System.IO.File]::WriteAllText($pidFile, [string]$process.Id, [System.Text.Encoding]::ASCII)
+Write-CommandState -Path $stateFile -Name $LogName -Status "running" -ProcessId $process.Id `
+    -StartedAt $startedAt -ElapsedSeconds 0 -LogBytes 0 -IdleSeconds 0 `
+    -TotalTimeoutSeconds $TimeoutSeconds -OutputStallTimeoutSeconds $StallTimeoutSeconds `
+    -StdoutLog $stdoutLog -StderrLog $stderrLog -ResultFile $resultFile
 
 try {
-    $heartbeatInterval = $HeartbeatSeconds
-    $heartbeatCount = 0
     $timedOut = $false
     $stalled = $false
     while (-not $process.HasExited) {
@@ -179,7 +233,7 @@ try {
             break
         }
 
-        $waitSeconds = $heartbeatInterval
+        $waitSeconds = $HeartbeatSeconds
         if ($TimeoutSeconds -gt 0) {
             $remaining = $TimeoutSeconds - $watch.Elapsed.TotalSeconds
             if ($remaining -le 0) {
@@ -202,14 +256,17 @@ try {
                 $lastLogActivityAt = $now
             }
             $idleSeconds = [Math]::Max(0, ($now - $lastLogActivityAt).TotalSeconds)
-            if ($heartbeatCount -lt 10) {
-                Write-Output "AI_COMMAND_PROGRESS=running name=$LogName elapsed_seconds=$([Math]::Round($watch.Elapsed.TotalSeconds, 1)) log_bytes=$lastLogBytes idle_seconds=$([Math]::Round($idleSeconds, 1))"
-                $heartbeatCount++
-            }
-            $heartbeatInterval = [Math]::Min(60, $heartbeatInterval * 2)
+            Write-CommandState -Path $stateFile -Name $LogName -Status "running" -ProcessId $process.Id `
+                -StartedAt $startedAt -ElapsedSeconds $watch.Elapsed.TotalSeconds `
+                -LogBytes $lastLogBytes -IdleSeconds $idleSeconds `
+                -TotalTimeoutSeconds $TimeoutSeconds -OutputStallTimeoutSeconds $StallTimeoutSeconds `
+                -StdoutLog $stdoutLog -StderrLog $stderrLog -ResultFile $resultFile
+            Write-Output "AI_COMMAND_PROGRESS=running name=$LogName elapsed_seconds=$([Math]::Round($watch.Elapsed.TotalSeconds, 1)) log_bytes=$lastLogBytes idle_seconds=$([Math]::Round($idleSeconds, 1))"
         }
     }
     if ($timedOut -or $stalled) {
+        $terminationReason = if ($timedOut) { "timeout" } else { "stalled_output" }
+        Write-Output "AI_COMMAND_PROGRESS=terminating name=$LogName reason=$terminationReason elapsed_seconds=$([Math]::Round($watch.Elapsed.TotalSeconds, 1))"
         Stop-CommandProcessTree -RootPid $process.Id
         [void]$process.WaitForExit(5000)
         $exitCode = if ($timedOut) { 124 } else { 125 }
@@ -251,12 +308,15 @@ $result = [ordered]@{
     stdout_log = $stdoutLog
     stderr_log = $stderrLog
     completed_at = [DateTimeOffset]::UtcNow.ToString("o")
+    timeout_seconds = $TimeoutSeconds
+    stall_timeout_seconds = $StallTimeoutSeconds
 }
-[System.IO.File]::WriteAllText(
-    $resultFile,
-    ($result | ConvertTo-Json -Depth 4 -Compress),
-    [System.Text.UTF8Encoding]::new($false)
-)
+Write-JsonAtomically -Path $resultFile -Value $result
+Write-CommandState -Path $stateFile -Name $LogName -Status $resultStatus -ProcessId 0 `
+    -StartedAt $startedAt -ElapsedSeconds $watch.Elapsed.TotalSeconds `
+    -LogBytes (Get-LogByteCount -Paths $logPaths) -IdleSeconds 0 `
+    -TotalTimeoutSeconds $TimeoutSeconds -OutputStallTimeoutSeconds $StallTimeoutSeconds `
+    -StdoutLog $stdoutLog -StderrLog $stderrLog -ResultFile $resultFile
 
 Write-Output "AI_COMMAND_STATUS=$resultStatus"
 Write-Output "AI_COMMAND_NAME=$LogName"
@@ -270,6 +330,7 @@ Write-Output "AI_COMMAND_WARNING_LINES=$warningCount"
 Write-Output "AI_COMMAND_STDOUT_LOG=$stdoutLog"
 Write-Output "AI_COMMAND_STDERR_LOG=$stderrLog"
 Write-Output "AI_COMMAND_RESULT_FILE=$resultFile"
+Write-Output "AI_COMMAND_STATE_FILE=$stateFile"
 
 if ($exitCode -ne 0) {
     $failureReason = if ($timedOut) {

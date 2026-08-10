@@ -21,6 +21,14 @@ Assert-True (-not $runnerSource.Contains("Start-Job")) `
     "Command runner must monitor the native process instead of a PowerShell job."
 Assert-True ($runnerSource.Contains('while (-not $process.HasExited)')) `
     "Command runner must stop waiting as soon as the native parent process exits."
+Assert-True ($runnerSource.Contains('[int]$TimeoutSeconds = 3600')) `
+    "Command runner must have a bounded default total timeout."
+Assert-True ($runnerSource.Contains('[int]$StallTimeoutSeconds = 900')) `
+    "Command runner must have a bounded default no-output timeout."
+Assert-True (-not $runnerSource.Contains('[ValidateRange(0, 86400)]')) `
+    "Command runner must not allow callers to disable the hard time bounds."
+Assert-True (-not $runnerSource.Contains('$heartbeatCount -lt')) `
+    "Command runner must not silently stop heartbeat output while still running."
 $gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
 if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
     $gitCommonDir = Join-Path $repoRoot $gitCommonDir
@@ -32,6 +40,7 @@ $successFixture = Join-Path $fixtureRoot "success.cmd"
 $failureFixture = Join-Path $fixtureRoot "failure.cmd"
 $timeoutFixture = Join-Path $fixtureRoot "timeout.cmd"
 $silentFixture = Join-Path $fixtureRoot "silent.cmd"
+$heartbeatFixture = Join-Path $fixtureRoot "heartbeat.cmd"
 
 Set-Content -LiteralPath $successFixture -Encoding ASCII -Value @(
     "@echo off",
@@ -51,6 +60,11 @@ Set-Content -LiteralPath $timeoutFixture -Encoding ASCII -Value @(
 )
 Set-Content -LiteralPath $silentFixture -Encoding ASCII -Value @(
     "@echo off",
+    "exit /b 0"
+)
+Set-Content -LiteralPath $heartbeatFixture -Encoding ASCII -Value @(
+    "@echo off",
+    "powershell -NoProfile -Command `"Start-Sleep -Seconds 6; Write-Output heartbeat-complete`"",
     "exit /b 0"
 )
 
@@ -93,6 +107,13 @@ try {
         -CommandLine "`"$timeoutFixture`"" 2>&1)
     $stallExit = $LASTEXITCODE
     $stallWatch.Stop()
+
+    $heartbeatOutput = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -LogName "bounded-heartbeat" `
+        -WorkingDirectory $repoRoot `
+        -HeartbeatSeconds 5 `
+        -CommandLine "`"$heartbeatFixture`"" 2>&1)
+    $heartbeatExit = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
 }
@@ -127,15 +148,26 @@ Assert-True ($stallText.Contains("AI_COMMAND_STALLED=true")) "Stall summary is m
 Assert-True ($stallText.Contains("AI_COMMAND_FAILURE_REASON=stalled_output")) "Stall failure reason is missing."
 Assert-True ($stallWatch.Elapsed.TotalSeconds -lt 10) "Stalled command left its process tree running."
 
+$heartbeatText = $heartbeatOutput -join "`n"
+Assert-True ($heartbeatExit -eq 0) "Heartbeat fixture must complete successfully."
+Assert-True ($heartbeatText.Contains("AI_COMMAND_PROGRESS=running")) `
+    "A running command must emit a heartbeat before it completes."
+
 $recoveryName = "bounded-recovery-$([Guid]::NewGuid().ToString('N'))"
 $recoveryBase = Join-Path $commandLogRoot "$recoveryName-20000101-000000-000"
 try {
     Set-Content -LiteralPath "$recoveryBase.stdout.log" -Encoding ASCII -Value "running"
     Set-Content -LiteralPath "$recoveryBase.stderr.log" -Encoding ASCII -Value ""
     Set-Content -LiteralPath "$recoveryBase.job.pid" -Encoding ASCII -Value "$PID"
+    Set-Content -LiteralPath "$recoveryBase.state.json" -Encoding UTF8 -Value `
+        '{"schema":"elon.ai_command_state.v1","status":"running","elapsed_seconds":42.5,"last_progress_at":"2000-01-01T00:00:42Z","timeout_seconds":3600,"stall_timeout_seconds":900}'
     $runningRecovery = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $statusReader `
         -LogName $recoveryName 2>&1) -join "`n"
     Assert-True ($runningRecovery.Contains("AI_COMMAND_RECOVERY_STATUS=running")) "Running recovery status is wrong."
+    Assert-True ($runningRecovery.Contains("AI_COMMAND_STATE_ELAPSED_SECONDS=42.5")) `
+        "Running recovery must expose persisted elapsed time."
+    Assert-True ($runningRecovery.Contains("AI_COMMAND_TIMEOUT_SECONDS=3600")) `
+        "Running recovery must expose the total timeout bound."
 
     Remove-Item -LiteralPath "$recoveryBase.job.pid" -Force
     Set-Content -LiteralPath "$recoveryBase.result.json" -Encoding UTF8 -Value `
@@ -154,7 +186,7 @@ try {
     Assert-True ($staleRecovery.Contains("AI_COMMAND_RECOVERY_STATUS=stale")) "Stale recovery status is wrong."
 } finally {
     Remove-Item -LiteralPath "$recoveryBase.stdout.log", "$recoveryBase.stderr.log", `
-        "$recoveryBase.job.pid", "$recoveryBase.result.json" `
+        "$recoveryBase.job.pid", "$recoveryBase.state.json", "$recoveryBase.result.json" `
         -Force -ErrorAction SilentlyContinue
 }
 
@@ -174,5 +206,15 @@ $resultFile = "$resultFileLine".Substring("AI_COMMAND_RESULT_FILE=".Length)
 $savedResult = Get-Content -LiteralPath $resultFile -Raw | ConvertFrom-Json
 Assert-True ($savedResult.status -eq "passed") "Persisted success result status is wrong."
 Assert-True ($savedResult.exit_code -eq 0) "Persisted success result exit code is wrong."
+Assert-True ($savedResult.timeout_seconds -eq 3600) "Persisted default total timeout is wrong."
+Assert-True ($savedResult.stall_timeout_seconds -eq 900) "Persisted default stall timeout is wrong."
+
+$stateFileLine = $successOutput |
+    Where-Object { "$_".StartsWith("AI_COMMAND_STATE_FILE=") } |
+    Select-Object -Last 1
+$stateFile = "$stateFileLine".Substring("AI_COMMAND_STATE_FILE=".Length)
+$savedState = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
+Assert-True ($savedState.status -eq "passed") "Persisted final command state is wrong."
+Assert-True ($savedState.pid -eq 0) "Persisted final command state must not retain a live PID."
 
 Write-Host "PASS bounded AI command output"
