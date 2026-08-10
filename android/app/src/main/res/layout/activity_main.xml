@@ -5,6 +5,11 @@
     android:layout_height="match_parent"
     android:background="@color/elon_bg_app">
 
+    <eightbitlab.com.blurview.BlurTarget
+        android:id="@+id/bottomNavBlurTarget"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -1122,6 +1127,8 @@
 
     </LinearLayout>
 
+    </eightbitlab.com.blurview.BlurTarget>
+
     <FrameLayout
         android:id="@+id/bottomBarContainer"
         android:layout_width="match_parent"
@@ -1306,12 +1313,14 @@
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
-                    <ImageView
+                    <eightbitlab.com.blurview.BlurView
+                        android:id="@+id/bottomNavGlass"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:background="@drawable/bg_bottom_nav_glass"
+                        android:clipToOutline="true"
                         android:contentDescription="@null"
-                        android:scaleType="fitXY"
-                        android:src="@drawable/bg_bottom_nav_primary_panel" />
+                        app:blurOverlayColor="#99121418" />
 
                     <LinearLayout
                         android:layout_width="match_parent"

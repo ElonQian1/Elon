@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -13,6 +14,13 @@ internal class MainBottomNavigationController(
     private val showHomeActions: (View, TextView) -> Unit
 ) {
     fun setup() {
+        binding.bottomNavGlass
+            .setupWith(binding.bottomNavBlurTarget)
+            .setFrameClearDrawable(activity.window.decorView.background)
+            .setBlurRadius(18f)
+        binding.bottomNavGlass.outlineProvider = ViewOutlineProvider.BACKGROUND
+        binding.bottomNavGlass.clipToOutline = true
+
         binding.tabChat.setOnClickListener { selectTab(binding.tabChat) }
         binding.tabProject.setOnClickListener { selectTab(binding.tabProject) }
         binding.tabProfile.setOnClickListener { selectTab(binding.tabProfile) }

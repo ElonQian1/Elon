@@ -3592,7 +3592,11 @@
       display: flex;
       align-items: stretch;
       flex: 1;
-      background: url("data:image/png;base64,__BOTTOM_NAV_PANEL_PNG_B64__") center / 100% 100% no-repeat;
+      border: 1px solid rgb(255 255 255 / 18%);
+      border-radius: 28px;
+      background: rgb(18 20 24 / 60%);
+      -webkit-backdrop-filter: blur(18px) saturate(135%);
+      backdrop-filter: blur(18px) saturate(135%);
       overflow: hidden;
     }
     .tab,

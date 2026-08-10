@@ -94,6 +94,28 @@ class BottomNavigationInsetsContractTest {
     }
 
     @Test
+    fun primaryPanelUsesMatchingDarkBackdropGlassOnAndroidAndWeb() {
+        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        val controller = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt"
+        )
+        val glass = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_glass.xml")
+        assertTrue(layout.contains("<eightbitlab.com.blurview.BlurTarget"))
+        assertTrue(layout.contains("android:id=\"@+id/bottomNavGlass\""))
+        assertTrue(layout.contains("app:blurOverlayColor=\"#99121418\""))
+        assertTrue(controller.contains(".setBlurRadius(18f)"))
+        assertTrue(glass.contains("android:radius=\"28dp\""))
+        assertTrue(glass.contains("android:color=\"#2EFFFFFF\""))
+
+        val web = readRepositoryFile("server/src/assets/web_page.html")
+        val panel = Regex("""\.tabs-panel\s*\{[^}]*}""", RegexOption.DOT_MATCHES_ALL)
+            .find(web)?.value ?: error("Missing tabs panel styles")
+        assertTrue(panel.contains("background: rgb(18 20 24 / 60%);"))
+        assertTrue(panel.contains("backdrop-filter: blur(18px) saturate(135%);"))
+        assertTrue(panel.contains("border-radius: 28px;"))
+    }
+
+    @Test
     fun scrollPagesReserveBottomBarExactlyOnceAcrossAndroidAndWeb() {
         val controller = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt"
