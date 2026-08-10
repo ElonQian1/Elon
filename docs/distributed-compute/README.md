@@ -20,7 +20,7 @@ owners: backend, node, ai-economy
 
 ## 当前事实
 
-> v218 合同修正：下表历史文字中的“v11 Planning Snapshot V2”现以协议阈值 12 解释；V2 schema/capability 名不变。installed record 的 work-admission 是可选 current-head commitment，`None` 允许新晋升槽取得首次 `reauthorize_existing`，`Some` 才承诺正 generation 与 receipt digest。当前仍无 snapshot producer，不能把该修正解释为 Runtime、Ready 或派发已可达。
+> v218 合同修正：下表历史文字中的“v11 Planning Snapshot V2”现以协议阈值 12 解释；V2 schema/capability 名不变。installed record 的 work-admission 是可选 current-head commitment，`None` 允许新晋升槽取得首次 `reauthorize_existing`，`Some` 才承诺正 generation 与 receipt digest。当前仍无 snapshot producer；A1 已形成未编译的 sealed handle-bound 同事务投影源码合同，v14 永久 blocked-only，未来 ready 必须另建 v15，不能据此宣称 Runtime、Ready 或派发可达。
 
 | 能力 | 2026-08-05 状态 |
 |---|---|
@@ -84,7 +84,7 @@ owners: backend, node, ai-economy
 1. `docs/decisions/distributed-compute-federation-v1.md`：不可随意改变的架构决定。
 2. `docs/distributed-compute/architecture.md`：Provider、控制面、数据面和任务状态。
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
-4. `docs/distributed-compute/node-endpoint-session-authority.md`、`docs/distributed-compute/node-plugin-local-authority.md`、`docs/distributed-compute/node-plugin-manifest-catalog-authority.md`、`docs/distributed-compute/node-ready-capability.md`、`docs/distributed-compute/node-plugin-candidate-cleanup.md` 与 `docs/distributed-compute/windows-compute-namespace-fence-wire-v1.json`：服务端端点凭据/认证会话 currentness、节点 SQLite 真源、签名目录与回滚边界、短期技术就绪、失败候选清理边界与首个 Windows hard-fence 固定 wire ABI。
+4. `docs/distributed-compute/node-endpoint-session-authority.md`、`docs/distributed-compute/node-plugin-local-authority.md`、`docs/distributed-compute/node-plugin-manifest-catalog-authority.md`、`docs/distributed-compute/node-plugin-planning-snapshot-authority.md`、`docs/distributed-compute/node-ready-capability.md`、`docs/distributed-compute/node-plugin-candidate-cleanup.md` 与 `docs/distributed-compute/windows-compute-namespace-fence-wire-v1.json`：端点会话 currentness、SQLite 真源、目录/回滚、Planning 同事务投影、短期就绪、失败清理与 Windows hard-fence ABI。
 5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
 6. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
 7. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
