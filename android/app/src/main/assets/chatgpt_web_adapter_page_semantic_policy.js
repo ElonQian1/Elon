@@ -41,6 +41,12 @@
     if (/download\s+(?:the\s+)?(?:chatgpt\s+)?app|下载(?:\s*chatgpt)?应用/.test(combined)) {
       return 'download_app';
     }
+    if (region === 'overlay') {
+      if (/personalization|personalise|personalize|个性化/.test(combined)) return 'personalization';
+      if (/log\s*out|sign\s*out|退出登录|登出/.test(combined)) return 'logout';
+      if (/help|support|帮助|支持/.test(combined)) return 'help';
+      if (/upgrade|subscription|manage\s+plan|套餐|订阅/.test(combined)) return 'plan';
+    }
     if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
     if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
     if (/^(?:chats?|聊天|整理聊天)$/.test(label || signal)) return 'conversation_group';

@@ -84,6 +84,21 @@ expectEqual(policy.classify({ pathname: '/', signal: '已置顶' }), 'pinned', '
 expectEqual(policy.classify({ pathname: '/', signal: '下载应用' }), 'download_app', 'download app');
 expectEqual(policy.classify({ pathname: '/', signal: '整理聊天' }), 'conversation_group', 'chat group');
 expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: 'Personalization'
+}), 'personalization', 'account personalization');
+expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: '帮助'
+}), 'help', 'account help');
+expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: '退出登录'
+}), 'logout', 'account logout');
+expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: 'Manage subscription'
+}), 'plan', 'account plan');
+expectEqual(policy.classify({
+  pathname: '/', region: 'content', signal: 'Manage subscription'
+}), '', 'account semantics stay overlay scoped');
+expectEqual(policy.classify({
   pathname: '/',
   signal: 'sidebar-section-toggle account-owned-id 整理聊天',
   label: '整理聊天'

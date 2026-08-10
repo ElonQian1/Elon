@@ -226,6 +226,10 @@
       pin: '置顶聊天',
       archive: '归档',
       more: '更多操作',
+      personalization: '个性化',
+      help: '帮助',
+      logout: '退出登录',
+      plan: '套餐',
       open_media: '打开媒体',
       reasoning_details: '查看思考过程',
       timestamp: '消息时间'
@@ -349,7 +353,7 @@
     });
     addRegionControls(controls, composer, 'composer', used);
     const overlays = Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
-    const overlay = overlays[0];
+    const overlay = overlays[overlays.length - 1];
     addRegionControls(controls, overlay, 'overlay', used);
     addMessageControls(controls, used);
     addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
