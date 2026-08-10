@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-`implementation_compiled_local_state_subset`
+`implementation_compiled_local_state_verified`
 
-Rust `elon-server` 测试目标已编译；全新 SQLite 专项夹具已走通 challenge 签发、当前修订本地验证和资料编辑失效。测试直接调用存储层状态转换，没有发出 DNS、TLS 或 HTTPS 请求，因此不构成真实域名控制证明。
+Rust `elon-server` 测试目标已编译；全新 SQLite 专项夹具已走通 challenge 签发、当前修订本地验证和资料编辑失效，并证明过期 challenge 会在白名单、DNS、TLS 或 HTTPS 处理前失败关闭且不记录网络尝试。测试没有发出真实网络请求，因此不构成真实域名控制证明。
 
 ## 已形成代码
 
@@ -14,13 +14,14 @@ Rust `elon-server` 测试目标已编译；全新 SQLite 专项夹具已走通 c
 - 资料编辑立即清除旧域名证明；资料提交要求当前修订已经验证。
 - PC 可生成、复制 challenge 和固定地址，发起验证并查看状态。
 - `server/src/open_commerce_developer_production_state_tests.rs` 仅验证本地状态依赖，真实网络安全边界仍由域名服务负责。
+- `server/src/open_commerce_developer_domain_state_tests.rs` 验证过期 challenge 在出站处理前失败关闭；这不验证真实时钟漂移或网络。
 
 ## 统一回归必须验证
 
 - V151 到 V152 升级、空 challenge 默认值和重复迁移；资料编辑失效的本地状态已通过专项测试。
 - 明文仅返回一次、摘要匹配、换行裁剪、UTF-8、0/4096/4097 字节边界。
 - HTTP、非 443、查询污染、重定向、超时、非白名单、错误状态和 DNS 变化。
-- 过期、重复生成、旧修订、并发验证、App 停用和已验证幂等读取。
+- 重复生成、旧修订、并发验证、App 停用和已验证幂等读取；过期 challenge 的网络前失败关闭已通过专项测试。
 - App 所有者、项目管理员、普通编辑者和非项目成员权限隔离。
 - PC 状态、复制、禁用条件、错误提示和小屏布局。
 

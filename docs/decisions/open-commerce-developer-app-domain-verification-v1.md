@@ -2,8 +2,8 @@
 title: 开放商业开发者 App 主页域名控制证明 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: implementation_compiled_local_state_verified
 ---
 
 # 开放商业开发者 App 主页域名控制证明 V1
