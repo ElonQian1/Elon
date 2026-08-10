@@ -62,7 +62,12 @@ class ChatGptWebObservedStateTest {
         )
 
         now += 10
-        state.accept(ChatGptWebEvent.CommandResult("list_conversations", false, "官网变化"))
+        state.accept(ChatGptWebEvent.CommandResult(
+            "list_conversations",
+            false,
+            "官网变化",
+            requestId = request.id,
+        ))
         val completed = state.snapshot().commandRequests.single()
         assertEquals(request.id, completed.id)
         assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, completed.status)
@@ -70,6 +75,41 @@ class ChatGptWebObservedStateTest {
         assertEquals("官网变化", completed.result?.detail)
         assertEquals(now, completed.completedAtMs)
         assertEquals(now, state.snapshot().lastCommandObservedAtMs)
+    }
+
+    @Test
+    fun concurrentCommandsCompleteOnlyTheirCorrelatedRequest() {
+        var now = 2_000L
+        val state = ChatGptWebObservedState { now }
+        val first = state.beginCommand("invoke_ui_control")
+        val second = state.beginCommand("invoke_ui_control")
+
+        now += 10
+        state.accept(ChatGptWebEvent.CommandResult(
+            "invoke_ui_control",
+            true,
+            "second",
+            requestId = second.id,
+        ))
+        var requests = state.snapshot().commandRequests
+        assertEquals(ChatGptWebObservedState.CommandRequest.PENDING, requests[0].status)
+        assertEquals(ChatGptWebObservedState.CommandRequest.SUCCEEDED, requests[1].status)
+
+        now += 10
+        state.accept(ChatGptWebEvent.CommandResult("invoke_ui_control", true, "native"))
+        requests = state.snapshot().commandRequests
+        assertEquals(ChatGptWebObservedState.CommandRequest.PENDING, requests[0].status)
+
+        now += 10
+        state.accept(ChatGptWebEvent.CommandResult(
+            "invoke_ui_control",
+            false,
+            "first",
+            requestId = first.id,
+        ))
+        requests = state.snapshot().commandRequests
+        assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, requests[0].status)
+        assertEquals(ChatGptWebObservedState.CommandRequest.SUCCEEDED, requests[1].status)
     }
 
     @Test

@@ -87,30 +87,43 @@ internal class ChatGptWebPageAdapter(
         }
     }
 
-    fun sendPrompt(prompt: String, expectedDraft: String) = runCommand(
+    fun sendPrompt(prompt: String, expectedDraft: String, requestId: String? = null) = runCommand(
         action = "send_prompt",
         value = prompt.take(MAX_PROMPT_LENGTH),
         expectedDraft = expectedDraft.take(MAX_PROMPT_LENGTH),
+        requestId = requestId,
     )
 
     fun stopGeneration() = runCommand("stop_generation")
+
+    fun stopGeneration(requestId: String) = runCommand("stop_generation", requestId = requestId)
 
     fun regenerateResponse() = runCommand("regenerate_response")
 
     fun startNewConversation() = runCommand("new_conversation")
 
+    fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)
+
     fun listConversations() = runCommand("list_conversations")
+
+    fun listConversations(requestId: String) = runCommand("list_conversations", requestId = requestId)
 
     fun openConversation(path: String) = runCommand(
         action = "open_conversation",
         value = path.take(MAX_CONVERSATION_PATH_LENGTH),
     )
 
+    fun openConversation(path: String, requestId: String) = runCommand(
+        action = "open_conversation",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+        requestId = requestId,
+    )
+
     fun startGoogleLogin() = runCommand("start_google_login")
 
-    fun listModelOptions() = runCommand("list_model_options")
+    fun listModelOptions(requestId: String? = null) = runCommand("list_model_options", requestId = requestId)
 
-    fun listComposerTools() = runCommand("list_composer_tools")
+    fun listComposerTools(requestId: String? = null) = runCommand("list_composer_tools", requestId = requestId)
 
     fun collectModelOptions() = runCommand("collect_model_options")
 
@@ -118,29 +131,58 @@ internal class ChatGptWebPageAdapter(
 
     fun dismissComposerMenu() = runCommand("dismiss_composer_menu")
 
-    fun selectModelOption(id: String) = runCommand("select_model_option", id.take(MAX_OPTION_ID_LENGTH))
+    fun selectModelOption(id: String, requestId: String? = null) = runCommand(
+        "select_model_option",
+        id.take(MAX_OPTION_ID_LENGTH),
+        requestId = requestId,
+    )
 
-    fun selectComposerTool(id: String) = runCommand("select_composer_tool", id.take(MAX_OPTION_ID_LENGTH))
+    fun selectComposerTool(id: String, requestId: String? = null) = runCommand(
+        "select_composer_tool",
+        id.take(MAX_OPTION_ID_LENGTH),
+        requestId = requestId,
+    )
 
     fun startDictation() = runCommand("start_dictation")
 
     fun cancelDictation() = runCommand("cancel_dictation")
 
+    fun cancelDictation(requestId: String) = runCommand("cancel_dictation", requestId = requestId)
+
     fun submitDictation() = runCommand("submit_dictation")
+
+    fun submitDictation(requestId: String) = runCommand("submit_dictation", requestId = requestId)
 
     fun removeAttachment(id: String) = runCommand("remove_attachment", id.take(MAX_OPTION_ID_LENGTH))
 
     fun listFeatures() = runCommand("list_navigation")
 
+    fun listFeatures(requestId: String) = runCommand("list_navigation", requestId = requestId)
+
     fun collectFeatures() = runCommand("collect_navigation")
 
     fun selectFeature(id: String) = runCommand("select_navigation", id.take(MAX_OPTION_ID_LENGTH))
+
+    fun selectFeature(id: String, requestId: String) = runCommand(
+        "select_navigation",
+        id.take(MAX_OPTION_ID_LENGTH),
+        requestId = requestId,
+    )
 
     fun dismissFeatures() = runCommand("dismiss_navigation")
 
     fun requestUiManifest() = runCommand("snapshot_ui_manifest")
 
-    fun invokeUiControl(id: String) = runCommand("invoke_ui_control", id.take(MAX_UI_CONTROL_ID_LENGTH))
+    fun requestUiManifest(requestId: String) = runCommand(
+        "snapshot_ui_manifest",
+        requestId = requestId,
+    )
+
+    fun invokeUiControl(id: String, requestId: String? = null) = runCommand(
+        "invoke_ui_control",
+        id.take(MAX_UI_CONTROL_ID_LENGTH),
+        requestId = requestId,
+    )
 
     fun requestSnapshot() = runCommand("snapshot")
 
@@ -180,6 +222,7 @@ internal class ChatGptWebPageAdapter(
         action: String,
         value: String? = null,
         expectedDraft: String? = null,
+        requestId: String? = null,
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
@@ -187,6 +230,7 @@ internal class ChatGptWebPageAdapter(
             .apply {
                 if (value != null) put("value", value)
                 if (expectedDraft != null) put("expectedDraft", expectedDraft)
+                if (requestId != null && REQUEST_ID.matches(requestId)) put("requestId", requestId)
             }
             .toString()
         val encoded = JSONObject.quote(command)
@@ -200,7 +244,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 27
+        internal const val ADAPTER_VERSION = 28
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -219,5 +263,6 @@ internal class ChatGptWebPageAdapter(
         private const val MAX_CONVERSATION_PATH_LENGTH = 256
         private const val MAX_OPTION_ID_LENGTH = 64
         private const val MAX_UI_CONTROL_ID_LENGTH = 72
+        private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
     }
 }

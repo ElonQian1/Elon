@@ -32,7 +32,7 @@ internal object ChatGptWebCommandReceipts {
             .put("action", value.action)
             .put("ok", value.ok)
             .put("detail", value.detail)
-            .put("request_id", requestId ?: JSONObject.NULL)
+            .put("request_id", requestId ?: value.requestId ?: JSONObject.NULL)
             .put("observed_at_ms", observedAtMs ?: JSONObject.NULL)
     }
 }

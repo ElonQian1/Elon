@@ -87,6 +87,7 @@ internal sealed interface ChatGptWebEvent {
         val action: String,
         val ok: Boolean,
         val detail: String,
+        val requestId: String? = null,
     ) : ChatGptWebEvent
 }
 
@@ -113,6 +114,9 @@ internal object ChatGptWebProtocol {
                 action = payload.optString("action").take(40),
                 ok = payload.optBoolean("ok"),
                 detail = payload.optString("detail").take(160),
+                requestId = payload.optString("requestId")
+                    .take(MAX_REQUEST_ID_LENGTH)
+                    .takeIf(REQUEST_ID::matches),
             )
             else -> null
         }
@@ -399,6 +403,7 @@ internal object ChatGptWebProtocol {
     )
     private const val MAX_MESSAGES = 80
     private const val MAX_OBSERVED_MESSAGES = 1_000_000
+    private const val MAX_REQUEST_ID_LENGTH = 36
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
     private const val MAX_STRUCTURED_MESSAGE_PARTS = 16
@@ -456,4 +461,5 @@ internal object ChatGptWebProtocol {
     private val UI_ROLES = setOf("button", "link", "menuitem", "switch", "tab")
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
+    private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
 }

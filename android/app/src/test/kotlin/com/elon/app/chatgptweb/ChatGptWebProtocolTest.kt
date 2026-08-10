@@ -25,6 +25,19 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun parsesOnlyBoundedMcpRequestIdsFromCommandResults() {
+        val correlated = ChatGptWebProtocol.parse(
+            """{"type":"command_result","adapterVersion":28,"action":"send_prompt","ok":true,"requestId":"mcp_a9"}""",
+        ) as ChatGptWebEvent.CommandResult
+        val malformed = ChatGptWebProtocol.parse(
+            """{"type":"command_result","adapterVersion":28,"action":"send_prompt","ok":true,"requestId":"../../other"}""",
+        ) as ChatGptWebEvent.CommandResult
+
+        assertEquals("mcp_a9", correlated.requestId)
+        assertNull(malformed.requestId)
+    }
+
+    @Test
     fun parsesBoundedConversationSnapshots() {
         val event = ChatGptWebProtocol.parse(
             """

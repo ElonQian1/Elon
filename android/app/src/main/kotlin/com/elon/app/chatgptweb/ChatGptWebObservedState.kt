@@ -23,7 +23,7 @@ internal class ChatGptWebObservedState(
             is ChatGptWebEvent.CommandResult -> {
                 lastCommand = event
                 lastCommandObservedAtMs = observedAtMs
-                completeOldestRequest(event, observedAtMs)
+                completeRequest(event, observedAtMs)
             }
             else -> return
         }
@@ -61,12 +61,15 @@ internal class ChatGptWebObservedState(
         )
     }
 
-    private fun completeOldestRequest(
+    private fun completeRequest(
         event: ChatGptWebEvent.CommandResult,
         observedAtMs: Long,
     ) {
+        val requestId = event.requestId ?: return
         val index = commandRequests.indexOfFirst {
-            it.status == CommandRequest.PENDING && it.expectedAction == event.action
+            it.status == CommandRequest.PENDING &&
+                it.id == requestId &&
+                it.expectedAction == event.action
         }
         if (index < 0) return
         commandRequests = commandRequests.toMutableList().apply {

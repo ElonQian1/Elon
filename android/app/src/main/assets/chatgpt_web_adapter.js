@@ -186,15 +186,17 @@
     return comparableText(composerValue(composer)) === comparableText(value);
   }
 
-  function result(action, ok, detail) {
+  function result(action, ok, detail, requestId) {
     if (disposed) return;
-    nativeBridge.postMessage(JSON.stringify({
+    const event = {
       type: 'command_result',
       adapterVersion,
       action,
       ok,
       detail: detail || ''
-    }));
+    };
+    if (requestId) event.requestId = requestId;
+    nativeBridge.postMessage(JSON.stringify(event));
   }
 
   function findSendButton(composer) {
@@ -221,28 +223,28 @@
     poll();
   }
 
-  function sendPrompt(value, expectedDraft) {
+  function sendPrompt(value, expectedDraft, respond) {
     const composer = findComposer();
-    if (!composer) return result('send_prompt', false, '未找到输入框，请切换网页模式。');
+    if (!composer) return respond('send_prompt', false, '未找到输入框，请切换网页模式。');
     if (comparableText(composerValue(composer)) !== comparableText(expectedDraft)) {
-      return result('send_prompt', false, '网页草稿已变化，请返回官网确认后重试。');
+      return respond('send_prompt', false, '网页草稿已变化，请返回官网确认后重试。');
     }
     if (!setComposerValue(composer, value)) {
-      return result('send_prompt', false, '官方输入框未接受文本，请返回官网重试。');
+      return respond('send_prompt', false, '官方输入框未接受文本，请返回官网重试。');
     }
     waitForReady(
       () => findSendButton(composer),
       2500,
       (button) => {
-        result('send_prompt', true, '已交给官方网页发送。');
+        respond('send_prompt', true, '已交给官方网页发送。');
         button.click();
         scheduleSnapshot();
       },
-      () => result('send_prompt', false, '发送按钮尚未就绪，请返回官网重试。')
+      () => respond('send_prompt', false, '发送按钮尚未就绪，请返回官网重试。')
     );
   }
 
-  function startGoogleLogin() {
+  function startGoogleLogin(respond) {
     const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
     const target = candidates.find((node) => {
       if (!isVisible(node)) return false;
@@ -253,9 +255,9 @@
       ].filter(Boolean).join(' ')).toLowerCase();
       return label.includes('google');
     });
-    if (!target) return result('start_google_login', false, '官方 Google 登录入口尚未就绪。');
+    if (!target) return respond('start_google_login', false, '官方 Google 登录入口尚未就绪。');
     target.click();
-    result('start_google_login', true, '');
+    respond('start_google_login', true, '');
   }
 
   function runCommand(raw) {
@@ -263,101 +265,105 @@
     try { command = JSON.parse(String(raw || '{}')); }
     catch { return result('unknown', false, '命令格式无效。'); }
     const action = String(command.action || '');
+    const rawRequestId = String(command.requestId || '');
+    const requestId = /^mcp_[a-z0-9]{1,32}$/.test(rawRequestId) ? rawRequestId : '';
+    const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     if (action === 'snapshot') return snapshot();
     if (action === 'snapshot_ui_manifest' && layoutAdapter) {
       layoutAdapter.emitSnapshot(emitEvent, true);
-      return result(action, true, '');
+      return respond(action, true, '');
     }
     if (action === 'invoke_ui_control' && layoutAdapter) {
-      return layoutAdapter.invoke(String(command.value || ''), emitEvent, result);
+      return layoutAdapter.invoke(String(command.value || ''), emitEvent, respond);
     }
     if (action === 'send_prompt') {
       return sendPrompt(
         String(command.value || '').slice(0, 20000),
-        String(command.expectedDraft || '').slice(0, 20000)
+        String(command.expectedDraft || '').slice(0, 20000),
+        respond
       );
     }
-    if (action === 'start_google_login') return startGoogleLogin();
+    if (action === 'start_google_login') return startGoogleLogin(respond);
     if (action === 'list_model_options' && composerAdapter) {
-      return composerAdapter.requestOptions('model', findComposer(), emitEvent, result);
+      return composerAdapter.requestOptions('model', findComposer(), emitEvent, respond);
     }
     if (action === 'list_composer_tools' && composerAdapter) {
-      return composerAdapter.requestOptions('tools', findComposer(), emitEvent, result);
+      return composerAdapter.requestOptions('tools', findComposer(), emitEvent, respond);
     }
     if (action === 'collect_model_options' && composerAdapter) {
-      return composerAdapter.collectRequestedOptions('model', findComposer(), emitEvent, result);
+      return composerAdapter.collectRequestedOptions('model', findComposer(), emitEvent, respond);
     }
     if (action === 'collect_composer_tools' && composerAdapter) {
-      return composerAdapter.collectRequestedOptions('tools', findComposer(), emitEvent, result);
+      return composerAdapter.collectRequestedOptions('tools', findComposer(), emitEvent, respond);
     }
     if (action === 'select_model_option' && composerAdapter) {
       return composerAdapter.selectOption(
-        'model', String(command.value || ''), findComposer(), emitEvent, result, scheduleSnapshot
+        'model', String(command.value || ''), findComposer(), emitEvent, respond, scheduleSnapshot
       );
     }
     if (action === 'select_composer_tool' && composerAdapter) {
       return composerAdapter.selectOption(
-        'tools', String(command.value || ''), findComposer(), emitEvent, result, scheduleSnapshot
+        'tools', String(command.value || ''), findComposer(), emitEvent, respond, scheduleSnapshot
       );
     }
     if (action === 'open_model_selector' && composerAdapter) {
-      return composerAdapter.openOfficial('model', findComposer(), emitEvent, result);
+      return composerAdapter.openOfficial('model', findComposer(), emitEvent, respond);
     }
     if (action === 'open_composer_tools' && composerAdapter) {
-      return composerAdapter.openOfficial('tools', findComposer(), emitEvent, result);
+      return composerAdapter.openOfficial('tools', findComposer(), emitEvent, respond);
     }
     if (action === 'start_dictation' && composerAdapter) {
-      return composerAdapter.startDictation(findComposer(), emitEvent, result);
+      return composerAdapter.startDictation(findComposer(), emitEvent, respond);
     }
     if (action === 'cancel_dictation' && composerAdapter) {
-      return composerAdapter.cancelDictation(emitEvent, result);
+      return composerAdapter.cancelDictation(emitEvent, respond);
     }
     if (action === 'submit_dictation' && composerAdapter) {
-      return composerAdapter.submitDictation(emitEvent, result);
+      return composerAdapter.submitDictation(emitEvent, respond);
     }
     if (action === 'remove_attachment' && composerAdapter) {
-      return composerAdapter.removeAttachment(String(command.value || ''), emitEvent, result);
+      return composerAdapter.removeAttachment(String(command.value || ''), emitEvent, respond);
     }
     if (action === 'dismiss_composer_menu' && composerAdapter) {
-      return composerAdapter.dismissOpenMenu(result);
+      return composerAdapter.dismissOpenMenu(respond);
     }
     if (action === 'list_navigation' && navigationAdapter) {
-      return navigationAdapter.requestList(emitEvent, result);
+      return navigationAdapter.requestList(emitEvent, respond);
     }
     if (action === 'collect_navigation' && navigationAdapter) {
-      return navigationAdapter.collectList(emitEvent, result);
+      return navigationAdapter.collectList(emitEvent, respond);
     }
     if (action === 'select_navigation' && navigationAdapter) {
-      return navigationAdapter.selectFeature(String(command.value || ''), emitEvent, result);
+      return navigationAdapter.selectFeature(String(command.value || ''), emitEvent, respond);
     }
     if (action === 'dismiss_navigation' && navigationAdapter) {
-      return navigationAdapter.dismiss(emitEvent, result);
+      return navigationAdapter.dismiss(emitEvent, respond);
     }
     if (action === 'list_conversations' && conversationAdapter) {
-      return conversationAdapter.requestList(emitEvent, result);
+      return conversationAdapter.requestList(emitEvent, respond);
     }
     if (action === 'open_conversation' && conversationAdapter) {
       if (comparableText(composerValue(findComposer()))) {
-        return result(action, false, '网页中有未发送草稿，请先处理草稿。');
+        return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
-      return conversationAdapter.openConversation(String(command.value || ''), result);
+      return conversationAdapter.openConversation(String(command.value || ''), respond);
     }
     if (action === 'regenerate_response' && messageAdapter) {
-      return messageAdapter.regenerate(result);
+      return messageAdapter.regenerate(respond);
     }
     if (action === 'stop_generation') {
       const stop = findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
-      if (!stop) return result(action, false, '当前没有正在生成的回复。');
+      if (!stop) return respond(action, false, '当前没有正在生成的回复。');
       stop.click();
-      result(action, true, '');
+      respond(action, true, '');
       return scheduleSnapshot();
     }
     if (action === 'new_conversation') {
       if (comparableText(composerValue(findComposer()))) {
-        return result(action, false, '网页中有未发送草稿，请先处理草稿。');
+        return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
       if (location.pathname === '/') {
-        result(action, true, '');
+        respond(action, true, '');
         return scheduleSnapshot();
       }
       const button = findButton('create-new-chat-button', ['new chat', '新聊天', '新建聊天']);
@@ -365,12 +371,12 @@
         document.querySelectorAll('a[href="/"], a[data-testid="create-new-chat-button"]')
       ).find(isVisible);
       const target = button || link;
-      if (!target) return result(action, false, '未找到新建会话入口。');
-      result(action, true, '');
+      if (!target) return respond(action, false, '未找到新建会话入口。');
+      respond(action, true, '');
       target.click();
       return scheduleSnapshot();
     }
-    result(action || 'unknown', false, '不支持的本地命令。');
+    respond(action || 'unknown', false, '不支持的本地命令。');
   }
 
   function dispose() {
