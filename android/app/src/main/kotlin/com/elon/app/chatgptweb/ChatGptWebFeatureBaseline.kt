@@ -52,6 +52,8 @@ internal object ChatGptWebFeatureBaseline {
                 "official_authentication" -> snapshot?.authenticated == true
                 "official_fullscreen_fallback" -> mode == ChatGptWebModeController.Mode.WEB
                 "native_chat_composer" -> snapshot?.composerReady == true
+                "disclosure_controls" -> manifest?.controls.orEmpty()
+                    .any(ChatGptWebUiControl::supportsExpandedState)
                 else -> feature.capabilityIds.any(advertised::contains) ||
                     feature.semantics.any { semantics[it].orZero() > 0 }
             }
@@ -315,9 +317,19 @@ internal object ChatGptWebFeatureBaseline {
                 "chatgpt_set_control_selected",
                 "chatgpt_select_control_choice",
                 "chatgpt_set_control_slider",
+                "chatgpt_set_control_expanded",
             ),
             semantics = setOf("text_input", "selection", "toggle", "slider", "confirm"),
             remainingGap = "official_feature_form_matrix_device_acceptance",
+        ),
+        feature(
+            id = "disclosure_controls",
+            group = "adaptation",
+            status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_set_control_expanded", "chatgpt_find_controls"),
+            remainingGap = "expand_collapse_restore_device_acceptance",
         ),
         feature(
             id = "official_change_detection",

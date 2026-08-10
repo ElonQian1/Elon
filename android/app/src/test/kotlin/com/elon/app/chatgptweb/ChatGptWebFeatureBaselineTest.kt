@@ -74,6 +74,17 @@ class ChatGptWebFeatureBaselineTest {
                     enabled = true,
                     selected = false,
                 ),
+                ChatGptWebUiControl(
+                    id = "control_project_tree",
+                    semantic = "navigation",
+                    label = "Project",
+                    region = ChatGptWebUiRegion.CONTENT,
+                    role = "treeitem",
+                    enabled = true,
+                    selected = false,
+                    expanded = false,
+                    expandable = true,
+                ),
             ),
         )
 
@@ -89,6 +100,7 @@ class ChatGptWebFeatureBaselineTest {
         val voice = feature(baseline, "realtime_voice")
         assertTrue(voice.getBoolean("current_page_observed"))
         assertEquals("fallback_only", voice.getString("implementation_status"))
+        assertTrue(feature(baseline, "disclosure_controls").getBoolean("current_page_observed"))
         assertFalse(feature(baseline, "projects").getBoolean("current_page_observed"))
     }
 
@@ -144,6 +156,7 @@ class ChatGptWebFeatureBaselineTest {
             "apps",
             "settings",
             "adaptive_form_controls",
+            "disclosure_controls",
             "official_change_detection",
             "stable_mcp_and_adb_controls",
         )
@@ -156,6 +169,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_set_control_selected",
             "chatgpt_select_control_choice",
             "chatgpt_set_control_slider",
+            "chatgpt_set_control_expanded",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",
@@ -165,6 +179,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_select_composer_option",
             "chatgpt_select_feature",
             "chatgpt_get_context",
+            "chatgpt_find_controls",
             "chatgpt_get_conversations",
             "chatgpt_get_navigation",
             "chatgpt_get_capability_matrix",
