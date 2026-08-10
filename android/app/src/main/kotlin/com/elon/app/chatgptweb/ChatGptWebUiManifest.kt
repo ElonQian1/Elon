@@ -23,6 +23,7 @@ internal data class ChatGptWebUiControl(
     val stateSettable: Boolean = false,
     val choiceLabels: List<String> = emptyList(),
     val selectedChoiceIndex: Int? = null,
+    val slider: ChatGptWebSlider? = null,
     val contextId: String? = null,
     val inViewport: Boolean = true,
     val webXRatio: Double? = null,
@@ -37,8 +38,21 @@ internal data class ChatGptWebUiControl(
     val supportsChoiceSelection: Boolean
         get() = enabled && role == "combobox" && inputKind == "select" && choiceLabels.isNotEmpty()
 
+    val supportsSliderValue: Boolean
+        get() = enabled && role == "slider" && inputKind == "range" && slider != null
+
     val accessibilityLabel: String
         get() = "chatgpt-control:$id:$label"
+}
+
+internal data class ChatGptWebSlider(
+    val min: Double,
+    val max: Double,
+    val step: Double,
+    val value: Double,
+) {
+    val stepCount: Int
+        get() = kotlin.math.round((max - min) / step).toInt()
 }
 
 internal object ChatGptWebUiRegion {

@@ -183,12 +183,59 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun nativeSlidersExposeBoundsAndDispatchTargetValues() {
+        var sliderTarget: Pair<String, Double>? = null
+        val actions = actions(
+            includeSliderControl = true,
+            onSetControlSlider = { id, value -> sliderTarget = id to value },
+        )
+
+        val result = actions.control(JSONObject()
+            .put("action", "chatgpt_set_control_slider")
+            .put("control_id", "control_effort_demo")
+            .put("value", 1.5))
+        val slider = actions.uiState().getJSONObject("ui_manifest")
+            .getJSONArray("controls").getJSONObject(2).getJSONObject("slider")
+
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals("control_effort_demo" to 1.5, sliderTarget)
+        assertEquals(0.0, slider.getDouble("min"), 0.0)
+        assertEquals(2.0, slider.getDouble("max"), 0.0)
+        assertEquals(0.5, slider.getDouble("step"), 0.0)
+        assertEquals(1.0, slider.getDouble("value"), 0.0)
+        assertEquals(
+            "chatgpt-control-slider:control_effort_demo",
+            slider.getString("native_input_content_description"),
+        )
+
+        val rejected = actions.control(JSONObject()
+            .put("action", "chatgpt_set_control_slider")
+            .put("control_id", "control_effort_demo")
+            .put("value", 3))
+        assertFalse(rejected.getBoolean("control_ok"))
+        assertEquals("slider_value_out_of_range", rejected.getString("error"))
+    }
+
+    @Test
+    fun unsupportedAriaSlidersRejectBlindGenericInvocation() {
+        val actions = actions(includeUnsupportedSlider = true)
+
+        val result = actions.control(JSONObject()
+            .put("action", "chatgpt_invoke_control")
+            .put("control_id", "control_aria_slider_demo"))
+
+        assertFalse(result.getBoolean("control_ok"))
+        assertEquals("control_requires_official_fallback", result.getString("error"))
+    }
+
+    @Test
     fun everyAcknowledgedWebCommandPassesItsReceiptIdToTheCommandPort() {
         val dispatched = mutableListOf<Pair<String, String>>()
         val actions = actions(
             dictationActive = true,
             includeWritableControl = true,
             includeFormControls = true,
+            includeSliderControl = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
         val commands = listOf(
@@ -204,6 +251,9 @@ class ChatGptWebMcpActionsTest {
             JSONObject().put("action", "chatgpt_select_control_choice")
                 .put("control_id", "control_model_demo")
                 .put("choice_index", 1) to "select_ui_control_choice",
+            JSONObject().put("action", "chatgpt_set_control_slider")
+                .put("control_id", "control_effort_demo")
+                .put("value", 1.5) to "set_ui_control_slider",
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
@@ -557,9 +607,12 @@ class ChatGptWebMcpActionsTest {
         onInvoke: (String) -> Unit = {},
         includeWritableControl: Boolean = false,
         includeFormControls: Boolean = false,
+        includeSliderControl: Boolean = false,
+        includeUnsupportedSlider: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
         onSetControlSelected: (String, Boolean) -> Unit = { _, _ -> },
         onSelectControlChoice: (String, Int) -> Unit = { _, _ -> },
+        onSetControlSlider: (String, Double) -> Unit = { _, _ -> },
         onStartDictation: () -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -673,6 +726,31 @@ class ChatGptWebMcpActionsTest {
                         selectedChoiceIndex = 0,
                     ))
                 }
+                if (includeSliderControl) {
+                    add(ChatGptWebUiControl(
+                        id = "control_effort_demo",
+                        semantic = "slider",
+                        label = "思考强度",
+                        region = ChatGptWebUiRegion.CONTENT,
+                        role = "slider",
+                        enabled = true,
+                        selected = false,
+                        inputKind = "range",
+                        slider = ChatGptWebSlider(0.0, 2.0, 0.5, 1.0),
+                    ))
+                }
+                if (includeUnsupportedSlider) {
+                    add(ChatGptWebUiControl(
+                        id = "control_aria_slider_demo",
+                        semantic = "slider",
+                        label = "自定义强度",
+                        region = ChatGptWebUiRegion.CONTENT,
+                        role = "slider",
+                        enabled = true,
+                        selected = false,
+                        inputKind = "range",
+                    ))
+                }
             },
         )
         var nextCommandId = 0
@@ -745,6 +823,15 @@ class ChatGptWebMcpActionsTest {
                 ) {
                     onSelectControlChoice(controlId, choiceIndex)
                     onDispatch("select_ui_control_choice", requestId)
+                }
+
+                override fun setControlSlider(
+                    controlId: String,
+                    value: Double,
+                    requestId: String,
+                ) {
+                    onSetControlSlider(controlId, value)
+                    onDispatch("set_ui_control_slider", requestId)
                 }
 
                 override fun newConversation(requestId: String) =

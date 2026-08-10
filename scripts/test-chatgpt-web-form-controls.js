@@ -9,6 +9,9 @@ function control(options = {}) {
   return {
     tagName: options.tagName || 'INPUT',
     type: options.type || '',
+    min: options.min || '',
+    max: options.max || '',
+    step: options.step || '',
     disabled: !!options.disabled,
     readOnly: !!options.readOnly,
     checked: !!options.checked,
@@ -39,6 +42,11 @@ assert.deepEqual(forms.describe(search), {
   stateSettable: false,
   choiceLabels: [],
   selectedChoiceIndex: -1,
+  sliderSettable: false,
+  sliderMin: null,
+  sliderMax: null,
+  sliderStep: null,
+  sliderValue: null,
   label: 'Search chats'
 });
 assert.equal(forms.setText(search, 'release notes').ok, true);
@@ -89,6 +97,26 @@ assert.equal(forms.selectChoice(modelSelect, 1).ok, true);
 assert.equal(modelSelect.selectedIndex, 1);
 assert.deepEqual(modelSelect.events, ['input', 'change']);
 assert.equal(forms.selectChoice(modelSelect, 3).reason, 'invalid_choice');
+
+const range = control({
+  type: 'range',
+  min: '0',
+  max: '2',
+  step: '0.5',
+  value: '1',
+  attributes: { 'aria-label': 'Thinking effort' }
+});
+const rangeDetails = forms.describe(range);
+assert.equal(rangeDetails.role, 'slider');
+assert.equal(rangeDetails.sliderSettable, true);
+assert.equal(rangeDetails.sliderMin, 0);
+assert.equal(rangeDetails.sliderMax, 2);
+assert.equal(rangeDetails.sliderStep, 0.5);
+assert.equal(rangeDetails.sliderValue, 1);
+assert.equal(forms.setSliderValue(range, 1.6).ok, true);
+assert.equal(range.value, '1.5');
+assert.deepEqual(range.events, ['input', 'change']);
+assert.equal(forms.setSliderValue(range, Number.NaN).reason, 'invalid_value');
 
 const richText = control({
   tagName: 'DIV',

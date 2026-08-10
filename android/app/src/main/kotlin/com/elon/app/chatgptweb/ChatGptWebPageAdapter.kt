@@ -213,6 +213,13 @@ internal class ChatGptWebPageAdapter(
         choiceIndex = choiceIndex,
     )
 
+    fun setUiControlSlider(id: String, value: Double, requestId: String? = null) = runCommand(
+        action = "set_ui_control_slider",
+        requestId = requestId,
+        controlId = id.take(MAX_UI_CONTROL_ID_LENGTH),
+        numericValue = value,
+    )
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)
@@ -255,6 +262,7 @@ internal class ChatGptWebPageAdapter(
         controlId: String? = null,
         selected: Boolean? = null,
         choiceIndex: Int? = null,
+        numericValue: Double? = null,
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
@@ -266,6 +274,7 @@ internal class ChatGptWebPageAdapter(
                 if (controlId != null) put("controlId", controlId)
                 if (selected != null) put("selected", selected)
                 if (choiceIndex != null) put("choiceIndex", choiceIndex)
+                if (numericValue != null && numericValue.isFinite()) put("numericValue", numericValue)
             }
             .toString()
         val encoded = JSONObject.quote(command)
@@ -279,7 +288,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 32
+        internal const val ADAPTER_VERSION = 33
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

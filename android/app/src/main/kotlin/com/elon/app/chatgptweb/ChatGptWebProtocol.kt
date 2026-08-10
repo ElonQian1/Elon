@@ -299,6 +299,7 @@ internal object ChatGptWebProtocol {
                 }
                 val selectedChoiceIndex = item.optInt("selectedChoiceIndex", -1)
                     .takeIf { it in choiceLabels.indices }
+                val slider = parseSlider(item, role, inputKind)
                 val contextId = item.optString("contextId")
                     .takeIf { it.isNotBlank() && UI_CONTEXT_ID.matches(it) }
                 val webXRatio = boundedRatio(item, "xRatio")
@@ -318,6 +319,7 @@ internal object ChatGptWebProtocol {
                         stateSettable = stateSettable,
                         choiceLabels = choiceLabels,
                         selectedChoiceIndex = selectedChoiceIndex,
+                        slider = slider,
                         contextId = contextId,
                         inViewport = item.optBoolean("inViewport", true),
                         webXRatio = webXRatio,
@@ -365,6 +367,20 @@ internal object ChatGptWebProtocol {
                 )
             }
         }
+    }
+
+    private fun parseSlider(item: JSONObject, role: String, inputKind: String?): ChatGptWebSlider? {
+        if (!item.optBoolean("sliderSettable") || role != "slider" || inputKind != "range") return null
+        val min = item.optDouble("sliderMin", Double.NaN)
+        val max = item.optDouble("sliderMax", Double.NaN)
+        val step = item.optDouble("sliderStep", Double.NaN)
+        val value = item.optDouble("sliderValue", Double.NaN)
+        if (!listOf(min, max, step, value).all(Double::isFinite)) return null
+        if (max <= min || step <= 0 || value !in min..max) return null
+        val rawSteps = (max - min) / step
+        val roundedSteps = kotlin.math.round(rawSteps)
+        if (kotlin.math.abs(rawSteps - roundedSteps) > 1e-7 || roundedSteps !in 1.0..10_000.0) return null
+        return ChatGptWebSlider(min, max, step, value)
     }
 
     private fun boundedRatio(value: JSONObject, key: String): Double? {
@@ -453,7 +469,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_UI_CONTROL_LABEL_LENGTH = 160
     private const val MAX_UI_CHOICE_OPTIONS = 50
     private const val MAX_UI_CHOICE_LABEL_LENGTH = 120
-    private const val MAX_UI_MANIFEST_VERSION = 6
+    private const val MAX_UI_MANIFEST_VERSION = 7
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")

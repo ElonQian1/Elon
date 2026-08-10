@@ -63,5 +63,15 @@
     window.setTimeout(emitSnapshot, update.changed ? 180 : 0);
   }
 
-  return Object.freeze({ selectChoice, setSelected });
+  function setSliderValue(node, value, formAdapter, result, emitSnapshot) {
+    if (!formAdapter) return result('set_ui_control_slider', false, '官网表单适配器尚未就绪。');
+    const update = formAdapter.setSliderValue(node, value);
+    if (!update.ok) {
+      return result('set_ui_control_slider', false, '该官网滑块不可写，或数值范围已经变化。');
+    }
+    result('set_ui_control_slider', true, '');
+    window.setTimeout(emitSnapshot, update.changed ? 180 : 0);
+  }
+
+  return Object.freeze({ selectChoice, setSelected, setSliderValue });
 });

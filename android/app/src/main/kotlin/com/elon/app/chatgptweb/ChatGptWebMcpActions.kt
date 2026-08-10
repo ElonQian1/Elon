@@ -58,8 +58,10 @@ internal class ChatGptWebMcpActions(
             "chatgpt_invoke_control" -> {
                 val controlId = args.optString("control_id")
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
-                if (uiManifest()?.controls?.none { it.id == controlId } != false) {
-                    return error(action, "stale_control_id")
+                val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
+                    ?: return error(action, "stale_control_id")
+                if (control.role == "slider" && !control.supportsSliderValue) {
+                    return error(action, "control_requires_official_fallback")
                 }
                 dispatch("invoke_ui_control") { requestId ->
                     commands.invokeControl(controlId, requestId)
@@ -109,6 +111,22 @@ internal class ChatGptWebMcpActions(
                 }
                 dispatch("select_ui_control_choice") { requestId ->
                     commands.selectControlChoice(controlId, choiceIndex, requestId)
+                }
+            }
+            "chatgpt_set_control_slider" -> {
+                val controlId = args.optString("control_id")
+                if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
+                val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
+                    ?: return error(action, "stale_control_id")
+                val slider = control.slider
+                    ?.takeIf { control.supportsSliderValue }
+                    ?: return error(action, "control_slider_unavailable")
+                val value = (args.opt("value") as? Number)?.toDouble()
+                    ?.takeIf(Double::isFinite)
+                    ?: return error(action, "missing_slider_value")
+                if (value !in slider.min..slider.max) return error(action, "slider_value_out_of_range")
+                dispatch("set_ui_control_slider") { requestId ->
+                    commands.setControlSlider(controlId, value, requestId)
                 }
             }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
@@ -504,6 +522,19 @@ internal class ChatGptWebMcpActions(
         .put("state_settable", control.supportsSelectedState)
         .put("choice_labels", JSONArray(control.choiceLabels))
         .put("selected_choice_index", control.selectedChoiceIndex ?: JSONObject.NULL)
+        .put(
+            "slider",
+            control.slider?.let { slider ->
+                JSONObject()
+                    .put("min", slider.min)
+                    .put("max", slider.max)
+                    .put("step", slider.step)
+                    .put("value", slider.value)
+                    .put("native_input_content_description", ChatGptNativeSliderControlDialog.sliderSelector(control.id))
+                    .put("native_value_content_description", ChatGptNativeSliderControlDialog.valueSelector(control.id))
+                    .put("native_commit_content_description", ChatGptNativeSliderControlDialog.commitSelector(control.id))
+            } ?: JSONObject.NULL,
+        )
         .put("context_id", control.contextId ?: JSONObject.NULL)
         .put("in_viewport", control.inViewport)
         .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
@@ -597,6 +628,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_control_text",
             "chatgpt_set_control_selected",
             "chatgpt_select_control_choice",
+            "chatgpt_set_control_slider",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",

@@ -314,7 +314,7 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"ui_manifest_snapshot",
-                "version":6,
+                "version":7,
                 "pageKind":"feature",
                 "title":"设置",
                 "compatibility":"healthy",
@@ -322,7 +322,8 @@ class ChatGptWebProtocolTest {
                   {"id":"control_search_ab12","semantic":"search","label":"搜索","region":"content","role":"textbox","inputKind":"search","writable":true},
                   {"id":"control_password_cd34","semantic":"text_input","label":"密码","region":"content","role":"textbox","inputKind":"password","writable":true},
                   {"id":"control_toggle_ef56","semantic":"toggle","label":"启用","region":"content","role":"checkbox","inputKind":"checkbox","writable":true,"stateSettable":true,"selected":true},
-                  {"id":"control_model_gh78","semantic":"selection","label":"模型","region":"content","role":"combobox","inputKind":"select","choiceLabels":["快速","思考"],"selectedChoiceIndex":1}
+                  {"id":"control_model_gh78","semantic":"selection","label":"模型","region":"content","role":"combobox","inputKind":"select","choiceLabels":["快速","思考"],"selectedChoiceIndex":1},
+                  {"id":"control_effort_ij90","semantic":"slider","label":"思考强度","region":"content","role":"slider","inputKind":"range","sliderSettable":true,"sliderMin":0,"sliderMax":2,"sliderStep":0.5,"sliderValue":1.5}
                 ]
               }
             }
@@ -333,6 +334,7 @@ class ChatGptWebProtocolTest {
         val password = event.value.controls[1]
         val toggle = event.value.controls[2]
         val selection = event.value.controls[3]
+        val slider = event.value.controls[4]
         assertEquals("search", search.inputKind)
         assertTrue(search.supportsTextEntry)
         assertFalse(password.writable)
@@ -344,6 +346,11 @@ class ChatGptWebProtocolTest {
         assertEquals(listOf("快速", "思考"), selection.choiceLabels)
         assertEquals(1, selection.selectedChoiceIndex)
         assertTrue(selection.supportsChoiceSelection)
+        assertTrue(slider.supportsSliderValue)
+        assertEquals(0.0, slider.slider?.min ?: -1.0, 0.0)
+        assertEquals(2.0, slider.slider?.max ?: -1.0, 0.0)
+        assertEquals(0.5, slider.slider?.step ?: -1.0, 0.0)
+        assertEquals(1.5, slider.slider?.value ?: -1.0, 0.0)
     }
 
     @Test

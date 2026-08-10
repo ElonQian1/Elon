@@ -311,6 +311,11 @@
         selectedChoiceIndex: form && form.selectedChoiceIndex >= 0
           ? form.selectedChoiceIndex
           : undefined,
+        sliderSettable: !!(form && form.sliderSettable),
+        sliderMin: form && form.sliderSettable ? form.sliderMin : undefined,
+        sliderMax: form && form.sliderSettable ? form.sliderMax : undefined,
+        sliderStep: form && form.sliderSettable ? form.sliderStep : undefined,
+        sliderValue: form && form.sliderSettable ? form.sliderValue : undefined,
         contextId: resolvedContextId || undefined,
         inViewport: isInViewport(rect),
         xRatio: (rect.left + rect.width / 2) / Math.max(1, window.innerWidth),
@@ -434,7 +439,7 @@
     const kind = pageKind();
     return {
       type: 'ui_manifest_snapshot',
-      version: 5,
+      version: 7,
       pageKind: kind,
       title: pageTitle(controls),
       compatibility: compatibilityFor(controls, kind),
@@ -465,6 +470,11 @@
         stateSettable: control.stateSettable,
         choiceLabels: control.choiceLabels,
         selectedChoiceIndex: control.selectedChoiceIndex,
+        sliderSettable: control.sliderSettable,
+        sliderMin: control.sliderMin,
+        sliderMax: control.sliderMax,
+        sliderStep: control.sliderStep,
+        sliderValue: control.sliderValue,
         contextId: control.contextId,
         inViewport: control.inViewport
       }))
@@ -562,6 +572,18 @@
     );
   }
 
+  function setSliderValue(id, value, emitEvent, result) {
+    discover();
+    const node = controlsById.get(String(id || ''));
+    if (!node || !isVisible(node) || !formCommands) {
+      return result('set_ui_control_slider', false, '官网滑块已变化，请刷新结构后重试。');
+    }
+    return formCommands.setSliderValue(
+      node, value, formAdapter, result,
+      () => emitSnapshot(emitEvent, true)
+    );
+  }
+
   window.__elonChatGptLayout = Object.freeze({
     emitSnapshot,
     invoke,
@@ -569,6 +591,7 @@
     requestSemanticTouch,
     selectChoice,
     setSelected,
+    setSliderValue,
     setText
   });
 })();

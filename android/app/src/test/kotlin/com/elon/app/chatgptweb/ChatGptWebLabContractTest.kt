@@ -113,6 +113,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("action === 'list_conversations'"))
         assertTrue(adapter.contains("action === 'open_conversation'"))
         assertTrue(adapter.contains("action === 'set_ui_control_text'"))
+        assertTrue(adapter.contains("action === 'set_ui_control_slider'"))
         assertTrue(conversations.contains("if (location.pathname === '/')"))
         assertTrue(adapter.contains("action === 'regenerate_response'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
@@ -127,6 +128,7 @@ class ChatGptWebLabContractTest {
         assertTrue(formControls.contains("function setText"))
         assertTrue(formControls.contains("function planSelectedState"))
         assertTrue(formControls.contains("function selectChoice"))
+        assertTrue(formControls.contains("function setSliderValue"))
         assertTrue(formCommands.contains("purpose: 'invoke_ui_control'"))
         assertTrue(formControls.contains("kind === 'password'"))
         assertFalse(formControls.contains("node.value ||"))
@@ -245,6 +247,7 @@ class ChatGptWebLabContractTest {
         assertTrue(commandPort.contains("fun setControlText(controlId: String, text: String, requestId: String)"))
         assertTrue(commandPort.contains("fun setControlSelected(controlId: String, selected: Boolean, requestId: String)"))
         assertTrue(commandPort.contains("fun selectControlChoice(controlId: String, choiceIndex: Int, requestId: String)"))
+        assertTrue(commandPort.contains("fun setControlSlider(controlId: String, value: Double, requestId: String)"))
     }
 
     @Test
@@ -287,6 +290,27 @@ class ChatGptWebLabContractTest {
         assertTrue(dialog.contains("chatgpt-control-choice:"))
         assertTrue(dialog.contains("control.choiceLabels[position]"))
         assertFalse(dialog.contains("option.value"))
+    }
+
+    @Test
+    fun nativeSlidersExposeStableSelectorsAndBoundedValues() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val overlay = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeOverlayControlsController.kt"
+        )
+        val dialog = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeSliderControlDialog.kt"
+        )
+
+        assertTrue(activity.contains("pageAdapter.setUiControlSlider(controlId, value)"))
+        assertTrue(overlay.contains("control.supportsSliderValue"))
+        assertTrue(overlay.contains("ChatGptNativeSliderControlDialog.show"))
+        assertTrue(dialog.contains("chatgpt-control-slider:"))
+        assertTrue(dialog.contains("chatgpt-control-slider-value:"))
+        assertTrue(dialog.contains("chatgpt-control-slider-commit:"))
+        assertTrue(dialog.contains("max = slider.stepCount"))
     }
 
     @Test

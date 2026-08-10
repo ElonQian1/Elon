@@ -166,6 +166,33 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun acceptsUnsupportedAriaSliderAsAnIntentionalOfficialFallback() {
+        val sliderManifest = manifest("healthy", "slider").copy(
+            pageKind = "feature",
+            controls = manifest("healthy", "slider").controls.map {
+                it.copy(
+                    region = ChatGptWebUiRegion.CONTENT,
+                    role = "slider",
+                    inputKind = "range",
+                    slider = null,
+                )
+            },
+        )
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = sliderManifest,
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        val manifest = matrix.getJSONObject("manifest")
+        assertEquals(1, manifest.getInt("expected_official_fallback_control_count"))
+        assertEquals(0, manifest.getInt("unexpected_official_fallback_control_count"))
+        assertFalse(matrix.getJSONObject("adaptation_review").getBoolean("required"))
+    }
+
+    @Test
     fun treatsFeaturePageContentAsNativeMenuCoverage() {
         val contentManifest = manifest("healthy", "create_asset").copy(
             pageKind = "feature",

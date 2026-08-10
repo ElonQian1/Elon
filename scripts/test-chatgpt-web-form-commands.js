@@ -70,4 +70,20 @@ assert.equal(receipt.ok, true);
 assert.equal(select.selectedIndex, 1);
 assert.deepEqual(select.events, ['input', 'change']);
 
+const range = node({ 'aria-label': 'Thinking effort' }, {
+  tagName: 'INPUT',
+  type: 'range'
+});
+range.min = '0';
+range.max = '10';
+range.step = '2';
+range.value = '4';
+commands.setSliderValue(range, 8, forms, (action, ok) => {
+  receipt = { action, ok };
+}, () => { snapshots += 1; });
+assert.equal(receipt.action, 'set_ui_control_slider');
+assert.equal(receipt.ok, true);
+assert.equal(range.value, '8');
+assert.deepEqual(range.events, ['input', 'change']);
+
 process.stdout.write('CHATGPT_FORM_COMMANDS=passed\n');

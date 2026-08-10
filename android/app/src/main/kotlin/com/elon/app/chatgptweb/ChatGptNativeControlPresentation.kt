@@ -100,7 +100,8 @@ internal object ChatGptNativeControlPresentation {
     fun usesHeaderIcon(control: ChatGptWebUiControl): Boolean = control.semantic == "sources"
 
     fun isExpectedOfficialFallback(control: ChatGptWebUiControl): Boolean =
-        control.region == ChatGptWebUiRegion.COMPOSER && control.semantic == "voice_mode"
+        (control.region == ChatGptWebUiRegion.COMPOSER && control.semantic == "voice_mode") ||
+            (control.role == "slider" && !control.supportsSliderValue)
 
     fun messageActions(controls: List<ChatGptWebUiControl>): Map<String, List<ChatGptWebUiControl>> =
         controls.asSequence()
@@ -129,6 +130,7 @@ internal object ChatGptNativeControlPresentation {
                 }
             }
             .filterNot { it.semantic == "timestamp" }
+            .filterNot { it.role == "slider" && !it.supportsSliderValue }
             .filterNot {
                 it.region == ChatGptWebUiRegion.OVERLAY && it.semantic in OVERLAY_DEDICATED_SEMANTICS
             }

@@ -14,6 +14,7 @@ internal class ChatGptNativeOverlayControlsController(
     private val onInvoke: (String) -> Unit,
     private val onSetText: (String, String) -> Unit,
     private val onSelectChoice: (String, Int) -> Unit,
+    private val onSetSlider: (String, Double) -> Unit,
 ) {
     private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var controls: List<ChatGptWebUiControl> = emptyList()
@@ -80,6 +81,12 @@ internal class ChatGptNativeOverlayControlsController(
                         control = control,
                         onSelected = onSelectChoice,
                     )
+                } else if (control.supportsSliderValue) {
+                    dialog = ChatGptNativeSliderControlDialog.show(
+                        context = activity,
+                        control = control,
+                        onSubmit = onSetSlider,
+                    )
                 } else {
                     onInvoke(control.id)
                 }
@@ -95,6 +102,7 @@ internal class ChatGptNativeOverlayControlsController(
         control.selected.toString(),
         control.selectedChoiceIndex?.toString().orEmpty(),
         control.choiceLabels.joinToString("\u001f"),
+        control.slider?.value?.toString().orEmpty(),
     ).joinToString("\u001e")
 
 }

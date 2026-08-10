@@ -90,6 +90,20 @@
     );
   }
 
+  function nativeSliderDetails(node, kind) {
+    if (tagName(node) !== 'input' || kind !== 'range') return null;
+    const min = Number(node.min || attribute(node, 'min') || 0);
+    const max = Number(node.max || attribute(node, 'max') || 100);
+    const rawStep = String(node.step || attribute(node, 'step') || '1').toLowerCase();
+    const step = rawStep === 'any' ? NaN : Number(rawStep);
+    const value = Number(node.value);
+    const rawStepCount = (max - min) / step;
+    const stepCount = Math.round(rawStepCount);
+    if (![min, max, step, value].every(Number.isFinite) || max <= min || step <= 0) return null;
+    if (Math.abs(rawStepCount - stepCount) > 1e-7 || stepCount < 1 || stepCount > 10000) return null;
+    return { min, max, step, value: Math.min(max, Math.max(min, value)) };
+  }
+
   function describe(node) {
     const resolvedRole = role(node);
     if (!resolvedRole) return null;
@@ -101,6 +115,7 @@
     const selectedChoiceIndex = choiceLabels.length && Number.isInteger(node.selectedIndex)
       ? node.selectedIndex
       : -1;
+    const slider = nativeSliderDetails(node, kind);
     return {
       role: resolvedRole,
       inputKind: kind,
@@ -110,6 +125,11 @@
       stateSettable: ['checkbox', 'radio', 'switch'].includes(resolvedRole) && !isDisabled(node),
       choiceLabels,
       selectedChoiceIndex,
+      sliderSettable: !!slider && !isDisabled(node) && !isReadOnly(node),
+      sliderMin: slider && slider.min,
+      sliderMax: slider && slider.max,
+      sliderStep: slider && slider.step,
+      sliderValue: slider && slider.value,
       label: label(node)
     };
   }
@@ -170,6 +190,28 @@
     return { ok: true, reason: '', changed: true };
   }
 
+  function setSliderValue(node, rawValue) {
+    const details = describe(node);
+    if (!details || !details.sliderSettable) return { ok: false, reason: 'not_settable' };
+    const requested = Number(rawValue);
+    if (!Number.isFinite(requested)) return { ok: false, reason: 'invalid_value' };
+    const stepIndex = Math.round((requested - details.sliderMin) / details.sliderStep);
+    const normalized = Math.min(
+      details.sliderMax,
+      Math.max(details.sliderMin, details.sliderMin + stepIndex * details.sliderStep)
+    );
+    const tolerance = Math.max(1e-9, Math.abs(details.sliderStep) * 1e-7);
+    if (Math.abs(details.sliderValue - normalized) <= tolerance) {
+      return { ok: true, reason: '', changed: false };
+    }
+    const setter = nativeValueSetter(node);
+    if (setter) setter.call(node, String(normalized));
+    else node.value = String(normalized);
+    if (typeof node.focus === 'function') node.focus();
+    dispatchValueEvents(node);
+    return { ok: true, reason: '', changed: true };
+  }
+
   function setText(node, rawValue) {
     const details = describe(node);
     if (!details || details.role !== 'textbox') return { ok: false, reason: 'not_textbox' };
@@ -189,5 +231,12 @@
     return { ok: true, reason: '' };
   }
 
-  return Object.freeze({ ACTIONABLE_SELECTOR, describe, planSelectedState, selectChoice, setText });
+  return Object.freeze({
+    ACTIONABLE_SELECTOR,
+    describe,
+    planSelectedState,
+    selectChoice,
+    setSliderValue,
+    setText
+  });
 });

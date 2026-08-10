@@ -2,6 +2,7 @@ package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGptNativeControlPresentationTest {
@@ -94,6 +95,26 @@ class ChatGptNativeControlPresentationTest {
         assertEquals("menu", coverage.getValue("create").kind.wireName)
         assertEquals("chatgpt-control:create:创建图片", coverage.getValue("create").nativeSelector)
         assertEquals("chatgpt-page-actions:2", coverage.getValue("create").nativeTriggerSelector)
+    }
+
+    @Test
+    fun unsupportedAriaSliderUsesTheOfficialPageInsteadOfABlindNativeTap() {
+        val slider = ChatGptWebUiControl(
+            id = "effort",
+            semantic = "slider",
+            label = "思考强度",
+            region = ChatGptWebUiRegion.CONTENT,
+            role = "slider",
+            enabled = true,
+            selected = false,
+            inputKind = "range",
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(slider)).getValue("effort")
+
+        assertTrue(ChatGptNativeControlPresentation.pageActions(listOf(slider)).isEmpty())
+        assertEquals("official_fallback", coverage.kind.wireName)
+        assertTrue(ChatGptNativeControlPresentation.isExpectedOfficialFallback(slider))
     }
 
     @Test
