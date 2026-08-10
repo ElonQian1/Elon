@@ -36,6 +36,8 @@ internal data class ChatGptWebSnapshot(
     val capabilities: ChatGptWebCapabilities,
     val pageKind: String = "unknown",
     val loginRequired: Boolean = false,
+    val messageWindowStart: Int = 0,
+    val observedMessageCount: Int = messages.size,
 )
 
 internal data class ChatGptWebComposerOption(
@@ -139,6 +141,12 @@ internal object ChatGptWebProtocol {
                 )
             }
         }
+        val messageWindowStart = event.optInt("messageWindowStart", 0)
+            .coerceIn(0, MAX_OBSERVED_MESSAGES - messages.size)
+        val observedMessageCount = event.optInt(
+            "observedMessageCount",
+            messageWindowStart + messages.size,
+        ).coerceIn(messageWindowStart + messages.size, MAX_OBSERVED_MESSAGES)
         return ChatGptWebSnapshot(
             title = event.optString("title").trim().take(120),
             url = event.optString("url").take(2_048),
@@ -153,6 +161,8 @@ internal object ChatGptWebProtocol {
             capabilities = ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
             pageKind = event.optString("pageKind").takeIf { it in PAGE_KINDS } ?: "unknown",
             loginRequired = event.optBoolean("loginRequired"),
+            messageWindowStart = messageWindowStart,
+            observedMessageCount = observedMessageCount,
         )
     }
 
@@ -388,6 +398,7 @@ internal object ChatGptWebProtocol {
         "invoke_ui_control",
     )
     private const val MAX_MESSAGES = 80
+    private const val MAX_OBSERVED_MESSAGES = 1_000_000
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
     private const val MAX_STRUCTURED_MESSAGE_PARTS = 16

@@ -199,19 +199,22 @@
     return turns.length ? turns : Array.from(main.querySelectorAll('[data-message-author-role]'));
   }
 
-  function readMessages(streaming) {
+  function readMessageWindow(streaming) {
+    const nodes = messageNodes();
+    const startIndex = Math.max(0, nodes.length - MAX_MESSAGES);
     const seen = new Set();
     lastStructuredTypes = new Set();
     lastComplexOutput = false;
-    const messages = messageNodes().slice(-MAX_MESSAGES).map((node, index) => {
+    const messages = nodes.slice(startIndex).map((node, index) => {
       const role = messageRole(node);
       const text = messageContent(node, role);
       const parts = structuredParts(contentNode(node));
+      const globalIndex = startIndex + index;
       const baseId = node.getAttribute('data-message-id')
         || node.getAttribute('data-testid')
         || node.id
-        || role + '-' + index;
-      const id = seen.has(baseId) ? baseId + '-' + index : baseId;
+        || role + '-' + globalIndex;
+      const id = seen.has(baseId) ? baseId + '-' + globalIndex : baseId;
       seen.add(id);
       return {
         id,
@@ -223,7 +226,11 @@
     if (streaming && messages.length && messages[messages.length - 1].role === 'assistant') {
       messages[messages.length - 1].state = 'streaming';
     }
-    return messages;
+    return { messages, observedCount: nodes.length, startIndex };
+  }
+
+  function readMessages(streaming) {
+    return readMessageWindow(streaming).messages;
   }
 
   function lastAssistantTurn() {
@@ -260,5 +267,10 @@
     return values;
   }
 
-  window.__elonChatGptMessages = Object.freeze({ capabilities, readMessages, regenerate });
+  window.__elonChatGptMessages = Object.freeze({
+    capabilities,
+    readMessages,
+    readMessageWindow,
+    regenerate
+  });
 })();

@@ -46,6 +46,8 @@ class ChatGptWebProtocolTest {
                 "streaming":false,
                 "currentModel":"5.6 Sol 轻度",
                 "dictationActive":true,
+                "observedMessageCount":43,
+                "messageWindowStart":40,
                 "attachments":[
                   {"id":"attachment_ab12","name":"需求.txt","state":"ready","removable":true},
                   {"id":"../unsafe","name":"忽略.txt","state":"ready","removable":true}
@@ -78,6 +80,8 @@ class ChatGptWebProtocolTest {
         assertEquals("需求.txt", event.value.attachments.single().name)
         assertTrue(event.value.attachments.single().removable)
         assertEquals(2, event.value.messages.size)
+        assertEquals(40, event.value.messageWindowStart)
+        assertEquals(43, event.value.observedMessageCount)
         assertEquals("assistant", event.value.messages.last().role)
         assertEquals("streaming", event.value.messages.last().state)
         assertTrue(event.value.messages.last().content.startsWith("## 你好"))

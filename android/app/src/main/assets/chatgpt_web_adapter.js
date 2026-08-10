@@ -124,7 +124,10 @@
     const composer = findComposer();
     const dictationActive = composerAdapter ? composerAdapter.dictationActive(composer) : false;
     const streaming = isStreaming();
-    const messages = messageAdapter ? messageAdapter.readMessages(streaming) : [];
+    const messageWindow = messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
+      ? messageAdapter.readMessageWindow(streaming)
+      : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 };
+    const messages = messageWindow.messages;
     const pageKind = layoutAdapter && typeof layoutAdapter.pageKind === 'function'
       ? layoutAdapter.pageKind()
       : 'unknown';
@@ -135,6 +138,8 @@
       url: location.origin + location.pathname,
       draft: composerValue(composer).slice(0, 20000),
       messages,
+      observedMessageCount: Math.max(messages.length, Number(messageWindow.observedCount) || 0),
+      messageWindowStart: Math.max(0, Number(messageWindow.startIndex) || 0),
       authenticated: isAuthenticated(dictationActive, loginRequired),
       pageKind,
       loginRequired,
