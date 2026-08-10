@@ -35,7 +35,7 @@
 - 后续独立任务已把开发者事件测试切换到真实沙箱凭据调用链，并增加同 App 平台事件隔离断言；开发者事件模块回归 `d78571bc0de87a1793a812d1026b88ac98b5ad702b0219a34f9f6b461e1c0669` 与开放商业广域回归 `5eb216be17647b54bcdc8de86b6ab0d83047bcf6a09b631fe63caae60c3fd551` 均已通过。
 - 本地 Axum 路由回归：`1ac763c9763d87862465de924864f46003537da09b381777e7f699d973ab3561`。
 - 删除请求模块回归：`7492c3f567249b18a8b41d9f5fa203fd19d37d6606eaa10a3a854b9425e72d09`。
-- 当前全目标 Rust 检查：`a4cbe1a72e80e22a2ddf2b83e30b00e0e92a3d737effb946b0fd71a0bb1a425b`。
+- 当前集成树全目标 Rust 检查：`ec5586e448090b7b26f66cc3238e787cd217310931f66ce97825a5810d385d76`。
 - PC 开放商业静态契约：`node scripts/test-open-commerce-pc-workspace.js`；PC 正式构建：`npm --prefix pc-frontend run build`，均通过。
 
 ## 未完成
