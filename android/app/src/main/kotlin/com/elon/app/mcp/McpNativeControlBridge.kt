@@ -11,8 +11,10 @@ import org.json.JSONObject
 internal object McpNativeControlBridge {
     private const val TOKEN_PREF = "mcp_debug_token"
     private const val DEFAULT_OPEN_MAIN_BIND_WAIT_MS = 1_200L
+    private const val DEFAULT_TARGET_BIND_WAIT_MS = 8_000L
 
     interface Controller {
+        val surfaceId: String
         fun uiState(): JSONObject
         fun control(args: JSONObject): JSONObject
     }
@@ -21,7 +23,7 @@ internal object McpNativeControlBridge {
 
     fun register(controller: Controller) {
         this.controller = controller
-        DebugTraceStore.record("mcp_native_control_bound")
+        DebugTraceStore.record("mcp_native_control_bound", mapOf("surface" to controller.surfaceId))
     }
 
     fun unregister(controller: Controller) {
@@ -76,7 +78,30 @@ internal object McpNativeControlBridge {
             .put("activity_bound", false)
             .put("error", "main_activity_not_bound")
             .put("hint", "Call action=open_main, then retry after MainActivity registers the native MCP controller.")
-        return decorateControlResult(current.control(args), action)
+        val sourceResult = current.control(args)
+        val targetSurface = targetSurfaceFor(action)
+        if (
+            targetSurface == null ||
+            current.surfaceId == targetSurface ||
+            sourceResult.has("error") ||
+            sourceResult.optBoolean("control_ok", true).not()
+        ) {
+            return decorateControlResult(sourceResult, action)
+        }
+        val waitMs = args.optLong("wait_for_target_bind_ms", DEFAULT_TARGET_BIND_WAIT_MS)
+            .coerceIn(0L, 15_000L)
+        val target = waitForControllerSurface(targetSurface, waitMs)
+            ?: return decorateControlResult(sourceResult, action)
+                .put("control_ok", false)
+                .put("target_surface", targetSurface)
+                .put("target_activity_bound", false)
+                .put("error", "target_activity_not_bound_after_open")
+                .put("retryable", true)
+                .put("hint", "Retry the same action after the target Activity finishes starting.")
+        return decorateControlResult(target.uiState(), action)
+            .put("control_ok", true)
+            .put("target_surface", targetSurface)
+            .put("target_activity_bound", true)
     }
 
     internal fun decorateControlResult(result: JSONObject, action: String): JSONObject {
@@ -123,6 +148,26 @@ internal object McpNativeControlBridge {
             SystemClock.sleep(100L)
         } while (SystemClock.elapsedRealtime() < deadline)
         return controller
+    }
+
+    internal fun waitForControllerSurface(
+        surfaceId: String,
+        timeoutMs: Long,
+        controllerProvider: () -> Controller? = { controller },
+    ): Controller? {
+        val timeoutNanos = timeoutMs.coerceAtLeast(0L) * 1_000_000L
+        val deadline = System.nanoTime() + timeoutNanos
+        do {
+            controllerProvider()?.takeIf { it.surfaceId == surfaceId }?.let { return it }
+            if (timeoutMs <= 0L) return null
+            Thread.sleep(50L)
+        } while (System.nanoTime() < deadline)
+        return controllerProvider()?.takeIf { it.surfaceId == surfaceId }
+    }
+
+    internal fun targetSurfaceFor(action: String): String? = when (action) {
+        "open_chatgpt_web" -> "chatgpt_web"
+        else -> null
     }
 
     private const val CONTROL_RESULT_SCHEMA = "elon.apk.native_mcp_control_result.v1"

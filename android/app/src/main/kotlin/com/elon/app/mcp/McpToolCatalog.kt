@@ -217,6 +217,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("message_offset", intProperty("Zero-based message offset for chatgpt_get_context."))
                         .put("message_limit", intProperty("Page size from 1 to 40 for chatgpt_get_context."))
                         .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false."))
+                        .put("wait_for_target_bind_ms", intProperty("How long open_chatgpt_web waits for the target Activity controller, 0-15000. Defaults to 8000."))
                         .put("main_thread_timeout_ms", intProperty("How long native MCP waits for the APK main thread, 1000-60000. Defaults to 15000.")),
                     required = JSONArray().put("action")
                 )

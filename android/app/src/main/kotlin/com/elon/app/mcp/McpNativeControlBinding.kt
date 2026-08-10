@@ -11,8 +11,11 @@ internal class McpNativeControlBinding(
     private val activity: Activity,
     private val uiStateProvider: () -> JSONObject,
     private val controlHandler: (JSONObject) -> JSONObject,
+    private val surfaceId: String = "main",
 ) {
     private val controller = object : McpNativeControlBridge.Controller {
+        override val surfaceId: String = this@McpNativeControlBinding.surfaceId
+
         override fun uiState(): JSONObject = runOnMain(DEFAULT_TIMEOUT_MS, uiStateProvider)
 
         override fun control(args: JSONObject): JSONObject = runOnMain(
