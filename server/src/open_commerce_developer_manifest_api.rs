@@ -59,7 +59,7 @@ async fn issue_domain_challenge(
     Path((project_id, app_record_id)): Path<(String, String)>,
     Json(request): Json<IssueDeveloperAppDomainChallengeRequest>,
 ) -> Response {
-    let caller = match project_caller(&state, &headers, &project_id) {
+    let caller = match managed_app_caller(&state, &headers, &project_id, &app_record_id) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -77,7 +77,7 @@ async fn verify_domain_challenge(
     headers: HeaderMap,
     Path((project_id, app_record_id)): Path<(String, String)>,
 ) -> Response {
-    let caller = match project_caller(&state, &headers, &project_id) {
+    let caller = match managed_app_caller(&state, &headers, &project_id, &app_record_id) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -98,7 +98,7 @@ async fn update_manifest(
     Path((project_id, app_record_id)): Path<(String, String)>,
     Json(request): Json<UpdateDeveloperAppManifestRequest>,
 ) -> Response {
-    let caller = match project_caller(&state, &headers, &project_id) {
+    let caller = match managed_app_caller(&state, &headers, &project_id, &app_record_id) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -117,7 +117,7 @@ async fn submit_manifest(
     Path((project_id, app_record_id)): Path<(String, String)>,
     Json(request): Json<SubmitDeveloperAppManifestRequest>,
 ) -> Response {
-    let caller = match project_caller(&state, &headers, &project_id) {
+    let caller = match managed_app_caller(&state, &headers, &project_id, &app_record_id) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -180,16 +180,20 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
     Ok(user.id)
 }
 
-fn project_caller(
+fn managed_app_caller(
     state: &AppState,
     headers: &HeaderMap,
     project_id: &str,
+    app_record_id: &str,
 ) -> Result<(String, String), Response> {
     let user = auth_from_headers(state, headers)
         .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error))?;
     let access = project_access(state, &user.id, project_id)
         .map_err(|error| json_error(StatusCode::FORBIDDEN, error))?;
-    Ok((user.id, access.role))
+    let caller = (user.id, access.role);
+    service::managed_app(&state.store, project_id, app_record_id, &actor(&caller))
+        .map_err(|error| json_error(StatusCode::FORBIDDEN, error))?;
+    Ok(caller)
 }
 
 fn actor<'a>(caller: &'a (String, String)) -> OpenCommerceActor<'a> {
