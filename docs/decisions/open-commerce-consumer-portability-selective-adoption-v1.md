@@ -2,8 +2,8 @@
 title: 开放商业消费者可携带偏好字段级采用 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_http_pc_build
 ---
 
 # 开放商业消费者可携带偏好字段级采用 V1
@@ -26,7 +26,7 @@ V1 已能预演并采用导入包中的完整低敏偏好档案，但消费者�
 - 字段选择不恢复关系、Grant、披露、订单、支付、ERP、CRM 或结算。
 - 来源签名状态继续只作为来源提示，不自动提高字段权限。
 - 多来源静态偏好冲突预演已由独立 V1 承接；当前不支持带共同祖先的三方历史合并或跨设备审批。
-- 当前实现尚未编译、运行接口、执行 PC 构建或验证旧记录兼容。
+- 当前实现已通过 6 项 Rust/SQLite 与进程内 Axum 专项、PC 严格类型检查、开放商业契约回归和生产构建；尚未绑定真实 TCP 端口、执行浏览器点击验收或使用生产历史库副本验证。
 
 ## 实现引用
 
