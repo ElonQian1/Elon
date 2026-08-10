@@ -2,8 +2,8 @@
 title: 开放商业消费者内部回执年龄筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者内部回执年龄筛选 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - 内部回执由商户项目生成，不证明美团等外部平台签发、授权有效或数据真实。
 - 年龄命中只证明登记完成时间满足本次查询阈值，不证明数据覆盖完整或库存仍然可售。
 - 该能力不是支付、下单或外部平台实时回读证明。
-- 当前代码未编译，未执行时间边界、组合筛选、排序凭证、兼容性或 PC 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 和固定时钟领域测试验证 1 秒至 365 天边界、精确临界值、过期、未来、缺失和非法时间失败关闭，以及组合筛选、匹配原因和排序凭证；状态为 `verified_rust_sqlite`。
+- 尚未执行携带来源条件的 HTTP 实例请求、专项 MCP 协议请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 

@@ -2,8 +2,8 @@
 title: 开放商业消费者来源厂商与数据域筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者来源厂商与数据域筛选 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - 厂商标识和数据域由商户项目登记，不证明厂商授权、接口可用或数据真实。
 - 精确命中只说明目录字段相等，不证明查询覆盖全部商户或全部来源。
 - 回执摘要、状态和时间仍固定 `externally_verified=false`。
-- 当前代码未编译，未执行规范化、组合筛选、排序凭证、兼容性或 PC 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证空白忽略、大小写规范化、非法标识失败关闭、厂商与数据域精确组合、同名普通声明排除、匹配原因和排序凭证；状态为 `verified_rust_sqlite`。
+- 尚未执行携带来源条件的 HTTP 实例请求、专项 MCP 协议请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 

@@ -2,8 +2,8 @@
 title: 开放商业消费者内部回执来源筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者内部回执来源筛选 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - 开启筛选只证明目录当前存在符合项目规则的内部回执关联。
 - 内部回执由商户项目或受控适配器提交，固定 `externally_verified=false`。
 - 筛选不证明外部平台授权、数据真实性、实时库存、价格、营业状态、支付或履约。
-- 当前代码未编译，未执行请求兼容、筛选组合、排序凭证或 PC 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证默认兼容、同商户混合来源、失效绑定、声明期四种组合、五种排序器、匹配原因和排序凭证；状态为 `verified_rust_sqlite`。
+- 尚未执行携带来源条件的 HTTP 实例请求、专项 MCP 协议请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 

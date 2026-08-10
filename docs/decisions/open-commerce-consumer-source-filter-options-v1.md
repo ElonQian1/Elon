@@ -2,8 +2,8 @@
 title: 开放商业消费者来源筛选建议 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者来源筛选建议 V1
@@ -27,7 +27,8 @@ implementation_status: implementation_uncompiled
 - 建议值来自商户项目公开目录声明，不证明外部厂商授权、连接成功或数据真实。
 - 能力数量只是本次候选窗口计数，不保证查询后一定产生匹配。
 - 空列表不证明系统中不存在其他厂商或数据域。
-- 当前代码未编译，未执行接口、计数、兼容性、浏览器或 UI 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证按公开能力计数、稳定排序、能力 Key 缩小聚合范围、来源条件不遮蔽建议、失效绑定排除和私有字段不泄露；状态为 `verified_rust_sqlite`。
+- 尚未执行携带来源条件的 HTTP 实例请求、专项 MCP 协议请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 
