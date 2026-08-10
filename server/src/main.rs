@@ -786,6 +786,6 @@ async fn main() -> Result<()> {
         });
     }
 
-    let app = router::build_app(state);
-    node_endpoint_transport::serve(app).await
+    let app = router::build_app(Arc::clone(&state));
+    node_endpoint_transport::serve(app, state).await
 }

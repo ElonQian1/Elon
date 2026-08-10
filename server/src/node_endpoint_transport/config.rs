@@ -7,6 +7,7 @@ const LISTEN_ADDR_ENV: &str = "NODE_ENDPOINT_DIRECT_TLS_LISTEN_ADDR";
 const CERT_CHAIN_PATH_ENV: &str = "NODE_ENDPOINT_DIRECT_TLS_CERT_CHAIN_PATH";
 const PRIVATE_KEY_PATH_ENV: &str = "NODE_ENDPOINT_DIRECT_TLS_PRIVATE_KEY_PATH";
 const VERIFIER_REVISION_ENV: &str = "NODE_ENDPOINT_DIRECT_TLS_VERIFIER_REVISION";
+const OWNER_CREDENTIAL_API_ENABLED_ENV: &str = "NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED";
 const MAX_IJSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 pub(super) struct DirectTlsTransportConfig {
@@ -14,6 +15,7 @@ pub(super) struct DirectTlsTransportConfig {
     pub(super) certificate_chain_path: PathBuf,
     pub(super) private_key_path: PathBuf,
     pub(super) verifier_revision: u64,
+    pub(super) owner_credential_api_enabled: bool,
 }
 
 impl DirectTlsTransportConfig {
@@ -23,6 +25,15 @@ impl DirectTlsTransportConfig {
         let certificate_chain_path = optional_env(CERT_CHAIN_PATH_ENV);
         let private_key_path = optional_env(PRIVATE_KEY_PATH_ENV);
         let verifier_revision = optional_env(VERIFIER_REVISION_ENV);
+        let owner_credential_api_enabled =
+            match optional_env(OWNER_CREDENTIAL_API_ENABLED_ENV).as_deref() {
+                None | Some("false") => false,
+                Some("true") => true,
+                Some(_) => bail!("NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED_INVALID"),
+            };
+        if owner_credential_api_enabled && enabled.as_deref() != Some("true") {
+            bail!("NODE_ENDPOINT_OWNER_CREDENTIAL_API_DIRECT_TLS_REQUIRED");
+        }
         let configured = [
             listen_addr.as_ref(),
             certificate_chain_path.as_ref(),
@@ -65,6 +76,7 @@ impl DirectTlsTransportConfig {
             certificate_chain_path,
             private_key_path,
             verifier_revision,
+            owner_credential_api_enabled,
         }))
     }
 }

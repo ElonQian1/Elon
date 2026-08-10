@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{net::IpAddr, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
@@ -15,13 +15,14 @@ use uuid::Uuid;
 use crate::node_compute_sharing::endpoint_authority::{
     canonical_direct_tls_verifier_digest, seal_direct_tls_connection,
 };
+use crate::types::AppState;
 
 use super::{
     config::DirectTlsTransportConfig, evidence_slot::VerifiedSecureTransportSlot, secure_router,
 };
 
 const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
-const COMPUTE_INERT_CONNECTION_TIMEOUT: Duration = Duration::from_secs(30);
+const SECURE_HTTP_CONNECTION_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Unforgeable within the crate: construction is private to the module that creates the exact
 /// rustls ServerConfig and TlsAcceptor. Domain code receives only read accessors.
@@ -31,6 +32,28 @@ pub(crate) struct DirectTlsVerifierSeal {
     verifier_revision: u64,
     verifier_digest: String,
     leaf_certificate_digest: String,
+}
+
+/// Direct socket peer used only for process-local abuse controls. It is not transport authority
+/// and never enters endpoint credential or session receipts.
+#[derive(Clone, Copy)]
+pub(super) struct DirectTlsPeerAddress(IpAddr);
+
+impl DirectTlsPeerAddress {
+    fn from_socket(address: std::net::SocketAddr) -> Self {
+        let address = match address.ip() {
+            IpAddr::V6(value) => value
+                .to_ipv4_mapped()
+                .map(IpAddr::V4)
+                .unwrap_or(IpAddr::V6(value)),
+            value => value,
+        };
+        Self(address)
+    }
+
+    pub(super) fn rate_limit_key(self) -> String {
+        self.0.to_string()
+    }
 }
 
 impl DirectTlsVerifierSeal {
@@ -76,6 +99,7 @@ pub(super) struct DirectTlsServer {
     listener: TcpListener,
     acceptor: TlsAcceptor,
     verifier: Arc<DirectTlsVerifierSeal>,
+    owner_credential_api_enabled: bool,
 }
 
 impl DirectTlsServer {
@@ -114,16 +138,28 @@ impl DirectTlsServer {
             listener,
             acceptor: TlsAcceptor::from(Arc::new(server_config)),
             verifier,
+            owner_credential_api_enabled: config.owner_credential_api_enabled,
         })
     }
 
-    pub(super) async fn serve(self) -> Result<()> {
+    pub(super) async fn serve(self, state: Arc<AppState>) -> Result<()> {
         loop {
-            let (stream, _) = self.listener.accept().await?;
+            let (stream, peer_address) = self.listener.accept().await?;
             let acceptor = self.acceptor.clone();
             let verifier = Arc::clone(&self.verifier);
+            let state = Arc::clone(&state);
+            let owner_credential_api_enabled = self.owner_credential_api_enabled;
             tokio::spawn(async move {
-                if let Err(error) = serve_connection(stream, acceptor, verifier).await {
+                if let Err(error) = serve_connection(
+                    stream,
+                    acceptor,
+                    verifier,
+                    state,
+                    owner_credential_api_enabled,
+                    DirectTlsPeerAddress::from_socket(peer_address),
+                )
+                .await
+                {
                     debug!(%error, "node endpoint direct TLS connection rejected");
                 }
             });
@@ -135,20 +171,28 @@ async fn serve_connection(
     stream: tokio::net::TcpStream,
     acceptor: TlsAcceptor,
     verifier: Arc<DirectTlsVerifierSeal>,
+    state: Arc<AppState>,
+    owner_credential_api_enabled: bool,
+    peer_address: DirectTlsPeerAddress,
 ) -> Result<()> {
     stream.set_nodelay(true)?;
     let tls_stream = timeout(TLS_HANDSHAKE_TIMEOUT, acceptor.accept(stream))
         .await
         .context("NODE_ENDPOINT_DIRECT_TLS_HANDSHAKE_TIMEOUT")??;
     let (_, connection) = tls_stream.get_ref();
-    let proof = seal_direct_tls_connection(connection, &verifier, Utc::now())?;
-    let app = secure_router::build(VerifiedSecureTransportSlot::new(proof));
+    let evidence = seal_direct_tls_connection(connection, &verifier, Utc::now())?;
+    let app = secure_router::build(
+        VerifiedSecureTransportSlot::new(evidence),
+        state,
+        owner_credential_api_enabled,
+        peer_address,
+    );
     let service = TowerToHyperService::new(app);
     let io = TokioIo::new(tls_stream);
     let mut builder = http1::Builder::new();
     builder.keep_alive(false);
     let connection = builder.serve_connection(io, service);
-    timeout(COMPUTE_INERT_CONNECTION_TIMEOUT, connection)
+    timeout(SECURE_HTTP_CONNECTION_TIMEOUT, connection)
         .await
         .context("NODE_ENDPOINT_DIRECT_TLS_HTTP_TIMEOUT")??;
     Ok(())

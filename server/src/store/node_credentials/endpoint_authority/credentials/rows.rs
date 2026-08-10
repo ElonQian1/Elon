@@ -81,6 +81,14 @@ impl StoredCredentialRevocation {
         self.envelope.recorded_at()
     }
 
+    pub(super) fn revocation_json(&self) -> &str {
+        &self.revocation_json
+    }
+
+    pub(super) fn revocation_digest(&self) -> &str {
+        &self.revocation_digest
+    }
+
     pub(super) fn into_envelope(self) -> NodeEndpointCredentialRevocationEnvelope {
         self.envelope
     }

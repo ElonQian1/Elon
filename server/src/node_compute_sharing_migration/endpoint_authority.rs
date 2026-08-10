@@ -5,6 +5,7 @@ use rusqlite::Connection;
 
 mod credential_guards;
 mod owner_reauthentication;
+mod owner_reauthentication_consumption;
 mod replacement_guards;
 mod session_guards;
 mod tables;
@@ -25,6 +26,13 @@ pub(super) fn migration_v216(conn: &Connection) -> Result<()> {
 pub(super) fn migration_v217(conn: &Connection) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
     owner_reauthentication::install(&tx)?;
+    tx.commit()?;
+    Ok(())
+}
+
+pub(super) fn migration_v218(conn: &Connection) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    owner_reauthentication_consumption::install(&tx)?;
     tx.commit()?;
     Ok(())
 }

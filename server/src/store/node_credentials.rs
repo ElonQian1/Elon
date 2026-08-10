@@ -4,6 +4,10 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use super::{clean_optional, now, Store};
 
 mod endpoint_authority;
+pub(crate) use endpoint_authority::{
+    CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
+    NodeEndpointOwnerCredentialMutationDelivery,
+};
 
 impl Store {
     /// Adopt a legacy node credential for the same owner + device name when the

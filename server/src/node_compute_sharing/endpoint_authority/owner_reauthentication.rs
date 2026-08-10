@@ -6,11 +6,16 @@
 
 mod contracts;
 mod digests;
+mod direct_tls;
 
 pub(crate) use contracts::{
-    AuthorizedNodeEndpointOwnerReauthentication, NodeEndpointOwnerReauthenticationEnvelope,
-    PreparedNodeEndpointOwnerReauthentication, VerifiedCurrentAccountSession,
-    VerifiedRecentOwnerReauthentication, VerifiedSecureOwnerApiTransport,
+    authorize_password_owner_reauthentication, AuthorizedNodeEndpointOwnerReauthentication,
+    NodeEndpointOwnerReauthenticationEnvelope, PreparedNodeEndpointOwnerReauthentication,
+    VerifiedCurrentAccountSession, VerifiedRecentOwnerReauthentication,
+};
+
+pub(crate) use direct_tls::{
+    bind_direct_tls_owner_api_transport, OwnerApiResponsePermit, VerifiedSecureOwnerApiTransport,
 };
 
 pub(crate) use digests::{

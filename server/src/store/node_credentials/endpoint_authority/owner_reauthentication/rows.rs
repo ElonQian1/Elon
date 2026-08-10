@@ -16,6 +16,10 @@ impl StoredOwnerReauthentication {
         &self.envelope
     }
 
+    pub(super) fn receipt_digest(&self) -> &str {
+        &self.receipt_digest
+    }
+
     pub(super) fn ensure_exact(
         &self,
         prepared: &PreparedNodeEndpointOwnerReauthentication,

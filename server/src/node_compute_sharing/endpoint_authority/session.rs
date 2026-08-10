@@ -14,10 +14,10 @@ use super::types::{
 };
 
 mod direct_tls;
-
 pub(crate) use direct_tls::{
-    canonical_direct_tls_verifier_digest, seal_direct_tls_connection,
-    NodeEndpointSecureTransportBinding, VerifiedSecureNodeEndpointTransport,
+    bind_direct_tls_node_endpoint_transport, canonical_direct_tls_verifier_digest,
+    seal_direct_tls_connection, NodeEndpointSecureTransportBinding,
+    VerifiedDirectTlsConnectionEvidence, VerifiedSecureNodeEndpointTransport,
 };
 
 const AUTHENTICATION_ID_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_AUTHENTICATION_ID_V1";

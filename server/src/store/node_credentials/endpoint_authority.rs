@@ -19,9 +19,15 @@ use crate::node_compute_sharing::endpoint_authority::{
 use super::super::Store;
 
 mod credentials;
+mod owner_credential_mutation;
 mod owner_reauthentication;
 mod secret;
 mod sessions;
+
+pub(crate) use owner_credential_mutation::{
+    CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
+    NodeEndpointOwnerCredentialMutationDelivery,
+};
 
 pub(in crate::store) struct NodeEndpointOwnerReauthenticationReceipt {
     envelope: NodeEndpointOwnerReauthenticationEnvelope,

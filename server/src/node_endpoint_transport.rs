@@ -1,23 +1,26 @@
-//! Optional direct-TLS ingress for future authoritative node endpoint sessions.
+//! Optional direct-TLS ingress for endpoint credential ownership and future endpoint sessions.
 //!
-//! The current secure route is deliberately compute-inert. It can seal evidence from a real
-//! rustls handshake, but it never upgrades a WebSocket or calls the endpoint credential Store.
+//! The owner API can atomically issue or mutate a versioned endpoint credential. The node-session
+//! route remains compute-inert: it never upgrades a WebSocket, publishes Ready, or dispatches work.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Result;
 use axum::Router;
 use tokio::net::TcpListener;
 use tracing::info;
 
+use crate::types::AppState;
+
 mod config;
 mod direct_tls;
 mod evidence_slot;
+mod owner_api;
 mod secure_router;
 
 pub(crate) use direct_tls::DirectTlsVerifierSeal;
 
-pub(crate) async fn serve(legacy_app: Router) -> Result<()> {
+pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()> {
     let legacy_addr: SocketAddr = std::env::var("LISTEN_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:8080".into())
         .parse()?;
@@ -34,7 +37,10 @@ pub(crate) async fn serve(legacy_app: Router) -> Result<()> {
 
     match direct_tls {
         Some(server) => {
-            tokio::try_join!(serve_legacy(legacy_listener, legacy_app), server.serve())?;
+            tokio::try_join!(
+                serve_legacy(legacy_listener, legacy_app),
+                server.serve(state)
+            )?;
             Ok(())
         }
         None => serve_legacy(legacy_listener, legacy_app).await,

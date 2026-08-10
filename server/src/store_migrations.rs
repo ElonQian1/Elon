@@ -252,6 +252,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (215, "分布式算力 Attempt accepted 本地提交闭包", crate::compute_attempt_activation_migration::migration_v215),
     (216, "节点算力 Endpoint 凭据版本与认证会话权威", crate::node_compute_sharing_migration::migration_v216),
     (217, "节点算力 Endpoint 所有者近期重新认证回执", crate::node_compute_sharing_migration::migration_v217),
+    (218, "节点算力 Endpoint 所有者重新认证消费闭包", crate::node_compute_sharing_migration::migration_v218),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

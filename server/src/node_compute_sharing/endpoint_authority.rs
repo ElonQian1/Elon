@@ -6,29 +6,43 @@
 
 mod canonical;
 mod credential;
+mod owner_credential_mutation;
 mod owner_reauthentication;
+mod owner_reauthentication_consumption;
 mod session;
 mod types;
 
 pub(crate) use credential::{
-    AuthorizedFreshNodeEndpointCredentialIssuance, AuthorizedNodeEndpointCredentialRecovery,
+    authorize_owner_credential_mutation, AuthorizedFreshNodeEndpointCredentialIssuance,
+    AuthorizedNodeEndpointCredentialMutation, AuthorizedNodeEndpointCredentialRecovery,
     AuthorizedNodeEndpointCredentialRevocation, AuthorizedNodeEndpointCredentialRotation,
     NodeEndpointCredentialRevocationEnvelope, NodeEndpointCredentialVersionEnvelope,
     PreparedNodeEndpointCredentialRevocation, PreparedNodeEndpointCredentialVersion,
     PresentedNodeEndpointCredentialSecret,
 };
+pub(crate) use owner_credential_mutation::{
+    ExpectedNodeEndpointCredential, NodeEndpointOwnerCredentialMutationRequest,
+};
 pub(crate) use owner_reauthentication::{
+    authorize_password_owner_reauthentication, bind_direct_tls_owner_api_transport,
     derive_owner_account_auth_state_digest, derive_owner_account_session_binding_digest,
     derive_owner_google_factor_binding_digest, derive_owner_password_factor_binding_digest,
     AuthorizedNodeEndpointOwnerReauthentication, NodeEndpointOwnerReauthenticationEnvelope,
-    PreparedNodeEndpointOwnerReauthentication, VerifiedCurrentAccountSession,
-    VerifiedRecentOwnerReauthentication, VerifiedSecureOwnerApiTransport,
+    OwnerApiResponsePermit, PreparedNodeEndpointOwnerReauthentication,
+    VerifiedCurrentAccountSession, VerifiedRecentOwnerReauthentication,
+    VerifiedSecureOwnerApiTransport,
+};
+pub(crate) use owner_reauthentication_consumption::{
+    prepare_owner_reauthentication_consumption, NodeEndpointCredentialMutationResultBinding,
+    NodeEndpointOwnerReauthenticationConsumptionEnvelope,
+    PreparedNodeEndpointOwnerReauthenticationConsumption,
 };
 pub(crate) use session::{
-    canonical_direct_tls_verifier_digest, canonical_node_endpoint_capability_set,
-    seal_direct_tls_connection, NodeEndpointSecureTransportBinding,
-    NodeEndpointSessionAuthenticationReceiptEnvelope, NodeEndpointSessionOpenRequest,
-    PreparedNodeEndpointSessionAuthentication, VerifiedSecureNodeEndpointTransport,
+    bind_direct_tls_node_endpoint_transport, canonical_direct_tls_verifier_digest,
+    canonical_node_endpoint_capability_set, seal_direct_tls_connection,
+    NodeEndpointSecureTransportBinding, NodeEndpointSessionAuthenticationReceiptEnvelope,
+    NodeEndpointSessionOpenRequest, PreparedNodeEndpointSessionAuthentication,
+    VerifiedDirectTlsConnectionEvidence, VerifiedSecureNodeEndpointTransport,
 };
 pub(crate) use types::{
     NodeEndpointCredentialBinding, NodeEndpointOwnerAuthorizationBasis, NodeEndpointSessionBinding,

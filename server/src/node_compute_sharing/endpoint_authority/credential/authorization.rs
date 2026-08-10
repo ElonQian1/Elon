@@ -12,10 +12,20 @@ pub(crate) struct PresentedNodeEndpointCredentialSecret {
 }
 
 impl PresentedNodeEndpointCredentialSecret {
+    pub(crate) fn from_secret_hash(secret_hash: [u8; 32]) -> Self {
+        Self { secret_hash }
+    }
+
     pub(crate) fn secret_hash(&self) -> &[u8; 32] {
         &self.secret_hash
     }
 }
+
+mod owner;
+
+pub(crate) use owner::{
+    authorize_owner_credential_mutation, AuthorizedNodeEndpointCredentialMutation,
+};
 
 pub(crate) struct AuthorizedFreshNodeEndpointCredentialIssuance {
     agent_id: String,

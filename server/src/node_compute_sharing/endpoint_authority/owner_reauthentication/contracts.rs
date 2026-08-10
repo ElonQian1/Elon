@@ -9,6 +9,7 @@ use super::super::{
     },
     types::{bounded_identifier, is_sha256, NodeEndpointCredentialBinding},
 };
+use super::direct_tls::VerifiedSecureOwnerApiTransport;
 
 const OWNER_REAUTHENTICATION_SCHEMA: &str = "elon.node_endpoint.owner_reauthentication.v1";
 const OWNER_REAUTHENTICATION_ID_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_OWNER_REAUTHENTICATION_ID_V1";
@@ -45,20 +46,6 @@ pub(crate) struct VerifiedRecentOwnerReauthentication {
     authorization_target_digest: String,
     reauthenticated_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
-}
-
-/// Request-scoped HTTPS evidence. The endpoint WSS proof has a different audience and cannot be
-/// converted into this type.
-pub(crate) struct VerifiedSecureOwnerApiTransport {
-    source: String,
-    evidence_schema: String,
-    evidence_id: String,
-    evidence_digest: String,
-    verifier_revision: u64,
-    verifier_digest: String,
-    server_instance_id: String,
-    request_binding_digest: String,
-    verified_at: DateTime<Utc>,
 }
 
 /// Sealed authorization input. No constructor is exposed in this batch, so the Store kernel stays
@@ -159,15 +146,18 @@ impl AuthorizedNodeEndpointOwnerReauthentication {
             expected_credential_id: expected.map(|value| value.credential_id().to_string()),
             expected_credential_revision: expected.map(|value| value.credential_revision()),
             expected_credential_digest: expected.map(|value| value.credential_digest().to_string()),
-            secure_transport_source: self.transport.source.clone(),
-            secure_transport_evidence_schema: self.transport.evidence_schema.clone(),
-            secure_transport_evidence_id: self.transport.evidence_id.clone(),
-            secure_transport_evidence_digest: self.transport.evidence_digest.clone(),
-            secure_transport_verifier_revision: self.transport.verifier_revision,
-            secure_transport_verifier_digest: self.transport.verifier_digest.clone(),
-            secure_transport_server_instance_id: self.transport.server_instance_id.clone(),
-            secure_transport_request_binding_digest: self.transport.request_binding_digest.clone(),
-            secure_transport_verified_at: utc_nanos(self.transport.verified_at),
+            secure_transport_source: self.transport.source().to_string(),
+            secure_transport_evidence_schema: self.transport.evidence_schema().to_string(),
+            secure_transport_evidence_id: self.transport.evidence_id().to_string(),
+            secure_transport_evidence_digest: self.transport.evidence_digest().to_string(),
+            secure_transport_verifier_revision: self.transport.verifier_revision(),
+            secure_transport_verifier_digest: self.transport.verifier_digest().to_string(),
+            secure_transport_server_instance_id: self.transport.server_instance_id().to_string(),
+            secure_transport_request_binding_digest: self
+                .transport
+                .request_binding_digest()
+                .to_string(),
+            secure_transport_verified_at: utc_nanos(self.transport.verified_at()),
             reauthenticated_at: utc_nanos(self.reauthentication.reauthenticated_at),
             expires_at: utc_nanos(self.reauthentication.expires_at),
             recorded_at: utc_nanos(recorded_at),
@@ -194,27 +184,29 @@ impl AuthorizedNodeEndpointOwnerReauthentication {
                 reauth.authentication_method.as_str(),
                 "password" | "google_oidc"
             )
-            || !matches!(
-                self.transport.source.as_str(),
-                "direct_tls" | "trusted_proxy_mtls"
-            )
-            || self.transport.request_binding_digest != reauth.credential_mutation_request_digest
+            || !matches!(self.transport.source(), "direct_tls" | "trusted_proxy_mtls")
+            || self.transport.request_binding_digest() != reauth.credential_mutation_request_digest
         {
             bail!("NODE_ENDPOINT_OWNER_REAUTHENTICATION_SOURCE_MISMATCH");
         }
+        self.transport.validate_for_mutation(
+            &reauth.authorization_action,
+            &self.agent_id,
+            &reauth.credential_mutation_request_digest,
+        )?;
         ensure_time_order(
             self.session.verified_at,
             reauth.reauthenticated_at,
             "NODE_ENDPOINT_ACCOUNT_SESSION_VERIFIED_AFTER_REAUTHENTICATION",
         )?;
         ensure_time_order(
-            self.transport.verified_at,
+            self.transport.verified_at(),
             reauth.reauthenticated_at,
             "NODE_ENDPOINT_OWNER_TRANSPORT_VERIFIED_AFTER_REAUTHENTICATION",
         )?;
         if self
             .transport
-            .verified_at
+            .verified_at()
             .checked_add_signed(Duration::seconds(MAX_TRANSPORT_TO_REAUTH_SECONDS))
             .is_none_or(|deadline| reauth.reauthenticated_at > deadline)
         {
@@ -282,6 +274,9 @@ pub(crate) struct NodeEndpointOwnerReauthenticationEnvelope {
 }
 
 mod accessors;
+mod producer;
+
+pub(crate) use producer::authorize_password_owner_reauthentication;
 
 pub(crate) struct PreparedNodeEndpointOwnerReauthentication {
     envelope: NodeEndpointOwnerReauthenticationEnvelope,

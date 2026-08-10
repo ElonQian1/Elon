@@ -19,6 +19,16 @@ pub(crate) struct NodeEndpointOwnerAuthorizationBasis {
 }
 
 impl NodeEndpointOwnerAuthorizationBasis {
+    pub(super) fn recent_reauthentication(basis_id: String, basis_digest: String) -> Result<Self> {
+        let basis = Self {
+            kind: "recent_reauthentication".to_string(),
+            basis_id,
+            basis_digest,
+        };
+        basis.validate()?;
+        Ok(basis)
+    }
+
     pub(crate) fn kind(&self) -> &str {
         &self.kind
     }

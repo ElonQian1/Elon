@@ -3,7 +3,8 @@ mod envelopes;
 mod prepare;
 
 pub(crate) use authorization::{
-    AuthorizedFreshNodeEndpointCredentialIssuance, AuthorizedNodeEndpointCredentialRecovery,
+    authorize_owner_credential_mutation, AuthorizedFreshNodeEndpointCredentialIssuance,
+    AuthorizedNodeEndpointCredentialMutation, AuthorizedNodeEndpointCredentialRecovery,
     AuthorizedNodeEndpointCredentialRevocation, AuthorizedNodeEndpointCredentialRotation,
     PresentedNodeEndpointCredentialSecret,
 };
