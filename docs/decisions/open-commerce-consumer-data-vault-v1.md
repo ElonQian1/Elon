@@ -2,8 +2,8 @@
 title: 开放商业消费者客户端加密数据保险箱 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_local_crypto_pc_build
 ---
 
 # 开放商业消费者客户端加密数据保险箱 V1
@@ -33,7 +33,8 @@ implementation_status: implementation_uncompiled
 - 平台不持有解密密钥，不提供密码找回、密钥托管、设备恢复或紧急解锁；口令丢失即无法解密。
 - V1 不向商户、开发者 App 或 AI 自动披露保险箱内容，也没有字段级授权解密和远端代理执行。
 - V1 不是端到端多设备密钥同步、硬件安全模块、跨运营方身份、完整订单迁移或外部数据删除系统。
-- 当前代码未编译，未执行 V162 迁移、加解密往返、浏览器兼容或 PC 交互验证，状态为 `implementation_uncompiled`。
+- V1 浏览器实际密码学模块已通过 Node 24 Web Crypto 往返、错误口令、密文篡改、跨记录/跨修订替换、严格 Base64、时间和资源上限测试；服务端信封校验已进入真实 `elon-server` Rust 测试，PC TypeScript、开放商业回归和 Vite 生产构建均通过。状态为 `verified_local_crypto_pc_build`。
+- 真实 Chromium 交互、HTTP 权限和项目隔离、V162 全新及既有磁盘迁移、100 项存储上限、下载行为和生产部署仍未验证。
 
 ## 实现入口
 
@@ -42,6 +43,9 @@ implementation_status: implementation_uncompiled
 - `server/src/store/open_commerce_consumer_vault.rs`
 - `server/src/open_commerce_consumer_vault_api.rs`
 - `server/src/open_commerce_consumer_vault_migration.rs`
-- `pc-frontend/src/features/open-commerce/consumerDataVaultCrypto.ts`
+- `pc-frontend/src/features/open-commerce/consumerDataVaultCrypto.js`
+- `pc-frontend/src/features/open-commerce/consumerDataVaultCrypto.d.ts`
 - `pc-frontend/src/features/open-commerce/ConsumerDataVaultPanel.tsx`
+- `server/src/open_commerce_consumer_vault_service_tests.rs`
+- `scripts/test-open-commerce-consumer-data-vault-crypto.mjs`
 - `docs/open-commerce-consumer-data-vault-v1-acceptance.md`
