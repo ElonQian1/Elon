@@ -142,6 +142,30 @@ function Wait-CommandResult {
     throw "Timed out waiting for $Action command result. Last action=$($last.last_command.action)."
 }
 
+function Get-ComposerOptions {
+    param([Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section)
+
+    $beforeState = Invoke-ApkMcp -Tool "ui_state"
+    $afterMs = [long]$beforeState.last_command.observed_at_ms
+    Invoke-UiAction -Action "chatgpt_list_composer_options" -Arguments @{ section = $Section } | Out-Null
+    $commandAction = if ($Section -eq "model") { "collect_model_options" } else { "collect_composer_tools" }
+    $commandState = Wait-CommandResult -Action $commandAction -AfterMs $afterMs -TimeoutSec $ReadyTimeoutSec
+    $navigation = Invoke-UiAction -Action "chatgpt_get_navigation" -Arguments @{ section = $Section }
+    $sectionProperty = $navigation.composer_sections.PSObject.Properties[$Section]
+    $options = if ($null -eq $sectionProperty) { @() } else { @($sectionProperty.Value) }
+    return [pscustomobject]@{
+        command_state = $commandState
+        options = $options
+    }
+}
+
+function Get-ForeignComposerLabels {
+    param([object[]]$Options)
+
+    $foreignPattern = 'download\s+chatgpt|chatgpt\s+(desktop|mobile)|settings?|personalization|profile|log\s*out|sign\s*out|help|account|下载|桌面版|移动版|设置|个性化|个人资料|退出登录|帮助|账户|帐户|账号'
+    return @($Options | Where-Object { [string]$_.label -match $foreignPattern } | ForEach-Object { [string]$_.label })
+}
+
 function Normalize-ProbeReply {
     param([AllowEmptyString()][string]$Text)
 
@@ -214,6 +238,30 @@ $visibleSelectors = Get-VisibleNativeSelectors
 foreach ($prefix in $requiredSelectors) {
     $match = @($visibleSelectors | Where-Object { $_.StartsWith($prefix) })
     Add-Check "selector_$($prefix.Split(':')[1])" ($match.Count -gt 0) ($match -join ",")
+}
+
+$beforeFeaturesState = Invoke-ApkMcp -Tool "ui_state"
+$beforeFeatures = [long]$beforeFeaturesState.last_command.observed_at_ms
+Invoke-UiAction -Action "chatgpt_list_features" | Out-Null
+$featuresState = Wait-CommandResult -Action "collect_navigation" -AfterMs $beforeFeatures -TimeoutSec $ReadyTimeoutSec
+Add-Check "composer_contamination_setup" ($featuresState.last_command.ok -eq $true) "official sidebar opened"
+
+$modelResult = Get-ComposerOptions -Section "model"
+$modelOptions = @($modelResult.options)
+$modelLabels = @($modelOptions | ForEach-Object { [string]$_.label })
+$foreignModelLabels = Get-ForeignComposerLabels -Options $modelOptions
+Add-Check "composer_model_options" ($modelOptions.Count -gt 0) ($modelLabels -join ",")
+Add-Check "composer_model_scope" ($foreignModelLabels.Count -eq 0) ($foreignModelLabels -join ",")
+
+$toolsResult = Get-ComposerOptions -Section "tools"
+$toolOptions = @($toolsResult.options)
+$toolLabels = @($toolOptions | ForEach-Object { [string]$_.label })
+$foreignToolLabels = Get-ForeignComposerLabels -Options $toolOptions
+Add-Check "composer_tool_options" ($toolOptions.Count -gt 0) ($toolLabels -join ",")
+Add-Check "composer_tool_scope" ($foreignToolLabels.Count -eq 0) ($foreignToolLabels -join ",")
+if ($toolsResult.command_state.last_command.ok -eq $true -and $toolOptions.Count -gt 0) {
+    Invoke-Adb shell input keyevent 4 | Out-Null
+    Start-Sleep -Milliseconds 500
 }
 
 $probe = $null
