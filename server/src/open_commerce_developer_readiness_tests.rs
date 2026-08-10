@@ -1,5 +1,7 @@
 #[path = "open_commerce_developer_readiness_api_tests.rs"]
 mod api_tests;
+#[path = "open_commerce_developer_readiness_state_matrix_tests.rs"]
+mod state_matrix_tests;
 
 use uuid::Uuid;
 
