@@ -70,6 +70,25 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun activeDictationRemainsAReadyAuthenticatedSessionWithoutAComposer() {
+        val dictating = snapshot(setOf(ChatGptWebCapabilityId.DICTATION)).copy(
+            composerReady = false,
+            dictationActive = true,
+        )
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = dictating,
+            manifest = manifest("healthy", "action"),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.WEB,
+        )
+
+        assertTrue(matrix.getBoolean("dictation_active"))
+        assertTrue(matrix.getBoolean("ready_for_chat"))
+        assertEquals(0, matrix.getJSONArray("blocking_gaps").length())
+    }
+
+    @Test
     fun reportsKnownControlsThatOnlyHaveTheOfficialFallback() {
         val matrix = ChatGptWebCapabilityMatrix.build(
             snapshot = snapshot(emptySet()),

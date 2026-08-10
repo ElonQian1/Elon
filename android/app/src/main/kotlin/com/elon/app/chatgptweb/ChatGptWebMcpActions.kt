@@ -15,6 +15,8 @@ internal class ChatGptWebMcpActions(
     private val invokeControl: (String) -> Unit,
     private val newConversation: () -> Unit,
     private val stopGeneration: () -> Unit,
+    private val cancelDictation: () -> Unit,
+    private val submitDictation: () -> Unit,
     private val refresh: () -> Unit,
     private val refreshControls: () -> Unit,
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
@@ -36,6 +38,7 @@ internal class ChatGptWebMcpActions(
             .put("view_mode", mode().name.lowercase())
             .put("authenticated", current?.authenticated ?: false)
             .put("composer_ready", current?.composerReady ?: false)
+            .put("dictation_active", current?.dictationActive ?: false)
             .put("streaming", current?.streaming ?: false)
             .put("conversation", conversationJson(current))
             .put("input", JSONObject()
@@ -64,6 +67,14 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_new_conversation" -> newConversation()
             "chatgpt_stop_generation" -> stopGeneration()
+            "chatgpt_cancel_dictation" -> {
+                if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
+                cancelDictation()
+            }
+            "chatgpt_submit_dictation" -> {
+                if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
+                submitDictation()
+            }
             "chatgpt_refresh" -> refresh()
             "chatgpt_refresh_controls" -> refreshControls()
             "chatgpt_list_conversations" -> listConversations()
@@ -400,6 +411,8 @@ internal class ChatGptWebMcpActions(
             "chatgpt_invoke_control",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_cancel_dictation",
+            "chatgpt_submit_dictation",
             "chatgpt_refresh",
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",
@@ -420,6 +433,8 @@ internal class ChatGptWebMcpActions(
             "chatgpt_invoke_control",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_cancel_dictation",
+            "chatgpt_submit_dictation",
             "chatgpt_refresh",
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",

@@ -361,6 +361,8 @@ internal object ChatGptWebProtocol {
         "open_model_selector",
         "open_composer_tools",
         "start_dictation",
+        "cancel_dictation",
+        "submit_dictation",
         "remove_attachment",
         "list_navigation",
         "select_navigation",

@@ -79,13 +79,14 @@
     });
   }
 
-  function isAuthenticated() {
+  function isAuthenticated(dictationActive) {
     const path = location.pathname.toLowerCase();
     if (path.startsWith('/auth') || path.startsWith('/cdn-cgi')) return false;
     const profile = document.querySelector(
       '[data-testid="profile-button"], [data-testid="accounts-profile-button"], button[aria-label*="profile" i]'
     );
     if (isVisible(profile)) return true;
+    if (dictationActive) return true;
     return !!findComposer() && !hasVisibleLoginEntry();
   }
 
@@ -104,7 +105,7 @@
     return !!findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
   }
 
-  function detectCapabilities() {
+  function detectCapabilities(composer) {
     const capabilities = [
       'streaming',
       'conversation_history',
@@ -114,28 +115,30 @@
     ];
     if (conversationAdapter) capabilities.push(...conversationAdapter.capabilities());
     if (messageAdapter) capabilities.push(...messageAdapter.capabilities());
-    if (composerAdapter) capabilities.push(...composerAdapter.capabilities(findComposer()));
+    if (composerAdapter) capabilities.push(...composerAdapter.capabilities(composer));
     if (navigationAdapter) capabilities.push(...navigationAdapter.capabilities());
     return Array.from(new Set(capabilities));
   }
 
   function snapshot() {
     if (disposed) return;
+    const composer = findComposer();
+    const dictationActive = composerAdapter ? composerAdapter.dictationActive(composer) : false;
     const streaming = isStreaming();
     const messages = messageAdapter ? messageAdapter.readMessages(streaming) : [];
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),
       url: location.origin + location.pathname,
-      draft: composerValue(findComposer()).slice(0, 20000),
+      draft: composerValue(composer).slice(0, 20000),
       messages,
-      authenticated: isAuthenticated(),
-      composerReady: !!findComposer(),
+      authenticated: isAuthenticated(dictationActive),
+      composerReady: !!composer,
       streaming,
-      currentModel: composerAdapter ? composerAdapter.currentModel(findComposer()) : '',
-      attachments: composerAdapter ? composerAdapter.readAttachments(findComposer()) : [],
-      dictationActive: composerAdapter ? composerAdapter.dictationActive(findComposer()) : false,
-      capabilities: detectCapabilities()
+      currentModel: composerAdapter ? composerAdapter.currentModel(composer) : '',
+      attachments: composerAdapter ? composerAdapter.readAttachments(composer) : [],
+      dictationActive,
+      capabilities: detectCapabilities(composer)
     };
     const fingerprint = JSON.stringify(event);
     if (fingerprint !== lastSnapshot) {
@@ -296,6 +299,12 @@
     if (action === 'start_dictation' && composerAdapter) {
       return composerAdapter.startDictation(findComposer(), emitEvent, result);
     }
+    if (action === 'cancel_dictation' && composerAdapter) {
+      return composerAdapter.cancelDictation(emitEvent, result);
+    }
+    if (action === 'submit_dictation' && composerAdapter) {
+      return composerAdapter.submitDictation(emitEvent, result);
+    }
     if (action === 'remove_attachment' && composerAdapter) {
       return composerAdapter.removeAttachment(String(command.value || ''), emitEvent, result);
     }
@@ -369,7 +378,7 @@
   });
   emitEvent({
     type: 'adapter_ready',
-    capabilities: detectCapabilities()
+    capabilities: detectCapabilities(findComposer())
   });
   observer = new MutationObserver(scheduleSnapshot);
   observer.observe(document.documentElement, {

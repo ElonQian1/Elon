@@ -193,8 +193,34 @@ class ChatGptWebMcpActionsTest {
         assertTrue(matrix.getBoolean("ready_for_chat"))
     }
 
+    @Test
+    fun activeDictationExportsStateAndAllowsOnlyScopedSessionActions() {
+        var cancellations = 0
+        var submissions = 0
+        val active = actions(
+            dictationActive = true,
+            onCancelDictation = { cancellations += 1 },
+            onSubmitDictation = { submissions += 1 },
+        )
+
+        assertTrue(active.uiState().getBoolean("dictation_active"))
+        assertTrue(active.control(JSONObject().put("action", "chatgpt_cancel_dictation"))
+            .getBoolean("control_ok"))
+        assertTrue(active.control(JSONObject().put("action", "chatgpt_submit_dictation"))
+            .getBoolean("control_ok"))
+        assertEquals(1, cancellations)
+        assertEquals(1, submissions)
+
+        val inactive = actions().control(JSONObject().put("action", "chatgpt_cancel_dictation"))
+        assertFalse(inactive.getBoolean("control_ok"))
+        assertEquals("dictation_not_active", inactive.getString("error"))
+    }
+
     private fun actions(
+        dictationActive: Boolean = false,
         onInvoke: (String) -> Unit = {},
+        onCancelDictation: () -> Unit = {},
+        onSubmitDictation: () -> Unit = {},
         onRequestComposerOptions: (String) -> Unit = {},
         onSelectComposerOption: (String, String) -> Unit = { _, _ -> },
         onRequestFeatures: () -> Unit = {},
@@ -210,7 +236,7 @@ class ChatGptWebMcpActionsTest {
             streaming = false,
             currentModel = "5.6 Sol 轻度",
             attachments = emptyList(),
-            dictationActive = false,
+            dictationActive = dictationActive,
             capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.DRAFT_SYNC)),
         )
         val manifest = ChatGptWebUiManifest(
@@ -276,6 +302,8 @@ class ChatGptWebMcpActionsTest {
             invokeControl = onInvoke,
             newConversation = {},
             stopGeneration = {},
+            cancelDictation = onCancelDictation,
+            submitDictation = onSubmitDictation,
             refresh = {},
             refreshControls = {},
             selectMode = {},

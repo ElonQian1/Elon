@@ -30,6 +30,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var composerToolsController: ChatGptNativeComposerToolsController
     private lateinit var attachmentController: ChatGptNativeAttachmentController
     private lateinit var voiceController: ChatGptNativeVoiceController
+    private lateinit var dictationSessionController: ChatGptWebDictationSessionController
     private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
     private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var featureHubController: ChatGptNativeFeatureHubController
@@ -67,6 +68,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             invokeControl = pageAdapter::invokeUiControl,
             newConversation = pageAdapter::startNewConversation,
             stopGeneration = pageAdapter::stopGeneration,
+            cancelDictation = pageAdapter::cancelDictation,
+            submitDictation = pageAdapter::submitDictation,
             refresh = { binding.chatGptWebView.reload() },
             refreshControls = pageAdapter::requestUiManifest,
             selectMode = modeController::select,
@@ -241,6 +244,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             nativeRoot = binding.chatGptNativeRoot,
             onModeChanged = ::showMode,
         )
+        dictationSessionController = ChatGptWebDictationSessionController(
+            isNativeSelected = modeController::isNativeSelected,
+            showOfficial = { modeController.select(ChatGptWebModeController.Mode.WEB) },
+            restoreNative = { modeController.select(ChatGptWebModeController.Mode.NATIVE) },
+            cancelOfficial = pageAdapter::cancelDictation,
+        )
 
         loginController = ChatGptNativeLoginController(
             context = this,
@@ -356,6 +365,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun navigateBack() {
+        if (dictationSessionController.handleBack()) return
         when (ChatGptWebBackNavigation.decide(latestUiManifest, binding.chatGptWebView.canGoBack())) {
             ChatGptWebBackNavigation.Action.DISMISS_OFFICIAL_OVERLAY -> officialOverlayController.dismissTop()
             ChatGptWebBackNavigation.Action.NAVIGATE_WEB_HISTORY -> binding.chatGptWebView.goBack()
@@ -407,11 +417,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 composerToolsController.render(event.value)
                 attachmentController.render(event.value)
                 voiceController.render(event.value)
+                dictationSessionController.onSnapshot(event.value.dictationActive)
                 conversationListController.renderCapabilities(event.value.capabilities)
                 featureHubController.renderCapabilities(event.value.capabilities)
                 if (
                     event.value.authenticated &&
-                    (event.value.composerReady || event.value.messages.isNotEmpty())
+                    (event.value.composerReady || event.value.messages.isNotEmpty() || event.value.dictationActive)
                 ) {
                     googleAccountHintController.onAuthenticated()
                     pageAdapter.markReady()
@@ -459,7 +470,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::collectFeatures,
                     NAVIGATION_SETTLE_MS,
                 )
-                "select_model_option", "select_composer_tool", "remove_attachment", "start_dictation" ->
+                "select_model_option", "select_composer_tool", "remove_attachment", "start_dictation",
+                "cancel_dictation", "submit_dictation" ->
                     binding.chatGptWebView.postDelayed(pageAdapter::requestSnapshot, COMPOSER_MENU_SETTLE_MS)
                 "select_navigation" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::requestSnapshot,
@@ -556,6 +568,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun clearSession() {
+        dictationSessionController.reset()
         modeController.select(ChatGptWebModeController.Mode.QUICK)
         loginController.reset()
         googleAccountHintController.reset()
@@ -598,6 +611,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         featureHubController.dispose()
         overlayControlsController.dispose()
         officialOverlayController.dispose()
+        dictationSessionController.reset()
         composerToolsController.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()

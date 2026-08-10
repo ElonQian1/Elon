@@ -173,15 +173,29 @@
       null;
   }
 
+  function findDictationSessionButton(kind) {
+    const labels = kind === 'cancel'
+      ? ['cancel dictation', '取消听写']
+      : ['submit dictation', '提交听写'];
+    return Array.from(document.querySelectorAll('button, [role="button"]')).find((button) => {
+      if (!isVisible(button)) return false;
+      const label = nodeLabel(button).toLowerCase();
+      return labels.some((candidate) => label.includes(candidate));
+    }) || null;
+  }
+
   function findDictationButton(composer) {
     const scope = composerScope(composer);
     return Array.from(scope.querySelectorAll('button')).find((button) => {
       if (!isVisible(button)) return false;
-      return /dictation|听写|语音输入/i.test(nodeLabel(button));
+      const label = nodeLabel(button);
+      return /dictation|听写|语音输入/i.test(label) &&
+        !/cancel dictation|submit dictation|取消听写|提交听写/i.test(label);
     }) || null;
   }
 
   function dictationActive(composer) {
+    if (findDictationSessionButton('cancel') || findDictationSessionButton('submit')) return true;
     const button = findDictationButton(composer);
     if (!button) return false;
     const label = nodeLabel(button);
@@ -193,7 +207,7 @@
     if (findAttachmentInput()) values.push('attachments');
     if (findModelButton(composer)) values.push('model_selector');
     if (findToolsButton(composer)) values.push('composer_tools');
-    if (findDictationButton(composer)) values.push('dictation');
+    if (findDictationButton(composer) || dictationActive(composer)) values.push('dictation');
     return values;
   }
 
@@ -343,6 +357,16 @@
     result('start_dictation', true, '');
   }
 
+  function finishDictation(kind, emitEvent, result) {
+    const action = kind === 'cancel' ? 'cancel_dictation' : 'submit_dictation';
+    const button = findDictationSessionButton(kind);
+    if (!button) return result(action, false, '官网当前没有进行中的听写。');
+    if (!emitTouchRequest(action, button, emitEvent)) {
+      return result(action, false, '官网听写操作当前不可见。');
+    }
+    result(action, true, '');
+  }
+
   function removeAttachment(id, emitEvent, result) {
     const attachment = lastAttachments.find((item) => item.id === id);
     if (!attachment || !attachment.removable || !isVisible(attachment.node)) {
@@ -382,6 +406,8 @@
     collectRequestedOptions,
     selectOption,
     startDictation,
+    cancelDictation: (emitEvent, result) => finishDictation('cancel', emitEvent, result),
+    submitDictation: (emitEvent, result) => finishDictation('submit', emitEvent, result),
     removeAttachment,
     openOfficial,
     dismissOpenMenu

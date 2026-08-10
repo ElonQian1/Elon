@@ -39,7 +39,11 @@ internal object ChatGptWebCapabilityMatrix {
         val blockingGaps = buildList {
             if (bridgeState != ChatGptWebPageAdapter.State.READY) add("bridge_not_ready")
             if (snapshot?.authenticated != true) add("not_authenticated")
-            if (snapshot?.authenticated == true && snapshot.composerReady.not()) add("composer_not_ready")
+            if (
+                snapshot?.authenticated == true &&
+                snapshot.composerReady.not() &&
+                snapshot.dictationActive.not()
+            ) add("composer_not_ready")
             if (manifest == null) add("manifest_unavailable")
             if (manifest != null && manifest.compatibility != "healthy") add("manifest_${manifest.compatibility}")
         }
@@ -59,6 +63,7 @@ internal object ChatGptWebCapabilityMatrix {
             .put("bridge_state", bridgeState.name.lowercase())
             .put("view_mode", mode.name.lowercase())
             .put("authenticated", snapshot?.authenticated ?: false)
+            .put("dictation_active", snapshot?.dictationActive ?: false)
             .put("ready_for_chat", blockingGaps.isEmpty())
             .put("ready_for_mcp", bridgeState == ChatGptWebPageAdapter.State.READY && manifest != null)
             .put("official_fallback", true)
