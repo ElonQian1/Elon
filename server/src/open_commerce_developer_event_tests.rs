@@ -2,12 +2,13 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
+    open_commerce_developer_credential_model::AuthenticatedDeveloperCredential,
     open_commerce_developer_event_model::DeveloperTerminalEventQuery,
     open_commerce_developer_event_service,
     open_commerce_developer_model::{
         CreateDeveloperAppRequest, OpenCommerceDeveloperAppCredential,
     },
-    open_commerce_directory_service,
+    open_commerce_directory_service, open_commerce_invocation_service,
     open_commerce_model::{
         CreateCapabilityRequest, CreateMerchantRequest, InvokeCapabilityRequest, ACCESS_PUBLIC,
         HANDLER_STATIC_JSON,
@@ -120,7 +121,39 @@ fn developer_app(
         .unwrap()
 }
 
-async fn invoke(fixture: &Fixture, app: &OpenCommerceDeveloperAppCredential, key: &str) -> Value {
+async fn invoke_sandbox(
+    fixture: &Fixture,
+    app: &OpenCommerceDeveloperAppCredential,
+    key: &str,
+) -> Value {
+    let actor = OpenCommerceActor {
+        user_id: &app.app.owner_user_id,
+        app_id: &app.app.app_id,
+        project_role: None,
+    };
+    open_commerce_invocation_service::invoke_with_developer_credential(
+        &fixture.store,
+        &AuthenticatedDeveloperCredential::sandbox(app.app.clone()),
+        &actor,
+        InvokeCapabilityRequest {
+            merchant_id: fixture.merchant_id.clone(),
+            capability_key: "menu.preview".to_string(),
+            requester_app_id: app.app.app_id.clone(),
+            grant_id: None,
+            idempotency_key: key.to_string(),
+            input: json!({}),
+        },
+        None,
+    )
+    .await
+    .unwrap()
+}
+
+async fn invoke_platform(
+    fixture: &Fixture,
+    app: &OpenCommerceDeveloperAppCredential,
+    key: &str,
+) -> Value {
     let actor = OpenCommerceActor {
         user_id: &app.app.owner_user_id,
         app_id: &app.app.app_id,
@@ -145,9 +178,11 @@ async fn invoke(fixture: &Fixture, app: &OpenCommerceDeveloperAppCredential, key
 #[tokio::test]
 async fn developer_event_feed_is_app_scoped_cursor_safe_and_resumable() {
     let fixture = fixture();
-    let first_result = invoke(&fixture, &fixture.first, "events-one-first").await;
-    invoke(&fixture, &fixture.second, "events-two-only").await;
-    let last_result = invoke(&fixture, &fixture.first, "events-one-last").await;
+    let first_result = invoke_sandbox(&fixture, &fixture.first, "events-one-first").await;
+    invoke_sandbox(&fixture, &fixture.second, "events-two-only").await;
+    let platform_result =
+        invoke_platform(&fixture, &fixture.first, "events-one-platform-hidden").await;
+    let last_result = invoke_sandbox(&fixture, &fixture.first, "events-one-last").await;
 
     let first_page = open_commerce_developer_event_service::list_terminal_events(
         &fixture.store,
@@ -161,6 +196,7 @@ async fn developer_event_feed_is_app_scoped_cursor_safe_and_resumable() {
     assert_eq!(first_page.events.len(), 1);
     assert!(first_page.has_more);
     assert_eq!(first_page.events[0].idempotency_key, "events-one-first");
+    assert_eq!(first_page.events[0].credential_environment, "sandbox");
     let cursor = first_page.next_cursor.clone().unwrap();
 
     let second_page = open_commerce_developer_event_service::list_terminal_events(
@@ -175,6 +211,7 @@ async fn developer_event_feed_is_app_scoped_cursor_safe_and_resumable() {
     assert_eq!(second_page.events.len(), 1);
     assert!(!second_page.has_more);
     assert_eq!(second_page.events[0].idempotency_key, "events-one-last");
+    assert_eq!(second_page.events[0].credential_environment, "sandbox");
     assert!(second_page.events[0].result_available);
     assert!(!second_page.events[0].funds_moved);
 
@@ -229,12 +266,20 @@ async fn developer_event_feed_is_app_scoped_cursor_safe_and_resumable() {
         )
         .is_err()
     );
+    assert!(
+        open_commerce_developer_event_service::terminal_event_detail(
+            &fixture.store,
+            &fixture.first.app,
+            platform_result["invocation_id"].as_str().unwrap(),
+        )
+        .is_err()
+    );
 }
 
 #[tokio::test]
 async fn developer_event_list_omits_request_and_internal_authorization_data() {
     let fixture = fixture();
-    invoke(&fixture, &fixture.first, "privacy-event").await;
+    invoke_sandbox(&fixture, &fixture.first, "privacy-event").await;
     let page = open_commerce_developer_event_service::list_terminal_events(
         &fixture.store,
         &fixture.first.app,
