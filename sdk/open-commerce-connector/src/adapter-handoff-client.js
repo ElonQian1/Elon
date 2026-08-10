@@ -4,6 +4,9 @@ export const ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA = 'open_commerce.adapter_busin
 export const ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA = 'open_commerce.adapter_business_handoff_claim_renew.v1'
 export const ADAPTER_HANDOFF_MAX_RESPONSE_BYTES = 256 * 1024
 
+const BUSINESS_HANDOFF_RECEIPT_SCHEMA = 'open_commerce.business_handoff_receipt.v1'
+const CLAIM_STATUSES = ['active', 'completed', 'expired', 'released']
+
 const RELEASE_REASONS = new Set([
   'adapter_shutdown',
   'capacity_pressure',
@@ -47,25 +50,21 @@ export function createAdapterHandoffClient(options) {
 
     async complete(issue, receipt, { signal } = {}) {
       validateClaimIssue(issue)
-      expectObject(receipt, 'receipt')
-      return request(
+      const completion = validateCompletion(receipt)
+      const response = await request(
         `/api/open-commerce/adapter/business-handoff-claims/${encodeURIComponent(issue.claim.id)}/complete`,
         {
           lease_token: issue.lease_token,
-          receipt_key: expectIdentifier(receipt.receiptKey, 'receipt.receiptKey', 3, 128),
-          status: expectOneOf(receipt.status, ['applied', 'ignored', 'rejected'], 'receipt.status'),
-          target_domain: expectIdentifier(receipt.targetDomain, 'receipt.targetDomain', 2, 96),
-          target_reference: optionalIdentifier(
-            receipt.targetReference,
-            'receipt.targetReference',
-            1,
-            160,
-          ),
-          error_code: optionalIdentifier(receipt.errorCode, 'receipt.errorCode', 2, 96),
-          completed_at: expectTimestamp(receipt.completedAt, 'receipt.completedAt'),
+          receipt_key: completion.receiptKey,
+          status: completion.status,
+          target_domain: completion.targetDomain,
+          target_reference: completion.targetReference,
+          error_code: completion.errorCode,
+          completed_at: completion.completedAt,
         },
         signal,
       )
+      return validateCompletionResponse(response, issue.claim, completion)
     },
 
     async release(issue, reasonCode, { signal } = {}) {
@@ -84,7 +83,8 @@ export function createAdapterHandoffClient(options) {
       if (released?.schema !== ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA || released.retryable !== true) {
         fail('invalid_release_response', 'adapter release response does not match the V1 contract')
       }
-      return released
+      const claim = validateTransitionClaim(released.claim, issue.claim, 'released', 'release.claim')
+      return Object.freeze({ ...released, claim })
     },
 
     async renew(issue, { extendSeconds = 300, signal } = {}) {
@@ -100,7 +100,8 @@ export function createAdapterHandoffClient(options) {
       if (renewed?.schema !== ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA || renewed.renewed !== true) {
         fail('invalid_renew_response', 'adapter renew response does not match the V1 contract')
       }
-      return renewed
+      const claim = validateTransitionClaim(renewed.claim, issue.claim, 'active', 'renew.claim')
+      return Object.freeze({ ...renewed, claim })
     },
   })
 }
@@ -122,12 +123,16 @@ function validateClaimPoll(poll) {
 
 function validateClaimIssue(issue) {
   expectObject(issue, 'issue')
-  expectObject(issue.claim, 'issue.claim')
-  if (issue.claim.schema !== ADAPTER_HANDOFF_CLAIM_SCHEMA) {
-    fail('invalid_claim_issue', 'claim schema is unsupported')
+  const claim = validateClaim(issue.claim, 'issue.claim', 'active')
+  if (issue.lease_token_visible_once !== true) {
+    fail('invalid_claim_issue', 'claim must mark its lease token as visible once')
   }
-  expectIdentifier(issue.claim.id, 'issue.claim.id', 3, 160)
-  if (typeof issue.lease_token !== 'string' || !issue.lease_token.startsWith('oc_claim_')) {
+  if (
+    typeof issue.lease_token !== 'string'
+    || !issue.lease_token.startsWith('oc_claim_')
+    || issue.lease_token.length < 46
+    || /\s/.test(issue.lease_token)
+  ) {
     fail('invalid_claim_issue', 'claim lease token is missing or malformed')
   }
   expectObject(issue.task, 'issue.task')
@@ -135,7 +140,119 @@ function validateClaimIssue(issue) {
   if (!Object.hasOwn(issue.task, 'result')) {
     fail('invalid_claim_issue', 'claim task result is missing')
   }
-  return issue
+  if (
+    issue.task.evidence.invocation_id !== claim.invocation_id
+    || issue.task.evidence.merchant_id !== claim.merchant_id
+    || issue.task.evidence.status !== 'succeeded'
+    || issue.task.evidence.receipt_state !== 'valid'
+    || issue.task.evidence.result_available !== true
+  ) {
+    fail('claim_binding_mismatch', 'claim evidence does not match its active lease')
+  }
+  return Object.freeze({ ...issue, claim })
+}
+
+function validateClaim(claim, path, expectedStatus) {
+  expectObject(claim, path)
+  if (claim.schema !== ADAPTER_HANDOFF_CLAIM_SCHEMA) {
+    fail('invalid_claim_issue', `${path} schema is unsupported`)
+  }
+  for (const field of [
+    'id',
+    'project_id',
+    'merchant_id',
+    'invocation_id',
+    'integration_id',
+    'adapter_credential_id',
+  ]) {
+    expectIdentifier(claim[field], `${path}.${field}`, 3, 160)
+  }
+  if (!Number.isInteger(claim.adapter_credential_version) || claim.adapter_credential_version < 1) {
+    fail('invalid_claim_issue', `${path}.adapter_credential_version must be positive`)
+  }
+  if (!Number.isInteger(claim.attempt_no) || claim.attempt_no < 1) {
+    fail('invalid_claim_issue', `${path}.attempt_no must be positive`)
+  }
+  expectOneOf(claim.status, CLAIM_STATUSES, `${path}.status`)
+  if (claim.status !== expectedStatus) {
+    fail('claim_binding_mismatch', `${path} status does not match the requested transition`)
+  }
+  const leaseExpiresAt = expectTimestamp(claim.lease_expires_at, `${path}.lease_expires_at`)
+  const leaseDeadlineAt = expectTimestamp(claim.lease_deadline_at, `${path}.lease_deadline_at`)
+  if (Date.parse(leaseExpiresAt) > Date.parse(leaseDeadlineAt)) {
+    fail('invalid_claim_issue', `${path} lease expiry exceeds its hard deadline`)
+  }
+  return Object.freeze({ ...claim })
+}
+
+function validateTransitionClaim(claim, source, expectedStatus, path) {
+  const validated = validateClaim(claim, path, expectedStatus)
+  for (const field of [
+    'id',
+    'project_id',
+    'merchant_id',
+    'invocation_id',
+    'integration_id',
+    'adapter_credential_id',
+    'adapter_credential_version',
+    'attempt_no',
+  ]) {
+    if (validated[field] !== source[field]) {
+      fail('claim_binding_mismatch', `${path} does not match the requested claim`)
+    }
+  }
+  return validated
+}
+
+function validateCompletion(receipt) {
+  expectObject(receipt, 'receipt')
+  const completion = {
+    receiptKey: expectIdentifier(receipt.receiptKey, 'receipt.receiptKey', 3, 128).toLowerCase(),
+    status: expectOneOf(receipt.status, ['applied', 'ignored', 'rejected'], 'receipt.status'),
+    targetDomain: expectOneOf(receipt.targetDomain, ['erp', 'crm'], 'receipt.targetDomain'),
+    targetReference: optionalIdentifier(receipt.targetReference, 'receipt.targetReference', 1, 160),
+    errorCode: optionalIdentifier(receipt.errorCode, 'receipt.errorCode', 2, 96)?.toLowerCase(),
+    completedAt: expectTimestamp(receipt.completedAt, 'receipt.completedAt'),
+  }
+  if (completion.status === 'applied' && (!completion.targetReference || completion.errorCode)) {
+    fail('invalid_completion', 'an applied completion requires targetReference and forbids errorCode')
+  }
+  if (completion.status !== 'applied' && (completion.targetReference || !completion.errorCode)) {
+    fail('invalid_completion', 'an ignored or rejected completion requires errorCode and forbids targetReference')
+  }
+  return completion
+}
+
+function validateCompletionResponse(response, claim, completion) {
+  expectObject(response, 'completion response')
+  if (response.schema !== BUSINESS_HANDOFF_RECEIPT_SCHEMA) {
+    fail('invalid_completion_response', 'completion receipt schema is unsupported')
+  }
+  const bindings = [
+    ['project_id', claim.project_id],
+    ['merchant_id', claim.merchant_id],
+    ['invocation_id', claim.invocation_id],
+    ['integration_id', claim.integration_id],
+    ['adapter_credential_id', claim.adapter_credential_id],
+    ['adapter_credential_version', claim.adapter_credential_version],
+    ['adapter_claim_id', claim.id],
+    ['receipt_key', completion.receiptKey],
+    ['status', completion.status],
+    ['target_domain', completion.targetDomain],
+    ['error_code', completion.errorCode],
+  ]
+  if (bindings.some(([field, expected]) => (response[field] ?? undefined) !== expected)) {
+    fail('completion_binding_mismatch', 'completion receipt does not match its claim and request')
+  }
+  if (
+    response.assertion_authority !== 'adapter_token_authenticated'
+    || response.confirmed_by_user !== false
+    || response.funds_moved !== false
+    || Date.parse(response.completed_at) !== Date.parse(completion.completedAt)
+  ) {
+    fail('invalid_completion_response', 'completion receipt authority or boundary is invalid')
+  }
+  return Object.freeze({ ...response })
 }
 
 async function requestJson(fetchImpl, baseUrl, token, path, body, signal) {

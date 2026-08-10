@@ -84,6 +84,7 @@ export function createAdapterHandoffWorker(options) {
       renewalStop.signal,
       handlerAbort,
     ).catch((error) => {
+      if (renewalStop.signal.aborted) return
       renewalFailure = error
       handlerAbort.abort(error)
     })
@@ -112,8 +113,7 @@ export function createAdapterHandoffWorker(options) {
     } catch (error) {
       renewalStop.abort()
       await renewal
-      if (renewalFailure && error !== renewalFailure) throw renewalFailure
-      if (error instanceof AdapterHandoffRejectError) {
+      if (!renewalFailure && error instanceof AdapterHandoffRejectError) {
         const completion = normalizeOutcome({
           status: 'rejected',
           errorCode: error.errorCode,
@@ -131,12 +131,12 @@ export function createAdapterHandoffWorker(options) {
       }
       const reasonCode = outerSignal?.aborted
         ? 'adapter_shutdown'
-        : error instanceof AdapterHandoffReleaseError
+        : !renewalFailure && error instanceof AdapterHandoffReleaseError
           ? error.reasonCode
           : 'transient_failure'
       await releaseBestEffort(currentIssue, reasonCode)
       if (outerSignal?.aborted) throw abortError(outerSignal.reason)
-      throw error
+      throw renewalFailure ?? error
     } finally {
       outerSignal?.removeEventListener('abort', abortHandler)
     }
@@ -151,8 +151,9 @@ export function createAdapterHandoffWorker(options) {
       const renewed = await client.renew(issue, { extendSeconds, signal })
       setIssue({ ...issue, claim: renewed.claim })
       if (Date.parse(renewed.claim.lease_deadline_at) <= Date.now()) {
-        handlerAbort.abort(new Error('adapter handoff hard lease deadline reached'))
-        return
+        const error = new Error('adapter handoff hard lease deadline reached')
+        handlerAbort.abort(error)
+        throw error
       }
     }
   }

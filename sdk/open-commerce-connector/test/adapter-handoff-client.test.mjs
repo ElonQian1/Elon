@@ -5,27 +5,13 @@ import {
   AdapterHandoffClientError,
   createAdapterHandoffClient,
 } from '../src/index.js'
-
-const token = `oc_adapter_${'a'.repeat(64)}`
-
-function jsonResponse(payload, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  })
-}
-
-function issue() {
-  return {
-    claim: {
-      schema: 'open_commerce.adapter_business_handoff_claim.v1',
-      id: 'handoffclaim-1',
-    },
-    lease_token: `oc_claim_${'b'.repeat(64)}`,
-    lease_token_visible_once: true,
-    task: { evidence: { id: 'evidence-1' }, result: { order: { id: 'order-1' } } },
-  }
-}
+import {
+  adapterToken as token,
+  claim,
+  issue,
+  jsonResponse,
+  receipt,
+} from './adapter-handoff-fixtures.mjs'
 
 test('claim, complete, and release keep identity boundaries in the SDK', async () => {
   const requests = []
@@ -33,7 +19,8 @@ test('claim, complete, and release keep identity boundaries in the SDK', async (
     baseUrl: 'https://commerce.example.test',
     token,
     fetch: async (url, init) => {
-      requests.push({ url: String(url), init, body: JSON.parse(init.body) })
+      const body = JSON.parse(init.body)
+      requests.push({ url: String(url), init, body })
       if (String(url).endsWith('/business-handoff-claims')) {
         return jsonResponse({
           schema: 'open_commerce.adapter_business_handoff_claim_poll.v1',
@@ -43,18 +30,23 @@ test('claim, complete, and release keep identity boundaries in the SDK', async (
           boundary: [],
         })
       }
-      if (String(url).endsWith('/complete')) return jsonResponse({ id: 'receipt-1' })
+      if (String(url).endsWith('/complete')) {
+        return jsonResponse(receipt(claim(), {
+          receipt_key: body.receipt_key,
+          completed_at: body.completed_at,
+        }))
+      }
       if (String(url).endsWith('/renew')) {
         return jsonResponse({
           schema: 'open_commerce.adapter_business_handoff_claim_renew.v1',
-          claim: { ...issue().claim, status: 'active' },
+          claim: claim(),
           renewed: true,
           boundary: [],
         })
       }
       return jsonResponse({
         schema: 'open_commerce.adapter_business_handoff_claim_release.v1',
-        claim: { ...issue().claim, status: 'released' },
+        claim: claim({ status: 'released' }),
         retryable: true,
         boundary: [],
       })

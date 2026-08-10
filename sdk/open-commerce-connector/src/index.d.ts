@@ -507,10 +507,35 @@ export interface AdapterHandoffClaimPoll {
 export interface AdapterHandoffCompletion {
   receiptKey: string
   status: 'applied' | 'ignored' | 'rejected'
-  targetDomain: string
+  targetDomain: 'erp' | 'crm'
   targetReference?: string
   errorCode?: string
   completedAt: string
+}
+
+export interface AdapterHandoffReceipt {
+  schema: 'open_commerce.business_handoff_receipt.v1'
+  id: string
+  project_id: string
+  merchant_id: string
+  invocation_id: string
+  integration_id: string
+  receipt_key: string
+  status: 'applied' | 'ignored' | 'rejected'
+  target_domain: 'erp' | 'crm'
+  evidence_result_sha256: string
+  target_reference_sha256?: string | null
+  error_code?: string | null
+  confirmed_by_user: false
+  assertion_authority: 'adapter_token_authenticated'
+  adapter_credential_id: string
+  adapter_credential_version: number
+  adapter_claim_id: string
+  recorded_by_user_id: string
+  recorded_by_app_id: string
+  completed_at: string
+  created_at: string
+  funds_moved: false
 }
 
 export interface AdapterHandoffClient {
@@ -519,7 +544,7 @@ export interface AdapterHandoffClient {
     issue: AdapterHandoffClaimIssue,
     receipt: AdapterHandoffCompletion,
     options?: { signal?: AbortSignal },
-  ): Promise<Record<string, unknown>>
+  ): Promise<AdapterHandoffReceipt>
   release(
     issue: AdapterHandoffClaimIssue,
     reasonCode: AdapterHandoffReleaseReason,
@@ -574,7 +599,7 @@ export interface AdapterHandoffWorkerResult {
   claimId?: string
   invocationId?: string
   status?: 'applied' | 'ignored' | 'rejected'
-  receipt?: Record<string, unknown>
+  receipt?: AdapterHandoffReceipt
   retryAfterMs: number
 }
 
