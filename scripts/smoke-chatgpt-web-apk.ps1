@@ -165,7 +165,9 @@ function Wait-NavigationReady {
         $cachedSnapshot = $command.action -eq "list_navigation" -and
             $command.ok -eq $true -and
             @($last.features).Count -gt 0
-        if ($fresh -and ($collected -or $cachedSnapshot)) {
+        $matrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
+        $overlayOpen = [int]$matrix.observed_semantics.close -gt 0
+        if ($fresh -and ($collected -or $cachedSnapshot) -and $overlayOpen) {
             return $last
         }
         Start-Sleep -Seconds $PollIntervalSec
