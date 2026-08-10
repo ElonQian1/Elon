@@ -1,4 +1,7 @@
+use std::{collections::HashMap, path::Path, sync::Arc};
+
 use chrono::{Duration, Utc};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
@@ -14,6 +17,7 @@ use crate::{
     },
     open_commerce_service::OpenCommerceActor,
     store::Store,
+    types::{AgentsConfig, AiBackend, AiCliConfig, AppState},
 };
 
 pub(crate) struct ApprovedDeveloperFixture {
@@ -155,4 +159,44 @@ pub(crate) fn issue_local_credential(
             &(Utc::now() + Duration::days(30)).to_rfc3339(),
         )
         .unwrap()
+}
+
+pub(crate) fn test_app_state(store: Store, root: &Path) -> AppState {
+    AppState {
+        store,
+        data_dir: root.to_path_buf(),
+        default_backend: AiBackend::Api,
+        ai_cli: AiCliConfig {
+            enabled: false,
+            options: Vec::new(),
+            default_option: None,
+            fallback_to_api: false,
+            codex_cli_only: true,
+            fallback_cli_option: None,
+        },
+        agents_config: RwLock::new(AgentsConfig {
+            agents: HashMap::new(),
+            default_agent: String::new(),
+        }),
+        project_root: root.to_path_buf(),
+        workspace_root: root.to_string_lossy().into_owned(),
+        public_url: "http://127.0.0.1".to_string(),
+        http_client: reqwest::Client::new(),
+        admin_token: "test".to_string(),
+        require_login: true,
+        min_apk_version_code: 0,
+        config_path: root.join("agents.json"),
+        image_model: None,
+        peer_registry: Arc::new(RwLock::new(HashMap::new())),
+        lan_peer_registry: Arc::new(RwLock::new(HashMap::new())),
+        node_registry: Arc::new(crate::node_registry::NodeRegistry::new()),
+        online_users: Arc::new(RwLock::new(HashMap::new())),
+        agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
+        project_task_scheduler: Arc::new(crate::types::ProjectTaskScheduler::new()),
+        codex_prewarm: Arc::new(crate::types::CodexPrewarmRegistry::new()),
+        route_a_session_leases: Arc::new(crate::types::RouteASessionLeaseRegistry::new()),
+        codex_network: Arc::new(crate::codex_health::CodexNetworkHealth::from_env()),
+        server_traces: Arc::new(crate::server_trace::ServerTraceStore::new()),
+        owner_token: None,
+    }
 }

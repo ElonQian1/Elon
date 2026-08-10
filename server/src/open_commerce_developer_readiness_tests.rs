@@ -1,3 +1,6 @@
+#[path = "open_commerce_developer_readiness_api_tests.rs"]
+mod api_tests;
+
 use uuid::Uuid;
 
 use crate::{
