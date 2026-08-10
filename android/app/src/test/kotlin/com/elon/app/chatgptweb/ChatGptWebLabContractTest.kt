@@ -53,6 +53,9 @@ class ChatGptWebLabContractTest {
         val controlOwnershipPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_control_ownership_policy.js"
         )
+        val formCommands = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_form_commands.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
@@ -61,11 +64,13 @@ class ChatGptWebLabContractTest {
                 bridge.indexOf("chatgpt_web_adapter_conversations.js")
         )
         assertTrue(
-            bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") &&
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") <
                 bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") &&
                 bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_form_commands.js") &&
+                bridge.indexOf("chatgpt_web_adapter_form_commands.js") <
                 bridge.indexOf("chatgpt_web_adapter_layout.js")
         )
         assertFalse(bridge.contains("addJavascriptInterface"))
@@ -116,9 +121,13 @@ class ChatGptWebLabContractTest {
             assertFalse("conversation adapter must not contain $it", conversations.contains(it))
             assertFalse("message adapter must not contain $it", messages.contains(it))
             assertFalse("form adapter must not contain $it", formControls.contains(it))
+            assertFalse("form command adapter must not contain $it", formCommands.contains(it))
         }
         assertTrue(formControls.contains("ACTIONABLE_SELECTOR"))
         assertTrue(formControls.contains("function setText"))
+        assertTrue(formControls.contains("function planSelectedState"))
+        assertTrue(formControls.contains("function selectChoice"))
+        assertTrue(formCommands.contains("purpose: 'invoke_ui_control'"))
         assertTrue(formControls.contains("kind === 'password'"))
         assertFalse(formControls.contains("node.value ||"))
         assertTrue(controlOwnershipPolicy.contains("isPrimaryComposerTextControl"))
@@ -234,6 +243,8 @@ class ChatGptWebLabContractTest {
         assertTrue(commandPort.contains("fun sendInput(requestId: String)"))
         assertTrue(commandPort.contains("fun invokeControl(controlId: String, requestId: String)"))
         assertTrue(commandPort.contains("fun setControlText(controlId: String, text: String, requestId: String)"))
+        assertTrue(commandPort.contains("fun setControlSelected(controlId: String, selected: Boolean, requestId: String)"))
+        assertTrue(commandPort.contains("fun selectControlChoice(controlId: String, choiceIndex: Int, requestId: String)"))
     }
 
     @Test
@@ -256,6 +267,26 @@ class ChatGptWebLabContractTest {
         assertTrue(dialog.contains("chatgpt-control-input-commit:"))
         assertTrue(dialog.contains("require(control.supportsTextEntry)"))
         assertFalse(dialog.contains("setText(control."))
+    }
+
+    @Test
+    fun nativeFeatureChoicesExposeStableIndexedSelectorsWithoutOptionValues() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val overlay = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeOverlayControlsController.kt"
+        )
+        val dialog = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeChoiceControlDialog.kt"
+        )
+
+        assertTrue(activity.contains("pageAdapter.selectUiControlChoice(controlId, choiceIndex)"))
+        assertTrue(overlay.contains("control.supportsChoiceSelection"))
+        assertTrue(overlay.contains("ChatGptNativeChoiceControlDialog.show"))
+        assertTrue(dialog.contains("chatgpt-control-choice:"))
+        assertTrue(dialog.contains("control.choiceLabels[position]"))
+        assertFalse(dialog.contains("option.value"))
     }
 
     @Test

@@ -199,6 +199,20 @@ internal class ChatGptWebPageAdapter(
         controlId = id.take(MAX_UI_CONTROL_ID_LENGTH),
     )
 
+    fun setUiControlSelected(id: String, selected: Boolean, requestId: String? = null) = runCommand(
+        action = "set_ui_control_selected",
+        requestId = requestId,
+        controlId = id.take(MAX_UI_CONTROL_ID_LENGTH),
+        selected = selected,
+    )
+
+    fun selectUiControlChoice(id: String, choiceIndex: Int, requestId: String? = null) = runCommand(
+        action = "select_ui_control_choice",
+        requestId = requestId,
+        controlId = id.take(MAX_UI_CONTROL_ID_LENGTH),
+        choiceIndex = choiceIndex,
+    )
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)
@@ -239,6 +253,8 @@ internal class ChatGptWebPageAdapter(
         expectedDraft: String? = null,
         requestId: String? = null,
         controlId: String? = null,
+        selected: Boolean? = null,
+        choiceIndex: Int? = null,
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
@@ -248,6 +264,8 @@ internal class ChatGptWebPageAdapter(
                 if (expectedDraft != null) put("expectedDraft", expectedDraft)
                 if (requestId != null && REQUEST_ID.matches(requestId)) put("requestId", requestId)
                 if (controlId != null) put("controlId", controlId)
+                if (selected != null) put("selected", selected)
+                if (choiceIndex != null) put("choiceIndex", choiceIndex)
             }
             .toString()
         val encoded = JSONObject.quote(command)
@@ -273,6 +291,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_page_semantic_policy.js",
             "chatgpt_web_adapter_form_controls.js",
             "chatgpt_web_adapter_control_ownership_policy.js",
+            "chatgpt_web_adapter_form_commands.js",
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_adapter.js",
         )

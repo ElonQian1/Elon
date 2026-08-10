@@ -314,14 +314,15 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"ui_manifest_snapshot",
-                "version":5,
+                "version":6,
                 "pageKind":"feature",
                 "title":"设置",
                 "compatibility":"healthy",
                 "controls":[
                   {"id":"control_search_ab12","semantic":"search","label":"搜索","region":"content","role":"textbox","inputKind":"search","writable":true},
                   {"id":"control_password_cd34","semantic":"text_input","label":"密码","region":"content","role":"textbox","inputKind":"password","writable":true},
-                  {"id":"control_toggle_ef56","semantic":"toggle","label":"启用","region":"content","role":"checkbox","inputKind":"checkbox","writable":true,"selected":true}
+                  {"id":"control_toggle_ef56","semantic":"toggle","label":"启用","region":"content","role":"checkbox","inputKind":"checkbox","writable":true,"stateSettable":true,"selected":true},
+                  {"id":"control_model_gh78","semantic":"selection","label":"模型","region":"content","role":"combobox","inputKind":"select","choiceLabels":["快速","思考"],"selectedChoiceIndex":1}
                 ]
               }
             }
@@ -331,6 +332,7 @@ class ChatGptWebProtocolTest {
         val search = event.value.controls[0]
         val password = event.value.controls[1]
         val toggle = event.value.controls[2]
+        val selection = event.value.controls[3]
         assertEquals("search", search.inputKind)
         assertTrue(search.supportsTextEntry)
         assertFalse(password.writable)
@@ -338,6 +340,10 @@ class ChatGptWebProtocolTest {
         assertEquals("checkbox", toggle.role)
         assertTrue(toggle.selected)
         assertFalse(toggle.writable)
+        assertTrue(toggle.supportsSelectedState)
+        assertEquals(listOf("快速", "思考"), selection.choiceLabels)
+        assertEquals(1, selection.selectedChoiceIndex)
+        assertTrue(selection.supportsChoiceSelection)
     }
 
     @Test

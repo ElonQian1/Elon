@@ -62,6 +62,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             override fun setControlText(controlId: String, text: String, requestId: String) =
                 pageAdapter.setUiControlText(controlId, text, requestId)
 
+            override fun setControlSelected(controlId: String, selected: Boolean, requestId: String) =
+                pageAdapter.setUiControlSelected(controlId, selected, requestId)
+
+            override fun selectControlChoice(controlId: String, choiceIndex: Int, requestId: String) =
+                pageAdapter.selectUiControlChoice(controlId, choiceIndex, requestId)
+
             override fun newConversation(requestId: String) = pageAdapter.startNewConversation(requestId)
 
             override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)
@@ -259,6 +265,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             headerActions = binding.chatGptNativeHeaderActions,
             onInvoke = ::invokeUiControl,
             onSetText = { controlId, text -> pageAdapter.setUiControlText(controlId, text) },
+            onSelectChoice = { controlId, choiceIndex ->
+                pageAdapter.selectUiControlChoice(controlId, choiceIndex)
+            },
         )
         pageAdapter = ChatGptWebPageAdapter(
             context = this,

@@ -16,6 +16,7 @@
     '[role="combobox"]',
     '[role="checkbox"]',
     '[role="radio"]',
+    '[role="switch"]',
     '[role="slider"]'
   ].join(', ');
   const TEXT_INPUT_KINDS = new Set([
@@ -41,6 +42,7 @@
     const explicitRole = attribute(node, 'role').toLowerCase();
     const tag = tagName(node);
     if (explicitRole === 'slider') return 'range';
+    if (explicitRole === 'switch') return 'switch';
     if (explicitRole === 'checkbox') return 'checkbox';
     if (explicitRole === 'radio') return 'radio';
     if (explicitRole === 'combobox' || tag === 'select') return 'select';
@@ -52,7 +54,7 @@
 
   function role(node) {
     const explicit = attribute(node, 'role').toLowerCase();
-    if (['textbox', 'combobox', 'checkbox', 'radio', 'slider'].includes(explicit)) return explicit;
+    if (['textbox', 'combobox', 'checkbox', 'radio', 'switch', 'slider'].includes(explicit)) return explicit;
     const kind = inputKind(node);
     if (kind === 'select') return 'combobox';
     if (kind === 'checkbox') return 'checkbox';
@@ -81,6 +83,13 @@
     return !!(node && node.readOnly) || attribute(node, 'aria-readonly') === 'true';
   }
 
+  function selectChoices(node) {
+    if (tagName(node) !== 'select' || !node || !node.options) return [];
+    return Array.from(node.options).slice(0, 50).map((option) =>
+      clean(option && (option.label || option.textContent)) || '选项'
+    );
+  }
+
   function describe(node) {
     const resolvedRole = role(node);
     if (!resolvedRole) return null;
@@ -88,12 +97,19 @@
     const sensitive = kind === 'password';
     const writable = resolvedRole === 'textbox' && TEXT_INPUT_KINDS.has(kind) &&
       !sensitive && !isDisabled(node) && !isReadOnly(node);
+    const choiceLabels = selectChoices(node);
+    const selectedChoiceIndex = choiceLabels.length && Number.isInteger(node.selectedIndex)
+      ? node.selectedIndex
+      : -1;
     return {
       role: resolvedRole,
       inputKind: kind,
       writable,
       sensitive,
       selected: !!(node && node.checked) || attribute(node, 'aria-checked') === 'true',
+      stateSettable: ['checkbox', 'radio', 'switch'].includes(resolvedRole) && !isDisabled(node),
+      choiceLabels,
+      selectedChoiceIndex,
       label: label(node)
     };
   }
@@ -117,6 +133,43 @@
     node.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  function planSelectedState(node, rawSelected) {
+    const details = describe(node);
+    if (!details || !details.stateSettable) return { ok: false, reason: 'not_settable' };
+    const selected = rawSelected === true;
+    if (details.role === 'radio' && !selected) return { ok: false, reason: 'radio_cannot_clear' };
+    return {
+      ok: true,
+      reason: '',
+      selected,
+      needsActivation: details.selected !== selected
+    };
+  }
+
+  function selectChoice(node, rawIndex) {
+    const details = describe(node);
+    if (!details || details.inputKind !== 'select' || tagName(node) !== 'select') {
+      return { ok: false, reason: 'not_native_select' };
+    }
+    if (isDisabled(node)) return { ok: false, reason: 'disabled' };
+    const index = Number(rawIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= details.choiceLabels.length) {
+      return { ok: false, reason: 'invalid_choice' };
+    }
+    const option = node.options && node.options[index];
+    if (!option || option.disabled) return { ok: false, reason: 'disabled_choice' };
+    if (node.selectedIndex === index) return { ok: true, reason: '', changed: false };
+    const constructor = typeof HTMLSelectElement === 'function' ? HTMLSelectElement : null;
+    const descriptor = constructor && constructor.prototype
+      ? Object.getOwnPropertyDescriptor(constructor.prototype, 'selectedIndex')
+      : null;
+    if (descriptor && descriptor.set) descriptor.set.call(node, index);
+    else node.selectedIndex = index;
+    if (typeof node.focus === 'function') node.focus();
+    dispatchValueEvents(node);
+    return { ok: true, reason: '', changed: true };
+  }
+
   function setText(node, rawValue) {
     const details = describe(node);
     if (!details || details.role !== 'textbox') return { ok: false, reason: 'not_textbox' };
@@ -136,5 +189,5 @@
     return { ok: true, reason: '' };
   }
 
-  return Object.freeze({ ACTIONABLE_SELECTOR, describe, setText });
+  return Object.freeze({ ACTIONABLE_SELECTOR, describe, planSelectedState, selectChoice, setText });
 });

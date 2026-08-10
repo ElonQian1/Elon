@@ -344,6 +344,16 @@
         String(command.controlId || ''), String(command.value || ''), emitEvent, respond
       );
     }
+    if (action === 'set_ui_control_selected' && layoutAdapter) {
+      return layoutAdapter.setSelected(
+        String(command.controlId || ''), command.selected === true, emitEvent, respond
+      );
+    }
+    if (action === 'select_ui_control_choice' && layoutAdapter) {
+      return layoutAdapter.selectChoice(
+        String(command.controlId || ''), Number(command.choiceIndex), emitEvent, respond
+      );
+    }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, respond);
     }

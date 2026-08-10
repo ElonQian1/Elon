@@ -135,11 +135,60 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun stateAndChoiceControlsDispatchIdempotentCommandsWithoutPrivateValues() {
+        var selectedTarget: Pair<String, Boolean>? = null
+        var choiceTarget: Pair<String, Int>? = null
+        val actions = actions(
+            includeFormControls = true,
+            onSetControlSelected = { id, selected -> selectedTarget = id to selected },
+            onSelectControlChoice = { id, index -> choiceTarget = id to index },
+        )
+
+        val selected = actions.control(JSONObject()
+            .put("action", "chatgpt_set_control_selected")
+            .put("control_id", "control_toggle_demo")
+            .put("selected", true))
+        val choice = actions.control(JSONObject()
+            .put("action", "chatgpt_select_control_choice")
+            .put("control_id", "control_model_demo")
+            .put("choice_index", 1))
+        val controls = actions.uiState().getJSONObject("ui_manifest").getJSONArray("controls")
+        val toggle = controls.getJSONObject(2)
+        val model = controls.getJSONObject(3)
+
+        assertTrue(selected.getBoolean("control_ok"))
+        assertEquals("control_toggle_demo" to true, selectedTarget)
+        assertTrue(choice.getBoolean("control_ok"))
+        assertEquals("control_model_demo" to 1, choiceTarget)
+        assertTrue(toggle.getBoolean("state_settable"))
+        assertEquals(2, model.getJSONArray("choice_labels").length())
+        assertEquals(0, model.getInt("selected_choice_index"))
+        assertFalse(model.has("value"))
+        assertEquals(
+            "chatgpt-control-choice:control_model_demo:1",
+            model.getJSONArray("native_choice_content_descriptions").getString(1),
+        )
+
+        val missingState = actions.control(JSONObject()
+            .put("action", "chatgpt_set_control_selected")
+            .put("control_id", "control_toggle_demo"))
+        val fractionalChoice = actions.control(JSONObject()
+            .put("action", "chatgpt_select_control_choice")
+            .put("control_id", "control_model_demo")
+            .put("choice_index", 1.5))
+        assertFalse(missingState.getBoolean("control_ok"))
+        assertEquals("missing_selected", missingState.getString("error"))
+        assertFalse(fractionalChoice.getBoolean("control_ok"))
+        assertEquals("invalid_choice_index", fractionalChoice.getString("error"))
+    }
+
+    @Test
     fun everyAcknowledgedWebCommandPassesItsReceiptIdToTheCommandPort() {
         val dispatched = mutableListOf<Pair<String, String>>()
         val actions = actions(
             dictationActive = true,
             includeWritableControl = true,
+            includeFormControls = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
         val commands = listOf(
@@ -149,6 +198,12 @@ class ChatGptWebMcpActionsTest {
             JSONObject().put("action", "chatgpt_set_control_text")
                 .put("control_id", "control_search_demo")
                 .put("text", "release notes") to "set_ui_control_text",
+            JSONObject().put("action", "chatgpt_set_control_selected")
+                .put("control_id", "control_toggle_demo")
+                .put("selected", true) to "set_ui_control_selected",
+            JSONObject().put("action", "chatgpt_select_control_choice")
+                .put("control_id", "control_model_demo")
+                .put("choice_index", 1) to "select_ui_control_choice",
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
@@ -501,7 +556,10 @@ class ChatGptWebMcpActionsTest {
         observedMessageCount: Int = messageWindowStart + availableMessageCount,
         onInvoke: (String) -> Unit = {},
         includeWritableControl: Boolean = false,
+        includeFormControls: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
+        onSetControlSelected: (String, Boolean) -> Unit = { _, _ -> },
+        onSelectControlChoice: (String, Int) -> Unit = { _, _ -> },
         onStartDictation: () -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -590,6 +648,31 @@ class ChatGptWebMcpActionsTest {
                         ),
                     )
                 }
+                if (includeFormControls) {
+                    add(ChatGptWebUiControl(
+                        id = "control_toggle_demo",
+                        semantic = "toggle",
+                        label = "启用记忆",
+                        region = ChatGptWebUiRegion.CONTENT,
+                        role = "switch",
+                        enabled = true,
+                        selected = false,
+                        inputKind = "switch",
+                        stateSettable = true,
+                    ))
+                    add(ChatGptWebUiControl(
+                        id = "control_model_demo",
+                        semantic = "selection",
+                        label = "模型",
+                        region = ChatGptWebUiRegion.CONTENT,
+                        role = "combobox",
+                        enabled = true,
+                        selected = false,
+                        inputKind = "select",
+                        choiceLabels = listOf("快速", "思考"),
+                        selectedChoiceIndex = 0,
+                    ))
+                }
             },
         )
         var nextCommandId = 0
@@ -644,6 +727,24 @@ class ChatGptWebMcpActionsTest {
                 override fun setControlText(controlId: String, text: String, requestId: String) {
                     onSetControlText(controlId, text)
                     onDispatch("set_ui_control_text", requestId)
+                }
+
+                override fun setControlSelected(
+                    controlId: String,
+                    selected: Boolean,
+                    requestId: String,
+                ) {
+                    onSetControlSelected(controlId, selected)
+                    onDispatch("set_ui_control_selected", requestId)
+                }
+
+                override fun selectControlChoice(
+                    controlId: String,
+                    choiceIndex: Int,
+                    requestId: String,
+                ) {
+                    onSelectControlChoice(controlId, choiceIndex)
+                    onDispatch("select_ui_control_choice", requestId)
                 }
 
                 override fun newConversation(requestId: String) =

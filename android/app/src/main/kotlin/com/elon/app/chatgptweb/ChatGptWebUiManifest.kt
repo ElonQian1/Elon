@@ -20,6 +20,9 @@ internal data class ChatGptWebUiControl(
     val selected: Boolean,
     val inputKind: String? = null,
     val writable: Boolean = false,
+    val stateSettable: Boolean = false,
+    val choiceLabels: List<String> = emptyList(),
+    val selectedChoiceIndex: Int? = null,
     val contextId: String? = null,
     val inViewport: Boolean = true,
     val webXRatio: Double? = null,
@@ -27,6 +30,12 @@ internal data class ChatGptWebUiControl(
 ) {
     val supportsTextEntry: Boolean
         get() = role == "textbox" && writable && inputKind != "password"
+
+    val supportsSelectedState: Boolean
+        get() = stateSettable && enabled && role in setOf("checkbox", "radio", "switch")
+
+    val supportsChoiceSelection: Boolean
+        get() = enabled && role == "combobox" && inputKind == "select" && choiceLabels.isNotEmpty()
 
     val accessibilityLabel: String
         get() = "chatgpt-control:$id:$label"

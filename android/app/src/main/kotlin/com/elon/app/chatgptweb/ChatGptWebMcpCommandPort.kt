@@ -4,6 +4,8 @@ internal interface ChatGptWebMcpCommandPort {
     fun sendInput(requestId: String)
     fun invokeControl(controlId: String, requestId: String)
     fun setControlText(controlId: String, text: String, requestId: String)
+    fun setControlSelected(controlId: String, selected: Boolean, requestId: String)
+    fun selectControlChoice(controlId: String, choiceIndex: Int, requestId: String)
     fun newConversation(requestId: String)
     fun stopGeneration(requestId: String)
     fun startDictation(requestId: String)

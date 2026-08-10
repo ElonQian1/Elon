@@ -19,6 +19,7 @@
     '__elonChatGptNavigation',
     '__elonChatGptFormControls',
     '__elonChatGptControlOwnershipPolicy',
+    '__elonChatGptFormCommands',
     '__elonChatGptLayout',
     '__elonChatGptBridge'
   ].forEach((name) => {

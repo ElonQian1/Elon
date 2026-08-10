@@ -77,6 +77,40 @@ internal class ChatGptWebMcpActions(
                     commands.setControlText(controlId, text, requestId)
                 }
             }
+            "chatgpt_set_control_selected" -> {
+                val controlId = args.optString("control_id")
+                if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
+                val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
+                    ?: return error(action, "stale_control_id")
+                if (!control.supportsSelectedState) return error(action, "control_state_not_settable")
+                val selected = args.opt("selected") as? Boolean
+                    ?: return error(action, "missing_selected")
+                if (control.role == "radio" && !selected) {
+                    return error(action, "radio_cannot_be_cleared")
+                }
+                dispatch("set_ui_control_selected") { requestId ->
+                    commands.setControlSelected(controlId, selected, requestId)
+                }
+            }
+            "chatgpt_select_control_choice" -> {
+                val controlId = args.optString("control_id")
+                if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
+                val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
+                    ?: return error(action, "stale_control_id")
+                if (!control.supportsChoiceSelection) return error(action, "control_choices_unavailable")
+                val rawChoiceIndex = args.opt("choice_index") as? Number
+                    ?: return error(action, "missing_choice_index")
+                val choiceIndex = rawChoiceIndex.toInt()
+                if (rawChoiceIndex.toDouble() != choiceIndex.toDouble()) {
+                    return error(action, "invalid_choice_index")
+                }
+                if (choiceIndex !in control.choiceLabels.indices) {
+                    return error(action, "invalid_choice_index")
+                }
+                dispatch("select_ui_control_choice") { requestId ->
+                    commands.selectControlChoice(controlId, choiceIndex, requestId)
+                }
+            }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
             "chatgpt_start_dictation" -> {
@@ -467,6 +501,9 @@ internal class ChatGptWebMcpActions(
         .put("selected", control.selected)
         .put("input_kind", control.inputKind ?: JSONObject.NULL)
         .put("writable", control.writable)
+        .put("state_settable", control.supportsSelectedState)
+        .put("choice_labels", JSONArray(control.choiceLabels))
+        .put("selected_choice_index", control.selectedChoiceIndex ?: JSONObject.NULL)
         .put("context_id", control.contextId ?: JSONObject.NULL)
         .put("in_viewport", control.inViewport)
         .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
@@ -495,6 +532,16 @@ internal class ChatGptWebMcpActions(
                 ChatGptNativeFormControlDialog.commitSelector(control.id)
             } else {
                 JSONObject.NULL
+            },
+        )
+        .put(
+            "native_choice_content_descriptions",
+            JSONArray().apply {
+                if (control.supportsChoiceSelection) {
+                    control.choiceLabels.indices.forEach { index ->
+                        put(ChatGptNativeChoiceControlDialog.choiceSelector(control.id, index))
+                    }
+                }
             },
         )
 
@@ -548,6 +595,8 @@ internal class ChatGptWebMcpActions(
             "send_input",
             "chatgpt_invoke_control",
             "chatgpt_set_control_text",
+            "chatgpt_set_control_selected",
+            "chatgpt_select_control_choice",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",

@@ -5,6 +5,7 @@
 
   const formAdapter = window.__elonChatGptFormControls;
   const controlOwnershipPolicy = window.__elonChatGptControlOwnershipPolicy;
+  const formCommands = window.__elonChatGptFormCommands;
   let controlsById = new Map();
   let lastFingerprint = '';
   const MAX_DISCOVERED_CONTROLS = 512;
@@ -301,6 +302,11 @@
           node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true',
         inputKind: form && form.inputKind || undefined,
         writable: !!(form && form.writable),
+        stateSettable: !!(form && form.stateSettable),
+        choiceLabels: form && form.choiceLabels.length ? form.choiceLabels : undefined,
+        selectedChoiceIndex: form && form.selectedChoiceIndex >= 0
+          ? form.selectedChoiceIndex
+          : undefined,
         contextId: resolvedContextId || undefined,
         inViewport: isInViewport(rect),
         xRatio: (rect.left + rect.width / 2) / Math.max(1, window.innerWidth),
@@ -452,6 +458,9 @@
         selected: control.selected,
         inputKind: control.inputKind,
         writable: control.writable,
+        stateSettable: control.stateSettable,
+        choiceLabels: control.choiceLabels,
+        selectedChoiceIndex: control.selectedChoiceIndex,
         contextId: control.contextId,
         inViewport: control.inViewport
       }))
@@ -525,11 +534,37 @@
     window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
   }
 
+  function setSelected(id, selected, emitEvent, result) {
+    discover();
+    const node = controlsById.get(String(id || ''));
+    if (!node || !isVisible(node) || !formCommands) {
+      return result('set_ui_control_selected', false, '官网控件已变化，请刷新结构后重试。');
+    }
+    return formCommands.setSelected(
+      node, id, selected, formAdapter, emitEvent, result,
+      () => emitSnapshot(emitEvent, true)
+    );
+  }
+
+  function selectChoice(id, choiceIndex, emitEvent, result) {
+    discover();
+    const node = controlsById.get(String(id || ''));
+    if (!node || !isVisible(node) || !formCommands) {
+      return result('select_ui_control_choice', false, '官网控件已变化，请刷新结构后重试。');
+    }
+    return formCommands.selectChoice(
+      node, choiceIndex, formAdapter, result,
+      () => emitSnapshot(emitEvent, true)
+    );
+  }
+
   window.__elonChatGptLayout = Object.freeze({
     emitSnapshot,
     invoke,
     pageKind,
     requestSemanticTouch,
+    selectChoice,
+    setSelected,
     setText
   });
 })();

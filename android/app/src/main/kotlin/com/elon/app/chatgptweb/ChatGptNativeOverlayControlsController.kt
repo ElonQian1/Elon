@@ -13,6 +13,7 @@ internal class ChatGptNativeOverlayControlsController(
     private val headerActions: LinearLayout,
     private val onInvoke: (String) -> Unit,
     private val onSetText: (String, String) -> Unit,
+    private val onSelectChoice: (String, Int) -> Unit,
 ) {
     private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var controls: List<ChatGptWebUiControl> = emptyList()
@@ -23,8 +24,7 @@ internal class ChatGptNativeOverlayControlsController(
             it.region == ChatGptWebUiRegion.OVERLAY && it.semantic == "timestamp"
         }?.label
         val nextControls = ChatGptNativeControlPresentation.pageActions(value.controls)
-        val controlsChanged = nextControls.map(ChatGptWebUiControl::id) !=
-            controls.map(ChatGptWebUiControl::id)
+        val controlsChanged = nextControls.map(::revision) != controls.map(::revision)
         controls = nextControls
         contextLabel = nextContextLabel
         if (controlsChanged && dialog?.isShowing == true) {
@@ -74,6 +74,12 @@ internal class ChatGptNativeOverlayControlsController(
                         control = control,
                         onSubmit = onSetText,
                     )
+                } else if (control.supportsChoiceSelection) {
+                    dialog = ChatGptNativeChoiceControlDialog.show(
+                        context = activity,
+                        control = control,
+                        onSelected = onSelectChoice,
+                    )
                 } else {
                     onInvoke(control.id)
                 }
@@ -82,5 +88,13 @@ internal class ChatGptNativeOverlayControlsController(
     }
 
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
+
+    private fun revision(control: ChatGptWebUiControl): String = listOf(
+        control.id,
+        control.label,
+        control.selected.toString(),
+        control.selectedChoiceIndex?.toString().orEmpty(),
+        control.choiceLabels.joinToString("\u001f"),
+    ).joinToString("\u001e")
 
 }

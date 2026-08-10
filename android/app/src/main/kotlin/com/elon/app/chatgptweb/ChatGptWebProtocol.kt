@@ -287,6 +287,18 @@ internal object ChatGptWebProtocol {
                     .takeIf { it.isNotBlank() && it in UI_INPUT_KINDS }
                 val writable = item.optBoolean("writable") &&
                     role == "textbox" && inputKind != null && inputKind in WRITABLE_UI_INPUT_KINDS
+                val stateSettable = item.optBoolean("stateSettable") &&
+                    role in STATE_SETTABLE_UI_ROLES
+                val choiceLabels = buildList {
+                    val rawChoices = item.optJSONArray("choiceLabels") ?: return@buildList
+                    for (choiceIndex in 0 until minOf(rawChoices.length(), MAX_UI_CHOICE_OPTIONS)) {
+                        val choiceLabel = rawChoices.optString(choiceIndex).trim()
+                            .take(MAX_UI_CHOICE_LABEL_LENGTH)
+                        add(choiceLabel.ifBlank { "选项 ${choiceIndex + 1}" })
+                    }
+                }
+                val selectedChoiceIndex = item.optInt("selectedChoiceIndex", -1)
+                    .takeIf { it in choiceLabels.indices }
                 val contextId = item.optString("contextId")
                     .takeIf { it.isNotBlank() && UI_CONTEXT_ID.matches(it) }
                 val webXRatio = boundedRatio(item, "xRatio")
@@ -303,6 +315,9 @@ internal object ChatGptWebProtocol {
                         selected = item.optBoolean("selected"),
                         inputKind = inputKind,
                         writable = writable,
+                        stateSettable = stateSettable,
+                        choiceLabels = choiceLabels,
+                        selectedChoiceIndex = selectedChoiceIndex,
                         contextId = contextId,
                         inViewport = item.optBoolean("inViewport", true),
                         webXRatio = webXRatio,
@@ -436,7 +451,9 @@ internal object ChatGptWebProtocol {
     private const val MAX_DISCOVERED_UI_CONTROLS = 10_000
     private const val MAX_UI_CONTROL_ID_LENGTH = 72
     private const val MAX_UI_CONTROL_LABEL_LENGTH = 160
-    private const val MAX_UI_MANIFEST_VERSION = 5
+    private const val MAX_UI_CHOICE_OPTIONS = 50
+    private const val MAX_UI_CHOICE_LABEL_LENGTH = 120
+    private const val MAX_UI_MANIFEST_VERSION = 6
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
@@ -494,6 +511,7 @@ internal object ChatGptWebProtocol {
         "select",
         "checkbox",
         "radio",
+        "switch",
         "range",
     )
     private val WRITABLE_UI_INPUT_KINDS = UI_INPUT_KINDS - setOf(
@@ -501,8 +519,10 @@ internal object ChatGptWebProtocol {
         "select",
         "checkbox",
         "radio",
+        "switch",
         "range",
     )
+    private val STATE_SETTABLE_UI_ROLES = setOf("checkbox", "radio", "switch")
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
     private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
