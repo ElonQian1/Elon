@@ -10,7 +10,16 @@ $repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
     throw "Unable to locate the repository root."
 }
-$logRoot = Join-Path $repoRoot.Trim() ".ai-tmp\command-logs"
+$repoRoot = [System.IO.Path]::GetFullPath($repoRoot.Trim())
+$gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitCommonDir)) {
+    throw "Unable to locate the shared Git metadata directory."
+}
+$gitCommonDir = $gitCommonDir.Trim()
+if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+    $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+}
+$logRoot = Join-Path ([System.IO.Path]::GetFullPath($gitCommonDir)) "ai-command-logs"
 $latest = Get-ChildItem -LiteralPath $logRoot -File -Filter "$LogName-*" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1

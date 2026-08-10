@@ -16,6 +16,11 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
 }
 $runner = Join-Path $repoRoot "scripts\invoke-ai-logged-command.ps1"
 $statusReader = Join-Path $repoRoot "scripts\get-ai-command-status.ps1"
+$gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
+if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+    $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+}
+$commandLogRoot = Join-Path ([System.IO.Path]::GetFullPath($gitCommonDir)) "ai-command-logs"
 $fixtureRoot = Join-Path $repoRoot ".ai-tmp\command-output-test"
 New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
 $successFixture = Join-Path $fixtureRoot "success.cmd"
@@ -118,7 +123,7 @@ Assert-True ($stallText.Contains("AI_COMMAND_FAILURE_REASON=stalled_output")) "S
 Assert-True ($stallWatch.Elapsed.TotalSeconds -lt 10) "Stalled command left its process tree running."
 
 $recoveryName = "bounded-recovery-$([Guid]::NewGuid().ToString('N'))"
-$recoveryBase = Join-Path $repoRoot ".ai-tmp\command-logs\$recoveryName-20000101-000000-000"
+$recoveryBase = Join-Path $commandLogRoot "$recoveryName-20000101-000000-000"
 try {
     Set-Content -LiteralPath "$recoveryBase.stdout.log" -Encoding ASCII -Value "running"
     Set-Content -LiteralPath "$recoveryBase.stderr.log" -Encoding ASCII -Value ""
@@ -152,6 +157,8 @@ $stdoutLogLine = $successOutput |
     Where-Object { "$_".StartsWith("AI_COMMAND_STDOUT_LOG=") } |
     Select-Object -Last 1
 $stdoutLog = "$stdoutLogLine".Substring("AI_COMMAND_STDOUT_LOG=".Length)
+Assert-True ($stdoutLog.StartsWith($commandLogRoot, [StringComparison]::OrdinalIgnoreCase)) `
+    "Command logs must live outside a removable task worktree."
 Assert-True (Test-Path -LiteralPath $stdoutLog -PathType Leaf) "Full success log was not retained."
 Assert-True (@(Get-Content -LiteralPath $stdoutLog).Count -eq 300) "Retained success log is incomplete."
 

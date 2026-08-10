@@ -105,6 +105,15 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
     throw "Unable to locate the repository root."
 }
 $repoRoot = [System.IO.Path]::GetFullPath($repoRoot.Trim())
+$gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitCommonDir)) {
+    throw "Unable to locate the shared Git metadata directory."
+}
+$gitCommonDir = $gitCommonDir.Trim()
+if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+    $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+}
+$gitCommonDir = [System.IO.Path]::GetFullPath($gitCommonDir)
 $workingPath = if ([System.IO.Path]::IsPathRooted($WorkingDirectory)) {
     [System.IO.Path]::GetFullPath($WorkingDirectory)
 } else {
@@ -119,7 +128,7 @@ if (-not (Test-Path -LiteralPath $workingPath -PathType Container)) {
     throw "WorkingDirectory does not exist: $workingPath"
 }
 
-$logRoot = Join-Path $repoRoot ".ai-tmp\command-logs"
+$logRoot = Join-Path $gitCommonDir "ai-command-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
 $stdoutLog = Join-Path $logRoot "$LogName-$stamp.stdout.log"

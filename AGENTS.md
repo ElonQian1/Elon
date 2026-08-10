@@ -37,7 +37,7 @@
 ## 脚本信号优先
 
 - `EDIT_ROOT` 是唯一编辑根；已隔离时不建嵌套 worktree。
-- Gradle/Cargo/npm/发布长命令完整日志写 `.ai-tmp/`；Windows 用 `scripts/invoke-ai-logged-command.ps1`，成功最多回传 20 行，失败 80 行。
+- Gradle/Cargo/npm/发布长命令完整日志由 `scripts/invoke-ai-logged-command.ps1` 写入共享 Git 元数据目录；成功最多回传 20 行，失败 80 行，任务 worktree 清理后仍可恢复查询。
 - commit 前运行 `scripts/check-source-size.ps1`，pre-push 兜底；禁止提交后才处理巨型入口增长。
 - 收尾必须执行预检输出的 `FINISH_COMMAND_*`，只有 `FINALIZABLE=true` 才可正常宣告完成。
 - 仅 push 被 non-fast-forward 拒绝时 rebase；不追车，只补受影响验证。

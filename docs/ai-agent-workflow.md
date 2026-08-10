@@ -325,7 +325,7 @@ scripts\invoke-ai-logged-command.ps1 `
 
 一龙自项目的 release 构建、签名、上传和版本 claim 必须由发布脚本完成；不能用 Debug 包或手工 Gradle release 命令代替发布闭环。
 长构建必须同时启用输出门禁和停滞超时：命令退出 0 但日志为空时按失败处理；日志持续不增长超过 15 分钟时终止对应进程树并返回 125，避免中断恢复后继续空等。
-如果 Codex 会话在命令运行时中断，恢复后先执行 `scripts\get-ai-command-status.ps1 -LogName "publish-apk"`。状态为 `running` 时只监控已有 PID 和日志，不得重复启动；`completed` 时读取持久化的 `AI_COMMAND_RESULT_STATUS/EXIT_CODE` 并核对产物；`stale` 时先处理残留状态再决定是否重跑。
+如果 Codex 会话在命令运行时中断，恢复后先执行 `scripts\get-ai-command-status.ps1 -LogName "publish-apk"`。状态为 `running` 时只监控已有 PID 和日志，不得重复启动；`completed` 时读取持久化的 `AI_COMMAND_RESULT_STATUS/EXIT_CODE` 并核对产物；`stale` 时先处理残留状态再决定是否重跑。命令日志保存在共享 Git 元数据目录的 `ai-command-logs/`，因此任务 worktree 被收尾脚本清理后仍可查询，也不会与清理中的活动日志发生文件占用冲突。
 
 ### 7.4 APK 签名
 ```powershell
