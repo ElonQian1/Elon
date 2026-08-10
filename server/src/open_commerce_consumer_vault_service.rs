@@ -192,27 +192,61 @@ fn validate_envelope(
     {
         bail!("消费者数据保险箱加密参数不受支持");
     }
-    let salt = BASE64
-        .decode(envelope.kdf.salt_base64.trim())
-        .map_err(|_| anyhow!("保险箱 KDF 盐值不是有效 Base64"))?;
+    let salt = decode_canonical_base64(
+        &envelope.kdf.salt_base64,
+        16,
+        "保险箱 KDF 盐值不是规范 Base64",
+        "保险箱 KDF 盐值必须为 16 字节",
+    )?;
     if salt.len() != 16 {
         bail!("保险箱 KDF 盐值必须为 16 字节");
     }
-    let nonce = BASE64
-        .decode(envelope.cipher.nonce_base64.trim())
-        .map_err(|_| anyhow!("保险箱随机数不是有效 Base64"))?;
+    let nonce = decode_canonical_base64(
+        &envelope.cipher.nonce_base64,
+        12,
+        "保险箱随机数不是规范 Base64",
+        "保险箱 AES-GCM 随机数必须为 12 字节",
+    )?;
     if nonce.len() != 12 {
         bail!("保险箱 AES-GCM 随机数必须为 12 字节");
     }
-    let ciphertext = BASE64
-        .decode(envelope.ciphertext_base64.trim())
-        .map_err(|_| anyhow!("保险箱密文不是有效 Base64"))?;
+    let ciphertext = decode_canonical_base64(
+        &envelope.ciphertext_base64,
+        MAX_CIPHERTEXT_BYTES,
+        "保险箱密文不是规范 Base64",
+        "保险箱密文大小必须为 17 字节到 1 MiB",
+    )?;
     if ciphertext.len() < 17 || ciphertext.len() > MAX_CIPHERTEXT_BYTES {
         bail!("保险箱密文大小必须为 17 字节到 1 MiB");
     }
     DateTime::parse_from_rfc3339(envelope.created_at.trim())
         .map_err(|_| anyhow!("保险箱加密时间必须为 RFC3339"))?;
     Ok(ciphertext)
+}
+
+fn decode_canonical_base64(
+    value: &str,
+    max_decoded_bytes: usize,
+    invalid_message: &str,
+    oversized_message: &str,
+) -> Result<Vec<u8>> {
+    let max_encoded_bytes = max_decoded_bytes.div_ceil(3) * 4;
+    if value.len() > max_encoded_bytes {
+        bail!(oversized_message.to_string());
+    }
+    if value.is_empty() || value.trim() != value {
+        bail!(invalid_message.to_string());
+    }
+    let decoded = BASE64
+        .decode(value)
+        .map_err(|_| anyhow!(invalid_message.to_string()))?;
+    if decoded.len() > max_decoded_bytes {
+        bail!(oversized_message.to_string());
+    }
+    if BASE64.encode(&decoded) != value {
+        bail!(invalid_message.to_string());
+    }
+    Ok(decoded)
 }
 
 fn normalize_id(value: &str) -> Result<String> {
@@ -250,3 +284,7 @@ fn ensure_consumer_project_actor(actor: &OpenCommerceActor<'_>) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_vault_service_tests.rs"]
+mod tests;
