@@ -25,6 +25,11 @@ Assert-Contains '$navigationMatrix = Invoke-UiAction -Action "chatgpt_get_capabi
 Assert-Contains 'Add-Check "navigation_adaptation_review"'
 Assert-Contains '$navigationCloseCount = [int]$navigationMatrix.observed_semantics.close'
 Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0)'
+Assert-Contains '$nativeView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "native" }'
+Assert-Contains 'Add-Check "native_view_selected"'
+Assert-Contains '$visibleSelectors = Get-VisibleNativeSelectors'
+Assert-Contains '$restoredOfficialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
+Assert-Contains 'Add-Check "official_view_restored"'
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
 Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
 Assert-Contains 'function Get-TopResumedActivity'
@@ -57,11 +62,16 @@ $openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_web"')
 $officialIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }')
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
 $toolsIndex = $source.IndexOf('Get-ComposerOptions -Section "tools"')
+$nativeIndex = $source.IndexOf('$nativeView = Invoke-UiAction -Action "chatgpt_select_view"')
+$selectorsIndex = $source.IndexOf('$visibleSelectors = Get-VisibleNativeSelectors')
 if (-not ($openIndex -lt $officialIndex -and $officialIndex -lt $featuresIndex)) {
     throw "ChatGPT Web smoke must select the official view before readiness and navigation checks."
 }
 if (-not ($featuresIndex -lt $modelIndex -and $modelIndex -lt $toolsIndex)) {
     throw "Composer contamination smoke must open the sidebar before model and tools checks."
+}
+if (-not ($toolsIndex -lt $nativeIndex -and $nativeIndex -lt $selectorsIndex)) {
+    throw "Native selectors must be audited only after official WebView checks complete."
 }
 
 Write-Output "CHATGPT_WEB_SMOKE_CONTRACT=passed"

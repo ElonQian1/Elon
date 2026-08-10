@@ -291,21 +291,6 @@ Add-Check "unknown_capabilities" ($unknownCapabilities.Count -eq 0) ($unknownCap
 Add-Check "unknown_semantics" ($unknownSemantics.Count -eq 0) ($unknownSemantics -join ",")
 Add-Check "adaptation_review" (-not $adaptationRequired) ($adaptationReasons -join ",")
 
-$requiredSelectors = @(
-    "chatgpt-native:conversation-list:",
-    "chatgpt-native:feature-list:",
-    "chatgpt-native:composer-input:",
-    "chatgpt-native:composer-model:",
-    "chatgpt-native:composer-tools:",
-    "chatgpt-native:dictation:",
-    "chatgpt-native:send:"
-)
-$visibleSelectors = Get-VisibleNativeSelectors
-foreach ($prefix in $requiredSelectors) {
-    $match = @($visibleSelectors | Where-Object { $_.StartsWith($prefix) })
-    Add-Check "selector_$($prefix.Split(':')[1])" ($match.Count -gt 0) ($match -join ",")
-}
-
 $beforeFeaturesState = Invoke-ApkMcp -Tool "ui_state"
 $beforeFeatures = [long]$beforeFeaturesState.last_command.observed_at_ms
 Invoke-UiAction -Action "chatgpt_list_features" | Out-Null
@@ -377,6 +362,27 @@ $listState = Wait-CommandResult -Action "list_conversations" -AfterMs $beforeLis
 Add-Check "conversation_list" ($listState.last_command.ok -eq $true) ([string]$listState.last_command.detail)
 $conversationPage = Invoke-UiAction -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 }
 Add-Check "conversation_query" ($conversationPage.control_ok -eq $true) "returned=$(@($conversationPage.conversations).Count)"
+
+$nativeView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "native" }
+Add-Check "native_view_selected" ($nativeView.control_ok -eq $true) ([string]$nativeView.view_mode)
+$requiredSelectors = @(
+    "chatgpt-native:conversation-list:",
+    "chatgpt-native:feature-list:",
+    "chatgpt-native:composer-input:",
+    "chatgpt-native:composer-model:",
+    "chatgpt-native:composer-tools:",
+    "chatgpt-native:dictation:",
+    "chatgpt-native:send:"
+)
+$visibleSelectors = Get-VisibleNativeSelectors
+foreach ($prefix in $requiredSelectors) {
+    $match = @($visibleSelectors | Where-Object { $_.StartsWith($prefix) })
+    Add-Check "selector_$($prefix.Split(':')[1])" ($match.Count -gt 0) ($match -join ",")
+}
+$restoredOfficialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
+Add-Check "official_view_restored" (
+    $restoredOfficialView.control_ok -eq $true
+) ([string]$restoredOfficialView.view_mode)
 
 $failed = @($checks | Where-Object { -not $_.passed })
 $summary = [ordered]@{
