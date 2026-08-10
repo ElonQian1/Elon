@@ -239,7 +239,7 @@ await worker.run({ signal: shutdown.signal })
 
 ## 商户运行时内核
 
-`createMerchantRuntime` 抽取了咖啡店参考节点中所有商户共同需要的协议层：HMAC 签名、5 分钟重放窗口、商户身份、Grant 检查、订单明确确认、幂等占位与重放、能力分发、Manifest 摘要和标准结果/错误信封。商户只实现自己的商品、库存、报价和订单处理器。
+`createMerchantRuntime` 抽取了咖啡店参考节点中所有商户共同需要的协议层：HMAC 签名、5 分钟重放窗口、商户和凭据来源、Grant 检查、平台动作确认、幂等占位与重放、能力分发、不可变 Manifest 摘要和标准结果/错误信封。平台把已经服务端确认并一次性消费的 `action_confirmation_id` 写入签名信封；`order.commit` 不信任业务输入自行声明的确认布尔值。商户只实现自己的商品、库存、报价和订单处理器。
 
 ## 消费者可携带数据包签名
 
@@ -275,7 +275,7 @@ const runtime = createMerchantRuntime({
 const response = await runtime.handleInvoke({ headers, body: rawBody })
 ```
 
-内存幂等存储只供本机开发和原型使用，进程重启会丢失记录。生产商户必须实现 `claim/complete/release` 持久化接口，并在数据库中对“商户 + App + 能力 + 幂等键”建立唯一约束；商品扣减、报价消费和订单创建仍由商户数据库事务负责。
+处理器上下文包含规范化的 `credentialEnvironment`、`credentialId`、`grantId` 与 `actionConfirmationId`。内存幂等存储只供本机开发和原型使用，进程重启会丢失记录。生产商户必须实现 `claim/complete/release` 持久化接口，并在数据库中对“商户 + App + 能力 + 幂等键”建立唯一约束；只有真正取得 `claimed` 状态的执行者可以释放占位，商品扣减、报价消费和订单创建仍由商户数据库事务负责。
 
 ## 数据边界
 

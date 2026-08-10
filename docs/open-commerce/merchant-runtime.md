@@ -2,7 +2,7 @@
 title: 商户自有运行时接入手册
 status: current
 owner: backend
-reviewed_at: 2026-07-31
+reviewed_at: 2026-08-10
 ---
 
 # 商户自有运行时接入手册
@@ -48,7 +48,9 @@ OPEN_COMMERCE_RUNTIME_SECRET_COFFICE=<与商户后端一致的32位以上随机�
 HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 ```
 
-请求头为 `x-yilong-runtime-key-id`、`x-yilong-runtime-timestamp` 和 `x-yilong-runtime-signature: v1=<hex>`。商户端必须校验时间窗口、商户 ID、信封版本、调用方和幂等键。
+请求头为 `x-yilong-runtime-key-id`、`x-yilong-runtime-timestamp` 和 `x-yilong-runtime-signature: v1=<hex>`。商户端必须校验时间窗口、商户 ID、信封版本、调用方、凭据环境和幂等键。信封还携带可空的 `credential_id`、`grant_id` 与 `action_confirmation_id`；这些字段都受原始请求体 HMAC 保护。
+
+`action_confirmation_id` 只来自平台已经确认并在创建 Invocation 时一次性消费的服务端确认记录。`order.commit` 必须使用该字段，不能把业务输入中的 `confirmed_by_user=true` 或任意字符串当作确认权威；因此商户的订单输入只需保留报价、商品和履约参数，不必重复设计一套平台确认布尔值。
 
 ## 参考能力
 
@@ -94,7 +96,7 @@ HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 - 签名、时间戳或密钥标识错误：拒绝，不进入业务逻辑。
 - 运行绑定未验证或已降级：平台拒绝转发。
 - 报价过期、商品停售或库存不足：拒绝提交，要求重新报价。
-- 未获得用户明确确认：拒绝 `order.commit`。
+- 签名信封缺少平台已验证的 `action_confirmation_id`：拒绝 `order.commit`。
 - 商户后端超时或返回身份不匹配：平台记录失败审计并把运行绑定标为 `degraded`。
 - 每次健康验证和业务调用都会重新核对当前白名单、解析全部 DNS 地址并拒绝任一私网或特殊用途结果；本次连接固定到已检查地址且不使用环境代理或重定向。
 
@@ -102,15 +104,18 @@ HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 
 `cofficethinking` 参考节点的部署配置、商品管理接口和订单落库说明见其 `docs/open_commerce_runtime.md`。跨仓库协议真源为两仓库内容一致的 `contracts/open-commerce/merchant-runtime-v1.json`。
 
-新的 Node.js 商户项目可以复用 `sdk/open-commerce-connector` 的 `createMerchantRuntime`，直接获得签名验证、重放窗口、商户与 Grant 边界、订单明确确认、幂等生命周期、Manifest 摘要和标准信封。商户仍需实现自己的能力处理器和持久化幂等存储；SDK 的内存存储仅供本机开发，不能用于生产订单。
+新的 Node.js 商户项目可以复用 `sdk/open-commerce-connector` 的 `createMerchantRuntime`，直接获得签名验证、重放窗口、商户与 Grant 边界、平台动作确认、幂等生命周期、Manifest 摘要和标准信封。处理器上下文会提供规范化的用户、App、凭据环境、凭据 ID、Grant 和动作确认 ID。商户仍需实现自己的能力处理器和持久化幂等存储；SDK 的内存存储仅供本机开发，不能用于生产订单。
 
 ## 验证
 
 ```powershell
 powershell -NoProfile -File scripts\test-open-commerce-merchant-runtime-contract.ps1 `
   -CoffeeRepo D:\rust\active-projects\cofficethinking
+
+Set-Location sdk\open-commerce-connector
+npm test
 ```
 
-平台 Rust 测试还会启动临时商户服务，验证签名、Manifest、真实处理器调用、计量、审计和平台幂等重放。
+Node SDK 全量回归已覆盖签名、来源字段、Grant、平台动作确认、Manifest、结果边界、并发忙碌、幂等冲突、失败释放和成功重放。平台 Rust 测试代码还会启动临时商户服务，验证签名、Manifest、真实处理器调用、动作确认字段、计量、审计和平台幂等重放；本批已通过 `cargo check --bin elon-server --tests`，但本机共享 D 盘在链接测试二进制时写满，新增断言尚未实际执行。
 
 商户运行时出站地址固定的代码状态和统一回归范围见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`；当前该批次为 `implementation_uncompiled`。

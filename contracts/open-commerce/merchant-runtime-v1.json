@@ -17,6 +17,12 @@
     "signature_prefix": "v1=",
     "max_clock_skew_seconds": 300
   },
+  "request_context": {
+    "credential_environment": "required_signed_provenance",
+    "credential_id": "nullable_signed_provenance",
+    "grant_id": "nullable_signed_authorization",
+    "action_confirmation_id": "nullable_platform_verified_confirmation"
+  },
   "money": {
     "business_amounts": "integer_minor_units",
     "platform_metering": "integer_micros",
@@ -53,6 +59,8 @@
     "quote_price_source": "merchant_server",
     "order_commit_requires_grant": true,
     "order_commit_requires_explicit_user_confirmation": true,
+    "order_commit_confirmation_source": "signed_action_confirmation_id",
+    "business_input_confirmation_is_authority": false,
     "confirmation_id_one_time_per_user_app": true,
     "idempotency_required": true
   }

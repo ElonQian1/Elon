@@ -2,7 +2,7 @@
 title: 开放商业商户运行时 V1 验收
 status: current
 owner: backend
-reviewed_at: 2026-07-31
+reviewed_at: 2026-08-10
 ---
 
 # 开放商业商户运行时 V1 验收
@@ -17,9 +17,16 @@ reviewed_at: 2026-07-31
 - 同一平台幂等键不重复访问商户运行时，不重复计量。
 - PC 工作台可配置、验证并查看运行绑定，不收集共享密钥。
 - `cofficethinking` 编译通过，签名、防占位令牌、整数金额和用户确认单测通过。
-- 两仓库共享契约文件 SHA-256 一致。
+- 本仓库契约已增加签名来源与动作确认字段；`cofficethinking` 参考仓仍待同步，跨仓库 SHA-256 一致性本批不成立，不能沿用旧验收结论。
+- 平台将已服务端确认并一次性消费的动作确认 ID 写入 HMAC 信封；通用 Node 内核的 `order.commit` 不信任业务输入自行声明的确认布尔值。
+- Node 运行时专项 18 项和连接器 SDK 全量 55 项已实际通过，覆盖签名、来源身份、Grant、动作确认、不可变 Manifest、结果上限、并发忙碌、幂等冲突、失败释放和成功重放。
+- Rust `cargo check --bin elon-server --tests` 已通过，确认动作确认字段从调用服务到签名信封及新增端到端测试代码可编译。
 
-补充的运行时公网 DNS 拒绝和单次连接地址固定代码尚未编译，见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。
+补充的运行时公网 DNS 拒绝和单次连接地址固定代码已通过 Rust 编译检查，但尚未执行 DNS、TLS 或真实网络回归，见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。
+
+## 本批验证限制
+
+Rust 端到端测试二进制两次未能进入断言：第一次构建无关的 `elon-pc-node` 测试目标时 Windows 编译进程以 `STATUS_STACK_BUFFER_OVERRUN` 退出；限定 `elon-server` 后，LLVM 在链接阶段因共享 D 盘写满退出。两次都不是测试断言失败。本批不能据此宣称平台到临时商户服务的新增动作确认断言已实际通过。
 
 ## 仍需环境配置
 
