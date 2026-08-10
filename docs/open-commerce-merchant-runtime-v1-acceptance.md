@@ -20,13 +20,13 @@ reviewed_at: 2026-08-10
 - 本仓库契约已增加签名来源与动作确认字段；`cofficethinking` 参考仓仍待同步，跨仓库 SHA-256 一致性本批不成立，不能沿用旧验收结论。
 - 平台将已服务端确认并一次性消费的动作确认 ID 写入 HMAC 信封；通用 Node 内核的 `order.commit` 不信任业务输入自行声明的确认布尔值。
 - Node 运行时专项 18 项和连接器 SDK 全量 55 项已实际通过，覆盖签名、来源身份、Grant、动作确认、不可变 Manifest、结果上限、并发忙碌、幂等冲突、失败释放和成功重放。
-- Rust `cargo check --bin elon-server --tests` 已通过，确认动作确认字段从调用服务到签名信封及新增端到端测试代码可编译。
+- Rust 本地端到端专项已实际通过：临时回环商户节点完成绑定验证、签名查询、幂等重放、服务端动作确认、`order.commit`、计量与审计，并确认 HMAC 信封携带已消费的 `action_confirmation_id`；指纹为 `301d42eddf2a96fe964f4095a68992a333b45a4f75000541ad47316d1b829bde`。
 
 补充的运行时公网 DNS 拒绝和单次连接地址固定代码已通过 Rust 编译检查，但尚未执行 DNS、TLS 或真实网络回归，见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。
 
-## 本批验证限制
+## 本地验证边界
 
-Rust 端到端测试二进制两次未能进入断言：第一次构建无关的 `elon-pc-node` 测试目标时 Windows 编译进程以 `STATUS_STACK_BUFFER_OVERRUN` 退出；限定 `elon-server` 后，LLVM 在链接阶段因共享 D 盘写满退出。两次都不是测试断言失败。本批不能据此宣称平台到临时商户服务的新增动作确认断言已实际通过。
+Rust 端到端专项只使用全新 SQLite 与本机回环 HTTP 商户节点，证明平台侧协议和状态链路可执行；它不证明公网 DNS、TLS、标准 443 白名单、跨机器网络质量或生产商户后端已经可用。
 
 ## 仍需环境配置
 
