@@ -40,7 +40,7 @@ internal object ChatGptNativeControlPresentation {
                 control.id in headerIds || control.id in suggestionIds -> Coverage(
                     control.id,
                     Kind.DIRECT,
-                    nativeSelector = control.accessibilityLabel,
+                    nativeSelector = directSelector(control),
                 )
                 control.region == ChatGptWebUiRegion.HEADER &&
                     control.semantic in HEADER_DEDICATED_SEMANTICS -> headerDedicatedCoverage(control)
@@ -85,10 +85,17 @@ internal object ChatGptNativeControlPresentation {
         .toList()
 
     fun suggestions(controls: List<ChatGptWebUiControl>): List<ChatGptWebUiControl> = controls.asSequence()
-        .filter { it.region == ChatGptWebUiRegion.SUGGESTIONS && it.semantic == "suggestion" }
+        .filter { it.region == ChatGptWebUiRegion.SUGGESTIONS && it.semantic in SUGGESTION_SEMANTICS }
         .distinctBy(ChatGptWebUiControl::id)
         .take(SUGGESTION_LIMIT)
         .toList()
+
+    fun directSelector(control: ChatGptWebUiControl): String =
+        if (control.region == ChatGptWebUiRegion.SUGGESTIONS && control.semantic == "project") {
+            "chatgpt-project:${stableContextId(control.id)}"
+        } else {
+            control.accessibilityLabel
+        }
 
     fun usesHeaderIcon(control: ChatGptWebUiControl): Boolean = control.semantic == "sources"
 
@@ -117,7 +124,7 @@ internal object ChatGptNativeControlPresentation {
                             control.semantic !in HEADER_DEDICATED_SEMANTICS &&
                             control.semantic != "title"
                     ChatGptWebUiRegion.SUGGESTIONS ->
-                        control.id !in directSuggestionIds && control.semantic == "suggestion"
+                        control.id !in directSuggestionIds && control.semantic in SUGGESTION_SEMANTICS
                     else -> false
                 }
             }
@@ -220,6 +227,7 @@ internal object ChatGptNativeControlPresentation {
         "stop",
     )
     private val OVERLAY_DEDICATED_SEMANTICS = setOf("conversation", "project")
+    private val SUGGESTION_SEMANTICS = setOf("suggestion", "project")
     private val PRIMARY_COPY_LABELS = setOf(
         "复制回复",
         "复制消息",

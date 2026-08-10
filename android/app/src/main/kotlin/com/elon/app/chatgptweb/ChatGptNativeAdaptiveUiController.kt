@@ -73,7 +73,7 @@ internal class ChatGptNativeAdaptiveUiController(
             ellipsize = TextUtils.TruncateAt.END
             isAllCaps = false
             isEnabled = control.enabled
-            contentDescription = control.accessibilityLabel
+            contentDescription = ChatGptNativeControlPresentation.directSelector(control)
             tag = control.id
             setOnClickListener { onInvoke(control.id) }
         }

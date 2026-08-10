@@ -158,6 +158,26 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun exposesProjectSuggestionsAsStableNativeControls() {
+        val project = control(
+            id = "project_home",
+            semantic = "project",
+            label = "我的项目",
+            region = ChatGptWebUiRegion.SUGGESTIONS,
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(project)).getValue(project.id)
+
+        assertEquals(listOf(project), ChatGptNativeControlPresentation.suggestions(listOf(project)))
+        assertEquals("direct", coverage.kind.wireName)
+        assertEquals("chatgpt-project:project_home", coverage.nativeSelector)
+        assertEquals(
+            coverage.nativeSelector,
+            ChatGptNativeControlPresentation.directSelector(project),
+        )
+    }
+
+    @Test
     fun exposesMediaAndReasoningAsMessageActionsWhileVoiceModeUsesOfficialFallback() {
         val controls = listOf(
             control("media", "open_media", "打开图片", ChatGptWebUiRegion.MESSAGE, CONTEXT),

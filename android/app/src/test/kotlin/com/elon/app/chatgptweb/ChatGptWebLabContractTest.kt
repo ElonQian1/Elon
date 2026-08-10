@@ -235,6 +235,7 @@ class ChatGptWebLabContractTest {
 
         assertTrue(activity.contains("onSuggestionsVisibleChanged = nativeController::setSuggestionsVisible"))
         assertTrue(conversation.contains("messages.isEmpty() && !suggestionsVisible"))
+        assertTrue(adaptive.contains("ChatGptNativeControlPresentation.directSelector(control)"))
         assertFalse(adaptive.contains("emptyView.visibility"))
     }
 
