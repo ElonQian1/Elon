@@ -180,6 +180,7 @@
         path,
         region,
         signal,
+        label: labelOf(node, ''),
         context: semanticContext(node),
         section: navigationSection(node),
         isLink: node.matches('a[href]')

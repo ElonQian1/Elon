@@ -85,6 +85,11 @@ expectEqual(policy.classify({ pathname: '/', signal: '下载应用' }), 'downloa
 expectEqual(policy.classify({ pathname: '/', signal: '整理聊天' }), 'conversation_group', 'chat group');
 expectEqual(policy.classify({
   pathname: '/',
+  signal: 'sidebar-section-toggle account-owned-id 整理聊天',
+  label: '整理聊天'
+}), 'conversation_group', 'chat group uses its visible label');
+expectEqual(policy.classify({
+  pathname: '/',
   signal: 'Dynamic account-owned name',
   section: '项目'
 }), 'project', 'dynamic project row');

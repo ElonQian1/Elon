@@ -23,6 +23,7 @@
     const path = clean(input && input.path);
     const region = clean(input && input.region);
     const signal = clean(input && input.signal);
+    const label = clean(input && input.label);
     const context = clean(input && input.context);
     const section = clean(input && input.section);
     const combined = [signal, context, path].filter(Boolean).join(' ');
@@ -42,7 +43,7 @@
     }
     if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
     if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
-    if (/^(?:chats?|聊天|整理聊天)$/.test(signal)) return 'conversation_group';
+    if (/^(?:chats?|聊天|整理聊天)$/.test(label || signal)) return 'conversation_group';
     if (/^(?:projects?|项目)$/.test(section)) return 'project';
     if (region === 'content') {
       const route = contentRoutes.find((candidate) => candidate.pattern.test(pathname));
