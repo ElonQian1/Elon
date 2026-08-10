@@ -38,6 +38,12 @@ pub(crate) fn call_if_handled(
         .list_project_open_commerce_developer_apps(project_id)?
         .into_iter()
         .filter(|app| app.owner_user_id == user_id)
+        .collect::<Vec<_>>();
+    if !uses_default_mcp_identity && !apps.iter().any(|app| app.app_id == current_app_id) {
+        bail!("当前 MCP App 不属于当前用户和项目，或该 App 已不存在");
+    }
+    let apps = apps
+        .into_iter()
         .map(|app| {
             json!({
                 "record_id":app.id,
@@ -49,7 +55,7 @@ pub(crate) fn call_if_handled(
                 "requested_scopes":app.requested_scopes,
                 "updated_at":app.updated_at,
                 "is_current_mcp_identity":!uses_default_mcp_identity && app.app_id == current_app_id,
-                "can_use_for_sandbox_mcp":app.status == "active"
+                "can_use_for_sandbox_mcp":app.status == "active" && app.environment == "sandbox"
             })
         })
         .collect::<Vec<_>>();
@@ -72,3 +78,7 @@ fn ensure_empty(arguments: &Value) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_app_mcp_tests.rs"]
+mod tests;
