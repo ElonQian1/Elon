@@ -30,12 +30,11 @@
 
 - 删除请求、跟进与 V163 SQLite 回归 12 项：`bc3afefee6cd7d0dfd7638079ae6098eba346895ae255131de4474ef2ff4acf0`。
 - Rust 全目标检查：`b649a91b2aaf79a3237ec2f26d8a63f7ab181bce82ba8e73196b2f8cf0c1fab0`。
-- 开放商业广域回归未全绿：`9dabd399d3ffbeb64639861d37425b2845d1ae37927c6d8c87020a0446d38e33`；失败项为本批未修改的 `open_commerce_developer_event_tests::developer_event_feed_is_app_scoped_cursor_safe_and_resumable`，最终代码快照单测复跑 `6fb534402e3519535ab689a883e05938d869bfac0bd1bd4d8c647b4d15d02025` 仍失败。
+- 后续独立任务已把开发者事件测试切换到真实沙箱凭据调用链，并增加同 App 平台事件隔离断言；开发者事件模块回归 `d78571bc0de87a1793a812d1026b88ac98b5ad702b0219a34f9f6b461e1c0669` 与开放商业广域回归 `5eb216be17647b54bcdc8de86b6ab0d83047bcf6a09b631fe63caae60c3fd551` 均已通过。
 
 ## 未完成
 
 - 真实 V162 磁盘数据库升级、生产数据库迁移和完整历史 V5 包字节回归。
 - HTTP 实例、TypeScript、PC 操作、窄屏布局和用户错误提示验证。
-- 修复并重新跑绿当前独立的开发者终态事件流回归。
 - 自动通知、平台工单、客服处置、争议仲裁、处罚赔付和法律期限策略。
 - 跟进记录导出、跨运营方迁移、外部平台删除适配器和回执核验。
