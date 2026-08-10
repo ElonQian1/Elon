@@ -1,3 +1,6 @@
+#[path = "open_commerce_developer_event_api_tests.rs"]
+mod event_api_tests;
+
 use serde_json::{json, Value};
 use uuid::Uuid;
 
