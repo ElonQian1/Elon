@@ -14,9 +14,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 $invokeMcp = Join-Path $PSScriptRoot "invoke-apk-mcp.ps1"
-if (-not (Test-Path -LiteralPath $invokeMcp -PathType Leaf)) {
-    throw "Missing APK MCP helper: $invokeMcp"
+$evidenceHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1"
+foreach ($helper in @($invokeMcp, $evidenceHelper)) {
+    if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
+        throw "Missing ChatGPT Web smoke helper: $helper"
+    }
 }
+. $evidenceHelper
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
     throw "adb not found: $Adb"
 }
@@ -112,17 +116,20 @@ function Get-TopResumedActivity {
     return ([string]$line).Trim()
 }
 
-function Get-VisibleNativeSelectors {
+function Get-VisibleUiXml {
     $remotePath = "/sdcard/elon-chatgpt-web-smoke.xml"
     Invoke-Adb shell uiautomator dump $remotePath | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "UIAutomator dump failed." }
     $xml = (Invoke-Adb shell cat $remotePath) -join "`n"
     if ($LASTEXITCODE -ne 0) { throw "Unable to read UIAutomator dump." }
-    return @(
-        [regex]::Matches($xml, 'content-desc="([^"]*chatgpt-native:[^"]*)"') |
-            ForEach-Object { $_.Groups[1].Value } |
-            Sort-Object -Unique
-    )
+    return $xml
+}
+
+function Get-VisibleNativeSelectors {
+    param([string]$UiXml = "")
+
+    if ([string]::IsNullOrWhiteSpace($UiXml)) { $UiXml = Get-VisibleUiXml }
+    return @(Get-ChatGptNativeSelectorsFromXml -UiXml $UiXml)
 }
 
 function Wait-CommandResult {
@@ -237,41 +244,6 @@ function Get-ForeignComposerLabels {
     return @($Options | Where-Object { [string]$_.label -match $foreignPattern } | ForEach-Object { [string]$_.label })
 }
 
-function Normalize-ProbeReply {
-    param([AllowEmptyString()][string]$Text)
-
-    return $Text.Replace('\_', '_').Replace('\-', '-').Trim()
-}
-
-function Wait-ProbeReply {
-    param(
-        [Parameter(Mandatory = $true)][string]$Marker,
-        [Parameter(Mandatory = $true)][long]$AfterMs,
-        [Parameter(Mandatory = $true)][int]$TimeoutSec
-    )
-
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
-    $last = $null
-    do {
-        $last = Invoke-ApkMcp -Tool "ui_state"
-        $messages = @($last.conversation.messages)
-        $lastMessage = $messages | Select-Object -Last 1
-        if (
-            $last.last_command.action -eq "send_prompt" -and
-            $last.last_command.ok -eq $true -and
-            [long]$last.last_command.observed_at_ms -gt $AfterMs -and
-            $last.streaming -eq $false -and
-            $messages.Count -ge 2 -and
-            [string]$lastMessage.role -eq "assistant" -and
-            (Normalize-ProbeReply ([string]$lastMessage.content)) -like "*$Marker*"
-        ) {
-            return $last
-        }
-        Start-Sleep -Seconds $PollIntervalSec
-    } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out waiting for ChatGPT Web probe reply. Last action=$($last.last_command.action)."
-}
-
 $opened = Invoke-UiAction -Action "open_chatgpt_web" -EnsureMainActivity
 $officialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
 $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT Web readiness" -Predicate {
@@ -281,6 +253,7 @@ $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT We
         $value.activity_bound -eq $true
 }
 $topResumedActivity = Get-TopResumedActivity
+$officialUiXml = Get-VisibleUiXml
 
 Add-Check "open_chatgpt_web" ($opened.control_ok -eq $true) ([string]$opened.action)
 Add-Check "official_view_selected" ($officialView.control_ok -eq $true) ([string]$officialView.view_mode)
@@ -291,6 +264,12 @@ Add-Check "chatgpt_activity_foreground" (
     $topResumedActivity -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
 ) $topResumedActivity
 Add-Check "chatgpt_surface" ($state.surface -eq "chatgpt_web") ([string]$state.surface)
+Add-Check "official_fullscreen_mode" ($state.view_mode -eq "web") ([string]$state.view_mode)
+foreach ($chromeId in @("chatGptWebToolbar", "chatGptWebStatus", "chatGptModeToggle")) {
+    Add-Check "official_fullscreen_chrome_$chromeId" (
+        -not (Test-ChatGptResourceVisible -UiXml $officialUiXml -ResourceId $chromeId)
+    ) $chromeId
+}
 Add-Check "bridge_ready" ($state.bridge_state -eq "ready") ([string]$state.bridge_state)
 Add-Check "authenticated" ($state.authenticated -eq $true) ([string]$state.authenticated)
 Add-Check "composer_ready" ($state.composer_ready -eq $true) ([string]$state.composer_ready)
@@ -307,6 +286,29 @@ Add-Check "blocking_gaps" ($blockingGaps.Count -eq 0) ($blockingGaps -join ",")
 Add-Check "unknown_capabilities" ($unknownCapabilities.Count -eq 0) ($unknownCapabilities -join ",")
 Add-Check "unknown_semantics" ($unknownSemantics.Count -eq 0) ($unknownSemantics -join ",")
 Add-Check "adaptation_review" (-not $adaptationRequired) ($adaptationReasons -join ",")
+
+$contextEvidence = Get-ChatGptContextPagingEvidence -MessageOffset ([int]$state.conversation.message_window_start) `
+    -InvokeUiAction { param($action, $arguments) Invoke-UiAction -Action $action -Arguments $arguments }
+$contextFirst = $contextEvidence.first
+$contextReplay = $contextEvidence.replay
+$contextNext = $contextEvidence.next
+Add-Check "context_page" ($contextFirst.control_ok -eq $true) ([string]$contextFirst.schema)
+Add-Check "context_schema" ($contextFirst.schema -eq "elon.chatgpt_web.context.v2") ([string]$contextFirst.schema)
+Add-Check "context_cursor_roundtrip" (
+    $null -ne $contextReplay -and
+        $contextReplay.control_ok -eq $true -and
+        $contextReplay.context_revision -eq $contextFirst.context_revision -and
+        [int]$contextReplay.message_offset -eq [int]$contextFirst.message_offset
+) "offset=$($contextFirst.message_offset)"
+$nextContextValid = if ($contextFirst.has_more -eq $true) {
+    $null -ne $contextNext -and
+        $contextNext.control_ok -eq $true -and
+        $contextNext.context_revision -eq $contextFirst.context_revision -and
+        [int]$contextNext.message_offset -eq [int]$contextFirst.next_message_offset
+} else {
+    $null -eq $contextNext
+}
+Add-Check "context_cursor_next" $nextContextValid "has_more=$($contextFirst.has_more)"
 
 $beforeFeaturesState = Invoke-ApkMcp -Tool "ui_state"
 $beforeFeatures = [long]$beforeFeaturesState.last_command.observed_at_ms
@@ -382,16 +384,26 @@ if ($SendProbe) {
     $beforeNew = [long]$beforeNewState.last_command.observed_at_ms
     Invoke-UiAction -Action "chatgpt_new_conversation" | Out-Null
     $newState = Wait-CommandResult -Action "new_conversation" -AfterMs $beforeNew -TimeoutSec $ReadyTimeoutSec
-    Add-Check "new_conversation" ($newState.last_command.ok -eq $true) ([string]$newState.last_command.detail)
+    $newConversationOk = $newState.last_command.ok -eq $true
+    Add-Check "new_conversation" $newConversationOk ([string]$newState.last_command.detail)
+    if (-not $newConversationOk) {
+        throw "ChatGPT Web new conversation failed; the send probe was not dispatched."
+    }
 
     $prompt = "Reply only with: $ProbeMarker"
     Invoke-UiAction -Action "set_input_text" -Arguments @{ text = $prompt } | Out-Null
     $beforeSendState = Invoke-ApkMcp -Tool "ui_state"
     $beforeSend = [long]$beforeSendState.last_command.observed_at_ms
-    Invoke-UiAction -Action "send_input" | Out-Null
-    $replyState = Wait-ProbeReply -Marker $ProbeMarker -AfterMs $beforeSend -TimeoutSec $ReplyTimeoutSec
+    $sendDispatch = Invoke-UiAction -Action "send_input"
+    $sendRequestId = [string]$sendDispatch.command_receipt.request_id
+    if ([string]::IsNullOrWhiteSpace($sendRequestId)) {
+        throw "send_input did not return a command receipt request_id."
+    }
+    $replyState = Wait-ChatGptProbeReply -RequestId $sendRequestId -Marker $ProbeMarker `
+        -AfterMs $beforeSend -TimeoutSec $ReplyTimeoutSec -PollIntervalSec $PollIntervalSec `
+        -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
     $lastMessage = @($replyState.conversation.messages) | Select-Object -Last 1
-    $normalizedReply = Normalize-ProbeReply ([string]$lastMessage.content)
+    $normalizedReply = Normalize-ChatGptProbeReply ([string]$lastMessage.content)
     Add-Check "probe_reply" ($normalizedReply -like "*$ProbeMarker*") $ProbeMarker
     $probe = [ordered]@{
         marker = $ProbeMarker
@@ -443,6 +455,13 @@ $summary = [ordered]@{
     manifest = $matrix.manifest
     adaptation_review = $matrix.adaptation_review
     conversation_count = [int]$conversationPage.match_count
+    context = [ordered]@{
+        schema = [string]$contextFirst.schema
+        revision = [string]$contextFirst.context_revision
+        message_offset = [int]$contextFirst.message_offset
+        has_more = [bool]$contextFirst.has_more
+        cursor_roundtrip = $contextReplay.control_ok -eq $true
+    }
     probe = $probe
     checks = $checks
 }
