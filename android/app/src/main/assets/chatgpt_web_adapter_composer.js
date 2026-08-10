@@ -255,6 +255,12 @@
     )).filter(isVisible);
   }
 
+  function opensSubmenu(node) {
+    const popup = String(node && node.getAttribute('aria-haspopup') || '').toLowerCase();
+    return popup === 'menu' || popup === 'listbox' ||
+      !!(node && node.hasAttribute('aria-expanded'));
+  }
+
   function collectOptions(section, baseline) {
     const seen = new Map();
     const candidates = visibleOptionNodes().filter((node) => !baseline || !baseline.has(node)).map((node) => {
@@ -273,6 +279,7 @@
         kind: role,
         semantic: optionSemantic(section, node, label),
         role,
+        opensSubmenu: opensSubmenu(node),
         selectable: selected || node.hasAttribute('aria-checked') || node.hasAttribute('aria-selected'),
         node
       };
@@ -302,8 +309,8 @@
       type: 'composer_controls_snapshot',
       section,
       currentModel: currentModel(composer),
-      options: options.map(({ id, label, selected, kind, semantic }) => ({
-        id, label, selected, kind, semantic
+      options: options.map(({ id, label, selected, kind, semantic, opensSubmenu }) => ({
+        id, label, selected, kind, semantic, opensSubmenu
       }))
     });
   }

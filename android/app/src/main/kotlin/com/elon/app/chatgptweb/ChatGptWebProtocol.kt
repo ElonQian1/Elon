@@ -46,6 +46,7 @@ internal data class ChatGptWebComposerOption(
     val selected: Boolean,
     val kind: String,
     val semantic: String = ChatGptWebComposerOptionSemantics.TOOL,
+    val opensSubmenu: Boolean = false,
 )
 
 internal data class ChatGptWebFeature(
@@ -225,6 +226,7 @@ internal object ChatGptWebProtocol {
                         semantic = item.optString("semantic")
                             .takeIf { it in ChatGptWebComposerOptionSemantics.KNOWN }
                             ?: ChatGptWebComposerOptionSemantics.fallback(section),
+                        opensSubmenu = item.optBoolean("opensSubmenu"),
                     ),
                 )
             }

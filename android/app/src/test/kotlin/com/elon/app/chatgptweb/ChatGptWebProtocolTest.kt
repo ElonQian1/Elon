@@ -125,7 +125,7 @@ class ChatGptWebProtocolTest {
                 "section":"model",
                 "currentModel":"5.6 Sol 轻度",
                 "options":[
-                  {"id":"model_ab12","label":"轻度","selected":true,"kind":"menuitemradio","semantic":"model"},
+                  {"id":"model_ab12","label":"模型 GPT-5.6 Sol","selected":false,"kind":"menuitem","semantic":"model","opensSubmenu":true},
                   {"id":"../unsafe","label":"错误选项","selected":false,"kind":"menuitem"},
                   {"id":"model_blank","label":"  ","selected":false,"kind":"menuitem"}
                 ]
@@ -137,9 +137,10 @@ class ChatGptWebProtocolTest {
         assertEquals("model", event.section)
         assertEquals("5.6 Sol 轻度", event.currentModel)
         assertEquals(1, event.options.size)
-        assertEquals("轻度", event.options.single().label)
-        assertTrue(event.options.single().selected)
+        assertEquals("模型 GPT-5.6 Sol", event.options.single().label)
+        assertFalse(event.options.single().selected)
         assertEquals("model", event.options.single().semantic)
+        assertTrue(event.options.single().opensSubmenu)
     }
 
     @Test

@@ -465,6 +465,7 @@ class ChatGptWebMcpActionsTest {
         )
         assertEquals("chatgpt_select_composer_option", option.getString("native_action"))
         assertEquals("model", option.getString("semantic"))
+        assertTrue(option.getBoolean("opens_submenu"))
         assertEquals(
             "chatgpt-composer-option:model:model_fast:快速",
             option.getString("native_adb_content_description"),
@@ -819,6 +820,7 @@ class ChatGptWebMcpActionsTest {
                                 selected = false,
                                 kind = "menuitemradio",
                                 semantic = "model",
+                                opensSubmenu = true,
                             ),
                         ),
                     ),

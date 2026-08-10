@@ -409,6 +409,7 @@ internal class ChatGptWebMcpActions(
                                 .put("kind", option.kind)
                                 .put("semantic", option.semantic)
                                 .put("selected", option.selected)
+                                .put("opens_submenu", option.opensSubmenu)
                                 .put("native_action", "chatgpt_select_composer_option")
                                 .put(
                                     "native_adb_content_description",
