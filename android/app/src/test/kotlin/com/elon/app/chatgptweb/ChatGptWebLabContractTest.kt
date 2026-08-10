@@ -97,7 +97,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("action === 'send_prompt'"))
         assertTrue(adapter.contains("action === 'list_conversations'"))
         assertTrue(adapter.contains("action === 'open_conversation'"))
-        assertTrue(adapter.contains("if (location.pathname === '/')"))
+        assertTrue(conversations.contains("if (location.pathname === '/')"))
         assertTrue(adapter.contains("action === 'regenerate_response'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {

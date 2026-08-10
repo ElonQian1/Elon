@@ -362,19 +362,8 @@
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
-      if (location.pathname === '/') {
-        respond(action, true, '');
-        return scheduleSnapshot();
-      }
-      const button = findButton('create-new-chat-button', ['new chat', '新聊天', '新建聊天']);
-      const link = Array.from(
-        document.querySelectorAll('a[href="/"], a[data-testid="create-new-chat-button"]')
-      ).find(isVisible);
-      const target = button || link;
-      if (!target) return respond(action, false, '未找到新建会话入口。');
-      respond(action, true, '');
-      target.click();
-      return scheduleSnapshot();
+      if (!conversationAdapter) return respond(action, false, '会话适配器尚未就绪。');
+      return conversationAdapter.newConversation(respond);
     }
     respond(action || 'unknown', false, '不支持的本地命令。');
   }

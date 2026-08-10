@@ -10,6 +10,15 @@
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
+  function isVisible(node) {
+    if (!node) return false;
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+    return rect.width > 0 && rect.height > 0 &&
+      rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth &&
+      style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
   function label(node) {
     return cleanText([
       node && node.getAttribute('aria-label'),
@@ -71,6 +80,27 @@
     ) || null;
   }
 
+  function findNewConversationNode() {
+    return Array.from(document.querySelectorAll(
+      'a[href="/"], [data-testid*="new-chat" i], [data-testid*="create-new-chat" i], ' +
+      'button, [role="button"], [role="link"]'
+    )).find((node) => {
+      if (!isVisible(node)) return false;
+      return /new chat|create chat|new conversation|新聊天|新建聊天|新建会话/.test(label(node));
+    }) || null;
+  }
+
+  function waitForNewConversation(onReady, onTimeout) {
+    const started = Date.now();
+    function poll() {
+      const target = findNewConversationNode();
+      if (target) return onReady(target);
+      if (Date.now() - started >= 3000) return onTimeout();
+      window.setTimeout(poll, 100);
+    }
+    poll();
+  }
+
   function waitForConversations(onReady, onTimeout) {
     const started = Date.now();
     function poll() {
@@ -103,6 +133,27 @@
     );
   }
 
+  function newConversation(result) {
+    if (location.pathname === '/') return result('new_conversation', true, '');
+    const existing = findNewConversationNode();
+    if (existing) {
+      result('new_conversation', true, '');
+      existing.click();
+      return;
+    }
+
+    const open = findSidebarButton(true);
+    if (!open) return result('new_conversation', false, '未找到新建会话入口。');
+    open.click();
+    waitForNewConversation(
+      (target) => {
+        result('new_conversation', true, '');
+        target.click();
+      },
+      () => result('new_conversation', false, '官网新建会话入口尚未加载完成。')
+    );
+  }
+
   function openConversation(path, result) {
     if (!CONVERSATION_PATH.test(path)) {
       return result('open_conversation', false, '会话地址无效。');
@@ -120,6 +171,7 @@
 
   window.__elonChatGptConversations = Object.freeze({
     capabilities,
+    newConversation,
     openConversation,
     requestList
   });
