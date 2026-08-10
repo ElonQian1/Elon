@@ -332,7 +332,24 @@ $unknownCapabilities = @($matrix.unknown_capabilities)
 $unknownSemantics = @($matrix.unknown_semantics)
 $adaptationRequired = $matrix.adaptation_review.required -eq $true
 $adaptationReasons = @($matrix.adaptation_review.reasons)
+$featureBaseline = $matrix.feature_baseline
+$baselineSummary = $featureBaseline.summary
+$baselineStatusTotal = [int]$baselineSummary.complete +
+    [int]$baselineSummary.partial +
+    [int]$baselineSummary.fallback_only
 Add-Check "capability_matrix_ready" ($matrix.ready_for_mcp -eq $true) ([string]$matrix.schema)
+Add-Check "capability_matrix_app_version" (
+    [int]$matrix.app.version_code -gt 0 -and
+        -not [string]::IsNullOrWhiteSpace([string]$matrix.app.version_name)
+) "v$($matrix.app.version_name) build=$($matrix.app.version_code)"
+Add-Check "feature_baseline_schema" (
+    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v1"
+) ([string]$featureBaseline.schema)
+Add-Check "feature_baseline_complete" (
+    [int]$featureBaseline.feature_count -gt 0 -and
+        $baselineStatusTotal -eq [int]$featureBaseline.feature_count -and
+        [int]$baselineSummary.remaining -eq @($featureBaseline.remaining_feature_ids).Count
+) "features=$($featureBaseline.feature_count),remaining=$($baselineSummary.remaining)"
 Add-Check "blocking_gaps" ($blockingGaps.Count -eq 0) ($blockingGaps -join ",")
 Add-Check "unknown_capabilities" ($unknownCapabilities.Count -eq 0) ($unknownCapabilities -join ",")
 Add-Check "unknown_semantics" ($unknownSemantics.Count -eq 0) ($unknownSemantics -join ",")
@@ -505,15 +522,18 @@ Add-Check "official_view_restored" (
 
 $failed = @($checks | Where-Object { -not $_.passed })
 $summary = [ordered]@{
-    schema = "elon.chatgpt_web.apk_smoke.v1"
+    schema = "elon.chatgpt_web.apk_smoke.v2"
+    recorded_at_utc = [DateTimeOffset]::UtcNow.ToString("o")
     passed = $failed.Count -eq 0
     mode = if ($SendProbe) { "send_probe" } else { "read_only" }
     device_serial = $DeviceSerial
+    app = $matrix.app
     adapter_version = [int]$state.adapter_version
     authenticated = [bool]$state.authenticated
     composer_ready = [bool]$state.composer_ready
     visible_native_selector_count = $visibleSelectors.Count
     manifest = $matrix.manifest
+    feature_baseline = $featureBaseline
     adaptation_review = $matrix.adaptation_review
     conversation_count = [int]$conversationPage.match_count
     context = [ordered]@{
