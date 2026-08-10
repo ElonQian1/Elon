@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Changelog,
-    [string]$BaseSha = '',
+    [string]$TaskBaseSha = '',
+    [Alias('BaseSha')]
+    [string]$DeployedServerSha = '',
     [switch]$StaticRuntimePwa,
     [switch]$PlanOnly,
     [switch]$NoResume
@@ -21,16 +23,21 @@ if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect repository status.' }
 if ($status) { throw 'Fast-lane publishing requires a clean committed worktree.' }
 
 $headSha = (& git -C $repoRoot rev-parse HEAD).Trim()
-if ([string]::IsNullOrWhiteSpace($BaseSha)) {
-    $BaseSha = Get-ElonDeployedServerSha
+$taskBase = Get-ElonAppUiTaskBaseSha -RepoRoot $repoRoot -ExplicitBaseSha $TaskBaseSha
+if ($null -eq $taskBase) {
+    throw 'APP UI task base is unavailable. Run ai-task-preflight before editing or pass -TaskBaseSha explicitly.'
 }
-if ([string]::IsNullOrWhiteSpace($BaseSha)) {
-    $BaseSha = '0000000000000000000000000000000000000000'
+if ([string]::IsNullOrWhiteSpace($DeployedServerSha)) {
+    $DeployedServerSha = Get-ElonDeployedServerSha
 }
-$scope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $BaseSha -HeadSha $headSha
-if ($StaticRuntimePwa -and $scope.MobilePwaMode -eq 'full_server') {
-    $scope.MobilePwaMode = 'static_template'
-    $scope.Reason = 'explicit_static_runtime_pwa_without_server_release'
+if ([string]::IsNullOrWhiteSpace($DeployedServerSha)) {
+    $DeployedServerSha = '0000000000000000000000000000000000000000'
+}
+$scope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $taskBase.Sha -HeadSha $headSha
+$deploymentDebt = Resolve-ElonAppUiChangeScope `
+    -RepoRoot $repoRoot -BaseSha $DeployedServerSha -HeadSha $headSha
+if ($StaticRuntimePwa -and $scope.MobilePwaMode -ne 'static_template') {
+    throw "-StaticRuntimePwa cannot override task scope '$($scope.MobilePwaMode)'. Static publishing is allowed only for self-contained mobile PWA assets."
 }
 $receipt = New-ElonReleaseReceipt -RepoRoot $repoRoot -Kind 'app-ui' -SourceSha $headSha
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
@@ -38,20 +45,42 @@ $watch = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Host 'APP_UI_RELEASE_POLICY=publish_before_optional_renderer'
 Write-Host 'APP_UI_PUBLISH_ORDER=mobile_pwa_then_apk'
 Write-Host 'APP_UI_RENDERER=skipped'
-Write-Host "APP_UI_BASE_SHA=$BaseSha"
+Write-Host "APP_UI_TASK_BASE_SHA=$($taskBase.Sha)"
+Write-Host "APP_UI_TASK_BASE_SOURCE=$($taskBase.Source)"
+Write-Host "APP_UI_DEPLOYED_SERVER_SHA=$DeployedServerSha"
 Write-Host "APP_UI_HEAD_SHA=$headSha"
 Write-Host "APP_UI_MOBILE_PWA_MODE=$($scope.MobilePwaMode)"
 Write-Host "APP_UI_SCOPE_REASON=$($scope.Reason)"
-Write-Host "APP_UI_CHANGED_PATHS=$($scope.ChangedPaths.Count)"
-Write-Host "APP_UI_SERVER_RELEASE=$(if ($StaticRuntimePwa) { 'deferred_explicitly' } else { 'scope_driven' })"
+Write-Host "APP_UI_TASK_CHANGED_PATHS=$($scope.ChangedPaths.Count)"
+Write-Host "APP_UI_DEPLOYMENT_DEBT_PATHS=$($deploymentDebt.ChangedPaths.Count)"
+Write-Host "APP_UI_DEPLOYMENT_DEBT_MODE=$($deploymentDebt.MobilePwaMode)"
+Write-Host 'APP_UI_SERVER_RELEASE=task_scope_driven'
 
 if ($PlanOnly) {
     Write-Host 'APP_UI_PUBLISH_RESULT=planned'
     exit 0
 }
 
+$resumeMobilePwa = $false
 if (-not $NoResume -and (Test-ElonReleaseStagePassed -Receipt $receipt -Stage 'mobile_pwa')) {
-    Write-Host 'RELEASE_STAGE=mobile_pwa status=resumed durationSeconds=0 message=previous receipt passed'
+    try {
+        & (Join-Path $PSScriptRoot 'publish-mobile-pwa-static.ps1') -VerifyOnly
+        $resumeMobilePwa = $LASTEXITCODE -eq 0
+        if ($resumeMobilePwa -and $scope.MobilePwaMode -eq 'full_server') {
+            $serverNowSha = Get-ElonDeployedServerSha
+            if ([string]::IsNullOrWhiteSpace($serverNowSha)) {
+                $resumeMobilePwa = $false
+            } else {
+                & git -C $repoRoot merge-base --is-ancestor $headSha $serverNowSha 2>$null
+                $resumeMobilePwa = $LASTEXITCODE -eq 0
+            }
+        }
+    } catch {
+        Write-Host "APP_UI_MOBILE_PWA_RESUME=stale reason=$($_.Exception.Message)"
+    }
+}
+if ($resumeMobilePwa) {
+    Write-Host 'RELEASE_STAGE=mobile_pwa status=resumed durationSeconds=0 message=receipt and remote artifact verified'
 } elseif ($scope.MobilePwaMode -eq 'static_template') {
     Invoke-ElonReleaseStage -Receipt $receipt -Stage 'mobile_pwa' -SuccessMessage 'static template published' -Action {
         & (Join-Path $PSScriptRoot 'publish-mobile-pwa-static.ps1')

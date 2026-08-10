@@ -203,7 +203,7 @@ $resultFileLine = $successOutput |
     Where-Object { "$_".StartsWith("AI_COMMAND_RESULT_FILE=") } |
     Select-Object -Last 1
 $resultFile = "$resultFileLine".Substring("AI_COMMAND_RESULT_FILE=".Length)
-$savedResult = Get-Content -LiteralPath $resultFile -Raw | ConvertFrom-Json
+$savedResult = [System.IO.File]::ReadAllText($resultFile, [System.Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json
 Assert-True ($savedResult.status -eq "passed") "Persisted success result status is wrong."
 Assert-True ($savedResult.exit_code -eq 0) "Persisted success result exit code is wrong."
 Assert-True ($savedResult.timeout_seconds -eq 3600) "Persisted default total timeout is wrong."
@@ -213,7 +213,7 @@ $stateFileLine = $successOutput |
     Where-Object { "$_".StartsWith("AI_COMMAND_STATE_FILE=") } |
     Select-Object -Last 1
 $stateFile = "$stateFileLine".Substring("AI_COMMAND_STATE_FILE=".Length)
-$savedState = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
+$savedState = [System.IO.File]::ReadAllText($stateFile, [System.Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json
 Assert-True ($savedState.status -eq "passed") "Persisted final command state is wrong."
 Assert-True ($savedState.pid -eq 0) "Persisted final command state must not retain a live PID."
 

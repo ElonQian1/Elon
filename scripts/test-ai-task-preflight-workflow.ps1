@@ -43,6 +43,7 @@ $preflightScript = Join-Path $repoRoot "scripts\ai-task-preflight.ps1"
 $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
+$gitPathResolutionScript = Join-Path $repoRoot "scripts\git-path-resolution.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $cleanupSh = Join-Path $repoRoot "scripts\cleanup-task-worktrees.sh"
 $preflightContent = Get-Content -Raw -LiteralPath $preflightScript
@@ -76,6 +77,10 @@ Assert-Contains $preflightContent "PC_CONVERSATION_WORKTREE=true" "PowerShell pr
 Assert-Contains $preflightShContent "PC_CONVERSATION_WORKTREE=true" "Shell preflight must expose when the current workspace is already a PC conversation worktree."
 Assert-Contains $preflightContent "FINISH_COMMAND_POWERSHELL=" "PowerShell preflight must print the deterministic finish entry point."
 Assert-Contains $preflightContent "FINISH_CONTRACT_ID=" "PowerShell preflight must issue an immutable finish contract."
+Assert-Contains $preflightContent "TASK_BASE_SHA=" "PowerShell preflight must expose the immutable task-scope baseline."
+Assert-Contains $preflightShContent "TASK_BASE_SHA=" "Shell preflight must expose the immutable task-scope baseline."
+Assert-Contains (Get-Content -Raw -LiteralPath $finishContractScript) 'elon-task-base.v1' "PowerShell finish contracts must persist a worktree-local task baseline."
+Assert-Contains (Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\ai-task-finish-contract.sh')) 'elon-task-base.v1' "Shell finish contracts must persist a worktree-local task baseline."
 Assert-Contains $preflightContent "-TaskContract" "PowerShell finish command must bind the preflight contract."
 Assert-Contains $preflightShContent "FINISH_COMMAND_SHELL=" "Shell preflight must print the deterministic finish entry point."
 Assert-Contains $preflightShContent "FINISH_CONTRACT_ID=" "Shell preflight must issue an immutable finish contract."
@@ -200,6 +205,7 @@ function Invoke-PreflightAndAssertNoNestedWorktree {
     Assert-Contains $outputText "AI_WORKFLOW_GUARD_BEGIN" "$Reason output must include the self-contained AI workflow guard."
     Assert-Contains $outputText "EDIT_ROOT=" "$Reason output must expose the safe edit root."
     Assert-Contains $outputText "EDIT_STATE=$ExpectedState" "$Reason must report the expected edit state."
+    Assert-Contains $outputText "TASK_BASE_SHA=" "$Reason must retain the task baseline independently of origin/main deployment state."
 
     $createdChildren = @(Get-ChildItem -LiteralPath $WorktreeParent -Force)
     if ($createdChildren.Count -ne 0) {
@@ -318,9 +324,10 @@ try {
     Copy-Item -LiteralPath $preflightScript -Destination (Join-Path $seedRepo "scripts\ai-task-preflight.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $seedRepo "scripts\direct-network.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $seedRepo "scripts\ai-task-finish-contract.ps1")
+    Copy-Item -LiteralPath $gitPathResolutionScript -Destination (Join-Path $seedRepo "scripts\git-path-resolution.ps1")
     Set-Content -LiteralPath (Join-Path $seedRepo "README.md") -Value "preflight workflow test`n" -Encoding UTF8
 
-    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/direct-network.ps1", "scripts/ai-task-finish-contract.ps1") | Out-Null
+    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/direct-network.ps1", "scripts/ai-task-finish-contract.ps1", "scripts/git-path-resolution.ps1") | Out-Null
     Invoke-Git $seedRepo @("commit", "-m", "seed preflight workflow test") | Out-Null
     Invoke-Git $seedRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $seedRepo @("push", "-u", "origin", "main") | Out-Null

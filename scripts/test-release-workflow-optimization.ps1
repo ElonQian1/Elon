@@ -52,6 +52,16 @@ $staticScope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $head -
 Assert-True ($staticScope.MobilePwaMode -eq 'static_template') 'Template-only UI change must use static PWA publishing.'
 Assert-True $staticScope.AndroidChanged 'Android UI change was not detected.'
 
+$modularStaticScope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $head -HeadSha $head `
+    -ChangedPaths @('server/src/assets/project_plaza.css', 'server/src/assets/project_plaza.js')
+Assert-True ($modularStaticScope.MobilePwaMode -eq 'static_template') `
+    'Self-contained modular mobile PWA assets must use static publishing.'
+
+$deploymentDebtScope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $head -HeadSha $head `
+    -ChangedPaths @('server/src/web.rs', 'server/src/assets/web_page.html')
+Assert-True ($staticScope.MobilePwaMode -eq 'static_template' -and $deploymentDebtScope.MobilePwaMode -eq 'full_server') `
+    'Task scope must remain static even when the deployed server has unrelated runtime debt.'
+
 $serverScope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $head -HeadSha $head `
     -ChangedPaths @('server/src/web.rs', 'server/src/assets/web_page.html')
 Assert-True ($serverScope.MobilePwaMode -eq 'full_server') 'Server runtime change must use full server publishing.'
@@ -105,6 +115,14 @@ Assert-True (-not $staticPublisher.Contains('Split-Path $RemotePath')) `
     'The static publisher treats a POSIX remote path as a Windows path.'
 Assert-True ($staticPublisher.Contains('New-ElonMobilePwaRuntimeTemplate')) `
     'The static publisher does not compose modular project plaza assets.'
+Assert-True ($staticPublisher.Contains('[switch]$VerifyOnly')) `
+    'The static publisher cannot verify a resumable remote artifact.'
+Assert-True ($staticPublisher.Contains("flock -w 30")) `
+    'The static publisher lacks a bounded cross-publisher swap lock.'
+Assert-True ($staticPublisher.Contains('web_page.html.release.v1') -or $staticPublisher.Contains('$metadataPath')) `
+    'The static publisher lacks release-generation metadata.'
+Assert-True ($staticPublisher.Contains('MOBILE_PWA_STATIC_RESULT=skipped_newer_generation')) `
+    'The static publisher can overwrite a newer mobile PWA generation.'
 
 $runtimeTemplatePath = Join-Path $repoRoot ".ai-tmp\tests\mobile-pwa-runtime-template.$PID.html"
 try {

@@ -28,6 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'git-path-resolution.ps1')
 
 function Get-LineCount {
     param([string]$Path)
@@ -150,20 +151,9 @@ function Stop-CommandProcessTree {
     }
 }
 
-$repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
-    throw "Unable to locate the repository root."
-}
-$repoRoot = [System.IO.Path]::GetFullPath($repoRoot.Trim())
-$gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null)
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitCommonDir)) {
-    throw "Unable to locate the shared Git metadata directory."
-}
-$gitCommonDir = $gitCommonDir.Trim()
-if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
-    $gitCommonDir = Join-Path $repoRoot $gitCommonDir
-}
-$gitCommonDir = [System.IO.Path]::GetFullPath($gitCommonDir)
+$repositoryPaths = Get-ElonRepositoryPathsFromScriptRoot -ScriptRoot $PSScriptRoot
+$repoRoot = $repositoryPaths.RepoRoot
+$gitCommonDir = $repositoryPaths.GitCommonDir
 $workingPath = if ([System.IO.Path]::IsPathRooted($WorkingDirectory)) {
     [System.IO.Path]::GetFullPath($WorkingDirectory)
 } else {

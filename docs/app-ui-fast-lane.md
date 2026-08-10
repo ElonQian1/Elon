@@ -42,12 +42,15 @@
      -CommandLine 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish-app-ui-fast-lane.ps1 -Changelog "同步说明"'
    ```
 
-   包装脚本先比较线上 Server SHA 与当前 HEAD 的改动范围，再发布移动 PWA，最后发布 APK：
+   包装脚本分别计算“预检时任务基线 → 当前 HEAD”和“线上 Server SHA → 当前 HEAD”，再发布移动 PWA，最后发布 APK。前者决定本任务需要发布什么；后者只作为累计部署债务观测，不能把其他任务尚未发布的后端变化归到本次 UI 任务：
 
-   - 只有 `server/src/assets/web_page.html` 变化时，原子上传运行时模板，不重新编译 Rust，也不构建 PC 前端。
+   - 只有自包含的移动 PWA 运行时模板资产（`web_page.html` 与由模板生成器内联的 plaza CSS/JS）变化时，原子上传运行时模板，不重新编译 Rust，也不构建 PC 前端。
    - 后端 Rust、其他内嵌资源或 PC 前端变化时，才运行完整 Server 发布；APP UI 路线使用 `-SkipPcFrontend` 避免重复构建无关 PC 页面。
    - 没有移动 PWA 变化时记录 skipped，不启动 Server 发布。
    - APK 发布始终先做线上 Android 构建输入覆盖检查；已覆盖时不 claim 版本、不重复构建。
+   - 预检会把完整 `TASK_BASE_SHA` 保存在 worktree 私有 Git 元数据中；发布脚本缺少该基线时失败关闭，禁止退回“线上 Server SHA 就是任务基线”的旧判断。
+   - 静态模板发布会先检查 `origin/main` 是否已有更新的 PWA 输入，并使用远端来源 SHA、模板哈希、大小和 `flock` 互斥执行比较交换；旧任务不得覆盖新页面。
+   - 发布收据恢复前必须重新核验远端模板哈希；完整 Server 阶段还要核验线上 SHA 覆盖当前提交，不能仅凭本地历史收据跳过。
 
    每个阶段写入 `.ai-tmp/release-receipts/`，相同源码 SHA 的重试可以复用已经完成的移动 PWA 阶段。两个正式发布仍按顺序执行，不并行抢占。
 6. 发布完成后，有空闲 Renderer 时再做针对性视觉补验。任何 start/bootstrap/prepare 前只调用一次 `ui_get_runtime_status` 和 `ui_check_capabilities` 检查明确的 `rendererResourceId`/lease；全部占用时立即记录 `VERIFICATION_DEFERRED=renderer_capacity_unavailable`、`RENDERER_PREPARATION_ATTEMPTS=0`，不得发起准备或重试。存在明确空闲槽时才允许一次最多 30 秒的准备；忙碌、离线或超时不得阻塞 Server/PWA、APK 发布或统一收尾。
@@ -62,6 +65,8 @@
 - 没有真帧证据时允许报告“已发布、验证延期”，但禁止报告“视觉已验收”或伪造视觉损失值。
 
 ## 时间与可靠性约束
+
+- 纯 APP UI 任务即使遇到线上 Server 累计落后，也只承担自己的静态 PWA 发布；后端部署债务由引入后端变化的任务处理。正常静态 PWA 阶段应是秒级，不应出现 Rust 交叉编译。
 
 - Gradle 快速验证和 Release 构建使用 `--no-daemon`，避免 daemon 持有日志句柄导致包装器无法退出。
 - `invoke-ai-logged-command.ps1` 支持 `-TimeoutSeconds`；超时返回 124，并终止对应任务的完整子进程树。

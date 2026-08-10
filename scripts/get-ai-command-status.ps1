@@ -6,20 +6,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
-    throw "Unable to locate the repository root."
-}
-$repoRoot = [System.IO.Path]::GetFullPath($repoRoot.Trim())
-$gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null)
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitCommonDir)) {
-    throw "Unable to locate the shared Git metadata directory."
-}
-$gitCommonDir = $gitCommonDir.Trim()
-if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
-    $gitCommonDir = Join-Path $repoRoot $gitCommonDir
-}
-$logRoot = Join-Path ([System.IO.Path]::GetFullPath($gitCommonDir)) "ai-command-logs"
+. (Join-Path $PSScriptRoot 'git-path-resolution.ps1')
+$repositoryPaths = Get-ElonRepositoryPathsFromScriptRoot -ScriptRoot $PSScriptRoot
+$repoRoot = $repositoryPaths.RepoRoot
+$gitCommonDir = $repositoryPaths.GitCommonDir
+$logRoot = Join-Path $gitCommonDir "ai-command-logs"
 $latest = Get-ChildItem -LiteralPath $logRoot -File -Filter "$LogName-*" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
@@ -42,10 +33,10 @@ if (Test-Path -LiteralPath $pidFile -PathType Leaf) {
 }
 $process = if ($pidValue -gt 0) { Get-Process -Id $pidValue -ErrorAction SilentlyContinue } else { $null }
 $result = if (Test-Path -LiteralPath $resultFile -PathType Leaf) {
-    Get-Content -LiteralPath $resultFile -Raw | ConvertFrom-Json
+    Read-ElonUtf8TextFile -Path $resultFile | ConvertFrom-Json
 } else { $null }
 $state = if (Test-Path -LiteralPath $stateFile -PathType Leaf) {
-    try { Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json } catch { $null }
+    try { Read-ElonUtf8TextFile -Path $stateFile | ConvertFrom-Json } catch { $null }
 } else { $null }
 $status = if ($result) {
     "completed"

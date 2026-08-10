@@ -27,15 +27,21 @@ Assert-Contains $validator '[void]$pwaProcess.Handle'
 Assert-Contains $publisher 'publish-server.ps1'
 Assert-Contains $publisher 'publish-mobile-pwa-static.ps1'
 Assert-Contains $publisher 'StaticRuntimePwa'
-Assert-Contains $publisher 'explicit_static_runtime_pwa_without_server_release'
+Assert-Contains $publisher 'TaskBaseSha'
+Assert-Contains $publisher 'APP_UI_TASK_BASE_SHA'
+Assert-Contains $publisher 'APP_UI_DEPLOYED_SERVER_SHA'
+Assert-Contains $publisher 'APP_UI_DEPLOYMENT_DEBT_PATHS'
+Assert-Contains $publisher "cannot override task scope"
 Assert-Contains $publisher 'app-ui-change-scope.ps1'
 Assert-Contains $publisher '-SkipPcFrontend'
 Assert-Contains $publisher 'publish-apk.ps1'
 Assert-Contains $publisher '-AllowAdbVerificationDeferred'
 Assert-Contains $publisher 'APP_UI_RELEASE_POLICY=publish_before_optional_renderer'
+Assert-Contains $publisher '-VerifyOnly'
+Assert-Contains $publisher 'receipt and remote artifact verified'
 $fullServerBranch = [regex]::Match(
     $publisher,
-    "(?s)MobilePwaMode -eq 'full_server'.*?^\s*}\s*else\s*{",
+    '(?s)elseif \(\$scope\.MobilePwaMode -eq ''full_server''\).*?^\s*}\s*else\s*{',
     [System.Text.RegularExpressions.RegexOptions]::Multiline
 ).Value
 Assert-Contains $fullServerBranch 'publish-server.ps1'

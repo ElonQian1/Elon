@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'git-path-resolution.ps1')
+
 function Get-ElonAppUiChangedPaths {
     param(
         [Parameter(Mandatory)] [string]$RepoRoot,
@@ -9,6 +11,41 @@ function Get-ElonAppUiChangedPaths {
     $paths = & git -C $RepoRoot diff --name-only --diff-filter=ACMR $BaseSha $HeadSha 2>$null
     if ($LASTEXITCODE -ne 0) { throw "Unable to inspect changes between $BaseSha and $HeadSha" }
     @($paths | ForEach-Object { $_.Trim() -replace '\\', '/' } | Where-Object { $_ })
+}
+
+function Get-ElonAppUiTaskBaseSha {
+    param(
+        [Parameter(Mandatory)] [string]$RepoRoot,
+        [string]$ExplicitBaseSha = ''
+    )
+
+    $candidate = $ExplicitBaseSha.Trim()
+    $source = 'explicit'
+    if ([string]::IsNullOrWhiteSpace($candidate)) {
+        $repositoryPaths = Get-ElonRepositoryPathsFromRoot -RepoRoot $RepoRoot
+        $markerPath = Join-Path $repositoryPaths.GitDir 'elon-task-base.v1'
+        if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) { return $null }
+        $candidate = ([System.IO.File]::ReadAllText($markerPath, [System.Text.Encoding]::ASCII)).Trim()
+        $source = 'preflight_marker'
+    }
+    if ($candidate -notmatch '^[0-9a-f]{40}$') {
+        throw "Invalid APP UI task base SHA from $source."
+    }
+    & git -C $RepoRoot cat-file -e "$candidate^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "APP UI task base commit is unavailable: $candidate" }
+    $headSha = (& git -C $RepoRoot rev-parse HEAD).Trim()
+    & git -C $RepoRoot merge-base --is-ancestor $candidate $headSha 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "APP UI task base is not an ancestor of HEAD: $candidate" }
+    [PSCustomObject]@{ Sha = $candidate; Source = $source }
+}
+
+function Get-ElonStaticMobilePwaInputPaths {
+    @(
+        'server/src/assets/web_page.html',
+        'server/src/assets/project_plaza.css',
+        'server/src/assets/project_plaza_cache.js',
+        'server/src/assets/project_plaza.js'
+    )
 }
 
 function Resolve-ElonAppUiChangeScope {
@@ -35,9 +72,11 @@ function Resolve-ElonAppUiChangeScope {
     }
 
     $androidChanged = @($ChangedPaths | Where-Object { $_ -like 'android/*' }).Count -gt 0
-    $webTemplateChanged = $ChangedPaths -contains 'server/src/assets/web_page.html'
+    $staticPwaInputs = @(Get-ElonStaticMobilePwaInputPaths)
+    $staticPwaChanges = @($ChangedPaths | Where-Object { $_ -in $staticPwaInputs })
+    $webTemplateChanged = $staticPwaChanges.Count -gt 0
     $otherServerChanges = @($ChangedPaths | Where-Object {
-        $_ -like 'server/*' -and $_ -ne 'server/src/assets/web_page.html'
+        $_ -like 'server/*' -and $_ -notin $staticPwaInputs
     })
     $pcFrontendChanged = @($ChangedPaths | Where-Object { $_ -like 'pc-frontend/*' }).Count -gt 0
 
@@ -57,7 +96,7 @@ function Resolve-ElonAppUiChangeScope {
             elseif ($otherServerChanges.Count -gt 0) { 'server_runtime_or_embedded_asset_changed' }
             else { 'pc_frontend_changed' }
         }
-        'static_template' { 'only_runtime_mobile_pwa_template_changed' }
+        'static_template' { 'only_runtime_mobile_pwa_assets_changed' }
         default { 'no_mobile_pwa_change' }
     }
 
@@ -67,6 +106,8 @@ function Resolve-ElonAppUiChangeScope {
         ChangedPaths = @($ChangedPaths)
         AndroidChanged = $androidChanged
         WebTemplateChanged = $webTemplateChanged
+        StaticPwaChanges = $staticPwaChanges
+        OtherServerChanges = $otherServerChanges
         MobilePwaMode = $mobilePwaMode
         Reason = $reason
     }

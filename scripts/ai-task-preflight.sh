@@ -107,6 +107,7 @@ write_ai_workflow_guard() {
   echo "RULE_PUSH=after commit run git push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
   [[ -z "$contract_id" ]] || echo "FINISH_CONTRACT_SCHEMA=elon.ai_finish_contract.v1"
   [[ -z "$contract_id" ]] || echo "FINISH_CONTRACT_ID=$contract_id"
+  [[ -z "$contract_id" ]] || echo "TASK_BASE_SHA=$(ai_finish_read_task_base_marker "$edit_root")"
   echo "RULE_FINISH=after push run the exact FINISH_COMMAND_SHELL; it validates the preflight identity, verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
   echo "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\finish-ai-task.ps1 -Kind CodePushed"
   printf 'FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed --task-worktree %q --task-contract %q\n' "$edit_root" "$contract_id"

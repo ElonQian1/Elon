@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'git-path-resolution.ps1')
+
 function Get-AiTaskFinishContractRoot {
     $base = if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         Join-Path $env:LOCALAPPDATA 'ElonNode'
@@ -12,6 +14,43 @@ function Get-AiTaskSha256 {
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try { $digest = $sha.ComputeHash($Bytes) } finally { $sha.Dispose() }
     -join ($digest | ForEach-Object { $_.ToString('x2') })
+}
+
+function Get-AiTaskBaseMarkerPath {
+    param([Parameter(Mandatory = $true)][string]$RepoPath)
+    $paths = Get-ElonRepositoryPathsFromRoot -RepoRoot $RepoPath
+    Join-Path $paths.GitDir 'elon-task-base.v1'
+}
+
+function Set-AiTaskBaseMarkerIfAbsent {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoPath,
+        [Parameter(Mandatory = $true)][string]$BaseCommit
+    )
+    $path = Get-AiTaskBaseMarkerPath -RepoPath $RepoPath
+    if (Test-Path -LiteralPath $path -PathType Leaf) { return $path }
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes("$BaseCommit`n")
+    try {
+        $stream = [System.IO.File]::Open(
+            $path,
+            [System.IO.FileMode]::CreateNew,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::Read
+        )
+        try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+    } catch [System.IO.IOException] {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw }
+    }
+    $path
+}
+
+function Get-AiTaskBaseMarker {
+    param([Parameter(Mandatory = $true)][string]$RepoPath)
+    $path = Get-AiTaskBaseMarkerPath -RepoPath $RepoPath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    $value = ([System.IO.File]::ReadAllText($path, [System.Text.Encoding]::ASCII)).Trim()
+    if ($value -notmatch '^[0-9a-f]{40}$') { throw "Invalid task base marker: $path" }
+    $value
 }
 
 function Get-AiTaskGitValue {
@@ -90,6 +129,7 @@ function New-AiTaskFinishContract {
     $branch = Get-AiTaskGitValue $worktree @('branch', '--show-current')
     $baseCommit = Get-AiTaskGitValue $worktree @('rev-parse', 'HEAD^{commit}')
     $origin = Get-AiTaskGitValue $worktree @('remote', 'get-url', 'origin')
+    Set-AiTaskBaseMarkerIfAbsent -RepoPath $worktree -BaseCommit $baseCommit | Out-Null
     $platform = Get-AiTaskPlatformIdentity -RepoPath $worktree -Branch $branch
     $payload = [ordered]@{
         schema = 'elon.ai_finish_contract.v1'

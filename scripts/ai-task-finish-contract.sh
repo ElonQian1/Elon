@@ -34,6 +34,31 @@ ai_finish_reject_control_text() {
   fi
 }
 
+ai_finish_task_base_marker_path() {
+  local repo_path="$1" git_dir
+  git_dir="$(git -C "$repo_path" rev-parse --path-format=absolute --git-dir)"
+  printf '%s/elon-task-base.v1' "$git_dir"
+}
+
+ai_finish_write_task_base_marker_if_absent() {
+  local repo_path="$1" base_commit="$2" path
+  path="$(ai_finish_task_base_marker_path "$repo_path")"
+  [[ -f "$path" ]] && return 0
+  set -o noclobber
+  printf '%s\n' "$base_commit" > "$path" 2>/dev/null || true
+  set +o noclobber
+  [[ -f "$path" ]] || { echo "Unable to persist task base marker: $path" >&2; return 1; }
+}
+
+ai_finish_read_task_base_marker() {
+  local repo_path="$1" path value
+  path="$(ai_finish_task_base_marker_path "$repo_path")"
+  [[ -f "$path" ]] || return 1
+  value="$(tr -d '\r\n' < "$path")"
+  [[ "$value" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid task base marker: $path" >&2; return 1; }
+  printf '%s' "$value"
+}
+
 ai_finish_worktree_lease_reason() {
   local repo_path="$1" target
   target="$(cd "$repo_path" && pwd -P)"
@@ -87,6 +112,7 @@ new_ai_task_finish_contract() {
   branch="$(git -C "$worktree" branch --show-current)"
   base_commit="$(git -C "$worktree" rev-parse 'HEAD^{commit}')"
   origin="$(git -C "$worktree" remote get-url origin)"
+  ai_finish_write_task_base_marker_if_absent "$worktree" "$base_commit"
   ai_finish_load_platform_identity "$worktree" "$branch"
   ai_finish_reject_control_text worktree "$worktree"
   ai_finish_reject_control_text branch "$branch"

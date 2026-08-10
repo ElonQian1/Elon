@@ -164,6 +164,7 @@ function Write-AiWorkflowGuard {
         $contractId = New-AiTaskFinishContract -RepoPath $EditRoot
         Write-Host "FINISH_CONTRACT_SCHEMA=elon.ai_finish_contract.v1"
         Write-Host "FINISH_CONTRACT_ID=$contractId"
+        Write-Host "TASK_BASE_SHA=$(Get-AiTaskBaseMarker -RepoPath $EditRoot)"
     }
     Write-Host "RULE_FINISH=after push run the exact FINISH_COMMAND_POWERSHELL; it validates the preflight identity, verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
     Write-Host "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed -TaskWorktree `"$EditRoot`" -TaskContract $contractId"
