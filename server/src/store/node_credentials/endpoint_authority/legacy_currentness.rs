@@ -5,14 +5,14 @@ use crate::node_compute_sharing::endpoint_authority::NodeEndpointCredentialBindi
 
 use super::credentials;
 
-pub(super) fn current_node_endpoint_root_by_agent_on(
+pub(in crate::store::node_credentials) fn current_node_endpoint_root_by_agent_on(
     connection: &Connection,
     agent_id: &str,
 ) -> Result<Option<NodeEndpointCredentialBinding>> {
     credentials::current_binding_by_agent_on(connection, agent_id)
 }
 
-pub(super) fn current_node_endpoint_root_by_owner_install_on(
+pub(in crate::store::node_credentials) fn current_node_endpoint_root_by_owner_install_on(
     connection: &Connection,
     owner_user_id: &str,
     install_id: &str,

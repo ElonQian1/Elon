@@ -6,4 +6,4 @@
 mod contracts;
 mod handlers;
 
-pub(super) use handlers::{login, register_node};
+pub(in crate::node_endpoint_transport) use handlers::{login, register_node};
