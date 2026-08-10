@@ -11,7 +11,6 @@ internal class ChatGptNativeOverlayControlsController(
     private val activity: AppCompatActivity,
     private val headerActionsScroll: HorizontalScrollView,
     private val headerActions: LinearLayout,
-    private val shouldPresent: () -> Boolean,
     private val onInvoke: (String) -> Unit,
 ) {
     private var dialog: androidx.appcompat.app.AlertDialog? = null
@@ -27,6 +26,10 @@ internal class ChatGptNativeOverlayControlsController(
             controls.map(ChatGptWebUiControl::id)
         controls = nextControls
         contextLabel = nextContextLabel
+        if (controlsChanged && dialog?.isShowing == true) {
+            dialog?.dismiss()
+            dialog = null
+        }
         if (controls.isEmpty()) {
             dialog?.dismiss()
             dialog = null
@@ -34,7 +37,6 @@ internal class ChatGptNativeOverlayControlsController(
         }
         headerActions.addView(createTrigger())
         headerActionsScroll.visibility = View.VISIBLE
-        if (controlsChanged && shouldPresent()) showActions()
     }
 
     fun dispose() {

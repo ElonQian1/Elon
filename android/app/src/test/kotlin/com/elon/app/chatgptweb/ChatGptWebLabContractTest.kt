@@ -210,7 +210,7 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
-    fun nativeOverlayAutomaticallyPresentsOfficialMessageActions() {
+    fun nativeOverlayKeepsOfficialActionsDiscoverableWithoutInterruptingOtherSurfaces() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
         )
@@ -220,14 +220,17 @@ class ChatGptWebLabContractTest {
 
         assertTrue(overlay.contains("it.semantic == \"timestamp\""))
         assertTrue(overlay.contains("filterNot { it.semantic == \"timestamp\" }"))
-        assertTrue(overlay.contains("controlsChanged && shouldPresent()"))
+        assertTrue(overlay.contains("contentDescription = \"chatgpt-overlay-actions:"))
+        assertTrue(overlay.contains("setOnClickListener { showActions() }"))
+        assertTrue(overlay.contains("controlsChanged && dialog?.isShowing == true"))
+        assertFalse(overlay.contains("controlsChanged && shouldPresent()"))
         assertTrue(
             overlay.contains(
                 "activity.getString(R.string.chatgpt_official_page_actions) + \" · \" + label"
             )
         )
         assertFalse(overlay.contains("setMessage"))
-        assertTrue(activity.contains("modeController.isNativeSelected()"))
+        assertFalse(activity.contains("shouldPresent ="))
     }
 
     @Test
