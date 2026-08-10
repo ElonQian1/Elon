@@ -8,7 +8,7 @@
 
 调用必须同时满足：
 
-- MCP 使用显式 `x-elon-app-id`，且该 App 已注册并属于当前用户；默认 `mcp-client` 身份失败关闭。
+- MCP 使用显式 `x-elon-app-id`，且该 App 已启用并同时属于当前用户和当前项目；默认 `mcp-client` 身份失败关闭。
 - 一次只申请一个已发布的 `authorized` 能力。
 - 用户已明确同意，并提交固定确认短语 `REQUEST_AUTHORIZATION`。
 - 用途为 3 至 200 个字符；任一现有 Grant 仍能覆盖下一次调用时拒绝重复申请。
