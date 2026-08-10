@@ -155,7 +155,8 @@ function Write-AiWorkflowGuard {
     Write-Host "EDIT_STATE=$State"
     Write-Host "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
     Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
-    Write-Host "RULE_OUTPUT=commands expected to exceed 200 lines must use scripts\invoke-ai-logged-command.ps1; never stream full successful build/test/publish logs into AI context."
+    Write-Host "RULE_OUTPUT=long build/test/publish commands must use scripts\invoke-ai-logged-command.ps1 with -RequireOutput and a bounded -StallTimeoutSeconds; never accept empty successful logs or stream full successful output into AI context."
+    Write-Host "RULE_RESUME=after an interrupted logged command, run scripts\get-ai-command-status.ps1 -LogName <name>; never launch a duplicate while status is running."
     Write-Host "RULE_BEFORE_COMMIT=run scripts\check-source-size.ps1 and scripts\check-document-modularity.ps1 before git commit; pre-commit/pre-push repeat the document guard."
     Write-Host "RULE_PUSH=after commit run powershell -NoProfile -ExecutionPolicy Bypass -File scripts\direct-network.ps1 push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
     $contractId = ''
@@ -277,7 +278,7 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     }
 
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $shortGuid = ((New-Guid).Guid -replace "-", "").Substring(0, 8)
+    $shortGuid = [Guid]::NewGuid().ToString("N").Substring(0, 8)
     $uniqueSuffix = "$PID-$shortGuid"
     $safePrefix = $BranchPrefix.TrimEnd("/")
     $newBranch = "$safePrefix-$stamp-$uniqueSuffix"

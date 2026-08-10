@@ -314,10 +314,18 @@ Linux/macOS 的 `scripts/cargo-dev.sh` 暂时继续使用绝对 `ELON_DEV_CARGO_
 
 ### 7.3 Android APK 编译打包
 ```powershell
-scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
+scripts\invoke-ai-logged-command.ps1 `
+  -LogName "publish-apk" `
+  -WorkingDirectory "." `
+  -RequireOutput `
+  -StallTimeoutSeconds 900 `
+  -TimeoutSeconds 3600 `
+  -CommandLine 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"'
 ```
 
 一龙自项目的 release 构建、签名、上传和版本 claim 必须由发布脚本完成；不能用 Debug 包或手工 Gradle release 命令代替发布闭环。
+长构建必须同时启用输出门禁和停滞超时：命令退出 0 但日志为空时按失败处理；日志持续不增长超过 15 分钟时终止对应进程树并返回 125，避免中断恢复后继续空等。
+如果 Codex 会话在命令运行时中断，恢复后先执行 `scripts\get-ai-command-status.ps1 -LogName "publish-apk"`。状态为 `running` 时只监控已有 PID 和日志，不得重复启动；`completed` 时读取持久化的 `AI_COMMAND_RESULT_STATUS/EXIT_CODE` 并核对产物；`stale` 时先处理残留状态再决定是否重跑。
 
 ### 7.4 APK 签名
 ```powershell
