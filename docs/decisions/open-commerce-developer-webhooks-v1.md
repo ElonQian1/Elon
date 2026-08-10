@@ -2,8 +2,8 @@
 title: 开放商业开发者签名 Webhook V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-11
+implementation_status: implementation_compiled_local_store_and_http_subset
 ---
 
 # 开放商业开发者签名 Webhook V1
@@ -30,9 +30,14 @@ implementation_status: implementation_uncompiled
 ## HTTP 契约
 
 - `GET/POST /api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks`
+- `GET .../webhook-health`
 - `POST .../webhooks/:subscription_id/disable`
 - `POST .../webhooks/:subscription_id/enable`
+- `POST .../webhooks/:subscription_id/verify`
+- `POST .../webhooks/:subscription_id/rotate-secret`
 - `GET .../webhooks/:subscription_id/deliveries`
+- `POST .../webhooks/:subscription_id/deliveries/:delivery_id/retry`
+- `POST .../webhooks/:subscription_id/replay-history`
 
 ## 实现引用
 
