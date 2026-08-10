@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-`implementation_uncompiled`
+`implementation_compiled_local_state_subset`
 
-本批次只形成代码、执行 Rust 格式整理及仓库源码和文档门禁，尚未编译、迁移、发出真实 HTTPS 请求或验证 PC 交互。
+Rust `elon-server` 测试目标已编译；全新 SQLite 专项夹具已走通 challenge 签发、当前修订本地验证和资料编辑失效。测试直接调用存储层状态转换，没有发出 DNS、TLS 或 HTTPS 请求，因此不构成真实域名控制证明。
 
 ## 已形成代码
 
@@ -13,10 +13,11 @@
 - 平台只请求主页同源固定 `well-known` 地址，要求精确白名单并限制端口、重定向、超时、响应大小和文本格式。
 - 资料编辑立即清除旧域名证明；资料提交要求当前修订已经验证。
 - PC 可生成、复制 challenge 和固定地址，发起验证并查看状态。
+- `server/src/open_commerce_developer_production_state_tests.rs` 仅验证本地状态依赖，真实网络安全边界仍由域名服务负责。
 
 ## 统一回归必须验证
 
-- V151 到 V152 升级、空 challenge 默认值、重复迁移及资料编辑失效。
+- V151 到 V152 升级、空 challenge 默认值和重复迁移；资料编辑失效的本地状态已通过专项测试。
 - 明文仅返回一次、摘要匹配、换行裁剪、UTF-8、0/4096/4097 字节边界。
 - HTTP、非 443、查询污染、重定向、超时、非白名单、错误状态和 DNS 变化。
 - 过期、重复生成、旧修订、并发验证、App 停用和已验证幂等读取。
@@ -26,7 +27,7 @@
 ## 仍未完成
 
 - 多域名、子域委托、DNS TXT 证明和周期性重新验证。
-- 声明式可撤销准入已形成独立代码，但组织身份、工商资料仍未通过外部权威来源核验；生产凭据、动态风控和公共网络权限仍未实现。
-- 本批次全部编译、迁移、网络、权限和 UI 验证。
+- 声明式可撤销准入和生产凭据的本地状态联动已验证，但组织身份、工商资料仍未通过外部权威来源核验；公共网络权限仍默认关闭。
+- 历史迁移、真实网络、权限和 UI 验证。
 
-域名验证现已接入公网地址解析与本次请求固定代码，但该新增安全边界同样处于 `implementation_uncompiled`，统一网络回归见 `docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md`。
+域名验证已接入公网地址解析与本次请求固定代码，但该网络安全边界仍未实际回归，统一网络验收见 `docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md`。

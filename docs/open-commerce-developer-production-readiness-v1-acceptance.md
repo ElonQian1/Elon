@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-`implementation_uncompiled`
+`implementation_compiled_unverified`
 
-本批只形成代码、Rust 格式整理及仓库静态门禁，尚未编译、运行 API、查询真实数据库或验证 PC 页面。
+生产就绪模块已随 Rust `elon-server` 测试目标完成编译，但本批只验证它依赖的资料、域名、准入、凭据和生产 Webhook 本地状态联动；尚未直接断言就绪步骤、运行 API、查询历史数据库或验证 PC 页面。
 
 ## 已形成代码
 
@@ -28,5 +28,5 @@
 
 ## 仍未完成
 
-- Rust/TypeScript 编译、API、权限、状态竞争、性能和 UI 验证。
+- 就绪投影专项断言、TypeScript 编译、API、权限、状态竞争、性能和 UI 验证。
 - 自动修复、外部告警、SLA、真实平台授权、真实资金、链上提交和生产部署证明。
