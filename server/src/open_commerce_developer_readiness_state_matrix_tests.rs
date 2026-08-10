@@ -62,6 +62,39 @@ fn readiness_orders_manifest_domain_and_admission_state_blockers() {
 }
 
 #[test]
+fn readiness_rejects_every_nonapproved_manifest_and_admission_status() {
+    let fixture = approved_developer_fixture();
+
+    for status in ["draft", "submitted", "changes_requested"] {
+        let mut app = fixture.app.clone();
+        app.manifest_status = status.to_string();
+        let summary = readiness(&fixture.store, &app);
+        assert_blocker(&summary, "manifest", "manifest_not_approved");
+    }
+
+    for status in ["submitted", "changes_requested", "suspended"] {
+        fixture
+            .store
+            .conn()
+            .unwrap()
+            .execute(
+                "UPDATE open_commerce_developer_app_admissions
+                    SET manifest_revision=?1, status=?2
+                  WHERE id=?3",
+                rusqlite::params![fixture.app.manifest_revision, status, fixture.admission_id],
+            )
+            .unwrap();
+        let summary = readiness(&fixture.store, &fixture.app);
+        assert_eq!(summary.admission_status.as_deref(), Some(status));
+        assert_blocker(
+            &summary,
+            "admission",
+            "admission_not_approved_for_current_revision",
+        );
+    }
+}
+
+#[test]
 fn readiness_treats_expired_and_revoked_credentials_as_missing() {
     let fixture = approved_developer_fixture();
     let expired = fixture

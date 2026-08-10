@@ -1,3 +1,6 @@
+#[path = "open_commerce_developer_domain_state_tests.rs"]
+mod domain_state_tests;
+
 use crate::{
     open_commerce_developer_admission_model::ReviewDeveloperAppAdmissionRequest,
     open_commerce_developer_admission_service, open_commerce_developer_manifest_service,
