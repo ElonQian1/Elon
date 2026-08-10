@@ -24,6 +24,8 @@
 - 读取过期确认不改写持久状态，不新增审计或 Invocation；v166 可保留旧表四种既有状态，并可安全重复执行。
 - 带调用次数和金额预算的 Grant 连续读取三次后，使用次数、使用金额和更新时间均不变。
 - 取消与 Invocation 创建使用两个独立 WAL 数据库连接同时竞争时恰好一方成功，最终记录仍不能同时被取消和消费。
+- MCP、消费者会话 HTTP 与开发者凭据 HTTP 共用同一个最小取消投影：对外状态固定为 `canceled`，并明确 `invocation_created=false`、`next_step=stop`；数据库为兼容约束保留的 `expired` 状态不会泄漏给调用方。
+- PC 消费者沙盒、商户测试器和开发者门户均保留显式取消入口，客户端使用专用取消响应类型；开放商业 PC 静态契约和生产构建通过。
 
 ## 仍未完成
 
@@ -31,11 +33,13 @@
 - 生产第三方应用审核和跨运营方身份互认。
 - 商户运行时内部订单、支付、退款、配送和履约状态机的统一确认协议。
 - 真实扣款、资金托管、链上提交和自动结算。
+- 本批新增的 Axum 取消路由断言尚未实际运行：代码已通过 `cargo check --tests`，但本机 D 盘低空间导致 Windows 测试二进制两次在链接阶段报 `no space on device`；运行中的 `cofficethinking` 后端使受控缓存 GC 按设计拒绝执行。
 
 ## 验证入口
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- test --manifest-path server\Cargo.toml open_commerce_action_confirmation --no-fail-fast
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- check --manifest-path server\Cargo.toml --tests
 npm --prefix pc-frontend run test:open-commerce
 npm --prefix pc-frontend run build
 ```

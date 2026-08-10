@@ -45,6 +45,7 @@ PC 已能要求消费者在动作能力表单上确认当前输入，但该约�
 - `server/src/open_commerce_action_confirmation_mcp.rs`
 - `server/src/store/open_commerce_action_confirmations.rs`
 - `server/src/open_commerce_action_confirmation_api.rs`
+- `server/src/open_commerce_action_confirmation_api_tests.rs`
 - `server/src/open_commerce_action_confirmation_cancellation_tests.rs`
 - `server/src/open_commerce_action_confirmation_read_tests.rs`
 - `server/src/open_commerce_action_confirmation_test_support.rs`
@@ -54,4 +55,5 @@ PC 已能要求消费者在动作能力表单上确认当前输入，但该约�
 
 - 动作确认定向 Rust 套件已通过，覆盖四种读取状态、不可枚举错误、最小安全投影、只读不改变 Grant 次数/金额/更新时间、主动取消、幂等重试、用户与 App 隔离、自然过期、已消费拒绝、同幂等请求重新准备和审计单写。
 - v166 迁移已通过带既有 `pending`、`confirmed`、`consumed` 和 `expired` 记录的旧表升级及重复执行测试；取消与 Invocation 创建使用两个独立 WAL 数据库连接竞争时仍严格二选一。
+- 消费者会话 HTTP、开发者凭据 HTTP 和 MCP 取消共用同一最小安全投影；HTTP 不再把主动取消暴露为数据库兼容状态 `expired`。新增 Axum 路由测试已通过 `cargo check --tests` 编译，PC 静态契约和生产构建通过；由于本机 D 盘低空间，新增路由断言尚未实际运行。
 - WebAuthn、可信设备展示、跨设备确认、真实订单撤销、退款、库存回滚和外部平台补偿不属于本批已验证能力。
