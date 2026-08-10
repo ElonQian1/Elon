@@ -2,8 +2,8 @@
 title: 开放商业消费者排序凭证 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者排序凭证 V1
@@ -29,12 +29,14 @@ implementation_status: implementation_uncompiled
 - 凭证不证明排序公平、没有遗漏商户、没有目录层过滤或不存在运营方利益冲突。
 - V1 不持久化、不可在平台内重新查询，不进入消费者 V5 可携带数据包。
 - V1 不是第三方排序器签名、区块链存证、可信时间戳、零知识证明或监管审计报告。
-- 当前代码未编译，未验证服务端序列化、浏览器摘要、下载文件或 UI，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证默认不生成、显式生成、服务端规范 JSON 精确字节 SHA-256、请求明文隐藏、候选范围与计数、非付费/非穷尽/未签名标志、来源与新鲜度快照及发现只读性；状态为 `verified_rust_sqlite`。
+- Chromium Web Crypto、下载文件、PC 窄屏、运营方签名、可信时间戳和跨运营方验证仍未验收。
 
 ## 实现入口
 
 - `server/src/open_commerce_consumer_model.rs`
 - `server/src/open_commerce_consumer.rs`
+- `server/src/open_commerce_consumer_ranking_tests.rs`
 - `pc-frontend/src/features/open-commerce/openCommerceClientTypes.ts`
 - `pc-frontend/src/features/open-commerce/consumerRankingReceipt.ts`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`

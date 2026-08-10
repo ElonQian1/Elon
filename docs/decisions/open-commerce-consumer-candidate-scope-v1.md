@@ -2,8 +2,8 @@
 title: 开放商业消费者候选范围摘要 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者候选范围摘要 V1
@@ -27,11 +27,13 @@ implementation_status: implementation_uncompiled
 - 候选范围只描述当前运营方本次查询窗口，不证明目录完整或排序公平。
 - 合格数是本次代码过滤结果，不证明商户数据真实、授权有效或能力可成功调用。
 - 空结果不能作为不存在其他商户、来源或能力的证明。
-- 当前代码未编译，未执行接口、计数、截断、兼容性、浏览器或 UI 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证空结果、单结果、截断、固定 100 候选窗口、同时间戳目录并列稳定性、请求上限及普通响应与排序凭证计数一致；状态为 `verified_rust_sqlite`。
+- HTTP 实例、PC 浏览器、窄屏布局、跨运营方聚合和目录完整性仍未验证。
 
 ## 实现入口
 
 - `server/src/open_commerce_consumer_model.rs`
 - `server/src/open_commerce_consumer.rs`
+- `server/src/open_commerce_consumer_ranking_tests.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerCandidateScopeSummary.tsx`
 - `docs/open-commerce-consumer-candidate-scope-v1-acceptance.md`

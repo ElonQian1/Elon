@@ -2,8 +2,8 @@
 title: 开放商业消费者声明期筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者声明期筛选 V1
@@ -27,12 +27,14 @@ implementation_status: implementation_uncompiled
 - 开启筛选不保证库存充足、价格正确、商户营业、运行时在线或交易成功。
 - 关闭筛选不代表消费者认可过期数据，只表示目录不会替用户作隐藏决定。
 - V1 不提供按分钟、来源、外部回执或行业 SLA 的高级过滤表达式。
-- 当前代码未编译、未执行接口、排序凭证、兼容性或 PC 验证，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证字段省略、默认关闭、`current/stale/unknown` 混合能力、指定能力键、五种排序器、匹配原因、输入指纹、排序凭证回显及发现只读性；状态为 `verified_rust_sqlite`。
+- HTTP 实例、PC 浏览器、外部同步真实性和自动暂停策略仍未验证。
 
 ## 实现入口
 
 - `server/src/open_commerce_consumer_model.rs`
 - `server/src/open_commerce_consumer.rs`
+- `server/src/open_commerce_consumer_ranking_tests.rs`
 - `pc-frontend/src/features/open-commerce/openCommerceClientTypes.ts`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
 - `docs/open-commerce-consumer-freshness-filter-v1-acceptance.md`

@@ -2,8 +2,8 @@
 title: 开放商业消费者可替换透明排序器 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: verified_rust_sqlite
 ---
 
 # 开放商业消费者可替换透明排序器 V1
@@ -40,13 +40,15 @@ implementation_status: implementation_uncompiled
 - `最近更新` 只表示目录能力记录的更新时间，不证明商户数据真实或最新。
 - `最低调用价` 只比较公开能力调用单价，不代表商品总价、配送费或最终交易成本最低。
 - 用户可选择规则不等于算法公平性已经得到证明；反作弊、虚假资料、利益冲突和联邦治理仍需独立实现。
-- 当前代码未编译或运行，状态为 `implementation_uncompiled`。
+- 已通过真实 SQLite 夹具验证默认、空白和显式策略选择，五种策略顺序、非付费元数据、未知策略失败关闭、重复稳定性、同商户多能力并列规则及固定候选窗口；状态为 `verified_rust_sqlite`。
+- HTTP 实例、PC 选择器、第三方排序器、反作弊、公平性与推荐质量仍未验证。
 
 ## 实现入口
 
 - `server/src/open_commerce_consumer_ranking.rs`
 - `server/src/open_commerce_consumer_model.rs`
 - `server/src/open_commerce_consumer.rs`
+- `server/src/open_commerce_consumer_ranking_tests.rs`
 - `pc-frontend/src/features/open-commerce/openCommerceClientTypes.ts`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
 - `docs/open-commerce-pluggable-ranking-v1-acceptance.md`
