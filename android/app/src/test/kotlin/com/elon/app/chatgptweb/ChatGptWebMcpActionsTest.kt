@@ -83,6 +83,11 @@ class ChatGptWebMcpActionsTest {
             .put("message_limit", 1))
 
         assertTrue(result.getBoolean("control_ok"))
+        assertEquals("elon.chatgpt_web.context.v2", result.getString("schema"))
+        assertEquals(24, result.getString("context_revision").length)
+        assertTrue(result.getString("message_cursor").startsWith("ctx1."))
+        assertTrue(result.isNull("next_message_cursor"))
+        assertTrue(result.getBoolean("cursor_stable"))
         assertEquals(1, result.getInt("message_count"))
         assertEquals(0, result.getJSONArray("messages").getJSONObject(0).getInt("index"))
         assertEquals("完整回答内容", result.getJSONArray("messages").getJSONObject(0).getString("content"))

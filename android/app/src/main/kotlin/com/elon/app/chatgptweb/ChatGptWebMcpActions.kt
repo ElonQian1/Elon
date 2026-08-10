@@ -163,22 +163,40 @@ internal class ChatGptWebMcpActions(
 
     private fun contextPage(args: JSONObject): JSONObject {
         val current = snapshot() ?: return error("chatgpt_get_context", "conversation_unavailable")
-        val offset = args.optInt("message_offset", 0).coerceIn(0, current.messages.size)
         val limit = args.optInt("message_limit", DEFAULT_CONTEXT_PAGE_SIZE)
             .coerceIn(1, MAX_CONTEXT_PAGE_SIZE)
-        val page = current.messages.drop(offset).take(limit)
-        val nextOffset = offset + page.size
+        val result = ChatGptWebContextPager.page(
+            snapshot = current,
+            cursor = args.optString("message_cursor").take(MAX_CONTEXT_CURSOR_CHARS),
+            requestedOffset = args.optInt("message_offset", 0),
+            requestedLimit = limit,
+            maxLimit = MAX_CONTEXT_PAGE_SIZE,
+        )
+        if (result is ChatGptWebContextPager.Result.Failure) {
+            return error("chatgpt_get_context", result.code)
+                .put("schema", ChatGptWebContextPager.SCHEMA)
+                .put("current_context_revision", result.currentRevision)
+                .put("message_count", result.messageCount)
+                .put("retry_from_message_offset", 0)
+        }
+        val page = (result as ChatGptWebContextPager.Result.Success).page
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_context")
+            .put("schema", ChatGptWebContextPager.SCHEMA)
             .put("conversation_title", current.title)
             .put("conversation_url", current.url)
             .put("message_count", current.messages.size)
-            .put("message_offset", offset)
-            .put("message_limit", limit)
-            .put("next_message_offset", nextOffset)
-            .put("has_more", nextOffset < current.messages.size)
-            .put("messages", messagesJson(page, offset, MAX_CONTEXT_MESSAGE_CHARS))
+            .put("context_revision", page.revision)
+            .put("context_streaming", current.streaming)
+            .put("cursor_stable", current.streaming.not())
+            .put("message_cursor", page.cursor)
+            .put("next_message_cursor", page.nextCursor ?: JSONObject.NULL)
+            .put("message_offset", page.offset)
+            .put("message_limit", page.limit)
+            .put("next_message_offset", page.nextOffset)
+            .put("has_more", page.hasMore)
+            .put("messages", messagesJson(page.messages, page.offset, MAX_CONTEXT_MESSAGE_CHARS))
     }
 
     private fun controlsPage(args: JSONObject): JSONObject {
@@ -432,6 +450,7 @@ internal class ChatGptWebMcpActions(
         const val MAX_MESSAGES = 50
         const val MAX_MESSAGE_CHARS = 30_000
         const val MAX_CONTEXT_MESSAGE_CHARS = 40_000
+        const val MAX_CONTEXT_CURSOR_CHARS = 80
         const val MAX_MESSAGE_PARTS = 16
         const val MAX_MESSAGE_PART_LABEL_CHARS = 180
         const val MAX_INPUT_CHARS = 20_000
