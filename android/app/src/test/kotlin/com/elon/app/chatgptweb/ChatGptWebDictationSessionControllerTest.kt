@@ -106,15 +106,36 @@ class ChatGptWebDictationSessionControllerTest {
         assertEquals(0, cancellations)
     }
 
+    @Test
+    fun startWaitsForOfficialViewSettlementAndSkipsAStaleAction() {
+        val scheduled = mutableListOf<Pair<Long, () -> Unit>>()
+        var starts = 0
+        val controller = controller(
+            schedule = { delayMs, action -> scheduled += delayMs to action },
+        )
+
+        val attempt = controller.onStartRequested { starts += 1 } ?: error("attempt missing")
+        assertEquals(0, starts)
+        assertEquals(ChatGptWebDictationSessionController.OFFICIAL_SETTLE_MS, scheduled.single().first)
+        scheduled.single().second()
+        assertEquals(1, starts)
+
+        controller.onStartTimedOut(attempt)
+        scheduled.single().second()
+        assertEquals(1, starts)
+    }
+
     private fun controller(
         isNative: () -> Boolean = { true },
         showOfficial: () -> Unit = {},
         restoreNative: () -> Unit = {},
         cancel: () -> Unit = {},
+        schedule: (Long, () -> Unit) -> Unit = { _, action -> action() },
     ) = ChatGptWebDictationSessionController(
         isNativeSelected = isNative,
         showOfficial = showOfficial,
         restoreNative = restoreNative,
         cancelOfficial = cancel,
+        schedule = schedule,
     )
 }

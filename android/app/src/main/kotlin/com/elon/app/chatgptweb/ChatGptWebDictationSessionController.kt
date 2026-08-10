@@ -5,19 +5,24 @@ internal class ChatGptWebDictationSessionController(
     private val showOfficial: () -> Unit,
     private val restoreNative: () -> Unit,
     private val cancelOfficial: () -> Unit,
+    private val schedule: (Long, () -> Unit) -> Unit,
 ) {
     private var active = false
     private var pending = false
     private var restoreNativeAfterSession = false
     private var startAttempt = 0L
 
-    fun onStartRequested(): Long? {
+    fun onStartRequested(startOfficial: () -> Unit = {}): Long? {
         if (active || pending) return null
         startAttempt += 1
+        val attempt = startAttempt
         pending = true
         restoreNativeAfterSession = isNativeSelected()
         showOfficial()
-        return startAttempt
+        schedule(OFFICIAL_SETTLE_MS) {
+            if (pending && !active && attempt == startAttempt) startOfficial()
+        }
+        return attempt
     }
 
     fun onSnapshot(dictationActive: Boolean) {
@@ -68,5 +73,9 @@ internal class ChatGptWebDictationSessionController(
         pending = false
         if (restoreNativeAfterSession) restoreNative()
         restoreNativeAfterSession = false
+    }
+
+    internal companion object {
+        const val OFFICIAL_SETTLE_MS = 320L
     }
 }
