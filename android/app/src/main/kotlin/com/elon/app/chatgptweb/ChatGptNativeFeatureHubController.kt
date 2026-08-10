@@ -210,6 +210,8 @@ internal class ChatGptNativeFeatureHubController(
             label.text = item.label
             kind.text = kindLabel(item.kind)
             selected.visibility = if (item.selected) View.VISIBLE else View.GONE
+            itemView.contentDescription = ChatGptNativeNavigationSelector.feature(item)
+            itemView.tag = item.id
             itemView.setOnClickListener { onClick(item) }
         }
     }

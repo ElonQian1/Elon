@@ -53,6 +53,27 @@ class ChatGptWebNavigationContractTest {
         assertTrue(activity.contains("ChatGptWebEvent.FeatureNavigation"))
     }
 
+    @Test
+    fun nativeNavigationRowsAndComposerOptionsUseTheSharedStableSelectorContract() {
+        val composer = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeComposerToolsController.kt",
+        )
+        val optionDialog = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeComposerOptionDialog.kt",
+        )
+        val conversations = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationListController.kt",
+        )
+        val features = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeFeatureHubController.kt",
+        )
+
+        assertTrue(composer.contains("ChatGptNativeComposerOptionDialog.show"))
+        assertTrue(optionDialog.contains("ChatGptNativeNavigationSelector.composerOption"))
+        assertTrue(conversations.contains("ChatGptNativeNavigationSelector.conversation"))
+        assertTrue(features.contains("ChatGptNativeNavigationSelector.feature"))
+    }
+
     private fun readRepositoryFile(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 

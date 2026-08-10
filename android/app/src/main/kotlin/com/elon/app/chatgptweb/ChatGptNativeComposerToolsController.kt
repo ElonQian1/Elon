@@ -20,7 +20,11 @@ internal class ChatGptNativeComposerToolsController(
     private val onOpenOfficialModelSelector: () -> Unit,
     private val onOpenOfficialTools: () -> Unit,
 ) {
-    private enum class Section { MODEL, TOOLS, ATTACHMENTS }
+    private enum class Section(val wireName: String) {
+        MODEL("model"),
+        TOOLS("tools"),
+        ATTACHMENTS("attachments"),
+    }
 
     private var bridgeReady = false
     private var snapshot: ChatGptWebSnapshot? = null
@@ -91,40 +95,37 @@ internal class ChatGptNativeComposerToolsController(
             openOfficial(section)
             return
         }
-        val labels = options.map(ChatGptWebComposerOption::label).toTypedArray()
-        val selected = options.indexOfFirst(ChatGptWebComposerOption::selected)
-        val builder = AlertDialog.Builder(activity)
-            .setTitle(
+        val title = activity.getString(
+            if (section == Section.MODEL) {
+                R.string.chatgpt_native_model_title
+            } else if (section == Section.ATTACHMENTS) {
+                R.string.chatgpt_native_attachment
+            } else {
+                R.string.chatgpt_native_tools_title
+            },
+        )
+        dialog = ChatGptNativeComposerOptionDialog.show(
+            context = activity,
+            title = title,
+            section = section.wireName,
+            options = options,
+            singleChoice = section == Section.MODEL,
+            cancelLabel = R.string.chatgpt_web_cancel,
+            officialLabel = R.string.chatgpt_native_open_official,
+            onSelected = { option ->
+                pendingSection = null
                 if (section == Section.MODEL) {
-                    R.string.chatgpt_native_model_title
-                } else if (section == Section.ATTACHMENTS) {
-                    R.string.chatgpt_native_attachment
+                    onSelectModelOption(option.id)
                 } else {
-                    R.string.chatgpt_native_tools_title
-                },
-            )
-            .setNegativeButton(R.string.chatgpt_web_cancel) { _, _ ->
+                    onSelectTool(option.id)
+                }
+            },
+            onCancelled = {
                 pendingSection = null
                 onDismissMenu()
-            }
-            .setNeutralButton(R.string.chatgpt_native_open_official) { _, _ -> openOfficial(section) }
-            .setOnCancelListener {
-                pendingSection = null
-                onDismissMenu()
-            }
-        if (section == Section.MODEL) {
-            builder.setSingleChoiceItems(labels, selected) { currentDialog, index ->
-                currentDialog.dismiss()
-                pendingSection = null
-                onSelectModelOption(options[index].id)
-            }
-        } else {
-            builder.setItems(labels) { _, index ->
-                pendingSection = null
-                onSelectTool(options[index].id)
-            }
-        }
-        dialog = builder.create().also { it.show() }
+            },
+            onOpenOfficial = { openOfficial(section) },
+        )
     }
 
     private fun openOfficial(section: Section) {

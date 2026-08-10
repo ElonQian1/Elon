@@ -199,6 +199,8 @@ internal class ChatGptNativeConversationListController(
             title.text = item.title
             indicator.visibility = if (item.active) View.VISIBLE else View.INVISIBLE
             current.visibility = if (item.active) View.VISIBLE else View.GONE
+            itemView.contentDescription = ChatGptNativeNavigationSelector.conversation(item)
+            itemView.tag = item.id
             itemView.setOnClickListener { onClick(item) }
         }
     }
