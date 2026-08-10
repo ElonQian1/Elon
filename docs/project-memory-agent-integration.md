@@ -177,6 +177,8 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 `native_context` 定向 Rust 回归 12 项全部通过，验证指纹为 `00726a809c88c52fe68c01f6eb058bbf92525292c443c4cc629dd3edb9c4c38b`。新增临时项目场景验证：含无效证据的批量回执在候选库写入前整体失败；两条有效候选只进入工作区外 SQLite，可分页读取、按固定原因拒绝并恢复为 pending，且仓库文件和源码正文不被候选流程写入或返回。其余回归覆盖哈希漂移、路径作用域、共享记忆冲突过滤、suggestions 合并和 MCP schema 不接受源码正文。该证据不代替 PC 收件箱浏览器/UI、跨 PC 长期并发或真实 Hook 信任验收。
 
+同日 PC `test:project-docs` 新增并通过候选模型合同：可控 `nodeApi` 响应验证了越界证据丢弃、Windows 路径规范化、候选去重，以及分页、审核、CAS 修订和单一重定位修复的请求字段；组件源码门禁确保漂移项不能接受、缺 catalog revision 不能并入建议、UI 不直接拼接候选 API。独立 `npm run typecheck` 与 `npm run build` 通过。该测试使用 mock `nodeApi` 和源码合同，不等于真实浏览器、真实 loopback API 或视觉交互验收。
+
 ## 仍需真实验收的项目
 
 以下项目仍需要生产环境或人工安全确认，不能由本轮自动化替代：
