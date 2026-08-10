@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
-use rusqlite::{params, Row};
+use rusqlite::{params, Connection, Row, Transaction};
+use serde_json::{json, Value};
 
 use crate::{
     open_commerce_capability_source_model::{
@@ -11,36 +12,66 @@ use crate::{
 use super::{new_id, now, Store};
 
 impl Store {
-    pub(crate) fn upsert_open_commerce_capability_source_link(
+    pub(crate) fn link_open_commerce_capability_source_with_audit(
         &self,
         project_id: &str,
         capability_id: &str,
         linked_by_user_id: &str,
+        actor_app_id: &str,
         request: LinkCapabilitySourceRequest,
     ) -> Result<OpenCommerceCapabilitySourceLink> {
-        let capability = self.open_commerce_capability_for_project(project_id, capability_id)?;
-        let integration =
-            self.open_commerce_integration_for_project(project_id, request.integration_id.trim())?;
-        if capability.merchant_id != integration.merchant_id {
-            bail!("商业能力和数据接入必须属于同一商户");
-        }
-        if integration.status == INTEGRATION_STATUS_DISABLED {
-            bail!("已停用的数据接入不能绑定公开能力来源");
-        }
+        let project_id = project_id.trim();
+        let capability_id = capability_id.trim();
+        let integration_id = request.integration_id.trim();
+        let sync_receipt_id = request.sync_receipt_id.trim();
         let data_domain = normalize_string_list(&[request.data_domain], "数据域", 1)?
             .into_iter()
             .next()
             .ok_or_else(|| anyhow!("数据域不能为空"))?;
-        if !integration.data_domains.contains(&data_domain) {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let (merchant_id, capability_version) = tx
+            .query_row(
+                "SELECT c.merchant_id, c.version
+                   FROM open_commerce_capabilities c
+                   JOIN open_commerce_merchants m ON m.id = c.merchant_id
+                  WHERE c.id = ?1 AND m.project_id = ?2",
+                params![capability_id, project_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .with_context(|| "当前项目中不存在该商业能力")?;
+        let (integration_merchant_id, integration_status, data_domains_json) = tx
+            .query_row(
+                "SELECT merchant_id, status, data_domains_json
+                   FROM open_commerce_integrations
+                  WHERE id = ?1 AND project_id = ?2",
+                params![integration_id, project_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
+            )
+            .with_context(|| "当前项目中不存在该数据接入")?;
+        if merchant_id != integration_merchant_id {
+            bail!("商业能力和数据接入必须属于同一商户");
+        }
+        if integration_status == INTEGRATION_STATUS_DISABLED {
+            bail!("已停用的数据接入不能绑定公开能力来源");
+        }
+        let data_domains = serde_json::from_str::<Vec<String>>(&data_domains_json)
+            .with_context(|| "数据接入的数据域 JSON 无效")?;
+        if !data_domains.contains(&data_domain) {
             bail!("所选数据域未在该数据接入中登记");
         }
-        let receipt = self
-            .conn()?
+        let receipt = tx
             .query_row(
                 "SELECT integration_id, sync_kind, status
                     FROM open_commerce_sync_receipts
                    WHERE id = ?1 AND project_id = ?2",
-                params![request.sync_receipt_id.trim(), project_id.trim()],
+                params![sync_receipt_id, project_id],
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,
@@ -50,7 +81,7 @@ impl Store {
                 },
             )
             .with_context(|| "当前项目中不存在该同步回执")?;
-        if receipt.0 != integration.id {
+        if receipt.0 != integration_id {
             bail!("同步回执不属于所选数据接入");
         }
         if receipt.1 == "health_check" {
@@ -60,7 +91,7 @@ impl Store {
             bail!("只有成功或部分成功的同步回执可以绑定公开能力来源");
         }
         let timestamp = now();
-        self.conn()?.execute(
+        tx.execute(
             "INSERT INTO open_commerce_capability_source_links (
                id, project_id, merchant_id, capability_id, capability_version,
                integration_id, sync_receipt_id, data_domain, revision,
@@ -78,31 +109,83 @@ impl Store {
                AND open_commerce_capability_source_links.merchant_id = excluded.merchant_id",
             params![
                 new_id("capability_source"),
-                project_id.trim(),
-                capability.merchant_id,
-                capability.id,
-                capability.version,
-                integration.id,
-                request.sync_receipt_id.trim(),
+                project_id,
+                merchant_id,
+                capability_id,
+                capability_version,
+                integration_id,
+                sync_receipt_id,
                 data_domain,
                 linked_by_user_id.trim(),
                 timestamp
             ],
         )?;
-        self.open_commerce_capability_source_link_for_project(project_id, capability_id)
+        let link = open_commerce_capability_source_link_on(&tx, project_id, capability_id)?;
+        insert_source_audit(
+            &tx,
+            project_id,
+            linked_by_user_id,
+            actor_app_id,
+            "capability.source_linked",
+            "capability_source_link",
+            &link.id,
+            &json!({
+                "merchant_id": link.merchant_id,
+                "capability_id": link.capability_id,
+                "capability_version": link.capability_version,
+                "integration_id": link.integration_id,
+                "sync_receipt_id": link.sync_receipt_id,
+                "data_domain": link.data_domain,
+                "revision": link.revision,
+                "externally_verified": false
+            }),
+        )?;
+        tx.commit()?;
+        Ok(link)
     }
 
-    pub(crate) fn remove_open_commerce_capability_source_link(
+    pub(crate) fn remove_open_commerce_capability_source_link_with_audit(
         &self,
         project_id: &str,
         capability_id: &str,
+        actor_user_id: &str,
+        actor_app_id: &str,
     ) -> Result<bool> {
-        self.open_commerce_capability_for_project(project_id, capability_id)?;
-        Ok(self.conn()?.execute(
+        let project_id = project_id.trim();
+        let capability_id = capability_id.trim();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let capability_exists = tx.query_row(
+            "SELECT EXISTS(
+               SELECT 1 FROM open_commerce_capabilities c
+               JOIN open_commerce_merchants m ON m.id = c.merchant_id
+              WHERE c.id = ?1 AND m.project_id = ?2
+             )",
+            params![capability_id, project_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if !capability_exists {
+            bail!("当前项目中不存在该商业能力");
+        }
+        let removed = tx.execute(
             "DELETE FROM open_commerce_capability_source_links
               WHERE project_id = ?1 AND capability_id = ?2",
-            params![project_id.trim(), capability_id.trim()],
-        )? > 0)
+            params![project_id, capability_id],
+        )? > 0;
+        if removed {
+            insert_source_audit(
+                &tx,
+                project_id,
+                actor_user_id,
+                actor_app_id,
+                "capability.source_unlinked",
+                "capability",
+                capability_id,
+                &json!({"externally_verified": false}),
+            )?;
+        }
+        tx.commit()?;
+        Ok(removed)
     }
 
     pub(crate) fn list_project_open_commerce_capability_source_links(
@@ -132,22 +215,51 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(links.into_iter().filter(|link| link.publishable).collect())
     }
+}
 
-    fn open_commerce_capability_source_link_for_project(
-        &self,
-        project_id: &str,
-        capability_id: &str,
-    ) -> Result<OpenCommerceCapabilitySourceLink> {
-        self.conn()?
-            .query_row(
-                &format!(
-                    "{CAPABILITY_SOURCE_SELECT} WHERE l.project_id = ?1 AND l.capability_id = ?2"
-                ),
-                params![project_id.trim(), capability_id.trim()],
-                capability_source_from_row,
-            )
-            .map_err(|error| anyhow!(error).context("商业能力来源绑定不存在"))
-    }
+fn open_commerce_capability_source_link_on(
+    conn: &Connection,
+    project_id: &str,
+    capability_id: &str,
+) -> Result<OpenCommerceCapabilitySourceLink> {
+    conn.query_row(
+        &format!("{CAPABILITY_SOURCE_SELECT} WHERE l.project_id = ?1 AND l.capability_id = ?2"),
+        params![project_id.trim(), capability_id.trim()],
+        capability_source_from_row,
+    )
+    .map_err(|error| anyhow!(error).context("商业能力来源绑定不存在"))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insert_source_audit(
+    tx: &Transaction<'_>,
+    project_id: &str,
+    actor_user_id: &str,
+    actor_app_id: &str,
+    action: &str,
+    subject_type: &str,
+    subject_id: &str,
+    metadata: &Value,
+) -> Result<()> {
+    let metadata_json = serde_json::to_string(metadata)?;
+    tx.execute(
+        "INSERT INTO open_commerce_audit_events (
+           id, project_id, actor_user_id, actor_app_id, action,
+           subject_type, subject_id, metadata_json, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            new_id("audit"),
+            project_id.trim(),
+            actor_user_id.trim(),
+            actor_app_id.trim(),
+            action,
+            subject_type,
+            subject_id.trim(),
+            metadata_json,
+            now()
+        ],
+    )?;
+    Ok(())
 }
 
 fn capability_source_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceCapabilitySourceLink> {
