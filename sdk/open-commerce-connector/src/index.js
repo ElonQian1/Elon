@@ -62,7 +62,9 @@ export {
 
 export {
   CONSUMER_PORTABILITY_ARCHIVE_ITERATIONS,
+  CONSUMER_PORTABILITY_ARCHIVE_MAX_PLAINTEXT_BYTES,
   CONSUMER_PORTABILITY_ARCHIVE_SCHEMA,
+  CONSUMER_PORTABILITY_ARCHIVE_SCHEMA_V1,
   decryptConsumerPortabilityArchive,
   encryptConsumerPortabilityArchive,
 } from './portability-archive.js'

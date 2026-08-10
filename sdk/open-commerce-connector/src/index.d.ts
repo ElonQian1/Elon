@@ -40,8 +40,10 @@ export const MERCHANT_RUNTIME_MANIFEST_SCHEMA: 'merchant_runtime.manifest.v1'
 export const MERCHANT_RUNTIME_MAX_BODY_BYTES: number
 export const CONSUMER_PORTABILITY_SIGNATURE_SCHEMA: 'open_commerce.consumer_portability_signed_package.v1'
 export const CONSUMER_PORTABILITY_SIGNATURE_ALGORITHM: 'rsa-pkcs1v15-sha256'
-export const CONSUMER_PORTABILITY_ARCHIVE_SCHEMA: 'open_commerce.consumer_portability_encrypted_archive.v1'
+export const CONSUMER_PORTABILITY_ARCHIVE_SCHEMA: 'open_commerce.consumer_portability_encrypted_archive.v2'
+export const CONSUMER_PORTABILITY_ARCHIVE_SCHEMA_V1: 'open_commerce.consumer_portability_encrypted_archive.v1'
 export const CONSUMER_PORTABILITY_ARCHIVE_ITERATIONS: 310000
+export const CONSUMER_PORTABILITY_ARCHIVE_MAX_PLAINTEXT_BYTES: number
 export const MERCHANT_IDENTITY_ALGORITHM: 'rsa-pkcs1v15-sha256'
 export const MERCHANT_IDENTITY_PROOF_PROTOCOL: 'open_commerce.merchant_identity_proof.v1'
 export const SUI_ADAPTER_HANDOFF_SCHEMA: 'task_economy.sui_adapter_handoff.v1'
@@ -287,7 +289,9 @@ export function verifyMerchantIdentityProof(input: {
 }): boolean
 
 export interface ConsumerPortabilityEncryptedArchive {
-  schema: typeof CONSUMER_PORTABILITY_ARCHIVE_SCHEMA
+  schema:
+    | typeof CONSUMER_PORTABILITY_ARCHIVE_SCHEMA
+    | typeof CONSUMER_PORTABILITY_ARCHIVE_SCHEMA_V1
   kdf: {
     name: 'PBKDF2'
     hash: 'SHA-256'
