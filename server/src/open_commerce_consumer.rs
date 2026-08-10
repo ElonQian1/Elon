@@ -241,7 +241,9 @@ fn normalize_discovery_request(request: &mut ConsumerDiscoveryRequest) -> Result
         .map(|value| normalize_capability_key(&value))
         .transpose()?;
     request.requester_app_id = normalize_app_id(&request.requester_app_id)?;
-    request.limit = request.limit.clamp(1, 50);
+    if !(1..=50).contains(&request.limit) {
+        bail!("消费者发现返回数量必须在 1 到 50 之间");
+    }
     Ok(())
 }
 
@@ -677,3 +679,7 @@ fn contains_ignore_case(values: &[String], needle: &str) -> bool {
         .iter()
         .any(|value| value.trim().eq_ignore_ascii_case(needle.trim()))
 }
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_input_tests.rs"]
+mod input_tests;

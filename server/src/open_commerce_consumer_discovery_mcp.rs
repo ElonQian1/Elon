@@ -161,9 +161,6 @@ pub(crate) fn call_if_handled(
         DISCOVER_FOR_CONSUMER => {
             let mut request: ConsumerDiscoveryRequest = serde_json::from_value(arguments)
                 .with_context(|| format!("{DISCOVER_FOR_CONSUMER} 参数无效"))?;
-            if !(1..=50).contains(&request.limit) {
-                bail!("消费者发现返回数量必须在 1 到 50 之间");
-            }
             request.requester_app_id = if uses_default_mcp_identity {
                 "pc-web".to_string()
             } else {
