@@ -406,8 +406,95 @@ class ChatGptWebMcpActionsTest {
         assertEquals("dictation_not_active", inactive.getString("error"))
     }
 
+    @Test
+    fun directDictationStartRequiresCapabilityAndReturnsAReceipt() {
+        var starts = 0
+        var dispatchedRequestId = ""
+        val supported = actions(
+            dictationSupported = true,
+            onStartDictation = { starts += 1 },
+            onDispatch = { action, requestId ->
+                if (action == "start_dictation") dispatchedRequestId = requestId
+            },
+        )
+
+        val started = supported.control(JSONObject().put("action", "chatgpt_start_dictation"))
+
+        assertTrue(started.getBoolean("control_ok"))
+        assertEquals(1, starts)
+        assertEquals(
+            "start_dictation",
+            started.getJSONObject("command_receipt").getString("expected_web_action"),
+        )
+        assertEquals(
+            started.getJSONObject("command_receipt").getString("request_id"),
+            dispatchedRequestId,
+        )
+
+        val unsupported = actions().control(JSONObject().put("action", "chatgpt_start_dictation"))
+        assertFalse(unsupported.getBoolean("control_ok"))
+        assertEquals("dictation_unavailable", unsupported.getString("error"))
+
+        val active = actions(
+            dictationActive = true,
+            dictationSupported = true,
+        ).control(JSONObject().put("action", "chatgpt_start_dictation"))
+        assertFalse(active.getBoolean("control_ok"))
+        assertEquals("dictation_already_active", active.getString("error"))
+    }
+
+    @Test
+    fun directAttachmentRemovalRequiresFreshRemovableAttachmentAndReturnsAReceipt() {
+        val removable = ChatGptWebAttachment("attachment_demo", "smoke.png", "ready", true)
+        val uploading = ChatGptWebAttachment("attachment_uploading", "pending.txt", "uploading", false)
+        var removedId = ""
+        var dispatchedRequestId = ""
+        val actions = actions(
+            attachments = listOf(removable, uploading),
+            onRemoveAttachment = { removedId = it },
+            onDispatch = { action, requestId ->
+                if (action == "remove_attachment") dispatchedRequestId = requestId
+            },
+        )
+
+        val removed = actions.control(JSONObject()
+            .put("action", "chatgpt_remove_attachment")
+            .put("attachment_id", removable.id))
+
+        assertTrue(removed.getBoolean("control_ok"))
+        assertEquals(removable.id, removedId)
+        assertEquals(
+            "remove_attachment",
+            removed.getJSONObject("command_receipt").getString("expected_web_action"),
+        )
+        assertEquals(
+            removed.getJSONObject("command_receipt").getString("request_id"),
+            dispatchedRequestId,
+        )
+
+        val stale = actions.control(JSONObject()
+            .put("action", "chatgpt_remove_attachment")
+            .put("attachment_id", "attachment_stale"))
+        assertFalse(stale.getBoolean("control_ok"))
+        assertEquals("stale_attachment_id", stale.getString("error"))
+
+        val pending = actions.control(JSONObject()
+            .put("action", "chatgpt_remove_attachment")
+            .put("attachment_id", uploading.id))
+        assertFalse(pending.getBoolean("control_ok"))
+        assertEquals("attachment_not_removable", pending.getString("error"))
+
+        val invalid = actions.control(JSONObject()
+            .put("action", "chatgpt_remove_attachment")
+            .put("attachment_id", " "))
+        assertFalse(invalid.getBoolean("control_ok"))
+        assertEquals("invalid_attachment_id", invalid.getString("error"))
+    }
+
     private fun actions(
         dictationActive: Boolean = false,
+        dictationSupported: Boolean = false,
+        attachments: List<ChatGptWebAttachment> = emptyList(),
         messageParts: List<ChatGptWebMessagePart>? = null,
         messageWindowStart: Int = 0,
         availableMessageCount: Int = 1,
@@ -415,8 +502,10 @@ class ChatGptWebMcpActionsTest {
         onInvoke: (String) -> Unit = {},
         includeWritableControl: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
+        onStartDictation: () -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
+        onRemoveAttachment: (String) -> Unit = {},
         onRequestComposerOptions: (String) -> Unit = {},
         onSelectComposerOption: (String, String) -> Unit = { _, _ -> },
         onRequestFeatures: () -> Unit = {},
@@ -447,9 +536,12 @@ class ChatGptWebMcpActionsTest {
             composerReady = true,
             streaming = false,
             currentModel = "5.6 Sol 轻度",
-            attachments = emptyList(),
+            attachments = attachments,
             dictationActive = dictationActive,
-            capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.DRAFT_SYNC)),
+            capabilities = ChatGptWebCapabilities(buildSet {
+                add(ChatGptWebCapabilityId.DRAFT_SYNC)
+                if (dictationSupported) add(ChatGptWebCapabilityId.DICTATION)
+            }),
             pageKind = "conversation",
             loginRequired = false,
             messageWindowStart = messageWindowStart,
@@ -560,6 +652,11 @@ class ChatGptWebMcpActionsTest {
                 override fun stopGeneration(requestId: String) =
                     onDispatch("stop_generation", requestId)
 
+                override fun startDictation(requestId: String) {
+                    onStartDictation()
+                    onDispatch("start_dictation", requestId)
+                }
+
                 override fun cancelDictation(requestId: String) {
                     onCancelDictation()
                     onDispatch("cancel_dictation", requestId)
@@ -568,6 +665,11 @@ class ChatGptWebMcpActionsTest {
                 override fun submitDictation(requestId: String) {
                     onSubmitDictation()
                     onDispatch("submit_dictation", requestId)
+                }
+
+                override fun removeAttachment(attachmentId: String, requestId: String) {
+                    onRemoveAttachment(attachmentId)
+                    onDispatch("remove_attachment", requestId)
                 }
 
                 override fun refreshControls(requestId: String) =

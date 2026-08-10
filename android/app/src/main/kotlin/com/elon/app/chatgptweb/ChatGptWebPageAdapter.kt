@@ -145,6 +145,8 @@ internal class ChatGptWebPageAdapter(
 
     fun startDictation() = runCommand("start_dictation")
 
+    fun startDictation(requestId: String) = runCommand("start_dictation", requestId = requestId)
+
     fun cancelDictation() = runCommand("cancel_dictation")
 
     fun cancelDictation(requestId: String) = runCommand("cancel_dictation", requestId = requestId)
@@ -154,6 +156,12 @@ internal class ChatGptWebPageAdapter(
     fun submitDictation(requestId: String) = runCommand("submit_dictation", requestId = requestId)
 
     fun removeAttachment(id: String) = runCommand("remove_attachment", id.take(MAX_OPTION_ID_LENGTH))
+
+    fun removeAttachment(id: String, requestId: String) = runCommand(
+        "remove_attachment",
+        id.take(MAX_OPTION_ID_LENGTH),
+        requestId = requestId,
+    )
 
     fun listFeatures() = runCommand("list_navigation")
 

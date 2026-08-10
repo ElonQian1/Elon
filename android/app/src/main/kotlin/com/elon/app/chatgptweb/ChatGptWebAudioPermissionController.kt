@@ -12,29 +12,36 @@ internal class ChatGptWebAudioPermissionController(
     private val onDenied: () -> Unit,
 ) {
     private var pendingAction: (() -> Unit)? = null
+    private var pendingDeniedAction: (() -> Unit)? = null
     private var pendingWebRequest: PermissionRequest? = null
     private val launcher = activity.registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         val webRequest = pendingWebRequest
         val action = pendingAction
+        val deniedAction = pendingDeniedAction
         pendingWebRequest = null
         pendingAction = null
+        pendingDeniedAction = null
         if (granted) {
             webRequest?.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
             action?.invoke()
         } else {
             webRequest?.deny()
-            onDenied()
+            (deniedAction ?: onDenied).invoke()
         }
     }
 
-    fun runWithMicrophone(action: () -> Unit) {
+    fun runWithMicrophone(
+        action: () -> Unit,
+        onPermissionDenied: () -> Unit = onDenied,
+    ) {
         if (hasPermission()) {
             action()
             return
         }
         pendingAction = action
+        pendingDeniedAction = onPermissionDenied
         launcher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
@@ -53,6 +60,7 @@ internal class ChatGptWebAudioPermissionController(
         }
         pendingWebRequest?.deny()
         pendingWebRequest = request
+        pendingDeniedAction = null
         launcher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
@@ -64,6 +72,7 @@ internal class ChatGptWebAudioPermissionController(
         pendingWebRequest?.deny()
         pendingWebRequest = null
         pendingAction = null
+        pendingDeniedAction = null
     }
 
     private fun hasPermission(): Boolean = ContextCompat.checkSelfPermission(

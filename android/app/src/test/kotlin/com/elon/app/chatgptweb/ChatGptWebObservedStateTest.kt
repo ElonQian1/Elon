@@ -113,6 +113,21 @@ class ChatGptWebObservedStateTest {
     }
 
     @Test
+    fun localPermissionFailureCompletesTheCorrelatedCommandImmediately() {
+        var now = 5_000L
+        val state = ChatGptWebObservedState { now }
+        val request = state.beginCommand("start_dictation")
+
+        now += 5
+        state.failCommand(request.id, "start_dictation", "microphone_permission_denied")
+
+        val completed = state.snapshot().commandRequests.single()
+        assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, completed.status)
+        assertEquals("microphone_permission_denied", completed.result?.detail)
+        assertEquals(now, completed.completedAtMs)
+    }
+
+    @Test
     fun pendingRequestsExpireAndHistoryStaysBounded() {
         var now = 10_000L
         val state = ChatGptWebObservedState { now }

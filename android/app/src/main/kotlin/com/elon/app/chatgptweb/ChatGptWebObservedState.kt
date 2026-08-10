@@ -48,6 +48,15 @@ internal class ChatGptWebObservedState(
         return request
     }
 
+    fun failCommand(requestId: String, expectedAction: String, detail: String) {
+        accept(ChatGptWebEvent.CommandResult(
+            action = expectedAction,
+            ok = false,
+            detail = detail,
+            requestId = requestId,
+        ))
+    }
+
     fun snapshot(): Snapshot {
         expirePendingCommands()
         return Snapshot(

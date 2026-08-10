@@ -79,6 +79,14 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
+            "chatgpt_start_dictation" -> {
+                val current = snapshot()
+                if (current?.dictationActive == true) return error(action, "dictation_already_active")
+                if (current?.capabilities?.supports(ChatGptWebCapabilityId.DICTATION) != true) {
+                    return error(action, "dictation_unavailable")
+                }
+                dispatch("start_dictation", commands::startDictation)
+            }
             "chatgpt_cancel_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
                 dispatch("cancel_dictation", commands::cancelDictation)
@@ -86,6 +94,18 @@ internal class ChatGptWebMcpActions(
             "chatgpt_submit_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
                 dispatch("submit_dictation", commands::submitDictation)
+            }
+            "chatgpt_remove_attachment" -> {
+                val attachmentId = args.optString("attachment_id").trim()
+                if (attachmentId.isBlank() || attachmentId.length > MAX_ATTACHMENT_ID_CHARS) {
+                    return error(action, "invalid_attachment_id")
+                }
+                val attachment = snapshot()?.attachments?.firstOrNull { it.id == attachmentId }
+                    ?: return error(action, "stale_attachment_id")
+                if (!attachment.removable) return error(action, "attachment_not_removable")
+                dispatch("remove_attachment") { requestId ->
+                    commands.removeAttachment(attachmentId, requestId)
+                }
             }
             "chatgpt_refresh" -> refresh()
             "chatgpt_refresh_controls" -> dispatch("snapshot_ui_manifest", commands::refreshControls)
@@ -510,6 +530,7 @@ internal class ChatGptWebMcpActions(
         const val MAX_MESSAGE_PARTS = 16
         const val MAX_MESSAGE_PART_LABEL_CHARS = 180
         const val MAX_INPUT_CHARS = 20_000
+        const val MAX_ATTACHMENT_ID_CHARS = 96
         const val DEFAULT_CONTEXT_PAGE_SIZE = 20
         const val MAX_CONTEXT_PAGE_SIZE = 40
         const val DEFAULT_CONTROL_PAGE_SIZE = 30
@@ -529,8 +550,10 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_control_text",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_start_dictation",
             "chatgpt_cancel_dictation",
             "chatgpt_submit_dictation",
+            "chatgpt_remove_attachment",
             "chatgpt_refresh",
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",

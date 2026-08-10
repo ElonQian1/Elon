@@ -66,9 +66,29 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
             override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)
 
+            override fun startDictation(requestId: String) {
+                audioPermissionController.runWithMicrophone(
+                    action = {
+                        prepareDictationStart()
+                        pageAdapter.startDictation(requestId)
+                    },
+                    onPermissionDenied = {
+                        observedMcpState.failCommand(
+                            requestId,
+                            "start_dictation",
+                            "microphone_permission_denied",
+                        )
+                        showMicrophoneDenied()
+                    },
+                )
+            }
+
             override fun cancelDictation(requestId: String) = pageAdapter.cancelDictation(requestId)
 
             override fun submitDictation(requestId: String) = pageAdapter.submitDictation(requestId)
+
+            override fun removeAttachment(attachmentId: String, requestId: String) =
+                pageAdapter.removeAttachment(attachmentId, requestId)
 
             override fun refreshControls(requestId: String) = pageAdapter.requestUiManifest(requestId)
 
@@ -326,9 +346,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun configureWebView() {
         WebView.setWebContentsDebuggingEnabled(false)
         fileChooserController = ChatGptWebFileChooserController(this)
-        audioPermissionController = ChatGptWebAudioPermissionController(this) {
-            Toast.makeText(this, R.string.chatgpt_native_microphone_denied, Toast.LENGTH_LONG).show()
-        }
+        audioPermissionController = ChatGptWebAudioPermissionController(this, ::showMicrophoneDenied)
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(binding.chatGptWebView, true)
 
@@ -424,6 +442,10 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun startDictation() {
         prepareDictationStart()
         pageAdapter.startDictation()
+    }
+
+    private fun showMicrophoneDenied() {
+        Toast.makeText(this, R.string.chatgpt_native_microphone_denied, Toast.LENGTH_LONG).show()
     }
 
     private fun invokeUiControl(id: String) = invokeUiControl(id, null)
