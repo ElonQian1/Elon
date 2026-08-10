@@ -1,7 +1,9 @@
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
-use crate::node_compute_sharing::endpoint_authority::NodeEndpointSessionBinding;
+use crate::node_compute_sharing::endpoint_authority::{
+    NodeEndpointSessionBinding, NodeEndpointSessionProfile,
+};
 
 use super::VerifiedCurrentNodeEndpointSession;
 
@@ -15,9 +17,13 @@ pub(crate) struct NodeEndpointSessionPermit {
     owner_user_id: String,
     install_id: String,
     installation_binding_digest: String,
+    profile: NodeEndpointSessionProfile,
+    protocol_version: u64,
+    agent_version: String,
     capability_count: u64,
     capability_set_digest: String,
     authenticated_at: DateTime<Utc>,
+    recorded_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     replayed: bool,
 }
@@ -39,6 +45,18 @@ impl NodeEndpointSessionPermit {
         &self.installation_binding_digest
     }
 
+    pub(crate) fn profile(&self) -> NodeEndpointSessionProfile {
+        self.profile
+    }
+
+    pub(crate) fn protocol_version(&self) -> u64 {
+        self.protocol_version
+    }
+
+    pub(crate) fn agent_version(&self) -> &str {
+        &self.agent_version
+    }
+
     pub(crate) fn capability_count(&self) -> u64 {
         self.capability_count
     }
@@ -51,6 +69,10 @@ impl NodeEndpointSessionPermit {
         self.authenticated_at
     }
 
+    pub(crate) fn recorded_at(&self) -> DateTime<Utc> {
+        self.recorded_at
+    }
+
     pub(crate) fn expires_at(&self) -> DateTime<Utc> {
         self.expires_at
     }
@@ -59,19 +81,48 @@ impl NodeEndpointSessionPermit {
         self.replayed
     }
 
+    pub(crate) fn require_planning_bootstrap_v14(&self) -> Result<()> {
+        self.profile.require_planning_bootstrap_v14()
+    }
+
+    pub(in crate::store) fn ensure_exact_authority(&self, other: &Self) -> Result<()> {
+        if self.binding != other.binding
+            || self.owner_user_id != other.owner_user_id
+            || self.install_id != other.install_id
+            || self.installation_binding_digest != other.installation_binding_digest
+            || self.profile != other.profile
+            || self.protocol_version != other.protocol_version
+            || self.agent_version != other.agent_version
+            || self.capability_count != other.capability_count
+            || self.capability_set_digest != other.capability_set_digest
+            || self.authenticated_at != other.authenticated_at
+            || self.recorded_at != other.recorded_at
+            || self.expires_at != other.expires_at
+        {
+            bail!("NODE_ENDPOINT_SESSION_PERMIT_AUTHORITY_MISMATCH");
+        }
+        Ok(())
+    }
+
     pub(super) fn from_verified(current: &VerifiedCurrentNodeEndpointSession) -> Result<Self> {
         let receipt = current.receipt();
-        if receipt.capability_count() != 0 {
-            bail!("NODE_ENDPOINT_SESSION_COMPUTE_INERT_CAPABILITY_MISMATCH");
-        }
+        let profile = NodeEndpointSessionProfile::from_receipt(
+            receipt.protocol_version(),
+            receipt.capability_count(),
+            receipt.capability_set_digest(),
+        )?;
         Ok(Self {
             binding: current.head().binding().clone(),
             owner_user_id: receipt.owner_user_id().to_string(),
             install_id: receipt.install_id().to_string(),
             installation_binding_digest: receipt.installation_binding_digest().to_string(),
+            profile,
+            protocol_version: receipt.protocol_version(),
+            agent_version: receipt.agent_version().to_string(),
             capability_count: receipt.capability_count(),
             capability_set_digest: receipt.capability_set_digest().to_string(),
             authenticated_at: parse_timestamp(receipt.authenticated_at())?,
+            recorded_at: parse_timestamp(receipt.recorded_at())?,
             expires_at: parse_timestamp(receipt.expires_at())?,
             replayed: current.replayed(),
         })

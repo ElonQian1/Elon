@@ -210,12 +210,21 @@ fn current_session_on(
     binding: &NodeEndpointSessionBinding,
     replayed: bool,
 ) -> Result<VerifiedCurrentNodeEndpointSession> {
+    current_session_at_on(connection, binding, replayed, Utc::now())
+}
+
+fn current_session_at_on(
+    connection: &Connection,
+    binding: &NodeEndpointSessionBinding,
+    replayed: bool,
+    checked_at: DateTime<Utc>,
+) -> Result<VerifiedCurrentNodeEndpointSession> {
     let head = head_rows::head_by_agent_on(connection, binding.agent_id())?
         .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_CURRENTNESS_MISMATCH"))?;
     if head.binding() != binding || head.state() != "active" {
         bail!("NODE_ENDPOINT_SESSION_CURRENTNESS_MISMATCH");
     }
-    if parse_timestamp(head.expires_at())? <= Utc::now() {
+    if parse_timestamp(head.expires_at())? <= checked_at {
         bail!("NODE_ENDPOINT_SESSION_EXPIRED");
     }
     let receipt = receipt_rows::receipt_by_binding_on(connection, binding)?
@@ -223,6 +232,19 @@ fn current_session_on(
     ensure_head_receipt_projection(&head, &receipt)?;
     credentials::require_current_binding_on(connection, &receipt.credential_binding()?)?;
     Ok(verified_session(receipt.into_envelope(), head, replayed))
+}
+
+pub(in crate::store) fn require_current_node_endpoint_session_on(
+    connection: &Connection,
+    permit: &super::NodeEndpointSessionPermit,
+    checked_at: DateTime<Utc>,
+) -> Result<super::NodeEndpointSessionPermit> {
+    let current = current_session_at_on(connection, permit.binding(), false, checked_at)?;
+    let current = super::NodeEndpointSessionPermit::from_verified(&current)?;
+    permit.ensure_exact_authority(&current)?;
+    permit.require_planning_bootstrap_v14()?;
+    current.require_planning_bootstrap_v14()?;
+    Ok(current)
 }
 
 fn terminate_exact_current_on(

@@ -50,7 +50,7 @@ pub(super) fn validate_sharing_observed(
             .is_some_and(|digest| !sha256_digest(digest))
         || !safe_integer(value.configuration_generation)
         || !safe_integer(value.cancellation_generation)
-        || value.phase != "blocked"
+        || !matches!(value.phase.as_str(), "blocked" | "disabled")
         || value.side_effects_started
         || value.blocked_reasons.is_empty()
         || !bounded_string_list(&value.blocked_reasons, 64)

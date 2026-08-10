@@ -13,6 +13,10 @@ pub(crate) use types::{
     DurableComputePluginInstallPlanPlanningSnapshotV2,
     NodeComputePluginInstallPlanPlanningDispatchIntentV2, PlanningSnapshotObservationCommitV2,
 };
+pub(in crate::store) use write::{
+    prepare_node_compute_plugin_install_plan_planning_delivery_v2_on,
+    record_node_compute_plugin_install_plan_planning_terminal_observation_v2_on,
+};
 
 const GENERATION_REQUEST_SCHEMA_V1: &str = "elon.compute_plugin.install_plan_generation_request.v1";
 const GENERATION_OUTCOME_SCHEMA_V1: &str = "elon.compute_plugin.install_plan_generation_outcome.v1";

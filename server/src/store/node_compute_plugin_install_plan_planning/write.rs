@@ -28,45 +28,10 @@ impl Store {
         &self,
         request: homecli_proto::ComputePluginInstallPlanPlanningSnapshotRequestV2,
     ) -> Result<NodeComputePluginInstallPlanPlanningDispatchIntentV2> {
-        validate_planning_request(&request)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let source = resolve_exact_planning_source(&tx, &request)?;
-        if let Some(delivery_id) = tx
-            .query_row(
-                "SELECT planning_delivery_id
-                   FROM node_compute_plugin_install_plan_planning_delivery_events_v2
-                  WHERE source_preparation_delivery_id=?1 AND event_sequence=1",
-                params![request.source_preparation_delivery_id],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?
-        {
-            let mut intent = build_intent(delivery_id, request, source, true)?;
-            validate_delivery_intent_readback(&tx, &intent)?;
-            let event_count = delivery_event_count(&tx, &intent.planning_delivery_id)?;
-            if !(1..=2).contains(&event_count) {
-                bail!("算力插件 Planning Snapshot V2 delivery event 链损坏");
-            }
-            intent.dispatchable = event_count == 1;
-            tx.commit()?;
-            return Ok(intent);
-        }
-
-        let intent = build_intent(new_id("cpv2d"), request, source, false)?;
-        insert_delivery_event(
-            &tx,
-            &intent,
-            1,
-            "intent_committed",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )?;
-        validate_delivery_intent_readback(&tx, &intent)?;
+        let intent =
+            prepare_node_compute_plugin_install_plan_planning_delivery_v2_on(&tx, request)?;
         tx.commit()?;
         Ok(intent)
     }
@@ -126,41 +91,105 @@ impl Store {
         intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
         observed: &homecli_proto::ComputePluginInstallPlanPlanningSnapshotObservedV2,
     ) -> Result<PlanningSnapshotObservationCommitV2> {
-        validate_planning_observation(intent, observed)?;
-        let (observed_json, observed_digest) = planning_observed_json_and_digest(observed)?;
-        let observed_snapshot_json = observed
-            .snapshot
-            .as_ref()
-            .map(hashed_snapshot_json)
-            .transpose()?;
-        let observed_snapshot_digest = observed
-            .snapshot
-            .as_ref()
-            .map(|snapshot| snapshot.snapshot_digest.as_str());
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        validate_source_matches_intent(&tx, intent)?;
-        validate_delivery_intent_readback(&tx, intent)?;
-        if delivery_event_count(&tx, &intent.planning_delivery_id)? == 1 {
-            insert_delivery_event(
-                &tx,
-                intent,
-                2,
-                "observed",
-                Some(&observed_json),
-                Some(&observed_digest),
-                Some(observed.snapshot_ready),
-                observed_snapshot_json.as_deref(),
-                observed_snapshot_digest,
-                observed.error_code.as_deref(),
-            )?;
-            if let Some(hashed) = observed.snapshot.as_ref() {
-                insert_planning_snapshot(&tx, intent, hashed)?;
-            }
+        let (committed, _, _) = record_planning_observation_on(&tx, intent, observed)?;
+        let snapshot = match &committed {
+            PlanningSnapshotObservationCommitV2::Snapshot(snapshot) => Some(snapshot),
+            PlanningSnapshotObservationCommitV2::ObservedWithoutSnapshot => None,
+        };
+        if let Some(snapshot) = snapshot.as_ref() {
+            ensure_signer_unavailable_in_transaction(&tx, snapshot)?;
         }
-        validate_delivery_outcome_readback(
-            &tx,
+        tx.commit()?;
+        Ok(committed)
+    }
+}
+
+pub(in crate::store) fn prepare_node_compute_plugin_install_plan_planning_delivery_v2_on(
+    tx: &Transaction<'_>,
+    request: homecli_proto::ComputePluginInstallPlanPlanningSnapshotRequestV2,
+) -> Result<NodeComputePluginInstallPlanPlanningDispatchIntentV2> {
+    validate_planning_request(&request)?;
+    let source = resolve_exact_planning_source(tx, &request)?;
+    if let Some(delivery_id) = tx
+        .query_row(
+            "SELECT planning_delivery_id
+               FROM node_compute_plugin_install_plan_planning_delivery_events_v2
+              WHERE source_preparation_delivery_id=?1 AND event_sequence=1",
+            params![request.source_preparation_delivery_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+    {
+        let mut intent = build_intent(delivery_id, request, source, true)?;
+        validate_delivery_intent_readback(tx, &intent)?;
+        let event_count = delivery_event_count(tx, &intent.planning_delivery_id)?;
+        if !(1..=2).contains(&event_count) {
+            bail!("算力插件 Planning Snapshot V2 delivery event 链损坏");
+        }
+        intent.dispatchable = event_count == 1;
+        return Ok(intent);
+    }
+    let intent = build_intent(new_id("cpv2d"), request, source, false)?;
+    insert_delivery_event(
+        tx,
+        &intent,
+        1,
+        "intent_committed",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )?;
+    validate_delivery_intent_readback(tx, &intent)?;
+    Ok(intent)
+}
+
+pub(in crate::store) fn record_node_compute_plugin_install_plan_planning_terminal_observation_v2_on(
+    tx: &Transaction<'_>,
+    intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
+    observed: &homecli_proto::ComputePluginInstallPlanPlanningSnapshotObservedV2,
+) -> Result<(String, String)> {
+    if observed.snapshot_ready || observed.snapshot.is_some() {
+        bail!("endpoint Planning 终点不得生成 snapshot、signer、generation 或 Plan");
+    }
+    let (committed, event_id, observed_digest) =
+        record_planning_observation_on(tx, intent, observed)?;
+    if !matches!(
+        committed,
+        PlanningSnapshotObservationCommitV2::ObservedWithoutSnapshot
+    ) {
+        bail!("endpoint Planning 终点意外生成 snapshot");
+    }
+    Ok((event_id, observed_digest))
+}
+
+fn record_planning_observation_on(
+    tx: &Transaction<'_>,
+    intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
+    observed: &homecli_proto::ComputePluginInstallPlanPlanningSnapshotObservedV2,
+) -> Result<(PlanningSnapshotObservationCommitV2, String, String)> {
+    validate_planning_observation(intent, observed)?;
+    let (observed_json, observed_digest) = planning_observed_json_and_digest(observed)?;
+    let observed_snapshot_json = observed
+        .snapshot
+        .as_ref()
+        .map(hashed_snapshot_json)
+        .transpose()?;
+    let observed_snapshot_digest = observed
+        .snapshot
+        .as_ref()
+        .map(|snapshot| snapshot.snapshot_digest.as_str());
+    validate_source_matches_intent(tx, intent)?;
+    validate_delivery_intent_readback(tx, intent)?;
+    let event_id = if delivery_event_count(tx, &intent.planning_delivery_id)? == 1 {
+        let event_id = insert_delivery_event(
+            tx,
             intent,
+            2,
             "observed",
             Some(&observed_json),
             Some(&observed_digest),
@@ -169,16 +198,35 @@ impl Store {
             observed_snapshot_digest,
             observed.error_code.as_deref(),
         )?;
-        let snapshot = read_planning_snapshot(&tx, intent)?;
-        if let Some(snapshot) = snapshot.as_ref() {
-            ensure_signer_unavailable_in_transaction(&tx, snapshot)?;
+        if let Some(hashed) = observed.snapshot.as_ref() {
+            insert_planning_snapshot(tx, intent, hashed)?;
         }
-        tx.commit()?;
-        Ok(match snapshot {
-            Some(snapshot) => PlanningSnapshotObservationCommitV2::Snapshot(snapshot),
-            None => PlanningSnapshotObservationCommitV2::ObservedWithoutSnapshot,
-        })
-    }
+        event_id
+    } else {
+        tx.query_row(
+            "SELECT id FROM node_compute_plugin_install_plan_planning_delivery_events_v2
+              WHERE planning_delivery_id=?1 AND event_sequence=2",
+            params![intent.planning_delivery_id],
+            |row| row.get::<_, String>(0),
+        )?
+    };
+    validate_delivery_outcome_readback(
+        tx,
+        intent,
+        "observed",
+        Some(&observed_json),
+        Some(&observed_digest),
+        Some(observed.snapshot_ready),
+        observed_snapshot_json.as_deref(),
+        observed_snapshot_digest,
+        observed.error_code.as_deref(),
+    )?;
+    let snapshot = read_planning_snapshot(tx, intent)?;
+    let committed = match snapshot {
+        Some(snapshot) => PlanningSnapshotObservationCommitV2::Snapshot(snapshot),
+        None => PlanningSnapshotObservationCommitV2::ObservedWithoutSnapshot,
+    };
+    Ok((committed, event_id, observed_digest))
 }
 
 fn build_intent(
@@ -235,7 +283,8 @@ fn insert_delivery_event(
     observed_snapshot_json: Option<&str>,
     observed_snapshot_digest: Option<&str>,
     detail_code: Option<&str>,
-) -> Result<()> {
+) -> Result<String> {
+    let event_id = new_id("cpv2e");
     tx.execute(
         "INSERT INTO node_compute_plugin_install_plan_planning_delivery_events_v2 (
            id, planning_delivery_id, cloud_session_id, source_sharing_delivery_id,
@@ -253,7 +302,7 @@ fn insert_delivery_event(
                    ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25,
                    ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34)",
         params![
-            new_id("cpv2e"),
+            event_id,
             intent.planning_delivery_id,
             intent.cloud_session_id,
             intent.source_sharing_delivery_id,
@@ -289,7 +338,7 @@ fn insert_delivery_event(
             now(),
         ],
     )?;
-    Ok(())
+    Ok(event_id)
 }
 
 fn insert_planning_snapshot(

@@ -4,9 +4,11 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
-    NodeEndpointSessionAcceptedV1, NodeEndpointSessionAcceptedV1Fields,
-    NodeEndpointSessionRegisterV1, NodeEndpointSessionRegisterV1Fields,
-    NODE_ENDPOINT_SESSION_MAX_LIFETIME_MS, NODE_ENDPOINT_SESSION_RENEWAL_MARGIN_MS,
+    NodeEndpointSessionAcceptedV2, NodeEndpointSessionAcceptedV2Fields,
+    NodeEndpointSessionRegisterV2, NodeEndpointSessionRegisterV2Fields,
+    CAP_NODE_ENDPOINT_PLANNING_SNAPSHOT_BOOTSTRAP_V1, NODE_ENDPOINT_SESSION_MAX_LIFETIME_MS,
+    NODE_ENDPOINT_SESSION_RENEWAL_MARGIN_MS, NODE_ENDPOINT_SESSION_V2_CAPABILITIES,
+    NODE_ENDPOINT_SESSION_V2_CAPABILITY_SET_DIGEST,
 };
 use sha2::{Digest, Sha256};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
@@ -14,21 +16,48 @@ use tracing::warn;
 
 use crate::{
     node_agent_endpoint_credentials::{EndpointAuthorityBinding, EndpointSessionLease},
-    NodeRuntime, CLOUD_WS_READ_TIMEOUT,
+    NodeRuntime,
 };
+
+mod bootstrap;
 
 const BASE_RECONNECT_BACKOFF: Duration = Duration::from_secs(2);
 const MAX_RECONNECT_BACKOFF: Duration = Duration::from_secs(60);
 const ACCEPTED_TIMEOUT: Duration = Duration::from_secs(10);
+const ENDPOINT_CLOSE_TIMEOUT: Duration = Duration::from_secs(1);
+const PLANNING_BOOTSTRAP_CHAIN_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_ACCEPTED_MESSAGE_BYTES: usize = 64 * 1024;
 const MAX_ACCEPTED_CLOCK_SKEW_MS: i64 = 2 * 60 * 1_000;
 const INSTALLATION_BINDING_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_INSTALLATION_BINDING_V1";
-const CAPABILITY_SET_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_CAPABILITY_SET_V1";
 
-type EndpointWebSocket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+pub(super) type EndpointWebSocket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
-enum EndpointSessionEnd {
+pub(super) enum EndpointSessionEnd {
     RemoteClose,
     RefreshRequired,
+}
+
+/// Linear proof that one strict Accepted V2 was checked against this exact local credential lease.
+/// Only this endpoint adapter can construct it; the compute Bootstrap host may only consume it.
+pub(crate) struct ValidatedEndpointSessionProvenance<'lease> {
+    _lease: &'lease EndpointSessionLease,
+    accepted: NodeEndpointSessionAcceptedV2Fields,
+}
+
+impl<'lease> ValidatedEndpointSessionProvenance<'lease> {
+    fn seal(
+        lease: &'lease EndpointSessionLease,
+        accepted: NodeEndpointSessionAcceptedV2Fields,
+    ) -> Self {
+        Self {
+            _lease: lease,
+            accepted,
+        }
+    }
+
+    pub(crate) fn into_accepted_fields(self) -> NodeEndpointSessionAcceptedV2Fields {
+        self.accepted
+    }
 }
 
 pub(crate) async fn run_if_required(runtime: &Arc<NodeRuntime>, backoff: &mut Duration) -> bool {
@@ -75,7 +104,6 @@ pub(crate) async fn run_if_required(runtime: &Arc<NodeRuntime>, backoff: &mut Du
             runtime
                 .set_connected(false, "安全 endpoint 会话已关闭，等待重连")
                 .await;
-            *backoff = BASE_RECONNECT_BACKOFF;
         }
         Err(error) => {
             warn!(
@@ -115,7 +143,7 @@ async fn run_endpoint_session(runtime: &Arc<NodeRuntime>) -> Result<EndpointSess
         return Ok(EndpointSessionEnd::RefreshRequired);
     };
     let result = run_connected_session(runtime, &mut websocket, &lease).await;
-    let _ = websocket.close(None).await;
+    let _ = tokio::time::timeout(ENDPOINT_CLOSE_TIMEOUT, websocket.close(None)).await;
     result
 }
 
@@ -133,7 +161,7 @@ async fn run_connected_session(
 
     let agent_version = crate::node_agent_release_identity::current();
     let binding = lease.binding();
-    let register = NodeEndpointSessionRegisterV1::new(NodeEndpointSessionRegisterV1Fields {
+    let register = NodeEndpointSessionRegisterV2::new(NodeEndpointSessionRegisterV2Fields {
         agent_id: binding.agent_id.clone(),
         owner_user_id: binding.owner_user_id.clone(),
         install_id: binding.install_id.clone(),
@@ -141,10 +169,19 @@ async fn run_connected_session(
         credential_revision: binding.credential_revision,
         credential_digest: binding.credential_digest.clone(),
         agent_version: agent_version.clone(),
+        capabilities: NODE_ENDPOINT_SESSION_V2_CAPABILITIES
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
     })
     .map_err(anyhow::Error::msg)?;
     let register_json = serde_json::to_string(&register)?;
-    websocket.send(Message::Text(register_json)).await?;
+    tokio::time::timeout(
+        ACCEPTED_TIMEOUT,
+        websocket.send(Message::Text(register_json)),
+    )
+    .await
+    .context("NODE_ENDPOINT_SESSION_REGISTER_SEND_TIMEOUT")??;
     if !lease_is_current(runtime, lease).await {
         return Ok(EndpointSessionEnd::RefreshRequired);
     }
@@ -166,48 +203,51 @@ async fn run_connected_session(
     let Message::Text(text) = first_frame else {
         bail!("NODE_ENDPOINT_SESSION_FIRST_FRAME_NOT_ACCEPTED_TEXT");
     };
-    let accepted: NodeEndpointSessionAcceptedV1 =
+    if text.len() > MAX_ACCEPTED_MESSAGE_BYTES {
+        bail!("NODE_ENDPOINT_SESSION_ACCEPTED_TOO_LARGE");
+    }
+    let chain_started_at = tokio::time::Instant::now();
+    let accepted: NodeEndpointSessionAcceptedV2 =
         serde_json::from_str(&text).context("NODE_ENDPOINT_SESSION_ACCEPTED_INVALID")?;
-    let accepted = accepted.into_fields().map_err(anyhow::Error::msg)?;
 
-    let renewal_after = validate_accepted(&accepted, binding, &agent_version)?;
+    let (renewal_after, accepted) = validate_accepted(accepted, binding, &agent_version)?;
     if !lease_is_current(runtime, lease).await {
         return Ok(EndpointSessionEnd::RefreshRequired);
     }
+    let provenance = ValidatedEndpointSessionProvenance::seal(lease, accepted);
+    let chain_deadline = chain_started_at + PLANNING_BOOTSTRAP_CHAIN_TIMEOUT;
+    let witness = tokio::time::timeout_at(
+        chain_deadline,
+        runtime
+            .endpoint_credentials
+            .with_current_endpoint_session_read_fence(lease, || {
+                runtime
+                    .compute_plugin_bootstrap
+                    .bind_endpoint_session_provenance(provenance)
+            }),
+    )
+    .await
+    .context("NODE_ENDPOINT_PLANNING_BOOTSTRAP_CHAIN_TIMEOUT")??;
     runtime
-        .set_connection_stage("endpoint_session_authenticated_compute_inert")
+        .set_connection_stage("endpoint_session_planning_bootstrap_blocked")
         .await;
     runtime
-        .set_connected(false, "安全 endpoint 会话已认证；算力能力保持关闭")
+        .set_connected(false, "安全 endpoint 规划引导已认证；算力能力保持关闭")
         .await;
-
-    let renewal = tokio::time::sleep(renewal_after);
-    tokio::pin!(renewal);
-    loop {
-        let frame = tokio::select! {
-            changed = epoch.changed() => {
-                changed.context("NODE_ENDPOINT_SESSION_EPOCH_CLOSED")?;
-                return Ok(EndpointSessionEnd::RefreshRequired);
-            }
-            _ = &mut renewal => return Ok(EndpointSessionEnd::RefreshRequired),
-            frame = tokio::time::timeout(CLOUD_WS_READ_TIMEOUT, websocket.next()) => {
-                frame
-                    .context("NODE_ENDPOINT_SESSION_READ_TIMEOUT")?
-                    .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_STREAM_ENDED"))??
-            }
-        };
-        if !lease_is_current(runtime, lease).await {
-            return Ok(EndpointSessionEnd::RefreshRequired);
-        }
-        match frame {
-            Message::Ping(payload) => websocket.send(Message::Pong(payload)).await?,
-            Message::Close(_) => return Ok(EndpointSessionEnd::RemoteClose),
-            Message::Text(_) => bail!("NODE_ENDPOINT_SESSION_TEXT_AFTER_ACCEPTED_FORBIDDEN"),
-            Message::Binary(_) => bail!("NODE_ENDPOINT_SESSION_BINARY_AFTER_ACCEPTED_FORBIDDEN"),
-            Message::Pong(_) => bail!("NODE_ENDPOINT_SESSION_UNSOLICITED_PONG_FORBIDDEN"),
-            _ => bail!("NODE_ENDPOINT_SESSION_FRAME_AFTER_ACCEPTED_FORBIDDEN"),
-        }
-    }
+    let result = bootstrap::run(
+        runtime,
+        websocket,
+        lease,
+        &witness,
+        &mut epoch,
+        chain_started_at,
+        renewal_after,
+    )
+    .await;
+    runtime
+        .compute_plugin_bootstrap
+        .release_endpoint_session_provenance(witness);
+    result
 }
 
 async fn lease_is_current(runtime: &Arc<NodeRuntime>, lease: &EndpointSessionLease) -> bool {
@@ -219,10 +259,11 @@ async fn lease_is_current(runtime: &Arc<NodeRuntime>, lease: &EndpointSessionLea
 }
 
 fn validate_accepted(
-    accepted: &NodeEndpointSessionAcceptedV1Fields,
+    accepted: NodeEndpointSessionAcceptedV2,
     binding: &EndpointAuthorityBinding,
     agent_version: &str,
-) -> Result<Duration> {
+) -> Result<(Duration, NodeEndpointSessionAcceptedV2Fields)> {
+    let accepted = accepted.into_fields().map_err(anyhow::Error::msg)?;
     if accepted.agent_id != binding.agent_id
         || accepted.owner_user_id != binding.owner_user_id
         || accepted.install_id != binding.install_id
@@ -242,7 +283,10 @@ fn validate_accepted(
     {
         bail!("NODE_ENDPOINT_SESSION_ACCEPTED_INSTALLATION_BINDING_MISMATCH");
     }
-    if accepted.capability_set_digest != domain_digest(CAPABILITY_SET_DOMAIN, b"[]") {
+    if accepted.capabilities.len() != 1
+        || accepted.capabilities[0] != CAP_NODE_ENDPOINT_PLANNING_SNAPSHOT_BOOTSTRAP_V1
+        || accepted.capability_set_digest != NODE_ENDPOINT_SESSION_V2_CAPABILITY_SET_DIGEST
+    {
         bail!("NODE_ENDPOINT_SESSION_ACCEPTED_CAPABILITY_SET_MISMATCH");
     }
 
@@ -275,12 +319,13 @@ fn validate_accepted(
         .to_std()
         .context("NODE_ENDPOINT_SESSION_ACCEPTED_EXPIRED")?;
     let declared_remaining = Duration::from_millis(accepted.expires_in_ms);
-    wall_remaining
+    let renewal_after = wall_remaining
         .min(declared_remaining)
         .checked_sub(Duration::from_millis(
             NODE_ENDPOINT_SESSION_RENEWAL_MARGIN_MS,
         ))
-        .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_ACCEPTED_RENEWAL_EXPIRED"))
+        .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_ACCEPTED_RENEWAL_EXPIRED"))?;
+    Ok((renewal_after, accepted))
 }
 
 fn installation_binding_digest(

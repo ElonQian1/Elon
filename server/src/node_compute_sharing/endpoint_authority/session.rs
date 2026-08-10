@@ -1,6 +1,5 @@
 use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
-use homecli_proto::NODE_ENDPOINT_SESSION_PROTO_VERSION;
 use serde::{Deserialize, Serialize};
 
 use super::canonical::{
@@ -15,11 +14,13 @@ use super::types::{
 };
 
 mod direct_tls;
+mod profile;
 pub(crate) use direct_tls::{
     bind_direct_tls_node_endpoint_transport, canonical_direct_tls_verifier_digest,
     seal_direct_tls_connection, NodeEndpointSecureTransportBinding,
     VerifiedDirectTlsConnectionEvidence, VerifiedSecureNodeEndpointTransport,
 };
+pub(crate) use profile::NodeEndpointSessionProfile;
 
 const AUTHENTICATION_ID_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_AUTHENTICATION_ID_V1";
 const AUTHENTICATION_DIGEST_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_AUTHENTICATION_RECEIPT_V1";
@@ -40,55 +41,11 @@ pub(crate) struct NodeEndpointSessionOpenRequest {
     protocol_version: u64,
     agent_version: String,
     capabilities: Vec<String>,
+    profile: NodeEndpointSessionProfile,
     presented_secret: PresentedNodeEndpointCredentialSecret,
 }
 
 impl NodeEndpointSessionOpenRequest {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(
-        agent_id: String,
-        owner_user_id: String,
-        install_id: String,
-        credential_id: String,
-        credential_revision: u64,
-        credential_digest: String,
-        session_id: String,
-        server_instance_id: String,
-        protocol_version: u64,
-        agent_version: String,
-        presented_secret: String,
-    ) -> Result<Self> {
-        if !bounded_identifier(&agent_id, 160)
-            || !bounded_identifier(&owner_user_id, 160)
-            || !bounded_identifier(&install_id, 512)
-            || !bounded_identifier(&credential_id, 160)
-            || !safe_positive(credential_revision)
-            || !is_sha256(&credential_digest)
-            || !bounded_identifier(&session_id, 160)
-            || !bounded_identifier(&server_instance_id, 160)
-            || protocol_version != u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION)
-            || !bounded_identifier(&agent_version, 160)
-        {
-            bail!("NODE_ENDPOINT_SESSION_OPEN_REQUEST_INVALID");
-        }
-        Ok(Self {
-            agent_id,
-            owner_user_id,
-            install_id,
-            credential_id,
-            credential_revision,
-            credential_digest,
-            session_id,
-            server_instance_id,
-            protocol_version,
-            agent_version,
-            capabilities: Vec::new(),
-            presented_secret: PresentedNodeEndpointCredentialSecret::from_endpoint_bearer(
-                presented_secret,
-            )?,
-        })
-    }
-
     pub(crate) fn agent_id(&self) -> &str {
         &self.agent_id
     }
@@ -121,9 +78,9 @@ impl NodeEndpointSessionOpenRequest {
             || transport.server_instance_id() != self.server_instance_id
             || !bounded_identifier(&self.session_id, 160)
             || !bounded_identifier(&self.server_instance_id, 160)
-            || self.protocol_version != u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION)
+            || self.protocol_version != self.profile.protocol_version()
             || !bounded_identifier(&self.agent_version, 160)
-            || !self.capabilities.is_empty()
+            || self.capabilities != self.profile.capabilities()
         {
             bail!("NODE_ENDPOINT_SESSION_OPEN_REQUEST_INVALID");
         }
@@ -357,13 +314,16 @@ impl NodeEndpointSessionAuthenticationReceiptEnvelope {
             || !safe_positive(self.session_generation)
             || !bounded_identifier(&self.server_instance_id, 160)
             || self.authentication_method != "bearer_sha256"
-            || self.protocol_version != u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION)
             || !bounded_identifier(&self.agent_version, 160)
-            || self.capability_count > MAX_CAPABILITIES as u64
             || !is_sha256(&self.capability_set_digest)
         {
             bail!("NODE_ENDPOINT_SESSION_AUTHENTICATION_INVALID");
         }
+        NodeEndpointSessionProfile::from_receipt(
+            self.protocol_version,
+            self.capability_count,
+            &self.capability_set_digest,
+        )?;
         match (
             self.session_generation,
             self.previous_authentication_receipt_id.as_deref(),

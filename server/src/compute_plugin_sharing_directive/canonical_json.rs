@@ -1,10 +1,15 @@
 use anyhow::{bail, Result};
+use homecli_proto::{
+    NODE_ENDPOINT_PLANNING_BOOTSTRAP_MESSAGE_DIGEST_DOMAIN,
+    NODE_ENDPOINT_PLANNING_BOOTSTRAP_MESSAGE_DIGEST_DOMAIN_SEPARATOR,
+};
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const MAX_IJSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const MAX_PREPARATION_LEDGER_JSON_BYTES: usize = 512 * 1024;
+const MAX_ENDPOINT_PLANNING_MESSAGE_BYTES: usize = 576 * 1024;
 const PREPARATION_CONTEXT_DOMAIN: &[u8] =
     b"ELON_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_CONTEXT_V1";
 const PREPARATION_OBSERVED_DOMAIN: &[u8] =
@@ -33,14 +38,39 @@ pub(crate) fn compute_plugin_install_plan_preparation_observed_json_and_digest<T
     domain_separated_json_and_digest(PREPARATION_OBSERVED_DOMAIN, value)
 }
 
+pub(crate) fn compute_plugin_endpoint_planning_message_json_and_digest<T: Serialize>(
+    digest_material: &T,
+) -> Result<(String, String)> {
+    domain_separated_json_and_digest_with_separator(
+        NODE_ENDPOINT_PLANNING_BOOTSTRAP_MESSAGE_DIGEST_DOMAIN.as_bytes(),
+        NODE_ENDPOINT_PLANNING_BOOTSTRAP_MESSAGE_DIGEST_DOMAIN_SEPARATOR,
+        digest_material,
+        MAX_ENDPOINT_PLANNING_MESSAGE_BYTES,
+    )
+}
+
 fn domain_separated_json_and_digest<T: Serialize>(
     domain: &[u8],
     value: &T,
 ) -> Result<(String, String)> {
-    let bytes = canonical_compute_plugin_ijson(value, MAX_PREPARATION_LEDGER_JSON_BYTES)?;
+    domain_separated_json_and_digest_with_separator(
+        domain,
+        0,
+        value,
+        MAX_PREPARATION_LEDGER_JSON_BYTES,
+    )
+}
+
+fn domain_separated_json_and_digest_with_separator<T: Serialize>(
+    domain: &[u8],
+    separator: u8,
+    value: &T,
+    max_bytes: usize,
+) -> Result<(String, String)> {
+    let bytes = canonical_compute_plugin_ijson(value, max_bytes)?;
     let mut digest = Sha256::new();
     digest.update(domain);
-    digest.update([0]);
+    digest.update([separator]);
     digest.update(&bytes);
     Ok((String::from_utf8(bytes)?, hex::encode(digest.finalize())))
 }

@@ -3,6 +3,7 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+mod endpoint_planning;
 mod install_plan_planning;
 mod install_plan_preparation;
 
@@ -148,4 +149,8 @@ pub(crate) fn migration_v209(conn: &Connection) -> Result<()> {
 
 pub(crate) fn migration_v210(conn: &Connection) -> Result<()> {
     install_plan_planning::migration_v210(conn)
+}
+
+pub(crate) fn migration_v219(conn: &Connection) -> Result<()> {
+    endpoint_planning::migration_v219(conn)
 }

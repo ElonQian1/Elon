@@ -233,16 +233,9 @@ impl Store {
     ) -> Result<Option<NodeComputePluginSharingDispatchIntent>> {
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(mut intent) = select_current_intent(&tx, node_id.trim())? else {
-            tx.commit()?;
-            return Ok(None);
-        };
-        intent.delivery_id = new_id("cpsd");
-        intent.replayed = true;
-        intent.dispatchable = true;
-        insert_delivery_intent(&tx, &intent, &now())?;
+        let intent = prepare_node_compute_plugin_sharing_session_delivery_on(&tx, node_id)?;
         tx.commit()?;
-        Ok(Some(intent))
+        Ok(intent)
     }
 
     pub fn record_node_compute_plugin_sharing_delivery(
@@ -251,43 +244,9 @@ impl Store {
         event_kind: &str,
         detail_code: Option<&str>,
     ) -> Result<()> {
-        if !matches!(
-            event_kind,
-            "dispatched"
-                | "capability_missing"
-                | "agent_offline"
-                | "writer_closed"
-                | "ack_timeout"
-                | "dispatch_failed"
-        ) {
-            bail!("未知算力插件下发结果");
-        }
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let sequence = tx.query_row(
-            "SELECT COALESCE(MAX(event_sequence), 0) + 1
-               FROM node_compute_plugin_sharing_delivery_events WHERE delivery_id=?1",
-            params![intent.delivery_id],
-            |row| row.get::<_, i64>(0),
-        )?;
-        tx.execute(
-            "INSERT INTO node_compute_plugin_sharing_delivery_events (
-               id, delivery_id, node_id, consent_receipt_id, policy_revision,
-               policy_digest, event_sequence, event_kind, detail_code, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                new_id("cpse"),
-                intent.delivery_id,
-                intent.node_id,
-                intent.consent_receipt_id,
-                intent.policy_revision,
-                intent.policy_digest,
-                sequence,
-                event_kind,
-                clean_optional(detail_code),
-                now()
-            ],
-        )?;
+        record_node_compute_plugin_sharing_delivery_on(&tx, intent, event_kind, detail_code)?;
         tx.commit()?;
         Ok(())
     }
@@ -298,24 +257,11 @@ impl Store {
         accepted: bool,
         observed: &serde_json::Value,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO node_compute_plugin_sharing_observations (
-               id, delivery_id, node_id, consent_receipt_id, policy_revision,
-               policy_digest, accepted, observed_json, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![
-                new_id("cpso"),
-                intent.delivery_id,
-                intent.node_id,
-                intent.consent_receipt_id,
-                intent.policy_revision,
-                intent.policy_digest,
-                accepted,
-                serde_json::to_string(observed)?,
-                now()
-            ],
-        )?;
+        let observed_json = serde_json::to_string(observed)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        record_node_compute_plugin_sharing_observation_on(&tx, intent, accepted, &observed_json)?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -356,6 +302,92 @@ impl Store {
             latest_observed_at,
         })
     }
+}
+
+pub(in crate::store) fn prepare_node_compute_plugin_sharing_session_delivery_on(
+    tx: &Transaction<'_>,
+    node_id: &str,
+) -> Result<Option<NodeComputePluginSharingDispatchIntent>> {
+    let Some(mut intent) = select_current_intent(tx, node_id.trim())? else {
+        return Ok(None);
+    };
+    intent.delivery_id = new_id("cpsd");
+    intent.replayed = true;
+    intent.dispatchable = true;
+    insert_delivery_intent(tx, &intent, &now())?;
+    Ok(Some(intent))
+}
+
+pub(in crate::store) fn record_node_compute_plugin_sharing_delivery_on(
+    tx: &Transaction<'_>,
+    intent: &NodeComputePluginSharingDispatchIntent,
+    event_kind: &str,
+    detail_code: Option<&str>,
+) -> Result<String> {
+    if !matches!(
+        event_kind,
+        "dispatched"
+            | "capability_missing"
+            | "agent_offline"
+            | "writer_closed"
+            | "ack_timeout"
+            | "dispatch_failed"
+    ) {
+        bail!("未知算力插件下发结果");
+    }
+    let sequence = tx.query_row(
+        "SELECT COALESCE(MAX(event_sequence), 0) + 1
+           FROM node_compute_plugin_sharing_delivery_events WHERE delivery_id=?1",
+        params![intent.delivery_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    let event_id = new_id("cpse");
+    tx.execute(
+        "INSERT INTO node_compute_plugin_sharing_delivery_events (
+           id, delivery_id, node_id, consent_receipt_id, policy_revision,
+           policy_digest, event_sequence, event_kind, detail_code, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![
+            event_id,
+            intent.delivery_id,
+            intent.node_id,
+            intent.consent_receipt_id,
+            intent.policy_revision,
+            intent.policy_digest,
+            sequence,
+            event_kind,
+            clean_optional(detail_code),
+            now()
+        ],
+    )?;
+    Ok(event_id)
+}
+
+pub(in crate::store) fn record_node_compute_plugin_sharing_observation_on(
+    tx: &Transaction<'_>,
+    intent: &NodeComputePluginSharingDispatchIntent,
+    accepted: bool,
+    observed_json: &str,
+) -> Result<String> {
+    let observation_id = new_id("cpso");
+    tx.execute(
+        "INSERT INTO node_compute_plugin_sharing_observations (
+           id, delivery_id, node_id, consent_receipt_id, policy_revision,
+           policy_digest, accepted, observed_json, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            observation_id,
+            intent.delivery_id,
+            intent.node_id,
+            intent.consent_receipt_id,
+            intent.policy_revision,
+            intent.policy_digest,
+            accepted,
+            observed_json,
+            now()
+        ],
+    )?;
+    Ok(observation_id)
 }
 
 fn validate_update(

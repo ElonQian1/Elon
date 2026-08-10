@@ -8,6 +8,7 @@ use homecli_proto::{
 };
 use serde::Serialize;
 
+use self::account::ComputePluginBootstrapAccountBinding;
 use self::install_plan_preparation::ComputePluginInstallPlanPreparationWitnessV1;
 use crate::compute_plugin_sharing_directive::compute_plugin_sharing_policy_snapshot_digest;
 use crate::node_agent_instance_lock::NodeAgentInstanceLockWitness;
@@ -22,6 +23,7 @@ const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 mod account;
 mod authority_controller;
 mod authority_controller_state;
+pub(crate) mod endpoint_provenance;
 mod install_plan_planning_snapshot;
 mod install_plan_preparation;
 mod policy_binding_intent;
@@ -48,6 +50,8 @@ pub(crate) struct ComputePluginBootstrap {
 struct ComputePluginBootstrapState {
     installation: Option<ComputePluginInstallationIdentity>,
     account: Option<ComputePluginBootstrapAccountBinding>,
+    endpoint_credential: Option<endpoint_provenance::ComputePluginEndpointCredentialProvenance>,
+    endpoint_session: Option<endpoint_provenance::BoundComputePluginEndpointSessionProvenance>,
     root: Option<DormantComputePluginRootBinding>,
     instance_lock: Option<NodeAgentInstanceLockWitness>,
     authority_controller: ComputePluginAuthorityControllerState,
@@ -62,12 +66,6 @@ struct ComputePluginBootstrapState {
     initialization_plan: Option<DormantComputePluginInitializationPlan>,
     last_install_plan_preparation: Option<ComputePluginInstallPlanPreparationWitnessV1>,
     last_install_plan_planning_snapshot: Option<ComputePluginInstallPlanPlanningSnapshotRequestV2>,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-struct ComputePluginBootstrapAccountBinding {
-    node_id: String,
-    owner_user_id: String,
 }
 
 #[derive(Clone)]
@@ -141,6 +139,8 @@ impl ComputePluginBootstrap {
                         owner_user_id: owner_user_id.to_string(),
                     }
                 }),
+                endpoint_credential: None,
+                endpoint_session: None,
                 root,
                 instance_lock: None,
                 authority_controller,

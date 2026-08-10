@@ -133,7 +133,7 @@ v13/V1 保持 auth-only、空 capability 与 Ping/Pong/Close 语义，不原地�
 
 1. v14 固定 `session_mode=planning_snapshot_bootstrap_only`、`compute_authority=false` 与唯一 capability `node_endpoint_planning_snapshot_bootstrap_v1`；V2 Register/Accepted 使用私有 wire 字段和全量校验，不能转换成 V1。
 2. Accepted 后只允许六条独立消息：sharing request/observed、preparation request/observed、Planning request/observed。每条封存 exact session binding、bootstrap ID、1–6 sequence、delivery ID、前序消息摘要与自身 JCS/SHA-256 摘要；第一条以前述 authentication digest 为前驱。
-3. 每个 exact session 最多一个 chain、一个 in-flight request。sharing disabled/rejected可在第二条结束，preparation rejected可在第四条结束，Planning始终在第六条结束；重复只接受同位置同摘要，冲突永久失败关闭。
+3. 每个 exact session 最多一个 chain、一个 in-flight request。sharing disabled/rejected可在第二条结束，preparation rejected可在第四条结束，Planning始终在第六条结束；本批没有 commit-uncertain chain 恢复接口，任何重复 prepare/observation 都失败关闭，未来恢复只能读回同位置同摘要的既存事实，冲突永久失败关闭。
 4. v219 append-only provenance把三段来源与 exact v216 authentication receipt/head/current credential绑定。每段 observation 与下一 intent必须在同一 `BEGIN IMMEDIATE` 中完成 transaction-local currentness重验、写入、exact readback与提交；发送前 supervisor 检查不能代替该门卫。
 5. Windows NodeAgent 在 Accepted V2 后建立 non-Clone typed session witness，并只复用本机纯 Bootstrap 状态机。credential replacement重绑 account并撤销旧 controller/witness；同 credential普通 socket replacement只换 session provenance。每阶段执行前后与发送 observation 前都重验 endpoint epoch/currentness。
 6. Planning observation可 `accepted=true`，但当前必须保持 `snapshot_ready=false`、`snapshot=None`、`phase=blocked` 及全部副作用标志为 false。生产 handle-bound SQLite VFS、可信时间、rollback、policy/revocation、inventory/profile、catalog/keyring、installed/work-admission同快照 projector齐备前，不得生成 signed Plan或调用既有 generation/signer路径。

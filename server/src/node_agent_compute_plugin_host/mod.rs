@@ -38,7 +38,10 @@ mod signed_artifact_verification;
 mod trusted_time;
 mod work_admission_contract;
 
-pub(crate) use bootstrap::{ComputePluginBootstrap, ComputePluginBootstrapStatus};
+pub(crate) use bootstrap::{
+    endpoint_provenance::ComputePluginEndpointSessionWitness, ComputePluginBootstrap,
+    ComputePluginBootstrapStatus,
+};
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};
 pub(crate) use host::ComputePluginHost;
 pub(crate) use keyring::{ComputePluginControlPlaneKeyResolver, ComputePluginPublisherKeyResolver};

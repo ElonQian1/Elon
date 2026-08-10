@@ -117,6 +117,29 @@ impl EndpointCredentialManager {
         lease: &EndpointSessionLease,
     ) -> Result<()> {
         let state = self.state.lock().await;
+        self.require_current_endpoint_session_locked(&state, lease)
+    }
+
+    /// Runs one synchronous endpoint action while the exact credential generation remains under
+    /// the manager read fence. The closure cannot await; the required lock order is credential
+    /// state first, then any Bootstrap lock acquired by the closure.
+    pub(crate) async fn with_current_endpoint_session_read_fence<T>(
+        &self,
+        lease: &EndpointSessionLease,
+        operation: impl FnOnce() -> Result<T>,
+    ) -> Result<T> {
+        let state = self.state.lock().await;
+        self.require_current_endpoint_session_locked(&state, lease)?;
+        let result = operation();
+        drop(state);
+        result
+    }
+
+    fn require_current_endpoint_session_locked(
+        &self,
+        state: &super::types::EndpointCredentialState,
+        lease: &EndpointSessionLease,
+    ) -> Result<()> {
         if lease.epoch == 0
             || self.session_epoch.load(Ordering::SeqCst) != lease.epoch
             || self.session_suspended.load(Ordering::SeqCst)

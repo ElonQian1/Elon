@@ -8,7 +8,9 @@ use tokio_tungstenite::{
     Connector, MaybeTlsStream, WebSocketStream,
 };
 
-const ENDPOINT_MAX_MESSAGE_BYTES: usize = 64 * 1024;
+const ENDPOINT_MAX_MESSAGE_BYTES: usize = 576 * 1024;
+const ENDPOINT_MAX_FRAME_BYTES: usize = 64 * 1024;
+const ENDPOINT_CLOSE_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub(crate) async fn connect(
     cfg: &crate::node_agent_config::NodeConfig,
@@ -57,7 +59,7 @@ pub(crate) async fn connect_endpoint(
         .await;
     let websocket_config = WebSocketConfig {
         max_message_size: Some(ENDPOINT_MAX_MESSAGE_BYTES),
-        max_frame_size: Some(ENDPOINT_MAX_MESSAGE_BYTES),
+        max_frame_size: Some(ENDPOINT_MAX_FRAME_BYTES),
         ..WebSocketConfig::default()
     };
     let connector = endpoint_tls_connector()?;
@@ -78,7 +80,7 @@ pub(crate) async fn connect_endpoint(
         .require_current_endpoint_session(&lease)
         .await
     {
-        let _ = stream.close(None).await;
+        let _ = tokio::time::timeout(ENDPOINT_CLOSE_TIMEOUT, stream.close(None)).await;
         tracing::debug!(%error, "endpoint credential changed during WebSocket handshake");
         return Ok(None);
     }

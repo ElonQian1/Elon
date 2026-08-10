@@ -12,7 +12,9 @@ use axum::{
 use chrono::{SecondsFormat, Utc};
 use homecli_proto::{
     NodeEndpointSessionAcceptedV1, NodeEndpointSessionAcceptedV1Fields,
-    NodeEndpointSessionRegisterV1, NODE_ENDPOINT_SESSION_PROTO_VERSION,
+    NodeEndpointSessionAcceptedV2, NodeEndpointSessionAcceptedV2Fields,
+    NodeEndpointSessionRegisterV1Fields, NodeEndpointSessionRegisterV2Fields,
+    NODE_ENDPOINT_SESSION_V1_PROTO_VERSION, NODE_ENDPOINT_SESSION_V2_CAPABILITIES,
 };
 use tokio::time::{interval, timeout, Instant, MissedTickBehavior};
 use uuid::Uuid;
@@ -27,7 +29,10 @@ use crate::{
     types::AppState,
 };
 
-use super::rate_limit;
+use super::{
+    planning, rate_limit, EndpointSessionProtocol, EndpointSessionRegister, MAX_FRAME_BYTES,
+    MAX_MESSAGE_BYTES, MAX_REGISTER_BYTES,
+};
 use crate::node_endpoint_transport::{
     direct_tls::DirectTlsPeerAddress, evidence_slot::VerifiedSecureTransportSlot,
 };
@@ -35,7 +40,8 @@ use crate::node_endpoint_transport::{
 const SESSION_PATH: &str = "/agent/ws";
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(10);
 const CURRENTNESS_INTERVAL: Duration = Duration::from_secs(5);
-const MAX_MESSAGE_BYTES: usize = 64 * 1024;
+const CONTROL_FRAME_SEND_TIMEOUT: Duration = Duration::from_secs(5);
+const CLOSE_FRAME_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub(in crate::node_endpoint_transport) async fn session_ws(
     State(state): State<Arc<AppState>>,
@@ -81,7 +87,7 @@ pub(in crate::node_endpoint_transport) async fn session_ws(
     };
 
     let mut response = ws
-        .max_frame_size(MAX_MESSAGE_BYTES)
+        .max_frame_size(MAX_FRAME_BYTES)
         .max_message_size(MAX_MESSAGE_BYTES)
         .on_upgrade(move |socket| run_socket(socket, state, transport, presented_secret));
     response
@@ -98,9 +104,9 @@ async fn run_socket(
 ) {
     let result = run_authenticated_socket(&mut socket, &state, transport, presented_secret).await;
     if let Err(error) = result {
-        tracing::info!(%error, "compute-inert endpoint session closed");
+        tracing::info!(%error, "endpoint session closed");
     }
-    let _ = socket.close().await;
+    let _ = timeout(CLOSE_FRAME_TIMEOUT, socket.close()).await;
 }
 
 async fn run_authenticated_socket(
@@ -109,26 +115,11 @@ async fn run_authenticated_socket(
     transport: VerifiedSecureNodeEndpointTransport,
     presented_secret: String,
 ) -> Result<()> {
-    let fields = read_register(socket)
-        .await?
-        .into_fields()
-        .map_err(anyhow::Error::msg)?;
-    let agent_version = fields.agent_version.clone();
+    let register = read_register(socket).await?;
     let session_id = format!("nes_{}", Uuid::new_v4().simple());
     let server_instance_id = transport.server_instance_id().to_string();
-    let request = NodeEndpointSessionOpenRequest::new(
-        fields.agent_id,
-        fields.owner_user_id,
-        fields.install_id,
-        fields.credential_id,
-        fields.credential_revision,
-        fields.credential_digest,
-        session_id,
-        server_instance_id,
-        u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION),
-        agent_version.clone(),
-        presented_secret,
-    )?;
+    let (request, protocol) =
+        open_request(register, session_id, server_instance_id, presented_secret)?;
     let lease = state
         .agent_manager
         .authenticate_and_install_endpoint_session(&state.store, &request, &transport)
@@ -136,29 +127,29 @@ async fn run_authenticated_socket(
     let (current, mut shutdown) = lease.into_parts();
     let cleanup = NodeEndpointSessionCleanup::new(state, current);
 
-    let result = serve_current_session(
-        socket,
-        state,
-        cleanup.current(),
-        &mut shutdown,
-        agent_version,
-    )
-    .await;
-    // Stop network use before waiting for durable terminalization. The cleanup guard remains
-    // armed across this await and will continue in a detached task if the handler is cancelled.
-    let _ = socket.send(Message::Close(None)).await;
+    let result =
+        serve_current_session(socket, state, cleanup.current(), &mut shutdown, protocol).await;
     let agent_id = cleanup.current().permit().binding().agent_id().to_string();
-    if let Err(error) = cleanup.finish().await {
-        tracing::warn!(
-            %error,
-            agent_id,
-            "endpoint session terminal close failed"
-        );
-    }
+    // Arm exact durable terminalization before any network await. Dropping this handler only
+    // detaches the cleanup task; the bounded Close frame can never delay session revocation.
+    tokio::spawn(async move {
+        if let Err(error) = cleanup
+            .finish()
+            .await
+            .context("NODE_ENDPOINT_SESSION_CLEANUP_TASK_FAILED")
+        {
+            tracing::warn!(
+                %error,
+                agent_id,
+                "endpoint session terminal close failed"
+            );
+        }
+    });
+    let _ = timeout(CLOSE_FRAME_TIMEOUT, socket.send(Message::Close(None))).await;
     result
 }
 
-async fn read_register(socket: &mut WebSocket) -> Result<NodeEndpointSessionRegisterV1> {
+async fn read_register(socket: &mut WebSocket) -> Result<EndpointSessionRegister> {
     let frame = timeout(FIRST_FRAME_TIMEOUT, socket.recv())
         .await
         .context("NODE_ENDPOINT_SESSION_REGISTER_TIMEOUT")?
@@ -166,10 +157,70 @@ async fn read_register(socket: &mut WebSocket) -> Result<NodeEndpointSessionRegi
     let Message::Text(text) = frame else {
         bail!("NODE_ENDPOINT_SESSION_REGISTER_FRAME_INVALID");
     };
-    if text.len() > MAX_MESSAGE_BYTES {
+    if text.len() > MAX_REGISTER_BYTES {
         bail!("NODE_ENDPOINT_SESSION_REGISTER_TOO_LARGE");
     }
     Ok(serde_json::from_str(&text)?)
+}
+
+fn open_request(
+    register: EndpointSessionRegister,
+    session_id: String,
+    server_instance_id: String,
+    presented_secret: String,
+) -> Result<(NodeEndpointSessionOpenRequest, EndpointSessionProtocol)> {
+    match register {
+        EndpointSessionRegister::V1(register) => {
+            let NodeEndpointSessionRegisterV1Fields {
+                agent_id,
+                owner_user_id,
+                install_id,
+                credential_id,
+                credential_revision,
+                credential_digest,
+                agent_version,
+            } = register.into_fields().map_err(anyhow::Error::msg)?;
+            let request = NodeEndpointSessionOpenRequest::new(
+                agent_id,
+                owner_user_id,
+                install_id,
+                credential_id,
+                credential_revision,
+                credential_digest,
+                session_id,
+                server_instance_id,
+                u64::from(NODE_ENDPOINT_SESSION_V1_PROTO_VERSION),
+                agent_version,
+                presented_secret,
+            )?;
+            Ok((request, EndpointSessionProtocol::AuthenticationOnlyV13))
+        }
+        EndpointSessionRegister::V2(register) => {
+            let NodeEndpointSessionRegisterV2Fields {
+                agent_id,
+                owner_user_id,
+                install_id,
+                credential_id,
+                credential_revision,
+                credential_digest,
+                agent_version,
+                capabilities: _,
+            } = register.into_fields().map_err(anyhow::Error::msg)?;
+            let request = NodeEndpointSessionOpenRequest::new_planning_bootstrap_v14(
+                agent_id,
+                owner_user_id,
+                install_id,
+                credential_id,
+                credential_revision,
+                credential_digest,
+                session_id,
+                server_instance_id,
+                agent_version,
+                presented_secret,
+            )?;
+            Ok((request, EndpointSessionProtocol::PlanningBootstrapV14))
+        }
+    }
 }
 
 async fn serve_current_session(
@@ -177,7 +228,7 @@ async fn serve_current_session(
     state: &Arc<AppState>,
     current: &NodeEndpointSessionCurrent,
     shutdown: &mut tokio::sync::watch::Receiver<bool>,
-    agent_version: String,
+    protocol: EndpointSessionProtocol,
 ) -> Result<()> {
     if *shutdown.borrow() {
         bail!("NODE_ENDPOINT_SESSION_SUPERSEDED_BEFORE_ACCEPTED");
@@ -189,10 +240,14 @@ async fn serve_current_session(
     let permit = current.permit();
     let remaining = remaining_lifetime(permit)?;
     let expires = Instant::now() + remaining;
-    let accepted = accepted_message(permit, agent_version, remaining)?;
-    socket
-        .send(Message::Text(serde_json::to_string(&accepted)?))
-        .await?;
+    let accepted = accepted_message(permit, protocol, remaining)?;
+    if accepted.len() > MAX_MESSAGE_BYTES {
+        bail!("NODE_ENDPOINT_SESSION_SERVER_MESSAGE_TOO_LARGE");
+    }
+    send_current_message(socket, shutdown, Message::Text(accepted)).await?;
+    if protocol == EndpointSessionProtocol::PlanningBootstrapV14 {
+        planning::run_bootstrap(socket, state, current, shutdown).await?;
+    }
 
     let mut currentness = interval(CURRENTNESS_INTERVAL);
     currentness.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -202,6 +257,7 @@ async fn serve_current_session(
 
     loop {
         tokio::select! {
+            biased;
             changed = shutdown.changed() => {
                 changed.context("NODE_ENDPOINT_SESSION_SUPERVISOR_CLOSED")?;
                 bail!("NODE_ENDPOINT_SESSION_SUPERSEDED");
@@ -217,7 +273,7 @@ async fn serve_current_session(
                 state.agent_manager.inspect_endpoint_session(&state.store, current).await?;
                 ping_nonce = ping_nonce.checked_add(1).context("NODE_ENDPOINT_SESSION_PING_EXHAUSTED")?;
                 let payload = ping_nonce.to_be_bytes().to_vec();
-                socket.send(Message::Ping(payload.clone())).await?;
+                send_current_message(socket, shutdown, Message::Ping(payload.clone())).await?;
                 awaiting_pong = Some(payload);
             }
             frame = socket.recv() => match frame {
@@ -234,7 +290,31 @@ async fn serve_current_session(
 
 fn accepted_message(
     permit: &NodeEndpointSessionPermit,
-    agent_version: String,
+    protocol: EndpointSessionProtocol,
+    remaining: Duration,
+) -> Result<String> {
+    match protocol {
+        EndpointSessionProtocol::AuthenticationOnlyV13 => {
+            if permit.protocol_version() != u64::from(NODE_ENDPOINT_SESSION_V1_PROTO_VERSION)
+                || permit.capability_count() != 0
+            {
+                bail!("NODE_ENDPOINT_SESSION_V1_PROFILE_MISMATCH");
+            }
+            Ok(serde_json::to_string(&accepted_message_v1(
+                permit, remaining,
+            )?)?)
+        }
+        EndpointSessionProtocol::PlanningBootstrapV14 => {
+            permit.require_planning_bootstrap_v14()?;
+            Ok(serde_json::to_string(&accepted_message_v2(
+                permit, remaining,
+            )?)?)
+        }
+    }
+}
+
+fn accepted_message_v1(
+    permit: &NodeEndpointSessionPermit,
     remaining: Duration,
 ) -> Result<NodeEndpointSessionAcceptedV1> {
     let binding = permit.binding();
@@ -247,7 +327,7 @@ fn accepted_message(
         credential_revision: binding.credential_revision(),
         credential_digest: binding.credential_digest().to_string(),
         installation_binding_digest: permit.installation_binding_digest().to_string(),
-        agent_version,
+        agent_version: permit.agent_version().to_string(),
         session_id: binding.session_id().to_string(),
         session_generation: binding.session_generation(),
         authentication_receipt_id: binding.authentication_receipt_id().to_string(),
@@ -263,6 +343,63 @@ fn accepted_message(
         expires_in_ms,
     })
     .map_err(anyhow::Error::msg)
+}
+
+fn accepted_message_v2(
+    permit: &NodeEndpointSessionPermit,
+    remaining: Duration,
+) -> Result<NodeEndpointSessionAcceptedV2> {
+    let binding = permit.binding();
+    let expires_in_ms = u64::try_from(remaining.as_millis())?;
+    NodeEndpointSessionAcceptedV2::new(NodeEndpointSessionAcceptedV2Fields {
+        agent_id: binding.agent_id().to_string(),
+        owner_user_id: permit.owner_user_id().to_string(),
+        install_id: permit.install_id().to_string(),
+        credential_id: binding.credential_id().to_string(),
+        credential_revision: binding.credential_revision(),
+        credential_digest: binding.credential_digest().to_string(),
+        installation_binding_digest: permit.installation_binding_digest().to_string(),
+        agent_version: permit.agent_version().to_string(),
+        session_id: binding.session_id().to_string(),
+        session_generation: binding.session_generation(),
+        authentication_receipt_id: binding.authentication_receipt_id().to_string(),
+        authentication_digest: binding.authentication_digest().to_string(),
+        server_instance_id: binding.server_instance_id().to_string(),
+        capabilities: NODE_ENDPOINT_SESSION_V2_CAPABILITIES
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
+        capability_set_digest: permit.capability_set_digest().to_string(),
+        authenticated_at: permit
+            .authenticated_at()
+            .to_rfc3339_opts(SecondsFormat::Nanos, true),
+        expires_at: permit
+            .expires_at()
+            .to_rfc3339_opts(SecondsFormat::Nanos, true),
+        expires_in_ms,
+    })
+    .map_err(anyhow::Error::msg)
+}
+
+async fn send_current_message(
+    socket: &mut WebSocket,
+    shutdown: &mut tokio::sync::watch::Receiver<bool>,
+    message: Message,
+) -> Result<()> {
+    if *shutdown.borrow() {
+        bail!("NODE_ENDPOINT_SESSION_SUPERSEDED_BEFORE_SEND");
+    }
+    tokio::select! {
+        biased;
+        changed = shutdown.changed() => {
+            changed.context("NODE_ENDPOINT_SESSION_SUPERVISOR_CLOSED")?;
+            bail!("NODE_ENDPOINT_SESSION_SUPERSEDED_BEFORE_SEND");
+        }
+        sent = timeout(CONTROL_FRAME_SEND_TIMEOUT, socket.send(message)) => {
+            sent.context("NODE_ENDPOINT_SESSION_CONTROL_FRAME_SEND_TIMEOUT")??;
+        }
+    }
+    Ok(())
 }
 
 fn remaining_lifetime(permit: &NodeEndpointSessionPermit) -> Result<Duration> {

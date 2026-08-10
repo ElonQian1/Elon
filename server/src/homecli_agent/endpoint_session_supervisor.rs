@@ -19,6 +19,7 @@ use super::AgentManager;
 
 mod cleanup;
 mod expiry;
+mod planning;
 pub(crate) use cleanup::NodeEndpointSessionCleanup;
 
 struct EndpointSessionEntry {

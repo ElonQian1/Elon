@@ -10,6 +10,7 @@ mod canonical_json;
 
 pub(crate) use canonical_json::{
     canonical_compute_plugin_ijson_and_sha256,
+    compute_plugin_endpoint_planning_message_json_and_digest,
     compute_plugin_install_plan_preparation_context_json_and_digest,
     compute_plugin_install_plan_preparation_observed_json_and_digest,
 };

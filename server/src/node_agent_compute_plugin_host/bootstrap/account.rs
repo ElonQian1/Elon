@@ -1,4 +1,13 @@
-use super::{ComputePluginBootstrap, ComputePluginBootstrapAccountBinding};
+use super::{
+    endpoint_provenance::ComputePluginEndpointCredentialProvenance, ComputePluginBootstrap,
+    ComputePluginBootstrapState,
+};
+
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct ComputePluginBootstrapAccountBinding {
+    pub(super) node_id: String,
+    pub(super) owner_user_id: String,
+}
 
 impl ComputePluginBootstrap {
     /// Any credential replacement is a control-authority boundary, including secret/token
@@ -12,6 +21,22 @@ impl ComputePluginBootstrap {
                 return;
             }
         };
+        let account =
+            account.map(
+                |(node_id, owner_user_id)| ComputePluginBootstrapAccountBinding {
+                    node_id: node_id.to_string(),
+                    owner_user_id: owner_user_id.to_string(),
+                },
+            );
+        self.replace_account_authority(&mut state, account, None);
+    }
+
+    pub(super) fn replace_account_authority(
+        &self,
+        state: &mut ComputePluginBootstrapState,
+        account: Option<ComputePluginBootstrapAccountBinding>,
+        endpoint_credential: Option<ComputePluginEndpointCredentialProvenance>,
+    ) {
         // The initial None -> Some login only completes Bootstrap identity binding. Once any
         // credentials were bound, logout, account replacement and same-account secret rotation
         // are terminal controller boundaries. Revoke while holding the state lock so finalize
@@ -25,13 +50,9 @@ impl ComputePluginBootstrap {
             Some(next) => state.cancellation_generation = next,
             None => state.configuration_exhausted = true,
         }
-        state.account =
-            account.map(
-                |(node_id, owner_user_id)| ComputePluginBootstrapAccountBinding {
-                    node_id: node_id.to_string(),
-                    owner_user_id: owner_user_id.to_string(),
-                },
-            );
+        state.account = account;
+        state.endpoint_credential = endpoint_credential;
+        state.endpoint_session = None;
         state.sharing_requested = false;
         state.desired_policy = None;
         state.authorization_high_water = None;

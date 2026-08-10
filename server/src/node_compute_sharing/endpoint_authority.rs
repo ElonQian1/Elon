@@ -41,8 +41,9 @@ pub(crate) use session::{
     bind_direct_tls_node_endpoint_transport, canonical_direct_tls_verifier_digest,
     canonical_node_endpoint_capability_set, seal_direct_tls_connection,
     NodeEndpointSecureTransportBinding, NodeEndpointSessionAuthenticationReceiptEnvelope,
-    NodeEndpointSessionOpenRequest, PreparedNodeEndpointSessionAuthentication,
-    VerifiedDirectTlsConnectionEvidence, VerifiedSecureNodeEndpointTransport,
+    NodeEndpointSessionOpenRequest, NodeEndpointSessionProfile,
+    PreparedNodeEndpointSessionAuthentication, VerifiedDirectTlsConnectionEvidence,
+    VerifiedSecureNodeEndpointTransport,
 };
 pub(crate) use types::{
     NodeEndpointCredentialBinding, NodeEndpointOwnerAuthorizationBasis, NodeEndpointSessionBinding,
