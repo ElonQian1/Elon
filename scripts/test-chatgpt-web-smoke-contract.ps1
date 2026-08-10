@@ -31,6 +31,8 @@ Assert-Contains 'Get-ForeignComposerLabels -Options $modelOptions'
 Assert-Contains 'Get-ForeignComposerLabels -Options $toolOptions'
 Assert-Contains 'Add-Check "composer_model_scope"'
 Assert-Contains 'Add-Check "composer_tool_scope"'
+Assert-Contains '$adaptationRequired = $matrix.adaptation_review.required -eq $true'
+Assert-Contains 'Add-Check "adaptation_review" (-not $adaptationRequired)'
 Assert-Contains 'Invoke-Adb shell input keyevent 4'
 
 if ($source.Contains('Wait-CommandResult -Action "collect_navigation" -AfterMs $beforeFeatures')) {

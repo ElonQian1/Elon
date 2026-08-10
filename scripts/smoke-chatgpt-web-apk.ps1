@@ -278,10 +278,13 @@ $matrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
 $blockingGaps = @($matrix.blocking_gaps)
 $unknownCapabilities = @($matrix.unknown_capabilities)
 $unknownSemantics = @($matrix.unknown_semantics)
+$adaptationRequired = $matrix.adaptation_review.required -eq $true
+$adaptationReasons = @($matrix.adaptation_review.reasons)
 Add-Check "capability_matrix_ready" ($matrix.ready_for_mcp -eq $true) ([string]$matrix.schema)
 Add-Check "blocking_gaps" ($blockingGaps.Count -eq 0) ($blockingGaps -join ",")
 Add-Check "unknown_capabilities" ($unknownCapabilities.Count -eq 0) ($unknownCapabilities -join ",")
 Add-Check "unknown_semantics" ($unknownSemantics.Count -eq 0) ($unknownSemantics -join ",")
+Add-Check "adaptation_review" (-not $adaptationRequired) ($adaptationReasons -join ",")
 
 $requiredSelectors = @(
     "chatgpt-native:conversation-list:",
