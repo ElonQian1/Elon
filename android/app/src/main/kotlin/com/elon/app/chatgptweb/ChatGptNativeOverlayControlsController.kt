@@ -21,7 +21,7 @@ internal class ChatGptNativeOverlayControlsController(
         val nextContextLabel = value.controls.firstOrNull {
             it.region == ChatGptWebUiRegion.OVERLAY && it.semantic == "timestamp"
         }?.label
-        val nextControls = ChatGptNativeControlPresentation.overlayActions(value.controls)
+        val nextControls = ChatGptNativeControlPresentation.pageActions(value.controls)
         val controlsChanged = nextControls.map(ChatGptWebUiControl::id) !=
             controls.map(ChatGptWebUiControl::id)
         controls = nextControls
@@ -50,7 +50,7 @@ internal class ChatGptNativeOverlayControlsController(
         setImageResource(R.drawable.ic_more_horizontal)
         imageTintList = activity.getColorStateList(R.color.elon_icon_primary)
         setPadding(dp(10), dp(10), dp(10), dp(10))
-        contentDescription = "chatgpt-overlay-actions:${controls.size}"
+        contentDescription = ChatGptNativeControlPresentation.pageActionsSelector(controls)
         tooltipText = activity.getString(R.string.chatgpt_official_page_actions)
         setOnClickListener { showActions() }
     }

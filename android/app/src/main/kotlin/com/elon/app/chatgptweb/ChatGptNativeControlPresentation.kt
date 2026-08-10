@@ -3,7 +3,7 @@ package com.elon.app.chatgptweb
 internal object ChatGptNativeControlPresentation {
     const val HEADER_ACTION_LIMIT = 2
     const val SUGGESTION_LIMIT = 4
-    const val OVERLAY_ACTION_LIMIT = 40
+    const val PAGE_ACTION_LIMIT = 40
 
     enum class Kind(val wireName: String) {
         DIRECT("direct"),
@@ -29,8 +29,9 @@ internal object ChatGptNativeControlPresentation {
         val primaryCopyIds = primaryMessageCopies(controls)
             .mapTo(mutableSetOf(), ChatGptWebUiControl::id)
         val messageActionCounts = messageActions.mapValues { it.value.size }
-        val overlayIds = overlayActions(controls).mapTo(mutableSetOf(), ChatGptWebUiControl::id)
-        val overlayTrigger = "chatgpt-overlay-actions:${overlayIds.size}"
+        val pageActions = pageActions(controls)
+        val pageActionIds = pageActions.mapTo(mutableSetOf(), ChatGptWebUiControl::id)
+        val pageActionTrigger = pageActionsSelector(pageActions)
 
         return controls.associate { control ->
             val coverage = when {
@@ -63,11 +64,11 @@ internal object ChatGptNativeControlPresentation {
                     Coverage(control.id, Kind.METADATA)
                 control.region == ChatGptWebUiRegion.OVERLAY &&
                     control.semantic in OVERLAY_DEDICATED_SEMANTICS -> overlayDedicatedCoverage(control)
-                control.id in overlayIds -> Coverage(
+                control.id in pageActionIds -> Coverage(
                     control.id,
                     Kind.MENU,
                     nativeSelector = control.accessibilityLabel,
-                    nativeTriggerSelector = overlayTrigger,
+                    nativeTriggerSelector = pageActionTrigger,
                 )
                 else -> Coverage(control.id, Kind.OFFICIAL_FALLBACK)
             }
@@ -103,13 +104,25 @@ internal object ChatGptNativeControlPresentation {
                 grouped.filter { it.id != primaryCopyId }.distinctBy(ChatGptWebUiControl::id)
             }
 
-    fun overlayActions(controls: List<ChatGptWebUiControl>): List<ChatGptWebUiControl> = controls.asSequence()
-        .filter { it.region == ChatGptWebUiRegion.OVERLAY && it.enabled }
+    fun pageActions(controls: List<ChatGptWebUiControl>): List<ChatGptWebUiControl> = controls.asSequence()
+        .filter { it.enabled }
+        .filter { it.region == ChatGptWebUiRegion.OVERLAY || it.region == ChatGptWebUiRegion.CONTENT }
         .filterNot { it.semantic == "timestamp" }
-        .filterNot { it.semantic in OVERLAY_DEDICATED_SEMANTICS }
+        .filterNot {
+            it.region == ChatGptWebUiRegion.OVERLAY && it.semantic in OVERLAY_DEDICATED_SEMANTICS
+        }
         .distinctBy(ChatGptWebUiControl::id)
-        .take(OVERLAY_ACTION_LIMIT)
+        .take(PAGE_ACTION_LIMIT)
         .toList()
+
+    fun pageActionsSelector(controls: List<ChatGptWebUiControl>): String {
+        val prefix = if (controls.any { it.region == ChatGptWebUiRegion.CONTENT }) {
+            "chatgpt-page-actions"
+        } else {
+            "chatgpt-overlay-actions"
+        }
+        return "$prefix:${controls.size}"
+    }
 
     fun messageActionsSelector(contextId: String, count: Int): String =
         "chatgpt-message-actions:${stableContextId(contextId)}:$count"

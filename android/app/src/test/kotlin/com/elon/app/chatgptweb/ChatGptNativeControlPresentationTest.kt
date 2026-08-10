@@ -77,6 +77,22 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun exposesFeaturePageContentThroughTheNativePageActionsMenu() {
+        val controls = listOf(
+            control("create", "create_asset", "创建图片", ChatGptWebUiRegion.CONTENT),
+            control("settings", "settings", "偏好设置", ChatGptWebUiRegion.CONTENT),
+        )
+
+        val actions = ChatGptNativeControlPresentation.pageActions(controls)
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(listOf("create", "settings"), actions.map(ChatGptWebUiControl::id))
+        assertEquals("menu", coverage.getValue("create").kind.wireName)
+        assertEquals("chatgpt-control:create:创建图片", coverage.getValue("create").nativeSelector)
+        assertEquals("chatgpt-page-actions:2", coverage.getValue("create").nativeTriggerSelector)
+    }
+
+    @Test
     fun exposesMediaAndReasoningAsMessageActionsWhileVoiceModeUsesOfficialFallback() {
         val controls = listOf(
             control("media", "open_media", "打开图片", ChatGptWebUiRegion.MESSAGE, CONTEXT),

@@ -142,6 +142,32 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun treatsFeaturePageContentAsNativeMenuCoverage() {
+        val contentManifest = manifest("healthy", "create_asset").copy(
+            pageKind = "feature",
+            controls = manifest("healthy", "create_asset").controls.map {
+                it.copy(region = ChatGptWebUiRegion.CONTENT)
+            },
+        )
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = contentManifest,
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        val manifest = matrix.getJSONObject("manifest")
+        assertEquals(1, manifest.getInt("native_menu_control_count"))
+        assertEquals(0, manifest.getInt("official_fallback_control_count"))
+        assertEquals(
+            "chatgpt-page-actions:1",
+            matrix.getJSONArray("control_coverage").getJSONObject(0)
+                .getString("native_trigger_content_description"),
+        )
+    }
+
+    @Test
     fun doesNotRequestAdaptationForTheHeaderTitleAlreadyRenderedByNativeUi() {
         val titleManifest = manifest("healthy", "title").copy(
             controls = manifest("healthy", "title").controls.map {

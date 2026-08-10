@@ -238,8 +238,8 @@ class ChatGptWebLabContractTest {
         )
 
         assertTrue(overlay.contains("it.semantic == \"timestamp\""))
-        assertTrue(overlay.contains("ChatGptNativeControlPresentation.overlayActions(value.controls)"))
-        assertTrue(overlay.contains("contentDescription = \"chatgpt-overlay-actions:"))
+        assertTrue(overlay.contains("ChatGptNativeControlPresentation.pageActions(value.controls)"))
+        assertTrue(overlay.contains("ChatGptNativeControlPresentation.pageActionsSelector(controls)"))
         assertTrue(overlay.contains("setOnClickListener { showActions() }"))
         assertTrue(overlay.contains("controlsChanged && dialog?.isShowing == true"))
         assertFalse(overlay.contains("controlsChanged && shouldPresent()"))
