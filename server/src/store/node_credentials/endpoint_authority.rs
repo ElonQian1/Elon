@@ -1,8 +1,7 @@
-//! Dormant Store kernels for durable node endpoint credentials and authenticated sessions.
+//! Store kernels for durable node endpoint credentials and authenticated sessions.
 //!
-//! No HTTP, WebSocket, protobuf, legacy credential, or in-memory connection path calls this
-//! module. Returned session values are durable facts only; they are not socket, routing,
-//! command, lease, or compute authority.
+//! The narrow secure-session facade returns socket-currentness permits only. Neither those permits
+//! nor any returned durable fact is routing, command, lease, Ready, or compute authority.
 
 use anyhow::Result;
 
@@ -23,6 +22,7 @@ mod legacy_currentness;
 mod owner_credential_mutation;
 mod owner_reauthentication;
 mod secret;
+mod session_permit;
 mod sessions;
 
 pub(super) use legacy_currentness::{
@@ -32,6 +32,7 @@ pub(crate) use owner_credential_mutation::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
     NodeEndpointOwnerCredentialMutationDelivery,
 };
+pub(crate) use session_permit::NodeEndpointSessionPermit;
 
 pub(in crate::store) struct NodeEndpointOwnerReauthenticationReceipt {
     envelope: NodeEndpointOwnerReauthenticationEnvelope,
@@ -141,32 +142,39 @@ impl Store {
         credentials::revoke(self, authorized)
     }
 
-    pub(in crate::store) fn authenticate_node_endpoint_session(
+    pub(crate) fn authenticate_node_endpoint_session(
         &self,
         request: &NodeEndpointSessionOpenRequest,
         transport: &VerifiedSecureNodeEndpointTransport,
-    ) -> Result<VerifiedCurrentNodeEndpointSession> {
-        sessions::authenticate(self, request, transport)
+    ) -> Result<NodeEndpointSessionPermit> {
+        let current = sessions::authenticate(self, request, transport)?;
+        NodeEndpointSessionPermit::from_verified(&current)
     }
 
-    pub(in crate::store) fn close_node_endpoint_session(
+    pub(crate) fn terminal_close_node_endpoint_session(
         &self,
-        current: &VerifiedCurrentNodeEndpointSession,
-    ) -> Result<NodeEndpointSessionHeadSnapshot> {
-        sessions::close(self, current)
+        permit: &NodeEndpointSessionPermit,
+    ) -> Result<bool> {
+        sessions::terminal_close(self, permit.binding())
     }
 
-    pub(in crate::store) fn inspect_node_endpoint_session_currentness(
+    pub(crate) fn expire_node_endpoint_session(
         &self,
-        binding: &crate::node_compute_sharing::endpoint_authority::NodeEndpointSessionBinding,
-    ) -> Result<VerifiedCurrentNodeEndpointSession> {
-        sessions::inspect_currentness(self, binding)
+        permit: &NodeEndpointSessionPermit,
+    ) -> Result<bool> {
+        sessions::expire(self, permit.binding())
     }
 
-    pub(in crate::store) fn restart_node_endpoint_sessions(
+    pub(crate) fn inspect_node_endpoint_session_currentness(
         &self,
-    ) -> Result<Vec<NodeEndpointSessionHeadSnapshot>> {
-        sessions::restart(self)
+        permit: &NodeEndpointSessionPermit,
+    ) -> Result<NodeEndpointSessionPermit> {
+        let current = sessions::inspect_currentness(self, permit.binding())?;
+        NodeEndpointSessionPermit::from_verified(&current)
+    }
+
+    pub(crate) fn restart_node_endpoint_sessions(&self) -> Result<usize> {
+        sessions::restart(self).map(|heads| heads.len())
     }
 
     pub(in crate::store) fn recover_node_endpoint_session_heads(

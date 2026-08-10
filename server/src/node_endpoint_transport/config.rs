@@ -9,6 +9,7 @@ const PRIVATE_KEY_PATH_ENV: &str = "NODE_ENDPOINT_DIRECT_TLS_PRIVATE_KEY_PATH";
 const VERIFIER_REVISION_ENV: &str = "NODE_ENDPOINT_DIRECT_TLS_VERIFIER_REVISION";
 const OWNER_CREDENTIAL_API_ENABLED_ENV: &str = "NODE_ENDPOINT_OWNER_CREDENTIAL_API_ENABLED";
 const OWNER_BOOTSTRAP_API_ENABLED_ENV: &str = "NODE_ENDPOINT_OWNER_BOOTSTRAP_API_ENABLED";
+const ENDPOINT_SESSION_API_ENABLED_ENV: &str = "NODE_ENDPOINT_SESSION_API_ENABLED";
 const MAX_IJSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 pub(super) struct DirectTlsTransportConfig {
@@ -18,6 +19,7 @@ pub(super) struct DirectTlsTransportConfig {
     pub(super) verifier_revision: u64,
     pub(super) owner_credential_api_enabled: bool,
     pub(super) owner_bootstrap_api_enabled: bool,
+    pub(super) endpoint_session_api_enabled: bool,
 }
 
 impl DirectTlsTransportConfig {
@@ -35,11 +37,20 @@ impl DirectTlsTransportConfig {
             OWNER_BOOTSTRAP_API_ENABLED_ENV,
             "NODE_ENDPOINT_OWNER_BOOTSTRAP_API_ENABLED_INVALID",
         )?;
+        let endpoint_session_api_enabled = optional_boolean_env(
+            ENDPOINT_SESSION_API_ENABLED_ENV,
+            "NODE_ENDPOINT_SESSION_API_ENABLED_INVALID",
+        )?;
         if owner_credential_api_enabled && enabled.as_deref() != Some("true") {
             bail!("NODE_ENDPOINT_OWNER_CREDENTIAL_API_DIRECT_TLS_REQUIRED");
         }
+        if endpoint_session_api_enabled && enabled.as_deref() != Some("true") {
+            bail!("NODE_ENDPOINT_SESSION_API_DIRECT_TLS_REQUIRED");
+        }
         if owner_bootstrap_api_enabled
-            && (enabled.as_deref() != Some("true") || !owner_credential_api_enabled)
+            && (enabled.as_deref() != Some("true")
+                || !owner_credential_api_enabled
+                || !endpoint_session_api_enabled)
         {
             bail!("NODE_ENDPOINT_OWNER_BOOTSTRAP_API_PREREQUISITES_REQUIRED");
         }
@@ -87,6 +98,7 @@ impl DirectTlsTransportConfig {
             verifier_revision,
             owner_credential_api_enabled,
             owner_bootstrap_api_enabled,
+            endpoint_session_api_enabled,
         }))
     }
 }

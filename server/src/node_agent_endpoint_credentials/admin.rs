@@ -78,6 +78,16 @@ pub(crate) async fn login(
         }
     };
 
+    let _bootstrap_transition = if secure_mode {
+        Some(
+            runtime
+                .endpoint_credentials
+                .lock_bootstrap_transition()
+                .await,
+        )
+    } else {
+        None
+    };
     if secure_mode {
         let Some(origin) = configured_secure_origin else {
             return error_response(
@@ -124,7 +134,7 @@ pub(crate) async fn login(
         };
 
     if secure_mode {
-        secure_bootstrap(runtime, token, password, outcome).await
+        secure_bootstrap(runtime.clone(), token, password, outcome).await
     } else {
         match outcome {
             ProvisionNodeOutcome::Legacy(credentials) => {
@@ -214,6 +224,10 @@ async fn secure_bootstrap(
 pub(crate) async fn logout(
     State(runtime): State<Arc<NodeRuntime>>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    let _bootstrap_transition = runtime
+        .endpoint_credentials
+        .lock_bootstrap_transition()
+        .await;
     let endpoint_required = runtime.endpoint_credentials.endpoint_required().await;
     if let Err(error) = runtime.endpoint_credentials.clear_secret_for_logout().await {
         return error_response(

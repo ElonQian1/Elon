@@ -133,6 +133,7 @@ impl AgentManager {
         let (result, mut cleanup) = {
             let mut agents = self.agents.write().await;
             let agent_id = preflight(&mutation_request)?;
+            let secure_session = self.detach_endpoint_session_for_authority_mutation(&agent_id)?;
             let old_entry = agents.remove(&agent_id);
             if let Some(entry) = old_entry.as_ref() {
                 let _ = entry.session_shutdown.send(true);
@@ -142,7 +143,35 @@ impl AgentManager {
                     "closing legacy agent session before endpoint-root mutation"
                 );
             }
-            let result = mutation(mutation_request);
+            if secure_session.is_some() {
+                tracing::warn!(
+                    agent_id,
+                    "closing secure endpoint session before endpoint-root mutation"
+                );
+            }
+            let mutation_result = mutation(mutation_request);
+            let terminal_result = secure_session
+                .as_ref()
+                .map(|permit| state.store.terminal_close_node_endpoint_session(permit))
+                .transpose();
+            if terminal_result.is_err() {
+                if let Some(permit) = secure_session.as_ref() {
+                    self.retry_detached_endpoint_session_terminal_close(state, permit.clone());
+                }
+            }
+            let result = match (mutation_result, terminal_result) {
+                (Ok(value), Ok(_)) => Ok(value),
+                (Ok(_), Err(error)) => Err(error),
+                (Err(error), Ok(_)) => Err(error),
+                (Err(error), Err(terminal_error)) => {
+                    tracing::error!(
+                        %terminal_error,
+                        agent_id,
+                        "endpoint mutation and exact session terminal close both failed"
+                    );
+                    Err(error)
+                }
+            };
             let mut cleanup =
                 old_entry.map(|old_entry| spawn_detached_session_cleanup(state, old_entry));
             if let Some(cleanup) = cleanup.as_mut() {

@@ -10,7 +10,8 @@ use axum::{
 use crate::types::AppState;
 
 use super::{
-    direct_tls::DirectTlsPeerAddress, evidence_slot::VerifiedSecureTransportSlot, owner_api,
+    direct_tls::DirectTlsPeerAddress, endpoint_session, evidence_slot::VerifiedSecureTransportSlot,
+    owner_api,
 };
 
 pub(super) fn build(
@@ -18,9 +19,14 @@ pub(super) fn build(
     state: Arc<AppState>,
     owner_credential_api_enabled: bool,
     owner_bootstrap_api_enabled: bool,
+    endpoint_session_api_enabled: bool,
     peer_address: DirectTlsPeerAddress,
 ) -> Router {
-    let router = Router::new().route("/agent/ws", get(reject_unwired_endpoint_session));
+    let router = if endpoint_session_api_enabled {
+        Router::new().route("/agent/ws", get(endpoint_session::session_ws))
+    } else {
+        Router::new().route("/agent/ws", get(reject_disabled_endpoint_session))
+    };
     let router = if owner_credential_api_enabled {
         router
             .route(
@@ -59,14 +65,14 @@ pub(super) fn build(
         .with_state(state)
 }
 
-async fn reject_unwired_endpoint_session(
+async fn reject_disabled_endpoint_session(
     Extension(slot): Extension<VerifiedSecureTransportSlot>,
 ) -> (StatusCode, &'static str) {
-    // Consume and immediately drop the single-use proof. Until credential issuance and the v216
-    // Store/WS bridge land together, this listener must never upgrade or reach legacy auth.
+    // Consume and immediately drop the single-use proof. A configured TLS listener must not make
+    // endpoint authentication reachable until its independent session gate is explicitly enabled.
     let _ = slot.take();
     (
         StatusCode::SERVICE_UNAVAILABLE,
-        "NODE_ENDPOINT_CREDENTIAL_BRIDGE_UNWIRED",
+        "NODE_ENDPOINT_SESSION_DISABLED",
     )
 }

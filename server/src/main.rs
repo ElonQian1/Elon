@@ -257,6 +257,7 @@ mod node_compute_plugin_sharing_migration;
 mod node_compute_reservation_migration;
 mod node_compute_sharing;
 mod node_compute_sharing_migration;
+mod node_endpoint_session_startup;
 mod node_endpoint_transport;
 mod node_exec_api;
 mod node_hardware_probe;
@@ -707,7 +708,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let state = Arc::new(AppState::new()?);
+    let state = node_endpoint_session_startup::prepare(Arc::new(AppState::new()?))?;
     codex_health::spawn_codex_network_monitor(state.clone());
     billing_lifecycle::spawn_reservation_janitor(state.clone());
     billing_monitor::spawn_reconciliation_monitor(state.clone());
@@ -717,7 +718,6 @@ async fn main() -> Result<()> {
     // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
     pc_relay_client::spawn_if_configured();
 
-    // 服务启动时：将上次运行中的频道 AI 任务标记为恢复中，而不是直接判失败。
     let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);
     if interrupted > 0 {
         info!("{} 个进行中的任务因服务器重启被标记为已中断", interrupted);

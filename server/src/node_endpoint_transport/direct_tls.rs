@@ -101,6 +101,7 @@ pub(super) struct DirectTlsServer {
     verifier: Arc<DirectTlsVerifierSeal>,
     owner_credential_api_enabled: bool,
     owner_bootstrap_api_enabled: bool,
+    endpoint_session_api_enabled: bool,
 }
 
 impl DirectTlsServer {
@@ -141,6 +142,7 @@ impl DirectTlsServer {
             verifier,
             owner_credential_api_enabled: config.owner_credential_api_enabled,
             owner_bootstrap_api_enabled: config.owner_bootstrap_api_enabled,
+            endpoint_session_api_enabled: config.endpoint_session_api_enabled,
         })
     }
 
@@ -152,6 +154,7 @@ impl DirectTlsServer {
             let state = Arc::clone(&state);
             let owner_credential_api_enabled = self.owner_credential_api_enabled;
             let owner_bootstrap_api_enabled = self.owner_bootstrap_api_enabled;
+            let endpoint_session_api_enabled = self.endpoint_session_api_enabled;
             tokio::spawn(async move {
                 if let Err(error) = serve_connection(
                     stream,
@@ -160,6 +163,7 @@ impl DirectTlsServer {
                     state,
                     owner_credential_api_enabled,
                     owner_bootstrap_api_enabled,
+                    endpoint_session_api_enabled,
                     DirectTlsPeerAddress::from_socket(peer_address),
                 )
                 .await
@@ -178,6 +182,7 @@ async fn serve_connection(
     state: Arc<AppState>,
     owner_credential_api_enabled: bool,
     owner_bootstrap_api_enabled: bool,
+    endpoint_session_api_enabled: bool,
     peer_address: DirectTlsPeerAddress,
 ) -> Result<()> {
     stream.set_nodelay(true)?;
@@ -191,13 +196,14 @@ async fn serve_connection(
         state,
         owner_credential_api_enabled,
         owner_bootstrap_api_enabled,
+        endpoint_session_api_enabled,
         peer_address,
     );
     let service = TowerToHyperService::new(app);
     let io = TokioIo::new(tls_stream);
     let mut builder = http1::Builder::new();
     builder.keep_alive(false);
-    let connection = builder.serve_connection(io, service);
+    let connection = builder.serve_connection(io, service).with_upgrades();
     timeout(SECURE_HTTP_CONNECTION_TIMEOUT, connection)
         .await
         .context("NODE_ENDPOINT_DIRECT_TLS_HTTP_TIMEOUT")??;

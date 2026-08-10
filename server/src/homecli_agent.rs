@@ -33,7 +33,6 @@ use std::{
 };
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 use uuid::Uuid;
-// ── manager state ────────────────────────────────────────────────────────────
 const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(40);
 const AGENT_DISPATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
@@ -43,37 +42,11 @@ const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_
 const DURABLE_CLI_COMPLETION_PROTO_VERSION: u32 = 5;
 const CLOUD_CONTROL_DEADLINE_PROTO_VERSION: u32 = 7;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CloudControlDispatchWindow {
-    pub(crate) issued_at: String,
-    pub(crate) ttl_ms: u64,
-}
-
-pub(crate) fn freeze_cloud_control_dispatch_window(
-    deadline: &str,
-) -> Result<CloudControlDispatchWindow> {
-    freeze_cloud_control_dispatch_window_at(deadline, chrono::Utc::now())
-}
-
-fn freeze_cloud_control_dispatch_window_at(
-    deadline: &str,
-    issued_at: chrono::DateTime<chrono::Utc>,
-) -> Result<CloudControlDispatchWindow> {
-    let deadline = chrono::DateTime::parse_from_rfc3339(deadline)
-        .map_err(|_| anyhow!("cloud authorization deadline is not valid RFC3339"))?
-        .with_timezone(&chrono::Utc);
-    let ttl_ms = deadline.signed_duration_since(issued_at).num_milliseconds();
-    if ttl_ms <= 0 {
-        return Err(anyhow!("cloud authorization deadline has expired"));
-    }
-    Ok(CloudControlDispatchWindow {
-        issued_at: issued_at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
-        ttl_ms: ttl_ms as u64,
-    })
-}
 mod android_device_host;
+mod cloud_control_dispatch_window;
 mod compute_plugin_sharing;
 mod endpoint_credential_fencing;
+mod endpoint_session_supervisor;
 mod heartbeat;
 mod journal;
 mod legacy_message_fencing;
@@ -81,7 +54,15 @@ mod legacy_session_authority;
 mod pending_recovery;
 mod session_fencing;
 mod summary;
+#[cfg(test)]
+use cloud_control_dispatch_window::freeze_cloud_control_dispatch_window_at;
+pub(crate) use cloud_control_dispatch_window::{
+    freeze_cloud_control_dispatch_window, CloudControlDispatchWindow,
+};
 pub(crate) use compute_plugin_sharing::dispatch_durable_compute_plugin_sharing_intent;
+pub(crate) use endpoint_session_supervisor::{
+    NodeEndpointSessionCleanup, NodeEndpointSessionCurrent, NodeEndpointSessionLease,
+};
 pub use summary::AgentSummary;
 #[cfg(test)]
 #[path = "homecli_agent_build_cache_tests.rs"]
@@ -168,6 +149,7 @@ impl CliPromptCancelHandle {
 #[derive(Default)]
 pub struct AgentManager {
     pub(crate) agents: RwLock<HashMap<String, AgentEntry>>,
+    endpoint_sessions: endpoint_session_supervisor::EndpointSessionSupervisor,
     recovering_cli: pending_recovery::RecoveringCliRequests,
     recovery_worker_started: AtomicBool,
 }

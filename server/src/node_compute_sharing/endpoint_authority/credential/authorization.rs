@@ -1,5 +1,7 @@
 use anyhow::{bail, Result};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Utc};
+use sha2::{Digest, Sha256};
 
 use super::prepare::{build_revocation, build_version, fresh_credential_id};
 use super::{PreparedNodeEndpointCredentialRevocation, PreparedNodeEndpointCredentialVersion};
@@ -11,9 +13,52 @@ pub(crate) struct PresentedNodeEndpointCredentialSecret {
     secret_hash: [u8; 32],
 }
 
+struct ZeroizingBytes(Vec<u8>);
+
+impl ZeroizingBytes {
+    fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+}
+
+impl Drop for ZeroizingBytes {
+    fn drop(&mut self) {
+        self.0.fill(0);
+    }
+}
+
 impl PresentedNodeEndpointCredentialSecret {
     pub(crate) fn from_secret_hash(secret_hash: [u8; 32]) -> Self {
         Self { secret_hash }
+    }
+
+    pub(crate) fn from_endpoint_bearer(endpoint_bearer: String) -> Result<Self> {
+        let endpoint_bearer = ZeroizingBytes(endpoint_bearer.into_bytes());
+        if endpoint_bearer.0.len() != 43 || !endpoint_bearer.as_slice().is_ascii() {
+            bail!("NODE_ENDPOINT_CREDENTIAL_BEARER_INVALID");
+        }
+        let decoded = ZeroizingBytes(
+            URL_SAFE_NO_PAD
+                .decode(endpoint_bearer.as_slice())
+                .map_err(|_| anyhow::anyhow!("NODE_ENDPOINT_CREDENTIAL_BEARER_INVALID"))?,
+        );
+        let mut canonical = ZeroizingBytes(vec![0_u8; 43]);
+        let encoded_len = URL_SAFE_NO_PAD
+            .encode_slice(decoded.as_slice(), canonical.as_mut_slice())
+            .map_err(|_| anyhow::anyhow!("NODE_ENDPOINT_CREDENTIAL_BEARER_INVALID"))?;
+        if decoded.0.len() != 32
+            || encoded_len != endpoint_bearer.0.len()
+            || canonical.as_slice() != endpoint_bearer.as_slice()
+        {
+            bail!("NODE_ENDPOINT_CREDENTIAL_BEARER_INVALID");
+        }
+        Ok(Self {
+            secret_hash: Sha256::digest(endpoint_bearer.as_slice()).into(),
+        })
     }
 
     pub(crate) fn secret_hash(&self) -> &[u8; 32] {

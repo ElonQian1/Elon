@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
+use homecli_proto::NODE_ENDPOINT_SESSION_PROTO_VERSION;
 use serde::{Deserialize, Serialize};
 
 use super::canonical::{
@@ -29,16 +30,65 @@ const MAX_CAPABILITIES: usize = 256;
 
 pub(crate) struct NodeEndpointSessionOpenRequest {
     agent_id: String,
+    owner_user_id: String,
+    install_id: String,
+    credential_id: String,
+    credential_revision: u64,
+    credential_digest: String,
     session_id: String,
     server_instance_id: String,
     protocol_version: u64,
     agent_version: String,
     capabilities: Vec<String>,
     presented_secret: PresentedNodeEndpointCredentialSecret,
-    authenticated_at: DateTime<Utc>,
 }
 
 impl NodeEndpointSessionOpenRequest {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
+        agent_id: String,
+        owner_user_id: String,
+        install_id: String,
+        credential_id: String,
+        credential_revision: u64,
+        credential_digest: String,
+        session_id: String,
+        server_instance_id: String,
+        protocol_version: u64,
+        agent_version: String,
+        presented_secret: String,
+    ) -> Result<Self> {
+        if !bounded_identifier(&agent_id, 160)
+            || !bounded_identifier(&owner_user_id, 160)
+            || !bounded_identifier(&install_id, 512)
+            || !bounded_identifier(&credential_id, 160)
+            || !safe_positive(credential_revision)
+            || !is_sha256(&credential_digest)
+            || !bounded_identifier(&session_id, 160)
+            || !bounded_identifier(&server_instance_id, 160)
+            || protocol_version != u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION)
+            || !bounded_identifier(&agent_version, 160)
+        {
+            bail!("NODE_ENDPOINT_SESSION_OPEN_REQUEST_INVALID");
+        }
+        Ok(Self {
+            agent_id,
+            owner_user_id,
+            install_id,
+            credential_id,
+            credential_revision,
+            credential_digest,
+            session_id,
+            server_instance_id,
+            protocol_version,
+            agent_version,
+            capabilities: Vec::new(),
+            presented_secret: PresentedNodeEndpointCredentialSecret::from_endpoint_bearer(
+                presented_secret,
+            )?,
+        })
+    }
+
     pub(crate) fn agent_id(&self) -> &str {
         &self.agent_id
     }
@@ -51,43 +101,46 @@ impl NodeEndpointSessionOpenRequest {
     pub(crate) fn presented_secret(&self) -> &PresentedNodeEndpointCredentialSecret {
         &self.presented_secret
     }
-    pub(crate) fn authenticated_at(&self) -> DateTime<Utc> {
-        self.authenticated_at
-    }
-
     pub(crate) fn prepare(
         &self,
         credential: &NodeEndpointCredentialBinding,
         predecessor: Option<&NodeEndpointSessionHeadSnapshot>,
         transport: &VerifiedSecureNodeEndpointTransport,
+        authenticated_at: DateTime<Utc>,
         recorded_at: DateTime<Utc>,
     ) -> Result<PreparedNodeEndpointSessionAuthentication> {
         credential.validate()?;
         transport.binding().validate()?;
         if credential.status() != "active"
             || credential.agent_id() != self.agent_id
+            || credential.owner_user_id() != self.owner_user_id
+            || credential.install_id() != self.install_id
+            || credential.credential_id() != self.credential_id
+            || credential.credential_revision() != self.credential_revision
+            || credential.credential_digest() != self.credential_digest
             || transport.server_instance_id() != self.server_instance_id
             || !bounded_identifier(&self.session_id, 160)
             || !bounded_identifier(&self.server_instance_id, 160)
-            || !safe_positive(self.protocol_version)
+            || self.protocol_version != u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION)
             || !bounded_identifier(&self.agent_version, 160)
+            || !self.capabilities.is_empty()
         {
             bail!("NODE_ENDPOINT_SESSION_OPEN_REQUEST_INVALID");
         }
         ensure_time_order(
             transport.verified_at(),
-            self.authenticated_at,
+            authenticated_at,
             "NODE_ENDPOINT_TRANSPORT_VERIFIED_AFTER_AUTHENTICATION",
         )?;
         if transport
             .verified_at()
             .checked_add_signed(Duration::seconds(MAX_TRANSPORT_AUTHENTICATION_AGE_SECONDS))
-            .is_none_or(|deadline| self.authenticated_at > deadline)
+            .is_none_or(|deadline| authenticated_at > deadline)
         {
             bail!("NODE_ENDPOINT_TRANSPORT_AUTHENTICATION_WINDOW_EXPIRED");
         }
         ensure_time_order(
-            self.authenticated_at,
+            authenticated_at,
             recorded_at,
             "NODE_ENDPOINT_AUTHENTICATED_AFTER_RECORDED",
         )?;
@@ -137,8 +190,7 @@ impl NodeEndpointSessionOpenRequest {
                 server_instance_id: &self.server_instance_id,
             },
         )?;
-        let expires_at = self
-            .authenticated_at
+        let expires_at = authenticated_at
             .checked_add_signed(Duration::minutes(SESSION_LIFETIME_MINUTES))
             .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_EXPIRY_OVERFLOW"))?;
         let envelope = NodeEndpointSessionAuthenticationReceiptEnvelope {
@@ -162,7 +214,7 @@ impl NodeEndpointSessionOpenRequest {
             capability_count: capabilities.len() as u64,
             capability_set_digest,
             transport: transport.binding().clone(),
-            authenticated_at: utc_nanos(self.authenticated_at),
+            authenticated_at: utc_nanos(authenticated_at),
             expires_at: utc_nanos(expires_at),
             recorded_at: utc_nanos(recorded_at),
         };
@@ -305,7 +357,7 @@ impl NodeEndpointSessionAuthenticationReceiptEnvelope {
             || !safe_positive(self.session_generation)
             || !bounded_identifier(&self.server_instance_id, 160)
             || self.authentication_method != "bearer_sha256"
-            || !safe_positive(self.protocol_version)
+            || self.protocol_version != u64::from(NODE_ENDPOINT_SESSION_PROTO_VERSION)
             || !bounded_identifier(&self.agent_version, 160)
             || self.capability_count > MAX_CAPABILITIES as u64
             || !is_sha256(&self.capability_set_digest)

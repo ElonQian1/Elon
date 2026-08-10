@@ -1,5 +1,3 @@
-// server/src/node_agent_main.rs
-
 #![recursion_limit = "256"]
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
@@ -103,6 +101,7 @@ mod node_agent_cli_runner;
 mod node_agent_data_root;
 mod node_agent_download_router;
 mod node_agent_endpoint_credentials;
+mod node_agent_endpoint_session;
 mod node_agent_env;
 use node_agent_cli_runner::*;
 pub use node_agent_cli_runner::{prepare_cli_prompt_cwd, PreparedCliPromptCwd};
@@ -364,7 +363,7 @@ pub(crate) use node_agent_cli_prompt_runner::{
 async fn run_loop(runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);
     loop {
-        if node_agent_endpoint_credentials::wait_if_legacy_connection_forbidden(&runtime).await {
+        if node_agent_endpoint_session::run_if_required(&runtime, &mut backoff).await {
             continue;
         }
         let (creds, credential_epoch) = runtime.credential_session().await;

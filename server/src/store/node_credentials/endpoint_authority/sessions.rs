@@ -27,11 +27,14 @@ pub(super) fn authenticate(
         let credential = stored.credential_binding()?;
         credentials::verify_bound_secret_on(&transaction, &credential, request.presented_secret())?;
         let predecessor = predecessor_for_receipt_on(&transaction, stored.envelope())?;
+        let authenticated_at = parse_timestamp(stored.envelope().authenticated_at())?;
+        let recorded_at = parse_timestamp(stored.recorded_at())?;
         let prepared = request.prepare(
             &credential,
             predecessor.as_ref(),
             transport,
-            parse_timestamp(stored.recorded_at())?,
+            authenticated_at,
+            recorded_at,
         )?;
         stored.ensure_exact(&prepared)?;
         let current = current_session_on(&transaction, &stored.session_binding()?, true)?;
@@ -48,7 +51,30 @@ pub(super) fn authenticate(
     if let Some(previous) = predecessor.as_ref() {
         validate_head_on(&transaction, previous)?;
     }
-    let prepared = request.prepare(&credential, predecessor.as_ref(), transport, Utc::now())?;
+    let authenticated_floor = predecessor
+        .as_ref()
+        .map(|head| {
+            parse_timestamp(head.updated_at())?
+                .checked_add_signed(Duration::nanoseconds(1))
+                .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_AUTHENTICATED_AT_EXHAUSTED"))
+        })
+        .transpose()?;
+    let observed_at = Utc::now();
+    let authenticated_at = match authenticated_floor {
+        Some(floor) => std::cmp::max(observed_at, floor),
+        None => observed_at,
+    };
+    let recorded_floor = authenticated_at
+        .checked_add_signed(Duration::nanoseconds(1))
+        .ok_or_else(|| anyhow::anyhow!("NODE_ENDPOINT_SESSION_RECORDED_AT_EXHAUSTED"))?;
+    let recorded_at = std::cmp::max(Utc::now(), recorded_floor);
+    let prepared = request.prepare(
+        &credential,
+        predecessor.as_ref(),
+        transport,
+        authenticated_at,
+        recorded_at,
+    )?;
 
     if let Some(previous) = predecessor.as_ref().filter(|head| head.state() == "active") {
         head_rows::terminate_exact_head_on(
@@ -69,24 +95,20 @@ pub(super) fn authenticate(
     Ok(current)
 }
 
-pub(super) fn close(
-    store: &Store,
-    current: &VerifiedCurrentNodeEndpointSession,
-) -> Result<NodeEndpointSessionHeadSnapshot> {
+pub(super) fn terminal_close(store: &Store, binding: &NodeEndpointSessionBinding) -> Result<bool> {
     let mut connection = store.conn()?;
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    let binding = current.head().binding();
-    current_session_on(&transaction, binding, false)?;
-    let closed_at = next_timestamp(current.head().updated_at())?;
-    let closed = head_rows::terminate_exact_head_on(
-        &transaction,
-        binding,
-        "closed",
-        &closed_at,
-        "secure_transport_closed",
-    )?;
+    let changed = terminate_exact_current_on(&transaction, binding, false)?;
     transaction.commit()?;
-    Ok(closed)
+    Ok(changed)
+}
+
+pub(super) fn expire(store: &Store, binding: &NodeEndpointSessionBinding) -> Result<bool> {
+    let mut connection = store.conn()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let changed = terminate_exact_current_on(&transaction, binding, true)?;
+    transaction.commit()?;
+    Ok(changed)
 }
 
 pub(super) fn inspect_currentness(
@@ -201,6 +223,32 @@ fn current_session_on(
     ensure_head_receipt_projection(&head, &receipt)?;
     credentials::require_current_binding_on(connection, &receipt.credential_binding()?)?;
     Ok(verified_session(receipt.into_envelope(), head, replayed))
+}
+
+fn terminate_exact_current_on(
+    transaction: &Transaction<'_>,
+    binding: &NodeEndpointSessionBinding,
+    expiry_only: bool,
+) -> Result<bool> {
+    let Some(head) = head_rows::head_by_agent_on(transaction, binding.agent_id())? else {
+        return Ok(false);
+    };
+    if head.binding() != binding || head.state() != "active" {
+        return Ok(false);
+    }
+    validate_head_on(transaction, &head)?;
+    let expired = parse_timestamp(head.expires_at())? <= Utc::now();
+    if expiry_only && !expired {
+        return Ok(false);
+    }
+    let closed_at = next_timestamp(head.updated_at())?;
+    let (state, reason) = if expired {
+        ("stale", "session_expired")
+    } else {
+        ("closed", "secure_transport_closed")
+    };
+    head_rows::terminate_exact_head_on(transaction, binding, state, &closed_at, reason)?;
+    Ok(true)
 }
 
 fn ensure_head_receipt_projection(

@@ -7,7 +7,7 @@ mod endpoint_authority;
 mod legacy_registration;
 pub(crate) use endpoint_authority::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
-    NodeEndpointOwnerCredentialMutationDelivery,
+    NodeEndpointOwnerCredentialMutationDelivery, NodeEndpointSessionPermit,
 };
 pub(crate) use legacy_registration::{
     LegacyNodeEndpointAuthority, LegacyNodeRegistrationOutcome, LegacyNodeRegistrationRequest,

@@ -1,7 +1,8 @@
-//! Optional direct-TLS ingress for endpoint credential ownership and future endpoint sessions.
+//! Optional direct-TLS ingress for endpoint credential ownership and compute-inert sessions.
 //!
-//! The owner API can atomically issue or mutate a versioned endpoint credential. The node-session
-//! route remains compute-inert: it never upgrades a WebSocket, publishes Ready, or dispatches work.
+//! The owner API can atomically issue or mutate a versioned endpoint credential. The independently
+//! gated node-session route can authenticate a durable WebSocket binding, but it never publishes
+//! Ready, registers compute presence, or dispatches work.
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -14,6 +15,7 @@ use crate::types::AppState;
 
 mod config;
 mod direct_tls;
+mod endpoint_session;
 mod evidence_slot;
 mod owner_api;
 mod secure_router;

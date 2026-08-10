@@ -1,16 +1,11 @@
-use std::sync::Arc;
-use std::time::Duration;
-
 use anyhow::Result;
 use tracing::{info, warn};
 
+use super::EndpointCredentialManager;
 use crate::node_agent_config::{
     initial_credentials, load_persisted, save_persisted, Credentials, NodeConfig, PersistedState,
 };
 use crate::node_agent_registration::{provision_node, ProvisionNodeOutcome};
-use crate::NodeRuntime;
-
-use super::EndpointCredentialManager;
 
 pub(crate) async fn load_and_bind(config: &mut NodeConfig) -> Result<EndpointCredentialManager> {
     let credentials = EndpointCredentialManager::load_default()?;
@@ -20,22 +15,6 @@ pub(crate) async fn load_and_bind(config: &mut NodeConfig) -> Result<EndpointCre
         crate::node_agent_proxy::ensure_cloud_no_proxy(origin, origin);
     }
     Ok(credentials)
-}
-
-pub(crate) async fn wait_if_legacy_connection_forbidden(runtime: &Arc<NodeRuntime>) -> bool {
-    if runtime.cfg.endpoint_https_origin.is_none()
-        && !runtime.endpoint_credentials.endpoint_required().await
-    {
-        return false;
-    }
-    runtime
-        .set_connected(
-            false,
-            "安全 endpoint 模式已固定；legacy WebSocket 已禁用，等待 WSS/Register 协议接线",
-        )
-        .await;
-    let _ = tokio::time::timeout(Duration::from_secs(2), runtime.wake.notified()).await;
-    true
 }
 
 pub(crate) fn clear_legacy_credentials_before_startup(
