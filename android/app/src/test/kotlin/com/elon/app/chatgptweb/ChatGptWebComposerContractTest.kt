@@ -14,12 +14,18 @@ class ChatGptWebComposerContractTest {
         val adapter = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_composer.js",
         )
+        val optionPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_composer_option_policy.js",
+        )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
         val pageAdapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
         )
 
-        assertTrue(pageAdapter.contains("chatgpt_web_adapter_composer.js"))
+        val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
+        val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
+        assertTrue(policyAsset >= 0)
+        assertTrue(composerAsset > policyAsset)
         assertTrue(core.contains("composerAdapter.capabilities(findComposer())"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
@@ -31,13 +37,18 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
         assertTrue(adapter.contains("dismiss_composer_menu"))
+        assertTrue(adapter.contains("optionPolicy.filter(section, candidates)"))
+        assertTrue(optionPolicy.contains("isForeignMenuLabel"))
+        assertTrue(optionPolicy.contains("return []"))
         assertTrue(adapter.contains("readAttachments"))
         assertTrue(adapter.contains("removeAttachment"))
         assertTrue(adapter.contains("dictationActive"))
         assertFalse(adapter.contains("input.click()"))
         assertTrue(adapter.contains("选项已过期"))
-        listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
-            assertFalse("composer adapter must not contain $it", adapter.contains(it))
+        listOf(adapter, optionPolicy).forEach { source ->
+            listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
+                assertFalse("composer adapter must not contain $it", source.contains(it))
+            }
         }
     }
 

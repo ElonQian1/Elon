@@ -4,6 +4,7 @@
   if (window.__elonChatGptComposer || location.origin !== 'https://chatgpt.com') return;
 
   const MAX_OPTIONS = 30;
+  const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
@@ -218,21 +219,27 @@
 
   function collectOptions(section, baseline) {
     const seen = new Map();
-    return visibleOptionNodes().filter((node) => !baseline || !baseline.has(node)).map((node) => {
+    const candidates = visibleOptionNodes().filter((node) => !baseline || !baseline.has(node)).map((node) => {
       const label = nodeLabel(node).slice(0, 120);
       if (!label) return null;
       const occurrence = seen.get(label) || 0;
       seen.set(label, occurrence + 1);
+      const role = String(node.getAttribute('role') || 'menuitem').slice(0, 32);
+      const selected = node.getAttribute('aria-checked') === 'true' ||
+        node.getAttribute('aria-selected') === 'true' ||
+        node.getAttribute('data-state') === 'checked';
       return {
         id: optionId(section, label, occurrence),
         label,
-        selected: node.getAttribute('aria-checked') === 'true' ||
-          node.getAttribute('aria-selected') === 'true' ||
-          node.getAttribute('data-state') === 'checked',
-        kind: String(node.getAttribute('role') || 'menuitem').slice(0, 32),
+        selected,
+        kind: role,
+        role,
+        selectable: selected || node.hasAttribute('aria-checked') || node.hasAttribute('aria-selected'),
         node
       };
-    }).filter(Boolean).slice(0, MAX_OPTIONS);
+    }).filter(Boolean);
+    if (!optionPolicy || typeof optionPolicy.filter !== 'function') return [];
+    return optionPolicy.filter(section, candidates).slice(0, MAX_OPTIONS);
   }
 
   function waitForOptions(section, baseline, onReady, onTimeout) {

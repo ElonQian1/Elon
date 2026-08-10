@@ -3,7 +3,7 @@
 
   if (location.origin !== 'https://chatgpt.com') return;
 
-  const adapterVersion = 6;
+  const adapterVersion = 7;
   if (window.__elonChatGptAdapterVersion === adapterVersion) return;
 
   const previousBridge = window.__elonChatGptBridge;
@@ -14,6 +14,7 @@
   [
     '__elonChatGptConversations',
     '__elonChatGptMessages',
+    '__elonChatGptComposerOptionPolicy',
     '__elonChatGptComposer',
     '__elonChatGptNavigation',
     '__elonChatGptLayout',
