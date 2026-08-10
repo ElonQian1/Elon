@@ -36,3 +36,7 @@ pub(crate) fn migration_v160(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "open_commerce_data_erasure_evidence_migration_tests.rs"]
+mod tests;
