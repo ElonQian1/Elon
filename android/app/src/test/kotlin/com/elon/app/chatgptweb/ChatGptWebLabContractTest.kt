@@ -242,6 +242,9 @@ class ChatGptWebLabContractTest {
         val overlay = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeOverlayControlsController.kt"
         )
+        val controlDialog = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeControlDialog.kt"
+        )
 
         assertTrue(overlay.contains("it.semantic == \"timestamp\""))
         assertTrue(overlay.contains("ChatGptNativeControlPresentation.pageActions(value.controls)"))
@@ -255,6 +258,8 @@ class ChatGptWebLabContractTest {
             )
         )
         assertFalse(overlay.contains("setMessage"))
+        assertTrue(controlDialog.contains("override fun isEnabled(position: Int)"))
+        assertTrue(controlDialog.contains("textView.isEnabled = control.enabled"))
         assertFalse(activity.contains("shouldPresent ="))
     }
 

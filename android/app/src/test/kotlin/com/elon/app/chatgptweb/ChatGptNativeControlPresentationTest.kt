@@ -42,7 +42,7 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
-    fun exposesTwoHeaderActionsAndReportsOverflowAsOfficialFallback() {
+    fun exposesTwoHeaderActionsAndMovesOverflowIntoTheNativeMenu() {
         val controls = listOf(
             control("more", "more", "更多", ChatGptWebUiRegion.HEADER),
             control("sources", "sources", "文件和来源", ChatGptWebUiRegion.HEADER),
@@ -56,8 +56,12 @@ class ChatGptNativeControlPresentationTest {
         assertEquals("direct", coverage.getValue("sources").kind.wireName)
         assertEquals(true, ChatGptNativeControlPresentation.usesHeaderIcon(controls[1]))
         assertEquals(false, ChatGptNativeControlPresentation.usesHeaderIcon(controls[0]))
-        assertEquals("official_fallback", coverage.getValue("future").kind.wireName)
-        assertNull(coverage.getValue("future").nativeSelector)
+        assertEquals("menu", coverage.getValue("future").kind.wireName)
+        assertEquals("chatgpt-control:future:未来动作", coverage.getValue("future").nativeSelector)
+        assertEquals(
+            "chatgpt-overflow-actions:1",
+            coverage.getValue("future").nativeTriggerSelector,
+        )
     }
 
     @Test
@@ -90,6 +94,48 @@ class ChatGptNativeControlPresentationTest {
         assertEquals("menu", coverage.getValue("create").kind.wireName)
         assertEquals("chatgpt-control:create:创建图片", coverage.getValue("create").nativeSelector)
         assertEquals("chatgpt-page-actions:2", coverage.getValue("create").nativeTriggerSelector)
+    }
+
+    @Test
+    fun coversEveryBoundedFeatureControlIncludingDisabledEntries() {
+        val controls = (1..48).map { index ->
+            control(
+                id = "feature_$index",
+                semantic = "action",
+                label = "功能 $index",
+                region = ChatGptWebUiRegion.CONTENT,
+                enabled = index != 48,
+            )
+        }
+
+        val actions = ChatGptNativeControlPresentation.pageActions(controls)
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(48, actions.size)
+        assertEquals(false, actions.last().enabled)
+        assertEquals(48, coverage.values.count { it.kind.wireName == "menu" })
+        assertEquals("chatgpt-page-actions:48", coverage.getValue("feature_48").nativeTriggerSelector)
+    }
+
+    @Test
+    fun movesSuggestionOverflowIntoTheNativeMenu() {
+        val controls = (1..5).map { index ->
+            control(
+                id = "suggestion_$index",
+                semantic = "suggestion",
+                label = "建议 $index",
+                region = ChatGptWebUiRegion.SUGGESTIONS,
+            )
+        }
+
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(4, ChatGptNativeControlPresentation.suggestions(controls).size)
+        assertEquals("menu", coverage.getValue("suggestion_5").kind.wireName)
+        assertEquals(
+            "chatgpt-overflow-actions:1",
+            coverage.getValue("suggestion_5").nativeTriggerSelector,
+        )
     }
 
     @Test
@@ -159,13 +205,14 @@ class ChatGptNativeControlPresentationTest {
         label: String,
         region: String,
         contextId: String? = null,
+        enabled: Boolean = true,
     ) = ChatGptWebUiControl(
         id = id,
         semantic = semantic,
         label = label,
         region = region,
         role = "button",
-        enabled = true,
+        enabled = enabled,
         selected = false,
         contextId = contextId,
     )

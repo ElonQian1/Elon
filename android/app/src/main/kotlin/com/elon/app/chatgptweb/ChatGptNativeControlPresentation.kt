@@ -3,7 +3,7 @@ package com.elon.app.chatgptweb
 internal object ChatGptNativeControlPresentation {
     const val HEADER_ACTION_LIMIT = 2
     const val SUGGESTION_LIMIT = 4
-    const val PAGE_ACTION_LIMIT = 40
+    const val PAGE_ACTION_LIMIT = 160
 
     enum class Kind(val wireName: String) {
         DIRECT("direct"),
@@ -104,22 +104,37 @@ internal object ChatGptNativeControlPresentation {
                 grouped.filter { it.id != primaryCopyId }.distinctBy(ChatGptWebUiControl::id)
             }
 
-    fun pageActions(controls: List<ChatGptWebUiControl>): List<ChatGptWebUiControl> = controls.asSequence()
-        .filter { it.enabled }
-        .filter { it.region == ChatGptWebUiRegion.OVERLAY || it.region == ChatGptWebUiRegion.CONTENT }
-        .filterNot { it.semantic == "timestamp" }
-        .filterNot {
-            it.region == ChatGptWebUiRegion.OVERLAY && it.semantic in OVERLAY_DEDICATED_SEMANTICS
-        }
-        .distinctBy(ChatGptWebUiControl::id)
-        .take(PAGE_ACTION_LIMIT)
-        .toList()
+    fun pageActions(controls: List<ChatGptWebUiControl>): List<ChatGptWebUiControl> {
+        val directHeaderIds = headerActions(controls).mapTo(mutableSetOf(), ChatGptWebUiControl::id)
+        val directSuggestionIds = suggestions(controls).mapTo(mutableSetOf(), ChatGptWebUiControl::id)
+        return controls.asSequence()
+            .filter { control ->
+                when (control.region) {
+                    ChatGptWebUiRegion.CONTENT,
+                    ChatGptWebUiRegion.OVERLAY -> true
+                    ChatGptWebUiRegion.HEADER ->
+                        control.id !in directHeaderIds &&
+                            control.semantic !in HEADER_DEDICATED_SEMANTICS &&
+                            control.semantic != "title"
+                    ChatGptWebUiRegion.SUGGESTIONS ->
+                        control.id !in directSuggestionIds && control.semantic == "suggestion"
+                    else -> false
+                }
+            }
+            .filterNot { it.semantic == "timestamp" }
+            .filterNot {
+                it.region == ChatGptWebUiRegion.OVERLAY && it.semantic in OVERLAY_DEDICATED_SEMANTICS
+            }
+            .distinctBy(ChatGptWebUiControl::id)
+            .take(PAGE_ACTION_LIMIT)
+            .toList()
+    }
 
     fun pageActionsSelector(controls: List<ChatGptWebUiControl>): String {
-        val prefix = if (controls.any { it.region == ChatGptWebUiRegion.CONTENT }) {
-            "chatgpt-page-actions"
-        } else {
-            "chatgpt-overlay-actions"
+        val prefix = when {
+            controls.any { it.region == ChatGptWebUiRegion.CONTENT } -> "chatgpt-page-actions"
+            controls.any { it.region == ChatGptWebUiRegion.OVERLAY } -> "chatgpt-overlay-actions"
+            else -> "chatgpt-overflow-actions"
         }
         return "$prefix:${controls.size}"
     }

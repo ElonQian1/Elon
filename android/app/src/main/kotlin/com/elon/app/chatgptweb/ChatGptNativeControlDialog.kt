@@ -31,6 +31,8 @@ internal object ChatGptNativeControlDialog {
         context: Context,
         private val controls: List<ChatGptWebUiControl>,
     ) : ArrayAdapter<ChatGptWebUiControl>(context, android.R.layout.simple_list_item_1, controls) {
+        override fun isEnabled(position: Int): Boolean = controls[position].enabled
+
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val textView = (convertView ?: LayoutInflater.from(context)
                 .inflate(android.R.layout.simple_list_item_1, parent, false)) as TextView
@@ -38,7 +40,11 @@ internal object ChatGptNativeControlDialog {
             textView.text = control.label
             textView.contentDescription = control.accessibilityLabel
             textView.tag = control.id
+            textView.isEnabled = control.enabled
+            textView.alpha = if (control.enabled) 1f else DISABLED_ALPHA
             return textView
         }
     }
+
+    private const val DISABLED_ALPHA = 0.45f
 }
