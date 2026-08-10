@@ -59,6 +59,7 @@ import type {
 } from './openCommerceClientTypes'
 import type {
   InvokeOpenCommerceCapability,
+  OpenCommerceActionCancellation,
   OpenCommerceActionConfirmation,
 } from './openCommerceTypes'
 
@@ -521,7 +522,7 @@ export const openCommerceClientApi = {
     ),
 
   cancelActionConfirmation: (appId: string, confirmationId: string) =>
-    api.postWithHeaders<OpenCommerceActionConfirmation>(
+    api.postWithHeaders<OpenCommerceActionCancellation>(
       `/api/open-commerce/action-confirmations/${encodeURIComponent(confirmationId)}/cancel`,
       { confirmation_phrase: 'CANCEL_ACTION' },
       { 'x-elon-app-id': appId },
@@ -542,7 +543,7 @@ export const openCommerceClientApi = {
     ),
 
   developerCancelActionConfirmation: (testToken: string, confirmationId: string) =>
-    api.postWithHeaders<OpenCommerceActionConfirmation>(
+    api.postWithHeaders<OpenCommerceActionCancellation>(
       `/api/open-commerce/developer/action-confirmations/${encodeURIComponent(confirmationId)}/cancel`,
       { confirmation_phrase: 'CANCEL_ACTION' },
       { Authorization: `Bearer ${testToken}` },

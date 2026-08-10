@@ -132,6 +132,7 @@ const actionConfirmationService = read('server/src/open_commerce_action_confirma
 const actionConfirmationStore = read('server/src/store/open_commerce_action_confirmations.rs')
 const actionConfirmationMigration = read('server/src/open_commerce_action_confirmation_migration.rs')
 const actionConfirmationMcp = read('server/src/open_commerce_action_confirmation_mcp.rs')
+const actionConfirmationApi = read('server/src/open_commerce_action_confirmation_api.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -172,6 +173,13 @@ assert.ok(actionConfirmationStore.includes('MAX_ACTIVE_ACTION_CONFIRMATIONS_PER_
 assert.ok(actionConfirmationMigration.includes('idx_open_commerce_action_confirmations_invocation'), 'one confirmation must bind at most one invocation')
 assert.ok(actionConfirmationMcp.includes('open_commerce_prepare_action_confirmation'), 'MCP actions must use the same confirmation preparation service')
 assert.ok(actionConfirmationMcp.includes('open_commerce_confirm_action_confirmation'), 'MCP must expose a separate explicit confirmation step')
+assert.ok(actionConfirmationMcp.includes('open_commerce_get_my_action_confirmation'), 'MCP must expose actor-bound confirmation recovery')
+assert.ok(actionConfirmationMcp.includes('open_commerce_cancel_my_action_confirmation'), 'MCP must expose explicit cancellation before invocation')
+assert.ok(actionConfirmationApi.includes('/:confirmation_id/cancel'), 'HTTP consumers and developer apps must have cancellation routes')
+assert.ok(consumer.includes('cancelActionConfirmation'), 'consumer pending actions must remain explicitly cancelable')
+assert.ok(merchantEditor.includes('cancelActionConfirmation'), 'merchant test actions must remain explicitly cancelable')
+assert.ok(developerPortal.includes('developerCancelActionConfirmation'), 'developer test actions must remain explicitly cancelable')
+assert.ok(clientApi.includes('OpenCommerceActionCancellation'), 'PC clients must distinguish cancellation from database expiry state')
 assert.ok(invocationSchemaField.includes('createCapabilityFieldValue'), 'array fields must support bounded repeatable items')
 assert.ok(invocationSchemaModel.includes('MAX_CAPABILITY_FORM_ITEMS = 50'), 'schema forms must bound repeated items')
 assert.ok(invocationSchemaModel.includes('没有可呈现的字段定义'), 'unrenderable required fields must fail closed')

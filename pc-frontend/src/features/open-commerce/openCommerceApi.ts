@@ -6,6 +6,7 @@ import type {
   CreateOpenCommerceIntegration,
   CreateOpenCommerceMerchant,
   InvokeOpenCommerceCapability,
+  OpenCommerceActionCancellation,
   OpenCommerceActionConfirmation,
   OpenCommerceCapability,
   OpenCommerceCapabilitySourceLink,
@@ -98,7 +99,7 @@ export const openCommerceApi = {
     ),
 
   cancelActionConfirmation: (confirmationId: string) =>
-    api.post<OpenCommerceActionConfirmation>(
+    api.post<OpenCommerceActionCancellation>(
       `/api/open-commerce/action-confirmations/${encodeURIComponent(confirmationId)}/cancel`,
       { confirmation_phrase: 'CANCEL_ACTION' },
     ),

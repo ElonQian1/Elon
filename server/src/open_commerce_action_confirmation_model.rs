@@ -1,3 +1,4 @@
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -33,6 +34,43 @@ pub(crate) struct OpenCommerceActionConfirmation {
     pub consumed_at: Option<String>,
     pub canceled_at: Option<String>,
     pub invocation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct OpenCommerceActionCancellationResponse {
+    pub schema: &'static str,
+    pub confirmation_id: String,
+    pub merchant_id: String,
+    pub capability_key: String,
+    pub requester_app_id: String,
+    pub status: &'static str,
+    pub canceled_at: String,
+    pub invocation_created: bool,
+    pub next_step: &'static str,
+}
+
+impl TryFrom<OpenCommerceActionConfirmation> for OpenCommerceActionCancellationResponse {
+    type Error = anyhow::Error;
+
+    fn try_from(confirmation: OpenCommerceActionConfirmation) -> Result<Self> {
+        let Some(canceled_at) = confirmation.canceled_at else {
+            bail!("动作确认没有主动取消证据");
+        };
+        if confirmation.invocation_id.is_some() {
+            bail!("已创建调用的动作确认不能投影为取消成功");
+        }
+        Ok(Self {
+            schema: "open_commerce.consumer_action_confirmation_cancellation.v1",
+            confirmation_id: confirmation.id,
+            merchant_id: confirmation.merchant_id,
+            capability_key: confirmation.capability_key,
+            requester_app_id: confirmation.requester_app_id,
+            status: "canceled",
+            canceled_at,
+            invocation_created: false,
+            next_step: "stop",
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]

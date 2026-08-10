@@ -565,6 +565,18 @@ export interface OpenCommerceActionConfirmation {
   canceled_at?: string
 }
 
+export interface OpenCommerceActionCancellation {
+  schema: 'open_commerce.consumer_action_confirmation_cancellation.v1'
+  confirmation_id: string
+  merchant_id: string
+  capability_key: string
+  requester_app_id: string
+  status: 'canceled'
+  canceled_at: string
+  invocation_created: false
+  next_step: 'stop'
+}
+
 export interface UpsertOpenCommerceRateLimit {
   merchant_id: string
   capability_key: string

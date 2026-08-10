@@ -7,7 +7,8 @@ use serde_json::{json, Value};
 
 use crate::{
     open_commerce_action_confirmation_model::{
-        ACTION_CANCELLATION_PHRASE, ACTION_CONFIRMATION_PHRASE,
+        OpenCommerceActionCancellationResponse, ACTION_CANCELLATION_PHRASE,
+        ACTION_CONFIRMATION_PHRASE,
     },
     open_commerce_action_confirmation_service,
     open_commerce_model::InvokeCapabilityRequest,
@@ -225,17 +226,9 @@ pub(crate) async fn call_if_handled(
                 &input.confirmation_id,
                 &input.confirmation_phrase,
             )?;
-            Ok(Some(json!({
-                "schema":"open_commerce.consumer_action_confirmation_cancellation.v1",
-                "confirmation_id":confirmation.id,
-                "merchant_id":confirmation.merchant_id,
-                "capability_key":confirmation.capability_key,
-                "requester_app_id":confirmation.requester_app_id,
-                "status":"canceled",
-                "canceled_at":confirmation.canceled_at,
-                "invocation_created":false,
-                "next_step":"stop"
-            })))
+            Ok(Some(serde_json::to_value(
+                OpenCommerceActionCancellationResponse::try_from(confirmation)?,
+            )?))
         }
         PREPARE_ACTION_CONFIRMATION => {
             let input: InvokeArguments = decode(arguments, name)?;

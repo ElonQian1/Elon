@@ -9,7 +9,9 @@ use axum::{
 };
 
 use crate::{
-    open_commerce_action_confirmation_model::ConfirmActionConfirmationRequest,
+    open_commerce_action_confirmation_model::{
+        ConfirmActionConfirmationRequest, OpenCommerceActionCancellationResponse,
+    },
     open_commerce_action_confirmation_service,
     open_commerce_developer_model::DeveloperInvokeRequest,
     open_commerce_model::{normalize_app_id, InvokeCapabilityRequest},
@@ -107,16 +109,19 @@ async fn cancel_authenticated(
         Ok(value) => value,
         Err(response) => return response,
     };
-    service_response(open_commerce_action_confirmation_service::cancel(
-        &state.store,
-        &OpenCommerceActor {
-            user_id: &user_id,
-            app_id: &app_id,
-            project_role: None,
-        },
-        &confirmation_id,
-        &request.confirmation_phrase,
-    ))
+    service_response(
+        open_commerce_action_confirmation_service::cancel(
+            &state.store,
+            &OpenCommerceActor {
+                user_id: &user_id,
+                app_id: &app_id,
+                project_role: None,
+            },
+            &confirmation_id,
+            &request.confirmation_phrase,
+        )
+        .and_then(OpenCommerceActionCancellationResponse::try_from),
+    )
 }
 
 async fn prepare_developer(
@@ -245,16 +250,19 @@ async fn cancel_developer(
     if let Err(error) = credential.ensure_runtime_access(&capability.handler_type) {
         return service_error(error);
     }
-    service_response(open_commerce_action_confirmation_service::cancel(
-        &state.store,
-        &OpenCommerceActor {
-            user_id: &app.owner_user_id,
-            app_id: &app.app_id,
-            project_role: None,
-        },
-        &confirmation_id,
-        &request.confirmation_phrase,
-    ))
+    service_response(
+        open_commerce_action_confirmation_service::cancel(
+            &state.store,
+            &OpenCommerceActor {
+                user_id: &app.owner_user_id,
+                app_id: &app.app_id,
+                project_role: None,
+            },
+            &confirmation_id,
+            &request.confirmation_phrase,
+        )
+        .and_then(OpenCommerceActionCancellationResponse::try_from),
+    )
 }
 
 fn authenticated_actor_identity(
