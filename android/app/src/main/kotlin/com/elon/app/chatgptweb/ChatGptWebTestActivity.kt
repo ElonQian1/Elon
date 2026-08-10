@@ -65,7 +65,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 binding.chatGptNativeComposer.setSelection(text.length)
             },
             sendInput = { binding.chatGptNativeSend.performClick() },
-            invokeControl = pageAdapter::invokeUiControl,
+            invokeControl = ::invokeUiControl,
             newConversation = pageAdapter::startNewConversation,
             stopGeneration = pageAdapter::stopGeneration,
             cancelDictation = pageAdapter::cancelDictation,
@@ -155,7 +155,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
             onRegenerate = { pageAdapter.regenerateResponse() },
-            onInvokeControl = { pageAdapter.invokeUiControl(it) },
+            onInvokeControl = ::invokeUiControl,
             onOpenOfficialOutput = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )
         composerToolsController = ChatGptNativeComposerToolsController(
@@ -179,7 +179,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         voiceController = ChatGptNativeVoiceController(
             button = binding.chatGptNativeDictation,
             onToggle = {
-                audioPermissionController.runWithMicrophone(pageAdapter::startDictation)
+                audioPermissionController.runWithMicrophone(::startDictation)
             },
         )
         conversationListController = ChatGptNativeConversationListController(
@@ -204,13 +204,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             headerActions = binding.chatGptNativeHeaderActions,
             suggestions = binding.chatGptNativeSuggestions,
             onSuggestionsVisibleChanged = nativeController::setSuggestionsVisible,
-            onInvoke = { pageAdapter.invokeUiControl(it) },
+            onInvoke = ::invokeUiControl,
         )
         overlayControlsController = ChatGptNativeOverlayControlsController(
             activity = this,
             headerActionsScroll = binding.chatGptNativeHeaderActionsScroll,
             headerActions = binding.chatGptNativeHeaderActions,
-            onInvoke = { pageAdapter.invokeUiControl(it) },
+            onInvoke = ::invokeUiControl,
         )
         pageAdapter = ChatGptWebPageAdapter(
             context = this,
@@ -380,6 +380,26 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         }
     }
 
+    private fun startDictation() {
+        prepareDictationStart()
+        pageAdapter.startDictation()
+    }
+
+    private fun invokeUiControl(id: String) {
+        if (latestUiManifest?.controls?.firstOrNull { it.id == id }?.semantic == ChatGptWebUiSemantics.DICTATION) {
+            prepareDictationStart()
+        }
+        pageAdapter.invokeUiControl(id)
+    }
+
+    private fun prepareDictationStart() {
+        val attempt = dictationSessionController.onStartRequested() ?: return
+        binding.chatGptWebView.postDelayed(
+            { dictationSessionController.onStartTimedOut(attempt) },
+            DICTATION_START_TIMEOUT_MS,
+        )
+    }
+
     private fun showLoading(url: String) {
         pageAdapter.onPageStarted(url)
         loginController.onPageStarted(url)
@@ -435,6 +455,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 if (event.value.title.isNotBlank()) binding.chatGptWebHost.text = event.value.title
             }
             is ChatGptWebEvent.CommandResult -> {
+                if (!event.ok && event.action in DICTATION_START_ACTIONS) {
+                    dictationSessionController.onStartFailed()
+                }
                 if (googleAccountHintController.onCommandResult(event)) return
                 if (conversationListController.onCommandResult(event)) return
                 if (featureHubController.onCommandResult(event)) return
@@ -636,6 +659,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
         const val ADAPTIVE_CONTROL_SETTLE_MS = 360L
+        const val DICTATION_START_TIMEOUT_MS = 4_000L
+        val DICTATION_START_ACTIONS = setOf("start_dictation", "invoke_ui_control")
 
         fun createProductIntent(context: Context): Intent =
             Intent(context, ChatGptWebTestActivity::class.java).putExtra(EXTRA_PRODUCT_ENTRY, true)

@@ -15,7 +15,7 @@ class ChatGptWebCapabilityMatrixTest {
                     ChatGptWebCapabilityId.CURRENT_CONVERSATION,
                 ),
             ),
-            manifest = manifest("healthy", "action"),
+            manifest = manifest("partial", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
             mode = ChatGptWebModeController.Mode.NATIVE,
         )

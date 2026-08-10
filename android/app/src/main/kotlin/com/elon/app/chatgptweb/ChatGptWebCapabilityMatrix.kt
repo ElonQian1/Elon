@@ -45,7 +45,11 @@ internal object ChatGptWebCapabilityMatrix {
                 snapshot.dictationActive.not()
             ) add("composer_not_ready")
             if (manifest == null) add("manifest_unavailable")
-            if (manifest != null && manifest.compatibility != "healthy") add("manifest_${manifest.compatibility}")
+            if (
+                manifest != null &&
+                manifest.compatibility != "healthy" &&
+                snapshot?.dictationActive != true
+            ) add("manifest_${manifest.compatibility}")
         }
         val reviewReasons = buildList {
             if (semantics[ChatGptWebUiSemantics.GENERIC_ACTION].orZero() > 0) {

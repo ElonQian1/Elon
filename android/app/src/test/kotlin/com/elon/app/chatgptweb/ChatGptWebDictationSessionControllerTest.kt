@@ -15,9 +15,13 @@ class ChatGptWebDictationSessionControllerTest {
             restoreNative = { mode = "native" },
         )
 
-        controller.onSnapshot(true)
+        controller.onStartRequested()
         assertEquals("official", mode)
 
+        controller.onSnapshot(false)
+        assertEquals("official", mode)
+
+        controller.onSnapshot(true)
         controller.onSnapshot(false)
         assertEquals("native", mode)
     }
@@ -48,6 +52,58 @@ class ChatGptWebDictationSessionControllerTest {
         assertEquals(1, cancellations)
         controller.onSnapshot(false)
         assertFalse(controller.handleBack())
+    }
+
+    @Test
+    fun failedOrTimedOutStartRestoresTheRememberedNativeMode() {
+        var mode = "native"
+        val controller = controller(
+            isNative = { mode == "native" },
+            showOfficial = { mode = "official" },
+            restoreNative = { mode = "native" },
+        )
+
+        val attempt = controller.onStartRequested() ?: error("attempt missing")
+        assertEquals("official", mode)
+        controller.onStartTimedOut(attempt)
+        assertEquals("native", mode)
+    }
+
+    @Test
+    fun staleTimeoutCannotCancelANewerStartAttempt() {
+        var mode = "native"
+        val controller = controller(
+            isNative = { mode == "native" },
+            showOfficial = { mode = "official" },
+            restoreNative = { mode = "native" },
+        )
+
+        val first = controller.onStartRequested() ?: error("first attempt missing")
+        controller.onStartFailed()
+        val second = controller.onStartRequested() ?: error("second attempt missing")
+        controller.onStartTimedOut(first)
+
+        assertEquals("official", mode)
+        controller.onStartTimedOut(second)
+        assertEquals("native", mode)
+    }
+
+    @Test
+    fun backDuringPendingStartRestoresNativeWithoutCancellingAnInactiveRecorder() {
+        var mode = "native"
+        var cancellations = 0
+        val controller = controller(
+            isNative = { mode == "native" },
+            showOfficial = { mode = "official" },
+            restoreNative = { mode = "native" },
+            cancel = { cancellations += 1 },
+        )
+
+        controller.onStartRequested()
+
+        assertTrue(controller.handleBack())
+        assertEquals("native", mode)
+        assertEquals(0, cancellations)
     }
 
     private fun controller(
