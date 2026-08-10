@@ -94,6 +94,8 @@ class ChatGptWebLabContractTest {
         assertTrue(messages.contains("function fencedCode"))
         assertTrue(messages.contains("function tableMarkdown"))
         assertTrue(messages.contains("function structuredParts"))
+        assertTrue(messages.contains("FILE_PATH_EXTENSION"))
+        assertFalse(messages.contains("/\\.[a-z0-9]{2,8}$/i.test(path)"))
         assertTrue(messages.contains("lastStructuredTypes"))
         assertTrue(messages.contains("lastComplexOutput"))
         assertTrue(messages.contains("table, pre, blockquote, ol, ul"))

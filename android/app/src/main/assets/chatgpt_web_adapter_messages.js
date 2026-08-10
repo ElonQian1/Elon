@@ -6,6 +6,7 @@
   const MAX_MESSAGES = 80;
   const MAX_MESSAGE_LENGTH = 40000;
   const MAX_STRUCTURED_PARTS = 16;
+  const FILE_PATH_EXTENSION = /\.(?:pdf|docx?|xlsx?|csv|pptx?|txt|md|json|xml|ya?ml|zip|rar|7z|tar|gz|png|jpe?g|gif|webp|svg|mp3|wav|m4a|ogg|mp4|mov|webm)$/i;
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
 
@@ -140,7 +141,9 @@
       node.getAttribute('aria-label'),
       node.getAttribute('title')
     ].filter(Boolean).join(' ')).toLowerCase();
-    const isFile = !!node.getAttribute('download') || /\.[a-z0-9]{2,8}$/i.test(path) || /download|file|attachment/.test(metadata);
+    const isFile = !!node.getAttribute('download') ||
+      FILE_PATH_EXTENSION.test(path) ||
+      /download|file|attachment/.test(metadata);
     return {
       type: isFile ? 'file' : 'citation',
       text: structuredLabel(node, isFile ? '文件' : '引用')
