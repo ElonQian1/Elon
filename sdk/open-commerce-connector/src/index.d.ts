@@ -659,7 +659,10 @@ export interface MerchantRuntimeEnvelope {
   capability_key: string
   requester_user_id: string
   requester_app_id: string
+  credential_environment: string
+  credential_id: string | null
   grant_id?: string | null
+  action_confirmation_id: string | null
   idempotency_key: string
   issued_at_unix: number
   input: Record<string, unknown>
@@ -671,7 +674,10 @@ export interface MerchantRuntimeHandlerContext {
   capabilityKey: string
   requesterUserId: string
   requesterAppId: string
+  credentialEnvironment: string
+  credentialId: string | null
   grantId?: string | null
+  actionConfirmationId: string | null
   idempotencyKey: string
   issuedAtUnix: number
 }
@@ -679,7 +685,11 @@ export interface MerchantRuntimeHandlerContext {
 export interface MerchantRuntimeIdempotencyInput {
   merchantId: string
   requesterAppId: string
+  requesterUserId: string
+  credentialEnvironment: string
+  credentialId: string | null
   capabilityKey: string
+  actionConfirmationId: string | null
   idempotencyKey: string
   invocationId: string
   requestHash: string

@@ -35,7 +35,7 @@ export function createMerchantRuntime(options) {
   )
   const idempotencyStore = options.idempotencyStore
   expectIdempotencyStore(idempotencyStore)
-  const manifest = Object.freeze({
+  const manifest = deepFreeze({
     schema: MERCHANT_RUNTIME_MANIFEST_SCHEMA,
     merchant_id: merchantId,
     protocol: 'yilong.open_commerce.runtime.v1',
@@ -56,6 +56,7 @@ export function createMerchantRuntime(options) {
 
   async function handleInvoke({ headers, body, nowUnix = Math.floor(Date.now() / 1_000) }) {
     let claimInput
+    let ownsClaim = false
     try {
       const bytes = bodyBytes(body)
       verifySignature(headers, bytes, { keyId, secret, nowUnix, maxClockSkewSeconds })
@@ -67,7 +68,7 @@ export function createMerchantRuntime(options) {
       if (authorized.has(envelope.capability_key) && !nonEmpty(envelope.grant_id)) {
         reject(401, 'signature_rejected', 'authorized capability requires a platform grant')
       }
-      if (envelope.capability_key === 'order.commit') validateOrderConfirmation(envelope.input)
+      if (envelope.capability_key === 'order.commit') validateOrderConfirmation(envelope)
 
       claimInput = idempotencyInput(envelope)
       const claim = await idempotencyStore.claim(claimInput)
@@ -84,6 +85,7 @@ export function createMerchantRuntime(options) {
       if (claim?.status !== 'claimed') {
         reject(500, 'idempotency_store_error', 'idempotency store returned an unsupported claim state')
       }
+      ownsClaim = true
 
       const result = envelope.capability_key === 'system.health'
         ? { merchant_id: merchantId, status: 'ok', manifest_sha256: manifestSha256 }
@@ -93,9 +95,10 @@ export function createMerchantRuntime(options) {
       if (completed !== true) {
         reject(409, 'idempotency_ownership_lost', 'idempotent invocation ownership changed before completion')
       }
+      ownsClaim = false
       return successEnvelope(envelope, result)
     } catch (error) {
-      if (claimInput) {
+      if (ownsClaim) {
         try {
           await idempotencyStore.release(claimInput)
         } catch {
@@ -123,6 +126,9 @@ async function invokeHandler(handlers, envelope) {
     requesterUserId: envelope.requester_user_id,
     requesterAppId: envelope.requester_app_id,
     grantId: envelope.grant_id,
+    actionConfirmationId: envelope.action_confirmation_id,
+    credentialEnvironment: envelope.credential_environment,
+    credentialId: envelope.credential_id,
     idempotencyKey: envelope.idempotency_key,
     issuedAtUnix: envelope.issued_at_unix,
   }))
@@ -141,9 +147,16 @@ function parseEnvelope(bytes, merchantId) {
   if (value.schema !== MERCHANT_RUNTIME_REQUEST_SCHEMA) {
     reject(400, 'invalid_request', 'runtime envelope schema is unsupported')
   }
-  if (value.merchant_id !== merchantId) {
+  let normalizedMerchantId
+  try {
+    normalizedMerchantId = expectIdentifier(value.merchant_id, 'runtime envelope.merchant_id', 2, 160)
+  } catch {
+    reject(400, 'invalid_request', 'runtime envelope merchant_id is invalid')
+  }
+  if (normalizedMerchantId !== merchantId) {
     reject(400, 'merchant_mismatch', 'runtime envelope merchant does not match this runtime')
   }
+  const normalized = { ...value, merchant_id: normalizedMerchantId }
   for (const [field, min, max] of [
     ['invocation_id', 3, 160],
     ['capability_key', 2, 128],
@@ -152,7 +165,7 @@ function parseEnvelope(bytes, merchantId) {
     ['idempotency_key', 8, 120],
   ]) {
     try {
-      expectIdentifier(value[field], `runtime envelope.${field}`, min, max)
+      normalized[field] = expectIdentifier(value[field], `runtime envelope.${field}`, min, max)
     } catch {
       reject(400, 'invalid_request', `runtime envelope ${field} is invalid`)
     }
@@ -160,17 +173,37 @@ function parseEnvelope(bytes, merchantId) {
   if (!Number.isInteger(value.issued_at_unix)) {
     reject(400, 'invalid_request', 'runtime envelope issued_at_unix must be an integer')
   }
-  if (value.grant_id !== null && value.grant_id !== undefined) {
+  normalized.issued_at_unix = value.issued_at_unix
+  try {
+    normalized.credential_environment = expectIdentifier(
+      value.credential_environment,
+      'runtime envelope.credential_environment',
+      2,
+      32,
+    )
+  } catch {
+    reject(400, 'invalid_request', 'runtime envelope credential_environment is invalid')
+  }
+  for (const [field, min, max] of [
+    ['credential_id', 2, 160],
+    ['grant_id', 2, 160],
+    ['action_confirmation_id', 8, 120],
+  ]) {
+    if (value[field] === null || value[field] === undefined) {
+      normalized[field] = null
+      continue
+    }
     try {
-      expectIdentifier(value.grant_id, 'runtime envelope.grant_id', 2, 160)
+      normalized[field] = expectIdentifier(value[field], `runtime envelope.${field}`, min, max)
     } catch {
-      reject(400, 'invalid_request', 'runtime envelope grant_id is invalid')
+      reject(400, 'invalid_request', `runtime envelope ${field} is invalid`)
     }
   }
   if (!value.input || Array.isArray(value.input) || typeof value.input !== 'object') {
     reject(400, 'invalid_request', 'runtime envelope input must be an object')
   }
-  return value
+  normalized.input = value.input
+  return normalized
 }
 
 function idempotencyInput(envelope) {
@@ -179,13 +212,20 @@ function idempotencyInput(envelope) {
     capability_key: envelope.capability_key,
     requester_user_id: envelope.requester_user_id,
     requester_app_id: envelope.requester_app_id,
+    credential_environment: envelope.credential_environment,
+    credential_id: envelope.credential_id,
     grant_id: envelope.grant_id ?? null,
+    action_confirmation_id: envelope.action_confirmation_id,
     input: envelope.input,
   }
   return Object.freeze({
     merchantId: envelope.merchant_id,
     requesterAppId: envelope.requester_app_id,
+    requesterUserId: envelope.requester_user_id,
+    credentialEnvironment: envelope.credential_environment,
+    credentialId: envelope.credential_id,
     capabilityKey: envelope.capability_key,
+    actionConfirmationId: envelope.action_confirmation_id,
     idempotencyKey: envelope.idempotency_key,
     invocationId: envelope.invocation_id,
     requestHash: digest(stableJson(logical)),
@@ -283,11 +323,8 @@ function expectIdempotencyStore(store) {
   }
 }
 
-function validateOrderConfirmation(input) {
-  if (input.confirmed_by_user !== true
-    || typeof input.confirmation_id !== 'string'
-    || input.confirmation_id.trim().length < 8
-    || input.confirmation_id.trim().length > 120) {
+function validateOrderConfirmation(envelope) {
+  if (!nonEmpty(envelope.action_confirmation_id)) {
     reject(400, 'confirmation_required', 'order.commit requires explicit user confirmation')
   }
 }
@@ -366,6 +403,12 @@ function sortValue(value) {
   if (Array.isArray(value)) return value.map(sortValue)
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortValue(value[key])]))
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value
+  for (const item of Object.values(value)) deepFreeze(item)
+  return Object.freeze(value)
 }
 
 function reject(status, errorCode, message) {
