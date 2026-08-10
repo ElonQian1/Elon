@@ -26,7 +26,7 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain open-commerce-consumer-discovery -- test --manifest-path server\Cargo.toml open_commerce_consumer_discovery_mcp::discovery_tests -- --nocapture
 ```
 
-发现验证指纹：`c4e4975aa3f812cf78875a22f68d1e98e3c1b3b1ee08fec9536b8fe9e0c31c7e`。
+发现验证指纹：`7275ca6676ce32c5c9f23f00029fc3d7291c4643278ffc9fd2136c3adf7087f4`。
 
 授权申请回归指纹：`0cb3f3464d6f68dc0b4ae57cb25974b1d1ee23be138bd98fe94e4a75a0a418e6`。
 
