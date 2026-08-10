@@ -1,7 +1,7 @@
 ---
 title: 分布式算力节点客户端与按需插件
 status: current
-reviewed_at: 2026-08-09
+reviewed_at: 2026-08-10
 owners: node, pc
 ---
 
@@ -133,6 +133,8 @@ endpoint 路径另以 v14 `planning_snapshot_bootstrap_only` profile重放 shari
 
 这只是 PlanApply live-binding 的必要前置，不是可用 planning context。A1 已形成未编译的 sealed handle-bound、同一只读事务 projector 源码合同：它从同一个 already-opened connection 闭合 policy/revocation、catalog/keyring、inventory/profile、installed/promotion、可选 exact work-admission 与 rollback，输出不可复制的本机 custody；不使用 legacy path facade、测试 VFS、多事务缓存或裸标量。生产 open/VFS/process fence/root/trusted-time/rollback/node-profile 均不可达，没有 producer。严格依赖顺序与禁线见 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md)，VFS/目录细节见 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md)。当前继续保持零 PlanApply、零下载、零安装、零 Sidecar。
 
+A2 又只形成未编译、未运行的 test-only SHM map/lock/unmap、WAL-main 联合关闭与同 namespace 多 Connection static contract/source；既有 69 项 SQLite 成功路径不覆盖该增量，动态 Windows 平台故障和竞争证据仍缺。精确矩阵见 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md)；测试 VFS 不得提升为生产入口。
+
 因此本地管理状态仍如实报告根锁、生产可信时间 authority、生产回滚见证、root pin、authority open 和 process fence 均未建立，并明确 `downloads_allowed=false`、`new_work_admission_enabled=false`。运行中切换数据根会销毁休眠计划并要求重启；关闭共享不会建目录、开库、执行 DDL、下载、解包或启动进程。未来即使意愿为开启，也仍必须取得精确匹配该授权的 signed `InstallPlan`、完成本机确认与全部准入门卫，才能进入任何下载副作用。
 
 ## 10. 模型与缓存
@@ -159,4 +161,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 13. 当前未验证声明
 
-本文是已接受的客户端目标设计。NodeAgent legacy Host seam、Manifest/InstallPlan、本机 authority/PlanApply、受管 fetch/verification/staging、健康与失败 cleanup 合同已形成代码；v216 新增的 v7 installed/promotion 双回执、线性 Store/recovery 与 retained-handle custody 已随节点编译，v7 authority 全新安装、重开及 v3-v6 原子迁移等 11 项测试通过。v217 新增的 v8 work-admission、authenticated PlanApply barrier、线性 Store/recovery 与 retained-handle fresh rehash 目前仅形成源码，尚未编译、迁移或运行验证，也未接入生产 Bootstrap/Host。生产磁盘迁移、完整 promotion/work-admission 事务夹具、生产时间源、真实 downloader、跨重启 custody、Sidecar/IPC/沙箱、Host enforcement、Runtime 健康、Ready 上报和调度仍未实现；节点不直接发布商业 Offer。精确物化、健康和清理边界见 `node-plugin-archive-extraction.md`、`node-ready-capability.md` 与 `node-plugin-candidate-cleanup.md`。
+本文是已接受的客户端目标设计。NodeAgent legacy Host seam、Manifest/InstallPlan、本机 authority/PlanApply、受管 fetch/verification/staging、健康与失败 cleanup 合同已形成代码；v216 的 v7 installed/promotion 增量已随节点编译并通过 11 项版本链测试。v217/v218 的 v8 work-admission、authenticated PlanApply barrier、retained-handle fresh rehash 与 Planning A1 仍未编译、迁移或运行；A2 也只有未编译、未运行的 test-only static contract/source，没有平台故障或多 Connection 动态证据。生产 open/VFS、磁盘迁移、完整事务夹具、生产时间源、downloader、跨重启 custody、Sidecar/IPC/沙箱、Host enforcement、Runtime、Ready 和调度仍不可达；节点不直接发布商业 Offer。精确边界见 `node-plugin-archive-extraction.md`、`node-ready-capability.md`、`node-plugin-candidate-cleanup.md` 与 `node-plugin-vfs-fault-authority.md`。

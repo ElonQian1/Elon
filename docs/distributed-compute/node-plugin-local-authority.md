@@ -1,7 +1,7 @@
 ---
 title: 节点插件本机权威库与下载栅栏
 status: current
-reviewed_at: 2026-08-09
+reviewed_at: 2026-08-10
 owners: node, security
 ---
 
@@ -196,6 +196,6 @@ enabled 必须使 authorization revision/digest 精确等于 policy，disabled �
 
 `user_version=6` 另铺设Control-signed Manifest catalog binding与catalog-aware rollback V2：仅空库存、无活动候选owner或prepared work时可追加目录头；V1/V2证据不互转。精确签名、回执、时间和迁移合同见[`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md)。
 
-这仍不是生产planning context：A1已形成未编译的sealed、handle-bound同事务projector源码合同；生产open/VFS/process/root/time/rollback与producer不可达，legacy path禁止参与。v14永久blocked-only，ready另建v15；详见[`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md)。cleanup只允许已耐久授权的`cleanup_pending`线性custody保活exact authority/root/process与retained handles。全部ready/side-effect标志为false，无Host、PlanApply、下载或准入。
+这仍不是生产planning context：A1只有未编译的sealed同事务projector；A2只有未编译、未运行的test-only SHM/联合close/多Connection static contract/source，见[`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md)与[`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md)。生产open/VFS/process/root/time/rollback/producer仍不可达，v14永久blocked-only，ready另建v15；无Host、PlanApply、下载、准入或任何ready/side-effect。
 
 当前供应链、候选健康与失败候选清理 sequence 1–4 已通过 `elon-pc-node` 编译；候选清理链通过 3 项 Windows 同句柄删除、1 项目录顺序、4 项 completion、5 项 topology builder/Store、4 项首 intent builder/Store、3 项强 disposition、4 项 disposition event builder/Store，以及 sequence 3/4 各 4 项 builder/SQLite exact-row 测试，合计 32 项，另有 1 项 topology/journal schema 建库与重开测试。新增 8 项只证明 hash-chain、时间/绑定拒绝、NULL/durability 列精确回读和列篡改失败关闭，不证明真实 parent-relative OS 观察、authority/owner fresh/recovery 全事务或 native namespace barrier。仍没有 retained custody → cleanup authorization → topology → intent → physical disposition → disposition Store → parent observation → absence Store → namespace barrier → namespace Store 的完整事务夹具。cleanup authorization Store 可推进 `cleanup_pending`，topology Store 可封存 exact execution plan，intent Store 可独立提交第一个物理动作前置授权，私有单对象 executor 可消费该 capability并保留物理结果 custody，disposition、absence 与 namespace durability Store 可分别独立持久化 sequence 2/3/4 并分类不确定提交；这些入口均没有 Host 调用方。由于安全 mutation fence 构造器、后续 ordinal 和 terminal journal producer 仍缺，终态 capability 不可构造，完整私有流水线尚不可达。当前仍未接入生产 Host 或生产本地库，不能授予生产重试、安装、promotion、ReadyCapability 或商业 Verification。v216 本机 install/promotion 双回执增量已随节点编译并通过 v7 schema 版本链测试；生产磁盘迁移和完整 promotion 事务夹具仍待动态验证，多对象 handle-tree 收口、跨重启物理恢复、真实下载/Sidecar/探针、GC、work-admission、Runtime/Ready 与 Attempt 接线仍待实现。精确边界见 `node-ready-capability.md` 与 `node-plugin-candidate-cleanup.md`。
