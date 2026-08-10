@@ -102,6 +102,9 @@ expectEqual(policy.classify({
   pathname: '/', region: 'overlay', signal: 'Account owner Pro'
 }), 'plan', 'account pro plan');
 expectEqual(policy.classify({
+  pathname: '/', region: 'overlay', signal: 'account menuitem', label: 'Example User Pro'
+}), 'plan', 'account tier row');
+expectEqual(policy.classify({
   pathname: '/', region: 'content', signal: 'Manage subscription'
 }), '', 'account semantics stay overlay scoped');
 expectEqual(policy.classify({
