@@ -47,6 +47,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private var latestSnapshot: ChatGptWebSnapshot? = null
     private var latestUiManifest: ChatGptWebUiManifest? = null
+    private val sessionContinuity = ChatGptWebSessionContinuity()
     private val observedMcpState = ChatGptWebObservedState()
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var latestMode = ChatGptWebModeController.Mode.QUICK
@@ -433,17 +434,21 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             }
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
             is ChatGptWebEvent.Snapshot -> {
-                latestSnapshot = event.value
-                nativeController.render(event.value)
-                composerToolsController.render(event.value)
-                attachmentController.render(event.value)
-                voiceController.render(event.value)
-                dictationSessionController.onSnapshot(event.value.dictationActive)
-                conversationListController.renderCapabilities(event.value.capabilities)
-                featureHubController.renderCapabilities(event.value.capabilities)
+                val snapshot = sessionContinuity.reconcile(event.value)
+                latestSnapshot = snapshot
+                nativeController.render(snapshot)
+                composerToolsController.render(snapshot)
+                attachmentController.render(snapshot)
+                voiceController.render(snapshot)
+                dictationSessionController.onSnapshot(snapshot.dictationActive)
+                conversationListController.renderCapabilities(snapshot.capabilities)
+                featureHubController.renderCapabilities(snapshot.capabilities)
                 if (
-                    event.value.authenticated &&
-                    (event.value.composerReady || event.value.messages.isNotEmpty() || event.value.dictationActive)
+                    snapshot.authenticated &&
+                    (
+                        snapshot.composerReady || snapshot.messages.isNotEmpty() ||
+                            snapshot.dictationActive || snapshot.pageKind == "feature"
+                    )
                 ) {
                     googleAccountHintController.onAuthenticated()
                     pageAdapter.markReady()
@@ -453,7 +458,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 } else {
                     pageAdapter.markLoginRequired()
                 }
-                if (event.value.title.isNotBlank()) binding.chatGptWebHost.text = event.value.title
+                if (snapshot.title.isNotBlank()) binding.chatGptWebHost.text = snapshot.title
             }
             is ChatGptWebEvent.CommandResult -> {
                 if (!event.ok && event.action in DICTATION_START_ACTIONS) {
@@ -596,6 +601,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         modeController.select(ChatGptWebModeController.Mode.QUICK)
         loginController.reset()
         googleAccountHintController.reset()
+        sessionContinuity.clear()
         cookieManager.removeAllCookies {
             cookieManager.flush()
             WebStorage.getInstance().deleteAllData()

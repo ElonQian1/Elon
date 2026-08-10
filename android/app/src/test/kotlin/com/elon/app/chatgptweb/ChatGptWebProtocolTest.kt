@@ -40,6 +40,8 @@ class ChatGptWebProtocolTest {
                 "url":"https://chatgpt.com/c/example",
                 "draft":"继续补充",
                 "authenticated":true,
+                "pageKind":"conversation",
+                "loginRequired":false,
                 "composerReady":true,
                 "streaming":false,
                 "currentModel":"5.6 Sol 轻度",
@@ -67,6 +69,8 @@ class ChatGptWebProtocolTest {
         assertEquals("测试会话", event.value.title)
         assertEquals("继续补充", event.value.draft)
         assertTrue(event.value.authenticated)
+        assertEquals("conversation", event.value.pageKind)
+        assertFalse(event.value.loginRequired)
         assertTrue(event.value.composerReady)
         assertFalse(event.value.streaming)
         assertEquals("5.6 Sol 轻度", event.value.currentModel)
@@ -81,6 +85,16 @@ class ChatGptWebProtocolTest {
         assertEquals("生成的图片", event.value.messages.last().parts.first().label)
         assertTrue(event.value.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST))
         assertFalse(event.value.capabilities.supports("invalid capability"))
+    }
+
+    @Test
+    fun boundsAuthenticationEvidenceFromSnapshots() {
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"message_snapshot","url":"https://chatgpt.com/tasks","pageKind":"unsupported","loginRequired":true}}""",
+        ) as ChatGptWebEvent.Snapshot
+
+        assertEquals("unknown", event.value.pageKind)
+        assertTrue(event.value.loginRequired)
     }
 
     @Test

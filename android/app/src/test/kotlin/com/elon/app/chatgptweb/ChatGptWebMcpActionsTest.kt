@@ -26,6 +26,8 @@ class ChatGptWebMcpActionsTest {
 
         assertEquals("chatgpt_web", state.getString("surface"))
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, state.getInt("adapter_version"))
+        assertEquals("conversation", state.getString("page_kind"))
+        assertFalse(state.getBoolean("login_required"))
         assertEquals("完整回答内容", conversation.getJSONArray("messages").getJSONObject(0).getString("content"))
         val messageParts = conversation.getJSONArray("messages").getJSONObject(0).getJSONArray("parts")
         assertEquals(2, messageParts.length())
@@ -279,6 +281,8 @@ class ChatGptWebMcpActionsTest {
             attachments = emptyList(),
             dictationActive = dictationActive,
             capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.DRAFT_SYNC)),
+            pageKind = "conversation",
+            loginRequired = false,
         )
         val manifest = ChatGptWebUiManifest(
             version = 1,

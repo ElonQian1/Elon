@@ -38,6 +38,8 @@ internal class ChatGptWebMcpActions(
             .put("bridge_state", bridgeState().name.lowercase())
             .put("view_mode", mode().name.lowercase())
             .put("authenticated", current?.authenticated ?: false)
+            .put("page_kind", current?.pageKind ?: "unknown")
+            .put("login_required", current?.loginRequired ?: false)
             .put("composer_ready", current?.composerReady ?: false)
             .put("dictation_active", current?.dictationActive ?: false)
             .put("streaming", current?.streaming ?: false)

@@ -34,6 +34,8 @@ internal data class ChatGptWebSnapshot(
     val attachments: List<ChatGptWebAttachment>,
     val dictationActive: Boolean,
     val capabilities: ChatGptWebCapabilities,
+    val pageKind: String = "unknown",
+    val loginRequired: Boolean = false,
 )
 
 internal data class ChatGptWebComposerOption(
@@ -148,6 +150,8 @@ internal object ChatGptWebProtocol {
             attachments = parseAttachments(event),
             dictationActive = event.optBoolean("dictationActive"),
             capabilities = ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
+            pageKind = event.optString("pageKind").takeIf { it in PAGE_KINDS } ?: "unknown",
+            loginRequired = event.optBoolean("loginRequired"),
         )
     }
 
@@ -353,6 +357,7 @@ internal object ChatGptWebProtocol {
         "video",
     )
     private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
+    private val PAGE_KINDS = setOf("auth", "conversation", "home", "feature")
     private val SUPPORTED_TOUCH_PURPOSES = setOf(
         "list_model_options",
         "list_composer_tools",

@@ -377,5 +377,5 @@
     window.setTimeout(dispatch, 120);
   }
 
-  window.__elonChatGptLayout = Object.freeze({ emitSnapshot, invoke });
+  window.__elonChatGptLayout = Object.freeze({ emitSnapshot, invoke, pageKind });
 })();

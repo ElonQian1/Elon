@@ -79,9 +79,8 @@
     });
   }
 
-  function isAuthenticated(dictationActive) {
-    const path = location.pathname.toLowerCase();
-    if (path.startsWith('/auth') || path.startsWith('/cdn-cgi')) return false;
+  function isAuthenticated(dictationActive, loginRequired) {
+    if (loginRequired) return false;
     const profile = document.querySelector(
       '[data-testid="profile-button"], [data-testid="accounts-profile-button"], button[aria-label*="profile" i]'
     );
@@ -126,13 +125,19 @@
     const dictationActive = composerAdapter ? composerAdapter.dictationActive(composer) : false;
     const streaming = isStreaming();
     const messages = messageAdapter ? messageAdapter.readMessages(streaming) : [];
+    const pageKind = layoutAdapter && typeof layoutAdapter.pageKind === 'function'
+      ? layoutAdapter.pageKind()
+      : 'unknown';
+    const loginRequired = pageKind === 'auth' || hasVisibleLoginEntry();
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),
       url: location.origin + location.pathname,
       draft: composerValue(composer).slice(0, 20000),
       messages,
-      authenticated: isAuthenticated(dictationActive),
+      authenticated: isAuthenticated(dictationActive, loginRequired),
+      pageKind,
+      loginRequired,
       composerReady: !!composer,
       streaming,
       currentModel: composerAdapter ? composerAdapter.currentModel(composer) : '',
