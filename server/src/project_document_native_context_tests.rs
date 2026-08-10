@@ -12,6 +12,7 @@ use crate::{
     project_document_native_context_projection::{relevant_memories, MemoryRetrievalScope},
 };
 
+mod health;
 mod lifecycle;
 
 #[test]
