@@ -2,7 +2,7 @@
 title: 开放商业开发者终态调用事件流 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-10
+reviewed_at: 2026-08-11
 ---
 
 # 开放商业开发者终态调用事件流 V1
@@ -28,7 +28,7 @@ reviewed_at: 2026-08-10
 
 - `GET /api/open-commerce/developer/events?cursor=&limit=`：读取当前 App 后续终态摘要。
 - `GET /api/open-commerce/developer/events/:invocation_id`：读取当前 App 的单条终态结果。
-- 两个接口都使用 `Authorization: Bearer <test-token>`；停用、轮换或重新启用 App 后，旧 Token 不能读取事件。
+- 两个接口都使用 `Authorization: Bearer <developer-credential>`，身份和环境完全由当前沙箱或已启用的生产凭据派生；停用、轮换或重新启用 App 后，旧 Token 不能读取事件。生产凭据入口仍受独立默认关闭开关约束。
 
 ## 实现引用
 
@@ -37,4 +37,5 @@ reviewed_at: 2026-08-10
 - `server/src/store/open_commerce_developer_events.rs`
 - `server/src/open_commerce_developer_event_migration.rs`
 - `server/src/open_commerce_developer_event_tests.rs`
+- `server/src/open_commerce_developer_event_api_tests.rs`
 - `pc-frontend/src/features/open-commerce/DeveloperInvocationEvents.tsx`
