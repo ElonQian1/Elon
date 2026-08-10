@@ -121,7 +121,7 @@ export function createSuiPreflightClient(options) {
           signal,
         },
       )
-      return readReportResponse(response)
+      return readReportResponse(response, verified, body)
     },
   })
 }
@@ -171,7 +171,7 @@ function verifyOfflineConstraints(constraints) {
   }
 }
 
-async function readReportResponse(response) {
+async function readReportResponse(response, verified, request) {
   const contentLength = Number(response.headers?.get?.('content-length'))
   if (Number.isFinite(contentLength) && contentLength > SUI_PREFLIGHT_MAX_RESPONSE_BYTES) {
     fail('response_too_large', 'preflight report response exceeds 256 KiB', response.status)
@@ -195,6 +195,21 @@ async function readReportResponse(response) {
   if (payload?.schema !== SUI_PREFLIGHT_REPORT_SCHEMA) {
     fail('invalid_report_response', 'preflight report response schema is unsupported')
   }
+  expectIdentifier(payload.id, 'response.id', 3, 160)
+  expectExact(payload.project_id, verified.projectId, 'response.project_id')
+  expectExact(payload.package_kind, verified.packageKind, 'response.package_kind')
+  expectExact(
+    payload.projection_package_id,
+    verified.projectionPackageId,
+    'response.projection_package_id',
+  )
+  expectExact(payload.target_network, verified.targetNetwork, 'response.target_network')
+  expectExact(payload.handoff_digest, verified.handoffDigest, 'response.handoff_digest')
+  expectExact(payload.projection_digest, verified.projectionDigest, 'response.projection_digest')
+  expectExact(payload.outcome, request.outcome, 'response.outcome')
+  expectExact(payload.summary, request.summary, 'response.summary')
+  expectExact(payload.tool_version, request.tool_version, 'response.tool_version')
+  expectExact(payload.idempotency_key, request.idempotency_key, 'response.idempotency_key')
   expectDigest(payload.report_digest, 'response.report_digest')
   return payload
 }

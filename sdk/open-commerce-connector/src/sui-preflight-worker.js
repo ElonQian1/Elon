@@ -67,6 +67,7 @@ export function createSuiPreflightWorker(options) {
       (job) => { issue = { ...issue, job } },
       stopRenewal.signal,
     ).catch((error) => {
+      if (stopRenewal.signal.aborted) return
       renewalFailure = error
       stopHandler.abort(error)
     })

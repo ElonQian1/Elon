@@ -1,5 +1,6 @@
 import {
   SUI_PREFLIGHT_MAX_RESPONSE_BYTES,
+  SUI_PREFLIGHT_REPORT_SCHEMA,
   SuiPreflightContractError,
   verifySuiAdapterHandoff,
 } from './sui-preflight.js'
@@ -8,6 +9,10 @@ export const SUI_PREFLIGHT_JOB_POLL_SCHEMA = 'task_economy.sui_preflight_job_pol
 export const SUI_PREFLIGHT_JOB_RENEW_SCHEMA = 'task_economy.sui_preflight_job_renew.v1'
 export const SUI_PREFLIGHT_JOB_RELEASE_SCHEMA = 'task_economy.sui_preflight_job_release.v1'
 export const SUI_PREFLIGHT_JOB_COMPLETE_SCHEMA = 'task_economy.sui_preflight_job_complete.v1'
+
+const SUI_PREFLIGHT_JOB_SCHEMA = 'task_economy.sui_preflight_job.v1'
+const SUI_PREFLIGHT_JOB_ISSUE_SCHEMA = 'task_economy.sui_preflight_job_issue.v1'
+const JOB_STATUSES = new Set(['pending', 'leased', 'completed', 'canceled', 'blocked'])
 
 export function createSuiPreflightJobClient(options) {
   expectObject(options, 'options')
@@ -39,13 +44,21 @@ export function createSuiPreflightJobClient(options) {
         SUI_PREFLIGHT_JOB_POLL_SCHEMA,
         signal,
       )
-      if (!payload.claimed) return payload
+      if (payload.claimed !== true && payload.claimed !== false) {
+        fail('invalid_job_response', 'preflight job poll must declare whether a task was claimed')
+      }
+      if (!payload.claimed) {
+        if (payload.issue !== null) {
+          fail('invalid_job_response', 'an idle preflight job poll must not contain an issue')
+        }
+        return Object.freeze({ ...payload, issue: null })
+      }
       const issue = validateIssue(payload.issue)
       return Object.freeze({ ...payload, issue })
     },
 
     async renew(jobId, leaseToken, { extendSeconds = 300, signal } = {}) {
-      return post(
+      const payload = await post(
         `/api/economy/sui-preflight/jobs/${encodeURIComponent(expectJobId(jobId))}/renew`,
         {
           lease_token: expectLeaseToken(leaseToken),
@@ -54,10 +67,17 @@ export function createSuiPreflightJobClient(options) {
         SUI_PREFLIGHT_JOB_RENEW_SCHEMA,
         signal,
       )
+      if (payload.renewed !== true) {
+        fail('invalid_job_response', 'preflight renewal response must confirm renewal')
+      }
+      return Object.freeze({
+        ...payload,
+        job: validateJob(payload.job, jobId, 'leased', 'renew.job'),
+      })
     },
 
     async release(jobId, leaseToken, { reason, signal } = {}) {
-      return post(
+      const payload = await post(
         `/api/economy/sui-preflight/jobs/${encodeURIComponent(expectJobId(jobId))}/release`,
         {
           lease_token: expectLeaseToken(leaseToken),
@@ -66,49 +86,126 @@ export function createSuiPreflightJobClient(options) {
         SUI_PREFLIGHT_JOB_RELEASE_SCHEMA,
         signal,
       )
+      if (payload.released !== true) {
+        fail('invalid_job_response', 'preflight release response must confirm release')
+      }
+      return Object.freeze({
+        ...payload,
+        job: validateJob(payload.job, jobId, 'pending', 'release.job'),
+      })
     },
 
     async complete(jobId, leaseToken, input, { signal } = {}) {
       expectObject(input, 'completion')
-      return post(
-        `/api/economy/sui-preflight/jobs/${encodeURIComponent(expectJobId(jobId))}/complete`,
-        {
-          lease_token: expectLeaseToken(leaseToken),
-          outcome: expectOneOf(input.outcome, new Set(['passed', 'rejected']), 'outcome'),
-          summary: expectText(input.summary, 'summary', 4, 500),
-          tool_version: expectText(input.toolVersion, 'toolVersion', 1, 100),
-          idempotency_key: expectIdentifier(
-            input.idempotencyKey,
-            'idempotencyKey',
-            8,
-            128,
-          ),
-        },
+      const normalizedJobId = expectJobId(jobId)
+      const completion = {
+        lease_token: expectLeaseToken(leaseToken),
+        outcome: expectOneOf(input.outcome, new Set(['passed', 'rejected']), 'outcome'),
+        summary: expectText(input.summary, 'summary', 4, 500),
+        tool_version: expectText(input.toolVersion, 'toolVersion', 1, 100),
+        idempotency_key: expectIdentifier(
+          input.idempotencyKey,
+          'idempotencyKey',
+          8,
+          128,
+        ),
+      }
+      const payload = await post(
+        `/api/economy/sui-preflight/jobs/${encodeURIComponent(normalizedJobId)}/complete`,
+        completion,
         SUI_PREFLIGHT_JOB_COMPLETE_SCHEMA,
         signal,
       )
+      if (payload.completed !== true) {
+        fail('invalid_job_response', 'preflight completion response must confirm completion')
+      }
+      const job = validateJob(payload.job, normalizedJobId, 'completed', 'complete.job')
+      const report = validateCompletionReport(payload.report, job, completion)
+      return Object.freeze({ ...payload, job, report })
     },
   })
 }
 
 function validateIssue(issue) {
   expectObject(issue, 'claim.issue')
-  expectObject(issue.job, 'claim.issue.job')
+  if (issue.schema !== SUI_PREFLIGHT_JOB_ISSUE_SCHEMA || issue.lease_token_visible_once !== true) {
+    fail('invalid_job_response', 'claimed issue schema or one-time lease marker is invalid')
+  }
+  const job = validateJob(issue.job, undefined, 'leased', 'claim.issue.job')
   const leaseToken = expectLeaseToken(issue.lease_token)
   const handoff = issue.handoff
   const verified = verifySuiAdapterHandoff(handoff)
   if (
-    issue.job.id !== expectJobId(issue.job.id)
-    || issue.job.project_id !== verified.projectId
-    || issue.job.package_kind !== verified.packageKind
-    || issue.job.projection_package_id !== verified.projectionPackageId
-    || issue.job.target_network !== verified.targetNetwork
-    || issue.job.projection_digest !== verified.projectionDigest
-    || issue.job.handoff_digest !== verified.handoffDigest
+    job.project_id !== verified.projectId
+    || job.package_kind !== verified.packageKind
+    || job.projection_package_id !== verified.projectionPackageId
+    || job.target_network !== verified.targetNetwork
+    || job.projection_digest !== verified.projectionDigest
+    || job.handoff_digest !== verified.handoffDigest
   ) {
     fail('claim_binding_mismatch', 'claimed job does not match its deterministic handoff')
   }
-  return Object.freeze({ ...issue, lease_token: leaseToken, handoff })
+  return Object.freeze({ ...issue, job, lease_token: leaseToken, handoff })
+}
+
+function validateJob(job, expectedId, expectedStatus, path) {
+  expectObject(job, path)
+  if (job.schema !== SUI_PREFLIGHT_JOB_SCHEMA) {
+    fail('invalid_job_response', `${path} schema is unsupported`)
+  }
+  const id = expectJobId(job.id)
+  if (expectedId !== undefined && id !== expectJobId(expectedId)) {
+    fail('job_binding_mismatch', `${path} does not match the requested job`)
+  }
+  expectIdentifier(job.project_id, `${path}.project_id`, 3, 160)
+  expectOneOf(job.package_kind, new Set(['standard', 'correction']), `${path}.package_kind`)
+  expectIdentifier(job.projection_package_id, `${path}.projection_package_id`, 8, 160)
+  expectOneOf(job.target_network, new Set(['devnet', 'testnet', 'mainnet']), `${path}.target_network`)
+  expectDigest(job.handoff_digest, `${path}.handoff_digest`)
+  expectDigest(job.projection_digest, `${path}.projection_digest`)
+  expectOneOf(job.status, JOB_STATUSES, `${path}.status`)
+  if (expectedStatus !== undefined && job.status !== expectedStatus) {
+    fail('job_binding_mismatch', `${path} status does not match the requested transition`)
+  }
+  if (!Number.isInteger(job.attempt_no) || job.attempt_no < 0) {
+    fail('invalid_job_response', `${path}.attempt_no must be a non-negative integer`)
+  }
+  if (job.status === 'leased') {
+    const expiresAt = expectTimestamp(job.lease_expires_at, `${path}.lease_expires_at`)
+    const deadlineAt = expectTimestamp(job.lease_deadline_at, `${path}.lease_deadline_at`)
+    if (Date.parse(expiresAt) > Date.parse(deadlineAt)) {
+      fail('invalid_job_response', `${path} lease expiry exceeds its hard deadline`)
+    }
+  }
+  return Object.freeze({ ...job, id })
+}
+
+function validateCompletionReport(report, job, request) {
+  expectObject(report, 'complete.report')
+  if (report.schema !== SUI_PREFLIGHT_REPORT_SCHEMA) {
+    fail('invalid_job_response', 'complete.report schema is unsupported')
+  }
+  expectIdentifier(report.id, 'complete.report.id', 3, 160)
+  const bindings = [
+    ['project_id', job.project_id],
+    ['package_kind', job.package_kind],
+    ['projection_package_id', job.projection_package_id],
+    ['target_network', job.target_network],
+    ['handoff_digest', job.handoff_digest],
+    ['projection_digest', job.projection_digest],
+    ['outcome', request.outcome],
+    ['summary', request.summary],
+    ['tool_version', request.tool_version],
+    ['idempotency_key', request.idempotency_key],
+  ]
+  if (bindings.some(([field, expected]) => report[field] !== expected)) {
+    fail('report_binding_mismatch', 'completion report does not match its task and request')
+  }
+  expectDigest(report.report_digest, 'complete.report.report_digest')
+  if (job.report_id !== report.id) {
+    fail('report_binding_mismatch', 'completed job does not reference its returned report')
+  }
+  return Object.freeze({ ...report })
 }
 
 async function readJsonResponse(response, expectedSchema) {
@@ -206,6 +303,20 @@ function expectText(value, path, min, max) {
     fail('invalid_text', `${path} must contain ${min}-${max} characters`)
   }
   return text
+}
+
+function expectTimestamp(value, path) {
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) {
+    fail('invalid_timestamp', `${path} must be an RFC3339 timestamp`)
+  }
+  return value
+}
+
+function expectDigest(value, path) {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) {
+    fail('invalid_digest', `${path} must be a lowercase SHA-256 digest`)
+  }
+  return value
 }
 
 function fail(code, message, status = undefined) {
