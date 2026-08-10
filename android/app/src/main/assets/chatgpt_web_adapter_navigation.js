@@ -19,6 +19,15 @@
       style.display !== 'none' && style.visibility !== 'hidden';
   }
 
+  function isSidebarScope(node) {
+    if (!isVisible(node)) return false;
+    const rect = node.getBoundingClientRect();
+    return rect.left <= window.innerWidth * 0.1 &&
+      rect.top <= window.innerHeight * 0.25 &&
+      rect.width >= window.innerWidth * 0.35 &&
+      rect.height >= window.innerHeight * 0.6;
+  }
+
   function nodeLabel(node) {
     return cleanText([
       node && node.getAttribute('aria-label'),
@@ -75,7 +84,7 @@
   function featureNodes() {
     const scopes = Array.from(document.querySelectorAll(
       'aside, nav, [data-testid*="sidebar" i], [role="navigation"], [role="dialog"]'
-    )).filter(isVisible);
+    )).filter(isSidebarScope);
     if (!scopes.length) return [];
     const roots = scopes;
     const seen = new Set();
