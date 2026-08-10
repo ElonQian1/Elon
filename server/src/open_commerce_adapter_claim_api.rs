@@ -224,3 +224,7 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 fn default_limit() -> usize {
     50
 }
+
+#[cfg(test)]
+#[path = "open_commerce_adapter_claim_api_tests.rs"]
+mod tests;
