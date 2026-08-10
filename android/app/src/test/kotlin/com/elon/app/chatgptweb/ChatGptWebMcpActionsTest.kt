@@ -115,6 +115,14 @@ class ChatGptWebMcpActionsTest {
         assertEquals("search", control.getString("input_kind"))
         assertTrue(control.getBoolean("writable"))
         assertFalse(control.has("value"))
+        assertEquals(
+            "chatgpt-control-input:control_search_demo",
+            control.getString("native_value_input_content_description"),
+        )
+        assertEquals(
+            "chatgpt-control-input-commit:control_search_demo",
+            control.getString("native_value_commit_content_description"),
+        )
 
         val rejected = actions.control(
             JSONObject()

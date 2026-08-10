@@ -461,6 +461,22 @@ internal class ChatGptWebMcpActions(
             "native_trigger_content_description",
             presentation?.nativeTriggerSelector ?: JSONObject.NULL,
         )
+        .put(
+            "native_value_input_content_description",
+            if (control.supportsTextEntry) {
+                ChatGptNativeFormControlDialog.inputSelector(control.id)
+            } else {
+                JSONObject.NULL
+            },
+        )
+        .put(
+            "native_value_commit_content_description",
+            if (control.supportsTextEntry) {
+                ChatGptNativeFormControlDialog.commitSelector(control.id)
+            } else {
+                JSONObject.NULL
+            },
+        )
 
     private fun page(
         args: JSONObject,

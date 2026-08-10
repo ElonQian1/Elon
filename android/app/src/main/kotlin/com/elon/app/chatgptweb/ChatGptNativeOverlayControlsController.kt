@@ -12,6 +12,7 @@ internal class ChatGptNativeOverlayControlsController(
     private val headerActionsScroll: HorizontalScrollView,
     private val headerActions: LinearLayout,
     private val onInvoke: (String) -> Unit,
+    private val onSetText: (String, String) -> Unit,
 ) {
     private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var controls: List<ChatGptWebUiControl> = emptyList()
@@ -66,7 +67,17 @@ internal class ChatGptNativeOverlayControlsController(
             context = activity,
             title = title,
             controls = current,
-            onSelected = { onInvoke(it.id) },
+            onSelected = { control ->
+                if (control.supportsTextEntry) {
+                    dialog = ChatGptNativeFormControlDialog.show(
+                        context = activity,
+                        control = control,
+                        onSubmit = onSetText,
+                    )
+                } else {
+                    onInvoke(control.id)
+                }
+            },
         )
     }
 

@@ -230,6 +230,28 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun nativeFeatureFormsUseStableSelectorsWithoutPrefillingPrivateValues() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val overlay = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeOverlayControlsController.kt"
+        )
+        val dialog = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeFormControlDialog.kt"
+        )
+
+        assertTrue(activity.contains("onSetText = { controlId, text ->"))
+        assertTrue(activity.contains("pageAdapter.setUiControlText(controlId, text)"))
+        assertTrue(overlay.contains("if (control.supportsTextEntry)"))
+        assertTrue(overlay.contains("ChatGptNativeFormControlDialog.show"))
+        assertTrue(dialog.contains("chatgpt-control-input:"))
+        assertTrue(dialog.contains("chatgpt-control-input-commit:"))
+        assertTrue(dialog.contains("require(control.supportsTextEntry)"))
+        assertFalse(dialog.contains("setText(control."))
+    }
+
+    @Test
     fun bridgeInstallationWaitsUntilEveryStateConsumerIsInitialized() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

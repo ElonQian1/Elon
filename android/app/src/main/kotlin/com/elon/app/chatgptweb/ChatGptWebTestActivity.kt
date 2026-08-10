@@ -238,6 +238,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             headerActionsScroll = binding.chatGptNativeHeaderActionsScroll,
             headerActions = binding.chatGptNativeHeaderActions,
             onInvoke = ::invokeUiControl,
+            onSetText = { controlId, text -> pageAdapter.setUiControlText(controlId, text) },
         )
         pageAdapter = ChatGptWebPageAdapter(
             context = this,
