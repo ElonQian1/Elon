@@ -12,7 +12,7 @@ implementation_status: implementation_unwired
 
 服务端 schema v216 已形成一组默认空、生产不可达的节点端点凭据与认证会话账本，以及只接受 sealed 输入的 Store 内核。这里的“服务端 v216”属于云端 SQLite 迁移序列；它与节点本机插件 authority 的 v7 schema、以及形成该节点源码的历史 v216 实现批次不是同一个版本域。
 
-本批只铺耐久 currentness：不从 `node_credentials` 或 `ELON_AGENT_SECRETS` 回填，不修改节点注册 HTTP、`/agent/ws`、`AgentManager`、`NodeRegistry`、NodeAgent、`homecli-proto` 或协议阈值，也没有 secure transport proof 的生产构造器。现有节点因此不会自动进入新账本，新表不会改变 legacy 登录、续约、连接或断开行为。
+服务端 v216 只铺耐久 currentness：不从 `node_credentials` 或 `ELON_AGENT_SECRETS` 回填，不修改节点注册 HTTP、legacy `/agent/ws`、`AgentManager`、`NodeRegistry`、NodeAgent、`homecli-proto` 或协议阈值。后续源码新增了默认关闭的 direct-TLS-only verifier seam：只有由专用 rustls listener 完成的同一连接 TLS 1.3 握手才能形成一次性 sealed transport proof；plain listener、legacy `/agent/ws`、URL/Host、`Forwarded`/`X-Forwarded-Proto` 和静态配置标记均拿不到 proof。现有节点仍不会自动进入新账本，新表也不改变 legacy 登录、续约、连接或断开行为。
 
 `store_migrations.rs` 已登记 v216，所以部署包含该源码的新二进制时会尝试创建空 schema；“dormant”不是“不运行 migration”，而是 migration 成功后没有 producer 或调用方。DDL 或 migration 失败仍可能让服务启动失败，本批未执行 migration，不能宣称磁盘兼容已验证；成功建表且 child row 仍为空时，新表不在 legacy 表上安装 trigger，也不参与 legacy auth 查询或写事务，不会选择性拒绝旧路径。
 
@@ -78,6 +78,14 @@ authentication digest 覆盖固定 `bearer_sha256` authentication method、agent
 
 session head 的既有 active 只允许精确转为 `closed`、`stale`、`credential_rotated` 或 `credential_revoked`，或者被 generation `+1` 的新 active receipt 取代。服务重启后必须通过 server-instance binding 或启动收口让旧 active head 不再具有 currentness；receipt 只证明认证发生时的绑定，耐久 head 只证明事务检查时的 currentness，两者都不能冒充 live socket。
 
+### Direct TLS verifier seam
+
+direct TLS 通过独立、默认关闭的 listener 提供唯一当前可构造的 secure transport proof。只有 `NODE_ENDPOINT_DIRECT_TLS_ENABLED=true` 才启用，并要求 `NODE_ENDPOINT_DIRECT_TLS_LISTEN_ADDR`、`NODE_ENDPOINT_DIRECT_TLS_CERT_CHAIN_PATH`、`NODE_ENDPOINT_DIRECT_TLS_PRIVATE_KEY_PATH` 与 `NODE_ENDPOINT_DIRECT_TLS_VERIFIER_REVISION` 作为完整组出现；一旦显式启用，证书、私钥、verifier revision、监听地址或 bind 任一无效都会让启动失败，不能静默回退为“已验证”。该 listener 固定 TLS 1.3 与 HTTP/1.1，握手后从 rustls 的同一 `ServerConnection` 读取 negotiated protocol、cipher 和 ALPN，并把 boot-scoped server instance、leaf certificate digest、verifier policy digest、连接 evidence ID 与握手时间纳入 canonical evidence digest。它不读取也不信任请求头、URI scheme、SNI、代理声明或 plain listener 状态。
+
+每条 TLS 连接只得到一个 30 秒内可取走一次的 proof slot；重复、过期或 poisoned take 均失败。当前 secure Router 只挂同名 `/agent/ws` seam，取走 proof 后固定返回 `503 NODE_ENDPOINT_CREDENTIAL_BRIDGE_UNWIRED`：不会 WebSocket upgrade，不调用 legacy handler，不读取或写入 v216 Store。proof 还额外绑定当前 boot 的 `server_instance_id`，未来 `NodeEndpointSessionOpenRequest` 必须与它精确一致，且认证时间不得晚于握手超过 30 秒。
+
+因此该 seam 证明的是“此请求来自本进程直接终止的特定 TLS 握手”，不是 bearer、owner、节点、在线状态或计算能力。可信反向代理模式仍不存在；未来若采用代理，必须先有仓库管理的受信 hop 与不可伪造 TLS evidence（例如受控 UDS/mTLS 或经验证的 PROXYv2 SSL TLV），普通转发头永远不够。
+
 ## 6. Legacy 禁线
 
 以下任一事实，单独或任意组合，均不得成为 compute endpoint authority：
@@ -129,10 +137,11 @@ legacy WS 可继续服务既有开发节点能力，但必须在未来桥接时�
 - domain：`server/src/node_compute_sharing/endpoint_authority.rs`；
 - Store：`server/src/store/node_credentials/endpoint_authority.rs`，子叶为 `credentials.rs`、`credentials/{root,rows,write}.rs`、`secret.rs`、`sessions.rs` 与 `sessions/{head_rows,receipt_rows}.rs`；
 - process-local fencing：`server/src/node_registry/session_key.rs`、`server/src/homecli_agent/session_fencing.rs`，以及 exact-key 接线后的 `agent_session.rs` 与三条插件 observation 子叶；
+- direct TLS verifier：`server/src/node_endpoint_transport.rs`、`server/src/node_endpoint_transport/{config,direct_tls,evidence_slot,secure_router}.rs` 与 `server/src/node_compute_sharing/endpoint_authority/session/direct_tls.rs`；
 - migration registry：`server/src/store_migrations.rs`。
 
 当前 Store surface 只有 crate-internal `issue_fresh_node_endpoint_credential`、`rotate_node_endpoint_credential`、`recover_node_endpoint_credential`、`revoke_node_endpoint_credential`、`authenticate_node_endpoint_session`、`close_node_endpoint_session`、`inspect_node_endpoint_session_currentness`、`restart_node_endpoint_sessions` 与 `recover_node_endpoint_session_heads`，且全部限制为 `pub(in crate::store)`。
 
 输出 `NodeEndpointCredentialMutationReceipt` 与 `VerifiedCurrentNodeEndpointSession` 也保持相同可见性，没有 constructor、`Deserialize` 或 `Clone`；WS/HTTP 所在模块当前不可见。未来 HTTP/WS 桥接必须通过 Store-owned facade 注入 sealed authorization/transport 输入，不得直接公开 domain 构造器或把这些 kernel 提升为网络 API。
 
-本批没有 HTTP、WS、AgentManager、NodeRegistry、NodeAgent 或协议调用点，没有 legacy backfill，也没有 secure transport proof 的生产构造器。只允许把它报告为 `implementation_unwired`；尚未编译、测试、执行内存或磁盘迁移，也未进行 TLS、网络、并发、崩溃恢复或真实节点验证。
+当前仍没有 owner credential HTTP、WebSocket upgrade、v216 session Store、AgentManager、NodeRegistry、NodeAgent 或协议调用点，也没有 legacy backfill。direct TLS proof producer 已有源码，但 secure handler 固定失败关闭；只允许把整体报告为 `implementation_unwired`。本增量尚未编译、测试或运行，也未执行内存/磁盘迁移或真实 TLS、网络、并发、崩溃恢复与节点验证。

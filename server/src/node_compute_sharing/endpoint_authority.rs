@@ -17,7 +17,8 @@ pub(crate) use credential::{
     PresentedNodeEndpointCredentialSecret,
 };
 pub(crate) use session::{
-    canonical_node_endpoint_capability_set, NodeEndpointSecureTransportBinding,
+    canonical_direct_tls_verifier_digest, canonical_node_endpoint_capability_set,
+    seal_direct_tls_connection, NodeEndpointSecureTransportBinding,
     NodeEndpointSessionAuthenticationReceiptEnvelope, NodeEndpointSessionOpenRequest,
     PreparedNodeEndpointSessionAuthentication, VerifiedSecureNodeEndpointTransport,
 };

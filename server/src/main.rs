@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dotenvy::dotenv;
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 use tracing::info;
 
 mod account_identity_migration;
@@ -257,6 +257,7 @@ mod node_compute_plugin_sharing_migration;
 mod node_compute_reservation_migration;
 mod node_compute_sharing;
 mod node_compute_sharing_migration;
+mod node_endpoint_transport;
 mod node_exec_api;
 mod node_hardware_probe;
 mod node_install_id_migration;
@@ -786,15 +787,5 @@ async fn main() -> Result<()> {
     }
 
     let app = router::build_app(state);
-
-    let addr: SocketAddr = std::env::var("LISTEN_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:8080".into())
-        .parse()?;
-
-    info!("elon server listening on {}", addr);
-
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
-
-    Ok(())
+    node_endpoint_transport::serve(app).await
 }

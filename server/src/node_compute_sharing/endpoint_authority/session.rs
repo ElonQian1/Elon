@@ -1,5 +1,3 @@
-use std::fmt;
-
 use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -15,92 +13,19 @@ use super::types::{
     SESSION_AUTH_SCHEMA,
 };
 
+mod direct_tls;
+
+pub(crate) use direct_tls::{
+    canonical_direct_tls_verifier_digest, seal_direct_tls_connection,
+    NodeEndpointSecureTransportBinding, VerifiedSecureNodeEndpointTransport,
+};
+
 const AUTHENTICATION_ID_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_AUTHENTICATION_ID_V1";
 const AUTHENTICATION_DIGEST_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_AUTHENTICATION_RECEIPT_V1";
 const CAPABILITY_SET_DOMAIN: &[u8] = b"ELON_NODE_ENDPOINT_SESSION_CAPABILITY_SET_V1";
 const SESSION_LIFETIME_MINUTES: i64 = 15;
+const MAX_TRANSPORT_AUTHENTICATION_AGE_SECONDS: i64 = 30;
 const MAX_CAPABILITIES: usize = 256;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct NodeEndpointSecureTransportBinding {
-    transport_scheme: String,
-    transport_security_source: String,
-    transport_security_evidence_schema: String,
-    transport_security_evidence_id: String,
-    transport_security_evidence_digest: String,
-    transport_verifier_revision: u64,
-    transport_verifier_digest: String,
-    transport_verified_at: String,
-}
-
-impl NodeEndpointSecureTransportBinding {
-    pub(crate) fn transport_scheme(&self) -> &str {
-        &self.transport_scheme
-    }
-    pub(crate) fn transport_security_source(&self) -> &str {
-        &self.transport_security_source
-    }
-    pub(crate) fn transport_security_evidence_schema(&self) -> &str {
-        &self.transport_security_evidence_schema
-    }
-    pub(crate) fn transport_security_evidence_id(&self) -> &str {
-        &self.transport_security_evidence_id
-    }
-    pub(crate) fn transport_security_evidence_digest(&self) -> &str {
-        &self.transport_security_evidence_digest
-    }
-    pub(crate) fn transport_verifier_revision(&self) -> u64 {
-        self.transport_verifier_revision
-    }
-    pub(crate) fn transport_verifier_digest(&self) -> &str {
-        &self.transport_verifier_digest
-    }
-    pub(crate) fn transport_verified_at(&self) -> &str {
-        &self.transport_verified_at
-    }
-
-    fn validate(&self) -> Result<()> {
-        if self.transport_scheme != "wss"
-            || !matches!(
-                self.transport_security_source.as_str(),
-                "direct_tls" | "trusted_reverse_proxy_tls"
-            )
-            || !bounded_identifier(&self.transport_security_evidence_schema, 160)
-            || !bounded_identifier(&self.transport_security_evidence_id, 160)
-            || !is_sha256(&self.transport_security_evidence_digest)
-            || !safe_positive(self.transport_verifier_revision)
-            || !is_sha256(&self.transport_verifier_digest)
-        {
-            bail!("NODE_ENDPOINT_SECURE_TRANSPORT_BINDING_INVALID");
-        }
-        Ok(())
-    }
-}
-
-pub(crate) struct VerifiedSecureNodeEndpointTransport {
-    binding: NodeEndpointSecureTransportBinding,
-    verified_at: DateTime<Utc>,
-}
-
-impl VerifiedSecureNodeEndpointTransport {
-    pub(crate) fn binding(&self) -> &NodeEndpointSecureTransportBinding {
-        &self.binding
-    }
-    pub(crate) fn verified_at(&self) -> DateTime<Utc> {
-        self.verified_at
-    }
-}
-
-impl fmt::Debug for VerifiedSecureNodeEndpointTransport {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("VerifiedSecureNodeEndpointTransport")
-            .field("transport_scheme", &self.binding.transport_scheme)
-            .field("evidence", &"<sealed>")
-            .finish()
-    }
-}
 
 pub(crate) struct NodeEndpointSessionOpenRequest {
     agent_id: String,
@@ -138,9 +63,10 @@ impl NodeEndpointSessionOpenRequest {
         recorded_at: DateTime<Utc>,
     ) -> Result<PreparedNodeEndpointSessionAuthentication> {
         credential.validate()?;
-        transport.binding.validate()?;
+        transport.binding().validate()?;
         if credential.status() != "active"
             || credential.agent_id() != self.agent_id
+            || transport.server_instance_id() != self.server_instance_id
             || !bounded_identifier(&self.session_id, 160)
             || !bounded_identifier(&self.server_instance_id, 160)
             || !safe_positive(self.protocol_version)
@@ -149,16 +75,23 @@ impl NodeEndpointSessionOpenRequest {
             bail!("NODE_ENDPOINT_SESSION_OPEN_REQUEST_INVALID");
         }
         ensure_time_order(
-            transport.verified_at,
+            transport.verified_at(),
             self.authenticated_at,
             "NODE_ENDPOINT_TRANSPORT_VERIFIED_AFTER_AUTHENTICATION",
         )?;
+        if transport
+            .verified_at()
+            .checked_add_signed(Duration::seconds(MAX_TRANSPORT_AUTHENTICATION_AGE_SECONDS))
+            .is_none_or(|deadline| self.authenticated_at > deadline)
+        {
+            bail!("NODE_ENDPOINT_TRANSPORT_AUTHENTICATION_WINDOW_EXPIRED");
+        }
         ensure_time_order(
             self.authenticated_at,
             recorded_at,
             "NODE_ENDPOINT_AUTHENTICATED_AFTER_RECORDED",
         )?;
-        if utc_nanos(transport.verified_at) != transport.binding.transport_verified_at {
+        if utc_nanos(transport.verified_at()) != transport.binding().transport_verified_at() {
             bail!("NODE_ENDPOINT_TRANSPORT_TIME_PROJECTION_MISMATCH");
         }
         let capabilities = canonical_capabilities(&self.capabilities)?;
@@ -228,7 +161,7 @@ impl NodeEndpointSessionOpenRequest {
             agent_version: self.agent_version.clone(),
             capability_count: capabilities.len() as u64,
             capability_set_digest,
-            transport: transport.binding.clone(),
+            transport: transport.binding().clone(),
             authenticated_at: utc_nanos(self.authenticated_at),
             expires_at: utc_nanos(expires_at),
             recorded_at: utc_nanos(recorded_at),
@@ -406,6 +339,9 @@ impl NodeEndpointSessionAuthenticationReceiptEnvelope {
         let expires_at = parse_utc_nanos(&self.expires_at, "NODE_ENDPOINT_EXPIRES_AT_INVALID")?;
         let recorded_at = parse_utc_nanos(&self.recorded_at, "NODE_ENDPOINT_RECORDED_AT_INVALID")?;
         if verified_at > authenticated_at
+            || verified_at
+                .checked_add_signed(Duration::seconds(MAX_TRANSPORT_AUTHENTICATION_AGE_SECONDS))
+                .is_none_or(|deadline| authenticated_at > deadline)
             || authenticated_at >= recorded_at
             || recorded_at >= expires_at
             || expires_at
