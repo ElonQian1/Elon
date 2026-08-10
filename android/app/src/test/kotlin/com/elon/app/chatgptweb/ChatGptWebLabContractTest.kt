@@ -44,12 +44,19 @@ class ChatGptWebLabContractTest {
         val adapterLayout = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_layout.js"
         )
+        val pageSemanticPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
         assertTrue(
             bridge.indexOf("chatgpt_web_adapter_bootstrap.js") <
                 bridge.indexOf("chatgpt_web_adapter_conversations.js")
+        )
+        assertTrue(
+            bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_layout.js")
         )
         assertFalse(bridge.contains("addJavascriptInterface"))
         assertFalse(bridge.contains("getCookie("))
@@ -124,6 +131,10 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("function compatibilityFor(controls, kind)"))
         assertTrue(adapterLayout.contains("hasFeatureContent"))
         assertTrue(adapterLayout.contains("compatibility: compatibilityFor(controls, kind)"))
+        assertTrue(adapterLayout.contains("window.__elonChatGptPageSemanticPolicy.classify"))
+        assertTrue(pageSemanticPolicy.contains("/^\\/scheduled(?:\\/|$)/"))
+        assertTrue(pageSemanticPolicy.contains("return 'tasks'"))
+        assertTrue(pageSemanticPolicy.contains("return 'navigation'"))
         assertTrue(adapterLayout.contains("const MAX_DISCOVERED_CONTROLS = 512"))
         assertTrue(adapterLayout.contains("discoveredControlCount: discovery.totalCount"))
         assertTrue(adapterLayout.contains("controlsTruncated: discovery.truncated"))

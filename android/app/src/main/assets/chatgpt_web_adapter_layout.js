@@ -133,6 +133,13 @@
     if (region === 'suggestions') return 'suggestion';
     if (region === 'header' && index === 0) return 'navigation';
     if (region === 'header' && /workspace|工作区|(^|\s)工作($|\s)|personal|team|business/.test(signal)) return 'title';
+    const pageSemantic = window.__elonChatGptPageSemanticPolicy
+      && window.__elonChatGptPageSemanticPolicy.classify({
+        pathname: location.pathname,
+        region,
+        signal
+      });
+    if (pageSemantic) return pageSemantic;
     return 'action';
   }
 
