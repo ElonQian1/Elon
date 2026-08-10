@@ -18,16 +18,56 @@ pub(crate) fn readiness_summary(
 ) -> Result<DeveloperProductionReadinessSummary> {
     let admission = store.open_commerce_developer_app_admission(&app.id)?;
     let webhook_health = open_commerce_webhook_health_service::health_summary(store, app)?;
-    let credential_gateway_ready = webhook_health.production_credentials_enabled;
-    let current_credential_present = webhook_health.production_credential_eligible;
-    let webhook_gateway_ready = webhook_health.production_webhooks_enabled;
     let active_production_webhook_count = webhook_health
         .environments
         .iter()
         .find(|item| item.environment == "production")
         .map(|item| item.active_subscription_count)
         .unwrap_or_default();
+    readiness_summary_from_state(
+        app,
+        admission,
+        webhook_health.production_credentials_enabled,
+        webhook_health.production_credential_eligible,
+        webhook_health.production_webhooks_enabled,
+        active_production_webhook_count,
+    )
+}
 
+#[cfg(test)]
+pub(crate) fn readiness_summary_with_feature_switches(
+    store: &Store,
+    app: &OpenCommerceDeveloperApp,
+    production_credentials_enabled: bool,
+    production_webhooks_enabled: bool,
+) -> Result<DeveloperProductionReadinessSummary> {
+    let admission = store.open_commerce_developer_app_admission(&app.id)?;
+    let current_credential_present =
+        store.has_current_open_commerce_production_credential(&app.project_id, &app.id)?;
+    let active_production_webhook_count = store
+        .open_commerce_developer_webhook_environment_health(&app.project_id, &app.id)?
+        .into_iter()
+        .find(|item| item.environment == "production")
+        .map(|item| item.active_subscription_count)
+        .unwrap_or_default();
+    readiness_summary_from_state(
+        app,
+        admission,
+        production_credentials_enabled,
+        current_credential_present,
+        production_webhooks_enabled,
+        active_production_webhook_count,
+    )
+}
+
+fn readiness_summary_from_state(
+    app: &OpenCommerceDeveloperApp,
+    admission: Option<crate::open_commerce_developer_admission_model::DeveloperAppAdmission>,
+    credential_gateway_ready: bool,
+    current_credential_present: bool,
+    webhook_gateway_ready: bool,
+    active_production_webhook_count: i64,
+) -> Result<DeveloperProductionReadinessSummary> {
     let app_ready = app.status == "active";
     let manifest_ready = app_ready && app.manifest_status == "approved";
     let domain_ready = app_ready
