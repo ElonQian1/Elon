@@ -16,6 +16,7 @@ use crate::{
 };
 
 struct RouteFixture {
+    state: Arc<AppState>,
     router: Router,
     project_id: String,
     other_project_id: String,
@@ -83,25 +84,92 @@ async fn readiness_route_enforces_login_project_and_app_management_boundaries() 
         assert_eq!(body["next_action_code"], "manifest_not_approved");
         assert_eq!(body["production_invocation_ready"], false);
         assert_eq!(body["production_webhook_ready"], false);
-        let serialized = body.to_string();
-        for forbidden in [
-            "owner_user_id",
-            "test_token",
-            "live_token",
-            "registration_id",
-            "challenge_hash",
-        ] {
-            assert!(!serialized.contains(forbidden), "leaked {forbidden}");
-        }
+        assert_no_sensitive_fields(&body);
     }
+}
+
+#[tokio::test]
+async fn readiness_route_hides_app_existence_across_project_boundaries() {
+    let fixture = route_fixture();
+    let (cross_project_status, cross_project_body) = get(
+        &fixture.router,
+        &fixture.path(&fixture.other_project_id),
+        Some(&fixture.owner_token),
+    )
+    .await;
+    let (missing_status, missing_body) = get(
+        &fixture.router,
+        &fixture.path_for(&fixture.project_id, "devapp_missing"),
+        Some(&fixture.owner_token),
+    )
+    .await;
+
+    assert_eq!(cross_project_status, StatusCode::FORBIDDEN);
+    assert_eq!(missing_status, StatusCode::FORBIDDEN);
+    assert_eq!(cross_project_body, missing_body);
+    assert!(missing_body.get("schema").is_none());
+    assert_no_sensitive_fields(&missing_body);
+}
+
+#[tokio::test]
+async fn readiness_route_reads_current_app_lifecycle_state_between_requests() {
+    let fixture = route_fixture();
+    let path = fixture.path(&fixture.project_id);
+
+    fixture
+        .state
+        .store
+        .disable_open_commerce_developer_app(&fixture.project_id, &fixture.app_record_id)
+        .unwrap();
+    let (disabled_status, disabled_body) =
+        get(&fixture.router, &path, Some(&fixture.owner_token)).await;
+    assert_eq!(disabled_status, StatusCode::OK, "{disabled_body}");
+    assert_eq!(disabled_body["next_action_code"], "app_inactive");
+    assert_eq!(disabled_body["blocker_codes"][0], "app_inactive");
+    assert_eq!(disabled_body["steps"][0]["code"], "app");
+    assert_eq!(disabled_body["steps"][0]["ready"], false);
+    assert_eq!(disabled_body["production_invocation_ready"], false);
+    assert_eq!(disabled_body["production_webhook_ready"], false);
+    assert_no_sensitive_fields(&disabled_body);
+
+    fixture
+        .state
+        .store
+        .reactivate_open_commerce_developer_app(&fixture.project_id, &fixture.app_record_id)
+        .unwrap();
+    let (reactivated_status, reactivated_body) =
+        get(&fixture.router, &path, Some(&fixture.owner_token)).await;
+    assert_eq!(reactivated_status, StatusCode::OK, "{reactivated_body}");
+    assert_eq!(
+        reactivated_body["next_action_code"],
+        "manifest_not_approved"
+    );
+    assert_eq!(reactivated_body["steps"][0]["ready"], true);
+    assert_no_sensitive_fields(&reactivated_body);
 }
 
 impl RouteFixture {
     fn path(&self, project_id: &str) -> String {
+        self.path_for(project_id, &self.app_record_id)
+    }
+
+    fn path_for(&self, project_id: &str, app_record_id: &str) -> String {
         format!(
-            "/api/projects/{project_id}/open-commerce/developer-apps/{}/production-readiness",
-            self.app_record_id
+            "/api/projects/{project_id}/open-commerce/developer-apps/{app_record_id}/production-readiness"
         )
+    }
+}
+
+fn assert_no_sensitive_fields(body: &Value) {
+    let serialized = body.to_string();
+    for forbidden in [
+        "owner_user_id",
+        "test_token",
+        "live_token",
+        "registration_id",
+        "challenge_hash",
+    ] {
+        assert!(!serialized.contains(forbidden), "leaked {forbidden}");
     }
 }
 
@@ -170,9 +238,10 @@ fn route_fixture() -> RouteFixture {
     let outsider_token = session(&store, &outsider.id);
     let root = path.parent().unwrap().to_path_buf();
     let state: Arc<AppState> = Arc::new(test_app_state(store, &root));
-    let router = routes().with_state(state);
+    let router = routes().with_state(state.clone());
 
     RouteFixture {
+        state,
         router,
         project_id: project.id,
         other_project_id: other_project.id,
