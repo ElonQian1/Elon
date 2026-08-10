@@ -2,8 +2,8 @@
 title: Sui 离线预检任务与短时租约 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: implementation_partially_verified
 ---
 
 # Sui 离线预检任务与短时租约 V1
@@ -34,7 +34,7 @@ V158 已能签发离线预检机器身份并接收摘要匹配的追加式报告
 - 所有机器接口继续受 `ELON_SUI_OFFLINE_PREFLIGHT_ENABLED` 控制并默认关闭。
 - 任务不含钱包、私钥、签名、PTB、Gas、RPC、交易摘要、对象 ID 或最终性证明。
 - 领取、续租、释放、完成和 `passed` 都不授权链上提交，也不移动真实资金。
-- 当前实现尚未编译、执行 V159 迁移、调用 API、验证并发租约或检查 PC 页面。
+- Node SDK、CLI 和单任务工作器已通过离线契约测试及本机假服务调用；服务端 V159 专项迁移、真实 Axum、并发租约和 PC 页面仍未运行。
 
 ## 实现引用
 

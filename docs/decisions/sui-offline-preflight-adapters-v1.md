@@ -2,8 +2,8 @@
 title: Sui 离线预检适配器身份与报告 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-10
+implementation_status: implementation_partially_verified
 ---
 
 # Sui 离线预检适配器身份与报告 V1
@@ -27,7 +27,7 @@ implementation_status: implementation_uncompiled
 - 当前没有 Sui SDK、Move Package、钱包、私钥、签名服务、RPC 客户端、Gas 预算、交易摘要、对象 ID 或最终性监听器。
 - 机器凭据证明请求来自已登记适配器，不证明适配器软件、运行主机或预检算法正确。
 - 报告不能替代平台投影完整性复核、争议处理、财务审计或链上证明。
-- 当前实现尚未编译、执行迁移、运行接口、验证并发幂等或检查 PC 页面。
+- Node 离线复核、报告客户端和 CLI 已通过契约测试及本机假服务调用；服务端 V158 专项迁移、真实 Axum、并发幂等和 PC 页面仍未运行。
 
 ## 实现引用
 
