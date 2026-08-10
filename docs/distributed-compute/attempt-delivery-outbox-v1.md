@@ -12,7 +12,7 @@ implementation_status: implementation_unwired
 
 v213 在 v211 Start command 和 v212 sealed Execution Plan 之后增加耐久派发 custody；v214 形成 rejected/quarantine/reconcile 的 no-start 恢复；v215 再形成 accepted ACK 到 commit outbox 的本地原子闭包。它解决的不是“如何发一次 HTTP 请求”，而是先落 command 还是先碰远端、哪个 worker 拥有工作、网络结果未知时如何恢复，以及什么证据才足以证明远端从未开始执行。
 
-v213-v215 只形成本地领域合同、SQLite 账本、Store 状态核和反向门卫；不实现 concrete Adapter、resolver、worker、网络、定时器、公网 ACK ingress、Bearer 凭据解析、Runner 事件或 external-pool onboarding。所有可认证远端 observation 与发送 authority 仍由字段私有、不可 Clone、不可反序列化且没有生产构造器的 sealed 类型承载，因此真实投递与远端恢复继续不可达。服务端及测试源码已编译；内存 SQLite 完整迁移、重复应用、关键对象和 v215 冲突 backfill 门卫已通过 3 项专项测试，但生产磁盘迁移与生产链路未运行。
+v213-v215 只形成本地领域合同、SQLite 账本、Store 状态核和反向门卫；不实现 concrete Adapter、resolver、worker、网络、定时器、公网 ACK ingress、Bearer 凭据解析或 Runner 事件。external-pool onboarding 首段现只有 docs-only 来源权威，没有 Rust、migration 或 route rows。所有可认证远端 observation 与发送 authority 仍由字段私有、不可 Clone、不可反序列化且没有生产构造器的 sealed 类型承载，因此真实投递与远端恢复继续不可达。服务端及测试源码已编译；内存 SQLite 完整迁移、重复应用、关键对象和 v215 冲突 backfill 门卫已通过 3 项专项测试，但生产磁盘迁移与生产链路未运行。
 
 ## 2. 先耐久、后远端
 
@@ -113,9 +113,9 @@ v176 只有在 Reservation 没有 Start command，或引用同一 command/reserv
 
 ## 10. External pool 边界
 
-external pool 只能使用 `server_adapter + adapter_execution`，不能伪装成用户节点或 endpoint ReadyCapability。v213 可表达 registry/authorization 历史形状，但本批不创建或激活 external-pool Provider，不签发 credential，不创建 Pool/Offer，不解析 concrete Adapter，也不开放派发或结算。
+external pool 只能使用 `server_adapter + adapter_execution`，不能伪装成用户节点或 endpoint ReadyCapability。首段来源权威固定为 owner request→独立管理员复核→immutable apply；未来 apply 也只登记 `external_pool/registering` Provider 和专用 application source，不签发 credential、不创建 Pool/Offer、不解析 concrete Adapter，也不开放派发或结算。
 
-后续需要独立管理员/系统 onboarding：绑定 Provider owner、结算主体、Adapter registry/config、credential verification、协议能力、撤销与 cleanup-only 语义，并形成审核回执。现有 endpoint-only 激活计划和通用 Store 写方法不得作为旁路。
+未来 v221 必须让 `external_pool_onboarding` 精确引用专用 application，而不是借用 endpoint-only activation application；本 docs-first 批不创建或执行该 migration，也不触发 route source。申请、管理员批准、Provider adapter ref 与 non-bearer lookup ref 都不等于 credential proof；v213 rows 仍须等待独立 verifier、TTL/revocation、六能力 currentness 与 sealed producer。完整边界见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)。
 
 ## 11. 仍未实现
 
@@ -124,7 +124,7 @@ external pool 只能使用 `server_adapter + adapter_execution`，不能伪装�
 - authenticated ACK/event 公网入口、reconcile/cancel 网络协议与 crash injection；
 - accepted closure 的可信生产入口、commit transport 与 Lease authority 带外交付；
 - Lease authority 带外交付、Runner event、Renew 与可信零用量补偿；
-- external-pool onboarding、Provider 激活和 service-managed capacity；
+- external-pool onboarding Rust/v221/API、credential authority、Provider 激活和 service-managed capacity；
 - 编译、迁移、SQLite trigger、并发、接口和真实远端验证。
 
 上游可执行闭包见 `attempt-execution-plan-v1.md`，v211 command/ACK 与 v185 原子边界见 `attempt-execution-gateway-v1.md`，Broker 退款边界见 `broker-api.md`。

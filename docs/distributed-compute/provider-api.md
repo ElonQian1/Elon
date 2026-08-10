@@ -24,7 +24,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 | GET | `/api/me/compute/providers?limit=20` | 列出本人 Provider 的脱敏视图 |
 | GET | `/api/me/compute/providers/:provider_id` | 读取本人一份 Provider 的脱敏视图 |
 
-创建请求可以声明稳定 `provider_id`、类型、显示名称、区域、任务类型、加速器类型、允许的数据分类、流式与检查点能力，以及可选硬件摘要。本人接口不接受 `external_pool`；该类型必须由服务端适配器管理。
+创建请求可以声明稳定 `provider_id`、类型、显示名称、区域、任务类型、加速器类型、允许的数据分类、流式与检查点能力，以及可选硬件摘要。本人通用接口不接受 `external_pool`；其专用 owner request、独立管理员复核和 immutable apply 边界见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)，当前仍只有文档权威。
 
 ## 3. MCP 工具
 
@@ -71,7 +71,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 ## 7. 尚未实现
 
 - Cargo 编译、迁移执行和 HTTP/MCP 真实调用验证；
-- 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；
+- 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；外部矿池专用 onboarding Rust、v221 与 API 尚未实现；
 - Endpoint/Adapter 路由提案、证明、审批、轮换和撤销；
 - 节点绑定、ReadyCapability、路由与硬件观测摘要的申请及人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实证据采集、密码学验证、信任升级和激活仍未实现；
 - 真实价格源和自动撮合；CapacityPool、供给账本、Offer 生命周期及 fallback_curve Price Snapshot 已另行写入代码，但仍为 `implementation_uncompiled`；
