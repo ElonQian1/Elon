@@ -1320,7 +1320,7 @@
                         android:background="@drawable/bg_bottom_nav_glass"
                         android:clipToOutline="true"
                         android:contentDescription="@null"
-                        app:blurOverlayColor="#8042474F" />
+                        app:blurOverlayColor="#302A3038" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -1488,7 +1488,7 @@
                         android:background="@drawable/bg_bottom_nav_glass_circle"
                         android:clipToOutline="true"
                         android:contentDescription="@null"
-                        app:blurOverlayColor="#8042474F" />
+                        app:blurOverlayColor="#302A3038" />
 
                     <ImageView
                         android:id="@+id/bottomActionPlusIcon"
