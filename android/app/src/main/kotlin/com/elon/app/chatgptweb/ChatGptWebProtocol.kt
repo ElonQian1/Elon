@@ -43,6 +43,7 @@ internal data class ChatGptWebComposerOption(
     val label: String,
     val selected: Boolean,
     val kind: String,
+    val semantic: String = ChatGptWebComposerOptionSemantics.TOOL,
 )
 
 internal data class ChatGptWebFeature(
@@ -207,6 +208,9 @@ internal object ChatGptWebProtocol {
                         label = label,
                         selected = item.optBoolean("selected"),
                         kind = item.optString("kind").take(MAX_OPTION_KIND_LENGTH),
+                        semantic = item.optString("semantic")
+                            .takeIf { it in ChatGptWebComposerOptionSemantics.KNOWN }
+                            ?: ChatGptWebComposerOptionSemantics.fallback(section),
                     ),
                 )
             }

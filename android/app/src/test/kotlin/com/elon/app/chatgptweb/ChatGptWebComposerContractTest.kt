@@ -36,6 +36,11 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("!baseline.has(node)"))
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
+        assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
+        assertTrue(adapter.contains("semantic: optionSemantic(section, node, label)"))
+        assertTrue(adapter.contains("deep_research"))
+        assertTrue(adapter.contains("attachment_camera"))
+        assertTrue(adapter.contains("web_search"))
         assertTrue(adapter.contains("dismiss_composer_menu"))
         assertTrue(adapter.contains("optionPolicy.filter(section, candidates)"))
         assertTrue(optionPolicy.contains("isForeignMenuLabel"))
@@ -101,6 +106,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(controller.contains("ChatGptWebCapabilityId.MODEL_SELECTOR"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.ATTACHMENTS"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.COMPOSER_TOOLS"))
+        assertTrue(controller.contains("ChatGptWebComposerOptionSemantics.isAttachment"))
+        assertFalse(controller.contains("ATTACHMENT_LABELS"))
         assertTrue(controller.contains("bridgeReady && capabilities.supports"))
         val voiceController = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeVoiceController.kt",

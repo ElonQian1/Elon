@@ -179,6 +179,7 @@ class ChatGptWebMcpActionsTest {
             feature.getString("native_adb_content_description"),
         )
         assertEquals("chatgpt_select_composer_option", option.getString("native_action"))
+        assertEquals("model", option.getString("semantic"))
         assertEquals(
             "chatgpt-composer-option:model:model_fast:快速",
             option.getString("native_adb_content_description"),
@@ -340,6 +341,7 @@ class ChatGptWebMcpActionsTest {
                                 "快速",
                                 selected = false,
                                 kind = "menuitemradio",
+                                semantic = "model",
                             ),
                         ),
                     ),

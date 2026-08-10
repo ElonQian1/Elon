@@ -108,7 +108,7 @@ class ChatGptWebProtocolTest {
                 "section":"model",
                 "currentModel":"5.6 Sol 轻度",
                 "options":[
-                  {"id":"model_ab12","label":"轻度","selected":true,"kind":"menuitemradio"},
+                  {"id":"model_ab12","label":"轻度","selected":true,"kind":"menuitemradio","semantic":"model"},
                   {"id":"../unsafe","label":"错误选项","selected":false,"kind":"menuitem"},
                   {"id":"model_blank","label":"  ","selected":false,"kind":"menuitem"}
                 ]
@@ -122,6 +122,33 @@ class ChatGptWebProtocolTest {
         assertEquals(1, event.options.size)
         assertEquals("轻度", event.options.single().label)
         assertTrue(event.options.single().selected)
+        assertEquals("model", event.options.single().semantic)
+    }
+
+    @Test
+    fun parsesStableToolSemanticsAndFallsBackForFutureOptions() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"composer_controls_snapshot",
+                "section":"tools",
+                "currentModel":"5.6 Sol 轻度",
+                "options":[
+                  {"id":"tools_camera","label":"拍摄新照片","kind":"menuitem","semantic":"attachment_camera"},
+                  {"id":"tools_search","label":"搜索互联网","kind":"menuitem","semantic":"web_search"},
+                  {"id":"tools_future","label":"未来工具","kind":"menuitem","semantic":"future_tool"}
+                ]
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.ComposerControls
+
+        assertEquals(
+            listOf("attachment_camera", "web_search", "tool"),
+            event.options.map(ChatGptWebComposerOption::semantic),
+        )
     }
 
     @Test

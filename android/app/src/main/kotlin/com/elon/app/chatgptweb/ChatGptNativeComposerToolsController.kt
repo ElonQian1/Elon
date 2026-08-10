@@ -137,8 +137,7 @@ internal class ChatGptNativeComposerToolsController(
     }
 
     private fun isAttachmentOption(option: ChatGptWebComposerOption): Boolean {
-        val label = option.label.trim().lowercase()
-        return label in ATTACHMENT_LABELS || label.startsWith("upload ")
+        return ChatGptWebComposerOptionSemantics.isAttachment(option.semantic)
     }
 
     private fun updateControls() {
@@ -163,16 +162,6 @@ internal class ChatGptNativeComposerToolsController(
             "list_composer_tools",
             "collect_model_options",
             "collect_composer_tools",
-        )
-        val ATTACHMENT_LABELS = setOf(
-            "相机",
-            "照片",
-            "文件",
-            "camera",
-            "photo",
-            "photos",
-            "file",
-            "files",
         )
     }
 }

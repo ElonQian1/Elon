@@ -225,6 +225,28 @@
     return section + '_' + (hash >>> 0).toString(36);
   }
 
+  function optionSemantic(section, node, label) {
+    if (section === 'model') return 'model';
+    const signal = cleanText([
+      node && node.id,
+      node && node.getAttribute('data-testid'),
+      node && node.getAttribute('aria-label'),
+      label
+    ].filter(Boolean).join(' ')).toLowerCase();
+    if (/deep.?research|深度研究/.test(signal)) return 'deep_research';
+    if (/create.?image|image.?generation|生成图片|创建图片/.test(signal)) return 'image_generation';
+    if (/canvas|画布/.test(signal)) return 'canvas';
+    if (/study|学习/.test(signal)) return 'study';
+    if (/agent|代理模式|智能体/.test(signal)) return 'agent';
+    if (/camera|take.?photo|相机|拍照/.test(signal)) return 'attachment_camera';
+    if (/photos?|gallery|照片|相册/.test(signal)) return 'attachment_photos';
+    if (/upload|files?|documents?|文件|文档|上传/.test(signal)) return 'attachment_file';
+    if (/(^|[\s_-])search($|[\s_-])|web.*search|search.*web|browse|搜索/.test(signal)) {
+      return 'web_search';
+    }
+    return 'tool';
+  }
+
   function visibleOptionNodes() {
     return Array.from(document.querySelectorAll(
       '[role="menuitemradio"], [role="menuitemcheckbox"], [role="menuitem"], [role="option"]'
@@ -247,6 +269,7 @@
         label,
         selected,
         kind: role,
+        semantic: optionSemantic(section, node, label),
         role,
         selectable: selected || node.hasAttribute('aria-checked') || node.hasAttribute('aria-selected'),
         node
@@ -277,7 +300,9 @@
       type: 'composer_controls_snapshot',
       section,
       currentModel: currentModel(composer),
-      options: options.map(({ id, label, selected, kind }) => ({ id, label, selected, kind }))
+      options: options.map(({ id, label, selected, kind, semantic }) => ({
+        id, label, selected, kind, semantic
+      }))
     });
   }
 

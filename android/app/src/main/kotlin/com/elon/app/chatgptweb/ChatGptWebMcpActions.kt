@@ -285,6 +285,7 @@ internal class ChatGptWebMcpActions(
                                 .put("id", option.id)
                                 .put("label", option.label)
                                 .put("kind", option.kind)
+                                .put("semantic", option.semantic)
                                 .put("selected", option.selected)
                                 .put("native_action", "chatgpt_select_composer_option")
                                 .put(
