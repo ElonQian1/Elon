@@ -14,7 +14,9 @@
     if (!node) return false;
     const rect = node.getBoundingClientRect();
     const style = window.getComputedStyle(node);
-    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+    return rect.width > 0 && rect.height > 0 &&
+      rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth &&
+      style.display !== 'none' && style.visibility !== 'hidden';
   }
 
   function nodeLabel(node) {
@@ -74,7 +76,8 @@
     const scopes = Array.from(document.querySelectorAll(
       'aside, nav, [data-testid*="sidebar" i], [role="navigation"], [role="dialog"]'
     )).filter(isVisible);
-    const roots = scopes.length ? scopes : [document.body];
+    if (!scopes.length) return [];
+    const roots = scopes;
     const seen = new Set();
     const values = [];
     roots.forEach((root) => {
@@ -143,6 +146,8 @@
   }
 
   function requestList(emitEvent, result) {
+    const existing = emitSnapshot(emitEvent);
+    if (existing.length) return result('list_navigation', true, '');
     const open = sidebarButton(true);
     if (open) {
       if (!emitTouchRequest('list_navigation', open, emitEvent)) {
@@ -150,8 +155,13 @@
       }
       return result('list_navigation', true, '');
     }
-    const existing = emitSnapshot(emitEvent);
-    if (existing.length) return result('list_navigation', true, '');
+    const layout = window.__elonChatGptLayout;
+    if (
+      layout && typeof layout.requestSemanticTouch === 'function' &&
+      layout.requestSemanticTouch('navigation', 'list_navigation', emitEvent)
+    ) {
+      return result('list_navigation', true, '');
+    }
     result('list_navigation', false, '官网功能侧栏入口当前不可见。');
   }
 

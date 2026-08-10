@@ -428,6 +428,23 @@
     emitEvent(event);
   }
 
+  function requestSemanticTouch(semantic, purpose, emitEvent) {
+    const discovery = discover();
+    const control = discovery.controls.find((candidate) =>
+      candidate.semantic === semantic && candidate.enabled && candidate.inViewport
+    );
+    const node = control && controlsById.get(control.id);
+    if (!node || !isVisible(node)) return false;
+    emitEvent({
+      type: 'web_touch_request',
+      purpose,
+      controlId: control.id,
+      xRatio: control.xRatio,
+      yRatio: control.yRatio
+    });
+    return true;
+  }
+
   function invoke(id, emitEvent, result) {
     discover();
     const node = controlsById.get(String(id || ''));
@@ -452,5 +469,10 @@
     window.setTimeout(dispatch, 120);
   }
 
-  window.__elonChatGptLayout = Object.freeze({ emitSnapshot, invoke, pageKind });
+  window.__elonChatGptLayout = Object.freeze({
+    emitSnapshot,
+    invoke,
+    pageKind,
+    requestSemanticTouch
+  });
 })();

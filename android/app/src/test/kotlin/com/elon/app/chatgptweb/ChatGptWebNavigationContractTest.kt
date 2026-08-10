@@ -14,6 +14,9 @@ class ChatGptWebNavigationContractTest {
         val adapter = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_navigation.js",
         )
+        val layoutAdapter = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
+        )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
         val pageAdapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
@@ -28,9 +31,12 @@ class ChatGptWebNavigationContractTest {
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("lastFeatures.find"))
         assertTrue(adapter.contains("location.origin !== 'https://chatgpt.com'"))
+        assertTrue(adapter.contains("if (!scopes.length) return []"))
+        assertTrue(adapter.contains("layout.requestSemanticTouch('navigation'"))
+        assertTrue(layoutAdapter.contains("function requestSemanticTouch"))
         val requestList = adapter.substringAfter("function requestList")
             .substringBefore("function collectList")
-        assertTrue(requestList.indexOf("sidebarButton(true)") < requestList.indexOf("emitSnapshot"))
+        assertTrue(requestList.indexOf("emitSnapshot") < requestList.indexOf("sidebarButton(true)"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("navigation adapter must not contain $it", adapter.contains(it))
         }
