@@ -94,6 +94,29 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun doesNotRequestAdaptationForTheHeaderTitleAlreadyRenderedByNativeUi() {
+        val titleManifest = manifest("healthy", "title").copy(
+            controls = manifest("healthy", "title").controls.map {
+                it.copy(region = ChatGptWebUiRegion.HEADER, label = "工作")
+            },
+        )
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = titleManifest,
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        assertEquals(0, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
+        assertEquals(
+            "metadata",
+            matrix.getJSONArray("control_coverage").getJSONObject(0).getString("presentation"),
+        )
+        assertFalse(matrix.getJSONObject("adaptation_review").getBoolean("required"))
+    }
+
+    @Test
     fun treatsCurrentConversationMenuSemanticsAsAdaptedControls() {
         val controls = listOf("conversation_files", "pin", "archive")
         controls.forEach { semantic ->

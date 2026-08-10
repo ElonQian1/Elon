@@ -6,6 +6,17 @@ import org.junit.Test
 
 class ChatGptNativeControlPresentationTest {
     @Test
+    fun treatsTheRenderedHeaderTitleAsMetadataInsteadOfAnOfficialFallback() {
+        val title = control("title", "title", "工作", ChatGptWebUiRegion.HEADER)
+
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(title)).getValue("title")
+
+        assertEquals("metadata", coverage.kind.wireName)
+        assertNull(coverage.nativeSelector)
+        assertNull(coverage.nativeTriggerSelector)
+    }
+
+    @Test
     fun keepsSecondaryCopyActionsInsteadOfCollapsingAllCopyControls() {
         val controls = listOf(
             control("copy_reply", "copy", "复制回复", ChatGptWebUiRegion.MESSAGE, CONTEXT),

@@ -34,6 +34,8 @@ internal object ChatGptNativeControlPresentation {
 
         return controls.associate { control ->
             val coverage = when {
+                control.region == ChatGptWebUiRegion.HEADER && control.semantic == "title" ->
+                    Coverage(control.id, Kind.METADATA)
                 control.id in headerIds || control.id in suggestionIds -> Coverage(
                     control.id,
                     Kind.DIRECT,
