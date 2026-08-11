@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 待结算回执
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc-frontend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 待结算回执
 
 ## 1. 当前实现
 
-v195、追加式 Store、独立 Service、HTTP 路由、角色生命周期历史和 PC 工作区已经写入代码，但尚未编译、执行迁移、运行接口验证或完成页面验收，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于精确的 v194 可信终态和 v193 Execution Receipt，为一个 Attempt 原子生成一次 Settlement Receipt。
+v195 的追加式 Store、独立 Service、HTTP 路由与角色生命周期历史已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-settlement-issuance` 与角色结算视图已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。平台 `admin/owner` 只能基于精确 v194/v193 为一个 Attempt 生成一次平台内 Settlement Receipt，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 这是 Attempt 链中第一项实际结清消费者平台人民币预授权、并为 Provider 与平台登记待结算收益的操作。Provider 收益只进入独立的 `pending` 余额，不是可提现余额，也不代表真实银行、支付机构或链上资金已经转移。
 
@@ -77,7 +78,7 @@ v195 只处理以下最窄合同：
 
 仅 `admin/owner` 可见的 `/compute-settlement-issuance` 已写入待结算列表与逐笔确认对话框。页面展示预授权、实际扣结、退款、Provider pending、平台 pending，以及 Finalization、Execution Receipt、Job、Price Snapshot 和预算预授权的精确绑定。管理员必须勾选资金影响并输入“确认扣结”后才能提交。
 
-该页面不会批量或自动结算，也不提供 pending 释放、提现或外部付款。它目前仅为源码实现，尚未构建、联调、视觉验收或发布。
+该页面不会批量或自动结算，也不提供 pending 释放、提现或外部付款。它已通过静态生产构建，但尚未完成真实 HTTP、浏览器视觉验收或发布。
 
 共享 `SettlementLifecycleHistoryList` 已接入消费者 `/compute-challenges`、Provider `/my-compute-settlement` 和管理员 `/compute-challenge-resolution`，同时展示正常结算与申诉结算的 pending、纠正及内部释放状态。三处页面均不把内部 available 显示为外部到账。
 

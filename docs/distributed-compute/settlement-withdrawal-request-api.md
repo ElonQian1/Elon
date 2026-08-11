@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Provider 提现申请与内部冻结
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Provider 提现申请与内部冻结
 
 ## 1. 当前实现
 
-v200、追加式 Store、独立 Service 与 Provider 本人 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+v200 的追加式 Store、独立 Service 与 Provider 本人 HTTP 路由已写入并随服务端组合编译/迁移；操作级接口专项仍未运行。PC `/my-compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 Provider 所有者可把本人结算账户中的一笔 CNY `available` 余额原子转入 `withdrawn` 保留区，并取得不可变 Withdrawal Request Receipt、Posting 和两条账本腿。该动作只创建提款申请和内部资金冻结，不执行银行付款、数字钱包转账、Sui 交易或任何外部清算。
 
@@ -69,7 +70,7 @@ v201 使用独立追加式记录表达取消、拒绝或“管理员登记外部
 
 `pc-frontend/src/features/compute-settlement/` 已写入 `/my-compute-settlement` 页面源码。登录用户可切换本人 Provider、查看经账本重建的余额和提款终态，并在 available 大于零时打开提款申请对话框。表单把人民币输入转换为整数微单位，要求目标引用非空，并强制确认“只冻结内部余额”和“引用不含秘密”；成功后重新读取账户与队列。
 
-本人可对仍为 pending 的申请执行显式取消。页面使用 v200 Event Digest 与 Request Posting ID/Digest 构造 v201 取消请求，服务端仍负责最终所有权、唯一终态和余额审计。该页面尚未构建、运行、视觉验收或发布。
+本人可对仍为 pending 的申请执行显式取消。页面使用 v200 Event Digest 与 Request Posting ID/Digest 构造 v201 取消请求，服务端仍负责最终所有权、唯一终态和余额审计。该页面已通过静态生产构建，但尚未完成真实 HTTP、浏览器视觉验收或发布。
 
 ## 7. 尚未实现
 

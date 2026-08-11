@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt 平台终态观测证据
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 平台终态观测证据
 
 ## 1. 当前实现
 
-v191、追加式 Store、Service、HTTP 路由、管理员待观测模板队列与 PC `/compute-observations` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面允许平台 `admin/owner` 发现尚无观测的 v189 Provider 终态候选，为其登记第一份平台观测证据，并保存与最终 v188 Provider 声明不同的 meter。
+v191 的追加式 Store、Service、HTTP 路由与管理员待观测队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-observations` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。本控制面允许平台 `admin/owner` 登记第一份平台观测证据并保存与 v188 声明不同的 meter，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 平台观测值仍是 Verification 的输入，不是 `verified_usage`。即使来源标记为 `server_metering`，v191 也不会生成 Execution Receipt、推进可信终态、消费容量、扣除预授权或释放 Provider 收益。
 

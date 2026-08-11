@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 可信终态与容量收口
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 可信终态与容量收口
 
 ## 1. 当前实现
 
-v194、追加式 Store、独立 Service、HTTP 路由和 PC 管理员工作区已经写入代码，但尚未编译、执行迁移、运行接口验证或完成页面验收，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用一次可信终态。
+v194 的追加式 Store、独立 Service 与 HTTP 路由已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-finalization` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。平台 `admin/owner` 只能基于 accepted Verification 的精确 v193 Execution Receipt 应用一次可信终态，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 这是 Attempt 链中第一项会同时修改业务状态和容量账本的操作。它本身不会扣除消费者预授权、释放 Provider 收益或生成 Settlement Receipt，不能描述为“任务已经完成付款”；后续 v195 待结算回执是独立事务，见 `docs/distributed-compute/attempt-settlement-api.md`。
 
@@ -61,7 +62,7 @@ POST 必须提供精确 Execution Receipt ID 和摘要、当前 Lease/Job/Reserv
 
 仅 `admin/owner` 可见的 `/compute-finalization` 已写入待收口列表和逐笔确认对话框。页面展示 Execution Receipt、Lease/Job/Reservation/Claim 的精确版本与摘要、fencing generation、可补偿用量及预期状态变化，并要求勾选风险确认后输入“确认收口”。页面不会自动批量提交，也不会把 v194 描述为付款或结算。
 
-该入口目前仅为源码实现，尚未构建、联调、视觉验收或发布；它不能作为接口可用、数据库已迁移或用户已经能够访问的证据。
+该入口已通过 PC 静态生产构建，但尚未完成真实 HTTP、浏览器视觉验收或发布；静态构建不能作为接口可用、生产数据库已迁移或用户已经能够访问的证据。
 
 ## 7. 尚未实现
 

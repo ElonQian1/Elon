@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt Lease 状态与续租控制面
 status: current
-reviewed_at: 2026-08-09
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt Lease 状态与续租控制面
 
 ## 1. 当前状态
 
-v186 Store kernel、历史读取、HTTP 路由与 PC `/compute-execution` Lease 控制面已经写入代码，但尚未编译、执行迁移或运行接口/页面验证。v213 铺设真实 Adapter 的耐久派发/恢复权威后，Provider-owner 人工续租 POST 已固定失败 `COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY`；GET、列表和历史回执仍可读取。下文续租事务描述的是保留的 dormant kernel，不是当前可调用写能力。
+v186 Store kernel、历史读取和 HTTP 路由已随服务端编译与全量迁移组合链验证；续租正向专项仍未运行。PC `/compute-execution` 已通过静态生产构建，并停止调用人工续租 POST。该入口继续固定失败 `COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY`；GET、列表和历史回执仍可读取。下文续租事务描述的是保留的 dormant kernel，不是当前可调用写能力，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 `executor_heartbeat_ref` 只是调用方提交的外部证据引用。当前平台不读取证明正文、不验证执行器签名，也不发送 `RenewLease` 节点命令，因此续租成功不能证明节点真实在线或任务真实运行。
 
@@ -26,7 +26,7 @@ v186 Store kernel、历史读取、HTTP 路由与 PC `/compute-execution` Lease 
 
 本人 Provider 列表最多返回 100 条当前状态投影，按 `updated_at` 倒序和稳定 Lease ID 排序；服务端先核对 Provider 所有权，再逐条重算摘要并审计投影。该读取不返回独立消费者账户字段，不修改 Lease、Job、Reservation、容量或资金。
 
-PC `/compute-execution` 仍可选择本人 Provider 的当前 Lease，并按稳定 Lease ID 读取激活回执和状态；旧续租控件在后端只会收到 Gateway-not-ready，不能展示为成功或平台验证。
+PC `/compute-execution` 仍可选择本人 Provider 的当前 Lease，并按稳定 Lease ID 读取激活回执和状态；人工续租控件已固定禁用并显示 Gateway 边界，不会调用失败关闭入口或展示为成功。
 
 ## 3. 状态与时间边界
 

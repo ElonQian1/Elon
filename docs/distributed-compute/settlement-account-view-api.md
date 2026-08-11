@@ -1,15 +1,16 @@
 ---
 title: 分布式算力结算账户审计视图与提款队列
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力结算账户审计视图与提款队列
 
 ## 1. 当前实现
 
-Provider 本人结算账户视图、按 Provider 过滤的本人提款队列、平台结算账户视图和管理员全局提款队列已经写入独立 Store、Service 与 HTTP 路由，但尚未编译或运行接口验证，状态固定为 `implementation_uncompiled`。这些能力复用 v195、v198-v201 数据表，不增加新迁移，也不修改任何余额。
+Provider 本人账户/提款队列和平台账户/全局提款队列已写入独立 Store、Service 与 HTTP 路由，并随服务端组合编译；操作级接口专项仍未运行。PC `/my-compute-settlement` 与 `/compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。这些只读能力复用 v195、v198-v201 数据表，不增加迁移或修改余额，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 ## 2. HTTP 路由
 
@@ -66,7 +67,7 @@ Provider 本人结算账户视图、按 Provider 过滤的本人提款队列、�
 
 ## 6. PC 管理入口
 
-`pc-frontend/src/features/compute-settlement/` 已写入两个页面源码。所有登录用户可从 `/my-compute-settlement` 切换本人 Provider，查看 pending/available/withdrawn、按终态读取本人队列、申请把 available 转入 withdrawn，并在二次确认后取消 pending 申请。只有本地用户角色为 `admin/owner` 时显示 `/compute-settlement` 管理导航；服务端仍独立执行最终鉴权。管理员页读取平台账户、到期释放候选和全局提款队列，并可在二次确认后调用到期逐笔释放。对于 pending 提款，管理员还可选择拒绝并把 withdrawn 全额返还 available，或在确认系统外付款已经完成后登记证据类型、公开引用和 64 位证据摘要。两页的写请求都精确携带既有摘要并复用 v198-v201 幂等与唯一终态门卫。页面尚未执行 TypeScript 构建、浏览器视觉验收或发布，不能描述为线上可用。
+`pc-frontend/src/features/compute-settlement/` 已写入两个页面。所有登录用户可从 `/my-compute-settlement` 切换本人 Provider，查看 pending/available/withdrawn、按终态读取本人队列、申请把 available 转入 withdrawn，并在二次确认后取消 pending 申请。只有本地用户角色为 `admin/owner` 时显示 `/compute-settlement` 管理导航；服务端仍独立执行最终鉴权。管理员页读取平台账户、到期释放候选和全局提款队列，并可在二次确认后调用到期逐笔释放。对于 pending 提款，管理员还可选择拒绝并把 withdrawn 全额返还 available，或在确认系统外付款已经完成后登记证据类型、公开引用和 64 位证据摘要。两页的写请求都精确携带既有摘要并复用 v198-v201 幂等与唯一终态门卫。页面已通过 TypeScript、lint 和静态生产构建，但未完成真实 HTTP、浏览器视觉验收或发布，不能描述为线上可用。
 
 ## 7. 非付款边界
 

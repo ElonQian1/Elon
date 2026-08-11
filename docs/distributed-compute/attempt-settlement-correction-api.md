@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt accepted 挑战结算纠正
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc-frontend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt accepted 挑战结算纠正
 
 ## 1. 当前实现
 
-v199、追加式 Store、独立 Service、HTTP 路由、accepted 待纠正队列和 PC `/compute-corrections` 管理员工作区已经写入代码，但尚未编译、执行迁移、接口联调、页面验收或发布，状态固定为 `implementation_uncompiled`。
+v199 的追加式 Store、独立 Service、HTTP 路由与 accepted 待纠正队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-corrections` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器、生产库和发布仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 v199 只处理 v197 已裁决为 `accepted` 的消费者挑战。平台管理员给出向下修正后的消费者费用、Provider 应得和平台价差，系统在单一事务中向消费者余额退款，并从 Provider 与平台 pending 余额冲减对应金额。原 v195 Settlement Receipt、v196 Challenge、v197 Resolution 和 `billing_reservation` 均保持历史原貌。
 

@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt 已接受激活控制面
 status: current
-reviewed_at: 2026-08-09
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 已接受激活控制面
 
 ## 1. 当前状态
 
-v185 的 Store 与状态推进内核已经写入代码，但尚未编译、执行迁移或运行接口/页面验证。v211 又把该内核收进 Attempt Execution Gateway：新 activation 必须与 exact provisional Adapter ACK 和 application receipt 在同一事务提交；原来依赖调用者声明“外部执行器已经接受任务”的写入口现固定返回 `COMPUTE_ATTEMPT_EXECUTION_GATEWAY_NOT_READY`。当前没有可构造 execution plan、生产 Adapter 或真实节点派发，详见 `attempt-execution-gateway-v1.md`。
+v185-v215 服务端源码已编译，全量迁移、两次重开与冲突 backfill 门卫已有组合证据；accepted 成功闭包和本接口正向专项仍未运行。PC `/compute-execution` 已通过静态生产构建，并停止调用人工 activation。v211 要求新 activation 与 exact provisional Adapter ACK 和 application receipt 在同一事务提交；旧写入口继续固定返回 `COMPUTE_ATTEMPT_EXECUTION_GATEWAY_NOT_READY`。当前没有可构造 execution plan、生产 Adapter 或真实节点派发，详见 `attempt-execution-gateway-v1.md` 与 `pc-compute-attempt-workbenches-acceptance.md`。
 
 ## 2. HTTP 接口
 
@@ -26,7 +26,7 @@ v185 的 Store 与状态推进内核已经写入代码，但尚未编译、执�
 
 候选读取只返回当前 Provider 自有、Reservation 仍为 `active` 且未过期、Job 仍为 `reserved`、并且尚不存在 Attempt 激活回执的记录。每条候选在返回前重新审计当前注册表；读取不冻结资金、不改变容量或状态，也不代表外部执行器已经接受任务。
 
-PC `/compute-execution` 的旧提交源码尚未改成 Gateway workflow；即使页面被构建，提交也只会收到失败关闭错误。页面不得据此显示节点已接受或 Attempt 已启动。
+PC `/compute-execution` 已移除人工 activation 调用，待激活 Reservation 只读显示“等待 Gateway”。页面不会因用户确认而显示节点已接受或 Attempt 已启动。
 
 ## 3. 原子效果
 

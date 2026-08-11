@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt 消费者终态审核证据
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 消费者终态审核证据
 
 ## 1. 当前实现
 
-v190、追加式 Store、Service、HTTP 路由、本人待审核队列与 PC `/compute-reviews` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面允许 Job 消费者发现自己的 v189 Provider 终态候选，并登记第一份 `accepted`、`rejected` 或 `disputed` 审核证据。
+v190 的追加式 Store、Service、HTTP 路由与本人待审核队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-reviews` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。本控制面允许 Job 消费者发现自己的 v189 Provider 终态候选并登记第一份审核证据，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 消费者审核只是一方证明，不是平台 Verification 决定。即使消费者选择 `accepted`，也不会生成 Execution Receipt、扣除预授权、释放 Provider 收益、消费容量或推进 Lease、Job、Reservation、Claim 状态。
 

@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt Execution Receipt
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt Execution Receipt
 
 ## 1. 当前实现
 
-v193、追加式 Store、独立 Service、HTTP 路由、管理员待签发队列与 PC `/compute-receipts` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 可发现尚无 v193 的 `accepted` v192 Verification，并基于精确决定签发第一份不可变 Execution Receipt。
+v193 的追加式 Store、独立 Service、HTTP 路由与管理员待签发队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-receipts` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。平台 `admin/owner` 可基于精确的 accepted v192 决定签发第一份不可变 Execution Receipt，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 Execution Receipt 固化执行事实，不负责修改业务状态或移动资金。v193 不推进 Lease、Job、Reservation、Capacity Claim，不消费容量，不扣除预授权，也不释放 Provider 收益。
 
@@ -69,7 +69,7 @@ v193 在一个事务中重新读取并审计 Attempt 激活、精确 Job/Reserva
 - PC 构建、接口联调、视觉验收和发布；
 - NodeAgent 到云端的签名事件传输、真实工件取回与恶意内容扫描；
 - 自动签发、多独立回执、挑战和争议裁决；
-- v193 本身不推进 Lease/Job，也不消费 Capacity Claim 与 Reservation；后续 v194 已写入独立可信终态事务，但仍为 `implementation_uncompiled`；
+- v193 本身不推进 Lease/Job，也不消费 Capacity Claim 与 Reservation；后续 v194 已写入独立可信终态事务，当前为 `implementation_partially_verified`，但操作级正向专项仍未运行；
 - Settlement Receipt、消费者扣款、Provider 收益、退款和纠正回执。
 
 后续状态与容量效果见 `docs/distributed-compute/attempt-finalization-api.md`。

@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt Verification 决定
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt Verification 决定
 
 ## 1. 当前实现
 
-v192、追加式 Store、Service、HTTP 路由、管理员待验证证据链队列与 PC `/compute-verification` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 可发现已经具备 v189 Provider 候选、v190 消费者审核和 v191 平台观测且尚无 v192 的证据链，并把三者绑定为第一份不可变 Verification 决定。
+v192 的追加式 Store、Service、HTTP 路由与管理员待验证队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-verification` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。平台 `admin/owner` 可把 v189-v191 证据链绑定为第一份不可变 Verification 决定，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 v192 只记录 `accepted/rejected/disputed` 及其确定性 `verified_usage`、`compensable_usage`。它本身不会生成 Execution Receipt，不会推进 Lease、Job、Reservation 或 Claim，不会消费容量，也不会扣除预授权或释放 Provider 收益；v193 可另行基于 accepted 决定签发回执。
 

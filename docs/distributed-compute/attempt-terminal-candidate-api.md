@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt Provider 终态候选控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt Provider 终态候选控制面
 
 ## 1. 当前状态
 
-v189、追加式 Store、Service、HTTP 路由与 PC `/compute-execution` 入口已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面只保存 Provider 对 `succeeded`、`failed` 或 `canceled` 的首次终态声明，形成待验证候选；它不是 Execution Receipt，也不会把 Lease、Job、Reservation 或 Capacity Claim 推进到终态。
+v189 的追加式 Store、Service 与 HTTP 路由已写入并随服务端组合编译/迁移；操作级 Store/Service/HTTP 正向专项仍未运行。PC `/compute-execution` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。本控制面只保存 Provider 首次终态声明，形成待验证候选；它不是 Execution Receipt，也不会推进 Lease、Job、Reservation 或 Capacity Claim，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 本批不接 NodeAgent 线协议。`executor_terminal_ref` 与 `diagnostic_ref` 只是外部 Host 事件或诊断材料的引用；平台不读取正文、不验证签名，也不据此扣款、退款或生成 Provider 收益。
 

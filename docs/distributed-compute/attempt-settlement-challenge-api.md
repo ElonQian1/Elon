@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 结算挑战
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc-frontend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 结算挑战
 
 ## 1. 当前实现
 
-v196、追加式 Store、独立 Service、HTTP 路由、消费者待申诉队列和 PC `/compute-challenges` 工作区已经写入代码，但尚未编译、执行迁移、接口联调、页面验收或发布，状态固定为 `implementation_uncompiled`。
+v196 的追加式 Store、独立 Service、HTTP 路由与消费者待申诉队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-challenges` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器、生产库和发布仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 Job 消费者可在 v195 Settlement Receipt 创建后的固定 72 小时内，为同一结算提交一份不可覆盖的挑战。挑战只记录争议事实并阻断后续 pending 收益释放，不撤销原结算、不退款、不移动任何余额，也不等于平台已认可消费者主张。
 

@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Attempt 累计声明用量控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 累计声明用量控制面
 
 ## 1. 当前状态
 
-v188、Store、Service、HTTP 路由、只读填写模板与 PC `/compute-execution` 入口已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面只把 Provider 或未来节点 Host 上报的累计 meter 保存为 `provider_declared` 证据，不把它提升为平台观测、验证用量或结算依据。
+v188 的 Store、Service、HTTP 路由与只读填写模板已写入并随服务端组合编译/迁移；操作级 Store/Service/HTTP 正向专项仍未运行。PC `/compute-execution` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。本控制面只把累计 meter 保存为 `provider_declared` 证据，不把它提升为平台观测、验证用量或结算依据；PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 本批不接 NodeAgent 线协议。`executor_usage_ref` 只是外部 Host 事件的引用；平台不读取其正文、不验证签名，也不据此改变 Lease、Job、Reservation、Capacity Claim、消费者余额或 Provider 收益。
 

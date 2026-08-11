@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 staging Attempt 无用量安全中止控制面
 status: current
-reviewed_at: 2026-08-09
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 staging Attempt 无用量安全中止控制面
 
 ## 1. 当前状态
 
-v187 Store kernel、历史读取、HTTP 路由与 PC `/compute-execution` 中止控制面已经写入代码，但尚未编译、执行迁移或运行接口/页面验证。v213 明确 cancel response 不等于 no-start 后，Provider-owner 人工 Abort POST 已固定失败 `COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY`；GET 和历史回执仍可读取。下文原子中止描述的是保留的 dormant kernel，不是当前可调用写能力。
+v187 Store kernel、历史读取和 HTTP 路由已随服务端编译与全量迁移组合链验证；中止正向专项仍未运行。PC `/compute-execution` 已通过静态生产构建，并停止调用人工 Abort POST。该入口继续固定失败 `COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY`；GET 和历史回执仍可读取。下文原子中止描述的是保留的 dormant kernel，不是当前可调用写能力，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 它用于修复“Broker Finish 已因 Claim 进入 active 而拒绝，但外部执行器实际上尚未开工”这一狭窄状态。它不是运行中取消、超时回收、实际用量结算或节点命令通道。
 
@@ -25,7 +25,7 @@ v187 Store kernel、历史读取、HTTP 路由与 PC `/compute-execution` 中止
 
 `executor_abort_ref` 只是外部凭据引用。当前平台不读取证明正文、不验证执行器签名，也不发送 `Cancel` 命令；确认字段表示 Provider 所有者主动声明“执行从未开始”，不是平台验证结果。
 
-PC `/compute-execution` 的旧控件条件不是 no-start 证明；后端固定拒绝该写请求。未来只有绑定 exact command/route/fence 的 final authenticated proof 才能进入独立 service-actor 补偿路径。
+PC `/compute-execution` 已固定禁用人工 no-start 中止控件，不再调用失败关闭入口。未来只有绑定 exact command/route/fence 的 final authenticated proof 才能进入独立 service-actor 补偿路径。
 
 ## 3. 允许条件
 

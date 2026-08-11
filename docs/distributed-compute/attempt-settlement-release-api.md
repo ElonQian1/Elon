@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 待结算原子释放
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 待结算原子释放
 
 ## 1. 当前实现
 
-v198、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+v198 的追加式 Store、独立 Service 与 HTTP 路由已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-settlement` 到期释放与批次工作区已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，把该笔 Provider 与平台收益从 `pending` 原子转入 `available`。它保存独立 Release Receipt、Posting 和四条不可变账本腿，不改写 v195 Settlement Receipt、v196 Challenge、v197 Resolution 或 v199 Correction Receipt。
 

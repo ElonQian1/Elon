@@ -1,15 +1,16 @@
 ---
 title: 分布式算力到期结算释放队列与管理员批处理
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力到期结算释放队列与管理员批处理
 
 ## 1. 当前实现
 
-到期候选扫描、独立 Service、管理员 HTTP 路由以及 v202 追加式批次意图/完成回执已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。该能力不创建第二套释放账本；它只发现已满 72 小时且尚无 v198 Release Receipt 的 Settlement，再逐笔复用现有 v198 原子释放入口。v202 只保存本次扫描和处理报告，不直接移动余额。
+到期候选扫描、独立 Service、管理员 HTTP 路由及 v202 批次意图/完成回执已写入并随服务端组合编译/迁移；操作级接口专项仍未运行。PC `/compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。该能力不创建第二套释放账本，只逐笔复用 v198；v202 只保存扫描和处理报告，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 ## 2. HTTP 路由
 
@@ -72,7 +73,7 @@ v202 把一次管理员操作拆成两类不可变记录：
 
 - Cargo 编译、HTTP 真实调用、并发竞争和故障注入验证；
 - 后台定时扫描、任务租约、失败退避和运维告警；
-- PC 管理页已按服务端游标逐页读取、显示本页/总数、复用失败重试幂等键并展示批次历史；源码尚未构建、视觉验收或发布；
+- PC 管理页已按服务端游标逐页读取、显示本页/总数、复用失败重试幂等键并展示批次历史，并通过静态生产构建；真实 HTTP、视觉验收和发布仍缺；
 - accepted 挑战的非金额补救和 available 事后追索；
 - 真实提款、外部支付、自动对账、多币种或 Sui 链上结算。
 

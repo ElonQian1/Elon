@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 结算挑战决议
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend, pc-frontend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Attempt 结算挑战决议
 
 ## 1. 当前实现
 
-v197、追加式 Store、独立 Service、HTTP 路由、消费者/管理员 open 挑战队列、角色历史队列、消费者撤回入口和 PC 角色工作区已经写入代码，但尚未编译、执行迁移、接口联调、页面验收或发布，状态固定为 `implementation_uncompiled`。
+v197 的追加式 Store、独立 Service、HTTP 路由、open 队列、历史队列与撤回入口已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-challenges` 与 `/compute-challenge-resolution` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器、生产库和发布仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以撤回，平台 `admin/owner` 可以接受或驳回。一个挑战只能产生一种终态，撤回与管理员裁决并发时只有一个事务能成功。
 

@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Provider 提款唯一终态
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: ai-economy, backend
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Provider 提款唯一终态
 
 ## 1. 当前实现
 
-v201、追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+v201 的追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已写入并随服务端组合编译/迁移；操作级接口专项仍未运行。PC `/my-compute-settlement` 与 `/compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 每份 v200 Withdrawal Request 最多绑定一份不可变 Terminal Receipt。终态只能是：
 
@@ -78,7 +79,7 @@ v201、追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已经
 - 页面把 v200 Withdrawal Event Digest、Request Posting ID/Digest 和稳定幂等键交给 v201，而不是自行计算或修改余额；
 - 接口失败会保留当前申请并显示错误，不把失败视为已处理。
 
-该页面源码尚未执行 TypeScript 构建、真实 HTTP 调用、视觉验收或发布，状态仍为 `implementation_uncompiled`。
+该页面已通过 TypeScript、lint、跨层静态合同和生产构建；真实 HTTP 调用、视觉验收和发布仍未执行，状态为 `implementation_partially_verified`。
 
 ## 7. 尚未实现
 
