@@ -137,7 +137,7 @@ v225 CapacityCommitment 已形成 `implementation_partially_verified` 的最窄�
 
 同一份卖方容量不能同时支持多个未被净额化的承诺。v225 不新增 Commitment Reservation 或余额表：Provider 的 Commitment、`capacity_commitment` Claim 与 ledger hold 必须在一个 `BEGIN IMMEDIATE` 内原子完成，并把同 Offer/bucket 的 live Claim 汇总限制在 current Offer `reservable_units` 内；Pool available 与 reducer 继续承担全局防超卖。
 
-v228 [`Delivery Allocation`](delivery-allocation-authority.md) 已按 `design_frozen/source_not_written` 冻结：一份 Commitment 最多一份双边 Grant；exact consumer 只能 whole-only 行权给一个 quoted Job。行权在一个 IMMEDIATE 事务内冻结既有 Broker 预算、全量释放父 Commitment Claim、以相同 lines 建立带 `parent_claim_id` 的标准 Reservation Claim，并登记 Reservation、Job、Broker receipt 与 immutable exercised receipt；Commitment current view 派生 `allocated`。它不产生 Position、第二份 Allocation Claim、真实价格或结算真源。
+v228 [`Delivery Allocation`](delivery-allocation-authority.md) 当前为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域、两张不可变表与门卫、Store-private authority、Service/HTTP 和中央接线源码已写，但尚未编译、执行 migration、运行测试或启动服务。一份 Commitment 最多一份双边 Grant；exact consumer 只能 whole-only 行权给一个 quoted Job。行权在一个 IMMEDIATE 事务内冻结既有 Broker 预算、全量释放父 Commitment Claim、以相同 lines 建立带 `parent_claim_id` 的标准 Reservation Claim，并登记 Reservation、Job、Broker receipt 与 immutable exercised receipt；Commitment current view 派生 `allocated`。它不产生 Position、第二份 Allocation Claim、真实价格或结算真源。
 
 ## 10. 从期货价格到任务结算
 

@@ -86,6 +86,7 @@ mod compute_capacity_request_digest;
 mod compute_capacity_rows;
 mod compute_capacity_supply_queries;
 mod compute_capacity_supply_withdrawal;
+mod compute_delivery_allocations;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_onboarding;
@@ -409,6 +410,17 @@ pub(crate) use compute_capacity_pool_lifecycle::{
 };
 pub(crate) use compute_capacity_supply_withdrawal::{
     WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
+};
+pub(crate) use compute_delivery_allocations::{
+    ComputeDeliveryAllocationDetail, ComputeDeliveryAllocationExerciseWriteReceipt,
+    ComputeDeliveryAllocationExpiryItem, ComputeDeliveryAllocationExpiryReport,
+    ComputeDeliveryAllocationGrantWriteReceipt, ComputeDeliveryAllocationTerminalWriteReceipt,
+    CreateComputeDeliveryAllocationGrant, DeclineComputeDeliveryAllocationGrant,
+    ExerciseComputeDeliveryAllocationGrant, ExpireDueComputeDeliveryAllocationGrants,
+    COMPUTE_DELIVERY_ALLOCATION_DECLINE_CONFIRMATION,
+    COMPUTE_DELIVERY_ALLOCATION_EXERCISE_CONFIRMATION,
+    COMPUTE_DELIVERY_ALLOCATION_EXPIRE_DUE_CONFIRMATION,
+    COMPUTE_DELIVERY_ALLOCATION_GRANT_CONFIRMATION,
 };
 pub(crate) use compute_external_pool_adapter_artifact_source::{
     ExternalPoolAdapterArtifactIntakeAuthority, ExternalPoolAdapterArtifactSourceReceipt,

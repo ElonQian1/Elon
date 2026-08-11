@@ -82,7 +82,7 @@ v225 CapacityCommitment 已接线并完成部分验证：Create 使用独立 `ca
 
 v225 已继续复用这些 private kernels，并把 public generic Hold、public generic Finish 与 generic expiry recovery 对 Commitment 全部失败关闭。只有 Commitment 外层事务可创建或终结该 Claim，并在同一事务写 immutable commitment 或唯一 terminal receipt；否则会产生 Claim 已释放/过期而 Commitment 仍 committed 的分裂真源。该封口已随生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 与磁盘重开完成定向验证；真实 TCP、生产升级和跨连接并发仍未验证。
 
-v228 Delivery Allocation 仅为 `design_frozen/source_not_written`。它不新增 Allocation Claim：Grant 未行权时唯一 live owner 是 v225 Commitment Claim；行权时同一 IMMEDIATE 事务先全量 release 父 Claim，再以相同 Pool/window 和完整 bucket/meter/quantity 建立标准 Reservation Claim，固定 `parent_claim_id=父 Claim`、`reservation_held` 的 causal transaction 为父 release transaction，随后原子登记既有 Broker 预算、Reservation、Job 与 exercised receipt。事务外没有可见 available 间隙；任何 partial、额外 line 或泛用 parented Hold 均拒绝，详见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)。
+v228 Delivery Allocation 当前为 `design_frozen/implementation_uncompiled/implementation_unrun`。领域、migration、Store-private Claim transfer/Reservation authority、Broker seam 与 Service/HTTP 源码已经写入，但尚未编译、执行 migration、运行测试或启动服务。它不新增 Allocation Claim：Grant 未行权时唯一 live owner 是 v225 Commitment Claim；行权时同一 IMMEDIATE 事务先全量 release 父 Claim，再以相同 Pool/window 和完整 bucket/meter/quantity 建立标准 Reservation Claim，固定 `parent_claim_id=父 Claim`、`reservation_held` 的 causal transaction 为父 release transaction，随后原子登记既有 Broker 预算、Reservation、Job 与 exercised receipt。事务外没有可见 available 间隙；任何 partial、额外 line 或泛用 parented Hold 均拒绝，详见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)。
 
 ## 5. Attempt 与容量
 

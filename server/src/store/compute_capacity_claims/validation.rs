@@ -7,6 +7,7 @@ use super::HoldComputeCapacityClaim;
 
 pub(super) const RESERVATION_SUBJECT_KIND: &str = "compute_reservation";
 pub(super) const CAPACITY_COMMITMENT_SUBJECT_KIND: &str = "compute_capacity_commitment";
+pub(super) const DELIVERY_ALLOCATION_SUBJECT_KIND: &str = "compute_delivery_allocation";
 
 pub(super) fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()> {
     for (label, value) in [
@@ -61,6 +62,9 @@ pub(super) fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()
 
 fn validate_hold_causal_binding(input: &HoldComputeCapacityClaim) -> Result<()> {
     let binding = &input.causal_binding;
+    if input.subject_kind.trim() == DELIVERY_ALLOCATION_SUBJECT_KIND {
+        bail!("Delivery Allocation subject cannot create a generic Capacity Claim");
+    }
     if input.subject_kind.trim() == RESERVATION_SUBJECT_KIND
         && (input.subject_kind != RESERVATION_SUBJECT_KIND
             || input.claim_kind != ComputeCapacityClaimKind::Reservation)

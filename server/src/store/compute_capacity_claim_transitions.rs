@@ -16,6 +16,7 @@ use super::{
     compute_capacity_claim_rows::{
         claim_state_value, finalize_claim_digest, stored_claim_on, update_claim_projection_on,
     },
+    compute_capacity_claims::DELIVERY_ALLOCATION_SUBJECT_KIND,
     compute_capacity_ledger::ComputeCapacityLedgerWriteReceipt,
     compute_capacity_posting::{
         event_kind_value, finalize_transaction_digest, held_claim_causal_transaction_on,
@@ -294,10 +295,14 @@ fn validate_finish_claim_binding(
         Some(_) => bail!("受保护容量 Finish 的 Claim 身份不一致"),
         None if matches!(
             claim.claim_kind,
-            ComputeCapacityClaimKind::Reservation | ComputeCapacityClaimKind::CapacityCommitment
+            ComputeCapacityClaimKind::Reservation
+                | ComputeCapacityClaimKind::CapacityCommitment
+                | ComputeCapacityClaimKind::DeliveryAllocation
         ) || matches!(
             claim.subject_kind.trim(),
-            RESERVATION_SUBJECT_KIND | CAPACITY_COMMITMENT_SUBJECT_KIND
+            RESERVATION_SUBJECT_KIND
+                | CAPACITY_COMMITMENT_SUBJECT_KIND
+                | DELIVERY_ALLOCATION_SUBJECT_KIND
         ) =>
         {
             bail!("受保护容量 Claim 必须通过对应事务内入口终结")

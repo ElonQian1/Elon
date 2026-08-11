@@ -21,12 +21,15 @@ use crate::compute_federation::{
 
 use super::{
     compute_capacity_claim_rows::finalize_claim_digest,
+    compute_delivery_allocations::DeliveryAllocationReservationAuthority,
     compute_job_contract_validation::validate_job_contract,
 };
 
 mod capacity;
+mod delivery_allocation;
 
 use self::capacity::validate_reserved_capacity;
+use self::delivery_allocation::validate_delivery_allocation_authority;
 
 const RESERVATION_CLAIM_SUBJECT_KIND: &str = "compute_reservation";
 
@@ -41,8 +44,72 @@ pub(super) fn validate_reservation_contract(
     provider: &ComputeProvider,
     claim: &ComputeCapacityClaim,
 ) -> Result<String> {
+    validate_reservation_contract_with_authority(
+        reservation,
+        job,
+        job_revision,
+        job_digest,
+        offer,
+        snapshot,
+        provider,
+        claim,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn validate_delivery_allocation_reservation_contract(
+    reservation: &ComputeReservation,
+    job: &ComputeJob,
+    job_revision: i64,
+    job_digest: &str,
+    offer: &ComputeOffer,
+    snapshot: &ComputePriceSnapshot,
+    provider: &ComputeProvider,
+    claim: &ComputeCapacityClaim,
+    authority: &DeliveryAllocationReservationAuthority,
+) -> Result<String> {
+    validate_reservation_contract_with_authority(
+        reservation,
+        job,
+        job_revision,
+        job_digest,
+        offer,
+        snapshot,
+        provider,
+        claim,
+        Some(authority),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_reservation_contract_with_authority(
+    reservation: &ComputeReservation,
+    job: &ComputeJob,
+    job_revision: i64,
+    job_digest: &str,
+    offer: &ComputeOffer,
+    snapshot: &ComputePriceSnapshot,
+    provider: &ComputeProvider,
+    claim: &ComputeCapacityClaim,
+    authority: Option<&DeliveryAllocationReservationAuthority>,
+) -> Result<String> {
     validate_reservation_identity(reservation)?;
     validate_claim_contract(claim)?;
+    match authority {
+        Some(authority) => validate_delivery_allocation_authority(
+            reservation,
+            job,
+            offer,
+            snapshot,
+            claim,
+            authority,
+        )?,
+        None if claim.parent_claim_id.is_some() => {
+            bail!("parented Reservation Claim 只能由 Delivery Allocation 私有授权登记")
+        }
+        None => {}
+    }
     let computed_job_digest =
         validate_job_contract(job, Some(offer), Some(snapshot), Some(provider))?;
     if computed_job_digest != job_digest {
@@ -64,7 +131,7 @@ pub(super) fn validate_reservation_contract(
         snapshot,
         claim,
     )?;
-    validate_reservation_times(reservation, job, snapshot, claim)?;
+    validate_reservation_times(reservation, job, snapshot, claim, authority.is_some())?;
     validate_state_alignment(reservation, job, claim)?;
     compute_reservation_digest(reservation)
 }
@@ -189,6 +256,7 @@ fn validate_reservation_times(
     job: &ComputeJob,
     snapshot: &ComputePriceSnapshot,
     claim: &ComputeCapacityClaim,
+    delivery_allocation_authorized: bool,
 ) -> Result<()> {
     let created = parse_utc("Reservation 创建时间", &reservation.created_at)?;
     let updated = parse_utc("Reservation 更新时间", &reservation.updated_at)?;
@@ -217,7 +285,7 @@ fn validate_reservation_times(
         || created >= expires
         || job_updated > updated
         || expires > deadline
-        || expires > snapshot_expires
+        || (!delivery_allocation_authorized && expires > snapshot_expires)
         || expires > window_end
         || claim.created_at != reservation.created_at
         || claim_update_is_misaligned

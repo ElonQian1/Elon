@@ -91,6 +91,7 @@ impl Store {
                 CAPACITY_COMMITMENT_STATUS_COMMITTED
                     | CAPACITY_COMMITMENT_STATUS_CANCELED
                     | CAPACITY_COMMITMENT_STATUS_EXPIRED
+                    | "allocated"
             )
         }) {
             bail!("容量承诺 list status 不受支持");
@@ -101,9 +102,15 @@ impl Store {
                FROM compute_capacity_commitments commitments
                LEFT JOIN compute_capacity_commitment_terminal_receipts terminal
                  ON terminal.commitment_id=commitments.commitment_id
+               LEFT JOIN compute_delivery_allocation_grants allocation_grant
+                 ON allocation_grant.commitment_id=commitments.commitment_id
+               LEFT JOIN compute_delivery_allocation_terminal_receipts allocation_terminal
+                 ON allocation_terminal.grant_id=allocation_grant.grant_id
               WHERE commitments.owner_account_id=?1
                 AND commitments.provider_id=?2 AND commitments.pool_id=?3
-                AND (?4 IS NULL OR COALESCE(terminal.terminal_status,'committed')=?4)
+                AND (?4 IS NULL OR CASE
+                    WHEN allocation_terminal.terminal_status='exercised' THEN 'allocated'
+                    ELSE COALESCE(terminal.terminal_status,'committed') END=?4)
               ORDER BY commitments.created_at DESC, commitments.commitment_id
               LIMIT ?5",
         )?;
@@ -122,6 +129,23 @@ impl Store {
             })
             .collect()
     }
+}
+
+pub(in crate::store) fn audited_capacity_commitment_source_on(
+    conn: &Connection,
+    commitment_id: &str,
+) -> Result<
+    Option<(
+        ComputeCapacityCommitmentCreateReceipt,
+        Option<crate::compute_federation::capacity_commitment::ComputeCapacityCommitmentTerminalReceipt>,
+    )>,
+>{
+    let Some(commitment) = read::commitment_by_id_on(conn, commitment_id)? else {
+        return Ok(None);
+    };
+    let terminal = read::terminal_by_commitment_on(conn, &commitment)?;
+    let receipt = read::create_receipt_on(conn, commitment, false)?;
+    Ok(Some((receipt, terminal)))
 }
 
 pub(super) fn audit_ledger_binding_on(

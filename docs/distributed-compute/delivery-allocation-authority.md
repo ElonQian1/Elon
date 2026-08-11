@@ -2,7 +2,7 @@
 title: Delivery Allocation v228 权威
 status: current
 design_status: design_frozen
-implementation_status: source_not_written
+implementation_status: implementation_uncompiled
 last_updated: 2026-08-12
 ---
 
@@ -12,7 +12,7 @@ last_updated: 2026-08-12
 
 v228 以 **GO** 冻结一个非 staging 的最窄真实交付纵切面：Provider 把一份 exact v225 Capacity Commitment 全量、双边地授权给一个消费者的一个 exact quoted Job；消费者在交付窗口开始前显式行权；Store 在一个 `BEGIN IMMEDIATE` 中把既有 Commitment Claim 的全部 held 容量转成既有 Broker 能消费的标准 Reservation Claim，并原子登记预算、Reservation、Job 与 Broker reserve receipt。
 
-设计状态固定为 `design_frozen`，实现状态固定为 `source_not_written`。本文件只冻结未来源码的权威合同，不构成 migration、Store、Service、HTTP、测试或运行证据。
+设计状态保持 `design_frozen`，实现状态提升为 `implementation_uncompiled/implementation_unrun`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；截至 2026-08-12 仅完成 rustfmt、diff/source-size 等静态门禁，尚未编译、执行 migration、运行测试或启动服务，因此不构成可执行或生产证据。
 
 该纵切面不是 Order、Trade、Position、ClearingReceipt 或买方可转售持仓，也不声明真实成交价、指数价、标记价、保证金、交割差额或结算成功。它只复用 v225 Commitment、v165-v168/v173 Claim/ledger、v172 Job、v174 Reservation 和 v175 Broker 的本地 `platform_balance_cny` 预授权链。
 
@@ -57,7 +57,7 @@ v228 只新增两张表，并重建既有 `compute_capacity_commitment_current` 
 - 仅 `exercised` 非空的子持有证据：`reservation_claim_id`、revision/digest、其 `parent_claim_id`，以及 hold ledger transaction ID/digest/sequence/event 和 causal parent release transaction ID；
 - 仅 `exercised` 非空的 Broker 证据：`reservation_id`/revision/digest、source/reserved Job revision/digest、`budget_reservation_id`、`reserved_amount_fen` 和既有 Broker reserve request digest。
 
-`declined|expired` 的全部 exercise-only 列必须为 NULL；`exercised` 的全部列必须齐全，父子 ID、event、revision、status、causal transaction 与 JCS 必须逐项相等。`exercised|declined` 的 actor 必须是 Grant 的 exact consumer，`expired` 的 actor 必须是已鉴权 platform admin。数据库 CHECK、外键、唯一约束和 immutable trigger 共同失败关闭；表及 JSON 禁止 UPDATE/DELETE。
+`declined|expired` 的全部 exercise-only 列必须为 NULL；`exercised` 的全部列必须齐全，父子 ID、event、revision、status、causal transaction 与 JCS 必须逐项相等。`exercised|declined` 的 actor 必须是 Grant 的 exact consumer，`expired` 的 actor 必须是已鉴权 platform admin。平台 admin/owner 角色证明属于 `auth_from_headers -> platform_admin` 的 Service/API 边界，并兼容不一定存在 `users` 行的本机 `local-owner`；Store 和 migration 固定 actor kind、ID 形状、时钟与不可变谱系，但不把用户表存在性冒充会话授权。任何 crate-internal 调用方都必须传入已经完成该认证的 actor。数据库 CHECK、外键、唯一约束和 immutable trigger 共同失败关闭；表及 JSON 禁止 UPDATE/DELETE。
 
 ## 4. 派生状态机
 
@@ -81,9 +81,9 @@ v174 的通用 Reservation 规则要求新 Reservation 引用未过期 Snapshot�
 1. 创建 Grant 时 exact v171 Snapshot 必须仍未过期；Grant JCS 固定 exact Commitment、Snapshot 与 Job digest。
 2. 行权可发生在 Snapshot 过期后，但 Store 时间必须严格早于 `exercise_expires_at=window.starts_at`。
 3. 继续引用原 immutable v171 Snapshot；禁止 UPDATE、延长或复制其 `expires_at`，也禁止补造新 Snapshot。
-4. Store-private `DeliveryAllocationReservationAuthority` 只能由同一事务中 exact active Grant 行权候选构造，或由 persisted `exercised` receipt 为历史读取/重审计恢复；不得由 Service/API/泛用 Store 调用方构造。它同时携带 exact pre-held child Reservation Claim authority，不能从普通参数拼装。
+4. Store-private `DeliveryAllocationReservationAuthority` 只能由同一事务中 exact active Grant 行权候选构造，或由 persisted `exercised` receipt 为同一既有 Reservation 的后续生命周期更新、历史读取和重审计恢复；恢复时必须以 exact reservation ID、child Claim 与完整 allocation 谱系查回，不得由 Service/API/泛用 Store 调用方构造或从普通参数拼装。它同时携带 exact pre-held child Reservation Claim authority。
 5. 该 authority 仅允许忽略 Snapshot quote TTL 与 exact current Snapshot version，并令 `Reservation.expires_at=Job.deadline_at <= window.ends_at`；它仍要求 exact 历史 Offer/Snapshot、current Provider、current Offer `active|draining`、安全 Pool、SKU/window/instrument/full meter 与 Job 限额全部一致。
-6. 泛用 `register_compute_reservation(_on)` 继续执行旧 TTL/currentness 规则，不得接受该例外、parented Claim 或 caller-supplied authority。
+6. 泛用 `register_compute_reservation(_on)` 的 fresh create 路径继续执行旧 TTL/currentness 规则，不得接受该例外、parented Claim 或 caller-supplied authority。只有已存在 immutable `exercised` receipt 且 Reservation/child Claim/allocation 谱系逐项相等时，既有生命周期更新与 readback 才可由 Store 内部恢复同一 authority；这不是泛用调用方可选择的布尔绕过。
 
 不得给 `ComputeReservation v1` 增字段，否则会改变历史 JSON/digest；不得修改 v171/v174 历史行或旧 migration。
 
@@ -147,7 +147,7 @@ active `granted` 或 `exercised` Grant 阻止 v225 Cancel/Expire 及其 recovery
 - public generic Hold 同时拒绝 Commitment 和 DeliveryAllocation subject，不能设置 `parent_claim_id`；只有 v228 exercise wrapper 可创建 exact parented Reservation Claim。
 - 子 Hold 使用版本化 request digest，固定父 Claim、parent release transaction、完整 lines、Job、Reservation、Offer/Snapshot；任何字段漂移均不是重放。
 - public generic Finish 继续拒绝 Commitment。private parent release 必须与 `exercised` receipt、child Hold、Broker result 同事务提交，否则整体回滚。
-- generic Reservation registration 不能获得 Snapshot TTL 例外或 parented Claim；未来历史读取只能从 persisted exercised authority 重建。
+- generic Reservation fresh registration 不能获得 Snapshot TTL 例外或 parented Claim，也不能接收 caller-supplied authority；只有 persisted exercised authority 能为同一既有 Reservation 的后续合法状态更新、历史读取与 readback 恢复原例外。
 - generic Broker Reserve 继续自行创建普通 Reservation Claim，不能接收 pre-held Claim；只有 v228 private pre-held kernel 能 adopt exact child Claim，且不得形成第二个 Claim。
 - v225 terminal insert、Cancel、Expire 与 recovery selector 必须排除 active/exercised Grant；v228 反向排除已有 v225 terminal。
 - 所有 grant、terminal、Claim、transaction、Reservation、budget ID 与幂等结果都以唯一约束、CAS、写后重审计失败关闭；list/get/status filter 必须识别 `allocated`。
@@ -155,7 +155,7 @@ active `granted` 或 `exercised` Grant 阻止 v225 Cancel/Expire 及其 recovery
 
 ## 11. P0 文件预算与禁线
 
-未来实现预算固定为：1 个 v228 migration 入口叶文件和最多 3 个 schema/view/trigger 叶文件；DeliveryAllocation 领域模型最多 2 个叶文件；Store 编排、query/replay、Claim transfer authority 最多 5 个叶文件；Service 与 HTTP 各最多 2 个叶文件；定向测试最多 4 个叶文件。每个新增源码叶文件目标 `<450` 行；中央 migration/module/router 只允许小幅注册。超过预算必须先拆职责并更新本权威，不得把多个语义塞进既有巨型文件。
+实际源码按职责拆为：1 个 DeliveryAllocation 领域叶文件；1 个 v228 migration 入口加 3 个 table/guard 叶文件；1 个 Store 装配入口加 9 个 canonical/grant/exercise/terminal/read/validation 叶文件；3 个 Claim、Broker、Reservation 专用 seam 叶文件；Service 与 HTTP 各 1 个叶文件。原先预估的 Store 最多 5 个叶文件不足以同时容纳 22/50 列 exact readback、两组 2*N ledger legs 与 replay/currentness 审计，因此按单一职责安全拆分并在本权威记录实际预算，而未扩大业务范围。所有新增源码叶文件仍 `<450` 行；中央 migration/module/router 只做小幅注册。测试源码和运行验证不在本批内，不得以模块拆分为由混入相邻能力。
 
 P0 明确禁止：partial/multi-Job/regrant/transfer/resale；Order/Trade/Position/Clearing；真实 price/index/mark；保证金、交割罚金、Provider 收益或新结算 ABI；`external_pool`、remote saga、staging/provisional；MCP、PC、worker、dispatch；Attempt/Lease、verified metering、生产部署或运行。不得修改 v171/v174/v225 历史表、JSON、digest 或 migration。
 
@@ -163,4 +163,4 @@ P1 才可讨论部分分配、多 Job、可转让 Position、真实市场价格�
 
 ## 12. 冻结结论
 
-v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。只要任一环未同事务接线，就必须保持 `source_not_written` 或失败关闭；不得降级成只写 Grant/receipt 的 staging 能力，也不得宣称未来交付、执行或结算已经生产可用。
+v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。上述源码现已静态接线；在编译、全量 migration、Store/HTTP 专项和重开证据完成前，状态必须保持 `implementation_uncompiled/implementation_unrun`。任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得宣称未来交付、执行或结算已经生产可用。

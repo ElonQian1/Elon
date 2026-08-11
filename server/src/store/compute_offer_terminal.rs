@@ -173,7 +173,15 @@ fn ensure_no_live_contracts(conn: &rusqlite::Connection, offer_id: &str) -> Resu
            FROM compute_capacity_commitments AS commitment
            LEFT JOIN compute_capacity_commitment_terminal_receipts AS terminal
              ON terminal.commitment_id=commitment.commitment_id
-          WHERE commitment.offer_id=?1 AND terminal.commitment_id IS NULL",
+          WHERE commitment.offer_id=?1 AND terminal.commitment_id IS NULL
+            AND NOT EXISTS (
+                SELECT 1
+                  FROM compute_delivery_allocation_grants allocation_grant
+                  JOIN compute_delivery_allocation_terminal_receipts allocation_terminal
+                    ON allocation_terminal.grant_id=allocation_grant.grant_id
+                   AND allocation_terminal.terminal_status='exercised'
+                 WHERE allocation_grant.commitment_id=commitment.commitment_id
+            )",
         params![offer_id],
         |row| row.get::<_, i64>(0),
     )?;

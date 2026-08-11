@@ -20,6 +20,10 @@ use finish::finish_new_broker_contract_on;
 use finish_receipt::replay_broker_finish_on;
 use finish_validation::normalize_broker_finish_request;
 use orchestrate::reserve_new_broker_contract_on;
+pub(in crate::store) use orchestrate::{
+    prepare_delivery_allocation_broker_budget_on, reserve_compute_job_with_preheld_claim_on,
+    PreparedDeliveryAllocationBrokerReserve,
+};
 use receipt::replay_broker_reserve_on;
 pub(super) use receipt::{broker_reserve_binding_on, BrokerReserveBinding};
 pub(super) use validation::broker_compute_call_id;

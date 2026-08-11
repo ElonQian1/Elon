@@ -37,6 +37,13 @@ use super::{
     ComputeBrokerReservationReceipt, BROKER_BILLING_FEATURE, BROKER_BILLING_USAGE_MODE,
 };
 
+mod delivery_allocation;
+
+pub(in crate::store) use delivery_allocation::{
+    prepare_delivery_allocation_broker_budget_on, reserve_compute_job_with_preheld_claim_on,
+    PreparedDeliveryAllocationBrokerReserve,
+};
+
 pub(super) fn reserve_new_broker_contract_on(
     conn: &Transaction<'_>,
     request: &NormalizedBrokerReserveRequest,
@@ -125,6 +132,36 @@ pub(super) fn reserve_new_broker_contract_on(
         .expires_at
         .clone()
         .ok_or_else(|| anyhow!("Broker Capacity Claim 缺少到期时间"))?;
+    register_broker_contract_with_claim_on(
+        conn,
+        request,
+        &budget,
+        &claim,
+        &source_job,
+        snapshot,
+        &reservation_expires_at,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn register_broker_contract_with_claim_on(
+    conn: &Transaction<'_>,
+    request: &NormalizedBrokerReserveRequest,
+    budget: &super::super::billing_reservations::BillingReservationOutcome,
+    claim: &crate::compute_federation::capacity::ComputeCapacityClaim,
+    source_job: &super::super::compute_job_registry::ComputeJobRegistrationReceipt,
+    snapshot: crate::compute_federation::market::ComputePriceSnapshot,
+    reservation_expires_at: &str,
+    delivery_authority: Option<
+        &super::super::compute_delivery_allocations::DeliveryAllocationReservationAuthority,
+    >,
+) -> Result<ComputeBrokerReservationReceipt> {
+    let selected_offer = source_job
+        .job
+        .selected_offer
+        .as_ref()
+        .ok_or_else(|| anyhow!("Broker source Job lacks an exact Offer binding"))?;
     let pending = ComputeReservation {
         schema: COMPUTE_RESERVATION_SCHEMA.to_string(),
         reservation_id: request.reservation_id.clone(),
@@ -146,12 +183,17 @@ pub(super) fn reserve_new_broker_contract_on(
         status: RESERVATION_STATUS_PENDING.to_string(),
         created_at: claim.created_at.clone(),
         updated_at: claim.created_at.clone(),
-        expires_at: reservation_expires_at,
+        expires_at: reservation_expires_at.to_string(),
         consumed_at: None,
         released_at: None,
     };
-    let pending_receipt = register_compute_reservation_on(conn, &pending, 0)
-        .context("Broker pending Reservation 登记失败")?;
+    let pending_receipt = match delivery_authority {
+        Some(authority) => super::super::compute_reservation_registry::register_compute_reservation_from_delivery_allocation_on(
+            conn, &pending, 0, authority,
+        ),
+        None => register_compute_reservation_on(conn, &pending, 0),
+    }
+    .context("Broker pending Reservation 登记失败")?;
 
     let active_at = timestamp_after(&pending.created_at)?;
     let mut reserved_job = source_job.job.clone();
@@ -168,14 +210,22 @@ pub(super) fn reserve_new_broker_contract_on(
         job_revision: reserved_job_receipt.revision,
         job_digest: reserved_job_receipt.job_digest.clone(),
     };
-    let active_receipt = register_compute_reservation_on(conn, &active, pending_receipt.revision)
-        .context("Broker active Reservation 版本登记失败")?;
+    let active_receipt = match delivery_authority {
+        Some(authority) => super::super::compute_reservation_registry::register_compute_reservation_from_delivery_allocation_on(
+            conn,
+            &active,
+            pending_receipt.revision,
+            authority,
+        ),
+        None => register_compute_reservation_on(conn, &active, pending_receipt.revision),
+    }
+    .context("Broker active Reservation 版本登记失败")?;
     persist_broker_reserve_receipt_on(
         conn,
         request,
-        &budget,
-        &claim,
-        &source_job,
+        budget,
+        claim,
+        source_job,
         &reserved_job_receipt,
         &active_receipt,
     )

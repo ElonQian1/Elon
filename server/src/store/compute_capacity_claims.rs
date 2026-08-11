@@ -31,7 +31,11 @@ use super::{
     new_id, now, Store,
 };
 
+mod delivery_allocation;
 mod validation;
+
+pub(super) use delivery_allocation::hold_parented_delivery_reservation_claim_on;
+pub(super) use validation::DELIVERY_ALLOCATION_SUBJECT_KIND;
 
 use validation::{
     parse_utc, validate_hold_input, CAPACITY_COMMITMENT_SUBJECT_KIND, RESERVATION_SUBJECT_KIND,
@@ -83,7 +87,9 @@ impl Store {
             ComputeCapacityClaimKind::Reservation | ComputeCapacityClaimKind::CapacityCommitment
         ) || matches!(
             input.subject_kind.trim(),
-            RESERVATION_SUBJECT_KIND | CAPACITY_COMMITMENT_SUBJECT_KIND
+            RESERVATION_SUBJECT_KIND
+                | CAPACITY_COMMITMENT_SUBJECT_KIND
+                | DELIVERY_ALLOCATION_SUBJECT_KIND
         ) || input.causal_binding.reservation_id.is_some()
         {
             bail!("受保护容量 Hold 必须由对应外层事务内入口创建");
@@ -100,8 +106,25 @@ pub(super) fn hold_compute_capacity_claim_on(
     conn: &Transaction<'_>,
     input: HoldComputeCapacityClaim,
 ) -> Result<HoldComputeCapacityClaimReceipt> {
+    hold_compute_capacity_claim_with_lineage_on(conn, input, None)
+}
+
+pub(super) struct HoldComputeCapacityClaimLineage {
+    parent_claim_id: String,
+    causal_transaction_id: String,
+    request_digest: String,
+}
+
+pub(super) fn hold_compute_capacity_claim_with_lineage_on(
+    conn: &Transaction<'_>,
+    input: HoldComputeCapacityClaim,
+    lineage: Option<HoldComputeCapacityClaimLineage>,
+) -> Result<HoldComputeCapacityClaimReceipt> {
     validate_hold_input(&input)?;
-    let request_digest = hold_claim_request_digest(&input)?;
+    let request_digest = match lineage.as_ref() {
+        Some(lineage) => lineage.request_digest.clone(),
+        None => hold_claim_request_digest(&input)?,
+    };
 
     let existing = read_existing_claim_on(
         conn,
@@ -109,7 +132,7 @@ pub(super) fn hold_compute_capacity_claim_on(
         input.idempotency_key.trim(),
     )?;
     if let Some(existing) = existing {
-        return replay_existing_hold_on(conn, &input, &request_digest, existing);
+        return replay_existing_hold_on(conn, &input, &request_digest, lineage.as_ref(), existing);
     }
     ensure_pool_operation_allowed_on(conn, &input.pool, ComputeCapacityPoolOperation::HoldClaim)?;
 
@@ -194,7 +217,9 @@ pub(super) fn hold_compute_capacity_claim_on(
         claim_kind: input.claim_kind,
         state: ComputeCapacityClaimState::Held,
         revision: 1,
-        parent_claim_id: None,
+        parent_claim_id: lineage
+            .as_ref()
+            .map(|lineage| lineage.parent_claim_id.clone()),
         subject_kind: input.subject_kind.trim().to_string(),
         subject_id: input.subject_id.trim().to_string(),
         idempotency_scope: input.idempotency_scope.trim().to_string(),
@@ -228,7 +253,9 @@ pub(super) fn hold_compute_capacity_claim_on(
         request_digest: claim.request_digest.clone(),
         subject_kind: claim.subject_kind.clone(),
         subject_id: claim.subject_id.clone(),
-        causal_transaction_id: None,
+        causal_transaction_id: lineage
+            .as_ref()
+            .map(|lineage| lineage.causal_transaction_id.clone()),
         movements,
         occurred_at: occurred_at_value,
         recorded_at,
@@ -273,6 +300,7 @@ struct ExistingClaim {
     subject_id: String,
     state: String,
     revision: i64,
+    parent_claim_id: Option<String>,
     request_digest: String,
     expires_at: Option<String>,
 }
@@ -293,6 +321,7 @@ struct ExistingHoldTransaction {
     reservation_id: Option<String>,
     attempt_lease_id: Option<String>,
     fencing_generation: Option<i64>,
+    causal_transaction_id: Option<String>,
     recorded_at: String,
 }
 
@@ -304,7 +333,7 @@ fn read_existing_claim_on(
     conn.query_row(
         "SELECT claim_id, claim_digest, pool_id, capacity_epoch,
                 delivery_window_id, claim_kind, subject_kind, subject_id,
-                status, revision, request_digest, expires_at
+                status, revision, parent_claim_id, request_digest, expires_at
            FROM compute_capacity_claims
           WHERE idempotency_scope=?1 AND idempotency_key=?2",
         params![idempotency_scope, idempotency_key],
@@ -320,8 +349,9 @@ fn read_existing_claim_on(
                 subject_id: row.get(7)?,
                 state: row.get(8)?,
                 revision: row.get(9)?,
-                request_digest: row.get(10)?,
-                expires_at: row.get(11)?,
+                parent_claim_id: row.get(10)?,
+                request_digest: row.get(11)?,
+                expires_at: row.get(12)?,
             })
         },
     )
@@ -333,6 +363,7 @@ fn replay_existing_hold_on(
     conn: &Connection,
     input: &HoldComputeCapacityClaim,
     request_digest: &str,
+    lineage: Option<&HoldComputeCapacityClaimLineage>,
     existing: ExistingClaim,
 ) -> Result<HoldComputeCapacityClaimReceipt> {
     if existing.request_digest != request_digest
@@ -342,6 +373,8 @@ fn replay_existing_hold_on(
         || existing.claim_kind != claim_kind_value(input.claim_kind)
         || existing.subject_kind != input.subject_kind.trim()
         || existing.subject_id != input.subject_id.trim()
+        || existing.parent_claim_id.as_deref()
+            != lineage.map(|lineage| lineage.parent_claim_id.as_str())
     {
         bail!("相同容量 Claim 幂等键不能用于不同预留请求");
     }
@@ -365,7 +398,7 @@ fn replay_existing_hold_on(
                     event_kind, request_digest, pool_id, capacity_epoch,
                     delivery_window_id, offer_id, offer_version, offer_digest,
                     job_id, reservation_id, attempt_lease_id, fencing_generation,
-                    recorded_at
+                    causal_transaction_id, recorded_at
                FROM compute_capacity_ledger_transactions
               WHERE claim_id=?1 AND claim_effect='held' AND claim_effect_key=?2",
             params![existing.claim_id, input.idempotency_key.trim()],
@@ -386,7 +419,8 @@ fn replay_existing_hold_on(
                     reservation_id: row.get(12)?,
                     attempt_lease_id: row.get(13)?,
                     fencing_generation: row.get(14)?,
-                    recorded_at: row.get(15)?,
+                    causal_transaction_id: row.get(15)?,
+                    recorded_at: row.get(16)?,
                 })
             },
         )
@@ -398,6 +432,8 @@ fn replay_existing_hold_on(
         || ledger.capacity_epoch != input.pool.capacity_epoch
         || ledger.delivery_window_id != input.delivery_window.window_id.trim()
         || !causal_binding_matches(&ledger, &input.causal_binding)
+        || ledger.causal_transaction_id.as_deref()
+            != lineage.map(|lineage| lineage.causal_transaction_id.as_str())
     {
         bail!("容量 Claim 幂等重放的账本绑定不一致");
     }

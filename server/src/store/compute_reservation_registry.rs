@@ -12,10 +12,11 @@ mod queries;
 mod rows;
 mod transitions;
 
-use audit::audited_reservation_on;
+use audit::{audited_reservation_on, audited_reservation_with_delivery_authority_on};
 use dependencies::{
-    ensure_current_job_and_claim_on, ensure_live_creation_dependencies_on,
-    registered_dependencies_on, validate_with_dependencies,
+    ensure_current_job_and_claim_on, ensure_delivery_allocation_creation_dependencies_on,
+    ensure_live_creation_dependencies_on, registered_dependencies_on,
+    validate_with_delivery_authority, validate_with_dependencies,
 };
 use queries::list_current_reservations_on;
 use rows::{
@@ -80,6 +81,36 @@ pub(super) fn register_compute_reservation_on(
     reservation: &ComputeReservation,
     expected_revision: i64,
 ) -> Result<ComputeReservationRegistrationReceipt> {
+    register_compute_reservation_with_delivery_authority_on(
+        conn,
+        reservation,
+        expected_revision,
+        None,
+    )
+}
+
+pub(in crate::store) fn register_compute_reservation_from_delivery_allocation_on(
+    conn: &Connection,
+    reservation: &ComputeReservation,
+    expected_revision: i64,
+    authority: &super::compute_delivery_allocations::DeliveryAllocationReservationAuthority,
+) -> Result<ComputeReservationRegistrationReceipt> {
+    register_compute_reservation_with_delivery_authority_on(
+        conn,
+        reservation,
+        expected_revision,
+        Some(authority),
+    )
+}
+
+fn register_compute_reservation_with_delivery_authority_on(
+    conn: &Connection,
+    reservation: &ComputeReservation,
+    expected_revision: i64,
+    delivery_authority: Option<
+        &super::compute_delivery_allocations::DeliveryAllocationReservationAuthority,
+    >,
+) -> Result<ComputeReservationRegistrationReceipt> {
     if reservation.reservation_id.trim().is_empty() || reservation.idempotency_key.trim().is_empty()
     {
         bail!("算力 Reservation ID 和幂等键不能为空");
@@ -95,7 +126,12 @@ pub(super) fn register_compute_reservation_on(
         let stored =
             reservation_version_on(conn, &current.reservation_id, current.current_revision)?
                 .ok_or_else(|| anyhow!("算力 Reservation 当前历史版本缺失，拒绝继续写入"))?;
-        let current_reservation = audited_reservation_on(conn, Some(&current), &stored)?;
+        let current_reservation = audited_reservation_with_delivery_authority_on(
+            conn,
+            Some(&current),
+            &stored,
+            delivery_authority,
+        )?;
         if stored.reservation_json == reservation_json {
             return Ok(ComputeReservationRegistrationReceipt {
                 reservation: current_reservation,
@@ -113,7 +149,12 @@ pub(super) fn register_compute_reservation_on(
         ensure_reservation_update(&current_reservation, reservation)?;
         let dependencies = registered_dependencies_on(conn, reservation)?;
         ensure_current_job_and_claim_on(conn, reservation, &dependencies)?;
-        let reservation_digest = validate_with_dependencies(reservation, &dependencies)?;
+        let reservation_digest = match delivery_authority {
+            Some(authority) => {
+                validate_with_delivery_authority(reservation, &dependencies, authority)
+            }
+            None => validate_with_dependencies(reservation, &dependencies),
+        }?;
         let next_revision = current
             .current_revision
             .checked_add(1)
@@ -165,8 +206,20 @@ pub(super) fn register_compute_reservation_on(
     ensure_new_reservation(reservation, expected_revision)?;
     let dependencies = registered_dependencies_on(conn, reservation)?;
     ensure_current_job_and_claim_on(conn, reservation, &dependencies)?;
-    ensure_live_creation_dependencies_on(conn, reservation, &dependencies)?;
-    let reservation_digest = validate_with_dependencies(reservation, &dependencies)?;
+    match delivery_authority {
+        Some(authority) => {
+            ensure_delivery_allocation_creation_dependencies_on(
+                reservation,
+                &dependencies,
+                authority,
+            )?;
+        }
+        None => ensure_live_creation_dependencies_on(conn, reservation, &dependencies)?,
+    }
+    let reservation_digest = match delivery_authority {
+        Some(authority) => validate_with_delivery_authority(reservation, &dependencies, authority),
+        None => validate_with_dependencies(reservation, &dependencies),
+    }?;
     let consumer_account_id = dependencies.job.job.consumer_account_id.as_str();
     if let Some(existing_id) = reservation_id_for_idempotency_on(
         conn,
