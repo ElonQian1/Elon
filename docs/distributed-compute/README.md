@@ -22,7 +22,7 @@ owners: backend, node, ai-economy
 
 > v218 合同修正：历史“v11 Planning Snapshot V2”现以协议阈值 12 解释；work-admission `None` 允许新晋升槽首次重授权，`Some` 才承诺 current head。当前 A1 只有未编译的同事务 projector；A2 总合同已冻结，未编译、未运行的 A2b2 静态源码已覆盖 route→WAL-main、map/lock、barrier、完整 unmap、联合 close、route/registration typed custody/count inventory，但逐 case Windows 动态证据仍缺。无 producer，v14 永久 blocked-only，Runtime/Ready/派发不可达。
 
-| 能力 | 2026-08-05 状态 |
+| 能力 | 2026-08-11 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码与 v169-v201 分段实现已写；Provider/Supply、Offer、Price Snapshot 和 Broker 部分链已有分层验证，其余 Attempt/结算仍有大量 `implementation_uncompiled` 或未接线入口。不能把局部通过描述为整条交易链可用 |
@@ -39,7 +39,7 @@ owners: backend, node, ai-economy
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | v165-v168 Supply/Claim 与 v173 Claim 历史已在 Supply、Offer 和 Broker 定向链中执行临时 SQLite 全量迁移；Broker 测试验证 held 与 release 回流。并发、到期批处理、生产磁盘和真实节点仍未验证 |
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；HTTP/MCP 全链、并发和生产磁盘仍未验证 |
-| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 全量迁移和发布、幂等、审计及 draining 门卫定向测试；PC `/compute-supply` 已通过严格类型、lint、生产构建和 bundle budget。HTTP/MCP、权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，状态为 `implementation_partially_verified`；只生成规范化 fallback_curve 快照，不预留容量、不冻结余额，也不代表真实市场价格，详见 `price-snapshot-control-plane-acceptance.md` |
+| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 全量迁移和发布、幂等、审计及 draining 门卫定向测试；PC `/compute-supply` 已通过严格类型、lint、生产构建和 bundle budget。HTTP/MCP、权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，状态为 `implementation_partially_verified`；当前源码只生成 Offer-owner fallback_curve。平台四眼 reference fallback 批次已冻结 docs-first 设计，计划由 Store-private v223 application 直接生成唯一 v171 Snapshot，但源码尚未写入。两者都不预留容量、不冻结余额，也不代表真实市场价格 |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -64,7 +64,7 @@ owners: backend, node, ai-economy
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期，并按 Provider/状态读取本人队列；管理员 HTTP 可重建固定平台账户的 pending/available，并按状态读取全局队列。PC 已写入本人收益与管理员结算两套页面源码。视图和队列只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
 | 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移，两条 Store 状态机各通过 2 项专项；Adapter release 的 admin/owner Service/HTTP 又通过 2 项进程内接口验收，onboarding service/API 与 release 生产部署仍未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md)、[`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)、[`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md) |
-| 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
+| 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 设计已冻结，限定 `fallback_curve/sample_count=0` 且直接复用 v171；领域、Store 与 v223 源码尚未写入。index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
 “已接受设计”不等于“已上线”。任何代理都必须保留实现状态，不得把文档中的目标合同描述成当前生产能力。
@@ -86,7 +86,7 @@ owners: backend, node, ai-economy
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
 4. `docs/distributed-compute/node-endpoint-session-authority.md`、`docs/distributed-compute/node-plugin-local-authority.md`、`docs/distributed-compute/node-plugin-manifest-catalog-authority.md`、`docs/distributed-compute/node-plugin-vfs-fault-authority.md`、`docs/distributed-compute/node-plugin-planning-snapshot-authority.md`、`docs/distributed-compute/node-ready-capability.md`、`docs/distributed-compute/node-plugin-candidate-cleanup.md` 与 `docs/distributed-compute/windows-compute-namespace-fence-wire-v1.json`：端点 currentness、SQLite 真源、目录/回滚、测试 VFS 故障、Planning 投影、短期就绪、失败清理与 Windows hard-fence ABI。
 5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
-6. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
+6. `docs/distributed-compute/market-and-settlement.md` 与 `docs/distributed-compute/platform-reference-price-curve-authority.md`：标准化 SKU、期货锁价、平台参考回退批次和结算回执。
 7. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
 8. `docs/distributed-compute/capacity-pool-api.md`：本人共享物理资源边界及摘要隐私合同。
 9. `docs/distributed-compute/capacity-bucket-api.md`：交付窗口 Bucket 登记、余额读取和窗口不变量。
@@ -94,7 +94,7 @@ owners: backend, node, ai-economy
 11. `docs/distributed-compute/activation-evidence-api.md`：证据申请、人工审核、版本复核和“批准不等于激活”边界。
 12. `docs/distributed-compute/activation-recovery-api.md`：隔离恢复计划、第二人复核、显式废止重做、旧 Offer 退场门卫和追加式恢复边界。
 13. `docs/distributed-compute/offer-api.md`：Offer 本人规范化草稿、管理员发布、安全退场与资金边界。
-14. `docs/distributed-compute/price-snapshot-api.md`：Offer 派生 fallback_curve 报价、候选效果与无资金效果边界。
+14. `docs/distributed-compute/price-snapshot-api.md`：Offer 派生 fallback_curve、计划中的平台 reference fallback producer、候选效果与无资金效果边界。
 15. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
 16. `docs/distributed-compute/attempt-execution-plan-v1.md`：可信 capability、ArtifactAccess、数值 ResourceGrant、不可变 Plan 与 v211 exact 门。
 17. `docs/distributed-compute/attempt-execution-gateway-v1.md`：Provider-neutral Start、Adapter ACK、本地原子激活与 provisional 远端边界。
@@ -161,7 +161,7 @@ v193 再基于 accepted v192 签发 Execution Receipt：回执重新审计 Attem
 v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用可信终态：单一事务把 Lease 推进为 terminal、Job 推进为 `verification_pending`、Reservation/Claim 推进为 consumed；consumable meter 消费 compensable usage 并归还余量，reusable meter 全量归还。回执不可覆盖，预授权与 Provider 收益仍不变。
 
 v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。管理员现可读取有界到期候选并逐笔复用 v198；这是人工触发的部分成功批处理，不是后台定时清算。v200 再允许 Provider 所有者把本人 available 原子转入 withdrawn 提款保留区；v201 为申请增加取消、拒绝或外部已付款声明的唯一终态。取消/拒绝返还内部余额，付款声明只保存证据，不调用或验证外部资金网络。
-Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据或适配器配置。报价发布、候选发现和锁价均不移动资金或容量；真实价格源、批量报价和自动撮合仍未实现。
+Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。平台 reference fallback 已冻结另一条 Store-private producer 设计：一名管理员提交 exact Offer/窗口/价格批次，另一名管理员复核，未来 v223 application 在一个事务中直接登记 entry 对应的唯一 v171 Snapshot。该设计没有源码或入口，来源仍为 `fallback_curve/sample_count=0`，不代表 index/mark/trade。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据或适配器配置。任何报价发布和锁价都不自动移动资金或容量；真实价格源、订单簿和自动撮合仍未实现。
 
 Provider、Pool、Bucket、Supply、激活、Offer 和 Broker 各自的控制面与证据由本页“阅读顺序”中的专题文档维护。PC `/compute-supply`、`/compute-activation`、`/compute-offers` 与 `/compute-market` 已完成静态生产构建；后续 Attempt 和结算入口仍为 `implementation_uncompiled`。静态构建不代表接口联调、浏览器验收、生产迁移或发布，Broker 证据见 `broker-control-plane-acceptance.md`。
 
@@ -169,7 +169,7 @@ v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可
 
 v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Job、Offer、Price Snapshot 和 Claim 版本；v175/v176 Broker 组合入口已通过成功预留、未执行释放、双向幂等重放、余额不足整笔回滚、两连接竞争和两次临时磁盘重开测试。注册表单独调用仍不创建 Claim、不冻结预算或移动容量；真实 TCP、高并发压力、生产数据库升级和异常断电恢复尚未验证。
 
-后续实现可选择真实价格源/期货曲线、批量报价与撮合、容量自动调度与受控修复、Attempt 真实派发/续租/归还、重试时递增 `fencing_generation`、运行中任务与最终用量结算、多源计量、挑战任务、争议状态和可提取收益账本。
+后续先按已冻结权威形成平台 reference fallback 的领域、Store-private 与 v223 原子 v171 接线，再选择真实价格源/期货曲线、批量报价与撮合、容量自动调度与受控修复、Attempt 真实派发/续租/归还、重试时递增 `fencing_generation`、运行中任务与最终用量结算、多源计量、挑战任务、争议状态和可提取收益账本。
 
 ### F3：外部矿池与企业集群
 
@@ -178,6 +178,8 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 ### F4：容量期货市场
 
 以标准化 Compute SKU 和交付窗口发行容量合约，引入订单、持仓、指数价、标记价、保证资源和到期交割；任务结算消费已锁定的价格快照。
+
+首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`，计划由 v223 application 直接生成既有 v171 Snapshot。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
 
 ## 当前工程指令
 
