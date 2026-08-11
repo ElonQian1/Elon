@@ -75,6 +75,63 @@ assert.equal(events[0].purpose, 'list_model_options');
 assert.equal(events[0].xRatio, 0.5);
 assert.equal(events[0].yRatio, 0.875);
 
+const renamedModelButton = {
+  id: '',
+  textContent: '5.6 Terra 中',
+  getAttribute(name) {
+    return name === 'role' ? 'button' : null;
+  }
+};
+const renamedEvents = [];
+const renamedResults = [];
+const renamedScope = {
+  querySelector: () => null,
+  querySelectorAll(selector) {
+    return selector === 'button, [role="button"]' ? [renamedModelButton] : [];
+  }
+};
+const renamedComposer = {
+  closest(selector) {
+    return selector === 'form' ? renamedScope : null;
+  }
+};
+const renamedSandbox = {
+  document: {
+    querySelector: () => null,
+    querySelectorAll: () => []
+  },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    __elonChatGptActionTargetPolicy: {
+      actionPoint(node) {
+        return node === renamedModelButton ? { x: 210, y: 700 } : null;
+      },
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: {
+      filter: (_section, options) => options
+    }
+  }
+};
+renamedSandbox.window.window = renamedSandbox.window;
+renamedSandbox.window.document = renamedSandbox.document;
+renamedSandbox.window.location = renamedSandbox.location;
+
+vm.runInNewContext(source, renamedSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+renamedSandbox.window.__elonChatGptComposer.requestOptions(
+  'model',
+  renamedComposer,
+  (event) => renamedEvents.push(event),
+  (...args) => renamedResults.push(args)
+);
+
+assert.equal(renamedResults.length, 0, 'a uniquely isolated renamed model control remains usable');
+assert.equal(renamedEvents.length, 1);
+assert.equal(renamedEvents[0].purpose, 'list_model_options');
+assert.equal(renamedEvents[0].xRatio, 0.525);
+
 const semanticEvents = [];
 const semanticResults = [];
 const semanticButton = {

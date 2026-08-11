@@ -181,6 +181,7 @@
     });
     return candidates.find((button) => button.getAttribute('aria-haspopup') === 'menu') ||
       candidates.find((button) => /gpt|\bo\d|auto|thinking|instant|sol|模型|能力|轻度|重度/i.test(nodeLabel(button))) ||
+      (candidates.length === 1 ? candidates[0] : null) ||
       null;
   }
 

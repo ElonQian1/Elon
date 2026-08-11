@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
+$script:modelDiscoveryStage = "initial"
 
 function Wait-CommandReceipt {
     param(
@@ -59,9 +60,12 @@ function Invoke-ReceiptAction {
 }
 
 function Get-CachedComposerModels {
-    param([switch]$RequireLeafChoices)
+    param(
+        [switch]$RequireLeafChoices,
+        [ValidateRange(1, 180)][int]$TimeoutSec = $ReadyTimeoutSec
+    )
 
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     do {
         $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
             -Action "chatgpt_get_navigation" -Arguments @{ section = "model" }
@@ -87,7 +91,7 @@ function Get-ComposerModels {
         }
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out waiting for ChatGPT model options."
+    throw "Timed out waiting for ChatGPT model options during $script:modelDiscoveryStage."
 }
 
 function Wait-SelectedModel {
@@ -128,17 +132,40 @@ function Wait-ViewMode {
         }
 }
 
-function Refresh-CurrentAdapter {
-    $refresh = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_refresh"
-    $fromGeneration = [long]$refresh.refresh_from_page_generation
+function Get-ConversationPathFromUrl {
+    param([string]$Url)
+
+    if ([string]::IsNullOrWhiteSpace($Url)) { return "" }
+    try {
+        $uri = [Uri]$Url
+        if ($uri.Host -in @("chatgpt.com", "www.chatgpt.com") -and $uri.AbsolutePath -match '^/c/') {
+            return $uri.AbsolutePath
+        }
+    } catch { }
+    return ""
+}
+
+function Wait-ConversationPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $expectedPath = $Path
     return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "new ChatGPT adapter generation" -Predicate {
+        -Description "restored ChatGPT conversation" -Predicate {
             param($state)
-            [long]$state.page_generation -gt $fromGeneration -and
-                [long]$state.adapter_generation -eq [long]$state.page_generation -and
-                $state.adapter_current -eq $true -and
-                $state.bridge_state -eq "ready" -and
-                $state.authenticated -eq $true
+            $state.bridge_state -eq "ready" -and
+                [string]$state.conversation.url -like "*$expectedPath*"
+        }.GetNewClosure()
+}
+
+function Wait-BlankConversation {
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "temporary blank ChatGPT conversation" -Predicate {
+            param($state)
+            $state.bridge_state -eq "ready" -and
+                $state.authenticated -eq $true -and
+                $state.composer_ready -eq $true -and
+                [int]$state.conversation.message_count -eq 0 -and
+                $state.streaming -eq $false
         }
 }
 
@@ -147,13 +174,31 @@ function Get-SelectableModels {
     $rootLeaves = @($root | Where-Object { $_.opens_submenu -ne $true })
     if ($rootLeaves.Count -ge 2) { return $rootLeaves }
 
-    foreach ($parent in @($root | Where-Object { $_.opens_submenu -eq $true })) {
+    $parents = @(
+        $root |
+            Where-Object { $_.opens_submenu -eq $true } |
+            Sort-Object `
+                @{ Expression = {
+                    if ([string]$_.label -match '(?i)reasoning|thinking|effort|思考|推理|强度') { 0 }
+                    elseif ([string]$_.label -match '(?i)model|模型') { 1 }
+                    else { 2 }
+                } }, `
+                @{ Expression = { [string]$_.label } }
+    )
+    foreach ($parent in $parents) {
         Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
             -ExpectedAction "select_model_option" -Arguments @{
                 section = "model"
                 option_id = [string]$parent.id
             } | Out-Null
-        $children = @(Get-CachedComposerModels -RequireLeafChoices)
+        try {
+            $children = @(
+                Get-CachedComposerModels -RequireLeafChoices `
+                    -TimeoutSec ([Math]::Min($ReadyTimeoutSec, 15))
+            )
+        } catch {
+            continue
+        }
         $childLeaves = @($children | Where-Object { $_.opens_submenu -ne $true })
         if ($childLeaves.Count -ge 2) { return $childLeaves }
     }
@@ -185,9 +230,7 @@ function Restore-ModelByLabel {
             Wait-SelectedModel -ExpectedLabel $Label | Out-Null
             return $true
         } catch {
-            if ($attempt -lt 2) {
-                try { Refresh-CurrentAdapter | Out-Null } catch { }
-            }
+            if ($attempt -lt 2) { Start-Sleep -Seconds $runtime.poll_interval_sec }
         }
     }
     return $false
@@ -237,9 +280,12 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
             $state.composer_ready -eq $true
     }
 $originViewMode = [string]$origin.view_mode
+$originConversationPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url)
 
 $modelRestored = $false
 $modelViewRestored = $false
+$modelConversationRestored = $false
+$temporaryConversationUsed = $false
 try {
     if ($originViewMode -ne "web") {
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
@@ -247,7 +293,15 @@ try {
         Wait-ViewMode -ExpectedMode "web" | Out-Null
     }
 
-    $originalModelLabel = [string]$origin.conversation.current_model
+    if ($originConversationPath) {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation" | Out-Null
+        Wait-BlankConversation | Out-Null
+        $temporaryConversationUsed = $true
+    }
+
+    $modelOrigin = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+    $originalModelLabel = [string]$modelOrigin.conversation.current_model
+    $script:modelDiscoveryStage = "discover_choices"
     $models = @(Get-SelectableModels)
     $originalModel = $null
     if (-not [string]::IsNullOrWhiteSpace($originalModelLabel)) {
@@ -264,18 +318,24 @@ try {
         throw "At least two observable model choices are required for reversible acceptance."
     }
     try {
+        $script:modelDiscoveryStage = "verify_alternate"
         Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
             -ExpectedAction "select_model_option" -Arguments @{
                 section = "model"
                 option_id = [string]$alternateModel.id
             } | Out-Null
         Wait-SelectedModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
-        Refresh-CurrentAdapter | Out-Null
-        Wait-SelectedModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
     } finally {
+        $script:modelDiscoveryStage = "restore_original"
         $modelRestored = Restore-ModelByLabel -Label $originalModelLabel
     }
 } finally {
+    if ($temporaryConversationUsed) {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
+            -Arguments @{ conversation_path = $originConversationPath } | Out-Null
+        Wait-ConversationPath -Path $originConversationPath | Out-Null
+    }
+    $modelConversationRestored = $true
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = $originViewMode } | Out-Null
     Wait-ViewMode -ExpectedMode $originViewMode | Out-Null
@@ -340,6 +400,7 @@ if ($originViewMode -in @("web", "native")) {
         observed_choices = $models.Count
         changed = $true
         original_state_restored = $modelRestored
+        original_conversation_restored = $modelConversationRestored
     }
     disclosure_control = [ordered]@{
         idempotent_request_passed = $true

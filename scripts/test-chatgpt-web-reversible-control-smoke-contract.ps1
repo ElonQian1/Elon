@@ -22,20 +22,26 @@ $required = @(
     "chatgpt_list_composer_options",
     "chatgpt_select_composer_option",
     "adapter_current -eq `$true",
-    "refresh_from_page_generation",
-    "adapter_generation -eq [long]`$state.page_generation",
     "Get-SelectableModels",
     "Get-CachedComposerModels -RequireLeafChoices",
+    "reasoning|thinking|effort|思考|推理|强度",
+    "[Math]::Min(`$ReadyTimeoutSec, 15)",
     "Wait-SelectedModel",
     "requested model as selected",
     "Find-ModelByLabel",
     "IsNullOrWhiteSpace(`$originalModelLabel)",
     "Restore-ModelByLabel",
     "Wait-ViewMode",
+    "Get-ConversationPathFromUrl",
+    "Wait-BlankConversation",
+    'Action "chatgpt_new_conversation"',
+    'Action "chatgpt_open_conversation"',
+    "original_conversation_restored = `$modelConversationRestored",
     'view_mode = "web"',
     "original_view_mode_restored = `$modelViewRestored",
     "`$options.Count -gt 0",
     "Timed out waiting for ChatGPT model options",
+    "modelDiscoveryStage",
     "model entry finishes hydrating",
     "chatgpt_refresh_controls",
     "chatgpt_find_controls",
@@ -51,6 +57,9 @@ foreach ($token in $required) {
     if (-not $smoke.Contains($token)) {
         throw "Missing reversible control smoke contract token: $token"
     }
+}
+if ($smoke -notmatch '(?s)Get-CachedComposerModels -RequireLeafChoices.*?catch\s*\{\s*continue\s*\}') {
+    throw "Reversible control smoke must continue past submenu choices without two leaves."
 }
 foreach ($token in @(
     "expected_hardware_serial",
@@ -123,7 +132,7 @@ try {
     $emulatorRejected = $_.Exception.Message -match "emulator transport"
 }
 if (-not $emulatorRejected) { throw "Emulator smoke runtime must be rejected." }
-foreach ($forbidden in @("send_input", "chatgpt_new_conversation", "chatgpt_remove_attachment")) {
+foreach ($forbidden in @("send_input", "chatgpt_remove_attachment")) {
     if ($smoke.Contains($forbidden)) {
         throw "Reversible control smoke must not use unsafe action: $forbidden"
     }
