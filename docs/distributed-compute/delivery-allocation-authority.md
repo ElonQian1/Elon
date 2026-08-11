@@ -2,7 +2,7 @@
 title: Delivery Allocation v228 权威
 status: current
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 last_updated: 2026-08-12
 ---
 
@@ -12,7 +12,7 @@ last_updated: 2026-08-12
 
 v228 以 **GO** 冻结一个非 staging 的最窄真实交付纵切面：Provider 把一份 exact v225 Capacity Commitment 全量、双边地授权给一个消费者的一个 exact quoted Job；消费者在交付窗口开始前显式行权；Store 在一个 `BEGIN IMMEDIATE` 中把既有 Commitment Claim 的全部 held 容量转成既有 Broker 能消费的标准 Reservation Claim，并原子登记预算、Reservation、Job 与 Broker reserve receipt。
 
-设计状态保持 `design_frozen`，实现状态提升为 `implementation_uncompiled/implementation_unrun`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；截至 2026-08-12 仅完成 rustfmt、diff/source-size 等静态门禁，尚未编译、执行 migration、运行测试或启动服务，因此不构成可执行或生产证据。
+设计状态保持 `design_frozen`，实现状态为 `implementation_partially_verified`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；临时 SQLite 新库迁移及 3 项 Store/Service 专项已实际通过。该证据不包含 HTTP 鉴权、并发竞争、文件重开、历史库升级、真实任务执行或生产部署，详见 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。
 
 该纵切面不是 Order、Trade、Position、ClearingReceipt 或买方可转售持仓，也不声明真实成交价、指数价、标记价、保证金、交割差额或结算成功。它只复用 v225 Commitment、v165-v168/v173 Claim/ledger、v172 Job、v174 Reservation 和 v175 Broker 的本地 `platform_balance_cny` 预授权链。
 
@@ -155,7 +155,7 @@ active `granted` 或 `exercised` Grant 阻止 v225 Cancel/Expire 及其 recovery
 
 ## 11. P0 文件预算与禁线
 
-实际源码按职责拆为：1 个 DeliveryAllocation 领域叶文件；1 个 v228 migration 入口加 3 个 table/guard 叶文件；1 个 Store 装配入口加 9 个 canonical/grant/exercise/terminal/read/validation 叶文件；3 个 Claim、Broker、Reservation 专用 seam 叶文件；Service 与 HTTP 各 1 个叶文件。原先预估的 Store 最多 5 个叶文件不足以同时容纳 22/50 列 exact readback、两组 2*N ledger legs 与 replay/currentness 审计，因此按单一职责安全拆分并在本权威记录实际预算，而未扩大业务范围。所有新增源码叶文件仍 `<450` 行；中央 migration/module/router 只做小幅注册。测试源码和运行验证不在本批内，不得以模块拆分为由混入相邻能力。
+实际源码按职责拆为：1 个 DeliveryAllocation 领域叶文件；1 个 v228 migration 入口加 3 个 table/guard 叶文件；1 个 Store 装配入口加 9 个 canonical/grant/exercise/terminal/read/validation 叶文件；3 个 Claim、Broker、Reservation 专用 seam 叶文件；Service 与 HTTP 各 1 个叶文件。原先预估的 Store 最多 5 个叶文件不足以同时容纳 22/50 列 exact readback、两组 2*N ledger legs 与 replay/currentness 审计，因此按单一职责安全拆分并在本权威记录实际预算，而未扩大业务范围。所有新增源码叶文件仍 `<450` 行；中央 migration/module/router 只做小幅注册。专项测试也保持为独立叶文件，不把测试夹具或断言混入业务入口。
 
 P0 明确禁止：partial/multi-Job/regrant/transfer/resale；Order/Trade/Position/Clearing；真实 price/index/mark；保证金、交割罚金、Provider 收益或新结算 ABI；`external_pool`、remote saga、staging/provisional；MCP、PC、worker、dispatch；Attempt/Lease、verified metering、生产部署或运行。不得修改 v171/v174/v225 历史表、JSON、digest 或 migration。
 
@@ -163,4 +163,4 @@ P1 才可讨论部分分配、多 Job、可转让 Position、真实市场价格�
 
 ## 12. 冻结结论
 
-v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。上述源码现已静态接线；在编译、全量 migration、Store/HTTP 专项和重开证据完成前，状态必须保持 `implementation_uncompiled/implementation_unrun`。任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得宣称未来交付、执行或结算已经生产可用。
+v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。当前已通过编译、临时 SQLite 新库迁移和 Store/Service 成功、回滚、Decline 三项专项，状态为 `implementation_partially_verified`。HTTP 鉴权、并发、重开、历史库升级和生产运行仍未验证；任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得宣称未来交付、执行或结算已经生产可用。
