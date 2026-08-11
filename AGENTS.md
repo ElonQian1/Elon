@@ -27,6 +27,7 @@
 | Windows PC 节点、自更新、推送 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册、相关源码 |
 | 完整流程/复杂发布/任务卡住 | `docs/ai-agent-workflow.md` |
 | Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
+| Android WebView 网页能力原生化、MCP/ADB 接入、能力矩阵与真机分批验收 | `.agents/skills/android-webview-feature-delivery/SKILL.md` |
 | APP 低风险视觉微调（Ripple、颜色、间距、圆角、字号、轻动画） | `docs/app-ui-fast-lane.md`；默认不启动真机、模拟器或 Renderer |
 | APP 复杂 UI、主题、导航、按图还原 | `docs/Design.md`、`docs/APP 颜色规范.md`；涉及 APK/网页同步再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 当前版本记忆 | `docs/app-version-memory.md` |

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android WebView Feature Delivery"
+  short_description: "Android WebView native UI and staged device acceptance"
+  default_prompt: "Use $android-webview-feature-delivery to extend an Android WebView-backed feature with a capability matrix and staged device acceptance."
