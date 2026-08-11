@@ -16,29 +16,28 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 
-$common = @{
+$pinned = @{
     Adb = $Adb
     DeviceSerial = $DeviceSerial
+    ExpectedHardwareSerial = $ExpectedHardwareSerial
     ReadyTimeoutSec = $ReadyTimeoutSec
     PollIntervalSec = $PollIntervalSec
 }
-$pinned = @{} + $common
-$pinned.ExpectedHardwareSerial = $ExpectedHardwareSerial
 $cases = @(
     [pscustomobject]@{
-        id = "read_only_surface"
-        script = "smoke-chatgpt-web-apk.ps1"
-        arguments = $common + @{ ReplyTimeoutSec = $ReadyTimeoutSec }
-    },
-    [pscustomobject]@{
-        id = "feature_pages"
-        script = "smoke-chatgpt-web-feature-pages.ps1"
-        arguments = $pinned + @{ MaxFeaturePages = 8 }
-    },
-    [pscustomobject]@{
-        id = "session_recovery"
-        script = "smoke-chatgpt-web-session-recovery.ps1"
+        id = "reversible_controls"
+        script = "smoke-chatgpt-web-reversible-controls.ps1"
         arguments = $pinned
+    },
+    [pscustomobject]@{
+        id = "composer_controls"
+        script = "smoke-chatgpt-web-composer-controls.ps1"
+        arguments = $pinned + @{ SkipDictation = $true }
+    },
+    [pscustomobject]@{
+        id = "message_structure"
+        script = "smoke-chatgpt-web-message-structure.ps1"
+        arguments = $pinned + @{ MaxConversations = 20 }
     }
 )
 
@@ -58,14 +57,14 @@ foreach ($case in $cases) {
 
 $failed = @($results | Where-Object { $_.passed -ne $true })
 [ordered]@{
-    schema = "elon.chatgpt_web.safe_acceptance_batch.v1"
+    schema = "elon.chatgpt_web.reversible_acceptance_batch.v1"
     passed = $failed.Count -eq 0
     device_serial = $DeviceSerial
     case_count = $results.Count
     passed_count = $results.Count - $failed.Count
     failed_count = $failed.Count
     cases = $results
-    user_assisted_remaining = @(
+    user_supervised_remaining = @(
         "official_authentication",
         "attachment_lifecycle",
         "dictation_audio_capture",
@@ -80,6 +79,6 @@ $failed = @($results | Where-Object { $_.passed -ne $true })
 } | ConvertTo-Json -Depth 6
 
 if ($failed.Count -gt 0) {
-    throw "ChatGPT Web safe acceptance batch failed: $($failed.Count) case(s)."
+    throw "ChatGPT Web reversible acceptance batch failed: $($failed.Count) case(s)."
 }
-Write-Output "CHATGPT_WEB_SAFE_ACCEPTANCE_BATCH_STATUS=passed"
+Write-Output "CHATGPT_WEB_REVERSIBLE_ACCEPTANCE_BATCH_STATUS=passed"

@@ -16,9 +16,6 @@ if ($parseErrors.Count -gt 0) {
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     'id = "read_only_surface"',
-    'id = "reversible_controls"',
-    'id = "composer_controls"',
-    "SkipDictation = `$true",
     'id = "feature_pages"',
     'id = "session_recovery"',
     "user_assisted_remaining",
@@ -50,14 +47,18 @@ if (
 
 foreach ($childScript in @(
     "smoke-chatgpt-web-apk.ps1",
-    "smoke-chatgpt-web-reversible-controls.ps1",
-    "smoke-chatgpt-web-composer-controls.ps1",
     "smoke-chatgpt-web-feature-pages.ps1",
     "smoke-chatgpt-web-session-recovery.ps1"
 )) {
     $childSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot $childScript) -Raw
     if ($childSource -match '(?m)^\s*exit\s+[1-9]') {
         throw "Safe acceptance child must throw instead of terminating the batch: $childScript"
+    }
+}
+
+foreach ($forbiddenCase in @('id = "reversible_controls"', 'id = "composer_controls"')) {
+    if ($source.Contains($forbiddenCase)) {
+        throw "Safe acceptance batch contains a reversible case: $forbiddenCase"
     }
 }
 
