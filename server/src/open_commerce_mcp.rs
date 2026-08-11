@@ -166,6 +166,7 @@ struct UnblockAppArguments {
 struct McpCaller {
     user_id: String,
     project_role: String,
+    platform_role: String,
     app_id: String,
 }
 
@@ -202,15 +203,18 @@ async fn mcp_handler(
             tools.extend(crate::open_commerce_merchant_evidence_mcp::definitions());
             tools.extend(crate::open_commerce_business_handoff_mcp::definitions());
             tools.extend(crate::erp_blueprint_mcp_tools::definitions());
-            tools.extend(crate::compute_federation_mcp::definitions());
+            tools.extend(
+                crate::compute_federation_mcp::definitions_for_platform_role(&caller.platform_role),
+            );
             Ok(json!({"tools": tools}))
         }
         "tools/call" => {
-            call_tool(
+            call_tool_for_platform_role(
                 &state.store,
                 &project_id,
                 &caller.user_id,
                 &caller.project_role,
+                &caller.platform_role,
                 &caller.app_id,
                 request.params,
             )
@@ -238,6 +242,27 @@ pub(crate) async fn call_tool(
     app_id: &str,
     params: Value,
 ) -> Result<Value> {
+    call_tool_for_platform_role(
+        store,
+        project_id,
+        user_id,
+        project_role,
+        "user",
+        app_id,
+        params,
+    )
+    .await
+}
+
+pub(crate) async fn call_tool_for_platform_role(
+    store: &crate::store::Store,
+    project_id: &str,
+    user_id: &str,
+    project_role: &str,
+    platform_role: &str,
+    app_id: &str,
+    params: Value,
+) -> Result<Value> {
     let name = params
         .get("name")
         .and_then(Value::as_str)
@@ -246,6 +271,15 @@ pub(crate) async fn call_tool(
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    if let Some(value) = crate::compute_federation_mcp::call_admin_if_handled(
+        store,
+        user_id,
+        platform_role,
+        name,
+        arguments.clone(),
+    )? {
+        return tool_response(value);
+    }
     if let Some(value) = crate::compute_federation_mcp::call_if_handled(
         store,
         project_id,
@@ -691,6 +725,7 @@ fn authenticate(
     Ok(McpCaller {
         user_id: user.id,
         project_role: access.role,
+        platform_role: user.role,
         app_id,
     })
 }
