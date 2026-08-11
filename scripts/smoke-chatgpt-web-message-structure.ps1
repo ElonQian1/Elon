@@ -17,11 +17,21 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 
+function Wait-BridgeReady {
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "stable ChatGPT bridge" -Predicate {
+            param($state)
+            $state.surface -eq "chatgpt_web" -and
+                $state.bridge_state -eq "ready" -and
+                $state.adapter_current -eq $true
+        }
+}
+
 function Wait-ConversationPath {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     $expectedPath = $Path
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+    $result = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
         -Description "historical conversation structure" -Predicate {
             param($state)
             $state.surface -eq "chatgpt_web" -and
@@ -29,13 +39,29 @@ function Wait-ConversationPath {
                 [string]$state.conversation.url -like "*$expectedPath*" -and
                 [int]$state.conversation.message_count -gt 0
         }.GetNewClosure()
+    Start-Sleep -Seconds $runtime.poll_interval_sec
+    Wait-BridgeReady | Out-Null
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "stable historical conversation structure" -Predicate {
+            param($state)
+            $state.surface -eq "chatgpt_web" -and
+                $state.bridge_state -eq "ready" -and
+                [string]$state.conversation.url -like "*$Path*" -and
+                [int]$state.conversation.message_count -gt 0
+        }.GetNewClosure()
 }
 
 function Get-ContextWithParts {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
     do {
-        $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_get_context" -Arguments @{ message_offset = 0; message_limit = 50 }
+        try {
+            Wait-BridgeReady | Out-Null
+            $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                -Action "chatgpt_get_context" -Arguments @{ message_offset = 0; message_limit = 50 }
+        } catch {
+            Start-Sleep -Seconds $runtime.poll_interval_sec
+            continue
+        }
         $messages = @($context.messages | Where-Object { $null -ne $_ })
         $parts = @(
             $messages |
@@ -61,6 +87,38 @@ function Get-ConversationPathFromUrl {
         return ""
     }
     return ""
+}
+
+function Open-ConversationPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        try {
+            Wait-BridgeReady | Out-Null
+            Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
+                -Arguments @{ conversation_path = $Path } | Out-Null
+            return Wait-ConversationPath -Path $Path
+        } catch {
+            if ($_.Exception.Message -notmatch 'bridge_not_ready') { throw }
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out opening a ChatGPT conversation after bridge recovery."
+}
+
+function Wait-ConversationList {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        try {
+            Wait-BridgeReady | Out-Null
+            $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = $MaxConversations }
+            if (@($page.conversations).Count -gt 0) { return $page }
+        } catch { }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "ChatGPT message structure verification is deferred without conversation history."
 }
 
 function Get-VisibleMessageSelectors {
@@ -119,9 +177,7 @@ function Restore-Origin {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "web" } | Out-Null
     if ($OriginPath) {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
-            -Arguments @{ conversation_path = $OriginPath } | Out-Null
-        Wait-ConversationPath -Path $OriginPath | Out-Null
+        Open-ConversationPath -Path $OriginPath | Out-Null
     } else {
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation" | Out-Null
         Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
@@ -162,9 +218,7 @@ try {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "web" } | Out-Null
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_list_conversations" | Out-Null
-    Start-Sleep -Seconds 1
-    $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_get_conversations" `
-        -Arguments @{ offset = 0; limit = $MaxConversations }
+    $page = Wait-ConversationList
     $candidates = @(
         $page.conversations |
             Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.path) } |
@@ -178,10 +232,8 @@ try {
     $inspected = 0
     foreach ($candidate in $candidates) {
         $path = [string]$candidate.path
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
-            -Arguments @{ conversation_path = $path } | Out-Null
         $restoreRequired = $true
-        Wait-ConversationPath -Path $path | Out-Null
+        Open-ConversationPath -Path $path | Out-Null
         $inspected += 1
         $sample = Get-ContextWithParts
         if ($null -ne $sample) { break }
