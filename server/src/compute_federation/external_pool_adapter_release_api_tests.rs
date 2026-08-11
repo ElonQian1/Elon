@@ -16,6 +16,9 @@ use crate::{
 
 use super::routes;
 
+#[path = "external_pool_adapter_release_api_tests/management.rs"]
+mod management;
+
 struct Fixture {
     state: Arc<crate::types::AppState>,
     router: Router,

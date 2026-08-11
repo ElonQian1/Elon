@@ -5,6 +5,7 @@
 
 mod apply;
 mod canonical;
+mod query;
 mod read;
 mod review;
 mod submit;
@@ -16,8 +17,8 @@ mod tests;
 
 pub(crate) use types::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,
-    ExternalPoolAdapterReleaseRequestReceipt, ExternalPoolAdapterReleaseReviewReceipt,
-    ReviewExternalPoolAdapterReleaseRequest, SubmitExternalPoolAdapterReleaseRequest,
-    EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
+    ExternalPoolAdapterReleaseDetailReceipt, ExternalPoolAdapterReleaseRequestReceipt,
+    ExternalPoolAdapterReleaseReviewReceipt, ReviewExternalPoolAdapterReleaseRequest,
+    SubmitExternalPoolAdapterReleaseRequest, EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
 };

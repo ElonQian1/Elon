@@ -401,9 +401,9 @@ pub(crate) use compute_capacity_supply_withdrawal::{
 };
 pub(crate) use compute_external_pool_adapter_release::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,
-    ExternalPoolAdapterReleaseRequestReceipt, ExternalPoolAdapterReleaseReviewReceipt,
-    ReviewExternalPoolAdapterReleaseRequest, SubmitExternalPoolAdapterReleaseRequest,
-    EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
+    ExternalPoolAdapterReleaseDetailReceipt, ExternalPoolAdapterReleaseRequestReceipt,
+    ExternalPoolAdapterReleaseReviewReceipt, ReviewExternalPoolAdapterReleaseRequest,
+    SubmitExternalPoolAdapterReleaseRequest, EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
 };
 pub(crate) use compute_external_pool_onboarding::{

@@ -66,6 +66,7 @@ pub(crate) struct ExternalPoolAdapterReleaseRequestReceipt {
     pub status: String,
     pub submitted_by_admin_user_id: String,
     pub submitted_at: String,
+    pub updated_at: String,
     pub replayed: bool,
     pub release_effect: &'static str,
 }
@@ -106,6 +107,13 @@ pub(crate) struct ExternalPoolAdapterReleaseAdmissionReceipt {
     pub applied_at: String,
     pub replayed: bool,
     pub release_effect: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct ExternalPoolAdapterReleaseDetailReceipt {
+    pub request: ExternalPoolAdapterReleaseRequestReceipt,
+    pub review: Option<ExternalPoolAdapterReleaseReviewReceipt>,
+    pub admission: Option<ExternalPoolAdapterReleaseAdmissionReceipt>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -262,6 +270,7 @@ impl StoredRequest {
             status: self.status,
             submitted_by_admin_user_id: request.submitted_by_admin_user_id.clone(),
             submitted_at: request.submitted_at.clone(),
+            updated_at: self.updated_at,
             replayed,
             release_effect: "none",
         }

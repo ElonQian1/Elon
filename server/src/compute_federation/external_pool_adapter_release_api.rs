@@ -3,12 +3,14 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
+use serde_json::json;
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
@@ -28,7 +30,15 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
             "/api/admin/compute/external-pool-adapter-releases",
-            post(submit_release),
+            get(list_releases).post(submit_release),
+        )
+        .route(
+            "/api/admin/compute/external-pool-adapter-releases/:request_id",
+            get(get_release),
+        )
+        .route(
+            "/api/admin/compute/external-pool-adapter-releases/:request_id/preflight",
+            get(preflight_release),
         )
         .route(
             "/api/admin/compute/external-pool-adapter-releases/:request_id/review",
@@ -38,6 +48,54 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/external-pool-adapter-releases/:request_id/stage",
             post(stage_release),
         )
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    status: Option<String>,
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+async fn list_releases(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    release_response(
+        service::list_for_admin(&state.store, query.status.as_deref(), query.limit)
+            .map(|items| json!({"adapter_release_requests": items})),
+    )
+}
+
+async fn get_release(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    release_response(service::get_for_admin(&state.store, &request_id))
+}
+
+async fn preflight_release(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    let admin_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    release_response(service::preflight_for_admin(
+        &state.store,
+        &admin_user_id,
+        &request_id,
+    ))
 }
 
 async fn submit_release(
@@ -102,6 +160,10 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
         ));
     }
     Ok(user.id)
+}
+
+fn default_limit() -> usize {
+    50
 }
 
 fn release_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {

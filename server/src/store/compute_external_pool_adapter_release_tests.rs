@@ -301,3 +301,78 @@ fn four_eyes_and_non_approval_close_staging_paths() {
     drop(store);
     remove_store_files(&path);
 }
+
+#[test]
+fn management_projection_filters_and_survives_database_reopen() {
+    let (store, path) = temporary_store();
+    let request = store
+        .submit_external_pool_adapter_release_request(submit_input("5.0.0"))
+        .expect("release request submits");
+
+    let submitted = store
+        .list_external_pool_adapter_release_requests_for_admin(Some("submitted"), 20)
+        .expect("submitted queue lists");
+    assert_eq!(submitted.len(), 1);
+    assert_eq!(submitted[0].request.request_id, request.request_id);
+    assert_eq!(submitted[0].request.updated_at, request.submitted_at);
+    assert!(submitted[0].review.is_none());
+    assert!(submitted[0].admission.is_none());
+
+    let review = store
+        .review_external_pool_adapter_release_request(review_input(
+            &request.request_id,
+            &request.request_digest,
+            &request.request_material_digest,
+            REVIEW_DECISION_APPROVED,
+        ))
+        .expect("release request approves");
+    let approved = store
+        .external_pool_adapter_release_request(&request.request_id)
+        .expect("approved detail reads");
+    assert_eq!(approved.request.status, "approved");
+    assert_eq!(
+        approved.review.as_ref().map(|item| item.review_id.as_str()),
+        Some(review.review_id.as_str())
+    );
+    assert!(approved.admission.is_none());
+
+    let admission = store
+        .apply_external_pool_adapter_release(apply_input(
+            &request.request_id,
+            &request.request_digest,
+            &request.request_material_digest,
+            &review.review_digest,
+        ))
+        .expect("approved release stages");
+    drop(store);
+
+    let reopened = Store::open(&path).expect("store reopens");
+    let staged = reopened
+        .list_external_pool_adapter_release_requests_for_admin(Some("staged"), 1000)
+        .expect("staged queue survives reopen");
+    assert_eq!(staged.len(), 1);
+    assert_eq!(staged[0].request.status, "staged");
+    assert_eq!(staged[0].request.updated_at, admission.applied_at);
+    assert_eq!(
+        staged[0]
+            .admission
+            .as_ref()
+            .map(|item| item.admission_id.as_str()),
+        Some(admission.admission_id.as_str())
+    );
+    assert!(reopened
+        .list_external_pool_adapter_release_requests_for_admin(Some("canceled"), 20)
+        .err()
+        .expect("unsupported state filter fails closed")
+        .to_string()
+        .contains("status filter is unsupported"));
+    assert!(reopened
+        .external_pool_adapter_release_request("missing-release-request")
+        .err()
+        .expect("missing detail fails")
+        .to_string()
+        .contains("does not exist"));
+
+    drop(reopened);
+    remove_store_files(&path);
+}

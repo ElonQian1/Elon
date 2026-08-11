@@ -1,13 +1,14 @@
 //! Administrator-only orchestration for external-pool Adapter release staging.
 
 use anyhow::{bail, Result};
-use serde::Deserialize;
+use chrono::{SecondsFormat, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::store::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,
-    ExternalPoolAdapterReleaseRequestReceipt, ExternalPoolAdapterReleaseReviewReceipt,
-    ReviewExternalPoolAdapterReleaseRequest, Store, SubmitExternalPoolAdapterReleaseRequest,
-    EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
+    ExternalPoolAdapterReleaseDetailReceipt, ExternalPoolAdapterReleaseRequestReceipt,
+    ExternalPoolAdapterReleaseReviewReceipt, ReviewExternalPoolAdapterReleaseRequest, Store,
+    SubmitExternalPoolAdapterReleaseRequest, EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
 };
 
@@ -57,6 +58,24 @@ pub(crate) struct StageExternalPoolAdapterReleaseBody {
     #[serde(default)]
     pub apply_note: String,
     pub confirm_stage: bool,
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct ExternalPoolAdapterReleasePreflightReport {
+    pub schema: &'static str,
+    pub request_id: String,
+    pub request_digest: String,
+    pub adapter_id: String,
+    pub release_version: String,
+    pub submitted_by_admin_user_id: String,
+    pub request_status: String,
+    pub checked_at: String,
+    pub review_present: bool,
+    pub admission_present: bool,
+    pub admin_review_allowed: bool,
+    pub admin_stage_allowed: bool,
+    pub blockers: Vec<String>,
+    pub release_effect: &'static str,
 }
 
 pub(crate) fn submit_for_admin(
@@ -133,6 +152,69 @@ pub(crate) fn stage_for_admin(
         apply_note: body.apply_note,
         idempotency_scope: operation_scope("stage", admin_user_id),
         idempotency_key: body.idempotency_key,
+    })
+}
+
+pub(crate) fn get_for_admin(
+    store: &Store,
+    request_id: &str,
+) -> Result<ExternalPoolAdapterReleaseDetailReceipt> {
+    store.external_pool_adapter_release_request(request_id)
+}
+
+pub(crate) fn list_for_admin(
+    store: &Store,
+    status: Option<&str>,
+    limit: usize,
+) -> Result<Vec<ExternalPoolAdapterReleaseDetailReceipt>> {
+    store.list_external_pool_adapter_release_requests_for_admin(status, limit)
+}
+
+pub(crate) fn preflight_for_admin(
+    store: &Store,
+    admin_user_id: &str,
+    request_id: &str,
+) -> Result<ExternalPoolAdapterReleasePreflightReport> {
+    preflight(get_for_admin(store, request_id)?, admin_user_id)
+}
+
+fn preflight(
+    detail: ExternalPoolAdapterReleaseDetailReceipt,
+    admin_user_id: &str,
+) -> Result<ExternalPoolAdapterReleasePreflightReport> {
+    let status = detail.request.status.as_str();
+    let review_approved = detail
+        .review
+        .as_ref()
+        .is_some_and(|review| review.decision == "approved");
+    let admin_review_allowed =
+        status == "submitted" && detail.request.submitted_by_admin_user_id != admin_user_id;
+    let admin_stage_allowed = status == "approved" && review_approved && detail.admission.is_none();
+    let blockers = match status {
+        "submitted" if !admin_review_allowed => {
+            vec!["current_admin_cannot_review_own_submission".to_string()]
+        }
+        "submitted" | "approved" => Vec::new(),
+        "changes_requested" => vec!["changes_requested_requires_new_submission".to_string()],
+        "rejected" => vec!["release_request_rejected".to_string()],
+        "staged" => vec!["adapter_release_already_staged".to_string()],
+        _ => bail!("external-pool Adapter release request status is unsupported"),
+    };
+    Ok(ExternalPoolAdapterReleasePreflightReport {
+        schema: "compute_federation.external_pool_adapter_release_preflight.v1",
+        request_id: detail.request.request_id,
+        request_digest: detail.request.request_digest,
+        adapter_id: detail.request.adapter_id,
+        release_version: detail.request.release_version,
+        submitted_by_admin_user_id: detail.request.submitted_by_admin_user_id,
+        request_status: detail.request.status,
+        checked_at: Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
+        review_present: detail.review.is_some(),
+        admission_present: detail.admission.is_some(),
+        admin_review_allowed,
+        admin_stage_allowed,
+        blockers,
+        release_effect: "none",
     })
 }
 
