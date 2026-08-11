@@ -14,7 +14,7 @@ implementation_status: implementation_partially_verified
 
 HTTP 与开放商业 MCP 共用 `compute_federation_capacity_bucket_service`，最终调用现有 `create_compute_capacity_bucket` 和只读 Store。分布式算力 MCP 已由 `compute_federation_mcp` 统一聚合，新增算力工具不再持续扩大 `open_commerce_mcp` 入口。
 
-PC `/compute-supply` 已写入当前 Pool 的 Bucket 列表、余额投影和交付窗口登记表单源码。页面从 Pool meter 策略选择计量单位，把本地选择时间转换为 UTC RFC3339 提交；创建成功仍是 open、零发行余额 Bucket。页面尚未构建、运行或发布。
+PC `/compute-supply` 已写入当前 Pool 的 Bucket 列表、余额投影和交付窗口登记表单源码。页面从 Pool meter 策略选择计量单位，把本地选择时间转换为 UTC RFC3339 提交；创建成功仍是 open、零发行余额 Bucket。页面已通过严格类型检查、lint、生产构建和 bundle budget，但尚未运行真实 HTTP、浏览器交互或发布。
 
 ## 2. HTTP 接口
 
@@ -52,7 +52,7 @@ PC `/compute-supply` 已写入当前 Pool 的 Bucket 列表、余额投影和交
 
 ## 5. 尚未实现
 
-- 真实 TCP HTTP/MCP 客户端、PC 构建和浏览器交互验证；
+- 真实 TCP HTTP/MCP 客户端和 PC 浏览器交互验证；
 - Supply Add/Withdraw 本人控制面已写入，边界见 `docs/distributed-compute/capacity-supply-api.md`；
 - Bucket 关闭、退役和窗口批量管理；
 - Provider/Pool 验证与受控激活；

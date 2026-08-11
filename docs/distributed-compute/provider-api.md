@@ -60,7 +60,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 
 `pc-frontend/src/features/compute-settlement/` 已在 `/my-compute-settlement` 写入 Provider 自助登记源码。所有登录用户都可创建 `user_node` 或 `managed_cluster` 声明，填写显示名称、区域、任务类型、加速器类型、允许的数据分类、流式/检查点能力和可选硬件摘要。前端为本次对话生成稳定 Provider ID，创建成功后刷新本人列表并切换到新 Provider。
 
-该表单不能提交 `external_pool`、路由、凭据、适配器、观测证据、验证状态或激活状态。服务端规则仍是最终权限边界。页面尚未执行 TypeScript 构建、真实 HTTP 调用、视觉验收或发布，不能描述为 Provider 已可接单。
+该表单不能提交 `external_pool`、路由、凭据、适配器、观测证据、验证状态或激活状态。服务端规则仍是最终权限边界。页面已通过严格类型检查、lint、生产构建和 bundle budget，但尚未执行真实 HTTP 调用、视觉验收或发布，不能描述为 Provider 已可接单。
 
 代码入口：
 
@@ -70,7 +70,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 
 ## 7. 尚未实现
 
-- 真实 TCP HTTP/MCP 客户端、PC 构建和浏览器交互验证；
+- 真实 TCP HTTP/MCP 客户端和 PC 浏览器交互验证；
 - 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；外部矿池专用 onboarding API 尚未实现，既有领域/Store-private/v221 源码也尚未编译或迁移；
 - Endpoint/Adapter 路由提案、证明、审批、轮换和撤销；
 - 节点绑定、ReadyCapability、路由与硬件观测摘要的申请及人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实证据采集、密码学验证、信任升级和激活仍未实现；

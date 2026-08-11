@@ -12,7 +12,7 @@ implementation_status: implementation_partially_verified
 
 本人 Capacity Supply 服务/Store 控制面已通过全新磁盘库迁移、多 Bucket 原子追加与撤回、幂等冲突、失败原子性、审计和重开回归，HTTP Bearer 与 MCP 聚合调用也已完成进程内验收，状态为 `implementation_partially_verified`；PC 页面仍未运行验证。它允许用户向本人 Provider 当前 Pool 版本、同一交付窗口的一组 open Bucket 原子追加 self-declared 供给，也允许把尚在 `available` 的供给原子撤入 `retired`。两类操作复用既有双分录账本；它们不激活 Provider/Pool、不发布 Offer，也不代表容量已经被平台验证或消费者可以预留。
 
-PC `/compute-supply` 已写入单 Bucket 追加和撤出表单源码，提交前检查正整数、最小量子、当前 available 上限和显式确认，并为同一弹窗重试保留稳定幂等键。当前页面只操作单 Bucket，后端 1 至 64 个同窗口 Bucket 的原子批量能力仍保留给未来批量界面和 MCP；页面尚未构建、运行或发布。
+PC `/compute-supply` 已写入单 Bucket 追加和撤出表单源码，提交前检查正整数、最小量子、当前 available 上限和显式确认，并为同一弹窗重试保留稳定幂等键。当前页面只操作单 Bucket，后端 1 至 64 个同窗口 Bucket 的原子批量能力仍保留给未来批量界面和 MCP；页面已通过严格类型检查、lint、生产构建和 bundle budget，但尚未运行真实 HTTP、浏览器交互或发布。
 
 ## 2. HTTP 与 MCP
 
@@ -47,7 +47,7 @@ Store 根据版本化字段和首次时间生成规范请求摘要，在一个 `
 
 ## 5. 尚未实现
 
-- 真实 TCP HTTP/MCP 客户端、PC 构建和浏览器交互验证；
+- 真实 TCP HTTP/MCP 客户端和 PC 浏览器交互验证；
 - Provider/Pool 证据验证、审批和激活；
 - Offer/Price Snapshot 发布、自动撮合和消费者预留；
 - Attempt、实际用量、Provider 收益和链上结算。

@@ -33,5 +33,5 @@ implementation_status: implementation_partially_verified
 ## 未验证边界
 
 - HTTP/MCP 已完成进程内接口验收，但未启动真实 TCP 服务、浏览器或跨进程客户端；通用算力资源仍按登录用户而非项目成员共享。
-- PC `/my-compute-settlement` 和 `/compute-supply` 尚未执行严格类型检查、生产构建、浏览器交互或发布。
+- PC `/my-compute-settlement` 和 `/compute-supply` 已通过严格类型检查、lint、生产构建和 bundle budget；真实 HTTP、浏览器交互与发布仍未验证，见 `pc-compute-build-acceptance.md`。
 - 本验收没有节点联网、硬件观测、Provider/Pool 激活、Offer 发布、容量预留、Attempt 派发、真实用量、收益结算、外部付款或 Sui 链上资产。

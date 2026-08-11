@@ -14,7 +14,7 @@ implementation_status: implementation_partially_verified
 
 HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最终写入既有 CapacityPool Registry。服务端固定初始 `capacity_epoch=1`、`pool_revision=1`、状态、时间和全部摘要，客户端不能直接提交摘要或生命周期状态。
 
-PC `/compute-supply` 已写入本人 Provider 的 Pool 列表、当前合同摘要、登记表单、账本重算健康和脱敏事务/双分录分页源码；表单只提交资源范围、区域、资源档案和 meter 策略，审计面板只读取现有报告与历史，不提供激活、Offer、节点任务或结算入口。页面尚未构建、运行或发布。
+PC `/compute-supply` 已写入本人 Provider 的 Pool 列表、当前合同摘要、登记表单、账本重算健康和脱敏事务/双分录分页源码；表单只提交资源范围、区域、资源档案和 meter 策略，审计面板只读取现有报告与历史，不提供激活、Offer、节点任务或结算入口。页面已通过严格类型检查、lint、生产构建和 bundle budget，但尚未运行真实 HTTP、浏览器交互或发布。
 
 ## 2. HTTP 接口
 
@@ -70,7 +70,7 @@ PC `/compute-supply` 已写入本人 Provider 的 Pool 列表、当前合同摘�
 
 ## 7. 尚未实现
 
-- 真实 TCP HTTP/MCP 客户端、PC 构建和浏览器交互验证；
+- 真实 TCP HTTP/MCP 客户端和 PC 浏览器交互验证；
 - Pool 版本更新、epoch 轮换的本人控制面；
 - CapacityBucket 与 Supply Add/Withdraw 控制面已写入，边界见 `docs/distributed-compute/capacity-bucket-api.md` 和 `docs/distributed-compute/capacity-supply-api.md`；
 - Provider/Pool 激活证据申请与人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实观测验证和 approved 后受控激活仍未实现；
