@@ -7,7 +7,7 @@ use crate::{
     compute_federation_offer_publication_service, compute_federation_offer_service,
 };
 
-use super::control_plane_tests::Fixture;
+use super::test_support::Fixture;
 
 #[test]
 fn revised_offer_publishes_drains_and_revokes_with_auditable_receipts() {

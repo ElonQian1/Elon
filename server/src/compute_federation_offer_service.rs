@@ -10,6 +10,10 @@ use sha2::{Digest, Sha256};
 mod control_plane_tests;
 
 #[cfg(test)]
+#[path = "compute_federation_offer_test_support.rs"]
+pub(crate) mod test_support;
+
+#[cfg(test)]
 #[path = "compute_federation_offer_lifecycle_tests.rs"]
 mod lifecycle_tests;
 

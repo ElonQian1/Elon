@@ -3,6 +3,10 @@ use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+#[cfg(test)]
+#[path = "compute_federation_price_snapshot_control_plane_tests.rs"]
+mod control_plane_tests;
+
 use crate::{
     compute_federation::{
         market::{
