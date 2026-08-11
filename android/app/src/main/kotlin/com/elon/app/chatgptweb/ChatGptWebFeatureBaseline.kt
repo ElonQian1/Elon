@@ -239,8 +239,10 @@ internal object ChatGptWebFeatureBaseline {
 
     private val DEVICE_VERIFICATION_CASES = mapOf(
         "official_fullscreen_fallback" to "safe/read_only_surface",
+        "native_chat_composer" to "reversible/send_probe",
         "conversation_context_paging" to "safe/read_only_surface",
         "conversation_history" to "safe/read_only_surface",
+        "conversation_create_and_switch" to "reversible/send_probe",
         "model_selection" to "reversible/reversible_controls",
         "web_search" to "reversible/composer_controls",
         "rich_message_rendering" to "reversible/message_structure",
