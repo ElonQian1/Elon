@@ -238,6 +238,24 @@ function Wait-AccountMenuReady {
     throw "Timed out waiting for the ChatGPT account menu semantic manifest."
 }
 
+function Wait-AccountMenuClosed {
+    param([Parameter(Mandatory = $true)][int]$TimeoutSec)
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    do {
+        $last = Invoke-ApkMcp -Tool "ui_state"
+        $accountControls = @(
+            $last.ui_manifest.controls |
+                Where-Object {
+                    $_.region -eq "overlay" -and $_.semantic -in @("settings", "logout")
+                }
+        )
+        if ($accountControls.Count -eq 0) { return $last }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for the ChatGPT account menu to close."
+}
+
 function Wait-ComposerOptionsReady {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section,
@@ -270,12 +288,15 @@ function Wait-ComposerOptionsReady {
 }
 
 function Get-ComposerOptions {
-    param([Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section)
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section,
+        [int]$TimeoutSec = $ReadyTimeoutSec
+    )
 
     $beforeState = Invoke-ApkMcp -Tool "ui_state"
     $afterMs = [long]$beforeState.last_command.observed_at_ms
     Invoke-UiAction -Action "chatgpt_list_composer_options" -Arguments @{ section = $Section } | Out-Null
-    return Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs -TimeoutSec $ReadyTimeoutSec
+    return Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs -TimeoutSec $TimeoutSec
 }
 
 function Get-ForeignComposerLabels {
@@ -474,7 +495,7 @@ if ($profileControls.Count -gt 0) {
         $accountMenuMatrix.adaptation_review.required -ne $true
     ) ($accountMenuReasons -join ",")
     Invoke-Adb shell input keyevent 4 | Out-Null
-    Start-Sleep -Milliseconds 500
+    Wait-AccountMenuClosed -TimeoutSec $ReadyTimeoutSec | Out-Null
 }
 
 $composerOptionsOriginPath = ""
@@ -489,24 +510,32 @@ try {
 } catch { }
 $temporaryComposerConversation = $false
 $composerOptionsOriginRestored = $false
-if ($composerOptionsOriginPath) {
-    $beforeComposerNewState = Invoke-ApkMcp -Tool "ui_state"
-    $beforeComposerNew = [long]$beforeComposerNewState.last_command.observed_at_ms
-    Invoke-UiAction -Action "chatgpt_new_conversation" | Out-Null
-    $composerNewState = Wait-CommandResult -Action "new_conversation" `
-        -AfterMs $beforeComposerNew -TimeoutSec $ReadyTimeoutSec
-    if ($composerNewState.last_command.ok -ne $true) {
-        throw "Temporary blank ChatGPT conversation was not accepted."
-    }
-    Wait-NewConversationReady `
-        -PreviousUrl ([string]$beforeComposerNewState.conversation.url) `
-        -PreviousMessageCount ([int]$beforeComposerNewState.conversation.message_count) `
-        -TimeoutSec $ReadyTimeoutSec | Out-Null
-    $temporaryComposerConversation = $true
-}
-
 try {
-    $modelResult = Get-ComposerOptions -Section "model"
+    $modelResult = $null
+    $modelOptionFailure = $null
+    $initialComposerTimeoutSec = [Math]::Min(20, $ReadyTimeoutSec)
+    try {
+        $modelResult = Get-ComposerOptions -Section "model" -TimeoutSec $initialComposerTimeoutSec
+    } catch {
+        $modelOptionFailure = $_
+    }
+    if ($null -eq $modelResult -and $composerOptionsOriginPath) {
+        $beforeComposerNewState = Invoke-ApkMcp -Tool "ui_state"
+        $beforeComposerNew = [long]$beforeComposerNewState.last_command.observed_at_ms
+        Invoke-UiAction -Action "chatgpt_new_conversation" | Out-Null
+        $composerNewState = Wait-CommandResult -Action "new_conversation" `
+            -AfterMs $beforeComposerNew -TimeoutSec $ReadyTimeoutSec
+        if ($composerNewState.last_command.ok -ne $true) {
+            throw "Temporary blank ChatGPT conversation was not accepted."
+        }
+        Wait-NewConversationReady `
+            -PreviousUrl ([string]$beforeComposerNewState.conversation.url) `
+            -PreviousMessageCount ([int]$beforeComposerNewState.conversation.message_count) `
+            -TimeoutSec $ReadyTimeoutSec | Out-Null
+        $temporaryComposerConversation = $true
+        $modelResult = Get-ComposerOptions -Section "model"
+    }
+    if ($null -eq $modelResult) { throw $modelOptionFailure }
     $modelOptions = @($modelResult.options)
     $modelLabels = @($modelOptions | ForEach-Object { [string]$_.label })
     $foreignModelLabels = Get-ForeignComposerLabels -Options $modelOptions
