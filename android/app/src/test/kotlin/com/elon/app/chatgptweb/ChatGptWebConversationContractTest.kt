@@ -36,10 +36,14 @@ class ChatGptWebConversationContractTest {
         val conversations = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
         )
+        val history = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js",
+        )
 
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization")
             .forEach { forbidden ->
                 assertFalse("conversation adapter must not contain $forbidden", conversations.contains(forbidden))
+                assertFalse("conversation history must not contain $forbidden", history.contains(forbidden))
             }
     }
 

@@ -629,6 +629,16 @@ $listState = Wait-CommandResult -Action "list_conversations" -AfterMs $beforeLis
 Add-Check "conversation_list" ($listState.last_command.ok -eq $true) ([string]$listState.last_command.detail)
 $conversationPage = Invoke-UiAction -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 }
 Add-Check "conversation_query" ($conversationPage.control_ok -eq $true) "returned=$(@($conversationPage.conversations).Count)"
+$conversationCollection = $conversationPage.collection
+Add-Check "conversation_collection_count" (
+    [int]$conversationCollection.observed_count -ge [int]$conversationPage.source_count
+) "observed=$($conversationCollection.observed_count),source=$($conversationPage.source_count)"
+Add-Check "conversation_scroll_restored" (
+    $conversationCollection.scroll_restored -eq $true
+) "scrolled=$($conversationCollection.scrolled),steps=$($conversationCollection.steps)"
+Add-Check "conversation_collection_timeout" (
+    $conversationCollection.timed_out -ne $true
+) "reached_end=$($conversationCollection.reached_end),truncated=$($conversationCollection.truncated)"
 
 $nativeView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "native" }
 Add-Check "native_view_selected" ($nativeView.control_ok -eq $true) ([string]$nativeView.view_mode)
@@ -668,6 +678,7 @@ $summary = [ordered]@{
     feature_baseline = $featureBaseline
     adaptation_review = $matrix.adaptation_review
     conversation_count = [int]$conversationPage.match_count
+    conversation_collection = $conversationCollection
     context = [ordered]@{
         schema = [string]$contextFirst.schema
         revision = [string]$contextFirst.context_revision

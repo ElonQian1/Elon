@@ -56,6 +56,17 @@ internal data class ChatGptWebFeature(
     val selected: Boolean,
 )
 
+internal data class ChatGptWebConversationCollection(
+    val scrollerFound: Boolean = false,
+    val scrolled: Boolean = false,
+    val scrollRestored: Boolean = true,
+    val reachedEnd: Boolean = false,
+    val truncated: Boolean = false,
+    val timedOut: Boolean = false,
+    val observedCount: Int = 0,
+    val steps: Int = 0,
+)
+
 internal sealed interface ChatGptWebEvent {
     data class AdapterReady(
         val capabilities: ChatGptWebCapabilities,
@@ -65,6 +76,9 @@ internal sealed interface ChatGptWebEvent {
 
     data class ConversationList(
         val conversations: List<ChatGptWebConversation>,
+        val collection: ChatGptWebConversationCollection = ChatGptWebConversationCollection(
+            observedCount = conversations.size,
+        ),
     ) : ChatGptWebEvent
 
     data class ComposerControls(
@@ -118,9 +132,13 @@ internal object ChatGptWebProtocol {
                     ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
                 )
                 "message_snapshot" -> ChatGptWebEvent.Snapshot(parseSnapshot(event))
-                "conversation_snapshot" -> ChatGptWebEvent.ConversationList(
-                    parseConversations(event),
-                )
+                "conversation_snapshot" -> {
+                    val conversations = parseConversations(event)
+                    ChatGptWebEvent.ConversationList(
+                        conversations = conversations,
+                        collection = parseConversationCollection(event, conversations.size),
+                    )
+                }
                 "composer_controls_snapshot" -> parseComposerControls(event)
                 "navigation_snapshot" -> ChatGptWebEvent.FeatureNavigation(parseFeatures(event))
                 "ui_manifest_snapshot" -> ChatGptWebEvent.UiManifest(parseUiManifest(event))
@@ -397,6 +415,24 @@ internal object ChatGptWebProtocol {
         }
     }
 
+    private fun parseConversationCollection(
+        event: JSONObject,
+        conversationCount: Int,
+    ): ChatGptWebConversationCollection {
+        val collection = event.optJSONObject("collection")
+            ?: return ChatGptWebConversationCollection(observedCount = conversationCount)
+        return ChatGptWebConversationCollection(
+            scrollerFound = collection.optBoolean("scrollerFound"),
+            scrolled = collection.optBoolean("scrolled"),
+            scrollRestored = !collection.has("scrollRestored") || collection.optBoolean("scrollRestored"),
+            reachedEnd = collection.optBoolean("reachedEnd"),
+            truncated = collection.optBoolean("truncated"),
+            timedOut = collection.optBoolean("timedOut"),
+            observedCount = conversationCount,
+            steps = collection.optInt("steps", 0).coerceIn(0, MAX_CONVERSATION_COLLECTION_STEPS),
+        )
+    }
+
     private fun parseSlider(item: JSONObject, role: String, inputKind: String?): ChatGptWebSlider? {
         if (!item.optBoolean("sliderSettable") || role != "slider" || inputKind != "range") return null
         val min = item.optDouble("sliderMin", Double.NaN)
@@ -481,6 +517,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_MESSAGE_PART_LABEL_LENGTH = 180
     private const val MAX_DRAFT_LENGTH = 20_000
     private const val MAX_CONVERSATIONS = 100
+    private const val MAX_CONVERSATION_COLLECTION_STEPS = 80
     private const val MAX_CAPABILITIES = 40
     private const val MAX_CAPABILITY_LENGTH = 48
     private const val MAX_MODEL_LABEL_LENGTH = 80

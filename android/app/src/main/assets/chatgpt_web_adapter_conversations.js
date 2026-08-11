@@ -66,6 +66,56 @@
     }).filter(Boolean).slice(0, MAX_CONVERSATIONS);
   }
 
+  function findConversationScroller() {
+    const links = conversationLinks();
+    const candidates = [];
+    links.slice(0, 5).forEach((link) => {
+      let node = link.parentElement;
+      while (node && node !== document.body && node !== document.documentElement) {
+        if (!candidates.includes(node)) candidates.push(node);
+        node = node.parentElement;
+      }
+    });
+    return candidates.find((node) => {
+      const style = window.getComputedStyle(node);
+      return Number(node.clientHeight) >= 80 &&
+        Number(node.scrollHeight) > Number(node.clientHeight) + 24 &&
+        /auto|scroll/.test(style.overflowY || '');
+    }) || candidates.find((node) =>
+      Number(node.clientHeight) >= 80 &&
+      Number(node.scrollHeight) > Number(node.clientHeight) + 24
+    ) || null;
+  }
+
+  function collectConversationHistory(initial, onDone) {
+    const history = window.__elonChatGptConversationHistory;
+    if (!history || typeof history.collect !== 'function') {
+      return onDone({
+        conversations: initial,
+        collection: {
+          scrollerFound: false,
+          scrolled: false,
+          scrollRestored: true,
+          reachedEnd: false,
+          truncated: initial.length >= MAX_CONVERSATIONS,
+          timedOut: false,
+          observedCount: initial.length,
+          steps: 0
+        }
+      });
+    }
+    history.collect({
+      initial,
+      read: readConversations,
+      findScroller: findConversationScroller,
+      maximum: MAX_CONVERSATIONS,
+      timeoutMs: 5000,
+      delayMs: 180,
+      maxSteps: 40,
+      stablePasses: 3
+    }, onDone);
+  }
+
   function findSidebarButton(open) {
     const selector = open
       ? '[data-testid*="open-sidebar" i], button[aria-label*="open sidebar" i], button[aria-label*="打开边栏" i], button[aria-label*="打开侧边栏" i]'
@@ -129,10 +179,16 @@
       open.click();
       return waitForConversations(
         (conversations) => {
-          emitEvent({ type: 'conversation_snapshot', conversations });
-          result('list_conversations', true, '');
-          const close = findSidebarButton(false);
-          if (close) close.click();
+          collectConversationHistory(conversations, (snapshot) => {
+            emitEvent({
+              type: 'conversation_snapshot',
+              conversations: snapshot.conversations,
+              collection: snapshot.collection
+            });
+            result('list_conversations', true, '');
+            const close = findSidebarButton(false);
+            if (close) close.click();
+          });
         },
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
       );
@@ -140,8 +196,14 @@
 
     const existing = readConversations();
     if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
-    emitEvent({ type: 'conversation_snapshot', conversations: existing });
-    result('list_conversations', true, '');
+    collectConversationHistory(existing, (snapshot) => {
+      emitEvent({
+        type: 'conversation_snapshot',
+        conversations: snapshot.conversations,
+        collection: snapshot.collection
+      });
+      result('list_conversations', true, '');
+    });
   }
 
   function newConversation(result) {

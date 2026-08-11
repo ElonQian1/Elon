@@ -253,6 +253,16 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"conversation_snapshot",
+                "collection":{
+                  "scrollerFound":true,
+                  "scrolled":true,
+                  "scrollRestored":true,
+                  "reachedEnd":true,
+                  "truncated":false,
+                  "timedOut":false,
+                  "observedCount":3,
+                  "steps":4
+                },
                 "conversations":[
                   {"id":"one","title":"第一场会话","path":"/c/one","active":true},
                   {"id":"bad","title":"越界地址","path":"https://example.com/c/bad"},
@@ -266,6 +276,14 @@ class ChatGptWebProtocolTest {
         assertEquals(1, event.conversations.size)
         assertEquals("第一场会话", event.conversations.single().title)
         assertTrue(event.conversations.single().active)
+        assertTrue(event.collection.scrollerFound)
+        assertTrue(event.collection.scrolled)
+        assertTrue(event.collection.scrollRestored)
+        assertTrue(event.collection.reachedEnd)
+        assertFalse(event.collection.truncated)
+        assertFalse(event.collection.timedOut)
+        assertEquals(1, event.collection.observedCount)
+        assertEquals(4, event.collection.steps)
     }
 
     @Test

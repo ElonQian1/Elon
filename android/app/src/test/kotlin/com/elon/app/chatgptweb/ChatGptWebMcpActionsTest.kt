@@ -37,6 +37,9 @@ class ChatGptWebMcpActionsTest {
         assertEquals(0.25, control.getDouble("web_x_ratio"), 0.0)
         assertFalse(control.getBoolean("in_viewport"))
         assertEquals(1, state.getJSONObject("navigation").getInt("conversation_count"))
+        assertTrue(state.getJSONObject("navigation")
+            .getJSONObject("conversation_collection")
+            .getBoolean("reached_end"))
         assertEquals(2, state.getJSONObject("ui_manifest").getInt("discovered_control_count"))
         assertFalse(state.getJSONObject("ui_manifest").getBoolean("controls_truncated"))
         assertEquals(123L, state.getJSONObject("last_command").getLong("observed_at_ms"))
@@ -422,6 +425,10 @@ class ChatGptWebMcpActionsTest {
         assertEquals("control_suggestion_demo", controls.getJSONArray("controls")
             .getJSONObject(0).getString("control_id"))
         assertEquals(1, conversations.getInt("match_count"))
+        assertEquals(1, conversations.getInt("source_count"))
+        assertTrue(conversations.getJSONObject("collection").getBoolean("scroll_restored"))
+        assertTrue(conversations.getJSONObject("collection").getBoolean("reached_end"))
+        assertTrue(conversations.getJSONObject("collection").getBoolean("complete"))
         val conversation = conversations.getJSONArray("conversations").getJSONObject(0)
         assertEquals("/c/demo", conversation.getString("path"))
         assertEquals("chatgpt_open_conversation", conversation.getString("native_action"))
@@ -837,6 +844,14 @@ class ChatGptWebMcpActionsTest {
                     lastCommandObservedAtMs = 123L,
                     pageGeneration = 1L,
                     adapterGeneration = 1L,
+                    conversationCollection = ChatGptWebConversationCollection(
+                        scrollerFound = true,
+                        scrolled = true,
+                        scrollRestored = true,
+                        reachedEnd = true,
+                        observedCount = 1,
+                        steps = 3,
+                    ),
                 )
             },
             beginCommand = { expectedAction ->

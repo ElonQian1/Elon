@@ -4,6 +4,7 @@ internal class ChatGptWebObservedState(
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     private var conversations: List<ChatGptWebConversation> = emptyList()
+    private var conversationCollection = ChatGptWebConversationCollection()
     private var features: List<ChatGptWebFeature> = emptyList()
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
     private var lastCommand: ChatGptWebEvent.CommandResult? = null
@@ -17,7 +18,10 @@ internal class ChatGptWebObservedState(
     fun accept(event: ChatGptWebEvent) {
         val observedAtMs = nowMs()
         when (event) {
-            is ChatGptWebEvent.ConversationList -> conversations = event.conversations
+            is ChatGptWebEvent.ConversationList -> {
+                conversations = event.conversations
+                conversationCollection = event.collection
+            }
             is ChatGptWebEvent.FeatureNavigation -> features = event.features
             is ChatGptWebEvent.ComposerControls -> {
                 composerSections = composerSections + (event.section to event.options)
@@ -42,6 +46,7 @@ internal class ChatGptWebObservedState(
         val observedAtMs = nowMs()
         if (document.pageGeneration > pageGeneration) {
             conversations = emptyList()
+            conversationCollection = ChatGptWebConversationCollection()
             features = emptyList()
             composerSections = emptyMap()
             lastCommand = null
@@ -99,6 +104,7 @@ internal class ChatGptWebObservedState(
             lastCommandObservedAtMs = lastCommandObservedAtMs,
             pageGeneration = pageGeneration,
             adapterGeneration = adapterGeneration,
+            conversationCollection = conversationCollection,
         )
     }
 
@@ -149,6 +155,9 @@ internal class ChatGptWebObservedState(
         val lastCommandObservedAtMs: Long? = null,
         val pageGeneration: Long = 0L,
         val adapterGeneration: Long = 0L,
+        val conversationCollection: ChatGptWebConversationCollection = ChatGptWebConversationCollection(
+            observedCount = conversations.size,
+        ),
     ) {
         val adapterCurrent: Boolean
             get() = pageGeneration > 0 && adapterGeneration == pageGeneration

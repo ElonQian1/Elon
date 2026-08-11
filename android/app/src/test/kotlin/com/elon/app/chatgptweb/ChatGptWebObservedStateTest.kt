@@ -9,9 +9,19 @@ class ChatGptWebObservedStateTest {
     @Test
     fun retainsNavigationComposerAndCommandObservations() {
         val state = ChatGptWebObservedState()
-        state.accept(ChatGptWebEvent.ConversationList(listOf(
-            ChatGptWebConversation("demo", "桥接验证", "/c/demo", active = true),
-        )))
+        state.accept(ChatGptWebEvent.ConversationList(
+            conversations = listOf(
+                ChatGptWebConversation("demo", "桥接验证", "/c/demo", active = true),
+            ),
+            collection = ChatGptWebConversationCollection(
+                scrollerFound = true,
+                scrolled = true,
+                scrollRestored = true,
+                reachedEnd = true,
+                observedCount = 1,
+                steps = 3,
+            ),
+        ))
         state.accept(ChatGptWebEvent.FeatureNavigation(listOf(
             ChatGptWebFeature("feature_library", "文件库", "library", selected = false),
         )))
@@ -24,6 +34,8 @@ class ChatGptWebObservedStateTest {
 
         val snapshot = state.snapshot()
         assertEquals("/c/demo", snapshot.conversations.single().path)
+        assertTrue(snapshot.conversationCollection.reachedEnd)
+        assertEquals(3, snapshot.conversationCollection.steps)
         assertEquals("library", snapshot.features.single().kind)
         assertEquals("快速", snapshot.composerSections.getValue("model").single().label)
         assertTrue(snapshot.lastCommand?.ok == true)
@@ -157,6 +169,7 @@ class ChatGptWebObservedStateTest {
 
         val reloading = state.snapshot()
         assertTrue(reloading.conversations.isEmpty())
+        assertEquals(0, reloading.conversationCollection.observedCount)
         assertTrue(reloading.composerSections.isEmpty())
         assertEquals(2L, reloading.pageGeneration)
         assertEquals(0L, reloading.adapterGeneration)

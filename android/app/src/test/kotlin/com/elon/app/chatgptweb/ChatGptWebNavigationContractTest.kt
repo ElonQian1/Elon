@@ -70,6 +70,12 @@ class ChatGptWebNavigationContractTest {
         val adapter = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
         )
+        val history = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js",
+        )
+        val pageAdapter = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        )
         val requestList = adapter.substringAfter("function requestList")
             .substringBefore("function newConversation")
 
@@ -77,6 +83,15 @@ class ChatGptWebNavigationContractTest {
         assertTrue(adapter.contains("Date.now() - stableSince >= 500"))
         assertTrue(adapter.contains("conversations.length > best.length"))
         assertTrue(adapter.contains("direct && isVisible(direct)"))
+        assertTrue(adapter.contains("collectConversationHistory"))
+        assertTrue(adapter.contains("findConversationScroller"))
+        assertTrue(history.contains("scrollRestored"))
+        assertTrue(history.contains("stablePassesRequired"))
+        assertTrue(history.contains("collected.size >= maximum"))
+        assertTrue(
+            pageAdapter.indexOf("chatgpt_web_adapter_conversation_history.js") <
+                pageAdapter.indexOf("chatgpt_web_adapter_conversations.js"),
+        )
     }
 
     @Test
