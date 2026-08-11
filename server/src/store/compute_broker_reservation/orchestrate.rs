@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use rusqlite::Transaction;
 
 use crate::compute_federation::{
@@ -87,7 +87,8 @@ pub(super) fn reserve_new_broker_contract_on(
             bill_missing_balance: true,
         },
         &request.expires_at,
-    )?;
+    )
+    .context("Broker 预算预授权失败")?;
     if budget.status != "reserved" || budget.balance_after_fen.is_none() {
         bail!("Broker 平台人民币余额预授权未进入 reserved 状态");
     }
@@ -116,7 +117,8 @@ pub(super) fn reserve_new_broker_contract_on(
                 &request.reservation_id,
             )?,
         },
-    )?;
+    )
+    .context("Broker 容量预留失败")?;
     let claim = stored_claim_on(conn, &held.claim_id)?
         .ok_or_else(|| anyhow!("Broker 已持有的 Capacity Claim 无法读取"))?;
     let reservation_expires_at = claim
@@ -148,13 +150,15 @@ pub(super) fn reserve_new_broker_contract_on(
         consumed_at: None,
         released_at: None,
     };
-    let pending_receipt = register_compute_reservation_on(conn, &pending, 0)?;
+    let pending_receipt = register_compute_reservation_on(conn, &pending, 0)
+        .context("Broker pending Reservation 登记失败")?;
 
     let active_at = timestamp_after(&pending.created_at)?;
     let mut reserved_job = source_job.job.clone();
     reserved_job.status = JOB_STATUS_RESERVED.to_string();
     reserved_job.updated_at = active_at.clone();
-    let reserved_job_receipt = register_compute_job_on(conn, &reserved_job, source_job.revision)?;
+    let reserved_job_receipt = register_compute_job_on(conn, &reserved_job, source_job.revision)
+        .context("Broker reserved Job 版本登记失败")?;
 
     let mut active = pending;
     active.status = RESERVATION_STATUS_ACTIVE.to_string();
@@ -164,7 +168,8 @@ pub(super) fn reserve_new_broker_contract_on(
         job_revision: reserved_job_receipt.revision,
         job_digest: reserved_job_receipt.job_digest.clone(),
     };
-    let active_receipt = register_compute_reservation_on(conn, &active, pending_receipt.revision)?;
+    let active_receipt = register_compute_reservation_on(conn, &active, pending_receipt.revision)
+        .context("Broker active Reservation 版本登记失败")?;
     persist_broker_reserve_receipt_on(
         conn,
         request,
@@ -174,6 +179,7 @@ pub(super) fn reserve_new_broker_contract_on(
         &reserved_job_receipt,
         &active_receipt,
     )
+    .context("Broker 原子预留回执持久化失败")
 }
 
 fn ensure_source_job_matches(

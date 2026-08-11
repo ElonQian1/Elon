@@ -2,6 +2,10 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 
+#[cfg(test)]
+#[path = "compute_federation_broker_control_plane_tests.rs"]
+mod control_plane_tests;
+
 use crate::{
     compute_federation::{
         execution::{
