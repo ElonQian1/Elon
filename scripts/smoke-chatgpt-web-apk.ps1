@@ -9,6 +9,7 @@ param(
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
     [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54,
+    [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,
     [string]$ProbeMarker = ""
@@ -401,12 +402,22 @@ Add-Check "feature_baseline_schema" (
 $currentEvidenceInput = [string]$featureBaseline.device_verification_input_sha256
 $verifiedEvidenceInput = [string]$featureBaseline.device_verification_verified_input_sha256
 $evidenceProvenance = $featureBaseline.device_verification_provenance
-Add-Check "feature_device_evidence_current" (
+$evidenceStructureValid =
+    [int]$featureBaseline.device_verification_adapter_version -eq [int]$state.adapter_version -and
+    $currentEvidenceInput -match '^[0-9a-f]{64}$' -and
+    $verifiedEvidenceInput -match '^[0-9a-f]{64}$'
+$evidenceCurrent =
     $featureBaseline.device_verification_current -eq $true -and
-        [int]$featureBaseline.device_verification_adapter_version -eq [int]$state.adapter_version -and
-        $currentEvidenceInput -match '^[0-9a-f]{64}$' -and
-        $currentEvidenceInput -eq $verifiedEvidenceInput
-) "evidence_adapter=$($featureBaseline.device_verification_adapter_version),runtime_adapter=$($state.adapter_version),input=$($currentEvidenceInput.Substring(0, [Math]::Min(12, $currentEvidenceInput.Length)))"
+    $evidenceStructureValid -and
+    $currentEvidenceInput -eq $verifiedEvidenceInput
+$staleCandidateAccepted =
+    $AllowStaleDeviceEvidence -and
+    $featureBaseline.device_verification_current -eq $false -and
+    $evidenceStructureValid -and
+    $currentEvidenceInput -ne $verifiedEvidenceInput
+Add-Check "feature_device_evidence_current" (
+    $evidenceCurrent -or $staleCandidateAccepted
+) "current=$evidenceCurrent,candidate_stale_accepted=$staleCandidateAccepted,evidence_adapter=$($featureBaseline.device_verification_adapter_version),runtime_adapter=$($state.adapter_version),input=$($currentEvidenceInput.Substring(0, [Math]::Min(12, $currentEvidenceInput.Length)))"
 Add-Check "feature_device_evidence_provenance" (
     $evidenceProvenance.schema -eq "elon.chatgpt_web.device_evidence.v1" -and
         [int]$evidenceProvenance.verified_apk_version_code -gt 0 -and
