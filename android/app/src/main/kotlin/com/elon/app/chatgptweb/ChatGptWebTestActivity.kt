@@ -43,6 +43,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var proxyController: ChatGptWebProxyController
     private lateinit var fileChooserController: ChatGptWebFileChooserController
     private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
+    private val sessionRestorer by lazy { ChatGptWebSessionRestorer(this) }
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private var latestSnapshot: ChatGptWebSnapshot? = null
@@ -174,7 +175,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             proxyStatus = status
             status.error?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
             if (savedInstanceState == null || binding.chatGptWebView.restoreState(savedInstanceState) == null) {
-                binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+                binding.chatGptWebView.loadUrl(sessionRestorer.restoreUrl())
             }
         }
     }
@@ -505,6 +506,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun showReady(url: String) {
         cookieManager.flush()
+        sessionRestorer.onPageReady(url)
         loginController.onPageReady(url)
         binding.chatGptWebHost.text = ChatGptWebNavigationPolicy.displayHost(url)
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_success))
@@ -545,8 +547,10 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     )
                 ) {
                     googleAccountHintController.onAuthenticated()
+                    val authenticationCompleted = loginController.onAuthenticated()
                     pageAdapter.markReady()
-                    if (loginController.onAuthenticated() || modeController.isQuickSelected()) {
+                    val modeRestored = sessionRestorer.restorePreferredMode(binding.chatGptModeNative.isEnabled, modeController)
+                    if (!modeRestored && (authenticationCompleted || modeController.isQuickSelected())) {
                         modeController.select(ChatGptWebModeController.Mode.NATIVE)
                     }
                 } else {
@@ -643,6 +647,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun showMode(mode: ChatGptWebModeController.Mode) {
         latestMode = mode
+        sessionRestorer.onModeShown(mode)
         binding.chatGptWebStatus.setTextColor(
             getColor(
                 if (mode == ChatGptWebModeController.Mode.NATIVE) {
@@ -720,6 +725,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         loginController.reset()
         googleAccountHintController.reset()
         sessionContinuity.clear()
+        sessionRestorer.clear()
         cookieManager.removeAllCookies {
             cookieManager.flush()
             WebStorage.getInstance().deleteAllData()

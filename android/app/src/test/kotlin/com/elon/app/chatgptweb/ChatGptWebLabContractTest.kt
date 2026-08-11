@@ -152,6 +152,13 @@ class ChatGptWebLabContractTest {
         assertTrue(messages.contains("function tableMarkdown"))
         assertTrue(messages.contains("function structuredParts"))
         assertTrue(messages.contains("FILE_PATH_EXTENSION"))
+        assertTrue(messages.contains("COMPLEX_PART_TYPES"))
+        assertTrue(messages.contains("data-testid*=\"math\""))
+        assertTrue(messages.contains("data-testid*=\"chart\""))
+        assertTrue(messages.contains("data-testid*=\"map\""))
+        assertTrue(messages.contains("data-testid*=\"interactive\""))
+        assertTrue(messages.contains("tag === 'DETAILS'"))
+        assertTrue(messages.contains("tag === 'DL'"))
         assertFalse(messages.contains("/\\.[a-z0-9]{2,8}$/i.test(path)"))
         assertTrue(messages.contains("lastStructuredTypes"))
         assertTrue(messages.contains("lastComplexOutput"))
@@ -230,7 +237,7 @@ class ChatGptWebLabContractTest {
         assertTrue(activity.contains("binding.chatGptWebToolbar"))
         assertTrue(activity.contains("ChatGptWebBackNavigation.Action.EXIT_OFFICIAL_VIEW"))
         assertTrue(activity.contains("modeController.select(ChatGptWebModeController.Mode.NATIVE)"))
-        assertTrue(activity.contains("loginController.onAuthenticated() || modeController.isQuickSelected()"))
+        assertTrue(activity.contains("sessionRestorer.restorePreferredMode("))
     }
 
     @Test
@@ -381,6 +388,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("ChatGptWebCapabilityId.MESSAGE_REGENERATE"))
         assertTrue(adapter.contains("partRenderer.render"))
         assertTrue(partRenderer.contains("ChatGptWebMessagePart"))
+        assertTrue(partRenderer.contains("messagePartSelector"))
         assertTrue(partRenderer.contains("onOpenOfficial"))
         assertFalse(partRenderer.contains("OkHttpClient"))
         assertFalse(partRenderer.contains("getCookie("))
@@ -474,6 +482,17 @@ class ChatGptWebLabContractTest {
         assertTrue(loginShell.contains("android:id=\"@+id/chatGptQuickOfficial\""))
         assertFalse(loginShell.contains("<EditText"))
         assertTrue(activity.contains("loadUrl(ChatGptWebNavigationPolicy.AUTH_URL)"))
+        val restorer = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSessionRestorer.kt"
+        )
+        assertTrue(activity.contains("ChatGptWebSessionRestorer(this)"))
+        assertTrue(activity.contains("sessionRestorer.restoreUrl()"))
+        assertTrue(activity.contains("sessionRestorer.onPageReady(url)"))
+        assertTrue(activity.contains("sessionRestorer.onModeShown(mode)"))
+        assertTrue(activity.contains("sessionRestorer.restorePreferredMode("))
+        assertTrue(restorer.contains("ChatGptWebSessionStateStore(context)"))
+        assertTrue(restorer.contains("pendingMode = stateStore.restoreMode()"))
+        assertTrue(restorer.contains("stateStore.saveMode(mode)"))
         assertTrue(activity.contains("loginController.onAuthenticated()"))
         assertTrue(googleController.contains("AccountManager.newChooseAccountIntent"))
         assertTrue(googleController.contains("GOOGLE_ACCOUNT_TYPE = \"com.google\""))
