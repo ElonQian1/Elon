@@ -196,7 +196,9 @@ internal class ChatGptNativeConversationController(
     private fun scrollToMessage(index: Int, target: RevealTarget) {
         messagesView.post {
             if (revealTarget != target) return@post
-            layoutManager.scrollToPositionWithOffset(index, messagesView.paddingTop)
+            if (messagesView.findViewHolderForAdapterPosition(index) == null) {
+                layoutManager.scrollToPositionWithOffset(index, messagesView.paddingTop)
+            }
             revealAttachedTarget(index, target, attempt = 0)
         }
     }
@@ -212,24 +214,36 @@ internal class ChatGptNativeConversationController(
                 return@reveal
             }
 
-            val targetRect = Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1))
-            messagesView.offsetDescendantRectToMyCoords(targetView, targetRect)
+            val targetRect = Rect(
+                0,
+                0,
+                targetView.width.coerceAtLeast(1),
+                targetView.height.coerceAtLeast(1),
+            )
+            holder.itemView.offsetDescendantRectToMyCoords(targetView, targetRect)
+            val viewportRect = Rect(targetRect)
+            messagesView.offsetDescendantRectToMyCoords(holder.itemView, viewportRect)
             val viewportTop = messagesView.paddingTop
             val viewportBottom = messagesView.height - messagesView.paddingBottom
-            val scrollDelta = when {
-                targetRect.top < viewportTop -> targetRect.top - viewportTop
-                targetRect.bottom > viewportBottom -> targetRect.top - viewportTop
-                else -> 0
+            if (viewportRect.top < viewportTop || viewportRect.bottom > viewportBottom) {
+                layoutManager.requestChildRectangleOnScreen(
+                    messagesView,
+                    holder.itemView,
+                    targetRect,
+                    true,
+                )
+                retryReveal(index, target, attempt)
+                return@reveal
             }
-            if (scrollDelta != 0) messagesView.scrollBy(0, scrollDelta)
-            targetView.requestRectangleOnScreen(
-                Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1)),
-                true,
-            )
 
             val visibleRect = Rect()
-            if (!targetView.getGlobalVisibleRect(visibleRect) || visibleRect.isEmpty) {
+            val fullyVisible = targetView.getGlobalVisibleRect(visibleRect) &&
+                visibleRect.width() >= targetView.width &&
+                visibleRect.height() >= targetView.height
+            if (!fullyVisible) {
                 retryReveal(index, target, attempt)
+            } else if (revealTarget == target) {
+                revealTarget = null
             }
         }
     }

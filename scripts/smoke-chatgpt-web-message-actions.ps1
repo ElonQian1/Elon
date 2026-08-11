@@ -191,16 +191,19 @@ try {
         throw "The native message action target could not be revealed."
     }
 
-    Start-Sleep -Seconds 1
     $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
     try {
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "uiautomator", "dump", $remoteDump) -TimeoutSec 30 `
-            -Label "dump native ChatGPT message menu selectors" | Out-Null
-        $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
-            -Label "read native ChatGPT message menu selectors"
-        $nativeMessageSelectorFound = $uiXml.Contains($nativeMessageSelector)
+        $selectorDeadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
+        do {
+            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                -Arguments @("shell", "uiautomator", "dump", $remoteDump) -TimeoutSec 30 `
+                -Label "dump native ChatGPT message menu selectors" | Out-Null
+            $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
+                -Label "read native ChatGPT message menu selectors"
+            $nativeMessageSelectorFound = $uiXml.Contains($nativeMessageSelector)
+            if (-not $nativeMessageSelectorFound) { Start-Sleep -Milliseconds 500 }
+        } while (-not $nativeMessageSelectorFound -and [DateTimeOffset]::UtcNow -lt $selectorDeadline)
     } finally {
         Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
             -Arguments @("shell", "rm", "-f", $remoteDump) -TimeoutSec 5 `
