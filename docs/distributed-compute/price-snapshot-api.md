@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Price Snapshot 控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Price Snapshot 控制面
 
 ## 1. 当前状态
 
-本人 HTTP、项目级 MCP 和 PC 工作区已写入代码，可基于当前 active Offer 发布或读取一份服务端规范化的不可变 Price Snapshot。代码尚未编译、执行 v171 迁移、运行 HTTP/MCP 验证或发布页面，状态固定为 `implementation_uncompiled`。
+本人 HTTP、项目级 MCP 和 PC 工作区已写入代码，可基于当前 active Offer 发布或读取一份服务端规范化的不可变 Price Snapshot。Store/Service 已通过临时 SQLite 全量迁移和 2 项定向测试，PC `/compute-supply` 已通过严格类型、lint、生产构建和 bundle budget，状态为 `implementation_partially_verified`。HTTP/MCP、并发、生产磁盘、真实 TCP、浏览器交互和发布仍未验证，证据见 `price-snapshot-control-plane-acceptance.md`。
 
 首版来源固定为 `fallback_curve`：它冻结 Offer 已声明的价格组件和费用规则，使现有 Job 候选查询可以发现该报价，但不代表真实成交价、指数价格、市场 mark 或期货曲线。
 
@@ -69,9 +69,9 @@ implementation_status: implementation_uncompiled
 
 当 Offer 转为 draining、expired 或 revoked 后，候选查询因当前 Offer 不再 active 而排除其历史快照；快照本身仍作为不可变历史保留。
 
-## 5. 尚未实现
+## 5. 尚未验证或实现
 
-- Cargo 编译、v171 迁移执行、并发幂等和 HTTP/MCP 真实调用验证；
+- 并发幂等、HTTP/MCP 真实调用、生产磁盘迁移、浏览器交互和发布验证；
 - 平台签名价格源、trade/index/mark 接入与来源治理；
 - 期货/远期曲线、订单簿、撮合、滑点和行情广播；
 - 自动刷新、批量报价和到期调度；
