@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前状态
 
-本人 Provider 服务/Store 控制面已通过真实磁盘 SQLite 定向回归，状态为 `implementation_partially_verified`；HTTP/MCP 和 PC 页面仍未运行验证。它只允许登录用户登记、读取和列出本人拥有的自我声明 Provider，不代表节点已经联网、通过验证、具备可调度路由或能够发布算力 Offer。
+本人 Provider 服务/Store 控制面已通过真实磁盘 SQLite 定向回归，HTTP Bearer 与 MCP 聚合调用也已完成进程内验收，状态为 `implementation_partially_verified`；PC 页面仍未运行验证。它只允许登录用户登记、读取和列出本人拥有的自我声明 Provider，不代表节点已经联网、通过验证、具备可调度路由或能够发布算力 Offer。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终写入同一份版本化 Provider Registry。创建时，所有者、结算账户、初始状态、信任层级、策略修订号和服务端时间均由服务端固定，客户端不能自行提升信任或激活供给。
 
@@ -70,7 +70,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 
 ## 7. 尚未实现
 
-- HTTP/MCP 进程内调用、PC 构建和浏览器交互验证；
+- 真实 TCP HTTP/MCP 客户端、PC 构建和浏览器交互验证；
 - 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；外部矿池专用 onboarding API 尚未实现，既有领域/Store-private/v221 源码也尚未编译或迁移；
 - Endpoint/Adapter 路由提案、证明、审批、轮换和撤销；
 - 节点绑定、ReadyCapability、路由与硬件观测摘要的申请及人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实证据采集、密码学验证、信任升级和激活仍未实现；
