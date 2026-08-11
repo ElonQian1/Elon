@@ -1,9 +1,9 @@
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
-use crate::compute_federation::market::ComputePriceSnapshot;
+use crate::compute_federation::market::{ComputePriceSnapshot, PRICE_SOURCE_FALLBACK_CURVE};
 
 use super::{
     compute_offer_registry::{current_registered_offer_on, registered_offer_version_on},
@@ -50,91 +50,19 @@ impl Store {
         &self,
         snapshot: &ComputePriceSnapshot,
     ) -> Result<ComputePriceSnapshotRegistrationReceipt> {
-        if snapshot.snapshot_id.trim().is_empty() || snapshot.quote_id.trim().is_empty() {
-            bail!("算力价格快照 ID 和报价 ID 不能为空");
+        if snapshot.price_source.source_kind != PRICE_SOURCE_FALLBACK_CURVE
+            || snapshot.price_source.source_id
+                != format!("offer_fallback_curve:{}", snapshot.offer_id)
+            || snapshot.price_source.source_version != snapshot.offer_version
+            || snapshot.price_source.sample_count != 0
+        {
+            bail!("通用价格快照入口只接受 Offer-owner fallback_curve 来源");
         }
-        let snapshot_json = serde_json::to_string(snapshot)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-
-        if let Some(stored) = price_snapshot_on(&tx, snapshot.snapshot_id.trim())? {
-            let stored_snapshot = audited_price_snapshot_on(&tx, &stored)?;
-            if stored.snapshot_json != snapshot_json
-                || stored.snapshot_digest != snapshot.snapshot_digest
-            {
-                bail!("相同算力价格快照 ID 不能绑定不同锁价合同");
-            }
-            tx.commit()?;
-            return Ok(ComputePriceSnapshotRegistrationReceipt {
-                snapshot: stored_snapshot,
-                replayed: true,
-            });
-        }
-        if let Some(existing_snapshot_id) = snapshot_id_for_quote_on(&tx, &snapshot.quote_id)? {
-            bail!("报价 ID 已绑定价格快照 {existing_snapshot_id}");
-        }
-
-        let offer = current_registered_offer_on(&tx, snapshot.offer_id.trim())?
-            .ok_or_else(|| anyhow!("算力价格快照 Offer 不存在"))?;
-        validate_price_snapshot_contract(snapshot, &offer.offer)?;
-        let expires_at = DateTime::parse_from_rfc3339(&snapshot.expires_at)
-            .context("算力价格快照失效时间不是 RFC3339")?;
-        let quoted_at = DateTime::parse_from_rfc3339(&snapshot.quoted_at)
-            .context("算力价格快照报价时间不是 RFC3339")?;
-        if quoted_at > chrono::Utc::now() {
-            bail!("不能登记报价时间位于未来的算力价格快照");
-        }
-        if expires_at <= chrono::Utc::now() {
-            bail!("不能登记已经失效的算力价格快照");
-        }
-
-        tx.execute(
-            "INSERT INTO compute_price_snapshots (
-                snapshot_id, snapshot_digest, quote_id, pricing_mode,
-                sku_id, sku_digest, provider_id, offer_id, offer_version,
-                offer_digest, delivery_window_id, delivery_window_digest,
-                currency, consumer_max_amount_micros, provider_max_amount_micros,
-                price_source_kind, price_source_id, price_source_version,
-                price_source_digest, trade_id, instrument_id, quoted_at,
-                expires_at, snapshot_json, created_at
-             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
-                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
-                ?20, ?21, ?22, ?23, ?24, ?25
-             )",
-            params![
-                snapshot.snapshot_id,
-                snapshot.snapshot_digest,
-                snapshot.quote_id,
-                snapshot.pricing_mode,
-                snapshot.sku.sku_id,
-                snapshot.sku.sku_digest,
-                snapshot.provider_id,
-                snapshot.offer_id,
-                snapshot.offer_version,
-                snapshot.offer_digest,
-                snapshot.delivery_window.binding.window_id,
-                snapshot.delivery_window.binding.window_digest,
-                snapshot.currency,
-                snapshot.consumer_max_amount_micros,
-                snapshot.provider_max_amount_micros,
-                snapshot.price_source.source_kind,
-                snapshot.price_source.source_id,
-                snapshot.price_source.source_version,
-                snapshot.price_source.source_digest,
-                snapshot.trade_id,
-                snapshot.instrument_id,
-                snapshot.quoted_at,
-                snapshot.expires_at,
-                snapshot_json,
-                now(),
-            ],
-        )?;
+        let receipt = register_compute_price_snapshot_on(&tx, snapshot, &Utc::now())?;
         tx.commit()?;
-        Ok(ComputePriceSnapshotRegistrationReceipt {
-            snapshot: snapshot.clone(),
-            replayed: false,
-        })
+        Ok(receipt)
     }
 
     pub(crate) fn compute_price_snapshot(
@@ -204,6 +132,99 @@ impl Store {
             })
             .collect()
     }
+}
+
+pub(super) fn register_compute_price_snapshot_on(
+    conn: &Connection,
+    snapshot: &ComputePriceSnapshot,
+    current_time: &DateTime<Utc>,
+) -> Result<ComputePriceSnapshotRegistrationReceipt> {
+    if snapshot.snapshot_id.trim().is_empty() || snapshot.quote_id.trim().is_empty() {
+        bail!("算力价格快照 ID 和报价 ID 不能为空");
+    }
+    let snapshot_json = serde_json::to_string(snapshot)?;
+    if let Some(stored) = price_snapshot_on(conn, snapshot.snapshot_id.trim())? {
+        let stored_snapshot = audited_price_snapshot_on(conn, &stored)?;
+        if stored.snapshot_json != snapshot_json
+            || stored.snapshot_digest != snapshot.snapshot_digest
+        {
+            bail!("相同算力价格快照 ID 不能绑定不同锁价合同");
+        }
+        return Ok(ComputePriceSnapshotRegistrationReceipt {
+            snapshot: stored_snapshot,
+            replayed: true,
+        });
+    }
+    if let Some(existing_snapshot_id) = snapshot_id_for_quote_on(conn, &snapshot.quote_id)? {
+        bail!("报价 ID 已绑定价格快照 {existing_snapshot_id}");
+    }
+
+    let offer = current_registered_offer_on(conn, snapshot.offer_id.trim())?
+        .ok_or_else(|| anyhow!("算力价格快照 Offer 不存在"))?;
+    validate_price_snapshot_contract(snapshot, &offer.offer)?;
+    let expires_at = DateTime::parse_from_rfc3339(&snapshot.expires_at)
+        .context("算力价格快照失效时间不是 RFC3339")?;
+    let quoted_at = DateTime::parse_from_rfc3339(&snapshot.quoted_at)
+        .context("算力价格快照报价时间不是 RFC3339")?;
+    let current_time = current_time.fixed_offset();
+    if quoted_at > current_time {
+        bail!("不能登记报价时间位于未来的算力价格快照");
+    }
+    if expires_at <= current_time {
+        bail!("不能登记已经失效的算力价格快照");
+    }
+
+    conn.execute(
+        "INSERT INTO compute_price_snapshots (
+            snapshot_id, snapshot_digest, quote_id, pricing_mode,
+            sku_id, sku_digest, provider_id, offer_id, offer_version,
+            offer_digest, delivery_window_id, delivery_window_digest,
+            currency, consumer_max_amount_micros, provider_max_amount_micros,
+            price_source_kind, price_source_id, price_source_version,
+            price_source_digest, trade_id, instrument_id, quoted_at,
+            expires_at, snapshot_json, created_at
+         ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+            ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
+            ?20, ?21, ?22, ?23, ?24, ?25
+         )",
+        params![
+            snapshot.snapshot_id,
+            snapshot.snapshot_digest,
+            snapshot.quote_id,
+            snapshot.pricing_mode,
+            snapshot.sku.sku_id,
+            snapshot.sku.sku_digest,
+            snapshot.provider_id,
+            snapshot.offer_id,
+            snapshot.offer_version,
+            snapshot.offer_digest,
+            snapshot.delivery_window.binding.window_id,
+            snapshot.delivery_window.binding.window_digest,
+            snapshot.currency,
+            snapshot.consumer_max_amount_micros,
+            snapshot.provider_max_amount_micros,
+            snapshot.price_source.source_kind,
+            snapshot.price_source.source_id,
+            snapshot.price_source.source_version,
+            snapshot.price_source.source_digest,
+            snapshot.trade_id,
+            snapshot.instrument_id,
+            snapshot.quoted_at,
+            snapshot.expires_at,
+            snapshot_json,
+            now(),
+        ],
+    )?;
+    let stored = registered_price_snapshot_on(conn, &snapshot.snapshot_id)?
+        .ok_or_else(|| anyhow!("算力价格快照写入后缺失"))?;
+    if stored != *snapshot {
+        bail!("算力价格快照写入后回读不一致");
+    }
+    Ok(ComputePriceSnapshotRegistrationReceipt {
+        snapshot: stored,
+        replayed: false,
+    })
 }
 
 pub(super) fn registered_price_snapshot_on(

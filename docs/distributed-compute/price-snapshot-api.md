@@ -14,7 +14,7 @@ implementation_status: implementation_partially_verified
 
 首版来源固定为 `fallback_curve`：它冻结 Offer 已声明的价格组件和费用规则，使现有 Job 候选查询可以发现该报价，但不代表真实成交价、指数价格、市场 mark 或期货曲线。
 
-2026-08-11 已另行冻结平台 reference fallback 批次的 docs-first 设计。它未来仍使用 `source_kind=fallback_curve` 与 `sample_count=0`，由四眼批准的 exact batch 在一个 Store 事务中直接生成唯一 v171 Snapshot；不会新增第二套 Snapshot Registry，也不把平台批准冒充 `index`、`mark`、`trade` 或真实市场样本。领域、Store-private 与 v223 源码尚未写入，且不规划 HTTP/MCP/PC 入口，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
+2026-08-11 已写入平台 reference fallback 批次的领域、Store-private 与 v223 五账本/trigger 源码。它使用 `source_kind=fallback_curve` 与 `sample_count=0`，由四眼批准的 exact batch 在一个 Store 事务中直接生成唯一 v171 Snapshot；不会新增第二套 Snapshot Registry，也不把平台批准冒充 `index`、`mark`、`trade` 或真实市场样本。当前状态为 `implementation_uncompiled`、`implementation_unrun`，且没有 HTTP/MCP/PC 入口，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
 
 ## 2. 接口
 
@@ -60,7 +60,7 @@ implementation_status: implementation_partially_verified
 
 ### 3.1 计划中的平台 reference fallback producer
 
-平台批次不会复用本人请求 DTO，也不会允许 application 调用方提交任意 Snapshot。计划中的 v223 Store-private application 只机械消费 exact approved batch/review，重新审计当前 active Offer 的 revision/digest、SKU、窗口、curve/instrument、CNY 整数价格组件、空 fee rules 与金额上限，然后调用 v171 transaction-local registration kernel。每条 entry 恰好生成一份确定性 Snapshot/Quote ID；任一 entry 冲突或过期时整批零提交。
+平台批次不会复用本人请求 DTO，也不会允许 application 调用方提交任意 Snapshot。v223 Store-private application 源码只机械消费 exact approved batch/review，重新审计当前 active Provider/Offer 的 revision/digest、SKU、窗口、curve/instrument、CNY 整数价格组件、空 fee rules 与金额上限，然后调用 v171 transaction-local registration kernel。每条 entry 恰好生成一份确定性 Snapshot/Quote ID；任一 entry 冲突或过期时整批零提交。
 
 该 producer 只新增来源账本、application receipt 与 entry→v171 Snapshot binding。它不改变本页既有本人 HTTP/MCP/PC 接口，也不开放通用管理员 Snapshot 写入口。
 

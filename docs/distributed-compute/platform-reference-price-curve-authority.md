@@ -3,22 +3,22 @@ title: 平台参考价格回退曲线批次权威
 status: current
 reviewed_at: 2026-08-11
 owners: ai-economy, backend, security
-implementation_status: design_frozen
+implementation_status: implementation_uncompiled
 ---
 
 # 平台参考价格回退曲线批次权威
 
 ## 1. 权威范围与当前结论
 
-本文冻结平台参考价格回退曲线的最小来源合同。平台管理员提交一份精确批次，另一名平台管理员独立复核；只有 exact approved batch 才能由后续 Store-private v223 application 在一个事务中直接生成唯一的既有 v171 Price Snapshot。application 不是第二套 Snapshot Registry，也不是先保存一份等待未知 consumer 的 staging receipt。
+本文冻结平台参考价格回退曲线的最小来源合同。平台管理员提交一份精确批次，另一名平台管理员独立复核；只有 exact approved batch 才能由 Store-private v223 application 在一个事务中直接生成唯一的既有 v171 Price Snapshot。application 不是第二套 Snapshot Registry，也不是先保存一份等待未知 consumer 的 staging receipt。
 
-本 docs-first 批次只冻结设计与源码计划。领域、Store-private 与 v223 迁移源码尚未写入，未编译、未执行迁移或运行；没有 service、HTTP、MCP 或 PC 入口。后续源码形成前，不得宣称平台参考曲线已经可以提交、复核、应用或进入报价候选。
+领域 DTO/JCS/校验、Store-private submit/review/application/exact readback、v223 五账本/trigger 与 v171 transaction-local kernel 接线源码已经写入；状态仍是 `implementation_uncompiled`、`implementation_unrun`，未执行迁移、SQLite trigger、权限、并发或真实运行验证。没有 service、HTTP、MCP 或 PC 入口；Store 只验证调用方声明的管理员 ID 形状和四眼 ID 不等，不查询或证明当前管理员角色，不能描述成生产管理员能力。
 
 这条来源仍是 `fallback_curve`：它只表示一份经过平台四眼治理、与当前 Offer 合同精确一致的参考回退报价。`sample_count=0`，不表示平台读取过外部行情、真实成交、已接受交付或订单簿，也不得称为 `index`、`mark`、`trade`、YCI、真实市场价或平台签名价格源。
 
 ## 2. 与既有 Offer owner fallback 的关系
 
-v171 已有的本人报价入口根据一份 active Offer 生成 `fallback_curve` Snapshot，来源 ID 绑定该 Offer。平台参考曲线不会替换、升级或复制该入口，而是计划成为同一 v171 Registry 的第二个受控 producer：
+v171 已有的本人报价入口根据一份 active Offer 生成 `fallback_curve` Snapshot，来源 ID 绑定该 Offer。平台参考曲线不会替换、升级或复制该入口；当前源码把它实现为同一 v171 Registry 的第二个 Store-private producer，但尚未编译或运行：
 
 - 两条路径都只能写既有 `compute_price_snapshots`，不得建立平行快照表、当前根或 Job 报价权威；
 - 本人路径表达 Provider 对自己 Offer 的规范化报价；平台路径表达四眼批准的参考回退批次；
@@ -30,7 +30,7 @@ v171 已有的本人报价入口根据一份 active Offer 生成 `fallback_curve
 
 ## 3. 平台批次合同
 
-未来 submit 入口只允许当前 `admin/owner` 提交。首版一份批次必须采用拒绝未知字段的版本化信封、RFC 8785 JCS、SHA-256 摘要、稳定幂等键与明确确认，并只包含一个 `curve_id/curve_version` 及 1 至有界上限条 entry。
+未来 service/API submit 入口只允许当前 `admin/owner` 提交；当前 Store-private 源码尚不证明该角色。首版一份批次必须采用拒绝未知字段的版本化信封、RFC 8785 JCS、SHA-256 摘要、稳定幂等键与明确确认，并只包含一个 `curve_id/curve_version` 及 1 至有界上限条 entry。
 
 每条 entry 必须精确绑定：
 
@@ -56,7 +56,7 @@ Store-private 源码即使形成，也只能校验管理员 ID 形状和四眼�
 
 ## 5. Atomic application 与 v171 唯一真源
 
-application 只消费仍为 `approved` 的 exact batch/review、预期摘要、稳定幂等键和固定确认语，不接收新的曲线或价格字段。计划中的事务必须使用一个 `BEGIN IMMEDIATE`，并按每条 entry 重新核验：
+application 只消费仍为 `approved` 的 exact batch/review、预期摘要、稳定幂等键和固定确认语，不接收新的曲线或价格字段。源码事务使用一个 `BEGIN IMMEDIATE`，并按每条 entry 重新核验：
 
 1. Provider 与 Offer 存在，Offer 仍为当前 `active` exact revision/digest；
 2. Provider、SKU、交付窗口、pricing mode、curve/instrument、币种与价格组件同时精确匹配 entry 和 Offer；双方最大金额精确匹配 entry，并通过 v171 的 checked `i128` 上限校验；
@@ -70,9 +70,9 @@ application 只消费仍为 `approved` 的 exact batch/review、预期摘要、�
 
 application 的直接效果固定为：每条 entry 恰好对应一份唯一 v171 Snapshot，并保存 entry→Snapshot 的不可变 binding。它不创建新 Snapshot schema，不修改既有 Snapshot，不自动创建或推进 Job。
 
-## 6. v223 计划账本
+## 6. v223 源码账本
 
-计划中的 v223 只增加平台参考曲线来源与 v171 binding：
+v223 源码只增加平台参考曲线来源与 v171 binding：
 
 - `compute_platform_reference_price_curve_batches`：规范 batch、exact 投影、状态与幂等；
 - `compute_platform_reference_price_curve_entries`：逐 entry 规范合同与批次内唯一性；
@@ -86,7 +86,7 @@ v223 不得新建另一张 Price Snapshot 表，不得修改 v171 历史行，�
 
 ## 7. 市场、容量与资金效果
 
-成功 application 计划返回以下固定效果：
+成功 application receipt 固定返回以下效果：
 
 - `market_effect: quote_candidate_enabled`；
 - `job_effect: none`；
@@ -108,6 +108,6 @@ v223 不得新建另一张 Price Snapshot 表，不得修改 v171 历史行，�
 
 ## 9. 交付与验收状态
 
-本 docs-first 状态为 `design_frozen`。后续同批计划形成领域合同、Store-private submit/review/application/exact readback、v223 DDL/trigger 和 v171 transaction-local kernel 接线；仍不开放 service、HTTP、MCP 或 PC。
+当前状态为 `implementation_uncompiled`、`implementation_unrun`：领域合同、Store-private submit/review/application/exact readback、v223 DDL/trigger 和 v171 transaction-local kernel 接线源码已经形成；仍不开放 service、HTTP、MCP 或 PC。
 
-按当前架构铺设要求，只允许定向格式化、源码/文档模块化、链接/术语搜索、行数和 `git diff --check`。不执行编译、测试、迁移、SQLite trigger、权限、并发、HTTP 或真实运行验证。源码形成后状态最多提升为 `implementation_uncompiled`、`implementation_unrun`，不能宣称生产可用。
+按当前架构铺设要求，本批只执行定向格式化、源码/文档模块化、链接/术语搜索、行数和 `git diff --check`。未执行编译、测试、迁移、SQLite trigger、权限、并发、HTTP 或真实运行验证，不能宣称生产可用。
