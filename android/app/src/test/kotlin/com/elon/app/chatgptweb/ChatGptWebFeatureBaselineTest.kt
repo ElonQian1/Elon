@@ -18,8 +18,13 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v2", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v3", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
+        assertEquals(
+            ChatGptWebPageAdapter.ADAPTER_VERSION,
+            baseline.getInt("device_verification_adapter_version"),
+        )
+        assertTrue(baseline.getBoolean("device_verification_current"))
         assertEquals(ids.size, ids.toSet().size)
         assertEquals(ChatGptWebFeatureBaseline.ids(), ids.toSet())
         assertTrue(ids.containsAll(REQUIRED_FEATURE_IDS))
@@ -39,10 +44,12 @@ class ChatGptWebFeatureBaselineTest {
             if (feature.getString("code_status") == "partial") {
                 assertFalse(feature.isNull("code_gap"))
             }
-            if (feature.getString("verification_status") == "verified") {
+            if (feature.getString("verification_status") == "device_verified") {
                 assertTrue(feature.isNull("verification_gap"))
+                assertFalse(feature.isNull("verification_case"))
             } else {
                 assertFalse(feature.isNull("verification_gap"))
+                assertTrue(feature.isNull("verification_case"))
             }
         }
     }
@@ -142,18 +149,22 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
-        assertEquals(13, verificationSummary.getInt("verified"))
+        assertEquals(16, verificationSummary.getInt("offline_verified"))
+        assertEquals(9, verificationSummary.getInt("device_verified"))
+        assertEquals(9, verificationSummary.getInt("verified"))
         assertEquals(16, verificationSummary.getInt("pending"))
-        assertEquals(3, verificationSummary.getInt("user_action_required"))
-        assertEquals(19, verificationSummary.getInt("remaining"))
+        assertEquals(7, verificationSummary.getInt("user_action_required"))
+        assertEquals(0, verificationSummary.getInt("deferred"))
+        assertEquals(0, verificationSummary.getInt("failed"))
+        assertEquals(23, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
-        assertEquals("verified", feature(baseline, "model_selection").getString("verification_status"))
+        assertEquals("device_verified", feature(baseline, "model_selection").getString("verification_status"))
         assertTrue(feature(baseline, "model_selection").isNull("remaining_gap"))
         assertEquals("complete", feature(baseline, "disclosure_controls").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "disclosure_controls").getString("code_status"))
-        assertEquals("verified", feature(baseline, "disclosure_controls").getString("verification_status"))
+        assertEquals("device_verified", feature(baseline, "disclosure_controls").getString("verification_status"))
         assertTrue(feature(baseline, "disclosure_controls").isNull("remaining_gap"))
     }
 

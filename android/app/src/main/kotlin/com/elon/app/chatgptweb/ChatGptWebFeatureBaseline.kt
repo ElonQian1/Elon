@@ -4,7 +4,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 2
+    const val VERSION = 3
+    private const val DEVICE_VERIFICATION_ADAPTER_VERSION = 39
 
     enum class ImplementationStatus(val wireName: String) {
         COMPLETE("complete"),
@@ -19,9 +20,11 @@ internal object ChatGptWebFeatureBaseline {
     }
 
     enum class VerificationStatus(val wireName: String) {
-        VERIFIED("verified"),
-        PENDING("pending"),
+        OFFLINE_VERIFIED("offline_verified"),
+        DEVICE_VERIFIED("device_verified"),
         USER_ACTION_REQUIRED("user_action_required"),
+        DEFERRED("deferred"),
+        FAILED("failed"),
     }
 
     enum class Delivery(val wireName: String) {
@@ -50,6 +53,8 @@ internal object ChatGptWebFeatureBaseline {
         val capabilityIds: Set<String> = emptySet(),
         val semantics: Set<String> = emptySet(),
         val codeGap: String? = null,
+        val verificationGap: String? = null,
+        val verificationCase: String? = null,
         val remainingGap: String? = null,
     )
 
@@ -83,9 +88,10 @@ internal object ChatGptWebFeatureBaseline {
                 .put("current_page_observed", currentPageObserved)
                 .put("mcp_actions", JSONArray(feature.mcpActions))
                 .put("code_gap", feature.codeGap ?: JSONObject.NULL)
+                .put("verification_case", feature.verificationCase ?: JSONObject.NULL)
                 .put(
                     "verification_gap",
-                    feature.remainingGap ?: JSONObject.NULL,
+                    feature.verificationGap ?: JSONObject.NULL,
                 )
                 .put(
                     "remaining_gap",
@@ -95,11 +101,16 @@ internal object ChatGptWebFeatureBaseline {
         val incomplete = FEATURES.filter { it.status != ImplementationStatus.COMPLETE }
         val incompleteCode = FEATURES.filter { it.codeStatus == CodeStatus.PARTIAL }
         val pendingVerification = FEATURES.filter {
-            it.verificationStatus != VerificationStatus.VERIFIED
+            it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v2")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v3")
             .put("version", VERSION)
+            .put("device_verification_adapter_version", DEVICE_VERIFICATION_ADAPTER_VERSION)
+            .put(
+                "device_verification_current",
+                ChatGptWebPageAdapter.ADAPTER_VERSION == DEVICE_VERIFICATION_ADAPTER_VERSION,
+            )
             .put("feature_count", FEATURES.size)
             .put(
                 "summary",
@@ -139,17 +150,46 @@ internal object ChatGptWebFeatureBaseline {
                 "verification_summary",
                 JSONObject()
                     .put(
-                        "verified",
-                        FEATURES.count { it.verificationStatus == VerificationStatus.VERIFIED },
+                        "offline_verified",
+                        FEATURES.count {
+                            it.verificationStatus == VerificationStatus.OFFLINE_VERIFIED
+                        },
                     )
                     .put(
-                        "pending",
-                        FEATURES.count { it.verificationStatus == VerificationStatus.PENDING },
+                        "device_verified",
+                        FEATURES.count {
+                            it.verificationStatus == VerificationStatus.DEVICE_VERIFIED
+                        },
                     )
                     .put(
                         "user_action_required",
                         FEATURES.count {
                             it.verificationStatus == VerificationStatus.USER_ACTION_REQUIRED
+                        },
+                    )
+                    .put(
+                        "deferred",
+                        FEATURES.count { it.verificationStatus == VerificationStatus.DEFERRED },
+                    )
+                    .put(
+                        "failed",
+                        FEATURES.count { it.verificationStatus == VerificationStatus.FAILED },
+                    )
+                    // Compatibility aliases for v2 consumers. "verified" now means device proof.
+                    .put(
+                        "verified",
+                        FEATURES.count {
+                            it.verificationStatus == VerificationStatus.DEVICE_VERIFIED
+                        },
+                    )
+                    .put(
+                        "pending",
+                        FEATURES.count {
+                            it.verificationStatus in setOf(
+                                VerificationStatus.OFFLINE_VERIFIED,
+                                VerificationStatus.DEFERRED,
+                                VerificationStatus.FAILED,
+                            )
                         },
                     )
                     .put("remaining", pendingVerification.size),
@@ -166,6 +206,18 @@ internal object ChatGptWebFeatureBaseline {
     fun ids(): Set<String> = FEATURES.mapTo(linkedSetOf(), Feature::id)
 
     private fun Int?.orZero(): Int = this ?: 0
+
+    private val DEVICE_VERIFICATION_CASES = mapOf(
+        "official_fullscreen_fallback" to "safe/read_only_surface",
+        "conversation_context_paging" to "safe/read_only_surface",
+        "conversation_history" to "safe/read_only_surface",
+        "model_selection" to "reversible/reversible_controls",
+        "web_search" to "reversible/composer_controls",
+        "feature_navigation" to "safe/feature_pages",
+        "disclosure_controls" to "reversible/reversible_controls",
+        "official_change_detection" to "safe/read_only_surface",
+        "stable_mcp_and_adb_controls" to "safe/read_only_surface",
+    )
 
     private val FEATURES = listOf(
         feature(
@@ -240,7 +292,7 @@ internal object ChatGptWebFeatureBaseline {
             id = "attachment_lifecycle",
             group = "composer",
             status = ImplementationStatus.PARTIAL,
-            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control", "chatgpt_remove_attachment"),
             capabilityIds = setOf(ChatGptWebCapabilityId.ATTACHMENTS),
             semantics = setOf("attachment"),
@@ -268,7 +320,7 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "dictation",
             group = "voice",
-            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_start_dictation", "chatgpt_invoke_control"),
             capabilityIds = setOf(ChatGptWebCapabilityId.DICTATION),
             semantics = setOf(ChatGptWebUiSemantics.DICTATION),
@@ -328,7 +380,7 @@ internal object ChatGptWebFeatureBaseline {
             group = "messages",
             status = ImplementationStatus.PARTIAL,
             delivery = Delivery.ADAPTIVE_NATIVE,
-            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control"),
             semantics = setOf(
                 "edit",
@@ -368,7 +420,7 @@ internal object ChatGptWebFeatureBaseline {
             group = "history",
             status = ImplementationStatus.PARTIAL,
             delivery = Delivery.ADAPTIVE_NATIVE,
-            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control"),
             semantics = setOf("conversation_files", "pin", "archive", "share", "delete"),
             remainingGap = "conversation_mutation_device_acceptance",
@@ -450,10 +502,24 @@ internal object ChatGptWebFeatureBaseline {
             else -> CodeStatus.IMPLEMENTED
         }
         val resolvedVerificationStatus = verificationStatus ?: when {
-            status == ImplementationStatus.COMPLETE -> VerificationStatus.VERIFIED
+            id in DEVICE_VERIFICATION_CASES &&
+                ChatGptWebPageAdapter.ADAPTER_VERSION == DEVICE_VERIFICATION_ADAPTER_VERSION ->
+                VerificationStatus.DEVICE_VERIFIED
+            id in DEVICE_VERIFICATION_CASES -> VerificationStatus.DEFERRED
             acceptance == Acceptance.USER_DRIVEN_DEVICE ->
                 VerificationStatus.USER_ACTION_REQUIRED
-            else -> VerificationStatus.PENDING
+            else -> VerificationStatus.OFFLINE_VERIFIED
+        }
+        val resolvedVerificationGap = when (resolvedVerificationStatus) {
+            VerificationStatus.DEVICE_VERIFIED -> null
+            VerificationStatus.USER_ACTION_REQUIRED ->
+                remainingGap ?: "supervised_device_acceptance_required"
+            VerificationStatus.OFFLINE_VERIFIED ->
+                remainingGap ?: "current_apk_device_acceptance_not_recorded"
+            VerificationStatus.DEFERRED ->
+                remainingGap ?: "adapter_changed_since_device_acceptance"
+            VerificationStatus.FAILED ->
+                remainingGap ?: "current_device_acceptance_failed"
         }
         return Feature(
             id = id,
@@ -467,7 +533,10 @@ internal object ChatGptWebFeatureBaseline {
             capabilityIds = capabilityIds,
             semantics = semantics,
             codeGap = codeGap,
+            verificationGap = resolvedVerificationGap,
+            verificationCase = DEVICE_VERIFICATION_CASES[id],
             remainingGap = remainingGap,
         )
     }
+
 }
