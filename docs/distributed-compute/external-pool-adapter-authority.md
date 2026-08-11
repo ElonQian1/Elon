@@ -12,7 +12,7 @@ implementation_status: implementation_partially_verified
 
 本文冻结 `external_pool` 的第一段服务端接入权威：Provider owner 发起 request，独立平台管理员复核，Store 再按精确摘要执行 immutable apply。该段只建立未来 Adapter route 可以引用的 owner-approved、admin-reviewed 来源；它不实现 concrete Adapter、credential verifier、route resolver、网络或任务执行。
 
-当前 owner request 领域 DTO、Store submit/review/apply/cancel/query、v221 三账本及 owner/admin 10 个 Service/HTTP 管理操作已经写入并可编译；完整临时文件 Store 迁移/重开、onboarding request→独立 review→immutable apply、取消与进程内 HTTP 均已执行，同时把通用 Provider 注册对 `external_pool` 封死。生产部署与 MCP/PC 写入口仍缺。apply 的最大效果固定为：
+当前 owner request 领域 DTO、Store submit/review/apply/cancel/query、v221 三账本及 owner/admin 10 个 Service/HTTP 管理操作已经写入并可编译；完整临时文件 Store 迁移/重开、onboarding request→独立 review→immutable apply、取消与进程内 HTTP 均已执行，同时把通用 Provider 注册对 `external_pool` 封死。MCP 与 PC `/compute-external-pools` 已复用同一 Service/HTTP 权威并通过专项或静态生产构建；生产部署、真实 TCP 与浏览器交互仍缺。apply 的最大效果固定为：
 
 - 登记一份 `provider_kind=external_pool`、`status=registering`、`trust_tier=self_declared` 的 Provider 当前版本与不可变历史；
 - 登记一份专用 `external_pool_onboarding` application source；
@@ -86,7 +86,7 @@ v221 目前已编译并在完整临时文件 Store 中完成迁移/重开，Stor
 
 只有第 1 至 4 项在同一 Store 权威中闭合后，未来 route producer 才能引用 onboarding application 写入 v213 rows。管理员审批、Provider adapter ref 或数据库中存在 non-bearer ref 都不能替代 credential proof。
 
-Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。v221 onboarding 的 10 个管理操作与 Store 重开共 7 项专项通过，v222 release 的 6 个管理员操作与 Store 重开共 7 项专项通过；生产部署与 MCP/PC 管理入口仍未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
+Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。v221 onboarding 的 10 个管理操作与 Store 重开共 7 项专项通过，v222 release 的 6 个管理员操作与 Store 重开共 7 项专项通过；分角色 MCP 已通过专项，PC 管理入口已通过跨层静态合同、严格类型、lint、生产构建和 bundle budget，但生产部署、真实 TCP 与浏览器交互仍未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
 
 ## 6. 明确禁线
 
@@ -105,7 +105,7 @@ Adapter release admission 与 Provider onboarding application 是两条正交来
 
 ## 8. HTTP 形状与当前覆盖
 
-首批代码只需 owner 与管理员 HTTP，不向 MCP 或 PC 下放信任升级写入口：
+owner、管理员 HTTP、分角色 MCP 与 PC 工作台均复用同一 Service 权威；客户端只展示 preflight 与显式确认，不得自行升级信任：
 
 | 方法 | 路径 | 固定作用 |
 |---|---|---|
@@ -122,7 +122,7 @@ Adapter release admission 与 Provider onboarding application 是两条正交来
 
 管理员入口不接受 bearer secret，不返回完整 non-bearer ref；响应只给出 presence、hint、摘要、状态、阻断码和不可变 receipt 身份。
 
-当前表中 10 个操作均已完成进程内编译和专项验收，但尚未部署到生产环境，也没有 MCP/PC 写入口。
+当前表中 10 个操作均已完成进程内编译和专项验收；分角色 MCP 已通过治理专项，PC `/compute-external-pools` 已完成静态生产构建。它们尚未部署到生产环境，也未通过真实 TCP 或已登录浏览器会话验证。
 
 ## 9. 本批静态验收边界
 

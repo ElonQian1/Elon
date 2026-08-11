@@ -4,7 +4,7 @@
 
 状态：`partially_verified`。
 
-本验收对应的 v221 onboarding 已形成 owner submit/list/detail/cancel/preflight 与 admin list/detail/preflight/review/application 共 10 个 Service/HTTP 操作，并通过定向真实 Rust 编译、4 项进程内接口测试和 3 项 Store 测试。该结论只证明受控来源登记及其管理面可调用，不证明 Provider 已激活、可路由、可供给容量或可执行任务。
+本验收对应的 v221 onboarding 已形成 owner submit/list/detail/cancel/preflight 与 admin list/detail/preflight/review/application 共 10 个 Service/HTTP 操作，并通过定向真实 Rust 编译、4 项进程内接口测试和 3 项 Store 测试。PC `/compute-external-pools` 已接入本人申请、取消、状态队列、管理员独立复核与 immutable apply，并通过跨层静态合同、严格类型、lint、生产构建和 bundle budget。该结论只证明受控来源登记及其静态管理面可调用，不证明 Provider 已激活、可路由、可供给容量或可执行任务。
 
 ## 2. 已实现接口
 
@@ -49,13 +49,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 
 - 结果：`CARGO_OK`；
 - 测试：7 项通过；
-- validation fingerprint：`6badc408ce9d915be01dace62bc29a468b074bcc7d85c3cd7c821cd0445671f1`；
+- validation fingerprint：`8fa2dc41b7a6e905adf96726035cfc742698facb685801af74e80359f13315e9`；
 - validation receipt：`ab387a054601aab2d14d96fabb41cc259d49b583e8aee11295190dd235cb8b33`。
+
+PC 静态验证命令：
+
+```powershell
+cd pc-frontend
+npm run test:compute-external-pools
+npm run typecheck
+npm run lint
+npm run build
+npm run check:bundle-budget
+```
+
+- 工作台不接收 actor 字段，管理员区域按平台角色关闭；
+- onboarding 回执只显示 credential presence/hint，不回显 non-bearer locator；
+- apply 前展示 Provider ID 冲突和四眼 blocker，完成后按服务端目标状态刷新；
+- 页面明确限定效果为 `provider_registered_only`，不生成 route、Pool、Offer、Job、派发或结算。
 
 ## 5. 未验证边界
 
-- 本批补入的 actor-aware 管理员 preflight 与 Provider ID 冲突预检仅完成源码、格式和静态合同检查，尚未重新编译或运行新增回归；既有 7 项证据不覆盖这两个新分支；
 - 未部署服务器，未调用生产数据库或真实外部矿池；
+- 未通过真实 TCP 或已登录浏览器会话验证 PC 页面；
 - 未验证并发提交/复核/application；
 - 未验证 Adapter release admission、artifact、verifier 或 credential；
 - 未生成 v213 route/credential/service actor/seal；

@@ -4,7 +4,7 @@
 
 状态：`management_surface_verified`，整体仍为 `partially_verified`。
 
-代码提交 `7b043a88f` 为 v222 Adapter release staging 增加管理员写入口；代码提交 `a37595e1a` 继续补齐管理员列表、详情和 actor-aware preflight。六个管理操作已经通过定向真实 Rust 编译、进程内接口测试及 Store 关闭重开测试。该结论只证明受控 staging 管理面可调用且可审计读回，不证明候选 Adapter 已下载、验签、加载、执行或获得 v213 route authority。
+代码提交 `7b043a88f` 为 v222 Adapter release staging 增加管理员写入口；代码提交 `a37595e1a` 继续补齐管理员列表、详情和 actor-aware preflight。六个管理操作已经通过定向真实 Rust 编译、进程内接口测试及 Store 关闭重开测试；PC `/compute-external-pools` 管理员工作台也已通过跨层静态合同、严格类型、lint、生产构建和 bundle budget。该结论只证明受控 staging 管理面可调用且可审计读回，不证明候选 Adapter 已下载、验签、加载、执行或获得 v213 route authority。
 
 ## 2. 接口
 
@@ -15,7 +15,7 @@
 - `POST /api/admin/compute/external-pool-adapter-releases/:request_id/review`：由另一名管理员独立复核；
 - `POST /api/admin/compute/external-pool-adapter-releases/:request_id/stage`：按 exact request/review 摘要形成 staged admission。
 
-六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。对应的 6 个 MCP 工具已经复用同一 Service 并通过角色隔离与治理链专项，见 `compute-management-mcp-acceptance.md`；PC 管理工具仍未实现。
+六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。对应的 6 个 MCP 工具已经复用同一 Service 并通过角色隔离与治理链专项，见 `compute-management-mcp-acceptance.md`；PC 管理员工作台复用相同 HTTP 合同，不增加旁路权限。
 
 ## 3. 已验证行为
 
@@ -47,9 +47,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 - validation fingerprint：`2b55e579b08b89acf2e6bc1065914755bba1f7bbfad10c9917d61c3c32dbea3d`；
 - validation receipt：`873f84be88b448fa00b7f9b15195ebcba439ee1cee558df5c41a6793f017ecc6`。
 
+PC 静态验证复用 `npm run test:compute-external-pools`、`typecheck`、`lint`、`build` 与 `check:bundle-budget`。页面固定六项 capability revision，独立展示 submit/review/stage 阶段及 blocker，不采信自由 JSON，也不把 staged admission 描述为已下载、已验签或可路由 Adapter。
+
 ## 5. 未验证边界
 
 - 未部署服务器，未对生产数据库或真实管理员会话调用；
+- 未通过真实 TCP 或已登录浏览器会话验证 PC 页面；
 - immutable release request 在 review 后关闭，当前未提供撤回或 supersede 运维入口；
 - 未解析或下载 `candidate_artifact_ref`，未重算实现摘要；
 - 未验证 verifier registry、签名、供应链或协议能力；
