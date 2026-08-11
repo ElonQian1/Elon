@@ -108,6 +108,13 @@ Assert-Contains 'official_fullscreen_chrome_$chromeId'
 Assert-Contains '$sendRequestId = [string]$sendDispatch.command_receipt.request_id'
 Assert-Contains 'Wait-ChatGptProbeReply -RequestId $sendRequestId'
 Assert-Contains 'throw "ChatGPT Web new conversation failed; the send probe was not dispatched."'
+Assert-Contains 'conversation_route_observed = -not [string]::IsNullOrWhiteSpace('
+Assert-Contains 'model_observed = -not [string]::IsNullOrWhiteSpace('
+Assert-Contains 'private_content_emitted = $false'
+
+if ($source.Contains('conversation_url =')) {
+    throw "ChatGPT Web smoke must not emit private conversation routes."
+}
 
 if (-not $evidenceSource.Contains('message_cursor = [string]$first.message_cursor')) {
     throw "Context paging evidence must replay the current MCP cursor."

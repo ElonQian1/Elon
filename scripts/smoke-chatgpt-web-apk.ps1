@@ -626,9 +626,14 @@ if ($SendProbe) {
     Add-Check "probe_reply" ($normalizedReply -like "*$ProbeMarker*") $ProbeMarker
     $probe = [ordered]@{
         marker = $ProbeMarker
-        conversation_url = [string]$replyState.conversation.url
-        model = [string]$replyState.conversation.current_model
+        conversation_route_observed = -not [string]::IsNullOrWhiteSpace(
+            [string]$replyState.conversation.url
+        )
+        model_observed = -not [string]::IsNullOrWhiteSpace(
+            [string]$replyState.conversation.current_model
+        )
         message_count = [int]$replyState.conversation.message_count
+        private_content_emitted = $false
     }
 }
 
