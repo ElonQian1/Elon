@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension, Row, TransactionBehavior};
 
 use crate::{
@@ -42,6 +42,9 @@ impl Store {
             )
             .optional()?;
         if let Some(existing) = existing {
+            if existing.source_operator != source_operator {
+                bail!("相同消费者数据包不能更换来源运营方身份");
+            }
             let trust_upgraded =
                 if existing.trust_status == CONSUMER_PORTABILITY_IMPORT_TRUST_STATUS {
                     if let Some(proof) = verified_signature {

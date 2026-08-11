@@ -312,3 +312,6 @@ fn reseal(export: &mut ConsumerPortabilityExport) {
     export.payload_json = serde_json::to_string(&export.payload).unwrap();
     export.payload_sha256 = hex::encode(Sha256::digest(export.payload_json.as_bytes()));
 }
+
+#[path = "open_commerce_portability_v5_import_tests.rs"]
+mod import_tests;
