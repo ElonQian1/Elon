@@ -31,6 +31,8 @@ mod sui_preflight_job_service;
 mod sui_preflight_job_service_tests;
 #[cfg(test)]
 mod sui_preflight_job_test_support;
+#[cfg(test)]
+mod sui_preflight_job_transaction_failure_tests;
 pub(crate) mod sui_preflight_model;
 mod sui_preflight_service;
 mod sui_projection;
