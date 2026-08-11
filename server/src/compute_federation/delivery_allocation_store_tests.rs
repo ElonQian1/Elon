@@ -187,17 +187,24 @@ fn decline_is_idempotent_and_does_not_move_capacity_or_budget() {
     fixture.cleanup();
 }
 
-struct Fixture {
-    supply: CapacityCommitmentFixture,
-    consumer_id: String,
-    project_id: String,
-    commitment: ComputeCapacityCommitmentCreateReceipt,
-    quoted: ComputeJobRegistrationReceipt,
+pub(super) struct Fixture {
+    pub(super) supply: CapacityCommitmentFixture,
+    pub(super) consumer_id: String,
+    pub(super) project_id: String,
+    pub(super) commitment: ComputeCapacityCommitmentCreateReceipt,
+    pub(super) quoted: ComputeJobRegistrationReceipt,
 }
 
 impl Fixture {
     fn new() -> Self {
-        let supply = CapacityCommitmentFixture::new_delivery_allocation();
+        Self::from_supply(CapacityCommitmentFixture::new_delivery_allocation())
+    }
+
+    pub(super) fn new_expiry_recovery() -> Self {
+        Self::from_supply(CapacityCommitmentFixture::new_delivery_allocation_expiry_recovery())
+    }
+
+    fn from_supply(supply: CapacityCommitmentFixture) -> Self {
         let commitment = capacity_commitment_service::create_for_owner(
             &supply.store,
             &supply.owner_id,
@@ -290,7 +297,7 @@ impl Fixture {
         }
     }
 
-    fn create_grant(
+    pub(super) fn create_grant(
         &self,
         suffix: &str,
         confirm_grant: bool,
@@ -314,7 +321,7 @@ impl Fixture {
         )
     }
 
-    fn exercise(
+    pub(super) fn exercise(
         &self,
         grant: &ComputeDeliveryAllocationGrantWriteReceipt,
         reservation_id: &str,
@@ -335,7 +342,7 @@ impl Fixture {
         )
     }
 
-    fn recharge(&self, amount_fen: i64) {
+    pub(super) fn recharge(&self, amount_fen: i64) {
         self.supply
             .store
             .billing_recharge(
@@ -348,7 +355,7 @@ impl Fixture {
             .unwrap();
     }
 
-    fn balance(&self) -> i64 {
+    pub(super) fn balance(&self) -> i64 {
         self.supply
             .store
             .billing_get_balance(&self.consumer_id)
@@ -356,18 +363,18 @@ impl Fixture {
             .unwrap_or(0)
     }
 
-    fn capacity(&self) -> ((i64, i64), (i64, i64)) {
+    pub(super) fn capacity(&self) -> ((i64, i64), (i64, i64)) {
         (
             self.supply.balance(&self.supply.token_bucket_id),
             self.supply.balance(&self.supply.concurrency_bucket_id),
         )
     }
 
-    fn reservation_id(&self, suffix: &str) -> String {
+    pub(super) fn reservation_id(&self, suffix: &str) -> String {
         format!("delivery-reservation-{suffix}-{}", self.consumer_id)
     }
 
-    fn table_count(&self, table: &str) -> i64 {
+    pub(super) fn table_count(&self, table: &str) -> i64 {
         self.supply
             .store
             .conn()
@@ -378,7 +385,7 @@ impl Fixture {
             .unwrap()
     }
 
-    fn cleanup(self) {
+    pub(super) fn cleanup(self) {
         self.supply.cleanup();
     }
 }

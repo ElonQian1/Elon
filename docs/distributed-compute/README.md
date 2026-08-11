@@ -1,7 +1,7 @@
 ---
 title: 一龙任务级分布式算力联邦
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-12
 owners: backend, node, ai-economy
 ---
 
@@ -186,7 +186,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 v225 Provider Capacity Commitment 详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md) 与 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。它只允许本地 current Provider/Offer/Pool 在 exact `capacity_future` v171 Snapshot 与已批准应用的 v223 binding 下，把同一 Claim/ledger 的完整 meter/window 从 available 锁到 held，再以唯一 canceled/expired receipt 原子归还；不包含 `external_pool`、DeliveryAllocation、资金或结算。PC 控制面只嵌入既有 `/compute-supply` Offer 工作区并复用同一 owner HTTP、Claim/ledger 和 reference binding。当前为 `implementation_partially_verified`：生产目标、临时 SQLite、进程内 HTTP、重开和 PC 静态构建已有定向证据，真实 TCP、生产升级、并发压力和浏览器未验证。
 
-v228 Delivery Allocation 详见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md) 与 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。它冻结一份 Commitment→一个消费者 Job 的 whole-only Grant：行权在同一事务内冻结既有 Broker 预算、完整释放父 Commitment Claim、完整建立带 `parent_claim_id` 的标准 Reservation Claim，并写 Reservation、Job、Broker 与 immutable exercised receipt；Commitment current view 派生 `allocated`。Snapshot TTL 例外只属于 sealed Store-private authority，泛用 Reservation 入口继续失败关闭。当前为 `design_frozen/implementation_partially_verified`，不是持仓、撮合、执行或结算完成。
+v228 Delivery Allocation 详见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md) 与 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。它冻结一份 Commitment→一个消费者 Job 的 whole-only Grant：行权在同一事务内冻结既有 Broker 预算、完整释放父 Commitment Claim、完整建立带 `parent_claim_id` 的标准 Reservation Claim，并写 Reservation、Job、Broker 与 immutable exercised receipt；Commitment current view 派生 `allocated`。Snapshot TTL 例外只属于 sealed Store-private authority，泛用 Reservation 入口继续失败关闭。既有 Grant/Exercise 纵切面为 `design_frozen/implementation_partially_verified`；行权后到期 Reservation 的管理员有界恢复源码另已写入，成功时只复用 Broker Expire 退回预授权、把 child Claim 置 `expired` 并归还容量、把 Job 置 `failed`、Reservation 置 `expired`，v228 仍 `exercised`、Commitment 仍 `allocated`。该恢复不新增 migration，源码尚未编译或运行，`passed=0`，不产生 verified usage、Provider 收益或 settlement，也不是持仓、撮合、执行或结算完成。
 
 ## 当前工程指令
 

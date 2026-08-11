@@ -27,6 +27,7 @@ use crate::{
         ComputeJobQuoteCandidatePage, ComputeJobRegistrationReceipt,
         ComputeReservationRegistrationReceipt, FinishComputeBrokerRequest,
         ReserveComputeBrokerRequest, Store,
+        COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX,
     },
 };
 
@@ -186,6 +187,7 @@ pub(crate) fn finish_for_user(
     action: ComputeBrokerFinishAction,
     request: FinishMyComputeRequest,
 ) -> Result<ComputeBrokerFinishReceipt> {
+    ensure_consumer_finish_idempotency_key(&request.idempotency_key)?;
     let reservation = store.compute_reservation(&reservation_id)?;
     ensure_job_scope(
         store,
@@ -202,6 +204,39 @@ pub(crate) fn finish_for_user(
         action,
         occurred_at: Utc::now().to_rfc3339(),
     })
+}
+
+fn ensure_consumer_finish_idempotency_key(idempotency_key: &str) -> Result<()> {
+    if idempotency_key
+        .trim()
+        .starts_with(COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX)
+    {
+        bail!("算力 Broker 结束幂等键不能使用系统保留前缀");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod finish_idempotency_key_tests {
+    use super::{
+        ensure_consumer_finish_idempotency_key,
+        COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX,
+    };
+
+    #[test]
+    fn consumer_cannot_claim_delivery_allocation_expiry_system_key() {
+        let key = format!(
+            "  {COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX}allocation-1:reservation-1  "
+        );
+        let error = ensure_consumer_finish_idempotency_key(&key).unwrap_err();
+
+        assert!(format!("{error:#}").contains("系统保留前缀"));
+    }
+
+    #[test]
+    fn ordinary_consumer_finish_key_remains_available() {
+        ensure_consumer_finish_idempotency_key("consumer-release-1").unwrap();
+    }
 }
 
 pub(crate) fn get_job_for_user(

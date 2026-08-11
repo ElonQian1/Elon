@@ -1,5 +1,9 @@
 //! Authenticated HTTP surface for v228 whole-only DeliveryAllocation.
 
+#[cfg(test)]
+#[path = "delivery_allocation_reservation_expiry_api_tests.rs"]
+mod reservation_expiry_tests;
+
 use std::sync::Arc;
 
 use axum::{
@@ -20,6 +24,7 @@ use crate::{
 use super::delivery_allocation_service::{
     self as service, CreateDeliveryAllocationGrantBody, DeclineDeliveryAllocationGrantBody,
     ExerciseDeliveryAllocationGrantBody, ExpireDueDeliveryAllocationGrantsBody,
+    ExpireDueDeliveryAllocationReservationsBody,
 };
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
@@ -47,6 +52,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/delivery-allocation-grants/expire-due",
             post(expire_due),
+        )
+        .route(
+            "/api/admin/compute/delivery-allocation-reservations/expire-due",
+            post(expire_due_reservations),
         )
 }
 
@@ -178,6 +187,22 @@ async fn expire_due(
         Err(response) => return response,
     };
     allocation_response(service::expire_due_for_admin(
+        &state.store,
+        &admin_user_id,
+        body,
+    ))
+}
+
+async fn expire_due_reservations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<ExpireDueDeliveryAllocationReservationsBody>,
+) -> Response {
+    let admin_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    allocation_response(service::expire_due_reservations_for_admin(
         &state.store,
         &admin_user_id,
         body,

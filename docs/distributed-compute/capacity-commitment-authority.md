@@ -135,4 +135,4 @@ v225 P0 禁止 DeliveryAllocation 仍是该批次的历史事实；v228 不回�
 
 `compute_capacity_commitment_current` 在 v228 migration 中只能重建 view：exact exercised receipt 派生 revision 2、`current_status=allocated`；Grant 仍 active、declined 或 expired 时仍为 `committed`；既有 v225 terminal 仍派生 `canceled|expired`。active/exercised Grant 阻止 v225 Cancel/Expire/recovery，v228 反向拒绝既有 v225 terminal，因此不存在 allocated 与 canceled/expired 双终态。
 
-Snapshot TTL 例外、`parent_claim_id`、父 release→子 hold 的因果链和泛用入口旁路门卫全部只属于 v228 sealed Store-private authority。v225 自身的 verified 边界与验收结论不因后继设计而升级；v228 当前状态为 `design_frozen/implementation_uncompiled/implementation_unrun`：源码已写入，但尚未编译、执行 migration、运行测试或启动服务。
+Snapshot TTL 例外、`parent_claim_id`、父 release→子 hold 的因果链和泛用入口旁路门卫全部只属于 v228 sealed Store-private authority。v225 自身的 verified 边界与验收结论不因后继实现而升级；v228 当前为 `design_frozen/implementation_partially_verified`：生产编译、临时 SQLite 新库 migration 与 3 项 Store/Service 专项已通过，HTTP 鉴权、并发、文件重开和生产升级仍未验证。后续写入的行权后 Reservation due-expiry recovery 不新增 migration，源码另为 `implementation_uncompiled/implementation_unrun`、`passed=0`，不能反向升级 v225 或 v228 主纵切面的证据。

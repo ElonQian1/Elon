@@ -62,6 +62,15 @@ impl Fixture {
         )
     }
 
+    pub(crate) fn new_delivery_allocation_expiry_recovery() -> Self {
+        Self::build_with_window(
+            OfferFixture::new(),
+            false,
+            Duration::seconds(60),
+            Duration::seconds(120),
+        )
+    }
+
     pub(crate) fn new_http() -> Self {
         Self::build(OfferFixture::new(), true)
     }

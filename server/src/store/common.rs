@@ -2,7 +2,11 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use ring::pbkdf2::{self, PBKDF2_HMAC_SHA256};
 use sha2::{Digest, Sha256};
+#[cfg(test)]
+use std::cell::RefCell;
 use std::num::NonZeroU32;
+#[cfg(test)]
+use std::{marker::PhantomData, rc::Rc};
 use uuid::Uuid;
 
 #[cfg(not(test))]
@@ -10,6 +14,26 @@ const PASSWORD_PBKDF2_ITERATIONS: u32 = 310_000;
 #[cfg(test)]
 const PASSWORD_PBKDF2_ITERATIONS: u32 = 1_000;
 const PASSWORD_HASH_BYTES: usize = 32;
+
+#[cfg(test)]
+thread_local! {
+    static TEST_NOW_OVERRIDE: RefCell<Option<String>> = RefCell::new(None);
+}
+
+#[cfg(test)]
+pub(crate) struct TestNowOverrideGuard {
+    previous: Option<String>,
+    _thread_bound: PhantomData<Rc<()>>,
+}
+
+#[cfg(test)]
+impl Drop for TestNowOverrideGuard {
+    fn drop(&mut self) {
+        TEST_NOW_OVERRIDE.with(|value| {
+            value.replace(self.previous.take());
+        });
+    }
+}
 
 pub(super) fn safe_external_id(value: &str, fallback: &str) -> String {
     let safe = value
@@ -52,7 +76,26 @@ pub(super) fn clean_optional(value: Option<&str>) -> Option<&str> {
 }
 
 pub(super) fn now() -> String {
+    #[cfg(test)]
+    if let Some(value) = TEST_NOW_OVERRIDE.with(|value| value.borrow().clone()) {
+        return value;
+    }
     Utc::now().to_rfc3339()
+}
+
+#[cfg(test)]
+pub(crate) fn override_now_for_test(value: &str) -> Result<TestNowOverrideGuard> {
+    let parsed = chrono::DateTime::parse_from_rfc3339(value)
+        .map_err(|_| anyhow!("test Store clock must be RFC3339"))?;
+    if parsed.offset().local_minus_utc() != 0 {
+        return Err(anyhow!("test Store clock must use UTC"));
+    }
+    let canonical = parsed.with_timezone(&Utc).to_rfc3339();
+    let previous = TEST_NOW_OVERRIDE.with(|value| value.replace(Some(canonical)));
+    Ok(TestNowOverrideGuard {
+        previous,
+        _thread_bound: PhantomData,
+    })
 }
 
 pub(super) fn new_id(prefix: &str) -> String {

@@ -12,7 +12,7 @@ last_updated: 2026-08-12
 
 v228 以 **GO** 冻结一个非 staging 的最窄真实交付纵切面：Provider 把一份 exact v225 Capacity Commitment 全量、双边地授权给一个消费者的一个 exact quoted Job；消费者在交付窗口开始前显式行权；Store 在一个 `BEGIN IMMEDIATE` 中把既有 Commitment Claim 的全部 held 容量转成既有 Broker 能消费的标准 Reservation Claim，并原子登记预算、Reservation、Job 与 Broker reserve receipt。
 
-设计状态保持 `design_frozen`，实现状态为 `implementation_partially_verified`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；临时 SQLite 新库迁移及 3 项 Store/Service 专项已实际通过。该证据不包含 HTTP 鉴权、并发竞争、文件重开、历史库升级、真实任务执行或生产部署，详见 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。
+设计状态保持 `design_frozen`，实现状态为 `implementation_partially_verified`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；临时 SQLite 新库迁移及 3 项 Store/Service 专项已实际通过。2026-08-12 又以 **FREEZE** 冻结并写入行权后到期 Reservation 的管理员有界恢复源码；它不新增 migration，但尚未编译或运行，`passed=0`，不能复用既有验证指纹。HTTP 鉴权、并发竞争、文件重开、历史库升级、真实任务执行和生产部署仍未证明，详见 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。
 
 该纵切面不是 Order、Trade、Position、ClearingReceipt 或买方可转售持仓，也不声明真实成交价、指数价、标记价、保证金、交割差额或结算成功。它只复用 v225 Commitment、v165-v168/v173 Claim/ledger、v172 Job、v174 Reservation 和 v175 Broker 的本地 `platform_balance_cny` 预授权链。
 
@@ -134,11 +134,17 @@ Grant 创建不移动 ledger、预算或 Job 状态，也不创建 Reservation�
 
 父 release 与子 hold 必须同事务成功或回滚，因此数据库外不存在可抢占的 available 间隙。这里复用 ledger 的既有事件/账户，不新增 reducer 或余额权威。
 
-## 9. Decline、Expire 与 v225 竞争
+## 9. Grant 终态、行权后 Reservation 到期恢复与 v225 竞争
 
 Decline 由 exact consumer 调用：重放优先，Grant 必须 active、来源 Commitment/父 Claim 仍 committed/held、Store 时间早于窗口开始；只插入 immutable `declined` receipt，不移动 ledger、预算或 Job。
 
 Expire 候选是已到 `exercise_expires_at` 且仍无 terminal 的 Grant。每个候选单独使用一个 IMMEDIATE 事务、确定性幂等键与 Store 时间，重审计来源仍 committed/held 后插入 `expired` receipt；不移动 ledger。批次部分成功，limit 为 `1..100`，不要求后台 scheduler。
+
+行权后的 `exercised` Grant 不再进入上述 Grant Expire。若消费者没有主动结束且其 exact downstream Reservation 已到 `expires_at`，管理员可调用有界恢复入口 `POST /api/admin/compute/delivery-allocation-reservations/expire-due`；请求只接受 `limit` 与显式 `confirm_expire_due=true`，cutoff、consumer、时间、revision/digest、金额和状态均由 Store 权威派生。候选必须同时满足：immutable v228 terminal 为 `exercised`、current Reservation 为 exact `active` 且 `expires_at <= Store now`、Job 为 `reserved`、parented child Claim 为 `held`，并且没有既有 Broker finish receipt。
+
+每个候选分别复用既有 `finish_compute_broker` 的 `Expire` 事务，consumer identity、Reservation revision/digest 和确定性幂等键来自持久化谱系，`occurred_at` 固定为 immutable `reservation.expires_at`；admin/owner 身份只由 HTTP 会话鉴权，不作为 Store 输入或持久化 actor。若已存在 dispatch command，既有 no-start 门卫仍必须取得 exact proof；远端状态未知、ACK 不完整或任一谱系漂移都对该候选失败关闭且零副作用。批次允许部分成功，不引入 scheduler、janitor 或新的 lifecycle 权威。
+
+成功项只产生既有 Broker Expire 效果：`platform_balance_cny` 预授权全额退回，parented child Claim `held r1 -> expired r2` 并把容量从 held 归还 available，Job `reserved -> failed`，Reservation `active -> expired`，同时追加既有 Broker finish receipt。immutable v228 terminal 继续是 `exercised`，v225 Commitment current status 继续是 `allocated`；二者表达容量已经分配过，而不是任务交付、计量或结算成功。该恢复不生成 verified usage、Provider 收益、settlement、罚金、赔付、Execution Receipt 或新的经济账本。
 
 active `granted` 或 `exercised` Grant 阻止 v225 Cancel/Expire 及其 recovery selector；`declined|expired` Grant 允许原 v225 规则继续工作：消费者拒绝或错过行权并不替 Provider 释放容量，Provider 仍可在窗口开始前 Cancel，平台仍在窗口结束时 Expire。反向地，v228 Grant/Exercise 必须拒绝已有 v225 terminal。
 
@@ -155,12 +161,12 @@ active `granted` 或 `exercised` Grant 阻止 v225 Cancel/Expire 及其 recovery
 
 ## 11. P0 文件预算与禁线
 
-实际源码按职责拆为：1 个 DeliveryAllocation 领域叶文件；1 个 v228 migration 入口加 3 个 table/guard 叶文件；1 个 Store 装配入口加 9 个 canonical/grant/exercise/terminal/read/validation 叶文件；3 个 Claim、Broker、Reservation 专用 seam 叶文件；Service 与 HTTP 各 1 个叶文件。原先预估的 Store 最多 5 个叶文件不足以同时容纳 22/50 列 exact readback、两组 2*N ledger legs 与 replay/currentness 审计，因此按单一职责安全拆分并在本权威记录实际预算，而未扩大业务范围。所有新增源码叶文件仍 `<450` 行；中央 migration/module/router 只做小幅注册。专项测试也保持为独立叶文件，不把测试夹具或断言混入业务入口。
+实际源码按职责拆为：1 个 DeliveryAllocation 领域叶文件；1 个 v228 migration 入口加 3 个 table/guard 叶文件；Store 装配入口及 canonical/grant/exercise/terminal/read/validation/downstream recovery 职责叶文件；3 个 Claim、Broker、Reservation 专用 seam 叶文件；Service 与 HTTP 各自保持薄边界。原先预估的 Store 最多 5 个叶文件不足以同时容纳 22/50 列 exact readback、两组 2*N ledger legs、replay/currentness 审计和本批恢复 selector，因此按单一职责安全拆分，而未扩大业务范围。所有新增源码叶文件仍 `<450` 行；中央 migration/module/router 只做小幅注册。专项测试也保持为独立叶文件，不把测试夹具或断言混入业务入口。
 
-P0 明确禁止：partial/multi-Job/regrant/transfer/resale；Order/Trade/Position/Clearing；真实 price/index/mark；保证金、交割罚金、Provider 收益或新结算 ABI；`external_pool`、remote saga、staging/provisional；MCP、PC、worker、dispatch；Attempt/Lease、verified metering、生产部署或运行。不得修改 v171/v174/v225 历史表、JSON、digest 或 migration。
+P0 明确禁止：partial/multi-Job/regrant/transfer/resale；Order/Trade/Position/Clearing；真实 price/index/mark；保证金、交割罚金、Provider 收益或新结算 ABI；`external_pool`、remote saga、staging/provisional；MCP、PC、worker、自动 scheduler/janitor 或新 dispatch；Attempt/Lease、verified metering、生产部署或运行。不得修改 v171/v174/v225 历史表、JSON、digest 或 migration。
 
 P1 才可讨论部分分配、多 Job、可转让 Position、真实市场价格、保证资源、自动清算、external pool 与生产结算；它们不能通过扩展 v228 请求体、状态 enum 或 Claim kind 旁路进入 P0。
 
 ## 12. 冻结结论
 
-v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。当前已通过编译、临时 SQLite 新库迁移和 Store/Service 成功、回滚、Decline 三项专项，状态为 `implementation_partially_verified`。HTTP 鉴权、并发、重开、历史库升级和生产运行仍未验证；任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得宣称未来交付、执行或结算已经生产可用。
+v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。原纵切面已通过编译、临时 SQLite 新库迁移和 Store/Service 成功、回滚、Decline 三项专项，整体状态保持 `implementation_partially_verified`。本批行权后 Reservation 到期恢复源码已经写入且不新增 migration，但未编译、未运行，`passed=0`；HTTP 鉴权、并发、重开、历史库升级和生产运行也仍未验证。任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得把预算退款和容量归还宣称为未来交付、verified usage、Provider 收益或 settlement 已生产可用。

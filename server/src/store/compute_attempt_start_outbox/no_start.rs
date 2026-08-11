@@ -12,7 +12,9 @@ mod finish_gate;
 
 pub(in crate::store) use derive::record_prepare_rejected_no_start_on;
 pub(super) use derive::{record_remote_never_committed_no_start_on, recover_no_start_on};
-pub(in crate::store) use finish_gate::ensure_start_resolved_for_broker_finish_on;
+pub(in crate::store) use finish_gate::{
+    ensure_start_resolved_for_broker_finish_on, BrokerFinishStartUnresolved,
+};
 
 fn proof_by_command_on(
     connection: &Connection,

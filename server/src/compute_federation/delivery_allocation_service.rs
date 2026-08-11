@@ -4,19 +4,25 @@
 #[path = "delivery_allocation_store_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "delivery_allocation_reservation_expiry_store_tests.rs"]
+mod reservation_expiry_store_tests;
+
 use anyhow::{bail, Result};
 use serde::Deserialize;
 
 use crate::store::{
     ComputeDeliveryAllocationDetail, ComputeDeliveryAllocationExerciseWriteReceipt,
     ComputeDeliveryAllocationExpiryReport, ComputeDeliveryAllocationGrantWriteReceipt,
+    ComputeDeliveryAllocationReservationExpiryReport,
     ComputeDeliveryAllocationTerminalWriteReceipt, CreateComputeDeliveryAllocationGrant,
     DeclineComputeDeliveryAllocationGrant, ExerciseComputeDeliveryAllocationGrant,
-    ExpireDueComputeDeliveryAllocationGrants, Store,
-    COMPUTE_DELIVERY_ALLOCATION_DECLINE_CONFIRMATION,
+    ExpireDueComputeDeliveryAllocationGrants, ExpireDueComputeDeliveryAllocationReservations,
+    Store, COMPUTE_DELIVERY_ALLOCATION_DECLINE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_EXERCISE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_EXPIRE_DUE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_GRANT_CONFIRMATION,
+    COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRE_DUE_CONFIRMATION,
 };
 
 #[derive(Clone, Deserialize)]
@@ -54,6 +60,13 @@ pub(crate) struct DeclineDeliveryAllocationGrantBody {
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ExpireDueDeliveryAllocationGrantsBody {
+    pub limit: usize,
+    pub confirm_expire_due: bool,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExpireDueDeliveryAllocationReservationsBody {
     pub limit: usize,
     pub confirm_expire_due: bool,
 }
@@ -176,6 +189,23 @@ pub(crate) fn expire_due_for_admin(
         limit: body.limit,
         confirmation: COMPUTE_DELIVERY_ALLOCATION_EXPIRE_DUE_CONFIRMATION.to_string(),
     })
+}
+
+pub(crate) fn expire_due_reservations_for_admin(
+    store: &Store,
+    _admin_user_id: &str,
+    body: ExpireDueDeliveryAllocationReservationsBody,
+) -> Result<ComputeDeliveryAllocationReservationExpiryReport> {
+    if !body.confirm_expire_due {
+        bail!("执行已行权交付分配的 Reservation 到期恢复前必须显式确认");
+    }
+    store.expire_due_compute_delivery_allocation_reservations(
+        ExpireDueComputeDeliveryAllocationReservations {
+            limit: body.limit,
+            confirmation: COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRE_DUE_CONFIRMATION
+                .to_string(),
+        },
+    )
 }
 
 fn operation_scope(operation: &str, actor_id: &str) -> String {

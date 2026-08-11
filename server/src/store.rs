@@ -297,6 +297,8 @@ use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     password_needs_rehash, safe_external_id, validate_password, verify_password,
 };
+#[cfg(test)]
+pub(crate) use common::{override_now_for_test, TestNowOverrideGuard};
 pub(crate) use compute_activation_applications::ApplyComputeActivationPlan;
 pub(crate) use compute_activation_lifecycle::SupersedeComputeActivationEvidenceRequest;
 pub(crate) use compute_activation_plan_reviews::{
@@ -415,13 +417,17 @@ pub(crate) use compute_capacity_supply_withdrawal::{
 pub(crate) use compute_delivery_allocations::{
     ComputeDeliveryAllocationDetail, ComputeDeliveryAllocationExerciseWriteReceipt,
     ComputeDeliveryAllocationExpiryItem, ComputeDeliveryAllocationExpiryReport,
-    ComputeDeliveryAllocationGrantWriteReceipt, ComputeDeliveryAllocationTerminalWriteReceipt,
-    CreateComputeDeliveryAllocationGrant, DeclineComputeDeliveryAllocationGrant,
-    ExerciseComputeDeliveryAllocationGrant, ExpireDueComputeDeliveryAllocationGrants,
+    ComputeDeliveryAllocationGrantWriteReceipt, ComputeDeliveryAllocationReservationExpiryItem,
+    ComputeDeliveryAllocationReservationExpiryReport,
+    ComputeDeliveryAllocationTerminalWriteReceipt, CreateComputeDeliveryAllocationGrant,
+    DeclineComputeDeliveryAllocationGrant, ExerciseComputeDeliveryAllocationGrant,
+    ExpireDueComputeDeliveryAllocationGrants, ExpireDueComputeDeliveryAllocationReservations,
     COMPUTE_DELIVERY_ALLOCATION_DECLINE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_EXERCISE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_EXPIRE_DUE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_GRANT_CONFIRMATION,
+    COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRE_DUE_CONFIRMATION,
+    COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX,
 };
 pub(crate) use compute_external_pool_adapter_artifact_source::{
     ExternalPoolAdapterArtifactIntakeAuthority, ExternalPoolAdapterArtifactSourceReceipt,

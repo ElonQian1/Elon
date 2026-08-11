@@ -97,7 +97,9 @@ fn required(label: &str, value: &str, max_len: usize) -> Result<String> {
 fn canonical_utc(value: &str) -> Result<String> {
     let parsed =
         DateTime::parse_from_rfc3339(value.trim()).context("Broker 终态发生时间不是 RFC3339")?;
-    if parsed.offset().local_minus_utc() != 0 || parsed > Utc::now() {
+    let store_now = DateTime::parse_from_rfc3339(&crate::store::now())
+        .context("Broker Store 当前时间不是 RFC3339")?;
+    if parsed.offset().local_minus_utc() != 0 || parsed > store_now {
         bail!("Broker 终态发生时间必须使用 UTC 且不能晚于当前时间");
     }
     Ok(parsed.with_timezone(&Utc).to_rfc3339())

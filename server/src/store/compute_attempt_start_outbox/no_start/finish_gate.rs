@@ -1,4 +1,4 @@
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{ensure, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::compute_federation::start_outbox::{
@@ -9,6 +9,24 @@ use super::{
     super::types::{BrokerFinishStartResolutionBinding, StartResolutionProofReceipt},
     derive::derive_local_never_sent_if_due_on,
 };
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[error("Broker finish requires an exact authoritative no-start proof")]
+pub(in crate::store) struct BrokerFinishStartUnresolved;
+
+#[cfg(test)]
+mod tests {
+    use super::BrokerFinishStartUnresolved;
+
+    #[test]
+    fn unresolved_finish_error_remains_downcastable() {
+        let error = anyhow::Error::new(BrokerFinishStartUnresolved);
+
+        assert!(error
+            .downcast_ref::<BrokerFinishStartUnresolved>()
+            .is_some());
+    }
+}
 
 pub(in crate::store) fn ensure_start_resolved_for_broker_finish_on(
     connection: &Connection,
@@ -98,7 +116,7 @@ pub(in crate::store) fn ensure_start_resolved_for_broker_finish_on(
             |row| row.get::<_, String>(0),
         )
         .optional()?
-        .ok_or_else(|| anyhow!("Broker finish requires an exact authoritative no-start proof"))?;
+        .ok_or(BrokerFinishStartUnresolved)?;
     let proof: ComputeStartNoStartProofEnvelope = serde_json::from_str(&json)?;
     let (canonical, digest) = canonical_start_no_start_proof_json_and_digest(&proof)?;
     ensure!(

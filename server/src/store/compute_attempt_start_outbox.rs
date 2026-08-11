@@ -27,6 +27,7 @@ pub(in crate::store) use accepted_commit::{
 };
 pub(super) use cleanup::{enqueue_quarantined_cleanup_on, has_cleanup_pair_on};
 pub(super) use enqueue::enqueue_prepare_on;
+pub(in crate::store) use no_start::BrokerFinishStartUnresolved;
 pub(super) use no_start::{
     ensure_start_resolved_for_broker_finish_on, record_prepare_rejected_no_start_on,
 };
