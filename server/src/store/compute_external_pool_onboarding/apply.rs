@@ -29,7 +29,7 @@ use crate::store::{
 };
 
 impl Store {
-    pub(in crate::store) fn apply_external_pool_onboarding(
+    pub(crate) fn apply_external_pool_onboarding(
         &self,
         input: ApplyExternalPoolOnboarding,
     ) -> Result<ExternalPoolOnboardingApplicationReceipt> {

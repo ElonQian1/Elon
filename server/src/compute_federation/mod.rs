@@ -12,6 +12,8 @@ pub(crate) mod external_pool_adapter_release;
 pub(crate) mod external_pool_adapter_release_api;
 pub(crate) mod external_pool_adapter_release_service;
 pub(crate) mod external_pool_onboarding;
+pub(crate) mod external_pool_onboarding_api;
+pub(crate) mod external_pool_onboarding_service;
 pub(crate) mod legacy;
 pub(crate) mod market;
 pub(crate) mod offer;

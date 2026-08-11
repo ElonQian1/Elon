@@ -19,7 +19,7 @@ use crate::store::{compute_provider_registry::validate_compute_provider_contract
 const MAX_TARGET_PROVIDER_JSON_BYTES: usize = 256 * 1024;
 
 impl Store {
-    pub(in crate::store) fn submit_external_pool_onboarding_request(
+    pub(crate) fn submit_external_pool_onboarding_request(
         &self,
         input: SubmitExternalPoolOnboardingRequest,
     ) -> Result<ExternalPoolOnboardingRequestReceipt> {

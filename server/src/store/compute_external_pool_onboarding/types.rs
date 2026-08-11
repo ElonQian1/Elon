@@ -9,16 +9,16 @@ pub(super) const EXTERNAL_POOL_ONBOARDING_APPLICATION_SCHEMA: &str =
 pub(super) const REVIEW_DECISION_APPROVED: &str = "approved";
 pub(super) const REVIEW_DECISION_CHANGES_REQUESTED: &str = "changes_requested";
 pub(super) const REVIEW_DECISION_REJECTED: &str = "rejected";
-pub(super) const EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION: &str =
+pub(crate) const EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION: &str =
     "confirm_external_pool_onboarding_apply";
 
-pub(in crate::store) struct SubmitExternalPoolOnboardingRequest {
+pub(crate) struct SubmitExternalPoolOnboardingRequest {
     pub request: ComputeExternalPoolOnboardingRequestEnvelope,
     pub idempotency_scope: String,
     pub idempotency_key: String,
 }
 
-pub(in crate::store) struct ReviewExternalPoolOnboardingRequest {
+pub(crate) struct ReviewExternalPoolOnboardingRequest {
     pub request_id: String,
     pub expected_request_digest: String,
     pub decision: String,
@@ -28,7 +28,7 @@ pub(in crate::store) struct ReviewExternalPoolOnboardingRequest {
     pub idempotency_key: String,
 }
 
-pub(in crate::store) struct ApplyExternalPoolOnboarding {
+pub(crate) struct ApplyExternalPoolOnboarding {
     pub request_id: String,
     pub expected_request_digest: String,
     pub expected_review_digest: String,
@@ -39,7 +39,7 @@ pub(in crate::store) struct ApplyExternalPoolOnboarding {
 }
 
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ExternalPoolOnboardingRequestReceipt {
+pub(crate) struct ExternalPoolOnboardingRequestReceipt {
     pub schema: &'static str,
     pub request_id: String,
     pub request_digest: String,
@@ -55,7 +55,7 @@ pub(in crate::store) struct ExternalPoolOnboardingRequestReceipt {
 }
 
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ExternalPoolOnboardingReviewReceipt {
+pub(crate) struct ExternalPoolOnboardingReviewReceipt {
     pub schema: &'static str,
     pub review_id: String,
     pub review_digest: String,
@@ -72,7 +72,7 @@ pub(in crate::store) struct ExternalPoolOnboardingReviewReceipt {
 }
 
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ExternalPoolOnboardingApplicationReceipt {
+pub(crate) struct ExternalPoolOnboardingApplicationReceipt {
     pub schema: &'static str,
     pub application_id: String,
     pub application_digest: String,

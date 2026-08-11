@@ -19,7 +19,7 @@ use super::{
 use crate::store::{new_id, Store};
 
 impl Store {
-    pub(in crate::store) fn review_external_pool_onboarding_request(
+    pub(crate) fn review_external_pool_onboarding_request(
         &self,
         mut input: ReviewExternalPoolOnboardingRequest,
     ) -> Result<ExternalPoolOnboardingReviewReceipt> {

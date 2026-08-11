@@ -406,6 +406,12 @@ pub(crate) use compute_external_pool_adapter_release::{
     EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
 };
+pub(crate) use compute_external_pool_onboarding::{
+    ApplyExternalPoolOnboarding, ExternalPoolOnboardingApplicationReceipt,
+    ExternalPoolOnboardingRequestReceipt, ExternalPoolOnboardingReviewReceipt,
+    ReviewExternalPoolOnboardingRequest, SubmitExternalPoolOnboardingRequest,
+    EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION,
+};
 pub(crate) use compute_job_registry::ComputeJobRegistrationReceipt;
 pub use compute_metering::ComputeMeterEvent;
 pub(crate) use compute_offer_contract_validation::{compute_offer_digest, compute_sku_digest};
