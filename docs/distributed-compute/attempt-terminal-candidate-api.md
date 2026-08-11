@@ -37,7 +37,7 @@ PC `/compute-execution` 只在本人 Provider 的 live running Lease 已有最�
 - outcome 只允许 `succeeded`、`failed`、`canceled`，reason code 只使用稳定小写代码字符；
 - 同一 Lease 尚无其他终态候选。
 
-相同 Provider 幂等键只能重放相同规范请求。同一 Lease 的第一份候选一旦保存，后续不同终态声明不能覆盖，也不能再追加新 v188 序号；重复读取和重放会重新计算请求、结果工件与事件摘要，并确认最终用量仍是流头。v226 合同见 `docs/distributed-compute/attempt-final-usage-fence-authority.md`。
+相同 Provider 幂等键只能重放相同规范请求。同一 Lease 的第一份候选一旦保存，后续不同终态声明不能覆盖，也不能再追加新 v188 序号；重复读取和重放会重新计算请求、结果工件与事件摘要，并确认最终用量仍是流头。v226 源码合同见 `docs/distributed-compute/attempt-final-usage-fence-authority.md`。
 
 ## 4. 输出合同
 

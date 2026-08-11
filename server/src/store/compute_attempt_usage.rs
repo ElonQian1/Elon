@@ -13,6 +13,7 @@ use crate::compute_federation::{
 use super::{
     compute_attempt_activations::compute_attempt_activation_on,
     compute_attempt_leases::{current_lease_state_on, StoredLeaseState},
+    compute_attempt_terminals::terminal_candidate_exists_on,
     compute_capacity_claim_rows::stored_claim_on,
     compute_job_registry::current_registered_job_on,
     compute_provider_registry::current_registered_provider_on,
@@ -127,6 +128,10 @@ impl Store {
             let receipt = stored.into_receipt(true)?;
             tx.commit()?;
             return Ok(receipt);
+        }
+
+        if terminal_candidate_exists_on(&tx, &input.lease_id)? {
+            bail!("Attempt 已登记终态候选，累计声明用量流已封口");
         }
 
         let current = current_lease_state_on(&tx, &input.lease_id)?

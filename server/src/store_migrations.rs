@@ -263,6 +263,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (223, "平台参考价格曲线四眼复核与 v171 Snapshot 来源", compute_platform_reference_price_curve::migration_v223),
     (224, "修复平台参考价格曲线 TTL 整数时间门卫", compute_platform_reference_price_curve::migration_v224),
     (225, "Provider 未来容量承诺与原子容量因果", compute_capacity_commitment::migration_v225),
+    (226, "Attempt 终态候选与最终声明用量原子栅栏", crate::compute_attempt_terminal_migration::migration_v226),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

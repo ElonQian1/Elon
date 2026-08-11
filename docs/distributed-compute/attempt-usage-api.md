@@ -42,7 +42,7 @@ PC `/compute-execution` 使用该模板生成逐 meter 数字输入，限制累�
 - 每个累计数量为非负整数，当前序号严格大于上一快照，所有 meter 的累计数量不得回退。
 - 同一 Lease 尚无 v189 终态候选；候选成功后声明流永久封口，只允许精确重放候选前已经保存的声明。
 
-相同 Provider 幂等键只能重放相同规范请求；同一 Lease 的同一序号也不能绑定不同声明。v226 将在数据库与 Store 两层固定“先重放、后检查候选、再允许新写”的顺序，详见 `docs/distributed-compute/attempt-final-usage-fence-authority.md`。
+相同 Provider 幂等键只能重放相同规范请求；同一 Lease 的同一序号也不能绑定不同声明。v226 源码在数据库与 Store 两层固定“先重放、后检查候选、再允许新写”的顺序，详见 `docs/distributed-compute/attempt-final-usage-fence-authority.md`。
 
 ## 4. 超额声明
 

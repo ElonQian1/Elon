@@ -165,7 +165,7 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 1. 版本化 Price Snapshot 注册、持久化与整数微单位（代码已写，尚未验证接线）；
 2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（源码已写，未编译/迁移/运行）；
 3. 平台签名价格源、真实指数/标记价、期货曲线、批量报价和自动撮合；
-4. Provider Capacity Commitment（v225 仅设计冻结，源码未写）；
+4. Provider Capacity Commitment（v225 源码已写，尚未编译、执行迁移或运行）；
 5. 需求方 Delivery Allocation；
 6. 限价订单簿、成交、持仓和净额；
 7. YCI 指数、标记价、替代交付和自动清算；

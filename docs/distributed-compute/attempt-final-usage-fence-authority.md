@@ -3,7 +3,7 @@ title: 分布式算力 Attempt 最终声明用量栅栏权威
 status: current
 reviewed_at: 2026-08-12
 owners: backend, node, ai-economy
-implementation_status: source_not_written
+implementation_status: implementation_uncompiled
 ---
 
 # 分布式算力 Attempt 最终声明用量栅栏权威
@@ -12,7 +12,7 @@ implementation_status: source_not_written
 
 本权威冻结 v226 的最窄修复合同：v189 Provider 终态候选必须原子绑定当时最新的 v188 累计声明用量；候选一旦存在，同一 Lease 的声明用量流即被封口。之后只允许对候选前已经保存的声明做精确幂等重放，不允许追加任何新序号。
 
-当前实现尚未写入，状态为 `source_not_written`。现有 v188 与 v189 都是 `implementation_uncompiled`；本批仍不编译、不执行迁移、不运行 SQLite、HTTP、PC 或节点链路。
+v226 迁移、Store 写入封口、模板门卫和统一候选 currentness 源码已经写入，状态为 `implementation_uncompiled/implementation_unrun`。本批仍不编译、不执行迁移、不运行 SQLite、HTTP、PC 或节点链路。
 
 ## 2. 被修复的完整性缺口
 

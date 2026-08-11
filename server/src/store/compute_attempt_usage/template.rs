@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use serde::Serialize;
 
 use crate::{
@@ -6,6 +6,7 @@ use crate::{
     store::{
         compute_attempt_activations::compute_attempt_activation_on,
         compute_attempt_leases::current_lease_state_on,
+        compute_attempt_terminals::terminal_candidate_exists_on,
         compute_capacity_claim_rows::stored_claim_on,
         compute_job_registry::current_registered_job_on,
         compute_reservation_registry::current_registered_reservation_on, Store,
@@ -62,6 +63,9 @@ impl Store {
         let current = current_lease_state_on(&conn, lease_id)?
             .ok_or_else(|| anyhow!("Attempt Lease 当前状态不存在"))?;
         ensure_live_running_lease_owner(&conn, provider_id, user_id, &current)?;
+        if terminal_candidate_exists_on(&conn, lease_id)? {
+            bail!("Attempt 已登记终态候选，累计声明用量流已封口");
+        }
 
         let activation = compute_attempt_activation_on(&conn, lease_id)?;
         let job = current_registered_job_on(&conn, &current.lease.job_id)?

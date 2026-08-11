@@ -1,5 +1,7 @@
 use anyhow::Result;
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction, TransactionBehavior};
+
+mod final_usage_fence;
 
 pub(crate) fn migration_v189(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -61,5 +63,13 @@ pub(crate) fn migration_v189(conn: &Connection) -> Result<()> {
            SELECT RAISE(ABORT, 'compute attempt terminal candidates are append-only');
          END;",
     )?;
+    Ok(())
+}
+
+pub(crate) fn migration_v226(conn: &Connection) -> Result<()> {
+    let transaction = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
+    final_usage_fence::audit_existing_candidates(&transaction)?;
+    final_usage_fence::install(&transaction)?;
+    transaction.commit()?;
     Ok(())
 }
