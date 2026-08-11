@@ -15,7 +15,7 @@
 - `POST /api/admin/compute/external-pool-adapter-releases/:request_id/review`：由另一名管理员独立复核；
 - `POST /api/admin/compute/external-pool-adapter-releases/:request_id/stage`：按 exact request/review 摘要形成 staged admission。
 
-六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。当前没有对应 MCP/PC 管理工具。
+六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。对应的 6 个 MCP 工具已经复用同一 Service 并通过角色隔离与治理链专项，见 `compute-management-mcp-acceptance.md`；PC 管理工具仍未实现。
 
 ## 3. 已验证行为
 

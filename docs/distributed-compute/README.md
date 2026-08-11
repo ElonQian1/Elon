@@ -39,7 +39,7 @@ owners: backend, node, ai-economy
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | v165-v168 Supply/Claim 与 v173 Claim 历史已在 Supply、Offer 和 Broker 定向链中执行临时 SQLite 全量迁移；Broker 测试验证 held 与 release 回流。并发、到期批处理、生产磁盘和真实节点仍未验证 |
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；HTTP/MCP 全链、并发和生产磁盘仍未验证 |
-| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，状态为 `implementation_partially_verified`。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本、平台曲线 MCP/PC 入口与部署仍未验证 |
+| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP/MCP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，状态为 `implementation_partially_verified`。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本、平台曲线 PC 入口与部署仍未验证 |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -63,8 +63,8 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期，并按 Provider/状态读取本人队列；管理员 HTTP 可重建固定平台账户的 pending/available，并按状态读取全局队列。PC 已写入本人收益与管理员结算两套页面源码。视图和队列只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
-| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移；onboarding 的 owner/admin 10 个管理操作与 Store 重开共 7 项专项通过，release 的 6 个管理员操作与 Store 重开共 7 项专项通过。生产部署与 MCP/PC 管理入口仍未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md)、[`external-pool-onboarding-api-acceptance.md`](external-pool-onboarding-api-acceptance.md)、[`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)、[`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md) |
-| 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。MCP/PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
+| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移；10 个 onboarding、6 个 release HTTP 操作及 22 个分角色 MCP 工具已通过治理链和 Store 重开专项。生产部署与 PC 管理入口仍未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`compute-management-mcp-acceptance.md`](compute-management-mcp-acceptance.md)、[`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-api-acceptance.md`](external-pool-onboarding-api-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md) |
+| 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
 “已接受设计”不等于“已上线”。任何代理都必须保留实现状态，不得把文档中的目标合同描述成当前生产能力。
@@ -173,7 +173,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider 首段来源权威见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)，Adapter release 候选来源见 [`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)：v221/v222 已编译迁移，onboarding 的 10 个管理操作与 Store 重开共 7 项专项通过，release 的 6 个管理员操作与 Store 重开共 7 项专项通过；生产部署和 MCP/PC 管理入口仍未运行。onboarding application 与 staged admission 均不证明 artifact/verifier、credential、route、容量、派发或结算。
+服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider 首段来源权威见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)，Adapter release 候选来源见 [`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)：v221/v222 已编译迁移，onboarding 的 10 个管理操作与 Store 重开共 7 项专项通过，release 的 6 个管理员操作与 Store 重开共 7 项专项通过，5 个本人 MCP 与 17 个平台 MCP 工具也已通过角色隔离和治理链专项；生产部署和 PC 管理入口仍未运行。onboarding application 与 staged admission 均不证明 artifact/verifier、credential、route、容量、派发或结算。
 
 ### F4：容量期货市场
 

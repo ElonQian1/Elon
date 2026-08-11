@@ -53,8 +53,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 ## 4. 明确未完成
 
 - 未验证真实 TCP、浏览器、并发压力、异常断电或生产数据库副本升级；
-- 未提供 MCP 或 PC 管理入口，未部署到生产；
+- 6 个 MCP 管理工具已复用同一 Service 并通过角色隔离和路由专项，见 `compute-management-mcp-acceptance.md`；PC 管理入口与生产部署仍未完成；
 - 未接入真实外部价格样本、多源校验、index、mark、trade、订单簿或自动撮合；
 - application 不创建 Job、不预留容量、不冻结或移动资金，也不派发 Attempt。
 
-这些缺口不能通过重复实现 v223 DTO 或五账本解决，后续应分别进入真实价格 producer、MCP/PC 管理面和生产验证任务。
+这些缺口不能通过重复实现 v223 DTO、五账本或 MCP 工具解决，后续应分别进入真实价格 producer、PC 管理面和生产验证任务。
