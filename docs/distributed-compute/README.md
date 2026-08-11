@@ -39,7 +39,7 @@ owners: backend, node, ai-economy
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | v165-v168 Supply/Claim 与 v173 Claim 历史已在 Supply、Offer 和 Broker 定向链中执行临时 SQLite 全量迁移；Broker 测试验证 held 与 release 回流。并发、到期批处理、生产磁盘和真实节点仍未验证 |
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；进程内 HTTP/MCP 与 Offer 文件重开已验证，并发和生产磁盘仍未验证 |
-| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP/MCP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，状态为 `implementation_partially_verified`。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本、平台曲线 PC 入口与部署仍未验证 |
+| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP/MCP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，PC `/compute-reference-curves` 已通过跨层契约、严格类型、lint、生产构建和 bundle budget。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本与部署仍未验证，状态为 `implementation_partially_verified` |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -163,7 +163,7 @@ v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt �
 v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。管理员现可读取有界到期候选并逐笔复用 v198；这是人工触发的部分成功批处理，不是后台定时清算。v200 再允许 Provider 所有者把本人 available 原子转入 withdrawn 提款保留区；v201 为申请增加取消、拒绝或外部已付款声明的唯一终态。取消/拒绝返还内部余额，付款声明只保存证据，不调用或验证外部资金网络。
 Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。平台 reference fallback 现由管理员 HTTP/MCP 完成 exact batch 提交、独立复核、preflight 和原子 application；v223/v224 直接登记 entry 对应的唯一 v171 Snapshot，并通过临时文件迁移与重开专项。它仍固定为 `fallback_curve/sample_count=0`，不代表 index/mark/trade；平台曲线 PC、真实 TCP 与生产部署未验证。候选不返回节点路由、凭据或适配器配置，任何报价发布和锁价都不自动移动资金或容量。
 
-Provider、Pool、Bucket、Supply、激活、Offer 和 Broker 各自的控制面与证据由本页“阅读顺序”中的专题文档维护。PC `/compute-supply`、`/compute-activation`、`/compute-offers` 与 `/compute-market` 已完成静态生产构建；后续 Attempt 和结算入口仍为 `implementation_uncompiled`。静态构建不代表接口联调、浏览器验收、生产迁移或发布，Broker 证据见 `broker-control-plane-acceptance.md`。
+Provider、Pool、Bucket、Supply、激活、Offer、平台参考价格和 Broker 各自的控制面与证据由本页“阅读顺序”中的专题文档维护。PC `/compute-supply`、`/compute-activation`、`/compute-offers`、`/compute-reference-curves` 与 `/compute-market` 已完成静态生产构建；后续 Attempt 和结算入口仍为 `implementation_uncompiled`。静态构建不代表接口联调、浏览器验收、生产迁移或发布，参考价格和 Broker 证据分别见 `platform-reference-price-curve-api-acceptance.md` 与 `broker-control-plane-acceptance.md`。
 
 v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 从 `submitted` 创建并只从当前合格候选进入 `quoted`；消费者幂等键、revision/digest CAS、历史依赖审计及临时磁盘重开已随 Broker 组合链通过定向测试。该结论不代表真实 TCP、生产数据库升级、异常断电恢复、自动撮合或任务派发已经验证。
 

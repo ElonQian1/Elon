@@ -2,7 +2,7 @@
 title: 平台参考价格回退曲线管理面验收
 status: current
 reviewed_at: 2026-08-11
-owners: ai-economy, backend, security
+owners: ai-economy, backend, pc, security
 implementation_status: implementation_partially_verified
 ---
 
@@ -50,10 +50,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 
 最终验证指纹：`1a23c7a39373d30c0597aca7d439d2f6fd121bd445727cb2a58aaf025fc75fd1`。验证回执 profile：`732e88238b2f3c94c16c6c9e75ef129e948027907d48b6e81e588c795141f923`。
 
+PC 管理入口 `/compute-reference-curves` 也已完成静态闭环：仅 `admin/owner` 显示导航并允许进入，管理员从 exact active Offer 选择交付窗口、调整安全整数价格组件后形成 1 至 32 条批次材料，不使用原始 JSON 编辑器；页面覆盖状态队列、详情、preflight、四眼复核和原子应用，并持续提示这些操作不创建 Job、不预留容量或移动资金。列表客户端按后端 `BatchDetailReceipt` 解包 `batch`，提交、复核和应用后显式刷新目标状态，避免读取旧标签。
+
+PC 验证命令：
+
+```powershell
+cd pc-frontend
+npm run test:compute-reference-curves
+npm run typecheck
+npm run lint
+npm run build
+npm run check:bundle-budget
+```
+
+上述命令均通过；bundle budget 的单入口和单 chunk 硬门卫通过，全仓总 JS/CSS 仍有既有 soft warning。该证据仅说明 PC 源码、路由和跨层静态合同可生产构建，不证明真实 HTTP 或浏览器交互。
+
 ## 4. 明确未完成
 
 - 未验证真实 TCP、浏览器、并发压力、异常断电或生产数据库副本升级；
-- 6 个 MCP 管理工具已复用同一 Service 并通过角色隔离和路由专项，见 `compute-management-mcp-acceptance.md`；PC 管理入口与生产部署仍未完成；
+- 6 个 MCP 管理工具已复用同一 Service 并通过角色隔离和路由专项，见 `compute-management-mcp-acceptance.md`；PC 管理入口已静态生产构建，真实接口联调、浏览器验收与生产部署仍未完成；
 - 未接入真实外部价格样本、多源校验、index、mark、trade、订单簿或自动撮合；
 - application 不创建 Job、不预留容量、不冻结或移动资金，也不派发 Attempt。
 
