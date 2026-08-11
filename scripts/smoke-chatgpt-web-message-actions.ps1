@@ -108,17 +108,6 @@ function Wait-OverlayClosed {
     return $false
 }
 
-function Get-MessageOverlaySelector {
-    param(
-        [Parameter(Mandatory = $true)][string]$ContextId,
-        [Parameter(Mandatory = $true)][int]$Count
-    )
-
-    $stableContext = [regex]::Replace($ContextId, '[^A-Za-z0-9_.:-]', '_')
-    if ($stableContext.Length -gt 160) { $stableContext = $stableContext.Substring(0, 160) }
-    return "chatgpt-message-overlay-actions:${stableContext}:$Count"
-}
-
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
@@ -152,8 +141,17 @@ try {
     if (@($overlayControls | Where-Object { $_.semantic -eq "action" }).Count -gt 0) {
         throw "The message action menu still contains unclassified controls."
     }
-    $expectedSelector = Get-MessageOverlaySelector `
-        -ContextId ([string]$messageMore.context_id) -Count $overlayControls.Count
+    $expectedSelector = [string](@(
+        $overlayControls |
+            Where-Object {
+                $_.native_presentation -eq "menu" -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.native_trigger_content_description)
+            } |
+            Select-Object -ExpandProperty native_trigger_content_description -Unique
+    ) | Select-Object -First 1)
+    if (-not $expectedSelector) {
+        throw "The message action menu did not export a native trigger selector."
+    }
 
     Start-Sleep -Seconds 1
     $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
