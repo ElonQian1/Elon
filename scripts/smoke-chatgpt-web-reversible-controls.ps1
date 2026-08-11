@@ -58,28 +58,73 @@ function Invoke-ReceiptAction {
     return Wait-CommandReceipt -RequestId $requestId -ExpectedAction $ExpectedAction
 }
 
-function Get-ComposerModels {
-    Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
-        -ExpectedAction "list_model_options" -Arguments @{ section = "model" } | Out-Null
+function Get-CachedComposerModels {
+    param([switch]$RequireLeafChoices)
+
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
         $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
             -Action "chatgpt_get_navigation" -Arguments @{ section = "model" }
         $options = @($navigation.composer_sections.model | Where-Object { $null -ne $_ })
-        if ($options.Count -gt 0) { return $options }
+        $leafCount = @($options | Where-Object { $_.opens_submenu -ne $true }).Count
+        if ($options.Count -gt 0 -and (-not $RequireLeafChoices -or $leafCount -ge 2)) {
+            return $options
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for cached ChatGPT model options."
+}
+
+function Get-ComposerModels {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        try {
+            Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
+                -ExpectedAction "list_model_options" -Arguments @{ section = "model" } | Out-Null
+            return @(Get-CachedComposerModels)
+        } catch {
+            # The authenticated composer can become ready before the model entry finishes hydrating.
+        }
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out waiting for ChatGPT model options."
 }
 
-function Wait-CurrentModel {
+function Wait-SelectedModel {
     param([Parameter(Mandatory = $true)][string]$ExpectedLabel)
 
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "requested ChatGPT model" -Predicate {
+    try {
+        return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 5 `
+            -Description "requested ChatGPT model summary" -Predicate {
             param($state)
             $state.adapter_current -eq $true -and
                 [string]$state.conversation.current_model -eq $ExpectedLabel
+        }
+    } catch {
+        # The official page can expose the selected menu item before its compact model label updates.
+    }
+
+    $models = @(Get-SelectableModels)
+    $selected = $models |
+        Where-Object {
+            $_.selected -eq $true -and
+                [string]$_.label -eq $ExpectedLabel
+        } |
+        Select-Object -First 1
+    if ($null -eq $selected) {
+        throw "ChatGPT model menu did not mark the requested model as selected."
+    }
+    return Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+}
+
+function Wait-ViewMode {
+    param([Parameter(Mandatory = $true)][string]$ExpectedMode)
+
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "requested ChatGPT view mode" -Predicate {
+            param($state)
+            [string]$state.view_mode -eq $ExpectedMode -and
+                $state.adapter_current -eq $true
         }
 }
 
@@ -108,7 +153,7 @@ function Get-SelectableModels {
                 section = "model"
                 option_id = [string]$parent.id
             } | Out-Null
-        $children = @(Get-ComposerModels)
+        $children = @(Get-CachedComposerModels -RequireLeafChoices)
         $childLeaves = @($children | Where-Object { $_.opens_submenu -ne $true })
         if ($childLeaves.Count -ge 2) { return $childLeaves }
     }
@@ -137,7 +182,7 @@ function Restore-ModelByLabel {
                     section = "model"
                     option_id = [string]$restoreModel.id
                 } | Out-Null
-            Wait-CurrentModel -ExpectedLabel $Label | Out-Null
+            Wait-SelectedModel -ExpectedLabel $Label | Out-Null
             return $true
         } catch {
             if ($attempt -lt 2) {
@@ -193,31 +238,48 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
     }
 $originViewMode = [string]$origin.view_mode
 
-$originalModelLabel = [string]$origin.conversation.current_model
-$models = @(Get-SelectableModels)
-$originalModel = Find-ModelByLabel -Models $models -Label $originalModelLabel
-if ($null -eq $originalModel) {
-    $originalModel = $models | Where-Object { $_.selected -eq $true } | Select-Object -First 1
-    $originalModelLabel = [string]$originalModel.label
-}
-$alternateModel = $models |
-    Where-Object { [string]$_.label -ne $originalModelLabel } |
-    Select-Object -First 1
-if ($null -eq $originalModel -or $null -eq $alternateModel) {
-    throw "At least two observable model choices are required for reversible acceptance."
-}
 $modelRestored = $false
+$modelViewRestored = $false
 try {
-    Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-        -ExpectedAction "select_model_option" -Arguments @{
-            section = "model"
-            option_id = [string]$alternateModel.id
-        } | Out-Null
-    Wait-CurrentModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
-    Refresh-CurrentAdapter | Out-Null
-    Wait-CurrentModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
+    if ($originViewMode -ne "web") {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+            -Arguments @{ view_mode = "web" } | Out-Null
+        Wait-ViewMode -ExpectedMode "web" | Out-Null
+    }
+
+    $originalModelLabel = [string]$origin.conversation.current_model
+    $models = @(Get-SelectableModels)
+    $originalModel = $null
+    if (-not [string]::IsNullOrWhiteSpace($originalModelLabel)) {
+        $originalModel = Find-ModelByLabel -Models $models -Label $originalModelLabel
+    }
+    if ($null -eq $originalModel) {
+        $originalModel = $models | Where-Object { $_.selected -eq $true } | Select-Object -First 1
+        $originalModelLabel = [string]$originalModel.label
+    }
+    $alternateModel = $models |
+        Where-Object { [string]$_.label -ne $originalModelLabel } |
+        Select-Object -First 1
+    if ($null -eq $originalModel -or $null -eq $alternateModel) {
+        throw "At least two observable model choices are required for reversible acceptance."
+    }
+    try {
+        Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+            -ExpectedAction "select_model_option" -Arguments @{
+                section = "model"
+                option_id = [string]$alternateModel.id
+            } | Out-Null
+        Wait-SelectedModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
+        Refresh-CurrentAdapter | Out-Null
+        Wait-SelectedModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
+    } finally {
+        $modelRestored = Restore-ModelByLabel -Label $originalModelLabel
+    }
 } finally {
-    $modelRestored = Restore-ModelByLabel -Label $originalModelLabel
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = $originViewMode } | Out-Null
+    Wait-ViewMode -ExpectedMode $originViewMode | Out-Null
+    $modelViewRestored = $true
 }
 if (-not $modelRestored) { throw "Original ChatGPT model was not restored." }
 
@@ -283,6 +345,6 @@ if ($originViewMode -in @("web", "native")) {
         idempotent_request_passed = $true
         original_state_restored = $disclosureRestored
     }
-    original_view_mode_restored = $true
+    original_view_mode_restored = $modelViewRestored
 } | ConvertTo-Json -Depth 10
 Write-Output "CHATGPT_WEB_REVERSIBLE_CONTROL_SMOKE_STATUS=passed"
