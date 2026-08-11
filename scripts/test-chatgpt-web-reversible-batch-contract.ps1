@@ -16,6 +16,8 @@ if (@($errors).Count -gt 0) {
 
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "Start-ChatGptWebSmokeAwakeLease",
+    "Stop-ChatGptWebSmokeAwakeLease",
     'id = "reversible_controls"',
     'id = "composer_controls"',
     'id = "message_structure"',

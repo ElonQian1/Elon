@@ -37,6 +37,9 @@ function New-ChatGptWebSmokeRuntime {
         invoke_mcp = $invokeMcp
         poll_interval_sec = $PollIntervalSec
         mcp_bootstrapped = $false
+        awake_lease_active = $false
+        previous_stay_awake_setting = ""
+        previous_stay_awake_setting_missing = $false
     }
 }
 
@@ -86,6 +89,79 @@ function Assert-ChatGptWebSmokeTrustedDevice {
     param([Parameter(Mandatory = $true)]$Runtime)
 
     Assert-ChatGptWebSmokeDevice -Runtime $Runtime
+}
+
+function Get-ChatGptWebSmokeDisplayState {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    $power = Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+        -Arguments @("shell", "dumpsys", "power") -TimeoutSec 8 `
+        -Label "read device power state"
+    $windowPolicy = Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+        -Arguments @("shell", "dumpsys", "window", "policy") -TimeoutSec 8 `
+        -Label "read device keyguard state"
+    return [pscustomobject]@{
+        awake = $power -match '(?m)^\s*mWakefulness=Awake\s*$'
+        keyguard_showing =
+            $windowPolicy -match '(?m)^\s*showing=true\s*$' -or
+            $windowPolicy -match '(?m)^\s*mIsShowing=true\s*$' -or
+            $windowPolicy -match '(?m)\bisStatusBarKeyguard=true\b'
+    }
+}
+
+function Start-ChatGptWebSmokeAwakeLease {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    if ($Runtime.awake_lease_active) { return $Runtime }
+    $display = Get-ChatGptWebSmokeDisplayState -Runtime $Runtime
+    if (-not $display.awake) {
+        Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+            -Arguments @("shell", "input", "keyevent", "KEYCODE_WAKEUP") `
+            -TimeoutSec 5 -Label "wake ChatGPT Web acceptance device" | Out-Null
+        Start-Sleep -Milliseconds 500
+        $display = Get-ChatGptWebSmokeDisplayState -Runtime $Runtime
+    }
+    if (-not $display.awake) {
+        throw "Device screen is not awake. Verification is deferred."
+    }
+    if ($display.keyguard_showing) {
+        throw "Device is locked. Unlock it before ChatGPT Web verification; no credential input was attempted."
+    }
+
+    $previous = (Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+        -Arguments @("shell", "settings", "get", "global", "stay_on_while_plugged_in") `
+        -TimeoutSec 5 -Label "read device stay-awake setting").Trim()
+    $Runtime.previous_stay_awake_setting = $previous
+    $Runtime.previous_stay_awake_setting_missing = -not $previous -or $previous -eq "null"
+    Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+        -Arguments @("shell", "settings", "put", "global", "stay_on_while_plugged_in", "7") `
+        -TimeoutSec 5 -Label "enable bounded ChatGPT Web stay-awake setting" | Out-Null
+    $Runtime.awake_lease_active = $true
+    return $Runtime
+}
+
+function Stop-ChatGptWebSmokeAwakeLease {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    if (-not $Runtime.awake_lease_active) { return $true }
+    try {
+        $arguments = if ($Runtime.previous_stay_awake_setting_missing) {
+            @("shell", "settings", "delete", "global", "stay_on_while_plugged_in")
+        } else {
+            @(
+                "shell", "settings", "put", "global", "stay_on_while_plugged_in",
+                [string]$Runtime.previous_stay_awake_setting
+            )
+        }
+        Invoke-ChatGptWebSmokeAdb -Runtime $Runtime -Arguments $arguments `
+            -TimeoutSec 5 -Label "restore device stay-awake setting" | Out-Null
+        $Runtime.awake_lease_active = $false
+        return $true
+    } catch {
+        $detail = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.Exception.Message
+        Write-Warning "Unable to restore ChatGPT Web stay-awake setting: $detail"
+        return $false
+    }
 }
 
 function Invoke-ChatGptWebSmokeAdb {

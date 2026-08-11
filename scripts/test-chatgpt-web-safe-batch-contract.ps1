@@ -15,6 +15,9 @@ if ($parseErrors.Count -gt 0) {
 
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "Start-ChatGptWebSmokeAwakeLease",
+    "Stop-ChatGptWebSmokeAwakeLease",
+    "ExpectedHardwareSerial = `$ExpectedHardwareSerial",
     'id = "read_only_surface"',
     'id = "feature_pages"',
     'id = "session_recovery"',

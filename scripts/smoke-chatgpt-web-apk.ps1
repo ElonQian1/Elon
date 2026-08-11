@@ -4,6 +4,7 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [string]$DeviceSerial = "",
+    [string]$ExpectedHardwareSerial = "",
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
@@ -15,12 +16,14 @@ $ErrorActionPreference = "Stop"
 
 $invokeMcp = Join-Path $PSScriptRoot "invoke-apk-mcp.ps1"
 $evidenceHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1"
-foreach ($helper in @($invokeMcp, $evidenceHelper)) {
+$runtimeHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1"
+foreach ($helper in @($invokeMcp, $evidenceHelper, $runtimeHelper)) {
     if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
         throw "Missing ChatGPT Web smoke helper: $helper"
     }
 }
 . $evidenceHelper
+. $runtimeHelper
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
     throw "adb not found: $Adb"
 }
@@ -310,6 +313,11 @@ function Wait-NewConversationReady {
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out proving an isolated blank ChatGPT conversation."
 }
+$smokeRuntime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
+    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
+Assert-ChatGptWebSmokeTrustedDevice -Runtime $smokeRuntime
+Start-ChatGptWebSmokeAwakeLease -Runtime $smokeRuntime | Out-Null
+try {
 $opened = Invoke-UiAction -Action "open_chatgpt_web" -EnsureMainActivity
 $officialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
 $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT Web readiness" -Predicate {
@@ -600,3 +608,6 @@ if ($failed.Count -gt 0) {
 }
 
 Write-Output "CHATGPT_WEB_SMOKE_STATUS=passed mode=$($summary.mode)"
+} finally {
+    Stop-ChatGptWebSmokeAwakeLease -Runtime $smokeRuntime | Out-Null
+}
