@@ -1,7 +1,7 @@
 ---
 title: 分布式算力容量池与账本设计
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, ai-economy
 ---
 
@@ -62,7 +62,7 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 | `reservation_released` | `held -> available` | 取消或显式释放 |
 | `reservation_expired` | `held -> available` | 到期恢复器 |
 
-未来 CapacityCommitment 同样进入 `held`，但使用独立 claim kind。将 Commitment 切给具体 DeliveryAllocation 时先转移 Claim 归属；实际 Attempt 激活后才进入 `active`。
+v225 CapacityCommitment 已冻结 docs-first 合同但源码尚未编写：Create 使用独立 `capacity_commitment` claim kind 和 `compute_capacity_commitment` subject，把完整 meter/window 以既有 `reservation_held` 从 `available` 移到 `held`；Cancel/Expire 分别复用 `reservation_released`/`reservation_expired` 归还。Commitment 不复制数量或余额，数量仍只读 exact Claim lines，余额仍只读 ledger。DeliveryAllocation、Claim 归属转移和 Attempt 激活不属于 v225，见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。
 
 ## 4. 原子 Reserve
 
@@ -79,6 +79,8 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 任何一步失败全部回滚。候选查询、Quote 和 ReadyCapability 只提供观察事实，不能跳过 Reserve 的再次检查。
 
 当前容量 Store 已把 Claim Hold/Finish/Activation/Attempt Return 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 Hold/Finish kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation；Finish 继承原始 held 绑定并精确引用因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记；v176 对尚未激活 Attempt 的 active Reservation 原子完成退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired。v185 通过仅供外层事务使用的 Activation kernel 将既有 Claim `held -> active`，并把 Attempt Lease ID 和 fencing generation 写入容量因果链，再与 Job/Reservation 新版本和不可变激活回执一同提交。v186 只更新 Lease 状态投影和追加续租回执，不触碰容量账本。v187 的外层事务精确复核 v185 激活、revision 1 staging Lease、无心跳、Provider 所有权和原预算后，调用 Attempt Return kernel 追加 `attempt_returned`，把 Claim `active -> released` 及容量 `active -> available` 与退款和其余终态一起提交。上述状态均为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`；它们不发送节点命令，v187 也不覆盖已运行任务的实际用量或结算。
+
+v225 实现时必须继续复用这些 private kernels，但同时把 public generic Hold、public generic Finish 与 generic expiry recovery 对 Commitment 全部失败关闭。只有 Commitment 外层事务可创建或终结该 Claim，并在同一事务写 immutable commitment 或唯一 terminal receipt；否则会产生 Claim 已释放/过期而 Commitment 仍 committed 的分裂真源。该封口当前仍是 `source_not_written`。
 
 ## 5. Attempt 与容量
 
@@ -105,10 +107,10 @@ reusable:   issued = available + held + active + retired
 
 ## 7. 到期、恢复与对账
 
-- Quote hold、Reservation 和 Commitment 都有明确 expires_at；
-- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口拒绝保留的 `compute_reservation` 主体，通用容量恢复器按 held 账本中真实的 Reservation causal binding 跳过 Broker 管理的 Claim，通用余额到期器也排除 v175 Broker 回执引用的预授权，避免任一资源腿在统一 Broker 终态之外单独归还；
+- 当前 Quote hold 与 Reservation 有明确 `expires_at`；v225 设计强制 Commitment Claim 的 `expires_at` 等于交付窗口结束，调用方不能自定；
+- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口已拒绝保留的 `compute_reservation` 主体。v225 还必须让 generic Hold/Finish/recovery 排除 `capacity_commitment`，由专用 Expire 把 Claim、ledger 和唯一 terminal receipt 原子提交；
 - 相同 effect 使用唯一幂等键，不会重复归还；
-- Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应，因此不能描述为严格幂等闭环；
+- Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；现有 generic 代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应。v225 必须在任何 current/time/state 门卫前先读 immutable commitment/terminal receipt，才能形成严格重放；
 - 账本与余额投影不一致时停止新 Reserve，重放 ledger 重建投影并形成审计报告；
 - 旧 epoch、旧 fencing generation 和晚到终态只能追加审计，不能影响当前余额。
 

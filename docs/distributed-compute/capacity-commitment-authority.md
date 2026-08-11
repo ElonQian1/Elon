@@ -1,0 +1,129 @@
+---
+title: Provider Capacity Commitment v225 权威
+status: current
+design_status: design_frozen
+implementation_status: source_not_written
+reviewed_at: 2026-08-11
+owners: backend, ai-economy
+---
+
+# Provider Capacity Commitment v225 权威
+
+## 1. 状态与最窄目标
+
+v225 只冻结 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的静态闭环。设计状态为 `design_frozen`，源码状态为 `source_not_written`；截至 2026-08-11，没有为本设计编写 Rust、迁移、Store、Service、API 或测试，也未编译、未测试、未执行迁移、未运行。
+
+该纵切面复用 v165-v168/v173 的 Claim 与容量账本、v169 Provider、v170 Offer、v171 Price Snapshot，以及 v223/v224 已审核的平台 reference binding。它不依赖节点插件/VFS、真实任务运行、verified metering、Delivery Allocation、资金或结算。
+
+## 2. 单一权威与两表
+
+v225 只新增两张表，不新增 Commitment 数量表、余额表或 mutable current projection：
+
+### `compute_capacity_commitments`
+
+不可变的 revision 1 `committed` 事实，字段冻结为：
+
+- 信封：`commitment_id`、固定 schema、`commitment_revision=1`、`commitment_status=committed`、`commitment_digest`、JCS JSON；
+- 主体：`owner_account_id`；
+- Provider：`provider_id`、`provider_policy_revision`、`provider_digest`；
+- Offer：`offer_id`、`offer_version`、`offer_digest`；
+- Pool：`pool_id`、`capacity_epoch`、`pool_revision`、`pool_digest`；
+- 窗口：`delivery_window_id`、`delivery_window_digest`、`starts_at`、`ends_at`；
+- 价格：`price_snapshot_id`、`price_snapshot_digest`、`reference_binding_id`、`reference_binding_digest`、`instrument_id`；
+- 容量因果：`claim_id`、`claim_revision=1`、`claim_digest`、创建 ledger transaction ID/digest/sequence/event kind；
+- 重放：`idempotency_scope`、`idempotency_key`、`request_digest`；
+- 时间：Store 生成的 `created_at`、且 `expires_at=ends_at`。
+
+`commitment_id`、`commitment_digest`、`claim_id`、创建 transaction ID 和 `(idempotency_scope,idempotency_key)` 分别唯一。表及其 JSON 禁止 UPDATE/DELETE；精确 Provider/Offer/Pool/Snapshot/reference binding/Claim version/ledger transaction 均以外键或写后重审计固定。
+
+### `compute_capacity_commitment_terminal_receipts`
+
+每个 Commitment 最多一份不可变 revision 2 终态回执，字段冻结为：
+
+- 信封：`terminal_receipt_id`、固定 schema、`terminal_revision=2`、`terminal_status IN (canceled,expired)`、receipt digest、JCS JSON；
+- 前序：`commitment_id`、revision 1 commitment digest；
+- Claim：`claim_id`、prior revision/digest、result revision/digest/state；
+- 账本：terminal transaction ID/digest/sequence，event kind 与 causal transaction ID；
+- 授权：`actor_kind`、`actor_id`、可选规范化 reason；
+- 重放：`idempotency_scope`、`idempotency_key`、`request_digest`；
+- 时间：Store 生成的 `occurred_at`、`recorded_at`。
+
+`commitment_id`、receipt digest、terminal transaction ID 和幂等 scope/key 分别唯一，表及 JSON 禁止 UPDATE/DELETE。当前状态只能由 commitment LEFT JOIN terminal receipt 派生；不存在可被单独改写的状态列，也不存在 revision 3、重开或第二终态。
+
+## 3. 状态与容量映射
+
+| Commitment | Claim | 既有 ledger event | 容量移动 |
+|---|---|---|---|
+| create `committed` | `capacity_commitment`, `held`, revision 1 | `reservation_held` | `available -> held` |
+| cancel `canceled` | `released`, revision 2 | `reservation_released` | `held -> available` |
+| expire `expired` | `expired`, revision 2 | `reservation_expired` | `held -> available` |
+
+Commitment 只用独立 claim kind 表达业务语义，不扩展 reducer、账户或 event enum。Claim 固定 `subject_kind=compute_capacity_commitment`、`subject_id=commitment_id`、无 parent；数量唯一权威是该 Claim 的不可变 lines，余额唯一权威是既有 ledger 与 balance projection，Commitment 两表不得复制 meter/quantity 或余额。
+
+## 4. Store API 与事务边界
+
+未来 P0 Store 只暴露：`create_compute_capacity_commitment`、`cancel_compute_capacity_commitment`、`expire_due_compute_capacity_commitments`、单条读取和本人有界列表。任何写操作由 Store 拥有一个 `BEGIN IMMEDIATE`；Service/API 不拼接跨事务步骤。
+
+Create 请求只接受精确 Provider/Offer/Pool/Snapshot/reference binding、`instrument_id`、完整 `meter -> quantity`、幂等键和固定确认短语。调用方不得提交 bucket ID、服务器时间、`expires_at`、部分 meter 或自行生成摘要。事务顺序固定为：
+
+1. 先按 scope/key 查 immutable commitment；同 request digest 返回原 revision 1 写结果，不同 digest 拒绝；
+2. 重审计当前 Provider、Offer、Pool、v171 Snapshot 与 v223 binding；
+3. 建立唯一窗口的完整 meter 映射并校验数量与 Offer 局部上限；
+4. 通过仅供外层事务使用的 Hold kernel 创建 Claim 与 `reservation_held` ledger transaction；
+5. 插入 immutable commitment，精确回读 Commitment、Claim revision 1、Claim lines、ledger 与全部依赖后提交。
+
+任何一步失败整笔回滚，不允许先写 staging、pending、provisional 或 outbox。
+
+## 5. Exact currentness
+
+Create 的同一事务必须同时满足：
+
+- Provider 是当前登录用户所有，状态 `active`，当前 policy revision/digest 与请求及 Offer 绑定完全一致，且 kind 不是 `external_pool`；
+- Offer 是数据库 current exact version/digest，状态 `active`，Store 时间位于 `[valid_from,valid_until)`，Provider、Pool、SKU、窗口、`capacity_future` 与 `instrument_id` 均精确一致；
+- Pool 是数据库 current exact `(pool_id,capacity_epoch,pool_revision,pool_digest)`，状态 `active`，归属同 Provider，region/profile/meter policies 与 Offer 精确兼容；即使 epoch 相同，旧 revision/digest 也必须拒绝；
+- v171 Snapshot 通过既有完整摘要审计，绑定同 Offer/SKU/窗口/组件/费用/`instrument_id`，`pricing_mode=capacity_future`、CNY、`trade_id=None`，且 Store 时间早于 Snapshot `expires_at`；
+- v223 binding 通过既有 application/binding 全链审计，review 为 approved、application 为 applied，并精确绑定该 Snapshot；`source_kind=fallback_curve`、`sample_count=0`；
+- v223 没有 mutable latest-curve 指针，因此只要求已批准并应用的 exact binding 与未过期 Snapshot，不臆造“最新 curve version”。
+
+v225 需要 Store-private、transaction-local 的 snapshot-ID lookup 来复用上述 v223 读审计；不得复制 v223 五张表、DTO、canonicalization 或第二套价格真源。
+
+## 6. 全 meter、窗口与 Offer 上限
+
+Store 先以 Snapshot 的 exact 窗口筛选 Offer capacity rows，再按 meter 建唯一映射；禁止复用跨全部窗口聚合 meter 的 Broker helper。SKU metering units、该窗口 Offer rows、Snapshot components 与请求 quantities 的 meter 集合必须完全相等。
+
+每个 quantity 必须大于零，同时整除 bucket `quantum_units` 与 Snapshot component `unit_size`，且不超过 component `max_units` 和该 Offer row 的 `reservable_units`。同一 IMMEDIATE 事务再以 checked `i128` 汇总同 `offer_id + bucket_id` 的所有 live `held|active` Quote/Reservation/Commitment Claim；已有量加新量不得超过当前 Offer `reservable_units`。共享 Pool 的全局防超卖仍由既有 reducer 和 available 余额最终裁决。
+
+## 7. Cancel、Expire 与严格重放
+
+Cancel 先查 terminal receipt 幂等键，再检查 owner、expected revision 1/digest、尚无终态、Claim 仍 held，并要求 Store 时间严格早于窗口开始；不要求创建后 Provider/Offer/Pool/Snapshot 仍 current 或 active。专用 exact-subject wrapper 在同一事务追加 `reservation_released`、把 Claim 推进为 released revision 2，并插入 `canceled` receipt。
+
+Expire 只供平台 admin 恢复入口使用。候选来自 commitment LEFT JOIN 无终态 receipt，且 Store 时间不早于强制 `expires_at=ends_at`；调用方不能传 occurred/cutoff 时间。Expire 的 `occurred_at` 固定取该 Commitment 的 `expires_at`，`recorded_at` 取本事务 Store 时间。每个候选用确定性 key 单独执行一个 IMMEDIATE 事务，追加 `reservation_expired`、把 Claim 推进为 expired revision 2，并插入 `expired` receipt。批量限制 `1..100`，是显式调用的部分成功恢复，不要求后台 scheduler。
+
+每个操作都必须在 currentness、时间与状态门卫之前查自己的 immutable 结果。同 key + 同 request digest 返回原始 Commitment/terminal receipt、Claim version 与 ledger transaction，不读取 mutable current Claim/余额来伪造首次响应；同 key + 不同 digest 拒绝。创建后已终态或来源已过期也不破坏历史重放。Cancel/Expire 竞争由 Claim CAS 与 terminal receipt 的 `UNIQUE(commitment_id)` 保证仅一方成功。
+
+## 8. Generic bypass 封口
+
+未来 v225 源码必须同时完成三道门卫，否则不得宣告闭环：
+
+- public generic Hold 拒绝 `capacity_commitment` claim kind 或 `compute_capacity_commitment` subject；只有 Create 外层事务可调用 private Hold kernel；
+- public generic Finish 像 Reservation 一样拒绝 Commitment；只有校验 exact commitment/Claim/原 held causal binding 的专用 wrapper 可 release/expire；
+- generic Claim expiry recovery 明确排除 Commitment；只允许专用 Expire 同事务写 terminal receipt，禁止出现 Claim 已 expired 而 Commitment 仍 committed。
+
+读取也必须从两张 Commitment 表、exact Claim versions/lines 和 ledger 重建并重审计；任何摘要、revision、subject、event、数量或状态不一致都失败关闭。
+
+## 9. HTTP P0
+
+- `GET/POST /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/capacity-commitments`；
+- `GET /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/capacity-commitments/:commitment_id`；
+- `POST /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/capacity-commitments/:commitment_id/cancel`；
+- `POST /api/admin/compute/capacity-commitments/expire-due`，要求固定确认短语、`limit=1..100`，时间完全由服务端生成。
+
+P0 不要求 MCP、PC 页面或后台 worker。所有响应只公开安全投影和 exact immutable receipt，不公开内部路由、凭据或 adapter 配置。
+
+## 10. 文件预算与 P0 禁线
+
+未来 P0 最多新增 9 个 Rust 文件：一个 v225 migration、一个领域/canonical 合同、Store 主模块与 create/terminal/query-audit 三个子模块、一个薄 Service、一个 HTTP API 和一个聚焦测试文件；现有 migration/module/router 只允许小幅注册。超过该预算必须拆批，不把 MCP、PC、worker 或相邻市场对象塞入同批。
+
+P0 明确禁止：`external_pool`；DeliveryAllocation；Order/Trade/Position/ClearingReceipt；资金预授权、收费、Provider 收益、保证资源、处罚、结算或清算；Job/Reservation/Attempt/Lease 修改；真实价格/index/mark/trade 声明；节点插件、VFS、artifact、route、派发或 verified metering 接线；staging/provisional/saga；调用方 bucket/time/expiry/部分 meter；新 reducer/event/余额权威。
+
+本文件冻结的是可独立静态闭合的设计，不是实现或验收证据。只有未来源码、迁移、定向编译/测试和运行证据全部形成后，才可改变 `source_not_written`。
