@@ -254,12 +254,14 @@
   function visibleOptionNodes() {
     return Array.from(document.querySelectorAll(
       '[role="menuitemradio"], [role="menuitemcheckbox"], [role="menuitem"], [role="option"]'
-    )).filter((node) => {
-      if (!isVisible(node)) return false;
-      const rect = node.getBoundingClientRect();
-      return rect.right > 0 && rect.bottom > 0 &&
-        rect.left < window.innerWidth && rect.top < window.innerHeight;
-    });
+    )).filter(isOptionVisible);
+  }
+
+  function isOptionVisible(node) {
+    if (!isVisible(node)) return false;
+    const rect = node.getBoundingClientRect();
+    return rect.right > 0 && rect.bottom > 0 &&
+      rect.left < window.innerWidth && rect.top < window.innerHeight;
   }
 
   function opensSubmenu(node) {
@@ -352,7 +354,7 @@
 
   function requestOptions(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
-    const reusable = lastOptions[section].filter((option) => isVisible(option.node));
+    const reusable = lastOptions[section].filter((option) => isOptionVisible(option.node));
     if (reusable.length > 0) {
       emitOptions(section, reusable, composer, emitEvent);
       return result(action, true, '');
@@ -412,7 +414,7 @@
       return result(action, false, '选项已过期，请重新打开列表。');
     }
     const target = lastOptions[section].find((option) => option.id === id);
-    if (!target || !isVisible(target.node)) {
+    if (!target || !isOptionVisible(target.node)) {
       return result(action, false, '官网菜单已经关闭，请重新选择。');
     }
     const submenuPurpose = section === 'model' ? 'open_model_submenu' : 'open_composer_tools_submenu';
@@ -439,7 +441,7 @@
 
   function ownsOptionNode(node) {
     return ['model', 'tools'].some((section) =>
-      lastOptions[section].some((option) => option.node === node && isVisible(option.node))
+      lastOptions[section].some((option) => option.node === node && isOptionVisible(option.node))
     );
   }
 
