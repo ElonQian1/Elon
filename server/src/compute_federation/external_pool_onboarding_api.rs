@@ -173,10 +173,15 @@ async fn preflight_admin_request(
     headers: HeaderMap,
     Path(request_id): Path<String>,
 ) -> Response {
-    if let Err(response) = platform_admin(&state, &headers) {
-        return response;
-    }
-    onboarding_response(service::preflight_for_admin(&state.store, &request_id))
+    let admin_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    onboarding_response(service::preflight_for_admin(
+        &state.store,
+        &admin_user_id,
+        &request_id,
+    ))
 }
 
 async fn submit_request(

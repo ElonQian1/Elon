@@ -54,6 +54,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 
 ## 5. 未验证边界
 
+- 本批补入的 actor-aware 管理员 preflight 与 Provider ID 冲突预检仅完成源码、格式和静态合同检查，尚未重新编译或运行新增回归；既有 7 项证据不覆盖这两个新分支；
 - 未部署服务器，未调用生产数据库或真实外部矿池；
 - 未验证并发提交/复核/application；
 - 未验证 Adapter release admission、artifact、verifier 或 credential；

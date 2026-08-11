@@ -153,7 +153,11 @@ pub(crate) fn call_admin_if_handled(
         ADMIN_PREFLIGHT => {
             support::ensure_platform_admin(platform_role)?;
             let input: EntityArguments = support::decode(arguments, name)?;
-            serde_json::to_value(service::preflight_for_admin(store, &input.request_id)?)?
+            serde_json::to_value(service::preflight_for_admin(
+                store,
+                user_id,
+                &input.request_id,
+            )?)?
         }
         ADMIN_REVIEW => {
             support::ensure_platform_admin(platform_role)?;

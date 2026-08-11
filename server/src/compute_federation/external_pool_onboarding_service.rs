@@ -92,6 +92,7 @@ pub(crate) struct ExternalPoolOnboardingPreflightReport {
     pub checked_at: String,
     pub review_present: bool,
     pub application_present: bool,
+    pub provider_conflict: bool,
     pub owner_cancel_allowed: bool,
     pub admin_review_allowed: bool,
     pub admin_apply_allowed: bool,
@@ -258,7 +259,11 @@ pub(crate) fn preflight_for_owner(
     owner_user_id: &str,
     request_id: &str,
 ) -> Result<ExternalPoolOnboardingPreflightReport> {
-    preflight(get_for_owner(store, owner_user_id, request_id)?)
+    preflight_with_current_state(
+        store,
+        get_for_owner(store, owner_user_id, request_id)?,
+        None,
+    )
 }
 
 pub(crate) fn get_for_admin(
@@ -278,9 +283,14 @@ pub(crate) fn list_for_admin(
 
 pub(crate) fn preflight_for_admin(
     store: &Store,
+    admin_user_id: &str,
     request_id: &str,
 ) -> Result<ExternalPoolOnboardingPreflightReport> {
-    preflight(get_for_admin(store, request_id)?)
+    preflight_with_current_state(
+        store,
+        get_for_admin(store, request_id)?,
+        Some(admin_user_id),
+    )
 }
 
 fn ensure_owner(detail: &ExternalPoolOnboardingDetailReceipt, owner_user_id: &str) -> Result<()> {
@@ -290,19 +300,33 @@ fn ensure_owner(detail: &ExternalPoolOnboardingDetailReceipt, owner_user_id: &st
     Ok(())
 }
 
-fn preflight(
+fn preflight_with_current_state(
+    store: &Store,
     detail: ExternalPoolOnboardingDetailReceipt,
+    admin_user_id: Option<&str>,
 ) -> Result<ExternalPoolOnboardingPreflightReport> {
+    let provider_registered = store
+        .compute_provider_if_exists(&detail.request.provider_id)?
+        .is_some();
+    let provider_conflict = provider_registered && detail.application.is_none();
     let status = detail.request.status.as_str();
     let review_approved = detail
         .review
         .as_ref()
         .is_some_and(|review| review.decision == "approved");
     let owner_cancel_allowed = status == "submitted";
-    let admin_review_allowed = status == "submitted";
-    let admin_apply_allowed =
-        status == "approved" && review_approved && detail.application.is_none();
-    let blockers = match status {
+    let current_admin_is_owner = admin_user_id.is_some_and(|admin_user_id| {
+        admin_user_id == detail.request.provider_owner_account_id.as_str()
+    });
+    let admin_review_allowed = status == "submitted" && !current_admin_is_owner;
+    let admin_apply_allowed = status == "approved"
+        && review_approved
+        && detail.application.is_none()
+        && !provider_conflict;
+    let mut blockers = match status {
+        "submitted" if current_admin_is_owner => {
+            vec!["current_admin_cannot_review_own_submission".to_string()]
+        }
         "submitted" | "approved" => Vec::new(),
         "changes_requested" => vec!["changes_requested_requires_new_submission".to_string()],
         "rejected" => vec!["request_rejected".to_string()],
@@ -310,6 +334,9 @@ fn preflight(
         "applied" => vec!["provider_already_registered".to_string()],
         _ => bail!("external-pool onboarding request status is unsupported"),
     };
+    if provider_conflict && matches!(status, "submitted" | "approved") {
+        blockers.push("provider_id_already_registered".to_string());
+    }
     Ok(ExternalPoolOnboardingPreflightReport {
         schema: "compute_federation.external_pool_onboarding_preflight.v1",
         request_id: detail.request.request_id,
@@ -320,6 +347,7 @@ fn preflight(
         checked_at: Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
         review_present: detail.review.is_some(),
         application_present: detail.application.is_some(),
+        provider_conflict,
         owner_cancel_allowed,
         admin_review_allowed,
         admin_apply_allowed,

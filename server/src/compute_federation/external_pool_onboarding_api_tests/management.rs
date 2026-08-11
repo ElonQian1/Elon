@@ -191,6 +191,21 @@ async fn admin_detail_and_preflight_follow_review_and_application_history() {
     )
     .await;
     assert_eq!(submitted_preflight["admin_review_allowed"], true);
+    assert_eq!(submitted_preflight["provider_conflict"], false);
+
+    let (_, owner_admin_preflight) = call(
+        &fixture.router,
+        Method::GET,
+        &admin_preflight,
+        Some(&fixture.owner_token),
+        &Value::Null,
+    )
+    .await;
+    assert_eq!(owner_admin_preflight["admin_review_allowed"], false);
+    assert_eq!(
+        owner_admin_preflight["blockers"][0],
+        "current_admin_cannot_review_own_submission"
+    );
 
     let (_, reviewed) = call(
         &fixture.router,
@@ -247,6 +262,7 @@ async fn admin_detail_and_preflight_follow_review_and_application_history() {
     )
     .await;
     assert_eq!(applied_preflight["application_present"], true);
+    assert_eq!(applied_preflight["provider_conflict"], false);
     assert_eq!(applied_preflight["admin_apply_allowed"], false);
     assert_eq!(
         applied_preflight["blockers"][0],
@@ -264,5 +280,120 @@ async fn admin_detail_and_preflight_follow_review_and_application_history() {
         .0,
         StatusCode::BAD_REQUEST
     );
+    fixture.cleanup();
+}
+
+#[tokio::test]
+async fn admin_preflight_blocks_provider_identity_claimed_by_another_request() {
+    let fixture = fixture();
+    let (_, first) = call(
+        &fixture.router,
+        Method::POST,
+        owner_path(),
+        Some(&fixture.owner_token),
+        &submit_body("provider-conflict-first", true),
+    )
+    .await;
+    let mut second_body = submit_body("provider-conflict-second", true);
+    second_body["provider_id"] = first["provider_id"].clone();
+    let (_, second) = call(
+        &fixture.router,
+        Method::POST,
+        owner_path(),
+        Some(&fixture.owner_token),
+        &second_body,
+    )
+    .await;
+
+    let first_review_path = format!(
+        "{}/{}/review",
+        admin_path(),
+        first["request_id"].as_str().unwrap()
+    );
+    let second_review_path = format!(
+        "{}/{}/review",
+        admin_path(),
+        second["request_id"].as_str().unwrap()
+    );
+    let (_, first_review) = call(
+        &fixture.router,
+        Method::POST,
+        &first_review_path,
+        Some(&fixture.reviewer_token),
+        &review_body(&first, "provider-conflict-first-review", "approved", true),
+    )
+    .await;
+    let (_, second_review) = call(
+        &fixture.router,
+        Method::POST,
+        &second_review_path,
+        Some(&fixture.reviewer_token),
+        &review_body(&second, "provider-conflict-second-review", "approved", true),
+    )
+    .await;
+    let second_application_path = format!(
+        "{}/{}/application",
+        admin_path(),
+        second["request_id"].as_str().unwrap()
+    );
+    let (status, applied) = call(
+        &fixture.router,
+        Method::POST,
+        &second_application_path,
+        Some(&fixture.applier_token),
+        &application_body(
+            &second,
+            &second_review,
+            "provider-conflict-second-application",
+            true,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{applied}");
+
+    let first_preflight_path = format!(
+        "{}/{}/preflight",
+        admin_path(),
+        first["request_id"].as_str().unwrap()
+    );
+    let (_, blocked) = call(
+        &fixture.router,
+        Method::GET,
+        &first_preflight_path,
+        Some(&fixture.applier_token),
+        &Value::Null,
+    )
+    .await;
+    assert_eq!(blocked["provider_conflict"], true);
+    assert_eq!(blocked["admin_apply_allowed"], false);
+    assert!(blocked["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|blocker| blocker == "provider_id_already_registered"));
+
+    let first_application_path = format!(
+        "{}/{}/application",
+        admin_path(),
+        first["request_id"].as_str().unwrap()
+    );
+    assert_eq!(
+        call(
+            &fixture.router,
+            Method::POST,
+            &first_application_path,
+            Some(&fixture.applier_token),
+            &application_body(
+                &first,
+                &first_review,
+                "provider-conflict-first-application",
+                true,
+            ),
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_ledger_counts(&fixture, 2, 2, 1);
     fixture.cleanup();
 }
