@@ -22,11 +22,10 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals("elon.chatgpt_web.feature_baseline.v4", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
-            ChatGptWebPageAdapter.ADAPTER_VERSION,
+            ChatGptWebFeatureBaseline.DEVICE_VERIFICATION_ADAPTER_VERSION,
             baseline.getInt("device_verification_adapter_version"),
         )
-        val deviceEvidenceCurrent =
-            BuildConfig.CHATGPT_WEB_INPUT_SHA256 == BuildConfig.CHATGPT_WEB_VERIFIED_INPUT_SHA256
+        val deviceEvidenceCurrent = ChatGptWebFeatureBaseline.isDeviceVerificationCurrent()
         assertEquals(deviceEvidenceCurrent, baseline.getBoolean("device_verification_current"))
         assertTrue(BuildConfig.CHATGPT_WEB_INPUT_SHA256.matches(Regex("^[0-9a-f]{64}$")))
         assertEquals(

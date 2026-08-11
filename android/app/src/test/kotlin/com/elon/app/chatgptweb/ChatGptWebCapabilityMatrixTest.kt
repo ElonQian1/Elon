@@ -25,7 +25,7 @@ class ChatGptWebCapabilityMatrixTest {
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, matrix.getInt("adapter_version"))
         assertTrue(matrix.getJSONObject("app").getInt("version_code") > 0)
         assertEquals(
-            "elon.chatgpt_web.feature_baseline.v3",
+            "elon.chatgpt_web.feature_baseline.v${ChatGptWebFeatureBaseline.VERSION}",
             matrix.getJSONObject("feature_baseline").getString("schema"),
         )
         assertEquals(0, matrix.getJSONArray("blocking_gaps").length())
