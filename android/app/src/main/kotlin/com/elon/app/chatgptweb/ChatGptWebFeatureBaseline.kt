@@ -407,7 +407,7 @@ internal object ChatGptWebFeatureBaseline {
             group = "messages",
             status = ImplementationStatus.PARTIAL,
             acceptance = Acceptance.INTERACTIVE_DEVICE,
-            mcpActions = listOf("chatgpt_invoke_control"),
+            mcpActions = listOf("chatgpt_regenerate_response"),
             capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE),
             semantics = setOf("regenerate"),
             remainingGap = "regenerate_reply_device_acceptance",

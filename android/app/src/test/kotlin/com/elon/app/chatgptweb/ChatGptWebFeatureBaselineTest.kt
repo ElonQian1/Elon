@@ -296,6 +296,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_set_control_expanded",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_regenerate_response",
             "chatgpt_start_dictation",
             "chatgpt_remove_attachment",
             "chatgpt_list_conversations",
