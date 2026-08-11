@@ -16,6 +16,8 @@ implementation_status: implementation_uncompiled
 
 当前状态是 `implementation_uncompiled/implementation_unrun`：v227 领域/文件 custody、Store、一表迁移、Service/HTTP 与中央接线源码已经写入，只通过 rustfmt、差异/尺寸门卫和独立静态审计；尚未编译、测试、执行迁移、启动服务或摄入 artifact。实际 artifact 测量数为 0。
 
+v229 admission lifecycle 已完成文档设计冻结，但仍为 `design_frozen/source_not_written`。其合同要求 v227 PUT 在读取 raw body/CAS 前、Store 的 IMMEDIATE 事务内以及新 v229 BEFORE INSERT currentness trigger 中拒绝 `withdrawn/revoked/superseded` admission；v229 不改写 v227 旧 migration。以下 currentness 行为是未来实现门槛，不是当前源码事实，详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
+
 ## 2. 唯一管理入口
 
 首版只开放两项平台管理员 HTTP，不开放 MCP、PC、SDK、下载或 Provider owner 自助入口：
@@ -31,9 +33,9 @@ PUT 必须先完成 Bearer 鉴权并确认角色是 `admin|owner`，再读取 bo
 - `X-Elon-Artifact-Source-Confirmation: confirm_external_pool_adapter_artifact_source_intake`；
 - body 非空且最多 33,554,432 字节。
 
-调用方不得提交 request/review/ref、声明摘要、observed 摘要、文件名、路径、storage key、actor 或时间；Service 必须从 exact staged admission、认证会话、服务端时间与实际 body 派生。首写返回 201，exact replay 与 GET 返回 200。摘要或 lineage/幂等冲突返回 409，超限返回 413，媒体类型或编码不符返回 415，body 摘要与 admission 声明不符返回 422；receipt 已存在但 blob 缺失或漂移必须失败关闭。
+调用方不得提交 request/review/ref、声明摘要、observed 摘要、文件名、路径、storage key、actor 或时间；Service 必须从 exact staged admission、认证会话、服务端时间与实际 body 派生。v229 实现后，只有派生 current status 仍为 `staged` 才能读取/流式消费 body 或进入 CAS；已有 terminal 时，包含旧 exact idempotent replay 在内的 PUT 都必须失败关闭。首写返回 201，仍 current 时的 exact replay 与 GET 返回 200。摘要或 lineage/currentness/幂等冲突返回 409，超限返回 413，媒体类型或编码不符返回 415，body 摘要与 admission 声明不符返回 422；receipt 已存在但 blob 缺失或漂移必须失败关闭。
 
-GET 不返回 bytes、下载地址、绝对路径、candidate ref 或凭据。历史 receipt 不能替代实时 currentness：每次读取和未来每次消费都必须重新打开最终普通文件并重算摘要与长度。
+GET 不返回 bytes、下载地址、绝对路径、candidate ref 或凭据。terminal 后 GET 仍可读取 immutable 历史 receipt，并重开最终普通文件复核 bytes；回执必须明确 `existing_artifact_source_effect=historical_only`。历史 receipt 不能替代实时 currentness：未来 registry 每次消费都必须同时重算 bytes 并确认 admission 仍无 terminal。
 
 ## 3. 服务端文件来源
 
@@ -60,17 +62,21 @@ GET 不返回 bytes、下载地址、绝对路径、candidate ref 或凭据。�
 
 文件系统与 SQLite 不是一个原子事务，不得宣称为单事务提交。首版采用 CAS-first、DB-second：
 
-1. 完成最终文件 no-clobber 安装与重开重算；
-2. 开启 SQLite `BEGIN IMMEDIATE`；
-3. 重审 exact staged admission/request/approved review、摘要、actor scope 与幂等；
-4. 插入一份不可变 receipt 并 exact readback；
-5. 提交数据库事务。
+1. 在读取 raw body 前取得 exact、无 terminal 的 staged intake authority；
+2. 完成最终文件 no-clobber 安装与重开重算；
+3. 开启 SQLite `BEGIN IMMEDIATE`；
+4. 对 fresh write 和 exact replay 都重审 admission currentness；
+5. 对 fresh write 再由 v227 exact-source trigger 与独立 v229 currentness trigger 重审 request/review/admission lineage 和无 terminal 条件；
+6. 插入一份不可变 receipt 并 exact readback；
+7. 提交数据库事务。
 
 崩溃窗口的裁决固定为：
 
 - temp 写入前/中失败：无 DB；孤儿 `.part` 不可采用；
 - CAS 已安装、DB 未提交：留下未引用 blob；同一请求重试必须重开复核后复用；
 - DB 已提交、响应丢失：同 key exact replay 重开复核后返回既有 receipt；
+- CAS 已安装、terminal 在 DB-second 前提交：receipt 写入失败，留下的未引用 blob 不能成为 authority；
+- receipt 先提交、terminal 后提交：历史 receipt/blob 保留，PUT replay 与 future consumer 失败，GET 仍可读取历史；
 - Store 结果不明：保留 CAS，返回失败并只允许读回或同 key 重试，不删除 final；
 - receipt 存在但 blob 缺失、非普通或摘要/长度漂移：保留历史行，所有读取和 consumer 失败关闭，绝不改写 receipt。
 
@@ -87,9 +93,9 @@ v227 只新增 `compute_external_pool_adapter_artifact_source_receipts`，一份
 - fixed effects：`admin_authenticated_raw_body`、`byte_digest_match_only`、`artifact_ref_resolution_effect=none`、`adapter_effect=none`、`route_effect=none`；
 - actor/confirmation/server time、稳定 intake material digest、idempotency scope/key。
 
-declared、intake、reopened 与 content-address 四个 SHA 必须 exact 相等；长度必须为 1..33,554,432。receipt digest、admission id 和 `(idempotency_scope,idempotency_key)` 唯一。BEFORE INSERT trigger 必须 exact JOIN v222 staged admission、request 与 approved review；另有 JSON projection、no-update、no-delete 与 no-replace 门卫。
+declared、intake、reopened 与 content-address 四个 SHA 必须 exact 相等；长度必须为 1..33,554,432。receipt digest、admission id 和 `(idempotency_scope,idempotency_key)` 唯一。v227 BEFORE INSERT trigger 必须 exact JOIN v222 staged admission、request 与 approved review；v229 未来新增独立 BEFORE INSERT currentness trigger，拒绝任何已有 terminal，而不修改 v227 旧 migration。另有 JSON projection、no-update、no-delete 与 no-replace 门卫。
 
-Store 的 exact replay 顺序是：先按 scope/key 查既有回执并逐字段比较，再重审 admission；相同 admission 使用不同 key，或同 key 任一 material 漂移，均冲突。不同 admissions 可以共享同一内容寻址 blob，但必须各自保存 lineage receipt。
+Store 当前 exact replay 顺序是先按 scope/key 查既有回执并逐字段比较，再重审 admission；v229 实现必须把“无 terminal”加入 fresh 与 replay 的事务重审。terminal 后 PUT exact replay失败，历史 receipt 只能由 GET 读取。相同 admission 使用不同 key，或同 key 任一 material 漂移，均冲突。不同 admissions 可以共享同一内容寻址 blob，但必须各自保存 lineage receipt。
 
 ## 6. 信任截止线与 P0 禁线
 
@@ -104,8 +110,10 @@ Store 的 exact replay 顺序是：先按 scope/key 查既有回执并逐字段�
 
 后续 Adapter registry consumer 仍须另行闭合 artifact provenance/signature、sandbox conformance、verifier registry/currentness/revocation、平台级 release actor 与 Provider-specific route actor 分权，以及 exact v222/v227 source companion。v227 永远不跨越该截止线。
 
+v229 terminal receipt 的固定 effects 为 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none` 与 `route_effect=none`。这些值只冻结未来合同；当前没有对应源码或运行记录。
+
 ## 7. 实现与验收门槛
 
 当前源码批标记为 `implementation_uncompiled/implementation_unrun`，实际摄入和运行测量仍为 0。本阶段只执行了 rustfmt、差异/文档/源码尺寸门卫和独立静态审计，不得把未执行路径写成已验证事实。
 
-未来独立运行验收至少覆盖：fresh migration、升级与重复迁移、两次重开；Store/API 成功与 401/403/409/413/415/422；exact replay 与并发；CAS existing exact/corrupt/symlink；各崩溃窗 fault injection；receipt 后 blob missing/corrupt。只有这些执行证据完成后才可升级为 `implementation_partially_verified`，且仍不得声称生产 Adapter 已验证或可执行。
+未来独立运行验收至少覆盖：fresh migration、升级与重复迁移、两次重开；Store/API 成功与 401/403/409/413/415/422；exact replay 与并发；CAS existing exact/corrupt/symlink；各崩溃窗 fault injection；receipt 后 blob missing/corrupt。叠加 v229 时还必须覆盖 terminal 前后 fresh PUT、exact replay、GET 历史读取，以及 terminal 与 CAS/DB-second 的两种线性顺序。只有这些执行证据完成后才可升级为 `implementation_partially_verified`，且仍不得声称生产 Adapter 已验证或可执行。

@@ -65,7 +65,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移；10 个 onboarding、6 个 release HTTP 操作及 22 个分角色 MCP 工具已通过治理链和 Store 重开专项。PC `/compute-external-pools` 已完成静态生产构建；真实 TCP、浏览器与生产部署仍未运行。v227 server-owned quarantine raw bytes source 源码已写但未编译、迁移或运行，实际测量为 0；它不解析 candidate ref、不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-artifact-source-authority.md`](external-pool-adapter-artifact-source-authority.md) 与既有 external-pool 权威/验收 |
+| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移；10 个 onboarding、6 个 release HTTP 操作及 22 个分角色 MCP 工具已通过治理链和 Store 重开专项。PC `/compute-external-pools` 已完成静态生产构建；真实 TCP、浏览器与生产部署仍未运行。v227 server-owned quarantine raw bytes source 源码已写但未编译、迁移或运行，实际测量为 0。v229 admission `staged -> withdrawn|revoked|superseded`、exact successor、唯一 terminal/current view 及 v227 pre-CAS/DB/trigger currentness 门卫仅为 `design_frozen/source_not_written`，无 MCP/PC；它不解析 candidate ref、不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-artifact-source-authority.md`](external-pool-adapter-artifact-source-authority.md)、[`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md) 与既有 external-pool 权威/验收 |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -176,7 +176,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider onboarding 与 Adapter release v221/v222 已编译迁移并通过管理面专项；生产部署仍未运行。v227 [`artifact bytes source`](external-pool-adapter-artifact-source-authority.md) 已写入管理员 raw body→DATA_DIR quarantine→重开 SHA-256→不可变 receipt 源码，尚未编译、迁移或运行。onboarding、staged admission 和 bytes receipt 均不证明 candidate ref provenance、verifier、credential、route、容量、派发或结算。
+服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider onboarding 与 Adapter release v221/v222 已编译迁移并通过管理面专项；生产部署仍未运行。v227 [`artifact bytes source`](external-pool-adapter-artifact-source-authority.md) 已写入管理员 raw body→DATA_DIR quarantine→重开 SHA-256→不可变 receipt 源码，尚未编译、迁移或运行。v229 [`release-admission lifecycle`](external-pool-adapter-release-lifecycle-authority.md) 只冻结 `staged -> withdrawn|revoked|superseded`、exact successor、唯一 terminal receipt/current view，以及 v227 PUT 在 CAS 前、Store fresh/exact replay 与新 trigger 的 currentness 门卫；状态是 `design_frozen/source_not_written`，无 MCP/PC，terminal 也不产生 Adapter 或 route effect。onboarding、staged admission、terminal 和 bytes receipt 均不证明 candidate ref provenance、verifier、credential、route、容量、派发或结算。
 
 ### F4：容量期货市场
 
