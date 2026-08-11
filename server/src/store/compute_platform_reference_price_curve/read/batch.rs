@@ -18,11 +18,14 @@ use super::super::{
 };
 use super::decode;
 
-pub(super) fn batch_by_id_on(conn: &Connection, id: &str) -> Result<Option<StoredBatch>> {
+pub(in crate::store::compute_platform_reference_price_curve) fn batch_by_id_on(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<StoredBatch>> {
     batch_on(conn, "WHERE batch_id=?1", params![id])
 }
 
-pub(super) fn batch_by_idempotency_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn batch_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,
@@ -34,7 +37,7 @@ pub(super) fn batch_by_idempotency_on(
     )
 }
 
-pub(super) fn batch_by_curve_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn batch_by_curve_on(
     conn: &Connection,
     curve_id: &str,
     curve_version: i64,
@@ -46,13 +49,19 @@ pub(super) fn batch_by_curve_on(
     )
 }
 
-pub(super) fn entries_by_batch_on(conn: &Connection, batch_id: &str) -> Result<Vec<StoredEntry>> {
+pub(in crate::store::compute_platform_reference_price_curve) fn entries_by_batch_on(
+    conn: &Connection,
+    batch_id: &str,
+) -> Result<Vec<StoredEntry>> {
     let batch = batch_by_id_on(conn, batch_id)?
         .ok_or_else(|| anyhow::anyhow!("reference price curve entries lost their batch"))?;
     entries_for_batch_on(conn, &batch.envelope)
 }
 
-pub(super) fn entry_by_id_on(conn: &Connection, entry_id: &str) -> Result<Option<StoredEntry>> {
+pub(in crate::store::compute_platform_reference_price_curve) fn entry_by_id_on(
+    conn: &Connection,
+    entry_id: &str,
+) -> Result<Option<StoredEntry>> {
     let stored = raw_entry_on(conn, "WHERE entry_id=?1", params![entry_id])?;
     let Some(stored) = stored else {
         return Ok(None);

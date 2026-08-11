@@ -17,14 +17,14 @@ use super::super::{
 };
 use super::{batch_by_id_on, decode};
 
-pub(super) fn review_by_batch_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn review_by_batch_on(
     conn: &Connection,
     batch_id: &str,
 ) -> Result<Option<StoredReview>> {
     review_on(conn, "WHERE batch_id=?1", params![batch_id])
 }
 
-pub(super) fn review_by_idempotency_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn review_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,

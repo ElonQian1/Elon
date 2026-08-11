@@ -22,13 +22,13 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 mod validation;
 use validation::{snapshot_matches, validate_application_material, validate_binding_material};
-pub(super) fn application_by_batch_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn application_by_batch_on(
     conn: &Connection,
     batch_id: &str,
 ) -> Result<Option<StoredApplication>> {
     application_on(conn, "WHERE batch_id=?1", params![batch_id])
 }
-pub(super) fn application_by_idempotency_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn application_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,
@@ -39,7 +39,7 @@ pub(super) fn application_by_idempotency_on(
         params![scope, key],
     )
 }
-pub(super) fn bindings_by_application_on(
+pub(in crate::store::compute_platform_reference_price_curve) fn bindings_by_application_on(
     conn: &Connection,
     application_id: &str,
 ) -> Result<Vec<StoredSnapshotBinding>> {
