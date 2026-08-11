@@ -23,7 +23,7 @@ use super::{
 };
 
 impl Store {
-    pub(in crate::store) fn review_compute_platform_reference_price_curve_batch(
+    pub(crate) fn review_compute_platform_reference_price_curve_batch(
         &self,
         mut input: ReviewComputePlatformReferencePriceCurveBatch,
     ) -> Result<ComputePlatformReferencePriceCurveReviewReceipt> {

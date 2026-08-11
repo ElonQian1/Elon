@@ -32,7 +32,7 @@ use super::{
 };
 
 impl Store {
-    pub(in crate::store) fn apply_compute_platform_reference_price_curve_batch(
+    pub(crate) fn apply_compute_platform_reference_price_curve_batch(
         &self,
         mut input: ApplyComputePlatformReferencePriceCurveBatch,
     ) -> Result<ComputePlatformReferencePriceCurveApplicationReceipt> {

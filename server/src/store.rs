@@ -420,6 +420,16 @@ pub(crate) use compute_offer_lifecycle::DrainComputeOffer;
 pub(crate) use compute_offer_publications::PublishComputeOfferDraft;
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_offer_terminal::TerminateComputeOffer;
+pub(crate) use compute_platform_reference_price_curve::{
+    ApplyComputePlatformReferencePriceCurveBatch,
+    ComputePlatformReferencePriceCurveApplicationReceipt,
+    ComputePlatformReferencePriceCurveBatchDetailReceipt,
+    ComputePlatformReferencePriceCurveBatchReceipt,
+    ComputePlatformReferencePriceCurveReviewReceipt, ReviewComputePlatformReferencePriceCurveBatch,
+    SubmitComputePlatformReferencePriceCurveBatch,
+    PLATFORM_REFERENCE_PRICE_CURVE_APPLY_CONFIRMATION,
+    PLATFORM_REFERENCE_PRICE_CURVE_REVIEW_CONFIRMATION,
+};
 pub(crate) use compute_platform_settlement_account_view::ComputePlatformSettlementAccountView;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
 pub(crate) use compute_price_snapshot_validation::compute_price_snapshot_digest;

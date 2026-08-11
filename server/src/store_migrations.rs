@@ -260,6 +260,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (221, "外部矿池所有者申请、独立复核与不可变登记来源", crate::compute_external_pool_onboarding_migration::migration_v221),
     (222, "外部矿池 Adapter release 四眼复核与 staged admission", compute_external_pool_adapter_release::migration_v222),
     (223, "平台参考价格曲线四眼复核与 v171 Snapshot 来源", compute_platform_reference_price_curve::migration_v223),
+    (224, "修复平台参考价格曲线 TTL 整数时间门卫", compute_platform_reference_price_curve::migration_v224),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

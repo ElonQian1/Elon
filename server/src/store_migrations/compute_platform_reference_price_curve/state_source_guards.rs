@@ -131,8 +131,9 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
                AND review.reviewed_at<=NEW.quoted_at
                AND batch.valid_from<=NEW.quoted_at AND NEW.quoted_at<batch.valid_until
                AND NEW.quoted_at<NEW.expires_at AND NEW.expires_at<=batch.valid_until
-               AND julianday(NEW.expires_at)-julianday(NEW.quoted_at)
-                    <=batch.quote_ttl_seconds/86400.0
+               AND CAST(strftime('%s', NEW.expires_at) AS INTEGER)
+                    -CAST(strftime('%s', NEW.quoted_at) AS INTEGER)
+                    <=batch.quote_ttl_seconds
         )
         BEGIN
             SELECT RAISE(ABORT, 'platform reference price curve binding lacks exact approval');

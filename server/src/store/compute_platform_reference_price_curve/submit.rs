@@ -31,7 +31,7 @@ use super::{
 };
 
 impl Store {
-    pub(in crate::store) fn submit_compute_platform_reference_price_curve_batch(
+    pub(crate) fn submit_compute_platform_reference_price_curve_batch(
         &self,
         input: SubmitComputePlatformReferencePriceCurveBatch,
     ) -> Result<ComputePlatformReferencePriceCurveBatchReceipt> {
@@ -39,7 +39,9 @@ impl Store {
         validate_exact(&input.idempotency_key, "batch idempotency key", 160)?;
         let entry_set_digest =
             canonical_platform_reference_price_curve_entry_set_digest(&input.entries)?;
-        let material = batch_material(&input, entry_set_digest, String::new());
+        // The server timestamp is excluded from the material digest. Use the latest admissible
+        // submission time for shape validation, then validate the actual timestamp below.
+        let material = batch_material(&input, entry_set_digest, input.valid_from.clone());
         validate_platform_reference_price_curve_batch_material(&material)?;
         let material_digest =
             canonical_platform_reference_price_curve_batch_material_digest(&material)?;

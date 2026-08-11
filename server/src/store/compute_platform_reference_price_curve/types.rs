@@ -15,9 +15,9 @@ pub(super) const PLATFORM_REFERENCE_PRICE_CURVE_APPLICATION_SCHEMA: &str =
     "compute_federation.platform_reference_price_curve_application.v1";
 pub(super) const PLATFORM_REFERENCE_PRICE_CURVE_SNAPSHOT_BINDING_SCHEMA: &str =
     "compute_federation.platform_reference_price_curve_snapshot_binding.v1";
-pub(super) const PLATFORM_REFERENCE_PRICE_CURVE_REVIEW_CONFIRMATION: &str =
+pub(crate) const PLATFORM_REFERENCE_PRICE_CURVE_REVIEW_CONFIRMATION: &str =
     "confirm_platform_reference_price_curve_review";
-pub(super) const PLATFORM_REFERENCE_PRICE_CURVE_APPLY_CONFIRMATION: &str =
+pub(crate) const PLATFORM_REFERENCE_PRICE_CURVE_APPLY_CONFIRMATION: &str =
     "confirm_platform_reference_price_curve_apply";
 
 pub(super) const BATCH_STATUS_SUBMITTED: &str = "submitted";
@@ -26,7 +26,7 @@ pub(super) const REVIEW_DECISION_CHANGES_REQUESTED: &str = "changes_requested";
 pub(super) const REVIEW_DECISION_REJECTED: &str = "rejected";
 pub(super) const APPLICATION_STATUS_APPLIED: &str = "applied";
 pub(super) const SNAPSHOT_BINDING_STATUS_REGISTERED: &str = "snapshot_registered";
-pub(in crate::store) struct SubmitComputePlatformReferencePriceCurveBatch {
+pub(crate) struct SubmitComputePlatformReferencePriceCurveBatch {
     pub submitted_by_admin_user_id: String,
     pub curve_id: String,
     pub curve_version: i64,
@@ -41,7 +41,7 @@ pub(in crate::store) struct SubmitComputePlatformReferencePriceCurveBatch {
     pub submission_note: String,
     pub idempotency_scope: String,
 }
-pub(in crate::store) struct ReviewComputePlatformReferencePriceCurveBatch {
+pub(crate) struct ReviewComputePlatformReferencePriceCurveBatch {
     pub batch_id: String,
     pub expected_batch_digest: String,
     pub expected_batch_material_digest: String,
@@ -52,7 +52,7 @@ pub(in crate::store) struct ReviewComputePlatformReferencePriceCurveBatch {
     pub idempotency_scope: String,
     pub idempotency_key: String,
 }
-pub(in crate::store) struct ApplyComputePlatformReferencePriceCurveBatch {
+pub(crate) struct ApplyComputePlatformReferencePriceCurveBatch {
     pub batch_id: String,
     pub expected_batch_digest: String,
     pub expected_batch_material_digest: String,
@@ -65,7 +65,7 @@ pub(in crate::store) struct ApplyComputePlatformReferencePriceCurveBatch {
     pub idempotency_key: String,
 }
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ComputePlatformReferencePriceCurveEntryReceipt {
+pub(crate) struct ComputePlatformReferencePriceCurveEntryReceipt {
     pub schema: &'static str,
     pub batch_id: String,
     pub batch_digest: String,
@@ -77,7 +77,7 @@ pub(in crate::store) struct ComputePlatformReferencePriceCurveEntryReceipt {
     pub offer_version: i64,
 }
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ComputePlatformReferencePriceCurveBatchReceipt {
+pub(crate) struct ComputePlatformReferencePriceCurveBatchReceipt {
     pub schema: &'static str,
     pub batch_id: String,
     pub batch_digest: String,
@@ -89,11 +89,12 @@ pub(in crate::store) struct ComputePlatformReferencePriceCurveBatchReceipt {
     pub status: String,
     pub submitted_by_admin_user_id: String,
     pub submitted_at: String,
+    pub updated_at: String,
     pub replayed: bool,
     pub market_effect: &'static str,
 }
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ComputePlatformReferencePriceCurveReviewReceipt {
+pub(crate) struct ComputePlatformReferencePriceCurveReviewReceipt {
     pub schema: &'static str,
     pub review_id: String,
     pub review_digest: String,
@@ -110,7 +111,7 @@ pub(in crate::store) struct ComputePlatformReferencePriceCurveReviewReceipt {
     pub market_effect: &'static str,
 }
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ComputePlatformReferencePriceCurveSnapshotBindingReceipt {
+pub(crate) struct ComputePlatformReferencePriceCurveSnapshotBindingReceipt {
     pub schema: &'static str,
     pub binding_id: String,
     pub binding_digest: String,
@@ -132,7 +133,7 @@ pub(in crate::store) struct ComputePlatformReferencePriceCurveSnapshotBindingRec
     pub status: String,
 }
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ComputePlatformReferencePriceCurveApplicationReceipt {
+pub(crate) struct ComputePlatformReferencePriceCurveApplicationReceipt {
     pub schema: &'static str,
     pub application_id: String,
     pub application_digest: String,
@@ -157,6 +158,13 @@ pub(in crate::store) struct ComputePlatformReferencePriceCurveApplicationReceipt
     pub capacity_effect: &'static str,
     pub funds_effect: &'static str,
     pub settlement_effect: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct ComputePlatformReferencePriceCurveBatchDetailReceipt {
+    pub batch: ComputePlatformReferencePriceCurveBatchReceipt,
+    pub review: Option<ComputePlatformReferencePriceCurveReviewReceipt>,
+    pub application: Option<ComputePlatformReferencePriceCurveApplicationReceipt>,
 }
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -321,6 +329,7 @@ impl StoredBatch {
             status: self.status,
             submitted_by_admin_user_id: batch.submitted_by_admin_user_id,
             submitted_at: batch.submitted_at,
+            updated_at: self.updated_at,
             replayed,
             market_effect: "none",
         }

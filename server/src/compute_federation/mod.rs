@@ -18,6 +18,8 @@ pub(crate) mod legacy;
 pub(crate) mod market;
 pub(crate) mod offer;
 pub(crate) mod platform_reference_price_curve;
+pub(crate) mod platform_reference_price_curve_api;
+pub(crate) mod platform_reference_price_curve_service;
 pub(crate) mod provider;
 pub(crate) mod receipts;
 pub(crate) mod route_authority;
