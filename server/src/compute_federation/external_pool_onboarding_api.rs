@@ -3,12 +3,14 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
+use serde_json::json;
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
@@ -16,8 +18,8 @@ use crate::{
 };
 
 use super::external_pool_onboarding_service::{
-    self as service, ApplyExternalPoolOnboardingBody, ReviewExternalPoolOnboardingBody,
-    SubmitExternalPoolOnboardingBody,
+    self as service, ApplyExternalPoolOnboardingBody, CancelExternalPoolOnboardingBody,
+    ReviewExternalPoolOnboardingBody, SubmitExternalPoolOnboardingBody,
 };
 
 #[cfg(test)]
@@ -28,7 +30,31 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
             "/api/me/compute/external-pool-onboarding-requests",
-            post(submit_request),
+            get(list_owner_requests).post(submit_request),
+        )
+        .route(
+            "/api/me/compute/external-pool-onboarding-requests/:request_id",
+            get(get_owner_request),
+        )
+        .route(
+            "/api/me/compute/external-pool-onboarding-requests/:request_id/cancel",
+            post(cancel_owner_request),
+        )
+        .route(
+            "/api/me/compute/external-pool-onboarding-requests/:request_id/preflight",
+            get(preflight_owner_request),
+        )
+        .route(
+            "/api/admin/compute/external-pool-onboarding-requests",
+            get(list_admin_requests),
+        )
+        .route(
+            "/api/admin/compute/external-pool-onboarding-requests/:request_id",
+            get(get_admin_request),
+        )
+        .route(
+            "/api/admin/compute/external-pool-onboarding-requests/:request_id/preflight",
+            get(preflight_admin_request),
         )
         .route(
             "/api/admin/compute/external-pool-onboarding-requests/:request_id/review",
@@ -38,6 +64,119 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/external-pool-onboarding-requests/:request_id/application",
             post(apply_request),
         )
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    status: Option<String>,
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+async fn list_owner_requests(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let owner_user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    onboarding_response(
+        service::list_for_owner(
+            &state.store,
+            &owner_user_id,
+            query.status.as_deref(),
+            query.limit,
+        )
+        .map(|items| json!({"onboarding_requests": items})),
+    )
+}
+
+async fn get_owner_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    let owner_user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    onboarding_response(service::get_for_owner(
+        &state.store,
+        &owner_user_id,
+        &request_id,
+    ))
+}
+
+async fn cancel_owner_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(body): Json<CancelExternalPoolOnboardingBody>,
+) -> Response {
+    let owner_user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    onboarding_response(service::cancel_for_owner(
+        &state.store,
+        &owner_user_id,
+        &request_id,
+        body,
+    ))
+}
+
+async fn preflight_owner_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    let owner_user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    onboarding_response(service::preflight_for_owner(
+        &state.store,
+        &owner_user_id,
+        &request_id,
+    ))
+}
+
+async fn list_admin_requests(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    onboarding_response(
+        service::list_for_admin(&state.store, query.status.as_deref(), query.limit)
+            .map(|items| json!({"onboarding_requests": items})),
+    )
+}
+
+async fn get_admin_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    onboarding_response(service::get_for_admin(&state.store, &request_id))
+}
+
+async fn preflight_admin_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    onboarding_response(service::preflight_for_admin(&state.store, &request_id))
 }
 
 async fn submit_request(
@@ -104,10 +243,14 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
     if !matches!(user.role.as_str(), "admin" | "owner") {
         return Err(json_error(
             StatusCode::FORBIDDEN,
-            "只有平台管理员可以复核或应用 external-pool onboarding",
+            "只有平台管理员可以管理 external-pool onboarding",
         ));
     }
     Ok(user.id)
+}
+
+fn default_limit() -> usize {
+    50
 }
 
 fn onboarding_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {

@@ -407,7 +407,8 @@ pub(crate) use compute_external_pool_adapter_release::{
     EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
 };
 pub(crate) use compute_external_pool_onboarding::{
-    ApplyExternalPoolOnboarding, ExternalPoolOnboardingApplicationReceipt,
+    ApplyExternalPoolOnboarding, CancelExternalPoolOnboardingRequest,
+    ExternalPoolOnboardingApplicationReceipt, ExternalPoolOnboardingDetailReceipt,
     ExternalPoolOnboardingRequestReceipt, ExternalPoolOnboardingReviewReceipt,
     ReviewExternalPoolOnboardingRequest, SubmitExternalPoolOnboardingRequest,
     EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION,

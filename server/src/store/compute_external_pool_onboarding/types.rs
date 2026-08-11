@@ -38,6 +38,12 @@ pub(crate) struct ApplyExternalPoolOnboarding {
     pub idempotency_key: String,
 }
 
+pub(crate) struct CancelExternalPoolOnboardingRequest {
+    pub request_id: String,
+    pub expected_request_digest: String,
+    pub owner_user_id: String,
+}
+
 #[derive(Clone, Serialize)]
 pub(crate) struct ExternalPoolOnboardingRequestReceipt {
     pub schema: &'static str,
@@ -50,6 +56,8 @@ pub(crate) struct ExternalPoolOnboardingRequestReceipt {
     pub credential_ref_present: bool,
     pub credential_hint: Option<String>,
     pub requested_at: String,
+    pub updated_at: String,
+    pub canceled_at: Option<String>,
     pub replayed: bool,
     pub onboarding_effect: &'static str,
 }
@@ -89,6 +97,13 @@ pub(crate) struct ExternalPoolOnboardingApplicationReceipt {
     pub applied_at: String,
     pub replayed: bool,
     pub onboarding_effect: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct ExternalPoolOnboardingDetailReceipt {
+    pub request: ExternalPoolOnboardingRequestReceipt,
+    pub review: Option<ExternalPoolOnboardingReviewReceipt>,
+    pub application: Option<ExternalPoolOnboardingApplicationReceipt>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -161,6 +176,8 @@ pub(super) struct StoredRequest {
     pub target_provider_jcs: String,
     pub target_provider_registry_json: String,
     pub status: String,
+    pub updated_at: String,
+    pub canceled_at: Option<String>,
     pub idempotency_scope: String,
     pub idempotency_key: String,
 }

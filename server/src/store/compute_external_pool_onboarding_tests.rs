@@ -25,9 +25,10 @@ use crate::{
 };
 
 use super::types::{
-    ApplyExternalPoolOnboarding, ReviewExternalPoolOnboardingRequest,
-    SubmitExternalPoolOnboardingRequest, EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION,
-    REVIEW_DECISION_APPROVED, REVIEW_DECISION_CHANGES_REQUESTED,
+    ApplyExternalPoolOnboarding, CancelExternalPoolOnboardingRequest,
+    ReviewExternalPoolOnboardingRequest, SubmitExternalPoolOnboardingRequest,
+    EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION, REVIEW_DECISION_APPROVED,
+    REVIEW_DECISION_CHANGES_REQUESTED,
 };
 
 const OWNER: &str = "external-pool-owner";
@@ -338,5 +339,80 @@ fn owner_review_and_non_approval_cannot_register_provider() {
         .to_string()
         .contains("conflicts with immutable history"));
     drop(store);
+    remove_store_files(&path);
+}
+
+#[test]
+fn owner_cancel_and_management_queries_survive_reopen() {
+    let (store, path) = temporary_store();
+    let request = store
+        .submit_external_pool_onboarding_request(submit_input("cancel"))
+        .expect("owner request submits");
+    assert_eq!(
+        store
+            .list_external_pool_onboarding_requests_for_owner(OWNER, Some("submitted"), 10,)
+            .expect("owner list reads")
+            .len(),
+        1
+    );
+    assert_eq!(
+        store
+            .list_external_pool_onboarding_requests_for_admin(None, 10)
+            .expect("admin list reads")
+            .len(),
+        1
+    );
+    assert!(store
+        .cancel_external_pool_onboarding_request(CancelExternalPoolOnboardingRequest {
+            request_id: request.request_id.clone(),
+            expected_request_digest: request.request_digest.clone(),
+            owner_user_id: "different-owner".to_string(),
+        })
+        .is_err());
+
+    let canceled = store
+        .cancel_external_pool_onboarding_request(CancelExternalPoolOnboardingRequest {
+            request_id: request.request_id.clone(),
+            expected_request_digest: request.request_digest.clone(),
+            owner_user_id: OWNER.to_string(),
+        })
+        .expect("owner cancels submitted request");
+    assert_eq!(canceled.status, "canceled");
+    assert!(canceled.canceled_at.is_some());
+    assert!(!canceled.replayed);
+    let replayed = store
+        .cancel_external_pool_onboarding_request(CancelExternalPoolOnboardingRequest {
+            request_id: request.request_id.clone(),
+            expected_request_digest: request.request_digest.clone(),
+            owner_user_id: OWNER.to_string(),
+        })
+        .expect("cancel replay reads existing state");
+    assert_eq!(replayed.canceled_at, canceled.canceled_at);
+    assert!(replayed.replayed);
+    assert!(store
+        .review_external_pool_onboarding_request(review_input(
+            &request.request_id,
+            &request.request_digest,
+            REVIEW_DECISION_APPROVED,
+        ))
+        .is_err());
+    drop(store);
+
+    let reopened = Store::open(&path).expect("store reopens");
+    let detail = reopened
+        .external_pool_onboarding_request(&request.request_id)
+        .expect("canceled detail survives reopen");
+    assert_eq!(detail.request.status, "canceled");
+    assert_eq!(detail.request.canceled_at, canceled.canceled_at);
+    assert!(detail.review.is_none());
+    assert!(detail.application.is_none());
+    assert_eq!(
+        reopened
+            .list_external_pool_onboarding_requests_for_owner(OWNER, Some("canceled"), 10,)
+            .expect("canceled owner list survives reopen")
+            .len(),
+        1
+    );
+    drop(reopened);
     remove_store_files(&path);
 }

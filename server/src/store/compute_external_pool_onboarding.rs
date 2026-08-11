@@ -3,7 +3,9 @@
 //! The owner/admin service/API may call these facades. They do not mint v213 route authority.
 
 mod apply;
+mod cancel;
 mod canonical;
+mod query;
 mod read;
 mod review;
 mod submit;
@@ -14,7 +16,8 @@ mod types;
 mod tests;
 
 pub(crate) use types::{
-    ApplyExternalPoolOnboarding, ExternalPoolOnboardingApplicationReceipt,
+    ApplyExternalPoolOnboarding, CancelExternalPoolOnboardingRequest,
+    ExternalPoolOnboardingApplicationReceipt, ExternalPoolOnboardingDetailReceipt,
     ExternalPoolOnboardingRequestReceipt, ExternalPoolOnboardingReviewReceipt,
     ReviewExternalPoolOnboardingRequest, SubmitExternalPoolOnboardingRequest,
     EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION,

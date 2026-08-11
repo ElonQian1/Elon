@@ -52,7 +52,8 @@ fn request_on<P: rusqlite::Params>(
         .query_row(
             &format!(
                 "SELECT request_json, target_provider_digest, target_provider_jcs,
-                        target_provider_registry_json, status, idempotency_scope, idempotency_key
+                        target_provider_registry_json, status, updated_at, canceled_at,
+                        idempotency_scope, idempotency_key
                    FROM compute_external_pool_onboarding_requests {filter}"
             ),
             parameters,
@@ -76,8 +77,10 @@ fn request_on<P: rusqlite::Params>(
                     target_provider_jcs: row.get(2)?,
                     target_provider_registry_json: row.get(3)?,
                     status: row.get(4)?,
-                    idempotency_scope: row.get(5)?,
-                    idempotency_key: row.get(6)?,
+                    updated_at: row.get(5)?,
+                    canceled_at: row.get(6)?,
+                    idempotency_scope: row.get(7)?,
+                    idempotency_key: row.get(8)?,
                 })
             },
         )
@@ -391,6 +394,8 @@ pub(super) fn request_receipt(
             .is_some(),
         credential_hint: request.credential_intent.credential_hint.clone(),
         requested_at: request.submitted_at.clone(),
+        updated_at: stored.updated_at,
+        canceled_at: stored.canceled_at,
         replayed,
         onboarding_effect: "none",
     }
