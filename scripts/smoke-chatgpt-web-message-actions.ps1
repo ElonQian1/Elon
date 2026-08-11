@@ -146,9 +146,8 @@ try {
     Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
     $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
         -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
-    if ([int]$origin.adapter_version -ne $ExpectedAdapterVersion) {
-        throw "Unexpected ChatGPT adapter version."
-    }
+    Assert-ChatGptWebSmokeAdapterVersion -State $origin `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion
     if ([int]$origin.conversation.message_count -lt 1) {
         throw "A conversation with at least one rendered message is required."
     }

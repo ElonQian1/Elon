@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
-    [ValidateRange(1, 10)][int]$PollIntervalSec = 2
+    [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +23,7 @@ $common = @{
     ExpectedHardwareSerial = $ExpectedHardwareSerial
     ReadyTimeoutSec = $ReadyTimeoutSec
     PollIntervalSec = $PollIntervalSec
+    ExpectedAdapterVersion = $ExpectedAdapterVersion
 }
 $pinned = @{} + $common
 $pinned.ExpectedHardwareSerial = $ExpectedHardwareSerial

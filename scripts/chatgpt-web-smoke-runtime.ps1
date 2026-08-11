@@ -91,6 +91,18 @@ function Assert-ChatGptWebSmokeTrustedDevice {
     Assert-ChatGptWebSmokeDevice -Runtime $Runtime
 }
 
+function Assert-ChatGptWebSmokeAdapterVersion {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)][ValidateRange(1, 9999)][int]$ExpectedAdapterVersion
+    )
+
+    $actual = [int]$State.adapter_version
+    if ($actual -ne $ExpectedAdapterVersion) {
+        throw "Unexpected ChatGPT adapter version: expected=$ExpectedAdapterVersion actual=$actual."
+    }
+}
+
 function Get-ChatGptWebSmokeDisplayState {
     param([Parameter(Mandatory = $true)]$Runtime)
 

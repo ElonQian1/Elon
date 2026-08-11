@@ -15,6 +15,8 @@ function Assert-Contains {
 
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features"'
 Assert-Contains 'ExpectedHardwareSerial'
+Assert-Contains 'ExpectedAdapterVersion'
+Assert-Contains 'Assert-ChatGptWebSmokeAdapterVersion -State $state'
 Assert-Contains 'Start-ChatGptWebSmokeAwakeLease'
 Assert-Contains 'Stop-ChatGptWebSmokeAwakeLease'
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'

@@ -8,6 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54,
     [switch]$SendProbe,
     [string]$ProbeMarker = ""
 )
@@ -347,6 +348,8 @@ $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT We
         $value.bridge_state -eq "ready" -and
         $value.activity_bound -eq $true
 }
+Assert-ChatGptWebSmokeAdapterVersion -State $state `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
 $topResumedActivity = Wait-ChatGptActivityForeground
 $officialUiXml = Get-VisibleUiXml
 
@@ -368,7 +371,9 @@ foreach ($chromeId in @("chatGptWebToolbar", "chatGptWebStatus", "chatGptModeTog
 Add-Check "bridge_ready" ($state.bridge_state -eq "ready") ([string]$state.bridge_state)
 Add-Check "authenticated" ($state.authenticated -eq $true) ([string]$state.authenticated)
 Add-Check "composer_ready" ($state.composer_ready -eq $true) ([string]$state.composer_ready)
-Add-Check "adapter_version" ([int]$state.adapter_version -ge 6) ([string]$state.adapter_version)
+Add-Check "adapter_version" (
+    [int]$state.adapter_version -eq $ExpectedAdapterVersion
+) ([string]$state.adapter_version)
 
 $matrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
 $blockingGaps = @($matrix.blocking_gaps)

@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $path = Join-Path $PSScriptRoot "smoke-chatgpt-web-safe-batch.ps1"
+$runtimePath = Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1"
 $source = Get-Content -LiteralPath $path -Raw
 $tokens = $null
 $parseErrors = $null
@@ -13,11 +14,25 @@ if ($parseErrors.Count -gt 0) {
     throw "ChatGPT Web safe batch has PowerShell parse errors: $($parseErrors[0].Message)"
 }
 
+. $runtimePath
+$adapterState = [pscustomobject]@{ adapter_version = 54 }
+Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 54
+$mismatchRejected = $false
+try {
+    Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 55
+} catch {
+    $mismatchRejected = $_.Exception.Message -match 'expected=55 actual=54'
+}
+if (-not $mismatchRejected) {
+    throw "ChatGPT Web adapter version mismatch was not rejected."
+}
+
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Start-ChatGptWebSmokeAwakeLease",
     "Stop-ChatGptWebSmokeAwakeLease",
     "ExpectedHardwareSerial = `$ExpectedHardwareSerial",
+    "ExpectedAdapterVersion = `$ExpectedAdapterVersion",
     'id = "read_only_surface"',
     'id = "feature_pages"',
     'id = "session_recovery"',

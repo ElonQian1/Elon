@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(15, 180)][int]$ReadyTimeoutSec = 90,
-    [ValidateRange(1, 10)][int]$PollIntervalSec = 2
+    [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,7 +18,7 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 
 function Wait-ReadySession {
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+    $state = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
         -Description "restored authenticated ChatGPT session" -Predicate {
             param($state)
             $state.surface -eq "chatgpt_web" -and
@@ -26,6 +27,9 @@ function Wait-ReadySession {
                 $state.authenticated -eq $true -and
                 $state.composer_ready -eq $true
         }
+    Assert-ChatGptWebSmokeAdapterVersion -State $state `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion
+    return $state
 }
 
 function Get-AppPid {

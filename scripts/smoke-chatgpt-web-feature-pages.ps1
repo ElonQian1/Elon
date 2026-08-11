@@ -8,7 +8,8 @@ param(
     [ValidateRange(10, 300)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(30, 600)][int]$TotalTimeoutSec = 180,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 12)][int]$MaxFeaturePages = 8
+    [ValidateRange(1, 12)][int]$MaxFeaturePages = 8,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54
 )
 
 $ErrorActionPreference = "Stop"
@@ -155,6 +156,8 @@ if ([string]$origin.view_mode -ne "official") {
     $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
         -TimeoutSec $officialReadySec -InitialWaitSec ([Math]::Min(5, $officialReadySec))
 }
+Assert-ChatGptWebSmokeAdapterVersion -State $origin `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originPageKind = [string]$origin.page_kind
 $originPath = Get-ObservedPath -State $origin
 

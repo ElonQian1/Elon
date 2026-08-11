@@ -26,6 +26,10 @@ foreach ($path in @($smokePath, $runtimePath, $policyPath)) {
 
 Assert-Contains $smoke "ExpectedHardwareSerial" `
     "Feature-page smoke must pin a wireless device to its hardware identity."
+Assert-Contains $smoke "ExpectedAdapterVersion" `
+    "Feature-page smoke must pin the expected adapter contract."
+Assert-Contains $smoke "Assert-ChatGptWebSmokeAdapterVersion -State `$origin" `
+    "Feature-page smoke must reject an unexpected adapter version."
 Assert-Contains $smoke "Assert-ChatGptWebSmokeTrustedDevice" `
     "Feature-page smoke must verify the pinned physical device."
 Assert-Contains $runtime "function Wait-ChatGptWebSmokeAuthenticatedReady" `

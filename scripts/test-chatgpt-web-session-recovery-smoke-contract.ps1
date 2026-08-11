@@ -5,6 +5,8 @@ $source = Get-Content -LiteralPath $path -Raw
 
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "ExpectedAdapterVersion",
+    "Assert-ChatGptWebSmokeAdapterVersion",
     "Wait-ReadySession",
     'Invoke-ElonNativeCommand -FilePath $runtime.adb',
     'if ($result.ExitCode -eq 1 -and -not $result.TimedOut) { return "" }',

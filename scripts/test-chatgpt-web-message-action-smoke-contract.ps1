@@ -17,6 +17,7 @@ if (@($errors).Count -gt 0) {
 $required = @(
     "ExpectedHardwareSerial",
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "Assert-ChatGptWebSmokeAdapterVersion",
     "Dismiss-VisibleOverlays",
     "Restore-OriginalViewMode",
     'view_mode = "official"',
