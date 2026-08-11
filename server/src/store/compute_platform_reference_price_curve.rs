@@ -16,7 +16,7 @@ mod snapshot;
 mod submit;
 mod types;
 
-pub(super) use types::ComputePlatformReferencePriceCurveSnapshotBindingReceipt;
+pub(crate) use types::ComputePlatformReferencePriceCurveSnapshotBindingReceipt;
 pub(crate) use types::{
     ApplyComputePlatformReferencePriceCurveBatch,
     ComputePlatformReferencePriceCurveApplicationReceipt,

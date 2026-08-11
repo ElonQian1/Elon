@@ -190,11 +190,12 @@ pub(super) fn due_commitment_ids_on(
           ORDER BY commitments.expires_at, commitments.commitment_id
           LIMIT ?2",
     )?;
-    Ok(statement
+    let commitment_ids = statement
         .query_map(params![recorded_at, limit as i64], |row| {
             row.get::<_, String>(0)
         })?
-        .collect::<rusqlite::Result<Vec<_>>>()?)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(commitment_ids)
 }
 
 fn audit_commitment_indexes_on(conn: &Connection, value: &ComputeCapacityCommitment) -> Result<()> {

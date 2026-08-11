@@ -435,8 +435,9 @@ pub(crate) use compute_platform_reference_price_curve::{
     ComputePlatformReferencePriceCurveApplicationReceipt,
     ComputePlatformReferencePriceCurveBatchDetailReceipt,
     ComputePlatformReferencePriceCurveBatchReceipt,
-    ComputePlatformReferencePriceCurveReviewReceipt, ReviewComputePlatformReferencePriceCurveBatch,
-    SubmitComputePlatformReferencePriceCurveBatch,
+    ComputePlatformReferencePriceCurveReviewReceipt,
+    ComputePlatformReferencePriceCurveSnapshotBindingReceipt,
+    ReviewComputePlatformReferencePriceCurveBatch, SubmitComputePlatformReferencePriceCurveBatch,
     PLATFORM_REFERENCE_PRICE_CURVE_APPLY_CONFIRMATION,
     PLATFORM_REFERENCE_PRICE_CURVE_REVIEW_CONFIRMATION,
 };

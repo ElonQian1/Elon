@@ -1,5 +1,9 @@
 //! Authenticated HTTP surface for local Provider Capacity Commitments.
 
+#[cfg(test)]
+#[path = "capacity_commitment_api_tests.rs"]
+mod tests;
+
 use std::sync::Arc;
 
 use axum::{

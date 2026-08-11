@@ -1,5 +1,12 @@
 //! Owner and administrator orchestration for Provider Capacity Commitments.
 
+#[cfg(test)]
+#[path = "capacity_commitment_test_support.rs"]
+pub(crate) mod test_support;
+#[cfg(test)]
+#[path = "capacity_commitment_store_tests.rs"]
+mod tests;
+
 use anyhow::{bail, Result};
 use serde::Deserialize;
 
