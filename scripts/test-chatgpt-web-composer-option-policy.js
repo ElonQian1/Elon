@@ -23,8 +23,13 @@ assert.deepEqual(policy.filter('tools', [
 assert.deepEqual(policy.filter('model', [
   option('自动', 'menuitemradio'),
   option('5.6 Sol轻度', 'menuitemradio'),
-  option('GPT-5 Thinking', 'option')
-]).map((value) => value.label), ['自动', '5.6 Sol轻度', 'GPT-5 Thinking']);
+  option('GPT-5 Thinking', 'option'),
+  option('能力'),
+  option('推理强度 中'),
+  option('速度 标准')
+]).map((value) => value.label), [
+  '自动', '5.6 Sol轻度', 'GPT-5 Thinking', '能力', '推理强度 中', '速度 标准'
+]);
 
 assert.deepEqual(policy.filter('tools', [
   option('相机'),

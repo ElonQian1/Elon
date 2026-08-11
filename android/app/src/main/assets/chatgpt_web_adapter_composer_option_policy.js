@@ -1,14 +1,14 @@
 (function (root, factory) {
   'use strict';
 
-  const policy = factory();
+  const policy = factory(root && root.__elonChatGptModelLabelPolicy);
   if (typeof module === 'object' && module.exports) module.exports = policy;
   if (root) root.__elonChatGptComposerOptionPolicy = Object.freeze(policy);
-})(typeof window === 'object' ? window : null, function () {
+})(typeof window === 'object' ? window : null, function (modelLabelPolicy) {
   'use strict';
 
   const FOREIGN_MENU_LABEL = /download\s+chatgpt|chatgpt\s+(desktop|mobile)|settings?|personalization|profile|log\s*out|sign\s*out|help|account|下载\s*chatgpt|桌面版|移动版|设置|个性化|个人资料|退出登录|帮助|账户|帐户|账号/iu;
-  const MODEL_LABEL = /\b(gpt(?:-?[0-9a-z.]+)?|o[1-9](?:-[a-z0-9.]+)?|auto|instant|thinking|fast)\b|sol(?:轻度|重度)?|模型|自动|快速|思考|轻度|重度/iu;
+  const MODEL_LABEL = /\b(gpt(?:-?[0-9a-z.]+)?|o[1-9](?:-[a-z0-9.]+)?|auto|instant|thinking|fast)\b|sol(?:轻度|重度)?|模型|能力|自动|快速|速度|思考|推理|轻度|标准|中度|重度|极高/iu;
   const OPTION_ROLES = new Set(['menuitem', 'menuitemcheckbox', 'menuitemradio', 'option']);
 
   function clean(value) {
@@ -24,7 +24,10 @@
     const role = clean(candidate && candidate.role).toLowerCase();
     if (!label || isForeignMenuLabel(label)) return false;
     if (section === 'model') {
-      return role === 'menuitemradio' || role === 'option' || MODEL_LABEL.test(label);
+      const sharedModelMatch = modelLabelPolicy &&
+        typeof modelLabelPolicy.isModelLabel === 'function' &&
+        modelLabelPolicy.isModelLabel(label);
+      return role === 'menuitemradio' || role === 'option' || sharedModelMatch || MODEL_LABEL.test(label);
     }
     return section === 'tools' && (OPTION_ROLES.has(role) || !!(candidate && candidate.selectable));
   }
