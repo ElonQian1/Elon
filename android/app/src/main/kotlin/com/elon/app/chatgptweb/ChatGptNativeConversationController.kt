@@ -1,8 +1,5 @@
 package com.elon.app.chatgptweb
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.graphics.Rect
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -21,6 +18,7 @@ internal class ChatGptNativeConversationController(
     private val sendButton: ImageButton,
     private val stopButton: ImageButton,
     private val newConversationButton: ImageButton,
+    private val messageClipboard: ChatGptMessageClipboard,
     private val onSend: (String, String, String?) -> Unit,
     onStop: () -> Unit,
     onNewConversation: () -> Unit,
@@ -188,8 +186,7 @@ internal class ChatGptNativeConversationController(
     }
 
     private fun copyMessage(message: ChatGptWebMessage) {
-        val clipboard = messagesView.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("ChatGPT message", message.content))
+        messageClipboard.copy(message.content)
         Toast.makeText(messagesView.context, R.string.chatgpt_message_copied, Toast.LENGTH_SHORT).show()
     }
 

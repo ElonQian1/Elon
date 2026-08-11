@@ -7,9 +7,14 @@ import org.junit.Test
 
 class ChatGptWebCapabilityMatrixTest {
     @Test
-    fun advertisesDedicatedRegenerateAction() {
+    fun advertisesDedicatedMessageActions() {
         val rows = ChatGptWebCapabilityMatrix.build(
-            snapshot = snapshot(setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE)),
+            snapshot = snapshot(
+                setOf(
+                    ChatGptWebCapabilityId.MESSAGE_COPY,
+                    ChatGptWebCapabilityId.MESSAGE_REGENERATE,
+                ),
+            ),
             manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
             mode = ChatGptWebModeController.Mode.NATIVE,
@@ -17,9 +22,14 @@ class ChatGptWebCapabilityMatrixTest {
         val regenerate = (0 until rows.length())
             .map(rows::getJSONObject)
             .single { it.getString("id") == ChatGptWebCapabilityId.MESSAGE_REGENERATE }
+        val copy = (0 until rows.length())
+            .map(rows::getJSONObject)
+            .single { it.getString("id") == ChatGptWebCapabilityId.MESSAGE_COPY }
 
         assertTrue(regenerate.getBoolean("observed"))
         assertEquals("chatgpt_regenerate_response", regenerate.getString("mcp_action"))
+        assertTrue(copy.getBoolean("observed"))
+        assertEquals("chatgpt_copy_last_response", copy.getString("mcp_action"))
     }
 
     @Test

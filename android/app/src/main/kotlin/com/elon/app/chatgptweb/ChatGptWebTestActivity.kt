@@ -45,6 +45,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var fileChooserController: ChatGptWebFileChooserController
     private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
     private val sessionRestorer by lazy { ChatGptWebSessionRestorer(this) }
+    private val messageClipboard by lazy { ChatGptMessageClipboard(this) }
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private var latestSnapshot: ChatGptWebSnapshot? = null
@@ -135,6 +136,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             bridgeState = { latestBridgeState },
             mode = { latestMode },
             inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },
+            copyMessage = messageClipboard::copy,
             setInputText = { text ->
                 binding.chatGptNativeComposer.setText(text)
                 binding.chatGptNativeComposer.setSelection(text.length)
@@ -211,6 +213,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             sendButton = binding.chatGptNativeSend,
             stopButton = binding.chatGptNativeComposerStop,
             newConversationButton = binding.chatGptNativeNew,
+            messageClipboard = messageClipboard,
             onSend = { prompt, expectedDraft, requestId ->
                 pageAdapter.sendPrompt(prompt, expectedDraft, requestId)
             },

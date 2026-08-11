@@ -210,7 +210,7 @@ internal object ChatGptWebCapabilityMatrix {
         Definition(ChatGptWebCapabilityId.DICTATION, true, "chatgpt_invoke_control"),
         Definition(ChatGptWebCapabilityId.GOOGLE_LOGIN_ENTRY, true, "chatgpt_select_view"),
         Definition(ChatGptWebCapabilityId.RICH_TEXT, true, "chatgpt_get_context"),
-        Definition(ChatGptWebCapabilityId.MESSAGE_COPY, true, "chatgpt_invoke_control"),
+        Definition(ChatGptWebCapabilityId.MESSAGE_COPY, true, "chatgpt_copy_last_response"),
         Definition(ChatGptWebCapabilityId.MESSAGE_REGENERATE, true, "chatgpt_regenerate_response"),
         Definition(ChatGptWebCapabilityId.FEATURE_NAVIGATION, true, "chatgpt_get_navigation"),
         Definition(ChatGptWebCapabilityId.COMPLEX_OUTPUT, true, "chatgpt_get_context"),

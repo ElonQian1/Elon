@@ -396,9 +396,8 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "message_copy",
             group = "messages",
-            status = ImplementationStatus.PARTIAL,
             acceptance = Acceptance.INTERACTIVE_DEVICE,
-            mcpActions = listOf("chatgpt_invoke_control"),
+            mcpActions = listOf("chatgpt_copy_last_response"),
             capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_COPY),
             semantics = setOf("copy"),
             remainingGap = "clipboard_device_acceptance_without_content_logging",

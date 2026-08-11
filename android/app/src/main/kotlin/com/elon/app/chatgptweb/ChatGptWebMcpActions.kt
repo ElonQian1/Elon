@@ -12,6 +12,9 @@ internal class ChatGptWebMcpActions(
     private val mode: () -> ChatGptWebModeController.Mode,
     private val inputText: () -> String,
     private val setInputText: (String) -> Unit,
+    private val copyMessage: (String) -> ChatGptClipboardMetadata = {
+        ChatGptClipboardMetadata(false, 0, emptySet())
+    },
     private val commands: ChatGptWebMcpCommandPort,
     private val refresh: () -> Unit,
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
@@ -158,6 +161,7 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
+            "chatgpt_copy_last_response" -> return ChatGptWebCopyAction.execute(snapshot(), copyMessage)
             "chatgpt_regenerate_response" -> {
                 val current = snapshot()
                 if (current?.streaming == true) return error(action, "generation_in_progress")
@@ -753,6 +757,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_control_expanded",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_copy_last_response",
             "chatgpt_regenerate_response",
             "chatgpt_start_dictation",
             "chatgpt_cancel_dictation",
