@@ -40,7 +40,7 @@ owners: backend, node, ai-economy
 | 共享 CapacityPool 与追加式容量账本 | v165-v168 Supply/Claim 与 v173 Claim 历史已在 Supply、Offer 和 Broker 定向链中执行临时 SQLite 全量迁移；Broker 测试验证 held 与 release 回流。并发、到期批处理、生产磁盘和真实节点仍未验证 |
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；进程内 HTTP/MCP 与 Offer 文件重开已验证，并发和生产磁盘仍未验证 |
 | Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP/MCP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，PC `/compute-reference-curves` 已通过跨层契约、严格类型、lint、生产构建和 bundle budget。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本与部署仍未验证，状态为 `implementation_partially_verified` |
-| Provider Capacity Commitment v225 | `implementation_uncompiled/implementation_unrun`：immutable revision 1 `committed` 主表、unique revision 2 `canceled|expired` terminal receipt、Store 原子 create/read/cancel/expire、generic bypass 封口与 owner/admin HTTP 源码均已接线；状态由 LEFT JOIN 派生，数量/余额仍复用同一 Claim lines/ledger。Create 绑定 current Provider/Offer/Pool、`capacity_future` v171 与 exact v223 reference binding。仅有静态门卫证据，未编译、未测试、未迁移、未运行 |
+| Provider Capacity Commitment v225 | `implementation_partially_verified`：immutable `committed` 主事实、唯一 `canceled|expired` terminal receipt、Store 原子 create/read/cancel/expire、generic bypass 与 owner/admin HTTP 已接线；数量/余额复用同一 Claim/ledger。生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过；真实 TCP、生产升级、跨连接并发及交付结算未验证 |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -183,7 +183,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`；v223/v224 application 已在一个事务中直接登记既有 v171 Snapshot，并通过管理员 HTTP、迁移与文件重开专项。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md) 与 [`platform-reference-price-curve-api-acceptance.md`](platform-reference-price-curve-api-acceptance.md)。
 
-v225 Provider Capacity Commitment 的静态源码合同已接线，详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。它只允许本地 current Provider/Offer/Pool 在 exact `capacity_future` v171 Snapshot 与已批准应用的 v223 binding 下，把同一 Claim/ledger 的完整 meter/window 从 available 锁到 held，再以唯一 canceled/expired receipt 原子归还；不包含 `external_pool`、DeliveryAllocation、资金、结算或 staging。当前状态为 `implementation_uncompiled/implementation_unrun`，未编译、未测试、未执行迁移、未运行。
+v225 Provider Capacity Commitment 详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md) 与 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。它只允许本地 current Provider/Offer/Pool 在 exact `capacity_future` v171 Snapshot 与已批准应用的 v223 binding 下，把同一 Claim/ledger 的完整 meter/window 从 available 锁到 held，再以唯一 canceled/expired receipt 原子归还；不包含 `external_pool`、DeliveryAllocation、资金或结算。当前为 `implementation_partially_verified`：生产目标、临时 SQLite、进程内 HTTP 和重开已有定向证据，真实 TCP、生产升级和并发压力未验证。
 
 ## 当前工程指令
 

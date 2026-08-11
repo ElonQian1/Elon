@@ -62,7 +62,7 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 | `reservation_released` | `held -> available` | 取消或显式释放 |
 | `reservation_expired` | `held -> available` | 到期恢复器 |
 
-v225 CapacityCommitment 静态源码已接线：Create 使用独立 `capacity_commitment` claim kind 和 `compute_capacity_commitment` subject，把完整 meter/window 以既有 `reservation_held` 从 `available` 移到 `held`；Cancel/Expire 分别复用 `reservation_released`/`reservation_expired` 归还。Commitment 不复制数量或余额，数量仍只读 exact Claim lines，余额仍只读 ledger。当前为 `implementation_uncompiled/implementation_unrun`；DeliveryAllocation、Claim 归属转移和 Attempt 激活不属于 v225，见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。
+v225 CapacityCommitment 已接线并完成部分验证：Create 使用独立 `capacity_commitment` claim kind 和 `compute_capacity_commitment` subject，把完整 meter/window 以既有 `reservation_held` 从 `available` 移到 `held`；Cancel/Expire 分别复用 `reservation_released`/`reservation_expired` 归还。Commitment 不复制数量或余额，数量仍只读 exact Claim lines，余额仍只读 ledger。生产目标、临时 SQLite、进程内 HTTP 和磁盘重开已有定向证据；DeliveryAllocation、Claim 归属转移和 Attempt 激活不属于 v225，见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。
 
 ## 4. 原子 Reserve
 

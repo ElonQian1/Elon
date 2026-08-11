@@ -2,8 +2,8 @@
 title: Provider Capacity Commitment v225 权威
 status: current
 design_status: design_frozen
-implementation_status: implementation_uncompiled
-reviewed_at: 2026-08-11
+implementation_status: implementation_partially_verified
+reviewed_at: 2026-08-12
 owners: backend, ai-economy
 ---
 
@@ -11,7 +11,7 @@ owners: backend, ai-economy
 
 ## 1. 状态与最窄目标
 
-v225 已写入 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的静态闭环。设计状态保持 `design_frozen`，实现状态为 `implementation_uncompiled` / `implementation_unrun`：领域模型、v225 两表与门卫、Store 原子 create/read/cancel/expire、通用 Claim 旁路封口、owner/admin Service 与 HTTP 路由源码均已接线；截至 2026-08-11，未编译、未执行测试或迁移、未启动服务，也未形成生产数据库、并发或真实 HTTP 验收证据。
+v225 已写入 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的最窄闭环。设计状态保持 `design_frozen`，实现状态提升为 `implementation_partially_verified`：领域模型、v225 两表与门卫、Store 原子 create/read/cancel/expire、通用 Claim 旁路封口、owner/admin Service 与 HTTP 路由均已接线；截至 2026-08-12，`elon-server` 生产目标编译及 3 项 Store/Service/进程内 HTTP 定向测试通过，新建临时 SQLite 可执行全量迁移，磁盘重开可恢复终态。真实 TCP、生产升级、并发压力、后台任务和交付结算仍未验证。
 
 该纵切面复用 v165-v168/v173 的 Claim 与容量账本、v169 Provider、v170 Offer、v171 Price Snapshot，以及 v223/v224 已审核的平台 reference binding。它不依赖节点插件/VFS、真实任务运行、verified metering、Delivery Allocation、资金或结算。
 
@@ -103,7 +103,7 @@ Expire 只供平台 admin 恢复入口使用。候选来自 commitment LEFT JOIN
 
 ## 8. Generic bypass 封口
 
-当前 v225 源码已同时完成三道门卫，但在编译、迁移和运行验收前仍不得宣告生产闭环：
+当前 v225 已验证以下三道 generic bypass 门卫；这不把相邻交付与结算链升级为生产闭环：
 
 - public generic Hold 拒绝 `capacity_commitment` claim kind 或 `compute_capacity_commitment` subject；只有 Create 外层事务可调用 private Hold kernel；
 - public generic Finish 像 Reservation 一样拒绝 Commitment；只有校验 exact commitment/Claim/原 held causal binding 的专用 wrapper 可 release/expire；
@@ -126,4 +126,4 @@ P0 仍只包含领域合同、v225 migration、Store create/read/terminal、通�
 
 P0 明确禁止：`external_pool`；DeliveryAllocation；Order/Trade/Position/ClearingReceipt；资金预授权、收费、Provider 收益、保证资源、处罚、结算或清算；Job/Reservation/Attempt/Lease 修改；真实价格/index/mark/trade 声明；节点插件、VFS、artifact、route、派发或 verified metering 接线；staging/provisional/saga；调用方 bucket/time/expiry/部分 meter；新 reducer/event/余额权威。
 
-当前源码仅形成可独立静态审计的实现候选，不是编译、迁移或运行验收证据。本批只执行 rustfmt 解析/格式检查、差异与尺寸门卫以及独立只读审计；没有聚焦 v225 测试运行证据。只有定向编译、临时 SQLite 全量迁移、Store/HTTP/并发/重开和生产升级证据形成后，才可把 `implementation_uncompiled` / `implementation_unrun` 升级为已验证状态。
+本轮已形成生产目标编译、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 与磁盘重开定向证据，详见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。仍缺真实 TCP、跨连接并发、已有生产数据库升级、异常恢复和生产运行证据，因此只能标记为 `implementation_partially_verified`，不得描述为容量市场、交付或结算全链可用。
