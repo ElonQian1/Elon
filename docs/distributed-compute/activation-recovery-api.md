@@ -1,16 +1,16 @@
 ---
 title: 分布式算力激活隔离恢复控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力激活隔离恢复控制面
 
 ## 1. 当前状态
 
-v204 隔离恢复计划、第二人复核、只读预检和原子应用回执，以及 v205 prepared 计划追加式废止回执、管理员 HTTP 路由和 PC `/compute-activation` 管理界面已写入源码。当前尚未执行 Cargo/TypeScript 编译、v204/v205 迁移、HTTP 调用、并发验证、浏览器验收或发布，状态固定为 `implementation_uncompiled`。
+v204 隔离恢复计划、第二人复核、只读预检和原子应用回执，以及 v205 prepared 计划追加式废止回执、管理员 HTTP 路由和 PC `/compute-activation` 管理界面已写入源码。2026-08-11 已通过临时 SQLite 全量迁移和 Store/Service 定向状态链测试，验证隔离后准备、不同管理员复核、显式废止、重新准备、旧复核不继承、预检和原子恢复；PC 源码也已通过严格类型、lint 和生产构建。HTTP、权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，状态为 `implementation_partially_verified`，详细证据见 `activation-control-plane-acceptance.md`。
 
 本控制面不是删除 v181 隔离事实，也不是把数据库回滚到隔离前。它在保留原申请、激活计划、复核、应用和隔离回执的前提下，为同一 Provider 准备一个新的 active revision，并在条件满足时追加 `quarantined -> active` Pool 生命周期事件。历史事实保持可审计。
 
@@ -53,7 +53,7 @@ v204 隔离恢复计划、第二人复核、只读预检和原子应用回执，
 
 废止请求提交稳定 `idempotency_key`、当前 64 位小写 `expected_plan_digest`、非空 `reason` 和 `confirm_supersede=true`。服务端只接受当前摘要精确匹配的 prepared 计划，并在同一 `BEGIN IMMEDIATE` 事务中把计划切换为 superseded、固定服务端时间并写入 `compute_federation.activation_recovery_plan_supersession.v1` 回执。
 
-回执绑定恢复计划、隔离、申请、Provider、Pool、原计划摘要、原因、执行人、请求摘要和服务端时间；数据库触发器禁止更新或删除。幂等重放必须匹配原请求摘要，读取时重新审计计划状态、绑定、时间和双层摘要。该操作的 `provider_effect`、`pool_effect`、`offer_effect`、`node_effect` 和 `money_effect` 均为 `none`。
+回执绑定恢复计划、隔离、申请、Provider、Pool、原计划摘要、原因、执行人、请求摘要和服务端时间；数据库触发器禁止更新或删除。幂等重放必须匹配原请求摘要，读取时重新审计计划状态、绑定、时间和双层摘要。该操作的 `recovery_effect` 为 `plan_superseded`，`provider_effect`、`pool_effect`、`offer_effect`、`node_effect` 和 `money_effect` 均为 `none`。
 
 废止不删除原计划或已有复核，也不会把旧复核转移到新计划。原 prepared 唯一约束释放后，管理员可以用新的幂等键按当前隔离事实重新准备计划；新计划必须生成新摘要并由不同于新准备人的管理员重新复核。
 
@@ -121,7 +121,7 @@ PC `/compute-activation` 在 v181 隔离回执下显示独立恢复区。准备�
 
 ## 11. 尚未实现
 
-- Cargo/TypeScript 编译、v204/v205 迁移、HTTP、权限、并发、浏览器和发布验证；
+- HTTP、权限、并发、浏览器、生产磁盘迁移和发布验证；当前只验证了临时 SQLite Store/Service 状态链和 PC 静态生产构建；
 - prepared 恢复计划自动过期、按策略自动替换或无人值守废止；当前只支持管理员显式废止后重做；
 - 恢复后再次隔离并形成第二个恢复周期；当前 v181 每份原激活应用最多一份隔离回执；
 - 自动清退旧 Offer、自动发布新 Offer 或批量恢复市场供给；

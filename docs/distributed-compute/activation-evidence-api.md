@@ -1,20 +1,20 @@
 ---
 title: 分布式算力激活证据申请控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力激活证据申请控制面
 
 ## 1. 当前状态
 
-激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、v204 隔离恢复控制面、v205 恢复计划废止回执、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、v204 隔离恢复控制面、v205 恢复计划废止回执、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码。2026-08-11 已通过临时 SQLite 全量迁移和一项 Store/Service 定向状态链测试，实际覆盖登记、证据批准、不同管理员复核、原子激活、紧急隔离、恢复计划废止重做和原子恢复，状态更新为 `implementation_partially_verified`。HTTP/MCP、角色权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，详细证据见 `activation-control-plane-acceptance.md`。
 
 这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、激活应写入哪一个精确 Provider 合同、谁独立复核了该计划，以及该计划是否被受控应用”。`approved` 只表示证据包通过人工审核，`prepared` 只表示不可变候选合同已生成，第二人复核只固定复核事实；三者的 `activation_effect` 均为 `none`。只有不同于计划准备人的第二名 `admin/owner` 已按精确 `plan_digest` 留下 v203 回执后，应用入口才可能在一个事务内把 Provider 下一版本和 CapacityPool 改为 active，并保存不可变回执。该内部状态变化不连接节点、不读取凭据正文、不发布 Offer、不开放预留、不派发任务，也不移动资金。
 
-PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、第二人复核、计划二次预检、精确摘要应用、应用回执、紧急隔离和三段式恢复源码。当前账号若是计划准备人或恢复计划准备人，PC 不提供对应复核按钮；服务端仍是最终强制边界。管理员能力没有下放到本人页面或 MCP。两个页面均尚未构建、运行或发布。
+PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、第二人复核、计划二次预检、精确摘要应用、应用回执、紧急隔离和三段式恢复源码。当前账号若是计划准备人或恢复计划准备人，PC 不提供对应复核按钮；服务端仍是最终强制边界。管理员能力没有下放到本人页面或 MCP。两个页面已通过 PC 严格类型、lint 和生产构建，但尚未运行、浏览器验收或发布。
 
 ## 2. 申请流程
 
@@ -144,7 +144,7 @@ v203 回执绑定 `plan_id`、`request_id`、Provider/Pool、计划摘要、准�
 
 ## 11. 尚未实现
 
-- Cargo/TypeScript 编译、v177-v181/v203/v204 迁移执行、并发、HTTP/MCP 和 PC 真实调用验证；
+- HTTP/MCP 真实接口、角色权限、并发、浏览器、生产磁盘迁移和发布验证；当前只验证了临时 SQLite Store/Service 状态链和 PC 静态生产构建；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
 - 第三名独立应用人、组织级多级审批、prepared 恢复计划废止/替换、重复隔离恢复周期和通用回滚控制面；
