@@ -1,0 +1,4 @@
+interface:
+  display_name: "模块化功能交付闭环"
+  short_description: "跨后端、前端、移动端和运维任务的模块化实现、验证、发布与验收闭环"
+  default_prompt: "使用 $deliver-feature-end-to-end 完成这个功能的认领、模块化实现、验证、发布和证据收尾。"

@@ -26,6 +26,7 @@
 | PC 工作台、`/pc`、React/Vite/TypeScript | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md`、`AI_INDEX.md` |
 | Windows PC 节点、自更新、推送 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册、相关源码 |
 | 完整流程/复杂发布/任务卡住 | `docs/ai-agent-workflow.md` |
+| 通用非简单功能、重构、迁移、生产修复或用户说“模块化功能交付闭环” | `.agents/skills/deliver-feature-end-to-end/SKILL.md`；再叠加命中的领域 Skill |
 | Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
 | Android WebView 网页能力原生化、MCP/ADB 接入、能力矩阵与真机分批验收 | `.agents/skills/android-webview-feature-delivery/SKILL.md` |
 | APP 低风险视觉微调（Ripple、颜色、间距、圆角、字号、轻动画） | `docs/app-ui-fast-lane.md`；默认不启动真机、模拟器或 Renderer |

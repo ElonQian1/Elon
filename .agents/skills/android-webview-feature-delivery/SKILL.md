@@ -7,6 +7,10 @@ description: Build or extend Android WebView-backed integrations that expose an 
 
 Deliver a WebView-backed Android feature as a maintainable native module without pretending that unverified behavior works. Preserve the official page as the authority and as the complete-function fallback.
 
+## Relationship to the General Delivery Skill
+
+Apply `$deliver-feature-end-to-end` for ownership, capability baselines, Git delivery, release state, and cross-domain evidence. Apply this Skill afterward for WebView protocol, semantic UI, MCP/ADB, session, privacy, and device-specific constraints. Preserve both Skills; this one is the specialized extension, not a replacement for the general workflow.
+
 ## Invariants
 
 - Treat the user's local web session and the official page as authoritative.
