@@ -57,6 +57,10 @@ internal data class ChatGptWebFeature(
 )
 
 internal sealed interface ChatGptWebEvent {
+    data class AdapterReady(
+        val capabilities: ChatGptWebCapabilities,
+    ) : ChatGptWebEvent
+
     data class Snapshot(val value: ChatGptWebSnapshot) : ChatGptWebEvent
 
     data class ConversationList(
@@ -92,13 +96,27 @@ internal sealed interface ChatGptWebEvent {
     ) : ChatGptWebEvent
 }
 
+internal data class ChatGptWebProtocolMessage(
+    val documentToken: String?,
+    val event: ChatGptWebEvent,
+)
+
 internal object ChatGptWebProtocol {
-    fun parse(rawPayload: String, minimumAdapterVersion: Int = 0): ChatGptWebEvent? {
+    fun parse(rawPayload: String, minimumAdapterVersion: Int = 0): ChatGptWebEvent? =
+        parseMessage(rawPayload, minimumAdapterVersion)?.event
+
+    fun parseMessage(
+        rawPayload: String,
+        minimumAdapterVersion: Int = 0,
+    ): ChatGptWebProtocolMessage? {
         val payload = runCatching { JSONObject(rawPayload) }.getOrNull() ?: return null
         if (payload.optInt("adapterVersion", 0) < minimumAdapterVersion) return null
-        if (payload.optString("schema") == SCHEMA) {
+        val parsedEvent = if (payload.optString("schema") == SCHEMA) {
             val event = payload.optJSONObject("event") ?: return null
-            return when (event.optString("type")) {
+            when (event.optString("type")) {
+                "adapter_ready" -> ChatGptWebEvent.AdapterReady(
+                    ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
+                )
                 "message_snapshot" -> ChatGptWebEvent.Snapshot(parseSnapshot(event))
                 "conversation_snapshot" -> ChatGptWebEvent.ConversationList(
                     parseConversations(event),
@@ -109,8 +127,7 @@ internal object ChatGptWebProtocol {
                 "web_touch_request" -> parseWebTouchRequest(event)
                 else -> null
             }
-        }
-        return when (payload.optString("type")) {
+        } else when (payload.optString("type")) {
             "command_result" -> ChatGptWebEvent.CommandResult(
                 action = payload.optString("action").take(40),
                 ok = payload.optBoolean("ok"),
@@ -120,7 +137,12 @@ internal object ChatGptWebProtocol {
                     .takeIf(REQUEST_ID::matches),
             )
             else -> null
-        }
+        } ?: return null
+        return ChatGptWebProtocolMessage(
+            documentToken = payload.optString("documentToken")
+                .takeIf(ChatGptWebDocumentSession.DOCUMENT_TOKEN::matches),
+            event = parsedEvent,
+        )
     }
 
     private fun parseSnapshot(event: JSONObject): ChatGptWebSnapshot {

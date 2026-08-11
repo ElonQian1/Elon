@@ -286,6 +286,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             webView = binding.chatGptWebView,
             onEvent = ::handleBridgeEvent,
             onStateChanged = ::handleBridgeState,
+            onDocumentChanged = ::handleDocumentChanged,
         )
         touchDispatcher = ChatGptWebTouchDispatcher(binding.chatGptWebView)
         officialOverlayController = ChatGptWebOfficialOverlayController(
@@ -515,6 +516,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun handleBridgeEvent(event: ChatGptWebEvent) {
         observedMcpState.accept(event)
         when (event) {
+            is ChatGptWebEvent.AdapterReady -> Unit
             is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
             is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
             is ChatGptWebEvent.FeatureNavigation -> featureHubController.render(event.features)
@@ -570,6 +572,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun handleDocumentChanged(document: ChatGptWebDocumentSession.Snapshot) {
+        if (document.pageGeneration > observedMcpState.snapshot().pageGeneration) {
+            latestSnapshot = null
+            latestUiManifest = null
+        }
+        observedMcpState.updateDocument(document)
     }
 
     private fun handleWebTouchRequest(event: ChatGptWebEvent.WebTouchRequest) {

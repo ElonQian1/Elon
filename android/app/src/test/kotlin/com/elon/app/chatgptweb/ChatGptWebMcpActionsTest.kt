@@ -828,6 +828,8 @@ class ChatGptWebMcpActionsTest {
                     commandRequests = emptyList(),
                     updatedAtMs = 123L,
                     lastCommandObservedAtMs = 123L,
+                    pageGeneration = 1L,
+                    adapterGeneration = 1L,
                 )
             },
             beginCommand = { expectedAction ->

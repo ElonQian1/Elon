@@ -141,6 +141,41 @@ class ChatGptWebObservedStateTest {
         assertTrue(requests.all { it.completedAtMs == now })
     }
 
+    @Test
+    fun pageGenerationClearsDocumentObservationsAndFailsPendingCommands() {
+        var now = 30_000L
+        val state = ChatGptWebObservedState { now }
+        state.updateDocument(document(page = 1, adapter = 1))
+        state.accept(ChatGptWebEvent.ConversationList(listOf(
+            ChatGptWebConversation("demo", "桥接验证", "/c/demo", active = true),
+        )))
+        state.accept(composerEvent("model", "快速"))
+        val pending = state.beginCommand("list_model_options")
+
+        now += 10
+        state.updateDocument(document(page = 2, adapter = 0))
+
+        val reloading = state.snapshot()
+        assertTrue(reloading.conversations.isEmpty())
+        assertTrue(reloading.composerSections.isEmpty())
+        assertEquals(2L, reloading.pageGeneration)
+        assertEquals(0L, reloading.adapterGeneration)
+        assertFalse(reloading.adapterCurrent)
+        val failed = reloading.commandRequests.single { it.id == pending.id }
+        assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, failed.status)
+        assertEquals("page_generation_changed", failed.result?.detail)
+
+        now += 10
+        state.updateDocument(document(page = 2, adapter = 2))
+        assertTrue(state.snapshot().adapterCurrent)
+    }
+
+    private fun document(page: Long, adapter: Long) = ChatGptWebDocumentSession.Snapshot(
+        pageGeneration = page,
+        adapterGeneration = adapter,
+        documentToken = "doc_page_$page",
+    )
+
     private fun composerEvent(section: String, label: String) = ChatGptWebEvent.ComposerControls(
         section = section,
         currentModel = "5.6 Sol 轻度",

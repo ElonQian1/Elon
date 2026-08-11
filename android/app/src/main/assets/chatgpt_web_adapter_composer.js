@@ -329,6 +329,22 @@
     return true;
   }
 
+  function replacePendingOptions(section, pending) {
+    const previous = pendingOptions[section];
+    pendingOptions[section] = pending;
+    if (previous && typeof previous.complete === 'function') {
+      previous.complete(previous.action, false, '菜单请求已被新的操作替代。');
+    }
+  }
+
+  function settlePendingOptions(section, ok, detail) {
+    const pending = pendingOptions[section];
+    pendingOptions[section] = null;
+    if (pending && typeof pending.complete === 'function') {
+      pending.complete(pending.action, ok, detail || '');
+    }
+  }
+
   function requestOptions(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
     const reusable = lastOptions[section].filter((option) => isVisible(option.node));
@@ -338,15 +354,15 @@
     }
     const trigger = triggerFor(section, composer);
     if (!trigger) return result(action, false, '官网当前没有可用入口。');
-    pendingOptions[section] = {
+    replacePendingOptions(section, {
       baseline: new Set(visibleOptionNodes()),
-      trigger
-    };
+      trigger,
+      action,
+      complete: result
+    });
     if (!emitTouchRequest(action, trigger, emitEvent)) {
-      pendingOptions[section] = null;
-      return result(action, false, '官网入口当前不可见。');
+      return settlePendingOptions(section, false, '官网入口当前不可见。');
     }
-    result(action, true, '');
   }
 
   function collectRequestedOptions(section, composer, emitEvent, result) {
@@ -357,13 +373,11 @@
       section,
       pending.baseline,
       (options) => {
-        pendingOptions[section] = null;
         emitOptions(section, options, composer, emitEvent);
-        result(action, true, '');
+        settlePendingOptions(section, true, '');
       },
       () => {
-        pendingOptions[section] = null;
-        result(action, false, '官网菜单尚未返回可用选项，请切换官方网页。');
+        settlePendingOptions(section, false, '官网菜单尚未返回可用选项，请切换官方网页。');
       }
     );
   }
@@ -380,17 +394,23 @@
     const submenuPurpose = section === 'model' ? 'open_model_submenu' : 'open_composer_tools_submenu';
     const purpose = target.opensSubmenu ? submenuPurpose : action;
     if (target.opensSubmenu) {
-      pendingOptions[section] = {
+      replacePendingOptions(section, {
         baseline: new Set(visibleOptionNodes()),
-        trigger: target.node
-      };
+        trigger: target.node,
+        action,
+        complete: result
+      });
     }
     if (!emitTouchRequest(purpose, target.node, emitEvent)) {
-      if (target.opensSubmenu) pendingOptions[section] = null;
+      if (target.opensSubmenu) {
+        return settlePendingOptions(section, false, '官网选项当前不可见。');
+      }
       return result(action, false, '官网选项当前不可见。');
     }
-    result(action, true, '');
-    if (!target.opensSubmenu) window.setTimeout(scheduleSnapshot, 240);
+    if (!target.opensSubmenu) {
+      result(action, true, '');
+      window.setTimeout(scheduleSnapshot, 240);
+    }
   }
 
   function ownsOptionNode(node) {
@@ -444,7 +464,8 @@
     target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
     target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
     lastOptions = { model: [], tools: [] };
-    pendingOptions = { model: null, tools: null };
+    settlePendingOptions('model', false, '官网菜单已关闭。');
+    settlePendingOptions('tools', false, '官网菜单已关闭。');
     result('dismiss_composer_menu', true, '');
   }
 

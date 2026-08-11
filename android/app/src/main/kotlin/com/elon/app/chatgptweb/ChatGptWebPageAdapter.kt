@@ -15,6 +15,7 @@ internal class ChatGptWebPageAdapter(
     private val webView: WebView,
     private val onEvent: (ChatGptWebEvent) -> Unit,
     private val onStateChanged: (State) -> Unit,
+    private val onDocumentChanged: (ChatGptWebDocumentSession.Snapshot) -> Unit = {},
 ) {
     enum class State {
         WEB_ONLY,
@@ -29,6 +30,7 @@ internal class ChatGptWebPageAdapter(
         }
     }
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val documentSession = ChatGptWebDocumentSession()
     private val handshake = ChatGptWebBridgeHandshake(
         schedule = { delayMs, action -> mainHandler.postDelayed({ action() }, delayMs) },
         injectAndRequestSnapshot = ::injectAndRequestSnapshot,
@@ -47,10 +49,14 @@ internal class ChatGptWebPageAdapter(
         ) { _, message, sourceOrigin, isMainFrame, _ ->
             if (!isMainFrame || !isAllowedOrigin(sourceOrigin)) return@addWebMessageListener
             val payload = message.data ?: return@addWebMessageListener
-            ChatGptWebProtocol.parse(payload, ADAPTER_VERSION)?.let { event ->
-                if (event.completesHandshake()) handshake.acknowledge()
-                onEvent(event)
-            }
+            val parsed = ChatGptWebProtocol.parseMessage(payload, ADAPTER_VERSION)
+                ?: return@addWebMessageListener
+            val token = parsed.documentToken ?: return@addWebMessageListener
+            val wasCurrent = documentSession.snapshot().adapterCurrent
+            val document = documentSession.accept(token) ?: return@addWebMessageListener
+            if (!wasCurrent) onDocumentChanged(document)
+            if (parsed.event.completesHandshake()) handshake.acknowledge()
+            onEvent(parsed.event)
         }
         listenerInstalled = true
         onStateChanged(State.WEB_ONLY)
@@ -65,12 +71,16 @@ internal class ChatGptWebPageAdapter(
             onStateChanged(State.UNSUPPORTED)
             return
         }
+        if (documentSession.snapshot().pageGeneration == 0L) {
+            onDocumentChanged(documentSession.ensurePage())
+        }
         onStateChanged(State.CONNECTING)
         handshake.start()
     }
 
     fun onPageStarted(url: String) {
         handshake.cancel()
+        onDocumentChanged(documentSession.beginPage())
         val state = if (
             listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(url)
         ) {
@@ -83,6 +93,9 @@ internal class ChatGptWebPageAdapter(
 
     fun onHostResumed(url: String?) {
         if (listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) {
+            if (documentSession.snapshot().pageGeneration == 0L) {
+                onDocumentChanged(documentSession.ensurePage())
+            }
             handshake.start()
         }
     }
@@ -229,7 +242,9 @@ internal class ChatGptWebPageAdapter(
 
     fun requestSnapshot() = runCommand("snapshot")
 
-    fun markReady() = onStateChanged(State.READY)
+    fun markReady() {
+        if (documentSession.snapshot().adapterCurrent) onStateChanged(State.READY)
+    }
 
     fun markLoginRequired() = onStateChanged(State.WEB_ONLY)
 
@@ -244,7 +259,9 @@ internal class ChatGptWebPageAdapter(
 
     private fun injectAndRequestSnapshot() {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
-        webView.evaluateJavascript(adapterScript) {
+        val document = documentSession.ensurePage()
+        val tokenSetup = "window.__elonChatGptDocumentToken=${JSONObject.quote(document.documentToken)};"
+        webView.evaluateJavascript("$tokenSetup\n$adapterScript") {
             if (listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
                 requestSnapshot()
             }
@@ -252,6 +269,7 @@ internal class ChatGptWebPageAdapter(
     }
 
     private fun ChatGptWebEvent.completesHandshake(): Boolean = when (this) {
+        is ChatGptWebEvent.AdapterReady -> true
         is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady || value.dictationActive
         is ChatGptWebEvent.ConversationList,
         is ChatGptWebEvent.ComposerControls,
@@ -275,6 +293,7 @@ internal class ChatGptWebPageAdapter(
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
             .put("action", action)
+            .put("documentToken", documentSession.snapshot().documentToken)
             .apply {
                 if (value != null) put("value", value)
                 if (expectedDraft != null) put("expectedDraft", expectedDraft)
@@ -297,7 +316,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 34
+        internal const val ADAPTER_VERSION = 35
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

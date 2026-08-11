@@ -99,6 +99,30 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun reportsAStaleAdapterGenerationAsAnExplicitBlockingGap() {
+        val document = ChatGptWebObservedState.Snapshot.EMPTY.copy(
+            pageGeneration = 5,
+            adapterGeneration = 4,
+        )
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = manifest("healthy", "action"),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            document = document,
+        )
+
+        assertEquals(5L, matrix.getLong("page_generation"))
+        assertEquals(4L, matrix.getLong("adapter_generation"))
+        assertFalse(matrix.getBoolean("adapter_current"))
+        assertEquals(
+            "adapter_generation_not_ready",
+            matrix.getJSONArray("blocking_gaps").getString(0),
+        )
+        assertFalse(matrix.getBoolean("ready_for_mcp"))
+    }
+
+    @Test
     fun activeDictationRemainsAReadyAuthenticatedSessionWithoutAComposer() {
         val dictating = snapshot(setOf(ChatGptWebCapabilityId.DICTATION)).copy(
             composerReady = false,

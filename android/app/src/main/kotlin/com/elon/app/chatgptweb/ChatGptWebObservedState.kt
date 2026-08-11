@@ -11,6 +11,8 @@ internal class ChatGptWebObservedState(
     private var commandRequests: List<CommandRequest> = emptyList()
     private var nextCommandId = 0L
     private var updatedAtMs: Long = 0L
+    private var pageGeneration = 0L
+    private var adapterGeneration = 0L
 
     fun accept(event: ChatGptWebEvent) {
         val observedAtMs = nowMs()
@@ -33,6 +35,34 @@ internal class ChatGptWebObservedState(
     fun beginComposerRequest(section: String) {
         composerSections = composerSections - section
         updatedAtMs = nowMs()
+    }
+
+    fun updateDocument(document: ChatGptWebDocumentSession.Snapshot) {
+        if (document.pageGeneration < pageGeneration) return
+        val observedAtMs = nowMs()
+        if (document.pageGeneration > pageGeneration) {
+            conversations = emptyList()
+            features = emptyList()
+            composerSections = emptyMap()
+            lastCommand = null
+            lastCommandObservedAtMs = null
+            commandRequests = commandRequests.map { request ->
+                if (request.status != CommandRequest.PENDING) return@map request
+                request.copy(
+                    status = CommandRequest.FAILED,
+                    completedAtMs = observedAtMs,
+                    result = ChatGptWebEvent.CommandResult(
+                        action = request.expectedAction,
+                        ok = false,
+                        detail = PAGE_GENERATION_CHANGED,
+                        requestId = request.id,
+                    ),
+                )
+            }
+        }
+        pageGeneration = document.pageGeneration
+        adapterGeneration = document.adapterGeneration
+        updatedAtMs = observedAtMs
     }
 
     fun beginCommand(expectedAction: String): CommandRequest {
@@ -67,6 +97,8 @@ internal class ChatGptWebObservedState(
             commandRequests = commandRequests,
             updatedAtMs = updatedAtMs,
             lastCommandObservedAtMs = lastCommandObservedAtMs,
+            pageGeneration = pageGeneration,
+            adapterGeneration = adapterGeneration,
         )
     }
 
@@ -115,7 +147,12 @@ internal class ChatGptWebObservedState(
         val commandRequests: List<CommandRequest>,
         val updatedAtMs: Long,
         val lastCommandObservedAtMs: Long? = null,
+        val pageGeneration: Long = 0L,
+        val adapterGeneration: Long = 0L,
     ) {
+        val adapterCurrent: Boolean
+            get() = pageGeneration > 0 && adapterGeneration == pageGeneration
+
         companion object {
             val EMPTY = Snapshot(emptyList(), emptyList(), emptyMap(), null, emptyList(), 0L)
         }
@@ -140,5 +177,6 @@ internal class ChatGptWebObservedState(
     private companion object {
         const val MAX_COMMAND_REQUESTS = 20
         const val COMMAND_TIMEOUT_MS = 20_000L
+        const val PAGE_GENERATION_CHANGED = "page_generation_changed"
     }
 }

@@ -10,6 +10,8 @@
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
+  const documentToken = String(window.__elonChatGptDocumentToken || '');
+  if (!/^doc_[a-z0-9_]{3,80}$/.test(documentToken)) return;
 
   let emitTimer = 0;
   let lastSnapshot = '';
@@ -22,6 +24,7 @@
     nativeBridge.postMessage(JSON.stringify({
       schema: 'yilong.ai.ui.v1',
       adapterVersion,
+      documentToken,
       providerId: 'chatgpt',
       source: 'official_web',
       conversationId: location.pathname,
@@ -191,6 +194,7 @@
     const event = {
       type: 'command_result',
       adapterVersion,
+      documentToken,
       action,
       ok,
       detail: detail || ''
@@ -267,6 +271,9 @@
     const action = String(command.action || '');
     const rawRequestId = String(command.requestId || '');
     const requestId = /^mcp_[a-z0-9]{1,32}$/.test(rawRequestId) ? rawRequestId : '';
+    if (String(command.documentToken || '') !== documentToken) {
+      return result(action || 'unknown', false, '页面已更新，请重新执行。', requestId);
+    }
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     if (action === 'snapshot') return snapshot();
     if (action === 'snapshot_ui_manifest' && layoutAdapter) {

@@ -8,6 +8,31 @@ import org.junit.Test
 
 class ChatGptWebProtocolTest {
     @Test
+    fun exposesBoundedDocumentTokensAndAdapterReadyEvents() {
+        val parsed = ChatGptWebProtocol.parseMessage(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "adapterVersion":35,
+              "documentToken":"doc_page_7",
+              "event":{"type":"adapter_ready","capabilities":["draft_sync"]}
+            }
+            """.trimIndent(),
+            minimumAdapterVersion = 35,
+        )
+
+        assertEquals("doc_page_7", parsed?.documentToken)
+        val ready = parsed?.event as ChatGptWebEvent.AdapterReady
+        assertTrue(ready.capabilities.supports(ChatGptWebCapabilityId.DRAFT_SYNC))
+        assertNull(
+            ChatGptWebProtocol.parseMessage(
+                """{"type":"command_result","adapterVersion":35,"documentToken":"../old","action":"snapshot","ok":true}""",
+                minimumAdapterVersion = 35,
+            )?.documentToken,
+        )
+    }
+
+    @Test
     fun rejectsEventsFromStalePageAdaptersWhenMinimumVersionIsRequired() {
         val current =
             """{"type":"command_result","adapterVersion":4,"action":"snapshot","ok":true}"""

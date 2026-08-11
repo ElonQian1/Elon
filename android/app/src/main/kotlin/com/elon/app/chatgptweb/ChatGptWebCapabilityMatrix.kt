@@ -10,7 +10,9 @@ internal object ChatGptWebCapabilityMatrix {
         manifest: ChatGptWebUiManifest?,
         bridgeState: ChatGptWebPageAdapter.State,
         mode: ChatGptWebModeController.Mode,
+        document: ChatGptWebObservedState.Snapshot? = null,
     ): JSONObject {
+        val adapterCurrent = document?.adapterCurrent ?: true
         val advertised = snapshot?.capabilities?.supported.orEmpty()
         val semantics = manifest?.controls.orEmpty()
             .groupingBy(ChatGptWebUiControl::semantic)
@@ -43,6 +45,7 @@ internal object ChatGptWebCapabilityMatrix {
         }
         val blockingGaps = buildList {
             if (bridgeState != ChatGptWebPageAdapter.State.READY) add("bridge_not_ready")
+            if (!adapterCurrent) add("adapter_generation_not_ready")
             if (snapshot?.authenticated != true) add("not_authenticated")
             if (
                 snapshot?.authenticated == true &&
@@ -73,6 +76,9 @@ internal object ChatGptWebCapabilityMatrix {
             .put("action", "chatgpt_get_capability_matrix")
             .put("schema", "elon.chatgpt_web.capability_matrix.v2")
             .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
+            .put("page_generation", document?.pageGeneration ?: 0L)
+            .put("adapter_generation", document?.adapterGeneration ?: 0L)
+            .put("adapter_current", adapterCurrent)
             .put(
                 "app",
                 JSONObject()
@@ -87,6 +93,7 @@ internal object ChatGptWebCapabilityMatrix {
             .put(
                 "ready_for_mcp",
                 bridgeState == ChatGptWebPageAdapter.State.READY &&
+                    adapterCurrent &&
                     manifest != null &&
                     manifest.controlsTruncated.not(),
             )

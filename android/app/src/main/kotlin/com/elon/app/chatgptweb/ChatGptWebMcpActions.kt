@@ -17,12 +17,16 @@ internal class ChatGptWebMcpActions(
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
 ) {
     fun uiState(): JSONObject {
-        val current = snapshot()
         val observed = observedState()
+        val current = snapshot().takeIf { observed.adapterCurrent }
+        val currentManifest = uiManifest().takeIf { observed.adapterCurrent }
         return JSONObject()
             .put("surface", "chatgpt_web")
             .put("active_page", "chatgpt_web")
             .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
+            .put("page_generation", observed.pageGeneration)
+            .put("adapter_generation", observed.adapterGeneration)
+            .put("adapter_current", observed.adapterCurrent)
             .put("bridge_state", bridgeState().name.lowercase())
             .put("view_mode", mode().name.lowercase())
             .put("authenticated", current?.authenticated ?: false)
@@ -36,7 +40,7 @@ internal class ChatGptWebMcpActions(
                 .put("text", inputText().take(MAX_INPUT_CHARS))
                 .put("text_length", inputText().length)
             )
-            .put("ui_manifest", manifestJson(uiManifest()))
+            .put("ui_manifest", manifestJson(currentManifest))
             .put("navigation", navigationSummary(observed))
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
             .put("command_requests", ChatGptWebCommandReceipts.requestsJson(observed))
@@ -45,6 +49,16 @@ internal class ChatGptWebMcpActions(
 
     fun control(args: JSONObject): JSONObject {
         val action = args.optString("action", "state").trim().lowercase()
+        val observedAtDispatch = observedState()
+        val refreshFromPageGeneration = observedAtDispatch.pageGeneration
+        if (action !in LOCAL_ACTIONS) {
+            if (bridgeState() != ChatGptWebPageAdapter.State.READY) {
+                return error(action, "bridge_not_ready")
+            }
+            if (!observedAtDispatch.adapterCurrent) {
+                return error(action, "adapter_generation_not_ready")
+            }
+        }
         var commandRequest: ChatGptWebObservedState.CommandRequest? = null
         fun dispatch(expectedAction: String, block: (String) -> Unit) {
             val request = beginCommand(expectedAction)
@@ -206,7 +220,11 @@ internal class ChatGptWebMcpActions(
             "chatgpt_get_conversations" -> return conversationsPage(args)
             "chatgpt_get_navigation" -> return navigationPage(args)
             "chatgpt_get_capability_matrix" -> return ChatGptWebCapabilityMatrix.build(
-                snapshot(), uiManifest(), bridgeState(), mode(),
+                snapshot().takeIf { observedAtDispatch.adapterCurrent },
+                uiManifest().takeIf { observedAtDispatch.adapterCurrent },
+                bridgeState(),
+                mode(),
+                observedAtDispatch,
             )
             "chatgpt_open_conversation" -> {
                 val path = args.optString("conversation_path")
@@ -246,8 +264,12 @@ internal class ChatGptWebMcpActions(
                 }
                 if (action == "chatgpt_refresh") {
                     put("command_status", "dispatched")
-                    put("completion_signal", "bridge_state")
-                    put("poll_hint", "读取 ui_state.bridge_state 确认页面重新连接")
+                    put("refresh_from_page_generation", refreshFromPageGeneration)
+                    put("completion_signal", "adapter_generation")
+                    put(
+                        "poll_hint",
+                        "等待 ui_state.page_generation 大于 refresh_from_page_generation，且 adapter_current=true",
+                    )
                 }
             }
     }
@@ -635,6 +657,14 @@ internal class ChatGptWebMcpActions(
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
         val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
         val COMPOSER_SECTIONS = setOf("model", "tools")
+        val LOCAL_ACTIONS = setOf(
+            "state",
+            "open_chatgpt_web",
+            "set_input_text",
+            "chatgpt_refresh",
+            "chatgpt_get_capability_matrix",
+            "chatgpt_select_view",
+        )
         val AVAILABLE_ACTIONS = listOf(
             "state",
             "set_input_text",
