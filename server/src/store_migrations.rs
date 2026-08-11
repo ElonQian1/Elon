@@ -5,6 +5,7 @@ mod compute_capacity_commitment;
 mod compute_delivery_allocation;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_release;
+mod compute_external_pool_adapter_release_lifecycle;
 mod compute_platform_reference_price_curve;
 #[cfg(test)]
 mod migration_tests;
@@ -268,6 +269,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (226, "Attempt 终态候选与最终声明用量原子栅栏", crate::compute_attempt_terminal_migration::migration_v226),
     (227, "外部矿池 Adapter artifact bytes quarantine source receipt", compute_external_pool_adapter_artifact_source::migration_v227),
     (228, "Commitment whole-only DeliveryAllocation 与原子 Broker 行权", compute_delivery_allocation::migration_v228),
+    (229, "外部矿池 Adapter staged admission 追加式终态与 intake currentness", compute_external_pool_adapter_release_lifecycle::migration_v229),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

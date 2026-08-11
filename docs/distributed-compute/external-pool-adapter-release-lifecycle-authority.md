@@ -4,14 +4,14 @@ status: current
 reviewed_at: 2026-08-12
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: source_not_written
+implementation_status: implementation_uncompiled
 ---
 
 # 外部矿池 Adapter Release Admission 生命周期权威
 
 ## 1. 冻结结论
 
-本文冻结 v229 的负向权威：为一份 immutable v222 `staged` admission 追加唯一终态，并从不可变根与终态 receipt 派生 currentness。当前状态严格为 `design_frozen/source_not_written`；没有 Rust、迁移、Store、Service、HTTP、测试或生产数据可以证明该合同已经生效。
+本文冻结 v229 的负向权威：为一份 immutable v222 `staged` admission 追加唯一终态，并从不可变根与终态 receipt 派生 currentness。当前状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域合同、v229 migration、Store terminal/current view、管理员 Service/HTTP，以及 v227 PUT 的 pre-CAS、Store fresh/exact replay 与数据库 trigger currentness 源码已经写入；尚未编译、执行 migration、测试、启动服务或产生生产数据，不能证明该合同已经运行生效。
 
 v229 只有在同一实现批次同时完成 terminal producer、current view，以及 v227 artifact PUT 的 pre-CAS、Store transaction 和数据库 trigger 三层 currentness 门卫时，才构成真实纵切面。只增加表、视图或管理 API 而不让现有 consumer 拒绝终态 admission，属于 producer-less 状态 staging，必须判定为 NO-GO。
 
@@ -99,7 +99,7 @@ actor、actor kind、作用域、确认语和服务端时间不能由调用方�
 
 真实上游 producer 是已经存在并通过专项的 v222 stage：它产生 exact immutable admission。v229 的管理员 terminal API/Store 是不可逆负向终态 producer。现有具体 consumer 是 v227 artifact source PUT，虽然后者当前仍为未编译、未迁移、未运行源码，设计上已经具有明确的 admission authority、CAS custody 与 DB-second receipt 写入点。
 
-v229 实现必须同时把 currentness 接入：
+v229 源码已经同时把 currentness 接入以下三个线性化位置；这些路径仍待编译和运行验证：
 
 1. Service 在读取/流式消费 raw body 和进入 quarantine CAS 前，只能取得无 terminal 的 exact staged intake authority；
 2. v227 Store 对 fresh write 和 exact replay 都必须在自己的事务线性化点重新要求 admission 仍 current；
@@ -150,4 +150,4 @@ v229 不得创建、修改或删除 v213 Adapter/version、credential、route au
 
 ## 9. 实现与验收门槛
 
-当前状态只允许描述为 `design_frozen/source_not_written`。未来实现完成后仍须分别记录编译、fresh/upgrade/repeat migration、Store 重开、HTTP 鉴权、三终态、successor 失败路径、exact replay、双 terminal 竞争、terminal↔v227 CAS/DB 两种顺序，以及终态后的 PUT/GET 差异。没有这些证据时不得升级 implementation 或 verification 状态。
+当前状态只允许描述为 `design_frozen/implementation_uncompiled/implementation_unrun`。源码完成不等于运行验收；后续仍须分别记录编译、fresh/upgrade/repeat migration、Store 重开、HTTP 鉴权、三终态、successor 失败路径、exact replay、双 terminal 竞争、terminal↔v227 CAS/DB 两种顺序，以及终态后的 PUT/GET 差异。没有这些执行证据时不得升级为 `implementation_partially_verified`。

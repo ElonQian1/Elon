@@ -2,7 +2,11 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, SecondsFormat};
 use rusqlite::{params, types::Type, Connection, OptionalExtension};
 
-use crate::store::{compute_external_pool_adapter_release::admission_by_id_on, Store};
+use crate::store::{
+    compute_external_pool_adapter_release::admission_by_id_on,
+    compute_external_pool_adapter_release_lifecycle::current_external_pool_adapter_release_admission_authority_on,
+    Store,
+};
 
 use super::{
     canonical::{canonical_intake_material_digest, canonical_receipt_json_and_digest},
@@ -268,22 +272,18 @@ impl Store {
         )?;
         let mut connection = self.conn()?;
         let transaction = connection.transaction()?;
-        let admission = admission_by_id_on(&transaction, admission_id)?;
-        let authority = match admission {
-            Some(admission) => {
-                if admission.admission_digest != expected_admission_digest
-                    || admission.status != "staged"
-                {
-                    bail!("artifact intake admission digest or status is not exact");
-                }
-                Some(ExternalPoolAdapterArtifactIntakeAuthority::new(
-                    admission.admission_id,
-                    admission.admission_digest,
-                    admission.declared_implementation_sha256,
-                ))
-            }
-            None => None,
-        };
+        let authority = current_external_pool_adapter_release_admission_authority_on(
+            &transaction,
+            admission_id,
+            expected_admission_digest,
+        )?
+        .map(|current| {
+            ExternalPoolAdapterArtifactIntakeAuthority::new(
+                current.admission_id().to_string(),
+                current.admission_digest().to_string(),
+                current.declared_implementation_sha256().to_string(),
+            )
+        });
         transaction.commit()?;
         Ok(authority)
     }

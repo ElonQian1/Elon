@@ -16,7 +16,7 @@ implementation_status: implementation_uncompiled
 
 当前状态是 `implementation_uncompiled/implementation_unrun`：v227 领域/文件 custody、Store、一表迁移、Service/HTTP 与中央接线源码已经写入，只通过 rustfmt、差异/尺寸门卫和独立静态审计；尚未编译、测试、执行迁移、启动服务或摄入 artifact。实际 artifact 测量数为 0。
 
-v229 admission lifecycle 已完成文档设计冻结，但仍为 `design_frozen/source_not_written`。其合同要求 v227 PUT 在读取 raw body/CAS 前、Store 的 IMMEDIATE 事务内以及新 v229 BEFORE INSERT currentness trigger 中拒绝 `withdrawn/revoked/superseded` admission；v229 不改写 v227 旧 migration。以下 currentness 行为是未来实现门槛，不是当前源码事实，详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
+v229 admission lifecycle 已写入领域、migration、Store、Service/HTTP 与 v227 三层 currentness 源码，状态为 `design_frozen/implementation_uncompiled/implementation_unrun`。v227 PUT 现在在读取 raw body/CAS 前、Store 的 IMMEDIATE fresh/exact replay 事务内以及新 v229 BEFORE INSERT currentness trigger 中拒绝 `withdrawn/revoked/superseded` admission；v229 不改写 v227 旧 migration。这些仍只是未编译、未迁移、未运行的源码事实，详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
 
 ## 2. 唯一管理入口
 
@@ -33,7 +33,7 @@ PUT 必须先完成 Bearer 鉴权并确认角色是 `admin|owner`，再读取 bo
 - `X-Elon-Artifact-Source-Confirmation: confirm_external_pool_adapter_artifact_source_intake`；
 - body 非空且最多 33,554,432 字节。
 
-调用方不得提交 request/review/ref、声明摘要、observed 摘要、文件名、路径、storage key、actor 或时间；Service 必须从 exact staged admission、认证会话、服务端时间与实际 body 派生。v229 实现后，只有派生 current status 仍为 `staged` 才能读取/流式消费 body 或进入 CAS；已有 terminal 时，包含旧 exact idempotent replay 在内的 PUT 都必须失败关闭。首写返回 201，仍 current 时的 exact replay 与 GET 返回 200。摘要或 lineage/currentness/幂等冲突返回 409，超限返回 413，媒体类型或编码不符返回 415，body 摘要与 admission 声明不符返回 422；receipt 已存在但 blob 缺失或漂移必须失败关闭。
+调用方不得提交 request/review/ref、声明摘要、observed 摘要、文件名、路径、storage key、actor 或时间；Service 必须从 exact staged admission、认证会话、服务端时间与实际 body 派生。v229 源码现要求只有派生 current status 仍为 `staged` 才能读取/流式消费 body 或进入 CAS；已有 terminal 时，包含旧 exact idempotent replay 在内的 PUT 都必须失败关闭。首写返回 201，仍 current 时的 exact replay 与 GET 返回 200。摘要或 lineage/currentness/幂等冲突返回 409，超限返回 413，媒体类型或编码不符返回 415，body 摘要与 admission 声明不符返回 422；receipt 已存在但 blob 缺失或漂移必须失败关闭。
 
 GET 不返回 bytes、下载地址、绝对路径、candidate ref 或凭据。terminal 后 GET 仍可读取 immutable 历史 receipt，并重开最终普通文件复核 bytes；回执必须明确 `existing_artifact_source_effect=historical_only`。历史 receipt 不能替代实时 currentness：未来 registry 每次消费都必须同时重算 bytes 并确认 admission 仍无 terminal。
 
@@ -93,9 +93,9 @@ v227 只新增 `compute_external_pool_adapter_artifact_source_receipts`，一份
 - fixed effects：`admin_authenticated_raw_body`、`byte_digest_match_only`、`artifact_ref_resolution_effect=none`、`adapter_effect=none`、`route_effect=none`；
 - actor/confirmation/server time、稳定 intake material digest、idempotency scope/key。
 
-declared、intake、reopened 与 content-address 四个 SHA 必须 exact 相等；长度必须为 1..33,554,432。receipt digest、admission id 和 `(idempotency_scope,idempotency_key)` 唯一。v227 BEFORE INSERT trigger 必须 exact JOIN v222 staged admission、request 与 approved review；v229 未来新增独立 BEFORE INSERT currentness trigger，拒绝任何已有 terminal，而不修改 v227 旧 migration。另有 JSON projection、no-update、no-delete 与 no-replace 门卫。
+declared、intake、reopened 与 content-address 四个 SHA 必须 exact 相等；长度必须为 1..33,554,432。receipt digest、admission id 和 `(idempotency_scope,idempotency_key)` 唯一。v227 BEFORE INSERT trigger 必须 exact JOIN v222 staged admission、request 与 approved review；v229 已新增独立 BEFORE INSERT currentness trigger 源码，拒绝任何已有 terminal，而不修改 v227 旧 migration。另有 JSON projection、no-update、no-delete 与 no-replace 门卫。
 
-Store 当前 exact replay 顺序是先按 scope/key 查既有回执并逐字段比较，再重审 admission；v229 实现必须把“无 terminal”加入 fresh 与 replay 的事务重审。terminal 后 PUT exact replay失败，历史 receipt 只能由 GET 读取。相同 admission 使用不同 key，或同 key 任一 material 漂移，均冲突。不同 admissions 可以共享同一内容寻址 blob，但必须各自保存 lineage receipt。
+Store exact replay 顺序是先按 scope/key 查既有回执并逐字段比较，再以 v229 sealed current authority 重审 admission；fresh 与 replay 的同一 IMMEDIATE 事务都要求“无 terminal”。terminal 后 PUT exact replay 失败，历史 receipt 只能由 GET 读取。相同 admission 使用不同 key，或同 key 任一 material 漂移，均冲突。不同 admissions 可以共享同一内容寻址 blob，但必须各自保存 lineage receipt。
 
 ## 6. 信任截止线与 P0 禁线
 
@@ -110,7 +110,7 @@ Store 当前 exact replay 顺序是先按 scope/key 查既有回执并逐字段�
 
 后续 Adapter registry consumer 仍须另行闭合 artifact provenance/signature、sandbox conformance、verifier registry/currentness/revocation、平台级 release actor 与 Provider-specific route actor 分权，以及 exact v222/v227 source companion。v227 永远不跨越该截止线。
 
-v229 terminal receipt 的固定 effects 为 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none` 与 `route_effect=none`。这些值只冻结未来合同；当前没有对应源码或运行记录。
+v229 terminal receipt 源码固定 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none` 与 `route_effect=none`。当前仍没有编译、migration 或运行记录。
 
 ## 7. 实现与验收门槛
 

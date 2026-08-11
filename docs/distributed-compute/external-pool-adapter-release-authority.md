@@ -16,7 +16,7 @@ implementation_status: implementation_partially_verified
 
 本权威与 Provider onboarding 分开：onboarding application 批准某个 Provider 使用指定 Adapter release/config；release admission 则冻结平台愿意继续审查的 Adapter 候选。任一来源都不能替代另一来源。
 
-v229 已另行冻结 admission 的 append-only 负向生命周期合同：immutable staged 根可追加唯一 `withdrawn/revoked/superseded` terminal，并派生 current view，同时让 v227 artifact PUT 在 pre-CAS、Store transaction 与新数据库 trigger 三处拒绝已有 terminal。该合同当前严格为 `design_frozen/source_not_written`，没有 Rust、迁移、API 或运行证据；详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
+v229 已写入 admission 的 append-only 负向生命周期源码：immutable staged 根可追加唯一 `withdrawn/revoked/superseded` terminal，并派生 current view，同时让 v227 artifact PUT 在 pre-CAS、Store transaction 与新数据库 trigger 三处拒绝已有 terminal。该合同当前严格为 `design_frozen/implementation_uncompiled/implementation_unrun`，没有编译、migration、测试或运行证据；详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
 
 ## 2. 不可旁路的三段流程
 
@@ -64,7 +64,7 @@ apply 只消费仍为 `approved` 的 exact request/review、稳定幂等键、�
 
 三类账本必须有 JSON 投影、追加式历史、禁止覆盖/删除、单调时间和状态来源 trigger。v222 不新增或修改 v213 Adapter/credential/route/seal 行，不替换 v213 source trigger，也不创建 Adapter current root、verifier registry、service actor 或 credential verification receipt。
 
-v229 设计固定新增独立 terminal receipt 与 current view，不更新或删除 admission。派生状态为 `staged|withdrawn|revoked|superseded`，终态不可恢复；`superseded` 必须绑定同 Adapter 的 exact、仍 current successor，但不能自动采用 successor。当前仅冻结设计、尚无源码，因此现有 consumer 仍必须把 admission 当作候选来源重新复核，不能假设 currentness 门卫已经生效。
+v229 源码新增独立 terminal receipt 与 current view，不更新或删除 admission。派生状态为 `staged|withdrawn|revoked|superseded`，终态不可恢复；`superseded` 必须绑定同 Adapter 的 exact、仍 current successor，但不能自动采用 successor。v227 consumer 已静态接入 currentness 门卫，但尚未编译或运行，因此不能把它描述为已经生效。
 
 ## 4. Future registry consumer 的硬门槛
 
@@ -89,11 +89,11 @@ v229 设计固定新增独立 terminal receipt 与 current view，不更新或�
 - 禁止改变 Provider 状态，或创建 CapacityPool、Supply、Offer、Price Snapshot、Job、Reservation、Execution Plan、outbox、Lease、Receipt 与 settlement。
 - HTTP 写入口只允许 `admin/owner`，actor 必须来自认证会话，响应只返回摘要回执；v229 terminal 不得复用既有 v222 MCP/PC 管理入口，也不得在没有独立权限批次时新增 MCP/PC 写入口。
 - 禁止把 staged admission 描述为 Adapter 可执行、外部矿池在线或商业可用。
-- 禁止把 v229 的设计状态写成已经存在的 current view 或 revocation 门卫；在源码与验证完成前，`design_frozen/source_not_written` 是唯一允许状态。
+- 禁止把 v229 的静态源码写成已经运行的 current view 或 revocation 门卫；在执行验证完成前，只允许 `design_frozen/implementation_uncompiled/implementation_unrun`。
 
 ## 6. 与后续批次的截止线
 
-当前形成 release staging 权威、已验证 Store 状态机和进程内管理员 Service/HTTP；生产部署与真实环境仍未接线。v227 server-owned quarantine raw bytes source 源码已写但未编译、迁移或运行，实际测量为 0，且它不解析 candidate ref。v229 只完成文档合同冻结，尚未写 terminal/current view、v227 currentness 门卫或管理员 terminal API。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
+当前形成 release staging 权威、已验证 Store 状态机和进程内管理员 Service/HTTP；生产部署与真实环境仍未接线。v227 server-owned quarantine raw bytes source 源码已写但未编译、迁移或运行，实际测量为 0，且它不解析 candidate ref。v229 terminal/current view、v227 currentness 门卫和管理员 terminal/currentness HTTP 源码已经写入，但同样未编译、迁移或运行。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
 
 后续 route producer 只有在 Adapter registry、sealed credential verification、TTL/revocation、service actor、六能力 currentness 和 onboarding source 在同一 Store 权威中闭合后，才允许写 v213 credential/route/seal rows。release admission 自身永远不跨越这条截止线。
 
@@ -101,4 +101,4 @@ v229 设计固定新增独立 terminal receipt 与 current view，不更新或�
 
 当前 2 项定向 Rust/SQLite Store 测试已执行完整临时文件迁移、submit、精确重放、独立复核、stage、重开读回及失败关闭路径；另 2 项进程内 HTTP 测试覆盖 `401/403`、actor 注入、四眼复核、确认门卫、摘要冲突、脱敏回执与 immutable replay。证据见 [`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md)。
 
-v222 状态为 `implementation_partially_verified`。v229 生命周期状态独立保持 `design_frozen/source_not_written`。既有 Store 状态机已运行不等于生产数据库已经升级、v229 终态已经生效、入口已经开放或任何生产 Adapter 能力已经存在；并发、异常断电、artifact、verifier、route 与网络仍未验证。
+v222 状态为 `implementation_partially_verified`。v229 生命周期状态独立保持 `design_frozen/implementation_uncompiled/implementation_unrun`。既有 Store 状态机已运行不等于生产数据库已经升级、v229 终态已经生效、入口已经运行或任何生产 Adapter 能力已经存在；并发、异常断电、artifact、verifier、route 与网络仍未验证。

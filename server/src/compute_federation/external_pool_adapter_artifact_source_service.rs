@@ -41,6 +41,24 @@ pub(crate) async fn put_for_admin(
     input: PutExternalPoolAdapterArtifactSource,
 ) -> Result<ExternalPoolAdapterArtifactSourceReceipt, ExternalPoolAdapterArtifactSourceServiceError>
 {
+    // A terminal admission cannot use PUT as a historical replay or as a repair path. Acquire the
+    // current staged authority before touching an existing blob or consuming the request body.
+    let authority = state
+        .store
+        .external_pool_adapter_artifact_intake_authority(
+            admission_id,
+            &input.expected_admission_digest,
+        )
+        .map_err(ExternalPoolAdapterArtifactSourceServiceError::Conflict)?
+        .ok_or(ExternalPoolAdapterArtifactSourceServiceError::NotFound)?;
+    if authority.admission_id() != admission_id
+        || authority.admission_digest() != input.expected_admission_digest
+    {
+        return Err(ExternalPoolAdapterArtifactSourceServiceError::Conflict(
+            anyhow::anyhow!("artifact source intake authority mismatch"),
+        ));
+    }
+
     // Receipt replay must prove the old blob is healthy before this request body can reach the CAS
     // writer. A missing or drifted blob is historical corruption, never an invitation to repair.
     if let Some(existing) = state
@@ -59,22 +77,6 @@ pub(crate) async fn put_for_admin(
                 anyhow::anyhow!("artifact source admission digest mismatch"),
             ));
         }
-    }
-
-    let authority = state
-        .store
-        .external_pool_adapter_artifact_intake_authority(
-            admission_id,
-            &input.expected_admission_digest,
-        )
-        .map_err(ExternalPoolAdapterArtifactSourceServiceError::Conflict)?
-        .ok_or(ExternalPoolAdapterArtifactSourceServiceError::NotFound)?;
-    if authority.admission_id() != admission_id
-        || authority.admission_digest() != input.expected_admission_digest
-    {
-        return Err(ExternalPoolAdapterArtifactSourceServiceError::Conflict(
-            anyhow::anyhow!("artifact source intake authority mismatch"),
-        ));
     }
 
     let artifact = intake_quarantined_artifact_bytes(

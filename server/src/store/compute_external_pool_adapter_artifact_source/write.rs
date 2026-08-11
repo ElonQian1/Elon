@@ -3,8 +3,9 @@ use chrono::{SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 use crate::store::{
-    compute_external_pool_adapter_release::{
-        admission_by_id_on, ExternalPoolAdapterReleaseArtifactSourceAdmission,
+    compute_external_pool_adapter_release_lifecycle::{
+        current_external_pool_adapter_release_admission_authority_on,
+        CurrentExternalPoolAdapterReleaseAdmissionAuthority,
     },
     new_id, Store,
 };
@@ -72,13 +73,24 @@ impl Store {
             )?
             .ok_or_else(|| anyhow::anyhow!("artifact source idempotency row disappeared"))?;
             ensure_replay(&stored, &input, &evidence)?;
+            let current = current_external_pool_adapter_release_admission_authority_on(
+                &transaction,
+                &input.admission_id,
+                &input.expected_admission_digest,
+            )?
+            .ok_or_else(|| anyhow::anyhow!("external-pool Adapter staged admission is absent"))?;
+            ensure_exact_admission(&current, &input, &evidence)?;
             let receipt = stored.into_receipt(true);
             transaction.commit()?;
             return Ok(receipt);
         }
 
-        let admission = admission_by_id_on(&transaction, &input.admission_id)?
-            .ok_or_else(|| anyhow::anyhow!("external-pool Adapter staged admission is absent"))?;
+        let admission = current_external_pool_adapter_release_admission_authority_on(
+            &transaction,
+            &input.admission_id,
+            &input.expected_admission_digest,
+        )?
+        .ok_or_else(|| anyhow::anyhow!("external-pool Adapter staged admission is absent"))?;
         ensure_exact_admission(&admission, &input, &evidence)?;
         if receipt_by_admission_on(&transaction, &input.admission_id)?.is_some() {
             bail!(
@@ -221,11 +233,12 @@ fn insert_receipt(
 }
 
 fn source_material(
-    admission: &ExternalPoolAdapterReleaseArtifactSourceAdmission,
+    authority: &CurrentExternalPoolAdapterReleaseAdmissionAuthority,
     input: &RecordExternalPoolAdapterArtifactSource,
     evidence: &ArtifactEvidence,
     recorded_at: String,
 ) -> StoredArtifactSource {
+    let admission = authority.admission();
     StoredArtifactSource {
         admission_id: admission.admission_id.clone(),
         admission_digest: admission.admission_digest.clone(),
@@ -289,10 +302,11 @@ fn artifact_evidence(input: &RecordExternalPoolAdapterArtifactSource) -> Result<
 }
 
 fn ensure_exact_admission(
-    admission: &ExternalPoolAdapterReleaseArtifactSourceAdmission,
+    authority: &CurrentExternalPoolAdapterReleaseAdmissionAuthority,
     input: &RecordExternalPoolAdapterArtifactSource,
     evidence: &ArtifactEvidence,
 ) -> Result<()> {
+    let admission = authority.admission();
     if admission.admission_id != input.admission_id
         || admission.admission_digest != input.expected_admission_digest
         || admission.status != "staged"

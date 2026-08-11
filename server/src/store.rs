@@ -89,6 +89,7 @@ mod compute_capacity_supply_withdrawal;
 mod compute_delivery_allocations;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_release;
+mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_onboarding;
 mod compute_job_contract_validation;
 mod compute_job_registry;
@@ -433,6 +434,14 @@ pub(crate) use compute_external_pool_adapter_release::{
     ExternalPoolAdapterReleaseReviewReceipt, ReviewExternalPoolAdapterReleaseRequest,
     SubmitExternalPoolAdapterReleaseRequest, EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
+};
+pub(crate) use compute_external_pool_adapter_release_lifecycle::{
+    CreateExternalPoolAdapterReleaseAdmissionTerminal,
+    ExternalPoolAdapterReleaseAdmissionCurrentnessReceipt,
+    ExternalPoolAdapterReleaseAdmissionTerminalWriteReceipt,
+    EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_REVOCATION_CONFIRMATION,
+    EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SUPERSESSION_CONFIRMATION,
+    EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_WITHDRAWAL_CONFIRMATION,
 };
 pub(crate) use compute_external_pool_onboarding::{
     ApplyExternalPoolOnboarding, CancelExternalPoolOnboardingRequest,

@@ -49,6 +49,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(stage_release),
         )
         .merge(super::external_pool_adapter_artifact_source_api::routes())
+        .merge(super::external_pool_adapter_release_lifecycle_api::routes())
 }
 
 #[derive(Debug, Deserialize)]
