@@ -96,6 +96,7 @@ mod compute_offer_owner_queries;
 mod compute_offer_publications;
 mod compute_offer_registry;
 mod compute_offer_terminal;
+mod compute_platform_reference_price_curve;
 mod compute_platform_settlement_account_view;
 mod compute_price_snapshot_registry;
 mod compute_price_snapshot_validation;

@@ -136,6 +136,8 @@ fn candidate_snapshot_ids_on(
             AND snapshot.consumer_max_amount_micros<=?2
             AND offer.status='active'
             AND provider.status='active'
+            AND offer.current_provider_policy_revision=provider.current_policy_revision
+            AND offer.current_provider_digest=provider.current_provider_digest
             AND julianday(snapshot.expires_at)>julianday(?3)
             AND julianday(offer.valid_from)<=julianday(?3)
             AND julianday(offer.valid_until)>julianday(?3)
@@ -178,6 +180,11 @@ fn quote_candidate_on(
         .ok_or_else(|| anyhow!("候选 Price Snapshot 的当前 Provider 不存在"))?;
     if current_provider.provider.status != PROVIDER_STATUS_ACTIVE {
         bail!("候选 Price Snapshot 的当前 Provider 不是 active");
+    }
+    if offer.provider_policy_revision != current_provider.provider.policy_revision
+        || offer.provider_digest != current_provider.provider_digest
+    {
+        return Ok(None);
     }
     let provider = registered_provider_version_on(
         conn,

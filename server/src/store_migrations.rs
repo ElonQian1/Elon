@@ -2,6 +2,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 
 mod compute_external_pool_adapter_release;
+mod compute_platform_reference_price_curve;
 #[cfg(test)]
 mod migration_tests;
 mod migrations_v17_v34;
@@ -258,6 +259,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (220, "消费者加密保险箱按项目和用户隔离条目 ID", crate::open_commerce_consumer_vault_migration::migration_v220),
     (221, "外部矿池所有者申请、独立复核与不可变登记来源", crate::compute_external_pool_onboarding_migration::migration_v221),
     (222, "外部矿池 Adapter release 四眼复核与 staged admission", compute_external_pool_adapter_release::migration_v222),
+    (223, "平台参考价格曲线四眼复核与 v171 Snapshot 来源", compute_platform_reference_price_curve::migration_v223),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

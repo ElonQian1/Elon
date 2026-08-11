@@ -67,7 +67,7 @@ future_reference = spot_index
 
 实现中不使用浮点数。各项以整数微单位和基点计算，保存曲线版本、观察窗口、样本量和回退来源。没有足够成交时，按上个有效指数、Provider 报价中位数和平台保底曲线依次回退，并在快照中记录来源。
 
-首段平台参考曲线不冒充上述真实价格发现。已冻结的 docs-first 合同采用 `platform_reference_curve:<curve_id>` 来源身份、`source_kind=fallback_curve` 与 `sample_count=0`：一名平台管理员提交精确 Offer/窗口/价格批次，另一名管理员独立复核，未来 v223 Store-private application 再在一个事务中直接生成唯一 v171 Snapshot。它只是四眼治理的参考回退价，不是 `index`、`mark`、`trade`、YCI、真实市场样本或平台签名价格源，完整边界见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
+首段平台参考曲线不冒充上述真实价格发现。已写入的 Store-private 源码采用 `platform_reference_curve:<curve_id>` 来源身份、`source_kind=fallback_curve` 与 `sample_count=0`：一名管理员 ID 提交精确 Offer/窗口/价格批次，另一名 ID 独立复核，v223 application 再在一个事务中直接生成唯一 v171 Snapshot。源码只校验 ID 形状与四眼分离，角色证明仍待 service/API；它不是 `index`、`mark`、`trade`、YCI、真实市场样本或平台签名价格源，完整边界见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
 
 ## 6. Price Snapshot
 
@@ -83,7 +83,7 @@ Reservation 必须绑定不可变快照，至少包含：
 
 所有价格使用 `i64/u64` 微单位，比例使用 basis points；禁止 `f32/f64`。历史任务永远引用原快照，不因未来曲线变化而重算。
 
-2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，并用 checked `i128` 检查金额上限。本人 HTTP/MCP 可从 Offer 生成 fallback_curve 快照，服务端固定来源、时间和摘要；v175 Broker 会复核并锁定 Job 已选择的既有 CNY 快照。2026-08-11 又冻结平台参考回退批次的 docs-first 设计：未来 application 必须直接复用 v171 transaction-local registration kernel，不能新建第二套 Snapshot 权威；其领域、Store 和 v223 源码尚未写入。真实价格源注册、指数/标记价、成交、订单簿和自动撮合仍未实现。
+2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，并用 checked `i128` 检查金额上限。本人 HTTP/MCP 可从 Offer 生成 fallback_curve 快照，服务端固定来源、时间和摘要；v175 Broker 会复核并锁定 Job 已选择的既有 CNY 快照。2026-08-11 又写入平台参考回退批次的领域、Store-private 与 v223 源码：application 直接复用 v171 transaction-local registration kernel，不新建第二套 Snapshot 权威；当前未编译、迁移或运行，也没有 service/API。真实价格源注册、指数/标记价、成交、订单簿和自动撮合仍未实现。
 
 ## 7. 双价格腿与平台价差
 
@@ -161,7 +161,7 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 ## 12. 演进顺序
 
 1. 版本化 Price Snapshot 注册、持久化与整数微单位（代码已写，尚未验证接线）；
-2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（设计已冻结，源码尚未写入）；
+2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（源码已写，未编译/迁移/运行）；
 3. 平台签名价格源、真实指数/标记价、期货曲线、批量报价和自动撮合；
 4. Provider Capacity Commitment 与需求方 Delivery Allocation；
 5. 限价订单簿、成交、持仓和净额；
@@ -172,4 +172,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 13. 当前未验证声明
 
-本文是已接受的目标市场合同。当前代码已写入 Offer-owner fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v201 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款流程；各段验证状态以专题验收文档为准。平台 reference fallback 批次目前只有 docs-first 冻结设计，领域、Store-private 与 v223 源码尚未写入。v195 只结清预授权并登记 pending；v196-v199 只处理内部挑战、纠正和 available 释放；v200 只冻结 Provider 本人的提款额；v201 的取消/拒绝只返还内部余额，`external_paid_attested` 只保存管理员声明与证据摘要。它们都不代表生产支付已经由平台执行或验证。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、真实付款、证据自动核验、指数/标记价、订单簿、持仓和外部清算仍未实现。
+本文是已接受的目标市场合同。当前代码已写入 Offer-owner fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v201 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款流程；各段验证状态以专题验收文档为准。平台 reference fallback 的领域、Store-private 与 v223 源码也已写入，但未编译、迁移或运行，且无 service/API。v195 只结清预授权并登记 pending；v196-v199 只处理内部挑战、纠正和 available 释放；v200 只冻结 Provider 本人的提款额；v201 的取消/拒绝只返还内部余额，`external_paid_attested` 只保存管理员声明与证据摘要。它们都不代表生产支付已经由平台执行或验证。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、真实付款、证据自动核验、指数/标记价、订单簿、持仓和外部清算仍未实现。

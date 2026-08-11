@@ -351,6 +351,11 @@ fn ensure_live_selection_on(
     if current_provider.provider.status != PROVIDER_STATUS_ACTIVE {
         bail!("quoted Job 只能选择当前 active Provider");
     }
+    if current_offer.provider_policy_revision != current_provider.provider.policy_revision
+        || current_offer.provider_digest != current_provider.provider_digest
+    {
+        bail!("quoted Job 只能选择绑定 Provider 当前策略的 Offer");
+    }
     let deadline = DateTime::parse_from_rfc3339(&job.workload.deadline_at)
         .context("quoted Job 的截止时间不是 RFC3339")?;
     if deadline <= chrono::Utc::now() {

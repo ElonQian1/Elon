@@ -39,7 +39,7 @@ owners: backend, node, ai-economy
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | v165-v168 Supply/Claim 与 v173 Claim 历史已在 Supply、Offer 和 Broker 定向链中执行临时 SQLite 全量迁移；Broker 测试验证 held 与 release 回流。并发、到期批处理、生产磁盘和真实节点仍未验证 |
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；HTTP/MCP 全链、并发和生产磁盘仍未验证 |
-| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 全量迁移和发布、幂等、审计及 draining 门卫定向测试；PC `/compute-supply` 已通过严格类型、lint、生产构建和 bundle budget。HTTP/MCP、权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，状态为 `implementation_partially_verified`；当前源码只生成 Offer-owner fallback_curve。平台四眼 reference fallback 批次已冻结 docs-first 设计，计划由 Store-private v223 application 直接生成唯一 v171 Snapshot，但源码尚未写入。两者都不预留容量、不冻结余额，也不代表真实市场价格 |
+| Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 全量迁移和发布、幂等、审计及 draining 门卫定向测试；PC `/compute-supply` 已通过严格类型、lint、生产构建和 bundle budget。HTTP/MCP、权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，状态为 `implementation_partially_verified`；当前公开源码只生成 Offer-owner fallback_curve。平台四眼 reference fallback 的领域、Store-private 与 v223 五账本/trigger 源码已写，application 直接复用 v171，状态为 `implementation_uncompiled`、`implementation_unrun`，且无 service/API 入口。两者都不预留容量、不冻结余额，也不代表真实市场价格 |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -64,7 +64,7 @@ owners: backend, node, ai-economy
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期，并按 Provider/状态读取本人队列；管理员 HTTP 可重建固定平台账户的 pending/available，并按状态读取全局队列。PC 已写入本人收益与管理员结算两套页面源码。视图和队列只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
 | 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移，两条 Store 状态机各通过 2 项专项；Adapter release 的 admin/owner Service/HTTP 又通过 2 项进程内接口验收，onboarding service/API 与 release 生产部署仍未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md)、[`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)、[`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md) |
-| 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 设计已冻结，限定 `fallback_curve/sample_count=0` 且直接复用 v171；领域、Store 与 v223 源码尚未写入。index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
+| 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已写入领域、Store-private 与 v223 源码，限定 `fallback_curve/sample_count=0` 且直接复用 v171；未编译、迁移或运行，也无 service/API。index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
 “已接受设计”不等于“已上线”。任何代理都必须保留实现状态，不得把文档中的目标合同描述成当前生产能力。
@@ -161,7 +161,7 @@ v193 再基于 accepted v192 签发 Execution Receipt：回执重新审计 Attem
 v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用可信终态：单一事务把 Lease 推进为 terminal、Job 推进为 `verification_pending`、Reservation/Claim 推进为 consumed；consumable meter 消费 compensable usage 并归还余量，reusable meter 全量归还。回执不可覆盖，预授权与 Provider 收益仍不变。
 
 v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。管理员现可读取有界到期候选并逐笔复用 v198；这是人工触发的部分成功批处理，不是后台定时清算。v200 再允许 Provider 所有者把本人 available 原子转入 withdrawn 提款保留区；v201 为申请增加取消、拒绝或外部已付款声明的唯一终态。取消/拒绝返还内部余额，付款声明只保存证据，不调用或验证外部资金网络。
-Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。平台 reference fallback 已冻结另一条 Store-private producer 设计：一名管理员提交 exact Offer/窗口/价格批次，另一名管理员复核，未来 v223 application 在一个事务中直接登记 entry 对应的唯一 v171 Snapshot。该设计没有源码或入口，来源仍为 `fallback_curve/sample_count=0`，不代表 index/mark/trade。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据或适配器配置。任何报价发布和锁价都不自动移动资金或容量；真实价格源、订单簿和自动撮合仍未实现。
+Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。平台 reference fallback 的 Store-private producer 源码也已写入：一名管理员 ID 提交 exact Offer/窗口/价格批次，另一名 ID 复核，v223 application 在一个事务中直接登记 entry 对应的唯一 v171 Snapshot。它仍无 service/API，状态为 `implementation_uncompiled`、`implementation_unrun`，来源固定为 `fallback_curve/sample_count=0`，不代表 index/mark/trade。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据或适配器配置。任何报价发布和锁价都不自动移动资金或容量；真实价格源、订单簿和自动撮合仍未实现。
 
 Provider、Pool、Bucket、Supply、激活、Offer 和 Broker 各自的控制面与证据由本页“阅读顺序”中的专题文档维护。PC `/compute-supply`、`/compute-activation`、`/compute-offers` 与 `/compute-market` 已完成静态生产构建；后续 Attempt 和结算入口仍为 `implementation_uncompiled`。静态构建不代表接口联调、浏览器验收、生产迁移或发布，Broker 证据见 `broker-control-plane-acceptance.md`。
 
@@ -179,7 +179,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 以标准化 Compute SKU 和交付窗口发行容量合约，引入订单、持仓、指数价、标记价、保证资源和到期交割；任务结算消费已锁定的价格快照。
 
-首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`，计划由 v223 application 直接生成既有 v171 Snapshot。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
+首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`；Store-private v223 application 源码在一个事务中直接登记既有 v171 Snapshot，但尚未编译或运行。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md)。
 
 ## 当前工程指令
 
