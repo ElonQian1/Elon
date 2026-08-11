@@ -254,7 +254,12 @@
   function visibleOptionNodes() {
     return Array.from(document.querySelectorAll(
       '[role="menuitemradio"], [role="menuitemcheckbox"], [role="menuitem"], [role="option"]'
-    )).filter(isVisible);
+    )).filter((node) => {
+      if (!isVisible(node)) return false;
+      const rect = node.getBoundingClientRect();
+      return rect.right > 0 && rect.bottom > 0 &&
+        rect.left < window.innerWidth && rect.top < window.innerHeight;
+    });
   }
 
   function opensSubmenu(node) {
@@ -350,6 +355,11 @@
     const reusable = lastOptions[section].filter((option) => isVisible(option.node));
     if (reusable.length > 0) {
       emitOptions(section, reusable, composer, emitEvent);
+      return result(action, true, '');
+    }
+    const alreadyOpen = collectOptions(section, null);
+    if (alreadyOpen.length > 0) {
+      emitOptions(section, alreadyOpen, composer, emitEvent);
       return result(action, true, '');
     }
     const trigger = triggerFor(section, composer);

@@ -36,6 +36,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("!baseline.has(node)"))
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
+        assertTrue(adapter.contains("const alreadyOpen = collectOptions(section, null)"))
+        assertTrue(adapter.contains("rect.left < window.innerWidth"))
         assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
         assertTrue(adapter.contains("semantic: optionSemantic(section, node, label)"))
         assertTrue(adapter.contains("opensSubmenu: opensSubmenu(node)"))
