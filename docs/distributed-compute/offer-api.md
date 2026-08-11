@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 Offer 草稿、发布与安全退场控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Offer 草稿、发布与安全退场控制面
 
 ## 1. 当前状态
 
-本控制面及对应 PC 工作区已写入代码，但尚未编译、执行 v182-v184 迁移、运行 HTTP/MCP 验证或发布，状态固定为 `implementation_uncompiled`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。
+本控制面已通过临时 SQLite 全量迁移和 2 项 Store/Service 定向测试，对应 PC 工作区已通过严格类型、lint、生产构建和 bundle budget，状态为 `implementation_partially_verified`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。HTTP/MCP、并发、生产磁盘、真实 TCP、浏览器交互和发布仍未验证，证据见 `offer-control-plane-acceptance.md`。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -122,9 +122,9 @@ active Offer 只是生成报价的前置合同。现有候选查询从未过期 
 
 `draft` 只是可审计的商业与容量意图，不是对消费者的可交易承诺。
 
-## 9. 尚未实现
+## 9. 尚未验证或实现
 
-- Cargo 编译、迁移执行、并发幂等和 HTTP/MCP 真实调用验证；
+- 并发幂等、HTTP/MCP 真实调用、生产磁盘迁移、浏览器交互和发布验证；
 - 自动终态调度，以及已有 Reservation 的自动取消、退款和 Claim 归还；
 - 真实价格源、期货曲线、批量报价和自动撮合；fallback_curve Price Snapshot 见 `price-snapshot-api.md`；
 - 容量动态校准、Attempt 派发、用量验证和运行中结算；
