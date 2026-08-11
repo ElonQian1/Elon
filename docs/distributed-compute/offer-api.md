@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前状态
 
-本控制面已通过临时 SQLite 全量迁移和 2 项 Store/Service 定向测试，对应 PC 工作区已通过严格类型、lint、生产构建和 bundle budget，状态为 `implementation_partially_verified`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。HTTP/MCP、并发、生产磁盘、真实 TCP、浏览器交互和发布仍未验证，证据见 `offer-control-plane-acceptance.md`。
+本控制面已通过临时 SQLite 全量迁移、Store/Service、进程内 HTTP/MCP 和文件重开专项，对应 PC 工作区已通过严格类型、lint、生产构建和 bundle budget，状态为 `implementation_partially_verified`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可通过 HTTP 或 MCP 原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。并发压力、生产数据库副本、真实 TCP、浏览器交互和发布仍未验证，证据见 `offer-control-plane-acceptance.md`。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -48,7 +48,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 
 工具加入现有项目级开放商业 MCP：`/api/projects/:project_id/open-commerce/mcp`。Provider 归属仍按登录用户判断，项目成员身份不能越权读写他人 Offer。
 
-管理员发布和退场不向 MCP 开放。AI 可协助准备和审阅草稿，但不能代替平台 `admin/owner` 通过 HTTP 执行最终状态变更。
+本人工具按认证用户隔离 Provider/Pool；管理员工具只在平台角色为 `admin/owner` 时出现在 `tools/list`。即使普通用户直接发送管理员工具名，也会在业务参数解码前失败关闭。所有写工具继续要求显式确认，并复用 HTTP 使用的同一 Service。
 
 | 工具 | 类型 | 作用 |
 |---|---|---|
@@ -57,6 +57,8 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | `compute_list_my_offers` | 只读 | 列出本人 Provider/Pool 下的 Offer |
 | `compute_revoke_my_offer_draft` | 显式确认的幂等写入 | 仅撤销本人当前 draft Offer |
 | `compute_revise_my_offer_draft` | 显式确认的幂等写入 | 完整替换本人当前 draft 合同并追加下一版本 |
+
+管理员 MCP 另提供 10 个工具：`compute_admin_list_offer_drafts`、`compute_admin_get_offer`，以及 publication、drain、expiration、revocation 各自的读取和写入工具。写工具分别为 `compute_admin_publish_offer`、`compute_admin_drain_offer`、`compute_admin_expire_offer` 和 `compute_admin_revoke_offer`；请求必须绑定精确版本、摘要和幂等键。
 
 ## 4. 创建前置条件
 
@@ -103,7 +105,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 
 管理员退场请求必须提供当前 active Offer 的 `expected_offer_version`、`expected_offer_digest`、非空原因、`idempotency_key` 和 `confirm_drain=true`。v183 在一个 `BEGIN IMMEDIATE` 事务中追加连续下一版本的 draining Offer，并保存 `compute_offer_lifecycle_events` 不可变回执；回执绑定退场前后版本、摘要、原因、执行人和时间。
 
-draining 状态用于停止接受新的报价和预留。现有候选查询只接受当前 active Offer，因此转换成功后该 Offer 不再进入新候选；已有 Reservation、Claim、Attempt 和余额均不在本事务中修改。该边界避免把“停止新增业务”误解为“强制取消已有履约”。所有者只有只读权限，管理员写入口不向 MCP 开放。
+draining 状态用于停止接受新的报价和预留。现有候选查询只接受当前 active Offer，因此转换成功后该 Offer 不再进入新候选；已有 Reservation、Claim、Attempt 和余额均不在本事务中修改。该边界避免把“停止新增业务”误解为“强制取消已有履约”。所有者只有只读权限，管理员 HTTP/MCP 写入口执行相同平台角色和服务端合同门卫。
 
 终态请求使用同样的精确版本、摘要、原因、幂等键和 `confirm_terminal=true` 约束，只接受当前 draining Offer。v184 为 Reservation 依赖检查增加查询索引；只要任意历史版本仍关联 `pending` 或 `active` Reservation，整个终态事务就失败。`expired` 还要求当前时间不早于 `valid_until`，提前退出只能选择 `revoked`。转换只追加 Offer 下一版本和 v183 生命周期回执，不替调用方取消预留、归还 Claim 或退款。
 
@@ -124,7 +126,7 @@ active Offer 只是生成报价的前置合同。现有候选查询从未过期 
 
 ## 9. 尚未验证或实现
 
-- 并发幂等、HTTP/MCP 真实调用、生产磁盘迁移、浏览器交互和发布验证；
+- 并发幂等压力、生产数据库副本升级、真实 TCP、浏览器交互和发布验证；
 - 自动终态调度，以及已有 Reservation 的自动取消、退款和 Claim 归还；
 - 真实价格源、期货曲线、批量报价和自动撮合；fallback_curve Price Snapshot 见 `price-snapshot-api.md`；
 - 容量动态校准、Attempt 派发、用量验证和运行中结算；
