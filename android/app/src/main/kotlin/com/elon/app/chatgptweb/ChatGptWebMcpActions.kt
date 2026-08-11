@@ -102,11 +102,10 @@ internal class ChatGptWebMcpActions(
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
                 val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
                     ?: return error(action, "stale_control_id")
-                if (!control.supportsSelectedState) return error(action, "control_state_not_settable")
                 val selected = args.opt("selected") as? Boolean
                     ?: return error(action, "missing_selected")
-                if (control.role == "radio" && !selected) {
-                    return error(action, "radio_cannot_be_cleared")
+                ChatGptWebSelectedStatePolicy.rejection(control, selected)?.let { rejection ->
+                    return error(action, rejection)
                 }
                 dispatch("set_ui_control_selected") { requestId ->
                     commands.setControlSelected(controlId, selected, requestId)

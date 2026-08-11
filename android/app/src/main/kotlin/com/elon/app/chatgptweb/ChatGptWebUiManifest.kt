@@ -36,7 +36,7 @@ internal data class ChatGptWebUiControl(
 
     val supportsSelectedState: Boolean
         get() = stateSettable && enabled && role in setOf(
-            "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch",
+            "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch", "tab",
         )
 
     val supportsChoiceSelection: Boolean

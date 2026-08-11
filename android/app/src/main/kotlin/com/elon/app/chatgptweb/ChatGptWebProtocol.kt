@@ -603,6 +603,7 @@ internal object ChatGptWebProtocol {
         "checkbox",
         "radio",
         "switch",
+        "tab",
         "range",
     )
     private val WRITABLE_UI_INPUT_KINDS = UI_INPUT_KINDS - setOf(
@@ -611,10 +612,11 @@ internal object ChatGptWebProtocol {
         "checkbox",
         "radio",
         "switch",
+        "tab",
         "range",
     )
     private val STATE_SETTABLE_UI_ROLES = setOf(
-        "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch",
+        "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch", "tab",
     )
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")

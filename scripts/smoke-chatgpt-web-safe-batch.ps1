@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 55
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +37,11 @@ $cases = @(
         id = "feature_pages"
         script = "smoke-chatgpt-web-feature-pages.ps1"
         arguments = $pinned + @{ MaxFeaturePages = 8 }
+    },
+    [pscustomobject]@{
+        id = "settings_structure"
+        script = "smoke-chatgpt-web-settings.ps1"
+        arguments = $pinned
     },
     [pscustomobject]@{
         id = "session_recovery"

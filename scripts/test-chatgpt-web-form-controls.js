@@ -81,6 +81,20 @@ const switchControl = control({
 });
 assert.equal(forms.describe(switchControl).role, 'switch');
 assert.equal(forms.describe(switchControl).stateSettable, true);
+assert.equal(forms.semantic(forms.describe(switchControl)), 'toggle');
+
+const selectedTab = control({
+  tagName: 'BUTTON',
+  attributes: { role: 'tab', 'aria-selected': 'true', 'aria-label': 'General' }
+});
+const tabDetails = forms.describe(selectedTab);
+assert.equal(tabDetails.role, 'tab');
+assert.equal(tabDetails.inputKind, 'tab');
+assert.equal(tabDetails.selected, true);
+assert.equal(tabDetails.stateSettable, true);
+assert.equal(forms.semantic(tabDetails), 'selection');
+assert.equal(forms.planSelectedState(selectedTab, true).needsActivation, false);
+assert.equal(forms.planSelectedState(selectedTab, false).reason, 'tab_cannot_clear');
 
 const menuRadio = control({
   tagName: 'DIV',
@@ -101,6 +115,7 @@ const modelSelect = control({
   attributes: { 'aria-label': 'Model' }
 });
 assert.deepEqual(forms.describe(modelSelect).choiceLabels, ['Fast', 'Thinking']);
+assert.equal(forms.semantic(forms.describe(modelSelect)), 'selection');
 assert.equal(forms.describe(modelSelect).selectedChoiceIndex, 0);
 assert.equal(forms.selectChoice(modelSelect, 1).ok, true);
 assert.equal(modelSelect.selectedIndex, 1);
@@ -122,6 +137,7 @@ assert.equal(rangeDetails.sliderMin, 0);
 assert.equal(rangeDetails.sliderMax, 2);
 assert.equal(rangeDetails.sliderStep, 0.5);
 assert.equal(rangeDetails.sliderValue, 1);
+assert.equal(forms.semantic(rangeDetails), 'slider');
 assert.equal(forms.setSliderValue(range, 1.6).ok, true);
 assert.equal(range.value, '1.5');
 assert.deepEqual(range.events, ['input', 'change']);
@@ -138,5 +154,6 @@ assert.equal(richText.textContent, 'Updated description');
 assert.match(forms.ACTIONABLE_SELECTOR, /role="textbox"/);
 assert.match(forms.ACTIONABLE_SELECTOR, /role="slider"/);
 assert.match(forms.ACTIONABLE_SELECTOR, /role="switch"/);
+assert.match(forms.ACTIONABLE_SELECTOR, /role="tab"/);
 assert.match(forms.ACTIONABLE_SELECTOR, /role="menuitemradio"/);
 process.stdout.write('CHATGPT_FORM_CONTROLS=passed\n');

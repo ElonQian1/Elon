@@ -17,7 +17,9 @@
     if (!plan.ok) {
       const detail = plan.reason === 'radio_cannot_clear'
         ? '单选项不能单独取消，请选择同组中的其他选项。'
-        : '该官网控件不支持设置选中状态。';
+        : plan.reason === 'tab_cannot_clear'
+          ? '当前标签不能单独取消，请选择其他标签页。'
+          : '该官网控件不支持设置选中状态。';
       return result('set_ui_control_selected', false, detail);
     }
     if (!plan.needsActivation) {

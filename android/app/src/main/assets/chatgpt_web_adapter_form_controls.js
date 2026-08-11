@@ -19,6 +19,7 @@
     '[role="menuitemcheckbox"]',
     '[role="menuitemradio"]',
     '[role="switch"]',
+    '[role="tab"]',
     '[role="slider"]'
   ].join(', ');
   const TEXT_INPUT_KINDS = new Set([
@@ -45,6 +46,7 @@
     const tag = tagName(node);
     if (explicitRole === 'slider') return 'range';
     if (explicitRole === 'switch') return 'switch';
+    if (explicitRole === 'tab') return 'tab';
     if (explicitRole === 'checkbox' || explicitRole === 'menuitemcheckbox') return 'checkbox';
     if (explicitRole === 'radio' || explicitRole === 'menuitemradio') return 'radio';
     if (explicitRole === 'combobox' || tag === 'select') return 'select';
@@ -58,7 +60,7 @@
     const explicit = attribute(node, 'role').toLowerCase();
     if ([
       'textbox', 'combobox', 'checkbox', 'radio', 'menuitemcheckbox',
-      'menuitemradio', 'switch', 'slider'
+      'menuitemradio', 'switch', 'tab', 'slider'
     ].includes(explicit)) return explicit;
     const kind = inputKind(node);
     if (kind === 'select') return 'combobox';
@@ -126,9 +128,11 @@
       inputKind: kind,
       writable,
       sensitive,
-      selected: !!(node && node.checked) || attribute(node, 'aria-checked') === 'true',
+      selected: !!(node && node.checked) ||
+        attribute(node, 'aria-checked') === 'true' ||
+        (resolvedRole === 'tab' && attribute(node, 'aria-selected') === 'true'),
       stateSettable: [
-        'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio', 'switch'
+        'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio', 'switch', 'tab'
       ].includes(resolvedRole) && !isDisabled(node),
       choiceLabels,
       selectedChoiceIndex,
@@ -139,6 +143,17 @@
       sliderValue: slider && slider.value,
       label: label(node)
     };
+  }
+
+  function semantic(details) {
+    if (!details) return '';
+    if (details.role === 'textbox') return 'text_input';
+    if (['combobox', 'tab'].includes(details.role)) return 'selection';
+    if ([
+      'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio', 'switch'
+    ].includes(details.role)) return 'toggle';
+    if (details.role === 'slider') return 'slider';
+    return '';
   }
 
   function nativeValueSetter(node) {
@@ -166,6 +181,9 @@
     const selected = rawSelected === true;
     if (['radio', 'menuitemradio'].includes(details.role) && !selected) {
       return { ok: false, reason: 'radio_cannot_clear' };
+    }
+    if (details.role === 'tab' && !selected) {
+      return { ok: false, reason: 'tab_cannot_clear' };
     }
     return {
       ok: true,
@@ -244,6 +262,7 @@
     ACTIONABLE_SELECTOR,
     describe,
     planSelectedState,
+    semantic,
     selectChoice,
     setSliderValue,
     setText

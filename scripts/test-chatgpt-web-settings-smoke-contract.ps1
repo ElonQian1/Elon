@@ -1,0 +1,58 @@
+$ErrorActionPreference = "Stop"
+
+$path = Join-Path $PSScriptRoot "smoke-chatgpt-web-settings.ps1"
+$source = Get-Content -LiteralPath $path -Raw
+$tokens = $null
+$parseErrors = $null
+[void][System.Management.Automation.Language.Parser]::ParseFile(
+    $path,
+    [ref]$tokens,
+    [ref]$parseErrors
+)
+if (@($parseErrors).Count -gt 0) {
+    throw "ChatGPT settings smoke has PowerShell parse errors: $($parseErrors[0].Message)"
+}
+
+foreach ($required in @(
+    "Assert-ChatGptWebSmokeTrustedDevice",
+    "Assert-ChatGptWebSmokeAdapterVersion",
+    'ExpectedAdapterVersion = 55',
+    'Wait-FirstControl -Semantic "profile" -Region "overlay"',
+    'Wait-FirstControl -Semantic "settings" -Region "overlay"',
+    '[string]$_.role -eq "tab"',
+    '[string]$_.role -eq "switch"',
+    '[string]$_.semantic -ne "selection"',
+    '[string]$_.semantic -ne "toggle"',
+    'selected = $true',
+    'idempotent_tab_selection = $true',
+    'changed_settings = $false',
+    "function Restore-Origin",
+    'sent_messages = 0',
+    'uploaded_attachments = 0',
+    'cleared_cookies = $false',
+    'cleared_app_data = $false',
+    "CHATGPT_SETTINGS_SMOKE_STATUS=passed"
+)) {
+    if (-not $source.Contains($required)) {
+        throw "ChatGPT settings smoke contract is missing: $required"
+    }
+}
+
+foreach ($forbidden in @(
+    "send_input",
+    "chatgpt_set_control_text",
+    "chatgpt_select_control_choice",
+    "selected = `$false",
+    "pm clear",
+    "removeAllCookies",
+    "chatgpt_remove_attachment",
+    "chatgpt_start_dictation",
+    "chatgpt_submit_dictation",
+    "chatgpt_new_conversation"
+)) {
+    if ($source.Contains($forbidden)) {
+        throw "ChatGPT settings smoke contains a forbidden side effect: $forbidden"
+    }
+}
+
+Write-Output "CHATGPT_SETTINGS_SMOKE_CONTRACT=passed"

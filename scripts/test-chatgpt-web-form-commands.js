@@ -54,6 +54,26 @@ commands.setSelected(alreadySelected, 'control_toggle_done', true, forms, (event
 }, () => {}, () => { snapshots += 1; });
 assert.equal(touch, null);
 
+const activeTab = node({ role: 'tab', 'aria-selected': 'true', 'aria-label': 'General' });
+touch = null;
+receipt = null;
+commands.setSelected(activeTab, 'control_tab_general', true, forms, (event) => {
+  touch = event;
+}, (action, ok, detail) => {
+  receipt = { action, ok, detail };
+}, () => { snapshots += 1; });
+assert.equal(receipt.ok, true);
+assert.equal(touch, null);
+
+commands.setSelected(activeTab, 'control_tab_general', false, forms, () => {
+  touch = 'unexpected';
+}, (action, ok, detail) => {
+  receipt = { action, ok, detail };
+}, () => { snapshots += 1; });
+assert.equal(receipt.ok, false);
+assert.match(receipt.detail, /标签/);
+assert.equal(touch, null);
+
 const select = node({ 'aria-label': 'Model' }, {
   tagName: 'SELECT',
   selectedIndex: 0,

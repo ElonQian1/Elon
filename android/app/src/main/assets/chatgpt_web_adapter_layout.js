@@ -168,12 +168,10 @@
     ].filter(Boolean).join(' ')).toLowerCase();
     const modelSignal = cleanText(signal + ' ' + labelOf(node, ''));
     if (form && (form.inputKind === 'search' || /search|搜索/.test(signal))) return 'search';
-    if (form && form.role === 'textbox') return 'text_input';
-    if (form && form.role === 'combobox') return 'selection';
-    if (form && [
-      'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio'
-    ].includes(form.role)) return 'toggle';
-    if (form && form.role === 'slider') return 'slider';
+    const formSemantic = formAdapter && typeof formAdapter.semantic === 'function'
+      ? formAdapter.semantic(form)
+      : '';
+    if (formSemantic) return formSemantic;
     if (
       region === 'composer' && modelLabelPolicy &&
       typeof modelLabelPolicy.isModelLabel === 'function' &&

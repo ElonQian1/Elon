@@ -380,6 +380,7 @@ class ChatGptWebProtocolTest {
                   {"id":"control_model_gh78","semantic":"selection","label":"模型","region":"content","role":"combobox","inputKind":"select","choiceLabels":["快速","思考"],"selectedChoiceIndex":1},
                   {"id":"control_effort_ij90","semantic":"slider","label":"思考强度","region":"content","role":"slider","inputKind":"range","sliderSettable":true,"sliderMin":0,"sliderMax":2,"sliderStep":0.5,"sliderValue":1.5},
                   {"id":"control_menu_kl12","semantic":"toggle","label":"快速","region":"overlay","role":"menuitemradio","inputKind":"radio","stateSettable":true,"selected":true},
+                  {"id":"control_tab_op56","semantic":"selection","label":"常规","region":"overlay","role":"tab","inputKind":"tab","stateSettable":true,"selected":true},
                   {"id":"control_tree_mn34","semantic":"navigation","label":"项目","region":"content","role":"treeitem","expanded":false,"expandable":true}
                 ]
               }
@@ -393,7 +394,8 @@ class ChatGptWebProtocolTest {
         val selection = event.value.controls[3]
         val slider = event.value.controls[4]
         val menuRadio = event.value.controls[5]
-        val disclosure = event.value.controls[6]
+        val tab = event.value.controls[6]
+        val disclosure = event.value.controls[7]
         assertEquals("search", search.inputKind)
         assertTrue(search.supportsTextEntry)
         assertFalse(password.writable)
@@ -411,6 +413,9 @@ class ChatGptWebProtocolTest {
         assertEquals(0.5, slider.slider?.step ?: -1.0, 0.0)
         assertEquals(1.5, slider.slider?.value ?: -1.0, 0.0)
         assertTrue(menuRadio.supportsSelectedState)
+        assertEquals("tab", tab.inputKind)
+        assertTrue(tab.selected)
+        assertTrue(tab.supportsSelectedState)
         assertEquals(false, disclosure.expanded)
         assertTrue(disclosure.supportsExpandedState)
     }

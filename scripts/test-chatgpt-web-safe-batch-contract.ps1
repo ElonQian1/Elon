@@ -15,13 +15,13 @@ if ($parseErrors.Count -gt 0) {
 }
 
 . $runtimePath
-$adapterState = [pscustomobject]@{ adapter_version = 54 }
-Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 54
+$adapterState = [pscustomobject]@{ adapter_version = 55 }
+Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 55
 $mismatchRejected = $false
 try {
-    Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 55
+    Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 56
 } catch {
-    $mismatchRejected = $_.Exception.Message -match 'expected=55 actual=54'
+    $mismatchRejected = $_.Exception.Message -match 'expected=56 actual=55'
 }
 if (-not $mismatchRejected) {
     throw "ChatGPT Web adapter version mismatch was not rejected."
@@ -35,6 +35,7 @@ $required = @(
     "ExpectedAdapterVersion = `$ExpectedAdapterVersion",
     'id = "read_only_surface"',
     'id = "feature_pages"',
+    'id = "settings_structure"',
     'id = "session_recovery"',
     'id = "message_actions"',
     "user_assisted_remaining",
@@ -67,6 +68,7 @@ if (
 foreach ($childScript in @(
     "smoke-chatgpt-web-apk.ps1",
     "smoke-chatgpt-web-feature-pages.ps1",
+    "smoke-chatgpt-web-settings.ps1",
     "smoke-chatgpt-web-session-recovery.ps1",
     "smoke-chatgpt-web-message-actions.ps1"
 )) {
