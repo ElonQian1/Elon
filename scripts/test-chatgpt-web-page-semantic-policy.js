@@ -108,6 +108,15 @@ expectEqual(policy.classify({
   pathname: '/', region: 'content', signal: 'Manage subscription'
 }), '', 'account semantics stay overlay scoped');
 expectEqual(policy.classify({
+  pathname: '/c/example', region: 'overlay', label: '6月1日，11:01'
+}), 'timestamp', 'Chinese message timestamp');
+expectEqual(policy.classify({
+  pathname: '/c/example', region: 'overlay', label: 'June 1, 2026, 11:01 AM'
+}), 'timestamp', 'English message timestamp');
+expectEqual(policy.classify({
+  pathname: '/c/example', region: 'content', label: '6月1日，11:01'
+}), '', 'timestamp semantics stay overlay scoped');
+expectEqual(policy.classify({
   pathname: '/',
   signal: 'sidebar-section-toggle account-owned-id 整理聊天',
   label: '整理聊天'

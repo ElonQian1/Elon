@@ -18,6 +18,15 @@
     { pattern: /^\/g\/g-p-[a-z0-9_-]+\/project(?:\/|$)/, semantic: 'project' }
   ]);
 
+  function isTimestampLabel(value) {
+    const text = clean(value);
+    return /timestamp|消息时间/.test(text) ||
+      /(?:today|yesterday|今天|昨天)[,，]?\s*\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?/.test(text) ||
+      /(?:\d{4}年)?\d{1,2}月\d{1,2}日[,，]?\s*\d{1,2}:\d{2}/.test(text) ||
+      /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}[,，\s]+\d{1,2}:\d{2}/.test(text) ||
+      /(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,\s*\d{4})?[,\s]+\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?/.test(text);
+  }
+
   function classify(input) {
     const pathname = clean(input && input.pathname);
     const path = clean(input && input.path);
@@ -42,6 +51,7 @@
       return 'download_app';
     }
     if (region === 'overlay') {
+      if (isTimestampLabel(label || signal)) return 'timestamp';
       if (/\bprofile\b|personal\s+(?:details|info)|个人(?:资料|信息)/.test(combined)) return 'profile';
       if (/personalization|personalise|personalize|个性化/.test(combined)) return 'personalization';
       if (/log\s*out|sign\s*out|退出登录|登出/.test(combined)) return 'logout';
@@ -62,5 +72,5 @@
     return '';
   }
 
-  return Object.freeze({ classify });
+  return Object.freeze({ classify, isTimestampLabel });
 });
