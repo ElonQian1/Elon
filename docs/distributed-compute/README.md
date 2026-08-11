@@ -43,7 +43,7 @@ owners: backend, node, ai-economy
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
-| Broker 原子 Reserve 与未执行任务终态 | v172-v176 已通过 2 项成功链/重放/回滚、1 项进程内 HTTP/MCP 身份与确认，以及 2 项独立连接并发竞争测试；服务端时间不再破坏终态重放。PC `/compute-market` 已静态生产构建；真实 TCP、高并发压力、生产磁盘、派发与结算未验证，状态为 `implementation_partially_verified`。详见 `broker-control-plane-acceptance.md` |
+| Broker 原子 Reserve 与未执行任务终态 | v172-v176 已通过 2 项成功链/重放/回滚、1 项进程内 HTTP/MCP 身份与确认、2 项独立连接竞争及 1 项两次临时磁盘重开测试；服务端时间不再破坏终态重放。PC `/compute-market` 已静态生产构建；真实 TCP、高并发压力、生产数据库升级、异常断电恢复、派发与结算未验证，状态为 `implementation_partially_verified`。详见 `broker-control-plane-acceptance.md` |
 | Attempt 已接受激活回执 | v185 状态推进内核仍负责原子激活 held Claim、reserved Job、active Reservation 与 staging Lease；v215 只在 sealed verified ACK 可用时同事务形成 exact application、actor receipt、Lease authority 与 commit outbox，并精确重放历史闭包。服务端及测试源码已编译，内存 SQLite 迁移与冲突 backfill 门卫已验证；生产磁盘迁移和生产链路仍未运行，旧 Provider HTTP/PC 人工确认写入口仍固定失败，也无可信 ACK producer、生产 Adapter、节点执行或新增扣款 |
 | Attempt Lease 状态与续租 | v186 的状态、续租 kernel 与历史读取仍在；Provider HTTP 人工续租写入口现固定 `COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY`，避免真实 Adapter 启用后用未认证心跳绕过 durable Renew/fencing/recovery。读取仍可保留，真实 Renew 尚未实现 |
 | staging Attempt 无用量安全中止 | v187 kernel 与历史读取仍在；Provider HTTP 人工“未执行”中止写入口现固定 `COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY`。v214 cancel observation 只解锁 reconcile，仍不等于 no-start；只有 rejected 或 final reconcile+tombstone 的 exact authenticated proof 可解 v176，真实零用量补偿/Abort service-actor kernel 尚未实现 |
@@ -142,7 +142,7 @@ F1 的下一硬门槛是实际执行 [`node-plugin-vfs-fault-authority.md`](node
 
 v185 保留唯一 Attempt 激活状态推进 kernel：单事务把 Claim `held -> active`、Job `reserved -> running`，更新 Reservation 并保存 staging Lease/回执。v211 已关闭 Provider 所有者人工确认激活；v214 形成 rejected/quarantine/reconcile 的 Store-local cleanup/recovery。v215 再把 authenticated accepted observation、ACK、v185、application actor、LeaseAuthorityBinding、commit outbox 与 application 放入同一事务；既有 ACK-null cleanup pair 只能 quarantine，历史重放不重新要求当前授权。服务端及测试源码已编译，内存 SQLite 完整迁移、重复应用、关键对象和冲突 backfill 门卫已验证；生产磁盘迁移和生产链路仍未运行。Offer `draining` 继续按 Reservation 历史版本履约，人工 Renew/Abort 写入口固定失败，也没有 sealed 输入构造器、网络或 worker。
 
-登录用户 HTTP/MCP 可读本人 Job/Reservation 并发起 Reserve、Release、Expire；旧 Attempt 激活 POST 已稳定失败，历史参与方仍可读激活回执与 Lease。上述 Broker 仅支持 `platform_balance_cny`，Store/Service、进程内接口和两连接竞争已定向验证；生产磁盘、真实 TCP、高并发压力、真实派发、超时归还和实际用量结算仍未验证，不能视为完整算力交易系统。
+登录用户 HTTP/MCP 可读本人 Job/Reservation 并发起 Reserve、Release、Expire；旧 Attempt 激活 POST 已稳定失败，历史参与方仍可读激活回执与 Lease。上述 Broker 仅支持 `platform_balance_cny`，Store/Service、进程内接口、两连接竞争和两次临时磁盘重开已定向验证；生产数据库升级、异常断电恢复、真实 TCP、高并发压力、真实派发、超时归还和实际用量结算仍未验证，不能视为完整算力交易系统。
 
 v187 保留最窄 staging 无用量中止 kernel 与历史回执，但 Provider 所有者人工写入口已关闭：未认证的 `executor_abort_ref` 或勾选“未执行”不能解 no-start 门。v214 产生的 exact rejected/final-reconcile proof 只可供 v176 重审计，不调用 v187，也不替代尚缺的 service-actor 补偿 kernel；当前没有真实取消/reconcile 网络，更不覆盖已开始执行、部分扣费、自动超时、调度重试或最终结算。
 
@@ -165,9 +165,9 @@ Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Sna
 
 Provider、Pool、Bucket、Supply、激活、Offer 和 Broker 各自的控制面与证据由本页“阅读顺序”中的专题文档维护。PC `/compute-supply`、`/compute-activation`、`/compute-offers` 与 `/compute-market` 已完成静态生产构建；后续 Attempt 和结算入口仍为 `implementation_uncompiled`。静态构建不代表接口联调、浏览器验收、生产迁移或发布，Broker 证据见 `broker-control-plane-acceptance.md`。
 
-v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 从 `submitted` 创建并只从当前合格候选进入 `quoted`；消费者幂等键、revision/digest CAS 及历史依赖审计已随 Broker 组合链通过临时 SQLite 定向测试。该结论不代表 HTTP/MCP、生产磁盘、自动撮合或任务派发已经验证。
+v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 从 `submitted` 创建并只从当前合格候选进入 `quoted`；消费者幂等键、revision/digest CAS、历史依赖审计及临时磁盘重开已随 Broker 组合链通过定向测试。该结论不代表真实 TCP、生产数据库升级、异常断电恢复、自动撮合或任务派发已经验证。
 
-v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Job、Offer、Price Snapshot 和 Claim 版本；v175/v176 Broker 组合入口已通过成功预留、未执行释放、双向幂等重放和余额不足整笔回滚测试。注册表单独调用仍不创建 Claim、不冻结预算或移动容量，HTTP/MCP、生产磁盘和并发尚未验证。
+v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Job、Offer、Price Snapshot 和 Claim 版本；v175/v176 Broker 组合入口已通过成功预留、未执行释放、双向幂等重放、余额不足整笔回滚、两连接竞争和两次临时磁盘重开测试。注册表单独调用仍不创建 Claim、不冻结预算或移动容量；真实 TCP、高并发压力、生产数据库升级和异常断电恢复尚未验证。
 
 后续实现可选择真实价格源/期货曲线、批量报价与撮合、容量自动调度与受控修复、Attempt 真实派发/续租/归还、重试时递增 `fencing_generation`、运行中任务与最终用量结算、多源计量、挑战任务、争议状态和可提取收益账本。
 

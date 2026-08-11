@@ -12,7 +12,7 @@ implementation_status: implementation_partially_verified
 
 V5 已有 Job、候选发现、锁价、Reservation、Broker Reserve 与未执行 Release/Expire 的生产实现，本轮没有创建第二套 Broker。临时 SQLite 可执行当前全量迁移，既有 Store/Service 可让真实平台消费者账户创建 Job、发现唯一合格 Offer/Price Snapshot、完成锁价，并在一个事务内预授权人民币余额、持有全部 meter 容量、推进 Job/Reservation 及保存不可变回执。
 
-状态提升为 `implementation_partially_verified`。Store/Service 与进程内 HTTP/MCP 已有定向证据；该结论不代表真实 TCP、并发、真实派发、运行中取消、实际用量或最终结算已经验证。
+状态提升为 `implementation_partially_verified`。Store/Service、进程内 HTTP/MCP、两连接竞争与临时磁盘重开已有定向证据；该结论不代表真实 TCP、高并发压力、生产数据库升级、异常断电恢复、真实派发、运行中取消、实际用量或最终结算已经验证。
 
 ## 2. 服务端证据
 
@@ -58,6 +58,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 --
 - 两个不同 Reservation 同时竞争同一 quoted Job 时只允许一个成功，另一请求在精确版本门卫失败；
 - 两种竞争结束后均只扣 10 分、只持有一次 tokens/concurrency，并且只存在一份 active Reservation。
 
+同日最后执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- test --manifest-path server/Cargo.toml --bin elon-server compute_federation_broker_service::restart_tests --locked
+```
+
+结果：1 项临时磁盘数据库重开测试通过，验证指纹为 `955152e1016e18b4e72bf22788ab2b3aae6598024a8ef5ab56907b9be99df25c`。覆盖：
+
+- Reserve 后关闭原 Store，再从同一 SQLite 文件重开，预算、容量、reserved Job、active Reservation 及不可变摘要均可继续读取；
+- 第一次重开后，相同 Reserve 请求只返回历史重放，不重复冻结余额或持有容量；
+- 重开后的 Store 可继续原子 Release，并恢复全部余额和容量；
+- 再次关闭并重开后，canceled Job、released Reservation 与不可变终态摘要仍一致，相同 Release 请求只返回历史重放。
+
 ## 3. PC 静态证据
 
 同日，包含 `/compute-market` 的 PC 前端已通过严格 TypeScript 与 Vite 生产构建，并产出独立 `ComputeMarketPage` JS/CSS chunk。该证据只说明源码可静态生产构建，不证明真实接口、浏览器交互、权限行为、视觉验收或发布。
@@ -65,7 +78,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 --
 ## 4. 尚未验证或实现
 
 - HTTP/MCP 真实 TCP、高并发压力、锁超时故障注入和完整路由联调；
-- 生产磁盘迁移、进程重启和浏览器操作；
+- 生产数据库升级、异常断电/进程崩溃恢复、长期磁盘耐久性和浏览器操作；
 - 真实价格源、批量报价、自动撮合和到期后台任务；
 - sealed Plan、可信 Adapter、节点命令、ACK、Attempt 真实派发与重试；
 - 已开始执行任务的安全取消、实际用量、验证、最终结算和 Provider 收益；

@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前状态
 
-本控制面的 Job、候选、锁价、原子 Reserve 与未执行 Release Store/Service 已通过组合事务测试，进程内 HTTP/MCP 已通过工具与身份隔离测试，两类独立 SQLite 连接竞争又通过 2 项并发测试，状态为 `implementation_partially_verified`；真实 TCP、高并发压力和生产磁盘仍未验证。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire。这些能力仍不能描述为完整算力交易或结算系统，证据见 `broker-control-plane-acceptance.md`。
+本控制面的 Job、候选、锁价、原子 Reserve 与未执行 Release Store/Service 已通过组合事务测试，进程内 HTTP/MCP 已通过工具与身份隔离测试，两类独立 SQLite 连接竞争通过 2 项并发测试，Reserve/Release 又通过两次临时磁盘数据库重开测试，状态为 `implementation_partially_verified`；真实 TCP、高并发压力、生产数据库升级和异常断电恢复仍未验证。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire。这些能力仍不能描述为完整算力交易或结算系统，证据见 `broker-control-plane-acceptance.md`。
 
 HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进入同一版本化 Job Store、Broker 和不可变回执。客户端不能提交 `consumer_account_id`、`project_id`、Job 状态或服务端时间；声明 `merchant_id` 时，该商户必须真实属于当前项目。Release/Expire 的 `occurred_at` 也由服务端生成；幂等重放仍核对全部客户端合同字段，但不把每次调用都会变化的服务端时间视为客户端请求差异。
 
@@ -88,7 +88,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 
 ## 6. 尚未实现
 
-- HTTP/MCP 真实 TCP、高并发压力、锁超时故障注入、完整路由联调和生产磁盘迁移；
+- HTTP/MCP 真实 TCP、高并发压力、锁超时故障注入、完整路由联调、生产数据库升级和异常断电恢复；
 - 真实价格源、批量报价和自动撮合；Offer 派生 fallback_curve 快照见 `price-snapshot-api.md`；
 - Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码，v186 HTTP 已增加 Lease 状态投影和外部心跳声明续租，v187 HTTP 已增加从未心跳的 staging 无用量中止；真实节点命令、自动超时回收、多次 Attempt 与 fencing 递增仍未实现；
 - 已出现心跳或真实运行任务的安全取消、容量处理、实际用量、验证和最终结算；
