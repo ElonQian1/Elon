@@ -10,18 +10,18 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前状态
 
-激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、v204 隔离恢复控制面、v205 恢复计划废止回执、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码。2026-08-11 已通过临时 SQLite 全量迁移和一项 Store/Service 定向状态链测试，实际覆盖登记、证据批准、不同管理员复核、原子激活、紧急隔离、恢复计划废止重做和原子恢复，状态更新为 `implementation_partially_verified`。HTTP/MCP、角色权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，详细证据见 `activation-control-plane-acceptance.md`。
+激活证据申请的 v177-v181、v203-v205 状态机、本人 HTTP/MCP、管理员 HTTP 和 22 个管理员 MCP 工具均已写入并复用同一生产 Service。2026-08-11 已通过临时 SQLite Store/Service 状态链，以及本人/管理员 HTTP/MCP、角色隔离、幂等重放和文件重开专项，实际覆盖登记、证据批准、不同管理员复核、原子激活、紧急隔离、恢复计划废止重做和原子恢复，状态为 `implementation_partially_verified`。并发压力、真实 TCP、浏览器和生产数据库副本升级仍未验证，详细证据见 `activation-control-plane-acceptance.md`。
 
 这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、激活应写入哪一个精确 Provider 合同、谁独立复核了该计划，以及该计划是否被受控应用”。`approved` 只表示证据包通过人工审核，`prepared` 只表示不可变候选合同已生成，第二人复核只固定复核事实；三者的 `activation_effect` 均为 `none`。只有不同于计划准备人的第二名 `admin/owner` 已按精确 `plan_digest` 留下 v203 回执后，应用入口才可能在一个事务内把 Provider 下一版本和 CapacityPool 改为 active，并保存不可变回执。该内部状态变化不连接节点、不读取凭据正文、不发布 Offer、不开放预留、不派发任务，也不移动资金。
 
-PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、第二人复核、计划二次预检、精确摘要应用、应用回执、紧急隔离和三段式恢复源码。当前账号若是计划准备人或恢复计划准备人，PC 不提供对应复核按钮；服务端仍是最终强制边界。管理员能力没有下放到本人页面或 MCP。两个页面已通过 PC 严格类型、lint 和生产构建，但尚未运行、浏览器验收或发布。
+PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、第二人复核、计划二次预检、精确摘要应用、应用回执、紧急隔离和三段式恢复源码。管理员 MCP 使用同一全局角色门卫；普通项目成员在 `tools/list` 中看不到这些工具，即使猜中名称也会在参数解码前失败。两个 PC 页面已通过严格类型、lint 和生产构建，但尚未运行、浏览器验收或发布。
 
 ## 2. 申请流程
 
 1. 用户先登记本人 `registering/self_declared` Provider、`registering` CapacityPool、Bucket 和所需 self-declared Supply。
 2. 用户提交节点绑定引用、短期 ReadyCapability 摘要、路由证明摘要和硬件观测摘要，并显式确认申请。
 3. 服务端确认 Provider/Pool 归属和 `registering` 状态，重新审计当前 Pool epoch，并锁定 Provider/Pool 精确版本及不含检查时间的稳定账本审计摘要。
-4. 管理员只能通过登录后的平台 HTTP 队列审核。批准前，服务端再次核对所有权、状态、精确版本和稳定账本审计摘要。
+4. 管理员通过登录后的平台 HTTP 或管理员 MCP 审核。批准前，服务端再次核对所有权、状态、精确版本和稳定账本审计摘要。
 5. 审核通过后，管理员可显式准备一个 v179 激活计划。服务端在同一事务内再次核对申请、Provider、Pool 和稳定账本审计摘要，并生成下一 Provider revision 的不可变目标合同。
 6. 不同于计划准备人的第二名管理员以当前 `plan_digest`、稳定幂等键和 `confirm_review=true` 独立复核计划，生成 v203 追加式回执，但不执行激活。
 7. 管理员以当前 `plan_digest`、稳定幂等键和 `confirm_apply=true` 应用计划；Store 在同一 `BEGIN IMMEDIATE` 事务内重新核对第二人复核和全部业务依赖，写入 Provider 下一版本、Pool 生命周期事件、申请/计划终态和 v180 不可变应用回执。
@@ -58,9 +58,9 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 | `compute_cancel_my_activation_evidence_request` | 显式确认、CAS 写入 | 取消仍为 submitted 的本人申请 |
 | `compute_preflight_my_activation_evidence_request` | 只读 | 检查本人申请的后续激活条件并返回阻断码 |
 
-管理员审核不向 MCP 开放，避免普通 AI 代理获得信任升级审批能力。
+管理员工具只对全局角色为 `admin/owner` 的会话开放，普通用户不会获得信任升级审批能力。
 
-## 5. 管理员 HTTP 审核
+## 5. 管理员 HTTP 与 MCP 审核
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
@@ -89,11 +89,13 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
+管理员 MCP 提供与上表相同的 22 个治理操作，名称统一使用 `compute_admin_*activation*`：申请队列/预检/审核/废止 4 个，激活计划准备/读取/预检/复核/应用/隔离 9 个，恢复计划准备/读取/预检/复核/废止/应用 9 个。写工具必须提交 HTTP 相同的精确摘要、幂等键和显式确认；MCP 不绕过第二人复核，也不产生额外状态真源。
+
 PC `/compute-activation` 复用上述管理员 HTTP 合同，不另建前端状态真源。工作区按状态筛选申请，先显示证据引用和申请预检，再把审核、计划准备、第二人复核、计划应用、过期批准废止、已激活资源隔离、隔离恢复和恢复计划废止重做拆成独立确认动作。激活和恢复表单只接收路由、Gateway、配置和凭据引用，不接收凭据正文；第二人复核展示准备人与复核人以及不可变复核摘要，应用按钮只有在对应预检 `ready_for_apply=true` 时可用。服务端写事务仍会重新审计，不能把前端快照当成授权或锁。恢复细节由 `docs/distributed-compute/activation-recovery-api.md` 维护。
 
 ## 6. 激活就绪预检
 
-本人 HTTP/MCP 和管理员 HTTP 可生成 `compute_federation.activation_preflight.v1` 只读报告。报告逐项检查申请已批准、Provider 所有权和精确版本未变化、Provider 仍为 registering、存在路由、存在 verified 硬件摘要及验证时间、信任层不再是 `self_declared`、服务区域非空、Pool 归属/版本/状态未变化，以及当前账本审计健康且稳定摘要一致。
+本人 HTTP/MCP 和管理员 HTTP/MCP 可生成 `compute_federation.activation_preflight.v1` 只读报告。报告逐项检查申请已批准、Provider 所有权和精确版本未变化、Provider 仍为 registering、存在路由、存在 verified 硬件摘要及验证时间、信任层不再是 `self_declared`、服务区域非空、Pool 归属/版本/状态未变化，以及当前账本审计健康且稳定摘要一致。
 
 失败项以稳定阻断码返回，例如 `request_not_approved`、`provider_routing_missing`、`verified_hardware_missing`、`provider_trust_tier_self_declared`、`pool_version_changed` 或 `ledger_audit_changed`。只有没有阻断项时 `ready_for_activation=true`；该值仍只是当前快照，不是授权、锁、SLA 或激活执行。预检的 `activation_effect` 同样固定为 `none`。
 
@@ -144,7 +146,7 @@ v203 回执绑定 `plan_id`、`request_id`、Provider/Pool、计划摘要、准�
 
 ## 11. 尚未实现
 
-- HTTP/MCP 真实接口、角色权限、并发、浏览器、生产磁盘迁移和发布验证；当前只验证了临时 SQLite Store/Service 状态链和 PC 静态生产构建；
+- 并发压力、真实 TCP、浏览器、生产数据库副本升级和发布验证；当前接口证据为进程内 HTTP/MCP 与临时文件重开；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
 - 第三名独立应用人、组织级多级审批、prepared 恢复计划废止/替换、重复隔离恢复周期和通用回滚控制面；

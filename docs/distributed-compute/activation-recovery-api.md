@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前状态
 
-v204 隔离恢复计划、第二人复核、只读预检和原子应用回执，以及 v205 prepared 计划追加式废止回执、管理员 HTTP 路由和 PC `/compute-activation` 管理界面已写入源码。2026-08-11 已通过临时 SQLite 全量迁移和 Store/Service 定向状态链测试，验证隔离后准备、不同管理员复核、显式废止、重新准备、旧复核不继承、预检和原子恢复；PC 源码也已通过严格类型、lint 和生产构建。HTTP、权限、并发、真实 TCP、浏览器和生产磁盘迁移仍未验证，状态为 `implementation_partially_verified`，详细证据见 `activation-control-plane-acceptance.md`。
+v204 隔离恢复计划、第二人复核、只读预检和原子应用回执，以及 v205 prepared 计划追加式废止回执、管理员 HTTP/MCP 和 PC `/compute-activation` 管理界面已写入源码。2026-08-11 已通过临时 SQLite Store/Service 状态链，以及管理员 HTTP/MCP、角色隔离和文件重开专项，验证隔离后准备、不同管理员复核、显式废止、重新准备、旧复核不继承、预检和原子恢复；PC 源码也已通过严格类型、lint 和生产构建。并发压力、真实 TCP、浏览器和生产数据库副本升级仍未验证，状态为 `implementation_partially_verified`，详细证据见 `activation-control-plane-acceptance.md`。
 
 本控制面不是删除 v181 隔离事实，也不是把数据库回滚到隔离前。它在保留原申请、激活计划、复核、应用和隔离回执的前提下，为同一 Provider 准备一个新的 active revision，并在条件满足时追加 `quarantined -> active` Pool 生命周期事件。历史事实保持可审计。
 
@@ -73,9 +73,9 @@ v204 隔离恢复计划、第二人复核、只读预检和原子应用回执，
 
 只有阻断列表为空时 `ready_for_apply=true`。该值不是锁、授权、SLA 或执行结果；`recovery_effect` 固定为 `none`。
 
-## 7. 管理员 HTTP
+## 7. 管理员 HTTP 与 MCP
 
-全部入口只允许平台 `admin/owner`，不向本人页面或 MCP 开放恢复写能力。
+全部入口只允许平台 `admin/owner`，不向本人页面或普通项目 MCP 会话开放恢复写能力。管理员 MCP 提供与下表相同的 9 个恢复计划读取和写入工具，并复用同一 Service、精确摘要、幂等键、显式确认及第二人复核门卫。
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
@@ -121,7 +121,7 @@ PC `/compute-activation` 在 v181 隔离回执下显示独立恢复区。准备�
 
 ## 11. 尚未实现
 
-- HTTP、权限、并发、浏览器、生产磁盘迁移和发布验证；当前只验证了临时 SQLite Store/Service 状态链和 PC 静态生产构建；
+- 并发压力、真实 TCP、浏览器、生产数据库副本升级和发布验证；当前接口证据为进程内 HTTP/MCP 与临时文件重开；
 - prepared 恢复计划自动过期、按策略自动替换或无人值守废止；当前只支持管理员显式废止后重做；
 - 恢复后再次隔离并形成第二个恢复周期；当前 v181 每份原激活应用最多一份隔离回执；
 - 自动清退旧 Offer、自动发布新 Offer 或批量恢复市场供给；
