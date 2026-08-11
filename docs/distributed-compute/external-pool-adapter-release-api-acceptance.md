@@ -2,17 +2,20 @@
 
 ## 1. 结论
 
-状态：`partially_verified`。
+状态：`management_surface_verified`，整体仍为 `partially_verified`。
 
-代码提交 `7b043a88f` 为 v222 Adapter release staging 增加管理员 Service/HTTP 入口，并通过定向真实 Rust 编译和 2 项进程内接口测试。该结论只证明受控 staging 入口可调用，不证明候选 Adapter 已下载、验签、加载、执行或获得 v213 route authority。
+代码提交 `7b043a88f` 为 v222 Adapter release staging 增加管理员写入口；代码提交 `a37595e1a` 继续补齐管理员列表、详情和 actor-aware preflight。六个管理操作已经通过定向真实 Rust 编译、进程内接口测试及 Store 关闭重开测试。该结论只证明受控 staging 管理面可调用且可审计读回，不证明候选 Adapter 已下载、验签、加载、执行或获得 v213 route authority。
 
 ## 2. 接口
 
+- `GET /api/admin/compute/external-pool-adapter-releases`：按状态列出 release request，`limit` 收敛到 1 至 100；
 - `POST /api/admin/compute/external-pool-adapter-releases`：提交候选 release；
+- `GET /api/admin/compute/external-pool-adapter-releases/:request_id`：读取 request、review 与 admission 的组合详情；
+- `GET /api/admin/compute/external-pool-adapter-releases/:request_id/preflight`：按当前管理员和账本状态返回 review/stage 可执行性及 blocker；
 - `POST /api/admin/compute/external-pool-adapter-releases/:request_id/review`：由另一名管理员独立复核；
 - `POST /api/admin/compute/external-pool-adapter-releases/:request_id/stage`：按 exact request/review 摘要形成 staged admission。
 
-三个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。当前没有对应 MCP/PC 写工具。
+六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。当前没有对应 MCP/PC 管理工具。
 
 ## 3. 已验证行为
 
@@ -26,23 +29,28 @@
 - 改变历史字段的同幂等键重放被拒绝；
 - `changes_requested` 不能 stage；
 - HTTP 回执不暴露 artifact ref 或 verifier 详情；
+- 列表支持 `submitted`、`approved`、`changes_requested`、`rejected`、`staged` 五种状态，未知状态失败关闭；
+- 详情组合 exact-audited request/review/admission 脱敏回执，且不绕过现有摘要和投影审计；
+- preflight 能区分提交者不可自审、待复核、可 stage、需重新提交、已拒绝和已 stage；
+- 列表、详情和 preflight 均执行管理员鉴权，普通成员不能读取发布账本；
+- Store 关闭重开后仍可按状态读取 exact request/review/admission 投影；
 - 最终效果保持 `staged_admission_only`，三张账本各只产生一行。
 
 ## 4. 验证命令与证据
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-external-pool-adapter-release-api -- test --manifest-path server/Cargo.toml --bin elon-server compute_federation::external_pool_adapter_release_api::tests -- --nocapture
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-external-pool-adapter-release-management -- test --manifest-path server/Cargo.toml --bin elon-server external_pool_adapter_release -- --nocapture
 ```
 
 - 结果：`CARGO_OK`；
-- 测试：2 项通过；
-- validation fingerprint：`e21798874a16f25eb9e2364ecb01a866c7b6f5d2ce0eb85c020b557392c85db8`；
-- validation receipt：`a38e67770c6a55870f000b7a781e7ad3afac622c031664b3d344b8733e54eea0`。
+- 测试：7 项通过，包含原写链回归、管理 API 和 Store 重启读取；
+- validation fingerprint：`2b55e579b08b89acf2e6bc1065914755bba1f7bbfad10c9917d61c3c32dbea3d`；
+- validation receipt：`873f84be88b448fa00b7f9b15195ebcba439ee1cee558df5c41a6793f017ecc6`。
 
 ## 5. 未验证边界
 
 - 未部署服务器，未对生产数据库或真实管理员会话调用；
-- 未提供列表、详情查询、撤回或 supersede 运维入口；
+- immutable release request 在 review 后关闭，当前未提供撤回或 supersede 运维入口；
 - 未解析或下载 `candidate_artifact_ref`，未重算实现摘要；
 - 未验证 verifier registry、签名、供应链或协议能力；
 - 未生成 Adapter registry/version、credential、service actor、v213 route/seal；
