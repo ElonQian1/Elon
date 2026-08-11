@@ -80,6 +80,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
             override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)
 
+            override fun regenerateResponse(requestId: String) =
+                pageAdapter.regenerateResponse(requestId)
+
             override fun startDictation(requestId: String) {
                 audioPermissionController.runWithMicrophone(
                     action = { controlInvocationCoordinator.startDictation(requestId) },

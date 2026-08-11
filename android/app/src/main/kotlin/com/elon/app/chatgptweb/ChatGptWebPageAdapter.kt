@@ -113,6 +113,11 @@ internal class ChatGptWebPageAdapter(
 
     fun regenerateResponse() = runCommand("regenerate_response")
 
+    fun regenerateResponse(requestId: String) = runCommand(
+        "regenerate_response",
+        requestId = requestId,
+    )
+
     fun startNewConversation() = runCommand("new_conversation")
 
     fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)

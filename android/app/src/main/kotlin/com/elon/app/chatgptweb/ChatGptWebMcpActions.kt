@@ -158,6 +158,17 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
+            "chatgpt_regenerate_response" -> {
+                val current = snapshot()
+                if (current?.streaming == true) return error(action, "generation_in_progress")
+                if (
+                    current?.capabilities?.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE) != true ||
+                    current.messages.lastOrNull { it.role == "assistant" }?.state != "completed"
+                ) {
+                    return error(action, "regenerate_unavailable")
+                }
+                dispatch("regenerate_response", commands::regenerateResponse)
+            }
             "chatgpt_start_dictation" -> {
                 val current = snapshot()
                 if (current?.dictationActive == true) return error(action, "dictation_already_active")
@@ -742,6 +753,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_control_expanded",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_regenerate_response",
             "chatgpt_start_dictation",
             "chatgpt_cancel_dictation",
             "chatgpt_submit_dictation",

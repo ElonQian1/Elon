@@ -263,6 +263,7 @@ class ChatGptWebMcpActionsTest {
         val dispatched = mutableListOf<Pair<String, String>>()
         val actions = actions(
             dictationActive = true,
+            regenerateSupported = true,
             includeWritableControl = true,
             includeFormControls = true,
             includeSliderControl = true,
@@ -290,6 +291,7 @@ class ChatGptWebMcpActionsTest {
                 .put("expanded", true) to "set_ui_control_expanded",
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
+            JSONObject().put("action", "chatgpt_regenerate_response") to "regenerate_response",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
             JSONObject().put("action", "chatgpt_submit_dictation") to "submit_dictation",
             JSONObject().put("action", "chatgpt_refresh_controls") to "snapshot_ui_manifest",
@@ -651,6 +653,7 @@ class ChatGptWebMcpActionsTest {
     private fun actions(
         dictationActive: Boolean = false,
         dictationSupported: Boolean = false,
+        regenerateSupported: Boolean = false,
         attachments: List<ChatGptWebAttachment> = emptyList(),
         messageParts: List<ChatGptWebMessagePart>? = null,
         messageWindowStart: Int = 0,
@@ -706,6 +709,7 @@ class ChatGptWebMcpActionsTest {
             capabilities = ChatGptWebCapabilities(buildSet {
                 add(ChatGptWebCapabilityId.DRAFT_SYNC)
                 if (dictationSupported) add(ChatGptWebCapabilityId.DICTATION)
+                if (regenerateSupported) add(ChatGptWebCapabilityId.MESSAGE_REGENERATE)
             }),
             pageKind = "conversation",
             loginRequired = false,
@@ -926,6 +930,8 @@ class ChatGptWebMcpActionsTest {
 
                 override fun stopGeneration(requestId: String) =
                     onDispatch("stop_generation", requestId)
+
+                override fun regenerateResponse(requestId: String) = onDispatch("regenerate_response", requestId)
 
                 override fun startDictation(requestId: String) {
                     onStartDictation()
