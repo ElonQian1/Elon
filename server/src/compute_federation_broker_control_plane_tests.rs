@@ -185,15 +185,16 @@ fn insufficient_balance_rolls_back_the_entire_reservation() {
     .is_err());
 }
 
-struct BrokerFixture {
-    supply: Fixture,
-    consumer_id: String,
-    project_id: String,
-    snapshot: crate::compute_federation_price_snapshot_service::MyComputePriceSnapshotView,
+pub(crate) struct BrokerFixture {
+    pub(crate) supply: Fixture,
+    pub(crate) consumer_id: String,
+    pub(crate) project_id: String,
+    pub(crate) snapshot:
+        crate::compute_federation_price_snapshot_service::MyComputePriceSnapshotView,
 }
 
 impl BrokerFixture {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let supply = Fixture::new();
         supply.seed_active_supply();
         let draft = compute_federation_offer_service::create_draft_for_user(
@@ -253,7 +254,12 @@ impl BrokerFixture {
                 None,
             )
             .unwrap();
-        let project_id = format!("project-{}", consumer.id);
+        let project_id = supply
+            .store
+            .create_project(&consumer.id, "Broker interface project", None, None)
+            .unwrap()
+            .project
+            .id;
         Self {
             supply,
             consumer_id: consumer.id,
@@ -262,7 +268,10 @@ impl BrokerFixture {
         }
     }
 
-    fn create_quoted_job(&self, suffix: &str) -> crate::store::ComputeJobRegistrationReceipt {
+    pub(crate) fn create_quoted_job(
+        &self,
+        suffix: &str,
+    ) -> crate::store::ComputeJobRegistrationReceipt {
         let created = compute_federation_broker_service::create_job_for_project(
             &self.supply.store,
             &self.consumer_id,
@@ -317,7 +326,7 @@ impl BrokerFixture {
         quoted
     }
 
-    fn reserve_request(
+    pub(crate) fn reserve_request(
         &self,
         quoted: &crate::store::ComputeJobRegistrationReceipt,
         suffix: &str,
@@ -345,7 +354,7 @@ impl BrokerFixture {
         }
     }
 
-    fn assert_capacity(
+    pub(crate) fn assert_capacity(
         &self,
         token_available: i64,
         token_held: i64,
@@ -369,7 +378,7 @@ impl BrokerFixture {
     }
 }
 
-fn workload() -> ComputeWorkloadSpec {
+pub(crate) fn workload() -> ComputeWorkloadSpec {
     ComputeWorkloadSpec {
         schema: COMPUTE_WORKLOAD_SCHEMA.into(),
         task_kind: "llm_chat".into(),

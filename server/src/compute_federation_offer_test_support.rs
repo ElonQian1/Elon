@@ -30,6 +30,7 @@ use crate::{
 
 pub(crate) struct Fixture {
     pub(crate) store: Store,
+    pub(crate) root: std::path::PathBuf,
     pub(crate) owner_id: String,
     pub(crate) admin_id: String,
     pub(crate) provider_id: String,
@@ -49,6 +50,7 @@ impl Fixture {
         std::fs::create_dir_all(&root).unwrap();
         Self {
             store: Store::open(&root.join("state.sqlite")).unwrap(),
+            root,
             owner_id: format!("offer-owner-{suffix}"),
             admin_id: format!("offer-admin-{suffix}"),
             provider_id: format!("provider-{suffix}"),
