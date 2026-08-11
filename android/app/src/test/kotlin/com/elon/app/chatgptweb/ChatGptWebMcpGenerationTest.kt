@@ -53,24 +53,31 @@ class ChatGptWebMcpGenerationTest {
     }
 
     @Test
-    fun nativeMessageRevealValidatesCurrentIdsAndStructuredPartIndexes() {
-        var revealed: Pair<String, Int?>? = null
+    fun nativeMessageRevealValidatesCurrentIdsTargetsAndStructuredPartIndexes() {
+        var revealed: Triple<String, Int?, String>? = null
         val actions = actions(
             pageGeneration = 1,
             adapterGeneration = 1,
             snapshot = MESSAGE_SNAPSHOT,
-            onRevealMessage = { messageId, partIndex ->
-                revealed = messageId to partIndex
+            onRevealMessage = { messageId, partIndex, nativeTarget ->
+                revealed = Triple(messageId, partIndex, nativeTarget)
                 true
             },
         )
 
         val result = actions.control(JSONObject()
+              .put("action", "chatgpt_reveal_message")
+              .put("message_id", "message_demo")
+              .put("target", "actions"))
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals(Triple("message_demo", null, "actions"), revealed)
+
+        val part = actions.control(JSONObject()
             .put("action", "chatgpt_reveal_message")
             .put("message_id", "message_demo")
             .put("part_index", 0))
-        assertTrue(result.getBoolean("control_ok"))
-        assertEquals("message_demo" to 0, revealed)
+        assertTrue(part.getBoolean("control_ok"))
+        assertEquals(Triple("message_demo", 0, "message"), revealed)
 
         val stale = actions.control(JSONObject()
             .put("action", "chatgpt_reveal_message")
@@ -84,6 +91,21 @@ class ChatGptWebMcpGenerationTest {
             .put("part_index", 2))
         assertFalse(invalidPart.getBoolean("control_ok"))
         assertEquals("invalid_part_index", invalidPart.getString("error"))
+
+        val invalidTarget = actions.control(JSONObject()
+            .put("action", "chatgpt_reveal_message")
+            .put("message_id", "message_demo")
+            .put("target", "unknown"))
+        assertFalse(invalidTarget.getBoolean("control_ok"))
+        assertEquals("invalid_reveal_target", invalidTarget.getString("error"))
+
+        val conflictingTarget = actions.control(JSONObject()
+            .put("action", "chatgpt_reveal_message")
+            .put("message_id", "message_demo")
+            .put("part_index", 0)
+            .put("target", "actions"))
+        assertFalse(conflictingTarget.getBoolean("control_ok"))
+        assertEquals("part_target_conflict", conflictingTarget.getString("error"))
     }
 
     private fun actions(
@@ -93,7 +115,7 @@ class ChatGptWebMcpGenerationTest {
         snapshot: ChatGptWebSnapshot = SNAPSHOT,
         onRefresh: () -> Unit = {},
         onRequestComposerOptions: () -> Unit = {},
-        onRevealMessage: (String, Int?) -> Boolean = { _, _ -> false },
+        onRevealMessage: (String, Int?, String) -> Boolean = { _, _, _ -> false },
     ) = ChatGptWebMcpActions(
         snapshot = { snapshot },
         uiManifest = { MANIFEST },

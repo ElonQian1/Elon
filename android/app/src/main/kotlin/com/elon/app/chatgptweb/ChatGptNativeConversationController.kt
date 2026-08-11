@@ -28,7 +28,11 @@ internal class ChatGptNativeConversationController(
     onInvokeControl: (String) -> Unit,
     onOpenOfficialOutput: () -> Unit,
 ) {
-    private data class RevealTarget(val messageId: String, val partIndex: Int?)
+    private data class RevealTarget(
+        val messageId: String,
+        val partIndex: Int?,
+        val nativeTarget: String,
+    )
 
     private var messages: List<ChatGptWebMessage> = emptyList()
     private val layoutManager = LinearLayoutManager(messagesView.context)
@@ -163,11 +167,12 @@ internal class ChatGptNativeConversationController(
         submit(requestId)
     }
 
-    fun revealMessage(messageId: String, partIndex: Int?): Boolean {
+    fun revealMessage(messageId: String, partIndex: Int?, nativeTarget: String): Boolean {
         val index = messages.indexOfFirst { it.id == messageId }
         if (index < 0) return false
         if (partIndex != null && partIndex !in messages[index].parts.indices) return false
-        val target = RevealTarget(messageId, partIndex)
+        if (nativeTarget !in ChatGptNativeMessageRevealTarget.ALL) return false
+        val target = RevealTarget(messageId, partIndex, nativeTarget)
         revealTarget = target
         scrollToMessage(index, target)
         return true
@@ -201,9 +206,7 @@ internal class ChatGptNativeConversationController(
             if (revealTarget != target) return@reveal
             val holder = messagesView.findViewHolderForAdapterPosition(index)
                 as? ChatGptNativeMessageAdapter.MessageViewHolder
-            val targetView = holder?.let { current ->
-                target.partIndex?.let(current.parts::getChildAt) ?: current.itemView
-            }
+            val targetView = holder?.let { current -> revealView(current, target) }
             if (targetView == null) {
                 retryReveal(index, target, attempt)
                 return@reveal
@@ -229,6 +232,17 @@ internal class ChatGptNativeConversationController(
                 retryReveal(index, target, attempt)
             }
         }
+    }
+
+    private fun revealView(
+        holder: ChatGptNativeMessageAdapter.MessageViewHolder,
+        target: RevealTarget,
+    ): View = target.partIndex?.let(holder.parts::getChildAt) ?: when (target.nativeTarget) {
+        ChatGptNativeMessageRevealTarget.CONTENT -> holder.text
+        ChatGptNativeMessageRevealTarget.COPY -> holder.copy
+        ChatGptNativeMessageRevealTarget.REGENERATE -> holder.regenerate
+        ChatGptNativeMessageRevealTarget.ACTIONS -> holder.more
+        else -> holder.itemView
     }
 
     private fun retryReveal(index: Int, target: RevealTarget, attempt: Int) {

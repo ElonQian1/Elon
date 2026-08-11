@@ -186,7 +186,7 @@ try {
     $script:viewModeChanged = $true
     Wait-ViewMode -ExpectedMode "native" | Out-Null
     $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
-        -Arguments @{ message_id = [string]$messageMore.context_id }
+        -Arguments @{ message_id = [string]$messageMore.context_id; target = "actions" }
     if ($reveal.control_ok -ne $true) {
         throw "The native message action target could not be revealed."
     }

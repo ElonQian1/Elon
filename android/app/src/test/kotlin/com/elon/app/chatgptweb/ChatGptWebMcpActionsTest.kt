@@ -337,6 +337,12 @@ class ChatGptWebMcpActionsTest {
         assertFalse(message.getBoolean("parts_truncated"))
         assertEquals("file", message.getJSONArray("parts").getJSONObject(1).getString("type"))
         assertEquals("chatgpt_reveal_message", message.getString("native_action"))
+        assertEquals(
+            listOf("message", "content", "copy", "regenerate", "actions"),
+            message.getJSONArray("native_reveal_targets").let { targets ->
+                (0 until targets.length()).map(targets::getString)
+            },
+        )
         assertEquals("chatgpt-message:a0:assistant", message.getString("native_adb_content_description"))
         assertEquals(
             "chatgpt-message-part:a0:1:file",
@@ -982,7 +988,7 @@ class ChatGptWebMcpActionsTest {
             },
             refresh = {},
             selectMode = {},
-            revealMessage = { _, _ -> true },
+            revealMessage = { _, _, _ -> true },
         )
     }
 }

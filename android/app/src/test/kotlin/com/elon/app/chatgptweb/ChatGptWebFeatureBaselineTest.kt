@@ -193,7 +193,7 @@ class ChatGptWebFeatureBaselineTest {
         assertTrue(summary.getInt("complete") > 0)
         assertTrue(summary.getInt("partial") > 0)
         assertTrue(summary.getInt("fallback_only") > 0)
-        assertEquals(32, codeSummary.getInt("implemented"))
+        assertEquals(33, codeSummary.getInt("implemented"))
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))

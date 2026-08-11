@@ -15,7 +15,7 @@ internal class ChatGptWebMcpActions(
     private val commands: ChatGptWebMcpCommandPort,
     private val refresh: () -> Unit,
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
-    private val revealMessage: (String, Int?) -> Boolean,
+    private val revealMessage: (String, Int?, String) -> Boolean,
 ) {
     fun uiState(): JSONObject {
         val observed = observedState()
@@ -235,10 +235,22 @@ internal class ChatGptWebMcpActions(
                 } else {
                     null
                 }
+                val nativeTarget = args.optString("target")
+                    .trim()
+                    .lowercase()
+                    .ifBlank { ChatGptNativeMessageRevealTarget.MESSAGE }
+                if (nativeTarget !in ChatGptNativeMessageRevealTarget.ALL) {
+                    return error(action, "invalid_reveal_target")
+                }
                 if (partIndex != null && partIndex !in message.parts.indices) {
                     return error(action, "invalid_part_index")
                 }
-                if (!revealMessage(messageId, partIndex)) return error(action, "message_not_rendered")
+                if (partIndex != null && nativeTarget != ChatGptNativeMessageRevealTarget.MESSAGE) {
+                    return error(action, "part_target_conflict")
+                }
+                if (!revealMessage(messageId, partIndex, nativeTarget)) {
+                    return error(action, "message_not_rendered")
+                }
             }
             "chatgpt_find_controls" -> return controlsPage(args)
             "chatgpt_get_conversations" -> return conversationsPage(args)
@@ -524,6 +536,7 @@ internal class ChatGptWebMcpActions(
                 .put("content_truncated", message.content.length > maxChars)
                 .put("part_count", message.parts.size)
                 .put("native_action", "chatgpt_reveal_message")
+                .put("native_reveal_targets", JSONArray(ChatGptNativeMessageRevealTarget.ALL))
                 .put(
                     "native_adb_content_description",
                     ChatGptNativeControlPresentation.messageSelector(message.id, message.role),
