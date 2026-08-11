@@ -4,7 +4,7 @@
 
 状态：`partially_verified`。
 
-代码提交 `1e07b42da` 为 v221 onboarding 增加 owner submit、管理员 review 与 immutable application 三条 Service/HTTP 写入口，并通过定向真实 Rust 编译和 2 项进程内接口测试。该结论只证明受控来源登记可调用，不证明 Provider 已激活、可路由、可供给容量或可执行任务。
+本验收对应的 v221 onboarding 增加 owner submit、管理员 review 与 immutable application 三条 Service/HTTP 写入口；合并远端 v223 后同步修复其价格曲线 read helper 的模块可见性，并通过定向真实 Rust 编译和 2 项进程内接口测试。该结论只证明受控来源登记可调用，不证明 Provider 已激活、可路由、可供给容量或可执行任务。
 
 ## 2. 已实现接口
 
@@ -36,7 +36,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 
 - 结果：`CARGO_OK`；
 - 测试：2 项通过；
-- validation fingerprint：`4880ee0cc5769f20d6f3c93817855ce0f82a4049bde3393bf8b926ba1ed1bb28`；
+- validation fingerprint：`94c1604e56f6a70e167118845fba5cb3d6b00b9599348a8c30672a12dcf73e01`；
 - validation receipt：`1ede1b0535fcc13192de3b9e85859d015575531986eab377b97adf7c7b413f7a`。
 
 ## 5. 未验证边界
