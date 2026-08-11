@@ -153,6 +153,7 @@
       node.getAttribute('aria-label'),
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
+    const modelSignal = cleanText(signal + ' ' + labelOf(node, ''));
     if (form && (form.inputKind === 'search' || /search|搜索/.test(signal))) return 'search';
     if (form && form.role === 'textbox') return 'text_input';
     if (form && form.role === 'combobox') return 'selection';
@@ -163,7 +164,7 @@
     if (
       region === 'composer' && modelLabelPolicy &&
       typeof modelLabelPolicy.isModelLabel === 'function' &&
-      modelLabelPolicy.isModelLabel(signal)
+      modelLabelPolicy.isModelLabel(modelSignal)
     ) return 'model';
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
