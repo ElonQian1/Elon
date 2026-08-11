@@ -49,6 +49,9 @@ class ChatGptWebLabContractTest {
         val pageSemanticPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js"
         )
+        val navigationPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_navigation_policy.js"
+        )
         val formControls = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_form_controls.js"
         )
@@ -67,6 +70,12 @@ class ChatGptWebLabContractTest {
         assertTrue(
             bridge.indexOf("chatgpt_web_adapter_bootstrap.js") <
                 bridge.indexOf("chatgpt_web_adapter_conversations.js")
+        )
+        assertTrue(
+            bridge.indexOf("chatgpt_web_adapter_navigation_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_navigation.js") &&
+                bridge.indexOf("chatgpt_web_adapter_navigation.js") <
+                bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js")
         )
         assertTrue(
                 bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
@@ -94,6 +103,8 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("observedMessageCount:"))
         assertTrue(adapter.contains("messageWindowStart:"))
         assertTrue(messages.contains("function readMessageWindow(streaming)"))
+        assertTrue(navigationPolicy.contains("function isProjectRoute(path)"))
+        assertTrue(navigationPolicy.contains("function isConversationPath(path)"))
         assertTrue(adapter.contains("observer.disconnect()"))
         assertTrue(adapter.contains("removeEventListener('popstate', scheduleSnapshot)"))
         assertTrue(adapter.contains("dispose"))

@@ -3,6 +3,9 @@
 
   if (window.__elonChatGptNavigation || location.origin !== 'https://chatgpt.com') return;
 
+  const navigationPolicy = window.__elonChatGptNavigationPolicy;
+  if (!navigationPolicy) return;
+
   const MAX_FEATURES = 60;
   let lastFeatures = [];
 
@@ -46,19 +49,6 @@
     }
   }
 
-  function classify(label, path) {
-    const value = (label + ' ' + path).toLowerCase();
-    if (/library|文件库|资料库/.test(value)) return 'library';
-    if (/scheduled|schedule|task|已安排|任务/.test(value)) return 'tasks';
-    if (/project|项目/.test(value)) return 'projects';
-    if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(value)) return 'gpts';
-    if (/memory|记忆/.test(value)) return 'memory';
-    if (/plugin|connector|app(s)?\b|插件|应用/.test(value)) return 'apps';
-    if (/setting|account|profile|设置|账号|账户/.test(value)) return 'settings';
-    if (/more|更多/.test(value)) return 'more';
-    return 'navigation';
-  }
-
   function hash(value) {
     let result = 2166136261;
     for (let index = 0; index < value.length; index += 1) {
@@ -73,7 +63,7 @@
   }
 
   function isConversationNode(node, path) {
-    return /^\/c\/[A-Za-z0-9_-]+$/.test(path) || !!node.closest('a[href*="/c/"]');
+    return navigationPolicy.isConversationPath(path) || !!node.closest('a[href*="/c/"]');
   }
 
   function isExcludedLabel(label) {
@@ -98,7 +88,7 @@
           const label = nodeLabel(node).slice(0, 120);
           const path = sameOriginPath(node);
           if (!label || isExcludedLabel(label) || isConversationNode(node, path)) return;
-          const kind = classify(label, path);
+          const kind = navigationPolicy.classify(label, path);
           const routeCandidate = path && path !== '/' && !path.startsWith('/auth');
           if (kind === 'navigation' && !routeCandidate) return;
           values.push({ node, label, path, kind });

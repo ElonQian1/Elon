@@ -325,6 +325,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_composer_option_policy.js",
             "chatgpt_web_adapter_composer.js",
+            "chatgpt_web_adapter_navigation_policy.js",
             "chatgpt_web_adapter_navigation.js",
             "chatgpt_web_adapter_page_semantic_policy.js",
             "chatgpt_web_adapter_form_controls.js",
