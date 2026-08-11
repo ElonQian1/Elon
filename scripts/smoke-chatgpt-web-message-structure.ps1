@@ -1,0 +1,230 @@
+#requires -Version 5.1
+
+[CmdletBinding()]
+param(
+    [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
+    [Parameter(Mandatory = $true)][string]$DeviceSerial,
+    [string]$ExpectedHardwareSerial = "",
+    [ValidateRange(20, 180)][int]$ReadyTimeoutSec = 90,
+    [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
+    [ValidateRange(1, 50)][int]$MaxConversations = 20
+)
+
+$ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+
+$runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
+    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
+Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
+
+function Wait-ConversationPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $expectedPath = $Path
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "historical conversation structure" -Predicate {
+            param($state)
+            $state.surface -eq "chatgpt_web" -and
+                $state.bridge_state -eq "ready" -and
+                [string]$state.conversation.url -like "*$expectedPath*" -and
+                [int]$state.conversation.message_count -gt 0
+        }.GetNewClosure()
+}
+
+function Get-ContextWithParts {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
+    do {
+        $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_get_context" -Arguments @{ message_offset = 0; message_limit = 50 }
+        $messages = @($context.messages | Where-Object { $null -ne $_ })
+        $parts = @(
+            $messages |
+                ForEach-Object { @($_.parts | Where-Object { $null -ne $_ }) }
+        )
+        if ($parts.Count -gt 0) {
+            return [pscustomobject]@{ context = $context; messages = $messages; parts = $parts }
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $null
+}
+
+function Get-ConversationPathFromUrl {
+    param([string]$Url)
+
+    if ([string]::IsNullOrWhiteSpace($Url)) { return "" }
+    try {
+        $uri = [Uri]$Url
+        if ($uri.Host -notin @("chatgpt.com", "www.chatgpt.com")) { return "" }
+        if ($uri.AbsolutePath -match '^/c/') { return $uri.AbsolutePath }
+    } catch {
+        return ""
+    }
+    return ""
+}
+
+function Get-VisibleMessageSelectors {
+    $remotePath = "/sdcard/elon-chatgpt-message-structure.xml"
+    try {
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "uiautomator", "dump", $remotePath) -TimeoutSec 30 `
+            -Label "dump native message UI" | Out-Null
+        $xml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "cat", $remotePath) -TimeoutSec 30 `
+            -Label "read native message UI"
+        return [pscustomobject]@{
+            messages = @(
+                [regex]::Matches($xml, 'content-desc="(chatgpt-message:[^"]+)"') |
+                    ForEach-Object { $_.Groups[1].Value } |
+                    Sort-Object -Unique
+            )
+            parts = @(
+                [regex]::Matches($xml, 'content-desc="(chatgpt-message-part:[^"]+)"') |
+                    ForEach-Object { $_.Groups[1].Value } |
+                    Sort-Object -Unique
+            )
+        }
+    } finally {
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "rm", "-f", $remotePath) -TimeoutSec 10 `
+            -Label "remove native message UI dump" | Out-Null
+    }
+}
+
+function Restore-Origin {
+    param(
+        [Parameter(Mandatory = $true)]$Origin,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$OriginPath
+    )
+
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = "web" } | Out-Null
+    if ($OriginPath) {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
+            -Arguments @{ conversation_path = $OriginPath } | Out-Null
+        Wait-ConversationPath -Path $OriginPath | Out-Null
+    } else {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation" | Out-Null
+        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+            -Description "restored blank conversation" -Predicate {
+                param($state)
+                $state.surface -eq "chatgpt_web" -and
+                    $state.bridge_state -eq "ready" -and
+                    [int]$state.conversation.message_count -eq 0 -and
+                    $state.streaming -eq $false
+            } | Out-Null
+    }
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = [string]$Origin.view_mode } | Out-Null
+    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "restored ChatGPT view mode" -Predicate {
+            param($state)
+            [string]$state.view_mode -eq [string]$Origin.view_mode
+        } | Out-Null
+}
+
+Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
+    -EnsureMainActivity | Out-Null
+$origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+    -Description "authenticated ChatGPT message surface" -Predicate {
+        param($state)
+        $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
+    }
+if ([int]$origin.input.text_length -gt 0) {
+    throw "ChatGPT message structure verification is deferred while a draft is present."
+}
+$originPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url)
+$restoreRequired = $false
+$result = $null
+try {
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = "web" } | Out-Null
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_list_conversations" | Out-Null
+    Start-Sleep -Seconds 1
+    $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_get_conversations" `
+        -Arguments @{ offset = 0; limit = $MaxConversations }
+    $candidates = @(
+        $page.conversations |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.path) } |
+            Select-Object -First $MaxConversations
+    )
+    if ($candidates.Count -eq 0) {
+        throw "ChatGPT message structure verification is deferred without conversation history."
+    }
+
+    $sample = $null
+    $inspected = 0
+    foreach ($candidate in $candidates) {
+        $path = [string]$candidate.path
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
+            -Arguments @{ conversation_path = $path } | Out-Null
+        $restoreRequired = $true
+        Wait-ConversationPath -Path $path | Out-Null
+        $inspected += 1
+        $sample = Get-ContextWithParts
+        if ($null -ne $sample) { break }
+    }
+    if ($null -eq $sample) {
+        throw "ChatGPT structured message sample is unavailable; verification is deferred."
+    }
+
+    $expectedSelectors = @(
+        $sample.parts |
+            ForEach-Object { [string]$_.native_adb_content_description } |
+            Where-Object { $_ -match '^chatgpt-message-part:' } |
+            Sort-Object -Unique
+    )
+    if ($expectedSelectors.Count -ne $sample.parts.Count) {
+        throw "Structured message parts do not all expose stable native selectors."
+    }
+    $partTypes = @(
+        $sample.parts |
+            ForEach-Object { [string]$_.type } |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
+
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = "native" } | Out-Null
+    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "native structured message surface" -Predicate {
+            param($state)
+            $state.view_mode -eq "native" -and $state.bridge_state -eq "ready"
+        } | Out-Null
+    Start-Sleep -Seconds 3
+    $visible = Get-VisibleMessageSelectors
+    $matchedSelectors = @($visible.parts | Where-Object { $_ -in $expectedSelectors })
+    if ($visible.messages.Count -eq 0 -or $matchedSelectors.Count -eq 0) {
+        throw "Native structured message selectors are not visible in the Android UI tree."
+    }
+
+    $result = [ordered]@{
+        schema = "elon.chatgpt_web.message_structure_smoke.v1"
+        passed = $true
+        device_serial = $DeviceSerial
+        inspected_conversation_count = $inspected
+        message_count = $sample.messages.Count
+        message_part_count = $sample.parts.Count
+        message_part_types = $partTypes
+        context_selector_count = $expectedSelectors.Count
+        visible_message_selector_count = $visible.messages.Count
+        visible_part_selector_count = $visible.parts.Count
+        matched_part_selector_count = $matchedSelectors.Count
+        original_conversation_restored = $true
+        original_view_mode_restored = $true
+        sent_messages = 0
+        uploaded_attachments = 0
+        cleared_cookies = $false
+        cleared_app_data = $false
+    }
+} finally {
+    if ($restoreRequired) {
+        Restore-Origin -Origin $origin -OriginPath $originPath
+    }
+}
+
+$result | ConvertTo-Json -Depth 8
+Write-Output "CHATGPT_WEB_MESSAGE_STRUCTURE_SMOKE_STATUS=passed"
