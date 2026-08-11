@@ -28,6 +28,39 @@ Assert-Contains $smoke "ExpectedHardwareSerial" `
     "Feature-page smoke must pin a wireless device to its hardware identity."
 Assert-Contains $smoke "Assert-ChatGptWebSmokeTrustedDevice" `
     "Feature-page smoke must verify the pinned physical device."
+Assert-Contains $runtime "function Wait-ChatGptWebSmokeAuthenticatedReady" `
+    "Runtime must centralize bounded bridge recovery before navigation."
+Assert-Contains $runtime "function Open-ChatGptWebSmokeSurface" `
+    "Runtime must centralize idempotent ChatGPT Web surface entry."
+Assert-Contains $runtime '$state.activity_bound -eq $true -and $state.surface -eq "chatgpt_web"' `
+    "Runtime must reuse an already bound ChatGPT Web activity."
+Assert-Contains $runtime '-Action "chatgpt_refresh"' `
+    "Runtime must repair a current authenticated adapter stuck connecting."
+Assert-Contains $runtime '$state.adapter_current -eq $true' `
+    "Runtime must not refresh an untrusted stale adapter."
+Assert-Contains $smoke "Wait-ChatGptWebSmokeAuthenticatedReady -Runtime `$runtime" `
+    "Feature-page smoke must await a ready bridge before feature controls."
+Assert-Contains $smoke "Open-ChatGptWebSmokeSurface -Runtime `$runtime" `
+    "Feature-page smoke must use the idempotent surface entry helper."
+if ($smoke -notmatch '(?s)CHATGPT_FEATURE_PAGE_PHASE phase=bootstrap.*Open-ChatGptWebSmokeSurface.*Wait-ChatGptWebSmokeAuthenticatedReady.*\$origin\.view_mode.*chatgpt_select_view') {
+    throw "Feature-page smoke must recover the bridge before selecting official view."
+}
+Assert-Contains $smoke "function Get-RemainingSeconds" `
+    "Feature-page smoke must enforce one deadline across nested bridge waits."
+Assert-Contains $smoke "Get-RemainingSeconds -Deadline `$deadline" `
+    "Feature-page smoke must pass only remaining time to nested waits."
+Assert-Contains $runtime '($deadline - [DateTimeOffset]::UtcNow).TotalSeconds' `
+    "Bridge recovery must consume the original timeout instead of resetting it."
+Assert-Contains $smoke "TotalTimeoutSec = 180" `
+    "Feature-page smoke must expose one bounded total acceptance budget."
+Assert-Contains $smoke "function Get-StepDeadline" `
+    "Feature-page steps must share the total acceptance deadline."
+Assert-Contains $smoke "CHATGPT_FEATURE_PAGE_PHASE phase=bootstrap" `
+    "Feature-page smoke must expose a content-free bootstrap progress marker."
+Assert-Contains $smoke 'CHATGPT_FEATURE_PAGE_START kind=$kind' `
+    "Feature-page smoke must identify the safe feature kind before navigation."
+Assert-Contains $smoke 'failed_kinds=$failedKinds' `
+    "Feature-page failures must identify only allowlisted feature kinds."
 Assert-Contains $runtime "Invoke-ElonNativeCommand" "Runtime must bound native adb commands."
 Assert-Contains $runtime "function Invoke-ChatGptWebSmokeAdb" `
     "Runtime must expose a bounded adb command helper."

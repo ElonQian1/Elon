@@ -36,6 +36,7 @@ function New-ChatGptWebSmokeRuntime {
         expected_hardware_serial = $hardwareSerial
         invoke_mcp = $invokeMcp
         poll_interval_sec = $PollIntervalSec
+        mcp_bootstrapped = $false
     }
 }
 
@@ -102,6 +103,52 @@ function Invoke-ChatGptWebSmokeAdb {
     return [string]$result.Stdout
 }
 
+function ConvertTo-ChatGptWebSmokeSafeDiagnostic {
+    param(
+        [AllowNull()]$Value,
+        [ValidateRange(16, 240)][int]$MaxLength = 120
+    )
+
+    $text = ([string]$Value).Replace("`r", " ").Replace("`n", " ").Trim()
+    if (-not $text) { return "" }
+    $text = [regex]::Replace($text, 'https?://\S+', '<url>', 'IgnoreCase')
+    $text = [regex]::Replace(
+        $text,
+        '(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+        '<email>'
+    )
+    $text = [regex]::Replace(
+        $text,
+        '(?i)\b(cookie|token|password|authorization)\s*[:=]\s*\S+',
+        '$1=<redacted>'
+    )
+    if ($text.Length -gt $MaxLength) { $text = $text.Substring(0, $MaxLength) }
+    return $text
+}
+
+function Get-ChatGptWebSmokeMcpFailureDetail {
+    param(
+        [AllowNull()]$Response,
+        [Parameter(Mandatory = $true)][string]$Tool
+    )
+
+    $structured = if ($null -ne $Response) { $Response.result.structuredContent } else { $null }
+    $action = if ($null -ne $structured) {
+        ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $structured.action -MaxLength 64
+    } else { "" }
+    $errorValue = if ($null -ne $structured -and $structured.PSObject.Properties["error_code"]) {
+        $structured.error_code
+    } elseif ($null -ne $structured) {
+        $structured.error
+    } else { "" }
+    $error = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $errorValue -MaxLength 120
+    $parts = [System.Collections.Generic.List[string]]::new()
+    $parts.Add("tool=$Tool")
+    if ($action) { $parts.Add("action=$action") }
+    if ($error) { $parts.Add("error=$error") }
+    return $parts -join " "
+}
+
 function Invoke-ChatGptWebSmokeMcp {
     param(
         [Parameter(Mandatory = $true)]$Runtime,
@@ -115,20 +162,34 @@ function Invoke-ChatGptWebSmokeMcp {
         DeviceSerial = $Runtime.device_serial
         Tool = $Tool
         Arguments = ($Arguments | ConvertTo-Json -Depth 20 -Compress)
+        HealthTimeoutSec = 15
+        RequestTimeoutSec = 30
+        AdbTimeoutSec = 8
     }
     if ($EnsureMainActivity) {
         $params.EnsureMainActivity = $true
         $params.OpenAppOnFailure = $true
     }
-    $responses = @(& $Runtime.invoke_mcp @params)
+    if ($Runtime.mcp_bootstrapped) { $params.NoBootstrap = $true }
+    try {
+        $responses = @(& $Runtime.invoke_mcp @params)
+    } catch {
+        if (-not $Runtime.mcp_bootstrapped) { throw }
+        $Runtime.mcp_bootstrapped = $false
+        $params.Remove("NoBootstrap")
+        $params.Remove("OpenAppOnFailure")
+        $responses = @(& $Runtime.invoke_mcp @params)
+    }
     $response = $responses | Select-Object -Last 1
     if ($null -eq $response -or $response.result.isError) {
-        throw "APK MCP tool failed: $Tool"
+        $detail = Get-ChatGptWebSmokeMcpFailureDetail -Response $response -Tool $Tool
+        throw "APK MCP tool failed: $detail"
     }
     $structured = $response.result.structuredContent
     if ($null -eq $structured) {
         throw "APK MCP tool returned no structured content: $Tool"
     }
+    $Runtime.mcp_bootstrapped = $true
     return $structured
 }
 
@@ -144,6 +205,59 @@ function Invoke-ChatGptWebSmokeAction {
     $payload.action = $Action
     return Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_control" `
         -Arguments $payload -EnsureMainActivity:$EnsureMainActivity
+}
+
+function Open-ChatGptWebSmokeSurface {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+    if ($state.activity_bound -eq $true -and $state.surface -eq "chatgpt_web") {
+        return $state
+    }
+    if ($state.activity_bound -eq $true) {
+        return Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "open_chatgpt_web"
+    }
+    return Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "open_chatgpt_web" `
+        -EnsureMainActivity
+}
+
+function Wait-ChatGptWebSmokeAuthenticatedReady {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [ValidateRange(10, 300)][int]$TimeoutSec = 90,
+        [ValidateRange(1, 60)][int]$InitialWaitSec = 15
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $ready = {
+        param($state)
+        $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
+    }
+    try {
+        return Wait-ChatGptWebSmokeState -Runtime $Runtime `
+            -TimeoutSec ([Math]::Min($InitialWaitSec, $TimeoutSec)) `
+            -Description "authenticated ChatGPT Web bridge" -Predicate $ready
+    } catch {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+        $recoverable = $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "connecting" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
+        if (-not $recoverable) { throw }
+
+        Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "chatgpt_refresh" | Out-Null
+        $remaining = [int][Math]::Ceiling(
+            ($deadline - [DateTimeOffset]::UtcNow).TotalSeconds
+        )
+        if ($remaining -lt 1) {
+            throw "Timed out refreshing the authenticated ChatGPT Web bridge."
+        }
+        return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $remaining `
+            -Description "refreshed authenticated ChatGPT Web bridge" -Predicate $ready
+    }
 }
 
 function Wait-ChatGptWebSmokeState {

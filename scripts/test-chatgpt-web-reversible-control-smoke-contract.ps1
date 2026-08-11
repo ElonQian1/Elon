@@ -56,7 +56,18 @@ foreach ($token in @(
     "expected_hardware_serial",
     "read adb hardware identity",
     "Device hardware identity does not match the pinned target",
-    "Assert-ChatGptWebSmokeUsbDevice"
+    "Assert-ChatGptWebSmokeUsbDevice",
+    "mcp_bootstrapped = `$false",
+    "HealthTimeoutSec = 15",
+    "RequestTimeoutSec = 30",
+    "AdbTimeoutSec = 8",
+    "if (`$Runtime.mcp_bootstrapped) { `$params.NoBootstrap = `$true }",
+    '$params.Remove("OpenAppOnFailure")',
+    "Get-ChatGptWebSmokeMcpFailureDetail",
+    "function Open-ChatGptWebSmokeSurface",
+    'throw "APK MCP tool failed: $detail"',
+    "<email>",
+    "<redacted>"
 )) {
     if (-not $runtime.Contains($token)) {
         throw "Missing trusted device runtime contract token: $token"
@@ -69,6 +80,28 @@ if ($runtime -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMai
     throw "Trusted runtime must relaunch MainActivity only for an explicit initial bootstrap."
 }
 . $runtimePath
+$safeDiagnostic = ConvertTo-ChatGptWebSmokeSafeDiagnostic `
+    -Value "bridge failed for sample@example.test token=synthetic-secret"
+if (
+    $safeDiagnostic -notmatch '<email>' -or
+    $safeDiagnostic -notmatch 'token=<redacted>' -or
+    $safeDiagnostic -match 'synthetic-secret'
+) {
+    throw "Smoke diagnostics must redact synthetic credential-shaped values."
+}
+$failureResponse = [pscustomobject]@{
+    result = [pscustomobject]@{
+        structuredContent = [pscustomobject]@{
+            action = "chatgpt_list_features"
+            error_code = "bridge_not_ready"
+        }
+    }
+}
+$failureDetail = Get-ChatGptWebSmokeMcpFailureDetail `
+    -Response $failureResponse -Tool "ui_control"
+if ($failureDetail -ne "tool=ui_control action=chatgpt_list_features error=bridge_not_ready") {
+    throw "Smoke diagnostics must retain safe action and error-code evidence."
+}
 $wirelessRejected = $false
 try {
     New-ChatGptWebSmokeRuntime -Adb "$PSHOME\powershell.exe" `

@@ -6,6 +6,7 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 300)][int]$ReadyTimeoutSec = 90,
+    [ValidateRange(30, 600)][int]$TotalTimeoutSec = 180,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
     [ValidateRange(1, 12)][int]$MaxFeaturePages = 8
 )
@@ -17,20 +18,42 @@ $ErrorActionPreference = "Stop"
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
+$scriptDeadline = [DateTimeOffset]::UtcNow.AddSeconds($TotalTimeoutSec)
 
 $safeKinds = @("library", "tasks", "apps", "projects", "gpts")
 $results = [System.Collections.Generic.List[object]]::new()
 
+function Get-RemainingSeconds {
+    param(
+        [Parameter(Mandatory = $true)][DateTimeOffset]$Deadline,
+        [ValidateRange(1, 60)][int]$Minimum = 1,
+        [ValidateRange(1, 300)][int]$Maximum = 300
+    )
+
+    $remaining = [int][Math]::Ceiling(($Deadline - [DateTimeOffset]::UtcNow).TotalSeconds)
+    if ($remaining -lt $Minimum) { return 0 }
+    return [Math]::Min($remaining, $Maximum)
+}
+
+function Get-StepDeadline {
+    param([ValidateRange(1, 300)][int]$TimeoutSec)
+
+    $stepDeadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    if ($stepDeadline -lt $scriptDeadline) { return $stepDeadline }
+    return $scriptDeadline
+}
+
 function Wait-FeatureList {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_list_features" | Out-Null
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    $deadline = Get-StepDeadline -TimeoutSec $ReadyTimeoutSec
     do {
-        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
-        $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_get_navigation"
+        $remaining = Get-RemainingSeconds -Deadline $deadline -Minimum 10 -Maximum 30
+        if ($remaining -eq 0) { break }
+        Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
+            -TimeoutSec $remaining -InitialWaitSec ([Math]::Min(5, $remaining)) | Out-Null
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_list_features" | Out-Null
+        $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_get_navigation"
         $features = @($navigation.features | Where-Object { $null -ne $_ })
         if (
-            $state.bridge_state -eq "ready" -and
             $navigation.control_ok -eq $true -and
             $features.Count -gt 0
         ) {
@@ -48,7 +71,15 @@ function Wait-CommandAndPage {
         [Parameter(Mandatory = $true)][string]$Description
     )
 
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+    $deadline = Get-StepDeadline -TimeoutSec $ReadyTimeoutSec
+    $remaining = Get-RemainingSeconds -Deadline $deadline -Minimum 10 `
+        -Maximum $ReadyTimeoutSec
+    if ($remaining -eq 0) { throw "Timed out waiting for $Description before bridge recovery." }
+    Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
+        -TimeoutSec $remaining -InitialWaitSec ([Math]::Min(5, $remaining)) | Out-Null
+    $remaining = Get-RemainingSeconds -Deadline $deadline
+    if ($remaining -eq 0) { throw "Timed out waiting for $Description after bridge recovery." }
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $remaining `
         -Description $Description -Predicate {
             param($state)
             $receipt = @($state.command_requests) |
@@ -77,12 +108,15 @@ function Restore-Origin {
         [string]$Path
     )
 
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min(45, $ReadyTimeoutSec))
+    $deadline = Get-StepDeadline -TimeoutSec ([Math]::Min(45, $ReadyTimeoutSec))
     $nextBackAt = [DateTimeOffset]::MinValue
     $backAttempts = 0
     $last = $null
     do {
-        $last = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        $remaining = Get-RemainingSeconds -Deadline $deadline -Minimum 10 -Maximum 30
+        if ($remaining -eq 0) { break }
+        $last = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
+            -TimeoutSec $remaining -InitialWaitSec ([Math]::Min(5, $remaining))
         $currentPath = Get-ObservedPath -State $last
         $pathMatches = -not $Path -or $currentPath -eq $Path
         if (
@@ -103,17 +137,24 @@ function Restore-Origin {
     throw "Timed out restoring the original ChatGPT page. Last page=$($last.page_kind)."
 }
 
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-    -EnsureMainActivity | Out-Null
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-    -Arguments @{ view_mode = "official" } | Out-Null
-$origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-    -Description "authenticated ChatGPT Web" -Predicate {
-        param($state)
-        $state.surface -eq "chatgpt_web" -and
-            $state.bridge_state -eq "ready" -and
-            $state.authenticated -eq $true
+Write-Output "CHATGPT_FEATURE_PAGE_PHASE phase=bootstrap"
+Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
+$initialReadySec = Get-RemainingSeconds -Deadline $scriptDeadline -Minimum 10 `
+    -Maximum $ReadyTimeoutSec
+if ($initialReadySec -eq 0) { throw "Feature-page smoke exhausted its total budget during bootstrap." }
+$origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
+    -TimeoutSec $initialReadySec -InitialWaitSec ([Math]::Min(5, $initialReadySec))
+if ([string]$origin.view_mode -ne "official") {
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = "official" } | Out-Null
+    $officialReadySec = Get-RemainingSeconds -Deadline $scriptDeadline -Minimum 10 `
+        -Maximum $ReadyTimeoutSec
+    if ($officialReadySec -eq 0) {
+        throw "Feature-page smoke exhausted its total budget selecting official view."
     }
+    $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
+        -TimeoutSec $officialReadySec -InitialWaitSec ([Math]::Min(5, $officialReadySec))
+}
 $originPageKind = [string]$origin.page_kind
 $originPath = Get-ObservedPath -State $origin
 
@@ -130,6 +171,10 @@ if ($availableKinds.Count -eq 0) {
 }
 
 foreach ($kind in $availableKinds) {
+    if ((Get-RemainingSeconds -Deadline $scriptDeadline) -eq 0) {
+        throw "Feature-page smoke exhausted its total budget before kind=$kind."
+    }
+    Write-Output "CHATGPT_FEATURE_PAGE_START kind=$kind"
     $navigation = Wait-FeatureList
     $feature = @($navigation.features | Where-Object { $null -ne $_ }) |
         Where-Object { [string]$_.kind -eq $kind -and $_.selected -ne $true } |
@@ -163,6 +208,7 @@ foreach ($kind in $availableKinds) {
         unexpected_fallback_count = [int]$audit.unexpected_fallback_count
     })
     Write-Output "CHATGPT_FEATURE_PAGE kind=$kind passed=$($audit.passed) controls=$($audit.control_count) generic=$($audit.generic_control_count) unexpected_fallback=$($audit.unexpected_fallback_count)"
+    Write-Output "CHATGPT_FEATURE_PAGE_PHASE phase=restore kind=$kind"
     Restore-Origin -PageKind $originPageKind -Path $originPath
 }
 
@@ -177,7 +223,8 @@ $failed = @($results | Where-Object { $_.passed -ne $true })
 } | ConvertTo-Json -Depth 12
 
 if ($failed.Count -gt 0) {
-    Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=failed failed_count=$($failed.Count)"
-    throw "ChatGPT feature-page smoke failed: $($failed.Count) page(s)."
+    $failedKinds = @($failed | ForEach-Object { [string]$_.kind }) -join ","
+    Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=failed failed_count=$($failed.Count) failed_kinds=$failedKinds"
+    throw "ChatGPT feature-page smoke failed: failed_count=$($failed.Count) failed_kinds=$failedKinds"
 }
 Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=passed audited_count=$($results.Count)"
