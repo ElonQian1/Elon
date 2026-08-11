@@ -1,0 +1,341 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(24 28 25 / 56%);
+}
+
+.wideDialog,
+.actionDialog {
+  display: flex;
+  flex-direction: column;
+  width: min(980px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid #cdd1ca;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgb(20 25 21 / 24%);
+  color: #202522;
+  letter-spacing: 0;
+}
+
+.actionDialog {
+  width: min(570px, 100%);
+}
+
+.wideDialog button,
+.wideDialog input,
+.wideDialog textarea,
+.actionDialog button,
+.actionDialog input,
+.actionDialog textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.wideDialog button,
+.actionDialog button {
+  border: 1px solid #c9cdc6;
+  border-radius: 6px;
+  background: #fff;
+  color: #2c332e;
+}
+
+.wideDialog button:focus-visible,
+.wideDialog input:focus-visible,
+.wideDialog textarea:focus-visible,
+.actionDialog button:focus-visible,
+.actionDialog input:focus-visible,
+.actionDialog textarea:focus-visible {
+  outline: 2px solid #2d6a4f;
+  outline-offset: 2px;
+}
+
+.wideDialog button:disabled,
+.actionDialog button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.wideDialog > header,
+.actionDialog > header,
+.wideDialog > footer,
+.actionDialog > footer,
+.wideDialog > header > div,
+.actionDialog > header > div,
+.wideDialog > footer > div,
+.actionDialog > footer > div {
+  display: flex;
+  align-items: center;
+}
+
+.wideDialog > header,
+.actionDialog > header,
+.wideDialog > footer,
+.actionDialog > footer {
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 14px;
+  padding: 15px 18px;
+}
+
+.wideDialog > header,
+.actionDialog > header {
+  border-bottom: 1px solid #dfe2dc;
+}
+
+.wideDialog > footer,
+.actionDialog > footer {
+  border-top: 1px solid #dfe2dc;
+}
+
+.wideDialog > header > div,
+.actionDialog > header > div {
+  align-items: flex-start;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wideDialog > header span,
+.actionDialog > header span {
+  color: #7a5b31;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wideDialog h2,
+.actionDialog h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.wideDialog > header button,
+.actionDialog > header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.wideDialog > footer > div,
+.actionDialog > footer > div {
+  gap: 8px;
+}
+
+.wideDialog > footer button,
+.actionDialog > footer button {
+  min-height: 36px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.wideDialog button.primary,
+.actionDialog button.primary {
+  border-color: #275f47;
+  background: #275f47;
+  color: #fff;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.formGrid label,
+.capabilityGrid label,
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.formGrid label > span,
+.capabilityGrid label > span,
+.noteField > span {
+  color: #6f766f;
+  font-size: 12px;
+}
+
+.formGrid input,
+.formGrid textarea,
+.capabilityGrid input,
+.noteField textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #cbd0c9;
+  border-radius: 5px;
+  background: #fff;
+  color: #252b27;
+}
+
+.formGrid input,
+.capabilityGrid input {
+  min-height: 36px;
+  padding: 0 9px;
+}
+
+.formGrid textarea,
+.noteField textarea {
+  padding: 8px 9px;
+  resize: vertical;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.toggleRow {
+  display: flex;
+  gap: 18px;
+  padding: 0 18px 16px;
+  color: #4f5751;
+  font-size: 13px;
+}
+
+.toggleRow label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.formSection {
+  margin: 0 18px 16px;
+  border: 1px solid #d8dcd5;
+  border-radius: 6px;
+  background: #f8f9f7;
+}
+
+.formSection > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border-bottom: 1px solid #dfe2dc;
+}
+
+.formSection > header span {
+  color: #737a74;
+  font-size: 12px;
+}
+
+.formSection .formGrid {
+  padding: 13px;
+}
+
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 13px;
+}
+
+.dialogError {
+  margin: 0 18px 12px;
+  padding: 9px 10px;
+  border-left: 3px solid #ad3c31;
+  background: #f8e9e7;
+  color: #9a352b;
+  font-size: 13px;
+}
+
+.confirmRow {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  margin: 0 18px 14px;
+  color: #4f5751;
+  font-size: 13px;
+}
+
+.confirmRow input,
+.toggleRow input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.requestId {
+  max-width: 55%;
+  overflow: hidden;
+  color: #737a74;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionDialog > code {
+  margin: 14px 18px;
+  overflow-wrap: anywhere;
+  color: #4d5650;
+  font-size: 12px;
+}
+
+.decisionTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 18px 14px;
+  overflow: hidden;
+  border: 1px solid #cfd3cd;
+  border-radius: 6px;
+}
+
+.decisionTabs button {
+  min-height: 36px;
+  border: 0;
+  border-right: 1px solid #cfd3cd;
+  border-radius: 0;
+  background: transparent;
+  color: #6e746f;
+  cursor: pointer;
+}
+
+.decisionTabs button:last-child {
+  border-right: 0;
+}
+
+.decisionTabs button[data-active='true'] {
+  background: #ede7dc;
+  color: #654820;
+  font-weight: 700;
+}
+
+.noteField,
+.actionSummary {
+  margin: 0 18px 14px;
+}
+
+.actionSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px;
+  border-left: 3px solid #446b75;
+  background: #ebf2f3;
+}
+
+.actionSummary span {
+  color: #657069;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .overlay { padding: 0; }
+  .wideDialog,
+  .actionDialog { width: 100%; max-height: 100vh; border-radius: 0; }
+  .formGrid,
+  .capabilityGrid { grid-template-columns: 1fr; }
+  .fullField { grid-column: auto; }
+  .formSection > header { flex-direction: column; }
+  .toggleRow { flex-direction: column; gap: 9px; }
+  .requestId { display: none; }
+}
