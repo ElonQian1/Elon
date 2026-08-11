@@ -37,7 +37,7 @@ struct ParentedHoldRequestDigest<'a> {
     offer_digest: &'a str,
 }
 
-pub(super) fn hold_parented_delivery_reservation_claim_on(
+pub(in crate::store) fn hold_parented_delivery_reservation_claim_on(
     tx: &Transaction<'_>,
     authority: &DeliveryAllocationClaimTransferAuthority,
     parent_release: &FinishComputeCapacityClaimReceipt,

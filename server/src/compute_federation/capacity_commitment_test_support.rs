@@ -53,11 +53,34 @@ impl Fixture {
         Self::build(OfferFixture::new(), false)
     }
 
+    pub(crate) fn new_delivery_allocation() -> Self {
+        Self::build_with_window(
+            OfferFixture::new(),
+            false,
+            Duration::seconds(30),
+            Duration::minutes(2),
+        )
+    }
+
     pub(crate) fn new_http() -> Self {
         Self::build(OfferFixture::new(), true)
     }
 
-    fn build(mut source: OfferFixture, with_users: bool) -> Self {
+    fn build(source: OfferFixture, with_users: bool) -> Self {
+        Self::build_with_window(
+            source,
+            with_users,
+            Duration::seconds(4),
+            Duration::seconds(6),
+        )
+    }
+
+    fn build_with_window(
+        mut source: OfferFixture,
+        with_users: bool,
+        starts_after: Duration,
+        ends_after: Duration,
+    ) -> Self {
         let (outsider_id, owner_token, admin_token, outsider_token) = if with_users {
             let owner = create_user(&source.store, "capacity-owner", None);
             let admin = create_user(&source.store, "capacity-admin", Some("admin"));
@@ -78,8 +101,8 @@ impl Fixture {
         };
 
         let now = Utc::now();
-        source.starts_at = canonical(now + Duration::seconds(4));
-        source.ends_at = canonical(now + Duration::seconds(6));
+        source.starts_at = canonical(now + starts_after);
+        source.ends_at = canonical(now + ends_after);
         source.valid_until = canonical(now + Duration::minutes(10));
         source.seed_active_supply();
         let provider = source.store.compute_provider(&source.provider_id).unwrap();

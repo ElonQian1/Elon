@@ -1,5 +1,9 @@
 //! Provider, consumer, and administrator orchestration for v228 DeliveryAllocation.
 
+#[cfg(test)]
+#[path = "delivery_allocation_store_tests.rs"]
+mod tests;
+
 use anyhow::{bail, Result};
 use serde::Deserialize;
 

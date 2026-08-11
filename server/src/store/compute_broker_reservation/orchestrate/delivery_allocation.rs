@@ -66,7 +66,11 @@ pub(in crate::store) fn prepare_delivery_allocation_broker_budget_on(
         .selected_offer
         .as_ref()
         .ok_or_else(|| anyhow!("Delivery Allocation Broker Job lacks an exact Offer"))?;
-    if selected_offer != authority.offer_binding() {
+    let commitment_offer = authority.offer_binding();
+    if selected_offer.offer_id != commitment_offer.offer_id
+        || selected_offer.offer_version != commitment_offer.offer_version
+        || selected_offer.offer_digest != commitment_offer.offer_digest
+    {
         bail!("Delivery Allocation Broker Job and Commitment Offer differ");
     }
     let offer =

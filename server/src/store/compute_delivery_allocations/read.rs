@@ -311,9 +311,10 @@ pub(super) fn due_grant_ids_on(
             AND julianday(grant.exercise_expires_at)<=julianday(?1)
           ORDER BY grant.exercise_expires_at, grant.grant_id LIMIT ?2",
     )?;
-    Ok(statement
+    let grant_ids = statement
         .query_map(params![recorded_at, limit as i64], |row| row.get(0))?
-        .collect::<rusqlite::Result<Vec<_>>>()?)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(grant_ids)
 }
 
 pub(in crate::store) fn delivery_allocation_commitment_status_on(

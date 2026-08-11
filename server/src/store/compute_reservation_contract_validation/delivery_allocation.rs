@@ -45,7 +45,9 @@ pub(super) fn validate_delivery_allocation_authority(
         || grant.job != source_job
         || authority.snapshot_id() != snapshot.snapshot_id
         || authority.snapshot_digest() != snapshot.snapshot_digest
-        || authority.offer_binding() != &reservation.offer
+        || authority.offer_binding().offer_id != reservation.offer.offer_id
+        || authority.offer_binding().offer_version != reservation.offer.offer_version
+        || authority.offer_binding().offer_digest != reservation.offer.offer_digest
         || authority.offer_binding().offer_id != offer.offer_id
         || authority.offer_binding().offer_version != offer.offer_version
         || authority.offer_binding().offer_digest != offer.offer_digest
