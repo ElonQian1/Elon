@@ -76,7 +76,7 @@ PC `/compute-execution` 使用该模板生成逐 meter 数字输入，限制累�
 ## 7. 尚未实现
 
 - Cargo 编译、v188 迁移执行、HTTP 真实调用、并发和故障注入验证；
-- PC 构建、接口联调、视觉验收和发布；
+- 接口联调、浏览器视觉验收和发布；
 - NodeAgent Host 到云端的签名事件传输、outbox、断点续传和真实身份校验；
 - 自动接入控制面、网关、重新分词、计时器、确定性复算和挑战任务；v191 已允许管理员保存第一份待验证平台观测，见 `docs/distributed-compute/attempt-platform-observation-api.md`；
 - 自动可信 `verified_usage`、Execution Receipt 自动签发和争议流程；v192 已提供管理员保守验证量，v193 已提供管理员签发回执，见 `docs/distributed-compute/attempt-verification-api.md` 和 `docs/distributed-compute/attempt-execution-receipt-api.md`；

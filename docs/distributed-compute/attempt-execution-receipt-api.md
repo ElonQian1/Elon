@@ -66,7 +66,7 @@ v193 在一个事务中重新读取并审计 Attempt 激活、精确 Job/Reserva
 ## 6. 尚未实现
 
 - Cargo 编译、v193 迁移执行、HTTP 真实调用、并发与故障注入验证；
-- PC 构建、接口联调、视觉验收和发布；
+- 接口联调、浏览器视觉验收和发布；
 - NodeAgent 到云端的签名事件传输、真实工件取回与恶意内容扫描；
 - 自动签发、多独立回执、挑战和争议裁决；
 - v193 本身不推进 Lease/Job，也不消费 Capacity Claim 与 Reservation；后续 v194 已写入独立可信终态事务，当前为 `implementation_partially_verified`，但操作级正向专项仍未运行；

@@ -85,7 +85,7 @@ PC `/compute-execution` 已固定禁用人工 no-start 中止控件，不再调�
 ## 7. 尚未实现
 
 - Cargo 编译、v187 迁移执行、HTTP 真实调用、并发和故障注入验证；
-- PC 构建、接口联调、视觉验收和发布；
+- 接口联调、浏览器视觉验收和发布；
 - 外部中止证明签名校验、可信节点身份、服务器 outbox 和真实 `Cancel` 送达；
 - 已出现心跳或 `running` Lease 的安全取消、检查点、实际用量和部分结算；
 - Lease 超时扫描、自动回收、重试 Attempt 和 fencing generation 单调递增；

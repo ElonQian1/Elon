@@ -67,7 +67,7 @@ PC `/compute-reviews` 展示候选结果、最终用量摘要和工件引用，�
 ## 6. 尚未实现
 
 - Cargo 编译、v190 迁移执行、HTTP 真实调用、并发与故障注入验证；
-- PC 构建、接口联调、视觉验收和发布；
+- 接口联调、浏览器视觉验收和发布；
 - 消费者审核 MCP 入口、结果工件真实取回与内容验证；
 - 平台观测自动接线、独立验证器和多策略治理；v191 已提供管理员平台观测，v192 已提供管理员保守 Verification 决定，见 `docs/distributed-compute/attempt-platform-observation-api.md` 和 `docs/distributed-compute/attempt-verification-api.md`；
 - rejected/disputed 的举证、仲裁、超时和追加式裁决流程；

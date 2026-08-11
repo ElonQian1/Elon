@@ -65,7 +65,7 @@ v192 只支持 `conservative_min_v1@1`：
 ## 6. 尚未实现
 
 - Cargo 编译、v192 迁移执行、HTTP 真实调用、并发与故障注入验证；
-- PC 构建、接口联调、视觉验收和发布；
+- 接口联调、浏览器视觉验收和发布；
 - 平台观测来源签名、可信时钟、自动采集、独立验证器和多策略版本治理；
 - 多份观测、重复执行、挑战任务、异常检测和争议裁决；
 - Execution Receipt 自动签发、Lease/Job 终态、Capacity Claim 消费和 Reservation 消费；v193 已提供管理员签发入口，见 `docs/distributed-compute/attempt-execution-receipt-api.md`；

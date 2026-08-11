@@ -68,7 +68,7 @@ v211 会先插入同时指向 v185 与 deterministic application 的 deferred AC
 ## 6. 尚未实现
 
 - Cargo 编译、v185 迁移执行、HTTP 真实调用和并发验证；
-- PC 构建、接口联调、视觉验收和发布；
+- 接口联调、浏览器视觉验收和发布；
 - execution plan producer、Adapter 身份/凭据、provisional prepare/commit 和服务器 outbox；
 - Start Attempt 真实派发、送达确认、崩溃恢复、心跳与 `running` Attempt 事件；
 - 自动超时取消、已出现心跳后的 active 容量处理或实际消耗；v187 只覆盖从未心跳的 staging 无用量中止；
