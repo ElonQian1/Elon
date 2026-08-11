@@ -104,17 +104,18 @@ const semanticSandbox = {
         assert.equal(semantic, 'model');
         assert.equal(region, 'composer');
         return semanticButton;
-      },
-      requestSemanticTouch(semantic, purpose, emitEvent, region) {
-        assert.equal(semantic, 'model');
-        assert.equal(region, 'composer');
-        emitEvent({ type: 'web_touch_request', purpose, xRatio: 0.4, yRatio: 0.8 });
-        return true;
       }
     }
   }
 };
-semanticButton.getBoundingClientRect = () => ({ width: 80, height: 40 });
+semanticButton.getBoundingClientRect = () => ({
+  left: 160,
+  top: 640,
+  right: 240,
+  bottom: 680,
+  width: 80,
+  height: 40
+});
 semanticSandbox.window.window = semanticSandbox.window;
 semanticSandbox.window.document = semanticSandbox.document;
 semanticSandbox.window.location = semanticSandbox.location;
@@ -131,5 +132,78 @@ assert.equal(semanticResults.length, 0);
 assert.equal(semanticEvents.length, 1);
 assert.equal(semanticEvents[0].type, 'web_touch_request');
 assert.equal(semanticEvents[0].purpose, 'list_model_options');
+assert.equal(semanticEvents[0].xRatio, 0.5);
+assert.equal(semanticEvents[0].yRatio, 0.825);
+
+const optionEvents = [];
+const optionResults = [];
+const optionNode = {
+  id: '',
+  textContent: '思考强度 极高',
+  getAttribute(name) {
+    return name === 'role' ? 'menuitem' : null;
+  },
+  hasAttribute: () => false,
+  getBoundingClientRect: () => ({
+    left: 40,
+    top: 400,
+    right: 360,
+    bottom: 460,
+    width: 320,
+    height: 60
+  })
+};
+const optionSandbox = {
+  document: {
+    querySelector: () => null,
+    querySelectorAll(selector) {
+      return selector.includes('[role="menuitem"]') ? [optionNode] : [];
+    }
+  },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    setTimeout: (callback) => callback(),
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+    __elonChatGptActionTargetPolicy: {
+      actionPoint: () => null,
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: {
+      filter: (_section, options) => options
+    }
+  }
+};
+optionSandbox.window.window = optionSandbox.window;
+optionSandbox.window.document = optionSandbox.document;
+optionSandbox.window.location = optionSandbox.location;
+
+vm.runInNewContext(source, optionSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+optionSandbox.window.__elonChatGptComposer.requestOptions(
+  'model',
+  composer,
+  (event) => optionEvents.push(event),
+  (...args) => optionResults.push(args)
+);
+
+assert.equal(optionResults.length, 1);
+assert.deepEqual(Array.from(optionResults[0]), ['list_model_options', true, '']);
+assert.equal(optionEvents.length, 1);
+assert.equal(optionEvents[0].type, 'composer_controls_snapshot');
+assert.equal(optionEvents[0].options.length, 1);
+
+optionSandbox.window.__elonChatGptComposer.selectOption(
+  'model',
+  optionEvents[0].options[0].id,
+  composer,
+  (event) => optionEvents.push(event),
+  (...args) => optionResults.push(args),
+  () => {}
+);
+
+assert.equal(optionEvents.length, 2);
+assert.equal(optionEvents[1].type, 'web_touch_request');
+assert.equal(optionEvents[1].purpose, 'select_model_option');
 
 process.stdout.write('CHATGPT_COMPOSER_TRIGGER_POLICY=passed\n');

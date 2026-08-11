@@ -268,7 +268,11 @@
   }
 
   function isOptionVisible(node) {
-    return isActionable(node);
+    const actionable = isActionable(node);
+    if (actionable || !isVisible(node)) return actionable;
+    const rect = node.getBoundingClientRect();
+    return rect.bottom > 0 && rect.right > 0 &&
+      rect.top < window.innerHeight && rect.left < window.innerWidth;
   }
 
   function captureOptionBaseline() {
@@ -354,12 +358,23 @@
     return true;
   }
 
-  function emitTriggerTouch(section, purpose, node, emitEvent) {
+  function emitVisibleNodeTouch(purpose, node, emitEvent) {
     if (emitTouchRequest(purpose, node, emitEvent)) return true;
-    const layout = window.__elonChatGptLayout;
-    return section === 'model' && layout && typeof layout.requestSemanticTouch === 'function'
-      ? layout.requestSemanticTouch('model', purpose, emitEvent, 'composer')
-      : false;
+    if (!isOptionVisible(node)) return false;
+    const rect = node.getBoundingClientRect();
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
+    const xRatio = (rect.left + rect.width / 2) / width;
+    const yRatio = (rect.top + rect.height / 2) / height;
+    if (xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) return false;
+    emitEvent({ type: 'web_touch_request', purpose, xRatio, yRatio });
+    return true;
+  }
+
+  function emitTriggerTouch(section, purpose, node, emitEvent) {
+    return section === 'model'
+      ? emitVisibleNodeTouch(purpose, node, emitEvent)
+      : emitTouchRequest(purpose, node, emitEvent);
   }
 
   function replacePendingOptions(section, pending) {
@@ -453,7 +468,7 @@
         complete: result
       });
     }
-    if (!emitTouchRequest(purpose, target.node, emitEvent)) {
+    if (!emitVisibleNodeTouch(purpose, target.node, emitEvent)) {
       if (target.opensSubmenu) {
         return settlePendingOptions(section, false, '官网选项当前不可见。');
       }
