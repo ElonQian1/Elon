@@ -30,6 +30,7 @@ internal class ChatGptNativeMessagePartRenderer(
         return TextView(context).apply {
             text = context.getString(R.string.chatgpt_message_part_format, typeLabel(context, part.type), part.label)
             contentDescription = ChatGptNativeControlPresentation.messagePartSelector(messageId, index, part.type)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             tooltipText = context.getString(R.string.chatgpt_message_part_open, text)
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 2

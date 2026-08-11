@@ -191,18 +191,52 @@ internal class ChatGptNativeConversationController(
     private fun scrollToMessage(index: Int, target: RevealTarget) {
         messagesView.post {
             if (revealTarget != target) return@post
-            layoutManager.scrollToPositionWithOffset(index, 0)
-            messagesView.post reveal@{
-                if (revealTarget != target) return@reveal
-                val holder = messagesView.findViewHolderForAdapterPosition(index)
-                    as? ChatGptNativeMessageAdapter.MessageViewHolder ?: return@reveal
-                val targetView = target.partIndex?.let(holder.parts::getChildAt) ?: holder.itemView
-                targetView?.requestRectangleOnScreen(
-                    Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1)),
-                    true,
-                )
+            layoutManager.scrollToPositionWithOffset(index, messagesView.paddingTop)
+            revealAttachedTarget(index, target, attempt = 0)
+        }
+    }
+
+    private fun revealAttachedTarget(index: Int, target: RevealTarget, attempt: Int) {
+        messagesView.postOnAnimation reveal@{
+            if (revealTarget != target) return@reveal
+            val holder = messagesView.findViewHolderForAdapterPosition(index)
+                as? ChatGptNativeMessageAdapter.MessageViewHolder
+            val targetView = holder?.let { current ->
+                target.partIndex?.let(current.parts::getChildAt) ?: current.itemView
+            }
+            if (targetView == null) {
+                retryReveal(index, target, attempt)
+                return@reveal
+            }
+
+            val targetRect = Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1))
+            messagesView.offsetDescendantRectToMyCoords(targetView, targetRect)
+            val viewportTop = messagesView.paddingTop
+            val viewportBottom = messagesView.height - messagesView.paddingBottom
+            val scrollDelta = when {
+                targetRect.top < viewportTop -> targetRect.top - viewportTop
+                targetRect.bottom > viewportBottom -> targetRect.top - viewportTop
+                else -> 0
+            }
+            if (scrollDelta != 0) messagesView.scrollBy(0, scrollDelta)
+            targetView.requestRectangleOnScreen(
+                Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1)),
+                true,
+            )
+
+            val visibleRect = Rect()
+            if (!targetView.getGlobalVisibleRect(visibleRect) || visibleRect.isEmpty) {
+                retryReveal(index, target, attempt)
             }
         }
+    }
+
+    private fun retryReveal(index: Int, target: RevealTarget, attempt: Int) {
+        if (attempt >= MAX_REVEAL_ATTEMPTS) return
+        messagesView.postDelayed(
+            { revealAttachedTarget(index, target, attempt + 1) },
+            REVEAL_RETRY_DELAY_MS,
+        )
     }
 
     private fun setControls(value: ChatGptWebSnapshot) {
@@ -228,6 +262,8 @@ internal class ChatGptNativeConversationController(
 
     private companion object {
         const val PENDING_MESSAGE_ID = "chatgpt-native-pending"
+        const val MAX_REVEAL_ATTEMPTS = 8
+        const val REVEAL_RETRY_DELAY_MS = 80L
         const val DISABLED_ALPHA = 0.4f
     }
 }

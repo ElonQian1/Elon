@@ -400,10 +400,14 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("partRenderer.render"))
         assertTrue(partRenderer.contains("ChatGptWebMessagePart"))
         assertTrue(partRenderer.contains("messagePartSelector"))
+        assertTrue(partRenderer.contains("IMPORTANT_FOR_ACCESSIBILITY_YES"))
         assertTrue(partRenderer.contains("onOpenOfficial"))
         assertFalse(partRenderer.contains("OkHttpClient"))
         assertFalse(partRenderer.contains("getCookie("))
         assertTrue(adapter.contains("position == messages.indexOfLast"))
+        assertTrue(controller.contains("revealAttachedTarget"))
+        assertTrue(controller.contains("getGlobalVisibleRect"))
+        assertTrue(controller.contains("MAX_REVEAL_ATTEMPTS"))
         assertTrue(activity.contains("pageAdapter.regenerateResponse()"))
     }
 
