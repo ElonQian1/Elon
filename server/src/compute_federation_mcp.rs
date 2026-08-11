@@ -15,6 +15,10 @@ mod broker_interface_tests;
 #[path = "compute_federation_management_mcp_tests.rs"]
 mod management_mcp_tests;
 
+#[cfg(test)]
+#[path = "compute_federation_offer_interface_tests.rs"]
+mod offer_interface_tests;
+
 pub(crate) fn definitions() -> Vec<Value> {
     let mut tools = crate::compute_federation_provider_mcp::definitions();
     tools.extend(crate::compute_federation_capacity_pool_mcp::definitions());
@@ -39,6 +43,7 @@ pub(crate) fn definitions_for_platform_role(platform_role: &str) -> Vec<Value> {
 fn admin_definitions() -> Vec<Value> {
     let mut tools = crate::compute_federation::external_pool_onboarding_mcp::admin_definitions();
     tools.extend(crate::compute_federation::external_pool_adapter_release_mcp::admin_definitions());
+    tools.extend(crate::compute_federation::offer_admin_mcp::admin_definitions());
     tools
         .extend(crate::compute_federation::platform_reference_price_curve_mcp::admin_definitions());
     tools
@@ -147,6 +152,15 @@ pub(crate) fn call_admin_if_handled(
             arguments.clone(),
         )?
     {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::compute_federation::offer_admin_mcp::call_admin_if_handled(
+        store,
+        user_id,
+        platform_role,
+        name,
+        arguments.clone(),
+    )? {
         return Ok(Some(value));
     }
     crate::compute_federation::platform_reference_price_curve_mcp::call_admin_if_handled(

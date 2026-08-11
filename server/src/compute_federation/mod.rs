@@ -20,6 +20,7 @@ pub(crate) mod legacy;
 pub(crate) mod management_mcp_support;
 pub(crate) mod market;
 pub(crate) mod offer;
+pub(crate) mod offer_admin_mcp;
 pub(crate) mod platform_reference_price_curve;
 pub(crate) mod platform_reference_price_curve_api;
 pub(crate) mod platform_reference_price_curve_mcp;
