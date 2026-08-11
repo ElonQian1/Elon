@@ -126,6 +126,10 @@ class ChatGptWebFeatureBaselineTest {
         assertTrue(summary.getInt("complete") > 0)
         assertTrue(summary.getInt("partial") > 0)
         assertTrue(summary.getInt("fallback_only") > 0)
+        assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
+        assertTrue(feature(baseline, "model_selection").isNull("remaining_gap"))
+        assertEquals("complete", feature(baseline, "disclosure_controls").getString("implementation_status"))
+        assertTrue(feature(baseline, "disclosure_controls").isNull("remaining_gap"))
     }
 
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {

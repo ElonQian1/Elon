@@ -161,7 +161,6 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "model_selection",
             group = "composer",
-            status = ImplementationStatus.PARTIAL,
             acceptance = Acceptance.INTERACTIVE_DEVICE,
             mcpActions = listOf(
                 "chatgpt_list_composer_options",
@@ -169,7 +168,6 @@ internal object ChatGptWebFeatureBaseline {
             ),
             capabilityIds = setOf(ChatGptWebCapabilityId.MODEL_SELECTOR),
             semantics = setOf("model"),
-            remainingGap = "model_change_interactive_acceptance",
         ),
         feature(
             id = "attachment_lifecycle",
@@ -325,11 +323,9 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "disclosure_controls",
             group = "adaptation",
-            status = ImplementationStatus.PARTIAL,
             delivery = Delivery.ADAPTIVE_NATIVE,
             acceptance = Acceptance.INTERACTIVE_DEVICE,
             mcpActions = listOf("chatgpt_set_control_expanded", "chatgpt_find_controls"),
-            remainingGap = "expand_collapse_restore_device_acceptance",
         ),
         feature(
             id = "official_change_detection",
