@@ -197,20 +197,24 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
-        assertEquals(11, verificationSummary.getInt("offline_verified"))
-        assertEquals(if (deviceEvidenceCurrent) 16 else 0, verificationSummary.getInt("device_verified"))
-        assertEquals(if (deviceEvidenceCurrent) 16 else 0, verificationSummary.getInt("verified"))
-        assertEquals(if (deviceEvidenceCurrent) 11 else 27, verificationSummary.getInt("pending"))
+        assertEquals(10, verificationSummary.getInt("offline_verified"))
+        assertEquals(if (deviceEvidenceCurrent) 17 else 0, verificationSummary.getInt("device_verified"))
+        assertEquals(if (deviceEvidenceCurrent) 17 else 0, verificationSummary.getInt("verified"))
+        assertEquals(if (deviceEvidenceCurrent) 10 else 27, verificationSummary.getInt("pending"))
         assertEquals(7, verificationSummary.getInt("user_action_required"))
-        assertEquals(if (deviceEvidenceCurrent) 0 else 16, verificationSummary.getInt("deferred"))
+        assertEquals(if (deviceEvidenceCurrent) 0 else 17, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(if (deviceEvidenceCurrent) 18 else 34, verificationSummary.getInt("remaining"))
+        assertEquals(if (deviceEvidenceCurrent) 17 else 34, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
         assertEquals(
             if (deviceEvidenceCurrent) "device_verified" else "deferred",
             feature(baseline, "model_selection").getString("verification_status"),
+        )
+        assertEquals(
+            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            feature(baseline, "composer_tools").getString("verification_status"),
         )
         assertEquals(
             deviceEvidenceCurrent,

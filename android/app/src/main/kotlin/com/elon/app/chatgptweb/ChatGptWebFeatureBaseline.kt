@@ -245,6 +245,7 @@ internal object ChatGptWebFeatureBaseline {
         "conversation_history" to "safe/read_only_surface",
         "conversation_create_and_switch" to "reversible/send_probe",
         "model_selection" to "reversible/reversible_controls",
+        "composer_tools" to "reversible/tool_execution_with_citations",
         "web_search" to "reversible/composer_controls",
         "rich_message_rendering" to "reversible/message_structure",
         "complex_output_rendering" to "reversible/message_structure",
