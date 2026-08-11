@@ -36,6 +36,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(core.contains("action === 'list_composer_tools'"))
         assertTrue(adapter.contains("#upload-fast-tools-files"))
         assertTrue(adapter.contains("#composer-plus-btn"))
+        assertTrue(adapter.contains("scope.querySelectorAll('button, [role=\"button\"]')"))
         assertTrue(adapter.contains("composer_controls_snapshot"))
         assertTrue(adapter.contains("baseline: captureOptionBaseline()"))
         assertTrue(adapter.contains("actionTargetPolicy.signature(node)"))

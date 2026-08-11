@@ -165,7 +165,7 @@
       const node = scope.querySelector(selector) || document.querySelector(selector);
       if (isVisible(node)) return node;
     }
-    const candidates = Array.from(scope.querySelectorAll('button')).filter((button) => {
+    const candidates = Array.from(scope.querySelectorAll('button, [role="button"]')).filter((button) => {
       const label = nodeLabel(button);
       return isActionable(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
     });
