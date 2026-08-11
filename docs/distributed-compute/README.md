@@ -22,7 +22,7 @@ owners: backend, node, ai-economy
 
 > v218 合同修正：历史“v11 Planning Snapshot V2”现以协议阈值 12 解释；work-admission `None` 允许新晋升槽首次重授权，`Some` 才承诺 current head。当前 A1 只有未编译的同事务 projector；A2 总合同已冻结，未编译、未运行的 A2b2 静态源码已覆盖 route→WAL-main、map/lock、barrier、完整 unmap、联合 close、route/registration typed custody/count inventory，但逐 case Windows 动态证据仍缺。无 producer，v14 永久 blocked-only，Runtime/Ready/派发不可达。
 
-| 能力 | 2026-08-11 状态 |
+| 能力 | 2026-08-12 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码与 v169-v201 分段实现已写；Provider/Supply、Offer、Price Snapshot 和 Broker 部分链已有分层验证，其余 Attempt/结算仍有大量 `implementation_uncompiled` 或未接线入口。不能把局部通过描述为整条交易链可用 |
@@ -41,6 +41,7 @@ owners: backend, node, ai-economy
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；进程内 HTTP/MCP 与 Offer 文件重开已验证，并发和生产磁盘仍未验证 |
 | Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP/MCP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，PC `/compute-reference-curves` 已通过跨层契约、严格类型、lint、生产构建和 bundle budget。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本与部署仍未验证，状态为 `implementation_partially_verified` |
 | Provider Capacity Commitment v225 | `implementation_partially_verified`：immutable `committed` 主事实、唯一 `canceled|expired` terminal receipt、Store 原子 create/read/cancel/expire、generic bypass 与 owner/admin HTTP 已接线；数量/余额复用同一 Claim/ledger。生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP、磁盘重开和 PC `/compute-supply` 静态构建已通过；真实 TCP、生产升级、跨连接并发、浏览器及交付结算未验证 |
+| Delivery Allocation v228 | `design_frozen/source_not_written`：whole-only 双边 Grant 只允许 exact consumer 把一份 v225 Commitment 一次性行权到一个 quoted Job；单一 IMMEDIATE 事务原子完成预算、父 Claim release、标准 parented Reservation Claim hold、Reservation/Job 与既有 Broker receipt，Commitment 派生 `allocated`。Snapshot 过期例外仅限 Store-private authority；尚无 migration、源码或运行证据 |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -87,7 +88,7 @@ owners: backend, node, ai-economy
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
 4. `docs/distributed-compute/node-endpoint-session-authority.md`、`docs/distributed-compute/node-plugin-local-authority.md`、`docs/distributed-compute/node-plugin-manifest-catalog-authority.md`、`docs/distributed-compute/node-plugin-vfs-fault-authority.md`、`docs/distributed-compute/node-plugin-planning-snapshot-authority.md`、`docs/distributed-compute/node-ready-capability.md`、`docs/distributed-compute/node-plugin-candidate-cleanup.md` 与 `docs/distributed-compute/windows-compute-namespace-fence-wire-v1.json`：端点 currentness、SQLite 真源、目录/回滚、测试 VFS 故障、Planning 投影、短期就绪、失败清理与 Windows hard-fence ABI。
 5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
-6. `docs/distributed-compute/market-and-settlement.md`、`docs/distributed-compute/platform-reference-price-curve-authority.md` 与 `docs/distributed-compute/capacity-commitment-authority.md`：标准化 SKU、期货锁价、平台参考回退批次、v225 Provider 容量承诺和结算边界。
+6. `docs/distributed-compute/market-and-settlement.md`、`docs/distributed-compute/platform-reference-price-curve-authority.md`、`docs/distributed-compute/capacity-commitment-authority.md` 与 `docs/distributed-compute/delivery-allocation-authority.md`：标准化 SKU、期货锁价、平台参考回退、v225 容量承诺、v228 whole-only 交付授权和结算边界。
 7. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
 8. `docs/distributed-compute/capacity-pool-api.md`：本人共享物理资源边界及摘要隐私合同。
 9. `docs/distributed-compute/capacity-bucket-api.md`：交付窗口 Bucket 登记、余额读取和窗口不变量。
@@ -184,6 +185,8 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`；v223/v224 application 已在一个事务中直接登记既有 v171 Snapshot，并通过管理员 HTTP、迁移与文件重开专项。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md) 与 [`platform-reference-price-curve-api-acceptance.md`](platform-reference-price-curve-api-acceptance.md)。
 
 v225 Provider Capacity Commitment 详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md) 与 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。它只允许本地 current Provider/Offer/Pool 在 exact `capacity_future` v171 Snapshot 与已批准应用的 v223 binding 下，把同一 Claim/ledger 的完整 meter/window 从 available 锁到 held，再以唯一 canceled/expired receipt 原子归还；不包含 `external_pool`、DeliveryAllocation、资金或结算。PC 控制面只嵌入既有 `/compute-supply` Offer 工作区并复用同一 owner HTTP、Claim/ledger 和 reference binding。当前为 `implementation_partially_verified`：生产目标、临时 SQLite、进程内 HTTP、重开和 PC 静态构建已有定向证据，真实 TCP、生产升级、并发压力和浏览器未验证。
+
+v228 Delivery Allocation 详见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)。它冻结一份 Commitment→一个消费者 Job 的 whole-only Grant：行权在同一事务内冻结既有 Broker 预算、完整释放父 Commitment Claim、完整建立带 `parent_claim_id` 的标准 Reservation Claim，并写 Reservation、Job、Broker 与 immutable exercised receipt；Commitment current view 派生 `allocated`。Snapshot TTL 例外只属于 Store-private authority，泛用 Reservation 入口继续失败关闭。当前仅为 `design_frozen/source_not_written`，不是持仓、撮合、执行或结算完成。
 
 ## 当前工程指令
 

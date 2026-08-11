@@ -122,7 +122,7 @@ platform_margin
 
 容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
 
-V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v201 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185-v194 已形成 Attempt 证据、可信终态和容量收口；v195-v199 已形成 CNY 待结算、消费者挑战、纠正与 available 释放；v200/v201 已形成 Provider 本人提款申请，以及取消、拒绝或外部已付款声明的唯一终态。真实价格源、自动撮合、节点真实运行接线、非金额补救、available 追索、自动释放、外部付款和证据自动核验仍未实现。
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v201 schema、各版本化 Registry 及 fallback_curve 报价入口已经形成，各段编译、迁移和定向证据以专题 authority/acceptance 为准。v175/v176 已形成平台人民币余额 Broker，v185-v194 已形成 Attempt 证据、可信终态和容量收口；v195-v199 已形成 CNY 待结算、消费者挑战、纠正与 available 释放；v200/v201 已形成 Provider 本人提款申请，以及取消、拒绝或外部已付款声明的唯一终态。真实价格源、自动撮合、节点真实运行接线、非金额补救、available 追索、自动释放、外部付款和证据自动核验仍未实现。
 
 v225 CapacityCommitment 已形成 `implementation_partially_verified` 的最窄实现：一个 immutable revision 1 `committed` 事实加每个 Commitment 最多一个 revision 2 `canceled|expired` terminal receipt，current status 由 LEFT JOIN 派生。Create 在同一事务锁定 current Provider/Offer/Pool、未过期 `capacity_future` v171 Snapshot、已批准应用的 exact v223 binding 和完整 meter/window；数量与余额继续只属于同一 Claim lines/ledger。生产目标、临时 SQLite、Store/Service/进程内 HTTP 和重开已有定向证据；实现仍不包含 DeliveryAllocation、订单/持仓、资金或结算，详见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。
 
@@ -132,15 +132,17 @@ v225 CapacityCommitment 已形成 `implementation_partially_verified` 的最窄�
 - `Trade`：撮合后的不可变成交；
 - `Position`：账户在某合约上的净持仓和已分配数量；
 - `CapacityCommitment`：卖方为交付锁定的 Offer 容量；
-- `DeliveryAllocation`：把买方持仓转成具体 Job 可消费的配额；
+- `DeliveryAllocation`：P0 把一份卖方 Commitment whole-only 授权给具体消费者 Job；未来才可从买方 Position 分配；
 - `ClearingReceipt`：到期交付、差额、奖励与处罚的汇总回执。
 
 同一份卖方容量不能同时支持多个未被净额化的承诺。v225 不新增 Commitment Reservation 或余额表：Provider 的 Commitment、`capacity_commitment` Claim 与 ledger hold 必须在一个 `BEGIN IMMEDIATE` 内原子完成，并把同 Offer/bucket 的 live Claim 汇总限制在 current Offer `reservable_units` 内；Pool available 与 reducer 继续承担全局防超卖。
 
+v228 [`Delivery Allocation`](delivery-allocation-authority.md) 已按 `design_frozen/source_not_written` 冻结：一份 Commitment 最多一份双边 Grant；exact consumer 只能 whole-only 行权给一个 quoted Job。行权在一个 IMMEDIATE 事务内冻结既有 Broker 预算、全量释放父 Commitment Claim、以相同 lines 建立带 `parent_claim_id` 的标准 Reservation Claim，并登记 Reservation、Job、Broker receipt 与 immutable exercised receipt；Commitment current view 派生 `allocated`。它不产生 Position、第二份 Allocation Claim、真实价格或结算真源。
+
 ## 10. 从期货价格到任务结算
 
 1. Planner 把任务需求归一为 SKU 与交付窗口；
-2. Market 选择用户已有 Delivery Allocation，或从期货曲线生成可接受快照；
+2. 消费者行权 eligible 双边 Grant，未来 Market 才可选择 Position-based Delivery Allocation；普通现货路径仍从价格曲线取得可接受快照；
 3. Broker 原子冻结消费者预算、所选 Pool/交付窗口的容量和 Price Snapshot；
 4. Attempt 执行并产生声明/观测/验证回执；
 5. Verification 决定 `verified_usage` 与 `compensable_usage`；
@@ -162,11 +164,11 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 12. 演进顺序
 
-1. 版本化 Price Snapshot 注册、持久化与整数微单位（代码已写，尚未验证接线）；
-2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（源码已写，未编译/迁移/运行）；
+1. 版本化 Price Snapshot 注册、持久化与整数微单位（已有分层定向验证）；
+2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（v223/v224 已分层验证）；
 3. 平台签名价格源、真实指数/标记价、期货曲线、批量报价和自动撮合；
 4. Provider Capacity Commitment（v225 部分验证，交付与结算未接线）；
-5. 需求方 Delivery Allocation；
+5. whole-only 双边 Delivery Allocation（v228 设计冻结、源码未写）；
 6. 限价订单簿、成交、持仓和净额；
 7. YCI 指数、标记价、替代交付和自动清算；
 8. 跨公司、跨矿池的统一容量市场。
@@ -177,4 +179,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 本文是已接受的目标市场合同。当前代码已写入 Offer-owner fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v201 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款流程；各段验证状态以专题验收文档为准。平台 reference fallback 的 v223 Store/application 与 v224 管理员 HTTP/MCP、TTL/升级门卫已有分层验证，但仍不代表真实价格。v195 只结清预授权并登记 pending；v196-v199 只处理内部挑战、纠正和 available 释放；v200 只冻结 Provider 本人的提款额；v201 的取消/拒绝只返还内部余额，`external_paid_attested` 只保存管理员声明与证据摘要。它们都不代表生产支付已经由平台执行或验证。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、真实付款、证据自动核验、指数/标记价、订单簿、持仓和外部清算仍未实现。
 
-v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router，当前为 `implementation_partially_verified`：生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过。真实 TCP、跨连接并发、生产升级、价格真实性、DeliveryAllocation 与资金结算仍未闭合，不得把局部验收描述为整条容量市场生产可用。
+v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router，当前为 `implementation_partially_verified`：生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过。v228 DeliveryAllocation 只有已冻结设计，尚无 migration、源码或运行证据。真实 TCP、跨连接并发、生产升级、价格真实性、执行与资金结算仍未闭合，不得把局部验收描述为整条容量市场生产可用。
