@@ -10,7 +10,7 @@ implementation_status: implementation_unwired
 
 ## 1. 当前状态
 
-v212 在源码中增加 Provider-neutral、不可变的 Execution Plan 合同、五张追加式 SQLite 账本和 sealed Store producer。它补齐 v211 只有 `plan_id/schema/digest`、却没有计划权威真源的问题。服务端及测试源码已编译；内存 SQLite 完整迁移、重复应用、关键对象和 v215 冲突 backfill 门卫已通过 3 项专项测试，但生产磁盘迁移与生产链路未运行。
+v212 在源码中增加 Provider-neutral、不可变的 Execution Plan 合同、五张追加式 SQLite 账本和 sealed Store producer。它补齐 v211 只有 `plan_id/schema/digest`、却没有计划权威真源的问题。服务端及测试源码已编译；内存与临时文件 SQLite 的完整迁移、重复迁移、两次重开、关键对象和 v215 冲突 backfill 门卫已通过 4 项专项测试，但 sealed Plan/accepted 成功链、生产数据库原位升级与生产链路未运行。验收边界见 `attempt-gateway-acceptance.md`。
 
 当前没有 ReadyCapability V2 上报与服务端验真、endpoint verifier、Adapter registry、Artifact credential issuer 或任何 sealed 输入构造器。因此 Store producer 虽能在拿到不可伪造输入后完成单事务计划生成，生产入口仍不可达；v211 Start、accepted ACK 和远端执行仍保持关闭。
 
