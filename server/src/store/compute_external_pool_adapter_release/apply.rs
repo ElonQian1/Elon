@@ -27,7 +27,7 @@ use super::{
 };
 
 impl Store {
-    pub(in crate::store) fn apply_external_pool_adapter_release(
+    pub(crate) fn apply_external_pool_adapter_release(
         &self,
         input: ApplyExternalPoolAdapterRelease,
     ) -> Result<ExternalPoolAdapterReleaseAdmissionReceipt> {

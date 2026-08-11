@@ -25,7 +25,7 @@ use super::{
 const MATERIAL_VALIDATION_TIMESTAMP: &str = "1970-01-01T00:00:00.000000000Z";
 
 impl Store {
-    pub(in crate::store) fn submit_external_pool_adapter_release_request(
+    pub(crate) fn submit_external_pool_adapter_release_request(
         &self,
         input: SubmitExternalPoolAdapterReleaseRequest,
     ) -> Result<ExternalPoolAdapterReleaseRequestReceipt> {

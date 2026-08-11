@@ -398,6 +398,13 @@ pub(crate) use compute_capacity_pool_lifecycle::{
 pub(crate) use compute_capacity_supply_withdrawal::{
     WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
 };
+pub(crate) use compute_external_pool_adapter_release::{
+    ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,
+    ExternalPoolAdapterReleaseRequestReceipt, ExternalPoolAdapterReleaseReviewReceipt,
+    ReviewExternalPoolAdapterReleaseRequest, SubmitExternalPoolAdapterReleaseRequest,
+    EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION,
+    EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION,
+};
 pub(crate) use compute_job_registry::ComputeJobRegistrationReceipt;
 pub use compute_metering::ComputeMeterEvent;
 pub(crate) use compute_offer_contract_validation::{compute_offer_digest, compute_sku_digest};

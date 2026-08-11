@@ -23,7 +23,7 @@ use super::{
 };
 
 impl Store {
-    pub(in crate::store) fn review_external_pool_adapter_release_request(
+    pub(crate) fn review_external_pool_adapter_release_request(
         &self,
         mut input: ReviewExternalPoolAdapterReleaseRequest,
     ) -> Result<ExternalPoolAdapterReleaseReviewReceipt> {

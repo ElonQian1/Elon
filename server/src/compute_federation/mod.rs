@@ -9,6 +9,8 @@ pub(crate) mod capacity;
 pub(crate) mod execution;
 pub(crate) mod execution_plan;
 pub(crate) mod external_pool_adapter_release;
+pub(crate) mod external_pool_adapter_release_api;
+pub(crate) mod external_pool_adapter_release_service;
 pub(crate) mod external_pool_onboarding;
 pub(crate) mod legacy;
 pub(crate) mod market;

@@ -13,16 +13,16 @@ pub(super) const EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_SCHEMA: &str =
     "compute_federation.external_pool_adapter_release_review.v1";
 pub(super) const EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SCHEMA: &str =
     "compute_federation.external_pool_adapter_release_admission.v1";
-pub(super) const EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION: &str =
+pub(crate) const EXTERNAL_POOL_ADAPTER_RELEASE_REVIEW_CONFIRMATION: &str =
     "confirm_external_pool_adapter_release_review";
-pub(super) const EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION: &str =
+pub(crate) const EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION: &str =
     "confirm_external_pool_adapter_release_stage";
 pub(super) const REVIEW_DECISION_APPROVED: &str = "approved";
 pub(super) const REVIEW_DECISION_CHANGES_REQUESTED: &str = "changes_requested";
 pub(super) const REVIEW_DECISION_REJECTED: &str = "rejected";
 pub(super) const ADMISSION_STATUS_STAGED: &str = "staged";
 
-pub(in crate::store) struct SubmitExternalPoolAdapterReleaseRequest {
+pub(crate) struct SubmitExternalPoolAdapterReleaseRequest {
     pub submitted_by_admin_user_id: String,
     pub release: ComputeExternalPoolAdapterReleaseIntent,
     pub idempotency_key: String,
@@ -31,7 +31,7 @@ pub(in crate::store) struct SubmitExternalPoolAdapterReleaseRequest {
     pub idempotency_scope: String,
 }
 
-pub(in crate::store) struct ReviewExternalPoolAdapterReleaseRequest {
+pub(crate) struct ReviewExternalPoolAdapterReleaseRequest {
     pub request_id: String,
     pub expected_request_digest: String,
     pub expected_request_material_digest: String,
@@ -43,7 +43,7 @@ pub(in crate::store) struct ReviewExternalPoolAdapterReleaseRequest {
     pub idempotency_key: String,
 }
 
-pub(in crate::store) struct ApplyExternalPoolAdapterRelease {
+pub(crate) struct ApplyExternalPoolAdapterRelease {
     pub request_id: String,
     pub expected_request_digest: String,
     pub expected_request_material_digest: String,
@@ -56,7 +56,7 @@ pub(in crate::store) struct ApplyExternalPoolAdapterRelease {
 }
 
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ExternalPoolAdapterReleaseRequestReceipt {
+pub(crate) struct ExternalPoolAdapterReleaseRequestReceipt {
     pub schema: &'static str,
     pub request_id: String,
     pub request_digest: String,
@@ -71,7 +71,7 @@ pub(in crate::store) struct ExternalPoolAdapterReleaseRequestReceipt {
 }
 
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ExternalPoolAdapterReleaseReviewReceipt {
+pub(crate) struct ExternalPoolAdapterReleaseReviewReceipt {
     pub schema: &'static str,
     pub review_id: String,
     pub review_digest: String,
@@ -88,7 +88,7 @@ pub(in crate::store) struct ExternalPoolAdapterReleaseReviewReceipt {
 }
 
 #[derive(Clone, Serialize)]
-pub(in crate::store) struct ExternalPoolAdapterReleaseAdmissionReceipt {
+pub(crate) struct ExternalPoolAdapterReleaseAdmissionReceipt {
     pub schema: &'static str,
     pub admission_id: String,
     pub admission_digest: String,
