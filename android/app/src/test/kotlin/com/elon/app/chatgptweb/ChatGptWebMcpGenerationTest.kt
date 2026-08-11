@@ -52,14 +52,50 @@ class ChatGptWebMcpGenerationTest {
         assertTrue(result.getString("poll_hint").contains("adapter_current=true"))
     }
 
+    @Test
+    fun nativeMessageRevealValidatesCurrentIdsAndStructuredPartIndexes() {
+        var revealed: Pair<String, Int?>? = null
+        val actions = actions(
+            pageGeneration = 1,
+            adapterGeneration = 1,
+            snapshot = MESSAGE_SNAPSHOT,
+            onRevealMessage = { messageId, partIndex ->
+                revealed = messageId to partIndex
+                true
+            },
+        )
+
+        val result = actions.control(JSONObject()
+            .put("action", "chatgpt_reveal_message")
+            .put("message_id", "message_demo")
+            .put("part_index", 0))
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals("message_demo" to 0, revealed)
+
+        val stale = actions.control(JSONObject()
+            .put("action", "chatgpt_reveal_message")
+            .put("message_id", "missing"))
+        assertFalse(stale.getBoolean("control_ok"))
+        assertEquals("stale_message_id", stale.getString("error"))
+
+        val invalidPart = actions.control(JSONObject()
+            .put("action", "chatgpt_reveal_message")
+            .put("message_id", "message_demo")
+            .put("part_index", 2))
+        assertFalse(invalidPart.getBoolean("control_ok"))
+        assertEquals("invalid_part_index", invalidPart.getString("error"))
+    }
+
     private fun actions(
         pageGeneration: Long,
         adapterGeneration: Long,
         bridgeState: ChatGptWebPageAdapter.State = ChatGptWebPageAdapter.State.READY,
+        snapshot: ChatGptWebSnapshot = SNAPSHOT,
         onRefresh: () -> Unit = {},
         onRequestComposerOptions: () -> Unit = {},
+        onRevealMessage: (String, Int?) -> Boolean = { _, _ -> false },
     ) = ChatGptWebMcpActions(
-        snapshot = { SNAPSHOT },
+        snapshot = { snapshot },
         uiManifest = { MANIFEST },
         observedState = {
             ChatGptWebObservedState.Snapshot.EMPTY.copy(
@@ -105,6 +141,7 @@ class ChatGptWebMcpGenerationTest {
         },
         refresh = onRefresh,
         selectMode = {},
+        revealMessage = onRevealMessage,
     )
 
     private companion object {
@@ -120,6 +157,19 @@ class ChatGptWebMcpGenerationTest {
             attachments = emptyList(),
             dictationActive = false,
             capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.MODEL_SELECTOR)),
+        )
+        val MESSAGE_SNAPSHOT = SNAPSHOT.copy(
+            messages = listOf(
+                ChatGptWebMessage(
+                    id = "message_demo",
+                    role = "assistant",
+                    content = "demo",
+                    state = "completed",
+                    parts = listOf(ChatGptWebMessagePart("file", "demo.txt")),
+                ),
+            ),
+            pageKind = "conversation",
+            observedMessageCount = 1,
         )
         val MANIFEST = ChatGptWebUiManifest(
             version = 3,

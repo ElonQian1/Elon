@@ -15,6 +15,7 @@ internal class ChatGptWebMcpActions(
     private val commands: ChatGptWebMcpCommandPort,
     private val refresh: () -> Unit,
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
+    private val revealMessage: (String, Int?) -> Boolean,
 ) {
     fun uiState(): JSONObject {
         val observed = observedState()
@@ -216,6 +217,29 @@ internal class ChatGptWebMcpActions(
                 }
             }
             "chatgpt_get_context" -> return contextPage(args)
+            "chatgpt_reveal_message" -> {
+                if (mode() != ChatGptWebModeController.Mode.NATIVE) {
+                    return error(action, "native_view_required")
+                }
+                val messageId = args.optString("message_id").trim()
+                if (messageId.isBlank() || messageId.length > MAX_MESSAGE_ID_CHARS) {
+                    return error(action, "invalid_message_id")
+                }
+                val message = snapshot()?.messages?.firstOrNull { it.id == messageId }
+                    ?: return error(action, "stale_message_id")
+                val partIndex = if (args.has("part_index") && !args.isNull("part_index")) {
+                    val raw = args.opt("part_index") as? Number
+                        ?: return error(action, "invalid_part_index")
+                    raw.toInt().takeIf { raw.toDouble() == it.toDouble() }
+                        ?: return error(action, "invalid_part_index")
+                } else {
+                    null
+                }
+                if (partIndex != null && partIndex !in message.parts.indices) {
+                    return error(action, "invalid_part_index")
+                }
+                if (!revealMessage(messageId, partIndex)) return error(action, "message_not_rendered")
+            }
             "chatgpt_find_controls" -> return controlsPage(args)
             "chatgpt_get_conversations" -> return conversationsPage(args)
             "chatgpt_get_navigation" -> return navigationPage(args)
@@ -497,6 +521,11 @@ internal class ChatGptWebMcpActions(
                 .put("content_chars", message.content.length)
                 .put("content_truncated", message.content.length > maxChars)
                 .put("part_count", message.parts.size)
+                .put("native_action", "chatgpt_reveal_message")
+                .put(
+                    "native_adb_content_description",
+                    ChatGptNativeControlPresentation.messageSelector(message.id, message.role),
+                )
                 .put("parts_truncated", message.parts.size > MAX_MESSAGE_PARTS)
                 .put("parts", JSONArray().apply {
                     message.parts.take(MAX_MESSAGE_PARTS).forEachIndexed { partIndex, part ->
@@ -651,6 +680,7 @@ internal class ChatGptWebMcpActions(
         const val MAX_CONTEXT_MESSAGE_CHARS = 40_000
         const val MAX_CONTEXT_CURSOR_CHARS = 80
         const val MAX_MESSAGE_PARTS = 16
+        const val MAX_MESSAGE_ID_CHARS = 200
         const val MAX_MESSAGE_PART_LABEL_CHARS = 180
         const val MAX_INPUT_CHARS = 20_000
         const val MAX_ATTACHMENT_ID_CHARS = 96
@@ -697,6 +727,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_list_features",
             "chatgpt_select_feature",
             "chatgpt_get_context",
+            "chatgpt_reveal_message",
             "chatgpt_find_controls",
             "chatgpt_get_conversations",
             "chatgpt_get_navigation",

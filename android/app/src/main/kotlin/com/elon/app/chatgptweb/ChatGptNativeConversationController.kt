@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Rect
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -27,7 +28,10 @@ internal class ChatGptNativeConversationController(
     onInvokeControl: (String) -> Unit,
     onOpenOfficialOutput: () -> Unit,
 ) {
+    private data class RevealTarget(val messageId: String, val partIndex: Int?)
+
     private var messages: List<ChatGptWebMessage> = emptyList()
+    private val layoutManager = LinearLayoutManager(messagesView.context)
     private val adapter = ChatGptNativeMessageAdapter(
         parent = messagesView,
         onCopy = ::copyMessage,
@@ -38,14 +42,20 @@ internal class ChatGptNativeConversationController(
     private var snapshot: ChatGptWebSnapshot? = null
     private var pendingPrompt: String? = null
     private var suggestionsVisible = false
+    private var revealTarget: RevealTarget? = null
 
     init {
         composer.contentDescription = ChatGptNativeNavigationSelector.COMPOSER_INPUT
         sendButton.contentDescription = ChatGptNativeNavigationSelector.SEND
         stopButton.contentDescription = ChatGptNativeNavigationSelector.STOP
         newConversationButton.contentDescription = ChatGptNativeNavigationSelector.NEW_CONVERSATION
-        messagesView.layoutManager = LinearLayoutManager(messagesView.context)
+        messagesView.layoutManager = layoutManager
         messagesView.adapter = adapter
+        messagesView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) revealTarget = null
+            }
+        })
         sendButton.setOnClickListener { submit() }
         stopButton.setOnClickListener { onStop() }
         newConversationButton.setOnClickListener { onNewConversation() }
@@ -84,7 +94,14 @@ internal class ChatGptNativeConversationController(
             composer.setSelection(composer.text?.length ?: 0)
         }
         setControls(value)
-        if (messages.isNotEmpty()) messagesView.scrollToPosition(messages.lastIndex)
+        val target = revealTarget
+        val targetIndex = target?.let { requested -> messages.indexOfFirst { it.id == requested.messageId } } ?: -1
+        if (target != null && targetIndex >= 0) {
+            scrollToMessage(targetIndex, target)
+        } else {
+            revealTarget = null
+            if (messages.isNotEmpty()) messagesView.scrollToPosition(messages.lastIndex)
+        }
     }
 
     fun onCommandResult(event: ChatGptWebEvent.CommandResult) {
@@ -101,6 +118,7 @@ internal class ChatGptNativeConversationController(
             }
             "new_conversation" -> if (event.ok) {
                 pendingPrompt = null
+                revealTarget = null
                 messages = emptyList()
                 adapter.submit(emptyList(), snapshot?.capabilities ?: ChatGptWebCapabilities.EMPTY)
                 updateEmptyVisibility()
@@ -145,6 +163,16 @@ internal class ChatGptNativeConversationController(
         submit(requestId)
     }
 
+    fun revealMessage(messageId: String, partIndex: Int?): Boolean {
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index < 0) return false
+        if (partIndex != null && partIndex !in messages[index].parts.indices) return false
+        val target = RevealTarget(messageId, partIndex)
+        revealTarget = target
+        scrollToMessage(index, target)
+        return true
+    }
+
     private fun submit(requestId: String? = null) {
         val prompt = composer.text.toString().trim()
         val hasAttachments = snapshot?.attachments?.isNotEmpty() == true
@@ -158,6 +186,23 @@ internal class ChatGptNativeConversationController(
         val clipboard = messagesView.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("ChatGPT message", message.content))
         Toast.makeText(messagesView.context, R.string.chatgpt_message_copied, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun scrollToMessage(index: Int, target: RevealTarget) {
+        messagesView.post {
+            if (revealTarget != target) return@post
+            layoutManager.scrollToPositionWithOffset(index, 0)
+            messagesView.post reveal@{
+                if (revealTarget != target) return@reveal
+                val holder = messagesView.findViewHolderForAdapterPosition(index)
+                    as? ChatGptNativeMessageAdapter.MessageViewHolder ?: return@reveal
+                val targetView = target.partIndex?.let(holder.parts::getChildAt) ?: holder.itemView
+                targetView?.requestRectangleOnScreen(
+                    Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1)),
+                    true,
+                )
+            }
+        }
     }
 
     private fun setControls(value: ChatGptWebSnapshot) {

@@ -146,6 +146,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             commands = mcpCommandPort,
             refresh = { binding.chatGptWebView.reload() },
             selectMode = modeController::select,
+            revealMessage = nativeController::revealMessage,
         )
     }
 

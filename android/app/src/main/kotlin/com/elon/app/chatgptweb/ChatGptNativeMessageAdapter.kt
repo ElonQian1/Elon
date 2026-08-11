@@ -60,8 +60,9 @@ internal class ChatGptNativeMessageAdapter(
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
         val message = messages[position]
-        val stableId = message.id.replace(Regex("[^A-Za-z0-9_-]"), "_").take(80)
-        holder.itemView.contentDescription = "chatgpt-message:$stableId:${message.role}"
+        val stableId = ChatGptNativeControlPresentation.stableContextId(message.id)
+        holder.itemView.contentDescription =
+            ChatGptNativeControlPresentation.messageSelector(message.id, message.role)
         holder.text.contentDescription = "chatgpt-message-content:$stableId"
         if (message.role == "assistant") {
             markwon.setMarkdown(holder.text, message.content)

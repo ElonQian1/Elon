@@ -157,6 +157,9 @@ internal object ChatGptNativeControlPresentation {
     fun messageRegenerateSelector(contextId: String): String =
         "chatgpt-message-regenerate:${stableContextId(contextId)}"
 
+    fun messageSelector(contextId: String, role: String): String =
+        "chatgpt-message:${stableContextId(contextId)}:${stableContextId(role)}"
+
     fun messagePartSelector(contextId: String, index: Int, type: String): String =
         "chatgpt-message-part:${stableContextId(contextId)}:$index:${stableContextId(type)}"
 

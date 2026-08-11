@@ -91,12 +91,31 @@ function Get-VisibleMessageSelectors {
     }
 }
 
+function Wait-VisibleMessageSelectors {
+    param([Parameter(Mandatory = $true)][string[]]$ExpectedPartSelectors)
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
+    do {
+        $visible = Get-VisibleMessageSelectors
+        $matched = @($visible.parts | Where-Object { $_ -in $ExpectedPartSelectors })
+        if ($visible.messages.Count -gt 0 -and $matched.Count -gt 0) {
+            return [pscustomobject]@{ visible = $visible; matched = $matched }
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $null
+}
+
 function Restore-Origin {
     param(
         [Parameter(Mandatory = $true)]$Origin,
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$OriginPath
     )
 
+    $current = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+    if ([string]$current.surface -ne "chatgpt_web") {
+        throw "ChatGPT surface left the foreground before origin restoration."
+    }
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "web" } | Out-Null
     if ($OriginPath) {
@@ -186,6 +205,13 @@ try {
             Where-Object { $_ } |
             Sort-Object -Unique
     )
+    $sampleMessage = $sample.messages |
+        Where-Object { @($_.parts | Where-Object { $null -ne $_ }).Count -gt 0 } |
+        Select-Object -First 1
+    if ($null -eq $sampleMessage) {
+        throw "Structured message sample lost its owning message."
+    }
+    $targetSelector = [string]$sampleMessage.parts[0].native_adb_content_description
 
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "native" } | Out-Null
@@ -194,12 +220,17 @@ try {
             param($state)
             $state.view_mode -eq "native" -and $state.bridge_state -eq "ready"
         } | Out-Null
-    Start-Sleep -Seconds 3
-    $visible = Get-VisibleMessageSelectors
-    $matchedSelectors = @($visible.parts | Where-Object { $_ -in $expectedSelectors })
-    if ($visible.messages.Count -eq 0 -or $matchedSelectors.Count -eq 0) {
+    $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
+        -Arguments @{ message_id = [string]$sampleMessage.id; part_index = 0 }
+    if ($reveal.control_ok -ne $true) {
+        throw "Native structured message reveal action failed."
+    }
+    $visibleResult = Wait-VisibleMessageSelectors -ExpectedPartSelectors @($targetSelector)
+    if ($null -eq $visibleResult) {
         throw "Native structured message selectors are not visible in the Android UI tree."
     }
+    $visible = $visibleResult.visible
+    $matchedSelectors = @($visibleResult.matched)
 
     $result = [ordered]@{
         schema = "elon.chatgpt_web.message_structure_smoke.v1"
@@ -213,6 +244,7 @@ try {
         visible_message_selector_count = $visible.messages.Count
         visible_part_selector_count = $visible.parts.Count
         matched_part_selector_count = $matchedSelectors.Count
+        reveal_action_succeeded = $true
         original_conversation_restored = $true
         original_view_mode_restored = $true
         sent_messages = 0
