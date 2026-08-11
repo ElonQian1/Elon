@@ -6,6 +6,7 @@
   const MAX_OPTIONS = 30;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
+  const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
@@ -180,7 +181,13 @@
       return isActionable(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
     });
     return candidates.find((button) => button.getAttribute('aria-haspopup') === 'menu') ||
-      candidates.find((button) => /gpt|\bo\d|auto|thinking|instant|sol|模型|能力|轻度|重度/i.test(nodeLabel(button))) ||
+      candidates.find((button) =>
+        modelLabelPolicy && typeof modelLabelPolicy.isModelLabel === 'function'
+          ? modelLabelPolicy.isModelLabel(nodeLabel(button))
+          : /gpt|\bo\d|\b\d+(?:\.\d+)+\b|auto|thinking|instant|sol|模型|能力|轻度|重度/i.test(
+            nodeLabel(button)
+          )
+      ) ||
       (candidates.length === 1 ? candidates[0] : null) ||
       null;
   }

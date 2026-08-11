@@ -82,12 +82,21 @@ const renamedModelButton = {
     return name === 'role' ? 'button' : null;
   }
 };
+const unrelatedComposerButton = {
+  id: '',
+  textContent: 'Workspace',
+  getAttribute(name) {
+    return name === 'role' ? 'button' : null;
+  }
+};
 const renamedEvents = [];
 const renamedResults = [];
 const renamedScope = {
   querySelector: () => null,
   querySelectorAll(selector) {
-    return selector === 'button, [role="button"]' ? [renamedModelButton] : [];
+    return selector === 'button, [role="button"]'
+      ? [unrelatedComposerButton, renamedModelButton]
+      : [];
   }
 };
 const renamedComposer = {
@@ -106,7 +115,9 @@ const renamedSandbox = {
     innerHeight: 800,
     __elonChatGptActionTargetPolicy: {
       actionPoint(node) {
-        return node === renamedModelButton ? { x: 210, y: 700 } : null;
+        if (node === renamedModelButton) return { x: 210, y: 700 };
+        if (node === unrelatedComposerButton) return { x: 80, y: 700 };
+        return null;
       },
       signature: () => 'visible'
     },

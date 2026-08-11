@@ -20,6 +20,9 @@ class ChatGptWebComposerContractTest {
         val actionTargetPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
         )
+        val modelLabelPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_model_label_policy.js",
+        )
         val layoutAdapter = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
         )
@@ -30,10 +33,12 @@ class ChatGptWebComposerContractTest {
 
         val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
         val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
+        val modelLabelAsset = pageAdapter.indexOf("chatgpt_web_adapter_model_label_policy.js")
         val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
         assertTrue(policyAsset >= 0)
         assertTrue(actionTargetAsset > policyAsset)
-        assertTrue(composerAsset > actionTargetAsset)
+        assertTrue(modelLabelAsset > actionTargetAsset)
+        assertTrue(composerAsset > modelLabelAsset)
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
@@ -42,6 +47,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("layout.findSemanticNode('attachment', 'composer')"))
         assertTrue(adapter.contains("scope.querySelectorAll('button, [role=\"button\"]')"))
         assertTrue(adapter.contains("layout.findSemanticNode('model', 'composer')"))
+        assertTrue(adapter.contains("modelLabelPolicy.isModelLabel"))
+        assertTrue(layoutAdapter.contains("modelLabelPolicy.isModelLabel(signal)"))
+        assertTrue(modelLabelPolicy.contains("function isModelLabel"))
         assertTrue(adapter.contains("function emitVisibleNodeTouch(purpose, node, emitEvent)"))
         assertTrue(layoutAdapter.contains("function findSemanticNode(semantic, region)"))
         assertTrue(layoutAdapter.contains("(!region || candidate.region === region)"))

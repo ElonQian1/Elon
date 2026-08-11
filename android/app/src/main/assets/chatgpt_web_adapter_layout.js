@@ -5,6 +5,7 @@
 
   const formAdapter = window.__elonChatGptFormControls;
   const composerAdapter = window.__elonChatGptComposer;
+  const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const controlOwnershipPolicy = window.__elonChatGptControlOwnershipPolicy;
   const formCommands = window.__elonChatGptFormCommands;
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
@@ -159,6 +160,11 @@
       'checkbox', 'radio', 'menuitemcheckbox', 'menuitemradio'
     ].includes(form.role)) return 'toggle';
     if (form && form.role === 'slider') return 'slider';
+    if (
+      region === 'composer' && modelLabelPolicy &&
+      typeof modelLabelPolicy.isModelLabel === 'function' &&
+      modelLabelPolicy.isModelLabel(signal)
+    ) return 'model';
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
       region === 'overlay'
