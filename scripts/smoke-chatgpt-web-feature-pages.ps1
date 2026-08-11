@@ -4,6 +4,7 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
+    [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 300)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
     [ValidateRange(1, 12)][int]$MaxFeaturePages = 8
@@ -14,8 +15,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-feature-audit-policy.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
-    -PollIntervalSec $PollIntervalSec
-Assert-ChatGptWebSmokeUsbDevice -Runtime $runtime
+    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
+Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 
 $safeKinds = @("library", "tasks", "apps", "projects", "gpts")
 $results = [System.Collections.Generic.List[object]]::new()
@@ -177,6 +178,6 @@ $failed = @($results | Where-Object { $_.passed -ne $true })
 
 if ($failed.Count -gt 0) {
     Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=failed failed_count=$($failed.Count)"
-    exit 1
+    throw "ChatGPT feature-page smoke failed: $($failed.Count) page(s)."
 }
 Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=passed audited_count=$($results.Count)"

@@ -4,6 +4,8 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
+    [string]$ExpectedHardwareSerial = "",
+    [switch]$SkipDictation,
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1
 )
@@ -12,8 +14,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
-    -PollIntervalSec $PollIntervalSec
-Assert-ChatGptWebSmokeUsbDevice -Runtime $runtime
+    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
+Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 
 function Wait-CommandReceipt {
     param(
@@ -85,16 +87,27 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
     }
 $originViewMode = [string]$origin.view_mode
 
-$dictationStart = Invoke-ReceiptAction -Action "chatgpt_start_dictation" `
-    -ExpectedAction "start_dictation"
-$active = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-    -Description "active ChatGPT dictation" -Predicate { param($state) $state.dictation_active -eq $true }
-$dictationCancel = Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
-    -ExpectedAction "cancel_dictation"
-$inactive = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-    -Description "stopped ChatGPT dictation" -Predicate { param($state) $state.dictation_active -eq $false }
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
-    -Arguments @{ text = "" } | Out-Null
+$dictationResult = [ordered]@{ skipped = $true; reason = "user_assisted_audio_capture" }
+if (-not $SkipDictation) {
+    $dictationStart = Invoke-ReceiptAction -Action "chatgpt_start_dictation" `
+        -ExpectedAction "start_dictation"
+    $active = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "active ChatGPT dictation" -Predicate { param($state) $state.dictation_active -eq $true }
+    $dictationCancel = Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
+        -ExpectedAction "cancel_dictation"
+    $inactive = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "stopped ChatGPT dictation" -Predicate { param($state) $state.dictation_active -eq $false }
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
+        -Arguments @{ text = "" } | Out-Null
+    $dictationResult = [ordered]@{
+        skipped = $false
+        start_receipt = [string]$dictationStart.receipt.status
+        active = [bool]$active.dictation_active
+        cancel_receipt = [string]$dictationCancel.receipt.status
+        stopped = -not [bool]$inactive.dictation_active
+        input_cleared = $true
+    }
+}
 
 $search = Get-WebSearchOption
 $initialSearchSelected = $search.selected -eq $true
@@ -128,13 +141,7 @@ if ($originViewMode -in @("web", "native")) {
     device_serial = $DeviceSerial
     sent_messages = 0
     uploaded_attachments = 0
-    dictation = [ordered]@{
-        start_receipt = [string]$dictationStart.receipt.status
-        active = [bool]$active.dictation_active
-        cancel_receipt = [string]$dictationCancel.receipt.status
-        stopped = -not [bool]$inactive.dictation_active
-        input_cleared = $true
-    }
+    dictation = $dictationResult
     web_search = [ordered]@{
         enable_receipt = [string]$toggleOn.receipt.status
         toggled = $true

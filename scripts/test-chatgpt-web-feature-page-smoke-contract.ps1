@@ -24,11 +24,14 @@ foreach ($path in @($smokePath, $runtimePath, $policyPath)) {
     }
 }
 
-Assert-Contains $runtime "physical USB serial" "Runtime must require an explicit physical USB serial."
+Assert-Contains $smoke "ExpectedHardwareSerial" `
+    "Feature-page smoke must pin a wireless device to its hardware identity."
+Assert-Contains $smoke "Assert-ChatGptWebSmokeTrustedDevice" `
+    "Feature-page smoke must verify the pinned physical device."
 Assert-Contains $runtime "Invoke-ElonNativeCommand" "Runtime must bound native adb commands."
 Assert-Contains $runtime "function Invoke-ChatGptWebSmokeAdb" `
-    "Runtime must expose a bounded USB-only adb command helper."
-Assert-Contains $runtime "Verification is deferred" "Missing USB must be reported as deferred."
+    "Runtime must expose a bounded adb command helper."
+Assert-Contains $runtime "Verification is deferred" "Missing device must be reported as deferred."
 if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
     throw "Feature-page smoke runtime must not create a wireless adb connection."
 }
@@ -43,7 +46,7 @@ Assert-Contains $smoke 'command_receipt.request_id' "Feature-page smoke must awa
 Assert-Contains $smoke 'Test-ChatGptWebFeatureMatrix' "Feature-page smoke must use shared structural policy."
 Assert-Contains $smoke 'function Restore-Origin' "Feature-page smoke must restore the original page."
 Assert-Contains $smoke 'Invoke-ChatGptWebSmokeAdb' `
-    "Feature-page smoke must use the bounded USB helper for back navigation."
+    "Feature-page smoke must use the bounded adb helper for back navigation."
 if ($smoke.Contains('chatgpt_new_conversation')) {
     throw "Feature-page smoke must not replace or discard the user's current conversation."
 }

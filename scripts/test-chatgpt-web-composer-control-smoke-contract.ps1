@@ -4,7 +4,10 @@ $ErrorActionPreference = "Stop"
 $script = Get-Content (Join-Path $PSScriptRoot "smoke-chatgpt-web-composer-controls.ps1") -Raw
 
 $required = @(
-    "Assert-ChatGptWebSmokeUsbDevice",
+    "ExpectedHardwareSerial",
+    "SkipDictation",
+    "user_assisted_audio_capture",
+    "Assert-ChatGptWebSmokeTrustedDevice",
     "chatgpt_start_dictation",
     "chatgpt_cancel_dictation",
     "start_dictation",
