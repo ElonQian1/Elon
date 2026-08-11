@@ -30,6 +30,7 @@ const MyComputeSettlementPage = lazy(() => import('./features/compute-settlement
 const ComputeSupplyPage = lazy(() => import('./features/compute-supply/ComputeSupplyPage'))
 const ComputeActivationAdminPage = lazy(() => import('./features/compute-activation/ComputeActivationAdminPage'))
 const ComputeOfferAdminPage = lazy(() => import('./features/compute-offers/ComputeOfferAdminPage'))
+const ComputeReferenceCurvePage = lazy(() => import('./features/compute-reference-curves/ComputeReferenceCurvePage'))
 const ComputeMarketPage = lazy(() => import('./features/compute-market/ComputeMarketPage'))
 const ComputeConsumerReviewPage = lazy(() => import('./features/compute-market/ComputeConsumerReviewPage'))
 const ComputeExecutionPage = lazy(() => import('./features/compute-execution/ComputeExecutionPage'))
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="compute-supply" element={lazyRoute(<ComputeSupplyPage />)} />
         <Route path="compute-activation" element={lazyRoute(<ComputeActivationAdminPage />)} />
         <Route path="compute-offers" element={lazyRoute(<ComputeOfferAdminPage />)} />
+        <Route path="compute-reference-curves" element={lazyRoute(<ComputeReferenceCurvePage />)} />
         <Route path="compute-market" element={lazyRoute(<ComputeMarketPage />)} />
         <Route path="compute-reviews" element={lazyRoute(<ComputeConsumerReviewPage />)} />
         <Route path="compute-execution" element={lazyRoute(<ComputeExecutionPage />)} />

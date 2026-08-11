@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Banknote, Bot, Boxes, CircleDollarSign, CircleMinus, ClipboardCheck, FileCheck2, Gauge, Gavel, GitBranch, Globe2, HardDrive, Landmark, LockKeyhole, MessageCircleMore, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal, TerminalSquare } from 'lucide-react'
+import { Activity, Banknote, Bot, Boxes, CircleDollarSign, CircleMinus, ClipboardCheck, FileCheck2, Gauge, Gavel, GitBranch, Globe2, HardDrive, Landmark, LockKeyhole, MessageCircleMore, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, TrendingUp, UsersRound, Mic2, SlidersHorizontal, TerminalSquare } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -56,6 +56,10 @@ const OFFER_ITEM: RailItem = {
   path: '/compute-offers', Icon: PackageCheck, label: '算力 Offer 管理', color: '#33312c', hoverColor: '#454138',
 }
 
+const REFERENCE_CURVE_ITEM: RailItem = {
+  path: '/compute-reference-curves', Icon: TrendingUp, label: '平台参考价格', color: '#302f37', hoverColor: '#403e4b',
+}
+
 const OBSERVATION_ITEM: RailItem = {
   path: '/compute-observations', Icon: Radar, label: '平台观测', color: '#28333a', hoverColor: '#344650',
 }
@@ -92,7 +96,7 @@ export default function ServerRail() {
   const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
   const railItems = user && ['admin', 'owner'].includes(user.role ?? '')
-    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, FINALIZATION_ITEM, SETTLEMENT_ISSUANCE_ITEM, CHALLENGE_RESOLUTION_ITEM, SETTLEMENT_CORRECTION_ITEM, SETTLEMENT_ITEM]
+    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, REFERENCE_CURVE_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, FINALIZATION_ITEM, SETTLEMENT_ISSUANCE_ITEM, CHALLENGE_RESOLUTION_ITEM, SETTLEMENT_CORRECTION_ITEM, SETTLEMENT_ITEM]
     : RAIL_ITEMS
 
   // 项目列表（从 store 读取，实时响应）

@@ -1,0 +1,413 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(24 28 25 / 56%);
+}
+
+.submitDialog,
+.actionDialog {
+  display: flex;
+  flex-direction: column;
+  width: min(960px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid #cdd1ca;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgb(20 25 21 / 24%);
+  color: #202522;
+  letter-spacing: 0;
+}
+
+.actionDialog {
+  width: min(560px, 100%);
+}
+
+.submitDialog button,
+.submitDialog input,
+.submitDialog select,
+.submitDialog textarea,
+.actionDialog button,
+.actionDialog input,
+.actionDialog select,
+.actionDialog textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.submitDialog button,
+.actionDialog button {
+  border: 1px solid #c9cdc6;
+  border-radius: 6px;
+  background: #fff;
+  color: #2c332e;
+}
+
+.submitDialog button:focus-visible,
+.submitDialog input:focus-visible,
+.submitDialog select:focus-visible,
+.submitDialog textarea:focus-visible,
+.actionDialog button:focus-visible,
+.actionDialog input:focus-visible,
+.actionDialog select:focus-visible,
+.actionDialog textarea:focus-visible {
+  outline: 2px solid #2d6a4f;
+  outline-offset: 2px;
+}
+
+.submitDialog button:disabled,
+.actionDialog button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.submitDialog > header,
+.actionDialog > header,
+.submitDialog > footer,
+.actionDialog > footer,
+.submitDialog > header > div,
+.actionDialog > header > div,
+.entryBuilder > header > div {
+  display: flex;
+  align-items: center;
+}
+
+.submitDialog > header,
+.actionDialog > header,
+.submitDialog > footer,
+.actionDialog > footer,
+.entryBuilder > header > div {
+  justify-content: space-between;
+}
+
+.submitDialog > header,
+.actionDialog > header,
+.submitDialog > footer,
+.actionDialog > footer {
+  flex: 0 0 auto;
+  gap: 14px;
+  padding: 15px 18px;
+}
+
+.submitDialog > header,
+.actionDialog > header {
+  border-bottom: 1px solid #dfe2dc;
+}
+
+.submitDialog > footer,
+.actionDialog > footer {
+  border-top: 1px solid #dfe2dc;
+}
+
+.submitDialog > header > div,
+.actionDialog > header > div {
+  align-items: flex-start;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.submitDialog > header span,
+.actionDialog > header span {
+  color: #7a5b31;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.submitDialog h2,
+.actionDialog h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.submitDialog > header button,
+.actionDialog > header button,
+.entryList article > button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.submitDialog > footer button,
+.actionDialog > footer button,
+.offerLookup button,
+.addEntry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  cursor: pointer;
+}
+
+.submitDialog button.primary,
+.actionDialog button.primary {
+  border-color: #275f47;
+  background: #275f47;
+  color: #fff;
+}
+
+.batchFields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(100px, .6fr) repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.batchFields label,
+.offerEditor label,
+.actionDialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.batchFields label > span,
+.offerEditor label > span,
+.actionDialog label > span,
+.offerIdentity span,
+.entryList article span,
+.entryBuilder > header span {
+  color: #747a75;
+  font-size: 12px;
+}
+
+.batchFields input,
+.batchFields textarea,
+.offerLookup input,
+.offerEditor input,
+.offerEditor select,
+.actionDialog textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #cbd0c9;
+  border-radius: 5px;
+  background: #fff;
+  color: #252b27;
+}
+
+.batchFields input,
+.offerLookup input,
+.offerEditor input,
+.offerEditor select {
+  min-height: 36px;
+  padding: 0 9px;
+}
+
+.batchFields textarea,
+.actionDialog textarea {
+  padding: 8px 9px;
+  resize: vertical;
+}
+
+.noteField {
+  grid-column: 1 / -1;
+}
+
+.entryBuilder {
+  padding: 0 18px 18px;
+}
+
+.entryBuilder > header {
+  padding: 11px 0;
+  border-top: 1px solid #dfe2dc;
+}
+
+.entryList {
+  margin-bottom: 10px;
+  border-top: 1px solid #e2e5df;
+}
+
+.entryList article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, .5fr) 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #e2e5df;
+}
+
+.entryList article > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.offerLookup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.inlineError,
+.dialogError {
+  margin: 8px 0 0;
+  color: #9a352b;
+  font-size: 13px;
+}
+
+.dialogError {
+  margin: 0 18px 12px;
+  padding: 9px 10px;
+  border-left: 3px solid #ad3c31;
+  background: #f8e9e7;
+}
+
+.offerEditor {
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid #d8dcd5;
+  border-radius: 6px;
+  background: #f8f9f7;
+}
+
+.offerIdentity {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 11px;
+  background: #d9ddd6;
+}
+
+.offerIdentity > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  background: #f8f9f7;
+}
+
+.offerIdentity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.componentTable {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.componentHead,
+.componentRow {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) repeat(4, minmax(120px, .8fr));
+  align-items: center;
+  gap: 8px;
+  min-width: 680px;
+}
+
+.componentHead {
+  padding-bottom: 6px;
+  color: #727873;
+  font-size: 11px;
+}
+
+.componentRow {
+  padding: 6px 0;
+  border-top: 1px solid #e0e3dd;
+}
+
+.componentRow strong {
+  overflow-wrap: anywhere;
+}
+
+.addEntry {
+  margin-top: 11px;
+}
+
+.confirmRow {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  margin: 0 18px 14px;
+  color: #4f5751;
+  font-size: 13px;
+}
+
+.confirmRow input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.actionDialog > code {
+  margin: 14px 18px;
+  overflow-wrap: anywhere;
+  color: #4d5650;
+  font-size: 12px;
+}
+
+.decisionTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 18px 14px;
+  overflow: hidden;
+  border: 1px solid #cfd3cd;
+  border-radius: 6px;
+}
+
+.decisionTabs button {
+  min-height: 36px;
+  border: 0;
+  border-right: 1px solid #cfd3cd;
+  border-radius: 0;
+  background: transparent;
+  color: #6e746f;
+  cursor: pointer;
+}
+
+.decisionTabs button:last-child {
+  border-right: 0;
+}
+
+.decisionTabs button[data-active='true'] {
+  background: #ede7dc;
+  color: #654820;
+  font-weight: 700;
+}
+
+.actionDialog > label,
+.applySummary {
+  margin: 0 18px 14px;
+}
+
+.applySummary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 13px;
+  border-left: 3px solid #2d6a4f;
+  background: #edf4ef;
+}
+
+.applySummary span {
+  color: #657069;
+  font-size: 13px;
+}
+
+@media (max-width: 920px) {
+  .batchFields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .noteField { grid-column: 1 / -1; }
+}
+
+@media (max-width: 680px) {
+  .overlay { padding: 0; }
+  .submitDialog,
+  .actionDialog { width: 100%; max-height: 100vh; border-radius: 0; }
+  .batchFields { grid-template-columns: 1fr; }
+  .noteField { grid-column: auto; }
+  .entryList article { grid-template-columns: minmax(0, 1fr) 34px; }
+  .entryList article > div:nth-child(2) { grid-column: 1; }
+  .entryList article > button { grid-column: 2; grid-row: 1 / span 2; }
+}
