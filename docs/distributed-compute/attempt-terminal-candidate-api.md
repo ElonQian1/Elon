@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Provider 终态候选控制面
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-12
 owners: backend, node, ai-economy
 implementation_status: implementation_partially_verified
 ---
@@ -33,10 +33,11 @@ PC `/compute-execution` 只在本人 Provider 的 live running Lease 已有最�
 - Lease 当前为已心跳且未越过软期限或硬期限的 `running`，请求精确匹配 revision、digest 与 fencing generation；
 - v185 激活回执绑定的 Job 仍为 `running`、Reservation 仍为 `active`、Capacity Claim 仍为 `active`；
 - 最新 v188 用量快照与当前 Lease、Job、Reservation、Claim 的 ID、版本和摘要完全一致；
+- 该快照仍是同一 Lease 当前最高序号的声明；候选提交与 v188 流封口在同一 SQLite 写序列中线性化；
 - outcome 只允许 `succeeded`、`failed`、`canceled`，reason code 只使用稳定小写代码字符；
 - 同一 Lease 尚无其他终态候选。
 
-相同 Provider 幂等键只能重放相同规范请求。同一 Lease 的第一份候选一旦保存，后续不同终态声明不能覆盖；重复读取和重放都会重新计算请求、结果工件与事件摘要。
+相同 Provider 幂等键只能重放相同规范请求。同一 Lease 的第一份候选一旦保存，后续不同终态声明不能覆盖，也不能再追加新 v188 序号；重复读取和重放会重新计算请求、结果工件与事件摘要，并确认最终用量仍是流头。v226 合同见 `docs/distributed-compute/attempt-final-usage-fence-authority.md`。
 
 ## 4. 输出合同
 

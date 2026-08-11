@@ -48,8 +48,8 @@ owners: backend, node, ai-economy
 | Attempt 已接受激活回执 | v185 状态推进内核仍负责原子激活 held Claim、reserved Job、active Reservation 与 staging Lease；v215 源码只在 sealed verified ACK 可用时同事务形成 exact application、actor receipt、Lease authority 与 commit outbox。服务端及测试源码已编译，内存/临时文件迁移、两次重开与冲突 backfill 门卫已验证；PC 已静态生产构建并关闭人工 Start。accepted 成功闭包、生产数据库原位升级和生产链路仍未运行，也无可信 ACK producer、生产 Adapter、节点执行或新增扣款 |
 | Attempt Lease 状态与续租 | v186 的状态、续租 kernel 与历史读取仍在；Provider HTTP 人工续租写入口现固定 `COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY`，PC 已静态生产构建并禁用人工续租，避免未认证心跳绕过 durable Renew/fencing/recovery。读取仍可保留，真实 Renew 尚未实现 |
 | staging Attempt 无用量安全中止 | v187 kernel 与历史读取仍在；Provider HTTP 人工“未执行”中止写入口现固定 `COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY`，PC 已静态生产构建并禁用人工中止。v214 cancel observation 只解锁 reconcile，仍不等于 no-start；只有 rejected 或 final reconcile+tombstone 的 exact authenticated proof 可解 v176，真实零用量补偿/Abort service-actor kernel 尚未实现 |
-| running Attempt 累计声明用量 | v188、Provider HTTP 与 PC `/compute-execution` 已写；只读模板从当前合同返回 meter、上一累计值和下一序号，写入口只接受精确 running Lease、完整 meter 集合和不回退累计值，保存 `provider_declared` 与超额标记。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不改变状态、容量或资金，也不等于 verified usage |
-| Attempt Provider 终态候选 | v189、追加式 Store、Provider HTTP 与 PC `/compute-execution` 已写；第一份候选必须绑定当前 running Lease、最新 v188 快照和服务端返回的 Workload 输出合同。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。候选不推进状态、不消费容量、不移动资金，也不等于 Execution Receipt |
+| running Attempt 累计声明用量 | v188、Provider HTTP 与 PC `/compute-execution` 已写；只读模板从当前合同返回 meter、上一累计值和下一序号，写入口只接受精确 running Lease、完整 meter 集合和不回退累计值，保存 `provider_declared` 与超额标记。v226 已冻结候选后封口与精确重放合同，源码尚未写入。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不改变状态、容量或资金，也不等于 verified usage |
+| Attempt Provider 终态候选 | v189、追加式 Store、Provider HTTP 与 PC `/compute-execution` 已写；第一份候选必须绑定当前 running Lease、最新 v188 快照和服务端返回的 Workload 输出合同。v226 将把“当前流头→唯一候选→声明流封口”线性化，并令 v190-v195 统一重审 final usage currentness。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。候选不推进状态、不消费容量、不移动资金，也不等于 Execution Receipt |
 | Attempt 消费者终态审核 | v190、追加式 Store、消费者 HTTP 与 PC `/compute-reviews` 已写；本人待审核队列按消费者过滤并排除已有审核，第一份 `accepted/rejected/disputed` 必须绑定精确 v189 候选。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。审核只登记消费者证据，不等于平台验证或结算 |
 | Attempt 平台终态观测 | v191、追加式 Store、管理员 HTTP 与 PC `/compute-observations` 已写；待观测队列返回已审计候选和最终 Provider meter，管理员可登记完整平台 meter、结果与证据引用并保存差异。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。观测不等于 verified usage、可信终态或结算 |
 | Attempt Verification 决定 | v192、追加式 Store、管理员 HTTP 与 PC `/compute-verification` 已写；待验证队列返回重新审计的 v189-v191 证据链，管理员按保守策略登记 verified/compensable usage。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。决定不生成 Execution Receipt、不改状态和资金 |
@@ -105,6 +105,7 @@ owners: backend, node, ai-economy
 21. `docs/distributed-compute/attempt-abort-api.md`：staging 无用量中止、容量归还、退款和外部声明边界。
 22. `docs/distributed-compute/attempt-usage-api.md`：running Attempt 累计声明用量、单调性、超额标记与无结算效果边界。
 23. `docs/distributed-compute/attempt-terminal-candidate-api.md`：Provider 首次终态候选、输出合同、不可覆盖与无状态/无资金效果边界。
+    - `docs/distributed-compute/attempt-final-usage-fence-authority.md`：v188 流头、v189 原子封口、精确重放和 v190-v195 currentness 继承。
 24. `docs/distributed-compute/attempt-consumer-review-api.md`：消费者首次终态审核、证据引用、不可覆盖与非验证/非结算边界。
 25. `docs/distributed-compute/attempt-platform-observation-api.md`：平台首次终态观测、累计 meter 差异、不可覆盖与非验证/非结算边界。
 26. `docs/distributed-compute/attempt-verification-api.md`：保守 Verification policy、verified/compensable usage、不可覆盖与非状态/非结算边界。
@@ -147,9 +148,9 @@ v185 保留唯一 Attempt 激活状态推进 kernel：单事务把 Claim `held -
 
 v187 保留最窄 staging 无用量中止 kernel 与历史回执，但 Provider 所有者人工写入口已关闭：未认证的 `executor_abort_ref` 或勾选“未执行”不能解 no-start 门。v214 产生的 exact rejected/final-reconcile proof 只可供 v176 重审计，不调用 v187，也不替代尚缺的 service-actor 补偿 kernel；当前没有真实取消/reconcile 网络，更不覆盖已开始执行、部分扣费、自动超时、调度重试或最终结算。
 
-v188 再补齐 running Attempt 的累计声明用量证据：Provider 所有者只能在当前 Lease 精确 revision/digest/fencing 下追加完整 meter 快照，序号严格递增、累计值不得回退；高于预留合同的 meter 被保留并标记为 overage。回执明确为 `unverified_provider_declaration`，该阶段不更新 Lease/Job/Reservation/Claim，不消费容量、不扣款，也不产生 Provider 收益。后续 v191-v194 已分别写入平台观测、Verification、Execution Receipt 与可信终态，但真实 Host 事件接线和结算仍未实现。
+v188 再补齐 running Attempt 的累计声明用量证据：Provider 所有者只能在当前 Lease 精确 revision/digest/fencing 下追加完整 meter 快照，序号严格递增、累计值不得回退；高于预留合同的 meter 被保留并标记为 overage。v226 已冻结候选前可追加、候选原子绑定当前流头、候选后只可精确重放的修复合同，源码尚未写入。回执仍为 `unverified_provider_declaration`，不更新 Lease/Job/Reservation/Claim，不消费容量、不扣款，也不产生 Provider 收益。
 
-v189 再保存 Provider 首次终态候选：当前 running Lease 必须已有最新 v188 用量快照，且 Lease、Job、Reservation、Claim 版本和摘要完全一致；`succeeded` 结果按 Workload 输出合同校验，`failed/canceled` 不得携带伪最终产物。候选只保存为 `unverified_provider_declaration`，不更新状态、容量或资金，也不等于 Execution Receipt。
+v189 再保存 Provider 首次终态候选：当前 running Lease 必须已有最新 v188 用量快照，且 Lease、Job、Reservation、Claim 版本和摘要完全一致；v226 将以 IMMEDIATE 迁移门卫和统一 Store 审计固定 final usage 仍是当前流头，并使 v190-v195 对漂移失败关闭。`succeeded` 结果按 Workload 输出合同校验，`failed/canceled` 不得携带伪最终产物。候选只保存为 `unverified_provider_declaration`，不更新状态、容量或资金，也不等于 Execution Receipt。
 
 v190 再保存消费者第一份终态审核证据：只有 v189 候选绑定的 Job 消费者可提交 `accepted/rejected/disputed`，并固定候选事件摘要和完整因果链；拒绝或争议必须提供证据引用。该记录固定为 `consumer_attestation_only`，不产生 Verification 决定，不更新状态、容量或资金，也不会因消费者接受而自动付款。
 

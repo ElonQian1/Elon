@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 累计声明用量控制面
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-12
 owners: backend, node, ai-economy
 implementation_status: implementation_partially_verified
 ---
@@ -40,8 +40,9 @@ PC `/compute-execution` 使用该模板生成逐 meter 数字输入，限制累�
 - Job、Reservation、Claim、Provider、消费者和 Lease 因果链没有漂移；
 - 快照包含 Capacity Claim 合同的全部 meter，不能缺失、增加或重复；
 - 每个累计数量为非负整数，当前序号严格大于上一快照，所有 meter 的累计数量不得回退。
+- 同一 Lease 尚无 v189 终态候选；候选成功后声明流永久封口，只允许精确重放候选前已经保存的声明。
 
-相同 Provider 幂等键只能重放相同规范请求；同一 Lease 的同一序号也不能绑定不同声明。
+相同 Provider 幂等键只能重放相同规范请求；同一 Lease 的同一序号也不能绑定不同声明。v226 将在数据库与 Store 两层固定“先重放、后检查候选、再允许新写”的顺序，详见 `docs/distributed-compute/attempt-final-usage-fence-authority.md`。
 
 ## 4. 超额声明
 
