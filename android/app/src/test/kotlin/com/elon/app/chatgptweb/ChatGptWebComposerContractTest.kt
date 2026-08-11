@@ -46,6 +46,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("complete: result"))
         assertTrue(adapter.contains("settlePendingOptions(section, true, '')"))
         assertTrue(adapter.contains("previous.complete(previous.action, false"))
+        assertTrue(adapter.contains("!pending.syntheticRetried"))
+        assertTrue(adapter.contains("pending.trigger.click()"))
         assertTrue(adapter.contains("if (!target.opensSubmenu) {"))
         assertTrue(adapter.contains("window.setTimeout(scheduleSnapshot, 240)"))
         assertTrue(adapter.contains("deep_research"))

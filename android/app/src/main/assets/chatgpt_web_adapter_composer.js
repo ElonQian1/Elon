@@ -379,17 +379,31 @@
     const action = section === 'model' ? 'collect_model_options' : 'collect_composer_tools';
     const pending = pendingOptions[section];
     if (!pending) return result(action, false, '没有等待读取的官网菜单。');
-    waitForOptions(
-      section,
-      pending.baseline,
-      (options) => {
-        emitOptions(section, options, composer, emitEvent);
-        settlePendingOptions(section, true, '');
-      },
-      () => {
-        settlePendingOptions(section, false, '官网菜单尚未返回可用选项，请切换官方网页。');
-      }
-    );
+    function collect() {
+      waitForOptions(
+        section,
+        pending.baseline,
+        (options) => {
+          if (pendingOptions[section] !== pending) return;
+          emitOptions(section, options, composer, emitEvent);
+          settlePendingOptions(section, true, '');
+        },
+        () => {
+          if (pendingOptions[section] !== pending) return;
+          if (
+            !pending.syntheticRetried &&
+            pending.trigger && pending.trigger.isConnected && isVisible(pending.trigger)
+          ) {
+            pending.syntheticRetried = true;
+            pending.baseline = new Set(visibleOptionNodes());
+            pending.trigger.click();
+            return collect();
+          }
+          settlePendingOptions(section, false, '官网菜单尚未返回可用选项，请切换官方网页。');
+        }
+      );
+    }
+    collect();
   }
 
   function selectOption(section, id, composer, emitEvent, result, scheduleSnapshot) {
