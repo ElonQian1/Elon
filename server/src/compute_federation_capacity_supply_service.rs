@@ -327,3 +327,7 @@ fn validate_bounded(label: &str, value: &str, max_len: usize) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "compute_federation_supply_control_plane_tests.rs"]
+mod tests;
