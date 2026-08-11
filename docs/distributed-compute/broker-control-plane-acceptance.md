@@ -46,13 +46,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 --
 - HTTP 项目写入口拒绝未登录和非项目成员，个人读取入口拒绝其他消费者读取 Job；
 - 测试使用真实用户、会话、项目和项目成员记录，不以伪身份绕过外键或项目门卫。
 
+同日再执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- test --manifest-path server/Cargo.toml --bin elon-server compute_federation_broker_service::concurrency_tests --locked
+```
+
+结果：2 项独立 SQLite 连接并发测试通过，验证指纹为 `47ed77b76b57343fb1813e75c472cdcf358c3ac2270799df751d846e0a1736fa`。覆盖：
+
+- 相同 Reserve 请求同时越过同步屏障后，只形成一份预算、Claim、Job/Reservation 版本和不可变回执；两个调用分别返回首次提交与重放；
+- 两个不同 Reservation 同时竞争同一 quoted Job 时只允许一个成功，另一请求在精确版本门卫失败；
+- 两种竞争结束后均只扣 10 分、只持有一次 tokens/concurrency，并且只存在一份 active Reservation。
+
 ## 3. PC 静态证据
 
 同日，包含 `/compute-market` 的 PC 前端已通过严格 TypeScript 与 Vite 生产构建，并产出独立 `ComputeMarketPage` JS/CSS chunk。该证据只说明源码可静态生产构建，不证明真实接口、浏览器交互、权限行为、视觉验收或发布。
 
 ## 4. 尚未验证或实现
 
-- HTTP/MCP 真实 TCP、并发竞争和完整路由联调；
+- HTTP/MCP 真实 TCP、高并发压力、锁超时故障注入和完整路由联调；
 - 生产磁盘迁移、进程重启和浏览器操作；
 - 真实价格源、批量报价、自动撮合和到期后台任务；
 - sealed Plan、可信 Adapter、节点命令、ACK、Attempt 真实派发与重试；
