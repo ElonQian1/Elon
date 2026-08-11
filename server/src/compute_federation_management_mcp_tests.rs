@@ -28,7 +28,7 @@ fn management_definitions_are_partitioned_by_platform_role() {
     ] {
         assert!(has_tool(&admin_tools, name), "missing MCP tool {name}");
     }
-    assert_eq!(admin_tools.len(), user_tools.len() + 27);
+    assert_eq!(admin_tools.len(), user_tools.len() + 49);
     assert_eq!(
         tool(&admin_tools, ADMIN_RELEASE_STAGE)["annotations"]["readOnlyHint"],
         false
