@@ -111,7 +111,7 @@ internal object ChatGptWebProtocol {
     ): ChatGptWebProtocolMessage? {
         val payload = runCatching { JSONObject(rawPayload) }.getOrNull() ?: return null
         if (payload.optInt("adapterVersion", 0) < minimumAdapterVersion) return null
-        val parsedEvent = if (payload.optString("schema") == SCHEMA) {
+        val parsedEvent = (if (payload.optString("schema") == SCHEMA) {
             val event = payload.optJSONObject("event") ?: return null
             when (event.optString("type")) {
                 "adapter_ready" -> ChatGptWebEvent.AdapterReady(
@@ -137,7 +137,7 @@ internal object ChatGptWebProtocol {
                     .takeIf(REQUEST_ID::matches),
             )
             else -> null
-        } ?: return null
+        }) ?: return null
         return ChatGptWebProtocolMessage(
             documentToken = payload.optString("documentToken")
                 .takeIf(ChatGptWebDocumentSession.DOCUMENT_TOKEN::matches),
