@@ -343,13 +343,27 @@ Add-Check "capability_matrix_app_version" (
         -not [string]::IsNullOrWhiteSpace([string]$matrix.app.version_name)
 ) "v$($matrix.app.version_name) build=$($matrix.app.version_code)"
 Add-Check "feature_baseline_schema" (
-    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v1"
+    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v2"
 ) ([string]$featureBaseline.schema)
 Add-Check "feature_baseline_complete" (
     [int]$featureBaseline.feature_count -gt 0 -and
         $baselineStatusTotal -eq [int]$featureBaseline.feature_count -and
         [int]$baselineSummary.remaining -eq @($featureBaseline.remaining_feature_ids).Count
 ) "features=$($featureBaseline.feature_count),remaining=$($baselineSummary.remaining)"
+$codeSummary = $featureBaseline.code_summary
+$verificationSummary = $featureBaseline.verification_summary
+Add-Check "feature_code_status_complete" (
+    [int]$codeSummary.implemented +
+        [int]$codeSummary.partial +
+        [int]$codeSummary.official_fallback -eq [int]$featureBaseline.feature_count -and
+        [int]$codeSummary.remaining -eq @($featureBaseline.remaining_code_feature_ids).Count
+) "implemented=$($codeSummary.implemented),remaining=$($codeSummary.remaining)"
+Add-Check "feature_verification_status_complete" (
+    [int]$verificationSummary.verified +
+        [int]$verificationSummary.pending +
+        [int]$verificationSummary.user_action_required -eq [int]$featureBaseline.feature_count -and
+        [int]$verificationSummary.remaining -eq @($featureBaseline.pending_verification_feature_ids).Count
+) "verified=$($verificationSummary.verified),remaining=$($verificationSummary.remaining)"
 Add-Check "blocking_gaps" ($blockingGaps.Count -eq 0) ($blockingGaps -join ",")
 Add-Check "unknown_capabilities" ($unknownCapabilities.Count -eq 0) ($unknownCapabilities -join ",")
 Add-Check "unknown_semantics" ($unknownSemantics.Count -eq 0) ($unknownSemantics -join ",")
@@ -550,7 +564,7 @@ $summary | ConvertTo-Json -Depth 30
 
 if ($failed.Count -gt 0) {
     Write-Output "CHATGPT_WEB_SMOKE_STATUS=failed failed_count=$($failed.Count)"
-    exit 1
+    throw "ChatGPT Web smoke failed: $($failed.Count) check(s)."
 }
 
 Write-Output "CHATGPT_WEB_SMOKE_STATUS=passed mode=$($summary.mode)"

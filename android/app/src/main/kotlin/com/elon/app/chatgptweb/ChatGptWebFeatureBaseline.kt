@@ -4,12 +4,24 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 1
+    const val VERSION = 2
 
     enum class ImplementationStatus(val wireName: String) {
         COMPLETE("complete"),
         PARTIAL("partial"),
         FALLBACK_ONLY("fallback_only"),
+    }
+
+    enum class CodeStatus(val wireName: String) {
+        IMPLEMENTED("implemented"),
+        PARTIAL("partial"),
+        OFFICIAL_FALLBACK("official_fallback"),
+    }
+
+    enum class VerificationStatus(val wireName: String) {
+        VERIFIED("verified"),
+        PENDING("pending"),
+        USER_ACTION_REQUIRED("user_action_required"),
     }
 
     enum class Delivery(val wireName: String) {
@@ -30,11 +42,14 @@ internal object ChatGptWebFeatureBaseline {
         val id: String,
         val group: String,
         val status: ImplementationStatus,
+        val codeStatus: CodeStatus,
+        val verificationStatus: VerificationStatus,
         val delivery: Delivery,
         val acceptance: Acceptance,
         val mcpActions: List<String>,
         val capabilityIds: Set<String> = emptySet(),
         val semantics: Set<String> = emptySet(),
+        val codeGap: String? = null,
         val remainingGap: String? = null,
     )
 
@@ -61,18 +76,29 @@ internal object ChatGptWebFeatureBaseline {
                 .put("id", feature.id)
                 .put("group", feature.group)
                 .put("implementation_status", feature.status.wireName)
+                .put("code_status", feature.codeStatus.wireName)
+                .put("verification_status", feature.verificationStatus.wireName)
                 .put("delivery", feature.delivery.wireName)
                 .put("acceptance", feature.acceptance.wireName)
                 .put("current_page_observed", currentPageObserved)
                 .put("mcp_actions", JSONArray(feature.mcpActions))
+                .put("code_gap", feature.codeGap ?: JSONObject.NULL)
+                .put(
+                    "verification_gap",
+                    feature.remainingGap ?: JSONObject.NULL,
+                )
                 .put(
                     "remaining_gap",
                     feature.remainingGap ?: JSONObject.NULL,
                 )
         }
         val incomplete = FEATURES.filter { it.status != ImplementationStatus.COMPLETE }
+        val incompleteCode = FEATURES.filter { it.codeStatus == CodeStatus.PARTIAL }
+        val pendingVerification = FEATURES.filter {
+            it.verificationStatus != VerificationStatus.VERIFIED
+        }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v1")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v2")
             .put("version", VERSION)
             .put("feature_count", FEATURES.size)
             .put(
@@ -92,8 +118,49 @@ internal object ChatGptWebFeatureBaseline {
                     )
                     .put("remaining", incomplete.size),
             )
+            .put(
+                "code_summary",
+                JSONObject()
+                    .put(
+                        "implemented",
+                        FEATURES.count { it.codeStatus == CodeStatus.IMPLEMENTED },
+                    )
+                    .put(
+                        "partial",
+                        FEATURES.count { it.codeStatus == CodeStatus.PARTIAL },
+                    )
+                    .put(
+                        "official_fallback",
+                        FEATURES.count { it.codeStatus == CodeStatus.OFFICIAL_FALLBACK },
+                    )
+                    .put("remaining", incompleteCode.size),
+            )
+            .put(
+                "verification_summary",
+                JSONObject()
+                    .put(
+                        "verified",
+                        FEATURES.count { it.verificationStatus == VerificationStatus.VERIFIED },
+                    )
+                    .put(
+                        "pending",
+                        FEATURES.count { it.verificationStatus == VerificationStatus.PENDING },
+                    )
+                    .put(
+                        "user_action_required",
+                        FEATURES.count {
+                            it.verificationStatus == VerificationStatus.USER_ACTION_REQUIRED
+                        },
+                    )
+                    .put("remaining", pendingVerification.size),
+            )
             .put("features", JSONArray(rows))
             .put("remaining_feature_ids", JSONArray(incomplete.map(Feature::id)))
+            .put("remaining_code_feature_ids", JSONArray(incompleteCode.map(Feature::id)))
+            .put(
+                "pending_verification_feature_ids",
+                JSONArray(pendingVerification.map(Feature::id)),
+            )
     }
 
     fun ids(): Set<String> = FEATURES.mapTo(linkedSetOf(), Feature::id)
@@ -210,6 +277,7 @@ internal object ChatGptWebFeatureBaseline {
             id = "realtime_voice",
             group = "voice",
             status = ImplementationStatus.FALLBACK_ONLY,
+            codeGap = "native_realtime_voice_session",
             delivery = Delivery.FULLSCREEN_OFFICIAL,
             acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control", "chatgpt_select_view"),
@@ -220,6 +288,7 @@ internal object ChatGptWebFeatureBaseline {
             id = "rich_message_rendering",
             group = "messages",
             status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
             mcpActions = listOf("chatgpt_get_context"),
             capabilityIds = setOf(ChatGptWebCapabilityId.RICH_TEXT),
             remainingGap = "all_rich_message_variants_device_acceptance",
@@ -228,6 +297,7 @@ internal object ChatGptWebFeatureBaseline {
             id = "complex_output_rendering",
             group = "messages",
             status = ImplementationStatus.PARTIAL,
+            delivery = Delivery.ADAPTIVE_NATIVE,
             mcpActions = listOf("chatgpt_get_context", "chatgpt_invoke_control"),
             capabilityIds = setOf(ChatGptWebCapabilityId.COMPLEX_OUTPUT),
             semantics = setOf("open_media", "sources", "reasoning_details"),
@@ -365,21 +435,39 @@ internal object ChatGptWebFeatureBaseline {
         id: String,
         group: String,
         status: ImplementationStatus = ImplementationStatus.COMPLETE,
+        codeStatus: CodeStatus? = null,
+        verificationStatus: VerificationStatus? = null,
         delivery: Delivery = Delivery.DEDICATED_NATIVE,
         acceptance: Acceptance = Acceptance.READ_ONLY_DEVICE,
         mcpActions: List<String>,
         capabilityIds: Set<String> = emptySet(),
         semantics: Set<String> = emptySet(),
+        codeGap: String? = null,
         remainingGap: String? = null,
-    ) = Feature(
-        id = id,
-        group = group,
-        status = status,
-        delivery = delivery,
-        acceptance = acceptance,
-        mcpActions = mcpActions,
-        capabilityIds = capabilityIds,
-        semantics = semantics,
-        remainingGap = remainingGap,
-    )
+    ): Feature {
+        val resolvedCodeStatus = codeStatus ?: when (status) {
+            ImplementationStatus.FALLBACK_ONLY -> CodeStatus.OFFICIAL_FALLBACK
+            else -> CodeStatus.IMPLEMENTED
+        }
+        val resolvedVerificationStatus = verificationStatus ?: when {
+            status == ImplementationStatus.COMPLETE -> VerificationStatus.VERIFIED
+            acceptance == Acceptance.USER_DRIVEN_DEVICE ->
+                VerificationStatus.USER_ACTION_REQUIRED
+            else -> VerificationStatus.PENDING
+        }
+        return Feature(
+            id = id,
+            group = group,
+            status = status,
+            codeStatus = resolvedCodeStatus,
+            verificationStatus = resolvedVerificationStatus,
+            delivery = delivery,
+            acceptance = acceptance,
+            mcpActions = mcpActions,
+            capabilityIds = capabilityIds,
+            semantics = semantics,
+            codeGap = codeGap,
+            remainingGap = remainingGap,
+        )
+    }
 }

@@ -18,7 +18,7 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v1", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v2", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(ids.size, ids.toSet().size)
         assertEquals(ChatGptWebFeatureBaseline.ids(), ids.toSet())
@@ -35,6 +35,14 @@ class ChatGptWebFeatureBaselineTest {
                 assertTrue(feature.isNull("remaining_gap"))
             } else {
                 assertFalse(feature.isNull("remaining_gap"))
+            }
+            if (feature.getString("code_status") == "partial") {
+                assertFalse(feature.isNull("code_gap"))
+            }
+            if (feature.getString("verification_status") == "verified") {
+                assertTrue(feature.isNull("verification_gap"))
+            } else {
+                assertFalse(feature.isNull("verification_gap"))
             }
         }
     }
@@ -100,6 +108,8 @@ class ChatGptWebFeatureBaselineTest {
         val voice = feature(baseline, "realtime_voice")
         assertTrue(voice.getBoolean("current_page_observed"))
         assertEquals("fallback_only", voice.getString("implementation_status"))
+        assertEquals("official_fallback", voice.getString("code_status"))
+        assertEquals("user_action_required", voice.getString("verification_status"))
         assertTrue(feature(baseline, "disclosure_controls").getBoolean("current_page_observed"))
         assertFalse(feature(baseline, "projects").getBoolean("current_page_observed"))
     }
@@ -112,6 +122,8 @@ class ChatGptWebFeatureBaselineTest {
             mode = ChatGptWebModeController.Mode.WEB,
         )
         val summary = baseline.getJSONObject("summary")
+        val codeSummary = baseline.getJSONObject("code_summary")
+        val verificationSummary = baseline.getJSONObject("verification_summary")
 
         assertEquals(
             baseline.getInt("feature_count"),
@@ -126,9 +138,22 @@ class ChatGptWebFeatureBaselineTest {
         assertTrue(summary.getInt("complete") > 0)
         assertTrue(summary.getInt("partial") > 0)
         assertTrue(summary.getInt("fallback_only") > 0)
+        assertEquals(31, codeSummary.getInt("implemented"))
+        assertEquals(0, codeSummary.getInt("partial"))
+        assertEquals(1, codeSummary.getInt("official_fallback"))
+        assertEquals(0, codeSummary.getInt("remaining"))
+        assertEquals(13, verificationSummary.getInt("verified"))
+        assertEquals(16, verificationSummary.getInt("pending"))
+        assertEquals(3, verificationSummary.getInt("user_action_required"))
+        assertEquals(19, verificationSummary.getInt("remaining"))
+        assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
+        assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
+        assertEquals("verified", feature(baseline, "model_selection").getString("verification_status"))
         assertTrue(feature(baseline, "model_selection").isNull("remaining_gap"))
         assertEquals("complete", feature(baseline, "disclosure_controls").getString("implementation_status"))
+        assertEquals("implemented", feature(baseline, "disclosure_controls").getString("code_status"))
+        assertEquals("verified", feature(baseline, "disclosure_controls").getString("verification_status"))
         assertTrue(feature(baseline, "disclosure_controls").isNull("remaining_gap"))
     }
 
