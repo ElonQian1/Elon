@@ -1,4 +1,7 @@
 use rusqlite::Connection;
+use uuid::Uuid;
+
+use crate::store::Store;
 
 #[test]
 fn migrations_v211_to_v215_apply_idempotently_with_required_schema() {
@@ -8,6 +11,45 @@ fn migrations_v211_to_v215_apply_idempotently_with_required_schema() {
     crate::store_schema::apply_migrations(&connection)
         .expect("reapplying the current schema should be idempotent");
 
+    assert_v211_to_v215_schema(&connection);
+}
+
+#[test]
+fn migrations_v211_to_v215_survive_two_file_database_reopens() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-compute-attempt-v215-disk-{}",
+        Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).expect("temporary migration directory should exist");
+    let database = root.join("state.sqlite");
+
+    drop(Store::open(&database).expect("file Store should apply the full schema"));
+    let connection = Connection::open(&database).expect("migrated file database should reopen");
+    assert_v211_to_v215_schema(&connection);
+    crate::store_schema::apply_migrations(&connection)
+        .expect("reapplying migrations after a file reopen should be idempotent");
+    assert_single_migration_rows(&connection);
+    drop(connection);
+
+    drop(Store::open(&database).expect("file Store should survive a second reopen"));
+    let connection = Connection::open(&database).expect("twice-reopened database should be valid");
+    assert_v211_to_v215_schema(&connection);
+    assert_single_migration_rows(&connection);
+    drop(connection);
+
+    for path in [
+        database.clone(),
+        root.join("state.sqlite-wal"),
+        root.join("state.sqlite-shm"),
+    ] {
+        if path.exists() {
+            std::fs::remove_file(path).expect("temporary database artifact should be removable");
+        }
+    }
+    std::fs::remove_dir(root).expect("temporary migration directory should be empty");
+}
+
+fn assert_v211_to_v215_schema(connection: &Connection) {
     let versions = connection
         .prepare(
             "SELECT version FROM schema_migrations
@@ -58,5 +100,18 @@ fn migrations_v211_to_v215_apply_idempotently_with_required_schema() {
             )
             .expect("schema object should be queryable");
         assert_eq!(count, 1, "missing {object_type} {object_name}");
+    }
+}
+
+fn assert_single_migration_rows(connection: &Connection) {
+    for version in 211..=215 {
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version=?1",
+                [version],
+                |row| row.get(0),
+            )
+            .expect("migration row should be queryable");
+        assert_eq!(count, 1, "migration v{version} should appear exactly once");
     }
 }
