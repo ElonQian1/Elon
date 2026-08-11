@@ -2,7 +2,7 @@
 title: 开放商业商户运行时 V1 验收
 status: current
 owner: backend
-reviewed_at: 2026-08-10
+reviewed_at: 2026-08-12
 ---
 
 # 开放商业商户运行时 V1 验收
@@ -16,17 +16,18 @@ reviewed_at: 2026-08-10
 - 健康检查核对商户身份与 Manifest 摘要，未验证绑定不能调用。
 - 同一平台幂等键不重复访问商户运行时，不重复计量。
 - PC 工作台可配置、验证并查看运行绑定，不收集共享密钥。
-- `cofficethinking` 编译通过，签名、防占位令牌、整数金额和用户确认单测通过。
-- 本仓库契约已增加签名来源与动作确认字段；`cofficethinking` 参考仓仍待同步，跨仓库 SHA-256 一致性本批不成立，不能沿用旧验收结论。
+- `cofficethinking` 定向编译与 9 项 `commerce_gateway` 测试通过，覆盖签名、整数金额、标准业务回执、Manifest、平台签名动作确认及旧双确认输入拒绝。
+- 两仓库的 `contracts/open-commerce/merchant-runtime-v1.json` 已恢复逐字节一致，跨仓库规范化 SHA-256 为 `1FC2C8A8659729957D8E225DAD5F5C7BCA4D72DFF29C373833BEAAC175659E2A`。
+- `cofficethinking` 已删除 `order.commit` 业务输入中的 `confirmed_by_user` 和 `confirmation_id` 第二权威，改为只接受 HMAC 信封中的 `action_confirmation_id`；凭据环境、凭据 ID、Grant 和动作确认同时进入商户侧幂等摘要，订单审计快照记录确认权威来源。
 - 平台将已服务端确认并一次性消费的动作确认 ID 写入 HMAC 信封；通用 Node 内核的 `order.commit` 不信任业务输入自行声明的确认布尔值。
 - Node 运行时专项 18 项和连接器 SDK 全量 55 项已实际通过，覆盖签名、来源身份、Grant、动作确认、不可变 Manifest、结果上限、并发忙碌、幂等冲突、失败释放和成功重放。
-- Rust 本地端到端专项已实际通过：临时回环商户节点完成绑定验证、签名查询、幂等重放、服务端动作确认、`order.commit`、计量与审计，并确认 HMAC 信封携带已消费的 `action_confirmation_id`；指纹为 `301d42eddf2a96fe964f4095a68992a333b45a4f75000541ad47316d1b829bde`。
+- Rust 本地端到端专项已实际通过：登记消费者开发者 App 后，由消费者 MCP 准备并确认动作，再调用临时回环商户节点完成 `order.commit`；测试同时确认 HMAC 信封携带已消费的 `action_confirmation_id`、计量仍为 `recorded_not_charged`，并从同一 Invocation 派生出引用同一商户订单号的有效标准业务回执。最新验证指纹为 `058e16928580a66d1ee5e11007f178a220078969ad9296a96065f4e18923da5e`。
 
 补充的运行时公网 DNS 拒绝和单次连接地址固定代码已通过 Rust 编译检查，但尚未执行 DNS、TLS 或真实网络回归，见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。
 
 ## 本地验证边界
 
-Rust 端到端专项只使用全新 SQLite 与本机回环 HTTP 商户节点，证明平台侧协议和状态链路可执行；它不证明公网 DNS、TLS、标准 443 白名单、跨机器网络质量或生产商户后端已经可用。
+Rust 端到端专项只使用全新 SQLite 与本机回环 HTTP 商户节点，证明平台侧协议和状态链路可执行；`cofficethinking` 的 9 项测试也不启动 PostgreSQL 或写真实订单。上述证据不证明公网 DNS、TLS、标准 443 白名单、跨机器网络质量、生产数据库迁移或生产商户后端已经可用。
 
 ## 仍需环境配置
 
