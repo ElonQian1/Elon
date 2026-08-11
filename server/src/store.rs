@@ -85,6 +85,7 @@ mod compute_capacity_request_digest;
 mod compute_capacity_rows;
 mod compute_capacity_supply_queries;
 mod compute_capacity_supply_withdrawal;
+mod compute_external_pool_adapter_release;
 mod compute_external_pool_onboarding;
 mod compute_job_contract_validation;
 mod compute_job_registry;
