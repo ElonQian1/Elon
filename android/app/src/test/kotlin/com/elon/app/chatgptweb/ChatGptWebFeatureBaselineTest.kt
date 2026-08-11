@@ -145,18 +145,18 @@ class ChatGptWebFeatureBaselineTest {
         assertTrue(summary.getInt("complete") > 0)
         assertTrue(summary.getInt("partial") > 0)
         assertTrue(summary.getInt("fallback_only") > 0)
-        assertEquals(31, codeSummary.getInt("implemented"))
+        assertEquals(32, codeSummary.getInt("implemented"))
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
-        assertEquals(16, verificationSummary.getInt("offline_verified"))
-        assertEquals(9, verificationSummary.getInt("device_verified"))
-        assertEquals(9, verificationSummary.getInt("verified"))
-        assertEquals(16, verificationSummary.getInt("pending"))
+        assertEquals(14, verificationSummary.getInt("offline_verified"))
+        assertEquals(12, verificationSummary.getInt("device_verified"))
+        assertEquals(12, verificationSummary.getInt("verified"))
+        assertEquals(14, verificationSummary.getInt("pending"))
         assertEquals(7, verificationSummary.getInt("user_action_required"))
         assertEquals(0, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(23, verificationSummary.getInt("remaining"))
+        assertEquals(21, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
@@ -166,6 +166,15 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals("implemented", feature(baseline, "disclosure_controls").getString("code_status"))
         assertEquals("device_verified", feature(baseline, "disclosure_controls").getString("verification_status"))
         assertTrue(feature(baseline, "disclosure_controls").isNull("remaining_gap"))
+        assertEquals(
+            "device_verified",
+            feature(baseline, "session_continuity_and_recovery").getString("verification_status"),
+        )
+        assertEquals(
+            "offline_verified",
+            feature(baseline, "session_long_running_stability").getString("verification_status"),
+        )
+        assertFalse(feature(baseline, "session_long_running_stability").isNull("verification_gap"))
     }
 
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {
@@ -199,6 +208,8 @@ class ChatGptWebFeatureBaselineTest {
             "disclosure_controls",
             "official_change_detection",
             "stable_mcp_and_adb_controls",
+            "session_continuity_and_recovery",
+            "session_long_running_stability",
         )
         val AVAILABLE_MCP_ACTIONS = setOf(
             "state",

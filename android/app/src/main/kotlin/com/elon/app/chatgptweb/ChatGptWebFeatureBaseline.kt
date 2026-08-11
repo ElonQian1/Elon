@@ -213,10 +213,13 @@ internal object ChatGptWebFeatureBaseline {
         "conversation_history" to "safe/read_only_surface",
         "model_selection" to "reversible/reversible_controls",
         "web_search" to "reversible/composer_controls",
+        "rich_message_rendering" to "reversible/message_structure",
+        "complex_output_rendering" to "reversible/message_structure",
         "feature_navigation" to "safe/feature_pages",
         "disclosure_controls" to "reversible/reversible_controls",
         "official_change_detection" to "safe/read_only_surface",
         "stable_mcp_and_adb_controls" to "safe/read_only_surface",
+        "session_continuity_and_recovery" to "safe/session_recovery",
     )
 
     private val FEATURES = listOf(
@@ -464,11 +467,18 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "session_continuity_and_recovery",
             group = "recovery",
+            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_select_view", "state"),
+        ),
+        feature(
+            id = "session_long_running_stability",
+            group = "recovery",
             status = ImplementationStatus.PARTIAL,
             delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
             acceptance = Acceptance.INTERACTIVE_DEVICE,
             mcpActions = listOf("chatgpt_select_view", "state"),
-            remainingGap = "long_running_process_and_webview_recreation_acceptance",
+            remainingGap = "multi_hour_webview_and_network_stability_acceptance",
         ),
     )
 
