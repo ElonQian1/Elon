@@ -477,23 +477,72 @@ if ($profileControls.Count -gt 0) {
     Start-Sleep -Milliseconds 500
 }
 
-$modelResult = Get-ComposerOptions -Section "model"
-$modelOptions = @($modelResult.options)
-$modelLabels = @($modelOptions | ForEach-Object { [string]$_.label })
-$foreignModelLabels = Get-ForeignComposerLabels -Options $modelOptions
-Add-Check "composer_model_options" ($modelOptions.Count -gt 0) ($modelLabels -join ",")
-Add-Check "composer_model_scope" ($foreignModelLabels.Count -eq 0) ($foreignModelLabels -join ",")
-
-$toolsResult = Get-ComposerOptions -Section "tools"
-$toolOptions = @($toolsResult.options)
-$toolLabels = @($toolOptions | ForEach-Object { [string]$_.label })
-$foreignToolLabels = Get-ForeignComposerLabels -Options $toolOptions
-Add-Check "composer_tool_options" ($toolOptions.Count -gt 0) ($toolLabels -join ",")
-Add-Check "composer_tool_scope" ($foreignToolLabels.Count -eq 0) ($foreignToolLabels -join ",")
-if ($toolsResult.command_state.last_command.ok -eq $true -and $toolOptions.Count -gt 0) {
-    Invoke-Adb shell input keyevent 4 | Out-Null
-    Start-Sleep -Milliseconds 500
+$composerOptionsOriginPath = ""
+try {
+    $composerOptionsOriginUri = [Uri][string]$state.conversation.url
+    if (
+        $composerOptionsOriginUri.Host -in @("chatgpt.com", "www.chatgpt.com") -and
+        $composerOptionsOriginUri.AbsolutePath -match '^/c/'
+    ) {
+        $composerOptionsOriginPath = $composerOptionsOriginUri.AbsolutePath
+    }
+} catch { }
+$temporaryComposerConversation = $false
+$composerOptionsOriginRestored = $false
+if ($composerOptionsOriginPath) {
+    $beforeComposerNewState = Invoke-ApkMcp -Tool "ui_state"
+    $beforeComposerNew = [long]$beforeComposerNewState.last_command.observed_at_ms
+    Invoke-UiAction -Action "chatgpt_new_conversation" | Out-Null
+    $composerNewState = Wait-CommandResult -Action "new_conversation" `
+        -AfterMs $beforeComposerNew -TimeoutSec $ReadyTimeoutSec
+    if ($composerNewState.last_command.ok -ne $true) {
+        throw "Temporary blank ChatGPT conversation was not accepted."
+    }
+    Wait-NewConversationReady `
+        -PreviousUrl ([string]$beforeComposerNewState.conversation.url) `
+        -PreviousMessageCount ([int]$beforeComposerNewState.conversation.message_count) `
+        -TimeoutSec $ReadyTimeoutSec | Out-Null
+    $temporaryComposerConversation = $true
 }
+
+try {
+    $modelResult = Get-ComposerOptions -Section "model"
+    $modelOptions = @($modelResult.options)
+    $modelLabels = @($modelOptions | ForEach-Object { [string]$_.label })
+    $foreignModelLabels = Get-ForeignComposerLabels -Options $modelOptions
+    Add-Check "composer_model_options" ($modelOptions.Count -gt 0) ($modelLabels -join ",")
+    Add-Check "composer_model_scope" ($foreignModelLabels.Count -eq 0) ($foreignModelLabels -join ",")
+    if ($modelOptions.Count -gt 0) {
+        Invoke-Adb shell input keyevent 4 | Out-Null
+        Start-Sleep -Milliseconds 500
+    }
+
+    $toolsResult = Get-ComposerOptions -Section "tools"
+    $toolOptions = @($toolsResult.options)
+    $toolLabels = @($toolOptions | ForEach-Object { [string]$_.label })
+    $foreignToolLabels = Get-ForeignComposerLabels -Options $toolOptions
+    Add-Check "composer_tool_options" ($toolOptions.Count -gt 0) ($toolLabels -join ",")
+    Add-Check "composer_tool_scope" ($foreignToolLabels.Count -eq 0) ($foreignToolLabels -join ",")
+    if ($toolsResult.command_state.last_command.ok -eq $true -and $toolOptions.Count -gt 0) {
+        Invoke-Adb shell input keyevent 4 | Out-Null
+        Start-Sleep -Milliseconds 500
+    }
+} finally {
+    if ($temporaryComposerConversation) {
+        Invoke-UiAction -Action "chatgpt_open_conversation" `
+            -Arguments @{ conversation_path = $composerOptionsOriginPath } | Out-Null
+        $expectedComposerOriginPath = $composerOptionsOriginPath
+        Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec `
+            -Description "restored ChatGPT conversation after composer inspection" -Predicate {
+                param($value)
+                $value.bridge_state -eq "ready" -and
+                    [string]$value.conversation.url -like "*$expectedComposerOriginPath*"
+            }.GetNewClosure() | Out-Null
+    }
+    $composerOptionsOriginRestored = $true
+}
+Add-Check "composer_options_origin_restored" $composerOptionsOriginRestored `
+    "temporary_blank=$temporaryComposerConversation"
 
 $probe = $null
 if ($SendProbe) {
