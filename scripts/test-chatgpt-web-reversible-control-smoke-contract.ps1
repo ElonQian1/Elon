@@ -21,6 +21,8 @@ $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "chatgpt_list_composer_options",
     "chatgpt_select_composer_option",
+    "`$options.Count -gt 0",
+    "Timed out waiting for ChatGPT model options",
     "chatgpt_refresh_controls",
     "chatgpt_find_controls",
     "chatgpt_set_control_expanded",

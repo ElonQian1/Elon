@@ -61,9 +61,15 @@ function Invoke-ReceiptAction {
 function Get-ComposerModels {
     Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
         -ExpectedAction "list_model_options" -Arguments @{ section = "model" } | Out-Null
-    $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action "chatgpt_get_navigation" -Arguments @{ section = "model" }
-    return @($navigation.composer_sections.model | Where-Object { $null -ne $_ })
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_get_navigation" -Arguments @{ section = "model" }
+        $options = @($navigation.composer_sections.model | Where-Object { $null -ne $_ })
+        if ($options.Count -gt 0) { return $options }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for ChatGPT model options."
 }
 
 function Get-ManifestControls {
