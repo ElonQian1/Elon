@@ -17,6 +17,8 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 $script:overlayOpened = $false
+$script:originalViewMode = ""
+$script:viewModeChanged = $false
 
 function Wait-CommandReceipt {
     param(
@@ -108,6 +110,37 @@ function Wait-OverlayClosed {
     return $false
 }
 
+function Dismiss-VisibleOverlays {
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        if (@(Get-Controls -Region "overlay").Count -eq 0) { return $true }
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
+            -Label "dismiss pre-existing ChatGPT overlay" | Out-Null
+        if (Wait-OverlayClosed) { return $true }
+    }
+    throw "Pre-existing ChatGPT overlays could not be dismissed safely."
+}
+
+function Wait-ViewMode {
+    param([Parameter(Mandatory = $true)][string]$ExpectedMode)
+
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 `
+        -Description "ChatGPT view mode $ExpectedMode" -Predicate {
+            param($state)
+            [string]$state.view_mode -eq $ExpectedMode -and $state.bridge_state -eq "ready"
+        }.GetNewClosure()
+}
+
+function Restore-OriginalViewMode {
+    if (-not $script:viewModeChanged) { return $true }
+    $requestedMode = if ($script:originalViewMode -eq "web") { "official" } else { "native" }
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = $requestedMode } | Out-Null
+    Wait-ViewMode -ExpectedMode $script:originalViewMode | Out-Null
+    $script:viewModeChanged = $false
+    return $true
+}
+
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
@@ -119,6 +152,17 @@ try {
     if ([int]$origin.conversation.message_count -lt 1) {
         throw "A conversation with at least one rendered message is required."
     }
+    $script:originalViewMode = [string]$origin.view_mode
+    if ($script:originalViewMode -notin @("native", "web")) {
+        throw "ChatGPT returned an unsupported view mode."
+    }
+    if ($script:originalViewMode -ne "web") {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+            -Arguments @{ view_mode = "official" } | Out-Null
+        $script:viewModeChanged = $true
+        Wait-ViewMode -ExpectedMode "web" | Out-Null
+    }
+    Dismiss-VisibleOverlays | Out-Null
     $originUrl = [string]$origin.conversation.url
 
     Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
@@ -132,16 +176,52 @@ try {
     if ($null -eq $messageMore) {
         throw "No visible message overflow control is available for safe verification."
     }
+    $nativeMessageSelector = [string]$messageMore.native_trigger_content_description
+    if (-not $nativeMessageSelector) {
+        throw "The message overflow control did not export a native menu selector."
+    }
+
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = "native" } | Out-Null
+    $script:viewModeChanged = $true
+    Wait-ViewMode -ExpectedMode "native" | Out-Null
+
+    Start-Sleep -Seconds 1
+    $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
+    try {
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "uiautomator", "dump", $remoteDump) -TimeoutSec 30 `
+            -Label "dump native ChatGPT message menu selectors" | Out-Null
+        $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
+            -Label "read native ChatGPT message menu selectors"
+        $nativeMessageSelectorFound = $uiXml.Contains($nativeMessageSelector)
+    } finally {
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "rm", "-f", $remoteDump) -TimeoutSec 5 `
+            -Label "remove native ChatGPT message selector dump" | Out-Null
+    }
+    if (-not $nativeMessageSelectorFound) {
+        throw "The native message menu selector was not visible to ADB."
+    }
 
     Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
         -ExpectedAction "invoke_ui_control" `
         -Arguments @{ control_id = [string]$messageMore.control_id } | Out-Null
+    Wait-ViewMode -ExpectedMode "web" | Out-Null
     $script:overlayOpened = $true
     $overlayControls = @(Wait-ContextualOverlay -ContextId ([string]$messageMore.context_id))
-    if (@($overlayControls | Where-Object { $_.semantic -eq "action" }).Count -gt 0) {
-        throw "The message action menu still contains unclassified controls."
+    $unclassifiedLabels = @(
+        $overlayControls |
+            Where-Object { $_.semantic -eq "action" } |
+            ForEach-Object {
+                ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.label -MaxLength 80
+            }
+    )
+    if ($unclassifiedLabels.Count -gt 0) {
+        throw "The message action menu contains unclassified controls: $($unclassifiedLabels -join ' | ')"
     }
-    $expectedSelector = [string](@(
+    $nativeOverlaySelector = [string](@(
         $overlayControls |
             Where-Object {
                 $_.native_presentation -eq "menu" -and
@@ -149,27 +229,8 @@ try {
             } |
             Select-Object -ExpandProperty native_trigger_content_description -Unique
     ) | Select-Object -First 1)
-    if (-not $expectedSelector) {
+    if (-not $nativeOverlaySelector) {
         throw "The message action menu did not export a native trigger selector."
-    }
-
-    Start-Sleep -Seconds 1
-    $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
-    try {
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "uiautomator", "dump", $remoteDump) -TimeoutSec 30 `
-            -Label "dump ChatGPT message action selectors" | Out-Null
-        $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
-            -Label "read ChatGPT message action selectors"
-        $nativeSelectorFound = $uiXml.Contains($expectedSelector)
-    } finally {
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "rm", "-f", $remoteDump) -TimeoutSec 5 `
-            -Label "remove ChatGPT message action selector dump" | Out-Null
-    }
-    if (-not $nativeSelectorFound) {
-        throw "The native message overlay selector was not visible to ADB."
     }
 
     Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
@@ -185,21 +246,20 @@ try {
                 $state.adapter_current -eq $true -and
                 [string]$state.conversation.url -eq $originUrl
         }
+    Restore-OriginalViewMode | Out-Null
 
     [ordered]@{
         schema = "elon.chatgpt_web.message_action_acceptance.v1"
         passed = $true
         adapter_version = [int]$restored.adapter_version
         overlay_control_count = $overlayControls.Count
-        generic_control_count = @($overlayControls | Where-Object { $_.semantic -eq "action" }).Count
-        generic_control_labels = @(
-            $overlayControls |
-                Where-Object { $_.semantic -eq "action" } |
-                ForEach-Object { ([string]$_.label).Trim().Substring(0, [Math]::Min(80, ([string]$_.label).Trim().Length)) }
-        )
+        generic_control_count = $unclassifiedLabels.Count
+        generic_control_labels = $unclassifiedLabels
         context_bound = $true
-        native_selector_found = $nativeSelectorFound
+        native_message_selector_found = $nativeMessageSelectorFound
+        native_overlay_selector_exported = $true
         conversation_restored = $true
+        view_mode_restored = $true
         sent_messages = 0
         copied_messages = 0
         started_audio = 0
@@ -215,5 +275,6 @@ try {
                 -Label "recover ChatGPT message action overlay" | Out-Null
         } catch { }
     }
+    try { Restore-OriginalViewMode | Out-Null } catch { }
     Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 }

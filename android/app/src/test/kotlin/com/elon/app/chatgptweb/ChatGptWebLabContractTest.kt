@@ -270,6 +270,23 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun messageOverflowStabilizesTheOfficialLayoutBeforeInvocation() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val coordinator = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebUiControlInvocationCoordinator.kt"
+        )
+
+        assertTrue(activity.contains("controlInvocationCoordinator.invoke("))
+        assertTrue(activity.contains("isOfficialVisible = modeController::isWebSelected"))
+        assertTrue(coordinator.contains("control?.region == ChatGptWebUiRegion.MESSAGE"))
+        assertTrue(coordinator.contains("control.semantic == \"more\""))
+        assertTrue(coordinator.contains("showOfficial()"))
+        assertTrue(coordinator.contains("schedule(OFFICIAL_LAYOUT_SETTLE_MS)"))
+    }
+
+    @Test
     fun mcpCommandsCarryTheirReceiptIdToTheOfficialPage() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

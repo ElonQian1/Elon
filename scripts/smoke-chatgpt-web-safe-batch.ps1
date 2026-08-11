@@ -40,6 +40,11 @@ $cases = @(
         id = "session_recovery"
         script = "smoke-chatgpt-web-session-recovery.ps1"
         arguments = $pinned
+    },
+    [pscustomobject]@{
+        id = "message_actions"
+        script = "smoke-chatgpt-web-message-actions.ps1"
+        arguments = $pinned
     }
 )
 

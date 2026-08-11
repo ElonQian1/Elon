@@ -32,6 +32,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var voiceController: ChatGptNativeVoiceController
     private lateinit var dictationSessionController: ChatGptWebDictationSessionController
     private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
+    private lateinit var controlInvocationCoordinator: ChatGptWebUiControlInvocationCoordinator
     private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var featureHubController: ChatGptNativeFeatureHubController
     private lateinit var adaptiveUiController: ChatGptNativeAdaptiveUiController
@@ -81,15 +82,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
             override fun startDictation(requestId: String) {
                 audioPermissionController.runWithMicrophone(
-                    action = {
-                        if (prepareDictationStart { pageAdapter.startDictation(requestId) } == null) {
-                            observedMcpState.failCommand(
-                                requestId,
-                                "start_dictation",
-                                "dictation_start_in_progress",
-                            )
-                        }
-                    },
+                    action = { controlInvocationCoordinator.startDictation(requestId) },
                     onPermissionDenied = {
                         observedMcpState.failCommand(
                             requestId,
@@ -328,6 +321,19 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             cancelOfficial = pageAdapter::cancelDictation,
             schedule = { delayMs, action -> binding.chatGptWebView.postDelayed(action, delayMs) },
         )
+        controlInvocationCoordinator = ChatGptWebUiControlInvocationCoordinator(
+            isOfficialVisible = modeController::isWebSelected,
+            showOfficial = { modeController.select(ChatGptWebModeController.Mode.WEB) },
+            schedule = { delayMs, action -> binding.chatGptWebView.postDelayed(action, delayMs) },
+            beginDictation = dictationSessionController::onStartRequested,
+            onDictationTimedOut = dictationSessionController::onStartTimedOut,
+            startOfficialDictation = { requestId ->
+                if (requestId == null) pageAdapter.startDictation()
+                else pageAdapter.startDictation(requestId)
+            },
+            failCommand = observedMcpState::failCommand,
+            invokeOfficialControl = pageAdapter::invokeUiControl,
+        )
 
         loginController = ChatGptNativeLoginController(
             context = this,
@@ -464,9 +470,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         }
     }
 
-    private fun startDictation() {
-        prepareDictationStart(pageAdapter::startDictation)
-    }
+    private fun startDictation() = controlInvocationCoordinator.startDictation()
 
     private fun showMicrophoneDenied() {
         Toast.makeText(this, R.string.chatgpt_native_microphone_denied, Toast.LENGTH_LONG).show()
@@ -474,28 +478,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun invokeUiControl(id: String) = invokeUiControl(id, null)
 
-    private fun invokeUiControl(id: String, requestId: String?) {
-        if (latestUiManifest?.controls?.firstOrNull { it.id == id }?.semantic == ChatGptWebUiSemantics.DICTATION) {
-            if (prepareDictationStart { pageAdapter.invokeUiControl(id, requestId) } == null && requestId != null) {
-                observedMcpState.failCommand(
-                    requestId,
-                    "invoke_ui_control",
-                    "dictation_start_in_progress",
-                )
-            }
-            return
-        }
-        pageAdapter.invokeUiControl(id, requestId)
-    }
-
-    private fun prepareDictationStart(startOfficial: () -> Unit): Long? {
-        val attempt = dictationSessionController.onStartRequested(startOfficial) ?: return null
-        binding.chatGptWebView.postDelayed(
-            { dictationSessionController.onStartTimedOut(attempt) },
-            DICTATION_START_TIMEOUT_MS,
-        )
-        return attempt
-    }
+    private fun invokeUiControl(id: String, requestId: String?) = controlInvocationCoordinator.invoke(
+        latestUiManifest?.controls?.firstOrNull { it.id == id },
+        id,
+        requestId,
+    )
 
     private fun showLoading(url: String) {
         pageAdapter.onPageStarted(url)
@@ -770,6 +757,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         composerToolsController.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()
+        controlInvocationCoordinator.dispose()
         pageAdapter.dispose()
         binding.chatGptWebView.apply {
             stopLoading()
@@ -791,7 +779,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
         const val ADAPTIVE_CONTROL_SETTLE_MS = 360L
-        const val DICTATION_START_TIMEOUT_MS = 20_000L
         val DICTATION_START_ACTIONS = setOf("start_dictation", "invoke_ui_control")
 
         fun createProductIntent(context: Context): Intent =

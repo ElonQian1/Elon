@@ -21,6 +21,7 @@ $required = @(
     'id = "read_only_surface"',
     'id = "feature_pages"',
     'id = "session_recovery"',
+    'id = "message_actions"',
     "user_assisted_remaining",
     "official_authentication",
     "attachment_lifecycle",
@@ -51,7 +52,8 @@ if (
 foreach ($childScript in @(
     "smoke-chatgpt-web-apk.ps1",
     "smoke-chatgpt-web-feature-pages.ps1",
-    "smoke-chatgpt-web-session-recovery.ps1"
+    "smoke-chatgpt-web-session-recovery.ps1",
+    "smoke-chatgpt-web-message-actions.ps1"
 )) {
     $childSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot $childScript) -Raw
     if ($childSource -match '(?m)^\s*exit\s+[1-9]') {
