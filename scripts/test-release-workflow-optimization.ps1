@@ -127,6 +127,8 @@ Assert-True ($staticPublisher.Contains('web_page.html.release.v1') -or $staticPu
     'The static publisher lacks release-generation metadata.'
 Assert-True ($staticPublisher.Contains('MOBILE_PWA_STATIC_RESULT=skipped_newer_generation')) `
     'The static publisher can overwrite a newer mobile PWA generation.'
+Assert-True ($staticPublisher.Contains('([string]$readMetadata.Stdout).Trim()')) `
+    'The static publisher does not support the first release with empty remote metadata.'
 
 $runtimeTemplatePath = Join-Path $repoRoot ".ai-tmp\tests\mobile-pwa-runtime-template.$PID.html"
 try {

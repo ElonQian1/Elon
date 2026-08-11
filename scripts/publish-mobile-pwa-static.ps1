@@ -68,10 +68,11 @@ function Invoke-MobilePwaRemoteVerification {
     $verify = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'mobile-pwa-verify' `
         -ArgumentList ($sshOptions + @($ServerHost, $verifyCommand))
     Assert-ElonNativeCommand -Result $verify -FailureMessage 'Unable to verify mobile PWA template.'
-    $parts = $verify.Stdout.Trim() -split '\s+'
+    $verifyText = ([string]$verify.Stdout).Trim()
+    $parts = $verifyText -split '\s+'
     $expectedSize = $runtimeTemplate.Length
     if ($parts.Count -lt 2 -or $parts[0] -ne $localHash -or [int64]$parts[1] -ne $expectedSize) {
-        throw "Mobile PWA verification mismatch: $($verify.Stdout.Trim())"
+        throw "Mobile PWA verification mismatch: $verifyText"
     }
 
     try {
@@ -116,7 +117,7 @@ $readMetadataCommand = "set -eu; if [ -f '$metadataPath' ]; then cat '$metadataP
 $readMetadata = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'mobile-pwa-read-generation' `
     -ArgumentList ($sshOptions + @($ServerHost, $readMetadataCommand))
 Assert-ElonNativeCommand -Result $readMetadata -FailureMessage 'Unable to read mobile PWA release generation.'
-$expectedMetadata = $readMetadata.Stdout.Trim()
+$expectedMetadata = ([string]$readMetadata.Stdout).Trim()
 if (-not [string]::IsNullOrWhiteSpace($expectedMetadata)) {
     $metadataParts = $expectedMetadata -split '\s+'
     if ($metadataParts.Count -ne 3 -or $metadataParts[0] -notmatch '^[0-9a-f]{40}$' -or
