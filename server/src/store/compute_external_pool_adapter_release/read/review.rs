@@ -17,14 +17,14 @@ use super::super::{
 };
 use super::{decode, request_by_id_on};
 
-pub(super) fn review_by_request_on(
+pub(in crate::store::compute_external_pool_adapter_release) fn review_by_request_on(
     conn: &Connection,
     request_id: &str,
 ) -> Result<Option<StoredReview>> {
     review_on(conn, "WHERE request_id=?1", params![request_id])
 }
 
-pub(super) fn review_by_idempotency_on(
+pub(in crate::store::compute_external_pool_adapter_release) fn review_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,

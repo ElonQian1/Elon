@@ -14,11 +14,14 @@ use super::super::{
 };
 use super::decode;
 
-pub(super) fn request_by_id_on(conn: &Connection, id: &str) -> Result<Option<StoredRequest>> {
+pub(in crate::store::compute_external_pool_adapter_release) fn request_by_id_on(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<StoredRequest>> {
     request_on(conn, "WHERE request_id=?1", params![id])
 }
 
-pub(super) fn request_by_idempotency_on(
+pub(in crate::store::compute_external_pool_adapter_release) fn request_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,

@@ -19,14 +19,14 @@ use super::super::{
 };
 use super::{decode, request_by_id_on, review_by_request_on};
 
-pub(super) fn admission_by_request_on(
+pub(in crate::store::compute_external_pool_adapter_release) fn admission_by_request_on(
     conn: &Connection,
     request_id: &str,
 ) -> Result<Option<StoredAdmission>> {
     admission_on(conn, "WHERE request_id=?1", params![request_id])
 }
 
-pub(super) fn admission_by_adapter_release_on(
+pub(in crate::store::compute_external_pool_adapter_release) fn admission_by_adapter_release_on(
     conn: &Connection,
     adapter_id: &str,
     release_version: &str,
@@ -38,7 +38,7 @@ pub(super) fn admission_by_adapter_release_on(
     )
 }
 
-pub(super) fn admission_by_idempotency_on(
+pub(in crate::store::compute_external_pool_adapter_release) fn admission_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,
