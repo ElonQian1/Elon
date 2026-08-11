@@ -12,7 +12,7 @@ implementation_status: implementation_partially_verified
 
 本文冻结 `external_pool` 的第一段服务端接入权威：Provider owner 发起 request，独立平台管理员复核，Store 再按精确摘要执行 immutable apply。该段只建立未来 Adapter route 可以引用的 owner-approved、admin-reviewed 来源；它不实现 concrete Adapter、credential verifier、route resolver、网络或任务执行。
 
-当前 owner request 领域 DTO、Store-private submit/review/apply 与 v221 三账本源码已经写入并可编译，v221 已随完整临时文件 Store 执行迁移、关闭和重开，onboarding request→独立 review→immutable apply 也已执行，同时把通用 Provider 注册对 `external_pool` 封死；没有 HTTP/MCP/PC 入口。apply 的最大效果固定为：
+当前 owner request 领域 DTO、Store submit/review/apply、v221 三账本及 owner/admin Service/HTTP 写入口已经写入并可编译；完整临时文件 Store 迁移/重开、onboarding request→独立 review→immutable apply 与进程内 HTTP 均已执行，同时把通用 Provider 注册对 `external_pool` 封死。生产部署、查询/取消/preflight 与 MCP/PC 写入口仍缺。apply 的最大效果固定为：
 
 - 登记一份 `provider_kind=external_pool`、`status=registering`、`trust_tier=self_declared` 的 Provider 当前版本与不可变历史；
 - 登记一份专用 `external_pool_onboarding` application source；
@@ -66,13 +66,13 @@ v221 同时替换 v213 的 `trg_compute_route_authorization_exact_source`：
 - `external_pool_onboarding` 精确引用专用 onboarding application 的 `application_id/application_digest/provider_id`，`approved_by_user_id` 继续绑定 Provider owner，并另行闭合独立 reviewer 与 approved review；
 - 禁止继续借用 endpoint-only `compute_activation_applications` 伪装外部矿池来源。
 
-v221 目前已编译并在完整临时文件 Store 中完成迁移/重开，Store onboarding request/review/apply、Provider 原子登记与 trigger 已通过 2 项专项；但没有生产调用入口，因此生产环境不会触发该 route source 分支。即使 application 已存在，也只说明 route 获得了一个可审核来源；没有后续 sealed credential verification 与 route currentness custody 时，仍不得写或采用 v213 route rows。
+v221 目前已编译并在完整临时文件 Store 中完成迁移/重开，Store onboarding request/review/apply、Provider 原子登记与 trigger 已通过 2 项专项；owner/admin Service/HTTP 写链另通过 2 项进程内专项，但没有生产部署。即使 application 已存在，也只说明 route 获得了一个可审核来源；没有后续 sealed credential verification 与 route currentness custody 时，仍不得写或采用 v213 route rows。
 
 ## 4. Generic registration 必须封死
 
 本人 Provider HTTP/MCP 继续只接受 `user_node` 与 `managed_cluster`；通用 `Store::register_compute_provider` 现也直接拒绝 `external_pool`，不会只依赖 HTTP service 的字符串检查。
 
-唯一允许写入首版 external-pool Provider 的入口是 onboarding apply 事务内部的 store-private registration kernel。不得新增 generic admin create、直接表写、通用 Store DTO、MCP 工具或测试 constructor 作为旁路。低层历史登记 kernel可以供已有受控事务复用，但不能独立公开成 external-pool 授权。
+唯一允许写入首版 external-pool Provider 的入口是 onboarding apply 事务内部的受限 registration kernel；Service/HTTP 只能调用完整三段链。不得新增 generic admin create、直接表写、通用 Store DTO、MCP 工具或测试 constructor 作为旁路。低层历史登记 kernel可以供已有受控事务复用，但不能独立公开成 external-pool 授权。
 
 ## 5. v213 Route Authority 后置门槛
 
@@ -86,7 +86,7 @@ v221 目前已编译并在完整临时文件 Store 中完成迁移/重开，Stor
 
 只有第 1 至 4 项在同一 Store 权威中闭合后，未来 route producer 才能引用 onboarding application 写入 v213 rows。管理员审批、Provider adapter ref 或数据库中存在 non-bearer ref 都不能替代 credential proof。
 
-Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。两者的服务端源码现可编译，v221/v222 已随完整临时文件 Store 迁移和重开，且两条 Store 状态机各通过 2 项专项；Adapter release 管理员 Service/HTTP 另通过 2 项进程内接口验收，onboarding service/API 与 release 生产部署仍未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
+Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。v221/v222 两条 Store 状态机及两条 owner/admin Service/HTTP 写链各通过 2 项专项；生产部署、onboarding 查询/取消/preflight 与 MCP/PC 写入口仍未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
 
 ## 6. 明确禁线
 
@@ -103,7 +103,7 @@ Adapter release admission 与 Provider onboarding application 是两条正交来
 
 外部矿池未来只走 `server_adapter + adapter_execution`，不能借本来源伪装成 user-node endpoint、ReadyCapability 或 Planning Snapshot。
 
-## 8. 未来最小 HTTP 形状
+## 8. HTTP 形状与当前覆盖
 
 首批代码只需 owner 与管理员 HTTP，不向 MCP 或 PC 下放信任升级写入口：
 
@@ -120,8 +120,10 @@ Adapter release admission 与 Provider onboarding application 是两条正交来
 
 管理员入口不接受 bearer secret，不返回完整 non-bearer ref；响应只给出 presence、hint、摘要、状态、阻断码和不可变 receipt 身份。
 
+当前仅实现表中的三条 POST 写入口；四条 GET、owner cancel 与管理员 preflight 仍是后续运维批次，不能描述为已经可用。
+
 ## 9. 本批静态验收边界
 
-当前已用 2 项定向 Rust/SQLite 测试执行完整临时文件迁移、owner submit、独立 approved review、Provider 原子登记、三段幂等重放、关闭重开，以及 owner 自审、非批准 apply、错误确认语与改变历史重放等失败关闭路径。证据见 [`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md)。角色权限、并发、HTTP 与生产数据库仍未验证，状态为 `implementation_partially_verified`。
+当前 2 项定向 Rust/SQLite Store 测试覆盖迁移/重开、owner submit、独立 review、Provider 原子登记、重放和失败关闭；另 2 项进程内 HTTP 测试覆盖 `401/403`、actor 注入、四眼、确认门卫、摘要冲突、非批准拒绝、脱敏回执与 Provider exact readback。证据见 [`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md) 与 [`external-pool-onboarding-api-acceptance.md`](external-pool-onboarding-api-acceptance.md)。并发、生产数据库和真实部署仍未验证，状态为 `implementation_partially_verified`。
 
 真实 credential verifier、v213 producer、Adapter、网络与 worker 仍未实现；不得以本源码、v221 名称或未来 API 表宣称 onboarding 已可用。
