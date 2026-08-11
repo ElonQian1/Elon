@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
     const val VERSION = 4
-    internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 39
+    internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 44
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
 

@@ -65,10 +65,10 @@ sortedInputs.each { input ->
 
 ext.chatGptWebInputFiles = sortedInputs
 ext.chatGptWebInputSha256 = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
-ext.chatGptWebVerifiedInputSha256 = "6bd5ee0954d405ebca848962da337da54333026b793ed4281093fc34e58c88cc"
-ext.chatGptWebVerifiedApkVersionName = "1.1.958"
-ext.chatGptWebVerifiedApkVersionCode = 968
-ext.chatGptWebVerifiedSourceCommit = "1fc5c5fe75439a5a7161805baad5af4608dcd6c7"
+ext.chatGptWebVerifiedInputSha256 = "e7149fcb2f68c0dfa4a798b7e9804057e7e5af8ba4ec210787979f594d4b5896"
+ext.chatGptWebVerifiedApkVersionName = "1.1.964"
+ext.chatGptWebVerifiedApkVersionCode = 974
+ext.chatGptWebVerifiedSourceCommit = "4604201584ef7c0a25df436fcc0920a9390211a2"
 
 tasks.register("printChatGptWebInputFingerprint") {
     group = "verification"
