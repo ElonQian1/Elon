@@ -127,3 +127,11 @@ P0 仍只包含领域合同、v225 migration、Store create/read/terminal、通�
 P0 明确禁止：`external_pool`；DeliveryAllocation；Order/Trade/Position/ClearingReceipt；资金预授权、收费、Provider 收益、保证资源、处罚、结算或清算；Job/Reservation/Attempt/Lease 修改；真实价格/index/mark/trade 声明；节点插件、VFS、artifact、route、派发或 verified metering 接线；staging/provisional/saga；调用方 bucket/time/expiry/部分 meter；新 reducer/event/余额权威。
 
 本轮已形成生产目标编译、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 与磁盘重开定向证据，详见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。仍缺真实 TCP、跨连接并发、已有生产数据库升级、异常恢复和生产运行证据，因此只能标记为 `implementation_partially_verified`，不得描述为容量市场、交付或结算全链可用。
+
+## 11. v228 后继边界
+
+v225 P0 禁止 DeliveryAllocation 仍是该批次的历史事实；v228 不回写 v225 两表、JCS、digest 或 migration。后继 [`delivery-allocation-authority.md`](delivery-allocation-authority.md) 只允许一份 Commitment 创建一份 whole-only 双边 Grant，并由 exact consumer 在同一 IMMEDIATE 事务中把父 Commitment Claim 全量 release、建立 exact parented 标准 Reservation Claim、登记既有 Broker 结果和 immutable exercised receipt。
+
+`compute_capacity_commitment_current` 在 v228 migration 中只能重建 view：exact exercised receipt 派生 revision 2、`current_status=allocated`；Grant 仍 active、declined 或 expired 时仍为 `committed`；既有 v225 terminal 仍派生 `canceled|expired`。active/exercised Grant 阻止 v225 Cancel/Expire/recovery，v228 反向拒绝既有 v225 terminal，因此不存在 allocated 与 canceled/expired 双终态。
+
+Snapshot TTL 例外、`parent_claim_id`、父 release→子 hold 的因果链和泛用入口旁路门卫全部只属于 v228 Store-private authority。v225 自身的 verified 边界与验收结论不因后继设计而升级；v228 当前状态固定为 `design_frozen/source_not_written`。

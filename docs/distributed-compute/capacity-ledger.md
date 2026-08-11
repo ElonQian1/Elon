@@ -41,7 +41,7 @@ Offer 引用精确 Pool binding；每条容量行再引用精确 bucket。Offer 
 
 ### CapacityClaim
 
-Claim 把一组 meter 数量绑定到 Quote hold、Reservation、未来 Commitment、DeliveryAllocation 或 Attempt。它拥有稳定 ID、主体、状态、revision、可选 parent claim 和过期时间，是幂等释放与防止“释放别人的容量”的边界。
+Claim 把一组 meter 数量绑定到 Quote hold、Reservation、Commitment 或 Attempt。它拥有稳定 ID、主体、状态、revision、可选 parent claim 和过期时间，是幂等释放与防止“释放别人的容量”的边界；v228 DeliveryAllocation 本身只有授权/终态回执，不拥有 Claim。
 
 当前 Store 的 Hold 必须显式设置 `expires_at`，只允许在交付窗口结束前创建，且 TTL 不得越过窗口结束；一个多 meter Claim 的全部 bucket 必须共享完全相同的窗口边界。窗口结束、TTL 生效和 Expire 授权都以 Store 生成的 `recorded_at` 为权威，调用方 `occurred_at/cutoff_at` 不能伪装未来时间或提前到期。通用 Release/Expire 只接受仍为 `held` 的 Claim，并从该 Claim 自己的 ledger legs 以 checked `i128` 证明每条 held 归属数量且 active 为零。v187 另提供严格的 Attempt return kernel：只在外层事务已经证明 v185 原始 Lease 仍为 staging 且从未心跳时，把该 Claim 自有的全部 meter 从 `active` 归还 `available`；实际用量 consume 与已运行任务归还仍未实现。
 
@@ -78,9 +78,11 @@ v225 CapacityCommitment 已接线并完成部分验证：Create 使用独立 `ca
 
 任何一步失败全部回滚。候选查询、Quote 和 ReadyCapability 只提供观察事实，不能跳过 Reserve 的再次检查。
 
-当前容量 Store 已把 Claim Hold/Finish/Activation/Attempt Return 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 Hold/Finish kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation；Finish 继承原始 held 绑定并精确引用因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记；v176 对尚未激活 Attempt 的 active Reservation 原子完成退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired。v185 通过仅供外层事务使用的 Activation kernel 将既有 Claim `held -> active`，并把 Attempt Lease ID 和 fencing generation 写入容量因果链，再与 Job/Reservation 新版本和不可变激活回执一同提交。v186 只更新 Lease 状态投影和追加续租回执，不触碰容量账本。v187 的外层事务精确复核 v185 激活、revision 1 staging Lease、无心跳、Provider 所有权和原预算后，调用 Attempt Return kernel 追加 `attempt_returned`，把 Claim `active -> released` 及容量 `active -> available` 与退款和其余终态一起提交。上述状态均为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`；它们不发送节点命令，v187 也不覆盖已运行任务的实际用量或结算。
+当前容量 Store 已把 Claim Hold/Finish/Activation/Attempt Return 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 Hold/Finish kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation；Finish 继承原始 held 绑定并精确引用因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记；v176 对尚未激活 Attempt 的 active Reservation 原子完成退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired。v185 通过仅供外层事务使用的 Activation kernel 将既有 Claim `held -> active`，并把 Attempt Lease ID 和 fencing generation 写入容量因果链，再与 Job/Reservation 新版本和不可变激活回执一同提交。v186 只更新 Lease 状态投影和追加续租回执，不触碰容量账本。v187 的外层事务精确复核 v185 激活、revision 1 staging Lease、无心跳、Provider 所有权和原预算后，调用 Attempt Return kernel 追加 `attempt_returned`，把 Claim `active -> released` 及容量 `active -> available` 与退款和其余终态一起提交。各版本的编译、迁移、Store/HTTP/MCP 与重开证据分层不同，必须以对应 authority/acceptance 为准，不能再统一标为 `implementation_uncompiled`；这些路径仍只覆盖 `platform_balance_cny`，不发送节点命令，v187 也不覆盖已运行任务的实际用量或结算。
 
-v225 已继续复用这些 private kernels，并把 public generic Hold、public generic Finish 与 generic expiry recovery 对 Commitment 全部失败关闭。只有 Commitment 外层事务可创建或终结该 Claim，并在同一事务写 immutable commitment 或唯一 terminal receipt；否则会产生 Claim 已释放/过期而 Commitment 仍 committed 的分裂真源。该封口已有静态源码和只读审计，但尚未编译、测试、迁移或运行。
+v225 已继续复用这些 private kernels，并把 public generic Hold、public generic Finish 与 generic expiry recovery 对 Commitment 全部失败关闭。只有 Commitment 外层事务可创建或终结该 Claim，并在同一事务写 immutable commitment 或唯一 terminal receipt；否则会产生 Claim 已释放/过期而 Commitment 仍 committed 的分裂真源。该封口已随生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 与磁盘重开完成定向验证；真实 TCP、生产升级和跨连接并发仍未验证。
+
+v228 Delivery Allocation 仅为 `design_frozen/source_not_written`。它不新增 Allocation Claim：Grant 未行权时唯一 live owner 是 v225 Commitment Claim；行权时同一 IMMEDIATE 事务先全量 release 父 Claim，再以相同 Pool/window 和完整 bucket/meter/quantity 建立标准 Reservation Claim，固定 `parent_claim_id=父 Claim`、`reservation_held` 的 causal transaction 为父 release transaction，随后原子登记既有 Broker 预算、Reservation、Job 与 exercised receipt。事务外没有可见 available 间隙；任何 partial、额外 line 或泛用 parented Hold 均拒绝，详见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)。
 
 ## 5. Attempt 与容量
 
@@ -107,10 +109,10 @@ reusable:   issued = available + held + active + retired
 
 ## 7. 到期、恢复与对账
 
-- 当前 Quote hold 与 Reservation 有明确 `expires_at`；v225 设计强制 Commitment Claim 的 `expires_at` 等于交付窗口结束，调用方不能自定；
-- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口已拒绝保留的 `compute_reservation` 主体。v225 还必须让 generic Hold/Finish/recovery 排除 `capacity_commitment`，由专用 Expire 把 Claim、ledger 和唯一 terminal receipt 原子提交；
+- 当前 Quote hold 与 Reservation 有明确 `expires_at`；v225 已强制 Commitment Claim 的 `expires_at` 等于交付窗口结束，调用方不能自定；
+- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口已拒绝保留的 `compute_reservation` 主体。v225 generic Hold/Finish/recovery 已排除 `capacity_commitment`，由专用 Expire 把 Claim、ledger 和唯一 terminal receipt 原子提交；
 - 相同 effect 使用唯一幂等键，不会重复归还；
-- Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；现有 generic 代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应。v225 必须在任何 current/time/state 门卫前先读 immutable commitment/terminal receipt，才能形成严格重放；
+- Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；现有 generic 代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应。v225 已在 current/time/state 门卫前读取 immutable commitment/terminal receipt 形成严格重放；
 - 账本与余额投影不一致时停止新 Reserve，重放 ledger 重建投影并形成审计报告；
 - 旧 epoch、旧 fencing generation 和晚到终态只能追加审计，不能影响当前余额。
 
@@ -120,4 +122,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-05 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v201 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。v175-v199 形成 Broker、Attempt 证据、可信终态、CNY 待结算、挑战纠正和 available 释放；v200/v201 形成 Provider 提款冻结与唯一终态。上述路径状态为 `implementation_uncompiled`，尚未执行迁移、调度、并发验证或真实容量/资金操作；节点派发、外部证明验证、自动超时归还、非金额补救、available 追索、自动释放、真实付款、外部证据核验、受控自动修复和完整运行协议仍未接线。
+2026-08-05 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v201 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。v175-v199 形成 Broker、Attempt 证据、可信终态、CNY 待结算、挑战纠正和 available 释放；v200/v201 形成 Provider 提款冻结与唯一终态。各链验证状态必须以专题 authority/acceptance 为准，不再以本文统一宣称未编译或生产可用；节点派发、外部证明验证、非金额补救、available 追索、真实付款、外部证据核验、受控自动修复和完整运行协议仍未接线。
