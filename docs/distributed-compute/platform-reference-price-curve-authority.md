@@ -3,7 +3,7 @@ title: 平台参考价格回退曲线批次权威
 status: current
 reviewed_at: 2026-08-11
 owners: ai-economy, backend, security
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 平台参考价格回退曲线批次权威
@@ -12,13 +12,13 @@ implementation_status: implementation_uncompiled
 
 本文冻结平台参考价格回退曲线的最小来源合同。平台管理员提交一份精确批次，另一名平台管理员独立复核；只有 exact approved batch 才能由 Store-private v223 application 在一个事务中直接生成唯一的既有 v171 Price Snapshot。application 不是第二套 Snapshot Registry，也不是先保存一份等待未知 consumer 的 staging receipt。
 
-领域 DTO/JCS/校验、Store-private submit/review/application/exact readback、v223 五账本/trigger 与 v171 transaction-local kernel 接线源码已经写入；状态仍是 `implementation_uncompiled`、`implementation_unrun`，未执行迁移、SQLite trigger、权限、并发或真实运行验证。没有 service、HTTP、MCP 或 PC 入口；Store 只验证调用方声明的管理员 ID 形状和四眼 ID 不等，不查询或证明当前管理员角色，不能描述成生产管理员能力。
+领域 DTO/JCS/校验、Store submit/review/application/exact readback、v223 五账本/trigger、v171 transaction-local kernel、管理员 Service 与 HTTP 管理入口均已接线，并通过临时文件 SQLite 全量迁移、旧触发器升级、Store 重开和进程内 Axum 定向验证。HTTP 从已认证会话派生管理员身份，只允许 `admin/owner`；请求体不能注入操作人 ID。当前状态为 `implementation_partially_verified`，不等于真实 TCP、浏览器、生产数据库副本、并发压力、MCP/PC 管理入口或生产部署已经验证。
 
 这条来源仍是 `fallback_curve`：它只表示一份经过平台四眼治理、与当前 Offer 合同精确一致的参考回退报价。`sample_count=0`，不表示平台读取过外部行情、真实成交、已接受交付或订单簿，也不得称为 `index`、`mark`、`trade`、YCI、真实市场价或平台签名价格源。
 
 ## 2. 与既有 Offer owner fallback 的关系
 
-v171 已有的本人报价入口根据一份 active Offer 生成 `fallback_curve` Snapshot，来源 ID 绑定该 Offer。平台参考曲线不会替换、升级或复制该入口；当前源码把它实现为同一 v171 Registry 的第二个 Store-private producer，但尚未编译或运行：
+v171 已有的本人报价入口根据一份 active Offer 生成 `fallback_curve` Snapshot，来源 ID 绑定该 Offer。平台参考曲线不会替换、升级或复制该入口；当前实现把它作为同一 v171 Registry 的第二个受治理 producer：
 
 - 两条路径都只能写既有 `compute_price_snapshots`，不得建立平行快照表、当前根或 Job 报价权威；
 - 本人路径表达 Provider 对自己 Offer 的规范化报价；平台路径表达四眼批准的参考回退批次；
@@ -30,7 +30,7 @@ v171 已有的本人报价入口根据一份 active Offer 生成 `fallback_curve
 
 ## 3. 平台批次合同
 
-未来 service/API submit 入口只允许当前 `admin/owner` 提交；当前 Store-private 源码尚不证明该角色。首版一份批次必须采用拒绝未知字段的版本化信封、RFC 8785 JCS、SHA-256 摘要、稳定幂等键与明确确认，并只包含一个 `curve_id/curve_version` 及 1 至有界上限条 entry。
+当前 service/API submit 入口只允许已认证的 `admin/owner` 提交，并从会话身份生成操作人 ID。首版一份批次必须采用拒绝未知字段的版本化信封、RFC 8785 JCS、SHA-256 摘要、稳定幂等键与明确确认，并只包含一个 `curve_id/curve_version` 及 1 至有界上限条 entry。
 
 每条 entry 必须精确绑定：
 
@@ -52,7 +52,7 @@ reviewer 必须是另一名当前 `admin/owner`，且 `reviewed_by_admin_user_id
 
 复核只确认平台愿意按这份精确参考回退合同生成报价快照。reviewer 不能把 `sample_count=0` 升级为市场观测，不能声明曲线是指数、mark、成交、可交割头寸或外部价格证明，也不能在 review 中更改 Offer、窗口、价格组件、金额或 TTL。
 
-Store-private 源码即使形成，也只能校验管理员 ID 形状和四眼分离；当前角色与权限必须由未来 service/API 独立重审。没有该入口前，数据库方法不得被描述成生产管理员能力。
+Store 继续负责摘要、状态和四眼分离，Service/HTTP 负责当前角色与会话身份。二者不能互相替代：任何未来 MCP、PC 或内部调用都必须复用同一 Service 身份边界，不能直接信任客户端声明的管理员 ID。
 
 ## 5. Atomic application 与 v171 唯一真源
 
@@ -70,9 +70,9 @@ application 只消费仍为 `approved` 的 exact batch/review、预期摘要、�
 
 application 的直接效果固定为：每条 entry 恰好对应一份唯一 v171 Snapshot，并保存 entry→Snapshot 的不可变 binding。它不创建新 Snapshot schema，不修改既有 Snapshot，不自动创建或推进 Job。
 
-## 6. v223 源码账本
+## 6. v223/v224 实现账本
 
-v223 源码只增加平台参考曲线来源与 v171 binding：
+v223 只增加平台参考曲线来源与 v171 binding：
 
 - `compute_platform_reference_price_curve_batches`：规范 batch、exact 投影、状态与幂等；
 - `compute_platform_reference_price_curve_entries`：逐 entry 规范合同与批次内唯一性；
@@ -82,7 +82,7 @@ v223 源码只增加平台参考曲线来源与 v171 binding：
 
 DDL 必须用投影、追加式历史、禁止 replace/update/delete、状态来源、反向边和唯一性门卫阻断拆分写入。batch 只允许 `submitted→approved|changes_requested|rejected`，以及 `approved→applied`；entry、review、application 与 binding 均不可覆盖。
 
-v223 不得新建另一张 Price Snapshot 表，不得修改 v171 历史行，也不得创建 Curve current root、Order、Trade、Position、Commitment 或 Clearing Receipt。v171 transaction-local kernel 只能保持 Store-private，由既有公开 wrapper 与 v223 application 事务复用；不能因此开放通用“任意 Snapshot”写入口。
+v224 只替换 v223 中使用 `julianday` 浮点差的 TTL 触发器，改用整数 Unix 秒差，避免精确 TTL 被浮点误差误拒绝；它不迁移业务数据或放宽时间顺序。v223/v224 不得新建另一张 Price Snapshot 表，不得修改 v171 历史行，也不得创建 Curve current root、Order、Trade、Position、Commitment 或 Clearing Receipt。v171 transaction-local kernel 只能保持 Store-private，由既有公开 wrapper 与 v223 application 事务复用；不能因此开放通用“任意 Snapshot”写入口。
 
 ## 7. 市场、容量与资金效果
 
@@ -104,10 +104,10 @@ v223 不得新建另一张 Price Snapshot 表，不得修改 v171 历史行，�
 - 禁止绕开 exact active Offer，把平台 entry 的价格强行覆盖到不一致的 Offer。
 - 禁止建立第二套 Snapshot、Job、Reservation、Claim、Broker 或结算注册表。
 - 禁止让 application 创建 Job、选择报价、预留容量、冻结余额、派发 Attempt、生成用量/Receipt 或移动任何资金。
-- 禁止因 docs、领域或 v223 源码形成就宣称 HTTP/MCP/PC、角色权限、并发、迁移或生产链路可用。
+- 禁止因进程内 HTTP 与临时 SQLite 验收通过就宣称 MCP/PC、真实 TCP、浏览器、并发压力、生产数据库升级或生产部署可用。
 
 ## 9. 交付与验收状态
 
-当前状态为 `implementation_uncompiled`、`implementation_unrun`：领域合同、Store-private submit/review/application/exact readback、v223 DDL/trigger 和 v171 transaction-local kernel 接线源码已经形成；仍不开放 service、HTTP、MCP 或 PC。
+当前状态为 `implementation_partially_verified`：已开放管理员 list、submit、detail、actor-aware preflight、review 与 application 六类 HTTP 管理操作；已验证登录与角色隔离、请求体操作人注入失败、四眼复核、摘要绑定、原子 v171 Snapshot 登记、拒绝零副作用、幂等重放、旧触发器 v224 升级和两次文件数据库重开。
 
-按当前架构铺设要求，本批只执行定向格式化、源码/文档模块化、链接/术语搜索、行数和 `git diff --check`。未执行编译、测试、迁移、SQLite trigger、权限、并发、HTTP 或真实运行验证，不能宣称生产可用。
+验收范围、命令指纹和未完成项见 [`platform-reference-price-curve-api-acceptance.md`](platform-reference-price-curve-api-acceptance.md)。当前未验证真实 TCP、浏览器、并发压力、生产数据库副本升级、MCP/PC 管理入口或部署；也未实现真实外部价格源、多源验证、index/mark/trade、订单簿或自动撮合。
