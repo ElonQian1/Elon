@@ -249,6 +249,7 @@ internal object ChatGptWebFeatureBaseline {
         "web_search" to "reversible/composer_controls",
         "rich_message_rendering" to "reversible/message_structure",
         "complex_output_rendering" to "reversible/message_structure",
+        "message_copy" to "reversible/copy_receipt_without_content_readback",
         "message_action_context" to "safe/message_actions",
         "feature_navigation" to "safe/feature_pages",
         "disclosure_controls" to "reversible/reversible_controls",
@@ -400,7 +401,6 @@ internal object ChatGptWebFeatureBaseline {
             mcpActions = listOf("chatgpt_copy_last_response"),
             capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_COPY),
             semantics = setOf("copy"),
-            remainingGap = "clipboard_device_acceptance_without_content_logging",
         ),
         feature(
             id = "message_regenerate",
