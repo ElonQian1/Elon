@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use sha2::{Digest, Sha256};
@@ -101,56 +101,47 @@ fn reopen_final_blocking(
 pub(super) fn install_new_and_sync(
     temporary: &Path,
     final_path: &Path,
-) -> Result<(), ExternalPoolAdapterArtifactSourceFsError> {
-    match install_new(temporary, final_path) {
-        Ok(()) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            std::fs::remove_file(temporary)
-                .map_err(ExternalPoolAdapterArtifactSourceFsError::Storage)?;
-        }
-        Err(error) => return Err(ExternalPoolAdapterArtifactSourceFsError::Storage(error)),
-    }
+) -> Result<TemporaryArtifactDisposition, ExternalPoolAdapterArtifactSourceFsError> {
+    let disposition = install_new(temporary, final_path)
+        .map_err(ExternalPoolAdapterArtifactSourceFsError::Storage)?;
     sync_parent_directory(
         final_path
             .parent()
             .ok_or(ExternalPoolAdapterArtifactSourceFsError::UnsafeTarget)?,
-    )
+    )?;
+    Ok(disposition)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum TemporaryArtifactDisposition {
+    Removed,
+    Deferred,
 }
 
 #[cfg(windows)]
-fn install_new(source: &Path, target: &Path) -> std::io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-
-    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
-    let source = source
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<_>>();
-    let target = target
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<_>>();
-    let ok = unsafe { MoveFileExW(source.as_ptr(), target.as_ptr(), MOVEFILE_WRITE_THROUGH) };
-    if ok == 0 {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(())
+fn install_new(source: &Path, target: &Path) -> std::io::Result<TemporaryArtifactDisposition> {
+    // A rename requires DELETE sharing on the pinned shard directory and would reopen the
+    // directory-swap window this custody boundary exists to close. A same-directory hard link
+    // atomically installs a no-clobber final name while every directory handle remains pinned.
+    match std::fs::hard_link(source, target) {
+        Ok(()) => Ok(TemporaryArtifactDisposition::Deferred),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            Ok(TemporaryArtifactDisposition::Deferred)
+        }
+        Err(error) => Err(error),
     }
 }
 
-#[cfg(windows)]
-#[link(name = "kernel32")]
-unsafe extern "system" {
-    fn MoveFileExW(existing: *const u16, target: *const u16, flags: u32) -> i32;
-}
-
 #[cfg(not(windows))]
-fn install_new(source: &Path, target: &Path) -> std::io::Result<()> {
+fn install_new(source: &Path, target: &Path) -> std::io::Result<TemporaryArtifactDisposition> {
     // `rename` replaces on Unix. A same-directory hard link is an atomic no-clobber install.
-    std::fs::hard_link(source, target)?;
-    std::fs::remove_file(source)
+    match std::fs::hard_link(source, target) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
+    std::fs::remove_file(source)?;
+    Ok(TemporaryArtifactDisposition::Removed)
 }
 
 #[cfg(unix)]
@@ -162,33 +153,6 @@ fn sync_parent_directory(parent: &Path) -> Result<(), ExternalPoolAdapterArtifac
 
 #[cfg(not(unix))]
 fn sync_parent_directory(_parent: &Path) -> Result<(), ExternalPoolAdapterArtifactSourceFsError> {
-    // Windows uses MoveFileExW with MOVEFILE_WRITE_THROUGH for the no-clobber installation.
+    // The file bytes are flushed before the no-clobber hard-link installation on Windows.
     Ok(())
-}
-
-pub(super) struct TemporaryArtifactGuard {
-    path: PathBuf,
-    armed: bool,
-}
-
-impl TemporaryArtifactGuard {
-    pub(super) fn unarmed(path: PathBuf) -> Self {
-        Self { path, armed: false }
-    }
-
-    pub(super) fn arm(&mut self) {
-        self.armed = true;
-    }
-
-    pub(super) fn disarm(&mut self) {
-        self.armed = false;
-    }
-}
-
-impl Drop for TemporaryArtifactGuard {
-    fn drop(&mut self) {
-        if self.armed {
-            let _ = std::fs::remove_file(&self.path);
-        }
-    }
 }

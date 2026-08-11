@@ -183,12 +183,16 @@ fn pin_directory(
     use std::os::windows::fs::OpenOptionsExt;
 
     const FILE_SHARE_READ: u32 = 0x0000_0001;
+    const FILE_SHARE_WRITE: u32 = 0x0000_0002;
     const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
     const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
 
+    // The quarantine writer needs directory write sharing for create-new files and hard-link
+    // installation. DELETE sharing remains intentionally excluded so no pinned directory can be
+    // renamed or replaced while its path and leaf identity are being verified.
     let directory = OpenOptions::new()
         .read(true)
-        .share_mode(FILE_SHARE_READ)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
         .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
         .open(path)
         .map_err(ExternalPoolAdapterArtifactSourceFsError::Storage)?;

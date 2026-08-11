@@ -27,6 +27,9 @@ pub(crate) const MAX_EXTERNAL_POOL_ADAPTER_ARTIFACT_BYTES: u64 = 32 * 1024 * 102
 pub(crate) struct QuarantinedExternalPoolAdapterArtifactBytes {
     _reopened_file: File,
     _pinned_directories: Vec<File>,
+    // Field order is intentional: Windows cleanup runs only after the final file and pinned
+    // directory handles have closed.
+    _temporary_guard: filesystem::TemporaryArtifactGuard,
     intake_sha256: String,
     reopened_sha256: String,
     artifact_size_bytes: u64,
