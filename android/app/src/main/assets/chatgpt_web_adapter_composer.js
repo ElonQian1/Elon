@@ -142,6 +142,11 @@
       const node = scope.querySelector(selector) || document.querySelector(selector);
       if (isActionable(node)) return node;
     }
+    const layout = window.__elonChatGptLayout;
+    const semanticNode = layout && typeof layout.findSemanticNode === 'function'
+      ? layout.findSemanticNode('attachment', 'composer')
+      : null;
+    if (isVisible(semanticNode)) return semanticNode;
     return null;
   }
 
@@ -372,9 +377,7 @@
   }
 
   function emitTriggerTouch(section, purpose, node, emitEvent) {
-    return section === 'model'
-      ? emitVisibleNodeTouch(purpose, node, emitEvent)
-      : emitTouchRequest(purpose, node, emitEvent);
+    return emitVisibleNodeTouch(purpose, node, emitEvent);
   }
 
   function replacePendingOptions(section, pending) {

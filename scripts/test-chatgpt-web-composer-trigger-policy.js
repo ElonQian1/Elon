@@ -206,4 +206,64 @@ assert.equal(optionEvents.length, 2);
 assert.equal(optionEvents[1].type, 'web_touch_request');
 assert.equal(optionEvents[1].purpose, 'select_model_option');
 
+const toolsEvents = [];
+const toolsResults = [];
+const toolsButton = {
+  id: '',
+  textContent: '',
+  getAttribute: () => null,
+  getBoundingClientRect: () => ({
+    left: 20,
+    top: 640,
+    right: 60,
+    bottom: 680,
+    width: 40,
+    height: 40
+  })
+};
+const toolsSandbox = {
+  document: {
+    querySelector: () => null,
+    querySelectorAll: () => []
+  },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+    __elonChatGptActionTargetPolicy: {
+      actionPoint: () => null,
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: {
+      filter: (_section, options) => options
+    },
+    __elonChatGptLayout: {
+      findSemanticNode(semantic, region) {
+        assert.equal(semantic, 'attachment');
+        assert.equal(region, 'composer');
+        return toolsButton;
+      }
+    }
+  }
+};
+toolsSandbox.window.window = toolsSandbox.window;
+toolsSandbox.window.document = toolsSandbox.document;
+toolsSandbox.window.location = toolsSandbox.location;
+
+vm.runInNewContext(source, toolsSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+toolsSandbox.window.__elonChatGptComposer.requestOptions(
+  'tools',
+  composer,
+  (event) => toolsEvents.push(event),
+  (...args) => toolsResults.push(args)
+);
+
+assert.equal(toolsResults.length, 0);
+assert.equal(toolsEvents.length, 1);
+assert.equal(toolsEvents[0].type, 'web_touch_request');
+assert.equal(toolsEvents[0].purpose, 'list_composer_tools');
+assert.equal(toolsEvents[0].xRatio, 0.1);
+assert.equal(toolsEvents[0].yRatio, 0.825);
+
 process.stdout.write('CHATGPT_COMPOSER_TRIGGER_POLICY=passed\n');
