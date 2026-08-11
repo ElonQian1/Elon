@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 CapacityPool 本人控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 CapacityPool 本人控制面
 
 ## 1. 当前状态
 
-本人 CapacityPool 控制面已写入代码，但尚未编译、执行 v165 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它允许用户在本人 `user_node` 或 `managed_cluster` Provider 下登记、读取、列出和审计共享物理资源边界，但只创建 `registering` Pool，不激活 Provider、不发行容量、不创建交付窗口、Bucket、Offer 或 Price Snapshot。
+本人 CapacityPool 服务/Store 控制面已通过全新磁盘库 v165 迁移、登记、幂等、审计和重开回归，状态为 `implementation_partially_verified`；HTTP/MCP 和 PC 页面仍未运行验证。它允许用户在本人 `user_node` 或 `managed_cluster` Provider 下登记、读取、列出和审计共享物理资源边界，但只创建 `registering` Pool，不激活 Provider、不发行容量、不创建交付窗口、Bucket、Offer 或 Price Snapshot。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最终写入既有 CapacityPool Registry。服务端固定初始 `capacity_epoch=1`、`pool_revision=1`、状态、时间和全部摘要，客户端不能直接提交摘要或生命周期状态。
 
@@ -70,7 +70,7 @@ PC `/compute-supply` 已写入本人 Provider 的 Pool 列表、当前合同摘�
 
 ## 7. 尚未实现
 
-- Cargo 编译、v165 迁移执行和 HTTP/MCP 真实调用验证；
+- HTTP/MCP 进程内调用、PC 构建和浏览器交互验证；
 - Pool 版本更新、epoch 轮换的本人控制面；
 - CapacityBucket 与 Supply Add/Withdraw 控制面已写入，边界见 `docs/distributed-compute/capacity-bucket-api.md` 和 `docs/distributed-compute/capacity-supply-api.md`；
 - Provider/Pool 激活证据申请与人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实观测验证和 approved 后受控激活仍未实现；

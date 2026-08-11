@@ -1,16 +1,16 @@
 ---
 title: 分布式算力 CapacityBucket 本人控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 CapacityBucket 本人控制面
 
 ## 1. 当前状态
 
-本人 CapacityBucket 控制面已写入代码，但尚未编译、执行 v165 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它允许用户在本人 Provider 的当前 CapacityPool 版本下创建 open、零发行余额的交付窗口 Bucket，并读取当前账本余额；它不发行容量、不激活 Pool、不创建 Offer，也不允许消费者预留。
+本人 CapacityBucket 服务/Store 控制面已通过全新磁盘库迁移、同窗口双 meter 创建、余额读取和重开回归，状态为 `implementation_partially_verified`；HTTP/MCP 和 PC 页面仍未运行验证。它允许用户在本人 Provider 的当前 CapacityPool 版本下创建 open、零发行余额的交付窗口 Bucket，并读取当前账本余额；它不发行容量、不激活 Pool、不创建 Offer，也不允许消费者预留。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_capacity_bucket_service`，最终调用现有 `create_compute_capacity_bucket` 和只读 Store。分布式算力 MCP 已由 `compute_federation_mcp` 统一聚合，新增算力工具不再持续扩大 `open_commerce_mcp` 入口。
 
@@ -52,7 +52,7 @@ PC `/compute-supply` 已写入当前 Pool 的 Bucket 列表、余额投影和交
 
 ## 5. 尚未实现
 
-- Cargo 编译、v165 迁移执行和 HTTP/MCP 真实调用验证；
+- HTTP/MCP 进程内调用、PC 构建和浏览器交互验证；
 - Supply Add/Withdraw 本人控制面已写入，边界见 `docs/distributed-compute/capacity-supply-api.md`；
 - Bucket 关闭、退役和窗口批量管理；
 - Provider/Pool 验证与受控激活；

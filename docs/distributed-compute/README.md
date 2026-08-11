@@ -26,10 +26,10 @@ owners: backend, node, ai-economy
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169-v176 注册表、Broker Reserve/未执行任务终态、v185-v201 Attempt 激活、证据链、可信终态、容量收口、待结算、挑战、决议、纠正、pending 释放与 Provider 提款流程已写，状态为 `implementation_uncompiled`，尚未迁移、完整接线和运行验证 |
-| Provider 本人控制面 | HTTP/MCP 已可登记、读取和列出本人 `user_node` 或 `managed_cluster` 的脱敏视图，PC 本人收益页已写入自助登记表单；只生成 `registering/self_declared` 记录，不接受路由、凭据、适配器或验证证据，尚未编译和运行验证 |
-| CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取、列出和审计 `registering` Pool，并按稳定序号分页读取脱敏账本历史；PC `/compute-supply` 已写入列表、登记、审计健康和事务双分录分页源码。审计健康不等于硬件 verified，历史省略消费者和业务因果字段；尚未编译和运行验证 |
-| CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；PC 已写入交付窗口登记和余额列表源码。窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易；尚未编译和运行验证 |
-| Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；PC 已写入单 Bucket 追加/撤出源码。服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易；尚未编译和运行验证 |
+| Provider 本人控制面 | 服务/Store 已验证登记、读取、幂等和本人隔离；只生成 `registering/self_declared` 记录，不接受路由、凭据、适配器或验证证据。HTTP/MCP 与 PC 自助登记尚未运行验证 |
+| CapacityPool 本人控制面 | 服务/Store 已验证登记、重放、审计和磁盘重开；审计健康不等于硬件 verified，账本历史省略消费者和业务因果字段。HTTP/MCP 与 PC `/compute-supply` 尚未运行验证 |
+| CapacityBucket 本人控制面 | 服务/Store 已验证同窗口双 meter Bucket、余额读取和磁盘重开；窗口和 Bucket 摘要由服务端生成，不发行可交易资产。HTTP/MCP 与 PC 尚未运行验证 |
+| Capacity Supply 本人控制面 | 服务/Store 已验证多 Bucket 原子追加、撤回、幂等冲突和失败不留半笔账；available 仍是 self-declared，不等于 verified 或可交易。HTTP/MCP 与 PC 尚未运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；v203 强制 prepared 激活计划第二人复核，v204 增加隔离恢复计划、第二人复核、预检和原子应用回执，v205 增加恢复计划追加式废止和重做入口。PC `/compute-supply` 已写入本人申请、历史、预检和取消，`/compute-activation` 已写入激活、隔离、恢复和恢复计划废止管理。恢复前旧 active Offer 必须先退场且不会自动重发；所有流程均不发送节点命令、不退款、不付款或移动资金，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
 | 节点插件治理合同 | Signed Manifest/InstallPlan、双 keyring、authority、受管取数/验证/staging/cleanup 与 v216 install/promotion 双回执已形成；v216 已随节点编译并通过 11 项版本链及既有 69 项 SQLite 回归，其中 3 项为单 Connection 成功路径。v217/v218 work-admission、Planning A1 尚未编译；A2b2 已形成未编译、未运行的 exact bridge、map/lock/barrier/unmap/联合 close/route/registration 静态源码和 typed custody/count inventory，但它不是逐 case Windows 动态证据。生产 VFS/register/live `sqlite3_file`/process owner/open、A1 producer、root/keyring/time/rollback、Signer、Host、downloader、Sidecar、Runtime、Ready 与 Attempt 接线不可达；v14 永久 blocked-only。精确边界见阅读顺序第 4 项 |
