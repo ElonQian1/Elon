@@ -459,3 +459,7 @@ fn verify_merchant_identity_claims(payload: &ConsumerPortabilityPayload) -> Resu
 fn digest_payload(payload: &[u8]) -> String {
     hex::encode(Sha256::digest(payload))
 }
+
+#[cfg(test)]
+#[path = "open_commerce_portability_v5_tests.rs"]
+mod v5_tests;
