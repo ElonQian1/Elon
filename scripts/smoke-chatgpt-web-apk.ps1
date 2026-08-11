@@ -10,6 +10,7 @@ param(
     [int]$PollIntervalSec = 3,
     [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 54,
     [switch]$SendProbe,
+    [switch]$VerifyStop,
     [string]$ProbeMarker = ""
 )
 
@@ -33,6 +34,9 @@ if ($ReadyTimeoutSec -lt 5 -or $ReplyTimeoutSec -lt 10 -or $PollIntervalSec -lt 
 }
 if (-not $SendProbe -and $ProbeMarker) {
     throw "ProbeMarker requires -SendProbe because the default smoke is read-only."
+}
+if ($VerifyStop -and -not $SendProbe) {
+    throw "VerifyStop requires -SendProbe because it dispatches an isolated prompt."
 }
 
 $checks = [System.Collections.Generic.List[object]]::new()
@@ -609,6 +613,39 @@ if ($SendProbe) {
         [int]$blankState.conversation.message_count -eq 0
     ) "isolated blank conversation"
 
+    $streamingStop = $null
+    if ($VerifyStop) {
+        $streamingPrompt = "Write 200 short numbered lines, one item per line."
+        Invoke-UiAction -Action "set_input_text" -Arguments @{ text = $streamingPrompt } | Out-Null
+        $streamDispatch = Invoke-UiAction -Action "send_input"
+        $streamRequestId = [string]$streamDispatch.command_receipt.request_id
+        if ([string]::IsNullOrWhiteSpace($streamRequestId)) {
+            throw "Streaming probe send_input did not return a command receipt request_id."
+        }
+        $streamingState = Wait-ChatGptStreamingState -Expected $true -TimeoutSec 30 `
+            -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
+        Add-Check "streaming_observed" ([bool]$streamingState.streaming) "active=True"
+
+        $stopDispatch = Invoke-UiAction -Action "chatgpt_stop_generation"
+        $stopRequestId = [string]$stopDispatch.command_receipt.request_id
+        if ([string]::IsNullOrWhiteSpace($stopRequestId)) {
+            throw "chatgpt_stop_generation did not return a command receipt request_id."
+        }
+        $stopResult = Wait-ChatGptCommandReceipt -RequestId $stopRequestId `
+            -ExpectedAction "stop_generation" -TimeoutSec 30 -PollIntervalSec 1 `
+            -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
+        $stoppedState = Wait-ChatGptStreamingState -Expected $false -TimeoutSec 30 `
+            -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
+        Add-Check "streaming_stopped" (-not [bool]$stoppedState.streaming) `
+            ([string]$stopResult.receipt.status)
+        $streamingStop = [ordered]@{
+            streaming_observed = $true
+            stop_receipt_succeeded = [string]$stopResult.receipt.status -eq "succeeded"
+            streaming_stopped = -not [bool]$stoppedState.streaming
+            private_content_emitted = $false
+        }
+    }
+
     $prompt = "Reply only with: $ProbeMarker"
     Invoke-UiAction -Action "set_input_text" -Arguments @{ text = $prompt } | Out-Null
     $beforeSendState = Invoke-ApkMcp -Tool "ui_state"
@@ -633,6 +670,7 @@ if ($SendProbe) {
             [string]$replyState.conversation.current_model
         )
         message_count = [int]$replyState.conversation.message_count
+        streaming_stop = $streamingStop
         private_content_emitted = $false
     }
 }

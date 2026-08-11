@@ -111,6 +111,14 @@ Assert-Contains 'throw "ChatGPT Web new conversation failed; the send probe was 
 Assert-Contains 'conversation_route_observed = -not [string]::IsNullOrWhiteSpace('
 Assert-Contains 'model_observed = -not [string]::IsNullOrWhiteSpace('
 Assert-Contains 'private_content_emitted = $false'
+Assert-Contains '[switch]$VerifyStop'
+Assert-Contains 'VerifyStop requires -SendProbe'
+Assert-Contains 'Wait-ChatGptStreamingState -Expected $true'
+Assert-Contains 'Invoke-UiAction -Action "chatgpt_stop_generation"'
+Assert-Contains 'Wait-ChatGptCommandReceipt -RequestId $stopRequestId'
+Assert-Contains '-ExpectedAction "stop_generation"'
+Assert-Contains 'Wait-ChatGptStreamingState -Expected $false'
+Assert-Contains 'streaming_stop = $streamingStop'
 
 if ($source.Contains('conversation_url =')) {
     throw "ChatGPT Web smoke must not emit private conversation routes."
@@ -178,6 +186,26 @@ $receiptResult = Wait-ChatGptProbeReply -RequestId "request-send" -Marker "PROBE
     -AfterMs 10 -TimeoutSec 1 -PollIntervalSec 1 -InvokeUiState { $probeState }
 if ($receiptResult.last_command.action -ne "collect_navigation") {
     throw "Probe receipt test did not preserve the overwritten last_command condition."
+}
+
+$streamingState = Wait-ChatGptStreamingState -Expected $true -TimeoutSec 1 `
+    -PollIntervalMilliseconds 1 -InvokeUiState { [pscustomobject]@{ streaming = $true } }
+if ($streamingState.streaming -ne $true) {
+    throw "Streaming state evidence did not observe the requested state."
+}
+$commandReceipt = Wait-ChatGptCommandReceipt -RequestId "request-stop" `
+    -ExpectedAction "stop_generation" -TimeoutSec 1 -PollIntervalSec 1 -InvokeUiState {
+        [pscustomobject]@{
+            command_requests = @([pscustomobject]@{
+                request_id = "request-stop"
+                expected_web_action = "stop_generation"
+                status = "succeeded"
+                result = [pscustomobject]@{ ok = $true }
+            })
+        }
+    }
+if ($commandReceipt.receipt.status -ne "succeeded") {
+    throw "Streaming stop evidence did not correlate the command receipt."
 }
 
 if ($source.Contains('Wait-CommandResult -Action "collect_navigation" -AfterMs $beforeFeatures')) {

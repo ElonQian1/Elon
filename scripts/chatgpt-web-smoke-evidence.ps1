@@ -58,6 +58,54 @@ function Normalize-ChatGptProbeReply {
     return $Text.Replace('\_', '_').Replace('\-', '-').Trim()
 }
 
+function Wait-ChatGptStreamingState {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$InvokeUiState,
+        [Parameter(Mandatory = $true)][bool]$Expected,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec,
+        [int]$PollIntervalMilliseconds = 250
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    do {
+        $state = & $InvokeUiState
+        if ([bool]$state.streaming -eq $Expected) { return $state }
+        Start-Sleep -Milliseconds $PollIntervalMilliseconds
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for ChatGPT streaming state: $Expected"
+}
+
+function Wait-ChatGptCommandReceipt {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$InvokeUiState,
+        [Parameter(Mandatory = $true)][string]$RequestId,
+        [Parameter(Mandatory = $true)][string]$ExpectedAction,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec,
+        [Parameter(Mandatory = $true)][int]$PollIntervalSec
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    do {
+        $state = & $InvokeUiState
+        $receipt = @($state.command_requests) |
+            Where-Object { [string]$_.request_id -eq $RequestId } |
+            Select-Object -Last 1
+        if ($null -ne $receipt -and [string]$receipt.status -eq "failed") {
+            throw "ChatGPT command failed: $ExpectedAction"
+        }
+        if (
+            $null -ne $receipt -and
+            [string]$receipt.status -eq "succeeded" -and
+            [string]$receipt.expected_web_action -eq $ExpectedAction -and
+            $receipt.result.ok -eq $true
+        ) {
+            return [pscustomobject]@{ state = $state; receipt = $receipt }
+        }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for ChatGPT command: $ExpectedAction"
+}
+
 function Wait-ChatGptProbeReply {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$InvokeUiState,
