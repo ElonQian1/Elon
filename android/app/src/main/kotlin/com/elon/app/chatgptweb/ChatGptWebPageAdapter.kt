@@ -260,7 +260,8 @@ internal class ChatGptWebPageAdapter(
     private fun injectAndRequestSnapshot() {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val document = documentSession.ensurePage()
-        val tokenSetup = "window.__elonChatGptDocumentToken=${JSONObject.quote(document.documentToken)};"
+        val tokenSetup = "window.__elonChatGptDocumentToken=${JSONObject.quote(document.documentToken)};" +
+            "window.__elonChatGptAdapterTargetVersion=$ADAPTER_VERSION;"
         webView.evaluateJavascript("$tokenSetup\n$adapterScript") {
             if (listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
                 requestSnapshot()

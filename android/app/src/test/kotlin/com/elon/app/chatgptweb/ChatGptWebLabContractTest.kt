@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,6 +39,9 @@ class ChatGptWebLabContractTest {
         )
         val messages = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_messages.js"
+        )
+        val composer = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_composer.js"
         )
         val adapterLayout = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_layout.js"
@@ -80,12 +82,10 @@ class ChatGptWebLabContractTest {
         )
         assertFalse(bridge.contains("addJavascriptInterface"))
         assertFalse(bridge.contains("getCookie("))
-        val bootstrapVersion = Regex("""const adapterVersion = (\d+);""")
-            .find(bootstrap)
-            ?.groupValues
-            ?.get(1)
-            ?.toInt()
-        assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, bootstrapVersion)
+        assertTrue(
+            bootstrap.contains("Number(window.__elonChatGptAdapterTargetVersion || 0)"),
+        )
+        assertTrue(bridge.contains("window.__elonChatGptAdapterTargetVersion=\$ADAPTER_VERSION;"))
         assertTrue(bootstrap.contains("window.__elonChatGptAdapterVersion = adapterVersion"))
         assertTrue(bootstrap.contains("previousBridge.dispose()"))
         assertTrue(bootstrap.contains("delete window[name]"))
