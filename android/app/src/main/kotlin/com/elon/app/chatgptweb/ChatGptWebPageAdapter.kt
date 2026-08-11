@@ -317,13 +317,14 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 39
+        internal const val ADAPTER_VERSION = 40
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_composer_option_policy.js",
+            "chatgpt_web_adapter_action_target_policy.js",
             "chatgpt_web_adapter_composer.js",
             "chatgpt_web_adapter_navigation_policy.js",
             "chatgpt_web_adapter_navigation.js",

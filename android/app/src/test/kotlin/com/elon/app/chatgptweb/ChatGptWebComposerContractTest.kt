@@ -17,27 +17,34 @@ class ChatGptWebComposerContractTest {
         val optionPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_composer_option_policy.js",
         )
+        val actionTargetPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
+        )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
         val pageAdapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
         )
 
         val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
+        val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
         val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
         assertTrue(policyAsset >= 0)
-        assertTrue(composerAsset > policyAsset)
+        assertTrue(actionTargetAsset > policyAsset)
+        assertTrue(composerAsset > actionTargetAsset)
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
         assertTrue(adapter.contains("#upload-fast-tools-files"))
         assertTrue(adapter.contains("#composer-plus-btn"))
         assertTrue(adapter.contains("composer_controls_snapshot"))
-        assertTrue(adapter.contains("baseline: new Set(visibleOptionNodes())"))
-        assertTrue(adapter.contains("!baseline.has(node)"))
+        assertTrue(adapter.contains("baseline: captureOptionBaseline()"))
+        assertTrue(adapter.contains("actionTargetPolicy.signature(node)"))
+        assertTrue(adapter.contains("isNewOrChangedOption(node, baseline)"))
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
         assertTrue(adapter.contains("const alreadyOpen = collectOptions(section, null)"))
         assertTrue(adapter.contains("function isOptionVisible(node)"))
+        assertTrue(adapter.contains("actionTargetPolicy.actionPoint(node)"))
         assertTrue(adapter.contains("filter((option) => isOptionVisible(option.node))"))
         assertTrue(adapter.contains("!target || !isOptionVisible(target.node)"))
         assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
@@ -72,7 +79,10 @@ class ChatGptWebComposerContractTest {
         assertTrue(core.contains("action === 'submit_dictation'"))
         assertFalse(adapter.contains("input.click()"))
         assertTrue(adapter.contains("选项已过期"))
-        listOf(adapter, optionPolicy).forEach { source ->
+        assertTrue(actionTargetPolicy.contains("documentRef.elementFromPoint"))
+        assertTrue(actionTargetPolicy.contains("style.pointerEvents === 'none'"))
+        assertTrue(actionTargetPolicy.contains("clipsChildren(style)"))
+        listOf(adapter, optionPolicy, actionTargetPolicy).forEach { source ->
             listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
                 assertFalse("composer adapter must not contain $it", source.contains(it))
             }

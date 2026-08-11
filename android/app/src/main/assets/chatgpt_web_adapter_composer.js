@@ -5,6 +5,7 @@
 
   const MAX_OPTIONS = 30;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
+  const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
@@ -139,7 +140,7 @@
     ];
     for (const selector of selectors) {
       const node = scope.querySelector(selector) || document.querySelector(selector);
-      if (isVisible(node)) return node;
+      if (isActionable(node)) return node;
     }
     return null;
   }
@@ -166,7 +167,7 @@
     }
     const candidates = Array.from(scope.querySelectorAll('button')).filter((button) => {
       const label = nodeLabel(button);
-      return isVisible(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
+      return isActionable(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
     });
     return candidates.find((button) => button.getAttribute('aria-haspopup') === 'menu') ||
       candidates.find((button) => /gpt|\bo\d|auto|thinking|instant|sol|模型|能力|轻度|重度/i.test(nodeLabel(button))) ||
@@ -178,7 +179,7 @@
       ? ['cancel dictation', '取消听写']
       : ['submit dictation', '提交听写'];
     return Array.from(document.querySelectorAll('button, [role="button"]')).find((button) => {
-      if (!isVisible(button)) return false;
+      if (!isActionable(button)) return false;
       const label = nodeLabel(button).toLowerCase();
       return labels.some((candidate) => label.includes(candidate));
     }) || null;
@@ -187,7 +188,7 @@
   function findDictationButton(composer) {
     const scope = composerScope(composer);
     return Array.from(scope.querySelectorAll('button')).find((button) => {
-      if (!isVisible(button)) return false;
+      if (!isActionable(button)) return false;
       const label = nodeLabel(button);
       return /dictation|听写|语音输入/i.test(label) &&
         !/cancel dictation|submit dictation|取消听写|提交听写/i.test(label);
@@ -257,11 +258,23 @@
     )).filter(isOptionVisible);
   }
 
+  function isActionable(node) {
+    return !!(actionTargetPolicy && actionTargetPolicy.actionPoint(node));
+  }
+
   function isOptionVisible(node) {
-    if (!isVisible(node)) return false;
-    const rect = node.getBoundingClientRect();
-    return rect.right > 0 && rect.bottom > 0 &&
-      rect.left < window.innerWidth && rect.top < window.innerHeight;
+    return isActionable(node);
+  }
+
+  function captureOptionBaseline() {
+    const baseline = new Map();
+    visibleOptionNodes().forEach((node) => baseline.set(node, actionTargetPolicy.signature(node)));
+    return baseline;
+  }
+
+  function isNewOrChangedOption(node, baseline) {
+    return !baseline || !baseline.has(node) ||
+      baseline.get(node) !== actionTargetPolicy.signature(node);
   }
 
   function opensSubmenu(node) {
@@ -272,7 +285,7 @@
 
   function collectOptions(section, baseline) {
     const seen = new Map();
-    const candidates = visibleOptionNodes().filter((node) => !baseline || !baseline.has(node)).map((node) => {
+    const candidates = visibleOptionNodes().filter((node) => isNewOrChangedOption(node, baseline)).map((node) => {
       const label = nodeLabel(node).slice(0, 120);
       if (!label) return null;
       const occurrence = seen.get(label) || 0;
@@ -325,12 +338,12 @@
   }
 
   function emitTouchRequest(purpose, node, emitEvent) {
-    if (!isVisible(node)) return false;
-    const rect = node.getBoundingClientRect();
+    const point = actionTargetPolicy && actionTargetPolicy.actionPoint(node);
+    if (!point) return false;
     const width = Math.max(1, window.innerWidth);
     const height = Math.max(1, window.innerHeight);
-    const xRatio = (rect.left + rect.width / 2) / width;
-    const yRatio = (rect.top + rect.height / 2) / height;
+    const xRatio = point.x / width;
+    const yRatio = point.y / height;
     if (xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) return false;
     emitEvent({ type: 'web_touch_request', purpose, xRatio, yRatio });
     return true;
@@ -367,7 +380,7 @@
     const trigger = triggerFor(section, composer);
     if (!trigger) return result(action, false, '官网当前没有可用入口。');
     replacePendingOptions(section, {
-      baseline: new Set(visibleOptionNodes()),
+      baseline: captureOptionBaseline(),
       trigger,
       action,
       complete: result
@@ -397,7 +410,7 @@
             pending.trigger && pending.trigger.isConnected && isVisible(pending.trigger)
           ) {
             pending.syntheticRetried = true;
-            pending.baseline = new Set(visibleOptionNodes());
+            pending.baseline = captureOptionBaseline();
             pending.trigger.click();
             return collect();
           }
@@ -421,7 +434,7 @@
     const purpose = target.opensSubmenu ? submenuPurpose : action;
     if (target.opensSubmenu) {
       replacePendingOptions(section, {
-        baseline: new Set(visibleOptionNodes()),
+        baseline: captureOptionBaseline(),
         trigger: target.node,
         action,
         complete: result

@@ -16,6 +16,7 @@
     '__elonChatGptConversations',
     '__elonChatGptMessages',
     '__elonChatGptComposerOptionPolicy',
+    '__elonChatGptActionTargetPolicy',
     '__elonChatGptComposer',
     '__elonChatGptNavigation',
     '__elonChatGptFormControls',
