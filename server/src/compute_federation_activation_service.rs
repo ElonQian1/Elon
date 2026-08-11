@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+#[cfg(test)]
+#[path = "compute_federation_activation_control_plane_tests.rs"]
+mod control_plane_tests;
+
 use crate::{
     compute_federation::{
         capacity::ComputeCapacityPoolStatus, provider::PROVIDER_STATUS_REGISTERING,
