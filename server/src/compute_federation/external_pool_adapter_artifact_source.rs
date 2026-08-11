@@ -6,6 +6,10 @@
 
 mod filesystem;
 
+#[cfg(test)]
+#[path = "external_pool_adapter_artifact_source_tests.rs"]
+mod tests;
+
 use std::{fmt, fs::File};
 
 use thiserror::Error;

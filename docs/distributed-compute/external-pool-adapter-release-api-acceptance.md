@@ -58,8 +58,8 @@ PC 静态验证复用 `npm run test:compute-external-pools`、`typecheck`、`lin
 - 未部署服务器，未对生产数据库或真实管理员会话调用；
 - 未通过真实 TCP 或已登录浏览器会话验证 PC 页面；
 - admission terminal/currentness 运维入口及 migration/Store/HTTP/并发/currentness 测试源码已写，但新增测试 passed=0，未编译、未执行 migration 或运行，无 fingerprint/receipt，实际 artifact/terminal=0；v229 仍为 `design_frozen/implementation_uncompiled/implementation_unrun`；
-- 未执行断言拟检查三终态、exact successor、fixed effects、fresh/replay/currentness 状态码、管理员/owner/`local-owner` actor、双连接竞争，以及 terminal 后 v227 PUT 在 raw body 被 poll 前拒绝、历史 GET 保留；这些不构成接口或运行证据；
-- test source 也表达 terminal-first、CAS-first/DB-second、receipt-first 与 artifact/terminal 竞争，但完整 crash fault injection、v227 全输入/文件安全矩阵和生产升级仍缺；不回改 v227 旧 migration；
+- 未执行断言拟检查三终态、exact successor、fixed effects、fresh/replay/currentness 状态码、管理员/owner/`local-owner` actor、双连接竞争，以及 terminal 后 v227 PUT 在 raw body 被 poll 前拒绝、历史 GET 保留；v227 新增测试源码再覆盖 pre-CAS 鉴权/header/大小/摘要拒绝、临时文件清理、CAS 复用/腐化拒绝、blob missing、路径/权限/reparse 门卫；这些不构成接口或运行证据；
+- test source 也表达 terminal-first、CAS-first/DB-second、receipt-first、response-loss replay 与 artifact/terminal 竞争，但实际执行、精确进程崩溃/断电 fault injection、目标平台动态 handle 证据和生产升级仍缺；不回改 v227 旧 migration；
 - 未解析或下载 `candidate_artifact_ref`，未重算实现摘要；
 - 未验证 verifier registry、签名、供应链或协议能力；
 - 未生成 Adapter registry/version、credential、service actor、v213 route/seal；

@@ -21,6 +21,8 @@ use super::types::{
     REVIEW_DECISION_CHANGES_REQUESTED,
 };
 
+#[path = "compute_external_pool_adapter_release_tests/artifact_fault_saga_test.rs"]
+mod artifact_fault_saga;
 #[path = "compute_external_pool_adapter_release_tests/lifecycle_artifact_currentness_test.rs"]
 mod lifecycle_artifact_currentness;
 #[path = "compute_external_pool_adapter_release_tests/lifecycle_concurrency_test.rs"]

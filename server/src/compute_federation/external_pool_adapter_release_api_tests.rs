@@ -18,6 +18,12 @@ use super::routes;
 
 #[path = "external_pool_adapter_release_api_tests/artifact_currentness_http_test.rs"]
 mod artifact_currentness_http_test;
+#[path = "external_pool_adapter_release_api_tests/artifact_intake_http_auth_headers_test.rs"]
+mod artifact_intake_http_auth_headers_test;
+#[path = "external_pool_adapter_release_api_tests/artifact_intake_http_body_test.rs"]
+mod artifact_intake_http_body_test;
+#[path = "external_pool_adapter_release_api_tests/artifact_intake_http_replay_test.rs"]
+mod artifact_intake_http_replay_test;
 #[path = "external_pool_adapter_release_api_tests/lifecycle_http_test.rs"]
 mod lifecycle_http_test;
 #[path = "external_pool_adapter_release_api_tests/lifecycle_support.rs"]
