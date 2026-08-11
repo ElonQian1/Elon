@@ -17,6 +17,14 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 $script:modelDiscoveryStage = "initial"
 
+function Test-SelectableModelLeaf {
+    param([Parameter(Mandatory = $true)]$Option)
+
+    if ($Option.opens_submenu -eq $true) { return $false }
+    $kind = [string]$Option.kind
+    return $Option.selected -eq $true -or $kind -in @("menuitemradio", "option")
+}
+
 function Wait-CommandReceipt {
     param(
         [Parameter(Mandatory = $true)][string]$RequestId,
@@ -70,7 +78,7 @@ function Get-CachedComposerModels {
         $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
             -Action "chatgpt_get_navigation" -Arguments @{ section = "model" }
         $options = @($navigation.composer_sections.model | Where-Object { $null -ne $_ })
-        $leafCount = @($options | Where-Object { $_.opens_submenu -ne $true }).Count
+        $leafCount = @($options | Where-Object { Test-SelectableModelLeaf -Option $_ }).Count
         if ($options.Count -gt 0 -and (-not $RequireLeafChoices -or $leafCount -ge 2)) {
             return $options
         }
@@ -172,7 +180,7 @@ function Wait-BlankConversation {
 
 function Get-SelectableModels {
     $root = @(Get-ComposerModels)
-    $rootLeaves = @($root | Where-Object { $_.opens_submenu -ne $true })
+    $rootLeaves = @($root | Where-Object { Test-SelectableModelLeaf -Option $_ })
     if ($rootLeaves.Count -ge 2) { return $rootLeaves }
 
     $parents = @(
@@ -180,8 +188,8 @@ function Get-SelectableModels {
             Where-Object { $_.opens_submenu -eq $true } |
             Sort-Object `
                 @{ Expression = {
-                    if ([string]$_.label -match '(?i)reasoning|thinking|effort|思考|推理|强度') { 0 }
-                    elseif ([string]$_.label -match '(?i)model|模型') { 1 }
+                    if ([string]$_.label -match '(?i)model|模型') { 0 }
+                    elseif ([string]$_.label -match '(?i)reasoning|thinking|effort|思考|推理|强度') { 1 }
                     else { 2 }
                 } }, `
                 @{ Expression = { [string]$_.label } }
@@ -200,7 +208,7 @@ function Get-SelectableModels {
         } catch {
             continue
         }
-        $childLeaves = @($children | Where-Object { $_.opens_submenu -ne $true })
+        $childLeaves = @($children | Where-Object { Test-SelectableModelLeaf -Option $_ })
         if ($childLeaves.Count -ge 2) { return $childLeaves }
     }
     throw "At least two selectable model choices are required for reversible acceptance."
@@ -345,7 +353,13 @@ try {
 if (-not $modelRestored) { throw "Original ChatGPT model was not restored." }
 
 $expandable = @(Get-ManifestControls) |
-    Where-Object { $_.expandable -eq $true -and $null -ne $_.expanded } |
+    Where-Object {
+        $_.expandable -eq $true -and
+        $null -ne $_.expanded -and
+        [string]$_.region -eq "composer" -and
+        [string]$_.semantic -in @("model", "attachment")
+    } |
+    Sort-Object @{ Expression = { if ([string]$_.semantic -eq "model") { 0 } else { 1 } } } |
     Select-Object -First 1
 if ($null -eq $expandable) {
     throw "No expandable ChatGPT control is observable on the current page."

@@ -23,6 +23,8 @@ $required = @(
     "chatgpt_select_composer_option",
     "adapter_current -eq `$true",
     "Get-SelectableModels",
+    "Test-SelectableModelLeaf",
+    'kind -in @("menuitemradio", "option")',
     "Get-CachedComposerModels -RequireLeafChoices",
     "reasoning|thinking|effort|思考|推理|强度",
     "[Math]::Min(`$ReadyTimeoutSec, 15)",
@@ -48,6 +50,8 @@ $required = @(
     "chatgpt_find_controls",
     "chatgpt_set_control_expanded",
     "set_ui_control_expanded",
+    '[string]$_.region -eq "composer"',
+    '[string]$_.semantic -in @("model", "attachment")',
     "original_state_restored = `$modelRestored",
     "original_state_restored = `$disclosureRestored",
     "sent_messages = 0",
@@ -61,6 +65,9 @@ foreach ($token in $required) {
 }
 if ($smoke -notmatch '(?s)Get-CachedComposerModels -RequireLeafChoices.*?catch\s*\{\s*continue\s*\}') {
     throw "Reversible control smoke must continue past submenu choices without two leaves."
+}
+if ($smoke -notmatch "if \(\[string\]\`$_.label -match '\(\?i\)model\|模型'\) \{ 0 \}") {
+    throw "Reversible control smoke must inspect the model submenu before adjacent capability submenus."
 }
 foreach ($token in @(
     "expected_hardware_serial",

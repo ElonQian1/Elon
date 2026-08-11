@@ -71,12 +71,12 @@
       ? '[data-testid*="open-sidebar" i], button[aria-label*="open sidebar" i], button[aria-label*="打开边栏" i], button[aria-label*="打开侧边栏" i]'
       : '[data-testid*="close-sidebar" i], button[aria-label*="close sidebar" i], button[aria-label*="关闭边栏" i], button[aria-label*="关闭侧边栏" i]';
     const direct = document.querySelector(selector);
-    if (direct) return direct;
+    if (direct && isVisible(direct)) return direct;
     const needles = open
       ? ['open sidebar', '打开边栏', '打开侧边栏']
       : ['close sidebar', '关闭边栏', '关闭侧边栏'];
     return Array.from(document.querySelectorAll('button')).find((button) =>
-      needles.some((needle) => label(button).includes(needle))
+      isVisible(button) && needles.some((needle) => label(button).includes(needle))
     ) || null;
   }
 
@@ -103,34 +103,45 @@
 
   function waitForConversations(onReady, onTimeout) {
     const started = Date.now();
+    let stableSince = started;
+    let lastFingerprint = '';
+    let best = [];
     function poll() {
       const conversations = readConversations();
-      if (conversations.length) return onReady(conversations);
-      if (Date.now() - started >= 3000) return onTimeout();
+      if (conversations.length > best.length) best = conversations;
+      const fingerprint = conversations.map((conversation) => conversation.path).join('|');
+      if (fingerprint !== lastFingerprint) {
+        lastFingerprint = fingerprint;
+        stableSince = Date.now();
+      }
+      if (conversations.length && Date.now() - stableSince >= 500) return onReady(best);
+      if (Date.now() - started >= 3000) {
+        return best.length ? onReady(best) : onTimeout();
+      }
       window.setTimeout(poll, 100);
     }
     poll();
   }
 
   function requestList(emitEvent, result) {
-    const existing = readConversations();
-    if (existing.length) {
-      emitEvent({ type: 'conversation_snapshot', conversations: existing });
-      return result('list_conversations', true, '');
+    const open = findSidebarButton(true);
+    if (open) {
+      open.click();
+      return waitForConversations(
+        (conversations) => {
+          emitEvent({ type: 'conversation_snapshot', conversations });
+          result('list_conversations', true, '');
+          const close = findSidebarButton(false);
+          if (close) close.click();
+        },
+        () => result('list_conversations', false, '官网会话列表尚未加载完成。')
+      );
     }
 
-    const open = findSidebarButton(true);
-    if (!open) return result('list_conversations', false, '未找到官网会话侧栏入口。');
-    open.click();
-    waitForConversations(
-      (conversations) => {
-        emitEvent({ type: 'conversation_snapshot', conversations });
-        result('list_conversations', true, '');
-        const close = findSidebarButton(false);
-        if (close) close.click();
-      },
-      () => result('list_conversations', false, '官网会话列表尚未加载完成。')
-    );
+    const existing = readConversations();
+    if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
+    emitEvent({ type: 'conversation_snapshot', conversations: existing });
+    result('list_conversations', true, '');
   }
 
   function newConversation(result) {

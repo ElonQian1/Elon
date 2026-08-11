@@ -66,6 +66,20 @@ class ChatGptWebNavigationContractTest {
     }
 
     @Test
+    fun conversationListOpensTheMobileSidebarBeforeTakingAStableSnapshot() {
+        val adapter = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val requestList = adapter.substringAfter("function requestList")
+            .substringBefore("function newConversation")
+
+        assertTrue(requestList.indexOf("findSidebarButton(true)") < requestList.indexOf("readConversations()"))
+        assertTrue(adapter.contains("Date.now() - stableSince >= 500"))
+        assertTrue(adapter.contains("conversations.length > best.length"))
+        assertTrue(adapter.contains("direct && isVisible(direct)"))
+    }
+
+    @Test
     fun nativeNavigationRowsAndComposerOptionsUseTheSharedStableSelectorContract() {
         val composer = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeComposerToolsController.kt",
