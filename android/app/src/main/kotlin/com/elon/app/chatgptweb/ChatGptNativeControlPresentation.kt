@@ -32,6 +32,10 @@ internal object ChatGptNativeControlPresentation {
         val pageActions = pageActions(controls)
         val pageActionIds = pageActions.mapTo(mutableSetOf(), ChatGptWebUiControl::id)
         val pageActionTrigger = pageActionsSelector(pageActions)
+        val contextualOverlayCounts = pageActions.asSequence()
+            .filter { it.region == ChatGptWebUiRegion.OVERLAY && it.contextId != null }
+            .groupingBy { it.contextId.orEmpty() }
+            .eachCount()
 
         return controls.associate { control ->
             val coverage = when {
@@ -68,7 +72,12 @@ internal object ChatGptNativeControlPresentation {
                     control.id,
                     Kind.MENU,
                     nativeSelector = control.accessibilityLabel,
-                    nativeTriggerSelector = pageActionTrigger,
+                    nativeTriggerSelector = control.contextId?.let { contextId ->
+                        messageOverlayActionsSelector(
+                            contextId,
+                            contextualOverlayCounts[contextId].orZero(),
+                        )
+                    } ?: pageActionTrigger,
                 )
                 else -> Coverage(control.id, Kind.OFFICIAL_FALLBACK)
             }
@@ -156,6 +165,9 @@ internal object ChatGptNativeControlPresentation {
 
     fun messageRegenerateSelector(contextId: String): String =
         "chatgpt-message-regenerate:${stableContextId(contextId)}"
+
+    fun messageOverlayActionsSelector(contextId: String, count: Int): String =
+        "chatgpt-message-overlay-actions:${stableContextId(contextId)}:$count"
 
     fun messageSelector(contextId: String, role: String): String =
         "chatgpt-message:${stableContextId(contextId)}:${stableContextId(role)}"

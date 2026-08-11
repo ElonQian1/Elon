@@ -10,8 +10,13 @@
   const formCommands = window.__elonChatGptFormCommands;
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
   let controlsById = new Map();
+  let controlMetadataById = new Map();
   let lastFingerprint = '';
   const MAX_DISCOVERED_CONTROLS = 512;
+  const overlayOwnership = controlOwnershipPolicy &&
+    typeof controlOwnershipPolicy.createOverlayOwnershipTracker === 'function'
+    ? controlOwnershipPolicy.createOverlayOwnershipTracker()
+    : null;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -142,6 +147,14 @@
       (formAdapter ? ', ' + formAdapter.ACTIONABLE_SELECTOR : '');
     return Array.from(root.querySelectorAll(selector))
       .filter(isVisible);
+  }
+
+  function ownershipPageKey() {
+    return location.pathname + location.search;
+  }
+
+  function visibleOverlayRoots() {
+    return Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
   }
 
   function semanticFor(node, region, index) {
@@ -315,8 +328,7 @@
       const form = formAdapter && formAdapter.describe(node);
       const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
       used.add(id);
-      controlsById.set(id, node);
-      target.push({
+      const control = {
         id,
         semantic,
         label,
@@ -343,7 +355,10 @@
         inViewport: isInViewport(rect),
         xRatio: (rect.left + rect.width / 2) / Math.max(1, window.innerWidth),
         yRatio: (rect.top + rect.height / 2) / Math.max(1, window.innerHeight)
-      });
+      };
+      controlsById.set(id, node);
+      controlMetadataById.set(id, control);
+      target.push(control);
     });
   }
 
@@ -408,6 +423,7 @@
 
   function discover() {
     controlsById = new Map();
+    controlMetadataById = new Map();
     const controls = [];
     const used = new Set();
     const header = headerRoot();
@@ -421,9 +437,17 @@
       return label.length >= 2 && label.length <= 120 && node.getBoundingClientRect().top > window.innerHeight * 0.45;
     });
     addRegionControls(controls, composer, 'composer', used);
-    const overlays = Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
+    const overlays = visibleOverlayRoots();
     const overlay = overlays[overlays.length - 1];
-    addRegionControls(controls, overlay, 'overlay', used);
+    let overlayContextId = '';
+    if (overlayOwnership) {
+      if (overlay) {
+        overlayContextId = overlayOwnership.resolveOverlayContext(overlay, ownershipPageKey());
+      } else {
+        overlayOwnership.observeNoOverlay(ownershipPageKey());
+      }
+    }
+    addRegionControls(controls, overlay, 'overlay', used, null, overlayContextId);
     addMessageControls(controls, used);
     addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
     return {
@@ -546,6 +570,7 @@
   function invoke(id, emitEvent, result) {
     discover();
     const node = controlsById.get(String(id || ''));
+    const control = controlMetadataById.get(String(id || ''));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
     function dispatch() {
       if (!node.isConnected || !isVisible(node)) {
@@ -556,6 +581,15 @@
       const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
       if (!isInViewport(rect) || xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
         return result('invoke_ui_control', false, '官网控件滚动后仍不在可操作区域。');
+      }
+      if (overlayOwnership) {
+        const remembered = overlayOwnership.rememberMessageTrigger(
+          control,
+          node,
+          visibleOverlayRoots(),
+          ownershipPageKey()
+        );
+        if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }
       emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
       result('invoke_ui_control', true, '');

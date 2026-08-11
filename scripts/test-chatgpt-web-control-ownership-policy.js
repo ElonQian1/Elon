@@ -1,8 +1,30 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const policy = require(
   '../android/app/src/main/assets/chatgpt_web_adapter_control_ownership_policy.js'
+);
+
+const layoutSource = fs.readFileSync(path.join(
+  __dirname,
+  '../android/app/src/main/assets/chatgpt_web_adapter_layout.js'
+), 'utf8');
+assert.match(
+  layoutSource,
+  /overlayOwnership\.rememberMessageTrigger\(/,
+  'layout records the message control that requested a new overlay'
+);
+assert.match(
+  layoutSource,
+  /overlayOwnership\.resolveOverlayContext\(/,
+  'layout resolves top-level overlay ownership before exporting controls'
+);
+assert.match(
+  layoutSource,
+  /addRegionControls\(controls, overlay, 'overlay', used, null, overlayContextId\)/,
+  'layout exports inherited context on overlay controls'
 );
 
 function control(role = 'textbox') {
@@ -90,6 +112,67 @@ assert.equal(
   policy.isPrimaryComposerTextControl(composer, 'content', composer, describe),
   false,
   'ownership only applies to the composer region'
+);
+
+let now = 1000;
+const tracker = policy.createOverlayOwnershipTracker(() => now, 500);
+const source = { isConnected: true };
+const existingOverlay = { isConnected: true };
+const openedOverlay = { isConnected: true };
+const trigger = {
+  region: 'message',
+  semantic: 'more',
+  contextId: 'conversation-turn-2'
+};
+assert.equal(
+  tracker.rememberMessageTrigger(trigger, source, [existingOverlay], '/c/example'),
+  true,
+  'a message overflow trigger starts a bounded ownership claim'
+);
+assert.equal(
+  tracker.resolveOverlayContext(existingOverlay, '/c/example'),
+  '',
+  'a menu that existed before the trigger is never claimed by the message'
+);
+assert.equal(
+  tracker.resolveOverlayContext(openedOverlay, '/c/example'),
+  'conversation-turn-2',
+  'the newly opened menu inherits the triggering message context'
+);
+assert.equal(
+  tracker.resolveOverlayContext(openedOverlay, '/c/example'),
+  'conversation-turn-2',
+  'the active menu keeps its context across repeated snapshots'
+);
+tracker.observeNoOverlay('/c/example');
+assert.equal(
+  tracker.resolveOverlayContext(openedOverlay, '/c/example'),
+  '',
+  'closing the menu clears active ownership'
+);
+
+tracker.rememberMessageTrigger(trigger, source, [], '/c/example');
+now += 501;
+assert.equal(
+  tracker.resolveOverlayContext({ isConnected: true }, '/c/example'),
+  '',
+  'a delayed unrelated menu cannot inherit an expired claim'
+);
+
+now += 1;
+tracker.rememberMessageTrigger(trigger, source, [], '/c/example');
+assert.equal(
+  tracker.resolveOverlayContext({ isConnected: true }, '/settings'),
+  '',
+  'navigation clears pending message ownership'
+);
+
+const disconnectedSource = { isConnected: false };
+tracker.rememberMessageTrigger(trigger, disconnectedSource, [], '/c/example');
+assert.equal(
+  tracker.resolveOverlayContext({ isConnected: true }, '/c/example'),
+  '',
+  'a removed trigger cannot own a later menu'
 );
 
 process.stdout.write('CHATGPT_WEB_CONTROL_OWNERSHIP_POLICY=passed\n');

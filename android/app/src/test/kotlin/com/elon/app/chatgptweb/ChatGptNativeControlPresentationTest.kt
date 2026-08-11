@@ -86,6 +86,25 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun bindsMessageOverlayEntriesToTheTriggeringMessageSelector() {
+        val controls = listOf(
+            control("sources", "sources", "查看来源", ChatGptWebUiRegion.OVERLAY, CONTEXT),
+            control("read", "read_aloud", "朗读", ChatGptWebUiRegion.OVERLAY, CONTEXT),
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(
+            "chatgpt-message-overlay-actions:$CONTEXT:2",
+            coverage.getValue("sources").nativeTriggerSelector,
+        )
+        assertEquals(
+            "chatgpt-message-overlay-actions:$CONTEXT:2",
+            coverage.getValue("read").nativeTriggerSelector,
+        )
+    }
+
+    @Test
     fun exposesFeaturePageContentThroughTheNativePageActionsMenu() {
         val controls = listOf(
             control("create", "create_asset", "创建图片", ChatGptWebUiRegion.CONTENT),
