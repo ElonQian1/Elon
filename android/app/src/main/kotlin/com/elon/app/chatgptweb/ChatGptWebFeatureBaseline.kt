@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
     const val VERSION = 4
-    internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 52
+    internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 54
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
 
@@ -245,6 +245,7 @@ internal object ChatGptWebFeatureBaseline {
         "web_search" to "reversible/composer_controls",
         "rich_message_rendering" to "reversible/message_structure",
         "complex_output_rendering" to "reversible/message_structure",
+        "message_action_context" to "safe/message_actions",
         "feature_navigation" to "safe/feature_pages",
         "disclosure_controls" to "reversible/reversible_controls",
         "official_change_detection" to "safe/read_only_surface",
@@ -407,6 +408,13 @@ internal object ChatGptWebFeatureBaseline {
             capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE),
             semantics = setOf("regenerate"),
             remainingGap = "regenerate_reply_device_acceptance",
+        ),
+        feature(
+            id = "message_action_context",
+            group = "messages",
+            delivery = Delivery.ADAPTIVE_NATIVE,
+            mcpActions = listOf("chatgpt_find_controls", "chatgpt_invoke_control"),
+            semantics = setOf("more", "timestamp", "sources", "read_aloud", "branch"),
         ),
         feature(
             id = "message_actions",
