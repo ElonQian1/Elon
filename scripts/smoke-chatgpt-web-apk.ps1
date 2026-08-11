@@ -494,7 +494,12 @@ if ($profileControls.Count -gt 0) {
     Add-Check "account_menu_adaptation_review" (
         $accountMenuMatrix.adaptation_review.required -ne $true
     ) ($accountMenuReasons -join ",")
-    Invoke-Adb shell input keyevent 4 | Out-Null
+    $accountMenuClose = Invoke-UiAction -Action "chatgpt_invoke_control" -Arguments @{
+        control_id = [string]$profileControls[0].control_id
+    }
+    Add-Check "account_menu_close" (
+        $accountMenuClose.control_ok -eq $true
+    ) ([string]$accountMenuClose.action)
     Wait-AccountMenuClosed -TimeoutSec $ReadyTimeoutSec | Out-Null
 }
 
