@@ -5,6 +5,14 @@ use chrono::Utc;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+#[cfg(test)]
+#[path = "compute_federation_offer_control_plane_tests.rs"]
+mod control_plane_tests;
+
+#[cfg(test)]
+#[path = "compute_federation_offer_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
 use crate::{
     compute_federation::{
         capacity::ComputeCapacityPoolStatus,
