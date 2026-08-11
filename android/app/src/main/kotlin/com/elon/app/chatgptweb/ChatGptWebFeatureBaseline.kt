@@ -1,11 +1,23 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 3
+    const val VERSION = 4
     private const val DEVICE_VERIFICATION_ADAPTER_VERSION = 39
+    private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
+    private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
+
+    internal fun isDeviceVerificationCurrent(
+        adapterVersion: Int = ChatGptWebPageAdapter.ADAPTER_VERSION,
+        currentInputSha256: String = BuildConfig.CHATGPT_WEB_INPUT_SHA256,
+        verifiedInputSha256: String = BuildConfig.CHATGPT_WEB_VERIFIED_INPUT_SHA256,
+    ): Boolean =
+        adapterVersion == DEVICE_VERIFICATION_ADAPTER_VERSION &&
+            SHA256_PATTERN.matches(currentInputSha256) &&
+            currentInputSha256 == verifiedInputSha256
 
     enum class ImplementationStatus(val wireName: String) {
         COMPLETE("complete"),
@@ -104,12 +116,30 @@ internal object ChatGptWebFeatureBaseline {
             it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v3")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v4")
             .put("version", VERSION)
             .put("device_verification_adapter_version", DEVICE_VERIFICATION_ADAPTER_VERSION)
+            .put("device_verification_current", DEVICE_VERIFICATION_CURRENT)
+            .put("device_verification_input_sha256", BuildConfig.CHATGPT_WEB_INPUT_SHA256)
             .put(
-                "device_verification_current",
-                ChatGptWebPageAdapter.ADAPTER_VERSION == DEVICE_VERIFICATION_ADAPTER_VERSION,
+                "device_verification_verified_input_sha256",
+                BuildConfig.CHATGPT_WEB_VERIFIED_INPUT_SHA256,
+            )
+            .put(
+                "device_verification_provenance",
+                JSONObject()
+                    .put("schema", "elon.chatgpt_web.device_evidence.v1")
+                    .put("verified_apk_version_name", BuildConfig.CHATGPT_WEB_VERIFIED_APK_VERSION_NAME)
+                    .put("verified_apk_version_code", BuildConfig.CHATGPT_WEB_VERIFIED_APK_VERSION_CODE)
+                    .put("verified_source_commit", BuildConfig.CHATGPT_WEB_VERIFIED_SOURCE_COMMIT)
+                    .put(
+                        "inherited_by_equivalent_inputs",
+                        DEVICE_VERIFICATION_CURRENT &&
+                            (
+                                BuildConfig.VERSION_CODE != BuildConfig.CHATGPT_WEB_VERIFIED_APK_VERSION_CODE ||
+                                    BuildConfig.VERSION_NAME != BuildConfig.CHATGPT_WEB_VERIFIED_APK_VERSION_NAME
+                            ),
+                    ),
             )
             .put("feature_count", FEATURES.size)
             .put(
@@ -513,7 +543,7 @@ internal object ChatGptWebFeatureBaseline {
         }
         val resolvedVerificationStatus = verificationStatus ?: when {
             id in DEVICE_VERIFICATION_CASES &&
-                ChatGptWebPageAdapter.ADAPTER_VERSION == DEVICE_VERIFICATION_ADAPTER_VERSION ->
+                DEVICE_VERIFICATION_CURRENT ->
                 VerificationStatus.DEVICE_VERIFIED
             id in DEVICE_VERIFICATION_CASES -> VerificationStatus.DEFERRED
             acceptance == Acceptance.USER_DRIVEN_DEVICE ->
@@ -527,7 +557,7 @@ internal object ChatGptWebFeatureBaseline {
             VerificationStatus.OFFLINE_VERIFIED ->
                 remainingGap ?: "current_apk_device_acceptance_not_recorded"
             VerificationStatus.DEFERRED ->
-                remainingGap ?: "adapter_changed_since_device_acceptance"
+                remainingGap ?: "adapter_or_chatgpt_web_inputs_changed_since_device_acceptance"
             VerificationStatus.FAILED ->
                 remainingGap ?: "current_device_acceptance_failed"
         }

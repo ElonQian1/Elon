@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,13 +19,32 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v3", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v4", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
             ChatGptWebPageAdapter.ADAPTER_VERSION,
             baseline.getInt("device_verification_adapter_version"),
         )
-        assertTrue(baseline.getBoolean("device_verification_current"))
+        val deviceEvidenceCurrent =
+            BuildConfig.CHATGPT_WEB_INPUT_SHA256 == BuildConfig.CHATGPT_WEB_VERIFIED_INPUT_SHA256
+        assertEquals(deviceEvidenceCurrent, baseline.getBoolean("device_verification_current"))
+        assertTrue(BuildConfig.CHATGPT_WEB_INPUT_SHA256.matches(Regex("^[0-9a-f]{64}$")))
+        assertEquals(
+            BuildConfig.CHATGPT_WEB_VERIFIED_INPUT_SHA256,
+            baseline.getString("device_verification_verified_input_sha256"),
+        )
+        assertEquals(
+            BuildConfig.CHATGPT_WEB_INPUT_SHA256,
+            baseline.getString("device_verification_input_sha256"),
+        )
+        val provenance = baseline.getJSONObject("device_verification_provenance")
+        assertEquals("elon.chatgpt_web.device_evidence.v1", provenance.getString("schema"))
+        assertEquals(968, provenance.getInt("verified_apk_version_code"))
+        assertEquals("1.1.958", provenance.getString("verified_apk_version_name"))
+        assertEquals(
+            "1fc5c5fe75439a5a7161805baad5af4608dcd6c7",
+            provenance.getString("verified_source_commit"),
+        )
         assertEquals(ids.size, ids.toSet().size)
         assertEquals(ChatGptWebFeatureBaseline.ids(), ids.toSet())
         assertTrue(ids.containsAll(REQUIRED_FEATURE_IDS))
@@ -49,9 +69,37 @@ class ChatGptWebFeatureBaselineTest {
                 assertFalse(feature.isNull("verification_case"))
             } else {
                 assertFalse(feature.isNull("verification_gap"))
-                assertTrue(feature.isNull("verification_case"))
+                if (!feature.isNull("verification_case")) {
+                    assertEquals("deferred", feature.getString("verification_status"))
+                }
             }
         }
+    }
+
+    @Test
+    fun invalidatesDeviceEvidenceWhenAdapterOrBehaviorInputsChange() {
+        val verified = BuildConfig.CHATGPT_WEB_VERIFIED_INPUT_SHA256
+
+        assertEquals(
+            BuildConfig.CHATGPT_WEB_INPUT_SHA256 == verified,
+            ChatGptWebFeatureBaseline.isDeviceVerificationCurrent(),
+        )
+        assertFalse(
+            ChatGptWebFeatureBaseline.isDeviceVerificationCurrent(
+                adapterVersion = ChatGptWebPageAdapter.ADAPTER_VERSION + 1,
+            ),
+        )
+        assertFalse(
+            ChatGptWebFeatureBaseline.isDeviceVerificationCurrent(
+                currentInputSha256 = "0".repeat(64),
+            ),
+        )
+        assertFalse(
+            ChatGptWebFeatureBaseline.isDeviceVerificationCurrent(
+                currentInputSha256 = verified,
+                verifiedInputSha256 = "not-a-sha256",
+            ),
+        )
     }
 
     @Test
@@ -131,6 +179,7 @@ class ChatGptWebFeatureBaselineTest {
         val summary = baseline.getJSONObject("summary")
         val codeSummary = baseline.getJSONObject("code_summary")
         val verificationSummary = baseline.getJSONObject("verification_summary")
+        val deviceEvidenceCurrent = baseline.getBoolean("device_verification_current")
 
         assertEquals(
             baseline.getInt("feature_count"),
@@ -150,24 +199,36 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
         assertEquals(14, verificationSummary.getInt("offline_verified"))
-        assertEquals(12, verificationSummary.getInt("device_verified"))
-        assertEquals(12, verificationSummary.getInt("verified"))
-        assertEquals(14, verificationSummary.getInt("pending"))
+        assertEquals(if (deviceEvidenceCurrent) 12 else 0, verificationSummary.getInt("device_verified"))
+        assertEquals(if (deviceEvidenceCurrent) 12 else 0, verificationSummary.getInt("verified"))
+        assertEquals(if (deviceEvidenceCurrent) 14 else 26, verificationSummary.getInt("pending"))
         assertEquals(7, verificationSummary.getInt("user_action_required"))
-        assertEquals(0, verificationSummary.getInt("deferred"))
+        assertEquals(if (deviceEvidenceCurrent) 0 else 12, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(21, verificationSummary.getInt("remaining"))
+        assertEquals(if (deviceEvidenceCurrent) 21 else 33, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
-        assertEquals("device_verified", feature(baseline, "model_selection").getString("verification_status"))
-        assertTrue(feature(baseline, "model_selection").isNull("remaining_gap"))
+        assertEquals(
+            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            feature(baseline, "model_selection").getString("verification_status"),
+        )
+        assertEquals(
+            deviceEvidenceCurrent,
+            feature(baseline, "model_selection").isNull("verification_gap"),
+        )
         assertEquals("complete", feature(baseline, "disclosure_controls").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "disclosure_controls").getString("code_status"))
-        assertEquals("device_verified", feature(baseline, "disclosure_controls").getString("verification_status"))
-        assertTrue(feature(baseline, "disclosure_controls").isNull("remaining_gap"))
         assertEquals(
-            "device_verified",
+            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            feature(baseline, "disclosure_controls").getString("verification_status"),
+        )
+        assertEquals(
+            deviceEvidenceCurrent,
+            feature(baseline, "disclosure_controls").isNull("verification_gap"),
+        )
+        assertEquals(
+            if (deviceEvidenceCurrent) "device_verified" else "deferred",
             feature(baseline, "session_continuity_and_recovery").getString("verification_status"),
         )
         assertEquals(

@@ -358,12 +358,23 @@ Add-Check "capability_matrix_app_version" (
         -not [string]::IsNullOrWhiteSpace([string]$matrix.app.version_name)
 ) "v$($matrix.app.version_name) build=$($matrix.app.version_code)"
 Add-Check "feature_baseline_schema" (
-    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v3"
+    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v4"
 ) ([string]$featureBaseline.schema)
+$currentEvidenceInput = [string]$featureBaseline.device_verification_input_sha256
+$verifiedEvidenceInput = [string]$featureBaseline.device_verification_verified_input_sha256
+$evidenceProvenance = $featureBaseline.device_verification_provenance
 Add-Check "feature_device_evidence_current" (
     $featureBaseline.device_verification_current -eq $true -and
-        [int]$featureBaseline.device_verification_adapter_version -eq [int]$state.adapter_version
-) "evidence_adapter=$($featureBaseline.device_verification_adapter_version),runtime_adapter=$($state.adapter_version)"
+        [int]$featureBaseline.device_verification_adapter_version -eq [int]$state.adapter_version -and
+        $currentEvidenceInput -match '^[0-9a-f]{64}$' -and
+        $currentEvidenceInput -eq $verifiedEvidenceInput
+) "evidence_adapter=$($featureBaseline.device_verification_adapter_version),runtime_adapter=$($state.adapter_version),input=$($currentEvidenceInput.Substring(0, [Math]::Min(12, $currentEvidenceInput.Length)))"
+Add-Check "feature_device_evidence_provenance" (
+    $evidenceProvenance.schema -eq "elon.chatgpt_web.device_evidence.v1" -and
+        [int]$evidenceProvenance.verified_apk_version_code -gt 0 -and
+        -not [string]::IsNullOrWhiteSpace([string]$evidenceProvenance.verified_apk_version_name) -and
+        [string]$evidenceProvenance.verified_source_commit -match '^[0-9a-f]{40}$'
+) "v$($evidenceProvenance.verified_apk_version_name) build=$($evidenceProvenance.verified_apk_version_code) source=$(([string]$evidenceProvenance.verified_source_commit).Substring(0, [Math]::Min(12, ([string]$evidenceProvenance.verified_source_commit).Length)))"
 Add-Check "feature_baseline_complete" (
     [int]$featureBaseline.feature_count -gt 0 -and
         $baselineStatusTotal -eq [int]$featureBaseline.feature_count -and

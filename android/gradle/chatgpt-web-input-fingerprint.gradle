@@ -1,0 +1,83 @@
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+
+def repoRoot = rootProject.projectDir.parentFile
+def inputFiles = new LinkedHashSet<File>()
+
+def addTree = { String relativeRoot, List<String> includes, List<String> excludes = [] ->
+    def root = new File(repoRoot, relativeRoot)
+    fileTree(root).matching {
+        includes.each { include it }
+        excludes.each { exclude it }
+    }.files.each { inputFiles.add(it) }
+}
+
+def addRequiredFile = { String relativePath ->
+    def input = new File(repoRoot, relativePath)
+    if (!input.isFile()) {
+        throw new GradleException("ChatGPT Web fingerprint input is missing: ${relativePath}")
+    }
+    inputFiles.add(input)
+}
+
+addTree(
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb",
+    ["**/*.kt"],
+    [
+        "ChatGptWebCapabilityMatrix.kt",
+        "ChatGptWebFeatureBaseline.kt",
+    ],
+)
+addTree("android/app/src/main/assets", ["chatgpt_web*.js"])
+addTree("android/app/src/main/res/layout", ["*chatgpt*.xml"])
+
+[
+    "android/app/src/main/AndroidManifest.xml",
+    "android/app/src/main/kotlin/com/elon/app/AiProviderAccountsActivity.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainActivity.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainMcpNativeControlActions.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainProfileQuickActions.kt",
+    "android/app/src/main/kotlin/com/elon/app/ProfileChatGptWebEntry.kt",
+    "android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt",
+    "android/app/src/main/kotlin/com/elon/app/mcp/McpDebugServer.kt",
+    "android/app/src/main/kotlin/com/elon/app/mcp/McpNativeControlBridge.kt",
+    "android/app/src/main/kotlin/com/elon/app/mcp/McpToolCatalog.kt",
+    "android/app/src/main/res/layout/activity_ai_provider_accounts.xml",
+    "android/app/src/main/res/layout/activity_main.xml",
+].each(addRequiredFile)
+
+def sortedInputs = inputFiles.toList().sort { left, right ->
+    repoRoot.toPath().relativize(left.toPath()).toString().replace('\\', '/') <=>
+        repoRoot.toPath().relativize(right.toPath()).toString().replace('\\', '/')
+}
+if (sortedInputs.isEmpty()) {
+    throw new GradleException("ChatGPT Web fingerprint input set is empty")
+}
+
+def digest = MessageDigest.getInstance("SHA-256")
+sortedInputs.each { input ->
+    def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
+    digest.update(relativePath.getBytes(StandardCharsets.UTF_8))
+    digest.update((byte) 0)
+    digest.update(input.bytes)
+    digest.update((byte) 0)
+}
+
+ext.chatGptWebInputFiles = sortedInputs
+ext.chatGptWebInputSha256 = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+ext.chatGptWebVerifiedInputSha256 = "6bd5ee0954d405ebca848962da337da54333026b793ed4281093fc34e58c88cc"
+ext.chatGptWebVerifiedApkVersionName = "1.1.958"
+ext.chatGptWebVerifiedApkVersionCode = 968
+ext.chatGptWebVerifiedSourceCommit = "1fc5c5fe75439a5a7161805baad5af4608dcd6c7"
+
+tasks.register("printChatGptWebInputFingerprint") {
+    group = "verification"
+    description = "Prints the deterministic input fingerprint used to validate ChatGPT Web device evidence."
+    doLast {
+        println "CHATGPT_WEB_INPUT_SHA256=${project.ext.chatGptWebInputSha256}"
+        println "CHATGPT_WEB_INPUT_FILE_COUNT=${project.ext.chatGptWebInputFiles.size()}"
+        project.ext.chatGptWebInputFiles.each { input ->
+            println "CHATGPT_WEB_INPUT_FILE=${repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')}"
+        }
+    }
+}
