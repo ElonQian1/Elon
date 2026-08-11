@@ -137,7 +137,7 @@ v225 CapacityCommitment 已形成 `implementation_partially_verified` 的最窄�
 
 同一份卖方容量不能同时支持多个未被净额化的承诺。v225 不新增 Commitment Reservation 或余额表：Provider 的 Commitment、`capacity_commitment` Claim 与 ledger hold 必须在一个 `BEGIN IMMEDIATE` 内原子完成，并把同 Offer/bucket 的 live Claim 汇总限制在 current Offer `reservable_units` 内；Pool available 与 reducer 继续承担全局防超卖。
 
-v228 [`Delivery Allocation`](delivery-allocation-authority.md) 已按 `design_frozen/source_not_written` 冻结：一份 Commitment 最多一份双边 Grant；exact consumer 只能 whole-only 行权给一个 quoted Job。行权在一个 IMMEDIATE 事务内冻结既有 Broker 预算、全量释放父 Commitment Claim、以相同 lines 建立带 `parent_claim_id` 的标准 Reservation Claim，并登记 Reservation、Job、Broker receipt 与 immutable exercised receipt；Commitment current view 派生 `allocated`。它不产生 Position、第二份 Allocation Claim、真实价格或结算真源。
+v228 [`Delivery Allocation`](delivery-allocation-authority.md) 当前为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域、两张不可变表与门卫、Store-private authority、Service/HTTP 和中央接线源码已写，但尚未编译、执行 migration、运行测试或启动服务。一份 Commitment 最多一份双边 Grant；exact consumer 只能 whole-only 行权给一个 quoted Job。行权在一个 IMMEDIATE 事务内冻结既有 Broker 预算、全量释放父 Commitment Claim、以相同 lines 建立带 `parent_claim_id` 的标准 Reservation Claim，并登记 Reservation、Job、Broker receipt 与 immutable exercised receipt；Commitment current view 派生 `allocated`。它不产生 Position、第二份 Allocation Claim、真实价格或结算真源。
 
 ## 10. 从期货价格到任务结算
 
@@ -168,7 +168,7 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（v223/v224 已分层验证）；
 3. 平台签名价格源、真实指数/标记价、期货曲线、批量报价和自动撮合；
 4. Provider Capacity Commitment（v225 部分验证，交付与结算未接线）；
-5. whole-only 双边 Delivery Allocation（v228 设计冻结、源码未写）；
+5. whole-only 双边 Delivery Allocation（v228 源码已写，尚未编译、迁移或运行）；
 6. 限价订单簿、成交、持仓和净额；
 7. YCI 指数、标记价、替代交付和自动清算；
 8. 跨公司、跨矿池的统一容量市场。
@@ -179,4 +179,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 本文是已接受的目标市场合同。当前代码已写入 Offer-owner fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v201 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款流程；各段验证状态以专题验收文档为准。平台 reference fallback 的 v223 Store/application 与 v224 管理员 HTTP/MCP、TTL/升级门卫已有分层验证，但仍不代表真实价格。v195 只结清预授权并登记 pending；v196-v199 只处理内部挑战、纠正和 available 释放；v200 只冻结 Provider 本人的提款额；v201 的取消/拒绝只返还内部余额，`external_paid_attested` 只保存管理员声明与证据摘要。它们都不代表生产支付已经由平台执行或验证。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、真实付款、证据自动核验、指数/标记价、订单簿、持仓和外部清算仍未实现。
 
-v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router，当前为 `implementation_partially_verified`：生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过。v228 DeliveryAllocation 只有已冻结设计，尚无 migration、源码或运行证据。真实 TCP、跨连接并发、生产升级、价格真实性、执行与资金结算仍未闭合，不得把局部验收描述为整条容量市场生产可用。
+v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router，当前为 `implementation_partially_verified`：生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过。v228 DeliveryAllocation 当前为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域、migration、Store-private authority、Service 与 HTTP 源码已写，但尚未编译、执行 migration、测试或运行。真实 TCP、跨连接并发、生产升级、价格真实性、执行与资金结算仍未闭合，不得把局部验收描述为整条容量市场生产可用。

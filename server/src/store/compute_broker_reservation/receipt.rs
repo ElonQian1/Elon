@@ -44,9 +44,11 @@ struct StoredBrokerReserveReceipt {
 }
 
 pub(crate) struct BrokerReserveBinding {
+    pub request_digest: String,
     pub budget_reservation_id: String,
     pub budget_reserved_fen: i64,
     pub capacity_claim: ComputeCapacityClaimBinding,
+    pub source_job: ComputeJobVersionBinding,
     pub reserved_job: ComputeJobVersionBinding,
     pub reservation_revision: i64,
     pub reservation_digest: String,
@@ -59,9 +61,10 @@ pub(crate) fn broker_reserve_binding_on(
 ) -> Result<BrokerReserveBinding> {
     let stored = conn
         .query_row(
-            "SELECT budget_reservation_id, budget_reserved_fen,
+            "SELECT request_digest, budget_reservation_id, budget_reserved_fen,
                     capacity_claim_id, capacity_claim_revision,
-                    capacity_claim_digest, job_id, reserved_job_revision,
+                    capacity_claim_digest, job_id, source_job_revision,
+                    source_job_digest, reserved_job_revision,
                     reserved_job_digest, reservation_revision,
                     reservation_digest, budget_adapter
                FROM compute_broker_reserve_receipts
@@ -70,39 +73,48 @@ pub(crate) fn broker_reserve_binding_on(
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, i64>(3)?,
-                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
                     row.get::<_, String>(5)?,
-                    row.get::<_, i64>(6)?,
-                    row.get::<_, String>(7)?,
-                    row.get::<_, i64>(8)?,
-                    row.get::<_, String>(9)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, i64>(9)?,
                     row.get::<_, String>(10)?,
+                    row.get::<_, i64>(11)?,
+                    row.get::<_, String>(12)?,
+                    row.get::<_, String>(13)?,
                 ))
             },
         )
         .optional()?
         .ok_or_else(|| anyhow!("Reservation 缺少平台余额 Broker 原子预留回执"))?;
-    if stored.10 != BROKER_BUDGET_ADAPTER {
+    if stored.13 != BROKER_BUDGET_ADAPTER {
         bail!("Reservation 的 Broker 预算适配器不受当前终态入口支持");
     }
     Ok(BrokerReserveBinding {
-        budget_reservation_id: stored.0,
-        budget_reserved_fen: stored.1,
+        request_digest: stored.0,
+        budget_reservation_id: stored.1,
+        budget_reserved_fen: stored.2,
         capacity_claim: ComputeCapacityClaimBinding {
-            claim_id: stored.2,
-            claim_revision: stored.3,
-            claim_digest: stored.4,
+            claim_id: stored.3,
+            claim_revision: stored.4,
+            claim_digest: stored.5,
+        },
+        source_job: ComputeJobVersionBinding {
+            job_id: stored.6.clone(),
+            job_revision: stored.7,
+            job_digest: stored.8,
         },
         reserved_job: ComputeJobVersionBinding {
-            job_id: stored.5,
-            job_revision: stored.6,
-            job_digest: stored.7,
+            job_id: stored.6,
+            job_revision: stored.9,
+            job_digest: stored.10,
         },
-        reservation_revision: stored.8,
-        reservation_digest: stored.9,
+        reservation_revision: stored.11,
+        reservation_digest: stored.12,
     })
 }
 

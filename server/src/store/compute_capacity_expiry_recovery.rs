@@ -46,7 +46,8 @@ impl Store {
                     AND claims.claim_kind='quote_hold'
                     AND trim(claims.subject_kind) NOT IN (
                         'compute_reservation',
-                        'compute_capacity_commitment'
+                        'compute_capacity_commitment',
+                        'compute_delivery_allocation'
                     )
                     AND NOT EXISTS (
                         SELECT 1

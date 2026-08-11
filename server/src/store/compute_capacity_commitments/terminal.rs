@@ -13,6 +13,7 @@ use super::{
             finish_compute_capacity_commitment_claim_on, ComputeCapacityClaimTerminalAction,
             FinishComputeCapacityClaim,
         },
+        compute_delivery_allocations::delivery_allocation_commitment_status_on,
         new_id, now, Store,
     },
     canonical::{
@@ -78,6 +79,15 @@ impl Store {
         }
         if terminal_by_commitment_on(&transaction, &commitment)?.is_some() {
             bail!("容量承诺已有终态；新幂等键不能覆盖或重开");
+        }
+        if delivery_allocation_commitment_status_on(
+            &transaction,
+            &commitment.commitment_id,
+            &commitment.commitment_digest,
+        )?
+        .is_some_and(|status| status.blocks_commitment_terminal())
+        {
+            bail!("active/exercised Delivery Allocation 阻止容量承诺 Cancel");
         }
         let cancel_at = now();
         if parse_utc("capacity commitment cancel time", &cancel_at)?
@@ -187,6 +197,15 @@ impl Store {
         }
         if terminal_by_commitment_on(&transaction, &commitment)?.is_some() {
             bail!("容量承诺已被 Cancel/Expire 竞争者终结");
+        }
+        if delivery_allocation_commitment_status_on(
+            &transaction,
+            &commitment.commitment_id,
+            &commitment.commitment_digest,
+        )?
+        .is_some_and(|status| status.blocks_commitment_terminal())
+        {
+            bail!("active/exercised Delivery Allocation 阻止容量承诺 Expire");
         }
         let recorded_at = now();
         if parse_utc("capacity commitment recovery Store time", &recorded_at)?

@@ -5,7 +5,8 @@ use crate::compute_federation::execution::ComputeReservation;
 
 use super::{
     dependencies::{
-        registered_dependencies_on, validate_with_dependencies, RegisteredReservationDependencies,
+        registered_dependencies_on, validate_with_delivery_authority, validate_with_dependencies,
+        RegisteredReservationDependencies,
     },
     rows::{CurrentReservationProjection, StoredReservationVersion},
 };
@@ -15,10 +16,24 @@ pub(super) fn audited_reservation_on(
     projection: Option<&CurrentReservationProjection>,
     stored: &StoredReservationVersion,
 ) -> Result<ComputeReservation> {
+    audited_reservation_with_delivery_authority_on(conn, projection, stored, None)
+}
+
+pub(super) fn audited_reservation_with_delivery_authority_on(
+    conn: &Connection,
+    projection: Option<&CurrentReservationProjection>,
+    stored: &StoredReservationVersion,
+    delivery_authority: Option<
+        &crate::store::compute_delivery_allocations::DeliveryAllocationReservationAuthority,
+    >,
+) -> Result<ComputeReservation> {
     let reservation: ComputeReservation = serde_json::from_str(&stored.reservation_json)
         .context("算力 Reservation 历史版本 JSON 无效")?;
     let dependencies = registered_dependencies_on(conn, &reservation)?;
-    let computed_digest = validate_with_dependencies(&reservation, &dependencies)?;
+    let computed_digest = match delivery_authority {
+        Some(authority) => validate_with_delivery_authority(&reservation, &dependencies, authority),
+        None => validate_with_dependencies(&reservation, &dependencies),
+    }?;
     if computed_digest != stored.reservation_digest
         || reservation.reservation_id != stored.reservation_id
         || reservation.status != stored.status

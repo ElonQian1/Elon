@@ -16,6 +16,9 @@ use super::{
         compute_capacity_posting::{
             capacity_causal_transaction_on, held_claim_causal_transaction_on,
         },
+        compute_delivery_allocations::{
+            delivery_allocation_commitment_status_on, DeliveryAllocationCommitmentState,
+        },
     },
     audit_immutable_dependencies_on, audit_ledger_binding_on,
     canonical::{canonical_commitment_json_and_digest, canonical_terminal_json_and_digest},
@@ -151,13 +154,30 @@ pub(super) fn detail_on(
 ) -> Result<ComputeCapacityCommitmentDetail> {
     let quantities = audit_claim_and_hold_on(conn, &commitment)?;
     let terminal_receipt = terminal_by_commitment_on(conn, &commitment)?;
+    let allocation = delivery_allocation_commitment_status_on(
+        conn,
+        &commitment.commitment_id,
+        &commitment.commitment_digest,
+    )?;
+    if terminal_receipt.is_some()
+        && allocation
+            .as_ref()
+            .is_some_and(|status| status.blocks_commitment_terminal())
+    {
+        bail!("容量承诺不能同时具有 v225 terminal 与 active/exercised Allocation");
+    }
     let current = stored_claim_on(conn, &commitment.claim.claim_id)?
         .ok_or_else(|| anyhow!("容量承诺 current Claim 缺失"))?;
-    match terminal_receipt.as_ref() {
-        None if current.revision == commitment.claim.claim_revision
-            && current.claim_digest == commitment.claim.claim_digest
-            && current.state == ComputeCapacityClaimState::Held => {}
-        Some(terminal)
+    match (terminal_receipt.as_ref(), allocation.as_ref()) {
+        (None, Some(status))
+            if status.state == DeliveryAllocationCommitmentState::Exercised
+                && current.revision == commitment.claim.claim_revision + 1
+                && current.state == ComputeCapacityClaimState::Released => {}
+        (None, _)
+            if current.revision == commitment.claim.claim_revision
+                && current.claim_digest == commitment.claim.claim_digest
+                && current.state == ComputeCapacityClaimState::Held => {}
+        (Some(terminal), _)
             if current.revision == terminal.result_claim_revision
                 && current.claim_digest == terminal.result_claim_digest
                 && claim_state_name(current.state) == terminal.result_claim_state => {}
@@ -166,7 +186,16 @@ pub(super) fn detail_on(
     let current_status = terminal_receipt
         .as_ref()
         .map(|receipt| receipt.terminal_status.clone())
-        .unwrap_or_else(|| CAPACITY_COMMITMENT_STATUS_COMMITTED.to_string());
+        .unwrap_or_else(|| {
+            if allocation
+                .as_ref()
+                .is_some_and(|status| status.state == DeliveryAllocationCommitmentState::Exercised)
+            {
+                "allocated".to_string()
+            } else {
+                CAPACITY_COMMITMENT_STATUS_COMMITTED.to_string()
+            }
+        });
     Ok(ComputeCapacityCommitmentDetail {
         commitment,
         terminal_receipt,
@@ -186,6 +215,15 @@ pub(super) fn due_commitment_ids_on(
            LEFT JOIN compute_capacity_commitment_terminal_receipts terminal
              ON terminal.commitment_id=commitments.commitment_id
           WHERE terminal.commitment_id IS NULL
+            AND NOT EXISTS (
+                SELECT 1
+                  FROM compute_delivery_allocation_grants allocation_grant
+                  LEFT JOIN compute_delivery_allocation_terminal_receipts allocation_terminal
+                    ON allocation_terminal.grant_id=allocation_grant.grant_id
+                 WHERE allocation_grant.commitment_id=commitments.commitment_id
+                   AND (allocation_terminal.grant_id IS NULL
+                        OR allocation_terminal.terminal_status='exercised')
+            )
             AND julianday(commitments.expires_at)<=julianday(?1)
           ORDER BY commitments.expires_at, commitments.commitment_id
           LIMIT ?2",

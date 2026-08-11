@@ -12,6 +12,10 @@ use crate::compute_federation::{
 
 use super::super::{
     compute_capacity_claim_rows::{stored_claim_on, stored_claim_version_on},
+    compute_delivery_allocations::{
+        persisted_delivery_allocation_reservation_authority_on,
+        DeliveryAllocationReservationAuthority,
+    },
     compute_job_registry::{
         current_registered_job_on, registered_job_version_on, ComputeJobRegistrationReceipt,
     },
@@ -23,7 +27,9 @@ use super::super::{
         current_registered_provider_on, registered_provider_version_on,
         ComputeProviderRegistrationReceipt,
     },
-    compute_reservation_contract_validation::validate_reservation_contract,
+    compute_reservation_contract_validation::{
+        validate_delivery_allocation_reservation_contract, validate_reservation_contract,
+    },
 };
 
 pub(super) struct RegisteredReservationDependencies {
@@ -32,6 +38,7 @@ pub(super) struct RegisteredReservationDependencies {
     pub(super) snapshot: ComputePriceSnapshot,
     pub(super) provider: ComputeProviderRegistrationReceipt,
     pub(super) claim: ComputeCapacityClaim,
+    pub(super) delivery_allocation_authority: Option<DeliveryAllocationReservationAuthority>,
 }
 
 pub(super) fn registered_dependencies_on(
@@ -73,12 +80,18 @@ pub(super) fn registered_dependencies_on(
     if claim.claim_digest != reservation.capacity_claim.claim_digest {
         bail!("Reservation 绑定的 Capacity Claim 摘要与历史版本不一致");
     }
+    let delivery_allocation_authority = persisted_delivery_allocation_reservation_authority_on(
+        conn,
+        &reservation.reservation_id,
+        &claim.claim_id,
+    )?;
     Ok(RegisteredReservationDependencies {
         job,
         offer,
         snapshot,
         provider,
         claim,
+        delivery_allocation_authority,
     })
 }
 
@@ -86,7 +99,35 @@ pub(super) fn validate_with_dependencies(
     reservation: &ComputeReservation,
     dependencies: &RegisteredReservationDependencies,
 ) -> Result<String> {
-    validate_reservation_contract(
+    match dependencies.delivery_allocation_authority.as_ref() {
+        Some(authority) => validate_with_delivery_authority(reservation, dependencies, authority),
+        None => validate_reservation_contract(
+            reservation,
+            &dependencies.job.job,
+            dependencies.job.revision,
+            &dependencies.job.job_digest,
+            &dependencies.offer.offer,
+            &dependencies.snapshot,
+            &dependencies.provider.provider,
+            &dependencies.claim,
+        ),
+    }
+}
+
+pub(super) fn validate_with_delivery_authority(
+    reservation: &ComputeReservation,
+    dependencies: &RegisteredReservationDependencies,
+    authority: &DeliveryAllocationReservationAuthority,
+) -> Result<String> {
+    if let Some(persisted) = dependencies.delivery_allocation_authority.as_ref() {
+        if persisted.grant_id() != authority.grant_id()
+            || persisted.grant_digest() != authority.grant_digest()
+            || persisted.child_claim_binding() != authority.child_claim_binding()
+        {
+            bail!("Reservation 的 persisted Delivery Allocation 授权发生冲突");
+        }
+    }
+    validate_delivery_allocation_reservation_contract(
         reservation,
         &dependencies.job.job,
         dependencies.job.revision,
@@ -95,6 +136,7 @@ pub(super) fn validate_with_dependencies(
         &dependencies.snapshot,
         &dependencies.provider.provider,
         &dependencies.claim,
+        authority,
     )
 }
 
@@ -149,6 +191,22 @@ pub(super) fn ensure_live_creation_dependencies_on(
         &dependencies.offer.offer.valid_until,
     )?;
     ensure_not_expired("Price Snapshot", &dependencies.snapshot.expires_at)?;
+    ensure_not_expired("Reservation", &reservation.expires_at)
+}
+
+pub(super) fn ensure_delivery_allocation_creation_dependencies_on(
+    reservation: &ComputeReservation,
+    dependencies: &RegisteredReservationDependencies,
+    authority: &DeliveryAllocationReservationAuthority,
+) -> Result<()> {
+    if reservation.status != RESERVATION_STATUS_PENDING
+        || dependencies.claim.state != ComputeCapacityClaimState::Held
+        || dependencies.claim.parent_claim_id.as_deref()
+            != Some(authority.parent_claim().claim_id.as_str())
+        || &dependencies.claim != authority.child_claim()
+    {
+        bail!("Delivery Allocation Reservation 必须绑定 exact parented held Claim");
+    }
     ensure_not_expired("Reservation", &reservation.expires_at)
 }
 
