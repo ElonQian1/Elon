@@ -42,3 +42,7 @@ pub(crate) fn migration_v159(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "task_sui_preflight_job_migration_tests.rs"]
+mod tests;
