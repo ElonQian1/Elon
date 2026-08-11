@@ -98,6 +98,24 @@ class ChatGptWebLabContractTest {
         assertTrue(bootstrap.contains("window.__elonChatGptAdapterVersion = adapterVersion"))
         assertTrue(bootstrap.contains("previousBridge.dispose()"))
         assertTrue(bootstrap.contains("delete window[name]"))
+        val adapterAssetNames = Regex("\\\"(chatgpt_web_adapter[^\\\"]+\\.js)\\\"")
+            .findAll(bridge)
+            .map { it.groupValues[1] }
+            .filterNot { it == "chatgpt_web_adapter_bootstrap.js" }
+            .toSet()
+        val exportedModuleGlobals = adapterAssetNames.flatMap { assetName ->
+            Regex("(?:window|root)\\.(__elonChatGpt[A-Za-z0-9]+)\\s*=")
+                .findAll(readRepositoryFile("android/app/src/main/assets/$assetName"))
+                .map { it.groupValues[1] }
+                .toList()
+        }.toSet()
+        assertTrue(exportedModuleGlobals.isNotEmpty())
+        exportedModuleGlobals.forEach { globalName ->
+            assertTrue(
+                "Adapter bootstrap must reset $globalName before a hot upgrade",
+                bootstrap.contains("'$globalName'"),
+            )
+        }
         assertTrue(adapter.contains("new MutationObserver"))
         assertTrue(adapter.contains("adapterVersion,"))
         assertTrue(adapter.contains("observedMessageCount:"))
