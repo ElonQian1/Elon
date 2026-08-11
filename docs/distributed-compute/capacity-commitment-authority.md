@@ -11,7 +11,7 @@ owners: backend, ai-economy
 
 ## 1. 状态与最窄目标
 
-v225 已写入 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的最窄闭环。设计状态保持 `design_frozen`，实现状态提升为 `implementation_partially_verified`：领域模型、v225 两表与门卫、Store 原子 create/read/cancel/expire、通用 Claim 旁路封口、owner/admin Service 与 HTTP 路由均已接线；截至 2026-08-12，`elon-server` 生产目标编译及 3 项 Store/Service/进程内 HTTP 定向测试通过，新建临时 SQLite 可执行全量迁移，磁盘重开可恢复终态。真实 TCP、生产升级、并发压力、后台任务和交付结算仍未验证。
+v225 已写入 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的最窄闭环。设计状态保持 `design_frozen`，实现状态为 `implementation_partially_verified`：领域模型、v225 两表与门卫、Store 原子 create/read/cancel/expire、通用 Claim 旁路封口、owner/admin Service 与 HTTP 路由均已接线；截至 2026-08-12，`elon-server` 生产目标编译及 3 项 Store/Service/进程内 HTTP 定向测试通过，新建临时 SQLite 可执行全量迁移，磁盘重开可恢复终态。后续 owner source 查询复用 v171 Snapshot 所有权门卫和 v223 binding 读取，PC 控制面嵌入现有 `/compute-supply` Offer 工作区，不创建第二套 Broker 或市场入口。真实 TCP、生产升级、并发压力、浏览器、后台任务和交付结算仍未验证。
 
 该纵切面复用 v165-v168/v173 的 Claim 与容量账本、v169 Provider、v170 Offer、v171 Price Snapshot，以及 v223/v224 已审核的平台 reference binding。它不依赖节点插件/VFS、真实任务运行、verified metering、Delivery Allocation、资金或结算。
 
@@ -116,9 +116,10 @@ Expire 只供平台 admin 恢复入口使用。候选来自 commitment LEFT JOIN
 - `GET/POST /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/capacity-commitments`；
 - `GET /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/capacity-commitments/:commitment_id`；
 - `POST /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/capacity-commitments/:commitment_id/cancel`；
+- `GET /api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/price-snapshots/:snapshot_id/capacity-commitment-source`，只为 owner 返回 exact Snapshot 与已审核 v223 binding；
 - `POST /api/admin/compute/capacity-commitments/expire-due`，要求固定确认短语、`limit=1..100`，时间完全由服务端生成。
 
-P0 不要求 MCP、PC 页面或后台 worker。所有响应只公开安全投影和 exact immutable receipt，不公开内部路由、凭据或 adapter 配置。
+P0 不要求 MCP、PC 页面或后台 worker。后续 PC 接线只消费上述 owner HTTP 和既有 Offer/Snapshot API；所有响应只公开安全投影和 exact immutable receipt，不公开内部路由、凭据或 adapter 配置。
 
 ## 10. 文件预算与 P0 禁线
 
@@ -126,4 +127,4 @@ P0 仍只包含领域合同、v225 migration、Store create/read/terminal、通�
 
 P0 明确禁止：`external_pool`；DeliveryAllocation；Order/Trade/Position/ClearingReceipt；资金预授权、收费、Provider 收益、保证资源、处罚、结算或清算；Job/Reservation/Attempt/Lease 修改；真实价格/index/mark/trade 声明；节点插件、VFS、artifact、route、派发或 verified metering 接线；staging/provisional/saga；调用方 bucket/time/expiry/部分 meter；新 reducer/event/余额权威。
 
-本轮已形成生产目标编译、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 与磁盘重开定向证据，详见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。仍缺真实 TCP、跨连接并发、已有生产数据库升级、异常恢复和生产运行证据，因此只能标记为 `implementation_partially_verified`，不得描述为容量市场、交付或结算全链可用。
+当前已形成生产目标编译、临时 SQLite 全量迁移、Store/Service/进程内 HTTP、磁盘重开，以及 PC 静态生产构建证据，详见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。仍缺真实 TCP、跨连接并发、已有生产数据库升级、浏览器、异常恢复和生产运行证据，因此只能标记为 `implementation_partially_verified`，不得描述为容量市场、交付或结算全链可用。
