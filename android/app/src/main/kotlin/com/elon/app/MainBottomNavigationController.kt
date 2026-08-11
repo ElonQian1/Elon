@@ -17,7 +17,7 @@ internal class MainBottomNavigationController(
         listOf(binding.bottomNavGlass, binding.bottomComposeGlass).forEach { glass ->
             glass.setupWith(binding.bottomNavBlurTarget)
                 .setFrameClearDrawable(activity.window.decorView.background)
-                .setBlurRadius(24f)
+                .setBlurRadius(18f)
             glass.outlineProvider = ViewOutlineProvider.BACKGROUND
             glass.clipToOutline = true
         }

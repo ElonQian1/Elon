@@ -51,6 +51,8 @@
   --badge-neutral-ink: rgba(248, 247, 244, 0.94);
   --nav-bg: #080b0f;
   --nav-active-bg: #20262e;
+  --nav-glass-overlay: rgb(53 58 66 / 45%);
+  --nav-glass-border: rgb(255 255 255 / 12%);
   --system-nav-bg: #05070a;
   --popup-panel-bg: #171c22;
   --bubble-user: #c2cbd6;
@@ -240,21 +242,21 @@ body,
 }
 
 .tabs-bar {
-  background: linear-gradient(180deg, transparent, #05070a 18%);
+  background: transparent;
 }
 
 .tabs-panel {
-  background: linear-gradient(145deg, #171c22 0%, #080b0f 58%, #05070a 100%);
-  border: 1px solid var(--metal-edge);
-  border-radius: 30px;
-  box-shadow: inset 0 1px 0 var(--metal-highlight);
+  background: var(--nav-glass-overlay);
+  border-color: var(--nav-glass-border);
+  border-radius: 28px;
+  box-shadow: none;
 }
 
 .bottom-compose-button {
-  border: 1px solid var(--metal-edge);
+  border-color: var(--nav-glass-border);
   border-radius: 50%;
-  background: linear-gradient(145deg, #20262e 0%, #0e1116 62%, #05070a 100%);
-  box-shadow: inset 0 1px 0 var(--metal-highlight);
+  background: var(--nav-glass-overlay);
+  box-shadow: none;
 }
 
 .bottom-compose-button::before,

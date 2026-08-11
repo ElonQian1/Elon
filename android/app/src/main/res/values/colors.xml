@@ -99,6 +99,8 @@
 
     <color name="elon_nav_bg">#080B0F</color>
     <color name="elon_nav_active_bg">#20262E</color>
+    <color name="elon_nav_glass_overlay">#73353A42</color>
+    <color name="elon_nav_glass_border">#1FFFFFFF</color>
 
     <color name="elon_store_detail_bg">#07090D</color>
     <color name="elon_store_detail_text_primary">#F0F8F7F4</color>
