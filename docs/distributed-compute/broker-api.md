@@ -1,18 +1,18 @@
 ---
 title: 分布式算力 Broker HTTP 与 MCP 控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-11
 owners: backend, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 分布式算力 Broker HTTP 与 MCP 控制面
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；v185 首次 Attempt 已接受激活、v186 Lease 续租和 v187 staging 无用量中止由独立的 Provider HTTP 控制面承接，分别见 `attempt-activation-api.md`、`attempt-lease-api.md` 与 `attempt-abort-api.md`。这些能力仍不能描述为完整算力交易或结算系统。
+本控制面的 Job、候选、锁价、原子 Reserve 与未执行 Release Store/Service 已通过临时 SQLite 全量迁移和 2 项组合事务测试，状态为 `implementation_partially_verified`；HTTP/MCP、并发和生产磁盘仍未验证。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire。这些能力仍不能描述为完整算力交易或结算系统，证据见 `broker-control-plane-acceptance.md`。
 
-HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进入同一版本化 Job Store、Broker 和不可变回执。客户端不能提交 `consumer_account_id`、`project_id`、Job 状态或服务端时间；声明 `merchant_id` 时，该商户必须真实属于当前项目。Release/Expire 的 `occurred_at` 也由服务端生成。
+HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进入同一版本化 Job Store、Broker 和不可变回执。客户端不能提交 `consumer_account_id`、`project_id`、Job 状态或服务端时间；声明 `merchant_id` 时，该商户必须真实属于当前项目。Release/Expire 的 `occurred_at` 也由服务端生成；幂等重放仍核对全部客户端合同字段，但不把每次调用都会变化的服务端时间视为客户端请求差异。
 
 ## 2. HTTP 接口
 
@@ -41,7 +41,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 
 对 quoted Job，工作区要求先重新取得与当前 Job revision/digest 一致、且 snapshot ID 与锁价选择相同的候选，才开放 Reservation 确认。确认窗口逐 meter 校验 Job 上限、Price Snapshot 上限和计价粒度，并把到期时间限制在 Job 截止、报价失效和交付窗口结束三者的最早边界。Reserve 成功后显示预算预授权、Capacity Claim、Reservation revision/digest 和持有数量；active 且尚未到期的预留只能显式 Release，达到到期边界后只能显式 Expire。两类终态均提交当前精确版本和摘要，后端仍是资金与容量原子性的最终权威。
 
-该 PC 工作区状态为 `implementation_uncompiled`，尚未构建、接口联调、视觉验收或发布。它不创建 Attempt、不派发节点、不声明任务已执行，也不覆盖运行中取消、实际用量、最终结算或外部付款。
+该 PC 工作区已通过严格 TypeScript 与 Vite 生产构建，并产出独立页面 chunk；尚未接口联调、浏览器交互、视觉验收或发布。它不创建 Attempt、不派发节点、不声明任务已执行，也不覆盖运行中取消、实际用量、最终结算或外部付款。
 
 ## 3. MCP 工具
 
@@ -81,14 +81,14 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 - Job、Reservation、Offer、Price Snapshot、Claim 或余额历史绑定不一致时拒绝。
 - Reserve 不是完整 `reserved` 结果或缺少余额结果时整笔事务回滚。
 - Broker Finish 遇到 active Claim 或已经启动的 Attempt 时拒绝；只有独立 v187 路径可在 Lease 从未心跳且 Provider 明确确认尚未执行时处理 staging 无用量中止。
-- 同一 ID 或幂等键只允许相同规范请求重放。
+- 同一 ID 或幂等键只允许相同的客户端合同重放；服务端生成的终态时间只作为首次不可变证据，不破坏网络重试。
 - 只有首次 Reserve 要求未来到期；不可变首次回执在合同到期或预算后来进入终态后仍按历史语义重放，不依赖余额表的可变到期字段。
 - 通用余额释放和到期器跳过 Broker 管理的预授权；只有核对精确预授权 ID 的 Broker Finish 可以退款，避免预算、容量、Job 与 Reservation 被拆成单腿终态。
 - 当前接口不接受客户端传入用户身份、终态时间、币种或任意退款金额。
 
 ## 6. 尚未实现
 
-- Cargo 编译、迁移执行、HTTP/MCP 真实调用与并发验证；
+- HTTP/MCP 真实调用、角色/项目隔离、并发验证和生产磁盘迁移；
 - 真实价格源、批量报价和自动撮合；Offer 派生 fallback_curve 快照见 `price-snapshot-api.md`；
 - Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码，v186 HTTP 已增加 Lease 状态投影和外部心跳声明续租，v187 HTTP 已增加从未心跳的 staging 无用量中止；真实节点命令、自动超时回收、多次 Attempt 与 fencing 递增仍未实现；
 - 已出现心跳或真实运行任务的安全取消、容量处理、实际用量、验证和最终结算；
