@@ -28,15 +28,9 @@ internal object ChatGptNativeControlPresentation {
             .mapTo(mutableSetOf(), ChatGptWebUiControl::id)
         val primaryCopyIds = primaryMessageCopies(controls)
             .mapTo(mutableSetOf(), ChatGptWebUiControl::id)
-        val messageActionCounts = messageActions.mapValues { it.value.size }
         val pageActions = pageActions(controls)
         val pageActionIds = pageActions.mapTo(mutableSetOf(), ChatGptWebUiControl::id)
         val pageActionTrigger = pageActionsSelector(pageActions)
-        val contextualOverlayCounts = pageActions.asSequence()
-            .filter { it.region == ChatGptWebUiRegion.OVERLAY && it.contextId != null }
-            .groupingBy { it.contextId.orEmpty() }
-            .eachCount()
-
         return controls.associate { control ->
             val coverage = when {
                 control.region == ChatGptWebUiRegion.HEADER && control.semantic == "title" ->
@@ -59,10 +53,7 @@ internal object ChatGptNativeControlPresentation {
                     control.id,
                     Kind.MENU,
                     nativeSelector = control.accessibilityLabel,
-                    nativeTriggerSelector = messageActionsSelector(
-                        control.contextId.orEmpty(),
-                        messageActionCounts[control.contextId].orZero(),
-                    ),
+                    nativeTriggerSelector = messageActionsSelector(control.contextId.orEmpty()),
                 )
                 control.region == ChatGptWebUiRegion.OVERLAY && control.semantic == "timestamp" ->
                     Coverage(control.id, Kind.METADATA)
@@ -73,10 +64,7 @@ internal object ChatGptNativeControlPresentation {
                     Kind.MENU,
                     nativeSelector = control.accessibilityLabel,
                     nativeTriggerSelector = control.contextId?.let { contextId ->
-                        messageOverlayActionsSelector(
-                            contextId,
-                            contextualOverlayCounts[contextId].orZero(),
-                        )
+                        messageOverlayActionsSelector(contextId)
                     } ?: pageActionTrigger,
                 )
                 else -> Coverage(control.id, Kind.OFFICIAL_FALLBACK)
@@ -157,8 +145,8 @@ internal object ChatGptNativeControlPresentation {
         return "$prefix:${controls.size}"
     }
 
-    fun messageActionsSelector(contextId: String, count: Int): String =
-        "chatgpt-message-actions:${stableContextId(contextId)}:$count"
+    fun messageActionsSelector(contextId: String): String =
+        "chatgpt-message-actions:${stableContextId(contextId)}"
 
     fun messageCopySelector(contextId: String): String =
         "chatgpt-message-copy:${stableContextId(contextId)}"
@@ -166,8 +154,8 @@ internal object ChatGptNativeControlPresentation {
     fun messageRegenerateSelector(contextId: String): String =
         "chatgpt-message-regenerate:${stableContextId(contextId)}"
 
-    fun messageOverlayActionsSelector(contextId: String, count: Int): String =
-        "chatgpt-message-overlay-actions:${stableContextId(contextId)}:$count"
+    fun messageOverlayActionsSelector(contextId: String): String =
+        "chatgpt-message-overlay-actions:${stableContextId(contextId)}"
 
     fun messageSelector(contextId: String, role: String): String =
         "chatgpt-message:${stableContextId(contextId)}:${stableContextId(role)}"
@@ -234,8 +222,6 @@ internal object ChatGptNativeControlPresentation {
     }
 
     private fun normalizeLabel(value: String): String = value.trim().lowercase()
-
-    private fun Int?.orZero(): Int = this ?: 0
 
     private const val MAX_CONTEXT_ID_LENGTH = 160
     private val HEADER_DEDICATED_SEMANTICS = setOf("navigation", "new_conversation", "stop")

@@ -81,7 +81,7 @@ internal class ChatGptNativeMessageAdapter(
         val actions = messageControls[messageContextId(message.id)].orEmpty()
         holder.more.visibility = if (actions.isEmpty()) View.GONE else View.VISIBLE
         holder.more.contentDescription =
-            ChatGptNativeControlPresentation.messageActionsSelector(message.id, actions.size)
+            ChatGptNativeControlPresentation.messageActionsSelector(message.id)
         holder.more.setOnClickListener { showMessageActions(holder, actions) }
         holder.state.visibility = if (message.state in ACTIVE_STATES) View.VISIBLE else View.GONE
         holder.state.setText(

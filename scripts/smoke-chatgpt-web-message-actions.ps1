@@ -185,6 +185,11 @@ try {
         -Arguments @{ view_mode = "native" } | Out-Null
     $script:viewModeChanged = $true
     Wait-ViewMode -ExpectedMode "native" | Out-Null
+    $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
+        -Arguments @{ message_id = [string]$messageMore.context_id }
+    if ($reveal.control_ok -ne $true) {
+        throw "The native message action target could not be revealed."
+    }
 
     Start-Sleep -Seconds 1
     $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
@@ -256,6 +261,7 @@ try {
         generic_control_count = $unclassifiedLabels.Count
         generic_control_labels = $unclassifiedLabels
         context_bound = $true
+        native_message_revealed = $true
         native_message_selector_found = $nativeMessageSelectorFound
         native_overlay_selector_exported = $true
         conversation_restored = $true

@@ -22,6 +22,8 @@ $required = @(
     'view_mode = "official"',
     'view_mode = "native"',
     "native_trigger_content_description",
+    "chatgpt_reveal_message",
+    "native_message_revealed",
     "native_message_selector_found",
     "native_overlay_selector_exported",
     "Wait-ContextualOverlay",

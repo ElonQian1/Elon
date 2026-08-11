@@ -37,7 +37,7 @@ class ChatGptNativeControlPresentationTest {
         )
         assertEquals("menu", coverage.getValue("copy_table").kind.wireName)
         assertEquals(
-            "chatgpt-message-actions:$CONTEXT:3",
+            "chatgpt-message-actions:$CONTEXT",
             coverage.getValue("copy_table").nativeTriggerSelector,
         )
         assertEquals(
@@ -95,11 +95,11 @@ class ChatGptNativeControlPresentationTest {
         val coverage = ChatGptNativeControlPresentation.describe(controls)
 
         assertEquals(
-            "chatgpt-message-overlay-actions:$CONTEXT:2",
+            "chatgpt-message-overlay-actions:$CONTEXT",
             coverage.getValue("sources").nativeTriggerSelector,
         )
         assertEquals(
-            "chatgpt-message-overlay-actions:$CONTEXT:2",
+            "chatgpt-message-overlay-actions:$CONTEXT",
             coverage.getValue("read").nativeTriggerSelector,
         )
     }
