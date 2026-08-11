@@ -19,6 +19,8 @@ mod sui_preflight_api;
 mod sui_preflight_job_api;
 #[cfg(test)]
 mod sui_preflight_job_api_tests;
+#[cfg(test)]
+mod sui_preflight_job_boundary_tests;
 pub(crate) mod sui_preflight_job_model;
 mod sui_preflight_job_service;
 #[cfg(test)]
