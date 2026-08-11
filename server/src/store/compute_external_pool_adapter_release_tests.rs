@@ -21,6 +21,17 @@ use super::types::{
     REVIEW_DECISION_CHANGES_REQUESTED,
 };
 
+#[path = "compute_external_pool_adapter_release_tests/lifecycle_artifact_currentness_test.rs"]
+mod lifecycle_artifact_currentness;
+#[path = "compute_external_pool_adapter_release_tests/lifecycle_concurrency_test.rs"]
+mod lifecycle_concurrency;
+#[path = "compute_external_pool_adapter_release_tests/lifecycle_migration_test.rs"]
+mod lifecycle_migration;
+#[path = "compute_external_pool_adapter_release_tests/lifecycle_support.rs"]
+mod lifecycle_support;
+#[path = "compute_external_pool_adapter_release_tests/lifecycle_terminal_test.rs"]
+mod lifecycle_terminal;
+
 const SUBMITTER: &str = "admin-release-submitter";
 const REVIEWER: &str = "admin-release-reviewer";
 const APPLIER: &str = "admin-release-applier";

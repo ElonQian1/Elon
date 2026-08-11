@@ -16,6 +16,12 @@ use crate::{
 
 use super::routes;
 
+#[path = "external_pool_adapter_release_api_tests/artifact_currentness_http_test.rs"]
+mod artifact_currentness_http_test;
+#[path = "external_pool_adapter_release_api_tests/lifecycle_http_test.rs"]
+mod lifecycle_http_test;
+#[path = "external_pool_adapter_release_api_tests/lifecycle_support.rs"]
+mod lifecycle_support;
 #[path = "external_pool_adapter_release_api_tests/management.rs"]
 mod management;
 
@@ -31,6 +37,7 @@ struct Fixture {
     applier_token: String,
     member_token: String,
     database_path: PathBuf,
+    data_dir: PathBuf,
 }
 
 #[tokio::test]
@@ -272,8 +279,14 @@ fn fixture() -> Fixture {
     let reviewer_token = session(&store, &reviewer.id);
     let applier_token = session(&store, &applier.id);
     let member_token = session(&store, &member.id);
-    let root = std::env::temp_dir();
-    let state = Arc::new(test_app_state(store, &root));
+    let data_dir = std::env::temp_dir().join(format!(
+        "elon_external_pool_adapter_release_api_data_{}",
+        Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&data_dir).unwrap();
+    let mut state = test_app_state(store, &data_dir);
+    state.owner_token = Some(lifecycle_support::LOCAL_OWNER_TOKEN.to_string());
+    let state = Arc::new(state);
     let router = routes().with_state(state.clone());
     Fixture {
         state,
@@ -287,6 +300,7 @@ fn fixture() -> Fixture {
         applier_token,
         member_token,
         database_path,
+        data_dir,
     }
 }
 
@@ -424,5 +438,6 @@ impl Fixture {
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{}", self.database_path.display(), suffix));
         }
+        let _ = std::fs::remove_dir_all(self.data_dir);
     }
 }

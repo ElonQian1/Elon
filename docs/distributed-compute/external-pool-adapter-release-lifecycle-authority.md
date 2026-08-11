@@ -11,7 +11,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 冻结结论
 
-本文冻结 v229 的负向权威：为一份 immutable v222 `staged` admission 追加唯一终态，并从不可变根与终态 receipt 派生 currentness。当前状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域合同、v229 migration、Store terminal/current view、管理员 Service/HTTP，以及 v227 PUT 的 pre-CAS、Store fresh/exact replay 与数据库 trigger currentness 源码已经写入；尚未编译、执行 migration、测试、启动服务或产生生产数据，不能证明该合同已经运行生效。
+本文冻结 v229 的负向权威：为一份 immutable v222 `staged` admission 追加唯一终态，并从不可变根与终态 receipt 派生 currentness。当前状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域合同、v229 migration、Store terminal/current view、管理员 Service/HTTP、v227 三层 currentness 以及分组测试源码已经写入；新增测试 passed=0，尚未编译、执行 migration、运行测试或启动服务，无 validation fingerprint/receipt，实际 terminal 与 artifact 均为 0，不能证明该合同已经运行生效。
 
 v229 只有在同一实现批次同时完成 terminal producer、current view，以及 v227 artifact PUT 的 pre-CAS、Store transaction 和数据库 trigger 三层 currentness 门卫时，才构成真实纵切面。只增加表、视图或管理 API 而不让现有 consumer 拒绝终态 admission，属于 producer-less 状态 staging，必须判定为 NO-GO。
 
@@ -150,4 +150,4 @@ v229 不得创建、修改或删除 v213 Adapter/version、credential、route au
 
 ## 9. 实现与验收门槛
 
-当前状态只允许描述为 `design_frozen/implementation_uncompiled/implementation_unrun`。源码完成不等于运行验收；后续仍须分别记录编译、fresh/upgrade/repeat migration、Store 重开、HTTP 鉴权、三终态、successor 失败路径、exact replay、双 terminal 竞争、terminal↔v227 CAS/DB 两种顺序，以及终态后的 PUT/GET 差异。没有这些执行证据时不得升级为 `implementation_partially_verified`。
+当前状态只允许描述为 `design_frozen/implementation_uncompiled/implementation_unrun`。未执行测试源码拟断言 fresh/upgrade/repeat migration 与两次重开、三终态及固定 effects、successor 正反路径、exact replay、双连接 terminal/successor/artifact 竞争、管理员与 synthetic owner HTTP、terminal 前后 PUT/GET、CAS-first/DB-second 顺序，以及 terminal 后 fresh/exact PUT 在 body 被 poll 前拒绝；这些都不是通过证据。完整崩溃窗 fault injection、生产数据库升级、真实 TCP/会话及 v227 全文件安全矩阵仍缺。只有实际编译、执行 migration 和测试并留下结果、fingerprint/receipt 后，才能重新评估 `implementation_partially_verified`；当前 passed=0、实际 terminal/artifact=0，绝不能升级。

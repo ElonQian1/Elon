@@ -6,7 +6,7 @@
 
 代码提交 `7b043a88f` 为 v222 Adapter release staging 增加管理员写入口；代码提交 `a37595e1a` 继续补齐管理员列表、详情和 actor-aware preflight。六个管理操作已经通过定向真实 Rust 编译、进程内接口测试及 Store 关闭重开测试；PC `/compute-external-pools` 管理员工作台也已通过跨层静态合同、严格类型、lint、生产构建和 bundle budget。该结论只证明受控 staging 管理面可调用且可审计读回，不证明候选 Adapter 已下载、验签、加载、执行或获得 v213 route authority。
 
-v229 release-admission lifecycle 的领域、migration、Store、Service/HTTP 与 v227 currentness 源码已经写入，但状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`：新增两个 HTTP 操作不属于上述六个已验证操作，没有编译、迁移、接口或运行证据，也没有 MCP/PC。冻结合同见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
+v229 release-admission lifecycle 的领域、migration、Store、Service/HTTP、v227 currentness 与分组测试源码已经写入，但状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`。新增测试 passed=0，未编译、未执行 migration 或运行，无 validation fingerprint/receipt，实际 artifact/terminal=0；两个新 HTTP 操作不属于下述六个已验证操作，也没有 MCP/PC。冻结合同见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
 
 ## 2. 接口
 
@@ -19,9 +19,9 @@ v229 release-admission lifecycle 的领域、migration、Store、Service/HTTP �
 
 六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。对应的 6 个 MCP 工具已经复用同一 Service 并通过角色隔离与治理链专项，见 `compute-management-mcp-acceptance.md`；PC 管理员工作台复用相同 HTTP 合同，不增加旁路权限。
 
-v229 源码新增两个尚未验证的管理员 HTTP 入口，不把它们计入当前已验证接口：`POST /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/terminal` 追加唯一的 `withdrawn|revoked|superseded` 终态，`GET /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/currentness` 读取派生 currentness。`superseded` 必须精确绑定同一 Adapter 的另一条、当时仍为 current staged 的 successor admission；旧 admission 永不自动跟随或恢复。v229 不增加 MCP、PC、SDK 或 Provider 本人入口。
+v229 源码新增两个尚未验证的管理员 HTTP 入口，不把它们计入当前已验证接口：`POST /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/terminal` 追加唯一的 `withdrawn|revoked|superseded` 终态，`GET /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/currentness` 读取派生 currentness。未执行测试源码拟断言 `401/403/404/409`、fresh `201`、replay/GET `200`、unknown field、确认语、持久 owner 与 `local-owner` actor、三终态及响应脱敏；`superseded` 仍须绑定同 Adapter 的 exact current successor，旧 admission 不自动跟随或恢复。v229 不增加 MCP、PC、SDK 或 Provider 本人入口。
 
-## 3. 已验证行为
+## 3. v222 已验证行为
 
 - 未登录返回 `401`，普通用户返回 `403`；
 - `deny_unknown_fields` 拒绝外部注入 `submitted_by_admin_user_id`；
@@ -40,7 +40,7 @@ v229 源码新增两个尚未验证的管理员 HTTP 入口，不把它们计入
 - Store 关闭重开后仍可按状态读取 exact request/review/admission 投影；
 - 最终效果保持 `staged_admission_only`，三张账本各只产生一行。
 
-## 4. 验证命令与证据
+## 4. v222 验证命令与证据
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-external-pool-adapter-release-management -- test --manifest-path server/Cargo.toml --bin elon-server external_pool_adapter_release -- --nocapture
@@ -57,9 +57,9 @@ PC 静态验证复用 `npm run test:compute-external-pools`、`typecheck`、`lin
 
 - 未部署服务器，未对生产数据库或真实管理员会话调用；
 - 未通过真实 TCP 或已登录浏览器会话验证 PC 页面；
-- admission terminal/currentness 运维入口已有静态源码，但尚未编译或运行；v229 把 `staged -> withdrawn|revoked|superseded`、唯一追加式 terminal receipt、派生 current view、幂等与并发合同保持为 `design_frozen/implementation_uncompiled/implementation_unrun`；
-- v229 terminal receipt 源码固定报告 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none`、`route_effect=none`；terminal 后的 v227 PUT（含 exact replay）失败关闭，历史 receipt 仅可 GET；
-- v229 源码在 v227 raw-body/CAS 前、Store fresh/exact replay 事务内和新的 v229 `BEFORE INSERT` trigger 重审 currentness；不回改 v227 旧 migration，仍无接口、竞争或故障注入证据；
+- admission terminal/currentness 运维入口及 migration/Store/HTTP/并发/currentness 测试源码已写，但新增测试 passed=0，未编译、未执行 migration 或运行，无 fingerprint/receipt，实际 artifact/terminal=0；v229 仍为 `design_frozen/implementation_uncompiled/implementation_unrun`；
+- 未执行断言拟检查三终态、exact successor、fixed effects、fresh/replay/currentness 状态码、管理员/owner/`local-owner` actor、双连接竞争，以及 terminal 后 v227 PUT 在 raw body 被 poll 前拒绝、历史 GET 保留；这些不构成接口或运行证据；
+- test source 也表达 terminal-first、CAS-first/DB-second、receipt-first 与 artifact/terminal 竞争，但完整 crash fault injection、v227 全输入/文件安全矩阵和生产升级仍缺；不回改 v227 旧 migration；
 - 未解析或下载 `candidate_artifact_ref`，未重算实现摘要；
 - 未验证 verifier registry、签名、供应链或协议能力；
 - 未生成 Adapter registry/version、credential、service actor、v213 route/seal；

@@ -80,10 +80,12 @@ pub(crate) struct ExternalPoolAdapterArtifactSourceReceipt {
     pub declared_implementation_sha256: String,
     pub intake_sha256: String,
     pub reopened_sha256: String,
+    #[serde(skip)]
     artifact_size_bytes: u64,
     pub storage_root_kind: &'static str,
     pub storage_namespace: &'static str,
     pub content_address_algorithm: &'static str,
+    #[serde(skip)]
     content_address_digest: String,
     pub custody_state: &'static str,
     pub intake_kind: &'static str,
