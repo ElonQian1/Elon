@@ -507,13 +507,25 @@
     emitEvent(event);
   }
 
-  function requestSemanticTouch(semantic, purpose, emitEvent) {
+  function resolveSemanticControl(semantic, region) {
     const discovery = discover();
     const control = discovery.controls.find((candidate) =>
-      candidate.semantic === semantic && candidate.enabled && candidate.inViewport
+      candidate.semantic === semantic && candidate.enabled && candidate.inViewport &&
+        (!region || candidate.region === region)
     );
     const node = control && controlsById.get(control.id);
-    if (!node || !isVisible(node)) return false;
+    return node && isVisible(node) ? { control, node } : null;
+  }
+
+  function findSemanticNode(semantic, region) {
+    const resolved = resolveSemanticControl(semantic, region);
+    return resolved && resolved.node;
+  }
+
+  function requestSemanticTouch(semantic, purpose, emitEvent, region) {
+    const resolved = resolveSemanticControl(semantic, region);
+    if (!resolved) return false;
+    const { control } = resolved;
     emitEvent({
       type: 'web_touch_request',
       purpose,
@@ -616,6 +628,7 @@
 
   window.__elonChatGptLayout = Object.freeze({
     emitSnapshot,
+    findSemanticNode,
     invoke,
     pageKind,
     requestSemanticTouch,

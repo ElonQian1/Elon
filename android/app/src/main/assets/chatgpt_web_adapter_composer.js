@@ -165,6 +165,11 @@
       const node = scope.querySelector(selector) || document.querySelector(selector);
       if (isVisible(node)) return node;
     }
+    const layout = window.__elonChatGptLayout;
+    const semanticNode = layout && typeof layout.findSemanticNode === 'function'
+      ? layout.findSemanticNode('model', 'composer')
+      : null;
+    if (isVisible(semanticNode)) return semanticNode;
     const candidates = Array.from(scope.querySelectorAll('button, [role="button"]')).filter((button) => {
       const label = nodeLabel(button);
       return isActionable(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
@@ -349,6 +354,14 @@
     return true;
   }
 
+  function emitTriggerTouch(section, purpose, node, emitEvent) {
+    if (emitTouchRequest(purpose, node, emitEvent)) return true;
+    const layout = window.__elonChatGptLayout;
+    return section === 'model' && layout && typeof layout.requestSemanticTouch === 'function'
+      ? layout.requestSemanticTouch('model', purpose, emitEvent, 'composer')
+      : false;
+  }
+
   function replacePendingOptions(section, pending) {
     const previous = pendingOptions[section];
     pendingOptions[section] = pending;
@@ -385,7 +398,7 @@
       action,
       complete: result
     });
-    if (!emitTouchRequest(action, trigger, emitEvent)) {
+    if (!emitTriggerTouch(section, action, trigger, emitEvent)) {
       return settlePendingOptions(section, false, '官网入口当前不可见。');
     }
   }
@@ -492,7 +505,7 @@
     const action = section === 'model' ? 'open_model_selector' : 'open_composer_tools';
     const trigger = triggerFor(section, composer);
     if (!trigger) return result(action, false, '官网当前没有可用入口。');
-    if (!emitTouchRequest(action, trigger, emitEvent)) {
+    if (!emitTriggerTouch(section, action, trigger, emitEvent)) {
       return result(action, false, '官网入口当前不可见。');
     }
     result(action, true, '');

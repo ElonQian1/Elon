@@ -20,6 +20,9 @@ class ChatGptWebComposerContractTest {
         val actionTargetPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
         )
+        val layoutAdapter = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
+        )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
         val pageAdapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
@@ -37,6 +40,10 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("#upload-fast-tools-files"))
         assertTrue(adapter.contains("#composer-plus-btn"))
         assertTrue(adapter.contains("scope.querySelectorAll('button, [role=\"button\"]')"))
+        assertTrue(adapter.contains("layout.findSemanticNode('model', 'composer')"))
+        assertTrue(adapter.contains("layout.requestSemanticTouch('model', purpose, emitEvent, 'composer')"))
+        assertTrue(layoutAdapter.contains("function findSemanticNode(semantic, region)"))
+        assertTrue(layoutAdapter.contains("(!region || candidate.region === region)"))
         assertTrue(adapter.contains("composer_controls_snapshot"))
         assertTrue(adapter.contains("baseline: captureOptionBaseline()"))
         assertTrue(adapter.contains("actionTargetPolicy.signature(node)"))
