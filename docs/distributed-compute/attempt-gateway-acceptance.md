@@ -24,7 +24,7 @@ v211-v215 的 sealed Plan、Start command、route/credential/actor authority、�
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- test --manifest-path server/Cargo.toml --bin elon-server compute_attempt_activation_migration --locked
 ```
 
-结果：4 项迁移与 backfill 门卫测试通过，验证指纹为 `393bb8f300dd765148c3a2884308091273abf64c00fb0af8092b62e8f616ffdc`。覆盖：
+结果：rebase 合入 v221/v222 后，4 项迁移与 backfill 门卫测试通过，验证指纹为 `f49f8182264eb9ae70a80754021f68f9d4b65eac3008b1cd868682ebdc4d5f1e`。覆盖：
 
 - 内存 SQLite 可完整应用 v211-v215，并幂等重复应用当前迁移；
 - 真实临时文件 Store 可执行完整迁移，关闭、重开、重复迁移并再次关闭重开；

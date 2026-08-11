@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Release Staged Admission 权威
 status: current
 reviewed_at: 2026-08-11
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_unwired
 ---
 
 # 外部矿池 Adapter Release Staged Admission 权威
@@ -12,7 +12,7 @@ implementation_status: implementation_uncompiled
 
 本文冻结 `external_pool` Adapter release 的第一段平台来源：一名平台管理员提交精确 release 声明，另一名平台管理员独立复核，Store 再按已批准摘要执行 immutable stage apply。最大效果只是形成一份 `staged` admission source，供未来 Adapter registry producer 重新验证后引用。
 
-`staged` 只表示“平台允许继续准备这份精确候选”，不表示 artifact 已下载、字节摘要已重算、签名或供应链已验证、实现已加载、协议能力已验证、credential verifier 已存在或 route 已获授权。当前已形成领域 DTO/规范摘要校验、Store-private submit/review/apply/exact readback、v222 三账本/trigger 源码，并接入 `compute_federation`、`Store` 与 `MIGRATIONS`；它们尚未编译、执行迁移或运行，也没有 service、HTTP、MCP 或 PC 入口。
+`staged` 只表示“平台允许继续准备这份精确候选”，不表示 artifact 已下载、字节摘要已重算、签名或供应链已验证、实现已加载、协议能力已验证、credential verifier 已存在或 route 已获授权。当前已形成领域 DTO/规范摘要校验、Store-private submit/review/apply/exact readback、v222 三账本/trigger 源码，并接入 `compute_federation`、`Store` 与 `MIGRATIONS`；服务端源码已编译，v222 已随完整临时文件 Store 迁移和两次重开执行，但 release submit/review/apply 状态机、trigger 行为和 service/HTTP/MCP/PC 入口仍未运行。
 
 本权威与 Provider onboarding 分开：onboarding application 批准某个 Provider 使用指定 Adapter release/config；release admission 则冻结平台愿意继续审查的 Adapter 候选。任一来源都不能替代另一来源。
 
@@ -89,12 +89,12 @@ apply 只消费仍为 `approved` 的 exact request/review、稳定幂等键、�
 
 ## 6. 与后续批次的截止线
 
-本批只形成 release staging 权威及未编译、未运行的领域/Store-private/v222 源码。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
+本批只形成 release staging 权威及已编译、未接线的领域/Store-private/v222 源码。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
 
 后续 route producer 只有在 Adapter registry、sealed credential verification、TTL/revocation、service actor、六能力 currentness 和 onboarding source 在同一 Store 权威中闭合后，才允许写 v213 credential/route/seal rows。release admission 自身永远不跨越这条截止线。
 
-## 7. 本批静态验收边界
+## 7. 当前验收边界
 
-本批可证明的是领域合同、Store-private 事务、exact readback、v222 DDL/trigger 与中央静态接线源码已经形成。允许的验收是定向 rustfmt、源码/文档模块化、链接/术语搜索、行数和 `git diff --check`；不执行编译、测试、迁移、SQLite trigger、权限、并发、HTTP、artifact 或网络验证。
+当前可证明领域合同、Store-private 事务、exact readback、v222 DDL/trigger 与中央静态接线源码已经形成并可编译；完整临时文件 Store 已执行包含 v222 的迁移、关闭和两次重开。该证据来自 `attempt-gateway-acceptance.md` 所列 Rust 验证；没有直接执行 release submit/review/apply、SQLite trigger、权限、并发、HTTP、artifact 或网络验证。
 
-状态固定为 `implementation_uncompiled`、`implementation_unrun`。不得以“v222”“staged”“admission”或表名宣称数据库已经迁移、入口已经开放或任何生产能力已经存在。
+状态为 `implementation_unwired`。不得以“v222”“staged”“admission”或表名宣称生产数据库已经升级、业务状态机已经运行、入口已经开放或任何生产 Adapter 能力已经存在。

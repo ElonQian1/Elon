@@ -3,7 +3,7 @@ title: 外部算力池 Adapter Onboarding 来源权威
 status: current
 reviewed_at: 2026-08-11
 owners: backend, ai-economy, security
-implementation_status: implementation_uncompiled
+implementation_status: implementation_unwired
 ---
 
 # 外部算力池 Adapter Onboarding 来源权威
@@ -86,7 +86,7 @@ v221 目前只是未编译、未执行的迁移源码，Store 也没有生产调
 
 只有第 1 至 4 项在同一 Store 权威中闭合后，未来 route producer 才能引用 onboarding application 写入 v213 rows。管理员审批、Provider adapter ref 或数据库中存在 non-bearer ref 都不能替代 credential proof。
 
-Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。前者的领域、Store-private 与 v222 来源源码已形成但未编译、未迁移、未运行或接 service/API；任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
+Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。两者的服务端源码现可编译，v221/v222 已随完整临时文件 Store 迁移和两次重开执行，但两条业务状态机、trigger 行为及 service/API 均未运行；任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
 
 ## 6. 明确禁线
 
@@ -122,6 +122,6 @@ Adapter release admission 与 Provider onboarding application 是两条正交来
 
 ## 9. 本批静态验收边界
 
-本批只能证明领域合同、Store-private 事务、v221 DDL/trigger 与静态 readback 源码已经形成。允许的证据是定向 rustfmt、模块化、链接/术语检查与 `git diff --check`；未执行编译、迁移、权限、并发、幂等、触发器或 HTTP 验收，状态固定为 `implementation_uncompiled`、`implementation_unrun`。
+当前可证明领域合同、Store-private 事务、v221 DDL/trigger 与静态 readback 源码已经形成并可编译；完整临时文件 Store 已执行包含 v221 的迁移、关闭和两次重开。仍未执行 onboarding 业务状态机、权限、并发、幂等、触发器或 HTTP 验收，状态为 `implementation_unwired`。
 
 真实 credential verifier、v213 producer、Adapter、网络与 worker 仍未实现；不得以本源码、v221 名称或未来 API 表宣称 onboarding 已可用。
