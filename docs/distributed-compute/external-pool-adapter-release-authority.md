@@ -89,7 +89,7 @@ apply 只消费仍为 `approved` 的 exact request/review、稳定幂等键、�
 
 ## 6. 与后续批次的截止线
 
-当前形成 release staging 权威、已验证 Store 状态机和进程内管理员 Service/HTTP；生产部署与真实环境仍未接线。v227 已另行冻结 server-owned quarantine raw bytes source，但其源码和运行证据尚未形成，且它不解析 candidate ref。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
+当前形成 release staging 权威、已验证 Store 状态机和进程内管理员 Service/HTTP；生产部署与真实环境仍未接线。v227 server-owned quarantine raw bytes source 源码已写但未编译、迁移或运行，实际测量为 0，且它不解析 candidate ref。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
 
 后续 route producer 只有在 Adapter registry、sealed credential verification、TTL/revocation、service actor、六能力 currentness 和 onboarding source 在同一 Store 权威中闭合后，才允许写 v213 credential/route/seal rows。release admission 自身永远不跨越这条截止线。
 

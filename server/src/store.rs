@@ -86,6 +86,7 @@ mod compute_capacity_request_digest;
 mod compute_capacity_rows;
 mod compute_capacity_supply_queries;
 mod compute_capacity_supply_withdrawal;
+mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_onboarding;
 mod compute_job_contract_validation;
@@ -408,6 +409,11 @@ pub(crate) use compute_capacity_pool_lifecycle::{
 };
 pub(crate) use compute_capacity_supply_withdrawal::{
     WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
+};
+pub(crate) use compute_external_pool_adapter_artifact_source::{
+    ExternalPoolAdapterArtifactIntakeAuthority, ExternalPoolAdapterArtifactSourceReceipt,
+    RecordExternalPoolAdapterArtifactSource,
+    EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_INTAKE_CONFIRMATION,
 };
 pub(crate) use compute_external_pool_adapter_release::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,

@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Artifact Bytes Source 权威
 status: current
 reviewed_at: 2026-08-12
 owners: backend, security, ai-economy
-implementation_status: implementation_not_started
+implementation_status: implementation_uncompiled
 ---
 
 # 外部矿池 Adapter Artifact Bytes Source 权威
@@ -14,7 +14,7 @@ implementation_status: implementation_not_started
 
 这份 receipt 只证明“本服务实际接收并持有的一组字节，其重开后摘要和长度与 admission 的声明一致”。它不证明字节来自 `candidate_artifact_ref`，不证明签名、供应链、格式、安全性、conformance、六能力、verifier currentness 或外部矿池可连接，也不构造 verified/trusted/attested Adapter。
 
-当前状态是 `implementation_not_started`：本页只冻结实现合同，尚无 v227 源码、迁移、文件摄入、回执或运行证据。实际 artifact 测量数为 0。
+当前状态是 `implementation_uncompiled/implementation_unrun`：v227 领域/文件 custody、Store、一表迁移、Service/HTTP 与中央接线源码已经写入，只通过 rustfmt、差异/尺寸门卫和独立静态审计；尚未编译、测试、执行迁移、启动服务或摄入 artifact。实际 artifact 测量数为 0。
 
 ## 2. 唯一管理入口
 
@@ -42,6 +42,8 @@ GET 不返回 bytes、下载地址、绝对路径、candidate ref 或凭据。�
 `DATA_DIR/compute-federation/external-pool-adapter-artifacts/v1/quarantine/blobs/sha256/<first2>/<sha256>.blob`
 
 路径中的可变部分只能来自已校验格式的 64 位小写 SHA-256；不得把 `candidate_artifact_ref`、URL、请求文件名或用户输入拼入路径。服务端必须拒绝 symlink、junction、reparse point、非普通文件及越出固定根的目标。
+
+部署信任锚必须明确：`AppState.data_dir` 及其父链由受信平台配置，不能被非受信本地 actor rename、replace 或改成 reparse；固定 quarantine namespace 只允许单一 service OS identity 写入，同 UID 的其他恶意 writer 不在本批隔离声明内。Windows 实现须从 DATA_DIR 到 shard 逐级保留 no-reparse 且拒绝 WRITE/DELETE sharing 的目录 handle，并把它们保留到 Store 消费 sealed evidence；Unix DATA_DIR 必须拒绝 group/other write，固定 namespace 必须为 0700。最终文件另以 no-follow handle 打开，并在哈希后再次核 canonical root 与平台 file identity。任一门卫失败均不能产生 receipt。
 
 写入顺序固定为：
 
@@ -104,6 +106,6 @@ Store 的 exact replay 顺序是：先按 scope/key 查既有回执并逐字段�
 
 ## 7. 实现与验收门槛
 
-源码批完成后最多只能标记 `implementation_uncompiled/implementation_unrun`，并明确实际摄入和运行测量仍为 0。本阶段只允许 rustfmt、差异/文档/源码尺寸门卫和独立静态审计，不得把未执行路径写成已验证事实。
+当前源码批标记为 `implementation_uncompiled/implementation_unrun`，实际摄入和运行测量仍为 0。本阶段只执行了 rustfmt、差异/文档/源码尺寸门卫和独立静态审计，不得把未执行路径写成已验证事实。
 
 未来独立运行验收至少覆盖：fresh migration、升级与重复迁移、两次重开；Store/API 成功与 401/403/409/413/415/422；exact replay 与并发；CAS existing exact/corrupt/symlink；各崩溃窗 fault injection；receipt 后 blob missing/corrupt。只有这些执行证据完成后才可升级为 `implementation_partially_verified`，且仍不得声称生产 Adapter 已验证或可执行。

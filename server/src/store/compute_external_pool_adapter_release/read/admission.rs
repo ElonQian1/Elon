@@ -12,12 +12,22 @@ use super::super::{
     },
     review::{validate_digest, validate_exact, validate_optional_note},
     types::{
-        canonical_nanos, StoredAdmission, ADMISSION_STATUS_STAGED,
-        EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SCHEMA,
+        canonical_nanos, ExternalPoolAdapterReleaseArtifactSourceAdmission, StoredAdmission,
+        ADMISSION_STATUS_STAGED, EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SCHEMA,
         EXTERNAL_POOL_ADAPTER_RELEASE_APPLY_CONFIRMATION, REVIEW_DECISION_APPROVED,
     },
 };
 use super::{decode, request_by_id_on, review_by_request_on};
+
+pub(in crate::store) fn admission_by_id_on(
+    conn: &Connection,
+    admission_id: &str,
+) -> Result<Option<ExternalPoolAdapterReleaseArtifactSourceAdmission>> {
+    Ok(
+        admission_on(conn, "WHERE admission_id=?1", params![admission_id])?
+            .map(StoredAdmission::into_artifact_source_admission),
+    )
+}
 
 pub(in crate::store::compute_external_pool_adapter_release) fn admission_by_request_on(
     conn: &Connection,

@@ -4,6 +4,7 @@ mod review;
 
 use rusqlite::types::Type;
 
+pub(in crate::store) use admission::admission_by_id_on;
 pub(super) use admission::{
     admission_by_adapter_release_on, admission_by_idempotency_on, admission_by_request_on,
 };

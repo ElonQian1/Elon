@@ -11,6 +11,9 @@ mod review;
 mod submit;
 mod types;
 
+pub(in crate::store) use read::admission_by_id_on;
+pub(in crate::store) use types::ExternalPoolAdapterReleaseArtifactSourceAdmission;
+
 #[cfg(test)]
 #[path = "compute_external_pool_adapter_release_tests.rs"]
 mod tests;

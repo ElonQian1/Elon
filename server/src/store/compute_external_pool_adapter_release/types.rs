@@ -55,6 +55,22 @@ pub(crate) struct ApplyExternalPoolAdapterRelease {
     pub idempotency_key: String,
 }
 
+/// Exact v222 lineage exposed only to Store siblings after the full admission audit.
+pub(in crate::store) struct ExternalPoolAdapterReleaseArtifactSourceAdmission {
+    pub(in crate::store) admission_id: String,
+    pub(in crate::store) admission_digest: String,
+    pub(in crate::store) request_id: String,
+    pub(in crate::store) request_digest: String,
+    pub(in crate::store) request_material_digest: String,
+    pub(in crate::store) review_id: String,
+    pub(in crate::store) review_digest: String,
+    pub(in crate::store) adapter_id: String,
+    pub(in crate::store) release_version: String,
+    pub(in crate::store) candidate_artifact_ref: String,
+    pub(in crate::store) declared_implementation_sha256: String,
+    pub(in crate::store) status: String,
+}
+
 #[derive(Clone, Serialize)]
 pub(crate) struct ExternalPoolAdapterReleaseRequestReceipt {
     pub schema: &'static str,
@@ -299,6 +315,26 @@ impl StoredReview {
 }
 
 impl StoredAdmission {
+    pub(in crate::store) fn into_artifact_source_admission(
+        self,
+    ) -> ExternalPoolAdapterReleaseArtifactSourceAdmission {
+        let admission = self.envelope.admission;
+        ExternalPoolAdapterReleaseArtifactSourceAdmission {
+            admission_id: self.envelope.admission_id,
+            admission_digest: self.envelope.admission_digest,
+            request_id: admission.request_id,
+            request_digest: admission.request_digest,
+            request_material_digest: admission.request_material_digest,
+            review_id: admission.review_id,
+            review_digest: admission.review_digest,
+            adapter_id: admission.adapter_id,
+            release_version: admission.release_version,
+            candidate_artifact_ref: admission.candidate_artifact_ref,
+            declared_implementation_sha256: admission.declared_implementation_sha256,
+            status: admission.status,
+        }
+    }
+
     pub(super) fn into_receipt(self, replayed: bool) -> ExternalPoolAdapterReleaseAdmissionReceipt {
         let admission = self.envelope.admission;
         ExternalPoolAdapterReleaseAdmissionReceipt {

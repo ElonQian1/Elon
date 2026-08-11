@@ -48,6 +48,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/external-pool-adapter-releases/:request_id/stage",
             post(stage_release),
         )
+        .merge(super::external_pool_adapter_artifact_source_api::routes())
 }
 
 #[derive(Debug, Deserialize)]
