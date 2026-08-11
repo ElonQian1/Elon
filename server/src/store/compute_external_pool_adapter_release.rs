@@ -10,6 +10,10 @@ mod review;
 mod submit;
 mod types;
 
+#[cfg(test)]
+#[path = "compute_external_pool_adapter_release_tests.rs"]
+mod tests;
+
 pub(super) use types::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,
     ExternalPoolAdapterReleaseRequestReceipt, ExternalPoolAdapterReleaseReviewReceipt,
