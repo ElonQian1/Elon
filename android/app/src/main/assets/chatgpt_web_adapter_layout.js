@@ -634,13 +634,19 @@
   }
 
   function setNodeExpanded(node, expanded, emitEvent, result) {
-    discover();
-    const entry = Array.from(controlsById.entries()).find(([, candidate]) => candidate === node);
-    if (!entry || !isVisible(node) || !disclosureAdapter) {
+    if (!node || !isVisible(node) || !disclosureAdapter) {
       return result('set_ui_control_expanded', false, '官网控件已变化，请刷新结构后重试。');
     }
+    const entry = Array.from(controlsById.entries()).find(([, candidate]) => candidate === node);
+    const stableId = entry ? entry[0] : 'control_disclosure_' + hash([
+      node.id,
+      node.getAttribute('data-testid'),
+      node.getAttribute('aria-label'),
+      node.getAttribute('title'),
+      labelOf(node, '展开选项')
+    ].filter(Boolean).join('|'));
     return disclosureAdapter.setExpanded(
-      node, entry[0], expanded, emitEvent, result,
+      node, stableId, expanded, emitEvent, result,
       () => emitSnapshot(emitEvent, true)
     );
   }

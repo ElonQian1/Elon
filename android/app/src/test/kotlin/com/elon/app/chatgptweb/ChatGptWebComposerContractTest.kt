@@ -55,6 +55,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(layoutAdapter.contains("function findSemanticNode(semantic, region)"))
         assertTrue(layoutAdapter.contains("function setNodeExpanded(node, expanded, emitEvent, result)"))
         assertTrue(layoutAdapter.contains("setNodeExpanded,"))
+        assertTrue(layoutAdapter.contains("'control_disclosure_' + hash"))
+        assertFalse(layoutAdapter.substringAfter("function setNodeExpanded").substringBefore("window.__elonChatGptLayout").contains("discover();"))
         assertTrue(layoutAdapter.contains("(!region || candidate.region === region)"))
         assertTrue(adapter.contains("composer_controls_snapshot"))
         assertTrue(adapter.contains("baseline: captureOptionBaseline()"))
