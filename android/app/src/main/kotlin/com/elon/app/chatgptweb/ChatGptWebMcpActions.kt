@@ -499,10 +499,18 @@ internal class ChatGptWebMcpActions(
                 .put("part_count", message.parts.size)
                 .put("parts_truncated", message.parts.size > MAX_MESSAGE_PARTS)
                 .put("parts", JSONArray().apply {
-                    message.parts.take(MAX_MESSAGE_PARTS).forEach { part ->
+                    message.parts.take(MAX_MESSAGE_PARTS).forEachIndexed { partIndex, part ->
                         put(JSONObject()
                             .put("type", part.type)
                             .put("label", part.label.take(MAX_MESSAGE_PART_LABEL_CHARS))
+                            .put(
+                                "native_adb_content_description",
+                                ChatGptNativeControlPresentation.messagePartSelector(
+                                    message.id,
+                                    partIndex,
+                                    part.type,
+                                ),
+                            )
                             .put(
                                 "label_truncated",
                                 part.label.length > MAX_MESSAGE_PART_LABEL_CHARS,

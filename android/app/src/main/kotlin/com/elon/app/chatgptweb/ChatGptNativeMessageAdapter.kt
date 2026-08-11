@@ -72,7 +72,7 @@ internal class ChatGptNativeMessageAdapter(
         }
         holder.copy.setOnClickListener { onCopy(message) }
         holder.copy.contentDescription = ChatGptNativeControlPresentation.messageCopySelector(message.id)
-        partRenderer.render(holder.parts, message.parts)
+        partRenderer.render(holder.parts, message.id, message.parts)
         holder.regenerate.visibility = if (canRegenerate(message, position)) View.VISIBLE else View.GONE
         holder.regenerate.setOnClickListener { onRegenerate() }
         holder.regenerate.contentDescription =

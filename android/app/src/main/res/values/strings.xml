@@ -123,5 +123,9 @@
     <string name="chatgpt_message_part_artifact">交互内容</string>
     <string name="chatgpt_message_part_audio">音频</string>
     <string name="chatgpt_message_part_video">视频</string>
+    <string name="chatgpt_message_part_math">数学公式</string>
+    <string name="chatgpt_message_part_chart">图表</string>
+    <string name="chatgpt_message_part_map">地图</string>
+    <string name="chatgpt_message_part_interactive">交互内容</string>
     <string name="chatgpt_message_part_content">内容</string>
 </resources>

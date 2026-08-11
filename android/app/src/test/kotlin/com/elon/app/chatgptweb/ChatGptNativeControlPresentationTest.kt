@@ -40,6 +40,10 @@ class ChatGptNativeControlPresentationTest {
             "chatgpt-message-actions:$CONTEXT:3",
             coverage.getValue("copy_table").nativeTriggerSelector,
         )
+        assertEquals(
+            "chatgpt-message-part:$CONTEXT:2:chart",
+            ChatGptNativeControlPresentation.messagePartSelector(CONTEXT, 2, "chart"),
+        )
     }
 
     @Test

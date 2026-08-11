@@ -447,6 +447,10 @@ internal object ChatGptWebProtocol {
         "artifact",
         "audio",
         "video",
+        "math",
+        "chart",
+        "map",
+        "interactive",
     )
     private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
     private val PAGE_KINDS = setOf("auth", "conversation", "home", "feature")

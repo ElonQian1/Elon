@@ -333,6 +333,11 @@ class ChatGptWebMcpActionsTest {
         assertEquals(2, message.getInt("part_count"))
         assertFalse(message.getBoolean("parts_truncated"))
         assertEquals("file", message.getJSONArray("parts").getJSONObject(1).getString("type"))
+        assertEquals(
+            "chatgpt-message-part:assistant-1:1:file",
+            message.getJSONArray("parts").getJSONObject(1)
+                .getString("native_adb_content_description"),
+        )
         assertFalse(result.getBoolean("has_more"))
     }
 

@@ -12,17 +12,25 @@ import com.elon.app.R
 internal class ChatGptNativeMessagePartRenderer(
     private val onOpenOfficial: () -> Unit,
 ) {
-    fun render(container: LinearLayout, parts: List<ChatGptWebMessagePart>) {
+    fun render(container: LinearLayout, messageId: String, parts: List<ChatGptWebMessagePart>) {
         container.removeAllViews()
-        parts.forEach { part -> container.addView(createRow(container, part)) }
+        parts.forEachIndexed { index, part ->
+            container.addView(createRow(container, messageId, index, part))
+        }
         container.visibility = if (parts.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    private fun createRow(container: LinearLayout, part: ChatGptWebMessagePart): TextView {
+    private fun createRow(
+        container: LinearLayout,
+        messageId: String,
+        index: Int,
+        part: ChatGptWebMessagePart,
+    ): TextView {
         val context = container.context
         return TextView(context).apply {
             text = context.getString(R.string.chatgpt_message_part_format, typeLabel(context, part.type), part.label)
-            contentDescription = context.getString(R.string.chatgpt_message_part_open, text)
+            contentDescription = ChatGptNativeControlPresentation.messagePartSelector(messageId, index, part.type)
+            tooltipText = context.getString(R.string.chatgpt_message_part_open, text)
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
@@ -49,14 +57,18 @@ internal class ChatGptNativeMessagePartRenderer(
             "artifact" -> R.string.chatgpt_message_part_artifact
             "audio" -> R.string.chatgpt_message_part_audio
             "video" -> R.string.chatgpt_message_part_video
+            "math" -> R.string.chatgpt_message_part_math
+            "chart" -> R.string.chatgpt_message_part_chart
+            "map" -> R.string.chatgpt_message_part_map
+            "interactive" -> R.string.chatgpt_message_part_interactive
             else -> R.string.chatgpt_message_part_content
         },
     )
 
     private fun icon(type: String): Int = when (type) {
-        "image", "video" -> R.drawable.ic_attach_photos
+        "image", "video", "chart", "map" -> R.drawable.ic_attach_photos
         "audio" -> R.drawable.ic_input_voice
-        "artifact" -> R.drawable.ic_project_documents_menu
+        "artifact", "interactive" -> R.drawable.ic_project_documents_menu
         else -> R.drawable.ic_attach_files
     }
 

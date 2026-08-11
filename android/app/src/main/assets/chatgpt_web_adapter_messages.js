@@ -7,6 +7,7 @@
   const MAX_MESSAGE_LENGTH = 40000;
   const MAX_STRUCTURED_PARTS = 16;
   const FILE_PATH_EXTENSION = /\.(?:pdf|docx?|xlsx?|csv|pptx?|txt|md|json|xml|ya?ml|zip|rar|7z|tar|gz|png|jpe?g|gif|webp|svg|mp3|wav|m4a|ogg|mp4|mov|webm)$/i;
+  const COMPLEX_PART_TYPES = new Set(['artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive']);
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
 
@@ -74,6 +75,11 @@
       const value = String(node.textContent || '').replace(/`/g, '\\`');
       return '`' + value + '`';
     }
+    if (node.matches('.katex, [data-testid*="math" i]')) {
+      const annotation = node.querySelector('annotation[encoding="application/x-tex"]');
+      const value = cleanText(annotation ? annotation.textContent : node.textContent);
+      return value ? '`' + value.replace(/`/g, '\\`') + '`' : '';
+    }
     if (tag === 'STRONG' || tag === 'B') return '**' + childrenMarkdown(node, context) + '**';
     if (tag === 'EM' || tag === 'I') return '*' + childrenMarkdown(node, context) + '*';
     if (tag === 'S' || tag === 'DEL') return '~~' + childrenMarkdown(node, context) + '~~';
@@ -95,6 +101,26 @@
     if (tag === 'BLOCKQUOTE') {
       return '\n\n' + childrenMarkdown(node, context).trim().split('\n').map((line) => '> ' + line).join('\n') + '\n\n';
     }
+    if (tag === 'DETAILS') {
+      const summary = node.querySelector(':scope > summary');
+      const title = cleanText(summary ? summary.textContent : '详情');
+      const body = Array.from(node.childNodes)
+        .filter((child) => child !== summary)
+        .map((child) => markdown(child, context)).join('').trim();
+      return '\n\n**' + escapeMarkdown(title) + '**\n\n' + body + '\n\n';
+    }
+    if (tag === 'DL') {
+      return '\n\n' + Array.from(node.children).map((child) => {
+        const value = childrenMarkdown(child, context).trim();
+        return child.tagName === 'DT' ? '**' + value + '**' : ': ' + value;
+      }).join('\n') + '\n\n';
+    }
+    if (tag === 'INPUT' && String(node.getAttribute('type')).toLowerCase() === 'checkbox') {
+      return node.checked ? '[x] ' : '[ ] ';
+    }
+    if (tag === 'SUP') return '^' + childrenMarkdown(node, context) + '^';
+    if (tag === 'SUB') return '~' + childrenMarkdown(node, context) + '~';
+    if (tag === 'MARK') return '**' + childrenMarkdown(node, context) + '**';
     if (tag === 'P') return childrenMarkdown(node, context).trim() + '\n\n';
     if (tag === 'LI' && !context.inList) return '- ' + childrenMarkdown(node, { inList: true }).trim() + '\n';
     if (tag === 'IMG') {
@@ -159,6 +185,7 @@
       seen.add(key);
       parts.push({ type, text: label });
       lastStructuredTypes.add(type);
+      if (COMPLEX_PART_TYPES.has(type)) lastComplexOutput = true;
     }
     Array.from(content.querySelectorAll('img')).forEach((node) => {
       add('image', structuredLabel(node, '图片'), node);
@@ -177,6 +204,26 @@
     });
     Array.from(content.querySelectorAll('video')).forEach((node) => {
       add('video', structuredLabel(node, '视频'), node);
+    });
+    Array.from(content.querySelectorAll('.katex, [data-testid*="math" i]')).forEach((node) => {
+      const annotation = node.querySelector('annotation[encoding="application/x-tex"]');
+      add('math', structuredLabel(annotation || node, '数学公式'), node);
+    });
+    Array.from(content.querySelectorAll(
+      'canvas, .mermaid, [data-testid*="chart" i], [data-testid*="diagram" i], [aria-label*="chart" i], [aria-label*="图表"]'
+    )).forEach((node) => {
+      add('chart', structuredLabel(node, '图表'), node);
+    });
+    Array.from(content.querySelectorAll(
+      '[data-testid*="map" i], [aria-label*="map" i], [aria-label*="地图"]'
+    )).forEach((node) => {
+      add('map', structuredLabel(node, '地图'), node);
+    });
+    Array.from(content.querySelectorAll(
+      'details, [role="tree"], [role="grid"], [data-testid*="interactive" i], '
+      + '[data-testid*="output" i], [data-testid*="viewer" i], [data-testid*="preview" i]'
+    )).forEach((node) => {
+      add('interactive', structuredLabel(node, '交互内容'), node);
     });
     return parts;
   }

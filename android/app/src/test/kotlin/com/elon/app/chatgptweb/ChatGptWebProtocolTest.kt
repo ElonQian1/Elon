@@ -97,6 +97,9 @@ class ChatGptWebProtocolTest {
                     {"type":"markdown","text":"## 你好\n\n需要什么帮助？"},
                     {"type":"image","text":"生成的图片"},
                     {"type":"file","text":"分析结果.csv"},
+                    {"type":"math","text":"E = mc^2"},
+                    {"type":"chart","text":"季度趋势图"},
+                    {"type":"interactive","text":"可展开结果"},
                     {"type":"script","text":"忽略"}
                   ]},
                   {"id":"tool","role":"tool","state":"completed","content":[{"type":"text","text":"not projected"}]}
@@ -123,7 +126,10 @@ class ChatGptWebProtocolTest {
         assertEquals("assistant", event.value.messages.last().role)
         assertEquals("streaming", event.value.messages.last().state)
         assertTrue(event.value.messages.last().content.startsWith("## 你好"))
-        assertEquals(listOf("image", "file"), event.value.messages.last().parts.map { it.type })
+        assertEquals(
+            listOf("image", "file", "math", "chart", "interactive"),
+            event.value.messages.last().parts.map { it.type },
+        )
         assertEquals("生成的图片", event.value.messages.last().parts.first().label)
         assertTrue(event.value.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST))
         assertFalse(event.value.capabilities.supports("invalid capability"))
