@@ -6,6 +6,10 @@ use serde::Deserialize;
 #[path = "compute_federation_broker_control_plane_tests.rs"]
 pub(crate) mod control_plane_tests;
 
+#[cfg(test)]
+#[path = "compute_federation_broker_concurrency_tests.rs"]
+mod concurrency_tests;
+
 use crate::{
     compute_federation::{
         execution::{
