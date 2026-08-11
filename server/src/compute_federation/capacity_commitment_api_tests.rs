@@ -25,9 +25,53 @@ async fn owner_http_is_authenticated_isolated_and_admin_expiry_is_role_gated() {
     let provider_id = fixture.provider_id.clone();
     let pool_id = fixture.pool_id.clone();
     let body = create_body(&fixture, "capacity-http-primary");
+    let source_path = format!(
+        "/api/me/compute/providers/{}/capacity-pools/{}/offers/{}/price-snapshots/{}/capacity-commitment-source",
+        fixture.provider_id,
+        fixture.pool_id,
+        fixture.offer.offer_id,
+        fixture.binding.snapshot_id,
+    );
+    let expected_binding_id = fixture.binding.binding_id.clone();
     let root = fixture.root.clone();
     let state = Arc::new(test_app_state(fixture.store, &root));
     let router = routes().with_state(state.clone());
+
+    assert_eq!(
+        call(&router, Method::GET, &source_path, None, &Value::Null)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        call(
+            &router,
+            Method::GET,
+            &source_path,
+            Some(&outsider_token),
+            &Value::Null,
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    let (status, source) = call(
+        &router,
+        Method::GET,
+        &source_path,
+        Some(&owner_token),
+        &Value::Null,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{source}");
+    assert_eq!(
+        source["reference_binding"]["binding_id"],
+        expected_binding_id
+    );
+    assert_eq!(
+        source["snapshot"]["snapshot_id"],
+        fixture.binding.snapshot_id
+    );
 
     assert_eq!(
         call(&router, Method::POST, &path, None, &body).await.0,

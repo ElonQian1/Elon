@@ -4,14 +4,26 @@ use rusqlite::{params, Connection};
 use super::{
     read::{
         application_by_batch_on, batch_by_id_on, bindings_by_application_on, entries_by_batch_on,
-        review_by_batch_on,
+        review_by_batch_on, snapshot_binding_by_snapshot_on,
     },
     review::validate_exact,
-    types::ComputePlatformReferencePriceCurveBatchDetailReceipt,
+    types::{
+        ComputePlatformReferencePriceCurveBatchDetailReceipt,
+        ComputePlatformReferencePriceCurveSnapshotBindingReceipt,
+    },
 };
 use crate::store::Store;
 
 impl Store {
+    pub(crate) fn platform_reference_snapshot_binding(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<Option<ComputePlatformReferencePriceCurveSnapshotBindingReceipt>> {
+        validate_exact(snapshot_id, "reference price curve Snapshot ID", 200)?;
+        let connection = self.conn()?;
+        snapshot_binding_by_snapshot_on(&connection, snapshot_id)
+    }
+
     pub(crate) fn platform_reference_price_curve_batch(
         &self,
         batch_id: &str,

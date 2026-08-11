@@ -41,6 +41,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(cancel_commitment),
         )
         .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/price-snapshots/:snapshot_id/capacity-commitment-source",
+            get(get_commitment_source),
+        )
+        .route(
             "/api/admin/compute/capacity-commitments/expire-due",
             post(expire_due),
         )
@@ -70,6 +74,25 @@ async fn create_commitment(
         &provider_id,
         &pool_id,
         body,
+    ))
+}
+
+async fn get_commitment_source(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, offer_id, snapshot_id)): Path<(String, String, String, String)>,
+) -> Response {
+    let owner_account_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    commitment_response(service::source_for_owner(
+        &state.store,
+        &owner_account_id,
+        &provider_id,
+        &pool_id,
+        &offer_id,
+        &snapshot_id,
     ))
 }
 

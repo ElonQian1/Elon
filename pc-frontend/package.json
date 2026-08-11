@@ -23,6 +23,7 @@
     "test:compute-reference-curves": "node ../scripts/test-pc-reference-curve-workbench.js",
     "test:compute-external-pools": "node ../scripts/test-pc-external-pool-workbench.js",
     "test:compute-attempt": "node ../scripts/test-pc-compute-attempt-workbenches.js",
+    "test:compute-capacity-commitment": "node ../scripts/test-pc-capacity-commitment-workbench.js",
     "test:plaza": "node scripts/test-project-plaza-carousel.mjs",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",
     "check:bundle-budget": "node ../scripts/test-pc-frontend-bundle-budget.js && node ../scripts/check-pc-frontend-bundle-budget.js",

@@ -8,7 +8,7 @@ pub(crate) mod test_support;
 mod tests;
 
 use anyhow::{bail, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     compute_federation::{
@@ -16,16 +16,24 @@ use crate::{
         capacity_commitment::ComputeCapacityCommitmentQuantity,
         market::ComputeDeliveryWindowBinding,
     },
+    compute_federation_price_snapshot_service,
     store::{
         CancelComputeCapacityCommitment, ComputeCapacityCommitmentCreateReceipt,
         ComputeCapacityCommitmentDetail, ComputeCapacityCommitmentExpiryReport,
-        ComputeCapacityCommitmentTerminalWriteReceipt, CreateComputeCapacityCommitment,
+        ComputeCapacityCommitmentTerminalWriteReceipt,
+        ComputePlatformReferencePriceCurveSnapshotBindingReceipt, CreateComputeCapacityCommitment,
         ExpireDueComputeCapacityCommitments, Store,
         COMPUTE_CAPACITY_COMMITMENT_CANCEL_CONFIRMATION,
         COMPUTE_CAPACITY_COMMITMENT_CREATE_CONFIRMATION,
         COMPUTE_CAPACITY_COMMITMENT_EXPIRE_DUE_CONFIRMATION,
     },
 };
+
+#[derive(Clone, Serialize)]
+pub(crate) struct CapacityCommitmentSourceView {
+    pub snapshot: crate::compute_federation::market::ComputePriceSnapshot,
+    pub reference_binding: ComputePlatformReferencePriceCurveSnapshotBindingReceipt,
+}
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -105,6 +113,37 @@ pub(crate) fn create_for_owner(
         idempotency_scope: operation_scope("create", owner_account_id),
         idempotency_key: body.idempotency_key,
         confirmation: COMPUTE_CAPACITY_COMMITMENT_CREATE_CONFIRMATION.to_string(),
+    })
+}
+
+pub(crate) fn source_for_owner(
+    store: &Store,
+    owner_account_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+    offer_id: &str,
+    snapshot_id: &str,
+) -> Result<CapacityCommitmentSourceView> {
+    let snapshot = compute_federation_price_snapshot_service::get_for_user(
+        store,
+        owner_account_id,
+        provider_id,
+        pool_id,
+        offer_id,
+        snapshot_id,
+    )?
+    .snapshot;
+    let reference_binding = store
+        .platform_reference_snapshot_binding(snapshot_id)?
+        .ok_or_else(|| anyhow::anyhow!("价格快照尚未获得平台参考价格审核绑定"))?;
+    if reference_binding.snapshot_id != snapshot.snapshot_id
+        || reference_binding.snapshot_digest != snapshot.snapshot_digest
+    {
+        bail!("平台参考价格绑定与价格快照不一致");
+    }
+    Ok(CapacityCommitmentSourceView {
+        snapshot,
+        reference_binding,
     })
 }
 
