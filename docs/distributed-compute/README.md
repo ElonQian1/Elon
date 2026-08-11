@@ -63,7 +63,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期，并按 Provider/状态读取本人队列；管理员 HTTP 可重建固定平台账户的 pending/available，并按状态读取全局队列。PC 已写入本人收益与管理员结算两套页面源码。视图和队列只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
-| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移，owner/管理员 onboarding→Provider 登记及 release 四眼复核→staged admission 两条 Store 状态机各通过 2 项专项；两者 service/API 未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md)、[`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md) 与 [`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) |
+| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移，两条 Store 状态机各通过 2 项专项；Adapter release 的 admin/owner Service/HTTP 又通过 2 项进程内接口验收，onboarding service/API 与 release 生产部署仍未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-acceptance.md`](external-pool-onboarding-acceptance.md)、[`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)、[`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md) |
 | 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -173,7 +173,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider 首段来源权威见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)，Adapter release 候选来源见 [`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)：v221/v222 已编译迁移且两条 Store 状态机各通过 2 项专项，但 service/API 仍未运行；onboarding application 与 staged admission 均不证明 artifact/verifier、credential、route、容量、派发或结算。
+服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider 首段来源权威见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)，Adapter release 候选来源见 [`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)：v221/v222 已编译迁移且两条 Store 状态机各通过 2 项专项；Adapter release 管理员 Service/HTTP 已通过 2 项进程内接口验收，但 onboarding service/API、release 生产部署、MCP/PC 写入口仍未运行。onboarding application 与 staged admission 均不证明 artifact/verifier、credential、route、容量、派发或结算。
 
 ### F4：容量期货市场
 

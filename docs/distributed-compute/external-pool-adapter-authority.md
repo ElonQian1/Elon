@@ -86,7 +86,7 @@ v221 目前已编译并在完整临时文件 Store 中完成迁移/重开，Stor
 
 只有第 1 至 4 项在同一 Store 权威中闭合后，未来 route producer 才能引用 onboarding application 写入 v213 rows。管理员审批、Provider adapter ref 或数据库中存在 non-bearer ref 都不能替代 credential proof。
 
-Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。两者的服务端源码现可编译，v221/v222 已随完整临时文件 Store 迁移和重开，且两条 Store 状态机各通过 2 项专项；两者的 service/API 均未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
+Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。两者的服务端源码现可编译，v221/v222 已随完整临时文件 Store 迁移和重开，且两条 Store 状态机各通过 2 项专项；Adapter release 管理员 Service/HTTP 另通过 2 项进程内接口验收，onboarding service/API 与 release 生产部署仍未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
 
 ## 6. 明确禁线
 

@@ -12,7 +12,7 @@ implementation_status: implementation_partially_verified
 
 本文冻结 `external_pool` Adapter release 的第一段平台来源：一名平台管理员提交精确 release 声明，另一名平台管理员独立复核，Store 再按已批准摘要执行 immutable stage apply。最大效果只是形成一份 `staged` admission source，供未来 Adapter registry producer 重新验证后引用。
 
-`staged` 只表示“平台允许继续准备这份精确候选”，不表示 artifact 已下载、字节摘要已重算、签名或供应链已验证、实现已加载、协议能力已验证、credential verifier 已存在或 route 已获授权。当前已形成领域 DTO/规范摘要校验、Store-private submit/review/apply/exact readback、v222 三账本/trigger 源码，并接入 `compute_federation`、`Store` 与 `MIGRATIONS`；服务端源码、完整临时文件 Store 迁移/重开，以及 release submit→独立 review→staged apply 状态机均已执行。service/HTTP/MCP/PC、角色证明、artifact 与外部网络仍未运行。
+`staged` 只表示“平台允许继续准备这份精确候选”，不表示 artifact 已下载、字节摘要已重算、签名或供应链已验证、实现已加载、协议能力已验证、credential verifier 已存在或 route 已获授权。当前已形成领域 DTO/规范摘要校验、Store submit/review/apply/exact readback、v222 三账本/trigger，以及仅限 `admin/owner` 的 Service/HTTP submit→独立 review→stage 入口；服务端编译、完整临时文件 Store 迁移/重开、Store 状态机和进程内 HTTP 接口均已执行。生产部署、MCP/PC 写入口、artifact、verifier 与外部网络仍未运行。
 
 本权威与 Provider onboarding 分开：onboarding application 批准某个 Provider 使用指定 Adapter release/config；release admission 则冻结平台愿意继续审查的 Adapter 候选。任一来源都不能替代另一来源。
 
@@ -20,7 +20,7 @@ implementation_status: implementation_partially_verified
 
 ### 2.1 平台管理员提交
 
-未来 submit 入口只允许当前 `admin/owner` 提交，不接受 Provider owner 以本人身份自助登记 release。当前 Store-private 源码只校验 `submitted_by_admin_user_id` 的形状，未查询或证明调用者具有 `admin/owner` 角色；该权限门卫必须由后续 service/API 批次闭合。请求必须采用拒绝未知字段的版本化信封、RFC 8785 JCS、SHA-256 摘要和稳定幂等键，并只携带：
+当前 HTTP submit 入口只允许已登录的 `admin/owner`，不接受 Provider owner 以本人身份自助登记 release。Service 从认证会话派生 `submitted_by_admin_user_id`，外部 JSON 拒绝该字段和其他未知字段；进程内接口测试已覆盖未登录、普通用户越权及 actor 注入。请求必须采用拒绝未知字段的 DTO、RFC 8785 JCS、SHA-256 摘要和稳定幂等键，并只携带：
 
 - `adapter_id` 与 `release_version`；
 - `route_kind=server_adapter`；
@@ -84,17 +84,17 @@ apply 只消费仍为 `approved` 的 exact request/review、稳定幂等键、�
 - 禁止把 expected verifier binding 称为 verifier registry/currentness 或 credential proof。
 - 禁止从 request/review/admission 写入 `compute_route_adapters`、`compute_route_adapter_versions`、credential、route authorization、capability 或 seal 行。
 - 禁止改变 Provider 状态，或创建 CapacityPool、Supply、Offer、Price Snapshot、Job、Reservation、Execution Plan、outbox、Lease、Receipt 与 settlement。
-- 禁止因领域、v222 与 Store-private 源码已经形成就开放 HTTP/MCP/PC 写入口；权限、角色证明、脱敏响应和 service/API 合同仍须另批闭合。
+- HTTP 写入口只允许 `admin/owner`，actor 必须来自认证会话，响应只返回摘要回执；禁止在没有独立权限批次的情况下复用为 MCP/PC 写入口。
 - 禁止把 staged admission 描述为 Adapter 可执行、外部矿池在线或商业可用。
 
 ## 6. 与后续批次的截止线
 
-本批只形成 release staging 权威及 Store 层已验证、生产入口未接线的领域/Store-private/v222 实现。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
+当前形成 release staging 权威、已验证 Store 状态机和进程内管理员 Service/HTTP；生产部署与真实环境仍未接线。credential resolver/verifier、verifier registry、service actor issuance、Adapter registry activation、route issuance、Provider activation、transport 与 authenticated ACK/event 均属于后续独立批次。
 
 后续 route producer 只有在 Adapter registry、sealed credential verification、TTL/revocation、service actor、六能力 currentness 和 onboarding source 在同一 Store 权威中闭合后，才允许写 v213 credential/route/seal rows。release admission 自身永远不跨越这条截止线。
 
 ## 7. 当前验收边界
 
-当前 2 项定向 Rust/SQLite 测试已执行完整临时文件迁移、submit、精确 submit 重放、独立管理员 approved review、精确 review 重放、staged apply、精确 apply 重放、关闭数据库、重开后再次精确读回，以及同 release 冲突、同人复核、错误确认语、`changes_requested` 禁止 apply 和改变历史重放等失败关闭路径。证据见 [`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md)。
+当前 2 项定向 Rust/SQLite Store 测试已执行完整临时文件迁移、submit、精确重放、独立复核、stage、重开读回及失败关闭路径；另 2 项进程内 HTTP 测试覆盖 `401/403`、actor 注入、四眼复核、确认门卫、摘要冲突、脱敏回执与 immutable replay。证据见 [`external-pool-adapter-release-acceptance.md`](external-pool-adapter-release-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md)。
 
 状态为 `implementation_partially_verified`。Store 状态机已运行不等于生产数据库已经升级、角色权限已经验证、入口已经开放或任何生产 Adapter 能力已经存在；并发、异常断电、HTTP、artifact、verifier、route 与网络仍未验证。
