@@ -35,18 +35,24 @@ if ($platformHash -ne $coffeeHash) {
 }
 
 $platformImplementation = @(
+    Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_runtime_model.rs")
     Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_runtime_client.rs")
+    Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_runtime_service.rs")
     Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_service.rs")
     Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_merchant_evidence_model.rs")
 ) -join "`n"
 $coffeeSecurity = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\security.rs")
 $coffeeService = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\service.rs")
+$coffeeModels = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\models.rs")
+$coffeeManifest = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\manifest.rs")
+$coffeeOrderRepository = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\order_repository.rs")
 $coffeeBusinessReceipt = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\business_receipt.rs")
 
 foreach ($required in @(
     "merchant_runtime.invoke.v1",
     "merchant_runtime.result.v1",
     "x-yilong-runtime-signature",
+    "action_confirmation_id",
     "open_commerce.merchant_business_receipt.v1",
     "validate_optional_business_receipt"
 )) {
@@ -77,11 +83,19 @@ foreach ($required in @(
     '"order.quote.create"',
     '"order.commit"',
     '"order.status.read"',
-    "confirmed_by_user"
+    "action_confirmation_id",
+    "credential_environment",
+    "credential_id"
 )) {
-    if (-not $coffeeService.Contains($required)) {
-        throw "Coffee runtime service does not implement contract guard: $required"
+    if (-not (($coffeeService + $coffeeModels + $coffeeOrderRepository).Contains($required))) {
+        throw "Coffee runtime does not implement signed request context: $required"
     }
+}
+if (-not $coffeeOrderRepository.Contains('"confirmation_authority":"platform_signed_envelope"')) {
+    throw "Coffee order audit snapshot does not preserve the platform confirmation authority"
+}
+if ($coffeeManifest.Contains("confirmed_by_user") -or $coffeeManifest.Contains('"confirmation_id"')) {
+    throw "Coffee order manifest still exposes a second business-input confirmation authority"
 }
 
 Write-Output "OPEN_COMMERCE_MERCHANT_RUNTIME_CONTRACT=passed"

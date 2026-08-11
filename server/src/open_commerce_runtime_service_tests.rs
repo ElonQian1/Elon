@@ -8,8 +8,11 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
+    open_commerce_action_confirmation_mcp,
     open_commerce_action_confirmation_model::ACTION_CONFIRMATION_PHRASE,
-    open_commerce_action_confirmation_service, open_commerce_invocation_service,
+    open_commerce_developer_model::CreateDeveloperAppRequest,
+    open_commerce_merchant_evidence_model::BUSINESS_RECEIPT_SCHEMA,
+    open_commerce_merchant_evidence_service,
     open_commerce_model::{
         CreateCapabilityRequest, CreateMerchantRequest, InvokeCapabilityRequest, ACCESS_PUBLIC,
         HANDLER_MERCHANT_RUNTIME,
@@ -64,6 +67,17 @@ async fn verified_runtime_is_signed_metered_audited_and_idempotent() {
         app_id: "pc-web",
         project_role: Some("owner"),
     };
+    let consumer_app_id = "consumer.ai";
+    store
+        .create_open_commerce_developer_app(
+            &project.id,
+            &owner.id,
+            CreateDeveloperAppRequest {
+                app_id: consumer_app_id.to_string(),
+                display_name: "Consumer AI".to_string(),
+            },
+        )
+        .unwrap();
     let merchant = open_commerce_service::create_merchant(
         &store,
         &project.id,
@@ -159,31 +173,53 @@ async fn verified_runtime_is_signed_metered_audited_and_idempotent() {
         },
     )
     .unwrap();
-    let action_request = || InvokeCapabilityRequest {
-        merchant_id: merchant.id.clone(),
-        capability_key: "order.commit".to_string(),
-        requester_app_id: "pc-web".to_string(),
-        grant_id: None,
-        idempotency_key: "order-commit-runtime-e2e".to_string(),
-        input: json!({"quote_id":"quote-1"}),
-    };
-    let prepared =
-        open_commerce_action_confirmation_service::prepare(&store, &actor, action_request())
-            .unwrap();
-    let confirmed = open_commerce_action_confirmation_service::confirm(
+    let prepared = open_commerce_action_confirmation_mcp::call_if_handled(
         &store,
-        &actor,
-        &prepared.id,
-        ACTION_CONFIRMATION_PHRASE,
-    )
-    .unwrap();
-    let committed = open_commerce_invocation_service::invoke_with_action_confirmation(
-        &store,
-        &actor,
-        action_request(),
-        Some(&confirmed.id),
+        &owner.id,
+        "owner",
+        consumer_app_id,
+        "open_commerce_prepare_action_confirmation",
+        json!({
+            "merchant_id":merchant.id,
+            "capability_key":"order.commit",
+            "idempotency_key":"order-commit-runtime-e2e",
+            "input":{"quote_id":"quote-1"}
+        }),
     )
     .await
+    .unwrap()
+    .unwrap();
+    let confirmation_id = prepared["id"].as_str().unwrap();
+    let confirmed = open_commerce_action_confirmation_mcp::call_if_handled(
+        &store,
+        &owner.id,
+        "owner",
+        consumer_app_id,
+        "open_commerce_confirm_action_confirmation",
+        json!({
+            "confirmation_id":confirmation_id,
+            "confirmation_phrase":ACTION_CONFIRMATION_PHRASE
+        }),
+    )
+    .await
+    .unwrap();
+    assert!(confirmed.is_some());
+    let committed = open_commerce_action_confirmation_mcp::call_if_handled(
+        &store,
+        &owner.id,
+        "owner",
+        consumer_app_id,
+        "open_commerce_invoke",
+        json!({
+            "merchant_id":merchant.id,
+            "capability_key":"order.commit",
+            "idempotency_key":"order-commit-runtime-e2e",
+            "action_confirmation_id":confirmation_id,
+            "input":{"quote_id":"quote-1"}
+        }),
+    )
+    .await
+    .unwrap()
     .unwrap();
 
     assert_eq!(first["result"]["items"][0]["product_id"], "coffee-latte");
@@ -200,16 +236,35 @@ async fn verified_runtime_is_signed_metered_audited_and_idempotent() {
     assert_eq!(first["settlement_receipt"]["amount_micros"], 1_000);
     assert_eq!(replay["replayed"], true);
     assert_eq!(committed["result"]["order_id"], "order-runtime-1");
+    let evidence = open_commerce_merchant_evidence_service::get_evidence(
+        &store,
+        &project.id,
+        &merchant.id,
+        committed["invocation_id"].as_str().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        evidence.evidence.source_authority,
+        "merchant_runtime_asserted"
+    );
+    assert_eq!(evidence.evidence.receipt_state, "valid");
+    assert_eq!(
+        evidence
+            .evidence
+            .business_receipt
+            .as_ref()
+            .unwrap()
+            .reference_id,
+        "order-runtime-1"
+    );
+    assert!(!evidence.evidence.funds_moved);
     assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 3);
     let envelopes = runtime_state.envelopes.lock().unwrap();
     let order_envelope = envelopes
         .iter()
         .find(|value| value["capability_key"] == "order.commit")
         .unwrap();
-    assert_eq!(
-        order_envelope["action_confirmation_id"],
-        confirmed.id.as_str()
-    );
+    assert_eq!(order_envelope["action_confirmation_id"], confirmation_id);
     assert_eq!(order_envelope["credential_environment"], "platform");
     assert_eq!(order_envelope["credential_id"], Value::Null);
     drop(envelopes);
@@ -257,7 +312,19 @@ async fn runtime_handler(
             "manifest_sha256": MANIFEST_SHA256
         })
     } else if capability_key == "order.commit" {
-        json!({"order_id":"order-runtime-1","status":"confirmed"})
+        json!({
+            "order_id":"order-runtime-1",
+            "status":"confirmed",
+            "_yilong_business_receipt":{
+                "schema":BUSINESS_RECEIPT_SCHEMA,
+                "entity_type":"order",
+                "reference_id":"order-runtime-1",
+                "state":"confirmed",
+                "occurred_at":"2026-08-12T03:00:00Z",
+                "amount_minor":2600,
+                "currency":"CNY"
+            }
+        })
     } else {
         json!({
             "items":[{
