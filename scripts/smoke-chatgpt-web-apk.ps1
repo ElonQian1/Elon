@@ -61,9 +61,11 @@ function Invoke-ApkMcp {
         DeviceSerial = $DeviceSerial
         Tool = $Tool
         Arguments = ($Arguments | ConvertTo-Json -Depth 20 -Compress)
-        OpenAppOnFailure = $true
     }
-    if ($EnsureMainActivity) { $params.EnsureMainActivity = $true }
+    if ($EnsureMainActivity) {
+        $params.EnsureMainActivity = $true
+        $params.OpenAppOnFailure = $true
+    }
     $response = & $invokeMcp @params
     if ($response.result.isError) {
         throw "APK MCP tool failed: $Tool"
@@ -113,7 +115,20 @@ function Get-TopResumedActivity {
     $line = @(Invoke-Adb shell dumpsys activity activities) |
         Where-Object { $_ -match 'topResumedActivity=' } |
         Select-Object -First 1
+    if ($null -eq $line) { return "" }
     return ([string]$line).Trim()
+}
+
+function Wait-ChatGptActivityForeground {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
+    do {
+        $top = Get-TopResumedActivity
+        if ($top -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b') {
+            return $top
+        }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $top
 }
 
 function Get-VisibleUiXml {
@@ -303,7 +318,7 @@ $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT We
         $value.bridge_state -eq "ready" -and
         $value.activity_bound -eq $true
 }
-$topResumedActivity = Get-TopResumedActivity
+$topResumedActivity = Wait-ChatGptActivityForeground
 $officialUiXml = Get-VisibleUiXml
 
 Add-Check "open_chatgpt_web" ($opened.control_ok -eq $true) ([string]$opened.action)

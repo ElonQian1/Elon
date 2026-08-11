@@ -47,6 +47,9 @@ Assert-Contains 'Add-Check "official_view_restored"'
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
 Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
 Assert-Contains 'function Get-TopResumedActivity'
+Assert-Contains 'if ($null -eq $line) { return "" }'
+Assert-Contains 'function Wait-ChatGptActivityForeground'
+Assert-Contains '$topResumedActivity = Wait-ChatGptActivityForeground'
 Assert-Contains 'Add-Check "chatgpt_target_bound"'
 Assert-Contains '$opened.target_activity_bound -eq $true'
 Assert-Contains 'Add-Check "chatgpt_activity_foreground"'
@@ -152,6 +155,9 @@ if ($source.Contains('Wait-CommandResult -Action $commandAction')) {
 }
 if ($source.Contains('ToUnixTimeMilliseconds()')) {
     throw "ChatGPT Web smoke must compare bridge timestamps from the same device clock."
+}
+if ($source -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMainActivity = \$true\s*\$params\.OpenAppOnFailure = \$true\s*\}') {
+    throw "ChatGPT Web smoke must relaunch MainActivity only for an explicit initial bootstrap."
 }
 
 $featuresIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_list_features"')

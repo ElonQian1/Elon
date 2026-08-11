@@ -29,9 +29,12 @@ function Wait-ReadySession {
 }
 
 function Get-AppPid {
-    return (Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-        -Arguments @("shell", "sh", "-c", "pidof com.elon.app 2>/dev/null || true") -TimeoutSec 10 `
-        -Label "read Elon app pid").Trim()
+    $result = Invoke-ElonNativeCommand -FilePath $runtime.adb `
+        -ArgumentList @("-s", $runtime.device_serial, "shell", "pidof", "com.elon.app") `
+        -TimeoutSeconds 10 -Label "read Elon app pid"
+    if ($result.ExitCode -eq 1 -and -not $result.TimedOut) { return "" }
+    Assert-ElonNativeCommand -Result $result -FailureMessage "read Elon app pid failed"
+    return ([string]$result.Stdout).Trim()
 }
 
 function Get-ContextIdentity {

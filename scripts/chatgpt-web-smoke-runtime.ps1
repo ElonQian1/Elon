@@ -115,9 +115,11 @@ function Invoke-ChatGptWebSmokeMcp {
         DeviceSerial = $Runtime.device_serial
         Tool = $Tool
         Arguments = ($Arguments | ConvertTo-Json -Depth 20 -Compress)
-        OpenAppOnFailure = $true
     }
-    if ($EnsureMainActivity) { $params.EnsureMainActivity = $true }
+    if ($EnsureMainActivity) {
+        $params.EnsureMainActivity = $true
+        $params.OpenAppOnFailure = $true
+    }
     $responses = @(& $Runtime.invoke_mcp @params)
     $response = $responses | Select-Object -Last 1
     if ($null -eq $response -or $response.result.isError) {

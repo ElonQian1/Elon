@@ -65,6 +65,9 @@ foreach ($token in @(
 if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
     throw "Trusted device runtime must not create a wireless adb connection."
 }
+if ($runtime -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMainActivity = \$true\s*\$params\.OpenAppOnFailure = \$true\s*\}') {
+    throw "Trusted runtime must relaunch MainActivity only for an explicit initial bootstrap."
+}
 . $runtimePath
 $wirelessRejected = $false
 try {

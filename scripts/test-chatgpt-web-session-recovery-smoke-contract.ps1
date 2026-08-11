@@ -6,6 +6,8 @@ $source = Get-Content -LiteralPath $path -Raw
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Wait-ReadySession",
+    'Invoke-ElonNativeCommand -FilePath $runtime.adb',
+    'if ($result.ExitCode -eq 1 -and -not $result.TimedOut) { return "" }',
     '"force-stop", "com.elon.app"',
     "ChatGPT conversation identity changed",
     "ChatGPT view mode was not restored",
@@ -25,6 +27,9 @@ foreach ($needle in $required) {
 }
 if ($source.Contains("pm clear") -or $source.Contains("removeAllCookies")) {
     throw "Session recovery smoke must preserve app data and cookies."
+}
+if ($source.Contains('"shell", "sh", "-c"')) {
+    throw "Session recovery smoke must pass pidof directly through adb on Windows."
 }
 
 Write-Output "CHATGPT_WEB_SESSION_RECOVERY_SMOKE_CONTRACT=passed"
