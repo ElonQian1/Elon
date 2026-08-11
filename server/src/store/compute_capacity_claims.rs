@@ -33,7 +33,9 @@ use super::{
 
 mod validation;
 
-use validation::{parse_utc, validate_hold_input};
+use validation::{
+    parse_utc, validate_hold_input, CAPACITY_COMMITMENT_SUBJECT_KIND, RESERVATION_SUBJECT_KIND,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct HoldComputeCapacityClaimLine {
@@ -76,10 +78,15 @@ impl Store {
         input: HoldComputeCapacityClaim,
     ) -> Result<HoldComputeCapacityClaimReceipt> {
         validate_hold_input(&input)?;
-        if input.subject_kind.trim() == "compute_reservation"
-            || input.causal_binding.reservation_id.is_some()
+        if matches!(
+            input.claim_kind,
+            ComputeCapacityClaimKind::Reservation | ComputeCapacityClaimKind::CapacityCommitment
+        ) || matches!(
+            input.subject_kind.trim(),
+            RESERVATION_SUBJECT_KIND | CAPACITY_COMMITMENT_SUBJECT_KIND
+        ) || input.causal_binding.reservation_id.is_some()
         {
-            bail!("Reservation-bound 容量 Hold 必须由外层事务内入口创建");
+            bail!("受保护容量 Hold 必须由对应外层事务内入口创建");
         }
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;

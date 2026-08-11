@@ -4,7 +4,8 @@ use super::super::{
         canonical_snapshot_binding_json_and_digest, canonical_snapshot_binding_set_digest,
     },
     types::{
-        StoredApplication, StoredSnapshotBinding, APPLICATION_STATUS_APPLIED,
+        ComputePlatformReferencePriceCurveSnapshotBindingReceipt, StoredApplication,
+        StoredSnapshotBinding, APPLICATION_STATUS_APPLIED,
         PLATFORM_REFERENCE_PRICE_CURVE_APPLICATION_SCHEMA,
         PLATFORM_REFERENCE_PRICE_CURVE_SNAPSHOT_BINDING_SCHEMA, REVIEW_DECISION_APPROVED,
     },
@@ -46,6 +47,36 @@ pub(in crate::store::compute_platform_reference_price_curve) fn bindings_by_appl
     let application = application_on(conn, "WHERE application_id=?1", params![application_id])?
         .ok_or_else(|| anyhow::anyhow!("reference price curve bindings lost their application"))?;
     bindings_for_application_on(conn, &application)
+}
+pub(in crate::store::compute_platform_reference_price_curve) fn snapshot_binding_by_snapshot_on(
+    conn: &Connection,
+    snapshot_id: &str,
+) -> Result<Option<ComputePlatformReferencePriceCurveSnapshotBindingReceipt>> {
+    let stored = conn
+        .query_row(
+            "SELECT binding_json
+               FROM compute_platform_reference_price_curve_snapshot_bindings
+              WHERE snapshot_id=?1",
+            params![snapshot_id],
+            |row| {
+                let binding_json: String = row.get(0)?;
+                Ok(StoredSnapshotBinding {
+                    envelope: decode(&binding_json, 0)?,
+                    binding_json,
+                })
+            },
+        )
+        .optional()?;
+    let Some(stored) = stored else {
+        return Ok(None);
+    };
+    let application = application_on(
+        conn,
+        "WHERE application_id=?1",
+        params![stored.envelope.binding.application_id.as_str()],
+    )?
+    .ok_or_else(|| anyhow::anyhow!("reference price curve binding lost its application"))?;
+    audit_binding(conn, stored, &application).map(|binding| Some(binding.into_receipt()))
 }
 fn application_on<P: rusqlite::Params>(
     conn: &Connection,

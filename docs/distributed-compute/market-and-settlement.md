@@ -124,7 +124,7 @@ platform_margin
 
 V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v201 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185-v194 已形成 Attempt 证据、可信终态和容量收口；v195-v199 已形成 CNY 待结算、消费者挑战、纠正与 available 释放；v200/v201 已形成 Provider 本人提款申请，以及取消、拒绝或外部已付款声明的唯一终态。真实价格源、自动撮合、节点真实运行接线、非金额补救、available 追索、自动释放、外部付款和证据自动核验仍未实现。
 
-v225 CapacityCommitment 已形成 `design_frozen/source_not_written` 的最窄合同：一个 immutable revision 1 `committed` 事实加每个 Commitment 最多一个 revision 2 `canceled|expired` terminal receipt，current status 由 LEFT JOIN 派生。Create 必须同事务锁定 current Provider/Offer/Pool、未过期 `capacity_future` v171 Snapshot、已批准应用的 exact v223 binding 和完整 meter/window；数量与余额继续只属于同一 Claim lines/ledger。设计不包含 DeliveryAllocation、订单/持仓、资金或结算，详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。
+v225 CapacityCommitment 已形成 `implementation_uncompiled/implementation_unrun` 的最窄静态实现：一个 immutable revision 1 `committed` 事实加每个 Commitment 最多一个 revision 2 `canceled|expired` terminal receipt，current status 由 LEFT JOIN 派生。Create 在同一事务锁定 current Provider/Offer/Pool、未过期 `capacity_future` v171 Snapshot、已批准应用的 exact v223 binding 和完整 meter/window；数量与余额继续只属于同一 Claim lines/ledger。实现不包含 DeliveryAllocation、订单/持仓、资金或结算，详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。
 
 市场对象分层：
 
@@ -177,4 +177,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 本文是已接受的目标市场合同。当前代码已写入 Offer-owner fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v201 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款流程；各段验证状态以专题验收文档为准。平台 reference fallback 的 v223 Store/application 与 v224 管理员 HTTP/MCP、TTL/升级门卫已有分层验证，但仍不代表真实价格。v195 只结清预授权并登记 pending；v196-v199 只处理内部挑战、纠正和 available 释放；v200 只冻结 Provider 本人的提款额；v201 的取消/拒绝只返还内部余额，`external_paid_attested` 只保存管理员声明与证据摘要。它们都不代表生产支付已经由平台执行或验证。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、真实付款、证据自动核验、指数/标记价、订单簿、持仓和外部清算仍未实现。
 
-v225 CapacityCommitment 仅完成本文与专题权威的 docs-first 冻结，当前为 `design_frozen/source_not_written`：没有 Rust、迁移、Store、Service、HTTP 或测试源码，未编译、未测试、未执行迁移、未运行。不得把该设计、v171 Snapshot 或 v223 fallback binding 描述为容量承诺、价格真实性、DeliveryAllocation、资金结算或生产市场已经可用。
+v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router 源码，当前为 `implementation_uncompiled/implementation_unrun`：只完成 rustfmt、差异/尺寸门卫与独立静态审计，未编译、未测试、未执行迁移、未运行。不得把静态源码、v171 Snapshot 或 v223 fallback binding 描述为容量承诺生产可用、价格真实性、DeliveryAllocation 或资金结算已经闭合。

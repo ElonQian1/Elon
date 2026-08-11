@@ -612,6 +612,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .merge(crate::compute_federation::external_pool_adapter_release_api::routes())
         .merge(crate::compute_federation::external_pool_onboarding_api::routes())
         .merge(crate::compute_federation::platform_reference_price_curve_api::routes())
+        .merge(crate::compute_federation::capacity_commitment_api::routes())
         .merge(crate::compute_federation_attempt_api::routes())
         .merge(crate::compute_federation_attempt_finalization_api::routes())
         .merge(crate::compute_federation_attempt_settlement_api::routes())

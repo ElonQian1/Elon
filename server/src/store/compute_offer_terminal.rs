@@ -65,7 +65,7 @@ impl Store {
         {
             bail!("只有当前版本和摘要精确匹配的 draining Offer 可以进入终态");
         }
-        ensure_no_live_reservations(&tx, input.offer_id.trim())?;
+        ensure_no_live_contracts(&tx, input.offer_id.trim())?;
         if input.target_status == OFFER_STATUS_EXPIRED {
             let valid_until = DateTime::parse_from_rfc3339(&previous.offer.valid_until)
                 .context("Offer 有效期不是 RFC3339")?;
@@ -158,15 +158,27 @@ impl Store {
     }
 }
 
-fn ensure_no_live_reservations(conn: &rusqlite::Connection, offer_id: &str) -> Result<()> {
-    let live_count = conn.query_row(
+fn ensure_no_live_contracts(conn: &rusqlite::Connection, offer_id: &str) -> Result<()> {
+    let live_reservations = conn.query_row(
         "SELECT COUNT(*) FROM compute_reservations
           WHERE offer_id=?1 AND status IN ('pending', 'active')",
         params![offer_id],
         |row| row.get::<_, i64>(0),
     )?;
-    if live_count > 0 {
-        bail!("Offer 仍有 {live_count} 个 pending/active Reservation，拒绝进入终态");
+    if live_reservations > 0 {
+        bail!("Offer 仍有 {live_reservations} 个 pending/active Reservation，拒绝进入终态");
+    }
+    let live_commitments = conn.query_row(
+        "SELECT COUNT(*)
+           FROM compute_capacity_commitments AS commitment
+           LEFT JOIN compute_capacity_commitment_terminal_receipts AS terminal
+             ON terminal.commitment_id=commitment.commitment_id
+          WHERE commitment.offer_id=?1 AND terminal.commitment_id IS NULL",
+        params![offer_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if live_commitments > 0 {
+        bail!("Offer 仍有 {live_commitments} 个 committed CapacityCommitment，拒绝进入终态");
     }
     Ok(())
 }

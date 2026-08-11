@@ -62,7 +62,7 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 | `reservation_released` | `held -> available` | 取消或显式释放 |
 | `reservation_expired` | `held -> available` | 到期恢复器 |
 
-v225 CapacityCommitment 已冻结 docs-first 合同但源码尚未编写：Create 使用独立 `capacity_commitment` claim kind 和 `compute_capacity_commitment` subject，把完整 meter/window 以既有 `reservation_held` 从 `available` 移到 `held`；Cancel/Expire 分别复用 `reservation_released`/`reservation_expired` 归还。Commitment 不复制数量或余额，数量仍只读 exact Claim lines，余额仍只读 ledger。DeliveryAllocation、Claim 归属转移和 Attempt 激活不属于 v225，见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。
+v225 CapacityCommitment 静态源码已接线：Create 使用独立 `capacity_commitment` claim kind 和 `compute_capacity_commitment` subject，把完整 meter/window 以既有 `reservation_held` 从 `available` 移到 `held`；Cancel/Expire 分别复用 `reservation_released`/`reservation_expired` 归还。Commitment 不复制数量或余额，数量仍只读 exact Claim lines，余额仍只读 ledger。当前为 `implementation_uncompiled/implementation_unrun`；DeliveryAllocation、Claim 归属转移和 Attempt 激活不属于 v225，见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md)。
 
 ## 4. 原子 Reserve
 
@@ -80,7 +80,7 @@ v225 CapacityCommitment 已冻结 docs-first 合同但源码尚未编写：Creat
 
 当前容量 Store 已把 Claim Hold/Finish/Activation/Attempt Return 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 Hold/Finish kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation；Finish 继承原始 held 绑定并精确引用因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记；v176 对尚未激活 Attempt 的 active Reservation 原子完成退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired。v185 通过仅供外层事务使用的 Activation kernel 将既有 Claim `held -> active`，并把 Attempt Lease ID 和 fencing generation 写入容量因果链，再与 Job/Reservation 新版本和不可变激活回执一同提交。v186 只更新 Lease 状态投影和追加续租回执，不触碰容量账本。v187 的外层事务精确复核 v185 激活、revision 1 staging Lease、无心跳、Provider 所有权和原预算后，调用 Attempt Return kernel 追加 `attempt_returned`，把 Claim `active -> released` 及容量 `active -> available` 与退款和其余终态一起提交。上述状态均为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`；它们不发送节点命令，v187 也不覆盖已运行任务的实际用量或结算。
 
-v225 实现时必须继续复用这些 private kernels，但同时把 public generic Hold、public generic Finish 与 generic expiry recovery 对 Commitment 全部失败关闭。只有 Commitment 外层事务可创建或终结该 Claim，并在同一事务写 immutable commitment 或唯一 terminal receipt；否则会产生 Claim 已释放/过期而 Commitment 仍 committed 的分裂真源。该封口当前仍是 `source_not_written`。
+v225 已继续复用这些 private kernels，并把 public generic Hold、public generic Finish 与 generic expiry recovery 对 Commitment 全部失败关闭。只有 Commitment 外层事务可创建或终结该 Claim，并在同一事务写 immutable commitment 或唯一 terminal receipt；否则会产生 Claim 已释放/过期而 Commitment 仍 committed 的分裂真源。该封口已有静态源码和只读审计，但尚未编译、测试、迁移或运行。
 
 ## 5. Attempt 与容量
 

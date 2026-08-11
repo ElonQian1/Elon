@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, Transaction, TransactionBehavior};
 use serde::Serialize;
 
 use crate::compute_federation::capacity::{
     ComputeCapacityAccount, ComputeCapacityCausalBinding, ComputeCapacityClaim,
-    ComputeCapacityClaimEffectBinding, ComputeCapacityClaimState, ComputeCapacityEventKind,
-    ComputeCapacityLedgerTransaction, ComputeCapacityMovementLine, ComputeCapacityOfferBinding,
-    COMPUTE_CAPACITY_TRANSACTION_SCHEMA,
+    ComputeCapacityClaimEffectBinding, ComputeCapacityClaimKind, ComputeCapacityClaimState,
+    ComputeCapacityEventKind, ComputeCapacityLedgerTransaction, ComputeCapacityMovementLine,
+    ComputeCapacityOfferBinding, COMPUTE_CAPACITY_TRANSACTION_SCHEMA,
 };
 
 use super::{
@@ -18,15 +18,21 @@ use super::{
     },
     compute_capacity_ledger::ComputeCapacityLedgerWriteReceipt,
     compute_capacity_posting::{
-        balances_for_transaction_on, capacity_causal_transaction_on, event_kind_value,
-        finalize_transaction_digest, held_claim_causal_transaction_on, next_ledger_sequence_on,
-        post_capacity_transaction_on, reservation_capacity_causal_binding,
+        event_kind_value, finalize_transaction_digest, held_claim_causal_transaction_on,
+        next_ledger_sequence_on, post_capacity_transaction_on, reservation_capacity_causal_binding,
         StoredCapacityCausalTransaction,
     },
     compute_capacity_request_digest::finish_claim_request_digest,
     compute_capacity_rows::stored_bucket_on,
     new_id, now, Store,
 };
+
+mod replay;
+
+use replay::{read_existing_transition_on, replay_existing_transition_on};
+
+const RESERVATION_SUBJECT_KIND: &str = "compute_reservation";
+const CAPACITY_COMMITMENT_SUBJECT_KIND: &str = "compute_capacity_commitment";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComputeCapacityClaimTerminalAction {
@@ -56,6 +62,13 @@ pub(crate) struct FinishComputeCapacityClaimReceipt {
     pub ledger: ComputeCapacityLedgerWriteReceipt,
 }
 
+struct ExpectedFinishBinding {
+    claim_kind: ComputeCapacityClaimKind,
+    subject_kind: &'static str,
+    subject_id: String,
+    causal_binding: ComputeCapacityCausalBinding,
+}
+
 impl Store {
     pub(crate) fn finish_compute_capacity_claim(
         &self,
@@ -76,33 +89,63 @@ pub(super) fn finish_compute_capacity_reservation_claim_on(
     job_id: &str,
     reservation_id: &str,
 ) -> Result<FinishComputeCapacityClaimReceipt> {
-    let expected_causal_binding =
-        reservation_capacity_causal_binding(offer, job_id, reservation_id)?;
-    finish_compute_capacity_claim_on(tx, input, Some(&expected_causal_binding))
+    let expected = ExpectedFinishBinding {
+        claim_kind: ComputeCapacityClaimKind::Reservation,
+        subject_kind: RESERVATION_SUBJECT_KIND,
+        subject_id: reservation_id.trim().to_string(),
+        causal_binding: reservation_capacity_causal_binding(offer, job_id, reservation_id)?,
+    };
+    finish_compute_capacity_claim_on(tx, input, Some(&expected))
+}
+
+pub(super) fn finish_compute_capacity_commitment_claim_on(
+    tx: &Transaction<'_>,
+    input: FinishComputeCapacityClaim,
+    offer: ComputeCapacityOfferBinding,
+    commitment_id: &str,
+) -> Result<FinishComputeCapacityClaimReceipt> {
+    if commitment_id.trim().is_empty() || commitment_id != commitment_id.trim() {
+        bail!("CapacityCommitment-bound 容量 Finish 的 Commitment ID 无效");
+    }
+    if offer.offer_id.trim().is_empty()
+        || offer.offer_id != offer.offer_id.trim()
+        || offer.offer_version <= 0
+        || offer.offer_digest.trim().is_empty()
+        || offer.offer_digest != offer.offer_digest.trim()
+    {
+        bail!("CapacityCommitment-bound 容量 Finish 的 Offer 绑定无效");
+    }
+    let expected = ExpectedFinishBinding {
+        claim_kind: ComputeCapacityClaimKind::CapacityCommitment,
+        subject_kind: CAPACITY_COMMITMENT_SUBJECT_KIND,
+        subject_id: commitment_id.to_string(),
+        causal_binding: ComputeCapacityCausalBinding {
+            offer: Some(offer),
+            job_id: None,
+            reservation_id: None,
+            attempt_lease_id: None,
+            fencing_generation: None,
+        },
+    };
+    finish_compute_capacity_claim_on(tx, input, Some(&expected))
 }
 
 fn finish_compute_capacity_claim_on(
     tx: &Transaction<'_>,
     input: FinishComputeCapacityClaim,
-    expected_causal_binding: Option<&ComputeCapacityCausalBinding>,
+    expected: Option<&ExpectedFinishBinding>,
 ) -> Result<FinishComputeCapacityClaimReceipt> {
     validate_finish_input(&input)?;
     let request_digest = finish_claim_request_digest(&input)?;
     let transaction_scope = transaction_scope(&input);
     let claim =
         stored_claim_on(tx, input.claim_id.trim())?.ok_or_else(|| anyhow!("容量 Claim 不存在"))?;
-    validate_finish_claim_binding(&claim, expected_causal_binding)?;
+    validate_finish_claim_binding(&claim, expected)?;
 
     if let Some(existing) =
         read_existing_transition_on(tx, &transaction_scope, input.idempotency_key.trim())?
     {
-        return replay_existing_transition_on(
-            tx,
-            &input,
-            &request_digest,
-            expected_causal_binding,
-            existing,
-        );
+        return replay_existing_transition_on(tx, &input, &request_digest, expected, existing);
     }
 
     if claim.revision != input.expected_revision {
@@ -172,7 +215,7 @@ fn finish_compute_capacity_claim_on(
         held_claim_causal_transaction_on(tx, &claim.claim_id, claim.idempotency_key.as_str())?
             .ok_or_else(|| anyhow!("容量 Claim 缺少原始 held 账本事务"))?;
     validate_original_held_transaction(&claim, &causal_predecessor)?;
-    validate_finish_causal_binding(&causal_predecessor.causal_binding, expected_causal_binding)?;
+    validate_finish_causal_binding(&causal_predecessor.causal_binding, expected)?;
     let causal_transaction_id = Some(causal_predecessor.transaction_id);
     let (event_kind, next_state, claim_effect) = terminal_parts(input.action);
     let mut ledger_transaction = ComputeCapacityLedgerTransaction {
@@ -236,138 +279,40 @@ fn finish_compute_capacity_claim_on(
     Ok(receipt)
 }
 
-struct ExistingTransition {
-    transaction_id: String,
-    transaction_digest: String,
-    ledger_sequence: i64,
-    event_kind: String,
-    claim_id: String,
-    claim_effect: String,
-    request_digest: String,
-    causal_transaction_id: Option<String>,
-    recorded_at: String,
-}
-
-fn read_existing_transition_on(
-    conn: &Connection,
-    idempotency_scope: &str,
-    idempotency_key: &str,
-) -> Result<Option<ExistingTransition>> {
-    conn.query_row(
-        "SELECT transaction_id, transaction_digest, ledger_sequence,
-                event_kind, claim_id, claim_effect, request_digest,
-                causal_transaction_id, recorded_at
-           FROM compute_capacity_ledger_transactions
-          WHERE idempotency_scope=?1 AND idempotency_key=?2",
-        params![idempotency_scope, idempotency_key],
-        |row| {
-            Ok(ExistingTransition {
-                transaction_id: row.get(0)?,
-                transaction_digest: row.get(1)?,
-                ledger_sequence: row.get(2)?,
-                event_kind: row.get(3)?,
-                claim_id: row.get(4)?,
-                claim_effect: row.get(5)?,
-                request_digest: row.get(6)?,
-                causal_transaction_id: row.get(7)?,
-                recorded_at: row.get(8)?,
-            })
-        },
-    )
-    .optional()
-    .map_err(Into::into)
-}
-
-fn replay_existing_transition_on(
-    conn: &Connection,
-    input: &FinishComputeCapacityClaim,
-    request_digest: &str,
-    expected_causal_binding: Option<&ComputeCapacityCausalBinding>,
-    existing: ExistingTransition,
-) -> Result<FinishComputeCapacityClaimReceipt> {
-    let (expected_event, expected_state, expected_effect) = terminal_parts(input.action);
-    if existing.claim_id != input.claim_id.trim()
-        || existing.event_kind != event_kind_value(expected_event)
-        || existing.claim_effect != expected_effect
-        || existing.request_digest != request_digest
-    {
-        bail!("相同容量 Claim 终态幂等键不能用于不同请求");
-    }
-    let claim = stored_claim_on(conn, &existing.claim_id)?
-        .ok_or_else(|| anyhow!("容量 Claim 终态重放时原 Claim 不存在"))?;
-    validate_finish_claim_binding(&claim, expected_causal_binding)?;
-    let original_held =
-        held_claim_causal_transaction_on(conn, &claim.claim_id, claim.idempotency_key.as_str())?
-            .ok_or_else(|| anyhow!("容量 Claim 终态重放时缺少原始 held 事务"))?;
-    validate_original_held_transaction(&claim, &original_held)?;
-    if existing.causal_transaction_id.as_deref() != Some(original_held.transaction_id.as_str()) {
-        bail!("容量 Claim 终态事务没有引用原始 held 因果前序");
-    }
-    let terminal_causal = capacity_causal_transaction_on(conn, &existing.transaction_id)?;
-    if terminal_causal.causal_binding != original_held.causal_binding {
-        bail!("容量 Claim 终态事务未继承原始 held 业务因果绑定");
-    }
-    validate_finish_causal_binding(&original_held.causal_binding, expected_causal_binding)?;
-    let expected_terminal_revision = input
-        .expected_revision
-        .checked_add(1)
-        .ok_or_else(|| anyhow!("容量 Claim expected_revision 溢出"))?;
-    if claim.state != expected_state || claim.revision != expected_terminal_revision {
-        bail!("容量 Claim 终态重放与当前 Claim 状态不一致");
-    }
-    let current_balances = balances_for_transaction_on(conn, &existing.transaction_id)?;
-    if current_balances.iter().any(|balance| {
-        balance.binding.pool != claim.pool
-            || balance.binding.delivery_window != claim.delivery_window
-    }) {
-        bail!("容量 Claim 终态重放的资源绑定不一致");
-    }
-    Ok(FinishComputeCapacityClaimReceipt {
-        claim_id: claim.claim_id,
-        claim_digest: claim.claim_digest,
-        state: claim_state_value(claim.state).to_string(),
-        revision: claim.revision,
-        request_digest: existing.request_digest.clone(),
-        recorded_at: existing.recorded_at,
-        replayed: true,
-        ledger: ComputeCapacityLedgerWriteReceipt {
-            transaction_id: existing.transaction_id,
-            transaction_digest: existing.transaction_digest,
-            ledger_sequence: existing.ledger_sequence,
-            event_kind: existing.event_kind,
-            request_digest: existing.request_digest,
-            replayed: true,
-            current_balances,
-        },
-    })
-}
-
 fn validate_finish_claim_binding(
     claim: &ComputeCapacityClaim,
-    expected_causal_binding: Option<&ComputeCapacityCausalBinding>,
+    expected: Option<&ExpectedFinishBinding>,
 ) -> Result<()> {
-    match expected_causal_binding.and_then(|binding| binding.reservation_id.as_deref()) {
-        Some(reservation_id) => {
-            if claim.subject_kind != "compute_reservation" || claim.subject_id != reservation_id {
-                bail!("Reservation-bound 容量 Finish 的 Claim 身份不一致");
-            }
+    match expected {
+        Some(expected)
+            if claim.claim_kind == expected.claim_kind
+                && claim.subject_kind == expected.subject_kind
+                && claim.subject_id == expected.subject_id =>
+        {
+            Ok(())
         }
-        None => {
-            if claim.subject_kind == "compute_reservation" {
-                bail!("compute_reservation 必须通过 Reservation-bound 事务内入口终结");
-            }
+        Some(_) => bail!("受保护容量 Finish 的 Claim 身份不一致"),
+        None if matches!(
+            claim.claim_kind,
+            ComputeCapacityClaimKind::Reservation | ComputeCapacityClaimKind::CapacityCommitment
+        ) || matches!(
+            claim.subject_kind.trim(),
+            RESERVATION_SUBJECT_KIND | CAPACITY_COMMITMENT_SUBJECT_KIND
+        ) =>
+        {
+            bail!("受保护容量 Claim 必须通过对应事务内入口终结")
         }
+        None => Ok(()),
     }
-    Ok(())
 }
 
 fn validate_finish_causal_binding(
     stored: &ComputeCapacityCausalBinding,
-    expected: Option<&ComputeCapacityCausalBinding>,
+    expected: Option<&ExpectedFinishBinding>,
 ) -> Result<()> {
     match expected {
-        Some(expected) if stored == expected => Ok(()),
-        Some(_) => bail!("Reservation-bound 容量 Finish 的业务因果绑定不一致"),
+        Some(expected) if stored == &expected.causal_binding => Ok(()),
+        Some(_) => bail!("受保护容量 Finish 的业务因果绑定不一致"),
         None if stored.reservation_id.is_none() => Ok(()),
         None => bail!("Reservation-bound 容量 Claim 必须由外层事务内入口终结"),
     }

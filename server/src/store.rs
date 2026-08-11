@@ -72,6 +72,7 @@ mod compute_capacity_claim_return;
 mod compute_capacity_claim_rows;
 mod compute_capacity_claim_transitions;
 mod compute_capacity_claims;
+mod compute_capacity_commitments;
 mod compute_capacity_expiry_recovery;
 mod compute_capacity_history_queries;
 mod compute_capacity_ledger;
@@ -379,6 +380,15 @@ pub(crate) use compute_capacity_claim_transitions::{
 };
 pub(crate) use compute_capacity_claims::{
     HoldComputeCapacityClaim, HoldComputeCapacityClaimLine, HoldComputeCapacityClaimReceipt,
+};
+pub(crate) use compute_capacity_commitments::{
+    CancelComputeCapacityCommitment, ComputeCapacityCommitmentCreateReceipt,
+    ComputeCapacityCommitmentDetail, ComputeCapacityCommitmentExpiryItem,
+    ComputeCapacityCommitmentExpiryReport, ComputeCapacityCommitmentTerminalWriteReceipt,
+    CreateComputeCapacityCommitment, ExpireDueComputeCapacityCommitments,
+    COMPUTE_CAPACITY_COMMITMENT_CANCEL_CONFIRMATION,
+    COMPUTE_CAPACITY_COMMITMENT_CREATE_CONFIRMATION,
+    COMPUTE_CAPACITY_COMMITMENT_EXPIRE_DUE_CONFIRMATION,
 };
 pub(crate) use compute_capacity_expiry_recovery::{
     ComputeCapacityExpiryRecoveryItem, ComputeCapacityExpiryRecoveryReport,

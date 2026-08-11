@@ -2,7 +2,7 @@
 title: Provider Capacity Commitment v225 权威
 status: current
 design_status: design_frozen
-implementation_status: source_not_written
+implementation_status: implementation_uncompiled
 reviewed_at: 2026-08-11
 owners: backend, ai-economy
 ---
@@ -11,7 +11,7 @@ owners: backend, ai-economy
 
 ## 1. 状态与最窄目标
 
-v225 只冻结 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的静态闭环。设计状态为 `design_frozen`，源码状态为 `source_not_written`；截至 2026-08-11，没有为本设计编写 Rust、迁移、Store、Service、API 或测试，也未编译、未测试、未执行迁移、未运行。
+v225 已写入 Provider 为一个 `capacity_future` Offer 的单一交付窗口锁定容量的静态闭环。设计状态保持 `design_frozen`，实现状态为 `implementation_uncompiled` / `implementation_unrun`：领域模型、v225 两表与门卫、Store 原子 create/read/cancel/expire、通用 Claim 旁路封口、owner/admin Service 与 HTTP 路由源码均已接线；截至 2026-08-11，未编译、未执行测试或迁移、未启动服务，也未形成生产数据库、并发或真实 HTTP 验收证据。
 
 该纵切面复用 v165-v168/v173 的 Claim 与容量账本、v169 Provider、v170 Offer、v171 Price Snapshot，以及 v223/v224 已审核的平台 reference binding。它不依赖节点插件/VFS、真实任务运行、verified metering、Delivery Allocation、资金或结算。
 
@@ -62,7 +62,7 @@ Commitment 只用独立 claim kind 表达业务语义，不扩展 reducer、账�
 
 ## 4. Store API 与事务边界
 
-未来 P0 Store 只暴露：`create_compute_capacity_commitment`、`cancel_compute_capacity_commitment`、`expire_due_compute_capacity_commitments`、单条读取和本人有界列表。任何写操作由 Store 拥有一个 `BEGIN IMMEDIATE`；Service/API 不拼接跨事务步骤。
+当前 P0 Store 只暴露：`create_compute_capacity_commitment`、`cancel_compute_capacity_commitment`、`expire_due_compute_capacity_commitments`、单条读取和本人有界列表。任何写操作由 Store 拥有一个 `BEGIN IMMEDIATE`；Service/API 不拼接跨事务步骤。
 
 Create 请求只接受精确 Provider/Offer/Pool/Snapshot/reference binding、`instrument_id`、完整 `meter -> quantity`、幂等键和固定确认短语。调用方不得提交 bucket ID、服务器时间、`expires_at`、部分 meter 或自行生成摘要。事务顺序固定为：
 
@@ -103,7 +103,7 @@ Expire 只供平台 admin 恢复入口使用。候选来自 commitment LEFT JOIN
 
 ## 8. Generic bypass 封口
 
-未来 v225 源码必须同时完成三道门卫，否则不得宣告闭环：
+当前 v225 源码已同时完成三道门卫，但在编译、迁移和运行验收前仍不得宣告生产闭环：
 
 - public generic Hold 拒绝 `capacity_commitment` claim kind 或 `compute_capacity_commitment` subject；只有 Create 外层事务可调用 private Hold kernel；
 - public generic Finish 像 Reservation 一样拒绝 Commitment；只有校验 exact commitment/Claim/原 held causal binding 的专用 wrapper 可 release/expire；
@@ -122,8 +122,8 @@ P0 不要求 MCP、PC 页面或后台 worker。所有响应只公开安全投影
 
 ## 10. 文件预算与 P0 禁线
 
-未来 P0 最多新增 9 个 Rust 文件：一个 v225 migration、一个领域/canonical 合同、Store 主模块与 create/terminal/query-audit 三个子模块、一个薄 Service、一个 HTTP API 和一个聚焦测试文件；现有 migration/module/router 只允许小幅注册。超过该预算必须拆批，不把 MCP、PC、worker 或相邻市场对象塞入同批。
+P0 仍只包含领域合同、v225 migration、Store create/read/terminal、通用 Claim seam、薄 Service 与 HTTP API 这些逻辑边界。为遵守单一职责和叶文件尺寸门卫，migration、Store 与 replay 实现按职责拆成多个 `<450` 行叶文件；这种机械拆分不扩大业务范围。中央 migration/module/router 只做小幅注册，MCP、PC、worker、测试运行或相邻市场对象不得借文件拆分混入本批。
 
 P0 明确禁止：`external_pool`；DeliveryAllocation；Order/Trade/Position/ClearingReceipt；资金预授权、收费、Provider 收益、保证资源、处罚、结算或清算；Job/Reservation/Attempt/Lease 修改；真实价格/index/mark/trade 声明；节点插件、VFS、artifact、route、派发或 verified metering 接线；staging/provisional/saga；调用方 bucket/time/expiry/部分 meter；新 reducer/event/余额权威。
 
-本文件冻结的是可独立静态闭合的设计，不是实现或验收证据。只有未来源码、迁移、定向编译/测试和运行证据全部形成后，才可改变 `source_not_written`。
+当前源码仅形成可独立静态审计的实现候选，不是编译、迁移或运行验收证据。本批只执行 rustfmt 解析/格式检查、差异与尺寸门卫以及独立只读审计；没有聚焦 v225 测试运行证据。只有定向编译、临时 SQLite 全量迁移、Store/HTTP/并发/重开和生产升级证据形成后，才可把 `implementation_uncompiled` / `implementation_unrun` 升级为已验证状态。

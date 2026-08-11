@@ -5,6 +5,9 @@ use crate::compute_federation::capacity::ComputeCapacityClaimKind;
 
 use super::HoldComputeCapacityClaim;
 
+pub(super) const RESERVATION_SUBJECT_KIND: &str = "compute_reservation";
+pub(super) const CAPACITY_COMMITMENT_SUBJECT_KIND: &str = "compute_capacity_commitment";
+
 pub(super) fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()> {
     for (label, value) in [
         ("容量池 ID", input.pool.pool_id.as_str()),
@@ -58,11 +61,18 @@ pub(super) fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()
 
 fn validate_hold_causal_binding(input: &HoldComputeCapacityClaim) -> Result<()> {
     let binding = &input.causal_binding;
-    if input.subject_kind.trim() == "compute_reservation"
-        && (input.subject_kind != "compute_reservation"
+    if input.subject_kind.trim() == RESERVATION_SUBJECT_KIND
+        && (input.subject_kind != RESERVATION_SUBJECT_KIND
             || input.claim_kind != ComputeCapacityClaimKind::Reservation)
     {
         bail!("compute_reservation 主体只能用于精确的 Reservation Claim");
+    }
+    let commitment_kind = input.claim_kind == ComputeCapacityClaimKind::CapacityCommitment;
+    let commitment_subject = input.subject_kind.trim() == CAPACITY_COMMITMENT_SUBJECT_KIND;
+    if commitment_kind != commitment_subject
+        || (commitment_subject && input.subject_kind != CAPACITY_COMMITMENT_SUBJECT_KIND)
+    {
+        bail!("CapacityCommitment Claim kind 与主体类型必须精确对应");
     }
     if binding.attempt_lease_id.is_some() || binding.fencing_generation.is_some() {
         bail!("容量 Hold 不能提前绑定 Attempt 或 fencing generation");
@@ -93,10 +103,29 @@ fn validate_hold_causal_binding(input: &HoldComputeCapacityClaim) -> Result<()> 
             .ok_or_else(|| anyhow!("Reservation Claim 缺少 Reservation 因果绑定"))?;
         if binding.offer.is_none()
             || binding.job_id.is_none()
-            || input.subject_kind != "compute_reservation"
+            || input.subject_kind != RESERVATION_SUBJECT_KIND
             || input.subject_id != reservation_id
         {
             bail!("Reservation Claim 必须完整绑定 Offer、Job 和同主体 Reservation");
+        }
+    }
+    if commitment_kind {
+        let offer = binding
+            .offer
+            .as_ref()
+            .ok_or_else(|| anyhow!("CapacityCommitment Claim 缺少 Offer 因果绑定"))?;
+        validate_exact_causal_value("CapacityCommitment ID", &input.subject_id)?;
+        if binding.job_id.is_some()
+            || binding.reservation_id.is_some()
+            || binding.attempt_lease_id.is_some()
+            || binding.fencing_generation.is_some()
+        {
+            bail!("CapacityCommitment Claim 只能绑定 exact Offer");
+        }
+        validate_exact_causal_value("Offer ID", &offer.offer_id)?;
+        validate_exact_causal_value("Offer 摘要", &offer.offer_digest)?;
+        if offer.offer_version <= 0 {
+            bail!("CapacityCommitment Claim 的 Offer 版本必须为正整数");
         }
     }
     Ok(())

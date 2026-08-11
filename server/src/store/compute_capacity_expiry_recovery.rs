@@ -43,6 +43,11 @@ impl Store {
                 "SELECT claims.claim_id, claims.revision, claims.expires_at
                    FROM compute_capacity_claims AS claims
                   WHERE claims.status='held'
+                    AND claims.claim_kind='quote_hold'
+                    AND trim(claims.subject_kind) NOT IN (
+                        'compute_reservation',
+                        'compute_capacity_commitment'
+                    )
                     AND NOT EXISTS (
                         SELECT 1
                           FROM compute_capacity_ledger_transactions AS held_transaction
