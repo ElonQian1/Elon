@@ -220,9 +220,16 @@ internal class ChatGptNativeConversationController(
                 targetView.width.coerceAtLeast(1),
                 targetView.height.coerceAtLeast(1),
             )
-            holder.itemView.offsetDescendantRectToMyCoords(targetView, targetRect)
+            messagesView.offsetDescendantRectToMyCoords(targetView, targetRect)
             val viewportRect = Rect(targetRect)
-            messagesView.offsetDescendantRectToMyCoords(holder.itemView, viewportRect)
+            val itemRect = Rect(
+                0,
+                0,
+                holder.itemView.width.coerceAtLeast(1),
+                holder.itemView.height.coerceAtLeast(1),
+            )
+            messagesView.offsetDescendantRectToMyCoords(holder.itemView, itemRect)
+            targetRect.offset(-itemRect.left, -itemRect.top)
             val viewportTop = messagesView.paddingTop
             val viewportBottom = messagesView.height - messagesView.paddingBottom
             if (viewportRect.top < viewportTop || viewportRect.bottom > viewportBottom) {
