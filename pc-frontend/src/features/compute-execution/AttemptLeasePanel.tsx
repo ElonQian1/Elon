@@ -3,36 +3,31 @@ import {
   CircleCheck, FileCheck2, Gauge, HeartPulse, LoaderCircle,
   OctagonX, RefreshCw, Search, TriangleAlert,
 } from 'lucide-react'
-import AbortAttemptDialog from './AbortAttemptDialog'
 import DeclareUsageDialog from './DeclareUsageDialog'
-import RenewAttemptLeaseDialog from './RenewAttemptLeaseDialog'
 import TerminalCandidateDialog from './TerminalCandidateDialog'
 import {
   computeExecutionApi,
-  type AbortComputeAttemptBody,
   type ComputeAttemptActivationReceipt,
   type ComputeAttemptLeaseStateReceipt,
   type ComputeAttemptTerminalCandidateReceipt,
   type ComputeAttemptUsageTemplateReceipt,
   type DeclareComputeAttemptTerminalCandidateBody,
   type DeclareComputeAttemptUsageBody,
-  type RenewComputeAttemptLeaseBody,
 } from './computeExecutionApi'
 import styles from './ComputeExecutionPage.module.css'
 
 interface Props {
   providerId: string
   initialLeaseId: string
-  onStateChanged: () => Promise<void>
 }
 
-export default function AttemptLeasePanel({ providerId, initialLeaseId, onStateChanged }: Props) {
+export default function AttemptLeasePanel({ providerId, initialLeaseId }: Props) {
   const [leaseId, setLeaseId] = useState(initialLeaseId)
   const [activation, setActivation] = useState<ComputeAttemptActivationReceipt | null>(null)
   const [state, setState] = useState<ComputeAttemptLeaseStateReceipt | null>(null)
   const [usageTemplate, setUsageTemplate] = useState<ComputeAttemptUsageTemplateReceipt | null>(null)
   const [terminalCandidate, setTerminalCandidate] = useState<ComputeAttemptTerminalCandidateReceipt | null>(null)
-  const [dialog, setDialog] = useState<'renew' | 'abort' | 'usage' | 'terminal' | null>(null)
+  const [dialog, setDialog] = useState<'usage' | 'terminal' | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -72,28 +67,6 @@ export default function AttemptLeasePanel({ providerId, initialLeaseId, onStateC
     if (initialLeaseId) { setLeaseId(initialLeaseId); void load(initialLeaseId) } else setLeaseId('')
   }, [initialLeaseId, load, providerId])
 
-  async function renew(body: RenewComputeAttemptLeaseBody) {
-    if (!state || busy) return
-    setBusy(true); setError('')
-    try {
-      const receipt = await computeExecutionApi.renew(providerId, state, body)
-      setDialog(null)
-      await Promise.all([load(state.lease.lease_id), onStateChanged()])
-      setNotice(`Lease 已续租到 revision ${receipt.state.lease_revision}。`)
-    } catch (reason) { setError(messageOf(reason, 'Lease 续租失败')) } finally { setBusy(false) }
-  }
-
-  async function abort(body: AbortComputeAttemptBody) {
-    if (!activation || !state || busy) return
-    setBusy(true); setError('')
-    try {
-      const receipt = await computeExecutionApi.abort(providerId, state.lease.lease_id, body)
-      setDialog(null)
-      await Promise.all([load(state.lease.lease_id), onStateChanged()])
-      setNotice(`Attempt 已安全中止，退回 CNY ${(receipt.budget_refunded_fen / 100).toFixed(2)}。`)
-    } catch (reason) { setError(messageOf(reason, 'Attempt 中止失败')) } finally { setBusy(false) }
-  }
-
   async function declareUsage(body: DeclareComputeAttemptUsageBody) {
     if (!state || busy) return
     setBusy(true); setError('')
@@ -116,8 +89,6 @@ export default function AttemptLeasePanel({ providerId, initialLeaseId, onStateC
 
   const sameProvider = state?.lease.provider_id === providerId
   const unexpired = Boolean(state && new Date(state.lease.expires_at).getTime() > Date.now())
-  const canRenew = Boolean(sameProvider && state && ['staging', 'running'].includes(state.lease.status) && unexpired)
-  const canAbort = Boolean(sameProvider && state?.lease.status === 'staging' && state.lease_revision === 1 && !state.lease.last_heartbeat_at)
   const canDeclareUsage = Boolean(sameProvider && usageTemplate && state?.lease.status === 'running' && unexpired && !terminalCandidate)
   const canDeclareTerminal = Boolean(canDeclareUsage && usageTemplate?.latest_snapshot)
 
@@ -133,11 +104,9 @@ export default function AttemptLeasePanel({ providerId, initialLeaseId, onStateC
       {usageTemplate?.latest_snapshot && <div className={styles.evidence}><Gauge size={14} /><span><strong>用量快照 #{usageTemplate.latest_snapshot.sequence_no}</strong><small>{shortId(usageTemplate.latest_snapshot.snapshot_id)} · provider_declared</small></span></div>}
       {terminalCandidate && <div className={styles.evidence}><FileCheck2 size={14} /><span><strong>{outcomeLabel(terminalCandidate.outcome)}候选</strong><small>{shortId(terminalCandidate.terminal_candidate_id)} · 未验证</small></span></div>}
       <code>{state.lease_digest}</code>
-      <footer><button type="button" onClick={() => void load(state.lease.lease_id)} disabled={loading}><RefreshCw size={14} />刷新</button><button type="button" onClick={() => openDialog('renew', setDialog, setError)} disabled={!canRenew}><HeartPulse size={14} />续租</button><button type="button" onClick={() => openDialog('usage', setDialog, setError)} disabled={!canDeclareUsage}><Gauge size={14} />登记用量</button><button type="button" onClick={() => openDialog('terminal', setDialog, setError)} disabled={!canDeclareTerminal}><FileCheck2 size={14} />终态候选</button><button type="button" data-tone="danger" onClick={() => openDialog('abort', setDialog, setError)} disabled={!canAbort}><OctagonX size={14} />无用量中止</button></footer>
+      <footer><button type="button" onClick={() => void load(state.lease.lease_id)} disabled={loading}><RefreshCw size={14} />刷新</button><button type="button" disabled title="等待认证 Gateway 续租"><HeartPulse size={14} />续租（Gateway）</button><button type="button" onClick={() => openDialog('usage', setDialog, setError)} disabled={!canDeclareUsage}><Gauge size={14} />登记用量</button><button type="button" onClick={() => openDialog('terminal', setDialog, setError)} disabled={!canDeclareTerminal}><FileCheck2 size={14} />终态候选</button><button type="button" data-tone="danger" disabled title="等待认证 no-start 证明"><OctagonX size={14} />中止（Gateway）</button></footer>
       {!sameProvider && <div className={styles.scopeWarning}>该 Lease 不属于当前选择的 Provider，只能读取，不能执行 Provider 写操作。</div>}
     </div>}
-    {dialog === 'renew' && state && <RenewAttemptLeaseDialog state={state} busy={busy} error={error} onClose={() => setDialog(null)} onSubmit={renew} />}
-    {dialog === 'abort' && activation && state && <AbortAttemptDialog activation={activation} state={state} busy={busy} error={error} onClose={() => setDialog(null)} onSubmit={abort} />}
     {dialog === 'usage' && usageTemplate && <DeclareUsageDialog template={usageTemplate} busy={busy} error={error} onClose={() => setDialog(null)} onSubmit={declareUsage} />}
     {dialog === 'terminal' && usageTemplate && <TerminalCandidateDialog template={usageTemplate} busy={busy} error={error} onClose={() => setDialog(null)} onSubmit={declareTerminal} />}
   </section>
@@ -148,7 +117,7 @@ async function optionalTerminalCandidate(leaseId: string) {
   catch (reason) { if (isMissingCandidate(reason)) return null; throw reason }
 }
 function isMissingCandidate(reason: unknown) { return Boolean(reason && typeof reason === 'object' && 'status' in reason && reason.status === 400 && 'message' in reason && typeof reason.message === 'string' && reason.message.includes('尚无终态候选')) }
-function openDialog(value: 'renew' | 'abort' | 'usage' | 'terminal', setDialog: (value: 'renew' | 'abort' | 'usage' | 'terminal') => void, setError: (value: string) => void) { setError(''); setDialog(value) }
+function openDialog(value: 'usage' | 'terminal', setDialog: (value: 'usage' | 'terminal') => void, setError: (value: string) => void) { setError(''); setDialog(value) }
 function statusLabel(value: string) { return ({ staging: '准备中', running: '运行中', result_reported: '结果已声明', verifying: '验证中', terminal: '已终结' } as Record<string, string>)[value] ?? value }
 function outcomeLabel(value: string) { return ({ succeeded: '成功', failed: '失败', canceled: '取消' } as Record<string, string>)[value] ?? value }
 function formatTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false }) }

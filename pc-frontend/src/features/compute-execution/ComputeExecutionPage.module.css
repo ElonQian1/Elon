@@ -10,6 +10,7 @@
 .alert { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; border: 1px solid; border-radius: 6px; padding: 8px 10px; font-size: 9px; }
 .alert[data-tone='error'] { color: #ffcaca; border-color: rgba(224,92,92,.3); background: rgba(224,92,92,.08); }
 .alert[data-tone='success'] { color: #d8f5e2; border-color: rgba(82,183,123,.3); background: rgba(82,183,123,.08); }
+.alert[data-tone='boundary'] { color: #f2d89f; border-color: rgba(216,169,79,.3); background: rgba(216,169,79,.08); }
 .workspace { min-height: 610px; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(400px,.95fr); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .queue { min-width: 0; border-right: 1px solid var(--border); }
 .queue > header, .leasePanel > header { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); padding: 9px 13px; }
@@ -36,6 +37,7 @@
 .candidate span, .candidate small { color: var(--text-muted); font-size: 8px; }
 .candidate button, .lookup button, .leaseBody footer button { min-height: 30px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; color: var(--text-secondary); font-size: 8px; }
 .candidate button { color: #071318; border-color: #78b7c9; background: #8cc5d5; font-weight: 750; }
+.candidate button:disabled { color: var(--text-muted); border-color: var(--border); background: var(--bg-elevated); opacity: 1; }
 .leasePanel { min-width: 0; }
 .lookup { min-width: 0; display: flex; gap: 6px; }
 .lookup input { width: min(190px,30vw); min-width: 0; min-height: 31px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; color: var(--text-primary); background: var(--bg-base); font-size: 8px; }
