@@ -64,7 +64,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移；10 个 onboarding、6 个 release HTTP 操作及 22 个分角色 MCP 工具已通过治理链和 Store 重开专项。PC `/compute-external-pools` 已通过跨层静态合同、严格类型、lint、生产构建和 bundle budget；真实 TCP、浏览器与生产部署仍未运行。它们只保存候选来源，不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`compute-management-mcp-acceptance.md`](compute-management-mcp-acceptance.md)、[`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)、[`external-pool-onboarding-api-acceptance.md`](external-pool-onboarding-api-acceptance.md) 与 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md) |
+| 外部算力池适配器与统一报价 | Provider onboarding v221 与 Adapter release v222 已编译迁移；10 个 onboarding、6 个 release HTTP 操作及 22 个分角色 MCP 工具已通过治理链和 Store 重开专项。PC `/compute-external-pools` 已完成静态生产构建；真实 TCP、浏览器与生产部署仍未运行。v227 仅冻结 server-owned quarantine raw bytes source，源码尚未写入、实际测量为 0；它不解析 candidate ref、不验证 artifact/verifier、不写 v213、不建 Pool/Offer 或派发。见 [`external-pool-adapter-artifact-source-authority.md`](external-pool-adapter-artifact-source-authority.md) 与既有 external-pool 权威/验收 |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -175,7 +175,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider 首段来源权威见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)，Adapter release 候选来源见 [`external-pool-adapter-release-authority.md`](external-pool-adapter-release-authority.md)：v221/v222 已编译迁移，onboarding 的 10 个管理操作与 Store 重开共 7 项专项通过，release 的 6 个管理员操作与 Store 重开共 7 项专项通过，5 个本人 MCP 与 17 个平台 MCP 工具也已通过角色隔离和治理链专项；生产部署和 PC 管理入口仍未运行。onboarding application 与 staged admission 均不证明 artifact/verifier、credential、route、容量、派发或结算。
+服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。Provider onboarding 与 Adapter release v221/v222 已编译迁移并通过管理面专项；生产部署仍未运行。v227 [`artifact bytes source`](external-pool-adapter-artifact-source-authority.md) 只冻结管理员 raw body→DATA_DIR quarantine→重开 SHA-256→不可变 receipt，源码尚未写入。onboarding、staged admission 和 bytes receipt 均不证明 candidate ref provenance、verifier、credential、route、容量、派发或结算。
 
 ### F4：容量期货市场
 
