@@ -44,11 +44,12 @@
 
    包装脚本分别计算“预检时任务基线 → 当前 HEAD”和“线上 Server SHA → 当前 HEAD”，再发布移动 PWA，最后发布 APK。前者决定本任务需要发布什么；后者只作为累计部署债务观测，不能把其他任务尚未发布的后端变化归到本次 UI 任务：
 
-   - 只有自包含的移动 PWA 运行时模板资产（`web_page.html` 与由模板生成器内联的 plaza CSS/JS）变化时，原子上传运行时模板，不重新编译 Rust，也不构建 PC 前端。
+   - 只有自包含的移动 PWA 运行时模板资产（`web_page.html` 与由模板生成器内联的 plaza CSS/JS、orbital 主题 CSS）变化时，原子上传运行时模板，不重新编译 Rust，也不构建 PC 前端。
    - 后端 Rust、其他内嵌资源或 PC 前端变化时，才运行完整 Server 发布；APP UI 路线使用 `-SkipPcFrontend` 避免重复构建无关 PC 页面。
    - 没有移动 PWA 变化时记录 skipped，不启动 Server 发布。
    - APK 发布始终先做线上 Android 构建输入覆盖检查；已覆盖时不 claim 版本、不重复构建。
    - 预检会把完整 `TASK_BASE_SHA` 保存在 worktree 私有 Git 元数据中；发布脚本缺少该基线时失败关闭，禁止退回“线上 Server SHA 就是任务基线”的旧判断。
+   - 每次 `direct-network.ps1 push origin HEAD:main` 成功后还会在 worktree 私有 Git 元数据中记录该次 push 相对旧 `origin/main` 的实际文件集合，并在同一任务多次 push 时做确定性并集。发布以这份任务拥有路径判断范围；push 前因 non-fast-forward 做过 rebase、或多次 push 之间又插入其他任务时，不能把新纳入历史的后端提交误算成本任务改动。缺少有效成功推送标记时才回退预检基线。
    - 静态模板发布会先检查 `origin/main` 是否已有更新的 PWA 输入，并使用远端来源 SHA、模板哈希、大小和 `flock` 互斥执行比较交换；旧任务不得覆盖新页面。
    - 发布收据恢复前必须重新核验远端模板哈希；完整 Server 阶段还要核验线上 SHA 覆盖当前提交，不能仅凭本地历史收据跳过。
 
@@ -67,6 +68,7 @@
 ## 时间与可靠性约束
 
 - 纯 APP UI 任务即使遇到线上 Server 累计落后，也只承担自己的静态 PWA 发布；后端部署债务由引入后端变化的任务处理。正常静态 PWA 阶段应是秒级，不应出现 Rust 交叉编译。
+- `APP_UI_TASK_BASE_SHA` 用于不可变任务审计，`APP_UI_TASK_SCOPE_BASE_SHA` 与成功 push 的路径集合用于发布归属计算；两者在 rebase 任务中允许不同，路径集合可以跨越不连续的主线区间。部署债务仍只记录，不得提升本任务的发布模式。
 
 - Gradle 快速验证和 Release 构建使用 `--no-daemon`，避免 daemon 持有日志句柄导致包装器无法退出。
 - `invoke-ai-logged-command.ps1` 支持 `-TimeoutSeconds`；超时返回 124，并终止对应任务的完整子进程树。

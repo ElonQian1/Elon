@@ -28,11 +28,12 @@ if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
 $sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim()
 $assetDirectory = Split-Path -Parent $SourcePath
 $stylesPath = Join-Path $assetDirectory 'project_plaza.css'
+$themeStylesPath = Join-Path $assetDirectory 'orbital_mobile_theme.css'
 $cacheScriptPath = Join-Path $assetDirectory 'project_plaza_cache.js'
 $scriptPath = Join-Path $assetDirectory 'project_plaza.js'
 $runtimeTemplatePath = Join-Path $repoRoot ".ai-tmp\mobile-pwa-static\web_page.$sourceSha.$PID.html"
 $runtimeTemplate = New-ElonMobilePwaRuntimeTemplate -TemplatePath $SourcePath `
-    -StylesPath $stylesPath -CacheScriptPath $cacheScriptPath `
+    -StylesPath $stylesPath -ThemeStylesPath $themeStylesPath -CacheScriptPath $cacheScriptPath `
     -ScriptPath $scriptPath -OutputPath $runtimeTemplatePath
 $localHash = (Get-FileHash -LiteralPath $runtimeTemplate.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 $remoteSeparator = $RemotePath.LastIndexOf('/')

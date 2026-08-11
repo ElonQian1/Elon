@@ -1,6 +1,8 @@
 # Shared direct/no-proxy network helpers for project verification scripts and
 # the bounded GitHub SSH fallback used by Windows workflow entrypoints.
 
+. (Join-Path $PSScriptRoot 'app-ui-task-push-scope.ps1')
+
 $script:ElonProxyEnvironmentNames = @(
     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy",
     "NO_PROXY", "no_proxy", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT", "SHELL"
@@ -385,10 +387,16 @@ function Add-ElonProjectDirectRequestParameters {
 }
 
 if ($MyInvocation.InvocationName -ne "." -and $args.Count -gt 0) {
+    $repoPath = (Get-Location).Path
     $remoteName = if ($args.Count -gt 1) { [string]$args[1] } else { "origin" }
-    $result = Invoke-ElonGitHubGitWithProxyFallback -RepoPath (Get-Location).Path -GitArgs @($args) -RemoteName $remoteName
+    $pushScopeCandidate = New-ElonAppUiPushScopeCandidate `
+        -RepoRoot $repoPath -GitArgs @($args) -RemoteName $remoteName
+    $result = Invoke-ElonGitHubGitWithProxyFallback -RepoPath $repoPath -GitArgs @($args) -RemoteName $remoteName
     if ($result.ProxyAttempted) { Write-Host "GITHUB_SSH_FALLBACK=$($result.Route):$($result.ExitCode)" }
     $result.Output | ForEach-Object { Write-Output ([string]$_) }
+    if ($result.ExitCode -eq 0 -and $null -ne $pushScopeCandidate) {
+        Save-ElonAppUiTaskPushScope -RepoRoot $repoPath -Candidate $pushScopeCandidate
+    }
     if ($result.ExitCode -ne 0) { Write-Error $result.Hint }
     exit $result.ExitCode
 }

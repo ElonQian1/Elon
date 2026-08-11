@@ -1,4 +1,5 @@
 . (Join-Path $PSScriptRoot 'git-path-resolution.ps1')
+. (Join-Path $PSScriptRoot 'app-ui-task-push-scope.ps1')
 
 function Get-ElonAppUiChangedPaths {
     param(
@@ -7,10 +8,7 @@ function Get-ElonAppUiChangedPaths {
         [Parameter(Mandatory)] [string]$HeadSha
     )
 
-    if ($BaseSha -eq $HeadSha) { return @() }
-    $paths = & git -C $RepoRoot diff --name-only --diff-filter=ACMR $BaseSha $HeadSha 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "Unable to inspect changes between $BaseSha and $HeadSha" }
-    @($paths | ForEach-Object { $_.Trim() -replace '\\', '/' } | Where-Object { $_ })
+    @(Get-ElonPushChangedPaths -RepoRoot $RepoRoot -BaseSha $BaseSha -HeadSha $HeadSha)
 }
 
 function Get-ElonAppUiTaskBaseSha {
@@ -44,8 +42,37 @@ function Get-ElonStaticMobilePwaInputPaths {
         'server/src/assets/web_page.html',
         'server/src/assets/project_plaza.css',
         'server/src/assets/project_plaza_cache.js',
-        'server/src/assets/project_plaza.js'
+        'server/src/assets/project_plaza.js',
+        'server/src/assets/orbital_mobile_theme.css'
     )
+}
+
+function Get-ElonAppUiTaskScopeBaseSha {
+    param(
+        [Parameter(Mandatory)] [string]$RepoRoot,
+        [Parameter(Mandatory)] $TaskBase,
+        [Parameter(Mandatory)] [string]$HeadSha,
+        [string]$ExplicitScopeBaseSha = ''
+    )
+
+    $candidate = $ExplicitScopeBaseSha.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        if ($candidate -notmatch '^[0-9a-f]{40}$') {
+            throw 'Invalid explicit APP UI task scope base SHA.'
+        }
+        if (-not (Test-ElonGitAncestor -RepoRoot $RepoRoot -AncestorSha $TaskBase.Sha -DescendantSha $candidate)) {
+            throw 'Explicit APP UI task scope base is outside the preflight task history.'
+        }
+        if (-not (Test-ElonGitAncestor -RepoRoot $RepoRoot -AncestorSha $candidate -DescendantSha $HeadSha)) {
+            throw 'Explicit APP UI task scope base is not an ancestor of HEAD.'
+        }
+        return [PSCustomObject]@{ Sha = $candidate; Source = 'explicit_scope_base'; ChangedPaths = $null }
+    }
+
+    $pushScope = Get-ElonAppUiTaskPushScope `
+        -RepoRoot $RepoRoot -TaskBaseSha $TaskBase.Sha -HeadSha $HeadSha
+    if ($null -ne $pushScope) { return $pushScope }
+    [PSCustomObject]@{ Sha = $TaskBase.Sha; Source = $TaskBase.Source; ChangedPaths = $null }
 }
 
 function Resolve-ElonAppUiChangeScope {

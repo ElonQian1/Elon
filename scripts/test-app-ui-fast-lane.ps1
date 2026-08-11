@@ -28,7 +28,9 @@ Assert-Contains $publisher 'publish-server.ps1'
 Assert-Contains $publisher 'publish-mobile-pwa-static.ps1'
 Assert-Contains $publisher 'StaticRuntimePwa'
 Assert-Contains $publisher 'TaskBaseSha'
+Assert-Contains $publisher 'TaskScopeBaseSha'
 Assert-Contains $publisher 'APP_UI_TASK_BASE_SHA'
+Assert-Contains $publisher 'APP_UI_TASK_SCOPE_BASE_SHA'
 Assert-Contains $publisher 'APP_UI_DEPLOYED_SERVER_SHA'
 Assert-Contains $publisher 'APP_UI_DEPLOYMENT_DEBT_PATHS'
 Assert-Contains $publisher "cannot override task scope"
@@ -74,6 +76,10 @@ Assert-Contains $lanDistClient '-RedirectStandardOutput "$LogFile.stdout"'
 
 & node (Join-Path $repoRoot "scripts\check-mobile-pwa-source.js")
 if ($LASTEXITCODE -ne 0) { throw "Mobile PWA source check failed." }
+
+& powershell -NoProfile -ExecutionPolicy Bypass -File `
+    (Join-Path $repoRoot 'scripts\test-app-ui-task-push-scope.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'APP UI task push scope tests failed.' }
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File `
     (Join-Path $repoRoot "scripts\validate-app-ui-fast-lane.ps1") `

@@ -5,6 +5,8 @@ function New-ElonMobilePwaRuntimeTemplate {
         [Parameter(Mandatory = $true)]
         [string]$StylesPath,
         [Parameter(Mandatory = $true)]
+        [string]$ThemeStylesPath,
+        [Parameter(Mandatory = $true)]
         [string]$CacheScriptPath,
         [Parameter(Mandatory = $true)]
         [string]$ScriptPath,
@@ -15,14 +17,19 @@ function New-ElonMobilePwaRuntimeTemplate {
     $utf8 = [System.Text.UTF8Encoding]::new($false)
     $template = [System.IO.File]::ReadAllText($TemplatePath, $utf8)
     $styles = [System.IO.File]::ReadAllText($StylesPath, $utf8)
+    $themeStyles = [System.IO.File]::ReadAllText($ThemeStylesPath, $utf8)
     $cacheScript = [System.IO.File]::ReadAllText($CacheScriptPath, $utf8)
     $script = [System.IO.File]::ReadAllText($ScriptPath, $utf8)
     $styleReference = '<link rel="stylesheet" href="/assets/project_plaza.css" />'
+    $themeStyleReference = '<link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />'
     $cacheScriptReference = '<script src="/assets/project_plaza_cache.js"></script>'
     $scriptReference = '<script src="/assets/project_plaza.js"></script>'
 
     if (-not $template.Contains($styleReference)) {
         throw "Mobile PWA template is missing the project plaza stylesheet reference: $TemplatePath"
+    }
+    if (-not $template.Contains($themeStyleReference)) {
+        throw "Mobile PWA template is missing the orbital theme stylesheet reference: $TemplatePath"
     }
     if (-not $template.Contains($scriptReference)) {
         throw "Mobile PWA template is missing the project plaza script reference: $TemplatePath"
@@ -33,6 +40,9 @@ function New-ElonMobilePwaRuntimeTemplate {
     if ($styles -match '(?i)</style\s*>') {
         throw "Project plaza styles cannot be embedded safely: $StylesPath"
     }
+    if ($themeStyles -match '(?i)</style\s*>') {
+        throw "Orbital theme styles cannot be embedded safely: $ThemeStylesPath"
+    }
     if ($script -match '(?i)</script\s*>') {
         throw "Project plaza script cannot be embedded safely: $ScriptPath"
     }
@@ -41,9 +51,11 @@ function New-ElonMobilePwaRuntimeTemplate {
     }
 
     $styleBlock = "<style data-elon-runtime-asset=`"/assets/project_plaza.css`">`n$styles`n</style>"
+    $themeStyleBlock = "<style data-elon-runtime-asset=`"/assets/orbital_mobile_theme.css`">`n$themeStyles`n</style>"
     $cacheScriptBlock = "<script data-elon-runtime-asset=`"/assets/project_plaza_cache.js`">`n$cacheScript`n</script>"
     $scriptBlock = "<script data-elon-runtime-asset=`"/assets/project_plaza.js`">`n$script`n</script>"
     $runtimeTemplate = $template.Replace($styleReference, $styleBlock)
+    $runtimeTemplate = $runtimeTemplate.Replace($themeStyleReference, $themeStyleBlock)
     $runtimeTemplate = $runtimeTemplate.Replace($cacheScriptReference, $cacheScriptBlock)
     $runtimeTemplate = $runtimeTemplate.Replace($scriptReference, $scriptBlock)
     $outputDirectory = Split-Path -Parent $OutputPath

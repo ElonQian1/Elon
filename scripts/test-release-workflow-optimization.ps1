@@ -53,7 +53,11 @@ Assert-True ($staticScope.MobilePwaMode -eq 'static_template') 'Template-only UI
 Assert-True $staticScope.AndroidChanged 'Android UI change was not detected.'
 
 $modularStaticScope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $head -HeadSha $head `
-    -ChangedPaths @('server/src/assets/project_plaza.css', 'server/src/assets/project_plaza.js')
+    -ChangedPaths @(
+        'server/src/assets/project_plaza.css',
+        'server/src/assets/project_plaza.js',
+        'server/src/assets/orbital_mobile_theme.css'
+    )
 Assert-True ($modularStaticScope.MobilePwaMode -eq 'static_template') `
     'Self-contained modular mobile PWA assets must use static publishing.'
 
@@ -129,18 +133,23 @@ try {
     $runtimeTemplate = New-ElonMobilePwaRuntimeTemplate `
         -TemplatePath (Join-Path $repoRoot 'server\src\assets\web_page.html') `
         -StylesPath (Join-Path $repoRoot 'server\src\assets\project_plaza.css') `
+        -ThemeStylesPath (Join-Path $repoRoot 'server\src\assets\orbital_mobile_theme.css') `
         -CacheScriptPath (Join-Path $repoRoot 'server\src\assets\project_plaza_cache.js') `
         -ScriptPath (Join-Path $repoRoot 'server\src\assets\project_plaza.js') `
         -OutputPath $runtimeTemplatePath
     $runtimeText = Get-Content -LiteralPath $runtimeTemplate.FullName -Raw
     Assert-True ($runtimeText.Contains('<style data-elon-runtime-asset="/assets/project_plaza.css">')) `
         'Runtime template did not embed project plaza styles.'
+    Assert-True ($runtimeText.Contains('<style data-elon-runtime-asset="/assets/orbital_mobile_theme.css">')) `
+        'Runtime template did not embed orbital theme styles.'
     Assert-True ($runtimeText.Contains('<script data-elon-runtime-asset="/assets/project_plaza.js">')) `
         'Runtime template did not embed project plaza script.'
     Assert-True ($runtimeText.Contains('<script data-elon-runtime-asset="/assets/project_plaza_cache.js">')) `
         'Runtime template did not embed project plaza cache script.'
     Assert-True (-not $runtimeText.Contains('<link rel="stylesheet" href="/assets/project_plaza.css" />')) `
         'Runtime template still depends on the compiled project plaza stylesheet route.'
+    Assert-True (-not $runtimeText.Contains('<link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />')) `
+        'Runtime template still depends on the compiled orbital theme stylesheet route.'
     Assert-True (-not $runtimeText.Contains('<script src="/assets/project_plaza.js"></script>')) `
         'Runtime template still depends on the compiled project plaza script route.'
     Assert-True (-not $runtimeText.Contains('<script src="/assets/project_plaza_cache.js"></script>')) `

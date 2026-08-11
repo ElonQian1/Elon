@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Changelog,
     [string]$TaskBaseSha = '',
+    [string]$TaskScopeBaseSha = '',
     [Alias('BaseSha')]
     [string]$DeployedServerSha = '',
     [switch]$StaticRuntimePwa,
@@ -33,7 +34,16 @@ if ([string]::IsNullOrWhiteSpace($DeployedServerSha)) {
 if ([string]::IsNullOrWhiteSpace($DeployedServerSha)) {
     $DeployedServerSha = '0000000000000000000000000000000000000000'
 }
-$scope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $taskBase.Sha -HeadSha $headSha
+$taskScopeBase = Get-ElonAppUiTaskScopeBaseSha `
+    -RepoRoot $repoRoot -TaskBase $taskBase -HeadSha $headSha `
+    -ExplicitScopeBaseSha $TaskScopeBaseSha
+$scope = if ($null -ne $taskScopeBase.ChangedPaths) {
+    Resolve-ElonAppUiChangeScope `
+        -RepoRoot $repoRoot -BaseSha $taskScopeBase.Sha -HeadSha $headSha `
+        -ChangedPaths @($taskScopeBase.ChangedPaths)
+} else {
+    Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $taskScopeBase.Sha -HeadSha $headSha
+}
 $deploymentDebt = Resolve-ElonAppUiChangeScope `
     -RepoRoot $repoRoot -BaseSha $DeployedServerSha -HeadSha $headSha
 if ($StaticRuntimePwa -and $scope.MobilePwaMode -ne 'static_template') {
@@ -47,6 +57,9 @@ Write-Host 'APP_UI_PUBLISH_ORDER=mobile_pwa_then_apk'
 Write-Host 'APP_UI_RENDERER=skipped'
 Write-Host "APP_UI_TASK_BASE_SHA=$($taskBase.Sha)"
 Write-Host "APP_UI_TASK_BASE_SOURCE=$($taskBase.Source)"
+Write-Host "APP_UI_TASK_SCOPE_BASE_SHA=$($taskScopeBase.Sha)"
+Write-Host "APP_UI_TASK_SCOPE_BASE_SOURCE=$($taskScopeBase.Source)"
+Write-Host "APP_UI_TASK_SCOPE_PATHS_SOURCE=$($taskScopeBase.Source)"
 Write-Host "APP_UI_DEPLOYED_SERVER_SHA=$DeployedServerSha"
 Write-Host "APP_UI_HEAD_SHA=$headSha"
 Write-Host "APP_UI_MOBILE_PWA_MODE=$($scope.MobilePwaMode)"
