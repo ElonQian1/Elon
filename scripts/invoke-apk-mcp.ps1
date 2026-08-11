@@ -7,12 +7,18 @@ param(
     [int]$HealthTimeoutSec = 6,
     [int]$HealthPollMs = 250,
     [int]$RequestTimeoutSec = 120,
+    [ValidateRange(1, 60)][int]$AdbTimeoutSec = 10,
     [switch]$EnsureMainActivity,
     [switch]$OpenAppOnFailure,
     [switch]$NoBootstrap
 )
 
 $ErrorActionPreference = "Stop"
+$nativeCommandModule = Join-Path $PSScriptRoot "native-command-timeout.ps1"
+if (-not (Test-Path -LiteralPath $nativeCommandModule -PathType Leaf)) {
+    throw "Missing native command timeout helper: $nativeCommandModule"
+}
+. $nativeCommandModule
 
 if (!(Test-Path -LiteralPath $Adb)) {
     throw "adb not found: $Adb"
@@ -24,21 +30,27 @@ function Invoke-Adb {
     if ($DeviceSerial.Trim()) {
         $serialArgs = @("-s", $DeviceSerial.Trim())
     }
-    & $Adb @serialArgs @AdbArgs
+    $script:LastAdbResult = Invoke-ElonNativeCommand -FilePath $Adb `
+        -ArgumentList (@($serialArgs) + @($adbArgs)) `
+        -TimeoutSeconds $AdbTimeoutSec -Label "APK MCP adb command"
+    @($script:LastAdbResult.Stdout, $script:LastAdbResult.Stderr) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
 }
 
 function Start-ApkMcpDebug {
     $serviceOutput = Invoke-Adb shell am start-foreground-service `
         -a com.elon.app.mcp.START_KEEPALIVE `
-        -n com.elon.app/.mcp.McpDebugKeepAliveService 2>&1
+        -n com.elon.app/.mcp.McpDebugKeepAliveService
     $serviceText = ($serviceOutput | Out-String).Trim()
-    if ($LASTEXITCODE -eq 0 -and $serviceText -notmatch "Error:") {
+    if ($script:LastAdbResult.ExitCode -eq 0 -and $serviceText -notmatch "Error:") {
         return
     }
 
     Invoke-Adb shell am broadcast --receiver-foreground `
         -a com.elon.app.mcp.START_DEBUG `
         -n com.elon.app/.mcp.McpDebugControlReceiver | Out-Null
+    Assert-ElonNativeCommand -Result $script:LastAdbResult `
+        -FailureMessage "Unable to start APK MCP debug service"
 }
 
 function Wait-ApkMcpHealth {
@@ -70,22 +82,38 @@ function Wait-ApkMcpHealth {
     throw "APK MCP health did not respond on port $Port within ${HealthTimeoutSec}s. Last error: $lastError"
 }
 
+function Get-ApkMcpHealthIfAvailable {
+    try {
+        return Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 1
+    } catch {
+        return $null
+    }
+}
+
 function Start-ApkMainActivity {
     Invoke-Adb shell am start -n com.elon.app/.MainActivity | Out-Null
+    Assert-ElonNativeCommand -Result $script:LastAdbResult `
+        -FailureMessage "Unable to start APK MainActivity"
     Start-Sleep -Milliseconds 700
 }
 
-if (!$NoBootstrap) {
-    Start-ApkMcpDebug
+$health = if ($NoBootstrap -and -not $EnsureMainActivity) {
+    Get-ApkMcpHealthIfAvailable
+} else { $null }
+if ($null -eq $health) {
+    if (!$NoBootstrap) {
+        Start-ApkMcpDebug
+    }
+
+    if ($EnsureMainActivity) {
+        Start-ApkMainActivity
+    }
+
+    Invoke-Adb forward "tcp:$Port" "tcp:$Port" | Out-Null
+    Assert-ElonNativeCommand -Result $script:LastAdbResult `
+        -FailureMessage "Unable to create APK MCP adb forward"
+    $health = Wait-ApkMcpHealth
 }
-
-if ($EnsureMainActivity) {
-    Start-ApkMainActivity
-}
-
-Invoke-Adb forward "tcp:$Port" "tcp:$Port" | Out-Null
-
-$health = Wait-ApkMcpHealth
 $token = [string]$health.auth_token
 if (!$token) {
     throw "MCP health endpoint did not return auth_token."

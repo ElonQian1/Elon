@@ -26,5 +26,18 @@ if (-not ($activityIndex -lt $forwardIndex -and $forwardIndex -lt $healthIndex -
 if ($source.IndexOf('if ($EnsureMainActivity)', $activityIndex + 1) -ge 0) {
     throw "APK MCP must not start the Activity again after health verification."
 }
+foreach ($token in @(
+    'native-command-timeout.ps1',
+    'AdbTimeoutSec = 10',
+    'Invoke-ElonNativeCommand',
+    'Assert-ElonNativeCommand',
+    'Unable to create APK MCP adb forward',
+    'function Get-ApkMcpHealthIfAvailable',
+    'if ($NoBootstrap -and -not $EnsureMainActivity)'
+)) {
+    if (-not $source.Contains($token)) {
+        throw "APK MCP adb timeout contract is missing token: $token"
+    }
+}
 
 Write-Output "APK_MCP_LIFECYCLE_CONTRACT=passed"
