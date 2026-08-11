@@ -10,6 +10,10 @@ pub(crate) mod control_plane_tests;
 #[path = "compute_federation_broker_concurrency_tests.rs"]
 mod concurrency_tests;
 
+#[cfg(test)]
+#[path = "compute_federation_broker_restart_tests.rs"]
+mod restart_tests;
+
 use crate::{
     compute_federation::{
         execution::{
