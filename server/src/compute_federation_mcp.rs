@@ -3,6 +3,10 @@ use serde_json::Value;
 
 use crate::store::Store;
 
+#[cfg(test)]
+#[path = "compute_federation_supply_interface_tests.rs"]
+mod interface_tests;
+
 pub(crate) fn definitions() -> Vec<Value> {
     let mut tools = crate::compute_federation_provider_mcp::definitions();
     tools.extend(crate::compute_federation_capacity_pool_mcp::definitions());
