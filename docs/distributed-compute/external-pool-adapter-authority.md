@@ -12,7 +12,7 @@ implementation_status: implementation_unwired
 
 本文冻结 `external_pool` 的第一段服务端接入权威：Provider owner 发起 request，独立平台管理员复核，Store 再按精确摘要执行 immutable apply。该段只建立未来 Adapter route 可以引用的 owner-approved、admin-reviewed 来源；它不实现 concrete Adapter、credential verifier、route resolver、网络或任务执行。
 
-当前 owner request 领域 DTO、Store-private submit/review/apply 与 v221 三账本源码已经写入，并把通用 Provider 注册对 `external_pool` 封死；没有 HTTP/MCP/PC 入口、测试源码、编译、迁移或运行验证。apply 的最大效果固定为：
+当前 owner request 领域 DTO、Store-private submit/review/apply 与 v221 三账本源码已经写入并可编译，v221 已随完整临时文件 Store 执行迁移、关闭和两次重开，同时把通用 Provider 注册对 `external_pool` 封死；没有 HTTP/MCP/PC 入口，也没有 onboarding 业务状态机测试。apply 的最大效果固定为：
 
 - 登记一份 `provider_kind=external_pool`、`status=registering`、`trust_tier=self_declared` 的 Provider 当前版本与不可变历史；
 - 登记一份专用 `external_pool_onboarding` application source；
@@ -66,7 +66,7 @@ v221 同时替换 v213 的 `trg_compute_route_authorization_exact_source`：
 - `external_pool_onboarding` 精确引用专用 onboarding application 的 `application_id/application_digest/provider_id`，`approved_by_user_id` 继续绑定 Provider owner，并另行闭合独立 reviewer 与 approved review；
 - 禁止继续借用 endpoint-only `compute_activation_applications` 伪装外部矿池来源。
 
-v221 目前只是未编译、未执行的迁移源码，Store 也没有生产调用入口，因此不会触发该 route source 分支。即使未来 application 已存在，也只说明 route 获得了一个可审核来源；没有后续 sealed credential verification 与 route currentness custody 时，仍不得写或采用 v213 route rows。
+v221 目前已编译并在完整临时文件 Store 中完成迁移/重开，但 Store 没有生产调用入口，onboarding request/review/apply 与 trigger 仍未直接执行，因此不会触发该 route source 分支。即使未来 application 已存在，也只说明 route 获得了一个可审核来源；没有后续 sealed credential verification 与 route currentness custody 时，仍不得写或采用 v213 route rows。
 
 ## 4. Generic registration 必须封死
 
@@ -86,7 +86,7 @@ v221 目前只是未编译、未执行的迁移源码，Store 也没有生产调
 
 只有第 1 至 4 项在同一 Store 权威中闭合后，未来 route producer 才能引用 onboarding application 写入 v213 rows。管理员审批、Provider adapter ref 或数据库中存在 non-bearer ref 都不能替代 credential proof。
 
-Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。两者的服务端源码现可编译，v221/v222 已随完整临时文件 Store 迁移和两次重开执行，但两条业务状态机、trigger 行为及 service/API 均未运行；任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
+Adapter release admission 与 Provider onboarding application 是两条正交来源：前者只允许平台继续准备一份候选 release，后者只允许登记一份 exact `external_pool/registering` Provider。两者的服务端源码现可编译，v221/v222 已随完整临时文件 Store 迁移和两次重开；v222 release Store 状态机已通过 2 项专项，v221 onboarding 业务状态机以及两者的 service/API 均未运行。任何一条都不能单独写 v213，声明的 artifact SHA-256 和 expected verifier binding 也不得描述为已重算或已验证。
 
 ## 6. 明确禁线
 
