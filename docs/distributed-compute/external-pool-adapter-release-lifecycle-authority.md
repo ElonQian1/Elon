@@ -4,14 +4,14 @@ status: current
 reviewed_at: 2026-08-12
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter Release Admission 生命周期权威
 
 ## 1. 冻结结论
 
-本文冻结 v229 的负向权威：为一份 immutable v222 `staged` admission 追加唯一终态，并从不可变根与终态 receipt 派生 currentness。当前状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`：领域合同、v229 migration、Store terminal/current view、管理员 Service/HTTP、v227 三层 currentness 以及分组测试源码已经写入；新增测试 passed=0，尚未编译、执行 migration、运行测试或启动服务，无 validation fingerprint/receipt，实际 terminal 与 artifact 均为 0，不能证明该合同已经运行生效。
+本文冻结 v229 的负向权威：为一份 immutable v222 `staged` admission 追加唯一终态，并从不可变根与终态 receipt 派生 currentness。当前状态为 `design_frozen/implementation_partially_verified`：完整 `elon-server` 目标已编译，临时 SQLite fresh/repeat/v228 upgrade、两次重开、Store/HTTP、三终态、successor、幂等、双连接竞争及 v227 三层 currentness 已纳入 51 项 Windows 专项。该结论不代表真实 TCP、生产数据库升级、精确崩溃注入或生产部署已经运行。
 
 v229 只有在同一实现批次同时完成 terminal producer、current view，以及 v227 artifact PUT 的 pre-CAS、Store transaction 和数据库 trigger 三层 currentness 门卫时，才构成真实纵切面。只增加表、视图或管理 API 而不让现有 consumer 拒绝终态 admission，属于 producer-less 状态 staging，必须判定为 NO-GO。
 
@@ -97,9 +97,9 @@ actor、actor kind、作用域、确认语和服务端时间不能由调用方�
 
 ## 5. 真实 producer 与现有 consumer
 
-真实上游 producer 是已经存在并通过专项的 v222 stage：它产生 exact immutable admission。v229 的管理员 terminal API/Store 是不可逆负向终态 producer。现有具体 consumer 是 v227 artifact source PUT，虽然后者当前仍为未编译、未迁移、未运行源码，设计上已经具有明确的 admission authority、CAS custody 与 DB-second receipt 写入点。
+真实上游 producer 是已经存在并通过专项的 v222 stage：它产生 exact immutable admission。v229 的管理员 terminal API/Store 是不可逆负向终态 producer。现有具体 consumer 是 v227 artifact source PUT；本地专项已经验证其 admission authority、Windows CAS custody、DB-second receipt 与历史 GET 边界可以共同运行。
 
-v229 源码已经同时把 currentness 接入以下三个线性化位置；这些路径仍待编译和运行验证：
+v229 已经同时把 currentness 接入以下三个线性化位置，并通过顺序及双连接专项：
 
 1. Service 在读取/流式消费 raw body 和进入 quarantine CAS 前，只能取得无 terminal 的 exact staged intake authority；
 2. v227 Store 对 fresh write 和 exact replay 都必须在自己的事务线性化点重新要求 admission 仍 current；
@@ -150,4 +150,4 @@ v229 不得创建、修改或删除 v213 Adapter/version、credential、route au
 
 ## 9. 实现与验收门槛
 
-当前状态只允许描述为 `design_frozen/implementation_uncompiled/implementation_unrun`。未执行测试源码拟断言 fresh/upgrade/repeat migration 与两次重开、三终态及固定 effects、successor 正反路径、exact replay、双连接 terminal/successor/artifact 竞争、管理员与 synthetic owner HTTP、terminal 前后 PUT/GET、CAS-first/DB-second 顺序，以及 terminal 后 fresh/exact PUT 在 body 被 poll 前拒绝；这些都不是通过证据。完整崩溃窗 fault injection、生产数据库升级、真实 TCP/会话及 v227 全文件安全矩阵仍缺。只有实际编译、执行 migration 和测试并留下结果、fingerprint/receipt 后，才能重新评估 `implementation_partially_verified`；当前 passed=0、实际 terminal/artifact=0，绝不能升级。
+当前状态只能描述为 `design_frozen/implementation_partially_verified`。51 项专项已覆盖 fresh/upgrade/repeat migration、两次重开、三终态及固定 effects、successor 正反路径、exact replay、双连接 terminal/successor/artifact 竞争、管理员与 synthetic owner HTTP、terminal 前后 PUT/GET、CAS-first/DB-second、response-loss replay，以及终态后 body 不被 poll。验证指纹与回执见 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md)。完整进程崩溃/断电 fault injection、生产数据库升级、真实 TCP/会话和生产部署仍缺；不得升级为 production-ready。

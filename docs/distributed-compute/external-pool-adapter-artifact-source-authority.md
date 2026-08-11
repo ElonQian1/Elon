@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Artifact Bytes Source 权威
 status: current
 reviewed_at: 2026-08-12
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter Artifact Bytes Source 权威
@@ -14,9 +14,9 @@ implementation_status: implementation_uncompiled
 
 这份 receipt 只证明“本服务实际接收并持有的一组字节，其重开后摘要和长度与 admission 的声明一致”。它不证明字节来自 `candidate_artifact_ref`，不证明签名、供应链、格式、安全性、conformance、六能力、verifier currentness 或外部矿池可连接，也不构造 verified/trusted/attested Adapter。
 
-当前状态是 `implementation_uncompiled/implementation_unrun`：v227 领域/文件 custody、Store、一表迁移、Service/HTTP、中央接线及与 v229 currentness 联合的测试源码已经写入；测试源码又补入 HTTP/pre-CAS 输入失败关闭、临时文件清理、内容寻址复用/腐化拒绝、路径与权限门卫、blob missing 以及 CAS/DB saga 重试合同。除 rustfmt、差异/尺寸门卫和独立静态审计外尚未编译、执行 migration、运行测试、启动服务或摄入 artifact。新增测试 passed=0，无 validation fingerprint/receipt，实际 artifact 与 terminal 测量数均为 0。
+当前状态是 `implementation_partially_verified`：完整 `elon-server` 目标已编译，51 项 Windows 临时 DATA_DIR/SQLite 专项覆盖 HTTP/pre-CAS 输入失败关闭、超长路径 `.part` 清理、内容寻址复用/腐化拒绝、blob missing、目录 junction/reparse、CAS/DB saga 重试与 v229 currentness。该结果只证明本地测试 artifact，不是生产摄入或可信 Adapter。
 
-v229 admission lifecycle 已写入领域、migration、Store、Service/HTTP 与 v227 三层 currentness 源码，状态为 `design_frozen/implementation_uncompiled/implementation_unrun`。v227 PUT 现在在读取 raw body/CAS 前、Store 的 IMMEDIATE fresh/exact replay 事务内以及新 v229 BEFORE INSERT currentness trigger 中拒绝 `withdrawn/revoked/superseded` admission；v229 不改写 v227 旧 migration。这些仍只是未编译、未迁移、未运行的源码事实，详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
+v229 admission lifecycle 已把三层 currentness 接入领域、migration、Store、Service/HTTP 与 v227。专项证明终态后的 fresh/exact PUT 在 body 被 poll 前拒绝，既有 receipt 的历史 GET 仍可重开 bytes，并覆盖 terminal-first、CAS-first/DB-second、receipt-first 与双连接竞争；v229 不改写 v227 旧 migration。详见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
 
 ## 2. 唯一管理入口
 
@@ -110,10 +110,10 @@ Store exact replay 顺序是先按 scope/key 查既有回执并逐字段比较�
 
 后续 Adapter registry consumer 仍须另行闭合 artifact provenance/signature、sandbox conformance、verifier registry/currentness/revocation、平台级 release actor 与 Provider-specific route actor 分权，以及 exact v222/v227 source companion。v227 永远不跨越该截止线。
 
-v229 terminal receipt 源码固定 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none` 与 `route_effect=none`。当前仍没有编译、migration 或运行记录。
+v229 terminal receipt 固定 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none` 与 `route_effect=none`。该合同已纳入 v227/v229 联合编译、migration、重开和运行专项，但仍无真实 TCP、生产数据库升级或部署证据。
 
 ## 7. 实现与验收门槛
 
-当前源码批标记为 `implementation_uncompiled/implementation_unrun`，实际摄入和运行测量仍为 0。测试源码已写但 passed=0；本阶段只执行了 rustfmt、差异/文档/源码尺寸门卫和独立静态审计，没有执行 migration、测试或服务，也没有 validation fingerprint/receipt，不得把源码断言写成已验证事实。
+当前源码批标记为 `implementation_partially_verified`。实际命令、51 项结果、fingerprint 和 receipt 见 [`external-pool-adapter-release-api-acceptance.md`](external-pool-adapter-release-api-acceptance.md)；不得把临时 fixture 摄入写成生产 artifact 或可信 Adapter。
 
-未执行测试源码拟检查 v229 migration/重开、terminal-first、CAS-first/DB-second、receipt-first、response-loss exact replay、两连接 artifact/terminal 竞争、terminal 后历史 GET、fresh/exact PUT 拒绝及 raw body 不被 poll；v227 测试源码另覆盖 `401/403/413/415/422` 与 header/currentness 前置拒绝、body 中断后的 `.part` 清理、existing CAS exact reuse/corrupt no-overwrite、blob missing/drift、symlink/junction/reparse、Unix 权限及外部目标不变。仍缺这些断言的实际执行、精确进程崩溃/断电注入、Windows/Unix 目标平台 handle 动态证据以及生产升级。只有全部相关源码实际编译、迁移和执行并形成可审计结果后才可重新评估 `implementation_partially_verified`，且仍不得声称生产 Adapter 已验证或可执行。
+后续仍须补齐真实进程崩溃/断电/磁盘故障注入、Windows 有 symlink 权限时的 leaf reparse 分支、Unix 权限与 symlink 动态证据、生产数据库升级、真实 TCP 和生产 DATA_DIR。完成这些证据后仍不得声称生产 Adapter 已验证或可执行，除非 provenance、signature、conformance、verifier、registry 与 route 另行闭合。

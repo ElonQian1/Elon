@@ -6,7 +6,7 @@
 
 代码提交 `7b043a88f` 为 v222 Adapter release staging 增加管理员写入口；代码提交 `a37595e1a` 继续补齐管理员列表、详情和 actor-aware preflight。六个管理操作已经通过定向真实 Rust 编译、进程内接口测试及 Store 关闭重开测试；PC `/compute-external-pools` 管理员工作台也已通过跨层静态合同、严格类型、lint、生产构建和 bundle budget。该结论只证明受控 staging 管理面可调用且可审计读回，不证明候选 Adapter 已下载、验签、加载、执行或获得 v213 route authority。
 
-v229 release-admission lifecycle 的领域、migration、Store、Service/HTTP、v227 currentness 与分组测试源码已经写入，但状态严格为 `design_frozen/implementation_uncompiled/implementation_unrun`。新增测试 passed=0，未编译、未执行 migration 或运行，无 validation fingerprint/receipt，实际 artifact/terminal=0；两个新 HTTP 操作不属于下述六个已验证操作，也没有 MCP/PC。冻结合同见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
+v227 artifact source 与 v229 release-admission lifecycle 已通过完整 `elon-server` 编译和 51 项 Windows 临时 DATA_DIR/SQLite 专项，状态为 `design_frozen/implementation_partially_verified`。证据覆盖管理员 HTTP、三终态、迁移/重开、双连接竞争、terminal↔artifact 顺序、raw body 门卫、CAS custody、失败清理、恢复和路径安全；两个 v229 HTTP 操作仍没有 MCP/PC。冻结合同见 [`external-pool-adapter-release-lifecycle-authority.md`](external-pool-adapter-release-lifecycle-authority.md)。
 
 ## 2. 接口
 
@@ -19,7 +19,7 @@ v229 release-admission lifecycle 的领域、migration、Store、Service/HTTP、
 
 六个入口均要求登录用户角色为 `admin` 或 `owner`。Service 从认证会话派生操作者 ID，请求体不接受提交者、复核者或执行者 ID。对应的 6 个 MCP 工具已经复用同一 Service 并通过角色隔离与治理链专项，见 `compute-management-mcp-acceptance.md`；PC 管理员工作台复用相同 HTTP 合同，不增加旁路权限。
 
-v229 源码新增两个尚未验证的管理员 HTTP 入口，不把它们计入当前已验证接口：`POST /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/terminal` 追加唯一的 `withdrawn|revoked|superseded` 终态，`GET /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/currentness` 读取派生 currentness。未执行测试源码拟断言 `401/403/404/409`、fresh `201`、replay/GET `200`、unknown field、确认语、持久 owner 与 `local-owner` actor、三终态及响应脱敏；`superseded` 仍须绑定同 Adapter 的 exact current successor，旧 admission 不自动跟随或恢复。v229 不增加 MCP、PC、SDK 或 Provider 本人入口。
+v229 新增两个已通过进程内 HTTP 专项的管理员入口：`POST /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/terminal` 追加唯一的 `withdrawn|revoked|superseded` 终态，`GET /api/admin/compute/external-pool-adapter-release-admissions/:admission_id/currentness` 读取派生 currentness。测试覆盖会话/角色、显式确认、幂等重放、冲突、持久 owner 与 `local-owner` actor、三终态及响应脱敏；`superseded` 必须绑定同 Adapter 的 exact current successor，旧 admission 不自动跟随或恢复。v229 不增加 MCP、PC、SDK 或 Provider 本人入口。
 
 ## 3. v222 已验证行为
 
@@ -53,13 +53,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 
 PC 静态验证复用 `npm run test:compute-external-pools`、`typecheck`、`lint`、`build` 与 `check:bundle-budget`。页面固定六项 capability revision，独立展示 submit/review/stage 阶段及 blocker，不采信自由 JSON，也不把 staged admission 描述为已下载、已验签或可路由 Adapter。
 
-## 5. 未验证边界
+## 5. v227/v229 联合验证命令与证据
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-external-pool-adapter -- test --manifest-path server\Cargo.toml -p elon-server --bin elon-server external_pool_adapter -- --nocapture
+```
+
+- 结果：`CARGO_OK`；
+- 测试：51 项通过、0 项失败、1675 项过滤，测试本体耗时 82.49 秒；
+- validation fingerprint：`19e2c747c306a4ded01a02f4ef39e914a28d331d7e3fae43a034814f8821e740`；
+- validation receipt：`0445dfa90206795ad3917f4892da4ca833d0c54dc8d2c93fc854202f6e931176`。
+
+专项实际覆盖 fresh/repeat/v228 upgrade migration、两次重开、三终态、successor 正反路径、exact replay、双连接 terminal/successor/artifact 竞争、terminal-first、CAS-first/DB-second、receipt-first、response-loss replay、终态前后 PUT/GET、HTTP 输入失败关闭、`.part` 清理、existing CAS 复用/腐化拒绝、blob missing、目录 junction/reparse 与恢复。Windows custody 使用无覆盖硬链接安装，固定目录拒绝 DELETE sharing，并在超长路径和 Tokio 提前返回时显式关闭句柄后清理临时文件。
+
+## 6. 未验证边界
 
 - 未部署服务器，未对生产数据库或真实管理员会话调用；
 - 未通过真实 TCP 或已登录浏览器会话验证 PC 页面；
-- admission terminal/currentness 运维入口及 migration/Store/HTTP/并发/currentness 测试源码已写，但新增测试 passed=0，未编译、未执行 migration 或运行，无 fingerprint/receipt，实际 artifact/terminal=0；v229 仍为 `design_frozen/implementation_uncompiled/implementation_unrun`；
-- 未执行断言拟检查三终态、exact successor、fixed effects、fresh/replay/currentness 状态码、管理员/owner/`local-owner` actor、双连接竞争，以及 terminal 后 v227 PUT 在 raw body 被 poll 前拒绝、历史 GET 保留；v227 新增测试源码再覆盖 pre-CAS 鉴权/header/大小/摘要拒绝、临时文件清理、CAS 复用/腐化拒绝、blob missing、路径/权限/reparse 门卫；这些不构成接口或运行证据；
-- test source 也表达 terminal-first、CAS-first/DB-second、receipt-first、response-loss replay 与 artifact/terminal 竞争，但实际执行、精确进程崩溃/断电 fault injection、目标平台动态 handle 证据和生产升级仍缺；不回改 v227 旧 migration；
+- 未执行真实进程崩溃、断电、磁盘写满或目录替换时序的 fault injection；受控 saga 测试不能替代这些证据；
+- 当前 Windows 会话没有创建文件 symlink 的权限，该测试只执行了能力检测；目录 junction/reparse 已通过。Unix 私有权限与 symlink 分支未在本机执行；
+- v227/v229 没有 MCP、PC、SDK 或 Provider 本人入口，未通过真实 TCP、生产数据库副本、生产 DATA_DIR 或已登录浏览器验证；
 - 未解析或下载 `candidate_artifact_ref`，未重算实现摘要；
 - 未验证 verifier registry、签名、供应链或协议能力；
 - 未生成 Adapter registry/version、credential、service actor、v213 route/seal；
