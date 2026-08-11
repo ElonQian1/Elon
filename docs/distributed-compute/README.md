@@ -25,6 +25,7 @@ owners: backend, node, ai-economy
 | 能力 | 2026-08-12 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
+| 旧节点 LLM 联邦兼容观察 | 真实 `NodeComputeRun` 与认证 `/api/me/node-usage` 已接入附加只读投影；只认 `server_node_llm/node_llm`，固定 `partial/provider_reported_unverified`，原始数组不变。源码未编译、未运行（`passed=0`），不生成 Job、Reservation、Attempt、Lease、Receipt、可信计量或结算 |
 | Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码与 v169-v201 分段实现已写；Provider/Supply、Offer、Price Snapshot 和 Broker 部分链已有分层验证，其余 Attempt/结算仍有大量 `implementation_uncompiled` 或未接线入口。不能把局部通过描述为整条交易链可用 |
 | Provider 本人控制面 | 服务/Store 及进程内 HTTP/MCP 已验证登记、读取、幂等和本人隔离；PC 自助登记已通过严格类型、lint 和生产构建。只生成 `registering/self_declared`，真实 TCP 与浏览器尚未验证 |
 | CapacityPool 本人控制面 | 服务/Store 及进程内 HTTP/MCP 已验证登记、重放、审计和磁盘重开；PC `/compute-supply` 已通过严格类型、lint 和生产构建。审计健康不等于硬件 verified，真实 TCP 与浏览器尚未验证 |
