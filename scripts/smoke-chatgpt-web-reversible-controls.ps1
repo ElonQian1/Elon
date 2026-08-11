@@ -116,7 +116,8 @@ function Wait-SelectedModel {
         } |
         Select-Object -First 1
     if ($null -eq $selected) {
-        throw "ChatGPT model menu did not mark the requested model as selected."
+        $current = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        throw "ChatGPT model menu did not mark the requested model as selected; expected=$ExpectedLabel current=$([string]$current.conversation.current_model)."
     }
     return Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
 }

@@ -633,6 +633,18 @@
     );
   }
 
+  function setNodeExpanded(node, expanded, emitEvent, result) {
+    discover();
+    const entry = Array.from(controlsById.entries()).find(([, candidate]) => candidate === node);
+    if (!entry || !isVisible(node) || !disclosureAdapter) {
+      return result('set_ui_control_expanded', false, '官网控件已变化，请刷新结构后重试。');
+    }
+    return disclosureAdapter.setExpanded(
+      node, entry[0], expanded, emitEvent, result,
+      () => emitSnapshot(emitEvent, true)
+    );
+  }
+
   window.__elonChatGptLayout = Object.freeze({
     emitSnapshot,
     findSemanticNode,
@@ -641,6 +653,7 @@
     requestSemanticTouch,
     selectChoice,
     setExpanded,
+    setNodeExpanded,
     setSelected,
     setSliderValue,
     setText

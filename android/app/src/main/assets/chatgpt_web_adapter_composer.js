@@ -478,6 +478,16 @@
         action,
         complete: result
       });
+      const layout = window.__elonChatGptLayout;
+      if (layout && typeof layout.setNodeExpanded === 'function') {
+        layout.setNodeExpanded(target.node, true, emitEvent, (_action, ok, detail) => {
+          if (!ok) return settlePendingOptions(section, false, detail);
+          window.setTimeout(() => {
+            collectRequestedOptions(section, composer, emitEvent, () => {});
+          }, 220);
+        });
+        return;
+      }
     }
     if (!emitVisibleNodeTouch(purpose, target.node, emitEvent)) {
       if (target.opensSubmenu) {

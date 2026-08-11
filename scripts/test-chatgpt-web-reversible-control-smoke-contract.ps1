@@ -28,6 +28,7 @@ $required = @(
     "[Math]::Min(`$ReadyTimeoutSec, 15)",
     "Wait-SelectedModel",
     "requested model as selected",
+    "expected=`$ExpectedLabel current=`$([string]`$current.conversation.current_model)",
     "Find-ModelByLabel",
     "IsNullOrWhiteSpace(`$originalModelLabel)",
     "Restore-ModelByLabel",
