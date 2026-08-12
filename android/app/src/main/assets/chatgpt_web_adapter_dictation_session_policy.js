@@ -41,16 +41,20 @@
     };
   }
 
-  function explicitControl(nodes, kind, isActionable) {
-    const pattern = kind === 'cancel' ? CANCEL_SIGNAL : SUBMIT_SIGNAL;
-    return nodes.find((node) => isActionable(node) && pattern.test(signal(node))) || null;
+  function eligible(node, isActionable, isVisible) {
+    return isActionable(node) || isVisible(node);
   }
 
-  function structuralControls(nodes, isActionable, composerPresent, viewportWidth, viewportHeight) {
+  function explicitControl(nodes, kind, isActionable, isVisible) {
+    const pattern = kind === 'cancel' ? CANCEL_SIGNAL : SUBMIT_SIGNAL;
+    return nodes.find((node) => eligible(node, isActionable, isVisible) && pattern.test(signal(node))) || null;
+  }
+
+  function structuralControls(nodes, isActionable, isVisible, composerPresent, viewportWidth, viewportHeight) {
     if (composerPresent || viewportWidth <= 0 || viewportHeight <= 0) return null;
     const bottomControls = nodes.map((node) => ({ node, rect: rect(node) }))
       .filter(({ node, rect: value }) => {
-        if (!value || !isActionable(node)) return false;
+        if (!value || !eligible(node, isActionable, isVisible)) return false;
         const ratio = value.width / value.height;
         return value.centerY >= viewportHeight * 0.72 &&
           value.width >= 28 && value.height >= 28 &&
@@ -82,11 +86,15 @@
     const isActionable = typeof options.isActionable === 'function'
       ? options.isActionable
       : () => false;
-    const explicit = explicitControl(nodes, kind, isActionable);
+    const isVisible = typeof options.isVisible === 'function'
+      ? options.isVisible
+      : () => false;
+    const explicit = explicitControl(nodes, kind, isActionable, isVisible);
     if (explicit) return explicit;
     const structural = structuralControls(
       nodes,
       isActionable,
+      isVisible,
       options.composerPresent === true,
       Number(options.viewportWidth) || 0,
       Number(options.viewportHeight) || 0

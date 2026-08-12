@@ -43,6 +43,15 @@ assert.equal(policy.find('cancel', iconSession), iconCancel);
 assert.equal(policy.find('submit', iconSession), iconSubmit);
 assert.equal(policy.active(iconSession), true);
 
+const webViewHitTestFallback = {
+  ...iconSession,
+  isActionable: () => false,
+  isVisible: () => true
+};
+assert.equal(policy.find('cancel', webViewHitTestFallback), iconCancel);
+assert.equal(policy.find('submit', webViewHitTestFallback), iconSubmit);
+assert.equal(policy.active(webViewHitTestFallback), true);
+
 assert.equal(policy.active({ ...iconSession, composerPresent: true }), false);
 assert.equal(policy.active({ ...iconSession, nodes: [iconCancel, iconSubmit] }), false);
 assert.equal(policy.active({ ...iconSession, nodes: [plus, iconSubmit] }), false);

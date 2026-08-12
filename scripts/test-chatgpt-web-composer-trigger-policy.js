@@ -287,26 +287,26 @@ const sessionPlus = {
   id: '',
   textContent: '',
   getAttribute: () => null,
-  getBoundingClientRect: () => ({ left: 20, top: 710, right: 75, bottom: 765 })
+  getBoundingClientRect: () => ({ left: 20, top: 710, right: 75, bottom: 765, width: 55, height: 55 })
 };
 const sessionCancel = {
   id: '',
   textContent: '',
   getAttribute: () => null,
-  getBoundingClientRect: () => ({ left: 285, top: 710, right: 335, bottom: 760 })
+  getBoundingClientRect: () => ({ left: 285, top: 710, right: 335, bottom: 760, width: 50, height: 50 })
 };
 const sessionSubmit = {
   id: '',
   textContent: '',
   getAttribute: () => null,
-  getBoundingClientRect: () => ({ left: 340, top: 710, right: 390, bottom: 760 })
+  getBoundingClientRect: () => ({ left: 340, top: 710, right: 390, bottom: 760, width: 50, height: 50 })
 };
 const sessionNodes = [sessionPlus, sessionCancel, sessionSubmit];
 const sessionSandbox = {
   document: {
     querySelector: () => null,
     querySelectorAll(selector) {
-      return selector === 'button, [role="button"]' ? sessionNodes : [];
+      return selector === 'button, [role="button"], [tabindex], svg' ? sessionNodes : [];
     }
   },
   location: { origin: 'https://chatgpt.com' },
@@ -348,6 +348,18 @@ assert.equal(sessionEvents[0].purpose, 'cancel_dictation');
 assert.equal(sessionEvents[0].xRatio, 0.775);
 assert.equal(sessionEvents[1].purpose, 'submit_dictation');
 assert.equal(sessionEvents[1].xRatio, 0.9125);
+
+sessionEvents.length = 0;
+sessionResults.length = 0;
+sessionSandbox.window.__elonChatGptActionTargetPolicy.actionPoint = () => null;
+assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
+sessionSandbox.window.__elonChatGptComposer.cancelDictation(
+  (event) => sessionEvents.push(event),
+  (...args) => sessionResults.push(args)
+);
+assert.deepEqual(Array.from(sessionResults[0]), ['cancel_dictation', true, '']);
+assert.equal(sessionEvents[0].purpose, 'cancel_dictation');
+assert.equal(sessionEvents[0].xRatio, 0.775);
 
 const optionEvents = [];
 const optionResults = [];

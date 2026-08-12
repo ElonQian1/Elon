@@ -207,10 +207,27 @@
     );
   }
 
+  function dictationSessionNodes() {
+    const seen = new Set();
+    const values = [];
+    Array.from(document.querySelectorAll(
+      'button, [role="button"], [tabindex], svg'
+    )).forEach((node) => {
+      const owner = node.closest && node.closest('button, [role="button"], [tabindex]');
+      const candidate = owner || node;
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        values.push(candidate);
+      }
+    });
+    return values;
+  }
+
   function dictationSessionOptions(composer) {
     return {
-      nodes: document.querySelectorAll('button, [role="button"]'),
+      nodes: dictationSessionNodes(),
       isActionable,
+      isVisible,
       composerPresent: !!composer || hasVisibleComposer(),
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight
@@ -560,7 +577,7 @@
     const action = kind === 'cancel' ? 'cancel_dictation' : 'submit_dictation';
     const button = findDictationSessionButton(kind, null);
     if (!button) return result(action, false, '官网当前没有进行中的听写。');
-    if (!emitTouchRequest(action, button, emitEvent)) {
+    if (!emitVisibleNodeTouch(action, button, emitEvent)) {
       return result(action, false, '官网听写操作当前不可见。');
     }
     result(action, true, '');
