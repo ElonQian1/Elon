@@ -190,6 +190,7 @@ internal object ChatGptNativeControlPresentation {
         Kind.DEDICATED,
         nativeSelector = when (control.semantic) {
             "attachment" -> ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER
+            ChatGptWebUiSemantics.WEB_SEARCH -> ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER
             "model" -> ChatGptNativeNavigationSelector.COMPOSER_MODEL_TRIGGER
             "dictation" -> ChatGptNativeNavigationSelector.DICTATION
             "voice_mode" -> ChatGptNativeNavigationSelector.REALTIME_VOICE
@@ -227,6 +228,7 @@ internal object ChatGptNativeControlPresentation {
     private val HEADER_DEDICATED_SEMANTICS = setOf("navigation", "new_conversation", "stop")
     private val COMPOSER_DEDICATED_SEMANTICS = setOf(
         "attachment",
+        ChatGptWebUiSemantics.WEB_SEARCH,
         "model",
         "dictation",
         "voice_mode",

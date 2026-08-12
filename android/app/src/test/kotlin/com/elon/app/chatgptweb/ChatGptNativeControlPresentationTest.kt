@@ -248,6 +248,7 @@ class ChatGptNativeControlPresentationTest {
             control("navigation", "navigation", "会话", ChatGptWebUiRegion.HEADER),
             control("new", "new_conversation", "新聊天", ChatGptWebUiRegion.HEADER),
             control("attachment", "attachment", "添加", ChatGptWebUiRegion.COMPOSER),
+            control("web-search", ChatGptWebUiSemantics.WEB_SEARCH, "搜索", ChatGptWebUiRegion.COMPOSER),
             control("model", "model", "模型", ChatGptWebUiRegion.COMPOSER),
             control("conversation", "conversation", "工作", ChatGptWebUiRegion.OVERLAY),
             control("project", "project", "项目", ChatGptWebUiRegion.OVERLAY),
@@ -271,6 +272,11 @@ class ChatGptNativeControlPresentationTest {
             ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER,
             coverage.getValue("attachment").nativeSelector,
         )
+        assertEquals(
+            ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER,
+            coverage.getValue("web-search").nativeSelector,
+        )
+        assertEquals("dedicated", coverage.getValue("web-search").kind.wireName)
         assertEquals(
             ChatGptNativeNavigationSelector.COMPOSER_MODEL_TRIGGER,
             coverage.getValue("model").nativeSelector,

@@ -330,10 +330,11 @@ class ChatGptWebProtocolTest {
                 "pageKind":"home",
                 "title":"工作",
                 "compatibility":"healthy",
-                "discoveredControlCount":9,
+                "discoveredControlCount":10,
                 "controlsTruncated":false,
                 "controls":[
                   {"id":"control_navigation","semantic":"navigation","label":"打开导航","region":"header","role":"button","enabled":true},
+                  {"id":"control_web_search","semantic":"action","label":"搜索","region":"composer","role":"button","enabled":true,"selected":true},
                   {"id":"control_suggestion_ab12","semantic":"suggestion","label":"帮我整理待办","region":"suggestions","role":"button","enabled":true,"inViewport":false},
                   {"id":"control_conversation_ab12","semantic":"conversation","label":"桥接验证","region":"overlay","role":"link","enabled":true,"contextId":"demo"},
                   {"id":"control_message_ab12_share_cd34","semantic":"share","label":"分享","region":"message","role":"button","enabled":true,"contextId":"conversation-turn-4","xRatio":0.8,"yRatio":0.6},
@@ -350,21 +351,23 @@ class ChatGptWebProtocolTest {
 
         assertEquals("工作", event.value.title)
         assertEquals("healthy", event.value.compatibility)
-        assertEquals(9, event.value.discoveredControlCount)
+        assertEquals(10, event.value.discoveredControlCount)
         assertFalse(event.value.controlsTruncated)
-        assertEquals(8, event.value.controls.size)
-        assertEquals("suggestion", event.value.controls[1].semantic)
-        assertFalse(event.value.controls[1].inViewport)
-        assertEquals("conversation", event.value.controls[2].semantic)
-        assertEquals("demo", event.value.controls[2].contextId)
-        assertEquals("conversation-turn-4", event.value.controls[3].contextId)
-        assertEquals("message", event.value.controls[3].region)
-        assertEquals(0.8, event.value.controls[3].webXRatio ?: -1.0, 0.0)
-        assertEquals(0.6, event.value.controls[3].webYRatio ?: -1.0, 0.0)
-        assertEquals("sources", event.value.controls[4].semantic)
-        assertEquals("more", event.value.controls[5].semantic)
-        assertEquals(ChatGptWebUiRegion.CONTENT, event.value.controls[6].region)
-        assertEquals("create_asset", event.value.controls[6].semantic)
+        assertEquals(9, event.value.controls.size)
+        assertEquals(ChatGptWebUiSemantics.WEB_SEARCH, event.value.controls[1].semantic)
+        assertTrue(event.value.controls[1].selected)
+        assertEquals("suggestion", event.value.controls[2].semantic)
+        assertFalse(event.value.controls[2].inViewport)
+        assertEquals("conversation", event.value.controls[3].semantic)
+        assertEquals("demo", event.value.controls[3].contextId)
+        assertEquals("conversation-turn-4", event.value.controls[4].contextId)
+        assertEquals("message", event.value.controls[4].region)
+        assertEquals(0.8, event.value.controls[4].webXRatio ?: -1.0, 0.0)
+        assertEquals(0.6, event.value.controls[4].webYRatio ?: -1.0, 0.0)
+        assertEquals("sources", event.value.controls[5].semantic)
+        assertEquals("more", event.value.controls[6].semantic)
+        assertEquals(ChatGptWebUiRegion.CONTENT, event.value.controls[7].region)
+        assertEquals("create_asset", event.value.controls[7].semantic)
         assertEquals("action", event.value.controls.last().semantic)
         assertEquals("chatgpt-control:control_navigation:打开导航", event.value.controls.first().accessibilityLabel)
     }

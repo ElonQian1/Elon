@@ -8,7 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 74,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 75,
     [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,
@@ -142,11 +142,15 @@ function Wait-ChatGptActivityForeground {
 
 function Get-VisibleUiXml {
     $remotePath = "/sdcard/elon-chatgpt-web-smoke.xml"
-    Invoke-Adb shell uiautomator dump $remotePath | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "UIAutomator dump failed." }
-    $xml = (Invoke-Adb shell cat $remotePath) -join "`n"
-    if ($LASTEXITCODE -ne 0) { throw "Unable to read UIAutomator dump." }
-    return $xml
+    foreach ($attempt in 1..3) {
+        Invoke-Adb shell uiautomator dump $remotePath | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $xml = (Invoke-Adb shell cat $remotePath) -join "`n"
+            if ($LASTEXITCODE -eq 0 -and $xml -match '<hierarchy') { return $xml }
+        }
+        if ($attempt -lt 3) { Start-Sleep -Seconds 1 }
+    }
+    throw "UIAutomator dump failed after 3 attempts."
 }
 
 function Get-VisibleNativeSelectors {

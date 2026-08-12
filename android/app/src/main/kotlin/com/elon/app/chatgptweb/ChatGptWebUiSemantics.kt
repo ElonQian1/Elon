@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 internal object ChatGptWebUiSemantics {
     const val GENERIC_ACTION = "action"
     const val DICTATION = "dictation"
+    const val WEB_SEARCH = "web_search"
 
     val KNOWN = setOf(
         "navigation",
@@ -11,6 +12,7 @@ internal object ChatGptWebUiSemantics {
         "new_conversation",
         "attachment",
         "model",
+        WEB_SEARCH,
         DICTATION,
         "voice_mode",
         "send",
