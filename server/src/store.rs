@@ -99,6 +99,7 @@ mod compute_external_pool_adapter_artifact_vulnerability_report;
 mod compute_external_pool_adapter_credential_verification;
 mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
+mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -516,6 +517,10 @@ pub(crate) use compute_external_pool_adapter_credential_verifier_key::{
     CredentialVerifierKeyCurrentnessReceipt, CredentialVerifierKeyRegistrationWriteReceipt,
     CredentialVerifierKeyRevocationWriteReceipt, RegisterCredentialVerifierKey,
     RevokeCredentialVerifierKey,
+};
+pub(crate) use compute_external_pool_adapter_installation::{
+    ExternalPoolAdapterInstallationCurrentness, ExternalPoolAdapterInstallationWriteReceipt,
+    InstallExternalPoolAdapter,
 };
 pub(crate) use compute_external_pool_adapter_release::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,

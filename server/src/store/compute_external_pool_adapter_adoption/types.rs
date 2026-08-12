@@ -100,15 +100,37 @@ pub(super) struct StoredExternalPoolAdapterAdoptionTerminal {
 
 pub(in crate::store) struct CurrentExternalPoolAdapterAdoptionAuthority {
     receipt: ExternalPoolAdapterAdoptionReceipt,
+    checked_at: String,
 }
 
-impl CurrentExternalPoolAdapterAdoptionAuthority {
+pub(in crate::store) struct HistoricalExternalPoolAdapterAdoptionAuthority {
+    receipt: ExternalPoolAdapterAdoptionReceipt,
+}
+
+impl HistoricalExternalPoolAdapterAdoptionAuthority {
     pub(super) fn new(receipt: ExternalPoolAdapterAdoptionReceipt) -> Self {
         Self { receipt }
     }
 
     pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterAdoptionReceipt {
         &self.receipt
+    }
+}
+
+impl CurrentExternalPoolAdapterAdoptionAuthority {
+    pub(super) fn new(receipt: ExternalPoolAdapterAdoptionReceipt, checked_at: String) -> Self {
+        Self {
+            receipt,
+            checked_at,
+        }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterAdoptionReceipt {
+        &self.receipt
+    }
+
+    pub(in crate::store) fn checked_at(&self) -> &str {
+        &self.checked_at
     }
 }
 

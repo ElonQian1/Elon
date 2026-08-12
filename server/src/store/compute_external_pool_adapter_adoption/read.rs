@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use chrono::{DateTime, SecondsFormat};
 use rusqlite::{params, types::Type, Connection, OptionalExtension};
 
 use crate::{
@@ -332,17 +333,101 @@ pub(in crate::store) fn current_external_pool_adapter_adoption_authority_on(
     conn: &Connection,
     receipt_id: &str,
     expected_receipt_digest: &str,
+    checked_at: &str,
 ) -> Result<Option<CurrentExternalPoolAdapterAdoptionAuthority>> {
-    let Some(currentness) = currentness_on(conn, receipt_id)? else {
+    validate_checked_at(checked_at)?;
+    let Some(stored) = adoption_by_id_on(conn, receipt_id)? else {
         return Ok(None);
     };
-    if currentness.current_status != "adopted_current"
-        || currentness.adoption.adoption_receipt_digest != expected_receipt_digest
+    let binding = &stored.receipt.adoption.binding;
+    if stored.receipt.adoption_receipt_digest != expected_receipt_digest
+        || terminal_by_adoption_on(conn, receipt_id)?.is_some()
+        || !strictly_current_at(&binding.sandbox_report_expires_at, checked_at)?
+        || !strictly_current_at(&binding.credential_report_expires_at, checked_at)?
     {
         bail!("Adapter adoption authority is not current and exact");
     }
-    Ok(adoption_by_id_on(conn, receipt_id)?
-        .map(|stored| CurrentExternalPoolAdapterAdoptionAuthority::new(stored.receipt)))
+    let credential = crate::store::compute_external_pool_adapter_credential_verification::current_external_pool_adapter_credential_verification_authority_on(
+        conn,
+        &binding.credential_verification_receipt_id,
+        &binding.credential_verification_receipt_digest,
+        checked_at,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("Adapter adoption lost current credential authority"))?;
+    if credential.checked_at() != checked_at {
+        bail!("Adapter adoption credential authority used a different checked_at");
+    }
+    let sandbox = crate::store::compute_external_pool_adapter_artifact_sandbox_conformance::external_pool_adapter_sandbox_conformance_receipt_authority_on(
+        conn,
+        &binding.admission_id,
+        &binding.sandbox_conformance_receipt_digest,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("Adapter adoption lost sandbox authority"))?;
+    if sandbox.receipt().conformance.binding.report_expires_at != binding.sandbox_report_expires_at
+    {
+        bail!("Adapter adoption sandbox expiry drifted");
+    }
+    let sandbox_statuses: Option<(String, String)> = conn
+        .query_row(
+            "SELECT vulnerability_report_status,sandbox_verifier_key_status
+               FROM compute_external_pool_adapter_sandbox_conformance_current
+              WHERE admission_id=?1 AND sandbox_conformance_receipt_id=?2
+                AND sandbox_conformance_receipt_digest=?3",
+            params![
+                binding.admission_id,
+                binding.sandbox_conformance_receipt_id,
+                binding.sandbox_conformance_receipt_digest
+            ],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    if sandbox_statuses
+        .as_ref()
+        .map(|values| (values.0.as_str(), values.1.as_str()))
+        != Some(("verified_current", "active"))
+    {
+        bail!("Adapter adoption sandbox upstream authorities are not current");
+    }
+    Ok(Some(CurrentExternalPoolAdapterAdoptionAuthority::new(
+        stored.receipt,
+        checked_at.to_string(),
+    )))
+}
+
+pub(in crate::store) fn external_pool_adapter_adoption_receipt_authority_on(
+    conn: &Connection,
+    receipt_id: &str,
+    expected_receipt_digest: &str,
+) -> Result<Option<HistoricalExternalPoolAdapterAdoptionAuthority>> {
+    let Some(stored) = adoption_by_id_on(conn, receipt_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.adoption_receipt_digest != expected_receipt_digest {
+        bail!("Adapter adoption receipt authority is not exact");
+    }
+    Ok(Some(HistoricalExternalPoolAdapterAdoptionAuthority::new(
+        stored.receipt,
+    )))
+}
+
+fn validate_checked_at(value: &str) -> Result<()> {
+    let parsed = DateTime::parse_from_rfc3339(value)?;
+    if parsed.offset().local_minus_utc() != 0
+        || parsed.to_rfc3339_opts(SecondsFormat::Nanos, true) != value
+    {
+        bail!("Adapter adoption checked_at is not canonical UTC nanoseconds");
+    }
+    Ok(())
+}
+
+fn strictly_current_at(expires_at: &str, checked_at: &str) -> Result<bool> {
+    let expires = DateTime::parse_from_rfc3339(expires_at)?;
+    if expires.offset().local_minus_utc() != 0
+        || expires.to_rfc3339_opts(SecondsFormat::Nanos, true) != expires_at
+    {
+        bail!("Adapter adoption upstream expiry is not canonical UTC nanoseconds");
+    }
+    Ok(checked_at < expires_at)
 }
 
 impl Store {

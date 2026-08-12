@@ -22,7 +22,7 @@ implementation_status: mixed
 
 ## Attempt 与外部 Adapter
 
-- Attempt v175-v215、v221/v222 管理面及 v227-v245 Adapter 前置门已形成分层权威，生产成功链仍未运行。V239 形成精确制品的限时动态沙箱签名收据，V241/V242 固定独立凭据验证器实现与签名公钥，V243 形成非 Bearer 凭据的短时独立签名验证回执，V244 再把当前 V239 与 V243 汇合为可撤销采用授权。V244 migration 定向测试及 2 项真实 HTTP 链路测试通过；V245 只加固 V243 凭据及 V244 采用/撤销回执的全部已物化 SQLite 标量投影、历史/当前 authority 类型隔离和同一事务显式 `checked_at`，当前未编译、未运行（`passed=0`），不扩大 V243/V244 的历史通过结论。采用授权仍不安装或执行制品，不激活 Provider，不创建 v213 route、worker/ACK 或付款。真实安装/Provider activation、生产 Adapter、Runner、任务派发、计量结算、生产 TCP/部署/MCP/PC 仍缺。见 `external-pool-adapter-adoption-authority.md`、`external-pool-adapter-credential-verification-authority.md` 与对应验收文档。
+- Attempt v175-v215、v221/v222 管理面及 v227-v246 Adapter 前置门已形成分层权威，生产成功链仍未运行。V239 形成限时动态沙箱签名收据，V241/V242 固定凭据验证器实现与公钥，V243 形成短时凭据验证回执，V244 汇合为可撤销采用授权；V244 migration 定向测试及 2 项真实 HTTP 链路测试通过。V245 加固 legacy 投影与显式检查时间，V246 新增从 V227 CAS 同一复验句柄按 V232 manifest 安全解包、原子发布内容寻址目录并登记 `installed_inert` 实例的源码；V245/V246 均未编译、未运行（`passed=0`），不扩大历史通过结论。V246 不读取 credential、不启动进程、不激活 Provider、不创建 v213 route、worker/ACK 或付款。安装运行验收、Provider activation、生产 Adapter、Runner、任务派发、计量结算、生产 TCP/部署/MCP/PC 仍缺。见 `external-pool-adapter-installation-authority.md`、`external-pool-adapter-adoption-authority.md` 与对应验收文档。
 - 算力 Attempt PC 的 12 个角色路由已通过跨层合同、严格类型、lint、生产构建和 bundle budget；Gateway 未接线，人工 Start、Renew、no-start Abort 仍关闭。v226 final-usage fence 源码已写但未编译、迁移或运行；它不新增账本或经济效果。操作级后端、真实 TCP/浏览器、生产库和发布仍未验收。见 `pc-compute-attempt-workbenches-acceptance.md` 与 `attempt-final-usage-fence-authority.md`。
 
 ## 节点插件与端点会话

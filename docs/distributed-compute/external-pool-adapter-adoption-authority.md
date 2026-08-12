@@ -51,4 +51,4 @@ V244 把一份当前 V239 动态沙箱符合性回执和一份当前 V243 凭据
 
 ## 5. 后续边界
 
-下一阶段应建立独立的 Adapter installation/Provider activation 事务：消费当前 V244 authority，安全获取已验证制品和凭据引用，生成新的 Provider 版本，并把安装实例与后续 v213 route authority 精确绑定。真实 Adapter worker、ACK、任务执行与结算仍必须作为后续独立交付，不能由 V244 自动推导。
+V246 单独建立惰性 Adapter installation authority：消费当前 V244 authority，从 V227 CAS 的同一已复验句柄按 V232 manifest 安全解包并登记不可变安装实例，但仍不激活 Provider、不读取凭据、不启动进程或写 v213。Provider activation、service actor/route authority、真实 Adapter worker、ACK、任务执行与结算继续作为后续独立交付，不能由 V244 或安装目录自动推导。见 [`external-pool-adapter-installation-authority.md`](external-pool-adapter-installation-authority.md)。

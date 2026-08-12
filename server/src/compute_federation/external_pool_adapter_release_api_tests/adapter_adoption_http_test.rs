@@ -281,6 +281,24 @@ async fn create_adoption_roots(fixture: &Fixture, suffix: &str, version: &str) -
     }
 }
 
+pub(super) async fn create_current_adoption(
+    fixture: &Fixture,
+    suffix: &str,
+    version: &str,
+) -> Value {
+    let roots = create_adoption_roots(fixture, suffix, version).await;
+    let (status, created) = call(
+        &fixture.router,
+        Method::POST,
+        path(),
+        Some(&fixture.applier_token),
+        &adoption_body(&roots, &format!("{suffix}-adoption")),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    created
+}
+
 fn adoption_body(roots: &AdoptionRoots, idempotency_key: &str) -> Value {
     json!({
         "application_id":roots.application.application_id,

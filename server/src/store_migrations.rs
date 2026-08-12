@@ -19,6 +19,7 @@ mod compute_external_pool_adapter_credential_verification;
 mod compute_external_pool_adapter_credential_verification_hardening;
 mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
+mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -303,6 +304,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (243, "外部矿池 Adapter 非 Bearer 凭据短时独立签名验证回执", compute_external_pool_adapter_credential_verification::migration_v243),
     (244, "外部矿池 Adapter 精确证据采用授权与追加式撤销", compute_external_pool_adapter_adoption::migration_v244),
     (245, "外部矿池 Adapter 凭据验证回执完整投影与检查时间加固", compute_external_pool_adapter_credential_verification_hardening::migration_v245),
+    (246, "外部矿池 Adapter 惰性安装制品与文件清单回执", compute_external_pool_adapter_installation::migration_v246),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
