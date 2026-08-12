@@ -23,7 +23,7 @@ function node(attributes, options = {}) {
 }
 
 function invoke(target, desired, options = {}) {
-  let touch = null;
+  const touches = [];
   let receipt = null;
   let snapshots = 0;
   disclosures.setExpanded(
@@ -31,15 +31,16 @@ function invoke(target, desired, options = {}) {
     'control_menu_demo',
     desired,
     (event) => {
-      touch = event;
-      if (options.applyTouch !== false) {
+      touches.push(event);
+      const applyOnAttempt = Number(options.applyOnAttempt || 1);
+      if (options.applyTouch !== false && touches.length >= applyOnAttempt) {
         target.setAttribute('aria-expanded', desired ? 'true' : 'false');
       }
     },
     (action, ok, detail) => { receipt = { action, ok, detail }; },
     () => { snapshots += 1; }
   );
-  return { touch, receipt, snapshots };
+  return { touch: touches.at(-1) || null, touches, receipt, snapshots };
 }
 
 const collapsed = node({ 'aria-expanded': 'false' });
@@ -48,6 +49,7 @@ const opened = invoke(collapsed, true);
 assert.deepEqual(opened.receipt, { action: 'set_ui_control_expanded', ok: true, detail: '' });
 assert.equal(opened.touch.purpose, 'invoke_ui_control');
 assert.equal(opened.touch.controlId, 'control_menu_demo');
+assert.equal(opened.touches.length, 1);
 assert.equal(opened.snapshots, 1);
 
 const expanded = node({ 'aria-expanded': 'true' });
@@ -66,8 +68,18 @@ assert.equal(disabled.receipt.ok, false);
 
 const unchangedAfterTouch = invoke(node({ 'aria-expanded': 'false' }), true, { applyTouch: false });
 assert.equal(unchangedAfterTouch.touch.purpose, 'invoke_ui_control');
+assert.equal(unchangedAfterTouch.touches.length, 2);
 assert.equal(unchangedAfterTouch.receipt.ok, false);
 assert.match(unchangedAfterTouch.receipt.detail, /未达到请求的展开状态/);
 assert.equal(unchangedAfterTouch.snapshots, 1);
+
+const recoveredSecondTouch = invoke(
+  node({ 'aria-expanded': 'false' }),
+  true,
+  { applyOnAttempt: 2 }
+);
+assert.equal(recoveredSecondTouch.touches.length, 2);
+assert.equal(recoveredSecondTouch.receipt.ok, true);
+assert.equal(recoveredSecondTouch.snapshots, 1);
 
 process.stdout.write('CHATGPT_DISCLOSURE_CONTROLS=passed\n');

@@ -28,18 +28,53 @@
       rect.top < window.innerHeight && rect.left < window.innerWidth;
   }
 
-  function finishWhenObserved(node, desired, result, emitSnapshot, attempt) {
+  function finishWhenObserved(node, controlId, desired, emitEvent, result, emitSnapshot, attempt, touchAttempt) {
     const current = describe(node);
     if (current && current.expanded === desired) {
       result('set_ui_control_expanded', true, '');
       return emitSnapshot();
     }
-    if (!node || !node.isConnected || attempt >= MAX_OBSERVATION_ATTEMPTS) {
+    if (!node || !node.isConnected) {
+      result('set_ui_control_expanded', false, '官网控件未达到请求的展开状态。');
+      return emitSnapshot();
+    }
+    if (attempt >= MAX_OBSERVATION_ATTEMPTS) {
+      if (touchAttempt < MAX_TOUCH_ATTEMPTS) {
+        return dispatchTouch(
+          node, controlId, desired, emitEvent, result, emitSnapshot, touchAttempt + 1
+        );
+      }
       result('set_ui_control_expanded', false, '官网控件未达到请求的展开状态。');
       return emitSnapshot();
     }
     window.setTimeout(
-      () => finishWhenObserved(node, desired, result, emitSnapshot, attempt + 1),
+      () => finishWhenObserved(
+        node, controlId, desired, emitEvent, result, emitSnapshot, attempt + 1, touchAttempt
+      ),
+      OBSERVATION_INTERVAL_MS
+    );
+  }
+
+  function dispatchTouch(node, controlId, desired, emitEvent, result, emitSnapshot, touchAttempt) {
+    const current = describe(node);
+    if (!current || !current.expandable) {
+      return result('set_ui_control_expanded', false, '该官网控件不再支持设置展开状态。');
+    }
+    if (current.expanded === desired) {
+      result('set_ui_control_expanded', true, '');
+      return emitSnapshot();
+    }
+    const rect = node.getBoundingClientRect();
+    const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
+    const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
+    if (!inViewport(rect) || xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
+      return result('set_ui_control_expanded', false, '官网控件滚动后仍不在可操作区域。');
+    }
+    emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId, xRatio, yRatio });
+    window.setTimeout(
+      () => finishWhenObserved(
+        node, controlId, desired, emitEvent, result, emitSnapshot, 1, touchAttempt
+      ),
       OBSERVATION_INTERVAL_MS
     );
   }
@@ -67,23 +102,7 @@
         result('set_ui_control_expanded', true, '');
         return emitSnapshot();
       }
-      const rect = node.getBoundingClientRect();
-      const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
-      const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
-      if (!inViewport(rect) || xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
-        return result('set_ui_control_expanded', false, '官网控件滚动后仍不在可操作区域。');
-      }
-      emitEvent({
-        type: 'web_touch_request',
-        purpose: 'invoke_ui_control',
-        controlId,
-        xRatio,
-        yRatio
-      });
-      window.setTimeout(
-        () => finishWhenObserved(node, desired, result, emitSnapshot, 1),
-        OBSERVATION_INTERVAL_MS
-      );
+      return dispatchTouch(node, controlId, desired, emitEvent, result, emitSnapshot, 1);
     }
 
     const rect = node.getBoundingClientRect();
@@ -93,6 +112,7 @@
   }
 
   const MAX_OBSERVATION_ATTEMPTS = 12;
+  const MAX_TOUCH_ATTEMPTS = 2;
   const OBSERVATION_INTERVAL_MS = 120;
   return Object.freeze({ describe, setExpanded });
 });
