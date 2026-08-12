@@ -107,6 +107,21 @@ pub(super) struct StoredArtifactPackageReceipt {
     pub receipt_json: String,
 }
 
+/// Sealed, same-transaction proof for one immutable V232 package receipt.
+pub(in crate::store) struct ExternalPoolAdapterArtifactPackageAuthority {
+    receipt: ExternalPoolAdapterArtifactPackageReceipt,
+}
+
+impl ExternalPoolAdapterArtifactPackageAuthority {
+    pub(super) fn new(receipt: ExternalPoolAdapterArtifactPackageReceipt) -> Self {
+        Self { receipt }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterArtifactPackageReceipt {
+        &self.receipt
+    }
+}
+
 impl StoredArtifactPackageReceipt {
     pub(super) fn summary(&self) -> ExternalPoolAdapterArtifactPackageSummary {
         let package = &self.receipt.package;

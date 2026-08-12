@@ -92,6 +92,14 @@ impl InspectedExternalPoolAdapterArtifactPackage {
     pub(crate) fn artifact_size_bytes(&self) -> u64 {
         self.artifact.artifact_size_bytes()
     }
+
+    pub(crate) fn artifact_reader(&mut self) -> &mut std::fs::File {
+        self.artifact.reader()
+    }
+
+    pub(crate) fn into_artifact(self) -> CurrentQuarantinedExternalPoolAdapterArtifactBytes {
+        self.artifact
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

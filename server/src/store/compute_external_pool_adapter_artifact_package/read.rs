@@ -19,9 +19,51 @@ use crate::{
 };
 
 use super::types::{
+    ExternalPoolAdapterArtifactPackageAuthority,
     ExternalPoolAdapterArtifactPackageCurrentnessReceipt,
     ExternalPoolAdapterArtifactPackageInspectionTarget, StoredArtifactPackageReceipt,
 };
+
+pub(in crate::store) fn artifact_package_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_package_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactPackageAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.package_receipt_digest != expected_package_receipt_digest {
+        return Ok(None);
+    }
+    Ok(Some(ExternalPoolAdapterArtifactPackageAuthority::new(
+        stored.receipt,
+    )))
+}
+
+pub(in crate::store) fn current_artifact_package_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_package_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactPackageAuthority>> {
+    let Some(authority) =
+        artifact_package_authority_on(conn, admission_id, expected_package_receipt_digest)?
+    else {
+        return Ok(None);
+    };
+    let current: Option<String> = conn
+        .query_row(
+            "SELECT current_status
+               FROM compute_external_pool_adapter_artifact_package_current
+              WHERE admission_id=?1 AND package_receipt_digest=?2",
+            params![admission_id, expected_package_receipt_digest],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if current.as_deref() != Some("verified_current") {
+        return Ok(None);
+    }
+    Ok(Some(authority))
+}
 
 pub(super) fn receipt_by_admission_on(
     conn: &Connection,

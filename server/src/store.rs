@@ -88,6 +88,7 @@ mod compute_capacity_supply_queries;
 mod compute_capacity_supply_withdrawal;
 mod compute_delivery_allocations;
 mod compute_external_pool_adapter_artifact_package;
+mod compute_external_pool_adapter_artifact_security;
 mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
@@ -437,6 +438,12 @@ pub(crate) use compute_external_pool_adapter_artifact_package::{
     ExternalPoolAdapterArtifactPackageCurrentnessReceipt,
     ExternalPoolAdapterArtifactPackageInspectionTarget, ExternalPoolAdapterArtifactPackageSummary,
     ExternalPoolAdapterArtifactPackageWriteReceipt,
+};
+pub(crate) use compute_external_pool_adapter_artifact_security::{
+    CreateExternalPoolAdapterArtifactSecurityReceipt,
+    ExternalPoolAdapterArtifactSecurityCurrentnessReceipt,
+    ExternalPoolAdapterArtifactSecurityScanTarget, ExternalPoolAdapterArtifactSecuritySummary,
+    ExternalPoolAdapterArtifactSecurityWriteReceipt,
 };
 pub(crate) use compute_external_pool_adapter_artifact_signed_provenance::{
     CreateExternalPoolAdapterArtifactSignedProvenance,

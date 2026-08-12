@@ -20,6 +20,10 @@ use crate::{
             ARTIFACT_PACKAGE_MANIFEST_PATH, ARTIFACT_PACKAGE_MANIFEST_SCHEMA,
             ARTIFACT_PACKAGE_RUNTIME_KIND,
         },
+        external_pool_adapter_artifact_security::{
+            ExternalPoolAdapterArtifactSbom, ExternalPoolAdapterArtifactSbomComponent,
+            ARTIFACT_SBOM_PATH, ARTIFACT_SBOM_SCHEMA,
+        },
         external_pool_adapter_release::{
             canonical_external_pool_adapter_release_capability_set_digest,
             ComputeExternalPoolAdapterReleaseCapability,
@@ -204,14 +208,21 @@ async fn artifact_package_http_rejects_path_traversal_and_manifest_drift() {
 }
 
 #[derive(Clone, Copy)]
-enum PackageMutation {
+pub(super) enum PackageMutation {
     Traversal,
     ManifestAdapterDrift,
     CaseConflict,
     CompressionBomb,
+    ForbiddenLicense,
+    SbomCoverageGap,
+    EmbeddedPrivateKey,
 }
 
-fn package_bytes(adapter_id: &str, version: &str, mutation: Option<PackageMutation>) -> Vec<u8> {
+pub(super) fn package_bytes(
+    adapter_id: &str,
+    version: &str,
+    mutation: Option<PackageMutation>,
+) -> Vec<u8> {
     let capabilities = [
         "authenticated_ack",
         "authenticated_events",
@@ -236,6 +247,8 @@ fn package_bytes(adapter_id: &str, version: &str, mutation: Option<PackageMutati
     };
     let entrypoint = if matches!(mutation, Some(PackageMutation::CompressionBomb)) {
         vec![0_u8; 2 * 1024 * 1024]
+    } else if matches!(mutation, Some(PackageMutation::EmbeddedPrivateKey)) {
+        b"#!/bin/sh\n-----BEGIN PRIVATE KEY-----\nnot-a-real-key\n".to_vec()
     } else {
         b"#!/bin/sh\nexit 0\n".to_vec()
     };
@@ -244,6 +257,31 @@ fn package_bytes(adapter_id: &str, version: &str, mutation: Option<PackageMutati
     } else {
         "bin/adapter.sh"
     };
+    let sbom = ExternalPoolAdapterArtifactSbom {
+        schema: ARTIFACT_SBOM_SCHEMA.to_string(),
+        adapter_id: adapter_id.to_string(),
+        release_version: version.to_string(),
+        components: vec![ExternalPoolAdapterArtifactSbomComponent {
+            component_id: "adapter-main".to_string(),
+            name: "community-external-pool-adapter".to_string(),
+            version: version.to_string(),
+            supplier: "community-pool".to_string(),
+            package_url: format!("pkg:generic/community-adapter@{version}"),
+            license_spdx_id: if matches!(mutation, Some(PackageMutation::ForbiddenLicense)) {
+                "GPL-3.0-only".to_string()
+            } else {
+                "Apache-2.0".to_string()
+            },
+            file_paths: vec![
+                if matches!(mutation, Some(PackageMutation::SbomCoverageGap)) {
+                    "bin/missing.sh".to_string()
+                } else {
+                    path.to_string()
+                },
+            ],
+        }],
+    };
+    let sbom_json = canonical(&sbom);
     let manifest = ExternalPoolAdapterArtifactManifest {
         schema: ARTIFACT_PACKAGE_MANIFEST_SCHEMA.to_string(),
         adapter_id: if matches!(mutation, Some(PackageMutation::ManifestAdapterDrift)) {
@@ -263,12 +301,20 @@ fn package_bytes(adapter_id: &str, version: &str, mutation: Option<PackageMutati
         )
         .unwrap(),
         credential_verifier: verifier,
-        files: vec![ExternalPoolAdapterArtifactManifestFile {
-            path: path.to_string(),
-            sha256: hex::encode(Sha256::digest(&entrypoint)),
-            size_bytes: entrypoint.len() as u64,
-            role: "entrypoint".to_string(),
-        }],
+        files: vec![
+            ExternalPoolAdapterArtifactManifestFile {
+                path: path.to_string(),
+                sha256: hex::encode(Sha256::digest(&entrypoint)),
+                size_bytes: entrypoint.len() as u64,
+                role: "entrypoint".to_string(),
+            },
+            ExternalPoolAdapterArtifactManifestFile {
+                path: ARTIFACT_SBOM_PATH.to_string(),
+                sha256: hex::encode(Sha256::digest(sbom_json.as_bytes())),
+                size_bytes: sbom_json.len() as u64,
+                role: "resource".to_string(),
+            },
+        ],
     };
     let manifest_json = canonical(&manifest);
     let cursor = Cursor::new(Vec::new());
@@ -286,6 +332,8 @@ fn package_bytes(adapter_id: &str, version: &str, mutation: Option<PackageMutati
     );
     zip.start_file(path, content_options).unwrap();
     zip.write_all(&entrypoint).unwrap();
+    zip.start_file(ARTIFACT_SBOM_PATH, options).unwrap();
+    zip.write_all(sbom_json.as_bytes()).unwrap();
     if matches!(mutation, Some(PackageMutation::CaseConflict)) {
         zip.start_file("BIN/adapter.sh", options).unwrap();
         zip.write_all(&entrypoint).unwrap();
@@ -299,7 +347,7 @@ fn canonical<T: Serialize>(value: &T) -> String {
         .0
 }
 
-async fn create_signed_provenance(
+pub(super) async fn create_signed_provenance(
     fixture: &Fixture,
     staged: &Value,
     source: &Value,
@@ -356,7 +404,7 @@ async fn create_signed_provenance(
     provenance
 }
 
-fn package_path(staged: &Value) -> String {
+pub(super) fn package_path(staged: &Value) -> String {
     format!(
         "/api/admin/compute/external-pool-adapter-release-admissions/{}/artifact-package",
         staged["admission_id"].as_str().unwrap()
