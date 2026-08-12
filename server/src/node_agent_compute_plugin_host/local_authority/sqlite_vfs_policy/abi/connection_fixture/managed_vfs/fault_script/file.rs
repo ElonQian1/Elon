@@ -18,7 +18,7 @@ use super::{
     ManagedTestCallbackFaultController, ManagedTestCallbackFaultOperation, ManagedTestRouteOrdinal,
 };
 
-pub(super) struct ManagedTestFaultingFile<Inner> {
+pub(in super::super) struct ManagedTestFaultingFile<Inner> {
     inner: Option<Inner>,
     controller: Arc<ManagedTestCallbackFaultController>,
     route: ManagedTestRouteOrdinal,
@@ -26,7 +26,7 @@ pub(super) struct ManagedTestFaultingFile<Inner> {
 }
 
 impl<Inner> ManagedTestFaultingFile<Inner> {
-    pub(super) fn new(
+    pub(in super::super) fn new(
         inner: Inner,
         controller: Arc<ManagedTestCallbackFaultController>,
         route: ManagedTestRouteOrdinal,

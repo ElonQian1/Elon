@@ -27,9 +27,11 @@ cargo test --manifest-path server/Cargo.toml --bin elon-server adapter_adoption_
 - 管理员追加撤销终态后降级为 `historical_only`；
 - V242 凭据验证公钥撤销后，未显式撤销的 V244 也因上游失效自动降级为历史。
 
-## 基线异常
+## 后续基线修复
 
-未限定二进制的 Cargo 测试仍会编译仓库现有 `elon-pc-node` 测试目标，该目标存在 9 个与 V244 无关的受管 SQLite registry 测试类型私有重导出错误。限定 `--bin elon-server` 后，V244 代码和定向测试通过。本批次未修改该既有 PC 节点基线问题。
+V244 验收时曾记录 `elon-pc-node` 测试目标的 9 个受管 SQLite registry 私有重导出编译错误。2026-08-12 后续修复只扩大 `cfg(test)` 类型与方法在最小共同测试模块祖先内的可见性，没有改变生产 API。`elon-pc-node` 完整测试目标已通过 `--no-run` 编译，直接受影响的故障矩阵已实际运行并通过 5 项测试。
+
+该修复只清除了仓库编译基线对 V244 验收的干扰，不扩大 V244 能力边界。宽范围 `sqlite_vfs_policy` 运行回归仍暴露 A2b2/A2c 静态库存与进程隔离 runner 的独立失败；它们属于节点 VFS 动态验收缺口，不是 Adapter 已安装或外部算力已可接单的证据。
 
 ## 未验证
 

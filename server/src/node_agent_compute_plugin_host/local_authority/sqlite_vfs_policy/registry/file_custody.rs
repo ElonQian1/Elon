@@ -59,7 +59,7 @@ pub(super) enum ManagedSqliteRegistryPinnedFileCloseRejection {
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ManagedSqliteRegistryCloseLifecyclePhase {
+pub(in super::super) enum ManagedSqliteRegistryCloseLifecyclePhase {
     BarrierCallbackCompletion,
     RegistryWalMainClose,
     CallbackCompletion,
@@ -68,7 +68,9 @@ pub(super) enum ManagedSqliteRegistryCloseLifecyclePhase {
 }
 
 #[cfg(test)]
-pub(super) trait ManagedSqliteRegistryCloseLifecycleFaults: Send + Sync + 'static {
+pub(in super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
+    Send + Sync + 'static
+{
     fn before(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
     fn after_success(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
     fn native_failure(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase);

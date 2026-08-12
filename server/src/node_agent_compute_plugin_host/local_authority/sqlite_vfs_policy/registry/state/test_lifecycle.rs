@@ -4,7 +4,7 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::r
 };
 
 impl ManagedSqliteRegistrySessionState {
-    pub(super) fn finish_callback_with_receipt(
+    pub(in super::super) fn finish_callback_with_receipt(
         &mut self,
         lease: &ManagedSqliteRegistryCallbackLease,
     ) -> Result<
@@ -15,7 +15,7 @@ impl ManagedSqliteRegistrySessionState {
         Ok(ManagedSqliteRegistryCallbackCompletionReceipt::from_completed(lease))
     }
 
-    pub(super) fn observe_connection_closed_after_callback(
+    pub(in super::super) fn observe_connection_closed_after_callback(
         &mut self,
         callback: &ManagedSqliteRegistryCallbackCompletionReceipt,
     ) -> Result<
@@ -35,7 +35,7 @@ impl ManagedSqliteRegistrySessionState {
         ))
     }
 
-    pub(super) fn validate_connection_closed_receipt(
+    pub(in super::super) fn validate_connection_closed_receipt(
         &mut self,
         receipt: &ManagedSqliteRegistryConnectionClosedReceipt,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {

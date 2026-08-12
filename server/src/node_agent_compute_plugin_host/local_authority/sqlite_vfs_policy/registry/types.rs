@@ -353,7 +353,7 @@ impl ManagedSqliteRegistryWalMainCloseProofs {
 
 #[derive(Debug, PartialEq, Eq)]
 #[must_use = "retirement must be followed by permanent exact-token tombstoning"]
-pub(super) struct ManagedSqliteRegistryRetirementReceipt {
+pub(in super::super) struct ManagedSqliteRegistryRetirementReceipt {
     pub(super) session_id: ManagedSqliteRegistrySessionId,
     pub(super) route_epoch: NonZeroU64,
     pub(super) main_was_claimed: bool,
