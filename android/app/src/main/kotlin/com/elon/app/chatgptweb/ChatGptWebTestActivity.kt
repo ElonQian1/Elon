@@ -38,6 +38,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var adaptiveUiController: ChatGptNativeAdaptiveUiController
     private lateinit var overlayControlsController: ChatGptNativeOverlayControlsController
     private lateinit var officialOverlayController: ChatGptWebOfficialOverlayController
+    private lateinit var manifestRefreshScheduler: ChatGptWebManifestRefreshScheduler
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var modeController: ChatGptWebModeController
@@ -298,6 +299,10 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             },
             schedule = { delayMs, action -> binding.chatGptWebView.postDelayed(action, delayMs) },
             refreshManifest = pageAdapter::requestUiManifest,
+        )
+        manifestRefreshScheduler = ChatGptWebManifestRefreshScheduler(
+            schedule = { delayMs, action -> binding.chatGptWebView.postDelayed(action, delayMs) },
+            refresh = pageAdapter::requestUiManifest,
         )
 
         modeController = ChatGptWebModeController(
@@ -605,15 +610,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::requestSnapshot,
                     NAVIGATION_SETTLE_MS,
                 )
-                "invoke_ui_control" -> binding.chatGptWebView.postDelayed(
-                    pageAdapter::requestSnapshot,
-                    ADAPTIVE_CONTROL_SETTLE_MS,
-                )
+                "invoke_ui_control" -> manifestRefreshScheduler.afterAdaptiveTouch()
                 "regenerate_open_menu", "regenerate_retry" ->
-                    binding.chatGptWebView.postDelayed(
-                        pageAdapter::requestSnapshot,
-                        ADAPTIVE_CONTROL_SETTLE_MS,
-                    )
+                    manifestRefreshScheduler.afterAdaptiveTouch()
             }
         }
     }
@@ -755,6 +754,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         featureHubController.dispose()
         overlayControlsController.dispose()
         officialOverlayController.dispose()
+        manifestRefreshScheduler.dispose()
         dictationSessionController.reset()
         composerToolsController.dispose()
         fileChooserController.dispose()
@@ -780,7 +780,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         private const val EXTRA_PRODUCT_ENTRY = "chatgpt_product_entry"
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
-        const val ADAPTIVE_CONTROL_SETTLE_MS = 360L
         val DICTATION_START_ACTIONS = setOf("start_dictation", "invoke_ui_control")
 
         fun createProductIntent(context: Context): Intent =

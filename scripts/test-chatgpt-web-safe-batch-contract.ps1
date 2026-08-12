@@ -15,14 +15,14 @@ if ($parseErrors.Count -gt 0) {
 }
 
 . $runtimePath
-$adapterState = [pscustomobject]@{ adapter_version = 60 }
-Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 60
-$staleAdapterState = [pscustomobject]@{ adapter_version = 59 }
+$adapterState = [pscustomobject]@{ adapter_version = 61 }
+Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 61
+$staleAdapterState = [pscustomobject]@{ adapter_version = 60 }
 $mismatchRejected = $false
 try {
-    Assert-ChatGptWebSmokeAdapterVersion -State $staleAdapterState -ExpectedAdapterVersion 60
+    Assert-ChatGptWebSmokeAdapterVersion -State $staleAdapterState -ExpectedAdapterVersion 61
 } catch {
-    $mismatchRejected = $_.Exception.Message -match 'expected=60 actual=59'
+    $mismatchRejected = $_.Exception.Message -match 'expected=61 actual=60'
 }
 if (-not $mismatchRejected) {
     throw "ChatGPT Web adapter version mismatch was not rejected."

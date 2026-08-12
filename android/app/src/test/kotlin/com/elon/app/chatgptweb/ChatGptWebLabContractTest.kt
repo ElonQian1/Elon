@@ -302,6 +302,7 @@ class ChatGptWebLabContractTest {
         assertTrue(activity.contains("sessionRestorer.restorePreferredMode("))
         assertTrue(activity.contains("if (snapshot.authenticated)"))
         assertFalse(activity.contains("snapshot.authenticated &&"))
+        assertTrue(activity.contains("manifestRefreshScheduler.afterAdaptiveTouch()"))
     }
 
     @Test
