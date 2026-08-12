@@ -46,6 +46,30 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-chatgpt-web-ap
 
 如果不带 `-SendProbe` 却传入 `-ProbeMarker`，脚本会立即失败，防止默认只读模式意外发送消息。
 
+## 附件选择与删除验收
+
+附件完整链路需要真人在 Android 系统选择器中选择测试文件，因此拆成三个可中断阶段。阶段之间的检查点只保存设备与会话的 SHA-256 绑定、版本和计数，不保存会话 URL、消息正文或文件名。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-attachment-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" -Phase Prepare
+
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-attachment-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" -Phase OpenPicker
+
+# 此时由用户在系统选择器中选一个非敏感测试文件，返回 ChatGPT 后继续：
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-attachment-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" -Phase VerifyAndRemove
+```
+
+`Prepare` 要求当前输入为空、没有附件且未生成回复；`OpenPicker` 只按 `attachment_file` 语义打开系统选择器；`VerifyAndRemove` 要求 adapter 识别到唯一 `ready` 附件，再通过 `chatgpt_remove_attachment` 删除并确认附件数恢复为 0。整个流程不创建会话、不发送消息、不清 Cookie 或应用数据。检查点默认位于被忽略的 `.ai-tmp/chatgpt-web-attachment-lifecycle.json`，12 小时后失效。
+
 ## 通过标志
 
 成功时最后输出：
