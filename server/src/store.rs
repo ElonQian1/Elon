@@ -103,6 +103,7 @@ mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_adapter_vulnerability_reattestation;
@@ -545,6 +546,15 @@ pub(crate) use compute_external_pool_adapter_release_lifecycle::{
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_REVOCATION_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SUPERSESSION_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_WITHDRAWAL_CONFIRMATION,
+};
+pub(crate) use compute_external_pool_adapter_sandbox_reattestation::{
+    CreateExternalPoolAdapterSandboxReattestation,
+    ExternalPoolAdapterSandboxReattestationCurrentness,
+    ExternalPoolAdapterSandboxReattestationRevocationWriteReceipt,
+    ExternalPoolAdapterSandboxReattestationSummary,
+    ExternalPoolAdapterSandboxReattestationWriteReceipt,
+    GetExternalPoolAdapterSandboxReattestationChallenge,
+    RevokeExternalPoolAdapterSandboxReattestation,
 };
 pub(crate) use compute_external_pool_adapter_sandbox_verifier_key::{
     ActivateExternalPoolAdapterSandboxVerifierKey,
