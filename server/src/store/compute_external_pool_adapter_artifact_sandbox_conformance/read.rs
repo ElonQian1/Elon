@@ -247,8 +247,27 @@ pub(in crate::store) fn current_external_pool_adapter_sandbox_conformance_author
     {
         bail!("sandbox conformance authority is not current and exact");
     }
-    Ok(receipt_by_admission_on(conn, admission_id)?
-        .map(|stored| CurrentExternalPoolAdapterSandboxConformanceAuthority::new(stored.receipt)))
+    external_pool_adapter_sandbox_conformance_receipt_authority_on(
+        conn,
+        admission_id,
+        expected_receipt_digest,
+    )
+}
+
+pub(in crate::store) fn external_pool_adapter_sandbox_conformance_receipt_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_receipt_digest: &str,
+) -> Result<Option<CurrentExternalPoolAdapterSandboxConformanceAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.sandbox_conformance_receipt_digest != expected_receipt_digest {
+        bail!("sandbox conformance receipt authority is not exact");
+    }
+    Ok(Some(
+        CurrentExternalPoolAdapterSandboxConformanceAuthority::new(stored.receipt),
+    ))
 }
 
 impl Store {

@@ -88,6 +88,7 @@ mod compute_capacity_rows;
 mod compute_capacity_supply_queries;
 mod compute_capacity_supply_withdrawal;
 mod compute_delivery_allocations;
+mod compute_external_pool_adapter_adoption;
 mod compute_external_pool_adapter_artifact_package;
 mod compute_external_pool_adapter_artifact_sandbox_conformance;
 mod compute_external_pool_adapter_artifact_security;
@@ -449,6 +450,10 @@ pub(crate) use compute_delivery_allocations::{
     COMPUTE_DELIVERY_ALLOCATION_GRANT_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRE_DUE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX,
+};
+pub(crate) use compute_external_pool_adapter_adoption::{
+    AdoptExternalPoolAdapter, ExternalPoolAdapterAdoptionCurrentness,
+    ExternalPoolAdapterAdoptionWriteReceipt, RevokeExternalPoolAdapterAdoption,
 };
 pub(crate) use compute_external_pool_adapter_artifact_package::{
     CreateExternalPoolAdapterArtifactPackageReceipt,

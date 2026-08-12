@@ -280,9 +280,27 @@ pub(in crate::store) fn current_external_pool_adapter_credential_verification_au
     {
         bail!("credential verification authority is not current and exact");
     }
-    Ok(receipt_by_id_on(conn, receipt_id)?.map(|stored| {
-        CurrentExternalPoolAdapterCredentialVerificationAuthority::new(stored.receipt)
-    }))
+    external_pool_adapter_credential_verification_receipt_authority_on(
+        conn,
+        receipt_id,
+        expected_receipt_digest,
+    )
+}
+
+pub(in crate::store) fn external_pool_adapter_credential_verification_receipt_authority_on(
+    conn: &Connection,
+    receipt_id: &str,
+    expected_receipt_digest: &str,
+) -> Result<Option<CurrentExternalPoolAdapterCredentialVerificationAuthority>> {
+    let Some(stored) = receipt_by_id_on(conn, receipt_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.credential_verification_receipt_digest != expected_receipt_digest {
+        bail!("credential verification receipt authority is not exact");
+    }
+    Ok(Some(
+        CurrentExternalPoolAdapterCredentialVerificationAuthority::new(stored.receipt),
+    ))
 }
 
 impl Store {

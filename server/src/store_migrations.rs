@@ -5,6 +5,7 @@ mod compute_capacity_commitment;
 mod compute_capacity_instrument;
 mod compute_delivery_allocation;
 mod compute_delivery_allocation_expiry_worker;
+mod compute_external_pool_adapter_adoption;
 mod compute_external_pool_adapter_artifact_package;
 mod compute_external_pool_adapter_artifact_sandbox_conformance;
 mod compute_external_pool_adapter_artifact_sandbox_conformance_no_replace;
@@ -298,6 +299,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (241, "外部矿池 Adapter 凭据验证器实现身份四眼注册与撤销", compute_external_pool_adapter_credential_verifier::migration_v241),
     (242, "外部矿池 Adapter 凭据验证器独立签名公钥精确绑定与撤销", compute_external_pool_adapter_credential_verifier_key::migration_v242),
     (243, "外部矿池 Adapter 非 Bearer 凭据短时独立签名验证回执", compute_external_pool_adapter_credential_verification::migration_v243),
+    (244, "外部矿池 Adapter 精确证据采用授权与追加式撤销", compute_external_pool_adapter_adoption::migration_v244),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

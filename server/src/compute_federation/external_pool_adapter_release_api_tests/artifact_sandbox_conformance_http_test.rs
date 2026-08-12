@@ -262,7 +262,7 @@ async fn sandbox_conformance_http_classifies_json_confirmation_and_missing_state
     fixture.cleanup();
 }
 
-fn conformance_body(vulnerability: &Value, verifier: &Value, suffix: &str) -> Value {
+pub(super) fn conformance_body(vulnerability: &Value, verifier: &Value, suffix: &str) -> Value {
     let now = Utc::now();
     let vulnerability_verified = chrono::DateTime::parse_from_rfc3339(
         vulnerability["vulnerability_report"]["verified_at"]
@@ -377,7 +377,7 @@ fn observation(capability_id: &str) -> Value {
     })
 }
 
-fn conformance_path(staged: &Value) -> String {
+pub(super) fn conformance_path(staged: &Value) -> String {
     format!(
         "/api/admin/compute/external-pool-adapter-release-admissions/{}/sandbox-conformance",
         staged["admission_id"].as_str().unwrap()

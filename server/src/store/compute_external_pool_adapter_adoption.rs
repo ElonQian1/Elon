@@ -1,0 +1,12 @@
+//! Immutable V244 Adapter adoption authorities and append-only revocation terminals.
+
+mod read;
+mod types;
+mod write;
+
+pub(in crate::store) use read::current_external_pool_adapter_adoption_authority_on;
+pub(in crate::store) use types::CurrentExternalPoolAdapterAdoptionAuthority;
+pub(crate) use types::{
+    AdoptExternalPoolAdapter, ExternalPoolAdapterAdoptionCurrentness,
+    ExternalPoolAdapterAdoptionWriteReceipt, RevokeExternalPoolAdapterAdoption,
+};

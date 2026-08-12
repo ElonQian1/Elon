@@ -57,4 +57,4 @@ V243 证明独立 V241/V242 验证器曾对一份精确 external-pool 非 Bearer
 
 ## 5. 后续边界
 
-下一阶段应建立 Adapter adoption/install 事务：同时消费当前 V243 凭据回执、V239 沙箱符合性及完整 V227-V242 制品安全链，生成新的 Provider 版本和可撤销安装权威。V243 不应直接接入 worker、派发、路由或结算。
+V244 已建立独立 Adapter adoption authority：同时消费当前 V243 凭据回执与 V239 沙箱符合性，形成可撤销的采用授权。V244 不生成 Provider 新版本，也不代表制品已经安装。后续仍需独立 installation/Provider activation 事务，之后才可衔接 route、worker、派发和结算。

@@ -236,7 +236,7 @@ async fn credential_verification_http_enforces_exact_binding_revocation_and_reda
     fixture.cleanup();
 }
 
-async fn create_release_credential_verifier(fixture: &Fixture, suffix: &str) -> Value {
+pub(super) async fn create_release_credential_verifier(fixture: &Fixture, suffix: &str) -> Value {
     let body = json!({
         "verifier_operator": "fixture-verification-lab",
         "verifier_product": "fixture-credential-verifier-v1",
@@ -278,7 +278,7 @@ async fn create_release_credential_verifier(fixture: &Fixture, suffix: &str) -> 
     created
 }
 
-fn create_onboarding_application(
+pub(super) fn create_onboarding_application(
     fixture: &Fixture,
     suffix: &str,
     release_version: &str,
@@ -389,7 +389,7 @@ fn create_onboarding_application(
         .unwrap()
 }
 
-fn verification_body(
+pub(super) fn verification_body(
     application: &crate::store::ExternalPoolOnboardingApplicationReceipt,
     staged: &Value,
     key: &Value,
@@ -415,7 +415,7 @@ fn verification_body(
     })
 }
 
-fn verification_path() -> &'static str {
+pub(super) fn verification_path() -> &'static str {
     "/api/admin/compute/external-pool-adapter-credential-verifications"
 }
 

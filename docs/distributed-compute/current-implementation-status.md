@@ -22,7 +22,7 @@ implementation_status: mixed
 
 ## Attempt 与外部 Adapter
 
-- Attempt v175-v215、v221/v222 管理面及 v227-v242 Adapter 前置门已形成分层权威，生产成功链仍未运行。v239 把精确 V236 安全链、当前 V237 验证者和服务器派生的六能力计划绑定为限时签名收据；V240 补齐防替换；V241 固定凭据验证器实现身份和撤销状态；V242 再把独立 RSA 公钥精确绑定到 active V241 实现，并让父实现撤销向公钥当前性失败关闭。V242 migration 与 HTTP 专项各 1 项通过。这些门都不执行制品或检查外部凭据。真实沙箱、V243 credential verification receipt、Adapter 采用/v213 route、worker/ACK、Runner、生产 TCP/部署/MCP/PC 和真实付款仍缺。见 `external-pool-adapter-artifact-sandbox-conformance-authority.md`、`external-pool-adapter-credential-verifier-authority.md`、`external-pool-adapter-credential-verifier-key-authority.md` 及对应验收文档。
+- Attempt v175-v215、v221/v222 管理面及 v227-v244 Adapter 前置门已形成分层权威，生产成功链仍未运行。V239 形成精确制品的限时动态沙箱签名收据，V241/V242 固定独立凭据验证器实现与签名公钥，V243 形成非 Bearer 凭据的短时独立签名验证回执，V244 再把当前 V239 与 V243 汇合为可撤销采用授权。V244 migration 定向测试及 2 项真实 HTTP 链路测试通过；采用授权仍不安装或执行制品，不激活 Provider，不创建 v213 route、worker/ACK 或付款。真实安装/Provider activation、生产 Adapter、Runner、任务派发、计量结算、生产 TCP/部署/MCP/PC 仍缺。见 `external-pool-adapter-adoption-authority.md` 与对应验收文档。
 - 算力 Attempt PC 的 12 个角色路由已通过跨层合同、严格类型、lint、生产构建和 bundle budget；Gateway 未接线，人工 Start、Renew、no-start Abort 仍关闭。v226 final-usage fence 源码已写但未编译、迁移或运行；它不新增账本或经济效果。操作级后端、真实 TCP/浏览器、生产库和发布仍未验收。见 `pc-compute-attempt-workbenches-acceptance.md` 与 `attempt-final-usage-fence-authority.md`。
 
 ## 节点插件与端点会话
