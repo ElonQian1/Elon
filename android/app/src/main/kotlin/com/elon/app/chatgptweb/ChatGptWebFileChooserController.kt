@@ -71,7 +71,9 @@ internal class ChatGptWebFileChooserController(
         if (params.isCaptureEnabled && mimeTypes.any { it == "image/*" || it.startsWith("image/") }) {
             return createCameraIntent()
         }
-        return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        // Web file inputs need a transient content grant. GET_CONTENT also keeps
+        // OEM pickers such as Xiaomi File Explorer on their supported result contract.
+        return Intent(Intent.ACTION_GET_CONTENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             type = mimeTypes.singleOrNull() ?: "*/*"
