@@ -593,15 +593,16 @@
     if (!attachment || !attachment.removable || !isVisible(attachment.node)) {
       return result('remove_attachment', false, '附件状态已变化，请刷新后重试。');
     }
-    if (emitTouchRequest('remove_attachment', attachment.node, emitEvent)) {
-      return result('remove_attachment', true, '');
-    }
     const invoked = attachmentPolicy && typeof attachmentPolicy.invokeRemoveAction === 'function' &&
       attachmentPolicy.invokeRemoveAction(attachment.node, nodeLabel(attachment.node));
+    if (invoked) {
+      return result('remove_attachment', true, '');
+    }
+    const touched = emitTouchRequest('remove_attachment', attachment.node, emitEvent);
     return result(
       'remove_attachment',
-      invoked,
-      invoked ? '' : '官网附件移除入口当前不可见。'
+      touched,
+      touched ? '' : '官网附件移除入口当前不可见。'
     );
   }
 

@@ -119,6 +119,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("removeAttachment"))
         assertTrue(adapter.contains("attachmentPolicy.isRemoveActionLabel"))
         assertTrue(adapter.contains("attachmentPolicy.invokeRemoveAction"))
+        assertTrue(adapter.indexOf("attachmentPolicy.invokeRemoveAction") < adapter.indexOf("emitTouchRequest('remove_attachment'"))
         assertTrue(adapter.contains("button, [role=\"button\"]"))
         assertTrue(attachmentPolicy.contains("移除|删除"))
         assertTrue(attachmentPolicy.contains("remove|delete"))
