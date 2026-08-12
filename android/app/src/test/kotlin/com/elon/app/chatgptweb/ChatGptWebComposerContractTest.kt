@@ -23,6 +23,9 @@ class ChatGptWebComposerContractTest {
         val actionTargetPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
         )
+        val attachmentPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_attachment_policy.js",
+        )
         val dictationSessionPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js",
         )
@@ -114,6 +117,10 @@ class ChatGptWebComposerContractTest {
         assertTrue(optionPolicy.contains("return []"))
         assertTrue(adapter.contains("readAttachments"))
         assertTrue(adapter.contains("removeAttachment"))
+        assertTrue(adapter.contains("attachmentPolicy.isRemoveActionLabel"))
+        assertTrue(adapter.contains("button, [role=\"button\"]"))
+        assertTrue(attachmentPolicy.contains("移除|删除"))
+        assertTrue(attachmentPolicy.contains("remove|delete"))
         assertTrue(adapter.contains("dictationActive"))
         assertTrue(adapter.contains("layout.findSemanticNode('dictation', 'composer')"))
         assertTrue(adapter.contains("layout.requestSemanticTouch('dictation', 'start_dictation'"))
@@ -136,6 +143,7 @@ class ChatGptWebComposerContractTest {
             optionPolicy,
             toolStatePolicy,
             actionTargetPolicy,
+            attachmentPolicy,
             dictationSessionPolicy,
         ).forEach { source ->
             listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {

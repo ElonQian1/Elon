@@ -6,6 +6,7 @@
   const MAX_OPTIONS = 30;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
+  const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
@@ -68,10 +69,11 @@
       node.getAttribute('title'),
       node.textContent
     ].filter(Boolean).join(' '));
-    const withoutActions = raw.replace(
-      /\b(remove|delete|download|preview)\b|移除附件|删除附件|删除文件|下载|预览/gi,
-      ' '
-    );
+    const withoutRemoveAction = attachmentPolicy &&
+      typeof attachmentPolicy.withoutRemoveAction === 'function'
+      ? attachmentPolicy.withoutRemoveAction(raw)
+      : raw;
+    const withoutActions = withoutRemoveAction.replace(/\b(download|preview)\b|下载|预览/gi, ' ');
     return cleanText(withoutActions).slice(0, 180) || fallback;
   }
 
@@ -79,12 +81,15 @@
     const scope = composerScope(composer);
     const seenNodes = new Set();
     const candidates = [];
-    const removeLabels = /remove (file|attachment)|delete (file|attachment)|移除附件|删除附件|删除文件/i;
-    Array.from(scope.querySelectorAll('button')).filter((button) =>
-      removeLabels.test(nodeLabel(button))
+    const isRemoveAction = (node) => !!(
+      attachmentPolicy && typeof attachmentPolicy.isRemoveActionLabel === 'function' &&
+      attachmentPolicy.isRemoveActionLabel(nodeLabel(node))
+    );
+    Array.from(scope.querySelectorAll('button, [role="button"]')).filter((button) =>
+      isRemoveAction(button)
     ).forEach((button) => {
       const container = button.closest(
-        '[data-testid*="attachment" i], [data-testid*="file" i], li, [role="listitem"]'
+        '[data-testid*="attachment" i], [data-testid*="file" i], [data-testid*="upload" i], li, [role="listitem"]'
       ) || button.parentElement;
       if (container && isVisible(container) && !seenNodes.has(container)) {
         seenNodes.add(container);
@@ -96,8 +101,8 @@
     )).filter(isVisible).forEach((container) => {
       if (!seenNodes.has(container)) {
         seenNodes.add(container);
-        const remove = Array.from(container.querySelectorAll('button')).find((button) =>
-          removeLabels.test(nodeLabel(button))
+        const remove = Array.from(container.querySelectorAll('button, [role="button"]')).find((button) =>
+          isRemoveAction(button)
         ) || null;
         candidates.push({ container, remove });
       }

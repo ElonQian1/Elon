@@ -98,6 +98,10 @@ class ChatGptWebLabContractTest {
                 bridge.indexOf("chatgpt_web_adapter_disclosure_controls.js") <
                 bridge.indexOf("chatgpt_web_adapter_layout.js")
         )
+        assertTrue(
+            bridge.indexOf("chatgpt_web_adapter_attachment_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_composer.js"),
+        )
         assertFalse(bridge.contains("addJavascriptInterface"))
         assertFalse(bridge.contains("getCookie("))
         assertTrue(

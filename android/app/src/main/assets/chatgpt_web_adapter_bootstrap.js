@@ -20,6 +20,7 @@
     '__elonChatGptComposerOptionPolicy',
     '__elonChatGptComposerToolStatePolicy',
     '__elonChatGptActionTargetPolicy',
+    '__elonChatGptAttachmentPolicy',
     '__elonChatGptDictationSessionPolicy',
     '__elonChatGptModelLabelPolicy',
     '__elonChatGptComposer',
