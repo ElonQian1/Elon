@@ -33,6 +33,8 @@ mod lifecycle_migration;
 mod lifecycle_support;
 #[path = "compute_external_pool_adapter_release_tests/lifecycle_terminal_test.rs"]
 mod lifecycle_terminal;
+#[path = "compute_external_pool_adapter_release_tests/signed_provenance_test.rs"]
+mod signed_provenance;
 
 const SUBMITTER: &str = "admin-release-submitter";
 const REVIEWER: &str = "admin-release-reviewer";

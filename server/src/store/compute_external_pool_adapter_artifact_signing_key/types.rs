@@ -163,6 +163,43 @@ pub(in crate::store) struct CurrentExternalPoolAdapterArtifactSigningKeyAuthorit
     public_key_pem: String,
 }
 
+/// Exact immutable key root, including historical roots after revocation.
+pub(in crate::store) struct ExternalPoolAdapterArtifactSigningKeyRecordAuthority {
+    key_record_id: String,
+    key_record_digest: String,
+    key_id: String,
+    source_operator: String,
+    public_key_pem: String,
+}
+
+impl ExternalPoolAdapterArtifactSigningKeyRecordAuthority {
+    pub(super) fn new(record: &StoredSigningKeyRecord) -> Self {
+        Self {
+            key_record_id: record.record.key_record_id.clone(),
+            key_record_digest: record.record.key_record_digest.clone(),
+            key_id: record.record.registration.key_id.clone(),
+            source_operator: record.record.registration.source_operator.clone(),
+            public_key_pem: record.record.registration.public_key_pem.clone(),
+        }
+    }
+
+    pub(in crate::store) fn key_record_id(&self) -> &str {
+        &self.key_record_id
+    }
+    pub(in crate::store) fn key_record_digest(&self) -> &str {
+        &self.key_record_digest
+    }
+    pub(in crate::store) fn key_id(&self) -> &str {
+        &self.key_id
+    }
+    pub(in crate::store) fn source_operator(&self) -> &str {
+        &self.source_operator
+    }
+    pub(in crate::store) fn public_key_pem(&self) -> &str {
+        &self.public_key_pem
+    }
+}
+
 impl CurrentExternalPoolAdapterArtifactSigningKeyAuthority {
     pub(super) fn new(record: &StoredSigningKeyRecord) -> Self {
         Self {

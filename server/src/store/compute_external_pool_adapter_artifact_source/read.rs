@@ -11,9 +11,9 @@ use crate::store::{
 use super::{
     canonical::{canonical_intake_material_digest, canonical_receipt_json_and_digest},
     types::{
-        ExternalPoolAdapterArtifactIntakeAuthority, ExternalPoolAdapterArtifactSourceReceipt,
-        StoredArtifactSourceEnvelope, StoredArtifactSourceReceipt,
-        EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_CANONICALIZATION,
+        ExternalPoolAdapterArtifactIntakeAuthority, ExternalPoolAdapterArtifactSourceAuthority,
+        ExternalPoolAdapterArtifactSourceReceipt, StoredArtifactSourceEnvelope,
+        StoredArtifactSourceReceipt, EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_CANONICALIZATION,
         EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_CUSTODY_STATE,
         EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_DIGEST_ALGORITHM,
         EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_EVIDENCE_SCOPE,
@@ -32,6 +32,25 @@ pub(super) fn receipt_by_admission_on(
     admission_id: &str,
 ) -> Result<Option<StoredArtifactSourceReceipt>> {
     receipt_on(conn, "WHERE admission_id=?1", params![admission_id])
+}
+
+pub(in crate::store) fn external_pool_adapter_artifact_source_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_admission_digest: &str,
+    expected_source_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactSourceAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.envelope.source.admission_digest != expected_admission_digest
+        || stored.envelope.source_receipt_digest != expected_source_receipt_digest
+    {
+        bail!("artifact source authority is not exact");
+    }
+    Ok(Some(ExternalPoolAdapterArtifactSourceAuthority::new(
+        &stored,
+    )))
 }
 
 pub(super) fn receipt_by_idempotency_on(

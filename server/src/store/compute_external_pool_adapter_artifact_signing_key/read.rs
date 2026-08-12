@@ -17,7 +17,8 @@ use crate::{
 
 use super::types::{
     CurrentExternalPoolAdapterArtifactSigningKeyAuthority,
-    ExternalPoolAdapterArtifactSigningKeyCurrentnessReceipt, StoredSigningKeyActivation,
+    ExternalPoolAdapterArtifactSigningKeyCurrentnessReceipt,
+    ExternalPoolAdapterArtifactSigningKeyRecordAuthority, StoredSigningKeyActivation,
     StoredSigningKeyRecord, StoredSigningKeyRevocation, CURRENTNESS_SCHEMA,
 };
 
@@ -396,6 +397,25 @@ pub(in crate::store) fn current_external_pool_adapter_artifact_signing_key_autho
         .ok_or_else(|| anyhow::anyhow!("signing-key root disappeared"))?;
     Ok(Some(
         CurrentExternalPoolAdapterArtifactSigningKeyAuthority::new(&record),
+    ))
+}
+
+pub(in crate::store) fn external_pool_adapter_artifact_signing_key_record_authority_on(
+    conn: &Connection,
+    key_record_id: &str,
+    expected_key_record_digest: &str,
+    expected_key_id: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactSigningKeyRecordAuthority>> {
+    let Some(record) = record_by_id_on(conn, key_record_id)? else {
+        return Ok(None);
+    };
+    if record.record.key_record_digest != expected_key_record_digest
+        || record.record.registration.key_id != expected_key_id
+    {
+        bail!("signing-key root authority is not exact");
+    }
+    Ok(Some(
+        ExternalPoolAdapterArtifactSigningKeyRecordAuthority::new(&record),
     ))
 }
 

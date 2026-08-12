@@ -36,6 +36,64 @@ pub(crate) struct ExternalPoolAdapterArtifactIntakeAuthority {
     declared_implementation_sha256: String,
 }
 
+/// Sealed exact v227 receipt for same-transaction provenance consumers.
+pub(in crate::store) struct ExternalPoolAdapterArtifactSourceAuthority {
+    source_receipt_id: String,
+    source_receipt_digest: String,
+    admission_id: String,
+    admission_digest: String,
+    adapter_id: String,
+    release_version: String,
+    candidate_artifact_ref: String,
+    artifact_sha256: String,
+    artifact_size_bytes: u64,
+}
+
+impl ExternalPoolAdapterArtifactSourceAuthority {
+    pub(super) fn new(stored: &StoredArtifactSourceReceipt) -> Self {
+        let source = &stored.envelope.source;
+        Self {
+            source_receipt_id: stored.envelope.source_receipt_id.clone(),
+            source_receipt_digest: stored.envelope.source_receipt_digest.clone(),
+            admission_id: source.admission_id.clone(),
+            admission_digest: source.admission_digest.clone(),
+            adapter_id: source.adapter_id.clone(),
+            release_version: source.release_version.clone(),
+            candidate_artifact_ref: source.candidate_artifact_ref.clone(),
+            artifact_sha256: source.reopened_sha256.clone(),
+            artifact_size_bytes: source.artifact_size_bytes as u64,
+        }
+    }
+
+    pub(in crate::store) fn source_receipt_id(&self) -> &str {
+        &self.source_receipt_id
+    }
+    pub(in crate::store) fn source_receipt_digest(&self) -> &str {
+        &self.source_receipt_digest
+    }
+    pub(in crate::store) fn admission_id(&self) -> &str {
+        &self.admission_id
+    }
+    pub(in crate::store) fn admission_digest(&self) -> &str {
+        &self.admission_digest
+    }
+    pub(in crate::store) fn adapter_id(&self) -> &str {
+        &self.adapter_id
+    }
+    pub(in crate::store) fn release_version(&self) -> &str {
+        &self.release_version
+    }
+    pub(in crate::store) fn candidate_artifact_ref(&self) -> &str {
+        &self.candidate_artifact_ref
+    }
+    pub(in crate::store) fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+    pub(in crate::store) fn artifact_size_bytes(&self) -> u64 {
+        self.artifact_size_bytes
+    }
+}
+
 impl ExternalPoolAdapterArtifactIntakeAuthority {
     pub(super) fn new(
         admission_id: String,

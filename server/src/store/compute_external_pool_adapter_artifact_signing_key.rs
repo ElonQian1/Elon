@@ -18,4 +18,6 @@ pub(crate) use types::{
 };
 
 pub(in crate::store) use read::current_external_pool_adapter_artifact_signing_key_authority_on;
+pub(in crate::store) use read::external_pool_adapter_artifact_signing_key_record_authority_on;
 pub(in crate::store) use types::CurrentExternalPoolAdapterArtifactSigningKeyAuthority;
+pub(in crate::store) use types::ExternalPoolAdapterArtifactSigningKeyRecordAuthority;

@@ -14,3 +14,6 @@ pub(crate) use types::{
     RecordExternalPoolAdapterArtifactSource,
     EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_INTAKE_CONFIRMATION,
 };
+
+pub(in crate::store) use read::external_pool_adapter_artifact_source_authority_on;
+pub(in crate::store) use types::ExternalPoolAdapterArtifactSourceAuthority;
