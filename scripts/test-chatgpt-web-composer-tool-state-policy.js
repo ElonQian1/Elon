@@ -7,7 +7,7 @@ const policy = require(
 
 assert.equal(policy.semantic({
   region: 'composer',
-  signal: 'composer-web-search retry search',
+  signal: 'composer-regenerate retry',
   label: '搜索'
 }), 'web_search');
 assert.equal(policy.semantic({

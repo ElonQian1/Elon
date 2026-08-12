@@ -25,8 +25,9 @@
 
   function semantic(input) {
     if (!input || clean(input.region) !== 'composer') return '';
-    const signal = [input.signal, input.label].map(clean).filter(Boolean).join(' ');
-    return isWebSearchSignal(signal) ? 'web_search' : '';
+    const label = clean(input.label);
+    if (isWebSearchSignal(label)) return 'web_search';
+    return isWebSearchSignal(input.signal) ? 'web_search' : '';
   }
 
   function controlSelected(input) {
