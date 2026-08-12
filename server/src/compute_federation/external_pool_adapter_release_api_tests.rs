@@ -38,6 +38,8 @@ mod lifecycle_http_test;
 mod lifecycle_support;
 #[path = "external_pool_adapter_release_api_tests/management.rs"]
 mod management;
+#[path = "external_pool_adapter_release_api_tests/scanner_key_http_test.rs"]
+mod scanner_key_http_test;
 
 struct Fixture {
     state: Arc<crate::types::AppState>,
