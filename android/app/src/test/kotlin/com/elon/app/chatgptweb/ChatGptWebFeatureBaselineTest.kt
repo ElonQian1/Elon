@@ -341,6 +341,53 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(1, baseline.getJSONObject("verification_evidence").getInt("current_case_count"))
     }
 
+    @Test
+    fun promotesRegenerateOnlyAfterItsCurrentDeviceCaseIsRecorded() {
+        val currentHash = "d".repeat(64)
+        val caseId = "reversible/regenerate_response"
+        val baselineWithoutEvidence = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+        assertEquals(
+            "complete",
+            feature(baselineWithoutEvidence, "message_regenerate")
+                .getString("implementation_status"),
+        )
+        assertEquals(
+            "deferred",
+            feature(baselineWithoutEvidence, "message_regenerate")
+                .getString("verification_status"),
+        )
+
+        val evidence = ChatGptWebVerificationEvidenceStore.Snapshot(
+            currentInputs = linkedMapOf(caseId to currentHash),
+            records = linkedMapOf(
+                caseId to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = caseId,
+                    inputSha256 = currentHash,
+                    current = true,
+                    adapterVersion = ChatGptWebPageAdapter.ADAPTER_VERSION,
+                    apkVersionName = "test",
+                    apkVersionCode = 1,
+                    recordedAtMs = 123L,
+                ),
+            ),
+        )
+        val verifiedBaseline = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            verificationEvidence = evidence,
+        )
+
+        val regenerate = feature(verifiedBaseline, "message_regenerate")
+        assertEquals(caseId, regenerate.getString("verification_case"))
+        assertEquals("device_verified", regenerate.getString("verification_status"))
+        assertTrue(regenerate.isNull("verification_gap"))
+    }
+
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {
         val features = baseline.getJSONArray("features")
         return (0 until features.length())

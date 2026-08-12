@@ -184,6 +184,10 @@ verificationCaseFiles["reversible/copy_receipt_without_content_readback"] = case
     messageCaseInputs,
     "smoke-chatgpt-web-copy.ps1",
 )
+verificationCaseFiles["reversible/regenerate_response"] = caseInputs(
+    messageCaseInputs,
+    "smoke-chatgpt-web-regenerate.ps1",
+)
 verificationCaseFiles["safe/message_actions"] = caseInputs(
     messageCaseInputs + adaptiveCaseInputs,
     "smoke-chatgpt-web-message-actions.ps1",

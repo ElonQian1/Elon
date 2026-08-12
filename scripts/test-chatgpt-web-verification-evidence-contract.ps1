@@ -9,6 +9,7 @@ $expected = [ordered]@{
     "smoke-chatgpt-web-composer-controls.ps1" = @("reversible/composer_controls")
     "smoke-chatgpt-web-message-structure.ps1" = @("reversible/message_structure")
     "smoke-chatgpt-web-copy.ps1" = @("reversible/copy_receipt_without_content_readback")
+    "smoke-chatgpt-web-regenerate.ps1" = @("reversible/regenerate_response")
     "smoke-chatgpt-web-message-actions.ps1" = @("safe/message_actions")
     "smoke-chatgpt-web-feature-pages.ps1" = @("safe/feature_pages", "safe/feature_pages_individual")
     "smoke-chatgpt-web-settings.ps1" = @(

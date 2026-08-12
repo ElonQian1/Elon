@@ -43,6 +43,8 @@ foreach ($required in @(
     'original_view_mode_restored = $true',
     'sent_messages = 1',
     'regenerated_messages = 1',
+    'Register-ChatGptWebVerificationCases -Runtime $runtime',
+    'reversible/regenerate_response',
     'private_content_emitted = $false',
     'cleared_cookies = $false',
     'cleared_app_data = $false',

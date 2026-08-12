@@ -289,6 +289,7 @@ internal object ChatGptWebFeatureBaseline {
         "rich_message_rendering" to "reversible/message_structure",
         "complex_output_rendering" to "reversible/message_structure",
         "message_copy" to "reversible/copy_receipt_without_content_readback",
+        "message_regenerate" to "reversible/regenerate_response",
         "message_action_context" to "safe/message_actions",
         "feature_navigation" to "safe/feature_pages",
         "tasks" to "safe/feature_pages_individual",
@@ -458,12 +459,10 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "message_regenerate",
             group = "messages",
-            status = ImplementationStatus.PARTIAL,
             acceptance = Acceptance.INTERACTIVE_DEVICE,
             mcpActions = listOf("chatgpt_regenerate_response"),
             capabilityIds = setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE),
             semantics = setOf("regenerate"),
-            remainingGap = "regenerate_reply_device_acceptance",
         ),
         feature(
             id = "message_action_context",

@@ -226,6 +226,9 @@ try {
         cleared_cookies = $false
         cleared_app_data = $false
     }
+    Register-ChatGptWebVerificationCases -Runtime $runtime `
+        -CaseIds @("reversible/regenerate_response") `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 } finally {
     if (-not $originRestored -and $originMode) {
         try {
