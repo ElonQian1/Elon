@@ -103,6 +103,27 @@ function Get-ObservedPath {
     return ""
 }
 
+function Wait-FeatureMatrix {
+    param([Parameter(Mandatory = $true)][string]$Kind)
+
+    $deadline = Get-StepDeadline -TimeoutSec $ReadyTimeoutSec
+    $last = $null
+    do {
+        $last = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_get_capability_matrix"
+        if (
+            $last.control_ok -eq $true -and
+            $last.ready_for_mcp -eq $true -and
+            [string]$last.manifest.page_kind -eq "feature" -and
+            [string]$last.manifest.compatibility -eq "healthy"
+        ) {
+            return $last
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for current ChatGPT feature manifest: kind=$Kind compatibility=$($last.manifest.compatibility)."
+}
+
 function Restore-Origin {
     param(
         [Parameter(Mandatory = $true)][string]$PageKind,
@@ -198,8 +219,7 @@ foreach ($kind in $availableKinds) {
     Wait-CommandAndPage -RequestId $requestId -PageKind "feature" `
         -Description "ChatGPT feature page kind=$kind" | Out-Null
 
-    $matrix = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action "chatgpt_get_capability_matrix"
+    $matrix = Wait-FeatureMatrix -Kind $kind
     $audit = Test-ChatGptWebFeatureMatrix -Matrix $matrix
     $results.Add([pscustomobject]@{
         kind = $kind

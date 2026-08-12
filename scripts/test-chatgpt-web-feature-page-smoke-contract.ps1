@@ -81,6 +81,12 @@ Assert-Contains $smoke '$navigation.features | Where-Object { $null -ne $_ }' `
     "Feature-page smoke must not count a null navigation payload as one feature."
 Assert-Contains $smoke 'command_receipt.request_id' "Feature-page smoke must await durable command receipts."
 Assert-Contains $smoke 'Test-ChatGptWebFeatureMatrix' "Feature-page smoke must use shared structural policy."
+Assert-Contains $smoke 'function Wait-FeatureMatrix' `
+    "Feature-page smoke must wait for the routed page manifest before auditing it."
+Assert-Contains $smoke '[string]$last.manifest.compatibility -eq "healthy"' `
+    "Feature-page smoke must not audit a stale or still-loading manifest."
+Assert-Contains $smoke '$matrix = Wait-FeatureMatrix -Kind $kind' `
+    "Feature-page smoke must audit the settled current feature manifest."
 Assert-Contains $smoke 'function Restore-Origin' "Feature-page smoke must restore the original page."
 Assert-Contains $smoke 'Invoke-ChatGptWebSmokeAdb' `
     "Feature-page smoke must use the bounded adb helper for back navigation."
