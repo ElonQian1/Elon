@@ -9,6 +9,7 @@ mod compute_external_pool_adapter_artifact_security;
 mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
+mod compute_external_pool_adapter_artifact_vulnerability_report;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_scanner_key;
@@ -282,6 +283,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (233, "外部矿池 Adapter Artifact SBOM、许可证与静态安全证明", compute_external_pool_adapter_artifact_security::migration_v233),
     (234, "DeliveryAllocation Reservation 到期恢复公平扫描检查点", compute_delivery_allocation_expiry_worker::migration_v234),
     (235, "外部矿池 Adapter 漏洞扫描器独立签名密钥四眼注册与撤销", compute_external_pool_adapter_scanner_key::migration_v235),
+    (236, "外部矿池 Adapter 精确 SBOM 漏洞情报签名报告", compute_external_pool_adapter_artifact_vulnerability_report::migration_v236),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

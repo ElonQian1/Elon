@@ -75,6 +75,22 @@ pub(super) struct StoredArtifactSecurityReceipt {
     pub receipt_json: String,
 }
 
+/// Same-transaction authority over one exact V233 receipt. It is deliberately
+/// non-serializable so later gates cannot substitute a client projection.
+pub(in crate::store) struct ExternalPoolAdapterArtifactSecurityAuthority {
+    receipt: ExternalPoolAdapterArtifactSecurityReceipt,
+}
+
+impl ExternalPoolAdapterArtifactSecurityAuthority {
+    pub(super) fn new(receipt: ExternalPoolAdapterArtifactSecurityReceipt) -> Self {
+        Self { receipt }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterArtifactSecurityReceipt {
+        &self.receipt
+    }
+}
+
 impl StoredArtifactSecurityReceipt {
     pub(super) fn summary(&self) -> ExternalPoolAdapterArtifactSecuritySummary {
         let item = &self.receipt.security;

@@ -172,7 +172,58 @@ async fn artifact_security_http_rejects_license_gap_and_embedded_secret() {
     }
 }
 
-fn security_path(staged: &Value) -> String {
+pub(super) async fn create_artifact_security(
+    fixture: &Fixture,
+    suffix: &str,
+    version: &str,
+) -> (Value, Value) {
+    let bytes = package_bytes("community-external-pool", version, None);
+    let staged = lifecycle_support::stage_release(fixture, suffix, version, &bytes).await;
+    let (status, source) = lifecycle_support::raw_artifact_call(
+        &fixture.router,
+        &staged,
+        Some(&fixture.applier_token),
+        &format!("{suffix}-source"),
+        Body::from(bytes),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{source}");
+    let provenance = create_signed_provenance(fixture, &staged, &source, suffix).await;
+    let (status, package) = call(
+        &fixture.router,
+        Method::POST,
+        &package_path(&staged),
+        Some(&fixture.applier_token),
+        &json!({
+            "expected_admission_digest":staged["admission_digest"],
+            "expected_source_receipt_digest":source["source_receipt_digest"],
+            "expected_provenance_receipt_digest":provenance["provenance"]["provenance_receipt_digest"],
+            "idempotency_key":format!("{suffix}-package"),
+            "confirm_package_inspection":true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{package}");
+    let (status, security) = call(
+        &fixture.router,
+        Method::POST,
+        &security_path(&staged),
+        Some(&fixture.applier_token),
+        &json!({
+            "expected_admission_digest":staged["admission_digest"],
+            "expected_source_receipt_digest":source["source_receipt_digest"],
+            "expected_provenance_receipt_digest":provenance["provenance"]["provenance_receipt_digest"],
+            "expected_package_receipt_digest":package["package"]["package_receipt_digest"],
+            "idempotency_key":format!("{suffix}-security"),
+            "confirm_static_security_scan":true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{security}");
+    (staged, security)
+}
+
+pub(super) fn security_path(staged: &Value) -> String {
     format!(
         "/api/admin/compute/external-pool-adapter-release-admissions/{}/artifact-security",
         staged["admission_id"].as_str().unwrap()

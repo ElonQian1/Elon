@@ -92,6 +92,7 @@ mod compute_external_pool_adapter_artifact_security;
 mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
+mod compute_external_pool_adapter_artifact_vulnerability_report;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_scanner_key;
@@ -466,6 +467,13 @@ pub(crate) use compute_external_pool_adapter_artifact_source::{
     ExternalPoolAdapterArtifactIntakeAuthority, ExternalPoolAdapterArtifactSourceReceipt,
     RecordExternalPoolAdapterArtifactSource,
     EXTERNAL_POOL_ADAPTER_ARTIFACT_SOURCE_INTAKE_CONFIRMATION,
+};
+pub(crate) use compute_external_pool_adapter_artifact_vulnerability_report::{
+    CreateExternalPoolAdapterVulnerabilityReport,
+    ExternalPoolAdapterVulnerabilityReportCurrentness,
+    ExternalPoolAdapterVulnerabilityReportSummary,
+    ExternalPoolAdapterVulnerabilityReportWriteReceipt,
+    GetExternalPoolAdapterVulnerabilityReportChallenge,
 };
 pub(crate) use compute_external_pool_adapter_release::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,

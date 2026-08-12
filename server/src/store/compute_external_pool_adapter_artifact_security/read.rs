@@ -16,9 +16,51 @@ use crate::{
 };
 
 use super::types::{
+    ExternalPoolAdapterArtifactSecurityAuthority,
     ExternalPoolAdapterArtifactSecurityCurrentnessReceipt,
     ExternalPoolAdapterArtifactSecurityScanTarget, StoredArtifactSecurityReceipt,
 };
+
+pub(in crate::store) fn current_artifact_security_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_security_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactSecurityAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.security_receipt_digest != expected_security_receipt_digest {
+        bail!("Artifact security receipt digest is stale");
+    }
+    let status: String = conn.query_row(
+        "SELECT current_status FROM compute_external_pool_adapter_artifact_security_current
+          WHERE admission_id=?1 AND security_receipt_digest=?2",
+        params![admission_id, expected_security_receipt_digest],
+        |row| row.get(0),
+    )?;
+    if status != "verified_current" {
+        bail!("Artifact security receipt is historical and cannot be consumed");
+    }
+    Ok(Some(ExternalPoolAdapterArtifactSecurityAuthority::new(
+        stored.receipt,
+    )))
+}
+
+pub(in crate::store) fn historical_artifact_security_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_security_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactSecurityAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.security_receipt_digest != expected_security_receipt_digest {
+        bail!("Artifact security receipt digest is stale");
+    }
+    Ok(Some(ExternalPoolAdapterArtifactSecurityAuthority::new(
+        stored.receipt,
+    )))
+}
 
 pub(super) fn scan_target_on(
     conn: &Connection,

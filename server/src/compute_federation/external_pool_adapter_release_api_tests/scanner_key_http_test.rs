@@ -105,7 +105,50 @@ async fn scanner_key_http_enforces_four_eyes_replay_and_redaction() {
     fixture.cleanup();
 }
 
-fn path() -> &'static str {
+pub(super) async fn create_active_scanner_key(
+    fixture: &Fixture,
+    suffix: &str,
+) -> (RsaPrivateKey, Value) {
+    let private = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+    let pem = private
+        .to_public_key()
+        .to_public_key_pem(LineEnding::LF)
+        .unwrap();
+    let (status, created) = call(
+        &fixture.router,
+        Method::POST,
+        path(),
+        Some(&fixture.submitter_token),
+        &json!({
+            "scanner_operator":"fixture-security-lab",
+            "scanner_product":"fixture-scanner-v1",
+            "algorithm":"rsa-pkcs1v15-sha256",
+            "public_key_pem":pem,
+            "idempotency_key":format!("{suffix}-scanner-register"),
+            "confirm_registration":true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let id = created["key_record"]["key_record_id"].as_str().unwrap();
+    let digest = created["key_record"]["key_record_digest"].as_str().unwrap();
+    let (status, active) = call(
+        &fixture.router,
+        Method::POST,
+        &format!("{path}/{id}/activate", path = path()),
+        Some(&fixture.reviewer_token),
+        &json!({
+            "expected_key_record_digest":digest,
+            "idempotency_key":format!("{suffix}-scanner-activate"),
+            "confirm_activation":true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{active}");
+    (private, created)
+}
+
+pub(super) fn path() -> &'static str {
     "/api/admin/compute/external-pool-adapter-scanner-keys"
 }
 fn assert_redacted(value: &Value, pem: &str) {
