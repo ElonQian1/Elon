@@ -6,6 +6,8 @@
 mod barrier;
 mod close_physical;
 mod close_registry;
+#[cfg(windows)]
+mod dynamic_registration;
 mod expected;
 mod invariants;
 mod model;
@@ -13,6 +15,12 @@ mod registration;
 mod unmap_delete;
 mod unmap_nonfinal;
 mod unmap_teardown;
+
+#[cfg(windows)]
+pub(super) use dynamic_registration::{
+    validate_dynamic_registration, DynamicRegistrationActual,
+    DynamicRegistrationRetainedDisposition, DynamicRegistrationTiming,
+};
 
 #[test]
 fn a2b2_declared_static_inventory_is_exact_and_self_consistent() {

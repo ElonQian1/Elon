@@ -12,7 +12,7 @@ use std::{
     ptr,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -103,11 +103,26 @@ struct ManagedTestVfsRegistration {
     name: Option<CString>,
     context: Option<Box<ManagedTestVfsContext>>,
     registered: bool,
+    retained_parts_witness: Arc<ManagedTestVfsRetainedPartsWitness>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ManagedTestVfsRegistrationDisposition {
     Registered,
     Unregistered,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ManagedTestVfsRetainedPartsSnapshot {
+    disposition: ManagedTestVfsRegistrationDisposition,
+    table_present: bool,
+    name_present: bool,
+    context_present: bool,
+}
+
+#[derive(Debug, Default)]
+struct ManagedTestVfsRetainedPartsWitness {
+    snapshot: Mutex<Option<ManagedTestVfsRetainedPartsSnapshot>>,
 }
 
 struct ManagedTestVfsRegistrationCustody {
@@ -115,6 +130,7 @@ struct ManagedTestVfsRegistrationCustody {
     _name: Option<CString>,
     _context: Option<Box<ManagedTestVfsContext>>,
     _disposition: ManagedTestVfsRegistrationDisposition,
+    _witness: Arc<ManagedTestVfsRetainedPartsWitness>,
 }
 
 impl ManagedTestVfsRegistration {
@@ -192,6 +208,7 @@ impl ManagedTestVfsRegistration {
             name: Some(name),
             context: Some(context),
             registered: true,
+            retained_parts_witness: Arc::new(ManagedTestVfsRetainedPartsWitness::default()),
         })
     }
 
@@ -246,6 +263,10 @@ impl ManagedTestVfsRegistration {
                 .expect("registered VFS context")
                 .lifecycle,
         )
+    }
+
+    fn retained_parts_witness(&self) -> Arc<ManagedTestVfsRetainedPartsWitness> {
+        Arc::clone(&self.retained_parts_witness)
     }
 
     fn live_route_count(&self) -> anyhow::Result<usize> {
@@ -329,12 +350,38 @@ impl ManagedTestVfsRegistration {
             ManagedTestVfsRegistrationDisposition::Unregistered
         };
         self.registered = false;
+        let table = self.table.take();
+        let name = self.name.take();
+        let context = self.context.take();
+        let snapshot = ManagedTestVfsRetainedPartsSnapshot {
+            disposition,
+            table_present: table.is_some(),
+            name_present: name.is_some(),
+            context_present: context.is_some(),
+        };
+        let witness = Arc::clone(&self.retained_parts_witness);
         let _custody = Box::leak(Box::new(ManagedTestVfsRegistrationCustody {
-            _table: self.table.take(),
-            _name: self.name.take(),
-            _context: self.context.take(),
+            _table: table,
+            _name: name,
+            _context: context,
             _disposition: disposition,
+            _witness: Arc::clone(&witness),
         }));
+        witness.record(snapshot);
+    }
+}
+
+impl ManagedTestVfsRetainedPartsWitness {
+    fn snapshot(&self) -> Option<ManagedTestVfsRetainedPartsSnapshot> {
+        *self.snapshot.lock().expect("retained VFS witness lock")
+    }
+
+    fn record(&self, snapshot: ManagedTestVfsRetainedPartsSnapshot) {
+        let mut current = self.snapshot.lock().expect("retained VFS witness lock");
+        assert!(
+            current.replace(snapshot).is_none(),
+            "retained VFS parts may be witnessed only once"
+        );
     }
 }
 
