@@ -26,8 +26,8 @@ function Invoke-ReceiptAction {
         [hashtable]$Arguments = @{}
     )
 
-    $dispatch = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action $Action -Arguments $Arguments
+    $dispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+        -Action $Action -Arguments $Arguments -TimeoutSec $ReadyTimeoutSec
     $requestId = [string]$dispatch.command_receipt.request_id
     if (-not $requestId) { throw "Missing command receipt for $Action." }
     return Wait-ChatGptCommandReceipt `

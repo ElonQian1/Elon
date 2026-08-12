@@ -295,6 +295,40 @@ function Invoke-ChatGptWebSmokeAction {
         -Arguments $payload -EnsureMainActivity:$EnsureMainActivity
 }
 
+function Invoke-ChatGptWebSmokeReadyAction {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [Parameter(Mandatory = $true)][string]$Action,
+        [hashtable]$Arguments = @{},
+        [ValidateRange(1, 300)][int]$TimeoutSec = 30,
+        [switch]$EnsureMainActivity
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    do {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+        if (
+            $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true
+        ) {
+            try {
+                return Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action $Action `
+                    -Arguments $Arguments -EnsureMainActivity:$EnsureMainActivity
+            } catch {
+                # The MCP action gate rejects both states before creating a command receipt,
+                # so retrying them cannot duplicate an already-dispatched web command.
+                if (
+                    $_.Exception.Message -notmatch
+                        "bridge_not_ready|adapter_generation_not_ready"
+                ) { throw }
+            }
+        }
+        Start-Sleep -Seconds $Runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting to dispatch ChatGPT Web action: $Action"
+}
+
 function Open-ChatGptWebSmokeSurface {
     param([Parameter(Mandatory = $true)]$Runtime)
 

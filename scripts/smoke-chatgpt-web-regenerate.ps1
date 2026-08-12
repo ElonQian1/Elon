@@ -38,13 +38,8 @@ function Invoke-ReceiptAction {
         [hashtable]$Arguments = @{}
     )
 
-    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "ChatGPT bridge before $Action" -Predicate {
-            param($state)
-            $state.bridge_state -eq "ready" -and $state.adapter_current -eq $true
-        } | Out-Null
-    $dispatch = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action $Action -Arguments $Arguments
+    $dispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+        -Action $Action -Arguments $Arguments -TimeoutSec $ReadyTimeoutSec
     $requestId = [string]$dispatch.command_receipt.request_id
     if (-not $requestId) { throw "Missing command receipt for $Action." }
     return Wait-ChatGptCommandReceipt `

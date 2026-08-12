@@ -24,6 +24,7 @@ foreach ($required in @(
     'Wait-FirstControl -Semantic "logout" -Region "overlay"',
     'Wait-FirstControl -Semantic "settings" -Region "overlay"',
     'Invoke-ReceiptAction -Action "chatgpt_refresh_controls"',
+    'Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime -Action $Action',
     '-ExpectedAction "snapshot_ui_manifest"',
     '[string]$_.role -eq "tab"',
     '[string]$_.role -eq "switch"',
