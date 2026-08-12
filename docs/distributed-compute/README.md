@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221/v222 管理面、v227-v233 静态供应链门、v235/v236 独立 scanner 与签名漏洞报告、v237 sandbox-verifier trust root，以及 v239 exact-artifact 六能力签名沙箱报告均为 `implementation_partially_verified`。V239 验证签名声明但服务器不执行制品；仍缺真实 verifier/沙箱、credential verifier、Adapter 采用、v213 route、真实派发和结算。生产文件/数据库、TCP、升级、部署及 MCP/PC 也未验收。见 [`external-pool-adapter-artifact-sandbox-conformance-authority.md`](external-pool-adapter-artifact-sandbox-conformance-authority.md) |
+| 外部算力池适配器与统一报价 | v221/v222 管理面、v227-v233 静态供应链门、v235/v236 独立 scanner 与签名漏洞报告、v237/v239 沙箱签名链，以及 v241 凭据验证器实现身份注册表均为 `implementation_partially_verified`。V239/V241 不执行制品或检查外部凭据；仍缺真实 verifier/沙箱、credential verification receipt、Adapter 采用、v213 route、真实派发和结算。见 [`external-pool-adapter-credential-verifier-authority.md`](external-pool-adapter-credential-verifier-authority.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -177,7 +177,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-Provider Adapter 的 v227-v239 供应链门已形成分层权威；最新状态见 [`current-implementation-status.md`](current-implementation-status.md)，签名沙箱边界见 [`V239 动态沙箱符合性证据`](external-pool-adapter-artifact-sandbox-conformance-authority.md)。服务器仍不真实执行或启用制品。
+Provider Adapter 的 v227-v241 前置门已形成分层权威；最新状态见 [`current-implementation-status.md`](current-implementation-status.md)，签名沙箱边界见 [`V239 动态沙箱符合性证据`](external-pool-adapter-artifact-sandbox-conformance-authority.md)，凭据验证器身份边界见 [`V241 凭据验证器身份权威`](external-pool-adapter-credential-verifier-authority.md)。服务器仍不真实执行制品、读取凭据或启用 Adapter。
 
 ### F4：容量期货市场
 

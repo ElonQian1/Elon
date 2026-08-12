@@ -36,6 +36,8 @@ mod artifact_signed_provenance_http_test;
 mod artifact_signing_key_http_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_vulnerability_report_http_test.rs"]
 mod artifact_vulnerability_report_http_test;
+#[path = "external_pool_adapter_release_api_tests/credential_verifier_http_test.rs"]
+mod credential_verifier_http_test;
 #[path = "external_pool_adapter_release_api_tests/lifecycle_http_test.rs"]
 mod lifecycle_http_test;
 #[path = "external_pool_adapter_release_api_tests/lifecycle_support.rs"]

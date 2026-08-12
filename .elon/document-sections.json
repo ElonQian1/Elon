@@ -254,6 +254,8 @@
     "docs/distributed-compute/README.md": "custom:distributed-compute",
     "docs/distributed-compute/architecture.md": "custom:distributed-compute",
     "docs/distributed-compute/current-implementation-status.md": "custom:distributed-compute",
+    "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md": "custom:distributed-compute",
+    "docs/distributed-compute/external-pool-adapter-credential-verifier-acceptance.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-abort-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-activation-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-consumer-review-api.md": "custom:distributed-compute",
@@ -409,6 +411,8 @@
     "docs/distributed-compute/README.md": "current",
     "docs/distributed-compute/architecture.md": "current",
     "docs/distributed-compute/current-implementation-status.md": "current",
+    "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md": "current",
+    "docs/distributed-compute/external-pool-adapter-credential-verifier-acceptance.md": "evidence",
     "docs/distributed-compute/attempt-abort-api.md": "current",
     "docs/distributed-compute/attempt-activation-api.md": "current",
     "docs/distributed-compute/attempt-consumer-review-api.md": "current",
@@ -864,7 +868,53 @@
         "AI_CURRENT.md",
         "docs/distributed-compute/README.md",
         "docs/distributed-compute/capacity-instrument-acceptance.md",
-        "docs/distributed-compute/external-pool-adapter-artifact-sandbox-conformance-authority.md"
+        "docs/distributed-compute/external-pool-adapter-artifact-sandbox-conformance-authority.md",
+        "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md"
+      ]
+    },
+    "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md": {
+      "doc_type": "authority_contract",
+      "audience": [
+        "架构师",
+        "后端开发者",
+        "安全工程师",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-12",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:server/src/compute_federation/external_pool_adapter_credential_verifier.rs",
+        "file:server/src/compute_federation/external_pool_adapter_credential_verifier_service.rs",
+        "file:server/src/store/compute_external_pool_adapter_credential_verifier.rs",
+        "file:server/src/store_migrations/compute_external_pool_adapter_credential_verifier.rs",
+        "route:POST /api/admin/compute/external-pool-adapter-credential-verifiers",
+        "route:GET /api/admin/compute/external-pool-adapter-credential-verifiers/:verifier_record_id/currentness"
+      ],
+      "related": [
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/external-pool-adapter-credential-verifier-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-artifact-sandbox-conformance-authority.md",
+        "docs/distributed-compute/external-pool-adapter-authority.md"
+      ]
+    },
+    "docs/distributed-compute/external-pool-adapter-credential-verifier-acceptance.md": {
+      "doc_type": "acceptance",
+      "audience": [
+        "后端开发者",
+        "安全工程师",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-12",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "test:server/src/compute_federation/external_pool_adapter_release_api_tests/credential_verifier_http_test.rs",
+        "test:server/src/store_migrations/compute_external_pool_adapter_credential_verifier.rs"
+      ],
+      "related": [
+        "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md",
+        "docs/distributed-compute/current-implementation-status.md"
       ]
     },
     "docs/distributed-compute/README.md": {

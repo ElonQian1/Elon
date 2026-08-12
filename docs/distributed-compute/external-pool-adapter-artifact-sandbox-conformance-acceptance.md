@@ -33,9 +33,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 - verifier key 撤销后 currentness 从 `verified_current` 变为 `historical_only`；
 - Rust format、`git diff --check` 和 source-size guard 通过。
 
-## V240 后续静态增量
+## V240 防替换增量
 
-V240 已写入但尚未编译、执行迁移或运行测试，`passed=0`。源码合同包括：
+V240 已在合入 V241 的最新工作树中补跑迁移与 HTTP 专项：迁移防替换测试 1 项通过、0 失败，指纹 `4122d1d41fbf2b5acf12528f2fa3ad7ca24b4ca7c813d736ba14d75fde3ece42`；HTTP 分类与当前性回归 3 项通过、0 失败，指纹 `10a4131d0519c942f4e3d16fd78a44f502137b913841590ed238a86c295feb3b`。已验证合同包括：
 
 - receipt ID、receipt digest、material digest、admission、V236 receipt、verifier report 和幂等键任一碰撞时，`INSERT OR REPLACE` 失败关闭；
 - 补齐普通 SQLite rowid 表中非整数 `PRIMARY KEY` 未隐含 `NOT NULL` 的 receipt ID 空值边界；
@@ -43,7 +43,7 @@ V240 已写入但尚未编译、执行迁移或运行测试，`passed=0`。源�
 - Store-private sealed current authority 只接受 `verified_current` 和精确 receipt digest；
 - JSON 形状或未知字段、业务输入无效、资源不存在和权威冲突分别保持 `422/400/404/409` 源码合同。
 
-本节不能替代上面的 V239 已执行证据，也不能表述为 V240 已通过迁移或 HTTP 回归。
+本节不能替代上面的 V239 六能力签名链证据，也不能表述为服务器已经真实执行沙箱或 Adapter 制品。
 
 ## 未验证
 
