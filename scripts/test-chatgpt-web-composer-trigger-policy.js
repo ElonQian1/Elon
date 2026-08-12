@@ -15,6 +15,7 @@ const source = fs.readFileSync(path.join(
   'assets',
   'chatgpt_web_adapter_composer.js'
 ), 'utf8');
+const dictationSessionPolicy = require('../android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js');
 
 const roleButton = {
   id: '',
@@ -53,7 +54,8 @@ const sandbox = {
     },
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
-    }
+    },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
   }
 };
 sandbox.window.window = sandbox.window;
@@ -123,7 +125,8 @@ const renamedSandbox = {
     },
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
-    }
+    },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
   }
 };
 renamedSandbox.window.window = renamedSandbox.window;
@@ -167,6 +170,7 @@ const semanticSandbox = {
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
     },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy,
     __elonChatGptLayout: {
       findSemanticNode(semantic, region) {
         assert.equal(semantic, 'model');
@@ -241,6 +245,7 @@ const dictationSandbox = {
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
     },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy,
     __elonChatGptLayout: {
       findSemanticNode(semantic, region) {
         return semantic === 'dictation' && region === 'composer' ? dictationButton : null;
@@ -275,6 +280,74 @@ assert.equal(dictationEvents[0].type, 'web_touch_request');
 assert.equal(dictationEvents[0].purpose, 'start_dictation');
 assert.equal(dictationEvents[0].xRatio, 0.825);
 assert.equal(dictationEvents[0].yRatio, 0.8375);
+
+const sessionEvents = [];
+const sessionResults = [];
+const sessionPlus = {
+  id: '',
+  textContent: '',
+  getAttribute: () => null,
+  getBoundingClientRect: () => ({ left: 20, top: 710, right: 75, bottom: 765 })
+};
+const sessionCancel = {
+  id: '',
+  textContent: '',
+  getAttribute: () => null,
+  getBoundingClientRect: () => ({ left: 285, top: 710, right: 335, bottom: 760 })
+};
+const sessionSubmit = {
+  id: '',
+  textContent: '',
+  getAttribute: () => null,
+  getBoundingClientRect: () => ({ left: 340, top: 710, right: 390, bottom: 760 })
+};
+const sessionNodes = [sessionPlus, sessionCancel, sessionSubmit];
+const sessionSandbox = {
+  document: {
+    querySelector: () => null,
+    querySelectorAll(selector) {
+      return selector === 'button, [role="button"]' ? sessionNodes : [];
+    }
+  },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+    __elonChatGptActionTargetPolicy: {
+      actionPoint(node) {
+        if (!sessionNodes.includes(node)) return null;
+        const rect = node.getBoundingClientRect();
+        return { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 };
+      },
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: {
+      filter: (_section, options) => options
+    },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+  }
+};
+sessionSandbox.window.window = sessionSandbox.window;
+sessionSandbox.window.document = sessionSandbox.document;
+sessionSandbox.window.location = sessionSandbox.location;
+
+vm.runInNewContext(source, sessionSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
+sessionSandbox.window.__elonChatGptComposer.cancelDictation(
+  (event) => sessionEvents.push(event),
+  (...args) => sessionResults.push(args)
+);
+sessionSandbox.window.__elonChatGptComposer.submitDictation(
+  (event) => sessionEvents.push(event),
+  (...args) => sessionResults.push(args)
+);
+assert.deepEqual(Array.from(sessionResults[0]), ['cancel_dictation', true, '']);
+assert.deepEqual(Array.from(sessionResults[1]), ['submit_dictation', true, '']);
+assert.equal(sessionEvents[0].purpose, 'cancel_dictation');
+assert.equal(sessionEvents[0].xRatio, 0.775);
+assert.equal(sessionEvents[1].purpose, 'submit_dictation');
+assert.equal(sessionEvents[1].xRatio, 0.9125);
 
 const optionEvents = [];
 const optionResults = [];
@@ -313,7 +386,8 @@ const optionSandbox = {
     },
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
-    }
+    },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
   }
 };
 optionSandbox.window.window = optionSandbox.window;
@@ -379,6 +453,7 @@ const toolsSandbox = {
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
     },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy,
     __elonChatGptLayout: {
       findSemanticNode(semantic, region) {
         assert.equal(semantic, 'attachment');

@@ -20,6 +20,9 @@ class ChatGptWebComposerContractTest {
         val actionTargetPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
         )
+        val dictationSessionPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js",
+        )
         val modelLabelPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_model_label_policy.js",
         )
@@ -33,12 +36,14 @@ class ChatGptWebComposerContractTest {
 
         val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
         val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
+        val dictationSessionAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_session_policy.js")
         val modelLabelAsset = pageAdapter.indexOf("chatgpt_web_adapter_model_label_policy.js")
         val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
         assertTrue(modelLabelAsset >= 0)
         assertTrue(policyAsset > modelLabelAsset)
         assertTrue(actionTargetAsset > policyAsset)
-        assertTrue(composerAsset > actionTargetAsset)
+        assertTrue(dictationSessionAsset > actionTargetAsset)
+        assertTrue(composerAsset > dictationSessionAsset)
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
@@ -101,10 +106,13 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("dictationActive"))
         assertTrue(adapter.contains("layout.findSemanticNode('dictation', 'composer')"))
         assertTrue(adapter.contains("layout.requestSemanticTouch('dictation', 'start_dictation'"))
-        assertTrue(adapter.contains("cancel dictation"))
-        assertTrue(adapter.contains("submit dictation"))
-        assertTrue(adapter.contains("取消听写"))
-        assertTrue(adapter.contains("提交听写"))
+        assertTrue(adapter.contains("dictationSessionPolicy.find"))
+        assertTrue(adapter.contains("dictationSessionPolicy.active"))
+        assertTrue(dictationSessionPolicy.contains("cancel dictation"))
+        assertTrue(dictationSessionPolicy.contains("submit dictation"))
+        assertTrue(dictationSessionPolicy.contains("取消听写"))
+        assertTrue(dictationSessionPolicy.contains("提交听写"))
+        assertTrue(dictationSessionPolicy.contains("composerPresent"))
         assertTrue(core.contains("action === 'cancel_dictation'"))
         assertTrue(core.contains("action === 'submit_dictation'"))
         assertFalse(adapter.contains("input.click()"))
@@ -112,7 +120,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(actionTargetPolicy.contains("documentRef.elementFromPoint"))
         assertTrue(actionTargetPolicy.contains("style.pointerEvents === 'none'"))
         assertTrue(actionTargetPolicy.contains("clipsChildren(style)"))
-        listOf(adapter, optionPolicy, actionTargetPolicy).forEach { source ->
+        listOf(adapter, optionPolicy, actionTargetPolicy, dictationSessionPolicy).forEach { source ->
             listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
                 assertFalse("composer adapter must not contain $it", source.contains(it))
             }

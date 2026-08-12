@@ -11,6 +11,7 @@ $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Assert-ChatGptWebSmokeAdapterVersion",
     "chatgpt_start_dictation",
+    '[string]$_.semantic -eq "dictation"',
     "chatgpt_cancel_dictation",
     "start_dictation",
     "cancel_dictation",

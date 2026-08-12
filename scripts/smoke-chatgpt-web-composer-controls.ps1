@@ -8,7 +8,7 @@ param(
     [switch]$SkipDictation,
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 65
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 66
 )
 
 $ErrorActionPreference = "Stop"
@@ -84,7 +84,14 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
         $state.surface -eq "chatgpt_web" -and
             $state.bridge_state -eq "ready" -and
             $state.authenticated -eq $true -and
-            $state.composer_ready -eq $true
+            $state.composer_ready -eq $true -and
+            (
+                $SkipDictation -or
+                $state.dictation_active -eq $true -or
+                @($state.ui_manifest.controls | Where-Object {
+                    [string]$_.semantic -eq "dictation" -and $_.enabled -eq $true
+                }).Count -gt 0
+            )
     }
 Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion

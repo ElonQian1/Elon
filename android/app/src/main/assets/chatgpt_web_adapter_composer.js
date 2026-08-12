@@ -7,6 +7,7 @@
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
+  const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
@@ -192,15 +193,32 @@
       null;
   }
 
-  function findDictationSessionButton(kind) {
-    const labels = kind === 'cancel'
-      ? ['cancel dictation', '取消听写']
-      : ['submit dictation', '提交听写'];
-    return Array.from(document.querySelectorAll('button, [role="button"]')).find((button) => {
-      if (!isActionable(button)) return false;
-      const label = nodeLabel(button).toLowerCase();
-      return labels.some((candidate) => label.includes(candidate));
-    }) || null;
+  function hasVisibleComposer() {
+    const selectors = [
+      '[data-testid="prompt-textarea"]',
+      'form [contenteditable="true"]',
+      'form textarea',
+      'main [contenteditable="true"]',
+      'textarea[placeholder]'
+    ];
+    return selectors.some((selector) =>
+      Array.from(document.querySelectorAll(selector)).some(isVisible)
+    );
+  }
+
+  function dictationSessionOptions(composer) {
+    return {
+      nodes: document.querySelectorAll('button, [role="button"]'),
+      isActionable,
+      composerPresent: !!composer || hasVisibleComposer(),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
+    };
+  }
+
+  function findDictationSessionButton(kind, composer) {
+    if (!dictationSessionPolicy || typeof dictationSessionPolicy.find !== 'function') return null;
+    return dictationSessionPolicy.find(kind, dictationSessionOptions(composer));
   }
 
   function findDictationButton(composer) {
@@ -220,7 +238,8 @@
   }
 
   function dictationActive(composer) {
-    if (findDictationSessionButton('cancel') || findDictationSessionButton('submit')) return true;
+    if (dictationSessionPolicy && typeof dictationSessionPolicy.active === 'function' &&
+        dictationSessionPolicy.active(dictationSessionOptions(composer))) return true;
     const button = findDictationButton(composer);
     if (!button) return false;
     const label = nodeLabel(button);
@@ -528,7 +547,7 @@
 
   function finishDictation(kind, emitEvent, result) {
     const action = kind === 'cancel' ? 'cancel_dictation' : 'submit_dictation';
-    const button = findDictationSessionButton(kind);
+    const button = findDictationSessionButton(kind, null);
     if (!button) return result(action, false, '官网当前没有进行中的听写。');
     if (!emitTouchRequest(action, button, emitEvent)) {
       return result(action, false, '官网听写操作当前不可见。');
