@@ -21,6 +21,7 @@ mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_installation_terminal;
+mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -308,6 +309,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (246, "外部矿池 Adapter 惰性安装制品与文件清单回执", compute_external_pool_adapter_installation::migration_v246),
     (247, "外部矿池 Adapter 安装实例追加式撤销与密封 current 权威", compute_external_pool_adapter_installation_terminal::migration_v247),
     (248, "ERP 实例与开放商业商户节点稳定归属", crate::erp_instance_merchant_binding_migration::migration_v248),
+    (249, "外部矿池 Adapter Provider-neutral release registry 与惰性安装 companion", compute_external_pool_adapter_registry::migration_v249),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

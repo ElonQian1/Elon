@@ -78,6 +78,15 @@ pub(super) fn terminal_by_adoption_on(
     .transpose()
 }
 
+/// Store-internal terminal probe for promoted authorities. Pure sandbox or credential
+/// expiry is not a revocation; an explicit adoption terminal remains authoritative.
+pub(in crate::store) fn external_pool_adapter_adoption_is_revoked_on(
+    conn: &Connection,
+    adoption_receipt_id: &str,
+) -> Result<bool> {
+    Ok(terminal_by_adoption_on(conn, adoption_receipt_id)?.is_some())
+}
+
 pub(super) fn terminal_by_idempotency_on(
     conn: &Connection,
     scope: &str,

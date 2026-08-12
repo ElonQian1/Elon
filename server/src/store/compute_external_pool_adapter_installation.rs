@@ -12,6 +12,7 @@ pub(in crate::store) use current::{
     current_external_pool_adapter_installation_authority_on,
     external_pool_adapter_installation_receipt_authority_on,
 };
+pub(in crate::store) use terminal::external_pool_adapter_installation_is_revoked_on;
 pub(in crate::store) use types::{
     CurrentExternalPoolAdapterInstallationAuthority,
     HistoricalExternalPoolAdapterInstallationAuthority,

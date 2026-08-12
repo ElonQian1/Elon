@@ -207,15 +207,20 @@ async fn Adapter_adoption_currentness_fails_closed_when_credential_root_is_revok
     fixture.cleanup();
 }
 
-struct AdoptionRoots {
-    staged: Value,
-    application: crate::store::ExternalPoolOnboardingApplicationReceipt,
-    sandbox: Value,
-    credential: Value,
-    credential_key: Value,
+pub(super) struct AdoptionRoots {
+    pub(super) staged: Value,
+    pub(super) application: crate::store::ExternalPoolOnboardingApplicationReceipt,
+    pub(super) sandbox: Value,
+    pub(super) credential: Value,
+    pub(super) credential_key: Value,
+    pub(super) credential_private: rsa::RsaPrivateKey,
 }
 
-async fn create_adoption_roots(fixture: &Fixture, suffix: &str, version: &str) -> AdoptionRoots {
+pub(super) async fn create_adoption_roots(
+    fixture: &Fixture,
+    suffix: &str,
+    version: &str,
+) -> AdoptionRoots {
     let (staged, vulnerability) = create_vulnerability_report(fixture, suffix, version).await;
     let (sandbox_private, sandbox_key) = create_active_sandbox_verifier_key(fixture, suffix).await;
     let sandbox_path = conformance_path(&staged);
@@ -260,7 +265,7 @@ async fn create_adoption_roots(fixture: &Fixture, suffix: &str, version: &str) -
     let mut credential_record = credential_body;
     credential_record["expected_signature_message_digest"] =
         challenge["signature_message_digest"].clone();
-    credential_record["signature_base64"] = json!(sign(&challenge, credential_private));
+    credential_record["signature_base64"] = json!(sign(&challenge, credential_private.clone()));
     credential_record["idempotency_key"] = json!(format!("{suffix}-credential-record"));
     credential_record["confirm_verification"] = json!(true);
     let (status, credential) = call(
@@ -278,6 +283,7 @@ async fn create_adoption_roots(fixture: &Fixture, suffix: &str, version: &str) -
         sandbox,
         credential,
         credential_key,
+        credential_private,
     }
 }
 
@@ -299,7 +305,7 @@ pub(super) async fn create_current_adoption(
     created
 }
 
-fn adoption_body(roots: &AdoptionRoots, idempotency_key: &str) -> Value {
+pub(super) fn adoption_body(roots: &AdoptionRoots, idempotency_key: &str) -> Value {
     json!({
         "application_id":roots.application.application_id,
         "expected_application_digest":roots.application.application_digest,
@@ -313,7 +319,7 @@ fn adoption_body(roots: &AdoptionRoots, idempotency_key: &str) -> Value {
     })
 }
 
-fn sign(challenge: &Value, private: rsa::RsaPrivateKey) -> String {
+pub(super) fn sign(challenge: &Value, private: rsa::RsaPrivateKey) -> String {
     let message = STANDARD
         .decode(challenge["signature_message_base64"].as_str().unwrap())
         .unwrap();

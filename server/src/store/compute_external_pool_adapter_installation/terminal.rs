@@ -31,6 +31,15 @@ pub(super) fn terminal_by_installation_on(
     )
 }
 
+/// Store-internal terminal probe for downstream authorities that must ignore expired
+/// short-lived attestations while still failing closed on an explicit installation revoke.
+pub(in crate::store) fn external_pool_adapter_installation_is_revoked_on(
+    conn: &Connection,
+    installation_receipt_id: &str,
+) -> Result<bool> {
+    Ok(terminal_by_installation_on(conn, installation_receipt_id)?.is_some())
+}
+
 fn terminal_by_idempotency_on(
     conn: &Connection,
     scope: &str,

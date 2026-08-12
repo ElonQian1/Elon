@@ -100,6 +100,7 @@ mod compute_external_pool_adapter_credential_verification;
 mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_installation;
+mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -524,6 +525,10 @@ pub(crate) use compute_external_pool_adapter_installation::{
     ExternalPoolAdapterInstallationTerminalWriteReceipt,
     ExternalPoolAdapterInstallationWriteReceipt, InstallExternalPoolAdapter,
     RevokeExternalPoolAdapterInstallation,
+};
+pub(crate) use compute_external_pool_adapter_registry::{
+    ExternalPoolAdapterRegistryProviderBindingCurrentness, ExternalPoolAdapterRegistryWriteReceipt,
+    RegisterExternalPoolAdapterInstalledInstance,
 };
 pub(crate) use compute_external_pool_adapter_release::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,
