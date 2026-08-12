@@ -639,6 +639,7 @@ mod server_agent_runtime_limits;
 mod server_agent_runtime_output;
 mod server_agent_runtime_policy;
 mod server_agent_runtime_status;
+mod server_background_workers;
 mod server_trace;
 mod social_ai;
 mod social_ai_agents;
@@ -718,14 +719,7 @@ async fn main() -> Result<()> {
         .init();
 
     let state = node_endpoint_session_startup::prepare(Arc::new(AppState::new()?))?;
-    codex_health::spawn_codex_network_monitor(state.clone());
-    billing_lifecycle::spawn_reservation_janitor(state.clone());
-    billing_monitor::spawn_reconciliation_monitor(state.clone());
-    project_workspace_health_monitor::spawn_project_workspace_health_monitor(state.clone());
-    project_document_maintenance::spawn_maintenance_worker();
-    open_commerce_webhook_worker::spawn(state.clone());
-    // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
-    pc_relay_client::spawn_if_configured();
+    server_background_workers::spawn(state.clone());
 
     let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);
     if interrupted > 0 {

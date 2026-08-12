@@ -3,6 +3,7 @@ use rusqlite::Connection;
 
 mod compute_capacity_commitment;
 mod compute_delivery_allocation;
+mod compute_delivery_allocation_expiry_worker;
 mod compute_external_pool_adapter_artifact_package;
 mod compute_external_pool_adapter_artifact_security;
 mod compute_external_pool_adapter_artifact_signed_provenance;
@@ -278,6 +279,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (231, "外部矿池 Adapter Artifact 精确绑定签名来源证明", compute_external_pool_adapter_artifact_signed_provenance::migration_v231),
     (232, "外部矿池 Adapter Artifact 有界静态包格式证明", compute_external_pool_adapter_artifact_package::migration_v232),
     (233, "外部矿池 Adapter Artifact SBOM、许可证与静态安全证明", compute_external_pool_adapter_artifact_security::migration_v233),
+    (234, "DeliveryAllocation Reservation 到期恢复公平扫描检查点", compute_delivery_allocation_expiry_worker::migration_v234),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

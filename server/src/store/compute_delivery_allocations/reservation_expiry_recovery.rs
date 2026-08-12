@@ -62,17 +62,17 @@ pub(crate) struct ComputeDeliveryAllocationReservationExpiryReport {
 }
 
 #[derive(Debug, Clone)]
-struct DueReservationCandidate {
-    grant_id: String,
-    terminal_receipt_id: String,
-    reservation_id: String,
-    consumer_account_id: String,
-    source_reservation_revision: i64,
-    source_reservation_digest: String,
-    expires_at: String,
-    job_id: String,
-    capacity_claim_id: String,
-    budget_reservation_id: String,
+pub(super) struct DueReservationCandidate {
+    pub(super) grant_id: String,
+    pub(super) terminal_receipt_id: String,
+    pub(super) reservation_id: String,
+    pub(super) consumer_account_id: String,
+    pub(super) source_reservation_revision: i64,
+    pub(super) source_reservation_digest: String,
+    pub(super) expires_at: String,
+    pub(super) job_id: String,
+    pub(super) capacity_claim_id: String,
+    pub(super) budget_reservation_id: String,
 }
 
 #[derive(Serialize)]
@@ -93,8 +93,16 @@ impl Store {
         let recovery_started_at = now();
         let candidates = {
             let connection = self.conn()?;
-            due_reservations_on(&connection, &recovery_started_at, input.limit)?
+            due_reservations_on(&connection, &recovery_started_at, None, None, input.limit)?
         };
+        Ok(self.expire_due_reservation_candidates(recovery_started_at, candidates))
+    }
+
+    pub(super) fn expire_due_reservation_candidates(
+        &self,
+        recovery_started_at: String,
+        candidates: Vec<DueReservationCandidate>,
+    ) -> ComputeDeliveryAllocationReservationExpiryReport {
         let mut report = ComputeDeliveryAllocationReservationExpiryReport {
             recovery_started_at,
             selected_count: candidates.len(),
@@ -137,7 +145,7 @@ impl Store {
                     }
                 });
         }
-        Ok(report)
+        report
     }
 
     fn expire_due_reservation(
@@ -167,9 +175,11 @@ fn validate_input(input: &ExpireDueComputeDeliveryAllocationReservations) -> Res
     Ok(())
 }
 
-fn due_reservations_on(
+pub(super) fn due_reservations_on(
     connection: &Connection,
     recovery_started_at: &str,
+    after_expires_at: Option<&str>,
+    after_reservation_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<DueReservationCandidate>> {
     let mut statement = connection.prepare(
@@ -241,28 +251,45 @@ fn due_reservations_on(
             AND money.status='reserved'
             AND money.reserved_fen=terminal.reserved_amount_fen
             AND julianday(reservation.expires_at)<=julianday(?1)
+            AND (
+                ?2 IS NULL
+                OR julianday(reservation.expires_at)>julianday(?2)
+                OR (julianday(reservation.expires_at)=julianday(?2)
+                    AND reservation.expires_at>?2)
+                OR (julianday(reservation.expires_at)=julianday(?2)
+                    AND reservation.expires_at=?2
+                    AND reservation.reservation_id>?3)
+            )
             AND NOT EXISTS (
                 SELECT 1 FROM compute_broker_finish_receipts finish
                  WHERE finish.reservation_id=reservation.reservation_id
             )
           ORDER BY julianday(reservation.expires_at), reservation.expires_at,
                    reservation.reservation_id
-          LIMIT ?2",
+          LIMIT ?4",
     )?;
-    let rows = statement.query_map(params![recovery_started_at, limit as i64], |row| {
-        Ok(DueReservationCandidate {
-            grant_id: row.get(0)?,
-            terminal_receipt_id: row.get(1)?,
-            reservation_id: row.get(2)?,
-            consumer_account_id: row.get(3)?,
-            source_reservation_revision: row.get(4)?,
-            source_reservation_digest: row.get(5)?,
-            expires_at: row.get(6)?,
-            job_id: row.get(7)?,
-            capacity_claim_id: row.get(8)?,
-            budget_reservation_id: row.get(9)?,
-        })
-    })?;
+    let rows = statement.query_map(
+        params![
+            recovery_started_at,
+            after_expires_at,
+            after_reservation_id,
+            limit as i64
+        ],
+        |row| {
+            Ok(DueReservationCandidate {
+                grant_id: row.get(0)?,
+                terminal_receipt_id: row.get(1)?,
+                reservation_id: row.get(2)?,
+                consumer_account_id: row.get(3)?,
+                source_reservation_revision: row.get(4)?,
+                source_reservation_digest: row.get(5)?,
+                expires_at: row.get(6)?,
+                job_id: row.get(7)?,
+                capacity_claim_id: row.get(8)?,
+                budget_reservation_id: row.get(9)?,
+            })
+        },
+    )?;
     rows.collect::<std::result::Result<Vec<_>, _>>()
         .map_err(Into::into)
 }

@@ -423,6 +423,7 @@ pub(crate) use compute_delivery_allocations::{
     ComputeDeliveryAllocationExpiryItem, ComputeDeliveryAllocationExpiryReport,
     ComputeDeliveryAllocationGrantWriteReceipt, ComputeDeliveryAllocationReservationExpiryItem,
     ComputeDeliveryAllocationReservationExpiryReport,
+    ComputeDeliveryAllocationReservationExpiryWorkerPageReport,
     ComputeDeliveryAllocationTerminalWriteReceipt, CreateComputeDeliveryAllocationGrant,
     DeclineComputeDeliveryAllocationGrant, ExerciseComputeDeliveryAllocationGrant,
     ExpireDueComputeDeliveryAllocationGrants, ExpireDueComputeDeliveryAllocationReservations,

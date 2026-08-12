@@ -11,6 +11,9 @@ use crate::{
 
 use super::{get_for_consumer, tests::Fixture};
 
+#[path = "delivery_allocation_reservation_expiry_fairness_support.rs"]
+mod fairness_support;
+
 #[test]
 fn exercised_reservation_expiry_refunds_and_releases_capacity_exactly_once() {
     let fixture = Fixture::new_expiry_recovery();
@@ -164,6 +167,122 @@ fn exercised_reservation_expiry_refunds_and_releases_capacity_exactly_once() {
     assert_eq!(fixture.balance(), 100);
     assert_eq!(fixture.capacity(), ((100, 0), (4, 0)));
     assert_eq!(fixture.table_count("compute_broker_finish_receipts"), 1);
+    fixture.cleanup();
+}
+
+#[test]
+fn worker_checkpoint_advances_past_failure_survives_reopen_and_retries_next_sweep() {
+    let fixture = Fixture::new_expiry_recovery();
+    let grant = fixture.create_grant("worker-fairness", true).unwrap();
+    fixture.recharge(100);
+    let reservation_id = fixture.reservation_id("worker-fairness");
+    fixture
+        .exercise(&grant, &reservation_id, "worker-fairness", true)
+        .unwrap();
+    let later =
+        fairness_support::exercise_additional_reservation(&fixture, "worker-fairness-zlater");
+    let expires_at = fixture
+        .supply
+        .store
+        .compute_reservation(&reservation_id)
+        .unwrap()
+        .reservation
+        .expires_at;
+    fairness_support::assert_key_is_after(
+        &expires_at,
+        &reservation_id,
+        &later.expires_at,
+        &later.reservation_id,
+    );
+    let database_path = fixture.supply.root.join("state.sqlite");
+
+    fixture
+        .supply
+        .store
+        .conn()
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER fail_delivery_expiry_once_for_test
+             BEFORE INSERT ON compute_broker_finish_receipts
+             BEGIN
+                 SELECT RAISE(ABORT, 'injected delivery expiry failure');
+             END;",
+        )
+        .unwrap();
+    let _clock = advance_store_clock_past(&expires_at);
+
+    let failed = fixture
+        .supply
+        .store
+        .expire_due_compute_delivery_allocation_reservations_worker_page(1)
+        .unwrap();
+    assert_eq!(failed.selected_count, 1);
+    assert_eq!(failed.expired_count, 0);
+    assert_eq!(failed.failed_count, 1);
+    assert!(!failed.sweep_completed);
+    assert_eq!(failed.checkpoint_effect, "advanced");
+    let checkpoint: (String, String, i64) = fixture
+        .supply
+        .store
+        .conn()
+        .unwrap()
+        .query_row(
+            "SELECT last_expires_at, last_reservation_id, revision
+               FROM compute_delivery_allocation_expiry_worker_checkpoint",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(checkpoint, (expires_at.clone(), reservation_id.clone(), 2));
+    assert_eq!(fixture.table_count("compute_broker_finish_receipts"), 0);
+    assert_eq!(fixture.balance(), 80);
+    fixture
+        .supply
+        .store
+        .conn()
+        .unwrap()
+        .execute_batch("DROP TRIGGER fail_delivery_expiry_once_for_test;")
+        .unwrap();
+
+    let reopened = crate::store::Store::open(&database_path).unwrap();
+    let continued = reopened
+        .expire_due_compute_delivery_allocation_reservations_worker_page(1)
+        .unwrap();
+    assert_eq!(continued.selected_count, 1);
+    assert_eq!(continued.expired_count, 1);
+    assert_eq!(continued.failed_count, 0);
+    assert!(!continued.sweep_completed);
+    assert_eq!(continued.checkpoint_effect, "advanced");
+    assert_eq!(fixture.balance(), 90);
+    assert_eq!(fixture.table_count("compute_broker_finish_receipts"), 1);
+    let completed = reopened
+        .expire_due_compute_delivery_allocation_reservations_worker_page(1)
+        .unwrap();
+    assert_eq!(completed.selected_count, 0);
+    assert!(completed.sweep_completed);
+    assert_eq!(completed.checkpoint_effect, "cleared");
+    assert_eq!(
+        fixture.table_count("compute_delivery_allocation_expiry_worker_checkpoint"),
+        0
+    );
+
+    let retried = reopened
+        .expire_due_compute_delivery_allocation_reservations_worker_page(1)
+        .unwrap();
+    assert_eq!(retried.selected_count, 1);
+    assert_eq!(retried.expired_count, 1);
+    assert_eq!(retried.failed_count, 0);
+    assert_eq!(retried.checkpoint_effect, "advanced");
+    let terminal = reopened
+        .expire_due_compute_delivery_allocation_reservations_worker_page(1)
+        .unwrap();
+    assert_eq!(terminal.selected_count, 0);
+    assert!(terminal.sweep_completed);
+    assert_eq!(terminal.checkpoint_effect, "cleared");
+    assert_eq!(fixture.balance(), 100);
+    assert_eq!(fixture.table_count("compute_broker_finish_receipts"), 2);
+
+    drop(reopened);
     fixture.cleanup();
 }
 

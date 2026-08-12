@@ -5,6 +5,7 @@ mod exercise;
 mod grant;
 mod read;
 mod reservation_expiry_recovery;
+mod reservation_expiry_scan;
 mod terminal;
 mod types;
 mod validation;
@@ -16,6 +17,7 @@ pub(crate) use reservation_expiry_recovery::{
     COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRE_DUE_CONFIRMATION,
     COMPUTE_DELIVERY_ALLOCATION_RESERVATION_EXPIRY_IDEMPOTENCY_PREFIX,
 };
+pub(crate) use reservation_expiry_scan::ComputeDeliveryAllocationReservationExpiryWorkerPageReport;
 pub(crate) use types::{
     ComputeDeliveryAllocationDetail, ComputeDeliveryAllocationExerciseWriteReceipt,
     ComputeDeliveryAllocationExpiryItem, ComputeDeliveryAllocationExpiryReport,

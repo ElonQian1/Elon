@@ -12,6 +12,7 @@ pub(crate) mod capacity_commitment_api;
 pub(crate) mod capacity_commitment_service;
 pub(crate) mod delivery_allocation;
 pub(crate) mod delivery_allocation_api;
+pub(crate) mod delivery_allocation_expiry_worker;
 pub(crate) mod delivery_allocation_service;
 pub(crate) mod execution;
 pub(crate) mod execution_plan;
