@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, FolderInput, GitBranch, PackagePlus, Plus, RotateCcw, X } from 'lucide-react'
 import { erpBlueprintApi } from './erpBlueprintApi'
 import BlueprintEvolutionForm from './BlueprintEvolutionForm'
+import ErpExistingProjectRegistrar from './ErpExistingProjectRegistrar'
 import type { ErpOverview, ErpReleaseManifest, ErpTargetProject } from './erpBlueprintTypes'
 import { errorMessage, shortDate } from './erpBlueprintUi'
 import styles from './ErpBlueprintPanel.module.css'
@@ -45,6 +46,29 @@ export default function BlueprintMaintainerView({
       )
     ))
   }, [overview.instances, projectId, targetProjects])
+
+  const loadTargetProjects = useCallback(async (preferredProjectId?: string) => {
+    const response = await erpBlueprintApi.listTargetProjects()
+    const projects = response.projects ?? []
+    const boundProjectIds = new Set(overview.instances.map((instance) => instance.project_id))
+    const eligible = projects.filter((project) => (
+      project.id !== projectId
+      && !boundProjectIds.has(project.id)
+      && ['owner', 'admin', 'editor'].includes(
+        project.viewer_role ?? project.role ?? project.my_role ?? '',
+      )
+    ))
+    setTargetProjects(projects)
+    setTargetProjectId((current) => {
+      const requested = preferredProjectId || current
+      return eligible.some((project) => project.id === requested)
+        ? requested
+        : eligible[0]?.id ?? ''
+    })
+    if (preferredProjectId && !eligible.some((project) => project.id === preferredProjectId)) {
+      throw new Error('项目已登记，但当前账号没有编辑权，或该项目已经纳入 ERP。')
+    }
+  }, [overview.instances, projectId])
 
   useEffect(() => {
     let active = true
@@ -161,14 +185,21 @@ export default function BlueprintMaintainerView({
           {onboardingMode === 'new_project' ? (
             <label>项目名称<input value={instanceName} onChange={(event) => setInstanceName(event.target.value)} /></label>
           ) : (
-            <label>现有项目
-              <select value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)}>
-                <option value="">请选择可编辑项目</option>
-                {eligibleTargetProjects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.display_name || project.name}</option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label>现有项目
+                <select value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)}>
+                  <option value="">请选择可编辑项目</option>
+                  {eligibleTargetProjects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.display_name || project.name}</option>
+                  ))}
+                </select>
+              </label>
+              <ErpExistingProjectRegistrar
+                canEdit={canEdit}
+                disabled={busy}
+                onRegistered={loadTargetProjects}
+              />
+            </>
           )}
           <label>实例标识<input value={instanceKey} onChange={(event) => setInstanceKey(event.target.value)} /></label>
           <label>行业<input value={industry} onChange={(event) => setIndustry(event.target.value)} /></label>

@@ -8,6 +8,7 @@ const shell = read('pc-frontend/src/features/open-commerce/OpenCommercePanel.tsx
 const panel = read(`${feature}/ErpBlueprintPanel.tsx`)
 const instance = read(`${feature}/ErpInstanceView.tsx`)
 const maintainer = read(`${feature}/BlueprintMaintainerView.tsx`)
+const existingProjectRegistrar = read(`${feature}/ErpExistingProjectRegistrar.tsx`)
 const evolution = read(`${feature}/BlueprintEvolutionForm.tsx`)
 const configuration = read(`${feature}/ErpInstanceConfigurationPanel.tsx`)
 const materialization = read(`${feature}/ErpMaterializationPanel.tsx`)
@@ -46,6 +47,11 @@ assert.ok(maintainer.includes('target_project_id:'), 'existing project adoption 
 assert.ok(maintainer.includes("['owner', 'admin', 'editor']"), 'target project picker must exclude read-only projects')
 assert.ok(maintainer.includes('project.viewer_role ?? project.role ?? project.my_role'), 'target project picker must read the project list role field')
 assert.ok(api.includes("'/api/me/projects'"), 'ERP workspace must load user-owned target projects through the authenticated project list')
+assert.ok(maintainer.includes('ErpExistingProjectRegistrar'), 'existing project onboarding must expose the local repository registration bridge')
+assert.ok(maintainer.includes('onRegistered={loadTargetProjects}'), 'registered repositories must refresh and select the target project')
+assert.ok(existingProjectRegistrar.includes("'/api/project-folder/pick'"), 'registration bridge must use the guarded local folder picker')
+assert.ok(existingProjectRegistrar.includes("'/api/register-project'"), 'registration bridge must reuse the local node cloud registration endpoint')
+assert.ok(!existingProjectRegistrar.includes('createInstance('), 'repository registration must not silently adopt the project into ERP')
 
 for (const forbidden of [
   'erp_accept_proposal',
