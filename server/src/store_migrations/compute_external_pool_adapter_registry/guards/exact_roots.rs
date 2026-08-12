@@ -52,7 +52,14 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
              AND package.runtime_kind='server_sidecar_v1'
              AND package.supported_capabilities_json=NEW.supported_capabilities_json
              AND package.capability_set_digest=NEW.capability_set_digest
-             AND package.credential_verifier_json=NEW.credential_verifier_json
+             AND json_extract(package.credential_verifier_json,'$.verification_kind')=
+                 json_extract(NEW.credential_verifier_json,'$.verification_kind')
+             AND json_extract(package.credential_verifier_json,'$.verifier_id')=
+                 json_extract(NEW.credential_verifier_json,'$.verifier_id')
+             AND json_extract(package.credential_verifier_json,'$.verifier_revision')=
+                 json_extract(NEW.credential_verifier_json,'$.verifier_revision')
+             AND json_extract(package.credential_verifier_json,'$.verifier_digest')=
+                 json_extract(NEW.credential_verifier_json,'$.verifier_digest')
              AND package.credential_verifier_digest=NEW.credential_verifier_digest
              AND source.source_receipt_id=NEW.source_receipt_id
              AND source.source_receipt_digest=NEW.source_receipt_digest

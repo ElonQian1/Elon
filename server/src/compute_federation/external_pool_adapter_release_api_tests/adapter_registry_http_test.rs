@@ -251,9 +251,9 @@ async fn adapter_registry_http_reuses_neutral_release_with_independent_provider_
             .unwrap();
         assert_eq!(count, expected, "unexpected {table} count");
     }
+    drop(connection);
     assert_no_registry_activation_effects(&fixture, &first_binding);
     assert_no_registry_activation_effects(&fixture, &second_binding);
-    drop(connection);
     fixture.cleanup();
 }
 

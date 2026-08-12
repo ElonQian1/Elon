@@ -260,6 +260,33 @@ fn schema_guards_cover_every_signed_field_and_forbid_wallclock_expiry_in_views()
     assert!(current.contains("adoption_terminal_receipts"));
 }
 
+#[test]
+fn v251_replaces_an_applied_v249_release_guard_and_is_repeatable() {
+    let connection = Connection::open_in_memory().unwrap();
+    create_v247_fixture(&connection);
+    migration_v249(&connection).unwrap();
+    connection
+        .execute_batch(
+            "DROP TRIGGER external_pool_adapter_registry_release_exact_roots;
+             CREATE TRIGGER external_pool_adapter_registry_release_exact_roots
+             BEFORE INSERT ON compute_external_pool_adapter_registry_releases
+             BEGIN SELECT RAISE(ABORT,'legacy v249 registry guard'); END;",
+        )
+        .unwrap();
+
+    migration_v251(&connection).unwrap();
+    migration_v251(&connection).unwrap();
+
+    let guard = object_sql(
+        &connection,
+        "trigger",
+        "external_pool_adapter_registry_release_exact_roots",
+    );
+    assert!(guard.contains("json_extract(package.credential_verifier_json"));
+    assert!(!guard.contains("legacy v249 registry guard"));
+    insert_release(&connection, &digest('6')).unwrap();
+}
+
 fn assert_status(connection: &Connection, binding_id: &str, expected: &str) {
     let status: String = connection
         .query_row(

@@ -2,7 +2,9 @@ use rusqlite::{params, Connection};
 
 use super::{digest, AT};
 
-pub(super) fn create_v247_fixture(connection: &Connection) {
+pub(in crate::store_migrations::compute_external_pool_adapter_registry::tests) fn create_v247_fixture(
+    connection: &Connection,
+) {
     connection
         .execute_batch(
             r#"
@@ -242,7 +244,13 @@ pub(super) fn capabilities_json() -> String {
     serde_json::json!([0, 1, 2, 3, 4, 5]).to_string()
 }
 pub(super) fn verifier_json() -> String {
-    serde_json::json!({"verification_kind":"signed_challenge","verifier_id":"verifier-1","verifier_revision":1}).to_string()
+    serde_json::json!({
+        "verification_kind":"signed_challenge",
+        "verifier_id":"verifier-1",
+        "verifier_revision":1,
+        "verifier_digest":digest('d')
+    })
+    .to_string()
 }
 pub(super) fn manifest_json() -> String {
     serde_json::json!({"adapter_id":"adapter-1","release_version":"1.0.0"}).to_string()

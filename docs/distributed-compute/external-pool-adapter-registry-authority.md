@@ -3,10 +3,12 @@ title: 外部矿池 Adapter Provider-neutral Registry 与安装 Companion 权威
 status: current
 reviewed_at: 2026-08-13
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter Provider-neutral Registry 与安装 Companion 权威
+
+> 当前实现：V249 registry/companion 与 V251 兼容修复已通过本地定向 migration 和 HTTP 验收。V251 只把凭据验证器 JSON 从原始字符串相等改为四个签名字段逐项相等，并原子替换已应用 V249 的 trigger；不放宽摘要、能力、制品、installation 或 Provider 根约束。独立的 V250 漏洞情报 re-attestation 仍按其权威与验收页单独计量，不属于本页通过证据。
 
 ## 1. 目的与边界
 

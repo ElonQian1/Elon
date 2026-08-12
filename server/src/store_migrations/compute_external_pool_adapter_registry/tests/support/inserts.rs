@@ -1,8 +1,9 @@
 use rusqlite::{params, Connection};
+use serde_json::{Map, Value};
 
 use super::{capabilities_json, digest, manifest_json, verifier_json, AT};
 
-pub(super) fn insert_release(
+pub(in crate::store_migrations::compute_external_pool_adapter_registry::tests) fn insert_release(
     connection: &Connection,
     json_installation_content_digest: &str,
 ) -> rusqlite::Result<usize> {
@@ -52,7 +53,7 @@ fn release_json(content_digest: &str) -> String {
         "supported_provider_kinds":["external_pool"],"implementation_digest":digest('b'),
         "declared_implementation_sha256":digest('b'),
         "supported_capabilities":[0,1,2,3,4,5],"capability_set_digest":digest('c'),
-        "credential_verifier":{"verification_kind":"signed_challenge","verifier_id":"verifier-1","verifier_revision":1},
+        "credential_verifier":{"verification_kind":"signed_challenge","verifier_id":"verifier-1","verifier_revision":1,"verifier_digest":digest('d')},
         "credential_verifier_digest":digest('d'),"archive_sha256":digest('b'),
         "archive_size_bytes":4096,"manifest":{"adapter_id":"adapter-1","release_version":"1.0.0"},
         "manifest_digest":digest('2'),"entry_inventory_digest":digest('3'),
@@ -64,7 +65,7 @@ fn release_json(content_digest: &str) -> String {
     }).to_string()
 }
 
-pub(super) fn insert_binding(
+pub(in crate::store_migrations::compute_external_pool_adapter_registry::tests) fn insert_binding(
     connection: &Connection,
     ordinal: usize,
     json_confirmation: &str,
@@ -170,32 +171,61 @@ impl ProviderValues {
 }
 
 fn binding_json(value: &ProviderValues, confirmation: &str) -> String {
+    let mut binding = Map::new();
+    extend_object(
+        &mut binding,
+        serde_json::json!({
+          "registry_release_id":"registry-release-1","registry_release_digest":digest('4'),
+          "route_adapter_projection_id":value.projection_id,"installation_receipt_id":value.installation_id,
+          "installation_receipt_digest":value.installation_digest,"installation_material_digest":digest('1'),
+          "installation_content_digest":digest('6'),"application_id":value.application_id,
+          "application_digest":digest('8'),"adoption_receipt_id":value.adoption_id,
+          "adoption_receipt_digest":value.adoption_digest,"adoption_material_digest":digest('6'),
+          "admission_id":"admission-1","admission_digest":digest('a'),
+          "package_receipt_id":"package-1","package_receipt_digest":digest('e'),
+          "package_material_digest":digest('f'),"source_receipt_id":"source-1",
+          "source_receipt_digest":digest('1')
+        }),
+    );
+    extend_object(
+        &mut binding,
+        serde_json::json!({
+          "provider_id":value.provider_id,"provider_owner_account_id":value.owner_id,
+          "provider_policy_revision":1,"provider_digest":value.provider_digest,
+          "adapter_id":"adapter-1","release_version":"1.0.0","adapter_config_revision":1,
+          "adapter_config_digest":"opaque-config",
+          "sandbox_conformance_receipt_id":value.sandbox_id,
+          "sandbox_conformance_receipt_digest":digest('9'),
+          "credential_verification_receipt_id":value.credential_id,
+          "credential_verification_receipt_digest":digest('0'),
+          "credential_locator_commitment":digest('5')
+        }),
+    );
+    extend_object(
+        &mut binding,
+        serde_json::json!({
+          "bound_by_admin_user_id":"admin-1","confirmation":confirmation,"checked_at":AT,
+          "bound_at":AT,"recorded_at":AT,"idempotency_scope":"registry",
+          "idempotency_key":value.idempotency_key,
+          "registry_effect":"installed_instance_companion_recorded",
+          "provider_effect":"none","credential_effect":"none","route_effect":"none",
+          "execution_effect":"none","settlement_effect":"none"
+        }),
+    );
     serde_json::json!({
       "schema":"compute_federation.external_pool_adapter_registry_provider_binding_receipt.v1",
       "provider_binding_id":value.binding_id,"provider_binding_digest":value.binding_digest,
       "provider_binding_material_digest":value.binding_material_digest,
-      "canonicalization":"rfc8785_jcs","digest_algorithm":"sha256","binding":{
-        "registry_release_id":"registry-release-1","registry_release_digest":digest('4'),
-        "route_adapter_projection_id":value.projection_id,"installation_receipt_id":value.installation_id,
-        "installation_receipt_digest":value.installation_digest,"installation_material_digest":digest('1'),
-        "installation_content_digest":digest('6'),"application_id":value.application_id,
-        "application_digest":digest('8'),"adoption_receipt_id":value.adoption_id,
-        "adoption_receipt_digest":value.adoption_digest,"adoption_material_digest":digest('6'),
-        "provider_id":value.provider_id,"provider_owner_account_id":value.owner_id,
-        "provider_policy_revision":1,"provider_digest":value.provider_digest,
-        "adapter_id":"adapter-1","release_version":"1.0.0","adapter_config_revision":1,
-        "adapter_config_digest":"opaque-config","admission_id":"admission-1",
-        "admission_digest":digest('a'),"package_receipt_id":"package-1",
-        "package_receipt_digest":digest('e'),"package_material_digest":digest('f'),
-        "source_receipt_id":"source-1","source_receipt_digest":digest('1'),
-        "sandbox_conformance_receipt_id":value.sandbox_id,"sandbox_conformance_receipt_digest":digest('9'),
-        "credential_verification_receipt_id":value.credential_id,
-        "credential_verification_receipt_digest":digest('0'),"credential_locator_commitment":digest('5'),
-        "bound_by_admin_user_id":"admin-1","confirmation":confirmation,"checked_at":AT,
-        "bound_at":AT,"recorded_at":AT,"idempotency_scope":"registry",
-        "idempotency_key":value.idempotency_key,"registry_effect":"installed_instance_companion_recorded",
-        "provider_effect":"none","credential_effect":"none","route_effect":"none",
-        "execution_effect":"none","settlement_effect":"none"
-      }
-    }).to_string()
+      "canonicalization":"rfc8785_jcs","digest_algorithm":"sha256","binding":binding
+    })
+    .to_string()
+}
+
+fn extend_object(target: &mut Map<String, Value>, chunk: Value) {
+    target.extend(
+        chunk
+            .as_object()
+            .expect("registry fixture chunk must be an object")
+            .clone(),
+    );
 }
