@@ -13,6 +13,8 @@ mod dynamic_mapping_close;
 #[cfg(windows)]
 mod dynamic_registration;
 #[cfg(windows)]
+mod dynamic_shm_file_close;
+#[cfg(windows)]
 mod dynamic_view_unmap;
 mod expected;
 mod invariants;
@@ -34,6 +36,10 @@ pub(super) use dynamic_mapping_close::{
 pub(super) use dynamic_registration::{
     validate_dynamic_registration, DynamicRegistrationActual,
     DynamicRegistrationRetainedDisposition, DynamicRegistrationTiming,
+};
+#[cfg(windows)]
+pub(super) use dynamic_shm_file_close::{
+    validate_shm_file_close_after_success_physical_subset, ShmFileClosePhysicalSubsetActual,
 };
 #[cfg(windows)]
 pub(super) use dynamic_view_unmap::{

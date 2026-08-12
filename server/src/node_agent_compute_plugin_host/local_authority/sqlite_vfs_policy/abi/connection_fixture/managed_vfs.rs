@@ -39,6 +39,8 @@ mod a2c_dms_shared_release_runner;
 #[cfg(all(test, windows))]
 mod a2c_mapping_close_runner;
 #[cfg(all(test, windows))]
+mod a2c_shm_file_close_runner;
+#[cfg(all(test, windows))]
 mod a2c_vfs_unregister_runner;
 #[cfg(all(test, windows))]
 mod a2c_view_unmap_runner;
