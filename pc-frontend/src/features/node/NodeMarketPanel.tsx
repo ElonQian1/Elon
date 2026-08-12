@@ -8,6 +8,10 @@ import {
   nodeId,
   nodeName,
 } from './nodeHelpers'
+import {
+  indexLegacyLlmCompatibility,
+  type LegacyLlmV1CompatibilityProjection,
+} from './nodeUsageFederationCompatibility'
 import { useAuthStore } from '../../store/auth'
 import type { NodeBalanceResponse, NodeComputeRun, NodeSummary, NodeUsageResponse } from './types'
 import styles from './NodeMarketPanel.module.css'
@@ -69,6 +73,14 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
     }
     return map
   }, [nodes, myNodes])
+  const consumingCompatibility = useMemo(
+    () => indexLegacyLlmCompatibility(usage ?? {}, 'consuming'),
+    [usage],
+  )
+  const providingCompatibility = useMemo(
+    () => indexLegacyLlmCompatibility(usage ?? {}, 'providing'),
+    [usage],
+  )
 
   return (
     <div className={styles.marketPage}>
@@ -134,6 +146,7 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
           title="我使用的节点"
           icon={<ArrowRightLeft size={16} />}
           runs={usage?.consuming ?? []}
+          compatibility={consumingCompatibility}
           nodeNames={nodeNames}
           empty="暂无共享使用记录。"
         />
@@ -141,6 +154,7 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
           title="我的节点被使用"
           icon={<Users size={16} />}
           runs={usage?.providing ?? []}
+          compatibility={providingCompatibility}
           nodeNames={nodeNames}
           empty="暂无提供记录。"
           providerView
@@ -231,6 +245,7 @@ function UsagePanel({
   title,
   icon,
   runs,
+  compatibility,
   nodeNames,
   empty,
   providerView = false,
@@ -238,6 +253,7 @@ function UsagePanel({
   title: string
   icon: ReactNode
   runs: NodeComputeRun[]
+  compatibility: ReadonlyMap<string, LegacyLlmV1CompatibilityProjection>
   nodeNames: Map<string, string>
   empty: string
   providerView?: boolean
@@ -264,6 +280,7 @@ function UsagePanel({
                 <strong>{formatFen(providerView ? run.provider_earned_fen : run.billed_cost_rmb_fen)}</strong>
                 <span>{run.settlement_status ?? run.usage_mode ?? ''}</span>
               </div>
+              <LegacyCompatibilityNote projection={run.id ? compatibility.get(run.id) : undefined} />
             </div>
           ))}
         </div>
@@ -271,6 +288,27 @@ function UsagePanel({
         <div className={styles.empty}>{empty}</div>
       )}
     </section>
+  )
+}
+
+function LegacyCompatibilityNote({ projection }: { projection?: LegacyLlmV1CompatibilityProjection }) {
+  if (!projection) return null
+  return (
+    <div className={styles.compatibilityNote}>
+      <strong>LLM 兼容观察</strong>
+      <span>partial · Provider 上报，未验证</span>
+      <p>旧节点账本；金额和结算状态不是新联邦结算。</p>
+      {projection.missing_contracts.length > 0 && (
+        <details>
+          <summary>查看缺少的 {projection.missing_contracts.length} 项联邦合同</summary>
+          <ul>
+            {projection.missing_contracts.map((contract, index) => (
+              <li key={`${contract}-${index}`}><code>{contract}</code></li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   )
 }
 

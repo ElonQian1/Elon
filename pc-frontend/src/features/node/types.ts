@@ -607,4 +607,5 @@ export interface NodeComputeRun {
 export interface NodeUsageResponse {
   consuming?: NodeComputeRun[]
   providing?: NodeComputeRun[]
+  federation_compatibility?: unknown
 }

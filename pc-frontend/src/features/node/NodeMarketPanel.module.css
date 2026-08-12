@@ -269,6 +269,50 @@
   white-space: nowrap;
 }
 
+.compatibilityNote {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(216, 181, 91, .3);
+  border-radius: var(--radius-sm);
+  background: rgba(216, 181, 91, .07);
+  padding: 8px 10px;
+  color: var(--text-secondary);
+}
+
+.compatibilityNote > strong {
+  color: #d8b55b;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.compatibilityNote p,
+.compatibilityNote ul {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.compatibilityNote summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.compatibilityNote summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.compatibilityNote ul {
+  padding: 6px 0 0 18px;
+}
+
+.compatibilityNote code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .good { color: #4caf78 !important; }
 .warn { color: #d8b55b !important; }
 .bad { color: #e07070 !important; }

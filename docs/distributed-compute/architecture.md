@@ -177,7 +177,7 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 现有节点模型共享继续提供 `llm_chat` 兼容供给，其白名单、每日 Token 预留、流租约和账本不被删除。迁移必须先暴露旧链能够证明的事实，再逐步把直接路由迁移到 Broker；不得在缺少稳定因果绑定时把旧记录伪造成 Provider/Offer/Job/Lease/Receipt。
 
-第一步只在既有认证 `GET /api/me/node-usage` 响应中追加 `federation_compatibility`：它从同一用户已可见的 `NodeComputeRun` 纯内存派生，仅纳入 `feature=node_llm` 且 `usage_mode=server_node_llm` 的真实旧 LLM 运行，并固定报告 `compatibility_level=partial`、`metering_trust=provider_reported_unverified` 及缺失的统一合同。PC CLI 等共用旧表的其他运行仍保留在原始数组，但不得误标为 `llm_chat`。该只读投影不写数据库、不扩大权限，也不生成或授权 Job、Reservation、Attempt、Lease、Receipt、可信计量或结算。
+第一步只在既有认证 `GET /api/me/node-usage` 响应中追加 `federation_compatibility`：它从同一用户已可见的 `NodeComputeRun` 纯内存派生，仅纳入 `feature=node_llm` 且 `usage_mode=server_node_llm` 的真实旧 LLM 运行，并固定报告 `compatibility_level=partial`、`metering_trust=provider_reported_unverified` 及缺失的统一合同。PC CLI 等共用旧表的其他运行仍保留在原始数组，但不得误标为 `llm_chat`。PC 只把完整校验后的投影按逐字、区分大小写且不裁剪的 `source_run_id=run.id` 建只读索引，并继续从原始数组生成行；未知 schema、畸形字段、重复或无源投影会让对应一侧失败关闭。标签明确金额与结算状态仍属旧节点账本，不得把投影重排、合并或新增为联邦运行。该只读投影不写数据库、不扩大权限，也不生成或授权 Job、Reservation、Attempt、Lease、Receipt、可信计量或结算。
 
 兼容策略中的节点级 `max_concurrent_runs` 是本机共享安全上限。生成 Federation Offer 时可以据此收紧 `execution_limits`，但同一节点发布多个 Offer 时不得把完整节点并发额度复制成每个 Offer 各自独立可售的容量；跨 Offer 的共同占用必须等待共享容量池与原子账本形成后再承诺。
 
