@@ -8,6 +8,7 @@
   const MAX_STRUCTURED_PARTS = 16;
   const FILE_PATH_EXTENSION = /\.(?:pdf|docx?|xlsx?|csv|pptx?|txt|md|json|xml|ya?ml|zip|rar|7z|tar|gz|png|jpe?g|gif|webp|svg|mp3|wav|m4a|ogg|mp4|mov|webm)$/i;
   const COMPLEX_PART_TYPES = new Set(['artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive']);
+  const messageActionPolicy = window.__elonChatGptMessageActionPolicy;
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
 
@@ -287,29 +288,63 @@
   function regenerateButton() {
     const turn = lastAssistantTurn();
     if (!turn) return null;
-    const labels = ['regenerate', 'try again', '重新生成', '重试'];
-    return Array.from(turn.querySelectorAll('button')).find((button) => {
-      if (!isVisible(button)) return false;
-      const value = cleanText([
-        button.getAttribute('data-testid'),
-        button.getAttribute('aria-label'),
-        button.getAttribute('title'),
-        button.textContent
-      ].filter(Boolean).join(' ')).toLowerCase();
-      return labels.some((label) => value.includes(label));
-    }) || null;
+    return Array.from(turn.querySelectorAll('button, [role="button"]')).find((button) =>
+      isVisible(button) && messageActionPolicy && messageActionPolicy.isRegenerateControl(button)
+    ) || null;
+  }
+
+  function messageOverflowButton() {
+    const turn = lastAssistantTurn();
+    if (!turn) return null;
+    return Array.from(turn.querySelectorAll('button, [role="button"]')).find((button) =>
+      isVisible(button) && messageActionPolicy && messageActionPolicy.isOverflowControl(button)
+    ) || null;
+  }
+
+  function visibleRegenerateMenuItem() {
+    if (!messageActionPolicy) return null;
+    return Array.from(document.querySelectorAll(
+      '[role="menuitem"], [role="option"], [data-radix-menu-content] button, [data-headlessui-portal] button'
+    )).find((item) => isVisible(item) && messageActionPolicy.isRegenerateControl(item)) || null;
+  }
+
+  function dismissOverflowMenu() {
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Escape',
+      code: 'Escape',
+      bubbles: true,
+      cancelable: true
+    }));
   }
 
   function regenerate(result) {
     const button = regenerateButton();
-    if (!button) return result('regenerate_response', false, '官网当前没有可用的重新生成入口。');
-    button.click();
-    result('regenerate_response', true, '');
+    if (button) {
+      button.click();
+      return result('regenerate_response', true, '');
+    }
+    const overflow = messageOverflowButton();
+    if (!overflow) return result('regenerate_response', false, '官网当前没有可用的重新生成入口。');
+    overflow.click();
+    const deadline = Date.now() + 2000;
+    function invokeMenuItem() {
+      const item = visibleRegenerateMenuItem();
+      if (item) {
+        item.click();
+        return result('regenerate_response', true, '');
+      }
+      if (Date.now() >= deadline) {
+        dismissOverflowMenu();
+        return result('regenerate_response', false, '官网消息菜单中没有可用的重新生成入口。');
+      }
+      window.setTimeout(invokeMenuItem, 75);
+    }
+    window.setTimeout(invokeMenuItem, 50);
   }
 
   function capabilities() {
     const values = ['message_copy', 'rich_text'];
-    if (regenerateButton()) values.push('message_regenerate');
+    if (regenerateButton() || messageOverflowButton()) values.push('message_regenerate');
     if (lastStructuredTypes.size || lastComplexOutput) values.push('complex_output');
     return values;
   }

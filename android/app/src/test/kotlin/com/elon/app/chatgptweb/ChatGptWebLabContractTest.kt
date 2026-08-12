@@ -40,6 +40,9 @@ class ChatGptWebLabContractTest {
         val messages = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_messages.js"
         )
+        val messageActionPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_message_action_policy.js"
+        )
         val composer = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_composer.js"
         )
@@ -70,6 +73,12 @@ class ChatGptWebLabContractTest {
         assertTrue(
             bridge.indexOf("chatgpt_web_adapter_bootstrap.js") <
                 bridge.indexOf("chatgpt_web_adapter_conversations.js")
+        )
+        assertTrue(
+            bridge.indexOf("chatgpt_web_adapter_conversations.js") <
+                bridge.indexOf("chatgpt_web_adapter_message_action_policy.js") &&
+                bridge.indexOf("chatgpt_web_adapter_message_action_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_messages.js")
         )
         assertTrue(
             bridge.indexOf("chatgpt_web_adapter_navigation_policy.js") <
@@ -198,6 +207,11 @@ class ChatGptWebLabContractTest {
         assertTrue(messages.contains("table, pre, blockquote, ol, ul"))
         assertTrue(messages.contains("complex_output"))
         assertTrue(messages.contains("message_regenerate"))
+        assertTrue(messages.contains("messageOverflowButton"))
+        assertTrue(messages.contains("visibleRegenerateMenuItem"))
+        assertTrue(messages.contains("Date.now() + 2000"))
+        assertTrue(messageActionPolicy.contains("isRegenerateControl"))
+        assertTrue(messageActionPolicy.contains("isOverflowControl"))
         assertTrue(adapterLayout.indexOf("read.aloud|朗读") < adapterLayout.indexOf("dictat|听写|语音输入"))
         assertTrue(adapterLayout.contains("return 'sources'"))
         assertTrue(adapterLayout.contains("return 'create_asset'"))

@@ -19,6 +19,18 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 
+function Get-ContentDigest {
+    param([AllowEmptyString()][string]$Value)
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace("-", "")
+    } finally {
+        $sha.Dispose()
+    }
+}
+
 function Invoke-ReceiptAction {
     param(
         [Parameter(Mandatory = $true)][string]$Action,
@@ -57,14 +69,65 @@ function Restore-Origin {
             -ExpectedAction "new_conversation" | Out-Null
     }
     if ($ViewMode -in @("web", "native")) {
+        $requestedMode = if ($ViewMode -eq "web") { "official" } else { "native" }
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = $ViewMode } | Out-Null
+            -Arguments @{ view_mode = $requestedMode } | Out-Null
         Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
             -Description "original ChatGPT view mode restoration" -Predicate {
                 param($state)
                 [string]$state.view_mode -eq $ViewMode
             }.GetNewClosure() | Out-Null
     }
+}
+
+function Wait-RegeneratedReply {
+    param(
+        [Parameter(Mandatory = $true)][string]$RequestId,
+        [Parameter(Mandatory = $true)][string]$Marker,
+        [Parameter(Mandatory = $true)][string]$PreviousMessageId,
+        [Parameter(Mandatory = $true)][string]$PreviousContentDigest
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReplyTimeoutSec)
+    $streamingObserved = $false
+    $lastReceipt = $null
+    do {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        if ($state.streaming -eq $true) { $streamingObserved = $true }
+        $lastReceipt = @($state.command_requests) |
+            Where-Object { [string]$_.request_id -eq $RequestId } |
+            Select-Object -Last 1
+        if ($null -ne $lastReceipt -and [string]$lastReceipt.status -eq "failed") {
+            throw "ChatGPT regenerate command failed."
+        }
+        $assistant = @($state.conversation.messages) |
+            Where-Object { [string]$_.role -eq "assistant" } |
+            Select-Object -Last 1
+        if ($null -ne $assistant) {
+            $normalized = Normalize-ChatGptProbeReply ([string]$assistant.content)
+            $identityChanged = [string]$assistant.id -ne $PreviousMessageId
+            $contentChanged = (Get-ContentDigest -Value $normalized) -ne $PreviousContentDigest
+            if (
+                $null -ne $lastReceipt -and
+                [string]$lastReceipt.expected_web_action -eq "regenerate_response" -and
+                [string]$lastReceipt.status -eq "succeeded" -and
+                $lastReceipt.result.ok -eq $true -and
+                $state.streaming -eq $false -and
+                [string]$assistant.state -eq "completed" -and
+                $normalized -like "*$Marker*" -and
+                ($streamingObserved -or $identityChanged -or $contentChanged)
+            ) {
+                return [pscustomobject]@{
+                    state = $state
+                    streaming_observed = $streamingObserved
+                    assistant_identity_changed = $identityChanged
+                    assistant_content_changed = $contentChanged
+                }
+            }
+        }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for a structurally new regenerated reply. Receipt=$($lastReceipt.status)."
 }
 
 $result = $null
@@ -87,59 +150,61 @@ try {
     Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
         -ExpectedAction "new_conversation" | Out-Null
     Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "isolated blank copy conversation" -Predicate {
+        -Description "isolated blank regenerate conversation" -Predicate {
             param($state)
             [int]$state.conversation.message_count -eq 0 -and
                 $state.composer_ready -eq $true -and
                 $state.streaming -eq $false
         } | Out-Null
 
-    $marker = "ELON-CHATGPT-COPY-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+    $marker = "ELON-CHATGPT-REGENERATE-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+    $prompt = "Reply with a fresh 12-character lowercase hexadecimal token, one space, then exactly: $marker"
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
-        -Arguments @{ text = "Reply only with this exact test marker: $marker" } | Out-Null
+        -Arguments @{ text = $prompt } | Out-Null
     $beforeSend = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
     $send = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input"
     $sendRequestId = [string]$send.command_receipt.request_id
-    if (-not $sendRequestId) { throw "ChatGPT copy prompt did not return a receipt id." }
-    $reply = Wait-ChatGptProbeReply `
+    if (-not $sendRequestId) { throw "ChatGPT regenerate probe did not return a send receipt id." }
+    $initialReply = Wait-ChatGptProbeReply `
         -InvokeUiState { Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" } `
         -RequestId $sendRequestId -Marker $marker `
         -AfterMs ([long]$beforeSend.last_command.observed_at_ms) `
         -TimeoutSec $ReplyTimeoutSec -PollIntervalSec $PollIntervalSec
+    $initialAssistant = @($initialReply.conversation.messages) |
+        Where-Object { [string]$_.role -eq "assistant" } |
+        Select-Object -Last 1
+    if ($null -eq $initialAssistant -or [string]$initialAssistant.state -ne "completed") {
+        throw "Initial ChatGPT regenerate probe did not produce a completed assistant message."
+    }
+    $initialDigest = Get-ContentDigest -Value (
+        Normalize-ChatGptProbeReply ([string]$initialAssistant.content)
+    )
 
-    $copy = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action "chatgpt_copy_last_response"
-    if ($copy.control_ok -ne $true) { throw "ChatGPT native copy action failed." }
-    if ([string]$copy.receipt.schema -ne "elon.chatgpt_web.clipboard_receipt.v1") {
-        throw "Unexpected ChatGPT clipboard receipt schema."
-    }
-    if ($copy.receipt.copied -ne $true -or [int]$copy.receipt.item_count -lt 1) {
-        throw "ChatGPT clipboard receipt did not confirm a copied item."
-    }
-    if (@($copy.receipt.mime_types) -notcontains "text/plain") {
-        throw "ChatGPT clipboard receipt did not report text/plain."
-    }
-    if ($copy.receipt.content_exported -ne $false) {
-        throw "ChatGPT clipboard receipt exported message content."
-    }
-    if (($copy | ConvertTo-Json -Depth 8 -Compress) -like "*$marker*") {
-        throw "ChatGPT clipboard receipt leaked the synthetic reply."
-    }
+    $regenerate = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        -Action "chatgpt_regenerate_response"
+    $regenerateRequestId = [string]$regenerate.command_receipt.request_id
+    if (-not $regenerateRequestId) { throw "ChatGPT regenerate did not return a receipt id." }
+    $regenerated = Wait-RegeneratedReply -RequestId $regenerateRequestId `
+        -Marker $marker -PreviousMessageId ([string]$initialAssistant.id) `
+        -PreviousContentDigest $initialDigest
 
     Restore-Origin -ConversationPath $originPath -ViewMode $originMode
     $originRestored = $true
     $result = [ordered]@{
-        schema = "elon.chatgpt_web.copy_acceptance.v1"
+        schema = "elon.chatgpt_web.regenerate_acceptance.v1"
         passed = $true
-        adapter_version = [int]$reply.adapter_version
+        adapter_version = [int]$regenerated.state.adapter_version
         isolated_conversation = $true
-        assistant_completed = $true
-        clipboard_receipt_observed = $true
-        clipboard_item_count = [int]$copy.receipt.item_count
-        clipboard_mime_types = @($copy.receipt.mime_types)
-        clipboard_content_read_back = $false
+        initial_assistant_completed = $true
+        regenerate_receipt_observed = $true
+        streaming_observed = [bool]$regenerated.streaming_observed
+        assistant_identity_changed = [bool]$regenerated.assistant_identity_changed
+        assistant_content_changed = [bool]$regenerated.assistant_content_changed
+        regenerated_assistant_completed = $true
         original_conversation_restored = $true
         original_view_mode_restored = $true
+        sent_messages = 1
+        regenerated_messages = 1
         private_content_emitted = $false
         cleared_cookies = $false
         cleared_app_data = $false
@@ -149,11 +214,11 @@ try {
         try {
             Restore-Origin -ConversationPath $originPath -ViewMode $originMode
         } catch {
-            Write-Warning "Unable to restore the original ChatGPT view after a failed copy smoke."
+            Write-Warning "Unable to restore the original ChatGPT view after a failed regenerate smoke."
         }
     }
     Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 }
 
 $result | ConvertTo-Json -Depth 4
-Write-Output "CHATGPT_WEB_COPY_ACCEPTANCE=passed"
+Write-Output "CHATGPT_WEB_REGENERATE_ACCEPTANCE=passed"
