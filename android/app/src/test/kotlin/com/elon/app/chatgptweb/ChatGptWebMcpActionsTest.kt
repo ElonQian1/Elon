@@ -596,6 +596,13 @@ class ChatGptWebMcpActionsTest {
         assertFalse(unsupported.getBoolean("control_ok"))
         assertEquals("dictation_unavailable", unsupported.getString("error"))
 
+        val manifestSupported = actions(
+            includeDictationControl = true,
+            onStartDictation = { starts += 1 },
+        ).control(JSONObject().put("action", "chatgpt_start_dictation"))
+        assertTrue(manifestSupported.getBoolean("control_ok"))
+        assertEquals(2, starts)
+
         val active = actions(
             dictationActive = true,
             dictationSupported = true,
@@ -697,6 +704,7 @@ class ChatGptWebMcpActionsTest {
         includeSliderControl: Boolean = false,
         includeUnsupportedSlider: Boolean = false,
         includeExpandedControl: Boolean = false,
+        includeDictationControl: Boolean = false,
         includeRealtimeVoiceControl: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
         onSetControlSelected: (String, Boolean) -> Unit = { _, _ -> },
@@ -853,6 +861,17 @@ class ChatGptWebMcpActionsTest {
                         selected = false,
                         expanded = false,
                         expandable = true,
+                    ))
+                }
+                if (includeDictationControl) {
+                    add(ChatGptWebUiControl(
+                        id = "control_dictation",
+                        semantic = ChatGptDictationPolicy.SEMANTIC,
+                        label = "开始听写",
+                        region = ChatGptWebUiRegion.COMPOSER,
+                        role = "button",
+                        enabled = true,
+                        selected = false,
                     ))
                 }
                 if (includeRealtimeVoiceControl) {

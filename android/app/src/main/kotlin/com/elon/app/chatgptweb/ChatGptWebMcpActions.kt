@@ -175,7 +175,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_start_dictation" -> {
                 val current = snapshot()
                 if (current?.dictationActive == true) return error(action, "dictation_already_active")
-                if (current?.capabilities?.supports(ChatGptWebCapabilityId.DICTATION) != true) {
+                if (!ChatGptDictationPolicy.isAvailable(current, uiManifest())) {
                     return error(action, "dictation_unavailable")
                 }
                 dispatch("start_dictation", commands::startDictation)

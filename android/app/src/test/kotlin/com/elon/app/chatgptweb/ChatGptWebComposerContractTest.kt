@@ -174,7 +174,7 @@ class ChatGptWebComposerContractTest {
         val permissionController = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAudioPermissionController.kt",
         )
-        assertTrue(voiceController.contains("ChatGptWebCapabilityId.DICTATION"))
+        assertTrue(voiceController.contains("ChatGptDictationPolicy.isAvailable(value, manifest)"))
         val realtimeVoiceController = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeRealtimeVoiceController.kt",
         )

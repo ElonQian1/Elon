@@ -9,6 +9,7 @@ internal class ChatGptNativeVoiceController(
 ) {
     private var bridgeReady = false
     private var snapshot: ChatGptWebSnapshot? = null
+    private var manifest: ChatGptWebUiManifest? = null
 
     init {
         button.setOnClickListener { onToggle() }
@@ -20,6 +21,11 @@ internal class ChatGptNativeVoiceController(
         update()
     }
 
+    fun renderManifest(value: ChatGptWebUiManifest) {
+        manifest = value
+        update()
+    }
+
     fun setBridgeState(state: ChatGptWebPageAdapter.State) {
         bridgeReady = state == ChatGptWebPageAdapter.State.READY
         update()
@@ -28,9 +34,8 @@ internal class ChatGptNativeVoiceController(
     private fun update() {
         val value = snapshot
         val enabled = bridgeReady &&
-            value != null &&
-            value.capabilities.supports(ChatGptWebCapabilityId.DICTATION) &&
-            !value.streaming
+            ChatGptDictationPolicy.isAvailable(value, manifest) &&
+            value?.streaming != true
         button.isEnabled = enabled
         button.alpha = if (enabled) 1f else DISABLED_ALPHA
         button.isSelected = value?.dictationActive == true

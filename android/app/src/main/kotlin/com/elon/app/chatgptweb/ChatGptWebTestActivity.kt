@@ -523,6 +523,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             is ChatGptWebEvent.UiManifest -> {
                 latestUiManifest = event.value
                 adaptiveUiController.render(event.value)
+                voiceController.renderManifest(event.value)
                 realtimeVoiceController.render(event.value)
                 overlayControlsController.render(event.value)
                 nativeController.renderUiManifest(event.value)
