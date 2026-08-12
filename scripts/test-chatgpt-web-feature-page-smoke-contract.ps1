@@ -74,6 +74,9 @@ if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
 }
 Assert-Contains $smoke '$safeKinds = @("library", "tasks", "apps", "projects", "gpts")' `
     "Feature-page smoke must constrain navigation to non-destructive page kinds."
+if ($smoke -match '\$safeKinds\s*=.*(?:health|finances)') {
+    throw "Sensitive Health and Finances pages must not enter unattended feature-page smoke."
+}
 Assert-Contains $smoke 'chatgpt_select_feature' "Feature-page smoke must use the stable MCP action."
 Assert-Contains $smoke '-Action "chatgpt_get_navigation"' `
     "Feature-page smoke must read features from the dedicated navigation API."

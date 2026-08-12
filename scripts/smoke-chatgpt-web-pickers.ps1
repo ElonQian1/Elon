@@ -6,7 +6,7 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 90)][int]$TimeoutSec = 20,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 73
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 74
 )
 
 $ErrorActionPreference = "Stop"

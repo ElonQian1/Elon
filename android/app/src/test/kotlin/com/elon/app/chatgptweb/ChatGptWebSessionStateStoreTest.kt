@@ -23,6 +23,23 @@ class ChatGptWebSessionStateStoreTest {
             ChatGptWebNavigationPolicy.START_URL,
             ChatGptWebSessionStateStore.normalizeRestorableUrl("https://chatgpt.com/"),
         )
+        listOf(
+            "/scheduled",
+            "/plugins",
+            "/studymode",
+            "/health",
+            "/finance",
+            "/finances",
+            "/work",
+        )
+            .forEach { path ->
+                assertEquals(
+                    "https://chatgpt.com$path",
+                    ChatGptWebSessionStateStore.normalizeRestorableUrl(
+                        "https://chatgpt.com$path?private=value#section",
+                    ),
+                )
+            }
     }
 
     @Test

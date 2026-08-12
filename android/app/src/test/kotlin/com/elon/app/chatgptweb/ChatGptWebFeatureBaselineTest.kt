@@ -19,7 +19,7 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v4", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v5", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
             ChatGptWebFeatureBaseline.DEVICE_VERIFICATION_ADAPTER_VERSION,
@@ -154,6 +154,15 @@ class ChatGptWebFeatureBaselineTest {
             snapshot = snapshot,
             manifest = manifest,
             mode = ChatGptWebModeController.Mode.NATIVE,
+            composerOptions = listOf(
+                ChatGptWebComposerOption(
+                    "tools_study",
+                    "学习",
+                    false,
+                    "menuitem",
+                    ChatGptWebComposerOptionSemantics.STUDY,
+                ),
+            ),
         )
 
         assertTrue(feature(baseline, "official_authentication").getBoolean("current_page_observed"))
@@ -166,6 +175,7 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals("user_action_required", voice.getString("verification_status"))
         assertTrue(feature(baseline, "disclosure_controls").getBoolean("current_page_observed"))
         assertFalse(feature(baseline, "projects").getBoolean("current_page_observed"))
+        assertTrue(feature(baseline, "study_mode").getBoolean("current_page_observed"))
     }
 
     @Test
@@ -193,18 +203,18 @@ class ChatGptWebFeatureBaselineTest {
         assertTrue(summary.getInt("complete") > 0)
         assertTrue(summary.getInt("partial") > 0)
         assertTrue(summary.getInt("fallback_only") > 0)
-        assertEquals(33, codeSummary.getInt("implemented"))
+        assertEquals(41, codeSummary.getInt("implemented"))
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
-        assertEquals(4, verificationSummary.getInt("offline_verified"))
+        assertEquals(10, verificationSummary.getInt("offline_verified"))
         assertEquals(if (deviceEvidenceCurrent) 23 else 0, verificationSummary.getInt("device_verified"))
         assertEquals(if (deviceEvidenceCurrent) 23 else 0, verificationSummary.getInt("verified"))
-        assertEquals(if (deviceEvidenceCurrent) 4 else 27, verificationSummary.getInt("pending"))
-        assertEquals(7, verificationSummary.getInt("user_action_required"))
+        assertEquals(if (deviceEvidenceCurrent) 10 else 33, verificationSummary.getInt("pending"))
+        assertEquals(9, verificationSummary.getInt("user_action_required"))
         assertEquals(if (deviceEvidenceCurrent) 0 else 23, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(if (deviceEvidenceCurrent) 11 else 34, verificationSummary.getInt("remaining"))
+        assertEquals(if (deviceEvidenceCurrent) 19 else 42, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
@@ -270,6 +280,22 @@ class ChatGptWebFeatureBaselineTest {
         listOf("projects", "gpts").forEach { id ->
             assertEquals("offline_verified", feature(baseline, id).getString("verification_status"))
         }
+        listOf("health", "finances").forEach { id ->
+            assertEquals(
+                "user_action_required",
+                feature(baseline, id).getString("verification_status"),
+            )
+        }
+        listOf(
+            "deep_research",
+            "image_generation",
+            "canvas",
+            "study_mode",
+            "agent_mode",
+            "work",
+        ).forEach { id ->
+            assertEquals("offline_verified", feature(baseline, id).getString("verification_status"))
+        }
     }
 
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {
@@ -290,6 +316,12 @@ class ChatGptWebFeatureBaselineTest {
             "model_selection",
             "attachment_lifecycle",
             "composer_tools",
+            "web_search",
+            "deep_research",
+            "image_generation",
+            "canvas",
+            "study_mode",
+            "agent_mode",
             "dictation",
             "realtime_voice",
             "message_action_context",
@@ -300,6 +332,9 @@ class ChatGptWebFeatureBaselineTest {
             "gpts",
             "apps",
             "settings",
+            "health",
+            "finances",
+            "work",
             "adaptive_form_controls",
             "disclosure_controls",
             "official_change_detection",

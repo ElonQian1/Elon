@@ -205,6 +205,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("control_id", stringProperty("Stable ChatGPT semantic control id returned by ui_state."))
                         .put("option_id", stringProperty("Stable ChatGPT model or tool option id returned by chatgpt_get_navigation."))
                         .put("feature_id", stringProperty("Stable ChatGPT feature id returned by chatgpt_get_navigation."))
+                        .put("user_confirmed", booleanProperty("Required and true before opening a sensitive ChatGPT feature such as Health or Finances."))
                         .put("query", stringProperty("Optional label/title query for chatgpt_find_controls or chatgpt_get_conversations."))
                         .put("semantic", stringProperty("Optional semantic filter for chatgpt_find_controls."))
                         .put("region", stringProperty("Optional region filter for chatgpt_find_controls."))

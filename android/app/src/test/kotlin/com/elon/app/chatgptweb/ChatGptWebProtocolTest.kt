@@ -303,6 +303,7 @@ class ChatGptWebProtocolTest {
                 "features":[
                   {"id":"feature_ab12","label":"文件库","kind":"library","selected":true},
                   {"id":"../bad","label":"忽略","kind":"settings","selected":false},
+                  {"id":"feature_health","label":"健康","kind":"health","selected":false},
                   {"id":"feature_cd34","label":"自定义入口","kind":"unknown","selected":false}
                 ]
               }
@@ -310,9 +311,10 @@ class ChatGptWebProtocolTest {
             """.trimIndent(),
         ) as ChatGptWebEvent.FeatureNavigation
 
-        assertEquals(2, event.features.size)
+        assertEquals(3, event.features.size)
         assertEquals("library", event.features.first().kind)
         assertTrue(event.features.first().selected)
+        assertEquals("health", event.features[1].kind)
         assertEquals("navigation", event.features.last().kind)
     }
 

@@ -36,13 +36,7 @@ internal class ChatGptWebSessionStateStore(context: Context) {
         private val RESTORABLE_PREFIXES = listOf(
             "/c/",
             "/g/",
-            "/gpts",
-            "/projects",
-            "/tasks",
-            "/library",
-            "/apps",
-            "/settings",
-        )
+        ) + ChatGptWebProductCapabilityCatalog.RESTORABLE_PREFIXES
 
         internal fun normalizeRestorableUrl(rawUrl: String?): String? {
             val uri = rawUrl?.let { runCatching { URI(it) }.getOrNull() } ?: return null

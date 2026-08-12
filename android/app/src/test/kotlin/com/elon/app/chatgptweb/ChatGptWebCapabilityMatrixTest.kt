@@ -54,6 +54,10 @@ class ChatGptWebCapabilityMatrixTest {
             "elon.chatgpt_web.feature_baseline.v${ChatGptWebFeatureBaseline.VERSION}",
             matrix.getJSONObject("feature_baseline").getString("schema"),
         )
+        assertEquals(
+            "elon.chatgpt_web.product_capabilities.v1",
+            matrix.getJSONObject("product_capabilities").getString("schema"),
+        )
         assertEquals(0, matrix.getJSONArray("blocking_gaps").length())
         assertTrue(matrix.getJSONObject("adaptation_review").getBoolean("required"))
         assertEquals(1, matrix.getJSONObject("manifest").getInt("generic_control_count"))

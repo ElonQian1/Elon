@@ -148,6 +148,9 @@ internal class ChatGptNativeFeatureHubController(
             "memory" -> R.string.chatgpt_feature_kind_memory
             "apps" -> R.string.chatgpt_feature_kind_apps
             "settings" -> R.string.chatgpt_feature_kind_settings
+            "health" -> R.string.chatgpt_feature_kind_health
+            "finances" -> R.string.chatgpt_feature_kind_finances
+            "work" -> R.string.chatgpt_feature_kind_work
             "more" -> R.string.chatgpt_feature_kind_more
             else -> R.string.chatgpt_feature_kind_navigation
         },

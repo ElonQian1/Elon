@@ -194,6 +194,9 @@
         || /(?:today|yesterday|今天|昨天)[,，]?\s*\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?/.test(signal))
     ) return 'timestamp';
     if (/search.chat|搜索聊天/.test(signal)) return 'search';
+    if (/health|健康/.test(signal + ' ' + path)) return 'health';
+    if (/finances?|个人财务|财务/.test(signal + ' ' + path)) return 'finances';
+    if (/^\/work(?:\/|$)/.test(path) || /^(?:work|工作)$/.test(signal)) return 'work';
     if (/library|文件库|资料库/.test(signal + ' ' + path)) return 'library';
     if (/scheduled|schedule|已安排|任务/.test(signal + ' ' + path)) return 'tasks';
     if (/project|项目/.test(signal + ' ' + path)) return 'project';
@@ -283,6 +286,9 @@
       project: '项目',
       gpts: 'GPT',
       settings: '设置',
+      health: '健康',
+      finances: '财务',
+      work: '工作',
       create_asset: '创建文件或网站',
       sources: '文件和来源',
       conversation_files: '在聊天中查看文件',

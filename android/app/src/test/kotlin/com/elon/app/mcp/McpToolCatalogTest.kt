@@ -13,6 +13,7 @@ class McpToolCatalogTest {
 
         assertFalse(schema.getBoolean("additionalProperties"))
         assertTrue(properties.has("message_cursor"))
+        assertTrue(properties.has("user_confirmed"))
         assertTrue(
             properties.getJSONObject("message_cursor")
                 .getString("description")

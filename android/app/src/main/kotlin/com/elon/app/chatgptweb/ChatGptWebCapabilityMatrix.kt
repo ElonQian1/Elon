@@ -122,6 +122,17 @@ internal object ChatGptWebCapabilityMatrix {
                 .put("unexpected_official_fallback_control_count", unexpectedFallbackControls.size)
             )
             .put("capabilities", JSONArray(rows))
+            .put(
+                "product_capabilities",
+                ChatGptWebProductCapabilityCatalog.describe(
+                    features = document?.features.orEmpty(),
+                    composerOptions = document?.composerSections
+                        ?.values
+                        ?.flatten()
+                        .orEmpty(),
+                    controls = manifest?.controls.orEmpty(),
+                ),
+            )
             .put("control_coverage", JSONArray().apply {
                 manifest?.controls.orEmpty().forEach { control ->
                     val coverage = controlCoverage.getValue(control.id)
@@ -173,7 +184,12 @@ internal object ChatGptWebCapabilityMatrix {
             .put("blocking_gaps", JSONArray(blockingGaps))
             .put(
                 "feature_baseline",
-                ChatGptWebFeatureBaseline.describe(snapshot, manifest, mode),
+                ChatGptWebFeatureBaseline.describe(
+                    snapshot,
+                    manifest,
+                    mode,
+                    document?.composerSections?.values?.flatten().orEmpty(),
+                ),
             )
             .put("adaptation_review", JSONObject()
                 .put("required", reviewReasons.isNotEmpty())

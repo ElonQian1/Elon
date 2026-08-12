@@ -24,9 +24,16 @@
   }
 
   function classify(label, path) {
-    const value = clean(label + ' ' + path);
+    const cleanLabel = clean(label);
+    const cleanPath = clean(path);
+    const value = clean(cleanLabel + ' ' + cleanPath);
     if (isConversationPath(path)) return 'navigation';
     if (isProjectRoute(path)) return 'projects';
+    if (/^\/health(?:\/|$)/.test(cleanPath) || /^(?:health|健康)$/.test(cleanLabel)) return 'health';
+    if (/^\/finances?(?:\/|$)/.test(cleanPath) || /^(?:finances?|财务|个人财务)$/.test(cleanLabel)) {
+      return 'finances';
+    }
+    if (/^\/work(?:\/|$)/.test(cleanPath) || /^(?:work|工作)$/.test(cleanLabel)) return 'work';
     if (/library|文件库|资料库/.test(value)) return 'library';
     if (/scheduled|schedule|task|已安排|任务/.test(value)) return 'tasks';
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(value)) return 'gpts';

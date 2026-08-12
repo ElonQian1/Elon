@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 4
+    const val VERSION = 5
     internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 55
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
@@ -64,6 +64,7 @@ internal object ChatGptWebFeatureBaseline {
         val mcpActions: List<String>,
         val capabilityIds: Set<String> = emptySet(),
         val semantics: Set<String> = emptySet(),
+        val composerOptionSemantics: Set<String> = emptySet(),
         val codeGap: String? = null,
         val verificationGap: String? = null,
         val verificationCase: String? = null,
@@ -74,10 +75,14 @@ internal object ChatGptWebFeatureBaseline {
         snapshot: ChatGptWebSnapshot?,
         manifest: ChatGptWebUiManifest?,
         mode: ChatGptWebModeController.Mode,
+        composerOptions: Collection<ChatGptWebComposerOption> = emptyList(),
     ): JSONObject {
         val advertised = snapshot?.capabilities?.supported.orEmpty()
         val semantics = manifest?.controls.orEmpty()
             .groupingBy(ChatGptWebUiControl::semantic)
+            .eachCount()
+        val composerSemantics = composerOptions
+            .groupingBy(ChatGptWebComposerOption::semantic)
             .eachCount()
         val rows = FEATURES.map { feature ->
             val currentPageObserved = when (feature.id) {
@@ -87,7 +92,10 @@ internal object ChatGptWebFeatureBaseline {
                 "disclosure_controls" -> manifest?.controls.orEmpty()
                     .any(ChatGptWebUiControl::supportsExpandedState)
                 else -> feature.capabilityIds.any(advertised::contains) ||
-                    feature.semantics.any { semantics[it].orZero() > 0 }
+                    feature.semantics.any { semantics[it].orZero() > 0 } ||
+                    feature.composerOptionSemantics.any {
+                        composerSemantics[it].orZero() > 0
+                    }
             }
             JSONObject()
                 .put("id", feature.id)
@@ -99,6 +107,7 @@ internal object ChatGptWebFeatureBaseline {
                 .put("acceptance", feature.acceptance.wireName)
                 .put("current_page_observed", currentPageObserved)
                 .put("mcp_actions", JSONArray(feature.mcpActions))
+                .put("composer_option_semantics", JSONArray(feature.composerOptionSemantics))
                 .put("code_gap", feature.codeGap ?: JSONObject.NULL)
                 .put("verification_case", feature.verificationCase ?: JSONObject.NULL)
                 .put(
@@ -116,7 +125,7 @@ internal object ChatGptWebFeatureBaseline {
             it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v4")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v5")
             .put("version", VERSION)
             .put("device_verification_adapter_version", DEVICE_VERIFICATION_ADAPTER_VERSION)
             .put("device_verification_current", DEVICE_VERIFICATION_CURRENT)
@@ -358,9 +367,18 @@ internal object ChatGptWebFeatureBaseline {
             id = "web_search",
             group = "composer",
             acceptance = Acceptance.INTERACTIVE_DEVICE,
-            mcpActions = listOf("chatgpt_invoke_control"),
+            mcpActions = listOf(
+                "chatgpt_list_composer_options",
+                "chatgpt_select_composer_option",
+            ),
             semantics = setOf("search", "toggle"),
+            composerOptionSemantics = setOf(ChatGptWebComposerOptionSemantics.WEB_SEARCH),
         ),
+        composerTool("deep_research", ChatGptWebComposerOptionSemantics.DEEP_RESEARCH),
+        composerTool("image_generation", ChatGptWebComposerOptionSemantics.IMAGE_GENERATION),
+        composerTool("canvas", ChatGptWebComposerOptionSemantics.CANVAS),
+        composerTool("study_mode", ChatGptWebComposerOptionSemantics.STUDY),
+        composerTool("agent_mode", ChatGptWebComposerOptionSemantics.AGENT),
         feature(
             id = "dictation",
             group = "voice",
@@ -454,6 +472,9 @@ internal object ChatGptWebFeatureBaseline {
         featurePage("gpts", "gpts"),
         featurePage("apps", "apps"),
         featurePage("settings", "settings"),
+        featurePage("health", "health", Acceptance.USER_DRIVEN_DEVICE),
+        featurePage("finances", "finances", Acceptance.USER_DRIVEN_DEVICE),
+        featurePage("work", "work"),
         feature(
             id = "account_menu",
             group = "account",
@@ -528,15 +549,33 @@ internal object ChatGptWebFeatureBaseline {
         ),
     )
 
-    private fun featurePage(id: String, semantic: String): Feature = feature(
+    private fun featurePage(
+        id: String,
+        semantic: String,
+        acceptance: Acceptance = Acceptance.INTERACTIVE_DEVICE,
+    ): Feature = feature(
         id = id,
         group = "features",
         status = ImplementationStatus.PARTIAL,
         delivery = Delivery.ADAPTIVE_NATIVE,
-        acceptance = Acceptance.INTERACTIVE_DEVICE,
+        acceptance = acceptance,
         mcpActions = listOf("chatgpt_select_feature", "chatgpt_invoke_control"),
         semantics = setOf(semantic),
         remainingGap = "${id}_workflow_end_to_end_acceptance",
+    )
+
+    private fun composerTool(id: String, semantic: String): Feature = feature(
+        id = id,
+        group = "composer",
+        status = ImplementationStatus.PARTIAL,
+        delivery = Delivery.DEDICATED_NATIVE,
+        acceptance = Acceptance.INTERACTIVE_DEVICE,
+        mcpActions = listOf(
+            "chatgpt_list_composer_options",
+            "chatgpt_select_composer_option",
+        ),
+        composerOptionSemantics = setOf(semantic),
+        remainingGap = "${id}_end_to_end_device_acceptance",
     )
 
     private fun feature(
@@ -550,6 +589,7 @@ internal object ChatGptWebFeatureBaseline {
         mcpActions: List<String>,
         capabilityIds: Set<String> = emptySet(),
         semantics: Set<String> = emptySet(),
+        composerOptionSemantics: Set<String> = emptySet(),
         codeGap: String? = null,
         remainingGap: String? = null,
     ): Feature {
@@ -588,6 +628,7 @@ internal object ChatGptWebFeatureBaseline {
             mcpActions = mcpActions,
             capabilityIds = capabilityIds,
             semantics = semantics,
+            composerOptionSemantics = composerOptionSemantics,
             codeGap = codeGap,
             verificationGap = resolvedVerificationGap,
             verificationCase = DEVICE_VERIFICATION_CASES[id],

@@ -12,6 +12,9 @@
   }
 
   const contentRoutes = Object.freeze([
+    { pattern: /^\/health(?:\/|$)/, semantic: 'health' },
+    { pattern: /^\/finances?(?:\/|$)/, semantic: 'finances' },
+    { pattern: /^\/work(?:\/|$)/, semantic: 'work' },
     { pattern: /^\/scheduled(?:\/|$)/, semantic: 'tasks' },
     { pattern: /^\/library(?:\/|$)/, semantic: 'library' },
     { pattern: /^\/plugins(?:\/|$)/, semantic: 'apps' },

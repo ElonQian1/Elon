@@ -550,17 +550,7 @@ internal object ChatGptWebProtocol {
     private val UI_CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
     private val UI_CONTEXT_ID = Regex("[A-Za-z0-9_.:-]{1,160}")
     private val ATTACHMENT_STATES = setOf("uploading", "ready", "error")
-    private val FEATURE_KINDS = setOf(
-        "library",
-        "tasks",
-        "projects",
-        "gpts",
-        "memory",
-        "apps",
-        "settings",
-        "more",
-        "navigation",
-    )
+    private val FEATURE_KINDS = ChatGptWebProductCapabilityCatalog.FEATURE_KINDS
     private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
     private val UI_REGIONS = setOf(
         ChatGptWebUiRegion.HEADER,

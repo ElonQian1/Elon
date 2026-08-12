@@ -8,7 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 73,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 74,
     [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,
@@ -397,7 +397,7 @@ Add-Check "capability_matrix_app_version" (
         -not [string]::IsNullOrWhiteSpace([string]$matrix.app.version_name)
 ) "v$($matrix.app.version_name) build=$($matrix.app.version_code)"
 Add-Check "feature_baseline_schema" (
-    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v4"
+    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v5"
 ) ([string]$featureBaseline.schema)
 $currentEvidenceInput = [string]$featureBaseline.device_verification_input_sha256
 $verifiedEvidenceInput = [string]$featureBaseline.device_verification_verified_input_sha256

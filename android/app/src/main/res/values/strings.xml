@@ -90,6 +90,9 @@
     <string name="chatgpt_feature_kind_memory">记忆</string>
     <string name="chatgpt_feature_kind_apps">插件与应用</string>
     <string name="chatgpt_feature_kind_settings">账号设置</string>
+    <string name="chatgpt_feature_kind_health">健康</string>
+    <string name="chatgpt_feature_kind_finances">财务</string>
+    <string name="chatgpt_feature_kind_work">工作</string>
     <string name="chatgpt_feature_kind_more">更多</string>
     <string name="chatgpt_feature_kind_navigation">官方功能</string>
     <string name="chatgpt_native_open_official">官网设置</string>

@@ -240,9 +240,11 @@ internal class ChatGptWebMcpActions(
             "chatgpt_list_features" -> dispatch("list_navigation", commands::requestFeatures)
             "chatgpt_select_feature" -> {
                 val featureId = args.optString("feature_id").trim()
-                if (observedState().features.none { it.id == featureId }) {
-                    return error(action, "stale_feature_id")
-                }
+                val feature = observedState().features.firstOrNull { it.id == featureId }
+                ChatGptWebProductCapabilityCatalog.selectionError(
+                    feature,
+                    args.optBoolean("user_confirmed", false),
+                )?.let { return error(action, it) }
                 dispatch("select_navigation") { requestId ->
                     commands.selectFeature(featureId, requestId)
                 }
@@ -477,17 +479,7 @@ internal class ChatGptWebMcpActions(
             .put("cached_at_ms", observed.updatedAtMs)
             .put("features", JSONArray().apply {
                 observed.features.forEach { feature ->
-                    put(JSONObject()
-                        .put("id", feature.id)
-                        .put("label", feature.label)
-                        .put("kind", feature.kind)
-                        .put("selected", feature.selected)
-                        .put("native_action", "chatgpt_select_feature")
-                        .put(
-                            "native_adb_content_description",
-                            ChatGptNativeNavigationSelector.feature(feature),
-                        )
-                    )
+                    put(ChatGptWebProductCapabilityCatalog.navigationJson(feature))
                 }
             })
             .put("composer_sections", JSONObject().apply {

@@ -33,6 +33,9 @@ expectEqual(
 expectEqual(policy.classify('Library', '/library'), 'library', 'library route');
 expectEqual(policy.classify('Tasks', '/scheduled'), 'tasks', 'task route');
 expectEqual(policy.classify('Apps', '/plugins'), 'apps', 'apps route');
+expectEqual(policy.classify('Health', '/health'), 'health', 'health route');
+expectEqual(policy.classify('个人财务', '/finances'), 'finances', 'finances route');
+expectEqual(policy.classify('工作', '/work'), 'work', 'work route');
 expectEqual(policy.isConversationPath('/c/demo_123'), true, 'normal conversation path');
 expectEqual(
   policy.isConversationPath('/g/g-p-demo_123/c/conversation_456'),

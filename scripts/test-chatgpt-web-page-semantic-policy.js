@@ -33,6 +33,24 @@ expectEqual(policy.classify({
 }), 'library', 'library page action');
 
 expectEqual(policy.classify({
+  pathname: '/health',
+  path: '',
+  region: 'content'
+}), 'health', 'health page action');
+
+expectEqual(policy.classify({
+  pathname: '/finances',
+  path: '',
+  region: 'content'
+}), 'finances', 'finances page action');
+
+expectEqual(policy.classify({
+  pathname: '/work',
+  path: '',
+  region: 'content'
+}), 'work', 'work page action');
+
+expectEqual(policy.classify({
   pathname: '/plugins/store',
   region: 'content',
   signal: 'Connector card'
