@@ -24,6 +24,8 @@ internal object ChatGptWebUiSemantics {
         "share",
         "feedback",
         "read_aloud",
+        "previous_response",
+        "next_response",
         "open_media",
         "reasoning_details",
         "branch",

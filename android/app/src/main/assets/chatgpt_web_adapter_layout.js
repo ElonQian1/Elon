@@ -217,6 +217,8 @@
     if (/regenerate|try.again|\bretry\b|重新生成|重试/.test(signal)) return 'regenerate';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
     if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
+    if (/previous.response|previous.answer|上一回复|上一答案/.test(signal)) return 'previous_response';
+    if (/next.response|next.answer|下一回复|下一答案/.test(signal)) return 'next_response';
     if (/dictat|听写|语音输入/.test(signal)) return 'dictation';
     if (/voice.mode|start.voice|microphone|启动语音|语音功能|麦克风/.test(signal)) return 'voice_mode';
     if (/thought.for|reasoning|思考了|思考过程|推理过程/.test(signal)) return 'reasoning_details';
@@ -270,6 +272,8 @@
       share: '分享',
       feedback: '反馈',
       read_aloud: '朗读',
+      previous_response: '上一回复',
+      next_response: '下一回复',
       branch: '创建分支',
       delete: '删除',
       close: '关闭',
