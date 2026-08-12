@@ -131,7 +131,7 @@ impl Fixture {
         request.price_terms.pricing_mode = "capacity_future".into();
         request.price_terms.curve_id = Some("platform-reference-cny".into());
         request.price_terms.curve_version = Some(1);
-        request.price_terms.instrument_id = Some(instrument_id);
+        request.price_terms.instrument_id = Some(instrument_id.clone());
         let draft = compute_federation_offer_service::create_draft_for_user(
             &source.store,
             &source.owner_id,

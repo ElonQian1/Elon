@@ -253,7 +253,8 @@ impl Store {
         instrument_id: &str,
     ) -> Result<Option<ComputeCapacityInstrument>> {
         validate_exact(instrument_id, "capacity instrument ID", 200)?;
-        Ok(instrument_by_id_on(&self.conn()?, instrument_id)?.map(|value| value.instrument))
+        let conn = self.conn()?;
+        Ok(instrument_by_id_on(&conn, instrument_id)?.map(|value| value.instrument))
     }
 
     pub(crate) fn compute_capacity_instrument_currentness(
@@ -261,7 +262,8 @@ impl Store {
         instrument_id: &str,
     ) -> Result<Option<ComputeCapacityInstrumentCurrentnessReceipt>> {
         validate_exact(instrument_id, "capacity instrument ID", 200)?;
-        currentness_on(&self.conn()?, instrument_id)
+        let conn = self.conn()?;
+        currentness_on(&conn, instrument_id)
     }
 
     pub(crate) fn list_compute_capacity_instruments(
@@ -288,6 +290,7 @@ impl Store {
         offer_id: &str,
     ) -> Result<Option<ComputeCapacityInstrumentOfferAdoptionReceipt>> {
         validate_exact(offer_id, "Offer ID", 200)?;
-        Ok(adoption_by_offer_on(&self.conn()?, offer_id)?.map(|value| value.adoption))
+        let conn = self.conn()?;
+        Ok(adoption_by_offer_on(&conn, offer_id)?.map(|value| value.adoption))
     }
 }
