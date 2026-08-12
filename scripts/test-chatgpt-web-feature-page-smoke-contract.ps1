@@ -72,9 +72,15 @@ Assert-Contains $runtime "Verification is deferred" "Missing device must be repo
 if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
     throw "Feature-page smoke runtime must not create a wireless adb connection."
 }
-Assert-Contains $smoke '$safeKinds = @("library", "tasks", "apps", "projects", "gpts")' `
-    "Feature-page smoke must constrain navigation to non-destructive page kinds."
-if ($smoke -match '\$safeKinds\s*=.*(?:health|finances)') {
+Assert-Contains $smoke '$safeFeatureCases = [ordered]@{' `
+    "Feature-page smoke must define one ordered allowlist and evidence mapping."
+foreach ($kind in @("library", "tasks", "apps", "projects", "gpts", "work")) {
+    Assert-Contains $smoke "$kind = `"safe/feature_page/$kind`"" `
+        "Feature-page smoke must map $kind to its own verification case."
+}
+Assert-Contains $smoke '$safeKinds = @($safeFeatureCases.Keys)' `
+    "Feature-page navigation must derive from the verification case allowlist."
+if ($smoke -match '(?m)^\s*(?:health|finances)\s*=\s*"safe/feature_page/') {
     throw "Sensitive Health and Finances pages must not enter unattended feature-page smoke."
 }
 Assert-Contains $smoke 'chatgpt_select_feature' "Feature-page smoke must use the stable MCP action."
@@ -84,6 +90,8 @@ Assert-Contains $smoke '$navigation.features | Where-Object { $null -ne $_ }' `
     "Feature-page smoke must not count a null navigation payload as one feature."
 Assert-Contains $smoke 'command_receipt.request_id' "Feature-page smoke must await durable command receipts."
 Assert-Contains $smoke 'Test-ChatGptWebFeatureMatrix' "Feature-page smoke must use shared structural policy."
+Assert-Contains $smoke '$safeFeatureCases[[string]$_.kind]' `
+    "Feature-page smoke must register evidence for each page that passed its own audit."
 Assert-Contains $smoke 'function Wait-FeatureMatrix' `
     "Feature-page smoke must wait for the routed page manifest before auditing it."
 Assert-Contains $smoke '[string]$last.manifest.compatibility -eq "healthy"' `

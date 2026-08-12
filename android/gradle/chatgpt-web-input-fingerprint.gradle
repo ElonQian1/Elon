@@ -211,10 +211,12 @@ verificationCaseFiles["safe/feature_pages"] = caseInputs(
     navigationCaseInputs,
     "smoke-chatgpt-web-feature-pages.ps1",
 )
-verificationCaseFiles["safe/feature_pages_individual"] = caseInputs(
-    navigationCaseInputs,
-    "smoke-chatgpt-web-feature-pages.ps1",
-)
+["projects", "tasks", "library", "gpts", "apps", "work"].each { featureKind ->
+    verificationCaseFiles["safe/feature_page/${featureKind}"] = caseInputs(
+        navigationCaseInputs,
+        "smoke-chatgpt-web-feature-pages.ps1",
+    )
+}
 verificationCaseFiles["safe/settings_overlay_form_controls"] = caseInputs(
     navigationCaseInputs + adaptiveCaseInputs,
     "smoke-chatgpt-web-settings.ps1",

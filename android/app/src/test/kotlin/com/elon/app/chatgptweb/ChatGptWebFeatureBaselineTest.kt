@@ -207,12 +207,12 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
-        assertEquals(9, verificationSummary.getInt("offline_verified"))
+        assertEquals(6, verificationSummary.getInt("offline_verified"))
         assertEquals(0, verificationSummary.getInt("device_verified"))
         assertEquals(0, verificationSummary.getInt("verified"))
         assertEquals(33, verificationSummary.getInt("pending"))
         assertEquals(9, verificationSummary.getInt("user_action_required"))
-        assertEquals(24, verificationSummary.getInt("deferred"))
+        assertEquals(27, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
         assertEquals(42, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
@@ -265,14 +265,20 @@ class ChatGptWebFeatureBaselineTest {
             feature(baseline, "session_long_running_stability").getString("verification_status"),
         )
         assertFalse(feature(baseline, "session_long_running_stability").isNull("verification_gap"))
-        listOf("tasks", "library", "apps", "settings", "adaptive_form_controls").forEach { id ->
+        listOf(
+            "projects",
+            "tasks",
+            "library",
+            "gpts",
+            "apps",
+            "work",
+            "settings",
+            "adaptive_form_controls",
+        ).forEach { id ->
             assertEquals(
                 "deferred",
                 feature(baseline, id).getString("verification_status"),
             )
-        }
-        listOf("projects", "gpts").forEach { id ->
-            assertEquals("offline_verified", feature(baseline, id).getString("verification_status"))
         }
         listOf("health", "finances").forEach { id ->
             assertEquals(
@@ -286,10 +292,40 @@ class ChatGptWebFeatureBaselineTest {
             "canvas",
             "study_mode",
             "agent_mode",
-            "work",
         ).forEach { id ->
             assertEquals("offline_verified", feature(baseline, id).getString("verification_status"))
         }
+    }
+
+    @Test
+    fun promotesOnlyTheFeaturePageWhoseCurrentDeviceCaseWasRecorded() {
+        val caseId = "safe/feature_page/projects"
+        val currentHash = "e".repeat(64)
+        val evidence = ChatGptWebVerificationEvidenceStore.Snapshot(
+            currentInputs = linkedMapOf(caseId to currentHash),
+            records = linkedMapOf(
+                caseId to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = caseId,
+                    inputSha256 = currentHash,
+                    current = true,
+                    adapterVersion = ChatGptWebPageAdapter.ADAPTER_VERSION,
+                    apkVersionName = "test",
+                    apkVersionCode = 1,
+                    recordedAtMs = 123L,
+                ),
+            ),
+        )
+
+        val baseline = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            verificationEvidence = evidence,
+        )
+
+        assertEquals("device_verified", feature(baseline, "projects").getString("verification_status"))
+        assertEquals("deferred", feature(baseline, "tasks").getString("verification_status"))
+        assertEquals("deferred", feature(baseline, "gpts").getString("verification_status"))
     }
 
     @Test

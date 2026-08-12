@@ -21,7 +21,15 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 $scriptDeadline = [DateTimeOffset]::UtcNow.AddSeconds($TotalTimeoutSec)
 
-$safeKinds = @("library", "tasks", "apps", "projects", "gpts")
+$safeFeatureCases = [ordered]@{
+    library = "safe/feature_page/library"
+    tasks = "safe/feature_page/tasks"
+    apps = "safe/feature_page/apps"
+    projects = "safe/feature_page/projects"
+    gpts = "safe/feature_page/gpts"
+    work = "safe/feature_page/work"
+}
+$safeKinds = @($safeFeatureCases.Keys)
 $results = [System.Collections.Generic.List[object]]::new()
 
 function Get-RemainingSeconds {
@@ -251,6 +259,9 @@ if ($failed.Count -gt 0) {
     throw "ChatGPT feature-page smoke failed: failed_count=$($failed.Count) failed_kinds=$failedKinds"
 }
 Register-ChatGptWebVerificationCases -Runtime $runtime `
-    -CaseIds @("safe/feature_pages", "safe/feature_pages_individual") `
+    -CaseIds @(
+        "safe/feature_pages"
+        @($results | ForEach-Object { $safeFeatureCases[[string]$_.kind] })
+    ) `
     -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=passed audited_count=$($results.Count)"

@@ -11,7 +11,15 @@ $expected = [ordered]@{
     "smoke-chatgpt-web-copy.ps1" = @("reversible/copy_receipt_without_content_readback")
     "smoke-chatgpt-web-regenerate.ps1" = @("reversible/regenerate_response")
     "smoke-chatgpt-web-message-actions.ps1" = @("safe/message_actions")
-    "smoke-chatgpt-web-feature-pages.ps1" = @("safe/feature_pages", "safe/feature_pages_individual")
+    "smoke-chatgpt-web-feature-pages.ps1" = @(
+        "safe/feature_pages",
+        "safe/feature_page/projects",
+        "safe/feature_page/tasks",
+        "safe/feature_page/library",
+        "safe/feature_page/gpts",
+        "safe/feature_page/apps",
+        "safe/feature_page/work"
+    )
     "smoke-chatgpt-web-settings.ps1" = @(
         "safe/settings_overlay_form_controls",
         "safe/settings_overlay_idempotent_form_controls"
