@@ -70,6 +70,55 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 `Prepare` 要求当前输入为空、没有附件且未生成回复；`OpenPicker` 只按 `attachment_file` 语义打开系统选择器；`VerifyAndRemove` 要求 adapter 识别到唯一 `ready` 附件，再通过 `chatgpt_remove_attachment` 删除并确认附件数恢复为 0。整个流程不创建会话、不发送消息、不清 Cookie 或应用数据。检查点默认位于被忽略的 `.ai-tmp/chatgpt-web-attachment-lifecycle.json`，12 小时后失效。
 
+## 听写与实时语音验收
+
+音频能力属于敏感操作，使用 `scripts/smoke-chatgpt-web-audio-lifecycle.ps1` 分阶段验收。`Prepare` 可以在无人监督时执行；其余阶段必须在用户看着手机时执行，并通过对应的 `UserConfirmed*` 开关确认当前步骤。脚本只读取权限、页面模式、听写布尔值和计数，不读取或保存音频内容。
+
+```powershell
+# 1. 无副作用基线
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-audio-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" -Phase Prepare
+
+# 2. 用户监督 Android 麦克风授权；不发送听写内容
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-audio-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -Phase StartDictation -UserConfirmedMicrophone
+
+# 3. 验证听写已启动，然后自动取消并恢复原视图
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-audio-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -Phase VerifyAndCancelDictation -UserConfirmedMicrophone
+
+# 4. 用户监督启动官网实时语音入口
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-audio-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -Phase StartRealtimeVoice -UserConfirmedRealtimeVoice
+
+# 5. 用户肉眼确认官网语音界面已正常工作；脚本只确认结构化权限状态
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-audio-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -Phase VerifyRealtimeVoice -UserConfirmedRealtimeVoice
+
+# 6. 用户在官网界面结束语音后，确认恢复原来的视图和空输入状态
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-audio-lifecycle.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -Phase VerifyRestored -UserConfirmedVoiceClosed
+```
+
+流程绑定同一台物理设备、同一会话和同一消息计数；检查点不保存会话 URL、账号、正文或音频。脚本不会调用 `send_input`，也不会自动结束实时语音，以免在官网状态未知时误操作；用户先在可见官网界面结束语音，最后一阶段只负责确认恢复。检查点默认位于 `.ai-tmp/chatgpt-web-audio-lifecycle.json`，12 小时后失效。
+
 ## 通过标志
 
 成功时最后输出：
