@@ -182,6 +182,7 @@ pub(crate) struct ErpInstance {
     pub plugins: Vec<ErpExtensionRef>,
     pub private_extensions: Vec<ErpExtensionRef>,
     pub configuration_revision: i64,
+    pub open_commerce_merchant_id: Option<String>,
     pub bootstrap_matter_id: Option<String>,
     pub onboarding_mode: String,
     pub status: String,
@@ -201,6 +202,7 @@ pub(crate) struct ErpMaterializationSource {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub(crate) struct ErpMaterializationConfiguration {
     pub revision: i64,
+    pub open_commerce_merchant_id: Option<String>,
     pub industry: String,
     pub theme_key: String,
     pub enabled_modules: Vec<String>,

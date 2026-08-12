@@ -179,6 +179,7 @@ mod erp_blueprint_open_commerce_readiness_tests;
 mod erp_blueprint_tests;
 #[cfg(test)]
 mod erp_blueprint_workflow_tests;
+mod erp_instance_merchant_binding_migration;
 mod erp_instance_onboarding_migration;
 mod errors;
 mod external_app_api;

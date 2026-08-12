@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    model::{ErpInstance, UpdateErpInstanceRequest},
+    model::{ErpInstance, UpdateErpInstanceRequest, UpdateErpOpenCommerceMerchantRequest},
     validation::validate_instance_configuration,
 };
 
@@ -112,4 +112,41 @@ pub(crate) fn update_configuration(
         bail!("实例配置没有变化");
     }
     store.update_erp_instance_configuration(instance_id, &request)
+}
+
+pub(crate) fn update_open_commerce_merchant(
+    store: &Store,
+    project_id: &str,
+    instance_id: &str,
+    request: UpdateErpOpenCommerceMerchantRequest,
+) -> Result<ErpInstance> {
+    if !request.merchant_confirmed {
+        bail!("商户未确认，不能变更 ERP 的开放商业身份");
+    }
+    if request.expected_revision < 1 {
+        bail!("expected_revision 必须大于 0");
+    }
+    let instance = store.erp_instance(instance_id)?;
+    if instance.project_id != project_id {
+        bail!("只有商户实例所属项目可以变更开放商业身份");
+    }
+    if instance.status != "active" {
+        bail!("已归档实例不能变更开放商业身份");
+    }
+    let merchant_id = request
+        .merchant_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if let Some(merchant_id) = merchant_id {
+        store.open_commerce_merchant_for_project(project_id, merchant_id)?;
+    }
+    if instance.open_commerce_merchant_id.as_deref() == merchant_id {
+        bail!("ERP 开放商业身份没有变化");
+    }
+    store.update_erp_instance_open_commerce_merchant(
+        instance_id,
+        request.expected_revision,
+        merchant_id,
+    )
 }

@@ -80,6 +80,7 @@ export type ErpInstance = {
   plugins: ErpExtension[]
   private_extensions: ErpExtension[]
   configuration_revision: number
+  open_commerce_merchant_id?: string | null
   bootstrap_matter_id?: string | null
   onboarding_mode: 'new_project' | 'existing_project'
   status: string
@@ -106,6 +107,7 @@ export type ErpMaterializationStatus = {
     }
     configuration: {
       revision: number
+      open_commerce_merchant_id?: string | null
       industry: string
       theme_key: string
       enabled_modules: string[]
@@ -161,7 +163,7 @@ export type ErpOpenCommerceReadiness = {
     next_action: string
   }
   merchant_selection: {
-    status: 'merchant_missing' | 'selection_required' | 'selected_implicit' | 'selected_explicit'
+    status: 'merchant_missing' | 'bound_merchant_missing' | 'selection_required' | 'selected_implicit' | 'selected_explicit' | 'selected_binding'
     selected?: ErpOpenCommerceMerchantSummary | null
     candidates: ErpOpenCommerceMerchantSummary[]
   }

@@ -307,6 +307,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (245, "外部矿池 Adapter 凭据验证回执完整投影与检查时间加固", compute_external_pool_adapter_credential_verification_hardening::migration_v245),
     (246, "外部矿池 Adapter 惰性安装制品与文件清单回执", compute_external_pool_adapter_installation::migration_v246),
     (247, "外部矿池 Adapter 安装实例追加式撤销与密封 current 权威", compute_external_pool_adapter_installation_terminal::migration_v247),
+    (248, "ERP 实例与开放商业商户节点稳定归属", crate::erp_instance_merchant_binding_migration::migration_v248),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

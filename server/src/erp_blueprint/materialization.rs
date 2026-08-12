@@ -61,6 +61,7 @@ pub(crate) fn build_contract(
         },
         configuration: ErpMaterializationConfiguration {
             revision: instance.configuration_revision,
+            open_commerce_merchant_id: instance.open_commerce_merchant_id.clone(),
             industry: instance.industry.clone(),
             theme_key: instance.theme_key.clone(),
             enabled_modules: instance.enabled_modules.clone(),

@@ -13,7 +13,7 @@
     "next_action": "由商户创建初始化 Matter；系统只保存计划，不会自动执行。"
   },
   "merchant_selection": {
-    "status": "selected_implicit",
+    "status": "selected_binding",
     "selected": {
       "id": "merchant-cofficethinking",
       "display_name": "咖啡店",

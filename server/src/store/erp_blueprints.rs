@@ -290,7 +290,8 @@ const BLUEPRINT_SELECT: &str =
 const VERSION_SELECT: &str = "SELECT id, blueprint_id, manifest_json, manifest_sha256, status, created_by, created_at FROM erp_blueprint_versions";
 const INSTANCE_SELECT: &str = "SELECT i.id, i.instance_key, i.project_id, i.blueprint_id,
  i.pinned_version_id, v.version, i.industry, i.theme_key, i.enabled_modules_json,
- i.plugins_json, i.private_extensions_json, i.configuration_revision, i.bootstrap_matter_id,
+ i.plugins_json, i.private_extensions_json, i.configuration_revision, i.open_commerce_merchant_id,
+ i.bootstrap_matter_id,
  i.onboarding_mode, i.status, i.created_by, i.created_at, i.updated_at
  FROM erp_instances i JOIN erp_blueprint_versions v ON v.id=i.pinned_version_id";
 
@@ -332,12 +333,13 @@ fn instance_from_row(row: &Row<'_>) -> rusqlite::Result<ErpInstance> {
         plugins: decode(row, 9)?,
         private_extensions: decode(row, 10)?,
         configuration_revision: row.get(11)?,
-        bootstrap_matter_id: row.get(12)?,
-        onboarding_mode: row.get(13)?,
-        status: row.get(14)?,
-        created_by: row.get(15)?,
-        created_at: row.get(16)?,
-        updated_at: row.get(17)?,
+        open_commerce_merchant_id: row.get(12)?,
+        bootstrap_matter_id: row.get(13)?,
+        onboarding_mode: row.get(14)?,
+        status: row.get(15)?,
+        created_by: row.get(16)?,
+        created_at: row.get(17)?,
+        updated_at: row.get(18)?,
     })
 }
 

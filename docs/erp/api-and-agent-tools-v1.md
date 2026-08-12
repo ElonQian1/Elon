@@ -20,6 +20,7 @@
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/bootstrap-matter` | 原子创建或返回商户实例初始化 Matter |
 | GET | `/api/projects/:project_id/erp/instances/:instance_id/materialization` | 从 Matter、Assignment 和 Artifact 真源读取初始化状态、证据与下一步 |
 | GET | `/api/projects/:project_id/erp/instances/:instance_id/open-commerce-readiness` | 聚合 ERP 物化、商户节点、运行时、对外能力和目录发布状态；多商户时可传 `merchant_id` |
+| POST | `/api/projects/:project_id/erp/instances/:instance_id/open-commerce-merchant` | 由商户按配置修订号绑定或解除 ERP 对应的开放商业商户节点 |
 | POST | `/api/projects/:project_id/erp/proposals/:proposal_id/decision` | 由蓝图维护者接受或拒绝提案 |
 | POST | `/api/projects/:project_id/erp/proposals/:proposal_id/matter` | 为已接受提案创建正式 Matter |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/upgrades` | 准备兼容检查和升级活动 |
@@ -46,7 +47,7 @@ AI 工具故意不提供蓝图演进、提案接受、Matter 创建、公共版�
 
 创建实例时默认使用 `project_name` 新建项目；传入 `target_project_id` 时忽略空的 `project_name`，并要求操作者对目标项目具有 `owner`、`admin` 或 `editor` 角色。响应中的 `onboarding_mode` 以及物化合同中的 `target_onboarding_mode` 用于区分 `new_project` 与 `existing_project`。该接口只登记治理关系，不导入本机目录、不复制 Git 仓库，也不启动开发任务。
 
-开放商业就绪度是从各领域真源即时生成的只读投影，不新增 ERP 与商户节点之间的第二套状态机。项目只有一个商户节点时可安全自动选择；存在多个节点时必须由调用者提供 `merchant_id`。`consumer_invocation_ready` 要求商户启用、运行时已验证且至少存在一项非 `owner_only` 的有效 `merchant_runtime` 能力；其中 `public` 能力可按现有公开规则调用，`authorized` 能力仍必须由具体消费者 App 取得有效 grant，本投影不会代替授权。`consumer_discovery_ready` 还要求商户已发布到开放目录；`erp_onboarding_ready` 只由物化证据是否达到 `accepted_verified` 决定。这三个结果不得互相替代。
+开放商业就绪度是从各领域真源即时生成的只读投影，不新增第二套执行状态机。ERP 实例可以把同项目中的一个商户节点登记为稳定商业身份，该字段属于现有实例配置并复用 `configuration_revision`：绑定变化后旧物化证据自然不再匹配。已绑定实例不能被查询参数临时覆盖；未绑定且只有一个商户节点时可安全预览，多节点时必须先传 `merchant_id` 预览，再由有编辑权的人确认绑定。`consumer_invocation_ready` 要求商户启用、运行时已验证且至少存在一项非 `owner_only` 的有效 `merchant_runtime` 能力；其中 `public` 能力可按现有公开规则调用，`authorized` 能力仍必须由具体消费者 App 取得有效 grant，本投影不会代替授权。`consumer_discovery_ready` 还要求商户已发布到开放目录；`erp_onboarding_ready` 只由物化证据是否达到 `accepted_verified` 决定。这三个结果不得互相替代。
 
 ## 机器合同
 

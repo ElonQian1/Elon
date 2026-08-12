@@ -3,10 +3,12 @@ use uuid::Uuid;
 
 use crate::{
     erp_blueprint::{
+        instance_service, materialization,
         model::{
             CreateBlueprintRequest, CreateBlueprintVersionRequest, CreateErpInstanceRequest,
             ErpCapabilityDefinition, ErpModuleDefinition, ErpReleaseCompatibility,
-            ErpReleaseManifest, ErpRollbackPlan, VersionedErpModule, RELEASE_SCHEMA,
+            ErpReleaseManifest, ErpRollbackPlan, UpdateErpOpenCommerceMerchantRequest,
+            VersionedErpModule, RELEASE_SCHEMA,
         },
         open_commerce_readiness, service,
     },
@@ -148,6 +150,170 @@ fn multiple_merchants_require_an_explicit_non_persistent_selection() {
         "selected_explicit"
     );
     assert_eq!(selected["merchant_selection"]["selected"]["id"], first.id);
+}
+
+#[test]
+fn confirmed_binding_becomes_the_instance_identity_and_revisioned_contract() {
+    let fixture = fixture();
+    let first = create_merchant(&fixture, "coffee-bound");
+    let second = create_merchant(&fixture, "coffee-preview-only");
+
+    let bound = instance_service::update_open_commerce_merchant(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.instance_id,
+        UpdateErpOpenCommerceMerchantRequest {
+            expected_revision: 1,
+            merchant_confirmed: true,
+            merchant_id: Some(first.id.clone()),
+        },
+    )
+    .unwrap();
+    assert_eq!(bound.configuration_revision, 2);
+    assert_eq!(
+        bound.open_commerce_merchant_id.as_deref(),
+        Some(first.id.as_str())
+    );
+
+    let readiness = open_commerce_readiness::get(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.instance_id,
+        None,
+    )
+    .unwrap();
+    assert_eq!(readiness.merchant_selection.status, "selected_binding");
+    assert_eq!(readiness.merchant_selection.selected.unwrap().id, first.id);
+
+    let override_error = open_commerce_readiness::get(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.instance_id,
+        Some(&second.id),
+    )
+    .unwrap_err();
+    assert!(override_error
+        .to_string()
+        .contains("不能通过查询参数临时覆盖"));
+
+    let blueprint = fixture.store.erp_blueprint(&bound.blueprint_id).unwrap();
+    let version = fixture
+        .store
+        .erp_blueprint_version(&bound.pinned_version_id)
+        .unwrap();
+    let contract = materialization::build_contract(&blueprint, &version, &bound);
+    assert_eq!(contract.configuration.revision, 2);
+    assert_eq!(
+        contract.configuration.open_commerce_merchant_id,
+        bound.open_commerce_merchant_id
+    );
+
+    let stale = instance_service::update_open_commerce_merchant(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.instance_id,
+        UpdateErpOpenCommerceMerchantRequest {
+            expected_revision: 1,
+            merchant_confirmed: true,
+            merchant_id: None,
+        },
+    )
+    .unwrap_err();
+    assert!(stale.to_string().contains("实例配置已变化"));
+}
+
+#[test]
+fn binding_rejects_unconfirmed_and_cross_project_merchants() {
+    let fixture = fixture();
+    let local = create_merchant(&fixture, "coffee-local");
+    let unconfirmed = instance_service::update_open_commerce_merchant(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.instance_id,
+        UpdateErpOpenCommerceMerchantRequest {
+            expected_revision: 1,
+            merchant_confirmed: false,
+            merchant_id: Some(local.id),
+        },
+    )
+    .unwrap_err();
+    assert!(unconfirmed.to_string().contains("商户未确认"));
+
+    let other_project = fixture
+        .store
+        .create_project(&fixture.owner_id, "Other Binding Project", None, None)
+        .unwrap()
+        .project;
+    let other = fixture
+        .store
+        .create_open_commerce_merchant(
+            &other_project.id,
+            &fixture.owner_id,
+            merchant_request("coffee-other-binding"),
+        )
+        .unwrap();
+    let cross_project = instance_service::update_open_commerce_merchant(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.instance_id,
+        UpdateErpOpenCommerceMerchantRequest {
+            expected_revision: 1,
+            merchant_confirmed: true,
+            merchant_id: Some(other.id),
+        },
+    )
+    .unwrap_err();
+    assert!(cross_project
+        .to_string()
+        .contains("当前项目中不存在该商户节点"));
+}
+
+#[test]
+fn one_open_commerce_identity_cannot_belong_to_two_erp_instances() {
+    let first = fixture();
+    let merchant = create_merchant(&first, "coffee-exclusive");
+    instance_service::update_open_commerce_merchant(
+        &first.store,
+        &first.project_id,
+        &first.instance_id,
+        UpdateErpOpenCommerceMerchantRequest {
+            expected_revision: 1,
+            merchant_confirmed: true,
+            merchant_id: Some(merchant.id.clone()),
+        },
+    )
+    .unwrap();
+
+    let original = first.store.erp_instance(&first.instance_id).unwrap();
+    let blueprint = first.store.erp_blueprint(&original.blueprint_id).unwrap();
+    let duplicate_project = first
+        .store
+        .create_project(&first.owner_id, "Duplicate ERP Merchant", None, None)
+        .unwrap()
+        .project;
+    let duplicate = service::create_instance(
+        &first.store,
+        &blueprint.definition.source_project_id,
+        &blueprint.id,
+        &first.owner_id,
+        CreateErpInstanceRequest {
+            instance_key: format!("duplicate.{}", Uuid::new_v4().simple()),
+            project_name: String::new(),
+            target_project_id: Some(duplicate_project.id),
+            version: "1.0.0".into(),
+            industry: "retail".into(),
+            theme_key: "merchant.clean".into(),
+            enabled_modules: vec!["catalog".into()],
+            plugins: vec![],
+            private_extensions: vec![],
+        },
+    )
+    .unwrap();
+    let error = first
+        .store
+        .update_erp_instance_open_commerce_merchant(&duplicate.id, 1, Some(&merchant.id))
+        .unwrap_err();
+    assert!(error.to_string().contains("已经归属于其他 ERP 实例"));
 }
 
 #[test]

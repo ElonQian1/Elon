@@ -41,6 +41,14 @@ pub(crate) struct UpdateErpInstanceRequest {
     pub private_extensions: Vec<ErpExtensionRef>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct UpdateErpOpenCommerceMerchantRequest {
+    pub expected_revision: i64,
+    pub merchant_confirmed: bool,
+    #[serde(default)]
+    pub merchant_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ErpUpgradeAdoptionEvidence {
     pub execution_attested: bool,

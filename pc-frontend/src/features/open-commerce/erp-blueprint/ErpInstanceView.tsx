@@ -74,7 +74,12 @@ export default function ErpInstanceView({
       </section>
 
       {overview.materialization && <ErpMaterializationPanel status={overview.materialization} />}
-      <ErpOpenCommerceReadinessPanel projectId={projectId} instanceId={instance.id} />
+      <ErpOpenCommerceReadinessPanel
+        projectId={projectId}
+        instance={instance}
+        canEdit={canEdit}
+        refresh={refresh}
+      />
 
       <section className={styles.band}>
         <header><Search size={17} /><h3>让 AI 先查能力，再决定怎么开发</h3></header>

@@ -23,9 +23,10 @@
     },
     "configuration": {
       "type": "object",
-      "required": ["revision", "industry", "theme_key", "enabled_modules", "plugins", "private_extensions"],
+      "required": ["revision", "open_commerce_merchant_id", "industry", "theme_key", "enabled_modules", "plugins", "private_extensions"],
       "properties": {
         "revision": { "type": "integer", "minimum": 1 },
+        "open_commerce_merchant_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
         "industry": { "type": "string", "minLength": 1 },
         "theme_key": { "type": "string", "minLength": 2 },
         "enabled_modules": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },

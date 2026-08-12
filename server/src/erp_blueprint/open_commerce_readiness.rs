@@ -104,7 +104,11 @@ pub(crate) fn get(
         .iter()
         .map(|detail| merchant_summary(&detail.merchant))
         .collect::<Vec<_>>();
-    let (selection_status, selected) = select_merchant(&merchants, merchant_id)?;
+    let (selection_status, selected) = select_merchant(
+        &merchants,
+        instance.open_commerce_merchant_id.as_deref(),
+        merchant_id,
+    )?;
 
     let mut blockers = Vec::new();
     if !erp_onboarding_ready {
@@ -245,12 +249,29 @@ pub(crate) fn get(
 
 fn select_merchant<'a>(
     merchants: &'a [crate::open_commerce_model::OpenCommerceMerchantDetail],
-    merchant_id: Option<&str>,
+    bound_merchant_id: Option<&str>,
+    requested_merchant_id: Option<&str>,
 ) -> Result<(
     &'static str,
     Option<&'a crate::open_commerce_model::OpenCommerceMerchantDetail>,
 )> {
-    if let Some(merchant_id) = merchant_id.map(str::trim).filter(|value| !value.is_empty()) {
+    let requested_merchant_id = requested_merchant_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if let Some(bound_merchant_id) = bound_merchant_id {
+        if requested_merchant_id.is_some_and(|requested| requested != bound_merchant_id) {
+            bail!("ERP 实例已经绑定其他开放商业商户节点，不能通过查询参数临时覆盖");
+        }
+        let selected = merchants
+            .iter()
+            .find(|detail| detail.merchant.id == bound_merchant_id);
+        return Ok(if let Some(selected) = selected {
+            ("selected_binding", Some(selected))
+        } else {
+            ("bound_merchant_missing", None)
+        });
+    }
+    if let Some(merchant_id) = requested_merchant_id {
         let selected = merchants
             .iter()
             .find(|detail| detail.merchant.id == merchant_id)
@@ -276,12 +297,20 @@ fn merchant_summary(
 }
 
 fn selection_blocker(status: &str) -> ReadinessBlocker {
-    if status == "selection_required" {
+    if status == "bound_merchant_missing" {
+        ReadinessBlocker {
+            code: "bound_merchant_missing",
+            scope: "consumer_invocation",
+            message: "ERP 实例绑定的开放商业商户节点已经不存在".into(),
+            next_action: "由项目编辑者解除失效绑定，再选择当前项目中的有效商户节点。".into(),
+        }
+    } else if status == "selection_required" {
         ReadinessBlocker {
             code: "merchant_selection_required",
             scope: "consumer_invocation",
             message: "当前项目存在多个商户节点，无法安全推断 ERP 实例对应哪一个节点".into(),
-            next_action: "调用时显式提供 merchant_id；本接口不会自动创建永久绑定。".into(),
+            next_action: "先用 merchant_id 预览对应节点，再由项目编辑者将正确节点绑定到 ERP 实例。"
+                .into(),
         }
     } else {
         ReadinessBlocker {

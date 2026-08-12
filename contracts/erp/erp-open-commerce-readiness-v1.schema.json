@@ -37,7 +37,7 @@
       "additionalProperties": false,
       "required": ["status", "selected", "candidates"],
       "properties": {
-        "status": { "enum": ["merchant_missing", "selection_required", "selected_implicit", "selected_explicit"] },
+        "status": { "enum": ["merchant_missing", "bound_merchant_missing", "selection_required", "selected_implicit", "selected_explicit", "selected_binding"] },
         "selected": { "oneOf": [{ "$ref": "#/$defs/merchant" }, { "type": "null" }] },
         "candidates": { "type": "array", "items": { "$ref": "#/$defs/merchant" } }
       }

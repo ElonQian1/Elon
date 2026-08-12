@@ -18,7 +18,7 @@ use crate::{
             CreateBlueprintRequest, CreateBlueprintVersionRequest, CreateErpInstanceRequest,
             DecideProposalRequest, DecideUpgradeRequest, EvolveBlueprintRequest,
             PrepareUpgradeRequest, ResolveRequirementRequest, SubmitFeatureSignalRequest,
-            UpdateErpInstanceRequest,
+            UpdateErpInstanceRequest, UpdateErpOpenCommerceMerchantRequest,
         },
         open_commerce_readiness, service,
     },
@@ -87,6 +87,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/erp/instances/:instance_id/open-commerce-readiness",
             get(open_commerce_readiness_status),
+        )
+        .route(
+            "/api/projects/:project_id/erp/instances/:instance_id/open-commerce-merchant",
+            post(update_open_commerce_merchant),
         )
         .route(
             "/api/projects/:project_id/erp/proposals/:proposal_id/decision",
@@ -317,6 +321,23 @@ async fn open_commerce_readiness_status(
         &project_id,
         &instance_id,
         query.merchant_id.as_deref(),
+    ))
+}
+
+async fn update_open_commerce_merchant(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, instance_id)): Path<(String, String)>,
+    Json(request): Json<UpdateErpOpenCommerceMerchantRequest>,
+) -> Response {
+    if let Err(response) = authenticate(&state, &headers, &project_id, true) {
+        return response;
+    }
+    respond(instance_service::update_open_commerce_merchant(
+        &state.store,
+        &project_id,
+        &instance_id,
+        request,
     ))
 }
 

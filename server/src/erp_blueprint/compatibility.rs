@@ -189,6 +189,7 @@ mod tests {
             plugins: vec![],
             private_extensions: vec![private.clone()],
             configuration_revision: 1,
+            open_commerce_merchant_id: None,
             bootstrap_matter_id: None,
             onboarding_mode: "new_project".into(),
             status: "active".into(),

@@ -80,6 +80,15 @@ export const erpBlueprintApi = {
     )
   },
 
+  updateOpenCommerceMerchant: (
+    projectId: string,
+    instanceId: string,
+    request: { expected_revision: number; merchant_confirmed: boolean; merchant_id: string | null },
+  ) => api.post<ErpInstance>(
+    `${base(projectId)}/instances/${encodeURIComponent(instanceId)}/open-commerce-merchant`,
+    request,
+  ),
+
   decideProposal: (
     projectId: string,
     proposalId: string,
