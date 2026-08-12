@@ -52,19 +52,34 @@ def sortedInputs = inputFiles.toList().sort { left, right ->
         repoRoot.toPath().relativize(right.toPath()).toString().replace('\\', '/')
 }
 
-def fingerprintBytes = { File input ->
-    def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
+def normalizeFingerprintText = { String text ->
+    text.replace("\r\n", "\n").replace("\r", "\n")
+}
+
+def fingerprintText = { String relativePath, String text ->
+    def normalized = normalizeFingerprintText(text)
     if (relativePath.endsWith("ChatGptWebPageAdapter.kt")) {
-        return input.getText("UTF-8")
-            .replaceAll(/ADAPTER_VERSION\s*=\s*\d+/, "ADAPTER_VERSION = <normalized>")
-            .getBytes(StandardCharsets.UTF_8)
+        return normalized.replaceAll(
+            /ADAPTER_VERSION\s*=\s*\d+/,
+            "ADAPTER_VERSION = <normalized>",
+        )
     }
     if (relativePath.startsWith("scripts/") && relativePath.endsWith(".ps1")) {
-        return input.getText("UTF-8")
-            .replaceAll(/ExpectedAdapterVersion\s*=\s*\d+/, "ExpectedAdapterVersion = <normalized>")
-            .getBytes(StandardCharsets.UTF_8)
+        return normalized.replaceAll(
+            /ExpectedAdapterVersion\s*=\s*\d+/,
+            "ExpectedAdapterVersion = <normalized>",
+        )
     }
-    input.bytes
+    normalized
+}
+
+def normalizedInputBytes = { File input ->
+    normalizeFingerprintText(input.getText("UTF-8")).getBytes(StandardCharsets.UTF_8)
+}
+
+def fingerprintBytes = { File input ->
+    def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
+    fingerprintText(relativePath, input.getText("UTF-8")).getBytes(StandardCharsets.UTF_8)
 }
 
 def digestFiles = { Collection<File> files ->
@@ -224,7 +239,7 @@ sortedInputs.each { input ->
     def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
     digest.update(relativePath.getBytes(StandardCharsets.UTF_8))
     digest.update((byte) 0)
-    digest.update(input.bytes)
+    digest.update(normalizedInputBytes(input))
     digest.update((byte) 0)
 }
 
@@ -236,6 +251,41 @@ ext.chatGptWebVerifiedInputSha256 = "52eca576928f8debc4578334916a775164999000cfe
 ext.chatGptWebVerifiedApkVersionName = "1.1.993"
 ext.chatGptWebVerifiedApkVersionCode = 1003
 ext.chatGptWebVerifiedSourceCommit = "f97454749c2f23e480995faa51a7eab5badf5fd9"
+
+tasks.register("verifyChatGptWebFingerprintPortability") {
+    group = "verification"
+    description = "Verifies ChatGPT Web fingerprints are stable across checkout line endings."
+    doLast {
+        sortedInputs.each { input ->
+            def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
+            def lfText = normalizeFingerprintText(input.getText("UTF-8"))
+            def variants = [
+                lf: lfText,
+                crlf: lfText.replace("\n", "\r\n"),
+                cr: lfText.replace("\n", "\r"),
+            ]
+            def expectedInput = normalizeFingerprintText(variants.lf)
+            def expectedCase = fingerprintText(relativePath, variants.lf)
+            variants.each { lineEnding, variant ->
+                if (normalizeFingerprintText(variant) != expectedInput) {
+                    throw new GradleException(
+                        "ChatGPT Web global fingerprint changes with ${lineEnding} line endings: ${relativePath}",
+                    )
+                }
+                if (fingerprintText(relativePath, variant) != expectedCase) {
+                    throw new GradleException(
+                        "ChatGPT Web case fingerprint changes with ${lineEnding} line endings: ${relativePath}",
+                    )
+                }
+            }
+        }
+        println "CHATGPT_WEB_FINGERPRINT_PORTABILITY=passed files=${sortedInputs.size()}"
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn("verifyChatGptWebFingerprintPortability")
+}
 
 tasks.register("printChatGptWebInputFingerprint") {
     group = "verification"
