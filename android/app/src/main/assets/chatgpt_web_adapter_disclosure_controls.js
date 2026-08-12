@@ -28,6 +28,22 @@
       rect.top < window.innerHeight && rect.left < window.innerWidth;
   }
 
+  function finishWhenObserved(node, desired, result, emitSnapshot, attempt) {
+    const current = describe(node);
+    if (current && current.expanded === desired) {
+      result('set_ui_control_expanded', true, '');
+      return emitSnapshot();
+    }
+    if (!node || !node.isConnected || attempt >= MAX_OBSERVATION_ATTEMPTS) {
+      result('set_ui_control_expanded', false, '官网控件未达到请求的展开状态。');
+      return emitSnapshot();
+    }
+    window.setTimeout(
+      () => finishWhenObserved(node, desired, result, emitSnapshot, attempt + 1),
+      OBSERVATION_INTERVAL_MS
+    );
+  }
+
   function setExpanded(node, controlId, desiredExpanded, emitEvent, result, emitSnapshot) {
     const desired = desiredExpanded === true;
     const initial = describe(node);
@@ -64,8 +80,10 @@
         xRatio,
         yRatio
       });
-      result('set_ui_control_expanded', true, '');
-      window.setTimeout(emitSnapshot, 180);
+      window.setTimeout(
+        () => finishWhenObserved(node, desired, result, emitSnapshot, 1),
+        OBSERVATION_INTERVAL_MS
+      );
     }
 
     const rect = node.getBoundingClientRect();
@@ -74,5 +92,7 @@
     window.setTimeout(dispatch, 120);
   }
 
+  const MAX_OBSERVATION_ATTEMPTS = 12;
+  const OBSERVATION_INTERVAL_MS = 120;
   return Object.freeze({ describe, setExpanded });
 });

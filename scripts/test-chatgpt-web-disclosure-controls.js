@@ -9,10 +9,12 @@ global.window = {
 const disclosures = require('../android/app/src/main/assets/chatgpt_web_adapter_disclosure_controls.js');
 
 function node(attributes, options = {}) {
+  const state = { ...attributes };
   return {
     disabled: !!options.disabled,
     isConnected: options.isConnected !== false,
-    getAttribute(name) { return attributes[name] || ''; },
+    getAttribute(name) { return state[name] || ''; },
+    setAttribute(name, value) { state[name] = String(value); },
     getBoundingClientRect() {
       return options.rect || { left: 100, top: 100, right: 220, bottom: 140, width: 120, height: 40 };
     },
@@ -20,7 +22,7 @@ function node(attributes, options = {}) {
   };
 }
 
-function invoke(target, desired) {
+function invoke(target, desired, options = {}) {
   let touch = null;
   let receipt = null;
   let snapshots = 0;
@@ -28,7 +30,12 @@ function invoke(target, desired) {
     target,
     'control_menu_demo',
     desired,
-    (event) => { touch = event; },
+    (event) => {
+      touch = event;
+      if (options.applyTouch !== false) {
+        target.setAttribute('aria-expanded', desired ? 'true' : 'false');
+      }
+    },
     (action, ok, detail) => { receipt = { action, ok, detail }; },
     () => { snapshots += 1; }
   );
@@ -56,5 +63,11 @@ assert.equal(unsupported.receipt.ok, false);
 const disabled = invoke(node({ 'aria-expanded': 'false', 'aria-disabled': 'true' }), true);
 assert.equal(disabled.touch, null);
 assert.equal(disabled.receipt.ok, false);
+
+const unchangedAfterTouch = invoke(node({ 'aria-expanded': 'false' }), true, { applyTouch: false });
+assert.equal(unchangedAfterTouch.touch.purpose, 'invoke_ui_control');
+assert.equal(unchangedAfterTouch.receipt.ok, false);
+assert.match(unchangedAfterTouch.receipt.detail, /未达到请求的展开状态/);
+assert.equal(unchangedAfterTouch.snapshots, 1);
 
 process.stdout.write('CHATGPT_DISCLOSURE_CONTROLS=passed\n');

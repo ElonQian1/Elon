@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 75
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 76
 )
 
 $ErrorActionPreference = "Stop"

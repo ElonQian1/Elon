@@ -4,6 +4,8 @@
   if (window.__elonChatGptComposer || location.origin !== 'https://chatgpt.com') return;
 
   const MAX_OPTIONS = 30;
+  const MAX_TOOL_STATE_ATTEMPTS = 12;
+  const TOOL_STATE_INTERVAL_MS = 120;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
   const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
@@ -554,9 +556,37 @@
       return result(action, false, '官网选项当前不可见。');
     }
     if (!target.opensSubmenu) {
-      result(action, true, '');
-      window.setTimeout(scheduleSnapshot, 240);
+      if (section === 'tools' && target.semantic === 'web_search') {
+        const desiredSelected = !target.selected;
+        waitForWebSearchSelection(desiredSelected, result, scheduleSnapshot, 1);
+      } else {
+        result(action, true, '');
+        window.setTimeout(scheduleSnapshot, 240);
+      }
     }
+  }
+
+  function webSearchActiveInComposer() {
+    const layout = window.__elonChatGptLayout;
+    return !!(
+      layout && typeof layout.findSemanticNode === 'function' &&
+      layout.findSemanticNode('web_search', 'composer')
+    );
+  }
+
+  function waitForWebSearchSelection(desiredSelected, result, scheduleSnapshot, attempt) {
+    if (webSearchActiveInComposer() === desiredSelected) {
+      result('select_composer_tool', true, '');
+      return scheduleSnapshot();
+    }
+    if (attempt >= MAX_TOOL_STATE_ATTEMPTS) {
+      result('select_composer_tool', false, '官网网页搜索状态未发生预期变化。');
+      return scheduleSnapshot();
+    }
+    window.setTimeout(
+      () => waitForWebSearchSelection(desiredSelected, result, scheduleSnapshot, attempt + 1),
+      TOOL_STATE_INTERVAL_MS
+    );
   }
 
   function ownsOptionNode(node) {
