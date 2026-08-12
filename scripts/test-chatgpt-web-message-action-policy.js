@@ -14,11 +14,16 @@ function control(attributes, textContent) {
 
 assert.strictEqual(policy.isRegenerateSignal('Regenerate response'), true);
 assert.strictEqual(policy.isRegenerateSignal('Try again'), true);
+assert.strictEqual(policy.isRegenerateSignal('Retry after 5.6 Sol'), true);
 assert.strictEqual(policy.isRegenerateSignal('重新生成'), true);
+assert.strictEqual(policy.isRegenerateSignal('于 • 5.6 Sol 后重试'), true);
 assert.strictEqual(policy.isRegenerateSignal('Copy'), false);
 assert.strictEqual(policy.isOverflowSignal('More actions'), true);
 assert.strictEqual(policy.isOverflowSignal('更多操作'), true);
 assert.strictEqual(policy.isOverflowSignal('Share'), false);
+assert.strictEqual(policy.isModelRetryTriggerSignal('Switch model'), true);
+assert.strictEqual(policy.isModelRetryTriggerSignal('切换模型'), true);
+assert.strictEqual(policy.isModelRetryTriggerSignal('GPT-5.6 Sol'), false);
 assert.strictEqual(
   policy.isRegenerateControl(control({ 'data-testid': 'regenerate-response-button' })),
   true
@@ -29,6 +34,10 @@ assert.strictEqual(
 );
 assert.strictEqual(
   policy.isRegenerateControl(control({ role: 'menuitem' }, '重新回答')),
+  true
+);
+assert.strictEqual(
+  policy.isModelRetryTriggerControl(control({ 'aria-label': '切换模型' })),
   true
 );
 

@@ -133,6 +133,14 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("observedMessageCount:"))
         assertTrue(adapter.contains("messageWindowStart:"))
         assertTrue(messages.contains("function readMessageWindow(streaming)"))
+        assertTrue(messages.contains("function messageModelRetryButton()"))
+        assertTrue(messages.contains("invokeFromMenu(messageModelRetryButton()"))
+        assertTrue(messageActionPolicy.contains("function isModelRetryTriggerSignal(value)"))
+        assertTrue(messageActionPolicy.contains("\\bretry\\b"))
+        assertTrue(
+            adapterLayout.indexOf("/regenerate|try.again|\\bretry\\b") <
+                adapterLayout.indexOf("/model|模型|gpt-|sol/")
+        )
         assertTrue(navigationPolicy.contains("function isProjectRoute(path)"))
         assertTrue(navigationPolicy.contains("function isConversationPath(path)"))
         assertTrue(adapter.contains("observer.disconnect()"))

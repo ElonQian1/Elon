@@ -201,6 +201,7 @@
       && (/(?:reasoning|thinking).*(?:effort|level)|推理|思考强度/.test(signal)
         || /(^|\s)(?:轻度|标准|中度|重度|极高)($|\s)/.test(signal))
     ) return 'model';
+    if (/regenerate|try.again|\bretry\b|重新生成|重试/.test(signal)) return 'regenerate';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
     if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
     if (/dictat|听写|语音输入/.test(signal)) return 'dictation';
@@ -209,7 +210,6 @@
     if (/send|submit|发送/.test(signal)) return 'send';
     if (/stop|停止/.test(signal)) return 'stop';
     if (/copy|复制/.test(signal)) return 'copy';
-    if (/regenerate|try.again|重新生成|重试/.test(signal)) return 'regenerate';
     if (/edit|编辑/.test(signal)) return 'edit';
     if (/share|分享/.test(signal)) return 'share';
     if (/branch|分支/.test(signal)) return 'branch';

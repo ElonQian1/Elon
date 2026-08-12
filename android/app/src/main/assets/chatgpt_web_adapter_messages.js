@@ -301,6 +301,15 @@
     ) || null;
   }
 
+  function messageModelRetryButton() {
+    const turn = lastAssistantTurn();
+    if (!turn) return null;
+    return Array.from(turn.querySelectorAll('button, [role="button"]')).find((button) =>
+      isVisible(button) && messageActionPolicy &&
+        messageActionPolicy.isModelRetryTriggerControl(button)
+    ) || null;
+  }
+
   function visibleRegenerateMenuItem() {
     if (!messageActionPolicy) return null;
     return Array.from(document.querySelectorAll(
@@ -323,28 +332,38 @@
       button.click();
       return result('regenerate_response', true, '');
     }
-    const overflow = messageOverflowButton();
-    if (!overflow) return result('regenerate_response', false, '官网当前没有可用的重新生成入口。');
-    overflow.click();
-    const deadline = Date.now() + 2000;
-    function invokeMenuItem() {
-      const item = visibleRegenerateMenuItem();
-      if (item) {
-        item.click();
-        return result('regenerate_response', true, '');
+
+    function invokeFromMenu(trigger, onMissing) {
+      if (!trigger) return onMissing();
+      trigger.click();
+      const deadline = Date.now() + 2000;
+      function invokeMenuItem() {
+        const item = visibleRegenerateMenuItem();
+        if (item) {
+          item.click();
+          return result('regenerate_response', true, '');
+        }
+        if (Date.now() >= deadline) {
+          dismissOverflowMenu();
+          return window.setTimeout(onMissing, 100);
+        }
+        window.setTimeout(invokeMenuItem, 75);
       }
-      if (Date.now() >= deadline) {
-        dismissOverflowMenu();
-        return result('regenerate_response', false, '官网消息菜单中没有可用的重新生成入口。');
-      }
-      window.setTimeout(invokeMenuItem, 75);
+      window.setTimeout(invokeMenuItem, 50);
     }
-    window.setTimeout(invokeMenuItem, 50);
+
+    invokeFromMenu(messageModelRetryButton(), () => {
+      invokeFromMenu(messageOverflowButton(), () => {
+        result('regenerate_response', false, '官网当前没有可用的重新生成入口。');
+      });
+    });
   }
 
   function capabilities() {
     const values = ['message_copy', 'rich_text'];
-    if (regenerateButton() || messageOverflowButton()) values.push('message_regenerate');
+    if (regenerateButton() || messageModelRetryButton() || messageOverflowButton()) {
+      values.push('message_regenerate');
+    }
     if (lastStructuredTypes.size || lastComplexOutput) values.push('complex_output');
     return values;
   }

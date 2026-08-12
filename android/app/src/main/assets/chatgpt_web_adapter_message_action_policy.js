@@ -22,11 +22,15 @@
   }
 
   function isRegenerateSignal(value) {
-    return /regenerate|try again|重新生成|重新回答|重试/.test(clean(value));
+    return /regenerate|try again|\bretry\b|重新生成|重新回答|重试/.test(clean(value));
   }
 
   function isOverflowSignal(value) {
     return /more actions?|message actions?|更多操作|更多选项|更多/.test(clean(value));
+  }
+
+  function isModelRetryTriggerSignal(value) {
+    return /switch model|change model|切换模型|更换模型/.test(clean(value));
   }
 
   function isRegenerateControl(node) {
@@ -37,12 +41,18 @@
     return isOverflowSignal(nodeSignal(node));
   }
 
+  function isModelRetryTriggerControl(node) {
+    return isModelRetryTriggerSignal(nodeSignal(node));
+  }
+
   return Object.freeze({
     clean,
     nodeSignal,
     isRegenerateSignal,
     isOverflowSignal,
+    isModelRetryTriggerSignal,
     isRegenerateControl,
-    isOverflowControl
+    isOverflowControl,
+    isModelRetryTriggerControl
   });
 });
