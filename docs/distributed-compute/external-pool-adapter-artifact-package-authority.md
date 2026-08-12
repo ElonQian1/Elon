@@ -56,7 +56,7 @@ v232 新增：
 
 后续不得直接从 V232 创建 Adapter 或路由。至少还需独立完成：
 
-1. SBOM、许可证、恶意代码与依赖安全扫描；
+1. V233 已完成 exact SBOM、许可证允许策略及有限本地静态规则；可信依赖解析、漏洞情报和动态恶意行为检测仍未完成；
 2. 隔离沙箱中的六能力 conformance；
 3. credential verifier registry/currentness/revocation；
 4. 安装根、运行身份、Sidecar IPC、健康探针和回滚；

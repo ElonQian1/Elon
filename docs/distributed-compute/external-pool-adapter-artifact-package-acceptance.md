@@ -39,7 +39,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 - 真实第三方 Adapter 包和供应商构建流水线；
 - fuzz/property 测试、极限并发、磁盘故障、断电和进程崩溃；
 - 生产数据库原位升级、真实 TCP、部署、浏览器、MCP 与 PC 控制面；
-- SBOM、安全扫描、sandbox conformance、credential verifier 运行时；
+- V233 已完成 exact SBOM、许可证策略和有限本地静态规则；依赖漏洞情报、动态安全扫描、sandbox conformance、credential verifier 运行时仍未完成；
 - Adapter 安装/采用、v213 route、Worker/ACK、真实派发、计量和结算。
 
 因此当前状态是 `implementation_partially_verified`，不是生产 Adapter 可用。
