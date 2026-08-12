@@ -22,7 +22,7 @@ class ChatGptWebAudioPermissionStateTest {
         state.localActionReady()
         val ready = state.snapshot(androidPermissionGranted = true)
         assertEquals(ChatGptWebAudioPermissionState.RequestState.LOCAL_ACTION_READY, ready.requestState)
-        assertTrue(ready.androidPermissionGranted)
+        assertEquals(true, ready.androidPermissionGranted)
         assertFalse(ready.localRequestPending)
     }
 
