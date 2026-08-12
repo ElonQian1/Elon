@@ -14,6 +14,7 @@ use crate::{
     },
 };
 
+use super::terminal::terminal_by_installation_on;
 use super::types::*;
 
 const CURRENTNESS_SCHEMA: &str =
@@ -309,8 +310,10 @@ fn currentness_on(
     let Some(stored) = receipt_by_id_on(conn, receipt_id)? else {
         return Ok(None);
     };
-    let statuses: (String, String, String, String, String) = conn.query_row(
-        "SELECT current_status,adoption_status,package_status,source_status,file_inventory_status
+    let terminal = terminal_by_installation_on(conn, receipt_id)?;
+    let statuses: (String, String, String, String, String, String) = conn.query_row(
+        "SELECT current_status,adoption_status,package_status,source_status,file_inventory_status,
+                terminal_status
            FROM compute_external_pool_adapter_installation_current
           WHERE installation_receipt_id=?1 AND installation_receipt_digest=?2",
         params![receipt_id, stored.receipt.installation_receipt_digest],
@@ -321,17 +324,22 @@ fn currentness_on(
                 row.get(2)?,
                 row.get(3)?,
                 row.get(4)?,
+                row.get(5)?,
             ))
         },
     )?;
     Ok(Some(ExternalPoolAdapterInstallationCurrentness {
         schema: CURRENTNESS_SCHEMA,
         installation: stored.summary(),
+        terminal: terminal
+            .as_ref()
+            .map(StoredExternalPoolAdapterInstallationTerminal::summary),
         current_status: statuses.0,
         adoption_status: statuses.1,
         package_status: statuses.2,
         source_status: statuses.3,
         file_inventory_status: statuses.4,
+        terminal_status: statuses.5,
     }))
 }
 

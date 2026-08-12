@@ -91,6 +91,8 @@ async fn Adapter_installation_http_installs_exact_bytes_replays_and_stays_inert(
     assert_eq!(current["package_status"], "verified_current");
     assert_eq!(current["source_status"], "exact");
     assert_eq!(current["file_inventory_status"], "exact");
+    assert_eq!(current["terminal_status"], "none");
+    assert!(current.get("terminal").is_none());
     assert_installation_redacted(&fixture, &current);
     assert_installation_has_no_activation_effects(&fixture, &adoption);
     fixture.cleanup();
@@ -197,7 +199,7 @@ async fn Adapter_installation_http_classifies_json_confirmation_missing_and_drif
     fixture.cleanup();
 }
 
-fn installation_body(
+pub(super) fn installation_body(
     fixture: &Fixture,
     adoption: &Value,
     idempotency_key: &str,
@@ -224,7 +226,7 @@ fn installation_body(
     })
 }
 
-fn installation_root(fixture: &Fixture, digest: &str) -> PathBuf {
+pub(super) fn installation_root(fixture: &Fixture, digest: &str) -> PathBuf {
     fixture
         .data_dir
         .join("compute-federation/external-pool-adapter-artifacts/v1/installed-inert/sha256")
@@ -232,7 +234,7 @@ fn installation_root(fixture: &Fixture, digest: &str) -> PathBuf {
         .join(digest)
 }
 
-fn assert_installation_redacted(fixture: &Fixture, value: &Value) {
+pub(super) fn assert_installation_redacted(fixture: &Fixture, value: &Value) {
     let encoded = value.to_string();
     for forbidden in [
         "bin/adapter.sh",
@@ -252,7 +254,7 @@ fn assert_installation_redacted(fixture: &Fixture, value: &Value) {
     }
 }
 
-fn assert_installation_has_no_activation_effects(fixture: &Fixture, adoption: &Value) {
+pub(super) fn assert_installation_has_no_activation_effects(fixture: &Fixture, adoption: &Value) {
     let provider_id = adoption["adoption"]["provider_id"].as_str().unwrap();
     let connection = fixture.state.store.conn().unwrap();
     let status: String = connection

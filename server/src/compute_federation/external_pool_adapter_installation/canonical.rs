@@ -4,12 +4,19 @@ use sha2::{Digest, Sha256};
 
 use crate::compute_plugin_sharing_directive::canonical_compute_plugin_ijson_and_sha256;
 
-use super::{ExternalPoolAdapterInstallationBinding, ExternalPoolAdapterInstallationReceipt};
+use super::{
+    ExternalPoolAdapterInstallationBinding, ExternalPoolAdapterInstallationReceipt,
+    ExternalPoolAdapterInstallationTerminalReceipt,
+};
 
 const MAX_INSTALLATION_JSON_BYTES: usize = 1024 * 1024;
 const CONTENT_DOMAIN: &[u8] = b"ELON-EXTERNAL-POOL-ADAPTER-INSTALLATION-CONTENT-V1";
 const MATERIAL_DOMAIN: &[u8] = b"ELON-EXTERNAL-POOL-ADAPTER-INSTALLATION-MATERIAL-V1";
 const RECEIPT_DOMAIN: &[u8] = b"ELON-EXTERNAL-POOL-ADAPTER-INSTALLATION-RECEIPT-V1";
+const TERMINAL_MATERIAL_DOMAIN: &[u8] =
+    b"ELON-EXTERNAL-POOL-ADAPTER-INSTALLATION-TERMINAL-MATERIAL-V1";
+const TERMINAL_RECEIPT_DOMAIN: &[u8] =
+    b"ELON-EXTERNAL-POOL-ADAPTER-INSTALLATION-TERMINAL-RECEIPT-V1";
 
 pub(crate) fn installation_content_digest<T: Serialize + ?Sized>(value: &T) -> Result<String> {
     domain_digest(CONTENT_DOMAIN, value)
@@ -17,6 +24,12 @@ pub(crate) fn installation_content_digest<T: Serialize + ?Sized>(value: &T) -> R
 
 pub(crate) fn installation_material_digest<T: Serialize + ?Sized>(value: &T) -> Result<String> {
     domain_digest(MATERIAL_DOMAIN, value)
+}
+
+pub(crate) fn installation_terminal_material_digest<T: Serialize + ?Sized>(
+    value: &T,
+) -> Result<String> {
+    domain_digest(TERMINAL_MATERIAL_DOMAIN, value)
 }
 
 pub(crate) fn canonical_external_pool_adapter_installation_receipt_json_and_digest(
@@ -39,6 +52,29 @@ pub(crate) fn canonical_external_pool_adapter_installation_receipt_json_and_dige
     Ok((
         canonical_json(receipt)?,
         domain_digest(RECEIPT_DOMAIN, &projection)?,
+    ))
+}
+
+pub(crate) fn canonical_external_pool_adapter_installation_terminal_receipt_json_and_digest(
+    receipt: &ExternalPoolAdapterInstallationTerminalReceipt,
+) -> Result<(String, String)> {
+    let value = serde_json::to_value(receipt)?;
+    let mut projection = value
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("installation terminal receipt must be an object"))?
+        .clone();
+    if projection
+        .insert(
+            "terminal_receipt_digest".to_string(),
+            serde_json::Value::String(String::new()),
+        )
+        .is_none()
+    {
+        bail!("installation terminal receipt lacks digest field");
+    }
+    Ok((
+        canonical_json(receipt)?,
+        domain_digest(TERMINAL_RECEIPT_DOMAIN, &projection)?,
     ))
 }
 

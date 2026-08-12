@@ -519,8 +519,10 @@ pub(crate) use compute_external_pool_adapter_credential_verifier_key::{
     RevokeCredentialVerifierKey,
 };
 pub(crate) use compute_external_pool_adapter_installation::{
-    ExternalPoolAdapterInstallationCurrentness, ExternalPoolAdapterInstallationWriteReceipt,
-    InstallExternalPoolAdapter,
+    ExternalPoolAdapterInstallationCurrentness, ExternalPoolAdapterInstallationTerminalSummary,
+    ExternalPoolAdapterInstallationTerminalWriteReceipt,
+    ExternalPoolAdapterInstallationWriteReceipt, InstallExternalPoolAdapter,
+    RevokeExternalPoolAdapterInstallation,
 };
 pub(crate) use compute_external_pool_adapter_release::{
     ApplyExternalPoolAdapterRelease, ExternalPoolAdapterReleaseAdmissionReceipt,

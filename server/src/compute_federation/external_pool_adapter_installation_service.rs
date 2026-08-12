@@ -6,8 +6,10 @@ use thiserror::Error;
 
 use crate::{
     store::{
-        ExternalPoolAdapterInstallationCurrentness, ExternalPoolAdapterInstallationWriteReceipt,
-        InstallExternalPoolAdapter,
+        ExternalPoolAdapterInstallationCurrentness,
+        ExternalPoolAdapterInstallationTerminalWriteReceipt,
+        ExternalPoolAdapterInstallationWriteReceipt, InstallExternalPoolAdapter,
+        RevokeExternalPoolAdapterInstallation,
     },
     types::AppState,
 };
@@ -17,6 +19,7 @@ use super::{
     external_pool_adapter_installation::{
         audit_external_pool_adapter_installation, prepare_external_pool_adapter_installation,
         ExternalPoolAdapterInstallationFsError, INSTALLATION_CONFIRMATION,
+        INSTALLATION_REVOCATION_CONFIRMATION,
     },
 };
 
@@ -29,6 +32,15 @@ pub(crate) struct InstallExternalPoolAdapterBody {
     pub expected_source_receipt_digest: String,
     pub idempotency_key: String,
     pub confirm_installed_inert: bool,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RevokeExternalPoolAdapterInstallationBody {
+    pub expected_installation_receipt_digest: String,
+    pub reason: String,
+    pub idempotency_key: String,
+    pub confirm_revocation: bool,
 }
 
 #[derive(Debug, Error)]
@@ -129,6 +141,42 @@ pub(crate) async fn install_for_admin(
         .map_err(AdapterInstallationServiceError::Conflict)
 }
 
+pub(crate) fn revoke_for_admin(
+    state: &AppState,
+    admin_user_id: &str,
+    installation_receipt_id: &str,
+    body: RevokeExternalPoolAdapterInstallationBody,
+) -> Result<ExternalPoolAdapterInstallationTerminalWriteReceipt, AdapterInstallationServiceError> {
+    if !body.confirm_revocation {
+        return Err(invalid(
+            "Adapter installation revocation requires explicit confirmation",
+        ));
+    }
+    validate_identifier(admin_user_id, 200)?;
+    validate_identifier(installation_receipt_id, 200)?;
+    validate_identifier(&body.reason, 1000)?;
+    validate_identifier(&body.idempotency_key, 240)?;
+    validate_digest(&body.expected_installation_receipt_digest)?;
+    state
+        .store
+        .external_pool_adapter_installation_audit_target(installation_receipt_id)
+        .map_err(AdapterInstallationServiceError::Conflict)?
+        .ok_or(AdapterInstallationServiceError::NotFound)?;
+
+    state
+        .store
+        .revoke_external_pool_adapter_installation(RevokeExternalPoolAdapterInstallation {
+            installation_receipt_id: installation_receipt_id.to_string(),
+            expected_installation_receipt_digest: body.expected_installation_receipt_digest,
+            revoked_by_admin_user_id: admin_user_id.to_string(),
+            reason: body.reason,
+            confirmation: INSTALLATION_REVOCATION_CONFIRMATION.to_string(),
+            idempotency_scope: revocation_idempotency_scope(admin_user_id),
+            idempotency_key: body.idempotency_key,
+        })
+        .map_err(AdapterInstallationServiceError::Conflict)
+}
+
 pub(crate) async fn currentness_for_admin(
     state: &AppState,
     installation_receipt_id: &str,
@@ -221,4 +269,19 @@ fn classify_filesystem_error(
 
 fn invalid(message: &'static str) -> AdapterInstallationServiceError {
     AdapterInstallationServiceError::Invalid(anyhow::anyhow!(message))
+}
+
+fn revocation_idempotency_scope(admin_user_id: &str) -> String {
+    format!("v247:installation-revoke:{admin_user_id}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::revocation_idempotency_scope;
+
+    #[test]
+    fn installation_revocation_scope_fits_the_sqlite_contract() {
+        let maximum_actor = "a".repeat(200);
+        assert!(revocation_idempotency_scope(&maximum_actor).chars().count() <= 240);
+    }
 }

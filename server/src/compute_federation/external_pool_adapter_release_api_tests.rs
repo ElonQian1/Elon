@@ -20,6 +20,8 @@ use super::routes;
 mod adapter_adoption_http_test;
 #[path = "external_pool_adapter_release_api_tests/adapter_installation_http_test.rs"]
 mod adapter_installation_http_test;
+#[path = "external_pool_adapter_release_api_tests/adapter_installation_revocation_http_test.rs"]
+mod adapter_installation_revocation_http_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_currentness_http_test.rs"]
 mod artifact_currentness_http_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_intake_http_auth_headers_test.rs"]

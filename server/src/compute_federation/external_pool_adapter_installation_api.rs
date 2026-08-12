@@ -17,6 +17,7 @@ use crate::{
 
 use super::external_pool_adapter_installation_service::{
     self as service, AdapterInstallationServiceError, InstallExternalPoolAdapterBody,
+    RevokeExternalPoolAdapterInstallationBody,
 };
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
@@ -24,6 +25,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/external-pool-adapter-installations",
             post(install),
+        )
+        .route(
+            "/api/admin/compute/external-pool-adapter-installations/:installation_id/revoke",
+            post(revoke),
         )
         .route(
             "/api/admin/compute/external-pool-adapter-installations/:installation_receipt_id/currentness",
@@ -44,7 +49,29 @@ async fn install(
         Ok(Json(value)) => value,
         Err(error) => return json_error(StatusCode::UNPROCESSABLE_ENTITY, error),
     };
-    write_response(service::install_for_admin(&state, &actor, body).await)
+    installation_write_response(service::install_for_admin(&state, &actor, body).await)
+}
+
+async fn revoke(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(installation_id): Path<String>,
+    payload: Result<Json<RevokeExternalPoolAdapterInstallationBody>, JsonRejection>,
+) -> Response {
+    let actor = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let body = match payload {
+        Ok(Json(value)) => value,
+        Err(error) => return json_error(StatusCode::UNPROCESSABLE_ENTITY, error),
+    };
+    terminal_write_response(service::revoke_for_admin(
+        &state,
+        &actor,
+        &installation_id,
+        body,
+    ))
 }
 
 async fn currentness(
@@ -61,9 +88,28 @@ async fn currentness(
     }
 }
 
-fn write_response(
+fn installation_write_response(
     result: Result<
         crate::store::ExternalPoolAdapterInstallationWriteReceipt,
+        AdapterInstallationServiceError,
+    >,
+) -> Response {
+    match result {
+        Ok(output) => {
+            let status = if output.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            };
+            (status, Json(output)).into_response()
+        }
+        Err(error) => error_response(error),
+    }
+}
+
+fn terminal_write_response(
+    result: Result<
+        crate::store::ExternalPoolAdapterInstallationTerminalWriteReceipt,
         AdapterInstallationServiceError,
     >,
 ) -> Response {
@@ -98,7 +144,7 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
     if !matches!(user.role.as_str(), "admin" | "owner") {
         return Err(json_error(
             StatusCode::FORBIDDEN,
-            "only platform administrators can install external-pool Adapter bytes",
+            "only platform administrators can manage external-pool Adapter installations",
         ));
     }
     Ok(user.id)

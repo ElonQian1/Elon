@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::compute_federation::external_pool_adapter_installation::{
-    ExternalPoolAdapterInstallationReceipt, InstalledExternalPoolAdapterFile,
-    PreparedExternalPoolAdapterInstallation,
+    ExternalPoolAdapterInstallationReceipt, ExternalPoolAdapterInstallationTerminalReceipt,
+    InstalledExternalPoolAdapterFile, PreparedExternalPoolAdapterInstallation,
 };
 use sha2::{Digest, Sha256};
 
@@ -12,6 +12,16 @@ pub(crate) struct InstallExternalPoolAdapter {
     pub expected_package_receipt_digest: String,
     pub expected_source_receipt_digest: String,
     pub installed_by_admin_user_id: String,
+    pub confirmation: String,
+    pub idempotency_scope: String,
+    pub idempotency_key: String,
+}
+
+pub(crate) struct RevokeExternalPoolAdapterInstallation {
+    pub installation_receipt_id: String,
+    pub expected_installation_receipt_digest: String,
+    pub revoked_by_admin_user_id: String,
+    pub reason: String,
     pub confirmation: String,
     pub idempotency_scope: String,
     pub idempotency_key: String,
@@ -70,20 +80,103 @@ pub(crate) struct ExternalPoolAdapterInstallationWriteReceipt {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct ExternalPoolAdapterInstallationTerminalSummary {
+    pub terminal_receipt_id: String,
+    pub terminal_receipt_digest: String,
+    pub installation_receipt_id: String,
+    pub installation_receipt_digest: String,
+    pub terminal_kind: String,
+    pub revoked_by_admin_user_id: String,
+    pub reason: String,
+    pub revoked_at: String,
+    pub installation_effect: String,
+    pub credential_effect: String,
+    pub provider_effect: String,
+    pub route_effect: String,
+    pub execution_effect: String,
+    pub settlement_effect: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct ExternalPoolAdapterInstallationTerminalWriteReceipt {
+    pub installation: ExternalPoolAdapterInstallationSummary,
+    pub terminal: ExternalPoolAdapterInstallationTerminalSummary,
+    pub replayed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub(crate) struct ExternalPoolAdapterInstallationCurrentness {
     pub schema: &'static str,
     pub installation: ExternalPoolAdapterInstallationSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<ExternalPoolAdapterInstallationTerminalSummary>,
     pub current_status: String,
     pub adoption_status: String,
     pub package_status: String,
     pub source_status: String,
     pub file_inventory_status: String,
+    pub terminal_status: String,
 }
 
 pub(super) struct StoredExternalPoolAdapterInstallation {
     pub receipt: ExternalPoolAdapterInstallationReceipt,
     pub receipt_json: String,
     pub files: Vec<InstalledExternalPoolAdapterFile>,
+}
+
+pub(super) struct StoredExternalPoolAdapterInstallationTerminal {
+    pub receipt: ExternalPoolAdapterInstallationTerminalReceipt,
+    pub receipt_json: String,
+}
+
+/// Sealed, non-Clone/non-Serde proof of one exact current installation.
+///
+/// The prepared proof pins every audited installed file and directory for this
+/// authority's lifetime. Only Store code can construct it.
+pub(in crate::store) struct CurrentExternalPoolAdapterInstallationAuthority {
+    receipt: ExternalPoolAdapterInstallationReceipt,
+    prepared: PreparedExternalPoolAdapterInstallation,
+    checked_at: String,
+}
+
+pub(in crate::store) struct HistoricalExternalPoolAdapterInstallationAuthority {
+    receipt: ExternalPoolAdapterInstallationReceipt,
+}
+
+impl CurrentExternalPoolAdapterInstallationAuthority {
+    pub(super) fn new(
+        receipt: ExternalPoolAdapterInstallationReceipt,
+        prepared: PreparedExternalPoolAdapterInstallation,
+        checked_at: String,
+    ) -> Self {
+        Self {
+            receipt,
+            prepared,
+            checked_at,
+        }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterInstallationReceipt {
+        &self.receipt
+    }
+
+    pub(in crate::store) fn prepared(&self) -> &PreparedExternalPoolAdapterInstallation {
+        &self.prepared
+    }
+
+    pub(in crate::store) fn checked_at(&self) -> &str {
+        &self.checked_at
+    }
+}
+
+impl HistoricalExternalPoolAdapterInstallationAuthority {
+    pub(super) fn new(receipt: ExternalPoolAdapterInstallationReceipt) -> Self {
+        Self { receipt }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterInstallationReceipt {
+        &self.receipt
+    }
 }
 
 impl StoredExternalPoolAdapterInstallation {
@@ -128,6 +221,29 @@ impl StoredExternalPoolAdapterInstallation {
             installed_total_bytes: self.files.iter().map(|file| file.size_bytes).sum(),
             installed_by_admin_user_id: item.installed_by_admin_user_id.clone(),
             installed_at: item.installed_at.clone(),
+            installation_effect: item.installation_effect.clone(),
+            credential_effect: item.credential_effect.clone(),
+            provider_effect: item.provider_effect.clone(),
+            route_effect: item.route_effect.clone(),
+            execution_effect: item.execution_effect.clone(),
+            settlement_effect: item.settlement_effect.clone(),
+        }
+    }
+}
+
+impl StoredExternalPoolAdapterInstallationTerminal {
+    pub(super) fn summary(&self) -> ExternalPoolAdapterInstallationTerminalSummary {
+        let receipt = &self.receipt;
+        let item = &receipt.terminal;
+        ExternalPoolAdapterInstallationTerminalSummary {
+            terminal_receipt_id: receipt.terminal_receipt_id.clone(),
+            terminal_receipt_digest: receipt.terminal_receipt_digest.clone(),
+            installation_receipt_id: item.installation_receipt_id.clone(),
+            installation_receipt_digest: item.installation_receipt_digest.clone(),
+            terminal_kind: item.terminal_kind.clone(),
+            revoked_by_admin_user_id: item.revoked_by_admin_user_id.clone(),
+            reason: item.reason.clone(),
+            revoked_at: item.revoked_at.clone(),
             installation_effect: item.installation_effect.clone(),
             credential_effect: item.credential_effect.clone(),
             provider_effect: item.provider_effect.clone(),

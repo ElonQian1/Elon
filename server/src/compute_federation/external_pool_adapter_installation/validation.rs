@@ -46,6 +46,45 @@ pub(crate) fn validate_external_pool_adapter_installation_receipt(
     Ok(())
 }
 
+pub(crate) fn validate_external_pool_adapter_installation_terminal_receipt(
+    receipt: &ExternalPoolAdapterInstallationTerminalReceipt,
+) -> Result<()> {
+    if receipt.schema != INSTALLATION_TERMINAL_RECEIPT_SCHEMA
+        || receipt.canonicalization != INSTALLATION_CANONICALIZATION
+        || receipt.digest_algorithm != INSTALLATION_DIGEST_ALGORITHM
+    {
+        bail!("Adapter installation terminal receipt metadata is unsupported");
+    }
+    identifier(&receipt.terminal_receipt_id, 200)?;
+    digest(&receipt.terminal_receipt_digest)?;
+    digest(&receipt.terminal_material_digest)?;
+    let item = &receipt.terminal;
+    identifier(&item.installation_receipt_id, 200)?;
+    digest(&item.installation_receipt_digest)?;
+    identifier(&item.revoked_by_admin_user_id, 200)?;
+    identifier(&item.reason, 1000)?;
+    identifier(&item.idempotency_scope, 240)?;
+    identifier(&item.idempotency_key, 240)?;
+    canonical_nanos(&item.revoked_at)?;
+    canonical_nanos(&item.recorded_at)?;
+    if item.revoked_at != item.recorded_at
+        || item.terminal_kind != INSTALLATION_TERMINAL_KIND_REVOKED
+        || item.confirmation != INSTALLATION_REVOCATION_CONFIRMATION
+        || item.installation_effect != INSTALLATION_REVOKED_EFFECT
+        || item.credential_effect != INSTALLATION_NO_EFFECT
+        || item.provider_effect != INSTALLATION_NO_EFFECT
+        || item.route_effect != INSTALLATION_NO_EFFECT
+        || item.execution_effect != INSTALLATION_NO_EFFECT
+        || item.settlement_effect != INSTALLATION_NO_EFFECT
+        || installation_terminal_material_digest(item)? != receipt.terminal_material_digest
+        || canonical_external_pool_adapter_installation_terminal_receipt_json_and_digest(receipt)?.1
+            != receipt.terminal_receipt_digest
+    {
+        bail!("Adapter installation terminal receipt material or effects are not exact");
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_external_pool_adapter_installation_binding(
     binding: &ExternalPoolAdapterInstallationBinding,
 ) -> Result<()> {
@@ -182,7 +221,7 @@ pub(super) fn relative_path(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn canonical_nanos(value: &str) -> Result<()> {
+pub(super) fn canonical_nanos(value: &str) -> Result<()> {
     let parsed = DateTime::parse_from_rfc3339(value)?;
     if parsed.offset().local_minus_utc() != 0
         || parsed.to_rfc3339_opts(SecondsFormat::Nanos, true) != value

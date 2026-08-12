@@ -16,6 +16,12 @@ pub(crate) const INSTALLATION_STORAGE_NAMESPACE: &str =
     "compute-federation/external-pool-adapter-artifacts/v1/installed-inert/sha256";
 pub(crate) const INSTALLATION_EFFECT: &str = "adapter_bytes_installed_inert";
 pub(crate) const INSTALLATION_NO_EFFECT: &str = "none";
+pub(crate) const INSTALLATION_TERMINAL_RECEIPT_SCHEMA: &str =
+    "compute_federation.external_pool_adapter_installation_terminal_receipt.v1";
+pub(crate) const INSTALLATION_REVOCATION_CONFIRMATION: &str =
+    "confirm_external_pool_adapter_installation_revocation";
+pub(crate) const INSTALLATION_TERMINAL_KIND_REVOKED: &str = "revoked";
+pub(crate) const INSTALLATION_REVOKED_EFFECT: &str = "installed_instance_revoked";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -95,6 +101,39 @@ pub(crate) struct ExternalPoolAdapterInstallationReceipt {
     pub canonicalization: String,
     pub digest_algorithm: String,
     pub installation: ExternalPoolAdapterInstallationMaterial,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExternalPoolAdapterInstallationTerminalMaterial {
+    pub installation_receipt_id: String,
+    pub installation_receipt_digest: String,
+    pub terminal_kind: String,
+    pub revoked_by_admin_user_id: String,
+    pub reason: String,
+    pub confirmation: String,
+    pub idempotency_scope: String,
+    pub idempotency_key: String,
+    pub revoked_at: String,
+    pub recorded_at: String,
+    pub installation_effect: String,
+    pub credential_effect: String,
+    pub provider_effect: String,
+    pub route_effect: String,
+    pub execution_effect: String,
+    pub settlement_effect: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExternalPoolAdapterInstallationTerminalReceipt {
+    pub schema: String,
+    pub terminal_receipt_id: String,
+    pub terminal_receipt_digest: String,
+    pub terminal_material_digest: String,
+    pub canonicalization: String,
+    pub digest_algorithm: String,
+    pub terminal: ExternalPoolAdapterInstallationTerminalMaterial,
 }
 
 pub(crate) struct ExternalPoolAdapterInstallationTarget {
