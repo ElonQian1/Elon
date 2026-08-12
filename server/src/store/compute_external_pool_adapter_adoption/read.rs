@@ -179,6 +179,7 @@ fn audit_terminal(
     if json != stored.receipt_json
         || digest != stored.receipt.terminal_receipt_digest
         || adoption.receipt.adoption_receipt_digest != item.adoption_receipt_digest
+        || !exact_terminal_projection(conn, &stored)?
     {
         bail!("Adapter adoption terminal failed exact readback audit");
     }
@@ -197,16 +198,21 @@ fn exact_adoption_projection(
             "SELECT 1 FROM compute_external_pool_adapter_adoption_receipts
           WHERE adoption_receipt_id=?1 AND adoption_receipt_digest=?2 AND receipt_json=?3
             AND adoption_material_digest=?4 AND application_id=?5 AND application_digest=?6
-            AND provider_id=?7 AND provider_digest=?8 AND admission_id=?9
-            AND admission_digest=?10 AND sandbox_conformance_receipt_id=?11
-            AND sandbox_conformance_receipt_digest=?12
-            AND credential_verification_receipt_id=?13
-            AND credential_verification_receipt_digest=?14
-            AND credential_locator_commitment=?15 AND adopted_by_admin_user_id=?16
-            AND confirmation=?17 AND idempotency_scope=?18 AND idempotency_key=?19
-            AND adopted_at=?20 AND recorded_at=?21 AND adoption_effect=?22
-            AND install_effect=?23 AND provider_effect=?24 AND route_effect=?25
-            AND execution_effect=?26 AND settlement_effect=?27",
+            AND provider_id=?7 AND provider_owner_account_id=?8
+            AND provider_policy_revision=?9 AND provider_digest=?10
+            AND admission_id=?11 AND admission_digest=?12 AND adapter_id=?13
+            AND adapter_release_version=?14 AND adapter_config_revision=?15
+            AND adapter_config_digest=?16 AND declared_implementation_sha256=?17
+            AND capability_set_digest=?18 AND sandbox_conformance_receipt_id=?19
+            AND sandbox_conformance_receipt_digest=?20 AND sandbox_report_expires_at=?21
+            AND credential_verification_receipt_id=?22
+            AND credential_verification_receipt_digest=?23
+            AND credential_locator_commitment=?24 AND credential_report_expires_at=?25
+            AND adopted_by_admin_user_id=?26 AND confirmation=?27
+            AND idempotency_scope=?28 AND idempotency_key=?29 AND adopted_at=?30
+            AND recorded_at=?31 AND adoption_effect=?32 AND install_effect=?33
+            AND provider_effect=?34 AND route_effect=?35 AND execution_effect=?36
+            AND settlement_effect=?37",
             params![
                 receipt.adoption_receipt_id,
                 receipt.adoption_receipt_digest,
@@ -215,14 +221,24 @@ fn exact_adoption_projection(
                 binding.application_id,
                 binding.application_digest,
                 binding.provider_id,
+                binding.provider_owner_account_id,
+                binding.provider_policy_revision,
                 binding.provider_digest,
                 binding.admission_id,
                 binding.admission_digest,
+                binding.adapter_id,
+                binding.adapter_release_version,
+                binding.adapter_config_revision,
+                binding.adapter_config_digest,
+                binding.declared_implementation_sha256,
+                binding.capability_set_digest,
                 binding.sandbox_conformance_receipt_id,
                 binding.sandbox_conformance_receipt_digest,
+                binding.sandbox_report_expires_at,
                 binding.credential_verification_receipt_id,
                 binding.credential_verification_receipt_digest,
                 binding.credential_locator_commitment,
+                binding.credential_report_expires_at,
                 item.adopted_by_admin_user_id,
                 item.confirmation,
                 item.idempotency_scope,
@@ -235,6 +251,48 @@ fn exact_adoption_projection(
                 item.route_effect,
                 item.execution_effect,
                 item.settlement_effect
+            ],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
+fn exact_terminal_projection(
+    conn: &Connection,
+    stored: &StoredExternalPoolAdapterAdoptionTerminal,
+) -> Result<bool> {
+    let receipt = &stored.receipt;
+    let item = &receipt.terminal;
+    Ok(conn
+        .query_row(
+            "SELECT 1 FROM compute_external_pool_adapter_adoption_terminal_receipts
+              WHERE terminal_receipt_id=?1 AND terminal_receipt_digest=?2
+                AND receipt_json=?3 AND terminal_material_digest=?4
+                AND adoption_receipt_id=?5 AND adoption_receipt_digest=?6
+                AND revoked_by_admin_user_id=?7 AND reason=?8 AND confirmation=?9
+                AND idempotency_scope=?10 AND idempotency_key=?11 AND revoked_at=?12
+                AND recorded_at=?13 AND adoption_effect=?14 AND provider_effect=?15
+                AND route_effect=?16 AND execution_effect=?17 AND settlement_effect=?18",
+            params![
+                receipt.terminal_receipt_id,
+                receipt.terminal_receipt_digest,
+                stored.receipt_json,
+                receipt.terminal_material_digest,
+                item.adoption_receipt_id,
+                item.adoption_receipt_digest,
+                item.revoked_by_admin_user_id,
+                item.reason,
+                item.confirmation,
+                item.idempotency_scope,
+                item.idempotency_key,
+                item.revoked_at,
+                item.recorded_at,
+                item.adoption_effect,
+                item.provider_effect,
+                item.route_effect,
+                item.execution_effect,
+                item.settlement_effect,
             ],
             |_| Ok(()),
         )

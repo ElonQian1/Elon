@@ -19,6 +19,12 @@ implementation_status: implementation_partially_verified
 
 HTTP 用例从真实 Store 流程创建 V221 onboarding application、V222 staged admission、V241 active verifier 和 V242 active key，没有直接伪造 V243 上游记录。
 
+## V245 本批验证边界
+
+V243 的上述 `2 passed / 0 failed` 是提交 `2490600fc` 已留下的历史证据；V244 adoption 的 migration 定向测试与 2 项 HTTP 链路通过证据记录在独立采用验收中。V245 不重写、继承或扩大这些通过结论。本批 V245 只形成 legacy 标量投影、历史/当前 authority 类型隔离、显式 `checked_at` 及 V244 采用消费 seam 加固源码；按当前架构阶段约束，没有运行编译、测试或真实迁移：`passed=0`、`failed=0`、`uncompiled=true`、`unrun=true`。
+
+V245 测试源码只用于覆盖以下待运行合同：V243 凭据与 V244 adoption/terminal 的全部已物化 SQLite 标量必须与各自不可变 `receipt_json` 精确一致，尤其不能通过漂移报告期限、Adapter 身份或治理/效果字段改变权威；只存在于签名 JSON 的字段仍由 canonical digest 与历史读回审计；显式检查时间到达报告期限后，current authority 必须失败关闭；V243→V244→V245 后 adoption current view 仍可解析父 current view。退出架构阶段前，不能把这些测试源码表述为已通过，也不能据此宣称生产数据库已安全升级。
+
 ## 基线异常
 
 首次运行未限定二进制的同名测试时，仓库当前 elon-pc-node 测试目标存在 8 个与本功能无关的 SQLite VFS 测试类型可见性错误。V243 自身的测试越层访问问题已修复；随后限定 elon-server 的 V243 测试全部通过。该既有 PC 节点错误未在本批次修改。
@@ -27,6 +33,7 @@ HTTP 用例从真实 Store 流程创建 V221 onboarding application、V222 stage
 
 - 生产数据库原位升级、并发压力、备份恢复、真实外部矿池/KMS、真实 credential resolver、网络故障和密钥托管；
 - V243 报告自然到期的长时间等待测试；到期计算由数据库 current view 和领域时间窗覆盖；
+- V245 编译、迁移重开、投影篡改、显式 `checked_at` 和受影响 V244 采用 seam 定向测试；
 - Adapter adoption/install、Provider 新版本、v213 route、worker/ACK、Runner、真实任务派发、计量、结算和付款；
 - 管理 UI、MCP 和生产部署。
 

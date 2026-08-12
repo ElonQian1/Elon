@@ -1,3 +1,5 @@
+use anyhow::{bail, Result};
+use chrono::{DateTime, SecondsFormat};
 use serde::Serialize;
 
 use crate::compute_federation::external_pool_adapter_credential_verification::{
@@ -88,17 +90,77 @@ pub(super) struct StoredExternalPoolAdapterCredentialVerification {
     pub receipt_json: String,
 }
 
-pub(in crate::store) struct CurrentExternalPoolAdapterCredentialVerificationAuthority {
+/// Same-connection authority over one exact historical V243 receipt.
+///
+/// Deliberately has no `Clone`, `Serialize`, or `Deserialize` implementation and
+/// cannot be substituted for the checked current authority below.
+pub(in crate::store) struct HistoricalExternalPoolAdapterCredentialVerificationAuthority {
     receipt: ExternalPoolAdapterCredentialVerificationReceipt,
 }
 
-impl CurrentExternalPoolAdapterCredentialVerificationAuthority {
+impl HistoricalExternalPoolAdapterCredentialVerificationAuthority {
     pub(super) fn new(receipt: ExternalPoolAdapterCredentialVerificationReceipt) -> Self {
         Self { receipt }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterCredentialVerificationReceipt {
+        &self.receipt
+    }
+}
+
+/// Same-connection authority over one exact, current V243 receipt.
+///
+/// Deliberately has no `Clone`, `Serialize`, or `Deserialize` implementation.
+pub(in crate::store) struct CurrentExternalPoolAdapterCredentialVerificationAuthority {
+    receipt: ExternalPoolAdapterCredentialVerificationReceipt,
+    non_bearer_credential_ref: String,
+    checked_at: String,
+}
+
+impl CurrentExternalPoolAdapterCredentialVerificationAuthority {
+    pub(super) fn new(
+        receipt: ExternalPoolAdapterCredentialVerificationReceipt,
+        non_bearer_credential_ref: String,
+        checked_at: String,
+    ) -> Result<Self> {
+        if !report_is_current_at(&receipt.verification.binding.report_expires_at, &checked_at)? {
+            bail!("credential verification authority was checked after report expiry");
+        }
+        Ok(Self {
+            receipt,
+            non_bearer_credential_ref,
+            checked_at,
+        })
     }
     pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterCredentialVerificationReceipt {
         &self.receipt
     }
+    pub(in crate::store) fn non_bearer_credential_ref(&self) -> &str {
+        &self.non_bearer_credential_ref
+    }
+    pub(in crate::store) fn checked_at(&self) -> &str {
+        &self.checked_at
+    }
+}
+
+pub(super) fn validate_checked_at(value: &str) -> Result<()> {
+    let parsed = DateTime::parse_from_rfc3339(value)?;
+    if parsed.offset().local_minus_utc() != 0 {
+        bail!("credential verification checked_at is not UTC");
+    }
+    if parsed.to_rfc3339_opts(SecondsFormat::Nanos, true) != value {
+        bail!("credential verification checked_at is not canonical UTC nanoseconds");
+    }
+    Ok(())
+}
+
+pub(super) fn report_is_current_at(report_expires_at: &str, checked_at: &str) -> Result<bool> {
+    validate_checked_at(checked_at)?;
+    let expires = DateTime::parse_from_rfc3339(report_expires_at)?;
+    if expires.to_rfc3339_opts(SecondsFormat::Nanos, true) != report_expires_at {
+        bail!("credential verification report expiry is not canonical UTC nanoseconds");
+    }
+    Ok(checked_at < report_expires_at)
 }
 
 impl StoredExternalPoolAdapterCredentialVerification {
@@ -156,5 +218,20 @@ pub(super) fn write_receipt(
     ExternalPoolAdapterCredentialVerificationWriteReceipt {
         credential_verification: stored.summary(),
         replayed,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::report_is_current_at;
+
+    #[test]
+    fn explicit_checked_at_uses_strict_canonical_expiry_boundary() {
+        let expiry = "2099-01-01T00:00:00.000000000Z";
+        assert!(report_is_current_at(expiry, "2098-12-31T23:59:59.999999999Z").unwrap());
+        assert!(!report_is_current_at(expiry, expiry).unwrap());
+        assert!(report_is_current_at(expiry, "2099-01-01T00:00:00Z").is_err());
+        assert!(report_is_current_at(expiry, "2099-01-01T08:00:00.000000000+08:00").is_err());
+        assert!(report_is_current_at(expiry, "2098-12-31T16:00:00.000000000-08:00").is_err());
     }
 }

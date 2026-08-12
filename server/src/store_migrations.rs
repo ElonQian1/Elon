@@ -6,6 +6,7 @@ mod compute_capacity_instrument;
 mod compute_delivery_allocation;
 mod compute_delivery_allocation_expiry_worker;
 mod compute_external_pool_adapter_adoption;
+mod compute_external_pool_adapter_adoption_hardening;
 mod compute_external_pool_adapter_artifact_package;
 mod compute_external_pool_adapter_artifact_sandbox_conformance;
 mod compute_external_pool_adapter_artifact_sandbox_conformance_no_replace;
@@ -15,6 +16,7 @@ mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_artifact_vulnerability_report;
 mod compute_external_pool_adapter_credential_verification;
+mod compute_external_pool_adapter_credential_verification_hardening;
 mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_release;
@@ -300,6 +302,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (242, "外部矿池 Adapter 凭据验证器独立签名公钥精确绑定与撤销", compute_external_pool_adapter_credential_verifier_key::migration_v242),
     (243, "外部矿池 Adapter 非 Bearer 凭据短时独立签名验证回执", compute_external_pool_adapter_credential_verification::migration_v243),
     (244, "外部矿池 Adapter 精确证据采用授权与追加式撤销", compute_external_pool_adapter_adoption::migration_v244),
+    (245, "外部矿池 Adapter 凭据验证回执完整投影与检查时间加固", compute_external_pool_adapter_credential_verification_hardening::migration_v245),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

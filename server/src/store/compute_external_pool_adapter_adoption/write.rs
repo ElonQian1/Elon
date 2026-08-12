@@ -32,8 +32,8 @@ impl Store {
         if adoption_by_lineage_on(&tx, &input.application_id, &input.admission_id)?.is_some() {
             bail!("exact onboarding and admission lineage already has an adoption receipt");
         }
-        let binding = exact_binding(&tx, &input)?;
         let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
+        let binding = exact_binding(&tx, &input, &timestamp)?;
         let material = ExternalPoolAdapterAdoptionMaterial {
             binding,
             adopted_by_admin_user_id: input.adopted_by_admin_user_id,
@@ -148,6 +148,7 @@ impl Store {
 fn exact_binding(
     tx: &Transaction<'_>,
     input: &AdoptExternalPoolAdapter,
+    checked_at: &str,
 ) -> Result<ExternalPoolAdapterAdoptionBinding> {
     let sandbox = current_external_pool_adapter_sandbox_conformance_authority_on(
         tx,
@@ -159,13 +160,17 @@ fn exact_binding(
         tx,
         &input.credential_verification_receipt_id,
         &input.expected_credential_verification_receipt_digest,
+        checked_at,
     )?
     .ok_or_else(|| anyhow::anyhow!("current credential verification authority was not found"))?;
     let sandbox_receipt = sandbox.receipt();
     let sandbox_binding = &sandbox_receipt.conformance.binding;
     let credential_receipt = credential.receipt();
     let credential_binding = &credential_receipt.verification.binding;
-    if credential_binding.application_id != input.application_id
+    if sandbox_binding.report_expires_at.as_str() <= checked_at
+        || credential.checked_at() != checked_at
+        || credential.non_bearer_credential_ref().is_empty()
+        || credential_binding.application_id != input.application_id
         || credential_binding.application_digest != input.expected_application_digest
         || credential_binding.admission_id != input.admission_id
         || credential_binding.admission_digest != input.expected_admission_digest
@@ -230,10 +235,11 @@ fn validate_adopt_input(input: &AdoptExternalPoolAdapter) -> Result<()> {
         &input.admission_id,
         &input.credential_verification_receipt_id,
         &input.adopted_by_admin_user_id,
-        &input.idempotency_scope,
-        &input.idempotency_key,
     ] {
-        identifier(value)?;
+        identifier(value, 200)?;
+    }
+    for value in [&input.idempotency_scope, &input.idempotency_key] {
+        identifier(value, 240)?;
     }
     for value in [
         &input.expected_application_digest,
@@ -250,26 +256,23 @@ fn validate_adopt_input(input: &AdoptExternalPoolAdapter) -> Result<()> {
 }
 
 fn validate_revoke_input(input: &RevokeExternalPoolAdapterAdoption) -> Result<()> {
-    for value in [
-        &input.adoption_receipt_id,
-        &input.revoked_by_admin_user_id,
-        &input.reason,
-        &input.idempotency_scope,
-        &input.idempotency_key,
-    ] {
-        identifier(value)?;
+    for value in [&input.adoption_receipt_id, &input.revoked_by_admin_user_id] {
+        identifier(value, 200)?;
     }
+    identifier(&input.reason, 1000)?;
+    identifier(&input.idempotency_scope, 240)?;
+    identifier(&input.idempotency_key, 240)?;
     digest(&input.expected_adoption_receipt_digest)?;
-    if input.reason.len() > 1000 || input.confirmation != ADOPTION_REVOCATION_CONFIRMATION {
+    if input.confirmation != ADOPTION_REVOCATION_CONFIRMATION {
         bail!("Adapter adoption revocation requires a bounded reason and confirmation");
     }
     Ok(())
 }
 
-fn identifier(value: &str) -> Result<()> {
+fn identifier(value: &str, max: usize) -> Result<()> {
     if value.is_empty()
         || value.trim() != value
-        || value.len() > 1000
+        || value.chars().count() > max
         || value.chars().any(char::is_control)
     {
         bail!("Adapter adoption input identifier is invalid");

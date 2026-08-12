@@ -109,7 +109,7 @@ pub(crate) fn revoke_for_admin(
             revoked_by_admin_user_id: admin_user_id.to_string(),
             reason: body.reason,
             confirmation: ADOPTION_REVOCATION_CONFIRMATION.to_string(),
-            idempotency_scope: format!("external-pool-adapter-adoption-revocation:{admin_user_id}"),
+            idempotency_scope: revocation_idempotency_scope(admin_user_id),
             idempotency_key: body.idempotency_key,
         })
         .map_err(AdapterAdoptionServiceError::Conflict)
@@ -153,4 +153,28 @@ fn validate_digest(value: &str) -> Result<(), AdapterAdoptionServiceError> {
 
 fn invalid(message: &'static str) -> AdapterAdoptionServiceError {
     AdapterAdoptionServiceError::Invalid(anyhow::anyhow!(message))
+}
+
+fn revocation_idempotency_scope(admin_user_id: &str) -> String {
+    if admin_user_id.chars().count() > 198 {
+        format!("v244:revoke:{admin_user_id}")
+    } else {
+        format!("external-pool-adapter-adoption-revocation:{admin_user_id}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::revocation_idempotency_scope;
+
+    #[test]
+    fn derived_scopes_fit_the_sqlite_contract_for_maximum_actor_id() {
+        let legacy_actor = "a".repeat(198);
+        let actor = "a".repeat(200);
+        assert_eq!(
+            revocation_idempotency_scope(&legacy_actor),
+            format!("external-pool-adapter-adoption-revocation:{legacy_actor}")
+        );
+        assert!(revocation_idempotency_scope(&actor).chars().count() <= 240);
+    }
 }

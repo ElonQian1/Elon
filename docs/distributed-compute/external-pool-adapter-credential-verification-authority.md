@@ -45,7 +45,15 @@ V243 证明独立 V241/V242 验证器曾对一份精确 external-pool 非 Bearer
 
 任一条件失效后回执保留为 historical_only。后续采用流程必须在自己的写事务内重新取得私有 current authority，并携带精确回执 ID 和摘要，不能长期持有序列化 DTO 代替当前性检查。
 
-## 4. 管理接口与脱敏
+## 4. V245 legacy 投影与检查时间加固
+
+V245 不改变上述 V243 签名报告或 V244 采用协议、HTTP 路径、领域 schema 或既有表形状。它加固 V243 凭据 `receipt_json` 及 V244 adoption/terminal `receipt_json` 与 SQLite 标量投影之间的权威一致性：读取时必须把三张表中全部已物化标量（包括 Provider/Adapter 身份、两个上游报告期限、治理与效果字段）逐项对照规范回执；只存在于签名 JSON、没有独立列的字段继续由 canonical receipt digest 与历史读回审计覆盖。迁移先在同一事务中失败关闭扫描全部既有行，不回填漂移事实，再重建三张表的新写投影门卫。
+
+当前性不能信任未经过上述一致性复核的独立 `report_expires_at` 列。V245 将历史回执与当前 authority 拆为两个不可互换的 sealed 类型；current authority 在同一连接上接收规范 `checked_at`，重新审计 V221/V222/V241/V242 current roots 和已签名报告期限，再封存该检查时间。V244 采用写事务复用同一个纳秒时间完成 V239/V243 到期边界检查及 adopted/recorded 时间落盘，调用方不能把墙钟 view 或历史 DTO 当作可长期持有的采用授权。
+
+V245 不是新的 credential-verification v2：它不新增随机一次性 challenge、V239 绑定、assertion/revocation API、credential resolver 或外部矿池调用，也不改变 V243 已验证的证据含义。若以后需要这些能力，必须使用新的 migration、schema、表和 API ABI，不能原位重解释 V243 历史行。
+
+## 5. 管理接口与脱敏
 
 仅平台 admin 或 owner 可调用：
 
@@ -55,6 +63,6 @@ V243 证明独立 V241/V242 验证器曾对一份精确 external-pool 非 Bearer
 
 挑战响应包含待签名消息，但不包含原始凭据定位符。写入和查询响应不返回原始签名、公钥 PEM、凭据提示、幂等材料、bearer、token 或 secret，只返回 commitment、签名摘要、证据摘要、精确根坐标和当前性状态。
 
-## 5. 后续边界
+## 6. 后续边界
 
-V244 已建立独立 Adapter adoption authority：同时消费当前 V243 凭据回执与 V239 沙箱符合性，形成可撤销的采用授权。V244 不生成 Provider 新版本，也不代表制品已经安装。后续仍需独立 installation/Provider activation 事务，之后才可衔接 route、worker、派发和结算。
+V244 已建立独立 Adapter adoption authority：同时消费当前 V243 凭据回执与 V239 沙箱符合性，形成可撤销的采用授权。V245 加固这条消费 seam，但不生成 Provider 新版本，也不代表制品已经安装。后续仍需独立 installation/Provider activation 事务，之后才可衔接 route、worker、派发和结算。
