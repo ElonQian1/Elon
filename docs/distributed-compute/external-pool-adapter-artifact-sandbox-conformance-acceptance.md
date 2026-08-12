@@ -17,10 +17,10 @@ implementation_status: implementation_partially_verified
 运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-federation-v239-tests-fix1 -- test --manifest-path server\Cargo.toml --bin elon-server sandbox_conformance_ -- --nocapture --test-threads=1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-federation-v239-tests-after-integration-fix -- test --manifest-path server\Cargo.toml --bin elon-server sandbox_conformance_ -- --nocapture --test-threads=1
 ```
 
-结果：通过。最终指纹 `6831ee196129ec7b47f109f6461d8fd8c3f29b4a5a088be6d298ca8f56879555`。
+结果：通过。最终指纹 `b700d01dade1f3ca409dadc2dbbcf88504e1b927bb1f92792d9c00f5889b823f`。该轮在最新远程 `v238 CapacityInstrument` 基线上执行，并包含其编译集成修复。
 
 专项覆盖：
 
