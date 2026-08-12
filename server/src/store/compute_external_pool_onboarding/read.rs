@@ -14,10 +14,12 @@ use crate::{
 use super::{
     canonical::{canonical_application_json_and_digest, canonical_review_json_and_digest},
     types::{
+        CurrentExternalPoolOnboardingApplicationAuthority,
         ExternalPoolOnboardingApplicationReceipt, ExternalPoolOnboardingRequestReceipt,
-        ExternalPoolOnboardingReviewReceipt, StoredApplication, StoredApplicationEnvelope,
-        StoredRequest, StoredReview, StoredReviewEnvelope,
-        EXTERNAL_POOL_ONBOARDING_APPLICATION_SCHEMA, EXTERNAL_POOL_ONBOARDING_REVIEW_SCHEMA,
+        ExternalPoolOnboardingReviewReceipt, HistoricalExternalPoolOnboardingApplicationAuthority,
+        StoredApplication, StoredApplicationEnvelope, StoredRequest, StoredReview,
+        StoredReviewEnvelope, EXTERNAL_POOL_ONBOARDING_APPLICATION_SCHEMA,
+        EXTERNAL_POOL_ONBOARDING_REVIEW_SCHEMA,
     },
 };
 use crate::store::compute_provider_registry::registered_provider_version_on;
@@ -285,6 +287,17 @@ pub(super) fn application_by_request_on(
     application_on(connection, "WHERE request_id=?1", params![request_id])
 }
 
+pub(super) fn application_by_id_on(
+    connection: &Connection,
+    application_id: &str,
+) -> Result<Option<StoredApplication>> {
+    application_on(
+        connection,
+        "WHERE application_id=?1",
+        params![application_id],
+    )
+}
+
 pub(super) fn application_by_idempotency_on(
     connection: &Connection,
     scope: &str,
@@ -373,6 +386,64 @@ fn audit_application(
         bail!("external-pool onboarding application failed exact readback audit");
     }
     Ok(stored)
+}
+
+pub(in crate::store) fn current_external_pool_onboarding_application_authority_on(
+    connection: &Connection,
+    application_id: &str,
+    expected_application_digest: &str,
+) -> Result<Option<CurrentExternalPoolOnboardingApplicationAuthority>> {
+    let Some(historical) = historical_external_pool_onboarding_application_authority_on(
+        connection,
+        application_id,
+        expected_application_digest,
+    )?
+    else {
+        return Ok(None);
+    };
+    let current = crate::store::compute_provider_registry::current_registered_provider_on(
+        connection,
+        &historical.provider().provider_id,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("external-pool onboarding lost its current Provider"))?;
+    if current.provider_digest != historical.provider_digest()
+        || current.provider != *historical.provider()
+    {
+        bail!("external-pool onboarding application is no longer current and exact");
+    }
+    Ok(Some(
+        CurrentExternalPoolOnboardingApplicationAuthority::new(historical),
+    ))
+}
+
+pub(in crate::store) fn historical_external_pool_onboarding_application_authority_on(
+    connection: &Connection,
+    application_id: &str,
+    expected_application_digest: &str,
+) -> Result<Option<HistoricalExternalPoolOnboardingApplicationAuthority>> {
+    let Some(stored) = application_by_id_on(connection, application_id)? else {
+        return Ok(None);
+    };
+    if stored.envelope.application_digest != expected_application_digest {
+        bail!("external-pool onboarding application digest is not exact");
+    }
+    let item = &stored.envelope.application;
+    let historical = crate::store::compute_provider_registry::registered_provider_version_on(
+        connection,
+        &item.provider_id,
+        item.target_provider_policy_revision,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("external-pool onboarding lost its Provider root"))?;
+    if historical.provider_digest != item.target_provider_digest {
+        bail!("external-pool onboarding Provider root is not exact");
+    }
+    Ok(Some(
+        HistoricalExternalPoolOnboardingApplicationAuthority::new(
+            &stored,
+            historical.provider,
+            historical.provider_digest,
+        )?,
+    ))
 }
 
 pub(super) fn request_receipt(

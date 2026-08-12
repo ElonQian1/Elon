@@ -36,6 +36,6 @@ RSA 公钥接受 SPKI 或 PKCS#1 PEM 输入，服务端统一规范化为 SPKI P
 
 响应只返回公钥指纹、精确父实现坐标、记录摘要和生命周期，不返回 PEM、幂等材料、credential、credential ref、bearer、token 或 secret。
 
-## 4. 下一阶段
+## 4. V243 衔接
 
-V243 才能创建服务器派生的限时挑战，绑定非 bearer 凭据定位引用的承诺、精确 onboarding/application、admission、V241 实现和 V242 公钥，并验签生成可撤销、可过期的 credential verification receipt。V242 本身不能表述为“凭据已经验证”。
+V243 已创建服务器派生的限时挑战，绑定非 bearer 凭据定位引用的承诺、精确 onboarding application、staged admission、V241 实现和 V242 公钥，并验签生成可过期的 credential verification receipt。V242 本身仍不能表述为“凭据已经验证”；只有精确且当前的 V243 回执可作为后续采用流程的一项输入。

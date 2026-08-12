@@ -91,7 +91,7 @@ pub(super) struct StoredRevocation {
     pub json: String,
 }
 
-pub(in crate::store) struct CurrentCredentialVerifierKeyAuthority {
+pub(in crate::store) struct CredentialVerifierKeyRecordAuthority {
     key_record_id: String,
     key_record_digest: String,
     verifier_record_id: String,
@@ -104,7 +104,7 @@ pub(in crate::store) struct CurrentCredentialVerifierKeyAuthority {
     public_key_pem: String,
 }
 
-impl CurrentCredentialVerifierKeyAuthority {
+impl CredentialVerifierKeyRecordAuthority {
     pub(super) fn new(root: &StoredKeyRecord) -> Self {
         let item = &root.record.registration;
         Self {
@@ -150,6 +150,48 @@ impl CurrentCredentialVerifierKeyAuthority {
     }
     pub(in crate::store) fn public_key_pem(&self) -> &str {
         &self.public_key_pem
+    }
+}
+
+pub(in crate::store) struct CurrentCredentialVerifierKeyAuthority {
+    historical: CredentialVerifierKeyRecordAuthority,
+}
+
+impl CurrentCredentialVerifierKeyAuthority {
+    pub(super) fn new(root: &StoredKeyRecord) -> Self {
+        Self {
+            historical: CredentialVerifierKeyRecordAuthority::new(root),
+        }
+    }
+    pub(in crate::store) fn key_record_id(&self) -> &str {
+        self.historical.key_record_id()
+    }
+    pub(in crate::store) fn key_record_digest(&self) -> &str {
+        self.historical.key_record_digest()
+    }
+    pub(in crate::store) fn verifier_record_id(&self) -> &str {
+        self.historical.verifier_record_id()
+    }
+    pub(in crate::store) fn verifier_record_digest(&self) -> &str {
+        self.historical.verifier_record_digest()
+    }
+    pub(in crate::store) fn verification_kind(&self) -> &str {
+        self.historical.verification_kind()
+    }
+    pub(in crate::store) fn verifier_id(&self) -> &str {
+        self.historical.verifier_id()
+    }
+    pub(in crate::store) fn verifier_revision(&self) -> i64 {
+        self.historical.verifier_revision()
+    }
+    pub(in crate::store) fn verifier_digest(&self) -> &str {
+        self.historical.verifier_digest()
+    }
+    pub(in crate::store) fn key_id(&self) -> &str {
+        self.historical.key_id()
+    }
+    pub(in crate::store) fn public_key_pem(&self) -> &str {
+        self.historical.public_key_pem()
     }
 }
 

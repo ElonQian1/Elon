@@ -190,6 +190,40 @@ pub(super) fn path() -> &'static str {
     "/api/admin/compute/external-pool-adapter-credential-verifier-keys"
 }
 
+pub(super) async fn create_active_credential_verifier_key(
+    fixture: &Fixture,
+    verifier: &Value,
+    suffix: &str,
+) -> (RsaPrivateKey, Value) {
+    let private = RsaPrivateKey::new(&mut OsRng, 2_048).unwrap();
+    let pem = private
+        .to_public_key()
+        .to_public_key_pem(LineEnding::LF)
+        .unwrap();
+    let body = json!({
+        "verifier_record_id": verifier["verifier_record"]["verifier_record_id"],
+        "expected_verifier_record_digest": verifier["verifier_record"]["verifier_record_digest"],
+        "verification_kind": verifier["verifier_record"]["verification_kind"],
+        "verifier_id": verifier["verifier_record"]["verifier_id"],
+        "verifier_revision": verifier["verifier_record"]["verifier_revision"],
+        "expected_verifier_digest": verifier["verifier_record"]["verifier_digest"],
+        "algorithm": "rsa-pkcs1v15-sha256",
+        "public_key_pem": pem,
+        "idempotency_key": format!("{suffix}-credential-verifier-key"),
+        "confirm_registration": true
+    });
+    let (status, created) = call(
+        &fixture.router,
+        Method::POST,
+        path(),
+        Some(&fixture.reviewer_token),
+        &body,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    (private, created)
+}
+
 fn assert_redacted(value: &Value, pem: &str) {
     let encoded = value.to_string();
     assert!(!encoded.contains(pem));

@@ -11,6 +11,15 @@ mod review;
 mod submit;
 mod types;
 
+pub(in crate::store) use read::{
+    current_external_pool_onboarding_application_authority_on,
+    historical_external_pool_onboarding_application_authority_on,
+};
+pub(in crate::store) use types::{
+    CurrentExternalPoolOnboardingApplicationAuthority,
+    HistoricalExternalPoolOnboardingApplicationAuthority,
+};
+
 #[cfg(test)]
 #[path = "compute_external_pool_onboarding_tests.rs"]
 mod tests;

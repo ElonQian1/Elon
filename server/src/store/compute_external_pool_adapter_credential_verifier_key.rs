@@ -4,10 +4,14 @@ mod read;
 mod types;
 mod write;
 
-pub(in crate::store) use read::current_credential_verifier_key_authority_on;
-pub(in crate::store) use types::CurrentCredentialVerifierKeyAuthority;
+pub(in crate::store) use read::{
+    credential_verifier_key_record_authority_on, current_credential_verifier_key_authority_on,
+};
 pub(crate) use types::{
     CredentialVerifierKeyCurrentnessReceipt, CredentialVerifierKeyRegistrationWriteReceipt,
     CredentialVerifierKeyRevocationWriteReceipt, RegisterCredentialVerifierKey,
     RevokeCredentialVerifierKey,
+};
+pub(in crate::store) use types::{
+    CredentialVerifierKeyRecordAuthority, CurrentCredentialVerifierKeyAuthority,
 };

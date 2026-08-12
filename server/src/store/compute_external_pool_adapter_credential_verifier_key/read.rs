@@ -218,6 +218,23 @@ pub(in crate::store) fn current_credential_verifier_key_authority_on(
     Ok(record_by_id_on(conn, id)?.map(|x| CurrentCredentialVerifierKeyAuthority::new(&x)))
 }
 
+pub(in crate::store) fn credential_verifier_key_record_authority_on(
+    conn: &Connection,
+    id: &str,
+    expected_digest: &str,
+    expected_key_id: &str,
+) -> Result<Option<CredentialVerifierKeyRecordAuthority>> {
+    let Some(root) = record_by_id_on(conn, id)? else {
+        return Ok(None);
+    };
+    if root.record.key_record_digest != expected_digest
+        || root.record.registration.key_id != expected_key_id
+    {
+        bail!("credential-verifier-key historical authority is not exact");
+    }
+    Ok(Some(CredentialVerifierKeyRecordAuthority::new(&root)))
+}
+
 impl Store {
     pub(crate) fn external_pool_adapter_credential_verifier_key_currentness(
         &self,
