@@ -8,7 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 69,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 70,
     [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,

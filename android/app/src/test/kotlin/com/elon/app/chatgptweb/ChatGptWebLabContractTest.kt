@@ -337,6 +337,9 @@ class ChatGptWebLabContractTest {
         val commandPort = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpCommandPort.kt"
         )
+        val commandAdapter = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpCommandAdapter.kt"
+        )
         val conversation = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationController.kt"
         )
@@ -344,14 +347,17 @@ class ChatGptWebLabContractTest {
         assertTrue(actions.contains("private val commands: ChatGptWebMcpCommandPort"))
         assertTrue(actions.contains("block(request.id)"))
         assertTrue(activity.contains("commands = mcpCommandPort"))
-        assertTrue(activity.contains("nativeController.submitFromMcp(requestId)"))
+        assertTrue(activity.contains("sendInputAction = nativeController::submitFromMcp"))
         assertTrue(activity.contains("setInputText = nativeController::setComposerTextFromMcp"))
+        assertTrue(commandAdapter.contains("override fun sendInput(requestId: String) = sendInputAction(requestId)"))
+        assertTrue(commandAdapter.contains("pageAdapter.setDraft(value, expectedDraft, requestId)"))
         assertTrue(conversation.contains("fun submitFromMcp(requestId: String)"))
         assertTrue(conversation.contains("fun setComposerTextFromMcp(text: String)"))
         assertTrue(conversation.contains("private var mcpDraft: String? = null"))
         assertTrue(conversation.contains("if (!updatingComposer) mcpDraft = null"))
         assertTrue(conversation.contains("val desiredDraft = mcpDraft ?: value.draft"))
         assertTrue(commandPort.contains("fun sendInput(requestId: String)"))
+        assertTrue(commandPort.contains("fun setDraft(value: String, expectedDraft: String, requestId: String)"))
         assertTrue(commandPort.contains("fun invokeControl(controlId: String, requestId: String)"))
         assertTrue(commandPort.contains("fun setControlText(controlId: String, text: String, requestId: String)"))
         assertTrue(commandPort.contains("fun setControlSelected(controlId: String, selected: Boolean, requestId: String)"))

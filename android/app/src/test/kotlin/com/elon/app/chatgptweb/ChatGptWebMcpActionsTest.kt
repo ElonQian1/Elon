@@ -17,6 +17,36 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun settingInputSynchronizesTheOfficialDraftWithAReceipt() {
+        var nativeText = ""
+        var value = ""
+        var expectedDraft = ""
+        var dispatched = ""
+        val actions = actions(
+            onSetInputText = { nativeText = it },
+            onSetDraft = { next, expected ->
+                value = next
+                expectedDraft = expected
+            },
+            onDispatch = { action, _ -> dispatched = action },
+        )
+
+        val result = actions.control(JSONObject()
+            .put("action", "set_input_text")
+            .put("text", "next prompt"))
+
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals("next prompt", nativeText)
+        assertEquals("next prompt", value)
+        assertEquals("", expectedDraft)
+        assertEquals("set_draft", dispatched)
+        assertEquals(
+            "set_draft",
+            result.getJSONObject("command_receipt").getString("expected_web_action"),
+        )
+    }
+
+    @Test
     fun stateExportsConversationContextAndStableControlMetadata() {
         val actions = actions()
 
@@ -711,6 +741,8 @@ class ChatGptWebMcpActionsTest {
         onSelectControlChoice: (String, Int) -> Unit = { _, _ -> },
         onSetControlSlider: (String, Double) -> Unit = { _, _ -> },
         onSetControlExpanded: (String, Boolean) -> Unit = { _, _ -> },
+        onSetInputText: (String) -> Unit = {},
+        onSetDraft: (String, String) -> Unit = { _, _ -> },
         onStartDictation: () -> Unit = {},
         onCancelDictation: () -> Unit = {},
         onSubmitDictation: () -> Unit = {},
@@ -938,8 +970,9 @@ class ChatGptWebMcpActionsTest {
             bridgeState = { ChatGptWebPageAdapter.State.READY },
             mode = { ChatGptWebModeController.Mode.NATIVE },
             inputText = { "" },
-            setInputText = {},
+            setInputText = onSetInputText,
             commands = ChatGptWebMcpTestCommandPort(
+                onSetDraft = onSetDraft,
                 onInvoke = onInvoke,
                 onSetControlText = onSetControlText,
                 onSetControlSelected = onSetControlSelected,

@@ -16,7 +16,13 @@ internal class ChatGptWebMcpTestCommandPort(
     private val onRequestFeatures: () -> Unit = {},
     private val onSelectFeature: (String) -> Unit = {},
     private val onDispatch: (String, String) -> Unit = { _, _ -> },
+    private val onSetDraft: (String, String) -> Unit = { _, _ -> },
 ) : ChatGptWebMcpCommandPort {
+    override fun setDraft(value: String, expectedDraft: String, requestId: String) {
+        onSetDraft(value, expectedDraft)
+        dispatch("set_draft", requestId)
+    }
+
     override fun sendInput(requestId: String) = dispatch("send_prompt", requestId)
 
     override fun invokeControl(controlId: String, requestId: String) {

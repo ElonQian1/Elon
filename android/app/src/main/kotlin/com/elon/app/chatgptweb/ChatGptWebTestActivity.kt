@@ -58,35 +58,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private var latestMode = ChatGptWebModeController.Mode.QUICK
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
     private val mcpCommandPort: ChatGptWebMcpCommandPort by lazy {
-        object : ChatGptWebMcpCommandPort {
-            override fun sendInput(requestId: String) = nativeController.submitFromMcp(requestId)
-
-            override fun invokeControl(controlId: String, requestId: String) =
-                invokeUiControl(controlId, requestId)
-
-            override fun setControlText(controlId: String, text: String, requestId: String) =
-                pageAdapter.setUiControlText(controlId, text, requestId)
-
-            override fun setControlSelected(controlId: String, selected: Boolean, requestId: String) =
-                pageAdapter.setUiControlSelected(controlId, selected, requestId)
-
-            override fun selectControlChoice(controlId: String, choiceIndex: Int, requestId: String) =
-                pageAdapter.selectUiControlChoice(controlId, choiceIndex, requestId)
-
-            override fun setControlSlider(controlId: String, value: Double, requestId: String) =
-                pageAdapter.setUiControlSlider(controlId, value, requestId)
-
-            override fun setControlExpanded(controlId: String, expanded: Boolean, requestId: String) =
-                pageAdapter.setUiControlExpanded(controlId, expanded, requestId)
-
-            override fun newConversation(requestId: String) = pageAdapter.startNewConversation(requestId)
-
-            override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)
-
-            override fun regenerateResponse(requestId: String) =
-                pageAdapter.regenerateResponse(requestId)
-
-            override fun startDictation(requestId: String) {
+        ChatGptWebMcpCommandAdapter(
+            pageAdapter = pageAdapter,
+            sendInputAction = nativeController::submitFromMcp,
+            invokeControlAction = ::invokeUiControl,
+            requestComposerOptionsAction = ::requestComposerOptions,
+            startDictationAction = { requestId ->
                 audioPermissionController.runWithMicrophone(
                     action = { controlInvocationCoordinator.startDictation(requestId) },
                     onPermissionDenied = {
@@ -98,35 +75,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                         showMicrophoneDenied()
                     },
                 )
-            }
-
-            override fun cancelDictation(requestId: String) = pageAdapter.cancelDictation(requestId)
-
-            override fun submitDictation(requestId: String) = pageAdapter.submitDictation(requestId)
-
-            override fun removeAttachment(attachmentId: String, requestId: String) =
-                pageAdapter.removeAttachment(attachmentId, requestId)
-
-            override fun refreshControls(requestId: String) = pageAdapter.requestUiManifest(requestId)
-
-            override fun listConversations(requestId: String) = pageAdapter.listConversations(requestId)
-
-            override fun requestComposerOptions(section: String, requestId: String) =
-                this@ChatGptWebTestActivity.requestComposerOptions(section, requestId)
-
-            override fun selectComposerOption(section: String, optionId: String, requestId: String) {
-                if (section == "model") pageAdapter.selectModelOption(optionId, requestId)
-                else pageAdapter.selectComposerTool(optionId, requestId)
-            }
-
-            override fun requestFeatures(requestId: String) = pageAdapter.listFeatures(requestId)
-
-            override fun selectFeature(featureId: String, requestId: String) =
-                pageAdapter.selectFeature(featureId, requestId)
-
-            override fun openConversation(path: String, requestId: String) =
-                pageAdapter.openConversation(path, requestId)
-        }
+            },
+        )
     }
 
     private val mcpActions: ChatGptWebMcpActions by lazy {

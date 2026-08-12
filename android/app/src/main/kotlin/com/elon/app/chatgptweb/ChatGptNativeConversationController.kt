@@ -80,6 +80,7 @@ internal class ChatGptNativeConversationController(
 
     fun render(value: ChatGptWebSnapshot) {
         snapshot = value
+        if (mcpDraft != null && mcpDraft == value.draft) mcpDraft = null
         val pending = pendingPrompt
         if (pending != null && value.messages.any { it.role == "user" && it.content == pending }) {
             pendingPrompt = null
@@ -114,6 +115,10 @@ internal class ChatGptNativeConversationController(
 
     fun onCommandResult(event: ChatGptWebEvent.CommandResult) {
         when (event.action) {
+            "set_draft" -> if (!event.ok) {
+                mcpDraft = null
+                snapshot?.let(::render)
+            }
             "send_prompt" -> {
                 if (event.ok) {
                     mcpDraft = null
@@ -197,7 +202,7 @@ internal class ChatGptNativeConversationController(
         val hasAttachments = snapshot?.attachments?.isNotEmpty() == true
         if ((prompt.isEmpty() && !hasAttachments) || !sendButton.isEnabled) return
         pendingPrompt = prompt.takeIf(String::isNotEmpty)
-        onSend(prompt, snapshot?.draft.orEmpty(), requestId)
+        onSend(prompt, mcpDraft ?: snapshot?.draft.orEmpty(), requestId)
         setAvailable(false)
     }
 

@@ -138,6 +138,7 @@ class ChatGptWebMcpGenerationTest {
         inputText = { "" },
         setInputText = {},
         commands = object : ChatGptWebMcpCommandPort {
+            override fun setDraft(value: String, expectedDraft: String, requestId: String) = Unit
             override fun sendInput(requestId: String) = Unit
             override fun invokeControl(controlId: String, requestId: String) = Unit
             override fun setControlText(controlId: String, text: String, requestId: String) = Unit

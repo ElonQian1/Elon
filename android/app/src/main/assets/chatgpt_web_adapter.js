@@ -260,6 +260,19 @@
     );
   }
 
+  function setDraft(value, expectedDraft, respond) {
+    const composer = findComposer();
+    if (!composer) return respond('set_draft', false, '未找到输入框，请切换网页模式。');
+    if (comparableText(composerValue(composer)) !== comparableText(expectedDraft)) {
+      return respond('set_draft', false, '网页草稿已变化，请返回官网确认后重试。');
+    }
+    if (!setComposerValue(composer, value)) {
+      return respond('set_draft', false, '官方输入框未接受文本，请返回官网重试。');
+    }
+    respond('set_draft', true, '');
+    scheduleSnapshot();
+  }
+
   function startGoogleLogin(respond) {
     const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
     const target = candidates.find((node) => {
@@ -297,6 +310,13 @@
     }
     if (action === 'send_prompt') {
       return sendPrompt(
+        String(command.value || '').slice(0, 20000),
+        String(command.expectedDraft || '').slice(0, 20000),
+        respond
+      );
+    }
+    if (action === 'set_draft') {
+      return setDraft(
         String(command.value || '').slice(0, 20000),
         String(command.expectedDraft || '').slice(0, 20000),
         respond

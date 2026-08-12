@@ -107,6 +107,13 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId,
     )
 
+    fun setDraft(value: String, expectedDraft: String, requestId: String) = runCommand(
+        action = "set_draft",
+        value = value.take(MAX_PROMPT_LENGTH),
+        expectedDraft = expectedDraft.take(MAX_PROMPT_LENGTH),
+        requestId = requestId,
+    )
+
     fun stopGeneration() = runCommand("stop_generation")
 
     fun stopGeneration(requestId: String) = runCommand("stop_generation", requestId = requestId)
@@ -322,7 +329,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 69
+        internal const val ADAPTER_VERSION = 70
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
