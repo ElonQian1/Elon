@@ -23,8 +23,8 @@ implementation_status: implementation_partially_verified
 
 ```text
 cargo test --manifest-path server/Cargo.toml --bin elon-server signed_provenance --no-fail-fast --locked --offline
-fingerprint: 8d40e8dce049f575145d00d446f13fb9948a7710bbe9e8e289c1ceee03517399
-evidence: D:\rust\shared\rust-cache-v2\validation-v1\evidence\8d40e8dce049f575145d00d446f13fb9948a7710bbe9e8e289c1ceee03517399\summary.json
+fingerprint: dedb895723ae77d4fca0735210e89e8c4ec9124bc8fa562da74a9681a99affd9
+evidence: D:\rust\shared\rust-cache-v2\validation-v1\evidence\dedb895723ae77d4fca0735210e89e8c4ec9124bc8fa562da74a9681a99affd9\summary.json
 status: success
 ```
 
