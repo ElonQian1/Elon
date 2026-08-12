@@ -253,6 +253,7 @@
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/distributed-compute/README.md": "custom:distributed-compute",
     "docs/distributed-compute/architecture.md": "custom:distributed-compute",
+    "docs/distributed-compute/current-implementation-status.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-abort-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-activation-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-consumer-review-api.md": "custom:distributed-compute",
@@ -407,6 +408,7 @@
     "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/distributed-compute/README.md": "current",
     "docs/distributed-compute/architecture.md": "current",
+    "docs/distributed-compute/current-implementation-status.md": "current",
     "docs/distributed-compute/attempt-abort-api.md": "current",
     "docs/distributed-compute/attempt-activation-api.md": "current",
     "docs/distributed-compute/attempt-consumer-review-api.md": "current",
@@ -842,6 +844,29 @@
     }
   },
   "document_metadata": {
+    "docs/distributed-compute/current-implementation-status.md": {
+      "doc_type": "current_status",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-12",
+      "review_interval_days": 14,
+      "implementation_refs": [
+        "file:server/src/compute_federation/mod.rs",
+        "file:server/src/store.rs",
+        "file:server/src/store_migrations.rs"
+      ],
+      "related": [
+        "AI_CURRENT.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/capacity-instrument-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-artifact-sandbox-conformance-authority.md"
+      ]
+    },
     "docs/distributed-compute/README.md": {
       "doc_type": "subproject_overview",
       "audience": [
@@ -851,7 +876,7 @@
         "AI 代理"
       ],
       "owner": "分布式算力联邦",
-      "reviewed_at": "2026-08-04",
+      "reviewed_at": "2026-08-12",
       "review_interval_days": 30,
       "implementation_refs": [
         "file:server/src/compute_federation/mod.rs",
@@ -888,6 +913,7 @@
         "file:server/src/node_compute_sharing.rs"
       ],
       "related": [
+        "docs/distributed-compute/current-implementation-status.md",
         "docs/decisions/distributed-compute-capacity-ledger-v1.md",
         "docs/decisions/distributed-compute-federation-v1.md",
         "docs/distributed-compute/architecture.md",

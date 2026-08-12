@@ -2,8 +2,8 @@
 title: Capacity Instrument v238 权威
 status: current
 design_status: design_frozen
-implementation_status: source_written
-verification_status: not_run
+implementation_status: implementation_compiled
+verification_status: integration_migration_smoke_passed
 reviewed_at: 2026-08-12
 owners: backend, ai-economy
 ---
@@ -14,7 +14,7 @@ owners: backend, ai-economy
 
 v238 以 **FREEZE** 冻结 `capacity_future` 的最窄标准合约权威：平台先登记一个不可变 `CapacityInstrument`，由另一名管理员激活，再把一个已经发布且仍为 current active 的 exact Offer 以不可变 adoption receipt 采用到该合约。此后新鲜报价、锁价、预留、容量承诺和 whole-only 交付必须同时绑定 exact Instrument、Offer version/digest 与 publication identity。
 
-当前状态仅为 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。领域合同、v238 migration、Store、Service、管理员 HTTP、下游 Store 门卫、数据库直写门卫和未执行测试源码已经写入；没有编译、执行 migration、运行测试、启动服务或生产部署证据。验收边界见 [`capacity-instrument-acceptance.md`](capacity-instrument-acceptance.md)。
+当前状态为 `implementation_compiled/integration_migration_smoke_passed`。完整服务端测试目标已经编译，v238 migration 已随两次全新文件数据库 `Store::open` 执行；但 Instrument lifecycle/adoption、下游门卫和管理员 HTTP 的 v238 专项仍为 `passed=0`，也没有服务启动、历史库升级、真实 TCP 或生产部署证据。验收边界见 [`capacity-instrument-acceptance.md`](capacity-instrument-acceptance.md)。
 
 这不是 Order、Trade、Position、ClearingReceipt、指数价、标记价、真实价格源、撮合、可信计量、任务执行、Provider 收益、外部付款或结算。它只回答“哪个标准合约被哪一版已发布 Offer 精确采用，以及 fresh `capacity_future` 消费能否继续”。
 

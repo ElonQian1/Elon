@@ -102,6 +102,28 @@
       ],
       "forbidden_paths": [],
       "require_first": "docs/decisions/reject-ai-to-ai-skill-route.md"
+    },
+    {
+      "id": "distributed-compute-current-status",
+      "query": "分布式算力、算力市场、Attempt、外部矿池 Adapter 和节点插件目前分别实现到什么程度，还有哪些没有完成？",
+      "expected_paths": [
+        "docs/distributed-compute/current-implementation-status.md"
+      ],
+      "forbidden_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md"
+      ],
+      "require_first": "docs/distributed-compute/current-implementation-status.md"
+    },
+    {
+      "id": "distributed-compute-v238-v239-boundary",
+      "query": "V238 CapacityInstrument 和 V239 Adapter 沙箱证明是不是重复实现，各自验证到了哪一步？",
+      "expected_paths": [
+        "docs/distributed-compute/capacity-instrument-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-artifact-sandbox-conformance-authority.md"
+      ],
+      "forbidden_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md"
+      ]
     }
   ]
 }

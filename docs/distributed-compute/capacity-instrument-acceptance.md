@@ -2,8 +2,8 @@
 title: Capacity Instrument v238 验收边界
 status: current
 design_status: design_frozen
-implementation_status: source_written
-verification_status: not_run
+implementation_status: implementation_compiled
+verification_status: integration_migration_smoke_passed
 acceptance_status: pending
 reviewed_at: 2026-08-12
 owners: backend, ai-economy
@@ -13,9 +13,11 @@ owners: backend, ai-economy
 
 ## 1. 当前结论
 
-v238 的领域合同、migration、Store、Service、管理员 HTTP、下游 Store/SQLite 门卫及测试夹具源码已经写入。当前只能报告 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`：未编译 Rust，未执行 v238 migration，未运行 Store/Service/HTTP/SQLite 测试，未启动服务，也未做文件重开、历史库升级、真实 TCP 或生产部署。
+v238 的领域合同、migration、Store、Service、管理员 HTTP、下游 Store/SQLite 门卫及测试夹具源码已经写入。本轮 `v239` 集成验证已编译完整 `elon-server` test target，并通过两次全新文件数据库 `Store::open` 间接执行 v238 migration；期间修复了 3 处连接借用错误和 1 处测试夹具所有权错误。证据指纹为 `b700d01dade1f3ca409dadc2dbbcf88504e1b927bb1f92792d9c00f5889b823f`。
 
-此前 v225 CapacityCommitment 与 v228 DeliveryAllocation 的编译、临时 SQLite 和专项测试是 v238 进入基线前的历史证据，只证明旧纵切面；它们没有执行 v238 新 migration、Instrument lifecycle/adoption 或新增下游门卫，不能作为 v238 的验证指纹，也不能把本批状态升级为 `implementation_partially_verified`。
+这只允许把状态更新为 `implementation_compiled/integration_migration_smoke_passed`。v238 自己的 Instrument lifecycle、Offer adoption、下游 Store/SQLite 门卫和管理员 HTTP 专项仍为 `passed=0`；服务启动、文件重开、历史库升级、真实 TCP 和生产部署也未验证。
+
+此前 v225 CapacityCommitment 与 v228 DeliveryAllocation 的编译、临时 SQLite 和专项测试是 v238 进入基线前的历史证据，只证明旧纵切面。本轮新增证据只补足编译和新库迁移冒烟，仍不能作为 Instrument lifecycle/adoption 或新增下游门卫的行为验收指纹，也不能把整批状态升级为 `implementation_partially_verified`。
 
 ## 2. 已写入的源码证据
 
@@ -24,7 +26,7 @@ v238 的领域合同、migration、Store、Service、管理员 HTTP、下游 Sto
 - Store root/lifecycle/adoption/currentness：`server/src/store/compute_capacity_instruments/`；
 - v238 tables、projection/source guard 与 downstream direct-SQL guard：`server/src/store_migrations/compute_capacity_instrument/`；
 - fresh consumer 接线：Price Snapshot、quote candidate、quoted Job、Broker Reservation、CapacityCommitment 与 DeliveryAllocation 的 Store validation；
-- 未执行测试/夹具：`server/src/compute_federation/capacity_instrument_api_tests.rs`、`server/src/compute_federation/capacity_instrument_test_support.rs` 及复用该 support 的 Commitment/Allocation 测试。
+- 尚未定向执行的测试/夹具：`server/src/compute_federation/capacity_instrument_api_tests.rs`、`server/src/compute_federation/capacity_instrument_test_support.rs` 及复用该 support 的 Commitment/Allocation 测试。
 
 源码存在不是运行证据。文档模块化与 `git diff --check` 即使通过，也只证明文档/补丁静态整洁，不证明 Rust 类型、SQLite trigger 或业务事务正确。
 
