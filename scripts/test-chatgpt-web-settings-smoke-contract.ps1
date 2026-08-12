@@ -16,7 +16,7 @@ if (@($parseErrors).Count -gt 0) {
 foreach ($required in @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Assert-ChatGptWebSmokeAdapterVersion",
-    'ExpectedAdapterVersion = 83',
+    'ExpectedAdapterVersion = 84',
     'view_mode -notin @("official", "web")',
     '$state.bridge_state -eq "ready"',
     '$state.adapter_current -eq $true',

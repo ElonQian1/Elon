@@ -103,7 +103,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("composerToolSelection.value(semantic, liveActiveInComposer)"))
         assertTrue(adapter.contains("composerToolSelection.observe('web_search', desiredSelected)"))
         assertTrue(toolSelection.contains("function verifyInMenu"))
-        assertTrue(adapter.contains("target.directStateKnown"))
+        assertTrue(toolSelection.contains("target.directStateKnown"))
         assertTrue(toolSelection.contains("touchAttempt >= MAX_TOUCH_ATTEMPTS"))
         assertFalse(adapter.contains("verify_composer_tool"))
         assertFalse(adapter.contains("select_composer_tool_retry"))
