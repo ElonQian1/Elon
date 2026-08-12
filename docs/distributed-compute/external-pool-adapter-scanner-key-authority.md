@@ -13,7 +13,7 @@ implementation_status: implementation_partially_verified
 
 V235 建立独立的漏洞扫描器 RSA 公钥登记、四眼激活、吊销和 currentness。扫描器密钥必须与 V230 供应商制品签名密钥不同；同一公钥不能同时证明“谁发布了制品”和“谁检查了制品”。
 
-V235 只回答未来扫描报告应由哪一个已登记、当前有效的扫描器身份签名。它不运行扫描器，不下载漏洞情报，不生成或认可漏洞报告，也不授予制品安全、conformance、Adapter、route 或派发权限。
+V235 只回答扫描报告应由哪一个已登记、当前有效的扫描器身份签名。后续 V236 已消费该信任根并记录 exact-SBOM 签名报告，但仍不运行扫描器、不下载或独立核验漏洞情报，也不授予 conformance、Adapter、route 或派发权限。
 
 ## 2. 信任根合同
 

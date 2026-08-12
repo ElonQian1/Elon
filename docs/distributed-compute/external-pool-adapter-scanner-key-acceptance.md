@@ -51,7 +51,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 ## 未验证
 
 - 真实漏洞扫描器进程、依赖解析器、CVE 数据源和情报镜像；
-- 已签漏洞报告、情报 snapshot 新鲜度、离线镜像更新和签名密钥托管；
+- V236 已完成已签报告和最长 168 小时 snapshot currentness；真实情报内容、离线镜像更新和生产签名密钥托管仍未验证；
 - 动态恶意行为、sandbox conformance、credential verifier runtime；
 - 生产数据库原位升级、真实 TCP、并发压力、备份恢复和部署；
 - MCP/PC 管理面、Adapter 安装/采用、route、Worker/ACK、真实派发和结算。
