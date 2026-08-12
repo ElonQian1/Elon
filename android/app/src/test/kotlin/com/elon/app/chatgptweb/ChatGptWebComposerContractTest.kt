@@ -105,6 +105,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(toolSelection.contains("function verifyInMenu"))
         assertTrue(adapter.contains("target.directStateKnown"))
         assertTrue(toolSelection.contains("touchAttempt >= MAX_TOUCH_ATTEMPTS"))
+        assertFalse(adapter.contains("verify_composer_tool"))
+        assertFalse(adapter.contains("select_composer_tool_retry"))
         assertTrue(adapter.contains("opensSubmenu: opensSubmenu(node)"))
         assertTrue(adapter.contains("open_model_submenu"))
         assertTrue(adapter.contains("layout.setNodeExpanded(target.node, true"))

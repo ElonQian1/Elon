@@ -609,13 +609,13 @@
             const trigger = triggerFor('tools', composer);
             if (!trigger || !isVisible(trigger)) return onTimeout();
             const baseline = captureOptionBaseline();
-            if (!emitTriggerTouch('tools', 'verify_composer_tool', trigger, emitEvent)) {
+            if (!emitTriggerTouch('tools', 'list_composer_tools', trigger, emitEvent)) {
               return onTimeout();
             }
             waitForOptions('tools', baseline, onReady, onTimeout);
           },
           retryTouch: (node) => emitVisibleNodeTouch(
-            'select_composer_tool_retry', node, emitEvent
+            'select_composer_tool', node, emitEvent
           ),
           complete: (ok, detail) => {
             if (ok && composerToolSelection) {
