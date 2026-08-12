@@ -191,6 +191,16 @@ function Invoke-ChatGptWebSmokeAdb {
     return [string]$result.Stdout
 }
 
+function Test-ChatGptWebSmokeActivityForeground {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    $activities = Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+        -Arguments @("shell", "dumpsys", "activity", "activities") `
+        -TimeoutSec 8 -Label "read ChatGPT Web foreground activity"
+    return $activities -match
+        '(?m)^\s*topResumedActivity=.*com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
+}
+
 function ConvertTo-ChatGptWebSmokeSafeDiagnostic {
     param(
         [AllowNull()]$Value,
@@ -387,12 +397,16 @@ function Wait-ChatGptWebSmokeState {
         [Parameter(Mandatory = $true)]$Runtime,
         [Parameter(Mandatory = $true)][scriptblock]$Predicate,
         [Parameter(Mandatory = $true)][ValidateRange(1, 300)][int]$TimeoutSec,
-        [Parameter(Mandatory = $true)][string]$Description
+        [Parameter(Mandatory = $true)][string]$Description,
+        [switch]$RequireChatGptForeground
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     $last = $null
     do {
+        if ($RequireChatGptForeground -and -not (Test-ChatGptWebSmokeActivityForeground -Runtime $Runtime)) {
+            throw "ChatGPT Web acceptance was interrupted because another app took the foreground."
+        }
         $last = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
         if (& $Predicate $last) { return $last }
         Start-Sleep -Seconds $Runtime.poll_interval_sec

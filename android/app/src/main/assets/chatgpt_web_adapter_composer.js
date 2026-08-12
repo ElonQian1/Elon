@@ -8,6 +8,7 @@
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
+  const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
@@ -338,15 +339,25 @@
       const occurrence = seen.get(label) || 0;
       seen.set(label, occurrence + 1);
       const role = String(node.getAttribute('role') || 'menuitem').slice(0, 32);
-      const selected = node.getAttribute('aria-checked') === 'true' ||
+      const directSelected = node.getAttribute('aria-checked') === 'true' ||
         node.getAttribute('aria-selected') === 'true' ||
         node.getAttribute('data-state') === 'checked';
+      const semantic = optionSemantic(section, node, label);
+      const layout = window.__elonChatGptLayout;
+      const activeInComposer = semantic === 'web_search' && !!(
+        layout && typeof layout.findSemanticNode === 'function' &&
+        layout.findSemanticNode('web_search', 'composer')
+      );
+      const selected = composerToolStatePolicy &&
+        typeof composerToolStatePolicy.optionSelected === 'function'
+        ? composerToolStatePolicy.optionSelected({ semantic, directSelected, activeInComposer })
+        : directSelected;
       return {
         id: optionId(section, label, occurrence),
         label,
         selected,
         kind: role,
-        semantic: optionSemantic(section, node, label),
+        semantic,
         role,
         opensSubmenu: opensSubmenu(node),
         selectable: selected || node.hasAttribute('aria-checked') || node.hasAttribute('aria-selected'),

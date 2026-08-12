@@ -2,6 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 $script = Get-Content (Join-Path $PSScriptRoot "smoke-chatgpt-web-composer-controls.ps1") -Raw
+$runtime = Get-Content (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1") -Raw
 
 $required = @(
     "ExpectedHardwareSerial",
@@ -10,8 +11,12 @@ $required = @(
     "user_assisted_audio_capture",
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Assert-ChatGptWebSmokeAdapterVersion",
+    "RequireChatGptForeground",
     "chatgpt_start_dictation",
     '[string]$_.semantic -eq "dictation"',
+    'view_mode = "native"',
+    'finally {',
+    '$restoreSearch',
     "chatgpt_cancel_dictation",
     "start_dictation",
     "cancel_dictation",
@@ -25,6 +30,10 @@ $required = @(
 )
 foreach ($token in $required) {
     if (-not $script.Contains($token)) { throw "Missing composer smoke contract token: $token" }
+}
+
+foreach ($token in @("function Test-ChatGptWebSmokeActivityForeground", "topResumedActivity")) {
+    if (-not $runtime.Contains($token)) { throw "Missing composer smoke runtime token: $token" }
 }
 
 if ($script -match "send_input|ProbeMarker|Reply only with") {

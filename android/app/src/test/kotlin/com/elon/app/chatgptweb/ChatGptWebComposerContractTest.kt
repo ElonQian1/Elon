@@ -17,6 +17,9 @@ class ChatGptWebComposerContractTest {
         val optionPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_composer_option_policy.js",
         )
+        val toolStatePolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_composer_tool_state_policy.js",
+        )
         val actionTargetPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
         )
@@ -35,13 +38,15 @@ class ChatGptWebComposerContractTest {
         )
 
         val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
+        val toolStateAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_state_policy.js")
         val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
         val dictationSessionAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_session_policy.js")
         val modelLabelAsset = pageAdapter.indexOf("chatgpt_web_adapter_model_label_policy.js")
         val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
         assertTrue(modelLabelAsset >= 0)
         assertTrue(policyAsset > modelLabelAsset)
-        assertTrue(actionTargetAsset > policyAsset)
+        assertTrue(toolStateAsset > policyAsset)
+        assertTrue(actionTargetAsset > toolStateAsset)
         assertTrue(dictationSessionAsset > actionTargetAsset)
         assertTrue(composerAsset > dictationSessionAsset)
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
@@ -77,7 +82,13 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("!target || !isOptionVisible(target.node)"))
         assertTrue(adapter.contains("emitVisibleNodeTouch(purpose, target.node, emitEvent)"))
         assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
-        assertTrue(adapter.contains("semantic: optionSemantic(section, node, label)"))
+        assertTrue(adapter.contains("const semantic = optionSemantic(section, node, label)"))
+        assertTrue(adapter.contains("layout.findSemanticNode('web_search', 'composer')"))
+        assertTrue(adapter.contains("composerToolStatePolicy.optionSelected"))
+        assertTrue(layoutAdapter.contains("composerToolStatePolicy.semantic"))
+        assertTrue(layoutAdapter.contains("composerToolStatePolicy.controlSelected"))
+        assertTrue(toolStatePolicy.contains("function isWebSearchSignal"))
+        assertTrue(toolStatePolicy.contains("function optionSelected"))
         assertTrue(adapter.contains("opensSubmenu: opensSubmenu(node)"))
         assertTrue(adapter.contains("open_model_submenu"))
         assertTrue(adapter.contains("layout.setNodeExpanded(target.node, true"))
@@ -120,7 +131,13 @@ class ChatGptWebComposerContractTest {
         assertTrue(actionTargetPolicy.contains("documentRef.elementFromPoint"))
         assertTrue(actionTargetPolicy.contains("style.pointerEvents === 'none'"))
         assertTrue(actionTargetPolicy.contains("clipsChildren(style)"))
-        listOf(adapter, optionPolicy, actionTargetPolicy, dictationSessionPolicy).forEach { source ->
+        listOf(
+            adapter,
+            optionPolicy,
+            toolStatePolicy,
+            actionTargetPolicy,
+            dictationSessionPolicy,
+        ).forEach { source ->
             listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
                 assertFalse("composer adapter must not contain $it", source.contains(it))
             }

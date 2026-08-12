@@ -8,7 +8,7 @@ param(
     [switch]$SkipDictation,
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 66
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 67
 )
 
 $ErrorActionPreference = "Stop"
@@ -102,11 +102,13 @@ if (-not $SkipDictation) {
     $dictationStart = Invoke-ReceiptAction -Action "chatgpt_start_dictation" `
         -ExpectedAction "start_dictation"
     $active = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "active ChatGPT dictation" -Predicate { param($state) $state.dictation_active -eq $true }
+        -Description "active ChatGPT dictation" -RequireChatGptForeground `
+        -Predicate { param($state) $state.dictation_active -eq $true }
     $dictationCancel = Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
         -ExpectedAction "cancel_dictation"
     $inactive = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "stopped ChatGPT dictation" -Predicate { param($state) $state.dictation_active -eq $false }
+        -Description "stopped ChatGPT dictation" -RequireChatGptForeground `
+        -Predicate { param($state) $state.dictation_active -eq $false }
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
         -Arguments @{ text = "" } | Out-Null
     $dictationResult = [ordered]@{
@@ -119,25 +121,48 @@ if (-not $SkipDictation) {
     }
 }
 
+Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+    -Arguments @{ view_mode = "native" } | Out-Null
+
 $search = Get-WebSearchOption
 $initialSearchSelected = $search.selected -eq $true
-$toggleOn = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-    -ExpectedAction "select_composer_tool" -Arguments @{
-        section = "tools"
-        option_id = [string]$search.id
+$restoreSearch = $false
+try {
+    $toggleOn = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+        -ExpectedAction "select_composer_tool" -Arguments @{
+            section = "tools"
+            option_id = [string]$search.id
+        }
+    $restoreSearch = $true
+    $toggled = Get-WebSearchOption
+    if (($toggled.selected -eq $true) -eq $initialSearchSelected) {
+        throw "ChatGPT web search selection did not toggle."
     }
-$toggled = Get-WebSearchOption
-if (($toggled.selected -eq $true) -eq $initialSearchSelected) {
-    throw "ChatGPT web search selection did not toggle."
-}
-$toggleOff = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-    -ExpectedAction "select_composer_tool" -Arguments @{
-        section = "tools"
-        option_id = [string]$toggled.id
+    $toggleOff = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+        -ExpectedAction "select_composer_tool" -Arguments @{
+            section = "tools"
+            option_id = [string]$toggled.id
+        }
+    $restoreSearch = $false
+    $restored = Get-WebSearchOption
+    if (($restored.selected -eq $true) -ne $initialSearchSelected) {
+        throw "ChatGPT web search selection was not restored."
     }
-$restored = Get-WebSearchOption
-if (($restored.selected -eq $true) -ne $initialSearchSelected) {
-    throw "ChatGPT web search selection was not restored."
+} finally {
+    if ($restoreSearch) {
+        try {
+            $current = Get-WebSearchOption
+            if (($current.selected -eq $true) -ne $initialSearchSelected) {
+                Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+                    -ExpectedAction "select_composer_tool" -Arguments @{
+                        section = "tools"
+                        option_id = [string]$current.id
+                    } | Out-Null
+            }
+        } catch {
+            Write-Warning "ChatGPT web search test state could not be restored automatically."
+        }
+    }
 }
 
 if ($originViewMode -in @("web", "native")) {

@@ -9,6 +9,7 @@
   const controlOwnershipPolicy = window.__elonChatGptControlOwnershipPolicy;
   const formCommands = window.__elonChatGptFormCommands;
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
+  const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -167,6 +168,15 @@
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
     const modelSignal = cleanText(signal + ' ' + labelOf(node, ''));
+    const composerToolSemantic = composerToolStatePolicy &&
+      typeof composerToolStatePolicy.semantic === 'function'
+      ? composerToolStatePolicy.semantic({
+        region,
+        signal,
+        label: labelOf(node, '')
+      })
+      : '';
+    if (composerToolSemantic) return composerToolSemantic;
     if (form && (form.inputKind === 'search' || /search|搜索/.test(signal))) return 'search';
     const formSemantic = formAdapter && typeof formAdapter.semantic === 'function'
       ? formAdapter.semantic(form)
@@ -326,6 +336,12 @@
       const form = formAdapter && formAdapter.describe(node);
       const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
       used.add(id);
+      const directSelected = form ? form.selected :
+        node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true';
+      const selected = composerToolStatePolicy &&
+        typeof composerToolStatePolicy.controlSelected === 'function'
+        ? composerToolStatePolicy.controlSelected({ semantic, region, directSelected })
+        : directSelected;
       const control = {
         id,
         semantic,
@@ -333,8 +349,7 @@
         region,
         role: roleOf(node),
         enabled: !node.matches(':disabled') && node.getAttribute('aria-disabled') !== 'true',
-        selected: form ? form.selected :
-          node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true',
+        selected,
         inputKind: form && form.inputKind || undefined,
         writable: !!(form && form.writable),
         stateSettable: !!(form && form.stateSettable),

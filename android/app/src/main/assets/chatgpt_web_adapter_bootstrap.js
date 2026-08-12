@@ -18,6 +18,7 @@
     '__elonChatGptMessageActionPolicy',
     '__elonChatGptMessages',
     '__elonChatGptComposerOptionPolicy',
+    '__elonChatGptComposerToolStatePolicy',
     '__elonChatGptActionTargetPolicy',
     '__elonChatGptDictationSessionPolicy',
     '__elonChatGptModelLabelPolicy',
