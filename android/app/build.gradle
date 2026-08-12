@@ -117,6 +117,9 @@ def releaseKeystoreFile = file(releaseKeystorePath)
 def debugApplicationIdSuffix = signingValue("ELON_DEBUG_APPLICATION_ID_SUFFIX")
 def localNodeName = System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: "一龙调试"
 def debugAppLabel = signingValue("ELON_DEBUG_APP_LABEL", localNodeName)
+def chatGptVerificationCaseJson = project.ext.chatGptWebVerificationCaseInputSha256Json
+    .replace('\\', '\\\\')
+    .replace('"', '\\"')
 
 gradle.taskGraph.whenReady { graph ->
     def needsReleaseSigning = graph.allTasks.any { it.name.toLowerCase(Locale.ROOT).contains("release") }
@@ -159,6 +162,7 @@ android {
         def fallbackUrl = signingValue("ELON_FALLBACK_SERVER_URL", "")
         buildConfigField "String", "FALLBACK_SERVER_URL", "\"${fallbackUrl}\""
         buildConfigField "String", "CHATGPT_WEB_INPUT_SHA256", "\"${project.ext.chatGptWebInputSha256}\""
+        buildConfigField "String", "CHATGPT_WEB_VERIFICATION_CASE_INPUT_SHA256_JSON", "\"${chatGptVerificationCaseJson}\""
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_INPUT_SHA256", "\"${project.ext.chatGptWebVerifiedInputSha256}\""
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_APK_VERSION_NAME", "\"${project.ext.chatGptWebVerifiedApkVersionName}\""
         buildConfigField "int", "CHATGPT_WEB_VERIFIED_APK_VERSION_CODE", "${project.ext.chatGptWebVerifiedApkVersionCode}"

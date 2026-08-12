@@ -76,6 +76,8 @@ internal object ChatGptWebFeatureBaseline {
         manifest: ChatGptWebUiManifest?,
         mode: ChatGptWebModeController.Mode,
         composerOptions: Collection<ChatGptWebComposerOption> = emptyList(),
+        verificationEvidence: ChatGptWebVerificationEvidenceStore.Snapshot =
+            ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY,
     ): JSONObject {
         val advertised = snapshot?.capabilities?.supported.orEmpty()
         val semantics = manifest?.controls.orEmpty()
@@ -84,7 +86,10 @@ internal object ChatGptWebFeatureBaseline {
         val composerSemantics = composerOptions
             .groupingBy(ChatGptWebComposerOption::semantic)
             .eachCount()
-        val rows = FEATURES.map { feature ->
+        val resolvedFeatures = FEATURES.map { feature ->
+            feature.withVerificationEvidence(verificationEvidence)
+        }
+        val rows = resolvedFeatures.map { feature ->
             val currentPageObserved = when (feature.id) {
                 "official_authentication" -> snapshot?.authenticated == true
                 "official_fullscreen_fallback" -> mode == ChatGptWebModeController.Mode.WEB
@@ -119,9 +124,9 @@ internal object ChatGptWebFeatureBaseline {
                     feature.remainingGap ?: JSONObject.NULL,
                 )
         }
-        val incomplete = FEATURES.filter { it.status != ImplementationStatus.COMPLETE }
-        val incompleteCode = FEATURES.filter { it.codeStatus == CodeStatus.PARTIAL }
-        val pendingVerification = FEATURES.filter {
+        val incomplete = resolvedFeatures.filter { it.status != ImplementationStatus.COMPLETE }
+        val incompleteCode = resolvedFeatures.filter { it.codeStatus == CodeStatus.PARTIAL }
+        val pendingVerification = resolvedFeatures.filter {
             it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
@@ -150,21 +155,22 @@ internal object ChatGptWebFeatureBaseline {
                             ),
                     ),
             )
-            .put("feature_count", FEATURES.size)
+            .put("verification_evidence", verificationEvidence.toJson())
+            .put("feature_count", resolvedFeatures.size)
             .put(
                 "summary",
                 JSONObject()
                     .put(
                         "complete",
-                        FEATURES.count { it.status == ImplementationStatus.COMPLETE },
+                        resolvedFeatures.count { it.status == ImplementationStatus.COMPLETE },
                     )
                     .put(
                         "partial",
-                        FEATURES.count { it.status == ImplementationStatus.PARTIAL },
+                        resolvedFeatures.count { it.status == ImplementationStatus.PARTIAL },
                     )
                     .put(
                         "fallback_only",
-                        FEATURES.count { it.status == ImplementationStatus.FALLBACK_ONLY },
+                        resolvedFeatures.count { it.status == ImplementationStatus.FALLBACK_ONLY },
                     )
                     .put("remaining", incomplete.size),
             )
@@ -173,15 +179,15 @@ internal object ChatGptWebFeatureBaseline {
                 JSONObject()
                     .put(
                         "implemented",
-                        FEATURES.count { it.codeStatus == CodeStatus.IMPLEMENTED },
+                        resolvedFeatures.count { it.codeStatus == CodeStatus.IMPLEMENTED },
                     )
                     .put(
                         "partial",
-                        FEATURES.count { it.codeStatus == CodeStatus.PARTIAL },
+                        resolvedFeatures.count { it.codeStatus == CodeStatus.PARTIAL },
                     )
                     .put(
                         "official_fallback",
-                        FEATURES.count { it.codeStatus == CodeStatus.OFFICIAL_FALLBACK },
+                        resolvedFeatures.count { it.codeStatus == CodeStatus.OFFICIAL_FALLBACK },
                     )
                     .put("remaining", incompleteCode.size),
             )
@@ -190,40 +196,40 @@ internal object ChatGptWebFeatureBaseline {
                 JSONObject()
                     .put(
                         "offline_verified",
-                        FEATURES.count {
+                            resolvedFeatures.count {
                             it.verificationStatus == VerificationStatus.OFFLINE_VERIFIED
                         },
                     )
                     .put(
                         "device_verified",
-                        FEATURES.count {
+                            resolvedFeatures.count {
                             it.verificationStatus == VerificationStatus.DEVICE_VERIFIED
                         },
                     )
                     .put(
                         "user_action_required",
-                        FEATURES.count {
+                            resolvedFeatures.count {
                             it.verificationStatus == VerificationStatus.USER_ACTION_REQUIRED
                         },
                     )
                     .put(
                         "deferred",
-                        FEATURES.count { it.verificationStatus == VerificationStatus.DEFERRED },
+                        resolvedFeatures.count { it.verificationStatus == VerificationStatus.DEFERRED },
                     )
                     .put(
                         "failed",
-                        FEATURES.count { it.verificationStatus == VerificationStatus.FAILED },
+                        resolvedFeatures.count { it.verificationStatus == VerificationStatus.FAILED },
                     )
                     // Compatibility aliases for v2 consumers. "verified" now means device proof.
                     .put(
                         "verified",
-                        FEATURES.count {
+                            resolvedFeatures.count {
                             it.verificationStatus == VerificationStatus.DEVICE_VERIFIED
                         },
                     )
                     .put(
                         "pending",
-                        FEATURES.count {
+                            resolvedFeatures.count {
                             it.verificationStatus in setOf(
                                 VerificationStatus.OFFLINE_VERIFIED,
                                 VerificationStatus.DEFERRED,
@@ -243,6 +249,30 @@ internal object ChatGptWebFeatureBaseline {
     }
 
     fun ids(): Set<String> = FEATURES.mapTo(linkedSetOf(), Feature::id)
+
+    fun verificationCaseIds(): Set<String> = DEVICE_VERIFICATION_CASES.values.toSortedSet()
+
+    private fun Feature.withVerificationEvidence(
+        evidence: ChatGptWebVerificationEvidenceStore.Snapshot,
+    ): Feature {
+        val caseId = verificationCase ?: return this
+        val record = evidence.records[caseId]
+        if (record?.current == true) {
+            return copy(
+                verificationStatus = VerificationStatus.DEVICE_VERIFIED,
+                verificationGap = null,
+            )
+        }
+        val gap = if (record == null) {
+            "device_acceptance_not_recorded_for_current_case_input"
+        } else {
+            "verification_case_inputs_changed_since_device_acceptance"
+        }
+        return copy(
+            verificationStatus = VerificationStatus.DEFERRED,
+            verificationGap = gap,
+        )
+    }
 
     private fun Int?.orZero(): Int = this ?: 0
 

@@ -11,6 +11,8 @@ internal object ChatGptWebCapabilityMatrix {
         bridgeState: ChatGptWebPageAdapter.State,
         mode: ChatGptWebModeController.Mode,
         document: ChatGptWebObservedState.Snapshot? = null,
+        verificationEvidence: ChatGptWebVerificationEvidenceStore.Snapshot =
+            ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY,
     ): JSONObject {
         val adapterCurrent = document?.adapterCurrent ?: true
         val advertised = snapshot?.capabilities?.supported.orEmpty()
@@ -189,6 +191,7 @@ internal object ChatGptWebCapabilityMatrix {
                     manifest,
                     mode,
                     document?.composerSections?.values?.flatten().orEmpty(),
+                    verificationEvidence,
                 ),
             )
             .put("adaptation_review", JSONObject()

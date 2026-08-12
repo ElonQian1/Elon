@@ -45,6 +45,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var modeController: ChatGptWebModeController
     private lateinit var proxyController: ChatGptWebProxyController
     private lateinit var fileChooserController: ChatGptWebFileChooserController
+    private val verificationEvidenceStore: ChatGptWebVerificationEvidenceStore by lazy {
+        ChatGptWebVerificationEvidenceStore(applicationContext)
+    }
     private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
     private val sessionRestorer by lazy { ChatGptWebSessionRestorer(this) }
     private val messageClipboard by lazy { ChatGptMessageClipboard(this) }
@@ -89,6 +92,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             mode = { latestMode },
             inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },
             audioPermissionState = audioPermissionController::snapshot,
+            verificationEvidence = verificationEvidenceStore::snapshot,
+            recordVerificationCases = verificationEvidenceStore::record,
             copyMessage = messageClipboard::copy,
             setInputText = nativeController::setComposerTextFromMcp,
             commands = mcpCommandPort,

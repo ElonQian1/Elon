@@ -11,8 +11,9 @@ internal class ChatGptWebMcpActions(
     private val bridgeState: () -> ChatGptWebPageAdapter.State,
     private val mode: () -> ChatGptWebModeController.Mode,
     private val inputText: () -> String,
-    private val audioPermissionState: () -> ChatGptWebAudioPermissionState.Snapshot =
-        { ChatGptWebAudioPermissionState.UNOBSERVED },
+    private val audioPermissionState: () -> ChatGptWebAudioPermissionState.Snapshot = { ChatGptWebAudioPermissionState.UNOBSERVED },
+    private val verificationEvidence: () -> ChatGptWebVerificationEvidenceStore.Snapshot = { ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY },
+    private val recordVerificationCases: (Set<String>) -> ChatGptWebVerificationEvidenceStore.Snapshot = { ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY },
     private val setInputText: (String) -> Unit,
     private val copyMessage: (String) -> ChatGptClipboardMetadata = {
         ChatGptClipboardMetadata(false, 0, emptySet())
@@ -294,7 +295,14 @@ internal class ChatGptWebMcpActions(
                 bridgeState(),
                 mode(),
                 observedAtDispatch,
+                verificationEvidence(),
             )
+            "chatgpt_record_verification_cases" -> {
+                return when (val result = ChatGptWebVerificationEvidenceActions.record(args, snapshot()?.authenticated == true, recordVerificationCases)) {
+                    is ChatGptWebVerificationEvidenceActions.Result.Success -> result.response
+                    is ChatGptWebVerificationEvidenceActions.Result.Error -> error(action, result.code)
+                }
+            }
             "chatgpt_open_conversation" -> {
                 val path = args.optString("conversation_path")
                 if (!CONVERSATION_PATH.matches(path)) return error(action, "invalid_conversation_path")
@@ -784,6 +792,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_get_conversations",
             "chatgpt_get_navigation",
             "chatgpt_get_capability_matrix",
+            "chatgpt_record_verification_cases",
             "chatgpt_open_conversation",
             "chatgpt_select_view",
         )

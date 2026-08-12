@@ -1,5 +1,6 @@
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import groovy.json.JsonOutput
 
 def repoRoot = rootProject.projectDir.parentFile
 def inputFiles = new LinkedHashSet<File>()
@@ -50,6 +51,166 @@ def sortedInputs = inputFiles.toList().sort { left, right ->
     repoRoot.toPath().relativize(left.toPath()).toString().replace('\\', '/') <=>
         repoRoot.toPath().relativize(right.toPath()).toString().replace('\\', '/')
 }
+
+def fingerprintBytes = { File input ->
+    def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
+    if (relativePath.endsWith("ChatGptWebPageAdapter.kt")) {
+        return input.getText("UTF-8")
+            .replaceAll(/ADAPTER_VERSION\s*=\s*\d+/, "ADAPTER_VERSION = <normalized>")
+            .getBytes(StandardCharsets.UTF_8)
+    }
+    if (relativePath.startsWith("scripts/") && relativePath.endsWith(".ps1")) {
+        return input.getText("UTF-8")
+            .replaceAll(/ExpectedAdapterVersion\s*=\s*\d+/, "ExpectedAdapterVersion = <normalized>")
+            .getBytes(StandardCharsets.UTF_8)
+    }
+    input.bytes
+}
+
+def digestFiles = { Collection<File> files ->
+    def caseDigest = MessageDigest.getInstance("SHA-256")
+    files.toList().sort { left, right ->
+        repoRoot.toPath().relativize(left.toPath()).toString().replace('\\', '/') <=>
+            repoRoot.toPath().relativize(right.toPath()).toString().replace('\\', '/')
+    }.each { input ->
+        def relativePath = repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')
+        caseDigest.update(relativePath.getBytes(StandardCharsets.UTF_8))
+        caseDigest.update((byte) 0)
+        caseDigest.update(fingerprintBytes(input))
+        caseDigest.update((byte) 0)
+    }
+    caseDigest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+
+def filesMatching = { List<String> patterns ->
+    def matches = new LinkedHashSet<File>()
+    patterns.each { pattern ->
+        fileTree(repoRoot).matching { include pattern }.files.each { matches.add(it) }
+    }
+    if (matches.isEmpty()) {
+        throw new GradleException("ChatGPT Web verification fingerprint matched no files: ${patterns}")
+    }
+    matches
+}
+
+def coreCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebBridge*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebCommandReceipts.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebDocumentSession.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcp*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebObservedState.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebProtocol.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchDispatcher.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebUi*.kt",
+    "android/app/src/main/assets/chatgpt_web_adapter.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_bootstrap.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
+    "scripts/chatgpt-web-smoke-*.ps1",
+])
+def composerCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Composer*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Dictation*.kt",
+    "android/app/src/main/assets/chatgpt_web_adapter_composer*.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js",
+])
+def messageCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Message*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Copy*.kt",
+    "android/app/src/main/assets/chatgpt_web_adapter_message*.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_messages.js",
+    "android/app/src/main/res/layout/item_chatgpt_message_*.xml",
+])
+def navigationCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Conversation*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Feature*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Navigation*.kt",
+    "android/app/src/main/assets/chatgpt_web_adapter_conversation*.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_navigation*.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js",
+    "android/app/src/main/res/layout/*chatgpt_conversation*.xml",
+    "android/app/src/main/res/layout/*chatgpt_feature*.xml",
+    "android/app/src/main/res/layout/sheet_chatgpt_*.xml",
+])
+def adaptiveCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeAdaptive*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNative*Control*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSelectedStatePolicy.kt",
+    "android/app/src/main/assets/chatgpt_web_adapter_control_ownership_policy.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_disclosure_controls.js",
+    "android/app/src/main/assets/chatgpt_web_adapter_form_*.js",
+])
+def sessionCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSession*.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebViewClient.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebNavigationPolicy.kt",
+])
+def allCaseInputs = new LinkedHashSet<File>(sortedInputs)
+def caseInputs = { Collection<File> specific, String smokeScript ->
+    def files = new LinkedHashSet<File>(coreCaseInputs)
+    files.addAll(specific)
+    files.addAll(filesMatching(["scripts/${smokeScript}"]))
+    files
+}
+def verificationCaseFiles = new LinkedHashMap<String, Collection<File>>()
+verificationCaseFiles["safe/read_only_surface"] = allCaseInputs + filesMatching(["scripts/smoke-chatgpt-web-apk.ps1"])
+verificationCaseFiles["reversible/send_probe"] = caseInputs(
+    composerCaseInputs + messageCaseInputs,
+    "smoke-chatgpt-web-apk.ps1",
+)
+verificationCaseFiles["reversible/send_probe_with_stop"] = caseInputs(
+    composerCaseInputs + messageCaseInputs,
+    "smoke-chatgpt-web-apk.ps1",
+)
+verificationCaseFiles["reversible/reversible_controls"] = caseInputs(
+    composerCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-reversible-controls.ps1",
+)
+verificationCaseFiles["reversible/tool_execution_with_citations"] = caseInputs(
+    composerCaseInputs + messageCaseInputs,
+    "smoke-chatgpt-web-tool-execution.ps1",
+)
+verificationCaseFiles["reversible/composer_controls"] = caseInputs(
+    composerCaseInputs,
+    "smoke-chatgpt-web-composer-controls.ps1",
+)
+verificationCaseFiles["reversible/message_structure"] = caseInputs(
+    messageCaseInputs,
+    "smoke-chatgpt-web-message-structure.ps1",
+)
+verificationCaseFiles["reversible/copy_receipt_without_content_readback"] = caseInputs(
+    messageCaseInputs,
+    "smoke-chatgpt-web-copy.ps1",
+)
+verificationCaseFiles["safe/message_actions"] = caseInputs(
+    messageCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-message-actions.ps1",
+)
+verificationCaseFiles["safe/feature_pages"] = caseInputs(
+    navigationCaseInputs,
+    "smoke-chatgpt-web-feature-pages.ps1",
+)
+verificationCaseFiles["safe/feature_pages_individual"] = caseInputs(
+    navigationCaseInputs,
+    "smoke-chatgpt-web-feature-pages.ps1",
+)
+verificationCaseFiles["safe/settings_overlay_form_controls"] = caseInputs(
+    navigationCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-settings.ps1",
+)
+verificationCaseFiles["safe/settings_overlay_idempotent_form_controls"] = caseInputs(
+    navigationCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-settings.ps1",
+)
+verificationCaseFiles["safe/session_recovery"] = caseInputs(
+    sessionCaseInputs,
+    "smoke-chatgpt-web-session-recovery.ps1",
+)
+def verificationCaseHashes = verificationCaseFiles.collectEntries { caseId, files ->
+    [(caseId): digestFiles(files)]
+}
 if (sortedInputs.isEmpty()) {
     throw new GradleException("ChatGPT Web fingerprint input set is empty")
 }
@@ -65,6 +226,8 @@ sortedInputs.each { input ->
 
 ext.chatGptWebInputFiles = sortedInputs
 ext.chatGptWebInputSha256 = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+ext.chatGptWebVerificationCaseInputSha256 = verificationCaseHashes
+ext.chatGptWebVerificationCaseInputSha256Json = JsonOutput.toJson(verificationCaseHashes)
 ext.chatGptWebVerifiedInputSha256 = "52eca576928f8debc4578334916a775164999000cfe95ed1f96a68074322f58b"
 ext.chatGptWebVerifiedApkVersionName = "1.1.993"
 ext.chatGptWebVerifiedApkVersionCode = 1003
@@ -77,7 +240,10 @@ tasks.register("printChatGptWebInputFingerprint") {
         println "CHATGPT_WEB_INPUT_SHA256=${project.ext.chatGptWebInputSha256}"
         println "CHATGPT_WEB_INPUT_FILE_COUNT=${project.ext.chatGptWebInputFiles.size()}"
         project.ext.chatGptWebInputFiles.each { input ->
-            println "CHATGPT_WEB_INPUT_FILE=${repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')}"
+        println "CHATGPT_WEB_INPUT_FILE=${repoRoot.toPath().relativize(input.toPath()).toString().replace('\\', '/')}"
+        }
+        project.ext.chatGptWebVerificationCaseInputSha256.each { caseId, hash ->
+            println "CHATGPT_WEB_VERIFICATION_CASE=${caseId}:${hash}"
         }
     }
 }
