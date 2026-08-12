@@ -30,9 +30,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 - `../` 路径、manifest Adapter 身份漂移、大小写冲突路径和高压缩比炸弹均返回 `422`，不产生格式收据；
 - source size guard、Rust format 和 `git diff --check` 通过。
 
-最终验收指纹：`4ac207d8bc36028cefbeaa9c8634aa33694f29cc58fad079342b21d2866176cf`。
+最终验收指纹：`28492d2b3eff802807f8d22a049fe214be5e6dc50d4cab19ba4b9d437eb7cb92`。
 
-证据：`D:\rust\shared\rust-cache-v2\validation-v1\evidence\4ac207d8bc36028cefbeaa9c8634aa33694f29cc58fad079342b21d2866176cf\summary.json`。
+证据：`D:\rust\shared\rust-cache-v2\validation-v1\evidence\28492d2b3eff802807f8d22a049fe214be5e6dc50d4cab19ba4b9d437eb7cb92\summary.json`。
 
 ## 未验证
 
