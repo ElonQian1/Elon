@@ -16,6 +16,9 @@ use crate::{
     },
 };
 
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::ManagedSqliteShmTestTargetObserver;
+
 use super::ManagedTestRouteOrdinal;
 
 const MAX_SHM_FAULT_STEPS: usize = 32;
@@ -302,6 +305,22 @@ impl ManagedTestShmFaultPlanBinding {
             return Err("managed SHM fault probe is not installed");
         };
         probe.was_triggered(phase, occurrence)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn observer(&self) -> Result<ManagedSqliteShmTestTargetObserver, &'static str> {
+        if self.target.role != ManagedSqliteLogicalFileRole::Main {
+            return Err("managed SHM fault observer requires the exact main-file role");
+        }
+        let state = self
+            .slot
+            .state
+            .lock()
+            .map_err(|_| "managed SHM fault plan slot poisoned")?;
+        let ManagedTestShmFaultPlanState::Installed(probe) = &*state else {
+            return Err("managed SHM fault probe is not installed");
+        };
+        Ok(probe.observer())
     }
 
     pub(super) fn role(&self) -> ManagedSqliteLogicalFileRole {

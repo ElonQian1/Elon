@@ -197,6 +197,65 @@ impl ManagedSqliteRoutedConnectionFixture {
             .ordinal()
     }
 
+    #[cfg(all(test, windows))]
+    pub(super) fn install_shm_fault_script(
+        &self,
+        after_success: &[(
+            crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
+            u32,
+            crate::node_agent_managed_fs::ManagedSqliteShmFailureClass,
+        )],
+    ) -> Result<(), &'static str> {
+        self.route_entry
+            .as_ref()
+            .ok_or("managed fixture route entry is not live")?
+            .install_shm_fault_script(&[], after_success)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn installed_shm_fault_witness(
+        &self,
+    ) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {
+        self.route_entry
+            .as_ref()
+            .ok_or("managed fixture route entry is not live")?
+            .installed_shm_fault_witness()
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn call_main_shm_unmap_keep(&self) -> c_int {
+        let mut file = ptr::null_mut::<ffi::sqlite3_file>();
+        // SAFETY: the fixture owns this live connection. SQLite writes only its current main-file
+        // pointer to `file`; the pointer never leaves this sealed test-only method.
+        let code = unsafe {
+            ffi::sqlite3_file_control(
+                self.raw_handle(),
+                b"main\0".as_ptr().cast(),
+                ffi::SQLITE_FCNTL_FILE_POINTER,
+                (&mut file as *mut *mut ffi::sqlite3_file).cast(),
+            )
+        };
+        if code != ffi::SQLITE_OK || file.is_null() {
+            return if code == ffi::SQLITE_OK {
+                ffi::SQLITE_IOERR
+            } else {
+                code
+            };
+        }
+        // SAFETY: `file_control` returned SQLite's live main-file allocation. We validate both
+        // method table and callback before invoking direct Keep-mode xShmUnmap.
+        let methods = unsafe { (*file).pMethods };
+        if methods.is_null() {
+            return ffi::SQLITE_IOERR;
+        }
+        // SAFETY: `methods` belongs to the same live main file and was checked non-null.
+        let Some(unmap) = (unsafe { (*methods).xShmUnmap }) else {
+            return ffi::SQLITE_IOERR;
+        };
+        // SAFETY: direct callback receives its owning live sqlite3_file and delete=0 (Keep).
+        unsafe { unmap(file, 0) }
+    }
+
     pub(super) fn close(mut self) -> anyhow::Result<ManagedTestVfsCounts> {
         let counts = self.close_connection()?;
         if let Some(registration) = self.registration.take() {

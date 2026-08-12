@@ -144,24 +144,24 @@ impl ManagedTestVfsRouteEntry {
         })
     }
 
-    pub(super) fn pending_shm_fault_count(&self) -> Result<usize, &'static str> {
-        let binding = self.main_shm_fault_binding()?;
-        binding.pending_count().map_err(|code| {
-            let _ = self.route.retain_failure(code);
-            code
-        })
+    #[cfg(all(test, windows))]
+    pub(super) fn installed_shm_fault_witness(
+        &self,
+    ) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {
+        let binding = self.readonly_main_shm_fault_binding()?;
+        binding.observer()?;
+        Ok(binding)
     }
 
-    pub(super) fn shm_fault_was_triggered(
+    #[cfg(all(test, windows))]
+    fn readonly_main_shm_fault_binding(
         &self,
-        phase: crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
-        occurrence: u32,
-    ) -> Result<bool, &'static str> {
-        let binding = self.main_shm_fault_binding()?;
-        binding.was_triggered(phase, occurrence).map_err(|code| {
-            let _ = self.route.retain_failure(code);
-            code
-        })
+    ) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {
+        self.shm_faults.binding(
+            self.registration_id,
+            self.ordinal,
+            ManagedSqliteLogicalFileRole::Main,
+        )
     }
 
     fn main_shm_fault_binding(&self) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {
