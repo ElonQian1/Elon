@@ -35,6 +35,8 @@ mod a2b1_cases;
 #[cfg(test)]
 mod a2b2_cases;
 #[cfg(all(test, windows))]
+mod a2c_vfs_unregister_runner;
+#[cfg(all(test, windows))]
 mod a2c_windows_runner;
 mod callbacks;
 mod connection;
