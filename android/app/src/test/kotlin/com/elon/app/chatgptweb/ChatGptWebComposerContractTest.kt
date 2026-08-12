@@ -99,6 +99,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("readAttachments"))
         assertTrue(adapter.contains("removeAttachment"))
         assertTrue(adapter.contains("dictationActive"))
+        assertTrue(adapter.contains("layout.findSemanticNode('dictation', 'composer')"))
         assertTrue(adapter.contains("cancel dictation"))
         assertTrue(adapter.contains("submit dictation"))
         assertTrue(adapter.contains("取消听写"))

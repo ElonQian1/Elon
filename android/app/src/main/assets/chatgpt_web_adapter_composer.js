@@ -205,12 +205,18 @@
 
   function findDictationButton(composer) {
     const scope = composerScope(composer);
-    return Array.from(scope.querySelectorAll('button')).find((button) => {
+    const direct = Array.from(scope.querySelectorAll('button')).find((button) => {
       if (!isActionable(button)) return false;
       const label = nodeLabel(button);
       return /dictation|听写|语音输入/i.test(label) &&
         !/cancel dictation|submit dictation|取消听写|提交听写/i.test(label);
     }) || null;
+    if (direct) return direct;
+    const layout = window.__elonChatGptLayout;
+    const semanticNode = layout && typeof layout.findSemanticNode === 'function'
+      ? layout.findSemanticNode('dictation', 'composer')
+      : null;
+    return isVisible(semanticNode) ? semanticNode : null;
   }
 
   function dictationActive(composer) {

@@ -203,6 +203,74 @@ assert.equal(semanticEvents[0].purpose, 'list_model_options');
 assert.equal(semanticEvents[0].xRatio, 0.5);
 assert.equal(semanticEvents[0].yRatio, 0.825);
 
+const dictationEvents = [];
+const dictationResults = [];
+const dictationButton = {
+  id: '',
+  textContent: '',
+  getAttribute(name) {
+    return name === 'aria-label' ? '开始听写' : null;
+  },
+  getBoundingClientRect() {
+    return { left: 300, top: 640, right: 360, bottom: 700, width: 60, height: 60 };
+  }
+};
+const dictationScope = {
+  querySelector: () => null,
+  querySelectorAll: () => []
+};
+const dictationComposer = {
+  closest(selector) {
+    return selector === 'form' ? dictationScope : null;
+  }
+};
+const dictationSandbox = {
+  document: {
+    querySelector: () => null,
+    querySelectorAll: () => []
+  },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+    __elonChatGptActionTargetPolicy: {
+      actionPoint(node) {
+        return node === dictationButton ? { x: 330, y: 670 } : null;
+      },
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: {
+      filter: (_section, options) => options
+    },
+    __elonChatGptLayout: {
+      findSemanticNode(semantic, region) {
+        return semantic === 'dictation' && region === 'composer' ? dictationButton : null;
+      }
+    }
+  }
+};
+dictationSandbox.window.window = dictationSandbox.window;
+dictationSandbox.window.document = dictationSandbox.document;
+dictationSandbox.window.location = dictationSandbox.location;
+
+vm.runInNewContext(source, dictationSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+assert.ok(
+  Array.from(dictationSandbox.window.__elonChatGptComposer.capabilities(dictationComposer))
+    .includes('dictation'),
+  'semantic manifest dictation controls must be advertised as a composer capability'
+);
+dictationSandbox.window.__elonChatGptComposer.startDictation(
+  dictationComposer,
+  (event) => dictationEvents.push(event),
+  (...args) => dictationResults.push(args)
+);
+assert.deepEqual(Array.from(dictationResults[0]), ['start_dictation', true, '']);
+assert.equal(dictationEvents[0].type, 'web_touch_request');
+assert.equal(dictationEvents[0].purpose, 'start_dictation');
+assert.equal(dictationEvents[0].xRatio, 0.825);
+assert.equal(dictationEvents[0].yRatio, 0.8375);
+
 const optionEvents = [];
 const optionResults = [];
 const optionNode = {
