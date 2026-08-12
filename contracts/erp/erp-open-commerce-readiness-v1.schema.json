@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.ai/contracts/erp/erp-open-commerce-readiness-v1.schema.json",
+  "title": "ERP open commerce readiness V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "project_id", "instance_id", "overall_state", "erp_onboarding_ready", "consumer_invocation_ready", "consumer_discovery_ready", "materialization", "merchant_selection", "runtime", "active_runtime_capability_keys", "directory", "blockers"],
+  "properties": {
+    "schema": { "const": "yilong.erp.open_commerce_readiness.v1" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "instance_id": { "type": "string", "minLength": 1 },
+    "overall_state": { "enum": ["ready", "consumer_ready_erp_pending", "erp_ready_commerce_pending", "blocked"] },
+    "erp_onboarding_ready": { "type": "boolean" },
+    "consumer_invocation_ready": { "type": "boolean" },
+    "consumer_discovery_ready": { "type": "boolean" },
+    "materialization": { "$ref": "#/$defs/materialization" },
+    "merchant_selection": { "$ref": "#/$defs/merchant_selection" },
+    "runtime": { "oneOf": [{ "$ref": "#/$defs/runtime" }, { "type": "null" }] },
+    "active_runtime_capability_keys": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "directory": { "oneOf": [{ "$ref": "#/$defs/directory" }, { "type": "null" }] },
+    "blockers": { "type": "array", "items": { "$ref": "#/$defs/blocker" } }
+  },
+  "$defs": {
+    "materialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "recoverable", "blockers", "next_action"],
+      "properties": {
+        "state": { "type": "string" },
+        "recoverable": { "type": "boolean" },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "next_action": { "type": "string" }
+      }
+    },
+    "merchant_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "selected", "candidates"],
+      "properties": {
+        "status": { "enum": ["merchant_missing", "selection_required", "selected_implicit", "selected_explicit"] },
+        "selected": { "oneOf": [{ "$ref": "#/$defs/merchant" }, { "type": "null" }] },
+        "candidates": { "type": "array", "items": { "$ref": "#/$defs/merchant" } }
+      }
+    },
+    "merchant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "display_name", "status", "node_mode"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 },
+        "status": { "type": "string" },
+        "node_mode": { "type": "string" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "manifest_sha256", "last_verified_at", "last_error_code"],
+      "properties": {
+        "status": { "type": "string" },
+        "manifest_sha256": { "type": ["string", "null"], "pattern": "^[0-9A-Fa-f]{64}$" },
+        "last_verified_at": { "type": ["string", "null"] },
+        "last_error_code": { "type": ["string", "null"] }
+      }
+    },
+    "directory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "revision", "published_at"],
+      "properties": {
+        "status": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "published_at": { "type": ["string", "null"] }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "scope", "message", "next_action"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "scope": { "enum": ["erp_onboarding", "consumer_invocation", "consumer_discovery"] },
+        "message": { "type": "string", "minLength": 1 },
+        "next_action": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

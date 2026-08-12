@@ -1,0 +1,48 @@
+{
+  "schema": "yilong.erp.open_commerce_readiness.v1",
+  "project_id": "project-cofficethinking",
+  "instance_id": "erp-instance-cofficethinking",
+  "overall_state": "consumer_ready_erp_pending",
+  "erp_onboarding_ready": false,
+  "consumer_invocation_ready": true,
+  "consumer_discovery_ready": true,
+  "materialization": {
+    "state": "not_planned",
+    "recoverable": true,
+    "blockers": ["尚未创建初始化 Matter"],
+    "next_action": "由商户创建初始化 Matter；系统只保存计划，不会自动执行。"
+  },
+  "merchant_selection": {
+    "status": "selected_implicit",
+    "selected": {
+      "id": "merchant-cofficethinking",
+      "display_name": "咖啡店",
+      "status": "active",
+      "node_mode": "self_hosted"
+    },
+    "candidates": [{
+      "id": "merchant-cofficethinking",
+      "display_name": "咖啡店",
+      "status": "active",
+      "node_mode": "self_hosted"
+    }]
+  },
+  "runtime": {
+    "status": "active",
+    "manifest_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "last_verified_at": "2026-08-12T00:00:00Z",
+    "last_error_code": null
+  },
+  "active_runtime_capability_keys": ["catalog.search", "order.commit"],
+  "directory": {
+    "status": "published",
+    "revision": 1,
+    "published_at": "2026-08-12T00:00:00Z"
+  },
+  "blockers": [{
+    "code": "erp_materialization_not_verified",
+    "scope": "erp_onboarding",
+    "message": "ERP 实例物化状态为 not_planned，尚未形成已验收证据",
+    "next_action": "由商户创建初始化 Matter；系统只保存计划，不会自动执行。"
+  }]
+}

@@ -174,6 +174,8 @@ mod erp_blueprint_mcp;
 mod erp_blueprint_mcp_tools;
 mod erp_blueprint_migration;
 #[cfg(test)]
+mod erp_blueprint_open_commerce_readiness_tests;
+#[cfg(test)]
 mod erp_blueprint_tests;
 #[cfg(test)]
 mod erp_blueprint_workflow_tests;

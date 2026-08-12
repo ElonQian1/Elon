@@ -19,6 +19,7 @@
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/configuration` | 由商户按配置修订号更新主题、模块和扩展元数据 |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/bootstrap-matter` | 原子创建或返回商户实例初始化 Matter |
 | GET | `/api/projects/:project_id/erp/instances/:instance_id/materialization` | 从 Matter、Assignment 和 Artifact 真源读取初始化状态、证据与下一步 |
+| GET | `/api/projects/:project_id/erp/instances/:instance_id/open-commerce-readiness` | 聚合 ERP 物化、商户节点、运行时、对外能力和目录发布状态；多商户时可传 `merchant_id` |
 | POST | `/api/projects/:project_id/erp/proposals/:proposal_id/decision` | 由蓝图维护者接受或拒绝提案 |
 | POST | `/api/projects/:project_id/erp/proposals/:proposal_id/matter` | 为已接受提案创建正式 Matter |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/upgrades` | 准备兼容检查和升级活动 |
@@ -32,6 +33,7 @@ ERP 工具合并到现有开放商业 MCP 工具列表中，供项目内 AI 在�
 |---|---|---|
 | `erp_get_overview` | 无 | 读取当前项目的 ERP 治理概况 |
 | `erp_get_materialization_status` | 无 | 读取实例初始化合同、任务进度、失败项和证据缺口，不启动任务 |
+| `erp_get_open_commerce_readiness` | 无 | 区分消费者 AI 可调用、开放目录可发现与 ERP 项目已验收，不返回运行地址或密钥引用 |
 | `erp_search_capabilities` | 无 | 开发前检索已有能力，避免重复造轮子 |
 | `erp_resolve_requirement` | 无 | 生成需求分类和实现建议，不修改公共内核 |
 | `erp_submit_feature_signal` | 写治理元数据 | 仅在商户明确授权后提交脱敏信号 |
@@ -44,6 +46,8 @@ AI 工具故意不提供蓝图演进、提案接受、Matter 创建、公共版�
 
 创建实例时默认使用 `project_name` 新建项目；传入 `target_project_id` 时忽略空的 `project_name`，并要求操作者对目标项目具有 `owner`、`admin` 或 `editor` 角色。响应中的 `onboarding_mode` 以及物化合同中的 `target_onboarding_mode` 用于区分 `new_project` 与 `existing_project`。该接口只登记治理关系，不导入本机目录、不复制 Git 仓库，也不启动开发任务。
 
+开放商业就绪度是从各领域真源即时生成的只读投影，不新增 ERP 与商户节点之间的第二套状态机。项目只有一个商户节点时可安全自动选择；存在多个节点时必须由调用者提供 `merchant_id`。`consumer_invocation_ready` 要求商户启用、运行时已验证且至少存在一项非 `owner_only` 的有效 `merchant_runtime` 能力；其中 `public` 能力可按现有公开规则调用，`authorized` 能力仍必须由具体消费者 App 取得有效 grant，本投影不会代替授权。`consumer_discovery_ready` 还要求商户已发布到开放目录；`erp_onboarding_ready` 只由物化证据是否达到 `accepted_verified` 决定。这三个结果不得互相替代。
+
 ## 机器合同
 
 - `contracts/erp/erp-blueprint-v1.schema.json`
@@ -53,5 +57,6 @@ AI 工具故意不提供蓝图演进、提案接受、Matter 创建、公共版�
 - `contracts/erp/erp-upgrade-campaign-v1.schema.json`
 - `contracts/erp/erp-materialization-contract-v1.schema.json`
 - `contracts/erp/erp-materialization-evidence-v1.schema.json`
+- `contracts/erp/erp-open-commerce-readiness-v1.schema.json`
 
 参考清单位于 `examples/erp-blueprints/`。其中咖啡店与最小零售实例使用同一内核版本，但拥有不同主题、插件和私有扩展边界。

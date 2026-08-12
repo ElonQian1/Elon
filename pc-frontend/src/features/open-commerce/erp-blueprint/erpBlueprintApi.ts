@@ -4,6 +4,7 @@ import type {
   ErpBlueprintVersion,
   ErpInstance,
   ErpMaterializationStatus,
+  ErpOpenCommerceReadiness,
   ErpOverview,
   ErpProposal,
   ErpReleaseManifest,
@@ -71,6 +72,13 @@ export const erpBlueprintApi = {
     api.get<ErpMaterializationStatus>(
       `${base(projectId)}/instances/${encodeURIComponent(instanceId)}/materialization`,
     ),
+
+  openCommerceReadiness: (projectId: string, instanceId: string, merchantId?: string) => {
+    const query = merchantId ? `?merchant_id=${encodeURIComponent(merchantId)}` : ''
+    return api.get<ErpOpenCommerceReadiness>(
+      `${base(projectId)}/instances/${encodeURIComponent(instanceId)}/open-commerce-readiness${query}`,
+    )
+  },
 
   decideProposal: (
     projectId: string,

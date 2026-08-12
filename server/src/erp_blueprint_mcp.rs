@@ -9,7 +9,7 @@ use crate::{
             PrepareUpgradeRequest, ResolveRequirementRequest, SubmitFeatureSignalRequest,
             UpdateErpInstanceRequest,
         },
-        service,
+        open_commerce_readiness, service,
     },
     project_auth::can_edit,
     store::Store,
@@ -25,6 +25,13 @@ struct SearchArgs {
 #[derive(Debug, Deserialize)]
 struct InstanceArgs {
     instance_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenCommerceReadinessArgs {
+    instance_id: String,
+    #[serde(default)]
+    merchant_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,6 +77,15 @@ pub(crate) fn call_tool(
                 store,
                 project_id,
                 &args.instance_id,
+            )?)?)
+        }
+        "erp_get_open_commerce_readiness" => {
+            let args: OpenCommerceReadinessArgs = decode(arguments, name)?;
+            Ok(serde_json::to_value(open_commerce_readiness::get(
+                store,
+                project_id,
+                &args.instance_id,
+                args.merchant_id.as_deref(),
             )?)?)
         }
         "erp_search_capabilities" => {

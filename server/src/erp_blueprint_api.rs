@@ -20,7 +20,7 @@ use crate::{
             PrepareUpgradeRequest, ResolveRequirementRequest, SubmitFeatureSignalRequest,
             UpdateErpInstanceRequest,
         },
-        service,
+        open_commerce_readiness, service,
     },
     group_ai::bot_selector::bots_for_project,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
@@ -33,6 +33,12 @@ struct CapabilityQuery {
     query: String,
     #[serde(default = "default_limit")]
     limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenCommerceReadinessQuery {
+    #[serde(default)]
+    merchant_id: Option<String>,
 }
 
 pub fn routes() -> Router<Arc<AppState>> {
@@ -77,6 +83,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/erp/instances/:instance_id/materialization",
             get(materialization_status),
+        )
+        .route(
+            "/api/projects/:project_id/erp/instances/:instance_id/open-commerce-readiness",
+            get(open_commerce_readiness_status),
         )
         .route(
             "/api/projects/:project_id/erp/proposals/:proposal_id/decision",
@@ -290,6 +300,23 @@ async fn materialization_status(
         &state.store,
         &project_id,
         &instance_id,
+    ))
+}
+
+async fn open_commerce_readiness_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, instance_id)): Path<(String, String)>,
+    Query(query): Query<OpenCommerceReadinessQuery>,
+) -> Response {
+    if let Err(response) = authenticate(&state, &headers, &project_id, false) {
+        return response;
+    }
+    respond(open_commerce_readiness::get(
+        &state.store,
+        &project_id,
+        &instance_id,
+        query.merchant_id.as_deref(),
     ))
 }
 

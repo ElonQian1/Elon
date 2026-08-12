@@ -26,6 +26,22 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "erp_get_open_commerce_readiness",
+            "读取 ERP 实例接入开放商业网络的聚合就绪度，区分消费者 AI 可调用、可发现与 ERP 物化验收。只读取既有真源，不返回运行地址、密钥引用或商户私有数据。",
+            json!({
+                "type":"object",
+                "required":["instance_id"],
+                "properties":{
+                    "instance_id":{"type":"string","minLength":1,"maxLength":120},
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120}
+                },
+                "additionalProperties":false
+            }),
+            true,
+            false,
+            true,
+        ),
+        tool(
             "erp_search_capabilities",
             "在官方 ERP 能力目录中检索可直接复用的能力。开发前应先调用，避免重复造轮子。",
             json!({
@@ -176,5 +192,17 @@ mod tests {
             .map(|tool| tool["name"].as_str().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(destructive, vec!["erp_update_instance_configuration"]);
+    }
+
+    #[test]
+    fn open_commerce_readiness_is_declared_read_only() {
+        let tools = definitions();
+        let readiness = tools
+            .iter()
+            .find(|tool| tool["name"] == "erp_get_open_commerce_readiness")
+            .unwrap();
+        assert_eq!(readiness["annotations"]["readOnlyHint"], true);
+        assert_eq!(readiness["annotations"]["destructiveHint"], false);
+        assert_eq!(readiness["inputSchema"]["required"], json!(["instance_id"]));
     }
 }

@@ -146,6 +146,52 @@ export type ErpMaterializationStatus = {
   next_action: string
 }
 
+export type ErpOpenCommerceReadiness = {
+  schema: 'yilong.erp.open_commerce_readiness.v1'
+  project_id: string
+  instance_id: string
+  overall_state: 'ready' | 'consumer_ready_erp_pending' | 'erp_ready_commerce_pending' | 'blocked'
+  erp_onboarding_ready: boolean
+  consumer_invocation_ready: boolean
+  consumer_discovery_ready: boolean
+  materialization: {
+    state: string
+    recoverable: boolean
+    blockers: string[]
+    next_action: string
+  }
+  merchant_selection: {
+    status: 'merchant_missing' | 'selection_required' | 'selected_implicit' | 'selected_explicit'
+    selected?: ErpOpenCommerceMerchantSummary | null
+    candidates: ErpOpenCommerceMerchantSummary[]
+  }
+  runtime?: {
+    status: string
+    manifest_sha256?: string | null
+    last_verified_at?: string | null
+    last_error_code?: string | null
+  } | null
+  active_runtime_capability_keys: string[]
+  directory?: {
+    status: string
+    revision: number
+    published_at?: string | null
+  } | null
+  blockers: Array<{
+    code: string
+    scope: 'erp_onboarding' | 'consumer_invocation' | 'consumer_discovery'
+    message: string
+    next_action: string
+  }>
+}
+
+export type ErpOpenCommerceMerchantSummary = {
+  id: string
+  display_name: string
+  status: string
+  node_mode: string
+}
+
 export type ErpTargetProject = {
   id: string
   name: string

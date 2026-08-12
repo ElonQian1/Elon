@@ -11,6 +11,7 @@ const retail = json('minimal-retail-instance.json')
 const signal = json('feature-signal.json')
 const upgrade = json('upgrade-campaign.json')
 const materializationEvidence = json('materialization-evidence.json')
+const commerceReadiness = json('open-commerce-readiness.json')
 
 assert.equal(blueprint.schema, 'yilong.erp.blueprint.v1')
 assert.equal(release.schema, 'yilong.erp.release.v1')
@@ -36,6 +37,11 @@ assert.deepEqual(upgrade.private_extensions_snapshot, coffee.private_extensions)
 assert.equal(materializationEvidence.schema, 'yilong.erp.materialization_evidence.v1')
 assert.equal(materializationEvidence.verification_passed, true)
 assert.equal(materializationEvidence.instance_manifest_sha256.length, 64)
+assert.equal(commerceReadiness.schema, 'yilong.erp.open_commerce_readiness.v1')
+assert.equal(commerceReadiness.consumer_invocation_ready, true)
+assert.equal(commerceReadiness.erp_onboarding_ready, false)
+assert.equal('endpoint_base_url' in commerceReadiness.runtime, false)
+assert.equal('credential_ref' in commerceReadiness.runtime, false)
 
 const extensionPoints = new Set(release.extension_points)
 for (const instance of [coffee, retail]) {
@@ -56,6 +62,7 @@ for (const schema of [
   'erp-upgrade-campaign-v1.schema.json',
   'erp-materialization-contract-v1.schema.json',
   'erp-materialization-evidence-v1.schema.json',
+  'erp-open-commerce-readiness-v1.schema.json',
 ]) {
   assert.doesNotThrow(() => JSON.parse(fs.readFileSync(path.join(root, 'contracts/erp', schema), 'utf8')))
 }

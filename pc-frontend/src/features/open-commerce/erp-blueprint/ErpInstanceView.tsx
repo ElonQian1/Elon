@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CheckCircle2, Search, Send } from 'lucide-react'
 import ErpInstanceConfigurationPanel from './ErpInstanceConfigurationPanel'
 import ErpMaterializationPanel from './ErpMaterializationPanel'
+import ErpOpenCommerceReadinessPanel from './ErpOpenCommerceReadinessPanel'
 import ErpUpgradePanel from './ErpUpgradePanel'
 import { erpBlueprintApi } from './erpBlueprintApi'
 import type { ErpOverview, RequirementResolution } from './erpBlueprintTypes'
@@ -73,6 +74,7 @@ export default function ErpInstanceView({
       </section>
 
       {overview.materialization && <ErpMaterializationPanel status={overview.materialization} />}
+      <ErpOpenCommerceReadinessPanel projectId={projectId} instanceId={instance.id} />
 
       <section className={styles.band}>
         <header><Search size={17} /><h3>让 AI 先查能力，再决定怎么开发</h3></header>

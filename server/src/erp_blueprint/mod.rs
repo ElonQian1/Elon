@@ -5,6 +5,7 @@ pub(crate) mod materialization;
 pub(crate) mod matter_bridge;
 pub(crate) mod model;
 pub(crate) mod model_configuration;
+pub(crate) mod open_commerce_readiness;
 pub(crate) mod proposal;
 pub(crate) mod service;
 pub(crate) mod validation;
