@@ -24,6 +24,25 @@ class ChatGptWebSessionContinuityTest {
     }
 
     @Test
+    fun preservesObservedSessionWhileAuthenticatedOverlayHidesTheComposer() {
+        val continuity = ChatGptWebSessionContinuity()
+        continuity.reconcile(
+            snapshot(
+                authenticated = true,
+                pageKind = "home",
+                url = "https://chatgpt.com/",
+            ),
+        )
+
+        val overlay = continuity.reconcile(
+            snapshot(pageKind = "home", url = "https://chatgpt.com/"),
+        )
+
+        assertTrue(overlay.authenticated)
+        assertFalse(overlay.loginRequired)
+    }
+
+    @Test
     fun visibleLoginEvidenceClearsSessionContinuity() {
         val continuity = ChatGptWebSessionContinuity()
         continuity.reconcile(snapshot(authenticated = true, pageKind = "conversation"))

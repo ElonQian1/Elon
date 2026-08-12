@@ -300,6 +300,8 @@ class ChatGptWebLabContractTest {
         assertTrue(activity.contains("ChatGptWebBackNavigation.Action.EXIT_OFFICIAL_VIEW"))
         assertTrue(activity.contains("modeController.select(ChatGptWebModeController.Mode.NATIVE)"))
         assertTrue(activity.contains("sessionRestorer.restorePreferredMode("))
+        assertTrue(activity.contains("if (snapshot.authenticated)"))
+        assertFalse(activity.contains("snapshot.authenticated &&"))
     }
 
     @Test

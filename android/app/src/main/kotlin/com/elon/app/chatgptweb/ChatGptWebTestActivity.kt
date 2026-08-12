@@ -530,13 +530,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 dictationSessionController.onSnapshot(snapshot.dictationActive)
                 conversationListController.renderCapabilities(snapshot.capabilities)
                 featureHubController.renderCapabilities(snapshot.capabilities)
-                if (
-                    snapshot.authenticated &&
-                    (
-                        snapshot.composerReady || snapshot.messages.isNotEmpty() ||
-                            snapshot.dictationActive || snapshot.pageKind == "feature"
-                    )
-                ) {
+                if (snapshot.authenticated) {
                     googleAccountHintController.onAuthenticated()
                     val authenticationCompleted = loginController.onAuthenticated()
                     pageAdapter.markReady()

@@ -14,7 +14,7 @@ internal class ChatGptWebSessionContinuity {
             authenticatedObserved = true
             return snapshot
         }
-        if (authenticatedObserved && snapshot.pageKind == "feature") {
+        if (authenticatedObserved) {
             return snapshot.copy(authenticated = true)
         }
         return snapshot
