@@ -275,6 +275,54 @@ pub(super) fn currentness_on(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(in crate::store) fn current_credential_verifier_authority_on(
+    conn: &Connection,
+    record_id: &str,
+    expected_record_digest: &str,
+    verification_kind: &str,
+    verifier_id: &str,
+    verifier_revision: i64,
+    expected_verifier_digest: &str,
+) -> Result<Option<CurrentExternalPoolAdapterCredentialVerifierAuthority>> {
+    let Some(current) = currentness_on(conn, record_id)? else {
+        return Ok(None);
+    };
+    let item = &current.verifier_record;
+    if current.current_status != CREDENTIAL_VERIFIER_STATUS_ACTIVE
+        || item.verifier_record_digest != expected_record_digest
+        || item.verification_kind != verification_kind
+        || item.verifier_id != verifier_id
+        || item.verifier_revision != verifier_revision
+        || item.verifier_digest != expected_verifier_digest
+    {
+        bail!("credential-verifier authority is not current and exact");
+    }
+    Ok(record_by_id_on(conn, record_id)?
+        .map(|root| CurrentExternalPoolAdapterCredentialVerifierAuthority::new(&root)))
+}
+
+pub(in crate::store) fn credential_verifier_is_current_exact_on(
+    conn: &Connection,
+    record_id: &str,
+    expected_record_digest: &str,
+    verification_kind: &str,
+    verifier_id: &str,
+    verifier_revision: i64,
+    expected_verifier_digest: &str,
+) -> Result<bool> {
+    let Some(current) = currentness_on(conn, record_id)? else {
+        return Ok(false);
+    };
+    let item = &current.verifier_record;
+    Ok(current.current_status == CREDENTIAL_VERIFIER_STATUS_ACTIVE
+        && item.verifier_record_digest == expected_record_digest
+        && item.verification_kind == verification_kind
+        && item.verifier_id == verifier_id
+        && item.verifier_revision == verifier_revision
+        && item.verifier_digest == expected_verifier_digest)
+}
+
 impl Store {
     pub(crate) fn external_pool_adapter_credential_verifier_currentness(
         &self,

@@ -39,4 +39,4 @@ V237 管理的是签署 V239 沙箱报告的 RSA 信任密钥；V241 管理的�
 
 V241 不存储或读取端点 bearer，不连接 KMS，不执行验证器，不签发 credential verification receipt，不采用 Adapter，不写 v213 route，不启动 worker/ACK，也不产生派发、计量或结算效果。
 
-下一阶段必须独立建立限时凭据验证回执：只绑定非 bearer 的凭据查找引用、精确 V241 当前实现、验证结果、到期时间和撤销语义。随后 Adapter adoption 事务才能同时采用精确 V222 admission、V227-V240 制品证据和 fresh 凭据验证回执；任何历史记录都不能单独授权执行。
+V242 已独立建立与精确 active V241 实现绑定的签名公钥权威，详见 `external-pool-adapter-credential-verifier-key-authority.md`。下一阶段 V243 仍必须建立限时凭据验证挑战与回执：只绑定非 bearer 的凭据查找引用承诺、精确 V241/V242 当前权威、验证结果、到期时间和撤销语义。随后 Adapter adoption 事务才能同时采用精确 V222 admission、V227-V240 制品证据和 fresh 凭据验证回执；任何历史记录都不能单独授权执行。

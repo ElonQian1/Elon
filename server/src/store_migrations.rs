@@ -14,6 +14,7 @@ mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_artifact_vulnerability_report;
 mod compute_external_pool_adapter_credential_verifier;
+mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -294,6 +295,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (239, "外部矿池 Adapter 精确制品动态沙箱六能力签名符合性证据", compute_external_pool_adapter_artifact_sandbox_conformance::migration_v239),
     (240, "外部矿池 Adapter 沙箱符合性回执防替换栅栏", compute_external_pool_adapter_artifact_sandbox_conformance_no_replace::migration_v240),
     (241, "外部矿池 Adapter 凭据验证器实现身份四眼注册与撤销", compute_external_pool_adapter_credential_verifier::migration_v241),
+    (242, "外部矿池 Adapter 凭据验证器独立签名公钥精确绑定与撤销", compute_external_pool_adapter_credential_verifier_key::migration_v242),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

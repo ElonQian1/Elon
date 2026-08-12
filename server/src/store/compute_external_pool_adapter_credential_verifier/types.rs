@@ -97,6 +97,63 @@ pub(super) struct StoredTransition {
     pub json: String,
 }
 
+pub(in crate::store) struct CurrentExternalPoolAdapterCredentialVerifierAuthority {
+    verifier_record_id: String,
+    verifier_record_digest: String,
+    verifier_operator: String,
+    verifier_product: String,
+    verification_kind: String,
+    verifier_id: String,
+    verifier_revision: i64,
+    verifier_digest: String,
+    created_by_admin_user_id: String,
+}
+
+impl CurrentExternalPoolAdapterCredentialVerifierAuthority {
+    pub(super) fn new(root: &StoredVerifierRecord) -> Self {
+        let item = &root.record.registration;
+        Self {
+            verifier_record_id: root.record.verifier_record_id.clone(),
+            verifier_record_digest: root.record.verifier_record_digest.clone(),
+            verifier_operator: item.verifier_operator.clone(),
+            verifier_product: item.verifier_product.clone(),
+            verification_kind: item.verification_kind.clone(),
+            verifier_id: item.verifier_id.clone(),
+            verifier_revision: item.verifier_revision,
+            verifier_digest: item.verifier_digest.clone(),
+            created_by_admin_user_id: item.created_by_admin_user_id.clone(),
+        }
+    }
+
+    pub(in crate::store) fn verifier_record_id(&self) -> &str {
+        &self.verifier_record_id
+    }
+    pub(in crate::store) fn verifier_record_digest(&self) -> &str {
+        &self.verifier_record_digest
+    }
+    pub(in crate::store) fn verifier_operator(&self) -> &str {
+        &self.verifier_operator
+    }
+    pub(in crate::store) fn verifier_product(&self) -> &str {
+        &self.verifier_product
+    }
+    pub(in crate::store) fn verification_kind(&self) -> &str {
+        &self.verification_kind
+    }
+    pub(in crate::store) fn verifier_id(&self) -> &str {
+        &self.verifier_id
+    }
+    pub(in crate::store) fn verifier_revision(&self) -> i64 {
+        self.verifier_revision
+    }
+    pub(in crate::store) fn verifier_digest(&self) -> &str {
+        &self.verifier_digest
+    }
+    pub(in crate::store) fn created_by_admin_user_id(&self) -> &str {
+        &self.created_by_admin_user_id
+    }
+}
+
 impl StoredVerifierRecord {
     pub(super) fn summary(&self) -> ExternalPoolAdapterCredentialVerifierRecordSummary {
         let item = &self.record.registration;

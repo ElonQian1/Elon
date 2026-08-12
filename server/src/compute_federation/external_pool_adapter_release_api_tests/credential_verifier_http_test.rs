@@ -239,6 +239,48 @@ fn registration(idempotency_key: &str, digest: &str) -> Value {
     })
 }
 
+pub(super) async fn create_active_credential_verifier(fixture: &Fixture, suffix: &str) -> Value {
+    let body = json!({
+        "verifier_operator": "fixture-verification-lab",
+        "verifier_product": "fixture-credential-verifier-v1",
+        "verification_kind": "signed_challenge",
+        "verifier_id": format!("fixture-verifier-{suffix}"),
+        "verifier_revision": 1,
+        "verifier_digest": "4".repeat(64),
+        "idempotency_key": format!("{suffix}-credential-register"),
+        "confirm_registration": true
+    });
+    let (status, created) = call(
+        &fixture.router,
+        Method::POST,
+        path(),
+        Some(&fixture.submitter_token),
+        &body,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let id = created["verifier_record"]["verifier_record_id"]
+        .as_str()
+        .unwrap();
+    let digest = created["verifier_record"]["verifier_record_digest"]
+        .as_str()
+        .unwrap();
+    let (status, activated) = call(
+        &fixture.router,
+        Method::POST,
+        &format!("{}/{id}/activate", path()),
+        Some(&fixture.reviewer_token),
+        &json!({
+            "expected_verifier_record_digest": digest,
+            "idempotency_key": format!("{suffix}-credential-activate"),
+            "confirm_activation": true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{activated}");
+    created
+}
+
 pub(super) fn path() -> &'static str {
     "/api/admin/compute/external-pool-adapter-credential-verifiers"
 }
