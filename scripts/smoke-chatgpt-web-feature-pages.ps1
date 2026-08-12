@@ -9,7 +9,7 @@ param(
     [ValidateRange(30, 600)][int]$TotalTimeoutSec = 180,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
     [ValidateRange(1, 12)][int]$MaxFeaturePages = 8,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -250,4 +250,7 @@ if ($failed.Count -gt 0) {
     Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=failed failed_count=$($failed.Count) failed_kinds=$failedKinds"
     throw "ChatGPT feature-page smoke failed: failed_count=$($failed.Count) failed_kinds=$failedKinds"
 }
+Register-ChatGptWebVerificationCases -Runtime $runtime `
+    -CaseIds @("safe/feature_pages", "safe/feature_pages_individual") `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 Write-Output "CHATGPT_FEATURE_PAGE_SMOKE_STATUS=passed audited_count=$($results.Count)"

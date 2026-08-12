@@ -8,7 +8,7 @@ param(
     [ValidateRange(20, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
     [ValidateRange(1, 50)][int]$MaxConversations = 20,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -312,6 +312,10 @@ try {
         Restore-Origin -Origin $origin -OriginPath $originPath
     }
 }
+
+Register-ChatGptWebVerificationCases -Runtime $runtime `
+    -CaseIds @("reversible/message_structure") `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
 $result | ConvertTo-Json -Depth 8
 Write-Output "CHATGPT_WEB_MESSAGE_STRUCTURE_SMOKE_STATUS=passed"

@@ -339,6 +339,32 @@ function Invoke-ChatGptWebSmokeReadyAction {
     throw "Timed out waiting to dispatch ChatGPT Web action: $Action"
 }
 
+function Register-ChatGptWebVerificationCases {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string[]]$CaseIds,
+        [Parameter(Mandatory = $true)][ValidateRange(1, 9999)][int]$ExpectedAdapterVersion
+    )
+
+    $expected = @($CaseIds | Sort-Object -Unique)
+    $result = Invoke-ChatGptWebSmokeReadyAction -Runtime $Runtime `
+        -Action "chatgpt_record_verification_cases" -Arguments @{
+            case_ids = $expected
+            expected_adapter_version = $ExpectedAdapterVersion
+        }
+    $recorded = @($result.recorded_case_ids | Sort-Object -Unique)
+    if (($recorded -join "`n") -ne ($expected -join "`n")) {
+        throw "ChatGPT Web verification evidence did not record the requested cases."
+    }
+    $current = @($result.verification_evidence.current_case_ids)
+    foreach ($caseId in $expected) {
+        if ($caseId -notin $current) {
+            throw "ChatGPT Web verification evidence is stale after registration: $caseId"
+        }
+    }
+    return $result
+}
+
 function Open-ChatGptWebSmokeSurface {
     param([Parameter(Mandatory = $true)]$Runtime)
 

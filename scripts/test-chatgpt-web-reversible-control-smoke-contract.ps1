@@ -99,6 +99,7 @@ if ($runtime -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMai
     throw "Trusted runtime must relaunch MainActivity only for an explicit initial bootstrap."
 }
 . $runtimePath
+$testExecutable = (Get-Process -Id $PID).Path
 $safeDiagnostic = ConvertTo-ChatGptWebSmokeSafeDiagnostic `
     -Value "bridge failed for sample@example.test token=synthetic-secret"
 if (
@@ -123,20 +124,20 @@ if ($failureDetail -ne "tool=ui_control action=chatgpt_list_features error=bridg
 }
 $wirelessRejected = $false
 try {
-    New-ChatGptWebSmokeRuntime -Adb "$PSHOME\powershell.exe" `
+    New-ChatGptWebSmokeRuntime -Adb $testExecutable `
         -DeviceSerial "192.0.2.10:5555" | Out-Null
 } catch {
     $wirelessRejected = $_.Exception.Message -match "expected hardware serial"
 }
 if (-not $wirelessRejected) { throw "Unpinned wireless smoke runtime must be rejected." }
-$trusted = New-ChatGptWebSmokeRuntime -Adb "$PSHOME\powershell.exe" `
+$trusted = New-ChatGptWebSmokeRuntime -Adb $testExecutable `
     -DeviceSerial "192.0.2.10:5555" -ExpectedHardwareSerial "hardware-test"
 if ($trusted.expected_hardware_serial -ne "hardware-test") {
     throw "Pinned wireless smoke runtime must retain the expected hardware identity."
 }
 $emulatorRejected = $false
 try {
-    New-ChatGptWebSmokeRuntime -Adb "$PSHOME\powershell.exe" `
+    New-ChatGptWebSmokeRuntime -Adb $testExecutable `
         -DeviceSerial "emulator-5554" | Out-Null
 } catch {
     $emulatorRejected = $_.Exception.Message -match "emulator transport"

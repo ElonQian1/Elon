@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -335,5 +335,10 @@ try {
 }
 
 if (-not $originRestored) { throw "ChatGPT settings origin was not restored." }
+Register-ChatGptWebVerificationCases -Runtime $runtime `
+    -CaseIds @(
+        "safe/settings_overlay_form_controls",
+        "safe/settings_overlay_idempotent_form_controls"
+    ) -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 $report | ConvertTo-Json -Depth 6
 Write-Output "CHATGPT_SETTINGS_SMOKE_STATUS=passed"

@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -407,6 +407,10 @@ if ($originViewMode -in @("web", "native")) {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = $originViewMode } | Out-Null
 }
+
+Register-ChatGptWebVerificationCases -Runtime $runtime `
+    -CaseIds @("reversible/reversible_controls") `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
 [ordered]@{
     schema = "elon.chatgpt_web.reversible_control_smoke.v1"

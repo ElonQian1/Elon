@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(15, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -120,6 +120,10 @@ try {
     ) {
         throw "ChatGPT conversation window changed after process recreation."
     }
+
+    Register-ChatGptWebVerificationCases -Runtime $runtime `
+        -CaseIds @("safe/session_recovery") `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
     [ordered]@{
         schema = "elon.chatgpt_web.session_recovery_smoke.v1"

@@ -8,7 +8,7 @@ param(
     [ValidateRange(30, 300)][int]$ReadyTimeoutSec = 120,
     [ValidateRange(30, 600)][int]$ReplyTimeoutSec = 240,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -181,6 +181,9 @@ try {
         cleared_cookies = $false
         cleared_app_data = $false
     }
+    Register-ChatGptWebVerificationCases -Runtime $runtime `
+        -CaseIds @("reversible/tool_execution_with_citations") `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 } finally {
     if (-not $originRestored -and $originMode) {
         try {

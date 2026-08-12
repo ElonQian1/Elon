@@ -47,6 +47,7 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(ids.size, ids.toSet().size)
         assertEquals(ChatGptWebFeatureBaseline.ids(), ids.toSet())
         assertTrue(ids.containsAll(REQUIRED_FEATURE_IDS))
+        assertEquals(0, baseline.getJSONObject("verification_evidence").getInt("current_case_count"))
 
         (0 until features.length()).forEach { index ->
             val feature = features.getJSONObject(index)
@@ -188,7 +189,6 @@ class ChatGptWebFeatureBaselineTest {
         val summary = baseline.getJSONObject("summary")
         val codeSummary = baseline.getJSONObject("code_summary")
         val verificationSummary = baseline.getJSONObject("verification_summary")
-        val deviceEvidenceCurrent = baseline.getBoolean("device_verification_current")
 
         assertEquals(
             baseline.getInt("feature_count"),
@@ -208,44 +208,41 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
         assertEquals(10, verificationSummary.getInt("offline_verified"))
-        assertEquals(if (deviceEvidenceCurrent) 23 else 0, verificationSummary.getInt("device_verified"))
-        assertEquals(if (deviceEvidenceCurrent) 23 else 0, verificationSummary.getInt("verified"))
-        assertEquals(if (deviceEvidenceCurrent) 10 else 33, verificationSummary.getInt("pending"))
+        assertEquals(0, verificationSummary.getInt("device_verified"))
+        assertEquals(0, verificationSummary.getInt("verified"))
+        assertEquals(33, verificationSummary.getInt("pending"))
         assertEquals(9, verificationSummary.getInt("user_action_required"))
-        assertEquals(if (deviceEvidenceCurrent) 0 else 23, verificationSummary.getInt("deferred"))
+        assertEquals(23, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(if (deviceEvidenceCurrent) 19 else 42, verificationSummary.getInt("remaining"))
+        assertEquals(42, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
         assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "model_selection").getString("verification_status"),
         )
         assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "composer_tools").getString("verification_status"),
         )
+        assertFalse(feature(baseline, "model_selection").isNull("verification_gap"))
         assertEquals(
-            deviceEvidenceCurrent,
-            feature(baseline, "model_selection").isNull("verification_gap"),
-        )
-        assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "native_chat_composer").getString("verification_status"),
         )
         assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "streaming_and_stop").getString("verification_status"),
         )
         assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "conversation_create_and_switch").getString("verification_status"),
         )
         assertEquals("complete", feature(baseline, "message_copy").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "message_copy").getString("code_status"))
         assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "message_copy").getString("verification_status"),
         )
         assertEquals(
@@ -255,15 +252,12 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals("complete", feature(baseline, "disclosure_controls").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "disclosure_controls").getString("code_status"))
         assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "disclosure_controls").getString("verification_status"),
         )
+        assertFalse(feature(baseline, "disclosure_controls").isNull("verification_gap"))
         assertEquals(
-            deviceEvidenceCurrent,
-            feature(baseline, "disclosure_controls").isNull("verification_gap"),
-        )
-        assertEquals(
-            if (deviceEvidenceCurrent) "device_verified" else "deferred",
+            "deferred",
             feature(baseline, "session_continuity_and_recovery").getString("verification_status"),
         )
         assertEquals(
@@ -273,7 +267,7 @@ class ChatGptWebFeatureBaselineTest {
         assertFalse(feature(baseline, "session_long_running_stability").isNull("verification_gap"))
         listOf("tasks", "library", "apps", "settings", "adaptive_form_controls").forEach { id ->
             assertEquals(
-                if (deviceEvidenceCurrent) "device_verified" else "deferred",
+                "deferred",
                 feature(baseline, id).getString("verification_status"),
             )
         }
@@ -296,6 +290,55 @@ class ChatGptWebFeatureBaselineTest {
         ).forEach { id ->
             assertEquals("offline_verified", feature(baseline, id).getString("verification_status"))
         }
+    }
+
+    @Test
+    fun resolvesDeviceEvidencePerVerificationCaseWithoutInvalidatingUnrelatedCases() {
+        val currentHash = "a".repeat(64)
+        val staleHash = "b".repeat(64)
+        val evidence = ChatGptWebVerificationEvidenceStore.Snapshot(
+            currentInputs = linkedMapOf(
+                "reversible/composer_controls" to currentHash,
+                "safe/session_recovery" to "c".repeat(64),
+            ),
+            records = linkedMapOf(
+                "reversible/composer_controls" to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = "reversible/composer_controls",
+                    inputSha256 = currentHash,
+                    current = true,
+                    adapterVersion = 79,
+                    apkVersionName = "test",
+                    apkVersionCode = 1,
+                    recordedAtMs = 123L,
+                ),
+                "safe/session_recovery" to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = "safe/session_recovery",
+                    inputSha256 = staleHash,
+                    current = false,
+                    adapterVersion = 78,
+                    apkVersionName = "old",
+                    apkVersionCode = 0,
+                    recordedAtMs = 100L,
+                ),
+            ),
+        )
+
+        val baseline = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            verificationEvidence = evidence,
+        )
+
+        assertEquals("device_verified", feature(baseline, "web_search").getString("verification_status"))
+        assertTrue(feature(baseline, "web_search").isNull("verification_gap"))
+        assertEquals("deferred", feature(baseline, "session_continuity_and_recovery").getString("verification_status"))
+        assertEquals(
+            "verification_case_inputs_changed_since_device_acceptance",
+            feature(baseline, "session_continuity_and_recovery").getString("verification_gap"),
+        )
+        assertEquals("deferred", feature(baseline, "model_selection").getString("verification_status"))
+        assertEquals(1, baseline.getJSONObject("verification_evidence").getInt("current_case_count"))
     }
 
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {
@@ -368,6 +411,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_get_conversations",
             "chatgpt_get_navigation",
             "chatgpt_get_capability_matrix",
+            "chatgpt_record_verification_cases",
             "chatgpt_open_conversation",
             "chatgpt_select_view",
         )

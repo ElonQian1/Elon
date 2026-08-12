@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 78
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 79
 )
 
 $ErrorActionPreference = "Stop"
@@ -254,6 +254,10 @@ try {
                 [string]$state.conversation.url -eq $originUrl
         }
     Restore-OriginalViewMode | Out-Null
+
+    Register-ChatGptWebVerificationCases -Runtime $runtime `
+        -CaseIds @("safe/message_actions") `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
     [ordered]@{
         schema = "elon.chatgpt_web.message_action_acceptance.v1"
