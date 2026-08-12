@@ -42,6 +42,15 @@ use crate::{
 
 use super::*;
 
+#[test]
+fn linux_atomic_publication_uses_a_musl_portable_kernel_syscall() {
+    let source = include_str!("filesystem/extract.rs");
+    assert!(source.contains("libc::syscall("));
+    assert!(source.contains("libc::SYS_renameat2"));
+    assert!(source.contains("libc::RENAME_NOREPLACE"));
+    assert!(!source.contains("fn renameat2("));
+}
+
 #[tokio::test]
 async fn filesystem_prepares_reuses_and_rejects_installed_byte_drift() {
     let data_dir = std::env::temp_dir().join(format!(

@@ -346,23 +346,18 @@ fn sync_directory(_path: &Path) -> Result<(), ExternalPoolAdapterInstallationFsE
 #[cfg(target_os = "linux")]
 fn publish_no_replace(source: &Path, target: &Path) -> std::io::Result<()> {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
-    const AT_FDCWD: i32 = -100;
-    const RENAME_NOREPLACE: u32 = 1;
-    unsafe extern "C" {
-        fn renameat2(old_dir: i32, old: *const i8, new_dir: i32, new: *const i8, flags: u32)
-            -> i32;
-    }
     let source = CString::new(source.as_os_str().as_bytes())
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
     let target = CString::new(target.as_os_str().as_bytes())
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
     if unsafe {
-        renameat2(
-            AT_FDCWD,
+        libc::syscall(
+            libc::SYS_renameat2,
+            libc::AT_FDCWD,
             source.as_ptr(),
-            AT_FDCWD,
+            libc::AT_FDCWD,
             target.as_ptr(),
-            RENAME_NOREPLACE,
+            libc::RENAME_NOREPLACE,
         )
     } == 0
     {
