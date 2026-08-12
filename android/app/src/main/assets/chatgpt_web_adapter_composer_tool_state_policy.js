@@ -30,15 +30,30 @@
     return isWebSearchSignal(input.signal) ? 'web_search' : '';
   }
 
+  function directSelection(input) {
+    const values = input || {};
+    const booleanSignals = [values.ariaChecked, values.ariaSelected, values.ariaPressed]
+      .map(clean);
+    if (booleanSignals.includes('true')) return { known: true, selected: true };
+    if (booleanSignals.includes('false')) return { known: true, selected: false };
+
+    const dataState = clean(values.dataState);
+    if (['checked', 'active', 'on', 'selected'].includes(dataState)) {
+      return { known: true, selected: true };
+    }
+    if (['unchecked', 'inactive', 'off', 'unselected'].includes(dataState)) {
+      return { known: true, selected: false };
+    }
+    return { known: false, selected: false };
+  }
+
   function controlSelected(input) {
-    const directSelected = !!(input && input.directSelected);
-    return directSelected || !!(
-      input && input.semantic === 'web_search' && clean(input.region) === 'composer'
-    );
+    return !!(input && input.directSelected);
   }
 
   function optionSelected(input) {
     const directSelected = !!(input && input.directSelected);
+    if (input && input.directKnown) return directSelected;
     return directSelected || !!(
       input && input.semantic === 'web_search' && input.activeInComposer
     );
@@ -62,6 +77,7 @@
   return Object.freeze({
     controlSelected,
     createSelectionTracker,
+    directSelection,
     isWebSearchSignal,
     optionSelected,
     semantic

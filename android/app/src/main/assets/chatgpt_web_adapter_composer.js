@@ -4,15 +4,13 @@
   if (window.__elonChatGptComposer || location.origin !== 'https://chatgpt.com') return;
 
   const MAX_OPTIONS = 30;
-  const MAX_TOOL_STATE_ATTEMPTS = 24;
-  const REQUIRED_TOOL_STATE_CONFIRMATIONS = 4;
-  const TOOL_STATE_INTERVAL_MS = 120;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
   const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
+  const composerToolSelectionAdapter = window.__elonChatGptComposerToolSelection;
   const composerToolSelection = composerToolStatePolicy &&
     typeof composerToolStatePolicy.createSelectionTracker === 'function'
     ? composerToolStatePolicy.createSelectionTracker()
@@ -360,6 +358,26 @@
       !!(node && node.hasAttribute('aria-expanded'));
   }
 
+  function directSelection(node) {
+    if (composerToolStatePolicy && typeof composerToolStatePolicy.directSelection === 'function') {
+      return composerToolStatePolicy.directSelection({
+        ariaChecked: node && node.getAttribute('aria-checked'),
+        ariaSelected: node && node.getAttribute('aria-selected'),
+        ariaPressed: node && node.getAttribute('aria-pressed'),
+        dataState: node && node.getAttribute('data-state')
+      });
+    }
+    return { known: false, selected: false };
+  }
+
+  function webSearchComposerSelection() {
+    const layout = window.__elonChatGptLayout;
+    const node = layout && typeof layout.findSemanticNode === 'function'
+      ? layout.findSemanticNode('web_search', 'composer')
+      : null;
+    return directSelection(node);
+  }
+
   function collectOptions(section, baseline) {
     const seen = new Map();
     const candidates = visibleOptionNodes().filter((node) => isNewOrChangedOption(node, baseline)).map((node) => {
@@ -368,21 +386,24 @@
       const occurrence = seen.get(label) || 0;
       seen.set(label, occurrence + 1);
       const role = String(node.getAttribute('role') || 'menuitem').slice(0, 32);
-      const directSelected = node.getAttribute('aria-checked') === 'true' ||
-        node.getAttribute('aria-selected') === 'true' ||
-        node.getAttribute('data-state') === 'checked';
+      const direct = directSelection(node);
+      const directSelected = direct.selected;
       const semantic = optionSemantic(section, node, label);
-      const layout = window.__elonChatGptLayout;
-      const liveActiveInComposer = semantic === 'web_search' && !!(
-        layout && typeof layout.findSemanticNode === 'function' &&
-        layout.findSemanticNode('web_search', 'composer')
-      );
+      const composerSelection = semantic === 'web_search'
+        ? webSearchComposerSelection()
+        : { known: false, selected: false };
+      const liveActiveInComposer = composerSelection.known && composerSelection.selected;
       const activeInComposer = composerToolSelection
         ? composerToolSelection.value(semantic, liveActiveInComposer)
         : liveActiveInComposer;
       const selected = composerToolStatePolicy &&
         typeof composerToolStatePolicy.optionSelected === 'function'
-        ? composerToolStatePolicy.optionSelected({ semantic, directSelected, activeInComposer })
+        ? composerToolStatePolicy.optionSelected({
+            semantic,
+            directSelected,
+            directKnown: direct.known,
+            activeInComposer
+          })
         : directSelected;
       return {
         id: optionId(section, label, occurrence),
@@ -390,9 +411,10 @@
         selected,
         kind: role,
         semantic,
+        directStateKnown: direct.known,
         role,
         opensSubmenu: opensSubmenu(node),
-        selectable: selected || node.hasAttribute('aria-checked') || node.hasAttribute('aria-selected'),
+        selectable: selected || direct.known,
         node
       };
     }).filter(Boolean);
@@ -480,7 +502,10 @@
       return result(action, true, '');
     }
     if (section === 'tools' && composerToolSelection) {
-      composerToolSelection.observe('web_search', webSearchActiveInComposer());
+      const composerSelection = webSearchComposerSelection();
+      if (composerSelection.known) {
+        composerToolSelection.observe('web_search', composerSelection.selected);
+      }
     }
     const alreadyOpen = collectOptions(section, null);
     if (alreadyOpen.length > 0) {
@@ -569,55 +594,42 @@
     if (!target.opensSubmenu) {
       if (section === 'tools' && target.semantic === 'web_search') {
         const desiredSelected = !target.selected;
-        waitForWebSearchSelection(target.node, desiredSelected, result, scheduleSnapshot, 1, 0);
+        if (!composerToolSelectionAdapter ||
+            typeof composerToolSelectionAdapter.select !== 'function') {
+          return result(action, false, '网页搜索状态适配器尚未就绪。');
+        }
+        composerToolSelectionAdapter.select({
+          optionNode: target.node,
+          desiredSelected,
+          directSelection,
+          composerSelection: webSearchComposerSelection,
+          menuSettled: () => !target.node || !target.node.isConnected || !isOptionVisible(target.node),
+          menuSettledFor: (node) => !node || !node.isConnected || !isOptionVisible(node),
+          openVerificationMenu: (onReady, onTimeout) => {
+            const trigger = triggerFor('tools', composer);
+            if (!trigger || !isVisible(trigger)) return onTimeout();
+            const baseline = captureOptionBaseline();
+            if (!emitTriggerTouch('tools', 'verify_composer_tool', trigger, emitEvent)) {
+              return onTimeout();
+            }
+            waitForOptions('tools', baseline, onReady, onTimeout);
+          },
+          retryTouch: (node) => emitVisibleNodeTouch(
+            'select_composer_tool_retry', node, emitEvent
+          ),
+          complete: (ok, detail) => {
+            if (ok && composerToolSelection) {
+              composerToolSelection.observe('web_search', desiredSelected);
+            }
+            result('select_composer_tool', ok, detail);
+            scheduleSnapshot();
+          }
+        });
       } else {
         result(action, true, '');
         window.setTimeout(scheduleSnapshot, 240);
       }
     }
-  }
-
-  function webSearchActiveInComposer() {
-    const layout = window.__elonChatGptLayout;
-    return !!(
-      layout && typeof layout.findSemanticNode === 'function' &&
-      layout.findSemanticNode('web_search', 'composer')
-    );
-  }
-
-  function waitForWebSearchSelection(
-    optionNode,
-    desiredSelected,
-    result,
-    scheduleSnapshot,
-    attempt,
-    consecutiveConfirmations
-  ) {
-    const menuSettled = !optionNode || !optionNode.isConnected || !isOptionVisible(optionNode);
-    const observed = menuSettled && webSearchActiveInComposer() === desiredSelected;
-    const nextConfirmations = observed ? consecutiveConfirmations + 1 : 0;
-    if (nextConfirmations >= REQUIRED_TOOL_STATE_CONFIRMATIONS) {
-      if (composerToolSelection) {
-        composerToolSelection.observe('web_search', desiredSelected);
-      }
-      result('select_composer_tool', true, '');
-      return scheduleSnapshot();
-    }
-    if (attempt >= MAX_TOOL_STATE_ATTEMPTS) {
-      result('select_composer_tool', false, '官网网页搜索状态未发生预期变化。');
-      return scheduleSnapshot();
-    }
-    window.setTimeout(
-      () => waitForWebSearchSelection(
-        optionNode,
-        desiredSelected,
-        result,
-        scheduleSnapshot,
-        attempt + 1,
-        nextConfirmations
-      ),
-      TOOL_STATE_INTERVAL_MS
-    );
   }
 
   function ownsOptionNode(node) {

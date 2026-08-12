@@ -30,7 +30,7 @@ assert.equal(policy.controlSelected({
   semantic: 'web_search',
   region: 'composer',
   directSelected: false
-}), true);
+}), false);
 assert.equal(policy.controlSelected({
   semantic: 'web_search',
   region: 'overlay',
@@ -45,11 +45,19 @@ assert.equal(policy.controlSelected({
 assert.equal(policy.optionSelected({
   semantic: 'web_search',
   directSelected: false,
+  directKnown: false,
   activeInComposer: true
 }), true);
 assert.equal(policy.optionSelected({
   semantic: 'web_search',
   directSelected: false,
+  directKnown: true,
+  activeInComposer: true
+}), false);
+assert.equal(policy.optionSelected({
+  semantic: 'web_search',
+  directSelected: false,
+  directKnown: false,
   activeInComposer: false
 }), false);
 assert.equal(policy.optionSelected({
@@ -57,6 +65,27 @@ assert.equal(policy.optionSelected({
   directSelected: true,
   activeInComposer: false
 }), true);
+
+assert.deepEqual(policy.directSelection({ ariaChecked: 'true' }), {
+  known: true,
+  selected: true
+});
+assert.deepEqual(policy.directSelection({ ariaPressed: 'false' }), {
+  known: true,
+  selected: false
+});
+assert.deepEqual(policy.directSelection({ dataState: 'active' }), {
+  known: true,
+  selected: true
+});
+assert.deepEqual(policy.directSelection({ dataState: 'unchecked' }), {
+  known: true,
+  selected: false
+});
+assert.deepEqual(policy.directSelection({}), {
+  known: false,
+  selected: false
+});
 
 const tracker = policy.createSelectionTracker();
 assert.equal(tracker.value('web_search', false), false);

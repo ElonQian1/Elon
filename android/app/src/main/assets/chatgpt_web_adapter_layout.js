@@ -342,11 +342,25 @@
       const form = formAdapter && formAdapter.describe(node);
       const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
       used.add(id);
-      const directSelected = form ? form.selected :
-        node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-checked') === 'true';
+      const selection = form ? { known: true, selected: form.selected } :
+        composerToolStatePolicy && typeof composerToolStatePolicy.directSelection === 'function'
+          ? composerToolStatePolicy.directSelection({
+              ariaChecked: node.getAttribute('aria-checked'),
+              ariaSelected: node.getAttribute('aria-selected'),
+              ariaPressed: node.getAttribute('aria-pressed'),
+              dataState: node.getAttribute('data-state')
+            })
+          : {
+              known: node.hasAttribute('aria-selected') || node.hasAttribute('aria-checked'),
+              selected: node.getAttribute('aria-selected') === 'true' ||
+                node.getAttribute('aria-checked') === 'true'
+            };
+      const directSelected = selection.selected;
       const selected = composerToolStatePolicy &&
         typeof composerToolStatePolicy.controlSelected === 'function'
-        ? composerToolStatePolicy.controlSelected({ semantic, region, directSelected })
+        ? composerToolStatePolicy.controlSelected({
+            semantic, region, directSelected, directKnown: selection.known
+          })
         : directSelected;
       const control = {
         id,
