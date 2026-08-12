@@ -50,7 +50,10 @@ assert.ok(api.includes("'/api/me/projects'"), 'ERP workspace must load user-owne
 assert.ok(maintainer.includes('ErpExistingProjectRegistrar'), 'existing project onboarding must expose the local repository registration bridge')
 assert.ok(maintainer.includes('onRegistered={loadTargetProjects}'), 'registered repositories must refresh and select the target project')
 assert.ok(existingProjectRegistrar.includes("'/api/project-folder/pick'"), 'registration bridge must use the guarded local folder picker')
+assert.ok(existingProjectRegistrar.includes("'/api/project-folder/inspect'"), 'registration bridge must validate an explicitly entered local path through the node')
 assert.ok(existingProjectRegistrar.includes("'/api/register-project'"), 'registration bridge must reuse the local node cloud registration endpoint')
+assert.ok(existingProjectRegistrar.includes('workspace_path: requestedPath'), 'known paths must be sent to the local inspection endpoint')
+assert.ok(existingProjectRegistrar.includes('await registerFolder(adminUrl, folder)'), 'picked and entered paths must share one registration flow')
 assert.ok(!existingProjectRegistrar.includes('createInstance('), 'repository registration must not silently adopt the project into ERP')
 
 for (const forbidden of [
