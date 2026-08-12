@@ -28,6 +28,9 @@ mod teardown;
 #[cfg(test)]
 #[path = "sqlite_namespace_shm/test_faults.rs"]
 mod test_faults;
+#[cfg(all(test, windows))]
+#[path = "sqlite_namespace_shm/test_snapshot.rs"]
+mod test_snapshot;
 #[cfg(test)]
 #[path = "sqlite_namespace_shm/test_support.rs"]
 mod test_support;
@@ -115,6 +118,13 @@ pub(crate) use coordinator::{
 };
 #[cfg(test)]
 pub(crate) use test_faults::ManagedSqliteShmTestFaultProbe;
+#[cfg(all(test, windows))]
+pub(crate) use test_faults::ManagedSqliteShmTestTargetObserver;
+#[cfg(all(test, windows))]
+pub(crate) use test_snapshot::{
+    ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetSnapshot,
+    ManagedSqliteShmTestTopologySnapshot,
+};
 pub(crate) use types::{
     ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
     ManagedSqliteShmFailurePhase, ManagedSqliteShmLockAction, ManagedSqliteShmLockAttempt,

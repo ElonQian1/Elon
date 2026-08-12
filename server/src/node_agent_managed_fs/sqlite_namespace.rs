@@ -50,6 +50,11 @@ pub(crate) use shm::{
     PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile,
     PinnedManagedSqliteWalRuntime,
 };
+#[cfg(all(test, windows))]
+pub(crate) use shm::{
+    ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
+};
 use types::ManagedSqliteNamespaceInner;
 pub(crate) use types::{
     ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,

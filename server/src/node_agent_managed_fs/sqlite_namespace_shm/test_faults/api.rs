@@ -1,3 +1,5 @@
+#[cfg(all(test, windows))]
+use std::fmt;
 use std::sync::Arc;
 
 use super::{
@@ -10,12 +12,29 @@ use super::{
     controller::{ManagedSqliteShmMatchedTestFault, ManagedSqliteShmTestFaultTarget},
 };
 
+#[cfg(all(test, windows))]
+use super::super::test_snapshot::{
+    test_target_snapshot as snapshot_test_target, ManagedSqliteShmTestTargetSnapshot,
+};
+
 const CONTROLLER_POISONED: &str = "NODE_MANAGED_SQLITE_SHM_TEST_FAULT_CONTROLLER_POISONED";
 
 /// Move-only observation authority for one exact installed SHM fault script.
 ///
 /// The exact runtime generation and connection target remain private to this module.
 pub(crate) struct ManagedSqliteShmTestFaultProbe {
+    coordinator: Arc<ManagedSqliteShmCoordinator>,
+    target: ManagedSqliteShmTestFaultTarget,
+}
+
+/// Cloneable, redacted read authority for the exact target of an installed test fault script.
+///
+/// Keeping this value alive retains only the sealed coordinator and private target identity. Its
+/// public observation contains no runtime generation, connection id, handle, pointer or path.
+#[cfg(all(test, windows))]
+#[derive(Clone)]
+#[must_use = "the exact-target observer must be retained for post-close observation"]
+pub(crate) struct ManagedSqliteShmTestTargetObserver {
     coordinator: Arc<ManagedSqliteShmCoordinator>,
     target: ManagedSqliteShmTestFaultTarget,
 }
@@ -47,6 +66,45 @@ impl ManagedSqliteShmTestFaultProbe {
                 Err(CONTROLLER_POISONED)
             }
         }
+    }
+
+    #[cfg(all(test, windows))]
+    pub(crate) fn test_target_snapshot(
+        &self,
+    ) -> Result<ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmFailure> {
+        self.observer().snapshot()
+    }
+
+    /// The installed exact fault probe is the only constructor for target observation authority.
+    #[cfg(all(test, windows))]
+    pub(crate) fn observer(&self) -> ManagedSqliteShmTestTargetObserver {
+        ManagedSqliteShmTestTargetObserver {
+            coordinator: Arc::clone(&self.coordinator),
+            target: self.target,
+        }
+    }
+}
+
+#[cfg(all(test, windows))]
+impl ManagedSqliteShmTestTargetObserver {
+    /// Observes coordinator state first and the domain registry second; this is intentionally a
+    /// sequential diagnostic observation, not an atomic snapshot across those authorities.
+    pub(crate) fn snapshot(
+        &self,
+    ) -> Result<ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmFailure> {
+        snapshot_test_target(&self.coordinator, |connection_id| {
+            self.coordinator.test_fault_target(connection_id) == self.target
+        })
+    }
+}
+
+#[cfg(all(test, windows))]
+impl fmt::Debug for ManagedSqliteShmTestTargetObserver {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ManagedSqliteShmTestTargetObserver")
+            .field("authority", &"<redacted>")
+            .finish()
     }
 }
 

@@ -23,3 +23,8 @@ pub(crate) use super::sqlite_namespace::{
     ManagedSqliteMainCloseTestFaultPhase, ManagedSqliteMainCloseTestFaults,
     ManagedSqliteShmTestFaultProbe,
 };
+#[cfg(all(test, windows))]
+pub(crate) use super::sqlite_namespace::{
+    ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
+};
