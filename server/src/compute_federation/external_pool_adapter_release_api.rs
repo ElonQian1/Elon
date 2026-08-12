@@ -55,6 +55,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .merge(super::external_pool_adapter_artifact_security_api::routes())
         .merge(super::external_pool_adapter_artifact_vulnerability_report_api::routes())
         .merge(super::external_pool_adapter_scanner_key_api::routes())
+        .merge(super::external_pool_adapter_sandbox_verifier_key_api::routes())
         .merge(super::external_pool_adapter_release_lifecycle_api::routes())
 }
 

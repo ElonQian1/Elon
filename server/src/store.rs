@@ -95,6 +95,7 @@ mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_artifact_vulnerability_report;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_onboarding;
 mod compute_job_contract_validation;
@@ -489,6 +490,13 @@ pub(crate) use compute_external_pool_adapter_release_lifecycle::{
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_REVOCATION_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SUPERSESSION_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_WITHDRAWAL_CONFIRMATION,
+};
+pub(crate) use compute_external_pool_adapter_sandbox_verifier_key::{
+    ActivateExternalPoolAdapterSandboxVerifierKey,
+    ExternalPoolAdapterSandboxVerifierKeyCurrentnessReceipt,
+    ExternalPoolAdapterSandboxVerifierKeyRegistrationWriteReceipt,
+    ExternalPoolAdapterSandboxVerifierKeyTransitionWriteReceipt,
+    RegisterExternalPoolAdapterSandboxVerifierKey, RevokeExternalPoolAdapterSandboxVerifierKey,
 };
 pub(crate) use compute_external_pool_adapter_scanner_key::{
     ActivateExternalPoolAdapterScannerKey, ExternalPoolAdapterScannerKeyActivationWriteReceipt,
