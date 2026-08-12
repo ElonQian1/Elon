@@ -51,6 +51,8 @@ internal class ChatGptWebTouchDispatcher(
             "select_navigation",
             "dismiss_navigation",
             "invoke_ui_control",
+            "regenerate_open_menu",
+            "regenerate_retry",
         )
     }
 }

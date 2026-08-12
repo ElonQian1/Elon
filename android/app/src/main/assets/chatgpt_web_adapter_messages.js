@@ -326,22 +326,38 @@
     }));
   }
 
-  function regenerate(result) {
+  function regenerate(emitEvent, result) {
     const button = regenerateButton();
     if (button) {
       button.click();
       return result('regenerate_response', true, '');
     }
 
+    function requestTouch(node, purpose) {
+      if (!node || !isVisible(node)) return false;
+      const rect = node.getBoundingClientRect();
+      const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
+      const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
+      if (
+        rect.width <= 0 || rect.height <= 0 ||
+        xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1
+      ) return false;
+      emitEvent({ type: 'web_touch_request', purpose, xRatio, yRatio });
+      return true;
+    }
+
     function invokeFromMenu(trigger, onMissing) {
       if (!trigger) return onMissing();
-      trigger.click();
-      const deadline = Date.now() + 2000;
+      if (!requestTouch(trigger, 'regenerate_open_menu')) return onMissing();
+      const deadline = Date.now() + 3000;
       function invokeMenuItem() {
         const item = visibleRegenerateMenuItem();
         if (item) {
-          item.click();
-          return result('regenerate_response', true, '');
+          const requested = requestTouch(item, 'regenerate_retry');
+          return result(
+            'regenerate_response', requested,
+            requested ? '' : '官网重试入口当前不在可操作区域。'
+          );
         }
         if (Date.now() >= deadline) {
           dismissOverflowMenu();
@@ -349,7 +365,7 @@
         }
         window.setTimeout(invokeMenuItem, 75);
       }
-      window.setTimeout(invokeMenuItem, 50);
+      window.setTimeout(invokeMenuItem, 120);
     }
 
     invokeFromMenu(messageModelRetryButton(), () => {

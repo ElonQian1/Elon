@@ -507,6 +507,8 @@ internal object ChatGptWebProtocol {
         "select_navigation",
         "dismiss_navigation",
         "invoke_ui_control",
+        "regenerate_open_menu",
+        "regenerate_retry",
     )
     private const val MAX_MESSAGES = 80
     private const val MAX_OBSERVED_MESSAGES = 1_000_000

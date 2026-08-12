@@ -238,6 +238,12 @@ class ChatGptWebProtocolTest {
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"open_model_submenu","xRatio":0.5,"yRatio":0.5}}""",
             ) is ChatGptWebEvent.WebTouchRequest,
         )
+        listOf("regenerate_open_menu", "regenerate_retry").forEach { purpose ->
+            val regenerateTouch = ChatGptWebProtocol.parse(
+                """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"$purpose","xRatio":0.5,"yRatio":0.5}}""",
+            ) as ChatGptWebEvent.WebTouchRequest
+            assertEquals(purpose, regenerateTouch.purpose)
+        }
         assertNull(
             ChatGptWebProtocol.parse(
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"list_composer_tools","xRatio":1.5,"yRatio":0.5}}""",

@@ -615,6 +615,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::requestSnapshot,
                     ADAPTIVE_CONTROL_SETTLE_MS,
                 )
+                "regenerate_open_menu", "regenerate_retry" ->
+                    binding.chatGptWebView.postDelayed(
+                        pageAdapter::requestSnapshot,
+                        ADAPTIVE_CONTROL_SETTLE_MS,
+                    )
             }
         }
     }

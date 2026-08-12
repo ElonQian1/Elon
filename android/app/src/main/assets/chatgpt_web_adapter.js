@@ -394,7 +394,7 @@
       return conversationAdapter.openConversation(String(command.value || ''), respond);
     }
     if (action === 'regenerate_response' && messageAdapter) {
-      return messageAdapter.regenerate(respond);
+      return messageAdapter.regenerate(emitEvent, respond);
     }
     if (action === 'stop_generation') {
       const composer = findComposer();
