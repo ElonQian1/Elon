@@ -24,5 +24,12 @@
     return clean(clean(value).replace(REMOVE_TEXT, ' '));
   }
 
-  return Object.freeze({ isRemoveActionLabel, withoutRemoveAction });
+  function invokeRemoveAction(node, label) {
+    if (!node || node.isConnected === false || typeof node.click !== 'function') return false;
+    if (!isRemoveActionLabel(label)) return false;
+    node.click();
+    return true;
+  }
+
+  return Object.freeze({ isRemoveActionLabel, withoutRemoveAction, invokeRemoveAction });
 });
