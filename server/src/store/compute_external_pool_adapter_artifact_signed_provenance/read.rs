@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::types::{
+    ExternalPoolAdapterArtifactSignedProvenanceAuthority,
     ExternalPoolAdapterArtifactSignedProvenanceCurrentnessReceipt, StoredSignedProvenanceReceipt,
 };
 
@@ -174,6 +175,48 @@ pub(super) fn currentness_on(
             admission_current_status: admission_status,
             signer_current_status: signer_status,
         },
+    ))
+}
+
+pub(in crate::store) fn current_external_pool_adapter_artifact_signed_provenance_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_provenance_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactSignedProvenanceAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.provenance_receipt_digest != expected_provenance_receipt_digest {
+        bail!("signed-provenance receipt digest is stale");
+    }
+    let status: String = conn.query_row(
+        "SELECT current_status
+           FROM compute_external_pool_adapter_artifact_signed_provenance_current
+          WHERE admission_id=?1 AND provenance_receipt_digest=?2",
+        params![admission_id, expected_provenance_receipt_digest],
+        |row| row.get(0),
+    )?;
+    if status != "verified_current" {
+        bail!("signed provenance is historical and cannot be consumed");
+    }
+    Ok(Some(
+        ExternalPoolAdapterArtifactSignedProvenanceAuthority::new(stored.receipt),
+    ))
+}
+
+pub(in crate::store) fn external_pool_adapter_artifact_signed_provenance_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_provenance_receipt_digest: &str,
+) -> Result<Option<ExternalPoolAdapterArtifactSignedProvenanceAuthority>> {
+    let Some(stored) = receipt_by_admission_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.provenance_receipt_digest != expected_provenance_receipt_digest {
+        bail!("signed-provenance receipt digest is stale");
+    }
+    Ok(Some(
+        ExternalPoolAdapterArtifactSignedProvenanceAuthority::new(stored.receipt),
     ))
 }
 

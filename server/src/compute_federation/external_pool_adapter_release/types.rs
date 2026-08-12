@@ -50,7 +50,7 @@ pub(crate) struct ComputeExternalPoolAdapterReleaseIntent {
 }
 
 /// Declared protocol revision in canonical array order, not conformance evidence.
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ComputeExternalPoolAdapterReleaseCapability {
     pub capability_id: String,
@@ -58,7 +58,7 @@ pub(crate) struct ComputeExternalPoolAdapterReleaseCapability {
 }
 
 /// Future verifier binding intent. It does not prove registry presence or currentness.
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ComputeExternalPoolAdapterReleaseVerifierIntent {
     pub verification_kind: String,

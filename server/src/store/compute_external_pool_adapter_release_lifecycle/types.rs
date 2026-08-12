@@ -96,6 +96,24 @@ impl CurrentExternalPoolAdapterReleaseAdmissionAuthority {
         &self.admission.declared_implementation_sha256
     }
 
+    pub(in crate::store) fn supported_capabilities(
+        &self,
+    ) -> &[crate::compute_federation::external_pool_adapter_release::ComputeExternalPoolAdapterReleaseCapability]
+    {
+        &self.admission.supported_capabilities
+    }
+
+    pub(in crate::store) fn capability_set_digest(&self) -> &str {
+        &self.admission.capability_set_digest
+    }
+
+    pub(in crate::store) fn expected_credential_verifier(
+        &self,
+    ) -> &crate::compute_federation::external_pool_adapter_release::ComputeExternalPoolAdapterReleaseVerifierIntent
+    {
+        &self.admission.expected_credential_verifier
+    }
+
     pub(in crate::store) fn applied_at(&self) -> &str {
         &self.applied_at
     }

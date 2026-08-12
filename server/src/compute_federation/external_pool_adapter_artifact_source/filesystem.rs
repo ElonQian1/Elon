@@ -6,8 +6,8 @@ use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
 use super::{
-    ExternalPoolAdapterArtifactSourceFsError, QuarantinedExternalPoolAdapterArtifactBytes,
-    MAX_EXTERNAL_POOL_ADAPTER_ARTIFACT_BYTES,
+    CurrentQuarantinedExternalPoolAdapterArtifactBytes, ExternalPoolAdapterArtifactSourceFsError,
+    QuarantinedExternalPoolAdapterArtifactBytes, MAX_EXTERNAL_POOL_ADAPTER_ARTIFACT_BYTES,
 };
 
 mod storage;
@@ -161,11 +161,30 @@ pub(crate) async fn require_current_quarantined_artifact_bytes(
     content_address_digest: &str,
     expected_size_bytes: u64,
 ) -> Result<(), ExternalPoolAdapterArtifactSourceFsError> {
+    open_current_quarantined_artifact_bytes(data_dir, content_address_digest, expected_size_bytes)
+        .await?;
+    Ok(())
+}
+
+/// Reopens, hashes, and retains the exact current CAS file without exposing its path.
+pub(crate) async fn open_current_quarantined_artifact_bytes(
+    data_dir: &Path,
+    content_address_digest: &str,
+    expected_size_bytes: u64,
+) -> Result<
+    CurrentQuarantinedExternalPoolAdapterArtifactBytes,
+    ExternalPoolAdapterArtifactSourceFsError,
+> {
     validate_sha256(content_address_digest)?;
     if expected_size_bytes == 0 || expected_size_bytes > MAX_EXTERNAL_POOL_ADAPTER_ARTIFACT_BYTES {
         return Err(ExternalPoolAdapterArtifactSourceFsError::BlobDrift);
     }
     let paths = locate_paths(data_dir, content_address_digest).await?;
-    let _reopened = reopen_final(paths, content_address_digest, Some(expected_size_bytes)).await?;
-    Ok(())
+    let reopened = reopen_final(paths, content_address_digest, Some(expected_size_bytes)).await?;
+    Ok(CurrentQuarantinedExternalPoolAdapterArtifactBytes {
+        reopened_file: reopened.file,
+        _pinned_directories: reopened.pinned_directories,
+        content_address_digest: reopened.sha256,
+        artifact_size_bytes: reopened.size_bytes,
+    })
 }

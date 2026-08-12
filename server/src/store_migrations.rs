@@ -3,6 +3,7 @@ use rusqlite::Connection;
 
 mod compute_capacity_commitment;
 mod compute_delivery_allocation;
+mod compute_external_pool_adapter_artifact_package;
 mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
@@ -274,6 +275,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (229, "外部矿池 Adapter staged admission 追加式终态与 intake currentness", compute_external_pool_adapter_release_lifecycle::migration_v229),
     (230, "外部矿池 Adapter Artifact 签名密钥四眼注册与撤销", compute_external_pool_adapter_artifact_signing_key::migration_v230),
     (231, "外部矿池 Adapter Artifact 精确绑定签名来源证明", compute_external_pool_adapter_artifact_signed_provenance::migration_v231),
+    (232, "外部矿池 Adapter Artifact 有界静态包格式证明", compute_external_pool_adapter_artifact_package::migration_v232),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

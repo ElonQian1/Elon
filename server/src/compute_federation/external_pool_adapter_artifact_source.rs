@@ -15,7 +15,8 @@ use std::{fmt, fs::File};
 use thiserror::Error;
 
 pub(crate) use filesystem::{
-    intake_quarantined_artifact_bytes, require_current_quarantined_artifact_bytes,
+    intake_quarantined_artifact_bytes, open_current_quarantined_artifact_bytes,
+    require_current_quarantined_artifact_bytes,
 };
 
 pub(crate) const MAX_EXTERNAL_POOL_ADAPTER_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
@@ -34,6 +35,30 @@ pub(crate) struct QuarantinedExternalPoolAdapterArtifactBytes {
     reopened_sha256: String,
     artifact_size_bytes: u64,
     content_address_digest: String,
+}
+
+/// A pathless, non-cloneable handle to the currently verified CAS object.
+///
+/// Static consumers may read this handle, but cannot derive a local path or execution authority.
+pub(crate) struct CurrentQuarantinedExternalPoolAdapterArtifactBytes {
+    reopened_file: File,
+    _pinned_directories: Vec<File>,
+    content_address_digest: String,
+    artifact_size_bytes: u64,
+}
+
+impl CurrentQuarantinedExternalPoolAdapterArtifactBytes {
+    pub(crate) fn reader(&mut self) -> &mut File {
+        &mut self.reopened_file
+    }
+
+    pub(crate) fn content_address_digest(&self) -> &str {
+        &self.content_address_digest
+    }
+
+    pub(crate) fn artifact_size_bytes(&self) -> u64 {
+        self.artifact_size_bytes
+    }
 }
 
 impl QuarantinedExternalPoolAdapterArtifactBytes {

@@ -66,6 +66,33 @@ pub(super) struct StoredSignedProvenanceReceipt {
     pub receipt_json: String,
 }
 
+/// Sealed, same-transaction proof that one exact V231 provenance receipt is current.
+pub(in crate::store) struct ExternalPoolAdapterArtifactSignedProvenanceAuthority {
+    receipt: ExternalPoolAdapterArtifactSignedProvenanceReceipt,
+}
+
+impl ExternalPoolAdapterArtifactSignedProvenanceAuthority {
+    pub(super) fn new(receipt: ExternalPoolAdapterArtifactSignedProvenanceReceipt) -> Self {
+        Self { receipt }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterArtifactSignedProvenanceReceipt {
+        &self.receipt
+    }
+
+    pub(in crate::store) fn provenance_receipt_id(&self) -> &str {
+        &self.receipt.provenance_receipt_id
+    }
+
+    pub(in crate::store) fn provenance_receipt_digest(&self) -> &str {
+        &self.receipt.provenance_receipt_digest
+    }
+
+    pub(in crate::store) fn binding(&self) -> &ExternalPoolAdapterArtifactSignatureBinding {
+        &self.receipt.provenance.binding
+    }
+}
+
 impl StoredSignedProvenanceReceipt {
     pub(super) fn summary(&self) -> ExternalPoolAdapterArtifactSignedProvenanceSummary {
         let material = &self.receipt.provenance;

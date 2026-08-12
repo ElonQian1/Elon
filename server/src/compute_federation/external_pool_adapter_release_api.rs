@@ -51,6 +51,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .merge(super::external_pool_adapter_artifact_source_api::routes())
         .merge(super::external_pool_adapter_artifact_signing_key_api::routes())
         .merge(super::external_pool_adapter_artifact_signed_provenance_api::routes())
+        .merge(super::external_pool_adapter_artifact_package_api::routes())
         .merge(super::external_pool_adapter_release_lifecycle_api::routes())
 }
 

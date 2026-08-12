@@ -68,6 +68,10 @@ pub(in crate::store) struct ExternalPoolAdapterReleaseArtifactSourceAdmission {
     pub(in crate::store) release_version: String,
     pub(in crate::store) candidate_artifact_ref: String,
     pub(in crate::store) declared_implementation_sha256: String,
+    pub(in crate::store) supported_capabilities: Vec<ComputeExternalPoolAdapterReleaseCapability>,
+    pub(in crate::store) capability_set_digest: String,
+    pub(in crate::store) expected_credential_verifier:
+        ComputeExternalPoolAdapterReleaseVerifierIntent,
     pub(in crate::store) status: String,
 }
 
@@ -331,6 +335,9 @@ impl StoredAdmission {
             release_version: admission.release_version,
             candidate_artifact_ref: admission.candidate_artifact_ref,
             declared_implementation_sha256: admission.declared_implementation_sha256,
+            supported_capabilities: admission.supported_capabilities,
+            capability_set_digest: admission.capability_set_digest,
+            expected_credential_verifier: admission.expected_credential_verifier,
             status: admission.status,
         }
     }
