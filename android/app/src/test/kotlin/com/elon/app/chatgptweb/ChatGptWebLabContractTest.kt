@@ -126,6 +126,9 @@ class ChatGptWebLabContractTest {
             )
         }
         assertTrue(adapter.contains("new MutationObserver"))
+        assertTrue(adapter.contains("[data-testid=\"stop-button\"]"))
+        assertTrue(adapter.contains("/stop generating|停止生成/"))
+        assertFalse(adapter.contains("['stop generating', 'stop', '停止生成', '停止']"))
         assertTrue(adapter.contains("adapterVersion,"))
         assertTrue(adapter.contains("observedMessageCount:"))
         assertTrue(adapter.contains("messageWindowStart:"))

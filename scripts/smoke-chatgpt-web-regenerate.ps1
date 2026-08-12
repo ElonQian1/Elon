@@ -8,7 +8,7 @@ param(
     [ValidateRange(30, 300)][int]$ReadyTimeoutSec = 120,
     [ValidateRange(30, 600)][int]$ReplyTimeoutSec = 240,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 56
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 57
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,6 +38,11 @@ function Invoke-ReceiptAction {
         [hashtable]$Arguments = @{}
     )
 
+    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "ChatGPT bridge before $Action" -Predicate {
+            param($state)
+            $state.bridge_state -eq "ready" -and $state.adapter_current -eq $true
+        } | Out-Null
     $dispatch = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
         -Action $Action -Arguments $Arguments
     $requestId = [string]$dispatch.command_receipt.request_id
@@ -91,6 +96,7 @@ function Wait-RegeneratedReply {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReplyTimeoutSec)
     $streamingObserved = $false
     $lastReceipt = $null
+    $lastProgressAt = [DateTimeOffset]::MinValue
     do {
         $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
         if ($state.streaming -eq $true) { $streamingObserved = $true }
@@ -125,6 +131,10 @@ function Wait-RegeneratedReply {
                 }
             }
         }
+        if (([DateTimeOffset]::UtcNow - $lastProgressAt).TotalSeconds -ge 20) {
+            Write-Output "CHATGPT_REGENERATE_PROGRESS phase=await_regenerated_reply streaming=$([bool]$state.streaming) messages=$([int]$state.conversation.message_count) receipt=$([string]$lastReceipt.status)"
+            $lastProgressAt = [DateTimeOffset]::UtcNow
+        }
         Start-Sleep -Seconds $PollIntervalSec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out waiting for a structurally new regenerated reply. Receipt=$($lastReceipt.status)."
@@ -147,21 +157,30 @@ try {
         '/c/[A-Za-z0-9_-]{1,160}'
     ).Value
 
+    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=create_isolated_conversation"
     Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
         -ExpectedAction "new_conversation" | Out-Null
     Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
         -Description "isolated blank regenerate conversation" -Predicate {
             param($state)
-            [int]$state.conversation.message_count -eq 0 -and
+            $state.page_kind -eq "home" -and
+                (-not $originPath -or [string]$state.conversation.url -notlike "*$originPath*") -and
                 $state.composer_ready -eq $true -and
                 $state.streaming -eq $false
-        } | Out-Null
+        }.GetNewClosure() | Out-Null
 
+    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=send_probe"
     $marker = "ELON-CHATGPT-REGENERATE-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
     $prompt = "Reply with a fresh 12-character lowercase hexadecimal token, one space, then exactly: $marker"
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
         -Arguments @{ text = $prompt } | Out-Null
-    $beforeSend = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+    $beforeSend = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "regenerate probe draft synchronization" -Predicate {
+            param($state)
+            $state.bridge_state -eq "ready" -and
+                $state.adapter_current -eq $true -and
+                [string]$state.draft -eq $prompt
+        }.GetNewClosure()
     $send = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input"
     $sendRequestId = [string]$send.command_receipt.request_id
     if (-not $sendRequestId) { throw "ChatGPT regenerate probe did not return a send receipt id." }
@@ -170,6 +189,7 @@ try {
         -RequestId $sendRequestId -Marker $marker `
         -AfterMs ([long]$beforeSend.last_command.observed_at_ms) `
         -TimeoutSec $ReplyTimeoutSec -PollIntervalSec $PollIntervalSec
+    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=initial_reply_complete"
     $initialAssistant = @($initialReply.conversation.messages) |
         Where-Object { [string]$_.role -eq "assistant" } |
         Select-Object -Last 1
@@ -184,10 +204,12 @@ try {
         -Action "chatgpt_regenerate_response"
     $regenerateRequestId = [string]$regenerate.command_receipt.request_id
     if (-not $regenerateRequestId) { throw "ChatGPT regenerate did not return a receipt id." }
+    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=regenerate_dispatched"
     $regenerated = Wait-RegeneratedReply -RequestId $regenerateRequestId `
         -Marker $marker -PreviousMessageId ([string]$initialAssistant.id) `
         -PreviousContentDigest $initialDigest
 
+    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=restore_origin"
     Restore-Origin -ConversationPath $originPath -ViewMode $originMode
     $originRestored = $true
     $result = [ordered]@{

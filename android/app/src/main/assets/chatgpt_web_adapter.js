@@ -104,7 +104,20 @@
   }
 
   function isStreaming() {
-    return !!findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
+    const direct = document.querySelector('[data-testid="stop-button"]');
+    if (isVisible(direct)) return true;
+    const composer = findComposer();
+    const scope = composer && composer.closest('form');
+    if (!scope) return false;
+    return Array.from(scope.querySelectorAll('button')).some((button) => {
+      if (!isVisible(button)) return false;
+      const label = cleanText([
+        button.getAttribute('aria-label'),
+        button.getAttribute('title'),
+        button.textContent
+      ].filter(Boolean).join(' ')).toLowerCase();
+      return /stop generating|停止生成/.test(label);
+    });
   }
 
   function detectCapabilities(composer) {
@@ -384,7 +397,17 @@
       return messageAdapter.regenerate(respond);
     }
     if (action === 'stop_generation') {
-      const stop = findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
+      const composer = findComposer();
+      const scope = composer && composer.closest('form');
+      const stop = document.querySelector('[data-testid="stop-button"]') ||
+        (scope && Array.from(scope.querySelectorAll('button')).find((button) => {
+          const label = cleanText([
+            button.getAttribute('aria-label'),
+            button.getAttribute('title'),
+            button.textContent
+          ].filter(Boolean).join(' ')).toLowerCase();
+          return isVisible(button) && /stop generating|停止生成/.test(label);
+        }));
       if (!stop) return respond(action, false, '当前没有正在生成的回复。');
       stop.click();
       respond(action, true, '');
