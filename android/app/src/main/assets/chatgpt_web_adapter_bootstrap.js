@@ -28,6 +28,7 @@
     '__elonChatGptControlOwnershipPolicy',
     '__elonChatGptFormCommands',
     '__elonChatGptDisclosureControls',
+    '__elonChatGptSnapshotScheduler',
     '__elonChatGptLayout',
     '__elonChatGptBridge'
   ].forEach((name) => {

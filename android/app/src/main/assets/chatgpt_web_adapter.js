@@ -9,15 +9,16 @@
   const composerAdapter = window.__elonChatGptComposer;
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
+  const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
   if (!/^doc_[a-z0-9_]{3,80}$/.test(documentToken)) return;
 
-  let emitTimer = 0;
   let lastSnapshot = '';
   let sequence = 0;
   let disposed = false;
   let observer = null;
+  let snapshotScheduler = null;
 
   function emitEvent(event) {
     if (disposed) return;
@@ -175,9 +176,7 @@
   }
 
   function scheduleSnapshot() {
-    if (disposed) return;
-    clearTimeout(emitTimer);
-    emitTimer = window.setTimeout(snapshot, 120);
+    if (!disposed && snapshotScheduler) snapshotScheduler.schedule();
   }
 
   function setComposerValue(composer, value) {
@@ -426,7 +425,7 @@
   function dispose() {
     if (disposed) return;
     disposed = true;
-    clearTimeout(emitTimer);
+    if (snapshotScheduler) snapshotScheduler.dispose();
     if (observer) observer.disconnect();
     window.removeEventListener('popstate', scheduleSnapshot);
   }
@@ -439,6 +438,13 @@
   emitEvent({
     type: 'adapter_ready',
     capabilities: detectCapabilities(findComposer())
+  });
+  snapshotScheduler = snapshotSchedulerModule && snapshotSchedulerModule.create({
+    scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
+    cancelTimer: (timer) => clearTimeout(timer),
+    snapshot,
+    quietDelayMs: 120,
+    maxDelayMs: 1000
   });
   observer = new MutationObserver(scheduleSnapshot);
   observer.observe(document.documentElement, {
