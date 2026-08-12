@@ -69,6 +69,35 @@ function Invoke-ReceiptAction {
     return Wait-CommandReceipt -RequestId $requestId -ExpectedAction $ExpectedAction
 }
 
+function Invoke-ReadOnlyControlQuery {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("chatgpt_find_controls", "chatgpt_get_capability_matrix")]
+        [string]$Action,
+        [hashtable]$Arguments = @{}
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        if (
+            $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
+        ) {
+            try {
+                return Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action $Action `
+                    -Arguments $Arguments
+            } catch {
+                if ($_.Exception.Message -notmatch "bridge_not_ready") { throw }
+            }
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting to run read-only ChatGPT query: $Action"
+}
+
 function Get-ManifestControls {
     param(
         [string]$Semantic = "",
@@ -81,7 +110,7 @@ function Get-ManifestControls {
         $arguments = @{ offset = $offset; limit = 50 }
         if ($Semantic) { $arguments.semantic = $Semantic }
         if ($Region) { $arguments.region = $Region }
-        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        $page = Invoke-ReadOnlyControlQuery `
             -Action "chatgpt_find_controls" -Arguments $arguments
         @($page.controls | Where-Object { $null -ne $_ }).ForEach({ $controls.Add($_) })
         $offset = if ($null -eq $page.next_offset) { 0 } else { [int]$page.next_offset }
@@ -128,7 +157,7 @@ function Wait-SettingsStructure {
             $switches = @($controls | Where-Object { [string]$_.role -eq "switch" })
             if ($tabs.Count -gt 0 -and $switches.Count -gt 0) {
                 return [pscustomobject]@{
-                    matrix = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                    matrix = Invoke-ReadOnlyControlQuery `
                         -Action "chatgpt_get_capability_matrix"
                     controls = $controls
                     tabs = $tabs
@@ -160,7 +189,7 @@ function Restore-Origin {
             $state.adapter_current -eq $true -and
             $state.authenticated -eq $true
         ) {
-            $overlay = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            $overlay = Invoke-ReadOnlyControlQuery `
                 -Action "chatgpt_find_controls" -Arguments @{ region = "overlay"; offset = 0; limit = 1 }
             $pathMatches = -not $Path -or (Get-ObservedPath -State $state) -eq $Path
             if (
@@ -204,7 +233,7 @@ Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originPageKind = [string]$origin.page_kind
 $originPath = Get-ObservedPath -State $origin
-$originOverlay = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+$originOverlay = Invoke-ReadOnlyControlQuery `
     -Action "chatgpt_find_controls" -Arguments @{ region = "overlay"; offset = 0; limit = 1 }
 $originOverlayCount = [int]$originOverlay.match_count
 $originOverlayControls = @(Get-ManifestControls -Region "overlay")
