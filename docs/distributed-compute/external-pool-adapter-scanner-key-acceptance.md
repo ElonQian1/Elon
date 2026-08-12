@@ -8,19 +8,19 @@ implementation_status: implementation_partially_verified
 
 # 外部矿池 Adapter 漏洞扫描器信任根验收
 
-## V234 定向验证
+## V235 定向验证
 
 运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-federation-v234 -- test --manifest-path server\Cargo.toml --bin elon-server scanner_key_ -- --nocapture --test-threads=1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-federation-v235 -- test --manifest-path server\Cargo.toml --bin elon-server scanner_key_ -- --nocapture --test-threads=1
 ```
 
 结果：5 项命名测试通过，包括 migration、Store 生命周期、并发激活、双向角色隔离和 HTTP 生命周期。
 
-验收指纹：`af242da61a874b153902c0e46cf2a636dd0a6414984b8824b76c867e2836a9f8`。
+验收指纹：`a0bc1096e5835e1309ffd1cb8904ef4859261c3dee4ea764640f4b399ff882ab`。
 
-证据：`D:\rust\shared\rust-cache-v2\validation-v1\evidence\af242da61a874b153902c0e46cf2a636dd0a6414984b8824b76c867e2836a9f8\summary.json`。
+证据：`D:\rust\shared\rust-cache-v2\validation-v1\evidence\a0bc1096e5835e1309ffd1cb8904ef4859261c3dee4ea764640f4b399ff882ab\summary.json`。
 
 覆盖：
 
@@ -42,9 +42,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 
 结果：5 项 V230 命名测试通过。
 
-回归指纹：`c4934a9e2f20d664333abb0d224e461a338f6dc1eabf4041cd4dfa9d6c5a6dd3`。
+回归指纹：`a7ba0663858feeecfae11654014ca749288d79bcd7bd383dda1915195a0ee556`。
 
-证据：`D:\rust\shared\rust-cache-v2\validation-v1\evidence\c4934a9e2f20d664333abb0d224e461a338f6dc1eabf4041cd4dfa9d6c5a6dd3\summary.json`。
+证据：`D:\rust\shared\rust-cache-v2\validation-v1\evidence\a7ba0663858feeecfae11654014ca749288d79bcd7bd383dda1915195a0ee556\summary.json`。
 
 新增反向角色隔离触发器未破坏既有供应商签名钥的登记、四眼激活、吊销、并发线性化、HTTP 权限和脱敏合同。
 
@@ -56,4 +56,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 - 生产数据库原位升级、真实 TCP、并发压力、备份恢复和部署；
 - MCP/PC 管理面、Adapter 安装/采用、route、Worker/ACK、真实派发和结算。
 
-因此 V234 只能证明独立 scanner trust root 生命周期，不能证明任何 Adapter 已扫描、无漏洞或可执行。
+因此 V235 只能证明独立 scanner trust root 生命周期，不能证明任何 Adapter 已扫描、无漏洞或可执行。

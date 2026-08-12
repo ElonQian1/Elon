@@ -11,9 +11,9 @@ implementation_status: implementation_partially_verified
 
 ## 1. 冻结结论
 
-V234 建立独立的漏洞扫描器 RSA 公钥登记、四眼激活、吊销和 currentness。扫描器密钥必须与 V230 供应商制品签名密钥不同；同一公钥不能同时证明“谁发布了制品”和“谁检查了制品”。
+V235 建立独立的漏洞扫描器 RSA 公钥登记、四眼激活、吊销和 currentness。扫描器密钥必须与 V230 供应商制品签名密钥不同；同一公钥不能同时证明“谁发布了制品”和“谁检查了制品”。
 
-V234 只回答未来扫描报告应由哪一个已登记、当前有效的扫描器身份签名。它不运行扫描器，不下载漏洞情报，不生成或认可漏洞报告，也不授予制品安全、conformance、Adapter、route 或派发权限。
+V235 只回答未来扫描报告应由哪一个已登记、当前有效的扫描器身份签名。它不运行扫描器，不下载漏洞情报，不生成或认可漏洞报告，也不授予制品安全、conformance、Adapter、route 或派发权限。
 
 ## 2. 信任根合同
 
@@ -29,7 +29,7 @@ Store 为未来签名报告事务提供不可序列化的 current authority。�
 
 ## 3. 数据与权限边界
 
-V234 新增三张不可变表和一个派生 current view：
+V235 新增三张不可变表和一个派生 current view：
 
 - scanner key root；
 - activation receipt；
@@ -64,7 +64,7 @@ V234 新增三张不可变表和一个派生 current view：
 下一阶段应新增独立、已签名的漏洞情报报告，至少精确绑定：
 
 1. V233 current artifact security receipt 和 exact V232 package digest；
-2. V234 current scanner key root、扫描器运营方和产品身份；
+2. V235 current scanner key root、扫描器运营方和产品身份；
 3. 漏洞数据库来源、不可变 snapshot digest、生成时间和有效期；
 4. exact dependency graph、扫描策略、扫描结果和原始报告摘要；
 5. 签名字节、签名验证及吊销后的历史/currentness 语义。
@@ -73,6 +73,6 @@ V234 新增三张不可变表和一个派生 current view：
 
 ## 6. 当前验收
 
-V234 的 migration、Store 生命周期、两连接激活竞争、SQL 不可变、双向密钥角色隔离和进程内 HTTP 鉴权/脱敏均已通过；V230 受影响回归也通过。证据见 [`external-pool-adapter-scanner-key-acceptance.md`](external-pool-adapter-scanner-key-acceptance.md)。
+V235 的 migration、Store 生命周期、两连接激活竞争、SQL 不可变、双向密钥角色隔离和进程内 HTTP 鉴权/脱敏均已通过；V230 受影响回归也通过。证据见 [`external-pool-adapter-scanner-key-acceptance.md`](external-pool-adapter-scanner-key-acceptance.md)。
 
 生产数据库原位升级、真实 TCP、外部扫描器、生产密钥托管、MCP/PC、部署和灾难恢复未验证，当前状态仍为 `implementation_partially_verified`。

@@ -177,7 +177,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 以独立合同逐步接入外部算力池。v227-v234 的制品来源、准入、供应商签名、来源证明、静态包、静态安全和独立 scanner trust root 均已有本地专项；最新边界见 [`V233 静态安全`](external-pool-adapter-artifact-security-authority.md) 与 [`V234 扫描器信任根`](external-pool-adapter-scanner-key-authority.md)。它们不代表已运行漏洞扫描、动态 conformance、Adapter、route、派发或结算；真实 TCP、生产升级、部署和 MCP/PC 也仍缺。
+服务端 Provider Adapter 以独立合同逐步接入外部算力池。v227-v233 与 v235 的制品来源、准入、供应商签名、来源证明、静态包、静态安全和独立 scanner trust root 均已有本地专项；最新边界见 [`V233 静态安全`](external-pool-adapter-artifact-security-authority.md) 与 [`V235 扫描器信任根`](external-pool-adapter-scanner-key-authority.md)。它们不代表已运行漏洞扫描、动态 conformance、Adapter、route、派发或结算；真实 TCP、生产升级、部署和 MCP/PC 也仍缺。
 
 ### F4：容量期货市场
 
