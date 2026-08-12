@@ -23,7 +23,7 @@ V235 只回答扫描报告应由哪一个已登记、当前有效的扫描器身
 - canonical record、activation 和 revocation 使用 RFC 8785 JCS 与 domain-separated SHA-256；
 - 登记者不能激活自己登记的密钥，激活必须由另一名平台管理员完成；
 - 吊销只能发生在激活之后，吊销后不能重新激活；
-- 供应商签名钥与扫描器钥实行数据库双向角色隔离。
+- 供应商签名钥、扫描器钥与 V237 沙箱验证者钥实行数据库三方双向角色隔离。
 
 Store 为未来签名报告事务提供不可序列化的 current authority。调用方必须同时提交精确 `key_record_id`、`key_record_digest` 和 `key_id`，且密钥仍为 `active`；历史报告回读可使用不可变 historical authority，但不得借历史密钥创建新报告。
 

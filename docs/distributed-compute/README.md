@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221/v222 管理面及 v227-v233 供应链门已分别通过本地专项，均为 `implementation_partially_verified`。v232 证明固定 ZIP/canonical manifest，v233 再证明 exact SBOM、许可证允许策略、逐文件归属/复算及有限本地静态规则；仍缺漏洞情报、动态恶意行为、conformance、verifier runtime、Adapter 采用、v213 route、真实派发和结算。真实崩溃/断电、生产文件边界、TCP、升级、部署及 v227-v233 MCP/PC 也未验收。见 [`external-pool-adapter-artifact-security-authority.md`](external-pool-adapter-artifact-security-authority.md) 与 [`external-pool-adapter-artifact-security-acceptance.md`](external-pool-adapter-artifact-security-acceptance.md) |
+| 外部算力池适配器与统一报价 | v221/v222 管理面、v227-v233 静态供应链门、v235/v236 独立 scanner 与签名漏洞报告，以及 v237 独立 sandbox verifier trust root 已通过对应本地专项，均为 `implementation_partially_verified`。仍缺真实漏洞情报/扫描器、动态沙箱报告、六能力 conformance、credential verifier、Adapter 采用、v213 route、真实派发和结算。真实生产文件/数据库、TCP、升级、部署及 MCP/PC 也未验收。见 [`external-pool-adapter-sandbox-verifier-key-authority.md`](external-pool-adapter-sandbox-verifier-key-authority.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -177,7 +177,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 以独立合同逐步接入外部算力池。v227-v235 已形成制品来源、准入、供应商签名、来源证明、静态包、静态安全和独立 scanner trust root；v236 又实现 exact-SBOM 依赖图、限时情报快照与零漏洞结果的扫描器签名报告。最新边界见 [`V236 漏洞情报签名报告`](external-pool-adapter-vulnerability-report-authority.md)。它不连接真实漏洞源或运行扫描器，也不代表动态 conformance、Adapter、route、派发或结算已完成；真实 TCP、生产升级、部署和 MCP/PC 仍缺。
+服务端 Provider Adapter 以独立合同逐步接入外部算力池。v227-v236 已形成制品来源、准入、供应商签名、来源证明、静态包、静态安全、独立 scanner trust root 和 exact-SBOM 漏洞签名报告；v237 又建立与供应商/扫描器密钥三方隔离的 sandbox verifier trust root。最新边界见 [`V237 沙箱验证者信任根`](external-pool-adapter-sandbox-verifier-key-authority.md)。它不执行制品或生成 conformance 报告，也不代表 Adapter、route、派发或结算已完成；真实 TCP、生产升级、部署和 MCP/PC 仍缺。
 
 ### F4：容量期货市场
 
