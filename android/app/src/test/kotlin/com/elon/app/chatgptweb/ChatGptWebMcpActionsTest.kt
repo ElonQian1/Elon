@@ -58,6 +58,7 @@ class ChatGptWebMcpActionsTest {
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, state.getInt("adapter_version"))
         assertEquals("conversation", state.getString("page_kind"))
         assertFalse(state.getBoolean("login_required"))
+        assertEquals("idle", state.getJSONObject("audio").getString("request_state"))
         assertEquals("完整回答内容", conversation.getJSONArray("messages").getJSONObject(0).getString("content"))
         val messageParts = conversation.getJSONArray("messages").getJSONObject(0).getJSONArray("parts")
         assertEquals(2, messageParts.length())

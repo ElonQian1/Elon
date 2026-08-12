@@ -11,6 +11,8 @@ internal class ChatGptWebMcpActions(
     private val bridgeState: () -> ChatGptWebPageAdapter.State,
     private val mode: () -> ChatGptWebModeController.Mode,
     private val inputText: () -> String,
+    private val audioPermissionState: () -> ChatGptWebAudioPermissionState.Snapshot =
+        { ChatGptWebAudioPermissionState.UNOBSERVED },
     private val setInputText: (String) -> Unit,
     private val copyMessage: (String) -> ChatGptClipboardMetadata = {
         ChatGptClipboardMetadata(false, 0, emptySet())
@@ -44,6 +46,7 @@ internal class ChatGptWebMcpActions(
                 .put("text", inputText().take(MAX_INPUT_CHARS))
                 .put("text_length", inputText().length)
             )
+            .put("audio", ChatGptWebAudioPermissionJson.encode(audioPermissionState()))
             .put("ui_manifest", manifestJson(currentManifest))
             .put("navigation", navigationSummary(observed))
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))

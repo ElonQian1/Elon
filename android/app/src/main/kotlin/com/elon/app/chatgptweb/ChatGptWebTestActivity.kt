@@ -88,6 +88,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             bridgeState = { latestBridgeState },
             mode = { latestMode },
             inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },
+            audioPermissionState = audioPermissionController::snapshot,
             copyMessage = messageClipboard::copy,
             setInputText = nativeController::setComposerTextFromMcp,
             commands = mcpCommandPort,
