@@ -264,6 +264,37 @@ impl ManagedSqliteShmCoordinator {
             .and_modify(|entry| entry.terminal = true)
             .or_insert_with(|| ManagedSqliteShmDomainEntry { terminal: true });
     }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn test_domain_terminal(&self) -> Result<bool, ManagedSqliteShmFailure> {
+        let registry = SHM_DOMAINS.get().ok_or_else(|| {
+            ManagedSqliteShmFailure::poisoned_code(
+                ManagedSqliteShmFailurePhase::Gate,
+                "NODE_MANAGED_SQLITE_SHM_TEST_DOMAIN_REGISTRY_MISSING",
+                false,
+                false,
+            )
+        })?;
+        let registry = registry.lock().map_err(|_| {
+            ManagedSqliteShmFailure::poisoned_code(
+                ManagedSqliteShmFailurePhase::Gate,
+                "NODE_MANAGED_SQLITE_SHM_TEST_DOMAIN_REGISTRY_POISONED",
+                false,
+                false,
+            )
+        })?;
+        registry
+            .get(&self.domain_key)
+            .map(|entry| entry.terminal)
+            .ok_or_else(|| {
+                ManagedSqliteShmFailure::poisoned_code(
+                    ManagedSqliteShmFailurePhase::Gate,
+                    "NODE_MANAGED_SQLITE_SHM_TEST_DOMAIN_ENTRY_MISSING",
+                    false,
+                    false,
+                )
+            })
+    }
 }
 
 fn merge_poison(

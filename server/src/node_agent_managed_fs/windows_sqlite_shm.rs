@@ -134,6 +134,11 @@ impl OwnedSqliteShmView {
         self.mapped_length
     }
 
+    #[cfg(all(test, windows))]
+    pub(super) fn test_custody_present(&self) -> bool {
+        !self.address.Value.is_null() || self.outcome_uncertain
+    }
+
     /// Leaves the original address retained when Windows reports failure, so the caller can move
     /// this owner into quarantined teardown custody instead of claiming the view was released.
     pub(super) fn unmap_explicit(&mut self) -> io::Result<()> {
@@ -157,6 +162,11 @@ impl OwnedSqliteShmView {
 }
 
 impl OwnedSqliteShmMapping {
+    #[cfg(all(test, windows))]
+    pub(super) fn test_custody_present(&self) -> bool {
+        !self.handle.is_null() || self.outcome_uncertain
+    }
+
     /// Leaves the handle value retained on failure. The coordinator must poison itself and keep
     /// this owner rather than retrying normal SHM initialization through a second mapping domain.
     pub(super) fn close_explicit(&mut self) -> io::Result<()> {
