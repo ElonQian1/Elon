@@ -268,6 +268,7 @@ class ChatGptWebMcpActionsTest {
             includeFormControls = true,
             includeSliderControl = true,
             includeExpandedControl = true,
+            includeRealtimeVoiceControl = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
         val commands = listOf(
@@ -292,6 +293,7 @@ class ChatGptWebMcpActionsTest {
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
             JSONObject().put("action", "chatgpt_regenerate_response") to "regenerate_response",
+            JSONObject().put("action", "chatgpt_start_realtime_voice") to "invoke_ui_control",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",
             JSONObject().put("action", "chatgpt_submit_dictation") to "submit_dictation",
             JSONObject().put("action", "chatgpt_refresh_controls") to "snapshot_ui_manifest",
@@ -603,6 +605,36 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
+    fun realtimeVoiceRequiresAnEnabledSemanticControlAndReturnsAReceipt() {
+        var invokedControl = ""
+        var dispatchedRequestId = ""
+        val supported = actions(
+            includeRealtimeVoiceControl = true,
+            onInvoke = { invokedControl = it },
+            onDispatch = { action, requestId ->
+                if (action == "invoke_ui_control") dispatchedRequestId = requestId
+            },
+        )
+
+        val started = supported.control(JSONObject().put("action", "chatgpt_start_realtime_voice"))
+
+        assertTrue(started.getBoolean("control_ok"))
+        assertEquals("control_realtime_voice", invokedControl)
+        assertEquals(
+            "invoke_ui_control",
+            started.getJSONObject("command_receipt").getString("expected_web_action"),
+        )
+        assertEquals(
+            started.getJSONObject("command_receipt").getString("request_id"),
+            dispatchedRequestId,
+        )
+
+        val unavailable = actions().control(JSONObject().put("action", "chatgpt_start_realtime_voice"))
+        assertFalse(unavailable.getBoolean("control_ok"))
+        assertEquals("realtime_voice_unavailable", unavailable.getString("error"))
+    }
+
+    @Test
     fun directAttachmentRemovalRequiresFreshRemovableAttachmentAndReturnsAReceipt() {
         val removable = ChatGptWebAttachment("attachment_demo", "smoke.png", "ready", true)
         val uploading = ChatGptWebAttachment("attachment_uploading", "pending.txt", "uploading", false)
@@ -665,6 +697,7 @@ class ChatGptWebMcpActionsTest {
         includeSliderControl: Boolean = false,
         includeUnsupportedSlider: Boolean = false,
         includeExpandedControl: Boolean = false,
+        includeRealtimeVoiceControl: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
         onSetControlSelected: (String, Boolean) -> Unit = { _, _ -> },
         onSelectControlChoice: (String, Int) -> Unit = { _, _ -> },
@@ -822,6 +855,17 @@ class ChatGptWebMcpActionsTest {
                         expandable = true,
                     ))
                 }
+                if (includeRealtimeVoiceControl) {
+                    add(ChatGptWebUiControl(
+                        id = "control_realtime_voice",
+                        semantic = ChatGptRealtimeVoicePolicy.SEMANTIC,
+                        label = "实时语音",
+                        region = ChatGptWebUiRegion.COMPOSER,
+                        role = "button",
+                        enabled = true,
+                        selected = false,
+                    ))
+                }
             },
         )
         var nextCommandId = 0
@@ -876,122 +920,23 @@ class ChatGptWebMcpActionsTest {
             mode = { ChatGptWebModeController.Mode.NATIVE },
             inputText = { "" },
             setInputText = {},
-            commands = object : ChatGptWebMcpCommandPort {
-                override fun sendInput(requestId: String) = onDispatch("send_prompt", requestId)
-
-                override fun invokeControl(controlId: String, requestId: String) {
-                    onInvoke(controlId)
-                    onDispatch("invoke_ui_control", requestId)
-                }
-
-                override fun setControlText(controlId: String, text: String, requestId: String) {
-                    onSetControlText(controlId, text)
-                    onDispatch("set_ui_control_text", requestId)
-                }
-
-                override fun setControlSelected(
-                    controlId: String,
-                    selected: Boolean,
-                    requestId: String,
-                ) {
-                    onSetControlSelected(controlId, selected)
-                    onDispatch("set_ui_control_selected", requestId)
-                }
-
-                override fun selectControlChoice(
-                    controlId: String,
-                    choiceIndex: Int,
-                    requestId: String,
-                ) {
-                    onSelectControlChoice(controlId, choiceIndex)
-                    onDispatch("select_ui_control_choice", requestId)
-                }
-
-                override fun setControlSlider(
-                    controlId: String,
-                    value: Double,
-                    requestId: String,
-                ) {
-                    onSetControlSlider(controlId, value)
-                    onDispatch("set_ui_control_slider", requestId)
-                }
-
-                override fun setControlExpanded(
-                    controlId: String,
-                    expanded: Boolean,
-                    requestId: String,
-                ) {
-                    onSetControlExpanded(controlId, expanded)
-                    onDispatch("set_ui_control_expanded", requestId)
-                }
-
-                override fun newConversation(requestId: String) =
-                    onDispatch("new_conversation", requestId)
-
-                override fun stopGeneration(requestId: String) =
-                    onDispatch("stop_generation", requestId)
-
-                override fun regenerateResponse(requestId: String) = onDispatch("regenerate_response", requestId)
-
-                override fun startDictation(requestId: String) {
-                    onStartDictation()
-                    onDispatch("start_dictation", requestId)
-                }
-
-                override fun cancelDictation(requestId: String) {
-                    onCancelDictation()
-                    onDispatch("cancel_dictation", requestId)
-                }
-
-                override fun submitDictation(requestId: String) {
-                    onSubmitDictation()
-                    onDispatch("submit_dictation", requestId)
-                }
-
-                override fun removeAttachment(attachmentId: String, requestId: String) {
-                    onRemoveAttachment(attachmentId)
-                    onDispatch("remove_attachment", requestId)
-                }
-
-                override fun refreshControls(requestId: String) =
-                    onDispatch("snapshot_ui_manifest", requestId)
-
-                override fun listConversations(requestId: String) =
-                    onDispatch("list_conversations", requestId)
-
-                override fun requestComposerOptions(section: String, requestId: String) {
-                    onRequestComposerOptions(section)
-                    onDispatch(
-                        if (section == "model") "list_model_options" else "list_composer_tools",
-                        requestId,
-                    )
-                }
-
-                override fun selectComposerOption(
-                    section: String,
-                    optionId: String,
-                    requestId: String,
-                ) {
-                    onSelectComposerOption(section, optionId)
-                    onDispatch(
-                        if (section == "model") "select_model_option" else "select_composer_tool",
-                        requestId,
-                    )
-                }
-
-                override fun requestFeatures(requestId: String) {
-                    onRequestFeatures()
-                    onDispatch("list_navigation", requestId)
-                }
-
-                override fun selectFeature(featureId: String, requestId: String) {
-                    onSelectFeature(featureId)
-                    onDispatch("select_navigation", requestId)
-                }
-
-                override fun openConversation(path: String, requestId: String) =
-                    onDispatch("open_conversation", requestId)
-            },
+            commands = ChatGptWebMcpTestCommandPort(
+                onInvoke = onInvoke,
+                onSetControlText = onSetControlText,
+                onSetControlSelected = onSetControlSelected,
+                onSelectControlChoice = onSelectControlChoice,
+                onSetControlSlider = onSetControlSlider,
+                onSetControlExpanded = onSetControlExpanded,
+                onStartDictation = onStartDictation,
+                onCancelDictation = onCancelDictation,
+                onSubmitDictation = onSubmitDictation,
+                onRemoveAttachment = onRemoveAttachment,
+                onRequestComposerOptions = onRequestComposerOptions,
+                onSelectComposerOption = onSelectComposerOption,
+                onRequestFeatures = onRequestFeatures,
+                onSelectFeature = onSelectFeature,
+                onDispatch = onDispatch,
+            ),
             refresh = {},
             selectMode = {},
             revealMessage = { _, _, _ -> true },

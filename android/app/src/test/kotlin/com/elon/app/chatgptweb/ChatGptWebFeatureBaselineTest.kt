@@ -322,6 +322,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_copy_last_response",
             "chatgpt_regenerate_response",
             "chatgpt_start_dictation",
+            "chatgpt_start_realtime_voice",
             "chatgpt_remove_attachment",
             "chatgpt_list_conversations",
             "chatgpt_list_composer_options",

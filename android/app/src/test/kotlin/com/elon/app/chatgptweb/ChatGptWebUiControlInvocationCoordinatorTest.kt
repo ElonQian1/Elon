@@ -44,6 +44,25 @@ class ChatGptWebUiControlInvocationCoordinatorTest {
     }
 
     @Test
+    fun realtimeVoiceOpensOfficialLayoutBeforeInvocation() {
+        val fixture = Fixture(officialVisible = false)
+
+        fixture.coordinator.invoke(
+            control(
+                semantic = ChatGptRealtimeVoicePolicy.SEMANTIC,
+                region = ChatGptWebUiRegion.COMPOSER,
+            ),
+            "realtime-voice",
+            "request-voice",
+        )
+
+        assertEquals(1, fixture.showOfficialCount)
+        assertTrue(fixture.invocations.isEmpty())
+        fixture.scheduled?.invoke()
+        assertEquals(listOf("realtime-voice" to "request-voice"), fixture.invocations)
+    }
+
+    @Test
     fun nonMessageMoreControlsKeepNativeInvocationPath() {
         val fixture = Fixture(officialVisible = false)
 

@@ -374,6 +374,17 @@
                     android:tooltipText="@string/chatgpt_native_features" />
 
                 <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/chatGptNativeRealtimeVoice"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/chatgpt_native_realtime_voice"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_input_voice"
+                    android:tooltipText="@string/chatgpt_native_realtime_voice"
+                    android:visibility="gone" />
+
+                <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/chatGptNativeNew"
                     android:layout_width="44dp"
                     android:layout_height="44dp"

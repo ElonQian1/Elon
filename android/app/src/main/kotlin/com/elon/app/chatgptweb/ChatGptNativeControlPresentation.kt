@@ -97,8 +97,7 @@ internal object ChatGptNativeControlPresentation {
     fun usesHeaderIcon(control: ChatGptWebUiControl): Boolean = control.semantic == "sources"
 
     fun isExpectedOfficialFallback(control: ChatGptWebUiControl): Boolean =
-        (control.region == ChatGptWebUiRegion.COMPOSER && control.semantic == "voice_mode") ||
-            (control.role == "slider" && !control.supportsSliderValue)
+        control.role == "slider" && !control.supportsSliderValue
 
     fun messageActions(controls: List<ChatGptWebUiControl>): Map<String, List<ChatGptWebUiControl>> =
         controls.asSequence()
@@ -193,6 +192,7 @@ internal object ChatGptNativeControlPresentation {
             "attachment" -> ChatGptNativeNavigationSelector.COMPOSER_TOOLS_TRIGGER
             "model" -> ChatGptNativeNavigationSelector.COMPOSER_MODEL_TRIGGER
             "dictation" -> ChatGptNativeNavigationSelector.DICTATION
+            "voice_mode" -> ChatGptNativeNavigationSelector.REALTIME_VOICE
             "send" -> ChatGptNativeNavigationSelector.SEND
             else -> ChatGptNativeNavigationSelector.STOP
         },
@@ -229,6 +229,7 @@ internal object ChatGptNativeControlPresentation {
         "attachment",
         "model",
         "dictation",
+        "voice_mode",
         "send",
         "stop",
     )

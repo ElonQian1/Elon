@@ -9,6 +9,7 @@ internal object ChatGptNativeNavigationSelector {
     const val COMPOSER_MODEL_TRIGGER = "chatgpt-native:composer-model:模型与能力"
     const val COMPOSER_TOOLS_TRIGGER = "chatgpt-native:composer-tools:工具与附件"
     const val DICTATION = "chatgpt-native:dictation:语音输入"
+    const val REALTIME_VOICE = "chatgpt-native:realtime-voice:实时语音"
     const val SEND = "chatgpt-native:send:发送"
     const val STOP = "chatgpt-native:stop:停止生成"
 

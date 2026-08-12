@@ -180,6 +180,13 @@ internal class ChatGptWebMcpActions(
                 }
                 dispatch("start_dictation", commands::startDictation)
             }
+            "chatgpt_start_realtime_voice" -> {
+                val voiceControl = ChatGptRealtimeVoicePolicy.resolve(uiManifest())
+                    ?: return error(action, "realtime_voice_unavailable")
+                dispatch("invoke_ui_control") { requestId ->
+                    commands.invokeControl(voiceControl.id, requestId)
+                }
+            }
             "chatgpt_cancel_dictation" -> {
                 if (snapshot()?.dictationActive != true) return error(action, "dictation_not_active")
                 dispatch("cancel_dictation", commands::cancelDictation)
@@ -759,6 +766,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_copy_last_response",
             "chatgpt_regenerate_response",
             "chatgpt_start_dictation",
+            "chatgpt_start_realtime_voice",
             "chatgpt_cancel_dictation",
             "chatgpt_submit_dictation",
             "chatgpt_remove_attachment",

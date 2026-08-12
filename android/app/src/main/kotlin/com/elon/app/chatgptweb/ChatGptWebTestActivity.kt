@@ -30,6 +30,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var composerToolsController: ChatGptNativeComposerToolsController
     private lateinit var attachmentController: ChatGptNativeAttachmentController
     private lateinit var voiceController: ChatGptNativeVoiceController
+    private lateinit var realtimeVoiceController: ChatGptNativeRealtimeVoiceController
     private lateinit var dictationSessionController: ChatGptWebDictationSessionController
     private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
     private lateinit var controlInvocationCoordinator: ChatGptWebUiControlInvocationCoordinator
@@ -245,6 +246,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 audioPermissionController.runWithMicrophone(::startDictation)
             },
         )
+        realtimeVoiceController = ChatGptNativeRealtimeVoiceController(binding.chatGptNativeRealtimeVoice, ::invokeUiControl)
         conversationListController = ChatGptNativeConversationListController(
             activity = this,
             trigger = binding.chatGptNativeHistory,
@@ -521,6 +523,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             is ChatGptWebEvent.UiManifest -> {
                 latestUiManifest = event.value
                 adaptiveUiController.render(event.value)
+                realtimeVoiceController.render(event.value)
                 overlayControlsController.render(event.value)
                 nativeController.renderUiManifest(event.value)
                 if (ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
@@ -628,6 +631,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         nativeController.setBridgeState(state)
         composerToolsController.setBridgeState(state)
         voiceController.setBridgeState(state)
+        realtimeVoiceController.setBridgeState(state)
         conversationListController.setBridgeState(state)
         featureHubController.setBridgeState(state)
         binding.chatGptModeNative.isEnabled = state == ChatGptWebPageAdapter.State.READY
@@ -762,6 +766,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         officialOverlayController.dispose()
         manifestRefreshScheduler.dispose()
         dictationSessionController.reset()
+        realtimeVoiceController.dispose()
         composerToolsController.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()

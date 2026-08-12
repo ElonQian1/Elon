@@ -35,6 +35,10 @@ class ChatGptNativeNavigationSelectorTest {
             "chatgpt-native:new-conversation:新建会话",
             ChatGptNativeNavigationSelector.NEW_CONVERSATION,
         )
+        assertEquals(
+            "chatgpt-native:realtime-voice:实时语音",
+            ChatGptNativeNavigationSelector.REALTIME_VOICE,
+        )
         assertTrue(ChatGptNativeNavigationSelector.SCHEMA.endsWith(".v1"))
     }
 }

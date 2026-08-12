@@ -64,7 +64,10 @@ internal class ChatGptWebUiControlInvocationCoordinator(
         const val OFFICIAL_LAYOUT_SETTLE_MS = 320L
         const val DICTATION_START_TIMEOUT_MS = 20_000L
 
-        fun requiresOfficialLayout(control: ChatGptWebUiControl?): Boolean =
-            control?.region == ChatGptWebUiRegion.MESSAGE && control.semantic == "more"
+        fun requiresOfficialLayout(control: ChatGptWebUiControl?): Boolean = when {
+            control?.semantic == ChatGptRealtimeVoicePolicy.SEMANTIC -> true
+            control?.region == ChatGptWebUiRegion.MESSAGE && control.semantic == "more" -> true
+            else -> false
+        }
     }
 }

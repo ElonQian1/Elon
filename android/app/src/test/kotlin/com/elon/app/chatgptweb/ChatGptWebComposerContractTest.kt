@@ -156,6 +156,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachment\""))
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeTools\""))
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeDictation\""))
+        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeRealtimeVoice\""))
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachments\""))
         assertTrue(controller.contains("ChatGptWebCapabilityId.MODEL_SELECTOR"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.ATTACHMENTS"))
@@ -172,6 +173,14 @@ class ChatGptWebComposerContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAudioPermissionController.kt",
         )
         assertTrue(voiceController.contains("ChatGptWebCapabilityId.DICTATION"))
+        val realtimeVoiceController = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeRealtimeVoiceController.kt",
+        )
+        val realtimeVoicePolicy = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptRealtimeVoicePolicy.kt",
+        )
+        assertTrue(realtimeVoicePolicy.contains("const val SEMANTIC = \"voice_mode\""))
+        assertTrue(realtimeVoiceController.contains("ChatGptNativeNavigationSelector.REALTIME_VOICE"))
         assertTrue(permissionController.contains("request.origin.host == \"chatgpt.com\""))
         assertTrue(permissionController.contains("RESOURCE_AUDIO_CAPTURE"))
         assertTrue(manifest.contains("android.permission.RECORD_AUDIO"))

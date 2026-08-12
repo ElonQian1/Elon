@@ -194,7 +194,7 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
-    fun acceptsRealtimeVoiceAsAnIntentionalOfficialFallback() {
+    fun reportsRealtimeVoiceAsANativeEntryToTheOfficialSession() {
         val voiceManifest = manifest("healthy", "voice_mode").copy(
             controls = manifest("healthy", "voice_mode").controls.map {
                 it.copy(region = ChatGptWebUiRegion.COMPOSER)
@@ -209,13 +209,18 @@ class ChatGptWebCapabilityMatrixTest {
         )
 
         val manifest = matrix.getJSONObject("manifest")
-        assertEquals(1, manifest.getInt("official_fallback_control_count"))
-        assertEquals(1, manifest.getInt("expected_official_fallback_control_count"))
+        assertEquals(0, manifest.getInt("official_fallback_control_count"))
+        assertEquals(0, manifest.getInt("expected_official_fallback_control_count"))
         assertEquals(0, manifest.getInt("unexpected_official_fallback_control_count"))
         assertEquals(
-            "expected",
+            "dedicated",
             matrix.getJSONArray("control_coverage").getJSONObject(0)
-                .getString("official_fallback_policy"),
+                .getString("presentation"),
+        )
+        assertEquals(
+            ChatGptNativeNavigationSelector.REALTIME_VOICE,
+            matrix.getJSONArray("control_coverage").getJSONObject(0)
+                .getString("native_adb_content_description"),
         )
         assertFalse(matrix.getJSONObject("adaptation_review").getBoolean("required"))
     }
