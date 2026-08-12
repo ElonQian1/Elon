@@ -23,6 +23,20 @@ class ChatGptWebVerificationEvidenceStoreTest {
     }
 
     @Test
+    fun acceptsKnownDiscoveryCasesWithoutTreatingUnknownCasesAsEvidence() {
+        val discoveryCase = "reversible/composer_tool_discovery/deep_research"
+        val hash = "d".repeat(64)
+        val inputs = ChatGptWebVerificationEvidenceStore.currentInputs(
+            org.json.JSONObject()
+                .put(discoveryCase, hash)
+                .put("reversible/composer_tool_discovery/unknown", hash)
+                .toString(),
+        )
+
+        assertEquals(mapOf(discoveryCase to hash), inputs)
+    }
+
+    @Test
     fun snapshotReportsOnlyStructuralEvidenceAndCurrentCases() {
         val caseId = "safe/session_recovery"
         val currentHash = "c".repeat(64)

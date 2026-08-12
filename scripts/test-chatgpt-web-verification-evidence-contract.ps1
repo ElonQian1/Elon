@@ -6,7 +6,14 @@ $expected = [ordered]@{
     "smoke-chatgpt-web-apk.ps1" = @("safe/read_only_surface", "reversible/send_probe")
     "smoke-chatgpt-web-reversible-controls.ps1" = @("reversible/reversible_controls")
     "smoke-chatgpt-web-tool-execution.ps1" = @("reversible/tool_execution_with_citations")
-    "smoke-chatgpt-web-composer-controls.ps1" = @("reversible/composer_controls")
+    "smoke-chatgpt-web-composer-controls.ps1" = @(
+        "reversible/composer_controls",
+        "reversible/composer_tool_discovery/deep_research",
+        "reversible/composer_tool_discovery/image_generation",
+        "reversible/composer_tool_discovery/canvas",
+        "reversible/composer_tool_discovery/study_mode",
+        "reversible/composer_tool_discovery/agent_mode"
+    )
     "smoke-chatgpt-web-message-structure.ps1" = @("reversible/message_structure")
     "smoke-chatgpt-web-copy.ps1" = @("reversible/copy_receipt_without_content_readback")
     "smoke-chatgpt-web-regenerate.ps1" = @("reversible/regenerate_response")

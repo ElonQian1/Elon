@@ -25,7 +25,7 @@ internal object ChatGptWebVerificationEvidenceActions {
 
         val caseIds = parseCaseIds(values) ?: return Result.Error("invalid_case_id")
         if (caseIds.isEmpty()) return Result.Error("missing_case_ids")
-        if (!ChatGptWebFeatureBaseline.verificationCaseIds().containsAll(caseIds)) {
+        if (!ChatGptWebFeatureBaseline.evidenceCaseIds().containsAll(caseIds)) {
             return Result.Error("unknown_verification_case")
         }
 

@@ -65,6 +65,23 @@ class ChatGptWebVerificationEvidenceActionsTest {
         )
     }
 
+    @Test
+    fun recordsKnownComposerToolDiscoveryCases() {
+        val caseId = "reversible/composer_tool_discovery/study_mode"
+        val recorded = linkedSetOf<String>()
+        val result = ChatGptWebVerificationEvidenceActions.record(
+            recordArgs(caseId),
+            authenticated = true,
+            recorder = { caseIds ->
+                recorded.addAll(caseIds)
+                currentSnapshot(caseIds)
+            },
+        ) as ChatGptWebVerificationEvidenceActions.Result.Success
+
+        assertEquals(setOf(caseId), recorded)
+        assertTrue(result.response.getBoolean("control_ok"))
+    }
+
     private fun assertError(args: JSONObject, authenticated: Boolean, expected: String) {
         val result = ChatGptWebVerificationEvidenceActions.record(
             args,

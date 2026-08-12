@@ -26,6 +26,9 @@ $required = @(
     "sent_messages = 0",
     "uploaded_attachments = 0",
     "original_state_restored = `$true",
+    '$composerToolDiscoveryCases = [ordered]@{',
+    'composer_tool_discovery',
+    'executed_tools = 0',
     "CHATGPT_WEB_COMPOSER_CONTROL_SMOKE_STATUS=passed"
 )
 foreach ($token in $required) {

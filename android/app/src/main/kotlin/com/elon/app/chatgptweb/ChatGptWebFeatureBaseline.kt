@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 5
+    const val VERSION = 6
     internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 55
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
@@ -68,6 +68,7 @@ internal object ChatGptWebFeatureBaseline {
         val codeGap: String? = null,
         val verificationGap: String? = null,
         val verificationCase: String? = null,
+        val discoveryCase: String? = null,
         val remainingGap: String? = null,
     )
 
@@ -90,6 +91,10 @@ internal object ChatGptWebFeatureBaseline {
             feature.withVerificationEvidence(verificationEvidence)
         }
         val rows = resolvedFeatures.map { feature ->
+            val discovery = ChatGptWebDiscoveryEvidence.resolve(
+                feature.discoveryCase,
+                verificationEvidence,
+            )
             val currentPageObserved = when (feature.id) {
                 "official_authentication" -> snapshot?.authenticated == true
                 "official_fullscreen_fallback" -> mode == ChatGptWebModeController.Mode.WEB
@@ -115,6 +120,9 @@ internal object ChatGptWebFeatureBaseline {
                 .put("composer_option_semantics", JSONArray(feature.composerOptionSemantics))
                 .put("code_gap", feature.codeGap ?: JSONObject.NULL)
                 .put("verification_case", feature.verificationCase ?: JSONObject.NULL)
+                .put("discovery_case", feature.discoveryCase ?: JSONObject.NULL)
+                .put("discovery_status", discovery.status)
+                .put("discovery_gap", discovery.gap ?: JSONObject.NULL)
                 .put(
                     "verification_gap",
                     feature.verificationGap ?: JSONObject.NULL,
@@ -130,7 +138,7 @@ internal object ChatGptWebFeatureBaseline {
             it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v5")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v6")
             .put("version", VERSION)
             .put("device_verification_adapter_version", DEVICE_VERIFICATION_ADAPTER_VERSION)
             .put("device_verification_current", DEVICE_VERIFICATION_CURRENT)
@@ -239,6 +247,30 @@ internal object ChatGptWebFeatureBaseline {
                     )
                     .put("remaining", pendingVerification.size),
             )
+            .put(
+                "discovery_summary",
+                JSONObject()
+                    .put("required", resolvedFeatures.count { it.discoveryCase != null })
+                    .put(
+                        "device_observed",
+                        resolvedFeatures.count {
+                            ChatGptWebDiscoveryEvidence.resolve(
+                                it.discoveryCase,
+                                verificationEvidence,
+                            ).status == "device_observed"
+                        },
+                    )
+                    .put(
+                        "remaining",
+                        resolvedFeatures.count {
+                            it.discoveryCase != null &&
+                                ChatGptWebDiscoveryEvidence.resolve(
+                                    it.discoveryCase,
+                                    verificationEvidence,
+                                ).status != "device_observed"
+                        },
+                    ),
+            )
             .put("features", JSONArray(rows))
             .put("remaining_feature_ids", JSONArray(incomplete.map(Feature::id)))
             .put("remaining_code_feature_ids", JSONArray(incompleteCode.map(Feature::id)))
@@ -251,6 +283,10 @@ internal object ChatGptWebFeatureBaseline {
     fun ids(): Set<String> = FEATURES.mapTo(linkedSetOf(), Feature::id)
 
     fun verificationCaseIds(): Set<String> = DEVICE_VERIFICATION_CASES.values.toSortedSet()
+
+    fun evidenceCaseIds(): Set<String> = (
+        DEVICE_VERIFICATION_CASES.values + DISCOVERY_CASES.values
+    ).toSortedSet()
 
     private fun Feature.withVerificationEvidence(
         evidence: ChatGptWebVerificationEvidenceStore.Snapshot,
@@ -304,6 +340,14 @@ internal object ChatGptWebFeatureBaseline {
         "official_change_detection" to "safe/read_only_surface",
         "stable_mcp_and_adb_controls" to "safe/read_only_surface",
         "session_continuity_and_recovery" to "safe/session_recovery",
+    )
+
+    private val DISCOVERY_CASES = mapOf(
+        "deep_research" to "reversible/composer_tool_discovery/deep_research",
+        "image_generation" to "reversible/composer_tool_discovery/image_generation",
+        "canvas" to "reversible/composer_tool_discovery/canvas",
+        "study_mode" to "reversible/composer_tool_discovery/study_mode",
+        "agent_mode" to "reversible/composer_tool_discovery/agent_mode",
     )
 
     private val FEATURES = listOf(
@@ -607,6 +651,7 @@ internal object ChatGptWebFeatureBaseline {
             "chatgpt_select_composer_option",
         ),
         composerOptionSemantics = setOf(semantic),
+        discoveryCase = DISCOVERY_CASES.getValue(id),
         remainingGap = "${id}_end_to_end_device_acceptance",
     )
 
@@ -623,6 +668,7 @@ internal object ChatGptWebFeatureBaseline {
         semantics: Set<String> = emptySet(),
         composerOptionSemantics: Set<String> = emptySet(),
         codeGap: String? = null,
+        discoveryCase: String? = null,
         remainingGap: String? = null,
     ): Feature {
         val resolvedCodeStatus = codeStatus ?: when (status) {
@@ -664,6 +710,7 @@ internal object ChatGptWebFeatureBaseline {
             codeGap = codeGap,
             verificationGap = resolvedVerificationGap,
             verificationCase = DEVICE_VERIFICATION_CASES[id],
+            discoveryCase = discoveryCase,
             remainingGap = remainingGap,
         )
     }

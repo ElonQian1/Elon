@@ -131,6 +131,12 @@ def composerCaseInputs = filesMatching([
     "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
     "android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js",
 ])
+def composerDiscoveryCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebDiscoveryEvidence.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebFeatureBaseline.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebProductCapabilityCatalog.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebVerificationEvidence*.kt",
+])
 def messageCaseInputs = filesMatching([
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Message*.kt",
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Copy*.kt",
@@ -191,6 +197,18 @@ verificationCaseFiles["reversible/composer_controls"] = caseInputs(
     composerCaseInputs,
     "smoke-chatgpt-web-composer-controls.ps1",
 )
+[
+    "deep_research",
+    "image_generation",
+    "canvas",
+    "study_mode",
+    "agent_mode",
+].each { toolId ->
+    verificationCaseFiles["reversible/composer_tool_discovery/${toolId}"] = caseInputs(
+        composerCaseInputs + composerDiscoveryCaseInputs,
+        "smoke-chatgpt-web-composer-controls.ps1",
+    )
+}
 verificationCaseFiles["reversible/message_structure"] = caseInputs(
     messageCaseInputs,
     "smoke-chatgpt-web-message-structure.ps1",

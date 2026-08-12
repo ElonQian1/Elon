@@ -111,7 +111,7 @@ internal class ChatGptWebVerificationEvidenceStore(
             val value = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
             return value.keys().asSequence().mapNotNull { caseId ->
                 val hash = value.optString(caseId)
-                if (caseId in ChatGptWebFeatureBaseline.verificationCaseIds() && SHA256.matches(hash)) {
+                if (caseId in ChatGptWebFeatureBaseline.evidenceCaseIds() && SHA256.matches(hash)) {
                     caseId to hash
                 } else {
                     null

@@ -401,7 +401,7 @@ Add-Check "capability_matrix_app_version" (
         -not [string]::IsNullOrWhiteSpace([string]$matrix.app.version_name)
 ) "v$($matrix.app.version_name) build=$($matrix.app.version_code)"
 Add-Check "feature_baseline_schema" (
-    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v5"
+    $featureBaseline.schema -eq "elon.chatgpt_web.feature_baseline.v6"
 ) ([string]$featureBaseline.schema)
 $currentEvidenceInput = [string]$featureBaseline.device_verification_input_sha256
 $verifiedEvidenceInput = [string]$featureBaseline.device_verification_verified_input_sha256

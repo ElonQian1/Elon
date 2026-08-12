@@ -76,6 +76,14 @@ function Get-WebSearchOption {
     return $option
 }
 
+$composerToolDiscoveryCases = [ordered]@{
+    deep_research = "reversible/composer_tool_discovery/deep_research"
+    image_generation = "reversible/composer_tool_discovery/image_generation"
+    canvas = "reversible/composer_tool_discovery/canvas"
+    study = "reversible/composer_tool_discovery/study_mode"
+    agent = "reversible/composer_tool_discovery/agent_mode"
+}
+
 Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
     -EnsureMainActivity | Out-Null
 $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
@@ -165,13 +173,24 @@ try {
     }
 }
 
+$observedTools = @(Get-ComposerTools)
+$observedToolSemantics = @(
+    $observedTools |
+        ForEach-Object { [string]$_.semantic } |
+        Where-Object { $composerToolDiscoveryCases.Contains($_) } |
+        Sort-Object -Unique
+)
+$discoveryCases = @(
+    $observedToolSemantics | ForEach-Object { $composerToolDiscoveryCases[$_] }
+)
+
 if ($originViewMode -in @("web", "native")) {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = $originViewMode } | Out-Null
 }
 
 Register-ChatGptWebVerificationCases -Runtime $runtime `
-    -CaseIds @("reversible/composer_controls") `
+    -CaseIds (@("reversible/composer_controls") + $discoveryCases) `
     -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
 [ordered]@{
@@ -186,6 +205,21 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
         toggled = $true
         disable_receipt = [string]$toggleOff.receipt.status
         original_state_restored = $true
+    }
+    composer_tool_discovery = [ordered]@{
+        observed_count = $observedToolSemantics.Count
+        observed_ids = @(
+            $composerToolDiscoveryCases.Keys |
+                Where-Object { $_ -in $observedToolSemantics } |
+                ForEach-Object {
+                    switch ($_) {
+                        "study" { "study_mode" }
+                        "agent" { "agent_mode" }
+                        default { $_ }
+                    }
+                }
+        )
+        executed_tools = 0
     }
     original_view_mode_restored = $true
 } | ConvertTo-Json -Depth 10

@@ -19,7 +19,7 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v5", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v6", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
             ChatGptWebFeatureBaseline.DEVICE_VERIFICATION_ADAPTER_VERSION,
@@ -422,6 +422,45 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(caseId, regenerate.getString("verification_case"))
         assertEquals("device_verified", regenerate.getString("verification_status"))
         assertTrue(regenerate.isNull("verification_gap"))
+    }
+
+    @Test
+    fun reportsComposerToolDiscoveryWithoutPromotingEndToEndVerification() {
+        val caseId = "reversible/composer_tool_discovery/deep_research"
+        val currentHash = "f".repeat(64)
+        val evidence = ChatGptWebVerificationEvidenceStore.Snapshot(
+            currentInputs = linkedMapOf(caseId to currentHash),
+            records = linkedMapOf(
+                caseId to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = caseId,
+                    inputSha256 = currentHash,
+                    current = true,
+                    adapterVersion = ChatGptWebPageAdapter.ADAPTER_VERSION,
+                    apkVersionName = "test",
+                    apkVersionCode = 1,
+                    recordedAtMs = 123L,
+                ),
+            ),
+        )
+
+        val baseline = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            verificationEvidence = evidence,
+        )
+
+        val deepResearch = feature(baseline, "deep_research")
+        assertEquals("device_observed", deepResearch.getString("discovery_status"))
+        assertTrue(deepResearch.isNull("discovery_gap"))
+        assertEquals("offline_verified", deepResearch.getString("verification_status"))
+        val image = feature(baseline, "image_generation")
+        assertEquals("not_recorded", image.getString("discovery_status"))
+        assertFalse(image.isNull("discovery_gap"))
+        val summary = baseline.getJSONObject("discovery_summary")
+        assertEquals(5, summary.getInt("required"))
+        assertEquals(1, summary.getInt("device_observed"))
+        assertEquals(4, summary.getInt("remaining"))
     }
 
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {
