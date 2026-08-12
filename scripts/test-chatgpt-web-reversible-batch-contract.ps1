@@ -18,16 +18,20 @@ $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Start-ChatGptWebSmokeAwakeLease",
     "Stop-ChatGptWebSmokeAwakeLease",
+    "ExpectedAdapterVersion = `$ExpectedAdapterVersion",
     'id = "reversible_controls"',
     'id = "composer_controls"',
     'id = "message_structure"',
+    'id = "message_actions_and_regenerate_menu"',
+    'id = "regenerate_reply"',
     "SkipDictation = `$true",
     "user_supervised_remaining",
     "official_authentication",
     "attachment_lifecycle",
     "dictation_audio_capture",
     "realtime_voice",
-    "sent_messages = 0",
+    "sent_messages = 2",
+    "regenerated_messages = 1",
     "uploaded_attachments = 0",
     "cleared_cookies = `$false",
     "cleared_app_data = `$false",
@@ -47,7 +51,9 @@ foreach ($forbidden in @("-SendProbe", "pm clear", "removeAllCookies")) {
 foreach ($childScript in @(
     "smoke-chatgpt-web-reversible-controls.ps1",
     "smoke-chatgpt-web-composer-controls.ps1",
-    "smoke-chatgpt-web-message-structure.ps1"
+    "smoke-chatgpt-web-message-structure.ps1",
+    "inspect-chatgpt-web-regenerate-menu.ps1",
+    "smoke-chatgpt-web-regenerate.ps1"
 )) {
     $childSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot $childScript) -Raw
     if ($childSource -match '(?m)^\s*exit\s+[1-9]') {

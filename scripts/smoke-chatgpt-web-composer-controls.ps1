@@ -7,7 +7,8 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [switch]$SkipDictation,
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
-    [ValidateRange(1, 10)][int]$PollIntervalSec = 1
+    [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,6 +86,8 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
             $state.authenticated -eq $true -and
             $state.composer_ready -eq $true
     }
+Assert-ChatGptWebSmokeAdapterVersion -State $origin `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originViewMode = [string]$origin.view_mode
 
 $dictationResult = [ordered]@{ skipped = $true; reason = "user_assisted_audio_capture" }

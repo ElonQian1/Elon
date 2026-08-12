@@ -5,9 +5,11 @@ $script = Get-Content (Join-Path $PSScriptRoot "smoke-chatgpt-web-composer-contr
 
 $required = @(
     "ExpectedHardwareSerial",
+    "ExpectedAdapterVersion",
     "SkipDictation",
     "user_assisted_audio_capture",
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "Assert-ChatGptWebSmokeAdapterVersion",
     "chatgpt_start_dictation",
     "chatgpt_cancel_dictation",
     "start_dictation",

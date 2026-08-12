@@ -18,7 +18,9 @@ if (@($errors).Count -gt 0) {
 
 $required = @(
     "ExpectedHardwareSerial",
+    "ExpectedAdapterVersion",
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "Assert-ChatGptWebSmokeAdapterVersion",
     "chatgpt_list_composer_options",
     "chatgpt_select_composer_option",
     "adapter_current -eq `$true",

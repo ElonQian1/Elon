@@ -7,7 +7,8 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(20, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 50)][int]$MaxConversations = 20
+    [ValidateRange(1, 50)][int]$MaxConversations = 20,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -208,6 +209,8 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
             $state.adapter_current -eq $true -and
             $state.authenticated -eq $true
     }
+Assert-ChatGptWebSmokeAdapterVersion -State $origin `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
 if ([int]$origin.input.text_length -gt 0) {
     throw "ChatGPT message structure verification is deferred while a draft is present."
 }

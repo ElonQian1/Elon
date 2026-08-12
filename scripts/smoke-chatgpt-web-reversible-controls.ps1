@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
-    [ValidateRange(1, 10)][int]$PollIntervalSec = 1
+    [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -288,6 +289,8 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
             $state.authenticated -eq $true -and
             $state.composer_ready -eq $true
     }
+Assert-ChatGptWebSmokeAdapterVersion -State $origin `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originViewMode = [string]$origin.view_mode
 $originConversationPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url)
 

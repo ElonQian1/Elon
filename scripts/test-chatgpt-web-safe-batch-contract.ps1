@@ -15,14 +15,14 @@ if ($parseErrors.Count -gt 0) {
 }
 
 . $runtimePath
-$adapterState = [pscustomobject]@{ adapter_version = 59 }
-Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 59
-$staleAdapterState = [pscustomobject]@{ adapter_version = 58 }
+$adapterState = [pscustomobject]@{ adapter_version = 60 }
+Assert-ChatGptWebSmokeAdapterVersion -State $adapterState -ExpectedAdapterVersion 60
+$staleAdapterState = [pscustomobject]@{ adapter_version = 59 }
 $mismatchRejected = $false
 try {
-    Assert-ChatGptWebSmokeAdapterVersion -State $staleAdapterState -ExpectedAdapterVersion 59
+    Assert-ChatGptWebSmokeAdapterVersion -State $staleAdapterState -ExpectedAdapterVersion 60
 } catch {
-    $mismatchRejected = $_.Exception.Message -match 'expected=59 actual=58'
+    $mismatchRejected = $_.Exception.Message -match 'expected=60 actual=59'
 }
 if (-not $mismatchRejected) {
     throw "ChatGPT Web adapter version mismatch was not rejected."
@@ -35,10 +35,10 @@ $required = @(
     "ExpectedHardwareSerial = `$ExpectedHardwareSerial",
     "ExpectedAdapterVersion = `$ExpectedAdapterVersion",
     'id = "read_only_surface"',
+    'AllowStaleDeviceEvidence = $true',
     'id = "feature_pages"',
     'id = "settings_structure"',
     'id = "session_recovery"',
-    'id = "message_actions"',
     "user_assisted_remaining",
     "official_authentication",
     "attachment_lifecycle",
@@ -70,8 +70,7 @@ foreach ($childScript in @(
     "smoke-chatgpt-web-apk.ps1",
     "smoke-chatgpt-web-feature-pages.ps1",
     "smoke-chatgpt-web-settings.ps1",
-    "smoke-chatgpt-web-session-recovery.ps1",
-    "smoke-chatgpt-web-message-actions.ps1"
+    "smoke-chatgpt-web-session-recovery.ps1"
 )) {
     $childSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot $childScript) -Raw
     if ($childSource -match '(?m)^\s*exit\s+[1-9]') {
@@ -83,6 +82,9 @@ foreach ($forbiddenCase in @('id = "reversible_controls"', 'id = "composer_contr
     if ($source.Contains($forbiddenCase)) {
         throw "Safe acceptance batch contains a reversible case: $forbiddenCase"
     }
+}
+if ($source.Contains('id = "message_actions"')) {
+    throw "Safe acceptance batch must not depend on a pre-existing conversation message."
 }
 
 Write-Output "CHATGPT_WEB_SAFE_ACCEPTANCE_BATCH_CONTRACT=passed"

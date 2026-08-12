@@ -8,7 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 59,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60,
     [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,
@@ -402,18 +402,22 @@ Add-Check "feature_baseline_schema" (
 $currentEvidenceInput = [string]$featureBaseline.device_verification_input_sha256
 $verifiedEvidenceInput = [string]$featureBaseline.device_verification_verified_input_sha256
 $evidenceProvenance = $featureBaseline.device_verification_provenance
-$evidenceStructureValid =
-    [int]$featureBaseline.device_verification_adapter_version -eq [int]$state.adapter_version -and
+$evidenceHashesValid =
     $currentEvidenceInput -match '^[0-9a-f]{64}$' -and
     $verifiedEvidenceInput -match '^[0-9a-f]{64}$'
+$registeredEvidenceAdapterCurrent =
+    [int]$featureBaseline.device_verification_adapter_version -eq [int]$state.adapter_version
 $evidenceCurrent =
     $featureBaseline.device_verification_current -eq $true -and
-    $evidenceStructureValid -and
+    $evidenceHashesValid -and
+    $registeredEvidenceAdapterCurrent -and
     $currentEvidenceInput -eq $verifiedEvidenceInput
 $staleCandidateAccepted =
     $AllowStaleDeviceEvidence -and
     $featureBaseline.device_verification_current -eq $false -and
-    $evidenceStructureValid -and
+    $evidenceHashesValid -and
+    [int]$state.adapter_version -eq $ExpectedAdapterVersion -and
+    [int]$featureBaseline.device_verification_adapter_version -le [int]$state.adapter_version -and
     $currentEvidenceInput -ne $verifiedEvidenceInput
 Add-Check "feature_device_evidence_current" (
     $evidenceCurrent -or $staleCandidateAccepted

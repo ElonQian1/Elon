@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 59
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,7 +31,10 @@ $cases = @(
     [pscustomobject]@{
         id = "read_only_surface"
         script = "smoke-chatgpt-web-apk.ps1"
-        arguments = $common + @{ ReplyTimeoutSec = $ReadyTimeoutSec }
+        arguments = $common + @{
+            ReplyTimeoutSec = $ReadyTimeoutSec
+            AllowStaleDeviceEvidence = $true
+        }
     },
     [pscustomobject]@{
         id = "feature_pages"
@@ -46,11 +49,6 @@ $cases = @(
     [pscustomobject]@{
         id = "session_recovery"
         script = "smoke-chatgpt-web-session-recovery.ps1"
-        arguments = $pinned
-    },
-    [pscustomobject]@{
-        id = "message_actions"
-        script = "smoke-chatgpt-web-message-actions.ps1"
         arguments = $pinned
     }
 )

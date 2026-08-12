@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
-    [ValidateRange(1, 10)][int]$PollIntervalSec = 2
+    [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +23,7 @@ $pinned = @{
     ExpectedHardwareSerial = $ExpectedHardwareSerial
     ReadyTimeoutSec = $ReadyTimeoutSec
     PollIntervalSec = $PollIntervalSec
+    ExpectedAdapterVersion = $ExpectedAdapterVersion
 }
 $cases = @(
     [pscustomobject]@{
@@ -37,7 +39,25 @@ $cases = @(
     [pscustomobject]@{
         id = "message_structure"
         script = "smoke-chatgpt-web-message-structure.ps1"
-        arguments = $pinned + @{ MaxConversations = 20 }
+        arguments = @{
+            Adb = $Adb
+            DeviceSerial = $DeviceSerial
+            ExpectedHardwareSerial = $ExpectedHardwareSerial
+            ReadyTimeoutSec = $ReadyTimeoutSec
+            PollIntervalSec = $PollIntervalSec
+            MaxConversations = 20
+            ExpectedAdapterVersion = $ExpectedAdapterVersion
+        }
+    },
+    [pscustomobject]@{
+        id = "message_actions_and_regenerate_menu"
+        script = "inspect-chatgpt-web-regenerate-menu.ps1"
+        arguments = $pinned + @{ ReplyTimeoutSec = 240 }
+    },
+    [pscustomobject]@{
+        id = "regenerate_reply"
+        script = "smoke-chatgpt-web-regenerate.ps1"
+        arguments = $pinned + @{ ReplyTimeoutSec = 240 }
     }
 )
 
@@ -74,7 +94,8 @@ try {
             "account_mutations",
             "destructive_conversation_actions"
         )
-        sent_messages = 0
+        sent_messages = 2
+        regenerated_messages = 1
         uploaded_attachments = 0
         cleared_cookies = $false
         cleared_app_data = $false

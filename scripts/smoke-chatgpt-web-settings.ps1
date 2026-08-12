@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 59
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -251,6 +251,7 @@ try {
         Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
             -ExpectedAction "invoke_ui_control" `
             -Arguments @{ control_id = [string]$profile.control_id } | Out-Null
+        Wait-FirstControl -Semantic "logout" -Region "overlay" | Out-Null
         $settings = Wait-FirstControl -Semantic "settings" -Region "overlay"
         Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
             -ExpectedAction "invoke_ui_control" `
