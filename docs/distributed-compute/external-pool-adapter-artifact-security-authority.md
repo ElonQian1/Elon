@@ -68,7 +68,7 @@ V233 新增：
 
 V233 之后仍不得直接创建可运行 Adapter 或 v213 route。至少还需独立完成：
 
-1. 可信依赖解析、漏洞情报源、情报时间点与可复核扫描证明；
+1. V234 已建立独立 scanner key 信任根；仍缺可信依赖解析、漏洞情报源、情报时间点与可复核的已签扫描证明；
 2. 动态恶意行为检测及隔离沙箱中的六能力 conformance；
 3. credential verifier 运行时 registry、currentness 与 revoke；
 4. 安装根、运行身份、Sidecar IPC、健康探针、升级和回滚；

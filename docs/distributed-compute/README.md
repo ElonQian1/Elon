@@ -177,7 +177,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。v221/v222 已通过管理面专项；v227 [`artifact bytes source`](external-pool-adapter-artifact-source-authority.md)、v229 [`release-admission lifecycle`](external-pool-adapter-release-lifecycle-authority.md)、v230 [`Artifact signer key registry`](external-pool-adapter-artifact-signing-key-authority.md)、v231 [`exact signed provenance`](external-pool-adapter-artifact-signed-provenance-authority.md)、v232 [`bounded static package proof`](external-pool-adapter-artifact-package-authority.md) 与 v233 [`deterministic artifact security proof`](external-pool-adapter-artifact-security-authority.md) 已分别通过本地专项。v233 证明 exact SBOM、许可证允许策略、逐文件归属/复算和有限本地静态规则，但不证明依赖无漏洞、动态行为安全、conformance、verifier runtime、Adapter 可执行、route、容量、派发或结算。真实 TCP、生产升级、部署和 MCP/PC 仍缺；证据见 [`external-pool-adapter-artifact-security-acceptance.md`](external-pool-adapter-artifact-security-acceptance.md)。
+服务端 Provider Adapter 以独立合同逐步接入外部算力池。v227-v234 的制品来源、准入、供应商签名、来源证明、静态包、静态安全和独立 scanner trust root 均已有本地专项；最新边界见 [`V233 静态安全`](external-pool-adapter-artifact-security-authority.md) 与 [`V234 扫描器信任根`](external-pool-adapter-scanner-key-authority.md)。它们不代表已运行漏洞扫描、动态 conformance、Adapter、route、派发或结算；真实 TCP、生产升级、部署和 MCP/PC 也仍缺。
 
 ### F4：容量期货市场
 
