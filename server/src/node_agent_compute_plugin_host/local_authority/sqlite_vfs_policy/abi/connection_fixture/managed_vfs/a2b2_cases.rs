@@ -7,6 +7,8 @@ mod barrier;
 mod close_physical;
 mod close_registry;
 #[cfg(windows)]
+mod dynamic_mapping_close;
+#[cfg(windows)]
 mod dynamic_registration;
 #[cfg(windows)]
 mod dynamic_view_unmap;
@@ -18,6 +20,10 @@ mod unmap_delete;
 mod unmap_nonfinal;
 mod unmap_teardown;
 
+#[cfg(windows)]
+pub(super) use dynamic_mapping_close::{
+    validate_mapping_close_after_success_physical_subset, MappingClosePhysicalSubsetActual,
+};
 #[cfg(windows)]
 pub(super) use dynamic_registration::{
     validate_dynamic_registration, DynamicRegistrationActual,
