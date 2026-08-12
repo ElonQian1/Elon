@@ -86,13 +86,13 @@ API 回执不得返回原始 RSA 签名、公钥 PEM、原始 candidate ref、�
 后续 Artifact verifier 或 Adapter registry 不能把 v231 receipt 当作最终 trust。它必须另行闭合：
 
 1. 当前 CAS 字节与 v231 binding 的 exact 重开复核；
-2. Artifact 固定格式、manifest/SBOM 和安全扫描；
+2. Artifact 固定格式与 manifest 精确检查；v232 已完成这一子门，SBOM 和安全扫描仍缺；
 3. sandbox conformance 与六能力声明验证；
 4. credential verifier registry/currentness/revocation；
 5. 平台 release actor 与 Provider route actor 分权；
 6. exact v213 Adapter/version 和 route authorization 的独立采用事务。
 
-v231 永远保持 `artifact_format_effect=none`、`conformance_effect=none`、`adapter_effect=none` 和 `route_effect=none`。
+v231 永远保持 `artifact_format_effect=none`、`conformance_effect=none`、`adapter_effect=none` 和 `route_effect=none`。后续 v232 独立收据可表达 `static_format_verified`，不得回写或升级 v231。
 
 ## 8. 当前验收状态
 
