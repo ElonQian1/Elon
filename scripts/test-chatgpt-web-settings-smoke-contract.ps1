@@ -17,6 +17,8 @@ foreach ($required in @(
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Assert-ChatGptWebSmokeAdapterVersion",
     'ExpectedAdapterVersion = 55',
+    'view_mode -notin @("official", "web")',
+    '$state.bridge_state -eq "ready"',
     'Wait-FirstControl -Semantic "profile" -Region "overlay"',
     'Wait-FirstControl -Semantic "settings" -Region "overlay"',
     '[string]$_.role -eq "tab"',
@@ -25,8 +27,11 @@ foreach ($required in @(
     '[string]$_.semantic -ne "toggle"',
     'selected = $true',
     'idempotent_tab_selection = $true',
+    'settings_already_open = $settingsAlreadyOpen',
     'changed_settings = $false',
     "function Restore-Origin",
+    '$refreshAttempted = $false',
+    'TotalSeconds -ge 10',
     'sent_messages = 0',
     'uploaded_attachments = 0',
     'cleared_cookies = $false',
@@ -53,6 +58,9 @@ foreach ($forbidden in @(
     if ($source.Contains($forbidden)) {
         throw "ChatGPT settings smoke contains a forbidden side effect: $forbidden"
     }
+}
+if ($source.Contains("InitialWaitSec 1")) {
+    throw "Settings navigation must not refresh during transient adapter reconnects."
 }
 
 Write-Output "CHATGPT_SETTINGS_SMOKE_CONTRACT=passed"

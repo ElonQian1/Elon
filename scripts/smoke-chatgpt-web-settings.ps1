@@ -97,11 +97,17 @@ function Wait-FirstControl {
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
-        Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-            -TimeoutSec ([Math]::Min(30, $ReadyTimeoutSec)) -InitialWaitSec 1 | Out-Null
-        $control = @(Get-ManifestControls -Semantic $Semantic -Region $Region) |
-            Select-Object -First 1
-        if ($null -ne $control) { return $control }
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        if (
+            $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
+        ) {
+            $control = @(Get-ManifestControls -Semantic $Semantic -Region $Region) |
+                Select-Object -First 1
+            if ($null -ne $control) { return $control }
+        }
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out waiting for ChatGPT control semantic=$Semantic region=$Region"
@@ -110,18 +116,24 @@ function Wait-FirstControl {
 function Wait-SettingsStructure {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
-        Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-            -TimeoutSec ([Math]::Min(30, $ReadyTimeoutSec)) -InitialWaitSec 1 | Out-Null
-        $controls = @(Get-ManifestControls -Region "overlay")
-        $tabs = @($controls | Where-Object { [string]$_.role -eq "tab" })
-        $switches = @($controls | Where-Object { [string]$_.role -eq "switch" })
-        if ($tabs.Count -gt 0 -and $switches.Count -gt 0) {
-            return [pscustomobject]@{
-                matrix = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-                    -Action "chatgpt_get_capability_matrix"
-                controls = $controls
-                tabs = $tabs
-                switches = $switches
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        if (
+            $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
+        ) {
+            $controls = @(Get-ManifestControls -Region "overlay")
+            $tabs = @($controls | Where-Object { [string]$_.role -eq "tab" })
+            $switches = @($controls | Where-Object { [string]$_.role -eq "switch" })
+            if ($tabs.Count -gt 0 -and $switches.Count -gt 0) {
+                return [pscustomobject]@{
+                    matrix = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                        -Action "chatgpt_get_capability_matrix"
+                    controls = $controls
+                    tabs = $tabs
+                    switches = $switches
+                }
             }
         }
         Start-Sleep -Seconds $runtime.poll_interval_sec
@@ -137,25 +149,43 @@ function Restore-Origin {
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min(60, $ReadyTimeoutSec))
+    $restoreStartedAt = [DateTimeOffset]::UtcNow
+    $refreshAttempted = $false
     $backAttempts = 0
     do {
-        $state = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-            -TimeoutSec ([Math]::Min(30, $ReadyTimeoutSec)) -InitialWaitSec 1
-        $overlay = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_find_controls" -Arguments @{ region = "overlay"; offset = 0; limit = 1 }
-        $pathMatches = -not $Path -or (Get-ObservedPath -State $state) -eq $Path
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
         if (
-            [string]$state.page_kind -eq $PageKind -and
-            $pathMatches -and
-            [int]$overlay.match_count -eq $OverlayControlCount
+            $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "ready" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true
         ) {
-            return
+            $overlay = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                -Action "chatgpt_find_controls" -Arguments @{ region = "overlay"; offset = 0; limit = 1 }
+            $pathMatches = -not $Path -or (Get-ObservedPath -State $state) -eq $Path
+            if (
+                [string]$state.page_kind -eq $PageKind -and
+                $pathMatches -and
+                [int]$overlay.match_count -eq $OverlayControlCount
+            ) {
+                return
+            }
+            if ($backAttempts -ge 4) { break }
+            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                -Arguments @("shell", "input", "keyevent", "4") `
+                -TimeoutSec 10 -Label "restore ChatGPT settings origin" | Out-Null
+            $backAttempts += 1
+        } elseif (
+            -not $refreshAttempted -and
+            $state.surface -eq "chatgpt_web" -and
+            $state.bridge_state -eq "connecting" -and
+            $state.adapter_current -eq $true -and
+            $state.authenticated -eq $true -and
+            ([DateTimeOffset]::UtcNow - $restoreStartedAt).TotalSeconds -ge 10
+        ) {
+            Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_refresh" | Out-Null
+            $refreshAttempted = $true
         }
-        if ($backAttempts -ge 4) { break }
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "input", "keyevent", "4") `
-            -TimeoutSec 10 -Label "restore ChatGPT settings origin" | Out-Null
-        $backAttempts += 1
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out restoring the original ChatGPT page after settings audit."
@@ -164,7 +194,7 @@ function Restore-Origin {
 Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
 $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
     -TimeoutSec $ReadyTimeoutSec -InitialWaitSec ([Math]::Min(5, $ReadyTimeoutSec))
-if ([string]$origin.view_mode -ne "official") {
+if ([string]$origin.view_mode -notin @("official", "web")) {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "official" } | Out-Null
     $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
@@ -177,20 +207,26 @@ $originPath = Get-ObservedPath -State $origin
 $originOverlay = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
     -Action "chatgpt_find_controls" -Arguments @{ region = "overlay"; offset = 0; limit = 1 }
 $originOverlayCount = [int]$originOverlay.match_count
+$originOverlayControls = @(Get-ManifestControls -Region "overlay")
+$settingsAlreadyOpen =
+    @($originOverlayControls | Where-Object { [string]$_.role -eq "tab" }).Count -gt 0 -and
+    @($originOverlayControls | Where-Object { [string]$_.role -eq "switch" }).Count -gt 0
 $originRestored = $false
 $report = $null
 
 try {
-    Invoke-ReceiptAction -Action "chatgpt_list_features" `
-        -ExpectedAction "list_navigation" | Out-Null
-    $profile = Wait-FirstControl -Semantic "profile" -Region "overlay"
-    Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
-        -ExpectedAction "invoke_ui_control" `
-        -Arguments @{ control_id = [string]$profile.control_id } | Out-Null
-    $settings = Wait-FirstControl -Semantic "settings" -Region "overlay"
-    Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
-        -ExpectedAction "invoke_ui_control" `
-        -Arguments @{ control_id = [string]$settings.control_id } | Out-Null
+    if (-not $settingsAlreadyOpen) {
+        Invoke-ReceiptAction -Action "chatgpt_list_features" `
+            -ExpectedAction "list_navigation" | Out-Null
+        $profile = Wait-FirstControl -Semantic "profile" -Region "overlay"
+        Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
+            -ExpectedAction "invoke_ui_control" `
+            -Arguments @{ control_id = [string]$profile.control_id } | Out-Null
+        $settings = Wait-FirstControl -Semantic "settings" -Region "overlay"
+        Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
+            -ExpectedAction "invoke_ui_control" `
+            -Arguments @{ control_id = [string]$settings.control_id } | Out-Null
+    }
 
     $structure = Wait-SettingsStructure
     $matrix = $structure.matrix
@@ -256,6 +292,7 @@ try {
         generic_control_count = [int]$matrix.manifest.generic_control_count
         unexpected_fallback_count = [int]$matrix.manifest.unexpected_official_fallback_control_count
         idempotent_tab_selection = $true
+        settings_already_open = $settingsAlreadyOpen
         changed_settings = $false
         sent_messages = 0
         uploaded_attachments = 0

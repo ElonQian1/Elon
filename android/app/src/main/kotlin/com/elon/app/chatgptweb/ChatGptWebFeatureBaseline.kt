@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
     const val VERSION = 4
-    internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 54
+    internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 55
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
 
@@ -252,6 +252,11 @@ internal object ChatGptWebFeatureBaseline {
         "message_copy" to "reversible/copy_receipt_without_content_readback",
         "message_action_context" to "safe/message_actions",
         "feature_navigation" to "safe/feature_pages",
+        "tasks" to "safe/feature_pages_individual",
+        "library" to "safe/feature_pages_individual",
+        "apps" to "safe/feature_pages_individual",
+        "settings" to "safe/settings_overlay_form_controls",
+        "adaptive_form_controls" to "safe/settings_overlay_idempotent_form_controls",
         "disclosure_controls" to "reversible/reversible_controls",
         "official_change_detection" to "safe/read_only_surface",
         "stable_mcp_and_adb_controls" to "safe/read_only_surface",
