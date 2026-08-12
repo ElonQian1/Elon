@@ -137,10 +137,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             mode = { latestMode },
             inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },
             copyMessage = messageClipboard::copy,
-            setInputText = { text ->
-                binding.chatGptNativeComposer.setText(text)
-                binding.chatGptNativeComposer.setSelection(text.length)
-            },
+            setInputText = nativeController::setComposerTextFromMcp,
             commands = mcpCommandPort,
             refresh = { binding.chatGptWebView.reload() },
             selectMode = modeController::select,

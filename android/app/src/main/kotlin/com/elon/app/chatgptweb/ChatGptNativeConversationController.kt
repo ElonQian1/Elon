@@ -9,6 +9,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.core.widget.doAfterTextChanged
 import com.elon.app.R
 
 internal class ChatGptNativeConversationController(
@@ -43,6 +44,8 @@ internal class ChatGptNativeConversationController(
     )
     private var snapshot: ChatGptWebSnapshot? = null
     private var pendingPrompt: String? = null
+    private var mcpDraft: String? = null
+    private var updatingComposer = false
     private var suggestionsVisible = false
     private var revealTarget: RevealTarget? = null
 
@@ -69,6 +72,9 @@ internal class ChatGptNativeConversationController(
                 false
             }
         }
+        composer.doAfterTextChanged {
+            if (!updatingComposer) mcpDraft = null
+        }
         setAvailable(false)
     }
 
@@ -91,9 +97,9 @@ internal class ChatGptNativeConversationController(
         messages = nextMessages
         adapter.submit(nextMessages, value.capabilities)
         updateEmptyVisibility()
-        if (!composer.hasFocus() && pendingPrompt == null && composer.text.toString() != value.draft) {
-            composer.setText(value.draft)
-            composer.setSelection(composer.text?.length ?: 0)
+        val desiredDraft = mcpDraft ?: value.draft
+        if (!composer.hasFocus() && pendingPrompt == null && composer.text.toString() != desiredDraft) {
+            replaceComposerText(desiredDraft)
         }
         setControls(value)
         val target = revealTarget
@@ -110,21 +116,23 @@ internal class ChatGptNativeConversationController(
         when (event.action) {
             "send_prompt" -> {
                 if (event.ok) {
-                    composer.text?.clear()
+                    mcpDraft = null
+                    replaceComposerText("")
                 } else {
-                    pendingPrompt?.let(composer::setText)
-                    composer.setSelection(composer.text?.length ?: 0)
+                    mcpDraft = pendingPrompt
+                    pendingPrompt?.let(::replaceComposerText)
                     pendingPrompt = null
                 }
                 snapshot?.let(::setControls)
             }
             "new_conversation" -> if (event.ok) {
                 pendingPrompt = null
+                mcpDraft = null
                 revealTarget = null
                 messages = emptyList()
                 adapter.submit(emptyList(), snapshot?.capabilities ?: ChatGptWebCapabilities.EMPTY)
                 updateEmptyVisibility()
-                composer.text?.clear()
+                replaceComposerText("")
             }
         }
     }
@@ -156,9 +164,17 @@ internal class ChatGptNativeConversationController(
     }
 
     fun restoreComposerState() {
-        pendingPrompt?.let(composer::setText)
+        pendingPrompt?.let {
+            mcpDraft = it
+            replaceComposerText(it)
+        }
         pendingPrompt = null
         snapshot?.let(::setControls)
+    }
+
+    fun setComposerTextFromMcp(text: String) {
+        mcpDraft = text
+        replaceComposerText(text)
     }
 
     fun submitFromMcp(requestId: String) {
@@ -183,6 +199,16 @@ internal class ChatGptNativeConversationController(
         pendingPrompt = prompt.takeIf(String::isNotEmpty)
         onSend(prompt, snapshot?.draft.orEmpty(), requestId)
         setAvailable(false)
+    }
+
+    private fun replaceComposerText(text: String) {
+        updatingComposer = true
+        try {
+            composer.setText(text)
+            composer.setSelection(composer.text?.length ?: 0)
+        } finally {
+            updatingComposer = false
+        }
     }
 
     private fun copyMessage(message: ChatGptWebMessage) {

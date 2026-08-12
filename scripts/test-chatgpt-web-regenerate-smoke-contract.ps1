@@ -27,7 +27,7 @@ foreach ($required in @(
     'CHATGPT_REGENERATE_PROGRESS phase=send_probe',
     'ChatGPT bridge before $Action',
     'regenerate probe draft synchronization',
-    '[string]$state.draft -eq $prompt',
+    '[string]$state.input.text -eq $prompt',
     'CHATGPT_REGENERATE_PROGRESS phase=initial_reply_complete',
     'CHATGPT_REGENERATE_PROGRESS phase=regenerate_dispatched',
     'CHATGPT_REGENERATE_PROGRESS phase=await_regenerated_reply',

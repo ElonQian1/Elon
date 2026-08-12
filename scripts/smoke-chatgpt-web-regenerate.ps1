@@ -179,7 +179,7 @@ try {
             param($state)
             $state.bridge_state -eq "ready" -and
                 $state.adapter_current -eq $true -and
-                [string]$state.draft -eq $prompt
+                [string]$state.input.text -eq $prompt
         }.GetNewClosure()
     $send = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input"
     $sendRequestId = [string]$send.command_receipt.request_id
