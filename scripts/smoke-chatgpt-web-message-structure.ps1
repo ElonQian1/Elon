@@ -8,7 +8,7 @@ param(
     [ValidateRange(20, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
     [ValidateRange(1, 50)][int]$MaxConversations = 20,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 84
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85
 )
 
 $ErrorActionPreference = "Stop"
@@ -260,6 +260,25 @@ try {
             Where-Object { $_ } |
             Sort-Object -Unique
     )
+    $metadataParts = @($sample.parts | Where-Object { $null -ne $_.metadata })
+    $metadataSchemas = @(
+        $metadataParts |
+            ForEach-Object { [string]$_.metadata.schema } |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
+    $metadataKinds = @(
+        $metadataParts |
+            ForEach-Object { [string]$_.metadata.kind } |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
+    if ($metadataSchemas | Where-Object { $_ -ne 'elon.chatgpt_web.message_part_metadata.v1' }) {
+        throw "Structured message metadata uses an unexpected schema."
+    }
+    if ($metadataParts.Count -ne $sample.parts.Count -or $metadataSchemas.Count -ne 1) {
+        throw "Structured message parts do not all expose bounded v1 metadata."
+    }
     $sampleMessage = $sample.messages |
         Where-Object { @($_.parts | Where-Object { $null -ne $_ }).Count -gt 0 } |
         Select-Object -First 1
@@ -295,6 +314,9 @@ try {
         message_count = $sample.messages.Count
         message_part_count = $sample.parts.Count
         message_part_types = $partTypes
+        metadata_part_count = $metadataParts.Count
+        metadata_kinds = $metadataKinds
+        metadata_schema_count = $metadataSchemas.Count
         context_selector_count = $expectedSelectors.Count
         visible_message_selector_count = $visible.messages.Count
         visible_part_selector_count = $visible.parts.Count

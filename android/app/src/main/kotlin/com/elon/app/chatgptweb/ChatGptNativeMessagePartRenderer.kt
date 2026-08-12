@@ -28,7 +28,7 @@ internal class ChatGptNativeMessagePartRenderer(
     ): TextView {
         val context = container.context
         return TextView(context).apply {
-            text = context.getString(R.string.chatgpt_message_part_format, typeLabel(context, part.type), part.label)
+            text = displayText(context, part)
             contentDescription = ChatGptNativeControlPresentation.messagePartSelector(messageId, index, part.type)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             tooltipText = context.getString(R.string.chatgpt_message_part_open, text)
@@ -50,11 +50,36 @@ internal class ChatGptNativeMessagePartRenderer(
         }
     }
 
+    private fun displayText(context: Context, part: ChatGptWebMessagePart): String {
+        val title = context.getString(
+            R.string.chatgpt_message_part_format,
+            typeLabel(context, part.type),
+            part.label,
+        )
+        val detail = metadataSummary(context, part.metadata)
+        return if (detail.isBlank()) title else "$title\n$detail"
+    }
+
+    private fun metadataSummary(context: Context, value: ChatGptWebMessagePartMetadata?): String {
+        if (value == null) return ""
+        return buildList {
+            value.language?.let { add(context.getString(R.string.chatgpt_message_part_language, it)) }
+            value.lineCount?.let { add(context.getString(R.string.chatgpt_message_part_lines, it)) }
+            if (value.rowCount != null && value.columnCount != null) {
+                add(context.getString(R.string.chatgpt_message_part_dimensions, value.rowCount, value.columnCount))
+            }
+            value.mediaType?.let { add(context.getString(R.string.chatgpt_message_part_media_type, it)) }
+            value.targetHost?.let { add(context.getString(R.string.chatgpt_message_part_source, it)) }
+        }.joinToString(" · ")
+    }
+
     private fun typeLabel(context: Context, type: String): String = context.getString(
         when (type) {
             "image" -> R.string.chatgpt_message_part_image
             "file" -> R.string.chatgpt_message_part_file
             "citation" -> R.string.chatgpt_message_part_citation
+            "code" -> R.string.chatgpt_message_part_code
+            "table" -> R.string.chatgpt_message_part_table
             "artifact" -> R.string.chatgpt_message_part_artifact
             "audio" -> R.string.chatgpt_message_part_audio
             "video" -> R.string.chatgpt_message_part_video

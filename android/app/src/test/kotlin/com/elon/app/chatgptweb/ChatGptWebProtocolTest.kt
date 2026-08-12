@@ -95,8 +95,10 @@ class ChatGptWebProtocolTest {
                   {"id":"u1","role":"user","state":"completed","content":[{"type":"text","text":"你好"}]},
                   {"id":"a1","role":"assistant","state":"streaming","content":[
                     {"type":"markdown","text":"## 你好\n\n需要什么帮助？"},
-                    {"type":"image","text":"生成的图片"},
-                    {"type":"file","text":"分析结果.csv"},
+                    {"type":"image","text":"生成的图片","kind":"image","mediaType":"image/png"},
+                    {"type":"file","text":"分析结果.csv","kind":"download","mediaType":"text/csv","targetKind":"external","targetHost":"files.example.com"},
+                    {"type":"code","text":"Kotlin 代码","kind":"code_block","language":"kotlin","lineCount":12},
+                    {"type":"table","text":"表格","kind":"table","rowCount":4,"columnCount":3},
                     {"type":"math","text":"E = mc^2"},
                     {"type":"chart","text":"季度趋势图"},
                     {"type":"interactive","text":"可展开结果"},
@@ -127,12 +129,34 @@ class ChatGptWebProtocolTest {
         assertEquals("streaming", event.value.messages.last().state)
         assertTrue(event.value.messages.last().content.startsWith("## 你好"))
         assertEquals(
-            listOf("image", "file", "math", "chart", "interactive"),
+            listOf("image", "file", "code", "table", "math", "chart", "interactive"),
             event.value.messages.last().parts.map { it.type },
         )
         assertEquals("生成的图片", event.value.messages.last().parts.first().label)
+        assertEquals("image/png", event.value.messages.last().parts.first().metadata?.mediaType)
+        assertEquals("files.example.com", event.value.messages.last().parts[1].metadata?.targetHost)
+        assertEquals("kotlin", event.value.messages.last().parts[2].metadata?.language)
+        assertEquals(12, event.value.messages.last().parts[2].metadata?.lineCount)
+        assertEquals(4, event.value.messages.last().parts[3].metadata?.rowCount)
+        assertEquals(3, event.value.messages.last().parts[3].metadata?.columnCount)
         assertTrue(event.value.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST))
         assertFalse(event.value.capabilities.supports("invalid capability"))
+    }
+
+    @Test
+    fun rejectsUnboundedOrCredentialLikeStructuredMetadata() {
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"message_snapshot","messages":[{"id":"a1","role":"assistant","state":"completed","content":[{"type":"markdown","text":"answer"},{"type":"citation","text":"source","kind":"reference","language":"bad language","mediaType":"text/html;token=secret","targetKind":"credential","targetHost":"user:password@example.com","targetPath":"/private?token=secret","lineCount":-1,"rowCount":999999}]}]}}""",
+        ) as ChatGptWebEvent.Snapshot
+
+        val metadata = event.value.messages.single().parts.single().metadata
+        assertEquals("reference", metadata?.kind)
+        assertEquals(null, metadata?.language)
+        assertEquals(null, metadata?.mediaType)
+        assertEquals(null, metadata?.targetKind)
+        assertEquals(null, metadata?.targetHost)
+        assertEquals(null, metadata?.lineCount)
+        assertEquals(null, metadata?.rowCount)
     }
 
     @Test

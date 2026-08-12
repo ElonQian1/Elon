@@ -10,11 +10,6 @@ internal data class ChatGptWebMessage(
     val parts: List<ChatGptWebMessagePart>,
 )
 
-internal data class ChatGptWebMessagePart(
-    val type: String,
-    val label: String,
-)
-
 internal data class ChatGptWebAttachment(
     val id: String,
     val name: String,
@@ -172,7 +167,7 @@ internal object ChatGptWebProtocol {
                 val role = item.optString("role").lowercase()
                 if (role !in SUPPORTED_ROLES) continue
                 val content = textContent(item).trim().take(MAX_MESSAGE_LENGTH)
-                val parts = parseMessageParts(item)
+                val parts = ChatGptWebMessagePartParser.parse(item)
                 if (content.isEmpty() && parts.isEmpty()) continue
                 add(
                     ChatGptWebMessage(
@@ -230,20 +225,6 @@ internal object ChatGptWebProtocol {
                 )
             }
         }
-    }
-
-    private fun parseMessageParts(message: JSONObject): List<ChatGptWebMessagePart> {
-        val content = message.optJSONArray("content") ?: return emptyList()
-        return buildList {
-            for (index in 0 until minOf(content.length(), MAX_CONTENT_PARTS)) {
-                val part = content.optJSONObject(index) ?: continue
-                val type = part.optString("type")
-                if (type !in STRUCTURED_CONTENT_TYPES) continue
-                val label = part.optString("text").trim().take(MAX_MESSAGE_PART_LABEL_LENGTH)
-                if (label.isBlank()) continue
-                add(ChatGptWebMessagePart(type = type, label = label))
-            }
-        }.take(MAX_STRUCTURED_MESSAGE_PARTS)
     }
 
     private fun parseComposerControls(event: JSONObject): ChatGptWebEvent.ComposerControls? {
@@ -491,18 +472,6 @@ internal object ChatGptWebProtocol {
     private val SUPPORTED_ROLES = setOf("user", "assistant")
     private val SUPPORTED_MESSAGE_STATES = setOf("completed", "streaming")
     private val SUPPORTED_CONTENT_TYPES = setOf("text", "markdown")
-    private val STRUCTURED_CONTENT_TYPES = setOf(
-        "image",
-        "file",
-        "citation",
-        "artifact",
-        "audio",
-        "video",
-        "math",
-        "chart",
-        "map",
-        "interactive",
-    )
     private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
     private val PAGE_KINDS = setOf("auth", "conversation", "home", "feature")
     private val SUPPORTED_TOUCH_PURPOSES = setOf(
@@ -530,8 +499,6 @@ internal object ChatGptWebProtocol {
     private const val MAX_REQUEST_ID_LENGTH = 36
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
-    private const val MAX_STRUCTURED_MESSAGE_PARTS = 16
-    private const val MAX_MESSAGE_PART_LABEL_LENGTH = 180
     private const val MAX_DRAFT_LENGTH = 20_000
     private const val MAX_CONVERSATIONS = 100
     private const val MAX_CONVERSATION_COLLECTION_STEPS = 80

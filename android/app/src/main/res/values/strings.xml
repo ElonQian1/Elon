@@ -124,6 +124,8 @@
     <string name="chatgpt_message_part_image">图片</string>
     <string name="chatgpt_message_part_file">文件</string>
     <string name="chatgpt_message_part_citation">引用</string>
+    <string name="chatgpt_message_part_code">代码</string>
+    <string name="chatgpt_message_part_table">表格</string>
     <string name="chatgpt_message_part_artifact">交互内容</string>
     <string name="chatgpt_message_part_audio">音频</string>
     <string name="chatgpt_message_part_video">视频</string>
@@ -132,4 +134,9 @@
     <string name="chatgpt_message_part_map">地图</string>
     <string name="chatgpt_message_part_interactive">交互内容</string>
     <string name="chatgpt_message_part_content">内容</string>
+    <string name="chatgpt_message_part_language">语言 %1$s</string>
+    <string name="chatgpt_message_part_lines">%1$d 行</string>
+    <string name="chatgpt_message_part_dimensions">%1$d 行 × %2$d 列</string>
+    <string name="chatgpt_message_part_media_type">格式 %1$s</string>
+    <string name="chatgpt_message_part_source">来源 %1$s</string>
 </resources>

@@ -399,7 +399,11 @@ internal class ChatGptWebMcpActions(
             .put("message_limit", page.limit)
             .put("next_message_offset", page.nextOffset)
             .put("has_more", page.hasMore)
-            .put("messages", messagesJson(page.messages, page.offset, MAX_CONTEXT_MESSAGE_CHARS))
+            .put("messages", ChatGptWebMessageJson.encode(
+                page.messages,
+                page.offset,
+                MAX_CONTEXT_MESSAGE_CHARS,
+            ))
     }
 
     private fun controlsPage(args: JSONObject): JSONObject {
@@ -539,7 +543,11 @@ internal class ChatGptWebMcpActions(
                 exportedMessages.size < value.messages.size || windowEnd < value.observedMessageCount,
             )
             .put("context_action", "chatgpt_get_context")
-            .put("messages", messagesJson(exportedMessages, exportedStart, MAX_MESSAGE_CHARS))
+            .put("messages", ChatGptWebMessageJson.encode(
+                exportedMessages,
+                exportedStart,
+                MAX_MESSAGE_CHARS,
+            ))
             .put("attachments", JSONArray().apply {
                 value.attachments.forEach { attachment ->
                     put(JSONObject()
@@ -549,52 +557,6 @@ internal class ChatGptWebMcpActions(
                     )
                 }
             })
-    }
-
-    private fun messagesJson(
-        messages: List<ChatGptWebMessage>,
-        startIndex: Int,
-        maxChars: Int,
-    ): JSONArray = JSONArray().apply {
-        messages.forEachIndexed { offset, message ->
-            put(JSONObject()
-                .put("index", startIndex + offset)
-                .put("id", message.id)
-                .put("role", message.role)
-                .put("state", message.state)
-                .put("content", message.content.take(maxChars))
-                .put("content_chars", message.content.length)
-                .put("content_truncated", message.content.length > maxChars)
-                .put("part_count", message.parts.size)
-                .put("native_action", "chatgpt_reveal_message")
-                .put("native_reveal_targets", JSONArray(ChatGptNativeMessageRevealTarget.ALL))
-                .put(
-                    "native_adb_content_description",
-                    ChatGptNativeControlPresentation.messageSelector(message.id, message.role),
-                )
-                .put("parts_truncated", message.parts.size > MAX_MESSAGE_PARTS)
-                .put("parts", JSONArray().apply {
-                    message.parts.take(MAX_MESSAGE_PARTS).forEachIndexed { partIndex, part ->
-                        put(JSONObject()
-                            .put("type", part.type)
-                            .put("label", part.label.take(MAX_MESSAGE_PART_LABEL_CHARS))
-                            .put(
-                                "native_adb_content_description",
-                                ChatGptNativeControlPresentation.messagePartSelector(
-                                    message.id,
-                                    partIndex,
-                                    part.type,
-                                ),
-                            )
-                            .put(
-                                "label_truncated",
-                                part.label.length > MAX_MESSAGE_PART_LABEL_CHARS,
-                            )
-                        )
-                    }
-                })
-            )
-        }
     }
 
     private fun navigationSummary(value: ChatGptWebObservedState.Snapshot): JSONObject = JSONObject()
@@ -737,9 +699,7 @@ internal class ChatGptWebMcpActions(
         const val MAX_MESSAGE_CHARS = 30_000
         const val MAX_CONTEXT_MESSAGE_CHARS = 40_000
         const val MAX_CONTEXT_CURSOR_CHARS = 80
-        const val MAX_MESSAGE_PARTS = 16
         const val MAX_MESSAGE_ID_CHARS = 200
-        const val MAX_MESSAGE_PART_LABEL_CHARS = 180
         const val MAX_INPUT_CHARS = 20_000
         const val MAX_ATTACHMENT_ID_CHARS = 96
         const val DEFAULT_CONTEXT_PAGE_SIZE = 20

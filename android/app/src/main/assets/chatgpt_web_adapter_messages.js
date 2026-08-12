@@ -7,7 +7,9 @@
   const MAX_MESSAGE_LENGTH = 40000;
   const MAX_STRUCTURED_PARTS = 16;
   const FILE_PATH_EXTENSION = /\.(?:pdf|docx?|xlsx?|csv|pptx?|txt|md|json|xml|ya?ml|zip|rar|7z|tar|gz|png|jpe?g|gif|webp|svg|mp3|wav|m4a|ogg|mp4|mov|webm)$/i;
-  const COMPLEX_PART_TYPES = new Set(['artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive']);
+  const COMPLEX_PART_TYPES = new Set([
+    'code', 'table', 'artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive'
+  ]);
   const messageActionPolicy = window.__elonChatGptMessageActionPolicy;
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
@@ -35,6 +37,20 @@
     const longest = Math.max(0, ...Array.from(String(value).matchAll(/`+/g), (match) => match[0].length));
     const fence = '`'.repeat(Math.max(3, longest + 1));
     return '\n\n' + fence + language + '\n' + String(value).replace(/\n$/, '') + '\n' + fence + '\n\n';
+  }
+
+  function safeMarkdownHref(node) {
+    try {
+      const url = new URL(node.getAttribute('href') || '', location.origin);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+      url.username = '';
+      url.password = '';
+      url.search = '';
+      url.hash = '';
+      return url.href;
+    } catch {
+      return '';
+    }
   }
 
   function listMarkdown(node, ordered) {
@@ -86,12 +102,8 @@
     if (tag === 'S' || tag === 'DEL') return '~~' + childrenMarkdown(node, context) + '~~';
     if (tag === 'A') {
       const text = childrenMarkdown(node, context) || escapeMarkdown(node.textContent || '链接');
-      try {
-        const url = new URL(node.getAttribute('href') || '', location.origin);
-        return url.protocol === 'http:' || url.protocol === 'https:' ? '[' + text + '](' + url.href + ')' : text;
-      } catch {
-        return text;
-      }
+      const href = safeMarkdownHref(node);
+      return href ? '[' + text + '](' + href + ')' : text;
     }
     if (/^H[1-6]$/.test(tag)) {
       return '\n\n' + '#'.repeat(Number(tag.slice(1))) + ' ' + childrenMarkdown(node, context).trim() + '\n\n';
@@ -159,6 +171,46 @@
     ].filter(Boolean).join(' ')).slice(0, 180) || fallback;
   }
 
+  function safeTargetMetadata(node) {
+    try {
+      const url = new URL(node.getAttribute('href') || '', location.origin);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return {};
+      return {
+        targetKind: url.origin === location.origin ? 'same_origin' : 'external',
+        targetHost: url.hostname.toLowerCase().slice(0, 253)
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  function mediaType(node) {
+    const direct = cleanText(node.getAttribute('type')).toLowerCase();
+    const nested = node.querySelector && node.querySelector('source[type]');
+    return (direct || cleanText(nested && nested.getAttribute('type')).toLowerCase()).slice(0, 96);
+  }
+
+  function codeMetadata(node) {
+    const code = node.querySelector('code') || node;
+    const match = String(code.className || '').match(/language-([A-Za-z0-9_+.#-]+)/);
+    const value = String(code.textContent || '');
+    return {
+      kind: 'code_block',
+      language: match ? match[1].slice(0, 32) : '',
+      lineCount: Math.max(1, value.split('\n').length)
+    };
+  }
+
+  function tableMetadata(node) {
+    const rows = Array.from(node.querySelectorAll('tr'));
+    return {
+      kind: 'table',
+      rowCount: rows.length,
+      columnCount: rows.reduce((width, row) =>
+        Math.max(width, row.querySelectorAll(':scope > th, :scope > td').length), 0)
+    };
+  }
+
   function linkPart(node) {
     let path = '';
     try { path = new URL(node.getAttribute('href') || '', location.origin).pathname; }
@@ -173,58 +225,67 @@
       /download|file|attachment/.test(metadata);
     return {
       type: isFile ? 'file' : 'citation',
-      text: structuredLabel(node, isFile ? '文件' : '引用')
+      text: structuredLabel(node, isFile ? '文件' : '引用'),
+      metadata: Object.assign(
+        { kind: isFile ? 'download' : 'reference', mediaType: mediaType(node) },
+        safeTargetMetadata(node)
+      )
     };
   }
 
   function structuredParts(content) {
     const parts = [];
-    const seen = new Set();
-    function add(type, label, node) {
-      const key = type + '|' + label;
-      if (seen.has(key) || parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node)) return;
-      seen.add(key);
-      parts.push({ type, text: label });
+    function add(type, label, node, metadata) {
+      if (parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node)) return;
+      parts.push(Object.assign({ type, text: label }, metadata || {}));
       lastStructuredTypes.add(type);
       if (COMPLEX_PART_TYPES.has(type)) lastComplexOutput = true;
     }
     Array.from(content.querySelectorAll('img')).forEach((node) => {
-      add('image', structuredLabel(node, '图片'), node);
+      add('image', structuredLabel(node, '图片'), node, { kind: 'image', mediaType: mediaType(node) });
     });
     Array.from(content.querySelectorAll('a[href]')).forEach((node) => {
       const part = linkPart(node);
-      if (part) add(part.type, part.text, node);
+      if (part) add(part.type, part.text, node, part.metadata);
+    });
+    Array.from(content.querySelectorAll('pre')).forEach((node) => {
+      const metadata = codeMetadata(node);
+      const label = metadata.language ? metadata.language + ' 代码' : '代码块';
+      add('code', label, node, metadata);
+    });
+    Array.from(content.querySelectorAll('table')).forEach((node) => {
+      add('table', '表格', node, tableMetadata(node));
     });
     Array.from(content.querySelectorAll(
       '[data-testid*="artifact" i], [data-testid*="canvas" i], [data-testid*="code-interpreter" i], iframe'
     )).forEach((node) => {
-      add('artifact', structuredLabel(node, '交互内容'), node);
+      add('artifact', structuredLabel(node, '交互内容'), node, { kind: 'artifact' });
     });
     Array.from(content.querySelectorAll('audio')).forEach((node) => {
-      add('audio', structuredLabel(node, '音频'), node);
+      add('audio', structuredLabel(node, '音频'), node, { kind: 'audio', mediaType: mediaType(node) });
     });
     Array.from(content.querySelectorAll('video')).forEach((node) => {
-      add('video', structuredLabel(node, '视频'), node);
+      add('video', structuredLabel(node, '视频'), node, { kind: 'video', mediaType: mediaType(node) });
     });
     Array.from(content.querySelectorAll('.katex, [data-testid*="math" i]')).forEach((node) => {
       const annotation = node.querySelector('annotation[encoding="application/x-tex"]');
-      add('math', structuredLabel(annotation || node, '数学公式'), node);
+      add('math', structuredLabel(annotation || node, '数学公式'), node, { kind: 'formula' });
     });
     Array.from(content.querySelectorAll(
       'canvas, .mermaid, [data-testid*="chart" i], [data-testid*="diagram" i], [aria-label*="chart" i], [aria-label*="图表"]'
     )).forEach((node) => {
-      add('chart', structuredLabel(node, '图表'), node);
+      add('chart', structuredLabel(node, '图表'), node, { kind: 'chart' });
     });
     Array.from(content.querySelectorAll(
       '[data-testid*="map" i], [aria-label*="map" i], [aria-label*="地图"]'
     )).forEach((node) => {
-      add('map', structuredLabel(node, '地图'), node);
+      add('map', structuredLabel(node, '地图'), node, { kind: 'map' });
     });
     Array.from(content.querySelectorAll(
       'details, [role="tree"], [role="grid"], [data-testid*="interactive" i], '
       + '[data-testid*="output" i], [data-testid*="viewer" i], [data-testid*="preview" i]'
     )).forEach((node) => {
-      add('interactive', structuredLabel(node, '交互内容'), node);
+      add('interactive', structuredLabel(node, '交互内容'), node, { kind: 'interactive' });
     });
     return parts;
   }

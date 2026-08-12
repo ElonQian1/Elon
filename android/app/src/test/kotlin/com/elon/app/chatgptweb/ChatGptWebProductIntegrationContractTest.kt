@@ -29,6 +29,7 @@ class ChatGptWebProductIntegrationContractTest {
     fun adaptiveMirrorAndMcpShareStableSemanticControlIds() {
         val layoutAdapter = read("android/app/src/main/assets/chatgpt_web_adapter_layout.js")
         val mcp = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt")
+        val messageJson = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMessageJson.kt")
         val activity = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt")
         val mcpBinding = read("android/app/src/main/kotlin/com/elon/app/mcp/McpNativeControlBinding.kt")
 
@@ -44,7 +45,9 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(baseAdapter.indexOf("layoutAdapter.emitSnapshot") > baseAdapter.indexOf("emitEvent(event)"))
         assertTrue(mcp.contains("adb_content_description"))
         assertTrue(mcp.contains("context_id"))
-        assertTrue(mcp.contains("message.content.take"))
+        assertTrue(mcp.contains("ChatGptWebMessageJson.encode"))
+        assertTrue(messageJson.contains("message.content.take"))
+        assertTrue(messageJson.contains("messagePartSelector"))
         assertTrue(mcp.contains("chatgpt_get_context"))
         assertTrue(activity.contains("mcpNativeControlBinding.register()"))
         assertTrue(mcpBinding.contains("controlHandler(args)"))
