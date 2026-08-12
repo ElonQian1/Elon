@@ -235,9 +235,7 @@ const dictationSandbox = {
     innerHeight: 800,
     getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
     __elonChatGptActionTargetPolicy: {
-      actionPoint(node) {
-        return node === dictationButton ? { x: 330, y: 670 } : null;
-      },
+      actionPoint: () => null,
       signature: () => 'visible'
     },
     __elonChatGptComposerOptionPolicy: {
@@ -246,6 +244,13 @@ const dictationSandbox = {
     __elonChatGptLayout: {
       findSemanticNode(semantic, region) {
         return semantic === 'dictation' && region === 'composer' ? dictationButton : null;
+      },
+      requestSemanticTouch(semantic, purpose, emitEvent, region) {
+        assert.equal(semantic, 'dictation');
+        assert.equal(purpose, 'start_dictation');
+        assert.equal(region, 'composer');
+        emitEvent({ type: 'web_touch_request', purpose, xRatio: 0.825, yRatio: 0.8375 });
+        return true;
       }
     }
   }

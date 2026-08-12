@@ -517,7 +517,11 @@
     const button = findDictationButton(composer);
     if (!button) return result('start_dictation', false, '官网当前没有听写入口。');
     if (!emitTouchRequest('start_dictation', button, emitEvent)) {
-      return result('start_dictation', false, '官网听写入口当前不可见。');
+      const layout = window.__elonChatGptLayout;
+      if (!layout || typeof layout.requestSemanticTouch !== 'function' ||
+          !layout.requestSemanticTouch('dictation', 'start_dictation', emitEvent, 'composer')) {
+        return result('start_dictation', false, '官网听写入口当前不可见。');
+      }
     }
     result('start_dictation', true, '');
   }
