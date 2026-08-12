@@ -108,7 +108,7 @@ Store exact replay 顺序是先按 scope/key 查既有回执并逐字段比较�
 - 禁止提供 bytes 下载、MCP/PC 二进制入口或把 server-local DATA_DIR 描述为共享对象存储。
 - 禁止用 fixture、fake resolver、管理员 DTO 或历史 receipt 升级生产 trust。
 
-后续 Adapter registry consumer 仍须另行闭合 artifact provenance/signature、sandbox conformance、verifier registry/currentness/revocation、平台级 release actor 与 Provider-specific route actor 分权，以及 exact v222/v227 source companion。v227 永远不跨越该截止线。
+v231 已另行闭合 exact Artifact RSA signed provenance，但不改变 v227 的 bytes-source 截止线。后续 Adapter registry consumer 仍须闭合 Artifact 格式与 sandbox conformance、verifier registry/currentness/revocation、平台级 release actor 与 Provider-specific route actor 分权，以及 exact v222/v227/v231 companion。v227 永远不跨越该截止线。见 [`external-pool-adapter-artifact-signed-provenance-authority.md`](external-pool-adapter-artifact-signed-provenance-authority.md)。
 
 v229 terminal receipt 固定 `currentness_effect=admission_terminal`、`artifact_intake_effect=blocked`、`existing_artifact_source_effect=historical_only`、`adapter_effect=none` 与 `route_effect=none`。该合同已纳入 v227/v229 联合编译、migration、重开和运行专项，但仍无真实 TCP、生产数据库升级或部署证据。
 

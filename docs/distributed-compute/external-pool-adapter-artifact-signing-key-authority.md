@@ -78,11 +78,11 @@ v230 只新增：
 - 已撤销 key 的 activation replay只允许 exact 历史读回，不恢复 `active`；
 - 进程重启和 migration 重放不得改变任何摘要、actor 或派生状态。
 
-## 7. 后续 consumer 门卫
+## 7. v231 signed provenance consumer
 
-后续 signed provenance producer 必须在验证 RSA 签名前和保存 receipt 的同一 Store 事务中重新读取 exact `key_record_id/key_record_digest/key_id`，并要求 current view 仍为 `active`。签名验证必须绑定 exact admission、v227 source receipt、`candidate_artifact_ref`、Artifact 字节摘要和长度；只按 `key_id`、运营方名称或历史 activation 猜测信任均失败关闭。
+v231 signed provenance producer 已在验证 RSA 签名前和保存 receipt 的同一 Store 事务中重新读取 exact `key_record_id/key_record_digest/key_id`，并要求 current view 仍为 `active`。签名验证绑定 exact admission、v227 source receipt、`candidate_artifact_ref` 摘要、Artifact 字节摘要和长度；只按 `key_id`、运营方名称或历史 activation 猜测信任会失败关闭。权威边界见 [`external-pool-adapter-artifact-signed-provenance-authority.md`](external-pool-adapter-artifact-signed-provenance-authority.md)。
 
-key 随后撤销时，历史签名 receipt 可以保留，但 future consumer 必须把它视为 historical-only；不得自动恢复、自动切换另一把 key 或继续产生 Adapter/route authority。
+key 随后撤销时，v231 保留历史签名 receipt 并派生为 `historical_only`；不得自动恢复、自动切换另一把 key 或继续产生 Adapter/route authority。
 
 ## 8. P0 禁线与非目标
 
