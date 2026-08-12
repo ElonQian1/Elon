@@ -25,6 +25,7 @@ use crate::{
 };
 
 use super::types::{
+    CurrentExternalPoolAdapterSandboxConformanceAuthority,
     ExternalPoolAdapterSandboxConformanceCurrentness, StoredExternalPoolAdapterSandboxConformance,
 };
 
@@ -228,6 +229,26 @@ fn currentness_on(
         sandbox_verifier_key_status: statuses.2,
         report_validity_status: statuses.3,
     }))
+}
+
+pub(in crate::store) fn current_external_pool_adapter_sandbox_conformance_authority_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_receipt_digest: &str,
+) -> Result<Option<CurrentExternalPoolAdapterSandboxConformanceAuthority>> {
+    let Some(currentness) = currentness_on(conn, admission_id)? else {
+        return Ok(None);
+    };
+    if currentness.current_status != "verified_current"
+        || currentness
+            .sandbox_conformance
+            .sandbox_conformance_receipt_digest
+            != expected_receipt_digest
+    {
+        bail!("sandbox conformance authority is not current and exact");
+    }
+    Ok(receipt_by_admission_on(conn, admission_id)?
+        .map(|stored| CurrentExternalPoolAdapterSandboxConformanceAuthority::new(stored.receipt)))
 }
 
 impl Store {

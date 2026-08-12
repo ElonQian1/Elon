@@ -81,6 +81,23 @@ pub(super) struct StoredExternalPoolAdapterSandboxConformance {
     pub receipt_json: String,
 }
 
+/// Same-connection authority over one exact, currently consumable V239 receipt.
+///
+/// Deliberately has no `Clone`, `Serialize`, or `Deserialize` implementation.
+pub(in crate::store) struct CurrentExternalPoolAdapterSandboxConformanceAuthority {
+    receipt: ExternalPoolAdapterSandboxConformanceReceipt,
+}
+
+impl CurrentExternalPoolAdapterSandboxConformanceAuthority {
+    pub(super) fn new(receipt: ExternalPoolAdapterSandboxConformanceReceipt) -> Self {
+        Self { receipt }
+    }
+
+    pub(in crate::store) fn receipt(&self) -> &ExternalPoolAdapterSandboxConformanceReceipt {
+        &self.receipt
+    }
+}
+
 impl StoredExternalPoolAdapterSandboxConformance {
     pub(super) fn summary(&self) -> ExternalPoolAdapterSandboxConformanceSummary {
         let item = &self.receipt.conformance;

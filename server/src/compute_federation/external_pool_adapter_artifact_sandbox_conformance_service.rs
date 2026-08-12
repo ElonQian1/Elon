@@ -1,6 +1,7 @@
 //! Administrator orchestration for verifier-signed exact-artifact sandbox conformance.
 
 use anyhow::Error as AnyError;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -11,7 +12,7 @@ use crate::store::{
 };
 
 use super::external_pool_adapter_artifact_sandbox_conformance::{
-    ExternalPoolAdapterSandboxCapabilityObservation,
+    validate_sandbox_conformance_draft, ExternalPoolAdapterSandboxCapabilityObservation,
     ExternalPoolAdapterSandboxConformanceChallenge, ExternalPoolAdapterSandboxConformanceDraft,
     SANDBOX_CONFORMANCE_CONFIRMATION,
 };
@@ -82,16 +83,19 @@ pub(crate) fn challenge_for_admin(
     body: SandboxConformanceChallengeBody,
 ) -> Result<ExternalPoolAdapterSandboxConformanceChallenge, SandboxConformanceServiceError> {
     let draft = draft_from_challenge(body.clone());
+    let input = challenge_input(
+        admission_id,
+        &body.expected_vulnerability_report_receipt_digest,
+        &body.sandbox_verifier_key_record_id,
+        &body.expected_sandbox_verifier_key_record_digest,
+        &body.expected_sandbox_verifier_key_id,
+        draft,
+    );
+    validate_challenge_request(&input)?;
+    require_admission(store, admission_id)?;
     store
-        .external_pool_adapter_sandbox_conformance_challenge(challenge_input(
-            admission_id,
-            &body.expected_vulnerability_report_receipt_digest,
-            &body.sandbox_verifier_key_record_id,
-            &body.expected_sandbox_verifier_key_record_digest,
-            &body.expected_sandbox_verifier_key_id,
-            draft,
-        ))
-        .map_err(classify_store_error)
+        .external_pool_adapter_sandbox_conformance_challenge(input)
+        .map_err(SandboxConformanceServiceError::Conflict)
 }
 
 pub(crate) fn record_for_admin(
@@ -113,6 +117,17 @@ pub(crate) fn record_for_admin(
         &body.expected_sandbox_verifier_key_id,
         draft_from_record(&body),
     );
+    let idempotency_scope = format!("external-pool-adapter-sandbox-conformance:{admin_user_id}");
+    validate_challenge_request(&challenge)?;
+    validate_identifier(admin_user_id, 200, "administrator user ID")?;
+    validate_identifier(&idempotency_scope, 240, "idempotency scope")?;
+    validate_identifier(&body.idempotency_key, 240, "idempotency key")?;
+    validate_digest(
+        &body.expected_signature_message_digest,
+        "signature message digest",
+    )?;
+    validate_signature(&body.signature_base64)?;
+    require_admission(store, admission_id)?;
     store
         .create_external_pool_adapter_sandbox_conformance(
             CreateExternalPoolAdapterSandboxConformance {
@@ -121,22 +136,21 @@ pub(crate) fn record_for_admin(
                 signature_base64: body.signature_base64,
                 verified_by_admin_user_id: admin_user_id.to_string(),
                 confirmation: SANDBOX_CONFORMANCE_CONFIRMATION.to_string(),
-                idempotency_scope: format!(
-                    "external-pool-adapter-sandbox-conformance:{admin_user_id}"
-                ),
+                idempotency_scope,
                 idempotency_key: body.idempotency_key,
             },
         )
-        .map_err(classify_store_error)
+        .map_err(SandboxConformanceServiceError::Conflict)
 }
 
 pub(crate) fn currentness_for_admin(
     store: &Store,
     admission_id: &str,
 ) -> Result<ExternalPoolAdapterSandboxConformanceCurrentness, SandboxConformanceServiceError> {
+    validate_identifier(admission_id, 160, "admission ID")?;
     store
         .external_pool_adapter_sandbox_conformance_currentness(admission_id)
-        .map_err(classify_store_error)?
+        .map_err(SandboxConformanceServiceError::Conflict)?
         .ok_or(SandboxConformanceServiceError::NotFound)
 }
 
@@ -200,11 +214,89 @@ fn draft_from_record(
     }
 }
 
-fn classify_store_error(error: AnyError) -> SandboxConformanceServiceError {
-    let text = format!("{error:#}");
-    if text.contains("was not found") {
-        SandboxConformanceServiceError::NotFound
-    } else {
-        SandboxConformanceServiceError::Conflict(error)
+fn validate_challenge_request(
+    input: &GetExternalPoolAdapterSandboxConformanceChallenge,
+) -> Result<(), SandboxConformanceServiceError> {
+    validate_identifier(&input.admission_id, 160, "admission ID")?;
+    validate_identifier(
+        &input.sandbox_verifier_key_record_id,
+        160,
+        "sandbox verifier key record ID",
+    )?;
+    for (value, label) in [
+        (
+            input.expected_vulnerability_report_receipt_digest.as_str(),
+            "vulnerability report receipt digest",
+        ),
+        (
+            input.expected_sandbox_verifier_key_record_digest.as_str(),
+            "sandbox verifier key record digest",
+        ),
+        (
+            input.expected_sandbox_verifier_key_id.as_str(),
+            "sandbox verifier key ID",
+        ),
+    ] {
+        validate_digest(value, label)?;
     }
+    validate_sandbox_conformance_draft(&input.draft)
+        .map_err(SandboxConformanceServiceError::Invalid)
+}
+
+fn validate_identifier(
+    value: &str,
+    max: usize,
+    label: &'static str,
+) -> Result<(), SandboxConformanceServiceError> {
+    if value.is_empty()
+        || value.chars().count() > max
+        || value.trim() != value
+        || value.chars().any(char::is_control)
+    {
+        return Err(SandboxConformanceServiceError::Invalid(anyhow::anyhow!(
+            "sandbox conformance {label} is invalid"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_digest(value: &str, label: &'static str) -> Result<(), SandboxConformanceServiceError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(SandboxConformanceServiceError::Invalid(anyhow::anyhow!(
+            "sandbox conformance {label} is invalid"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_signature(value: &str) -> Result<(), SandboxConformanceServiceError> {
+    if value.is_empty() || value.len() > 1_368 {
+        return Err(invalid("sandbox verifier signature Base64 is invalid"));
+    }
+    let signature = STANDARD
+        .decode(value)
+        .map_err(|error| SandboxConformanceServiceError::Invalid(AnyError::new(error)))?;
+    if signature.is_empty() || signature.len() > 1024 || STANDARD.encode(&signature) != value {
+        return Err(invalid("sandbox verifier signature Base64 is invalid"));
+    }
+    Ok(())
+}
+
+fn require_admission(
+    store: &Store,
+    admission_id: &str,
+) -> Result<(), SandboxConformanceServiceError> {
+    store
+        .external_pool_adapter_release_admission_currentness(admission_id)
+        .map_err(SandboxConformanceServiceError::Conflict)?
+        .map(|_| ())
+        .ok_or(SandboxConformanceServiceError::NotFound)
+}
+
+fn invalid(message: &'static str) -> SandboxConformanceServiceError {
+    SandboxConformanceServiceError::Invalid(anyhow::anyhow!(message))
 }

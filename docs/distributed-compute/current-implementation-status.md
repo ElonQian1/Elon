@@ -22,7 +22,7 @@ implementation_status: mixed
 
 ## Attempt 与外部 Adapter
 
-- Attempt v175-v215、v221/v222 管理面及 v227-v239 Adapter 供应链门已形成分层权威并通过各自本地专项，生产成功链仍未运行。v239 把精确 V236 安全链、当前 V237 验证者和服务器派生的六能力计划绑定为限时签名收据；它只验证签名声明，不执行或启用制品。真实沙箱、credential verifier、Adapter 采用/v213 route、worker/ACK、Runner、生产 TCP/部署/MCP/PC 和真实付款仍缺。见 `external-pool-adapter-artifact-sandbox-conformance-authority.md` 及对应验收文档。
+- Attempt v175-v215、v221/v222 管理面及 v227-v239 Adapter 供应链门已形成分层权威并通过各自本地专项，生产成功链仍未运行。v239 把精确 V236 安全链、当前 V237 验证者和服务器派生的六能力计划绑定为限时签名收据；它只验证签名声明，不执行或启用制品。后续 V240 防替换门卫、sealed current authority 与稳定 HTTP 分类只有源码和静态门禁，尚未编译、执行迁移或运行测试。真实沙箱、credential verifier、Adapter 采用/v213 route、worker/ACK、Runner、生产 TCP/部署/MCP/PC 和真实付款仍缺。见 `external-pool-adapter-artifact-sandbox-conformance-authority.md` 及对应验收文档。
 - 算力 Attempt PC 的 12 个角色路由已通过跨层合同、严格类型、lint、生产构建和 bundle budget；Gateway 未接线，人工 Start、Renew、no-start Abort 仍关闭。v226 final-usage fence 源码已写但未编译、迁移或运行；它不新增账本或经济效果。操作级后端、真实 TCP/浏览器、生产库和发布仍未验收。见 `pc-compute-attempt-workbenches-acceptance.md` 与 `attempt-final-usage-fence-authority.md`。
 
 ## 节点插件与端点会话

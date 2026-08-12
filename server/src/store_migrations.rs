@@ -7,6 +7,7 @@ mod compute_delivery_allocation;
 mod compute_delivery_allocation_expiry_worker;
 mod compute_external_pool_adapter_artifact_package;
 mod compute_external_pool_adapter_artifact_sandbox_conformance;
+mod compute_external_pool_adapter_artifact_sandbox_conformance_no_replace;
 mod compute_external_pool_adapter_artifact_security;
 mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
@@ -290,6 +291,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (237, "外部矿池 Adapter 沙箱验证者独立签名密钥四眼注册与撤销", compute_external_pool_adapter_sandbox_verifier_key::migration_v237),
     (238, "不可变 CapacityInstrument 与 Offer 精确采用权威", compute_capacity_instrument::migration_v238),
     (239, "外部矿池 Adapter 精确制品动态沙箱六能力签名符合性证据", compute_external_pool_adapter_artifact_sandbox_conformance::migration_v239),
+    (240, "外部矿池 Adapter 沙箱符合性回执防替换栅栏", compute_external_pool_adapter_artifact_sandbox_conformance_no_replace::migration_v240),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

@@ -157,7 +157,7 @@ async fn sandbox_conformance_http_rejects_missing_capability_and_policy_violatio
         )
         .await
         .0,
-        StatusCode::CONFLICT
+        StatusCode::BAD_REQUEST
     );
     let mut violation = conformance_body(&vulnerability, &verifier, "sandbox-invalid-violation");
     violation["observations"][0]["policy_violation_count"] = json!(1);
@@ -171,7 +171,93 @@ async fn sandbox_conformance_http_rejects_missing_capability_and_policy_violatio
         )
         .await
         .0,
-        StatusCode::CONFLICT
+        StatusCode::BAD_REQUEST
+    );
+    fixture.cleanup();
+}
+
+#[tokio::test]
+async fn sandbox_conformance_http_classifies_json_confirmation_and_missing_state() {
+    let fixture = fixture();
+    let path = "/api/admin/compute/external-pool-adapter-release-admissions/missing-admission/sandbox-conformance";
+    let mut body = invalid_fixture_body();
+    body["verified_by_admin_user_id"] = json!(fixture.submitter.id);
+    assert_eq!(
+        call(
+            &fixture.router,
+            Method::POST,
+            &format!("{path}/challenge"),
+            Some(&fixture.applier_token),
+            &body,
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+
+    let mut unconfirmed = invalid_fixture_body();
+    unconfirmed["expected_signature_message_digest"] = json!("a".repeat(64));
+    unconfirmed["signature_base64"] = json!("AA==");
+    unconfirmed["idempotency_key"] = json!("sandbox-conformance-unconfirmed");
+    unconfirmed["confirm_conformance"] = json!(false);
+    assert_eq!(
+        call(
+            &fixture.router,
+            Method::POST,
+            path,
+            Some(&fixture.applier_token),
+            &unconfirmed,
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    let connection = fixture.state.store.conn().unwrap();
+    let count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM compute_external_pool_adapter_sandbox_conformance_reports",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
+    drop(connection);
+
+    assert_eq!(
+        call(
+            &fixture.router,
+            Method::GET,
+            path,
+            Some(lifecycle_support::LOCAL_OWNER_TOKEN),
+            &Value::Null,
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(
+            &fixture.router,
+            Method::POST,
+            &format!("{path}/challenge"),
+            Some(&fixture.applier_token),
+            &missing_admission_body(),
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(
+            &fixture.router,
+            Method::POST,
+            &format!("{path}/challenge"),
+            Some(&fixture.applier_token),
+            &invalid_fixture_body(),
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
     );
     fixture.cleanup();
 }
@@ -237,6 +323,57 @@ fn conformance_body(vulnerability: &Value, verifier: &Value, suffix: &str) -> Va
         "peak_memory_bytes":67_108_864,
         "cpu_time_ms":600,
         "observations":observations
+    })
+}
+
+fn invalid_fixture_body() -> Value {
+    let now = Utc::now();
+    json!({
+        "expected_vulnerability_report_receipt_digest":"1".repeat(64),
+        "sandbox_verifier_key_record_id":"sandbox-key-record",
+        "expected_sandbox_verifier_key_record_digest":"2".repeat(64),
+        "expected_sandbox_verifier_key_id":"3".repeat(64),
+        "verifier_report_id":"sandbox-report",
+        "sandbox_runtime_id":"fixture-firecracker-v1",
+        "runtime_image_digest":"4".repeat(64),
+        "isolation_profile_id":"invalid-profile",
+        "run_started_at":now.to_rfc3339_opts(SecondsFormat::Nanos,true),
+        "run_completed_at":now.to_rfc3339_opts(SecondsFormat::Nanos,true),
+        "report_generated_at":now.to_rfc3339_opts(SecondsFormat::Nanos,true),
+        "report_expires_at":(now+Duration::hours(1))
+            .to_rfc3339_opts(SecondsFormat::Nanos,true),
+        "external_network_attempt_count":0,
+        "write_outside_ephemeral_count":0,
+        "child_process_attempt_count":0,
+        "peak_memory_bytes":1,
+        "cpu_time_ms":1,
+        "observations":[]
+    })
+}
+
+fn missing_admission_body() -> Value {
+    let mut body = invalid_fixture_body();
+    body["isolation_profile_id"] = json!("offline_readonly_ephemeral_no_child_process_v1");
+    body["observations"] = json!([
+        observation("authenticated_ack"),
+        observation("authenticated_events"),
+        observation("cancel_no_start"),
+        observation("idempotent_commit"),
+        observation("prepare"),
+        observation("reconcile")
+    ]);
+    body
+}
+
+fn observation(capability_id: &str) -> Value {
+    json!({
+        "capability_id":capability_id,
+        "capability_revision":1,
+        "test_case_id":format!("{capability_id}-contract-r1-v1"),
+        "outcome":"passed",
+        "output_transcript_digest":"8".repeat(64),
+        "duration_ms":1,
+        "policy_violation_count":0
     })
 }
 

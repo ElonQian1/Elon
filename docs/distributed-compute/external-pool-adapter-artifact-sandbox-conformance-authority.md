@@ -52,6 +52,8 @@ V239 新增 append-only receipt 表和派生 current view。仅 `admin|owner` �
 
 响应只返回摘要，不返回签名原文、test plan、observations、credential verifier 或幂等材料。每个 admission 只有一份不可覆盖报告；相同幂等输入精确重放，冲突输入失败关闭。
 
+后续 V240 增量为已发布的 V239 表补充显式 `INSERT OR REPLACE` 冲突门卫和 receipt ID 非空门卫；Store 同时新增不可克隆、不可序列化的同连接 current authority，供后续采用事务消费 `verified_current` 且摘要精确匹配的收据。当前尚无采用事务调用该 helper；该增量不会创建 Adapter，也不会把 current authority 暴露为 HTTP DTO。
+
 ## 当前性与失效
 
 只有以下条件同时满足，current view 才返回 `verified_current`：

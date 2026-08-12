@@ -33,6 +33,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 - verifier key 撤销后 currentness 从 `verified_current` 变为 `historical_only`；
 - Rust format、`git diff --check` 和 source-size guard 通过。
 
+## V240 后续静态增量
+
+V240 已写入但尚未编译、执行迁移或运行测试，`passed=0`。源码合同包括：
+
+- receipt ID、receipt digest、material digest、admission、V236 receipt、verifier report 和幂等键任一碰撞时，`INSERT OR REPLACE` 失败关闭；
+- 补齐普通 SQLite rowid 表中非整数 `PRIMARY KEY` 未隐含 `NOT NULL` 的 receipt ID 空值边界；
+- 精确重放在既有 Store 写路径中先审计并返回，不再次执行 INSERT；
+- Store-private sealed current authority 只接受 `verified_current` 和精确 receipt digest；
+- JSON 形状或未知字段、业务输入无效、资源不存在和权威冲突分别保持 `422/400/404/409` 源码合同。
+
+本节不能替代上面的 V239 已执行证据，也不能表述为 V240 已通过迁移或 HTTP 回归。
+
 ## 未验证
 
 - 真实 sandbox/verifier 进程、VM/container 内核隔离、系统调用拦截和恶意制品执行；

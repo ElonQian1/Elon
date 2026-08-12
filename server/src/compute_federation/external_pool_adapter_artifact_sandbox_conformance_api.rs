@@ -95,7 +95,7 @@ async fn currentness(
 fn json_body<T>(payload: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
     payload
         .map(|Json(value)| value)
-        .map_err(|error| json_error(StatusCode::BAD_REQUEST, error))
+        .map_err(|error| json_error(StatusCode::UNPROCESSABLE_ENTITY, error))
 }
 
 fn error_response(error: SandboxConformanceServiceError) -> Response {
