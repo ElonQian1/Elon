@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 62
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 63
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,8 +83,7 @@ function Invoke-ReadOnlyControlQuery {
         if (
             $state.surface -eq "chatgpt_web" -and
             $state.bridge_state -eq "ready" -and
-            $state.adapter_current -eq $true -and
-            $state.authenticated -eq $true
+            $state.adapter_current -eq $true
         ) {
             try {
                 return Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action $Action `
@@ -130,8 +129,7 @@ function Wait-FirstControl {
         if (
             $state.surface -eq "chatgpt_web" -and
             $state.bridge_state -eq "ready" -and
-            $state.adapter_current -eq $true -and
-            $state.authenticated -eq $true
+            $state.adapter_current -eq $true
         ) {
             $control = @(Get-ManifestControls -Semantic $Semantic -Region $Region) |
                 Select-Object -First 1
@@ -149,9 +147,10 @@ function Wait-SettingsStructure {
         if (
             $state.surface -eq "chatgpt_web" -and
             $state.bridge_state -eq "ready" -and
-            $state.adapter_current -eq $true -and
-            $state.authenticated -eq $true
+            $state.adapter_current -eq $true
         ) {
+            Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
+                -ExpectedAction "snapshot_ui_manifest" | Out-Null
             $controls = @(Get-ManifestControls -Region "overlay")
             $tabs = @($controls | Where-Object { [string]$_.role -eq "tab" })
             $switches = @($controls | Where-Object { [string]$_.role -eq "switch" })

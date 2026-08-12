@@ -306,6 +306,7 @@ class ChatGptWebLabContractTest {
         assertTrue(activity.contains("if (snapshot.authenticated)"))
         assertFalse(activity.contains("snapshot.authenticated &&"))
         assertTrue(activity.contains("manifestRefreshScheduler.afterAdaptiveTouch()"))
+        assertTrue(activity.contains("ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest("))
     }
 
     @Test

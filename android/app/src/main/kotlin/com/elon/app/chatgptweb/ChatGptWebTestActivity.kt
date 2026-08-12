@@ -523,6 +523,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 adaptiveUiController.render(event.value)
                 overlayControlsController.render(event.value)
                 nativeController.renderUiManifest(event.value)
+                if (ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
+                    latestSnapshot,
+                    event.value,
+                )) {
+                    pageAdapter.markReady()
+                }
             }
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
             is ChatGptWebEvent.Snapshot -> {
