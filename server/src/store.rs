@@ -105,6 +105,7 @@ mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
+mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_onboarding;
 mod compute_job_contract_validation;
 mod compute_job_registry;
@@ -558,6 +559,15 @@ pub(crate) use compute_external_pool_adapter_scanner_key::{
     ExternalPoolAdapterScannerKeyRegistrationWriteReceipt,
     ExternalPoolAdapterScannerKeyRevocationWriteReceipt, RegisterExternalPoolAdapterScannerKey,
     RevokeExternalPoolAdapterScannerKey,
+};
+pub(crate) use compute_external_pool_adapter_vulnerability_reattestation::{
+    CreateExternalPoolAdapterVulnerabilityReattestation,
+    ExternalPoolAdapterVulnerabilityReattestationCurrentness,
+    ExternalPoolAdapterVulnerabilityReattestationRevocationWriteReceipt,
+    ExternalPoolAdapterVulnerabilityReattestationSummary,
+    ExternalPoolAdapterVulnerabilityReattestationWriteReceipt,
+    GetExternalPoolAdapterVulnerabilityReattestationChallenge,
+    RevokeExternalPoolAdapterVulnerabilityReattestation,
 };
 pub(crate) use compute_external_pool_onboarding::{
     ApplyExternalPoolOnboarding, CancelExternalPoolOnboardingRequest,

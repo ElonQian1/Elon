@@ -10,6 +10,22 @@ pub(super) fn release_by_id_on(
     release_on(conn, "registry_release_id=?1", params![id])
 }
 
+pub(in crate::store) fn historical_external_pool_adapter_registry_release_authority_on(
+    conn: &Connection,
+    id: &str,
+    expected_digest: &str,
+) -> Result<Option<HistoricalExternalPoolAdapterRegistryReleaseAuthority>> {
+    let Some(stored) = release_by_id_on(conn, id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.registry_release_digest != expected_digest {
+        anyhow::bail!("Adapter registry release history is not exact");
+    }
+    Ok(Some(
+        HistoricalExternalPoolAdapterRegistryReleaseAuthority::new(stored.receipt),
+    ))
+}
+
 pub(super) fn release_by_adapter_version_on(
     conn: &Connection,
     adapter_id: &str,

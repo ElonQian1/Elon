@@ -27,6 +27,77 @@ use crate::{
 
 use super::{read::*, types::*};
 
+pub(in crate::store) fn current_external_pool_adapter_registry_release_authority_on(
+    conn: &Connection,
+    registry_release_id: &str,
+    expected_registry_release_digest: &str,
+    checked_at: &str,
+) -> Result<Option<CurrentExternalPoolAdapterRegistryReleaseAuthority>> {
+    let Some(release) = release_by_id_on(conn, registry_release_id)? else {
+        return Ok(None);
+    };
+    let item = &release.receipt.release;
+    validate_release_checked_at(checked_at, &item.registered_at)?;
+    let admission = current_external_pool_adapter_release_admission_authority_on(
+        conn,
+        &item.admission_id,
+        &item.admission_digest,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("registry release lost current admission"))?;
+    let package = current_artifact_package_authority_on(
+        conn,
+        &item.admission_id,
+        &item.package_receipt_digest,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("registry release lost current package"))?;
+    let source = external_pool_adapter_artifact_source_authority_on(
+        conn,
+        &item.admission_id,
+        &item.admission_digest,
+        &item.source_receipt_digest,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("registry release lost exact source"))?;
+    let package_receipt = package.receipt();
+    let package_item = &package_receipt.package;
+    if release.receipt.registry_release_digest != expected_registry_release_digest
+        || admission.admission_id() != item.admission_id
+        || admission.admission_digest() != item.admission_digest
+        || admission.adapter_id() != item.adapter_id
+        || admission.release_version() != item.release_version
+        || package_receipt.package_receipt_id != item.package_receipt_id
+        || package_receipt.package_receipt_digest != item.package_receipt_digest
+        || package_item.source_receipt_digest != item.source_receipt_digest
+        || package_item.archive_sha256 != item.archive_sha256
+        || package_item.manifest_digest != item.manifest_digest
+        || source.source_receipt_id() != item.source_receipt_id
+        || source.source_receipt_digest() != item.source_receipt_digest
+        || source.artifact_sha256() != item.archive_sha256
+    {
+        bail!("Adapter registry release is not current and exact");
+    }
+    Ok(Some(
+        CurrentExternalPoolAdapterRegistryReleaseAuthority::new(
+            release.receipt,
+            checked_at.to_string(),
+        ),
+    ))
+}
+
+fn validate_release_checked_at(checked_at: &str, registered_at: &str) -> Result<()> {
+    let checked = DateTime::parse_from_rfc3339(checked_at)?;
+    let registered = DateTime::parse_from_rfc3339(registered_at)?;
+    if checked.offset().local_minus_utc() != 0
+        || checked.to_rfc3339_opts(SecondsFormat::Nanos, true) != checked_at
+        || registered.offset().local_minus_utc() != 0
+        || registered.to_rfc3339_opts(SecondsFormat::Nanos, true) != registered_at
+        || checked < registered
+        || checked > Utc::now() + chrono::Duration::minutes(5)
+    {
+        bail!("Adapter registry release checked_at is not a current canonical observation");
+    }
+    Ok(())
+}
+
 pub(in crate::store) fn current_external_pool_adapter_registry_provider_binding_authority_on(
     conn: &Connection,
     provider_binding_id: &str,

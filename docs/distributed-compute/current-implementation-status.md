@@ -1,7 +1,7 @@
 ---
 title: 分布式算力当前实现状态
 status: current
-reviewed_at: 2026-08-12
+reviewed_at: 2026-08-13
 owners: backend, pc, node-agent, ai-economy
 implementation_status: mixed
 ---
@@ -22,7 +22,7 @@ implementation_status: mixed
 
 ## Attempt 与外部 Adapter
 
-- Attempt v175-v215、v221/v222 管理面及 v227-v249 Adapter 前置门已形成分层权威，生产成功链仍未运行。V239 形成限时动态沙箱签名收据，V241/V242 固定凭据验证器实现与公钥，V243 形成短时凭据验证回执，V244 汇合为可撤销采用授权；V244 migration 定向测试及 2 项真实 HTTP 链路测试通过。V245 加固 legacy 投影与显式检查时间，V246 新增从 V227 CAS 同一复验句柄按 V232 manifest 安全解包、原子发布内容寻址目录并登记 `installed_inert` 实例的源码，V247 再新增安装撤销终态与 sealed current-authority seam。主线 V248 属于 ERP；外部 Adapter 的下一迁移顺延为 V249，用同一 V247 sealed 文件树登记 Provider-neutral release 与每个 Provider 独立的 installed-inert companion，并预留 Provider-specific route projection ID。V245-V247/V249 均未编译、未运行（`passed=0`），不扩大历史通过结论。V249 不删除安装字节、不读取 credential、不启动进程、不激活 Provider、不创建 v213 route、worker/ACK 或付款；纯 V239/V243 到期不撤销 registry 历史，但 future route 必须另取 fresh credential 与可续签 security authority。运行验收、同事务 Provider activation/actor/route、生产 Adapter、Runner、任务派发、计量结算、生产 TCP/部署/MCP/PC 仍缺。见 `external-pool-adapter-registry-authority.md`、`external-pool-adapter-installation-authority.md`、`external-pool-adapter-adoption-authority.md` 与对应验收文档。
+- Attempt v175-v215、v221/v222 管理面及 v227-v250 Adapter 前置门已形成分层权威，生产成功链仍未运行。V239 形成限时动态沙箱签名收据，V243 形成短时凭据验证回执，V244 汇合为可撤销采用授权；V244 migration 与 2 项 HTTP 有历史通过证据。V245-V247 增加 legacy 栅栏、可撤销 `installed_inert` 安装和 sealed current seam；主线 V248 属于 ERP，V249 顺延登记 Provider-neutral release 与 Provider-specific companion。V250 再为 exact V249 release 增加 durable challenge、RSA scanner 签名、sequence/predecessor 续签、currentness 与显式撤销的漏洞情报 re-attestation 源码。V245-V247/V249-V250 均未编译、未运行（`passed=0`）。V250 不运行扫描、不验证 intelligence 真实性或完整性、不刷新 V239 sandbox；V251 sandbox re-attestation、fresh credential、同事务 Provider activation/actor/route、生产 Adapter、Runner、派发、计量结算、生产 TCP/部署/MCP/PC 仍缺。见 `external-pool-adapter-vulnerability-reattestation-authority.md`、`external-pool-adapter-registry-authority.md` 与对应验收文档。
 - 算力 Attempt PC 的 12 个角色路由已通过跨层合同、严格类型、lint、生产构建和 bundle budget；Gateway 未接线，人工 Start、Renew、no-start Abort 仍关闭。v226 final-usage fence 源码已写但未编译、迁移或运行；它不新增账本或经济效果。操作级后端、真实 TCP/浏览器、生产库和发布仍未验收。见 `pc-compute-attempt-workbenches-acceptance.md` 与 `attempt-final-usage-fence-authority.md`。
 
 ## 节点插件与端点会话

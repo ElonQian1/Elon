@@ -137,6 +137,42 @@ pub(super) struct StoredRegistryProviderBinding {
     pub receipt_json: String,
 }
 
+pub(in crate::store) struct HistoricalExternalPoolAdapterRegistryReleaseAuthority {
+    release: ExternalPoolAdapterRegistryReleaseReceipt,
+}
+
+pub(in crate::store) struct CurrentExternalPoolAdapterRegistryReleaseAuthority {
+    release: ExternalPoolAdapterRegistryReleaseReceipt,
+    checked_at: String,
+}
+
+impl HistoricalExternalPoolAdapterRegistryReleaseAuthority {
+    pub(super) fn new(release: ExternalPoolAdapterRegistryReleaseReceipt) -> Self {
+        Self { release }
+    }
+    pub(in crate::store) fn release(&self) -> &ExternalPoolAdapterRegistryReleaseReceipt {
+        &self.release
+    }
+}
+
+impl CurrentExternalPoolAdapterRegistryReleaseAuthority {
+    pub(super) fn new(
+        release: ExternalPoolAdapterRegistryReleaseReceipt,
+        checked_at: String,
+    ) -> Self {
+        Self {
+            release,
+            checked_at,
+        }
+    }
+    pub(in crate::store) fn release(&self) -> &ExternalPoolAdapterRegistryReleaseReceipt {
+        &self.release
+    }
+    pub(in crate::store) fn checked_at(&self) -> &str {
+        &self.checked_at
+    }
+}
+
 /// Store-only current proof retaining V247's reopened and rehashed file handles.
 pub(in crate::store) struct CurrentExternalPoolAdapterRegistryProviderBindingAuthority {
     release: ExternalPoolAdapterRegistryReleaseReceipt,

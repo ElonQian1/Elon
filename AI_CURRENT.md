@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-08-12
+reviewed_at: 2026-08-13
 ---
 
 # 一龙项目当前事实
@@ -56,7 +56,7 @@ reviewed_at: 2026-08-12
 - 已实现、只预演：项目 AI 资源控制面可盘点自己的 Codex、本人节点、已授权共享 Codex 和平台模型并保存策略；它不启动任务、不验证外部额度，也未接管真实调度。
 - 已实现、默认关闭，Node 离线适配与服务端本地任务路径已验证：AI 任务与开放商业调用的链外影子经济层，可生成幂等用量凭证、验收后双分录，以及未提交网络的 Sui 链下投影包；追加式争议可阻断投影，已接受争议可创建独立纠正 Matter，人工验收后原子追加冲销与替换双分录而不改写原凭证。两条腿可共同保存为原子纠正包；系统还能从任意标准、冲销或替换凭证只读解析根、纠正步骤和当前有效凭证，异常循环或分叉失败关闭。标准包和纠正包可导出统一离线交接文件；项目还能签发限时、限网络和限包类型的离线预检机器凭据，外部工具只有在服务端只读重建交接包且摘要一致时才能追加 `passed/rejected` 报告。项目编辑者可将当前可导出的投影显式加入预检队列，机器按权限领取 60 至 900 秒短时租约，交接摘要漂移会阻断任务，报告与任务完成原子写入。连接器 SDK、CLI 和自动续租工作器已通过本机假服务及 Node 测试；客户端会拒绝摘要漂移、空领取夹带任务、跨任务响应和不匹配报告，机器凭据不接受命令行参数。服务端已有 21 项 Rust 测试，覆盖 V159 新库/V158 升级与约束、Axum 鉴权、租约并发/恢复/隔离/失效、摘要与争议阻断、纠正包领取、幂等冲突、两阶段写入故障回滚和本地 SQLite 一致性备份恢复；真实一小时工作器、操作系统级磁盘故障、生产库备份恢复和 PC 交互仍未验证。报告和任务不改变投影状态，也不授权签名、广播、最终性或资金移动。当前没有 Sui 网络适配器，不移动真实资金。
 - 分布式算力的供给、市场、Attempt、外部 Adapter 和节点插件已形成多层控制面，但各层成熟度不同，不能统称为“开放算力市场已完成”。当前细分状态、验证证据和生产缺口统一见 `docs/distributed-compute/current-implementation-status.md`。
-- 外部矿池 Adapter V243 的独立签名 credential verification receipt 已留下 migration/HTTP `2 passed` 的局部证据；V244 已把当前 V239/V243 汇合成可撤销采用授权并留下 migration 与 2 项 HTTP 通过证据。V245 加固 legacy 投影与显式检查时间；V246 写入从 V227 CAS 同一复验句柄按 V232 manifest 安全解包、内容寻址发布并登记 `installed_inert` 的安装权威源码；V247 再追加安装撤销终态和携带已复验文件树能力的 sealed current-authority seam。主线 V248 已由 ERP 实例/商户稳定归属占用，外部 Adapter 因此顺延为 V249：同一事务消费 V247 sealed 文件树，登记一份 Provider-neutral release 与每个 Provider 独立的 installed-inert companion，并预留未来 Provider-specific route projection ID。V245-V247、V249 均未编译、未运行、`passed=0`，不扩大 V243/V244 的历史通过结论。V249 不读取 credential、不启动 Adapter、不激活 Provider，也不写 v213 route、计量或结算；直接 activation 仍为 NO-GO，未来必须另取 fresh credential/security authority，并与精确 service actor、route compatibility binding 和 Provider activation 同事务。权威边界见 `docs/distributed-compute/external-pool-adapter-registry-authority.md`、`docs/distributed-compute/external-pool-adapter-installation-authority.md`、`docs/distributed-compute/external-pool-adapter-credential-verification-authority.md` 与 `docs/distributed-compute/external-pool-adapter-adoption-authority.md`。
+- 外部矿池 Adapter V243 的独立签名 credential verification receipt 已留下 migration/HTTP `2 passed` 的局部证据；V244 已把当前 V239/V243 汇合成可撤销采用授权并留下 migration 与 2 项 HTTP 通过证据。V245 加固 legacy 投影，V246/V247 增加可撤销 `installed_inert` 安装与 sealed current seam；主线 V248 属于 ERP，V249 因此顺延登记 Provider-neutral release 与每个 Provider 独立 companion。V250 再为 exact V249 registry release 增加 durable single-use challenge、RSA scanner 签名、sequence/predecessor 续签、currentness 与显式撤销的漏洞情报 re-attestation 源码；它不运行扫描、不验证情报真实性，也不刷新 V239 sandbox conformance。V245-V247、V249-V250 均未编译、未运行、`passed=0`，不扩大 V243/V244 的历史通过结论。Provider activation 继续 NO-GO：后续仍须 fresh V243 credential、V251 sandbox re-attestation、精确 service actor、Provider-specific route compatibility binding 与 Provider activation 同事务。权威边界见 `docs/distributed-compute/external-pool-adapter-vulnerability-reattestation-authority.md`、`docs/distributed-compute/external-pool-adapter-registry-authority.md`、`docs/distributed-compute/external-pool-adapter-installation-authority.md` 与 `docs/distributed-compute/external-pool-adapter-credential-verification-authority.md`。
 
 ## 已接受的产品方向
 
@@ -69,7 +69,7 @@ reviewed_at: 2026-08-12
 ## 尚未成为当前事实
 
 - 接入器任务领取、短时租约、1 小时硬期限内续租、一次性租约密钥、原子完成、主动释放、拒绝退避、第 6 次拒绝暂停、编辑者恢复、Connector SDK 客户端、通用 ERP/CRM 适配器工作器和项目侧租约监控已经落位。Node 客户端和工作器已验证领取边界、任务/凭据/完成回执响应绑定、自动续租、硬截止释放、稳定回执键、幂等完成重试、永久拒绝、容量释放和进程停机；服务端 6 项 Rust/全新 SQLite 与 2 项进程内 Axum 专项已验证显式 scope、单任务租约、续租/释放/重领、原子幂等完成、凭据与项目隔离和脱敏。历史迁移、真实 TCP、并发压力、PC 浏览器、真实 ERP 和外部回读仍待验证，不能宣称生产适配器可用。既有凭据不会自动获得读取权，只有项目编辑者明确轮换并加入 `business_handoff.claim` 后才能领取单条衔接任务。
-- 消费者 AI 的跨项目基础目录与授权沙盒已实现；节点模型推理的显式供给授权已实现。异构算力联邦、通用节点插件合同、共享容量账本、本地原子 Reserve、未执行任务 Release/Expire、staging 无用量 Attempt 中止，以及外部矿池 Adapter 到 V249 的制品/凭据验证、可撤销采用、惰性安装、Provider-neutral release registry 与 Provider-specific companion 源码已写入；但 V245-V247/V249 路径尚未运行验收，插件隔离执行、同事务 Provider activation/actor/route、生产 Adapter、异构任务真实派发、已开始执行的 Attempt 终态、运行中 Broker 结算、验证计量、期货曲线/订单簿、自动收费与跨主体结算仍未实现。
+- 消费者 AI 的跨项目基础目录与授权沙盒已实现；节点模型推理的显式供给授权已实现。异构算力联邦、通用节点插件合同、共享容量账本、本地原子 Reserve、未执行任务 Release/Expire、staging 无用量 Attempt 中止，以及外部矿池 Adapter 到 V250 的制品/凭据验证、可撤销采用、惰性安装、Provider-neutral registry/companion 与可续签漏洞情报源码已写入；但 V245-V247/V249-V250 路径尚未运行验收，V251 sandbox re-attestation、插件隔离执行、同事务 Provider activation/actor/route、生产 Adapter、异构任务真实派发、已开始执行的 Attempt 终态、运行中 Broker 结算、验证计量、期货曲线/订单簿、自动收费与跨主体结算仍未实现。
 - 通用 ERP V1.3 用初始化 Matter 和可机读物化合同衔接真实项目开发，并从既有任务与产物记录派生可恢复状态；它能登记现有平台项目，并已提供只读开放商业就绪度投影，分别显示 ERP 物化验收、消费者 AI 调用和开放目录发现状态。该投影复用 ERP、实例绑定商户、运行时、能力和目录真源；未绑定的多商户项目可显式预览，但必须由项目编辑者确认稳定归属，且响应不返回运行地址或密钥引用。它不会自动导入本机目录、复制商户源码、启动 Assignment、执行数据库迁移或部署生产系统。`cofficethinking` 仍需先在一龙创建或绑定对应平台项目，再由有编辑权的用户显式纳入。Matter 仍需商户批准和启动，真实商户项目继续走现有项目开发和发布流程。
 - Sui Move 合约、测试网/主网提交、NET、CREDIT、RevenuePosition、链上治理和收入权益均是草案；链外 Sui 信封不等于已上链、已发币或公司股权。
 - 任何提案只有经过正式 ADR、实现引用和验收后，才能进入本文件的“已实现”部分。

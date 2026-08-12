@@ -62,6 +62,10 @@ mod management;
 mod sandbox_verifier_key_http_test;
 #[path = "external_pool_adapter_release_api_tests/scanner_key_http_test.rs"]
 mod scanner_key_http_test;
+#[path = "external_pool_adapter_release_api_tests/vulnerability_reattestation_http_test.rs"]
+mod vulnerability_reattestation_http_test;
+#[path = "external_pool_adapter_release_api_tests/vulnerability_reattestation_test_support.rs"]
+mod vulnerability_reattestation_test_support;
 
 struct Fixture {
     state: Arc<crate::types::AppState>,

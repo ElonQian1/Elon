@@ -1,7 +1,7 @@
 ---
 title: 一龙任务级分布式算力联邦
 status: current
-reviewed_at: 2026-08-12
+reviewed_at: 2026-08-13
 owners: backend, node, ai-economy
 ---
 
@@ -22,7 +22,7 @@ owners: backend, node, ai-economy
 
 > v218 合同修正：历史“v11 Planning Snapshot V2”现以协议阈值 12 解释；work-admission `None` 允许新晋升槽首次重授权，`Some` 才承诺 current head。当前 A1 只有未编译的同事务 projector；A2 总合同已冻结，未编译、未运行的 A2b2 静态源码已覆盖 route→WAL-main、map/lock、barrier、完整 unmap、联合 close、route/registration typed custody/count inventory，但逐 case Windows 动态证据仍缺。无 producer，v14 永久 blocked-only，Runtime/Ready/派发不可达。
 
-| 能力 | 2026-08-12 状态 |
+| 能力 | 2026-08-13 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | 旧节点 LLM 联邦兼容观察 | 真实 `NodeComputeRun` 与认证 `/api/me/node-usage` 已接入附加只读投影；只认 `server_node_llm/node_llm`，固定 `partial/provider_reported_unverified`，原始数组不变。PC 账本源码只按逐字 `source_run_id=run.id` 在原始行内显示兼容观察、未验证计量和旧结算边界；未知或畸形投影整侧不贴标签。源码未编译、未运行、未做浏览器或读屏验证（`passed=0`），不生成 Job、Reservation、Attempt、Lease、Receipt、可信计量或结算 |
@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221-v249 前置门为 `implementation_partially_verified`；V243/V244 保留短时凭据与可撤销采用的局部通过证据，V245 加固 legacy 投影，V246/V247 增加可撤销的 `installed_inert` 安装与 sealed current seam。主线 V248 属于 ERP；V249 登记 Provider-neutral release 与每个 Provider 独立的 installed-inert companion。V245-V247/V249 均为 `implementation_uncompiled`、`passed=0`；Provider 仍未激活，Adapter 未启动。见 [`当前状态`](current-implementation-status.md)、[`V249 registry 权威`](external-pool-adapter-registry-authority.md)、[`V247 安装/撤销权威`](external-pool-adapter-installation-authority.md)、[`V244 采用权威`](external-pool-adapter-adoption-authority.md) 与 [`V243/V245 凭据回执权威`](external-pool-adapter-credential-verification-authority.md) |
+| 外部算力池适配器与统一报价 | v221-v250 前置门为 `implementation_partially_verified`；V243/V244 保留短时凭据与可撤销采用的局部通过证据，V245-V247 增加 legacy 栅栏、可撤销 `installed_inert` 安装与 sealed seam，V249 登记 Provider-neutral release 与 Provider companion，V250 增加可续签/可撤销的 scanner 签名漏洞情报链。V245-V247/V249-V250 均为 `implementation_uncompiled`、`passed=0`；V250 不执行扫描或证明情报真实，V251 sandbox re-attestation 仍缺，Provider 未激活且 Adapter 未启动。见 [`当前状态`](current-implementation-status.md)、[`V250 漏洞情报续签权威`](external-pool-adapter-vulnerability-reattestation-authority.md)、[`V249 registry 权威`](external-pool-adapter-registry-authority.md) 与 [`V247 安装/撤销权威`](external-pool-adapter-installation-authority.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -177,7 +177,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-Provider Adapter 的 v227-v249 前置门已形成分层权威；V244 汇合当前 V239/V243 为可撤销采用授权，V245 加固 legacy 投影，V246/V247 增加可撤销的 `installed_inert` 内容树与 sealed current seam。主线 V248 属于 ERP；V249 再消费该 seam，分开登记 Provider-neutral release 与 Provider-specific installed-instance companion。V245-V247/V249 尚未编译或运行。最新状态见 [`current-implementation-status.md`](current-implementation-status.md)，registry 边界见 [`V249 Provider-neutral registry`](external-pool-adapter-registry-authority.md)，安装/撤销边界见 [`V247 惰性安装与撤销`](external-pool-adapter-installation-authority.md)，签名沙箱边界见 [`V239 动态沙箱符合性证据`](external-pool-adapter-artifact-sandbox-conformance-authority.md)，采用边界见 [`V244 采用授权`](external-pool-adapter-adoption-authority.md)。服务器仍不删除安装字节、不启动或执行制品、不返回原始凭据，也未激活 Provider 或启用生产 Adapter；后续 activation 必须另取 fresh credential/security authority，并与精确 service actor、Provider-specific route compatibility binding 和 Provider activation 同事务。
+Provider Adapter 的 v227-v250 前置门已形成分层权威；V244 汇合当前 V239/V243 为可撤销采用授权，V245-V247 增加 legacy 栅栏、可撤销 `installed_inert` 内容树与 sealed seam；主线 V248 属于 ERP，V249 顺延登记 Provider-neutral release 与 Provider-specific companion，V250 再为 exact neutral release 建立可续签、可撤销的 scanner 签名漏洞情报链。V245-V247/V249-V250 尚未编译或运行。最新状态见 [`current-implementation-status.md`](current-implementation-status.md)，漏洞情报续签边界见 [`V250 vulnerability re-attestation`](external-pool-adapter-vulnerability-reattestation-authority.md)，registry 边界见 [`V249 Provider-neutral registry`](external-pool-adapter-registry-authority.md)。服务器不运行扫描、不证明 intelligence 真实性、不删除或执行安装字节、不返回原始凭据，也未激活 Provider；后续 activation 仍须 fresh credential、V251 sandbox re-attestation，并与精确 service actor、Provider-specific route compatibility binding 和 Provider activation 同事务。
 
 ### F4：容量期货市场
 
