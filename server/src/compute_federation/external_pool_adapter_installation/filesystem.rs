@@ -29,6 +29,21 @@ pub(crate) enum ExternalPoolAdapterInstallationFsError {
     Storage(#[source] std::io::Error),
 }
 
+pub(super) fn with_storage_context(
+    error: ExternalPoolAdapterInstallationFsError,
+    operation: impl std::fmt::Display,
+) -> ExternalPoolAdapterInstallationFsError {
+    match error {
+        ExternalPoolAdapterInstallationFsError::Storage(source) => {
+            ExternalPoolAdapterInstallationFsError::Storage(std::io::Error::new(
+                source.kind(),
+                format!("{operation}: {source}"),
+            ))
+        }
+        other => other,
+    }
+}
+
 impl PreparedExternalPoolAdapterInstallation {
     /// Reopens the final tree instead of trusting retained metadata or path strings.
     pub(crate) fn audit_current(

@@ -20,7 +20,7 @@ use crate::compute_federation::{
 use super::{
     audit::audit_external_pool_adapter_installation,
     paths::{create_private_directory, ensure_child_directories, prepare_paths},
-    ExternalPoolAdapterInstallationFsError,
+    with_storage_context, ExternalPoolAdapterInstallationFsError,
 };
 use crate::compute_federation::external_pool_adapter_installation::{
     binding_content_digest, ExternalPoolAdapterInstallationBinding,
@@ -35,16 +35,39 @@ pub(crate) fn prepare_external_pool_adapter_installation(
 ) -> Result<PreparedExternalPoolAdapterInstallation, ExternalPoolAdapterInstallationFsError> {
     let binding = exact_binding(&target, &artifact)
         .map_err(ExternalPoolAdapterInstallationFsError::Authority)?;
-    let paths = prepare_paths(data_dir, &binding.installation_content_digest)?;
+    let paths = prepare_paths(data_dir, &binding.installation_content_digest).map_err(|error| {
+        with_storage_context(
+            error,
+            format!("prepare installation paths under {}", data_dir.display()),
+        )
+    })?;
     match std::fs::symlink_metadata(&paths.final_root) {
         Ok(_) => return audit_external_pool_adapter_installation(data_dir, binding),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(ExternalPoolAdapterInstallationFsError::Storage(error)),
     }
 
-    create_private_directory(&paths.staging_root)?;
-    extract_exact_archive(&mut artifact, &target, &paths.staging_root)?;
-    sync_tree(&paths.staging_root)?;
+    create_private_directory(&paths.staging_root).map_err(|error| {
+        with_storage_context(
+            error,
+            format!("create staging directory {}", paths.staging_root.display()),
+        )
+    })?;
+    extract_exact_archive(&mut artifact, &target, &paths.staging_root).map_err(|error| {
+        with_storage_context(
+            error,
+            format!(
+                "extract installation archive into {}",
+                paths.staging_root.display()
+            ),
+        )
+    })?;
+    sync_tree(&paths.staging_root).map_err(|error| {
+        with_storage_context(
+            error,
+            format!("sync staging tree {}", paths.staging_root.display()),
+        )
+    })?;
 
     match publish_no_replace(&paths.staging_root, &paths.final_root) {
         Ok(()) => {}
@@ -52,10 +75,31 @@ pub(crate) fn prepare_external_pool_adapter_installation(
         // here: its name is never authoritative, and deletion after directory substitution would
         // widen this boundary's destructive scope.
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-        Err(error) => return Err(ExternalPoolAdapterInstallationFsError::Storage(error)),
+        Err(error) => {
+            return Err(ExternalPoolAdapterInstallationFsError::Storage(
+                std::io::Error::new(
+                    error.kind(),
+                    format!(
+                        "publish installation tree {} to {}: {error}",
+                        paths.staging_root.display(),
+                        paths.final_root.display()
+                    ),
+                ),
+            ))
+        }
     }
-    sync_directory(&paths.shard)?;
-    audit_external_pool_adapter_installation(data_dir, binding)
+    sync_directory(&paths.shard).map_err(|error| {
+        with_storage_context(
+            error,
+            format!("sync installation shard {}", paths.shard.display()),
+        )
+    })?;
+    audit_external_pool_adapter_installation(data_dir, binding).map_err(|error| {
+        with_storage_context(
+            error,
+            format!("audit published installation under {}", data_dir.display()),
+        )
+    })
 }
 
 fn exact_binding(
@@ -330,24 +374,52 @@ fn publish_no_replace(source: &Path, target: &Path) -> std::io::Result<()> {
 
 #[cfg(windows)]
 fn publish_no_replace(source: &Path, target: &Path) -> std::io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
-    let source: Vec<u16> = source
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    let target: Vec<u16> = target
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
+    let source = windows_extended_path(source)?;
+    let target = windows_extended_path(target)?;
     const MOVEFILE_WRITE_THROUGH: u32 = 0x0000_0008;
     if unsafe { MoveFileExW(source.as_ptr(), target.as_ptr(), MOVEFILE_WRITE_THROUGH) } != 0 {
         Ok(())
     } else {
         Err(std::io::Error::last_os_error())
     }
+}
+
+#[cfg(windows)]
+fn windows_extended_path(path: &Path) -> std::io::Result<Vec<u16>> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let raw: Vec<u16> = path.as_os_str().encode_wide().collect();
+    let mut extended = Vec::with_capacity(raw.len() + 8);
+    let slash = b'\\' as u16;
+    let question = b'?' as u16;
+    let dot = b'.' as u16;
+
+    if raw.starts_with(&[slash, slash, question, slash])
+        || raw.starts_with(&[slash, slash, dot, slash])
+    {
+        extended.extend_from_slice(&raw);
+    } else if raw.starts_with(&[slash, slash]) {
+        extended.extend("\\\\?\\UNC\\".encode_utf16());
+        extended.extend_from_slice(&raw[2..]);
+    } else if raw.get(1) == Some(&(b':' as u16))
+        && matches!(raw.get(2), Some(value) if *value == slash || *value == b'/' as u16)
+    {
+        extended.extend("\\\\?\\".encode_utf16());
+        extended.extend_from_slice(&raw);
+    } else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "installation publication requires an absolute Windows path",
+        ));
+    }
+    extended.push(0);
+    Ok(extended)
 }
 
 #[cfg(not(any(target_os = "linux", windows)))]

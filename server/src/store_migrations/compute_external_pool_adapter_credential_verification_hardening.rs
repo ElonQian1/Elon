@@ -292,7 +292,8 @@ mod tests {
         let connection = fixture();
         connection
             .execute_batch(
-                "DROP TRIGGER credential_verification_json_projection;
+                "PRAGMA foreign_keys=OFF;
+                 DROP TRIGGER credential_verification_json_projection;
                  DROP TRIGGER credential_verification_exact_onboarding;
                  DROP TRIGGER credential_verification_exact_admission;
                  DROP TRIGGER credential_verification_requires_current_inputs;
@@ -318,7 +319,7 @@ mod tests {
                      'verification_material_digest','forged',
                      'canonicalization','rfc8785_jcs','digest_algorithm','sha256',
                      'verification',json_object('binding',json_object(
-                       'report_expires_at','2099-01-01T00:05:00.000000000Z')))),
+                       'report_expires_at','2099-01-01T00:05:00.000000000Z'))),
                    lower(hex(randomblob(32))),'application-1',lower(hex(randomblob(32))),
                    'provider-1',1,lower(hex(randomblob(32))),'adapter-1','1.0.0',1,
                    'config-digest','vault_ref',lower(hex(randomblob(32))),'admission-1',
@@ -329,7 +330,8 @@ mod tests {
                    'confirm_external_pool_adapter_credential_verification','scope-1','key-1',
                    '2099-01-01T00:00:00.000000000Z','2099-01-01T00:00:00.000000000Z',
                    'verifier_signature_over_exact_v221_non_bearer_locator_commitment_v222_admission_and_asserted_authentication',
-                   'signed_credential_verification_current','none','none','none','none';",
+                   'signed_credential_verification_current','none','none','none','none';
+                 PRAGMA foreign_keys=ON;",
             )
             .unwrap();
 
