@@ -9,7 +9,7 @@ param(
     [ValidateSet("Prepare", "OpenPicker", "VerifyAndRemove")][string]$Phase,
     [string]$CheckpointPath = "",
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 76
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 77
 )
 
 $ErrorActionPreference = "Stop"

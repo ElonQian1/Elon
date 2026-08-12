@@ -4,7 +4,8 @@
   if (window.__elonChatGptComposer || location.origin !== 'https://chatgpt.com') return;
 
   const MAX_OPTIONS = 30;
-  const MAX_TOOL_STATE_ATTEMPTS = 12;
+  const MAX_TOOL_STATE_ATTEMPTS = 24;
+  const REQUIRED_TOOL_STATE_CONFIRMATIONS = 4;
   const TOOL_STATE_INTERVAL_MS = 120;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
@@ -558,7 +559,7 @@
     if (!target.opensSubmenu) {
       if (section === 'tools' && target.semantic === 'web_search') {
         const desiredSelected = !target.selected;
-        waitForWebSearchSelection(desiredSelected, result, scheduleSnapshot, 1);
+        waitForWebSearchSelection(target.node, desiredSelected, result, scheduleSnapshot, 1, 0);
       } else {
         result(action, true, '');
         window.setTimeout(scheduleSnapshot, 240);
@@ -574,8 +575,18 @@
     );
   }
 
-  function waitForWebSearchSelection(desiredSelected, result, scheduleSnapshot, attempt) {
-    if (webSearchActiveInComposer() === desiredSelected) {
+  function waitForWebSearchSelection(
+    optionNode,
+    desiredSelected,
+    result,
+    scheduleSnapshot,
+    attempt,
+    consecutiveConfirmations
+  ) {
+    const menuSettled = !optionNode || !optionNode.isConnected || !isOptionVisible(optionNode);
+    const observed = menuSettled && webSearchActiveInComposer() === desiredSelected;
+    const nextConfirmations = observed ? consecutiveConfirmations + 1 : 0;
+    if (nextConfirmations >= REQUIRED_TOOL_STATE_CONFIRMATIONS) {
       result('select_composer_tool', true, '');
       return scheduleSnapshot();
     }
@@ -584,7 +595,14 @@
       return scheduleSnapshot();
     }
     window.setTimeout(
-      () => waitForWebSearchSelection(desiredSelected, result, scheduleSnapshot, attempt + 1),
+      () => waitForWebSearchSelection(
+        optionNode,
+        desiredSelected,
+        result,
+        scheduleSnapshot,
+        attempt + 1,
+        nextConfirmations
+      ),
       TOOL_STATE_INTERVAL_MS
     );
   }
