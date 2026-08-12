@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## V249/V251 当前证据
 
-V249 已完成服务端编译、SQLite migration 与本地 HTTP 定向验收；V251 修复了 V249 release trigger 对凭据验证器 JSON 做原始字符串比较、因合法键序差异拒绝生产写入的问题。V251 会在原子事务中替换已应用数据库中的旧 trigger，新数据库也直接安装逐字段语义校验版本。当前状态为 `implementation_partially_verified`，不等于生产部署、真实 Provider 激活或外部矿池接单。独立的 V250 漏洞情报 re-attestation 不属于本页通过证据，仍以其验收页的 `implementation_uncompiled/passed=0` 为准。
+V249 已完成服务端编译、SQLite migration 与本地 HTTP 定向验收；V251 修复了 V249 release trigger 对凭据验证器 JSON 做原始字符串比较、因合法键序差异拒绝生产写入的问题。V251 会在原子事务中替换已应用数据库中的旧 trigger，新数据库也直接安装逐字段语义校验版本。当前状态为 `implementation_partially_verified`，不等于生产部署、真实 Provider 激活或外部矿池接单。独立的 V250 漏洞情报 re-attestation 不属于本页行为通过证据；本次完整服务端测试目标编译与全新 `Store::open` 仅将其提升为 `implementation_compiled/migration_smoke_passed`，专属行为仍为 `passed=0`。
 
 已运行：
 
@@ -21,7 +21,7 @@ cargo test --manifest-path server/Cargo.toml --bin elon-server store_migrations:
 
 - HTTP：`4 passed`，覆盖鉴权、显式确认、fresh/replay、文件漂移、同一 neutral release 的跨 Provider companion、安装撤销后的 fail-closed currentness 和无激活副作用；
 - migration：`6 passed`，覆盖 V249 重放/重开、不可变与 exact-root trigger、两 Provider 独立 companion、terminal/current view，以及已应用 V249 到 V251 的原位修复与重复执行；
-- 受管正式筛选回归 `adapter_registry` 通过，验证指纹为 `5cd80751c844e3508445397a18411524c4fefd1ebf78835a2a89a01122992255`；
+- 合并后受管正式筛选回归 `adapter_registry` 为 `10 passed`，验证指纹为 `f08db4e7be78f34f62b917b7a64a4e9a55e5615432d7cbbdb37822c6598391e0`；
 - 编译期间发现并修复测试 support 子模块可见性、超大 `json!` 宏递归和 HTTP 测试连接生命周期问题；这些问题此前使“有测试源码”不能等同于“测试可运行”。
 
 源码合同覆盖：
