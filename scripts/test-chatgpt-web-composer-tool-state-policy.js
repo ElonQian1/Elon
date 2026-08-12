@@ -58,4 +58,12 @@ assert.equal(policy.optionSelected({
   activeInComposer: false
 }), true);
 
+const tracker = policy.createSelectionTracker();
+assert.equal(tracker.value('web_search', false), false);
+assert.equal(tracker.observe('web_search', true), true);
+assert.equal(tracker.value('web_search', false), true);
+assert.equal(tracker.value('web_search', false), true, 'a hidden composer control must not erase cached state');
+assert.equal(tracker.observe('web_search', false), false);
+assert.equal(tracker.value('web_search', true), false);
+
 process.stdout.write('CHATGPT_COMPOSER_TOOL_STATE_POLICY=passed\n');

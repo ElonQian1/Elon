@@ -44,5 +44,26 @@
     );
   }
 
-  return Object.freeze({ controlSelected, isWebSearchSignal, optionSelected, semantic });
+  function createSelectionTracker() {
+    const values = new Map();
+    return Object.freeze({
+      observe(semantic, selected) {
+        const key = clean(semantic);
+        if (key) values.set(key, selected === true);
+        return selected === true;
+      },
+      value(semantic, fallback) {
+        const key = clean(semantic);
+        return key && values.has(key) ? values.get(key) : fallback === true;
+      }
+    });
+  }
+
+  return Object.freeze({
+    controlSelected,
+    createSelectionTracker,
+    isWebSearchSignal,
+    optionSelected,
+    semantic
+  });
 });

@@ -13,6 +13,10 @@
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
+  const composerToolSelection = composerToolStatePolicy &&
+    typeof composerToolStatePolicy.createSelectionTracker === 'function'
+    ? composerToolStatePolicy.createSelectionTracker()
+    : null;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
@@ -369,10 +373,13 @@
         node.getAttribute('data-state') === 'checked';
       const semantic = optionSemantic(section, node, label);
       const layout = window.__elonChatGptLayout;
-      const activeInComposer = semantic === 'web_search' && !!(
+      const liveActiveInComposer = semantic === 'web_search' && !!(
         layout && typeof layout.findSemanticNode === 'function' &&
         layout.findSemanticNode('web_search', 'composer')
       );
+      const activeInComposer = composerToolSelection
+        ? composerToolSelection.value(semantic, liveActiveInComposer)
+        : liveActiveInComposer;
       const selected = composerToolStatePolicy &&
         typeof composerToolStatePolicy.optionSelected === 'function'
         ? composerToolStatePolicy.optionSelected({ semantic, directSelected, activeInComposer })
@@ -471,6 +478,9 @@
     if (reusable.length > 0) {
       emitOptions(section, reusable, composer, emitEvent);
       return result(action, true, '');
+    }
+    if (section === 'tools' && composerToolSelection) {
+      composerToolSelection.observe('web_search', webSearchActiveInComposer());
     }
     const alreadyOpen = collectOptions(section, null);
     if (alreadyOpen.length > 0) {
@@ -587,6 +597,9 @@
     const observed = menuSettled && webSearchActiveInComposer() === desiredSelected;
     const nextConfirmations = observed ? consecutiveConfirmations + 1 : 0;
     if (nextConfirmations >= REQUIRED_TOOL_STATE_CONFIRMATIONS) {
+      if (composerToolSelection) {
+        composerToolSelection.observe('web_search', desiredSelected);
+      }
       result('select_composer_tool', true, '');
       return scheduleSnapshot();
     }
