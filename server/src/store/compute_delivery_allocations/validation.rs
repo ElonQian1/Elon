@@ -21,6 +21,10 @@ use super::{
         compute_capacity_commitments::{
             audited_capacity_commitment_source_on, ComputeCapacityCommitmentCreateReceipt,
         },
+        compute_capacity_instruments::{
+            require_capacity_instrument_adoption_for_historical_offer_on,
+            require_current_capacity_instrument_adoption_on,
+        },
         compute_capacity_pool_queries::current_capacity_pool_on,
         compute_job_registry::{current_registered_job_on, ComputeJobRegistrationReceipt},
         compute_offer_registry::current_registered_offer_on,
@@ -182,6 +186,7 @@ pub(super) fn validate_grant_source_on(
     {
         bail!("DeliveryAllocation Grant 必须在 exact Snapshot 仍有效时创建");
     }
+    require_commitment_instrument_authority_on(conn, root, &snapshot, false)?;
     ensure_current_supply_on(conn, root, false)?;
     let source_job = current_registered_job_on(conn, &input.job_id)?
         .ok_or_else(|| anyhow!("DeliveryAllocation Grant 的 current Job 不存在"))?;
@@ -223,6 +228,9 @@ pub(super) fn validate_exercise_source_on(
     {
         bail!("DeliveryAllocation Grant 已到行权截止时间");
     }
+    let snapshot = registered_price_snapshot_on(conn, &root.price_snapshot_id)?
+        .ok_or_else(|| anyhow!("DeliveryAllocation Exercise 的 Price Snapshot 缺失"))?;
+    require_commitment_instrument_authority_on(conn, root, &snapshot, true)?;
     ensure_current_supply_on(conn, root, true)?;
     let source_job = current_registered_job_on(conn, &grant.job.job_id)?
         .ok_or_else(|| anyhow!("DeliveryAllocation Exercise 的 current Job 不存在"))?;
@@ -253,6 +261,50 @@ pub(super) fn validate_exercise_source_on(
         parent_claim,
         source_job,
     })
+}
+
+fn require_commitment_instrument_authority_on(
+    conn: &Connection,
+    commitment: &crate::compute_federation::capacity_commitment::ComputeCapacityCommitment,
+    snapshot: &crate::compute_federation::market::ComputePriceSnapshot,
+    allow_historical_offer: bool,
+) -> Result<()> {
+    if snapshot.snapshot_digest != commitment.price_snapshot_digest
+        || snapshot.instrument_id.as_deref() != Some(commitment.instrument_id.as_str())
+    {
+        bail!("DeliveryAllocation Commitment/Snapshot instrument binding 不一致");
+    }
+    let offer = if allow_historical_offer {
+        super::super::compute_offer_registry::registered_offer_version_on(
+            conn,
+            &commitment.offer.offer_id,
+            commitment.offer.offer_version,
+        )?
+    } else {
+        current_registered_offer_on(conn, &commitment.offer.offer_id)?
+    }
+    .ok_or_else(|| anyhow!("DeliveryAllocation CapacityInstrument exact Offer 缺失"))?;
+    if offer.offer.offer_version != commitment.offer.offer_version
+        || offer.offer.offer_digest != commitment.offer.offer_digest
+    {
+        bail!("DeliveryAllocation CapacityInstrument Offer exact version/digest 已漂移");
+    }
+    let authority = if allow_historical_offer {
+        require_capacity_instrument_adoption_for_historical_offer_on(
+            conn,
+            &offer.offer,
+            snapshot.instrument_id.as_deref(),
+        )?
+    } else {
+        require_current_capacity_instrument_adoption_on(
+            conn,
+            &offer.offer,
+            snapshot.instrument_id.as_deref(),
+        )?
+    };
+    authority
+        .ok_or_else(|| anyhow!("DeliveryAllocation 缺少 CapacityInstrument adoption authority"))?;
+    Ok(())
 }
 
 pub(super) fn validate_nonexercise_source_on(

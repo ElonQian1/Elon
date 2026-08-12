@@ -19,6 +19,7 @@ use crate::compute_federation::{
 use super::{
     super::{
         compute_capacity_claims::HoldComputeCapacityClaimLine,
+        compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
         compute_capacity_pool_queries::current_capacity_pool_on,
         compute_offer_registry::current_registered_offer_on,
         compute_platform_reference_price_curve::audited_platform_reference_snapshot_binding_on,
@@ -214,6 +215,17 @@ pub(super) fn validate_create_dependencies_on(
         bail!("容量承诺 v223 binding 与 Snapshot/source/status 不一致");
     }
 
+    let instrument_authority = require_current_capacity_instrument_adoption_on(
+        conn,
+        &offer,
+        snapshot.instrument_id.as_deref(),
+    )?
+    .ok_or_else(|| anyhow!("容量承诺 future Offer 缺少 CapacityInstrument adoption authority"))?;
+    validate_contract_multiple(
+        &input.quantities,
+        &instrument_authority.instrument.contract_units,
+    )?;
+
     let claim_lines = validate_meter_window_and_offer_cap_on(conn, input, &offer, &snapshot)?;
     Ok(ValidatedCreate {
         offer,
@@ -221,6 +233,42 @@ pub(super) fn validate_create_dependencies_on(
         delivery_window,
         claim_lines,
     })
+}
+
+fn validate_contract_multiple(
+    quantities: &[crate::compute_federation::capacity_commitment::ComputeCapacityCommitmentQuantity],
+    contract_units: &[crate::compute_federation::capacity_instrument::ComputeCapacityInstrumentContractUnit],
+) -> Result<()> {
+    let requested = quantities
+        .iter()
+        .map(|value| (value.meter.as_str(), value.quantity_units))
+        .collect::<BTreeMap<_, _>>();
+    let contract = contract_units
+        .iter()
+        .map(|value| (value.meter.as_str(), value.quantity_units))
+        .collect::<BTreeMap<_, _>>();
+    if requested.len() != quantities.len()
+        || contract.len() != contract_units.len()
+        || requested.keys().copied().collect::<BTreeSet<_>>()
+            != contract.keys().copied().collect::<BTreeSet<_>>()
+    {
+        bail!("容量承诺必须覆盖 CapacityInstrument 的完整 contract unit meter 集合");
+    }
+    let mut multiplier = None;
+    for (meter, contract_quantity) in contract {
+        let quantity = requested[&meter];
+        if contract_quantity <= 0 || quantity <= 0 || quantity % contract_quantity != 0 {
+            bail!("容量承诺 meter {meter} 必须是 CapacityInstrument 合约数量的整数倍");
+        }
+        let current = quantity / contract_quantity;
+        if multiplier
+            .replace(current)
+            .is_some_and(|expected| expected != current)
+        {
+            bail!("容量承诺所有 meter 必须采用同一个整份 CapacityInstrument 合约倍数");
+        }
+    }
+    Ok(())
 }
 
 fn validate_snapshot(

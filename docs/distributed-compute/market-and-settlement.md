@@ -1,7 +1,7 @@
 ---
 title: 分布式算力市场与期货锁价结算
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-12
 owners: ai-economy, backend
 ---
 
@@ -126,6 +126,8 @@ V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口
 
 v225 CapacityCommitment 已形成 `implementation_partially_verified` 的最窄实现：一个 immutable revision 1 `committed` 事实加每个 Commitment 最多一个 revision 2 `canceled|expired` terminal receipt，current status 由 LEFT JOIN 派生。Create 在同一事务锁定 current Provider/Offer/Pool、未过期 `capacity_future` v171 Snapshot、已批准应用的 exact v223 binding 和完整 meter/window；数量与余额继续只属于同一 Claim lines/ledger。生产目标、临时 SQLite、Store/Service/进程内 HTTP 和重开已有定向证据；实现仍不包含 DeliveryAllocation、订单/持仓、资金或结算，详见 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。
 
+v238 [`CapacityInstrument`](capacity-instrument-authority.md) 把本节原先只作为目标描述的标准合约落成独立的 immutable authority：exact SKU、单一窗口、有序 meter/unit/quantity、SLA/区域/验证等级与 CNY 平台微单位由平台登记，经不同于 registrar 的 actor 激活；另一个不可变 adoption receipt 才把 exact current active Offer version/digest 和 publication ID/digest 绑定进该合约。Offer 中仅出现 `instrument_id` 不算采用。fresh `capacity_future` Snapshot、quoted Job、Broker、Commitment、Grant/Exercise 必须重审该链，Commitment 的所有 meter 必须是同一个合同数量 multiplier；退休后不得形成 fresh 消费，但既有取消、到期、退款和容量归还继续收尾。当前 v238 只是 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`，旧 v225/v228 运行证据不适用；详见 [`capacity-instrument-acceptance.md`](capacity-instrument-acceptance.md)。它不创建 Order、Trade、Position、真实价格、计量、执行或结算。
+
 市场对象分层：
 
 - `Order`：买/卖方向、限价、数量、有效期；
@@ -167,11 +169,12 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 1. 版本化 Price Snapshot 注册、持久化与整数微单位（已有分层定向验证）；
 2. 平台四眼 reference fallback 批次直接生成既有 v171 Snapshot（v223/v224 已分层验证）；
 3. 平台签名价格源、真实指数/标记价、期货曲线、批量报价和自动撮合；
-4. Provider Capacity Commitment（v225 部分验证，交付与结算未接线）；
-5. whole-only 双边 Delivery Allocation（v228 主纵切面部分验证；v234 到期公平恢复含 checkpoint migration 与 server-owned worker，源码已写但未编译或运行）；
-6. 限价订单簿、成交、持仓和净额；
-7. YCI 指数、标记价、替代交付和自动清算；
-8. 跨公司、跨矿池的统一容量市场。
+4. 标准 CapacityInstrument 与 exact Offer adoption（v238 源码已写，未编译、迁移或运行）；
+5. Provider Capacity Commitment（v225 旧纵切面部分验证；v238 fresh-admission/currentness 接入未验证）；
+6. whole-only 双边 Delivery Allocation（v228 主纵切面部分验证；v234 到期公平恢复与 v238 Instrument 门源码均未编译或运行）；
+7. 限价订单簿、成交、持仓和净额；
+8. YCI 指数、标记价、替代交付和自动清算；
+9. 跨公司、跨矿池的统一容量市场。
 
 前一步生成的 Job、Receipt 和 Snapshot 必须能被后一步继续读取，不能为了市场升级重写历史账本。
 
@@ -180,3 +183,5 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 本文是已接受的目标市场合同。当前代码已写入 Offer-owner fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v201 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款流程；各段验证状态以专题验收文档为准。平台 reference fallback 的 v223 Store/application 与 v224 管理员 HTTP/MCP、TTL/升级门卫已有分层验证，但仍不代表真实价格。v195 只结清预授权并登记 pending；v196-v199 只处理内部挑战、纠正和 available 释放；v200 只冻结 Provider 本人的提款额；v201 的取消/拒绝只返还内部余额，`external_paid_attested` 只保存管理员声明与证据摘要。它们都不代表生产支付已经由平台执行或验证。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、真实付款、证据自动核验、指数/标记价、订单簿、持仓和外部清算仍未实现。
 
 v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router，当前为 `implementation_partially_verified`：生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过。v228 DeliveryAllocation 也为 `design_frozen/implementation_partially_verified`：生产编译、临时 SQLite 新库 migration 与 3 项 Store/Service 专项已通过；HTTP 鉴权、并发、文件重开和生产升级仍未验证。新增行权后 Reservation 到期恢复及 v234 checkpoint migration/server-owned worker 仅为源码已写，仍是 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。真实 TCP、价格真实性、执行、verified usage、Provider 收益与资金结算仍未闭合，不得把局部验收描述为整条容量市场生产可用。
+
+v238 CapacityInstrument 的 root/lifecycle/adoption、管理员 API、migration 与 fresh downstream 门也只达到 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。v225/v228 的旧指纹发生在 v238 之前，不能证明新 migration、数据库 trigger、共同合约倍数、退休 currentness 或历史收尾兼容；在重新编译并执行专项前，容量承诺和交付授权的 v238 接入均保持未验证。

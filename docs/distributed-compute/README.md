@@ -89,7 +89,7 @@ owners: backend, node, ai-economy
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
 4. `docs/distributed-compute/node-endpoint-session-authority.md`、`docs/distributed-compute/node-plugin-local-authority.md`、`docs/distributed-compute/node-plugin-manifest-catalog-authority.md`、`docs/distributed-compute/node-plugin-vfs-fault-authority.md`、`docs/distributed-compute/node-plugin-planning-snapshot-authority.md`、`docs/distributed-compute/node-ready-capability.md`、`docs/distributed-compute/node-plugin-candidate-cleanup.md` 与 `docs/distributed-compute/windows-compute-namespace-fence-wire-v1.json`：端点 currentness、SQLite 真源、目录/回滚、测试 VFS 故障、Planning 投影、短期就绪、失败清理与 Windows hard-fence ABI。
 5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
-6. `docs/distributed-compute/market-and-settlement.md`、`docs/distributed-compute/platform-reference-price-curve-authority.md`、`docs/distributed-compute/capacity-commitment-authority.md` 与 `docs/distributed-compute/delivery-allocation-authority.md`：标准化 SKU、期货锁价、平台参考回退、v225 容量承诺、v228 whole-only 交付授权和结算边界。
+6. `docs/distributed-compute/market-and-settlement.md`、`docs/distributed-compute/platform-reference-price-curve-authority.md`、`docs/distributed-compute/capacity-instrument-authority.md`、`docs/distributed-compute/capacity-commitment-authority.md` 与 `docs/distributed-compute/delivery-allocation-authority.md`：标准化 SKU、期货锁价、平台参考回退、v238 标准合约采用门、v225 容量承诺、v228 whole-only 交付授权和结算边界。
 7. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
 8. `docs/distributed-compute/capacity-pool-api.md`：本人共享物理资源边界及摘要隐私合同。
 9. `docs/distributed-compute/capacity-bucket-api.md`：交付窗口 Bucket 登记、余额读取和窗口不变量。
@@ -184,6 +184,8 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 以标准化 Compute SKU 和交付窗口发行容量合约，引入订单、持仓、指数价、标记价、保证资源和到期交割；任务结算消费已锁定的价格快照。
 
 首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`；v223/v224 application 已在一个事务中直接登记既有 v171 Snapshot，并通过管理员 HTTP、迁移与文件重开专项。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md) 与 [`platform-reference-price-curve-api-acceptance.md`](platform-reference-price-curve-api-acceptance.md)。
+
+v238 CapacityInstrument 详见 [`capacity-instrument-authority.md`](capacity-instrument-authority.md) 与 [`capacity-instrument-acceptance.md`](capacity-instrument-acceptance.md)：标准合约、四眼生命周期、exact Offer adoption 及 fresh consumer 双门源码已写；退休不锁死历史终态。当前 `implementation_uncompiled/implementation_unrun`、`passed=0`，旧 v225/v228 证据不适用，也不代表真实市场、价格、计量或结算。
 
 v225 Provider Capacity Commitment 详见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md) 与 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。它只允许本地 current Provider/Offer/Pool 在 exact `capacity_future` v171 Snapshot 与已批准应用的 v223 binding 下，把同一 Claim/ledger 的完整 meter/window 从 available 锁到 held，再以唯一 canceled/expired receipt 原子归还；不包含 `external_pool`、DeliveryAllocation、资金或结算。PC 控制面只嵌入既有 `/compute-supply` Offer 工作区并复用同一 owner HTTP、Claim/ledger 和 reference binding。当前为 `implementation_partially_verified`：生产目标、临时 SQLite、进程内 HTTP、重开和 PC 静态构建已有定向证据，真实 TCP、生产升级、并发压力和浏览器未验证。
 

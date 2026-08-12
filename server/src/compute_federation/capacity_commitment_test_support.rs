@@ -1,9 +1,13 @@
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use uuid::Uuid;
 
+#[path = "capacity_instrument_test_support.rs"]
+mod capacity_instrument_support;
+
 use crate::{
     compute_federation::{
         capacity_commitment::ComputeCapacityCommitmentQuantity,
+        capacity_instrument::ComputeCapacityInstrument,
         platform_reference_price_curve::{
             ComputePlatformReferencePriceCurveComponent,
             ComputePlatformReferencePriceCurveEntryIntent,
@@ -12,7 +16,9 @@ use crate::{
             COMPUTE_PLATFORM_REFERENCE_PRICE_CURVE_ROUNDING_MODE,
         },
     },
-    compute_federation_offer_publication_model::PublishComputeOfferDraftRequest,
+    compute_federation_offer_publication_model::{
+        ComputeOfferPublicationReceipt, PublishComputeOfferDraftRequest,
+    },
     compute_federation_offer_publication_service, compute_federation_offer_service,
     compute_federation_offer_service::test_support::Fixture as OfferFixture,
     store::{
@@ -43,6 +49,9 @@ pub(crate) struct Fixture {
     pub(crate) token_bucket_id: String,
     pub(crate) concurrency_bucket_id: String,
     pub(crate) offer: crate::compute_federation::offer::ComputeOffer,
+    pub(crate) publication: ComputeOfferPublicationReceipt,
+    pub(crate) capacity_instrument: ComputeCapacityInstrument,
+    pub(crate) capacity_instrument_registrar_id: String,
     pub(crate) provider_policy_revision: i64,
     pub(crate) provider_digest: String,
     pub(crate) binding: crate::store::ComputePlatformReferencePriceCurveSnapshotBindingReceipt,
@@ -131,7 +140,7 @@ impl Fixture {
             request,
         )
         .unwrap();
-        compute_federation_offer_publication_service::publish_for_review(
+        let publication = compute_federation_offer_publication_service::publish_for_review(
             &source.store,
             &source.admin_id,
             &draft.offer.offer_id,
@@ -152,6 +161,15 @@ impl Fixture {
         )
         .unwrap()
         .offer;
+        let capacity_instrument_registrar_id =
+            format!("capacity-instrument-registrar-{instrument_id}");
+        let capacity_instrument = capacity_instrument_support::establish_authority(
+            &source.store,
+            &offer,
+            &publication,
+            &capacity_instrument_registrar_id,
+            &source.admin_id,
+        );
         wait_until(&offer.valid_from);
         let application = apply_reference_binding(&source, &offer);
         let binding = application.bindings.into_iter().next().unwrap();
@@ -170,6 +188,9 @@ impl Fixture {
             token_bucket_id: source.token_bucket_id,
             concurrency_bucket_id: source.concurrency_bucket_id,
             offer,
+            publication,
+            capacity_instrument,
+            capacity_instrument_registrar_id,
             provider_policy_revision: provider.provider.policy_revision,
             provider_digest: provider.provider_digest,
             binding,

@@ -33,6 +33,10 @@ fn exercised_reservation_expiry_refunds_and_releases_capacity_exactly_once() {
         .unwrap();
     let expires_at = reservation.reservation.expires_at.clone();
 
+    fixture
+        .supply
+        .retire_instrument("preserve-reservation-expiry");
+
     assert_eq!(fixture.balance(), 90);
     assert_eq!(fixture.capacity(), ((80, 20), (3, 1)));
     assert_eq!(reservation.reservation.status, "active");

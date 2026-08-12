@@ -67,3 +67,9 @@ PC 侧 `test:compute-capacity-commitment`、严格 TypeScript、lint、Vite 生�
 - `external_pool`、真实平台参考价格源和真实生产 Offer。
 
 后续必须复用 v225 immutable Commitment、terminal receipt、既有 Claim 与 ledger，不得为 UI、派发或结算新增平行的容量承诺权威。
+
+## 6. v238 CapacityInstrument 接入不继承旧证据
+
+v238 已在 CapacityCommitment Create 前增加 exact active Instrument、immutable Offer publication adoption 与共同合约单位门，并在 SQLite direct-insert trigger 复核相同边界。所有 meter 的 claim quantity 必须分别是 Instrument `quantity_units` 的正整数倍，且 multiplier 完全相同；仅同 meter、window 或 `instrument_id` 相等不足以创建 Commitment。
+
+该接入当前为 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。本页第 2–4 节的 v225 编译、临时 SQLite、HTTP、重开和 PC 证据发生在 v238 之前，没有执行 v238 migration 或新门卫，不得据此声称 v238 后的 Commitment 已验证。后续至少须重新覆盖正常共同倍数、缺/多 meter、不同 multiplier、registered/retired Instrument、stale adoption/publication、raw SQL 旁路，以及退休后既有 Cancel/Expire 仍能归还容量。v238 不生成订单、真实价格、可信计量、Provider 收益或结算，权威见 [`capacity-instrument-authority.md`](capacity-instrument-authority.md)。

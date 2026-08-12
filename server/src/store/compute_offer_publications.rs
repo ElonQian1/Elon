@@ -136,6 +136,18 @@ impl Store {
     }
 }
 
+pub(in crate::store) fn audited_compute_offer_publication_on(
+    conn: &Connection,
+    offer_id: &str,
+) -> Result<Option<ComputeOfferPublicationReceipt>> {
+    publication_by_offer_on(conn, offer_id)?
+        .map(|stored| {
+            audit_publication_on(conn, &stored)?;
+            Ok(stored.into_receipt(false))
+        })
+        .transpose()
+}
+
 #[derive(Debug, Clone)]
 struct StoredPublication {
     publication_id: String,

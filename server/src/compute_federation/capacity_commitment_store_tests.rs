@@ -166,6 +166,133 @@ fn due_commitment_expires_once_and_restores_capacity() {
     fixture.cleanup();
 }
 
+#[test]
+fn capacity_instrument_replays_reject_drift_and_retirement_fences_only_fresh_work() {
+    let fixture = Fixture::new();
+
+    let registration = fixture
+        .store
+        .register_compute_capacity_instrument(fixture.instrument_registration_input())
+        .unwrap();
+    assert!(registration.replayed);
+    assert_eq!(registration.instrument, fixture.capacity_instrument);
+    let activation = fixture
+        .store
+        .activate_compute_capacity_instrument(fixture.instrument_activation_input())
+        .unwrap();
+    assert!(activation.replayed);
+    let adoption = fixture
+        .store
+        .adopt_compute_capacity_instrument_offer(fixture.instrument_adoption_input())
+        .unwrap();
+    assert!(adoption.replayed);
+    assert_eq!(adoption.adoption.offer_digest, fixture.offer.offer_digest);
+    assert_eq!(
+        adoption.adoption.publication_digest,
+        fixture.publication.publication_digest
+    );
+
+    let mut drifted = fixture.instrument_registration_input();
+    drifted.contract_units[0].quantity_units += drifted.contract_units[0].unit_size;
+    let drift_error = fixture
+        .store
+        .register_compute_capacity_instrument(drifted)
+        .unwrap_err();
+    assert!(drift_error
+        .to_string()
+        .contains("idempotency key binds different input"));
+    let mut drifted_adoption = fixture.instrument_adoption_input();
+    drifted_adoption.expected_offer_digest = "0".repeat(64);
+    let adoption_drift_error = fixture
+        .store
+        .adopt_compute_capacity_instrument_offer(drifted_adoption)
+        .unwrap_err();
+    assert!(adoption_drift_error
+        .to_string()
+        .contains("idempotency key binds different input"));
+
+    let fresh_snapshot = fixture.fresh_price_snapshot("before-retirement");
+    let snapshot_receipt = fixture
+        .store
+        .register_compute_price_snapshot(&fresh_snapshot)
+        .unwrap();
+    assert!(!snapshot_receipt.replayed);
+
+    let mut fractional = fixture.create_body("fractional-standard-contract", true);
+    fractional.quantities[0].quantity_units = 10;
+    let fractional_error = capacity_commitment_service::create_for_owner(
+        &fixture.store,
+        &fixture.owner_id,
+        &fixture.provider_id,
+        &fixture.pool_id,
+        fractional,
+    )
+    .unwrap_err();
+    assert!(format!("{fractional_error:#}").contains("整数倍"));
+    assert_eq!(fixture.balance(&fixture.token_bucket_id), (100, 0));
+
+    let committed = capacity_commitment_service::create_for_owner(
+        &fixture.store,
+        &fixture.owner_id,
+        &fixture.provider_id,
+        &fixture.pool_id,
+        fixture.create_body("retirement-preserved-terminal", true),
+    )
+    .unwrap();
+    fixture.retire_instrument("fence-fresh-work");
+    let retired_adoption_replay = fixture
+        .store
+        .adopt_compute_capacity_instrument_offer(fixture.instrument_adoption_input())
+        .unwrap();
+    assert!(retired_adoption_replay.replayed);
+    assert_eq!(
+        retired_adoption_replay.adoption.adoption_receipt_id,
+        adoption.adoption.adoption_receipt_id
+    );
+    let currentness = fixture
+        .store
+        .compute_capacity_instrument_currentness(&fixture.capacity_instrument.instrument_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(currentness.current_status, "retired");
+
+    let blocked_snapshot = fixture.fresh_price_snapshot("after-retirement");
+    let snapshot_error = fixture
+        .store
+        .register_compute_price_snapshot(&blocked_snapshot)
+        .unwrap_err();
+    assert!(snapshot_error.to_string().contains("not current active"));
+    let commitment_error = capacity_commitment_service::create_for_owner(
+        &fixture.store,
+        &fixture.owner_id,
+        &fixture.provider_id,
+        &fixture.pool_id,
+        fixture.create_body("blocked-after-retirement", true),
+    )
+    .unwrap_err();
+    assert!(format!("{commitment_error:#}").contains("not current active"));
+
+    let canceled = capacity_commitment_service::cancel_for_owner(
+        &fixture.store,
+        &fixture.owner_id,
+        &fixture.provider_id,
+        &fixture.pool_id,
+        &committed.commitment.commitment_id,
+        CancelCapacityCommitmentBody {
+            idempotency_key: "terminal-after-instrument-retirement".into(),
+            expected_commitment_revision: committed.commitment.commitment_revision,
+            expected_commitment_digest: committed.commitment.commitment_digest,
+            reason: "instrument retirement must not lock historical cancellation".into(),
+            confirm_cancel: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(canceled.terminal_receipt.terminal_status, "canceled");
+    assert_eq!(fixture.balance(&fixture.token_bucket_id), (100, 0));
+    assert_eq!(fixture.balance(&fixture.concurrency_bucket_id), (4, 0));
+    fixture.cleanup();
+}
+
 fn assert_table_count(store: &Store, table: &str, expected: i64) {
     let count: i64 = store
         .conn()

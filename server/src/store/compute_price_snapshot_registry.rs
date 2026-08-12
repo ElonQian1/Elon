@@ -6,6 +6,7 @@ use serde::Serialize;
 use crate::compute_federation::market::{ComputePriceSnapshot, PRICE_SOURCE_FALLBACK_CURVE};
 
 use super::{
+    compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
     compute_offer_registry::{current_registered_offer_on, registered_offer_version_on},
     compute_price_snapshot_validation::validate_price_snapshot_contract,
     now, Store,
@@ -162,6 +163,11 @@ pub(super) fn register_compute_price_snapshot_on(
     let offer = current_registered_offer_on(conn, snapshot.offer_id.trim())?
         .ok_or_else(|| anyhow!("算力价格快照 Offer 不存在"))?;
     validate_price_snapshot_contract(snapshot, &offer.offer)?;
+    require_current_capacity_instrument_adoption_on(
+        conn,
+        &offer.offer,
+        snapshot.instrument_id.as_deref(),
+    )?;
     let expires_at = DateTime::parse_from_rfc3339(&snapshot.expires_at)
         .context("算力价格快照失效时间不是 RFC3339")?;
     let quoted_at = DateTime::parse_from_rfc3339(&snapshot.quoted_at)

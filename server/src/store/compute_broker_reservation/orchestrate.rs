@@ -21,6 +21,7 @@ use super::super::{
     compute_capacity_claims::{
         hold_compute_capacity_claim_on, HoldComputeCapacityClaim, HoldComputeCapacityClaimLine,
     },
+    compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
     compute_capacity_posting::reservation_capacity_causal_binding,
     compute_job_registry::{current_registered_job_on, register_compute_job_on},
     compute_offer_registry::current_registered_offer_on,
@@ -72,6 +73,11 @@ pub(super) fn reserve_new_broker_contract_on(
         .ok_or_else(|| anyhow!("Broker 绑定的 quoted Job 缺少 Price Snapshot"))?;
     let snapshot = registered_price_snapshot_on(conn, snapshot_id)?
         .ok_or_else(|| anyhow!("Broker 绑定的 Price Snapshot 不存在"))?;
+    require_current_capacity_instrument_adoption_on(
+        conn,
+        &offer.offer,
+        snapshot.instrument_id.as_deref(),
+    )?;
     ensure_platform_cny_contract(&source_job.job.currency, &snapshot.currency)?;
 
     let reserve_fen = cny_micros_to_fen(snapshot.consumer_max_amount_micros)?;

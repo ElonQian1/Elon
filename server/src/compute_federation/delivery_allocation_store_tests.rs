@@ -8,6 +8,8 @@ use crate::{
     compute_federation_broker_service::{
         self, control_plane_tests::workload, CreateMyComputeJobRequest, QuoteMyComputeJobRequest,
     },
+    compute_federation_offer_lifecycle_model::DrainComputeOfferRequest,
+    compute_federation_offer_lifecycle_service,
     store::{
         ComputeCapacityCommitmentCreateReceipt, ComputeDeliveryAllocationGrantWriteReceipt,
         ComputeJobRegistrationReceipt,
@@ -185,6 +187,68 @@ fn decline_is_idempotent_and_does_not_move_capacity_or_budget() {
     assert_eq!(fixture.capacity(), ((80, 20), (3, 1)));
     assert_eq!(fixture.balance(), 0);
     fixture.cleanup();
+}
+
+#[test]
+fn retirement_blocks_fresh_grant_and_exercise_while_draining_keeps_exact_history_exercisable() {
+    let retired = Fixture::new();
+    retired.supply.retire_instrument("block-grant");
+    let grant_error = retired.create_grant("retired", true).unwrap_err();
+    assert!(format!("{grant_error:#}").contains("not current active"));
+    assert_eq!(retired.table_count("compute_delivery_allocation_grants"), 0);
+    retired.cleanup();
+
+    let exercising = Fixture::new();
+    let grant = exercising
+        .create_grant("retirement-exercise", true)
+        .unwrap();
+    exercising.supply.retire_instrument("block-exercise");
+    exercising.recharge(100);
+    let reservation_id = exercising.reservation_id("retirement-exercise");
+    let exercise_error = exercising
+        .exercise(&grant, &reservation_id, "retirement-exercise", true)
+        .unwrap_err();
+    assert!(format!("{exercise_error:#}").contains("not current active"));
+    assert_eq!(exercising.balance(), 100);
+    assert_eq!(exercising.capacity(), ((80, 20), (3, 1)));
+    let declined = decline_for_consumer(
+        &exercising.supply.store,
+        &exercising.consumer_id,
+        &grant.grant.grant_id,
+        DeclineDeliveryAllocationGrantBody {
+            idempotency_key: "decline-after-instrument-retirement".into(),
+            expected_grant_revision: grant.grant.grant_revision,
+            expected_grant_digest: grant.grant.grant_digest,
+            confirm_decline: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(declined.terminal_receipt.terminal_status, "declined");
+    exercising.cleanup();
+
+    let draining = Fixture::new();
+    let grant = draining.create_grant("draining-exercise", true).unwrap();
+    compute_federation_offer_lifecycle_service::drain_for_review(
+        &draining.supply.store,
+        &draining.supply.admin_id,
+        &draining.supply.offer.offer_id,
+        DrainComputeOfferRequest {
+            expected_offer_version: draining.supply.offer.offer_version,
+            expected_offer_digest: draining.supply.offer.offer_digest.clone(),
+            reason: "preserve exact historical capacity-instrument exercise".into(),
+            idempotency_key: "drain-before-exercise".into(),
+            confirm_drain: true,
+        },
+    )
+    .unwrap();
+    draining.recharge(100);
+    let reservation_id = draining.reservation_id("draining-exercise");
+    let exercised = draining
+        .exercise(&grant, &reservation_id, "draining-exercise", true)
+        .unwrap();
+    assert_eq!(exercised.terminal_receipt.terminal_status, "exercised");
+    assert_eq!(draining.balance(), 90);
+    draining.cleanup();
 }
 
 pub(super) struct Fixture {

@@ -66,3 +66,9 @@ worker 首 tick 即运行，默认 60 秒，环境配置仅接受不少于 10 �
 - 不包含 partial、多 Job、转让、转售、Order、Trade、Position、Clearing 或真实未来交付结算。
 
 因此，v228 整体状态只能表述为 `implementation_partially_verified`，其中 downstream Reservation due-expiry recovery 与 v234 公平 worker 必须单独标记 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。后续验收必须继续引用 [`delivery-allocation-authority.md`](delivery-allocation-authority.md) 的 whole-only、单终态、固定 sweep 和 Store-private authority 边界。
+
+## v238 CapacityInstrument 接入不继承旧证据
+
+v238 已在新 Grant 前要求 current active exact Offer 的 immutable Instrument adoption，并在 Exercise 前允许重审 Grant 所绑定的 historical exact Offer（含 stable `active -> active` 升版及后续 `draining`），但 Instrument 仍必须 active、未退休且 adoption/publication identity 不漂移。SQLite 对 Grant 与 `exercised` terminal 的 raw insert 同样增加门卫。Retirement 只阻止 fresh Grant/Exercise；既有 Decline/Expire，以及已形成 Reservation 的到期退款和容量归还仍须按原权威收尾，不能因 Instrument 退役被锁死。
+
+上述接入当前为 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。本页既有 3 项 v228 测试与指纹未执行 v238 migration/门卫，不能作为 v238 通过证据；v234 的未运行状态也不改变。后续须分别验证 current active、active 升版后的 historical Exercise、draining historical Exercise、retired rejection、direct-SQL bypass 和历史终态兼容。该门不产生 Position、成交、真实价格、verified usage、Provider 收益或 settlement，权威见 [`capacity-instrument-authority.md`](capacity-instrument-authority.md)。

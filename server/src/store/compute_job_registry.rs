@@ -11,6 +11,7 @@ use crate::compute_federation::{
 };
 
 use super::{
+    compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
     compute_job_contract_validation::validate_job_contract,
     compute_offer_registry::{
         current_registered_offer_on, registered_offer_version_on, ComputeOfferRegistrationReceipt,
@@ -345,6 +346,11 @@ fn ensure_live_selection_on(
     {
         bail!("quoted Job 只能选择当前 active Offer 版本");
     }
+    require_current_capacity_instrument_adoption_on(
+        conn,
+        &current_offer.offer,
+        selection.snapshot.instrument_id.as_deref(),
+    )?;
     let current_provider =
         current_registered_provider_on(conn, &selection.provider.provider.provider_id)?
             .ok_or_else(|| anyhow!("quoted Job 的当前 Provider 不存在"))?;

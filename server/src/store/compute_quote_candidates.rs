@@ -11,6 +11,7 @@ use crate::compute_federation::{
 };
 
 use super::{
+    compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
     compute_job_contract_validation::validate_job_contract,
     compute_job_registry::ComputeJobRegistrationReceipt,
     compute_offer_registry::current_registered_offer_on,
@@ -175,6 +176,15 @@ fn quote_candidate_on(
         || offer.offer.status != OFFER_STATUS_ACTIVE
     {
         bail!("候选 Price Snapshot 与当前 Offer 投影不一致");
+    }
+    if require_current_capacity_instrument_adoption_on(
+        conn,
+        &offer.offer,
+        snapshot.instrument_id.as_deref(),
+    )
+    .is_err()
+    {
+        return Ok(None);
     }
     let current_provider = current_registered_provider_on(conn, &snapshot.provider_id)?
         .ok_or_else(|| anyhow!("候选 Price Snapshot 的当前 Provider 不存在"))?;
