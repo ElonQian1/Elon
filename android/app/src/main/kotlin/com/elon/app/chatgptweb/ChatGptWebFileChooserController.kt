@@ -25,7 +25,7 @@ internal class ChatGptWebFileChooserController(
         pendingCallback = null
         val captured = pendingCaptureUri
         pendingCaptureUri = null
-        val selected = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+        val selected = ChatGptWebFileSelectionResult.parse(result.resultCode, result.data)
         val captureResult: Array<Uri>? = if (
             captured != null && result.resultCode == Activity.RESULT_OK
         ) {
@@ -71,9 +71,25 @@ internal class ChatGptWebFileChooserController(
         if (params.isCaptureEnabled && mimeTypes.any { it == "image/*" || it.startsWith("image/") }) {
             return createCameraIntent()
         }
-        // Web file inputs need a transient content grant. GET_CONTENT also keeps
-        // OEM pickers such as Xiaomi File Explorer on their supported result contract.
-        return Intent(Intent.ACTION_GET_CONTENT).apply {
+        val documentIntent = createContentIntent(Intent.ACTION_OPEN_DOCUMENT, mimeTypes, params)
+        val documentProvider = DOCUMENT_PROVIDER_PACKAGES.firstOrNull { packageName ->
+            documentIntent.setPackage(packageName)
+            documentIntent.resolveActivity(activity.packageManager) != null
+        }
+        if (documentProvider != null) {
+            return documentIntent.setPackage(documentProvider)
+        }
+
+        // Some devices do not ship DocumentsUI. GET_CONTENT remains a standards-based
+        // fallback and still grants access only to the user's explicit selection.
+        return createContentIntent(Intent.ACTION_GET_CONTENT, mimeTypes, params)
+    }
+
+    private fun createContentIntent(
+        action: String,
+        mimeTypes: List<String>,
+        params: WebChromeClient.FileChooserParams,
+    ): Intent = Intent(action).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             type = mimeTypes.singleOrNull() ?: "*/*"
@@ -83,7 +99,6 @@ internal class ChatGptWebFileChooserController(
                 params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE,
             )
         }
-    }
 
     private fun createCameraIntent(): Intent {
         val directory = File(activity.cacheDir, "attachments").apply { mkdirs() }
@@ -121,6 +136,10 @@ internal class ChatGptWebFileChooserController(
             .ifEmpty { listOf("*/*") }
 
         private const val MAX_MIME_TYPES = 12
+        private val DOCUMENT_PROVIDER_PACKAGES = listOf(
+            "com.google.android.documentsui",
+            "com.android.documentsui",
+        )
         private val MIME_TYPE = Regex("[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+*-]+")
     }
 }
