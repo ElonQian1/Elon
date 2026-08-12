@@ -167,7 +167,44 @@ fn registration(pem: &str, key: &str) -> Value {
     })
 }
 
-fn path() -> &'static str {
+pub(super) async fn create_active_sandbox_verifier_key(
+    fixture: &Fixture,
+    suffix: &str,
+) -> (RsaPrivateKey, Value) {
+    let private = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+    let pem = private
+        .to_public_key()
+        .to_public_key_pem(LineEnding::LF)
+        .unwrap();
+    let register = registration(&pem, &format!("{suffix}-sandbox-register"));
+    let (status, created) = call(
+        &fixture.router,
+        Method::POST,
+        path(),
+        Some(&fixture.submitter_token),
+        &register,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let id = created["key_record"]["key_record_id"].as_str().unwrap();
+    let digest = created["key_record"]["key_record_digest"].as_str().unwrap();
+    let (status, active) = call(
+        &fixture.router,
+        Method::POST,
+        &format!("{}/{id}/activate", path()),
+        Some(&fixture.reviewer_token),
+        &json!({
+            "expected_key_record_digest":digest,
+            "idempotency_key":format!("{suffix}-sandbox-activate"),
+            "confirm_activation":true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{active}");
+    (private, created)
+}
+
+pub(super) fn path() -> &'static str {
     "/api/admin/compute/external-pool-adapter-sandbox-verifier-keys"
 }
 

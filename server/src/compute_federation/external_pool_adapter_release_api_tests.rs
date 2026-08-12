@@ -26,6 +26,8 @@ mod artifact_intake_http_body_test;
 mod artifact_intake_http_replay_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_package_http_test.rs"]
 mod artifact_package_http_test;
+#[path = "external_pool_adapter_release_api_tests/artifact_sandbox_conformance_http_test.rs"]
+mod artifact_sandbox_conformance_http_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_security_http_test.rs"]
 mod artifact_security_http_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_signed_provenance_http_test.rs"]
