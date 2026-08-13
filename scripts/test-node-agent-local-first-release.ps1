@@ -339,6 +339,8 @@ try {
     $runtimeLog = Join-Path $internalRoot 'logs\nested\client-launcher.jsonl'
     New-Item -ItemType Directory -Path (Split-Path -Parent $runtimeLog) -Force | Out-Null
     [System.IO.File]::WriteAllText($runtimeLog, 'runtime-log', [System.Text.Encoding]::UTF8)
+    $jvmCrashLog = Join-Path $installRoot 'hs_err_pid16068.log'
+    [System.IO.File]::WriteAllText($jvmCrashLog, 'jvm-crash-diagnostic', [System.Text.Encoding]::UTF8)
     [System.IO.File]::WriteAllText(
         (Join-Path $installRoot 'supervisor-node-url.txt'),
         'http://127.0.0.1:7800',
@@ -385,6 +387,8 @@ try {
         'finish contracts must never enter the rollback client tree'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot '_internal\logs'))) `
         'runtime logs must never enter the rollback client tree'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot 'hs_err_pid16068.log'))) `
+        'JVM crash diagnostics must remain in place and never enter the rollback client tree'
     foreach ($runtimeStateName in @(
         'elon-node-agent.exe.new',
         'elon-node-client.exe.new',
@@ -428,6 +432,15 @@ try {
             -PriorReleaseIdentity ("0.3.69+" + ('b' * 40)) | Out-Null
     } 'unclassified' 'unknown stable client files must require an explicit allowlist decision'
     Remove-Item -LiteralPath $unknownPath -Force
+
+    $nearMissCrashLog = Join-Path $installRoot 'hs_err_pid-not-numeric.log'
+    [System.IO.File]::WriteAllText($nearMissCrashLog, 'unknown', [System.Text.Encoding]::UTF8)
+    Assert-Throws {
+        New-NodeAgentRollbackSnapshot -InstallRoot $installRoot `
+            -SnapshotRoot (Join-Path $activationRoot 'rollback\fixture-near-miss-crash-log') `
+            -PriorReleaseIdentity ("0.3.69+" + ('b' * 40)) | Out-Null
+    } 'unclassified' 'only canonical JVM crash diagnostic names may bypass rollback inventory'
+    Remove-Item -LiteralPath $nearMissCrashLog -Force
 
     $gate = Test-NodeAgentActivationOwnerGate -Status ([pscustomobject]@{
         active_cli_prompt_count = 1

@@ -79,6 +79,12 @@ function Assert-NodeAgentRollbackSourceItem {
     }
 }
 
+function Test-NodeAgentRollbackIgnoredRootItem {
+    param([Parameter(Mandatory = $true)][System.IO.FileSystemInfo]$Item)
+    if ($Item.Name -in $script:NodeAgentRollbackIgnoredRootItems) { return $true }
+    return (-not $Item.PSIsContainer -and $Item.Name -cmatch '^hs_err_pid[0-9]+\.log$')
+}
+
 function Get-NodeAgentRollbackInventory {
     param([Parameter(Mandatory = $true)][string]$InstallRoot)
     $root = [System.IO.Path]::GetFullPath($InstallRoot)
@@ -99,7 +105,7 @@ function Get-NodeAgentRollbackInventory {
     $files = New-Object System.Collections.Generic.List[System.IO.FileInfo]
     foreach ($item in Get-ChildItem -LiteralPath $root -Force) {
         Assert-NodeAgentRollbackSourceItem -Item $item
-        if ($item.Name -in $script:NodeAgentRollbackIgnoredRootItems) { continue }
+        if (Test-NodeAgentRollbackIgnoredRootItem -Item $item) { continue }
         if ($item.Name -eq '_internal' -and $item.PSIsContainer) { continue }
         if (-not $item.PSIsContainer -and $item.Name -in $script:NodeAgentRollbackRootFiles) {
             $files.Add([System.IO.FileInfo]$item)
