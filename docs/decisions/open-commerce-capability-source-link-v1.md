@@ -2,8 +2,8 @@
 title: 开放商业能力与内部同步回执来源绑定 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-10
-implementation_status: verified_rust_sqlite
+reviewed_at: 2026-08-13
+implementation_status: verified_rust_sqlite_axum_tcp
 ---
 
 # 开放商业能力与内部同步回执来源绑定 V1
@@ -35,11 +35,12 @@ implementation_status: verified_rust_sqlite
 - SHA-256 证明相同字节得到相同摘要，不证明数据来源身份、完整性或业务真实性。
 - 新鲜度只表示距离所绑定回执完成时间是否仍在商户声明期限内，不保证库存、价格、营业状态或订单实时。
 - 已完成定向 Rust/SQLite 验证：V164 重复执行、索引与五条外键、回执级联、资格和隔离失败关闭、修订递增、版本与停用回退、目录公开投影，以及绑定/解绑审计故障时的事务回滚均通过。
-- 既有开放商业集成测试、消费者发现 MCP 与进程内来源绑定 Axum HTTP 回归通过；HTTP 覆盖未登录、非项目成员、只读成员、合法绑定、幂等解绑和审计状态。尚未执行真实 TCP、历史升级、旧客户端兼容和 PC 浏览器交互/视觉验证，状态为 `verified_rust_sqlite_axum`。
+- 既有开放商业集成测试、消费者发现 MCP 与进程内来源绑定 Axum HTTP 回归通过；HTTP 覆盖未登录、非项目成员、只读成员、合法绑定、幂等解绑和审计状态。本机真实 TCP 纵向测试通过完整生产 Router 执行 owner 绑定、另一登录消费者按来源发现、owner 解绑和消费者空结果，并确认两条来源审计。历史升级、旧客户端兼容、PC 浏览器交互/视觉和生产部署尚未验证，状态为 `verified_rust_sqlite_axum_tcp`。
 
 ## 实现入口
 
 - `server/src/open_commerce_capability_source_*.rs`
+- `server/src/open_commerce_source_discovery_tcp_tests.rs`
 - `server/src/store/open_commerce_capability_sources.rs`
 - `server/src/open_commerce_directory_model.rs`
 - `pc-frontend/src/features/open-commerce/OpenCommerceIntegrationManager.tsx`

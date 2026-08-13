@@ -91,3 +91,7 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 #[cfg(test)]
 #[path = "open_commerce_capability_source_api_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "open_commerce_source_discovery_tcp_tests.rs"]
+mod tcp_tests;

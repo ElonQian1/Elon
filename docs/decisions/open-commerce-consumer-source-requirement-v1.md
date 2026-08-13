@@ -2,8 +2,8 @@
 title: 开放商业消费者内部回执来源筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-10
-implementation_status: verified_rust_sqlite
+reviewed_at: 2026-08-13
+implementation_status: verified_rust_sqlite_axum_tcp
 ---
 
 # 开放商业消费者内部回执来源筛选 V1
@@ -28,11 +28,12 @@ implementation_status: verified_rust_sqlite
 - 内部回执由商户项目或受控适配器提交，固定 `externally_verified=false`。
 - 筛选不证明外部平台授权、数据真实性、实时库存、价格、营业状态、支付或履约。
 - 已通过真实 SQLite 夹具验证默认兼容、同商户混合来源、失效绑定、声明期四种组合、五种排序器、匹配原因和排序凭证；状态为 `verified_rust_sqlite`。
-- 已执行携带来源条件的 MCP 与进程内 Axum HTTP 请求；尚未执行绑定真实 TCP 端口的请求或 PC 浏览器交互与视觉验证。
+- 已执行携带来源条件的 MCP、进程内 Axum HTTP 和本机真实 TCP 请求；真实 TCP 覆盖内部回执来源要求、绑定后命中和解绑后空结果。最大来源年龄、完整 PC 组合请求、PC 浏览器交互与视觉和生产部署仍未验证。
 
 ## 实现入口
 
 - `server/src/open_commerce_consumer_model.rs`
 - `server/src/open_commerce_consumer.rs`
+- `server/src/open_commerce_source_discovery_tcp_tests.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
 - `docs/open-commerce-consumer-source-requirement-v1-acceptance.md`

@@ -2,8 +2,8 @@
 title: 开放商业消费者来源厂商与数据域筛选 V1
 status: accepted
 owner: open-commerce
-reviewed_at: 2026-08-10
-implementation_status: verified_rust_sqlite
+reviewed_at: 2026-08-13
+implementation_status: verified_rust_sqlite_axum_tcp
 ---
 
 # 开放商业消费者来源厂商与数据域筛选 V1
@@ -28,11 +28,12 @@ implementation_status: verified_rust_sqlite
 - 精确命中只说明目录字段相等，不证明查询覆盖全部商户或全部来源。
 - 回执摘要、状态和时间仍固定 `externally_verified=false`。
 - 已通过真实 SQLite 夹具验证空白忽略、大小写规范化、非法标识失败关闭、厂商与数据域精确组合、同名普通声明排除、匹配原因和排序凭证；状态为 `verified_rust_sqlite`。
-- 已执行携带来源条件的 MCP 与进程内 Axum HTTP 请求；尚未执行绑定真实 TCP 端口的请求或 PC 浏览器交互与视觉验证。
+- 已执行携带来源条件的 MCP、进程内 Axum HTTP 和本机真实 TCP 请求；真实 TCP 覆盖厂商 `merchant_erp` 与数据域 `catalog` 联合精确筛选，以及解绑后不再命中。多种来源组合、完整 PC 请求、PC 浏览器交互与视觉和生产部署仍未验证。
 
 ## 实现入口
 
 - `server/src/open_commerce_consumer_model.rs`
 - `server/src/open_commerce_consumer.rs`
+- `server/src/open_commerce_source_discovery_tcp_tests.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
 - `docs/open-commerce-consumer-source-filters-v1-acceptance.md`
