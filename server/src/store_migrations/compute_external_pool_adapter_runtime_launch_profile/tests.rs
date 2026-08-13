@@ -1,6 +1,8 @@
 use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 use super::*;
+use crate::store::Store;
 
 const TABLES: &str = include_str!("tables.sql");
 const VIEW: &str = include_str!("view.sql");
@@ -37,6 +39,21 @@ fn v255_full_receipt_and_policy_projection_counts_are_frozen() {
     assert_eq!(guards::policy_projection_count(), 45);
     assert!(POLICY_PROJECTION.contains("server_runtime_launch_policy_catalog"));
     assert!(POLICY_DOMAIN.contains("server_runtime_launch_policy_catalog"));
+    let (policy, _) = crate::compute_federation::external_pool_adapter_runtime_launch_profile::server_runtime_launch_policy_catalog()
+        .expect("server runtime launch policy catalog");
+    let policy = serde_json::to_value(policy).expect("serialize runtime launch policy");
+    let policy = policy.as_object().expect("runtime launch policy object");
+    assert_eq!(policy.len(), guards::policy_projection_count());
+    for field in [
+        "host_environment",
+        "binary_format",
+        "max_runtime_temp_bytes",
+    ] {
+        assert!(
+            policy.contains_key(field),
+            "missing launch policy field {field}"
+        );
+    }
     for column in insert_columns(
         PERSISTENCE,
         "compute_external_pool_adapter_runtime_launch_profiles",
@@ -70,9 +87,6 @@ fn v255_full_receipt_and_policy_projection_counts_are_frozen() {
         "entrypoint_relative_path",
         "adapter_effect",
         "usage_effect",
-        "host_environment",
-        "binary_format",
-        "max_runtime_temp_bytes",
     ] {
         assert!(
             PROFILE_PROJECTION.contains(required) || POLICY_PROJECTION.contains(required),
@@ -108,6 +122,9 @@ fn v255_exact_roots_keep_profile_inert_and_provider_registering() {
         "NEW.credential_ref_scheme='vault_ref'",
         "substr(onboarding.non_bearer_credential_ref,1,10)='vault-ref:'",
         "installation.entry_inventory_digest=NEW.entry_inventory_digest",
+        "json_each(installation.receipt_json,'$.installation.binding.installed_files')",
+        "json_each(release.manifest_canonical_json,'$.files')",
+        "=NEW.installed_total_bytes",
         "installation.entrypoint_path=NEW.entrypoint_relative_path",
         "release.credential_verifier_digest=NEW.credential_verifier_digest",
     ] {
@@ -125,6 +142,66 @@ fn v255_exact_roots_keep_profile_inert_and_provider_registering() {
             "V255 claims forbidden root {forbidden}"
         );
     }
+}
+
+#[test]
+fn v255_fresh_and_repeat_migration_install_the_same_runtime_profile_contract() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-runtime-launch-profile-v255-{}",
+        Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).expect("temporary migration directory should exist");
+    let database = root.join("state.sqlite");
+
+    for pass in ["fresh", "repeat"] {
+        let store = Store::open(&database)
+            .unwrap_or_else(|error| panic!("{pass} migration through V255 failed: {error:#}"));
+        let connection = store.conn().expect("V255 database should lock");
+        let migration_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version=255",
+                [],
+                |row| row.get(0),
+            )
+            .expect("V255 migration row should read");
+        assert_eq!(migration_count, 1, "{pass} migration row drift");
+        for (kind, name) in [
+            (
+                "table",
+                "compute_external_pool_adapter_runtime_launch_profiles",
+            ),
+            (
+                "view",
+                "compute_external_pool_adapter_runtime_launch_profile_current",
+            ),
+            (
+                "trigger",
+                "external_pool_adapter_runtime_launch_profile_exact_roots",
+            ),
+        ] {
+            let count: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type=?1 AND name=?2",
+                    [kind, name],
+                    |row| row.get(0),
+                )
+                .expect("V255 schema object should read");
+            assert_eq!(count, 1, "{pass} migration lacks {kind} {name}");
+        }
+        drop(connection);
+        drop(store);
+    }
+
+    for path in [
+        database.clone(),
+        root.join("state.sqlite-wal"),
+        root.join("state.sqlite-shm"),
+    ] {
+        if path.exists() {
+            std::fs::remove_file(path).expect("temporary database artifact should be removable");
+        }
+    }
+    std::fs::remove_dir(root).expect("temporary migration directory should be empty");
 }
 
 #[test]
@@ -211,11 +288,11 @@ fn v255_source_preserves_all_v254_absolute_denies_exactly() {
         "INSERT INTO compute_service_actor_authorizations",
         "INSERT INTO compute_capacity_pools",
         "INSERT INTO compute_offers",
-        "status='active'",
-        "status=\"active\"",
     ] {
         assert!(!v255.contains(forbidden), "V255 crosses no-go {forbidden}");
     }
+    assert!(!v255.contains("provider.status='active'"));
+    assert!(!v255.contains("provider.status=\"active\""));
 }
 
 fn insert_columns(source: &str, table: &str) -> Vec<String> {

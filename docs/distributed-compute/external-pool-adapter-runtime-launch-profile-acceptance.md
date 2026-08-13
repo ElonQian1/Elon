@@ -1,30 +1,26 @@
 ---
 title: 外部矿池 Adapter runtime launch profile 验收边界
 status: current
-reviewed_at: 2026-08-13
+reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_locally_verified
+verification_status: targeted_local_verified
 ---
 
 # 外部矿池 Adapter runtime launch profile 验收边界
 
 ## 本批状态
 
-V255 的目标是 Domain、migration、Store、Service/API 与源码合同；本批明确禁止编译、执行 migration、运行测试或启动服务。未启动 entrypoint/Sidecar，未解析 secret，未连接 resolver backend、IPC/transport、probe、Runner、真实矿池、可信计量或结算。实际执行证据固定为 `passed=0`；下列是待运行矩阵与源码断言，不是通过声明。
+V255 Domain、migration、Store、Service/API 与源码合同已完成本地定向验证。`cargo test --manifest-path server/Cargo.toml --bin elon-server runtime_launch_profile --locked` 实际命中 `12 passed / 0 failed / 1875 filtered out`，正式验证指纹为 `e6919db4d7535bae1e8fc4017e1c7e829a3ad0ce23407e3c29c636a5557c0575`，收据摘要为 `e4a5779153d0f60de92d05d18e037ee80c2547223261b23f9030b796a1835da8`。该命令没有启动 entrypoint/Sidecar，没有解析 secret，也没有连接 resolver backend、IPC/transport、probe、Runner、真实矿池、可信计量或结算。
 
-## 待运行正向矩阵
+## 已执行的本地定向矩阵
 
-- fresh database、V254→V255 upgrade、重复 migration、文件重开与 V249/V254 历史逐字兼容；V254 的 18 个 market absolute deny trigger 名称和 SQL body 不变；
-- fresh create/successor 以 current V249 Prepared + current V254 candidate/delegation + server policy root 原子追加；owner/admin fresh `201`，exact actor-bound replay `200`；
-- create exact replay 在 upstream/current policy 后续换代时仍只按历史 exact profile + fresh Prepared 恢复同一 receipt，不把新 policy 混入旧结果；
-- owner/admin policy GET 返回相同 server-fixed summary/digest；policy builder 零数据库访问，endpoint 只有 historical candidate auth/path read 且零写，不能标记 candidate current；create 才精确消费该 digest 并重验 current roots，旧 digest 失败关闭；
-- optional predecessor pair 全空创建首条，随后 exact structural latest pair 线性创建 successor；latest 即使已撤销也可在重新通过 current V249/V254/policy 后恢复 successor，旧 profile 保留历史，只有新 head 为 `launch_profile_current_inert`；
-- owner/admin GET 重新审计 live filesystem 并在 Store 同次检查 binding、candidate、Provider、policy、predecessor/head，返回 inert currentness；
-- owner/admin revoke fresh `201`、exact replay `200`；fresh revoke 只要求历史 exact profile/candidate 与 structural latest/unrevoked，不被 upstream/FS/policy 后续失效阻断，追加后 currentness 失败关闭；
-- profile/revocation 的 `adapter_effect=none`、`runtime_effect=none`、`usage_effect=none`，且 Domain/DDL 中 Provider、credential、route、execution、market、settlement 等其余 fixed effects 也全部为 `none`；响应只保留这些稳定摘要，并递归隐藏 raw path/locator（包括 `entrypoint_relative_path`）、resolver backend root、credential、actor、幂等和 confirmation。
+- 7 项 migration/Store/source tests：fresh database、重复 Store migration、V255 schema objects、DDL/Store ABI、45 字段 server policy、完整 receipt projection、exact roots、append-only lineage、display-only current view 和 V254 18 个 absolute deny 源码逐字保护；
+- 2 项 HTTP source contract tests：服务端固定策略、公开投影脱敏、无 process spawn、无 secret/resolver 读取、无 Provider/route/market/usage/settlement 下游写路径；
+- 1 项 owner HTTP test：策略读取、fresh create、exact replay、currentness、权限/输入失败关闭、公开响应递归脱敏和零下游表效果；
+- 2 项 admin HTTP tests：管理员 linear successor 修复，以及 filesystem drift 后仍可撤销并 exact replay；Provider 始终保持 `registering`，profile 始终为 inert。
 
-## 待运行失败关闭矩阵
+## 仍需扩展的失败关闭与环境矩阵
 
 - 无会话 `401`；非 binding owner 或非 platform `admin|owner` 为 `403`；identifier/digest/reason/confirmation/predecessor pair 非法为 `400`；missing binding/candidate/profile 为 `404`；malformed/unknown body 为 `422`；
 - body 注入 policy 或任一 policy field、Provider/release/installation/entrypoint/route/service actor、credential/resolver backend、recorded/revoked actor、timestamp/status/effect，一律 `422`；
@@ -51,10 +47,10 @@ V255 的目标是 Domain、migration、Store、Service/API 与源码合同；本
 
 ## HTTP 源码边界
 
-HTTP source tests 分成共享 support 与场景 leaf，每个 leaf 小于 430 行。场景至少覆盖：owner/admin 双面三操作、auth/path ownership、unknown-field 注入、confirmation、exact replay、predecessor successor、root drift、live-FS drift、revocation、递归脱敏和完整零表效果。测试可定义为 Rust async tests，但本批不得运行；只允许静态检索、源码结构、行数、禁词/禁表和 diff 审核。
+HTTP source tests 分成共享 support 与场景 leaf，每个 leaf 小于 430 行。当前 5 项 HTTP/source contract tests 已实际运行，覆盖 owner/admin、auth/path ownership、unknown-field 注入、confirmation、exact replay、predecessor successor、root drift、live-FS drift、revocation、递归脱敏和零下游表效果。后续增加真实 TCP 或生产环境验收时仍须保留同一公开投影和零副作用边界。
 
 ## 仍未验收与后续禁线
 
-未验收 Rust compile、SQLite migration/upgrade/reopen/concurrency/crash、进程内或真实 TCP HTTP、生产数据库、真实 filesystem drift、secret custody、resolver、IPC/Sidecar、probe、runtime readiness、Provider activation、market、execution、usage 或 settlement。因此只能记录 `implementation_uncompiled / implementation_unrun / passed=0`。
+已验收本机 Rust compile、fresh/repeat SQLite migration、进程内 Axum HTTP 与测试 fixture filesystem drift。尚未验收停在 exact V254 的磁盘升级副本、SQLite concurrency/crash recovery、真实 TCP HTTP、生产数据库、生产 secret custody/resolver、IPC/Sidecar、probe、runtime readiness、Provider activation、market、execution、usage 或 settlement。因此只能记录 `implementation_locally_verified`，不能记录 production ready。
 
 V255 currentness 不是 runtime currentness/readiness，也不消费 V250/V252/V253 的短 TTL evidence。V254 temporary absolute deny 必须原样保留；后续不得仅因 profile current 就开放 CapacityPool 或 Offer。

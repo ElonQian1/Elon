@@ -1,9 +1,9 @@
 ---
 title: 外部矿池 Adapter Provider-specific 惰性 runtime launch profile 权威
 status: current
-reviewed_at: 2026-08-13
+reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_locally_verified
 ---
 
 # 外部矿池 Adapter Provider-specific 惰性 runtime launch profile 权威
@@ -63,3 +63,9 @@ owner 与 admin 使用同形路由：
 V255 不激活 Provider，因此 V254 覆盖 `external_pool` CapacityPool active 与 Offer draft/active insert、update、version、direct SQL 及 Provider-kind legacy 绕行的 18 个 temporary absolute deny trigger 必须逐字保留。launch profile currentness 不能缩窄或替代这些 fence，也不能作为 market admission gate。
 
 只有未来同一批真正实现 atomic Provider activation、route/service actor、secret resolver/transport readiness 与 runtime currentness 时，才可在同一 migration/transaction 边界把 absolute deny 原子替换为 external-pool 专用 admission gate；不能先删除、分批修改或只在 Service/HTTP 检查。legacy Provider 路径必须保持原语义。
+
+## 6. 本地实现与验证状态
+
+截至 2026-08-14，V255 Domain、migration、Store、Service 与 owner/admin HTTP 已通过 `elon-server` 定向测试：共命中 `12 passed / 0 failed / 1875 filtered out`。其中 7 项覆盖 fresh/repeat migration、DDL/Store ABI、完整 profile/policy 投影、exact roots、lineage/current view、不可变性以及 V254 18 个 absolute deny 的源码逐字保护；5 项覆盖 owner/admin 创建、策略公开投影、currentness、linear successor 修复、filesystem drift 后撤销与递归脱敏。正式验证指纹为 `e6919db4d7535bae1e8fc4017e1c7e829a3ad0ce23407e3c29c636a5557c0575`，收据摘要为 `e4a5779153d0f60de92d05d18e037ee80c2547223261b23f9030b796a1835da8`。
+
+该证据只证明本机 Rust/SQLite 与进程内 Axum 定向链路，不包含真实 TCP、生产数据库、生产 secret resolver、Sidecar/IPC/transport、真实外部矿池、probe/Runner/ACK、Provider activation、market admission、可信计量或结算。`launch_profile_current_inert` 仍不得解释为 runtime ready 或 production ready。

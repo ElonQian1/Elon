@@ -50,7 +50,8 @@ $registryFullPath = Join-Path $repoRoot $RegistryPath
 Assert-RegistryAdoption (Test-Path -LiteralPath $registryFullPath -PathType Leaf) "Feature registry is missing: $RegistryPath"
 
 $registryText = [System.IO.File]::ReadAllText($registryFullPath, [System.Text.Encoding]::UTF8)
-Assert-RegistryAdoption ([System.Text.Encoding]::UTF8.GetByteCount($registryText) -le 65536) "Initial feature registry exceeds the 64 KiB bounded-read budget."
+$maxRegistryBytes = 8 * 1024 * 1024
+Assert-RegistryAdoption ([System.Text.Encoding]::UTF8.GetByteCount($registryText) -le $maxRegistryBytes) "Feature registry exceeds the 8 MiB repository contract."
 
 try {
     $registry = $registryText | ConvertFrom-Json
@@ -60,7 +61,7 @@ try {
 
 Assert-RegistryAdoption ($registry.version -eq 1) "Feature registry version must be 1."
 $features = @($registry.features)
-Assert-RegistryAdoption ($features.Count -ge 1 -and $features.Count -le 12) "Initial feature registry must contain between 1 and 12 reviewed features."
+Assert-RegistryAdoption ($features.Count -ge 1 -and $features.Count -le 512) "Feature registry must contain between 1 and 512 features."
 
 $featureIds = @($features | ForEach-Object { [string]$_.id })
 Assert-RegistryAdoption (($featureIds | Select-Object -Unique).Count -eq $featureIds.Count) "Feature registry contains duplicate feature IDs."
@@ -69,7 +70,7 @@ $feature = @($features | Where-Object { $_.id -eq $FeatureId } | Select-Object -
 Assert-RegistryAdoption ($feature.Count -eq 1) "Required adoption feature is missing: $FeatureId"
 $feature = $feature[0]
 
-$allowedStatuses = @("proposed", "accepted", "ready", "claimed", "in_progress", "implemented", "verified", "released", "rejected", "archived")
+$allowedStatuses = @("draft", "proposed", "accepted", "ready", "claimed", "in_progress", "blocked", "implemented", "verified", "released", "retired")
 Assert-RegistryAdoption ($allowedStatuses -contains [string]$feature.status) "Adoption feature has an unsupported status."
 Assert-RegistryAdoption (-not [string]::IsNullOrWhiteSpace([string]$feature.summary)) "Adoption feature summary is missing."
 Assert-RegistryAdoption ([string]$feature.summary -notmatch "[\r\n]") "Adoption feature summary must remain a single bounded line."

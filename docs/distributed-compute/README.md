@@ -1,7 +1,7 @@
 ---
 title: 一龙任务级分布式算力联邦
 status: current
-reviewed_at: 2026-08-13
+reviewed_at: 2026-08-14
 owners: backend, node, ai-economy
 ---
 
@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221-v257 前置门为 `implementation_partially_verified`。V257 只新增未编译/未运行的 Linux ephemeral capsule：fresh V249 retained entrypoint 复制为 exact sealed memfd，V257 companion policy 校验 static ELF64 `ET_EXEC`/no-interp/no-dynamic/no-W+X，Store 同一 `checked_at` 自选 current V250/V252/V253 并组合 V255/V256 roots。它不回写 V255，不 spawn/probe/deliver secret，不新增 migration/receipt/API 或 readiness；Windows unavailable、`passed=0`，V254 18 deny 原样保留。见 [`V257 capsule 权威`](external-pool-adapter-entrypoint-capsule-authority.md)、[`V257 验收边界`](external-pool-adapter-entrypoint-capsule-acceptance.md)、[`V256 resolver 权威`](external-pool-adapter-runtime-bundle-resolver-authority.md) 与 [`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | v221-v257 前置门为 `implementation_partially_verified`。V255 inert launch profile 已通过 migration/Store/source contract 与 owner/admin 进程内 Axum 定向测试，合计 `12 passed / 0 failed`；它仍不启动或激活 Provider。V257 只新增未编译/未运行的 Linux ephemeral capsule：fresh V249 retained entrypoint 复制为 exact sealed memfd，companion policy 校验 static ELF64 `ET_EXEC`/no-interp/no-dynamic/no-W+X，Store 同一 `checked_at` 自选 current V250/V252/V253 并组合 V255/V256 roots。它不回写 V255，不 spawn/probe/deliver secret，不新增 migration/receipt/API 或 readiness；Windows unavailable、`passed=0`，V254 18 deny 原样保留。见 [`V257 capsule 权威`](external-pool-adapter-entrypoint-capsule-authority.md)、[`V255 验收边界`](external-pool-adapter-runtime-launch-profile-acceptance.md)、[`V256 resolver 权威`](external-pool-adapter-runtime-bundle-resolver-authority.md) 与 [`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -177,7 +177,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-Provider Adapter 的 v227-v257 前置门已形成分层权威。V256 保留按 profile digest 寻址的 strict bundle manifest、retained handles 与 locked/zeroize config/credential；V257 再从 fresh V249 retained entrypoint 形成 Linux-only exact `0500` sealed memfd，并用独立、ephemeral companion policy 审计 x86-64 little-endian ELF64 static `ET_EXEC`、no `PT_INTERP/PT_DYNAMIC/ET_DYN` 与 no W+X；它不回写或重解释 V255 durable profile。Store 在同一近当前 `checked_at` 内部选择 V250/V252/V253 heads并组合 V249/V255/V256 roots，但不生成 receipt。V257 无 migration/API，不 spawn、probe、deliver secret 或 activation；Windows unavailable，`runtime_launch_ready=false`、`activation_ready=false`、`passed=0`。V254 18 deny 原样保留；后续 authenticated supervisor/no-work probe 与 atomic activation 必须用完整 admission gate 显式替换它。见 [`V257 entrypoint capsule`](external-pool-adapter-entrypoint-capsule-authority.md)、[`current-implementation-status.md`](current-implementation-status.md) 与 [`V256 runtime bundle resolver`](external-pool-adapter-runtime-bundle-resolver-authority.md)。
+Provider Adapter 的 v227-v257 前置门已形成分层权威。V255 durable inert profile 已通过本地 `12 passed / 0 failed` 定向验证，但仍不代表 runtime ready。V256 保留按 profile digest 寻址的 strict bundle manifest、retained handles 与 locked/zeroize config/credential；V257 再从 fresh V249 retained entrypoint 形成 Linux-only exact `0500` sealed memfd，并用独立、ephemeral companion policy 审计 x86-64 little-endian ELF64 static `ET_EXEC`、no `PT_INTERP/PT_DYNAMIC/ET_DYN` 与 no W+X；它不回写或重解释 V255 durable profile。Store 在同一近当前 `checked_at` 内部选择 V250/V252/V253 heads并组合 V249/V255/V256 roots，但不生成 receipt。V257 无 migration/API，不 spawn、probe、deliver secret 或 activation；Windows unavailable，`runtime_launch_ready=false`、`activation_ready=false`、`passed=0`。V254 18 deny 原样保留；后续 authenticated supervisor/no-work probe 与 atomic activation 必须用完整 admission gate 显式替换它。见 [`V257 entrypoint capsule`](external-pool-adapter-entrypoint-capsule-authority.md)、[`V255 runtime launch profile`](external-pool-adapter-runtime-launch-profile-authority.md)、[`current-implementation-status.md`](current-implementation-status.md) 与 [`V256 runtime bundle resolver`](external-pool-adapter-runtime-bundle-resolver-authority.md)。
 
 ### F4：容量期货市场
 

@@ -76,13 +76,17 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
              AND installation.entrypoint_size_bytes=NEW.entrypoint_size_bytes
              AND installation.entry_inventory_digest=NEW.entry_inventory_digest
              AND installation.entry_count=NEW.installed_file_count
-             AND installation.total_uncompressed_bytes=NEW.installed_total_bytes
+             AND (SELECT SUM(CAST(json_extract(installed_file.value,'$.size_bytes') AS INTEGER))
+                    FROM json_each(installation.receipt_json,'$.installation.binding.installed_files') installed_file)
+                 =NEW.installed_total_bytes
              AND release.implementation_digest=NEW.implementation_digest
              AND release.capability_set_digest=NEW.capability_set_digest
              AND release.credential_verifier_digest=NEW.credential_verifier_digest
              AND release.entry_inventory_digest=NEW.entry_inventory_digest
              AND release.entry_count=NEW.installed_file_count
-             AND release.total_uncompressed_bytes=NEW.installed_total_bytes
+             AND (SELECT SUM(CAST(json_extract(release_file.value,'$.size_bytes') AS INTEGER))
+                    FROM json_each(release.manifest_canonical_json,'$.files') release_file)
+                 =NEW.installed_total_bytes
              AND candidate.registry_release_id=NEW.registry_release_id
              AND candidate.registry_release_digest=NEW.registry_release_digest
              AND candidate.installation_receipt_id=NEW.installation_receipt_id

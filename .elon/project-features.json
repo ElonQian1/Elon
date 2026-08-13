@@ -123,6 +123,176 @@
       "updated_at_ms": 1786625457423
     },
     {
+      "id": "compute-v255-runtime-launch-profile-verification",
+      "title": "V255 惰性 runtime launch profile 验收闭环",
+      "summary": "编译并执行已落地的 V255 Domain、migration、Store、Service 与 HTTP 测试，修复真实缺口并把 passed=0 更新为可复核的局部验收证据；不扩张到 Sidecar、真实凭据、Provider activation、市场或结算。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-authority.md",
+        "content_hash": "b7d06ff5b644170d6d1856507b01ac081155fe42987386013f4246a4fecf2993",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+          "head_blob_oid": "24ef6f207406e9be97a69f96e35c26fa74264246",
+          "worktree_blob_oid": "fedd7a972b3313b992ea6593c17460d1e9f58731",
+          "state": "tracked_modified"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security-ai-economy",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "v255",
+        "verification"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-authority.md",
+        "server/src/compute_federation/external_pool_adapter_release_api_tests.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_launch_profile.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_launch_profile_api.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_launch_profile_service.rs",
+        "server/src/store/compute_external_pool_adapter_runtime_launch_profile.rs",
+        "server/src/store_migrations/compute_external_pool_adapter_runtime_launch_profile.rs",
+        "server/src/store_migrations_tests/compute_external_pool_adapter_runtime_launch_profile.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "完整服务端测试目标可编译，V255 定向过滤实际执行非零测试且全部通过。",
+        "fresh 与 repeat migration、Store/Service/HTTP 正反向合同均有可重复本地证据。",
+        "V254 18 个 temporary absolute deny 保持逐字有效，V255 不启动 runtime、不解析 secret、不激活 Provider、不产生市场或结算副作用。",
+        "权威状态、验收文档、当前状态与 README 更新为准确的局部验证结论并保留未验收生产边界。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "01a43f6b12ffab6af76626eb3b5a87cee593192cb3394375f10ddb8627ca369d",
+          "locator": "V255",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "b06895f801d6b912e1338a40952e398713145fca",
+            "worktree_blob_oid": "a5b9738bc28972248cd9ff79e2e9848df4e81797",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/current-implementation-status.md",
+          "content_hash": "a11277f95c41648d9fd0d50228196c15104cabbf8ec4e39e7e539b107a76c857",
+          "locator": "V255",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "e4ade40f3367e6e031f565623ca76fcbb4d0631a",
+            "worktree_blob_oid": "49361591ec974bd4e5476ab662362ebd34dc48d5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-acceptance.md",
+          "content_hash": "5aaefdcd1674900b3ed828310c27f6781f7e326a960dd924661c7d1ba04eaa51",
+          "locator": "本批状态",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "553e920f616e1b3ab7c4d15c05d89aca107d1531",
+            "worktree_blob_oid": "e35da6be0de737366837d9163ca1c52115f9b5de",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-authority.md",
+          "content_hash": "b7d06ff5b644170d6d1856507b01ac081155fe42987386013f4246a4fecf2993",
+          "locator": "6. 本地实现与验证状态",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "24ef6f207406e9be97a69f96e35c26fa74264246",
+            "worktree_blob_oid": "fedd7a972b3313b992ea6593c17460d1e9f58731",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/runtime_launch_profile_admin_http_test.rs",
+          "content_hash": "8cee50b2ca6b41239fe2a8fb1a61edcec94d76588b695d3b51aa87f91ee2ac6c",
+          "locator": "runtime_launch_profile_admin_can_repair_with_a_linear_successor",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "14c315d90c5b049a461f18eb1d960a44137a74f6",
+            "worktree_blob_oid": "14c315d90c5b049a461f18eb1d960a44137a74f6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/runtime_launch_profile_owner_http_test.rs",
+          "content_hash": "43ac143cfdfad3d6e69ad23c1a0c463606d838f1664155ebf5dd88c157eb52c2",
+          "locator": "runtime_launch_profile_owner_surface_is_minimal_redacted_and_inert",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "01d5f0409a9ad33bdf1d24135417892330923c5f",
+            "worktree_blob_oid": "01d5f0409a9ad33bdf1d24135417892330923c5f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/runtime_launch_profile_source_contract_test.rs",
+          "content_hash": "7ef469434fc9e9efbc83e320810359c77c1f630c8ee1128fad22d2b79e3e1531",
+          "locator": "runtime_launch_http_source_has_no_launch_secret_or_downstream_write_path",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "45685b1b02f240a2b7f863503a3901909c4b609e",
+            "worktree_blob_oid": "c7db550214ea2dae064674d9ded04bbdd8cc433b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/compute_external_pool_adapter_runtime_launch_profile/guards/roots.rs",
+          "content_hash": "48c6ed42c508554f9c2a4c62844c8da36f3c4b95007051f993bcb350e739dfd2",
+          "locator": "external_pool_adapter_runtime_launch_profile_exact_roots",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "f3e8b97ade38bffa95d0977539564ebc783eee5d",
+            "worktree_blob_oid": "c2416012db1ac16075454436ad980ad086940f64",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/compute_external_pool_adapter_runtime_launch_profile/tests.rs",
+          "content_hash": "62635f2827efd87f93cb69baf0326fb1120b193b0d1f757a62119e90e054c31f",
+          "locator": "v255_fresh_and_repeat_migration_install_the_same_runtime_profile_contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "d201784559666a10d7f1f8982c2d76dbf139f560",
+            "worktree_blob_oid": "4fd8a4354c5331832856adbc9ffed95c03057e00",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786647694990,
+      "updated_at_ms": 1786652715138
+    },
+    {
       "id": "delivery-allocation-expiry-worker-v234-verification",
       "title": "v234 Delivery Allocation 到期公平恢复验收",
       "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
@@ -764,6 +934,75 @@
       ],
       "created_at_ms": 1786619748837,
       "updated_at_ms": 1786620439206
+    },
+    {
+      "id": "project-feature-registry-growth-contract-v1",
+      "title": "项目功能注册表增长门禁修正",
+      "summary": "使 adoption CI 门禁与服务端 512 项、有界分页和当前状态机保持一致，同时保留 8 MiB 文件上限。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/project-feature-registry-growth-contract-v1.md",
+        "content_hash": "cff991ed68c1a454eb58ebdbf336d2dd27f084ae2820f63663ef6e60b7a79940",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "77a97a73307334bdde16ac9cc19dc27779fb6ee8",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "ai-platform-developer-experience",
+      "tags": [
+        "feature-registry",
+        "ci",
+        "governance"
+      ],
+      "task_paths": [
+        ".elon/project-features.json",
+        "docs/requirements/project-feature-registry-growth-contract-v1.md",
+        "scripts/test-project-feature-registry-adoption.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "当前合法注册表超过 64 KiB 时 adoption test 通过，超过 8 MiB 时失败关闭。",
+        "功能数量上限与服务端 MAX_FEATURES=512 一致。",
+        "允许状态集合与当前功能状态机一致。",
+        "预检工作流与 AI 资产审计继续通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/project-feature-registry-growth-contract-v1.md",
+          "content_hash": "cff991ed68c1a454eb58ebdbf336d2dd27f084ae2820f63663ef6e60b7a79940",
+          "locator": "合同",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "77a97a73307334bdde16ac9cc19dc27779fb6ee8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-project-feature-registry-adoption.ps1",
+          "content_hash": "3e6a178a258f21a3412ed3a92dcfc7f1d592d8200d3dd2041fabf5f9d878956f",
+          "locator": "maxRegistryBytes",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_blob_oid": "eb21500cf0f513ba3717cc539b6da5d6b42df98f",
+            "worktree_blob_oid": "1f2efc172f6e139c02369d5e4c6482bf711901f7",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786653173582,
+      "updated_at_ms": 1786653174384
     },
     {
       "id": "project-feature-registry-normalized-hash-v1",
@@ -1976,6 +2215,186 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786647275788
+    },
+    {
+      "id": "feature_event_2ff888c3498c484a8b26cd39dcf88707",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "registered",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786647694990
+    },
+    {
+      "id": "feature_event_012ef42f4ef34d468642fdff74906b52",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "claimed",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786647708306
+    },
+    {
+      "id": "feature_event_2fc8d19438a444cea455674f8b5208bf",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "开始执行 V255 局部验收矩阵",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786647708350
+    },
+    {
+      "id": "feature_event_4b9e806c4b294df78b64837763fcc3bc",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "claim_released",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Requirement evidence was intentionally updated after successful V255 validation; release before rebind.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786652711543
+    },
+    {
+      "id": "feature_event_f0b3767492364cce985b84e8d71b81fd",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Bind the authority document to the successful 12-test local verification result and exact production boundaries.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786652711931
+    },
+    {
+      "id": "feature_event_9862c56672624ec4a6606182c206c58e",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Reviewed V255 scope remains inert and matches the targeted local verification evidence.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786652711944
+    },
+    {
+      "id": "feature_event_73e4827ec6ce41f4a429e4acd80b9ebb",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Reviewed V255 scope remains inert and matches the targeted local verification evidence.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786652711955
+    },
+    {
+      "id": "feature_event_a593d3727dff468d8ecc6cfa217a88ea",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "claimed",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786652711966
+    },
+    {
+      "id": "feature_event_5921f0d1bb384235a75891577d83db9d",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Record implementation and test evidence after successful targeted validation.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786652711979
+    },
+    {
+      "id": "feature_event_ee77efdc0d9e4e85b86a6c4eb2f2b263",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786652715098
+    },
+    {
+      "id": "feature_event_57860230746748f2b5c9e662fc884c7d",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "V255 targeted Rust/SQLite/Axum verification passed 12 tests with no forbidden runtime or market effect.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786652715123
+    },
+    {
+      "id": "feature_event_305b4fbdd8e94b4bb77bd197cf837abf",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "V255 targeted Rust/SQLite/Axum verification passed 12 tests with no forbidden runtime or market effect.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786652715138
+    },
+    {
+      "id": "feature_event_16d43d8788774319a1fcccf97b723eb5",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "registered",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786653173582
+    },
+    {
+      "id": "feature_event_d279eac92691447bab07c383cffdaf68",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "claimed",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786653173595
+    },
+    {
+      "id": "feature_event_cbc30d020e584bee97ed91361701472f",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Align the stale adoption threshold with the current bounded registry contract.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786653173609
+    },
+    {
+      "id": "feature_event_122be033a33c49adabeb11c5145bea64",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786653174355
+    },
+    {
+      "id": "feature_event_282fd35f9f5e4c40b90dcd254ecb997d",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Adoption, preflight workflow, Rust format guard, and AI prompt asset audit passed.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786653174367
+    },
+    {
+      "id": "feature_event_3d0bcf873b964aca8b8caf5466ea20cd",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Adoption, preflight workflow, Rust format guard, and AI prompt asset audit passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786653174384
     }
   ]
 }

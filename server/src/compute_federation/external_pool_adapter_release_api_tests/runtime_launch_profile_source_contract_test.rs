@@ -9,7 +9,7 @@ fn runtime_launch_http_source_keeps_policy_server_fixed_and_public_projection_re
         "expected_launch_policy_digest",
         "expected_predecessor: Option<ExpectedRuntimeLaunchProfilePredecessor>",
         "RuntimeLaunchProfileActor::ProviderOwner",
-        "RuntimeLaunchProfileActor::PlatformAdmin",
+        "Self::PlatformAdmin",
         "audit_external_pool_adapter_installation",
         "external_pool_adapter_runtime_launch_policy_summary",
         "external_pool_adapter_runtime_launch_profile_currentness",
