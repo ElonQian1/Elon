@@ -10,9 +10,9 @@ use windows_sys::Win32::{
     Foundation::{GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT},
     Storage::FileSystem::{
         FileIdInfo, GetDriveTypeW, GetFileInformationByHandle, GetFileInformationByHandleEx,
-        BY_HANDLE_FILE_INFORMATION, DRIVE_FIXED, FILE_ATTRIBUTE_DIRECTORY,
-        FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-        FILE_GENERIC_READ, FILE_ID_INFO, FILE_SHARE_READ,
+        BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_ID_INFO,
+        FILE_SHARE_READ,
     },
 };
 
@@ -20,6 +20,8 @@ use super::{
     ExternalPoolAdapterRuntimeBundleError, LockedSensitiveBytes, OpenedRuntimeBundle, CONFIG_FILE,
     CREDENTIAL_FILE, MANIFEST_FILE,
 };
+
+const DRIVE_FIXED: u32 = 3;
 
 pub(super) struct WindowsOpenedRuntimeBundle {
     directories: Vec<File>,
@@ -178,8 +180,8 @@ fn validate_handle(
     {
         return Err(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody);
     }
-    // Until the protected-DACL parser accepts only the service identity and LocalSystem, Windows
-    // custody remains deliberately unavailable instead of silently weakening this boundary.
+    // Windows custody remains deliberately unavailable.
+    // A protected-DACL parser must accept only the service identity and LocalSystem first.
     validate_protected_dacl(file)
 }
 

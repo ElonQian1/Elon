@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Linux entrypoint capsule 权威
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled_unrun
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 权威
@@ -78,4 +78,4 @@ Provider 必须继续 exact `registering`。V254 覆盖 direct SQL 与 versions 
 
 ## 7. 实现现实
 
-V257 源码只达到 `implementation_uncompiled / implementation_unrun / source_review_only / passed=0`。没有执行 Rust compile、migration、unit/source-contract test、Linux syscall fixture、服务、真实 mount、secret、process 或 network。文档中的 `must` 是 fail-closed 合同，不是动态证据；不能把源码存在表述为 Linux capsule 已验证、runtime 可启动或 production ready。
+V257 源码已随完整 `elon-server` 测试目标在 Windows 编译通过，但没有执行 V257 unit/source-contract test、Linux syscall fixture、migration、服务、真实 mount、secret、process 或 network，仍为 `implementation_compiled_unrun / source_review_only / passed=0`。文档中的 `must` 是 fail-closed 合同，不是动态证据；不能把编译通过表述为 Linux capsule 已验证、runtime 可启动或 production ready。

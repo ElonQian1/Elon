@@ -208,9 +208,9 @@ pub(super) fn select_current_probe_preparation_roots_on(
     })
 }
 
-pub(super) fn prepared_entrypoint(
-    bundle: &CurrentExternalPoolAdapterRuntimeBundleAuthority<'_, '_>,
-) -> &PreparedExternalPoolAdapterInstallation {
+pub(super) fn prepared_entrypoint<'a>(
+    bundle: &'a CurrentExternalPoolAdapterRuntimeBundleAuthority<'_, '_>,
+) -> &'a PreparedExternalPoolAdapterInstallation {
     bundle.launch_profile().candidate().registry().prepared()
 }
 

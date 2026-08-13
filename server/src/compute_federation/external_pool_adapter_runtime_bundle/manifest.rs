@@ -168,3 +168,7 @@ fn bounded_opaque(value: &str, max: usize) -> bool {
         && value.trim() == value
         && !value.chars().any(char::is_control)
 }
+
+#[cfg(test)]
+#[path = "manifest_tests.rs"]
+mod tests;

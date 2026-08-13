@@ -138,3 +138,7 @@ impl OpenedRuntimeBundle for UnsupportedOpenedRuntimeBundle {
         Err(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody)
     }
 }
+
+#[cfg(test)]
+#[path = "filesystem_tests.rs"]
+mod tests;

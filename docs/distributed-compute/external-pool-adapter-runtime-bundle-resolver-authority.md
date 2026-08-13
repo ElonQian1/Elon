@@ -3,7 +3,7 @@ title: 外部矿池 Adapter operator-mounted runtime bundle resolver 权威
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter operator-mounted runtime bundle resolver 权威
@@ -69,11 +69,11 @@ resolver 必须逐层无跟随打开目录与三个固定 leaf，拒绝非本地
 
 config 与 credential 直接读入 OS page-backed locked memory；allocation、lock 或 dump-exclusion 任一步失败即整体失败。敏感 byte buffer 不实现 Clone/Serde，不通过 Debug 展示内容，也不转换为 Vec/String。manifest canonical 校验产生的 content-hash 字符串中间值也必须在比较后显式 zeroize。唯一消费方式是在 sealed authority 的短生命周期闭包中借用 `&[u8]`；闭包只能返回 `Result<()>`，不能通过泛型返回值带出 secret；Drop 顺序为显式覆写、unlock、release。retained handles 与 buffers 都不得跨 HTTP、MCP、日志、数据库或 crash recovery。
 
-这些是源码合同，不代表已验证 Linux `openat/mlock/madvise`、Windows handle/DACL/`VirtualLock` 行为，也不能抵御已取得服务进程权限、内核权限、调试器、CPU register、swap/dump 配置错误或物理攻击。
+本地 Windows 测试目标已编译该 resolver，并用 test-only 文件动态验证 locked-memory 精确读取、短读/超读拒绝、manifest canonical/unknown/root/大小边界与 SHA-256 漂移；这些证据不代表已验证 Linux `openat/mlock/madvise`、Windows handle/DACL/`VirtualLock` 生产行为，也不能抵御已取得服务进程权限、内核权限、调试器、CPU register、swap/dump 配置错误或物理攻击。
 
 ## 6. readiness 的下一道门
 
-V256 只把生产 bundle 的 server-only custody/resolution seam 从“未实现”推进到 `implementation_uncompiled/source_review_only`。未来 atomic activation 至少还要：
+V256 只把生产 bundle 的 server-only custody/resolution seam 推进到 `implementation_partially_verified`。完整 `elon-server` 测试目标已编译，14 项定向测试通过；其中 8 项执行 manifest、摘要和 locked-memory 行为，6 项锁定私有边界、Store composition 与 V254 绝对市场门。证据指纹为 `bf17a791bd94e135404950399a2ba0e7322ce236b23b980c9295fa9fb862acfc`。未来 atomic activation 至少还要：
 
 - 在 authenticated supervisor 内以 fresh handles 和短借用启动隔离 runtime；
 - 用 no-work authenticated probe 或新签名 generation ABI，把实际消费的 exact credential/config generation 与 Provider/release/profile 绑定；

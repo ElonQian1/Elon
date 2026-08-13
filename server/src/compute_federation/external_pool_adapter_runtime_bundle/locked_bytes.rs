@@ -133,3 +133,7 @@ impl LockedSensitiveBytes {
     #[cfg(not(any(target_os = "linux", windows)))]
     fn release(&mut self) {}
 }
+
+#[cfg(test)]
+#[path = "locked_bytes_tests.rs"]
+mod tests;

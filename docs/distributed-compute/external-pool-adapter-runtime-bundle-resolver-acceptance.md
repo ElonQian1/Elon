@@ -3,20 +3,20 @@ title: 外部矿池 Adapter runtime bundle resolver 验收边界
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-verification_status: source_review_only
+verification_status: local_target_verified
 ---
 
 # 外部矿池 Adapter runtime bundle resolver 验收边界
 
 ## 本批状态
 
-V256 只交付 server-only ephemeral operator-mounted resolver、Store-private composition seam、权威文档与 source-contract test 源码。按架构铺设阶段约束，本批不编译、不执行 migration、不运行测试或服务，也不访问真实 mount、secret、网络或进程；实际动态证据固定为 `passed=0`。
+V256 的 server-only ephemeral operator-mounted resolver 与 Store-private composition seam 已进入完整 `elon-server` 测试目标。定向验证实际运行 14 项测试，`14 passed / 0 failed`：6 项既有 source-contract，3 项 strict manifest 行为、3 项摘要/路径格式行为、2 项 test-only 文件的 locked-memory 精确读取与短读/超读拒绝。验证指纹为 `bf17a791bd94e135404950399a2ba0e7322ce236b23b980c9295fa9fb862acfc`。
 
-Linux 与 Windows 均只有源码。Windows protected-DACL parser 尚未实现，当前实现固定返回 `UnsafeCustody`，所以 Windows resolver 明确 fail-closed/unavailable；不能把其 handle/identity 骨架表述成可解析 bundle。
+Windows 源码已经编译，错误的 `DRIVE_FIXED` 模块导入已修复；protected-DACL parser 尚未实现，当前实现仍固定返回 `UnsafeCustody`，所以 Windows resolver 明确 fail-closed/unavailable。Linux 分支在本次 Windows 目标上未编译或运行；不能把任一平台的 handle/identity 骨架表述成生产 bundle 已解析。
 
 数据库 schema 保持 V255：无 `migration_v256`、无 receipt、无 mutable head、无 secret metadata persistence。没有 HTTP/MCP/PC route，GET 不读取 secret。Provider 保持 `registering`、`runtime_launch_ready=false`；V254 18 个 temporary absolute deny 原样保留。
 
-## source-contract 待执行断言
+## 已执行定向断言
 
 静态测试源码必须锁定：
 
@@ -52,6 +52,6 @@ Linux 与 Windows 均只有源码。Windows protected-DACL parser 尚未实现�
 
 ## 仍未验收
 
-未验收 Rust compile、unit/source-contract test、Linux/Windows filesystem 与 ACL、locked memory/zeroization、SQLite upgrade/reopen/concurrency/crash、生产 mount/secret、HTTP/TCP、Sidecar/transport、authenticated no-work probe、runtime identity、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification 或 settlement。
+未验收 Linux 编译与 filesystem syscall，Windows protected DACL/真实 bundle path/`VirtualLock`，Drop 后内存取证式 zeroization，SQLite upgrade/reopen/concurrency/crash、生产 mount/secret、HTTP/TCP、Sidecar/transport、authenticated no-work probe、runtime identity、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification或 settlement。
 
-因此本批只能记录：`implementation_uncompiled / implementation_unrun / source_review_only / passed=0`。SQLite 与 filesystem 非原子；V253 只认证逻辑 credential subject，不证明 `credential.bin` exact bytes。后续不得因 V256 resolve 源码存在或一次 resolve 成功而删除 V254 absolute deny 或宣称 production readiness。
+因此本批记录为 `implementation_partially_verified / local_target_verified / passed=14`。SQLite 与 filesystem 非原子；V253 只认证逻辑 credential subject，不证明 `credential.bin` exact bytes。后续不得因 V256 局部测试通过或一次 resolve 成功而删除 V254 absolute deny 或宣称 production readiness。

@@ -10,7 +10,7 @@ verification_status: source_review_only
 
 ## 本批状态
 
-V257 只交付 Linux-only exact entrypoint capsule preparation、Store-private V250/V252/V253 同时点聚合、权威文档和 source-contract test 源码。按架构铺设阶段约束，本批不编译、不执行 migration、不运行测试或服务，不读取真实 mount/secret，不创建进程或网络连接；动态证据固定为 `passed=0`。
+V257 的 Linux-only exact entrypoint capsule preparation、Store-private V250/V252/V253 同时点聚合和 source-contract test 源码已随完整 `elon-server` Windows 测试目标编译通过。本批没有执行 V257 专项、migration、服务或 Linux syscall fixture，不读取真实 mount/secret，不创建进程或网络连接；动态证据仍固定为 `passed=0`。
 
 数据库 schema 保持 V255；没有 `migration_v257`、receipt、current view、HTTP/MCP/PC route。Windows 与其他平台固定 unavailable。Provider 保持 `registering`，`probe_observed=false`、`runtime_launch_ready=false`、`activation_ready=false`；V254 18 个 temporary absolute deny 原样保留。
 
@@ -53,6 +53,6 @@ V257 只交付 Linux-only exact entrypoint capsule preparation、Store-private V
 
 ## 仍未验收
 
-未验收 Rust compile、unit/source-contract tests、Linux syscall/seal/permission/Drop 行为、生产文件系统与 kernel 配置、SQLite upgrade/reopen/concurrency/crash、Windows、真实 secret、secret delivery、Sidecar/IPC、process isolation、authenticated no-work probe、runtime identity、ACK/event、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification 或 settlement。
+未验收 V257 unit/source-contract tests、Linux 编译和 syscall/seal/permission/Drop 行为、生产文件系统与 kernel 配置、SQLite upgrade/reopen/concurrency/crash、Windows运行、真实 secret、secret delivery、Sidecar/IPC、process isolation、authenticated no-work probe、runtime identity、ACK/event、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification 或 settlement。
 
-因此本批只能记录：`implementation_uncompiled / implementation_unrun / source_review_only / passed=0`。V257 不是 runtime、probe 或 activation；后续不得因一次 capsule preparation 或三条签名 evidence current 而删除 V254 absolute deny 或宣称 production readiness。
+因此本批只能记录：`implementation_compiled_unrun / source_review_only / passed=0`。V257 不是 runtime、probe 或 activation；后续不得因编译通过、一次 capsule preparation 或三条签名 evidence current 而删除 V254 absolute deny 或宣称 production readiness。
