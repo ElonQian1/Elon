@@ -199,6 +199,7 @@ async fn mcp_handler(
             tools.extend(crate::open_commerce_consumer_authorization_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_discovery_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_preference_mcp::definitions());
+            tools.extend(crate::open_commerce_consumer_order_closure::definitions());
             tools.extend(crate::open_commerce_consumer_receipt_mcp::definitions());
             tools.extend(crate::open_commerce_merchant_evidence_mcp::definitions());
             tools.extend(crate::open_commerce_business_handoff_mcp::definitions());
@@ -357,6 +358,14 @@ pub(crate) async fn call_tool_for_platform_role(
         return tool_response(value);
     }
     if let Some(value) = crate::open_commerce_consumer_receipt_mcp::call_if_handled(
+        store,
+        user_id,
+        name,
+        arguments.clone(),
+    )? {
+        return tool_response(value);
+    }
+    if let Some(value) = crate::open_commerce_consumer_order_closure::call_if_handled(
         store,
         user_id,
         name,

@@ -342,6 +342,7 @@ mod open_commerce_consumer_constraints;
 mod open_commerce_consumer_discovery_mcp;
 mod open_commerce_consumer_execution_plan;
 mod open_commerce_consumer_model;
+mod open_commerce_consumer_order_closure;
 mod open_commerce_consumer_preference_api;
 mod open_commerce_consumer_preference_mcp;
 mod open_commerce_consumer_preference_migration;

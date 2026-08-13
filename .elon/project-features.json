@@ -126,7 +126,7 @@
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
-      "status": "accepted",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/open-commerce-consumer-order-closure-v1.md",
@@ -174,9 +174,88 @@
         "funds_moved 固定 false 且订单金额与调用计量分离",
         "HTTP 与 MCP 共用服务并通过 Rust/SQLite 验证"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "7d5890f8e79b7bd25651fa5c4172664c28636b7cc184144ee7e7b7d1b6f78b4d",
+          "locator": "consumer order closure current fact",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
+            "head_blob_oid": "a8d9e9bae4f3ec6380fb7c50e80d78e9ddbc15a9",
+            "worktree_blob_oid": "5f4a1f8d5b2e48683a665d3f9184b43a8be36ef8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/open-commerce-consumer-order-closure-v1-acceptance.md",
+          "content_hash": "c3db5b4be94e7f66cc879c4980a4ef1db9005134a253e6ada6152d4df89813b7",
+          "locator": "verification fingerprint 88e72aa",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3733b4fd1ae896bd4292ea270adb55fbd072c989",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_consumer_order_closure/api.rs",
+          "content_hash": "bf0b18079cd565ccda26b4cc336acd061b0c4e4f35c0d9b85072171de5524bc3",
+          "locator": "routes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "37696b87194594aaac50f75ff56a4df914c302da",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_consumer_order_closure/mcp.rs",
+          "content_hash": "d19561fb71e59d6eb712f5316c02bfdf465c4b5f2f5098242e10e4b864db36d4",
+          "locator": "open_commerce_get_my_order_closure",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "96e69bfd7c8680a6b5949e7b76744385c38cd8a3",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_consumer_order_closure/service.rs",
+          "content_hash": "200a18e73f130fffb967b72423fc6ee72487b26a93c4d018fd96fc5e543858a4",
+          "locator": "get_order_closure",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f6175b383f051cfeef23356ffef49634cc83eee6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_consumer_order_closure/tests.rs",
+          "content_hash": "96efd97597d2194481b80286609f147e5b0c3e89a83744e4dc3fbeba2164ebd4",
+          "locator": "4 targeted Rust/SQLite tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0c67a0dca037941b742fca56e9b3d128577d11ab",
+            "state": "untracked"
+          }
+        }
+      ],
       "created_at_ms": 1786626114513,
-      "updated_at_ms": 1786626114513
+      "updated_at_ms": 1786628571617
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -744,6 +823,66 @@
       "from_status": "",
       "to_status": "accepted",
       "at_ms": 1786626114513
+    },
+    {
+      "id": "feature_event_e18bd2454d334bf79831bdd4a0b23b1e",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "需求已提交，范围只读、真源和隐私边界明确，现有依赖均已存在。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786626165590
+    },
+    {
+      "id": "feature_event_fb3f032266904f57a46839831ccb3fdf",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786626184885
+    },
+    {
+      "id": "feature_event_ad6c411d139346eea63f79675915dd4e",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "开始实现消费者本人权限下的只读订单闭环聚合与 HTTP/MCP 入口。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786626204872
+    },
+    {
+      "id": "feature_event_b710797b079047ea9406a74fc42901ac",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786628523151
+    },
+    {
+      "id": "feature_event_9445097de53b4ede81fe0e55e9a7faff",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "只读聚合服务、HTTP/MCP 入口、隐私投影和四态测试已完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786628571543
+    },
+    {
+      "id": "feature_event_b60c0bd884174e9fa699099c0a327a03",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Rust server 编译及 4 项定向 Rust/SQLite 测试通过，验证指纹 88e72aa16558。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786628571617
     }
   ]
 }
