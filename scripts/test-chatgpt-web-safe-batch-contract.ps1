@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $path = Join-Path $PSScriptRoot "smoke-chatgpt-web-safe-batch.ps1"
 $runtimePath = Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1"
 $source = Get-Content -LiteralPath $path -Raw
+$runtimeSource = Get-Content -LiteralPath $runtimePath -Raw
 $tokens = $null
 $parseErrors = $null
 [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -38,6 +39,8 @@ $required = @(
     "Stop-ChatGptWebSmokeAwakeLease",
     "ExpectedHardwareSerial = `$ExpectedHardwareSerial",
     "ExpectedAdapterVersion = `$ExpectedAdapterVersion",
+    "Restore-ChatGptWebSmokeInteractiveBaseline",
+    "CHATGPT_WEB_SAFE_CASE_BASELINE=ready",
     'id = "read_only_surface"',
     'AllowStaleDeviceEvidence = $true',
     'id = "feature_pages"',
@@ -54,6 +57,10 @@ $required = @(
     "cleared_cookies = `$false",
     "cleared_app_data = `$false",
     "& `$path @caseArguments",
+    'CHATGPT_WEB_SAFE_CASE_PROGRESS=running',
+    'CHATGPT_WEB_SAFE_CASE_PROGRESS=passed',
+    'CHATGPT_WEB_SAFE_CASE_PROGRESS=failed',
+    "elapsed_seconds",
     "CHATGPT_WEB_SAFE_ACCEPTANCE_BATCH_STATUS=passed"
 )
 foreach ($needle in $required) {
@@ -69,6 +76,20 @@ if (
     $source.Contains(".Take(")
 ) {
     throw "Safe acceptance batch must not send messages or clear user session data."
+}
+
+$runtimeRequired = @(
+    "function Restore-ChatGptWebSmokeInteractiveBaseline",
+    'page_kind -in @("conversation", "home")',
+    'region -in @("overlay", "dialog")',
+    'Action "chatgpt_new_conversation"',
+    'blank_conversation_requested = $blankConversationRequested',
+    'ConvertTo-ChatGptWebSmokeSafeDiagnostic'
+)
+foreach ($needle in $runtimeRequired) {
+    if (-not $runtimeSource.Contains($needle)) {
+        throw "ChatGPT Web safe baseline contract is missing: $needle"
+    }
 }
 
 foreach ($childScript in @(

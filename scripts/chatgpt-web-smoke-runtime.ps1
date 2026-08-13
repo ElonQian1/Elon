@@ -463,6 +463,89 @@ function Open-ChatGptWebSmokeSurface {
         -EnsureMainActivity
 }
 
+function Restore-ChatGptWebSmokeInteractiveBaseline {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [ValidateRange(10, 180)][int]$TimeoutSec = 60,
+        [ValidateRange(1, 5)][int]$MaxBackAttempts = 3
+    )
+
+    Open-ChatGptWebSmokeSurface -Runtime $Runtime | Out-Null
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $backAttempts = 0
+    $blankConversationRequested = $false
+    $last = $null
+    do {
+        $last = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+        if ($last.login_required -eq $true -or [string]$last.page_kind -eq "auth") {
+            throw "ChatGPT Web interactive baseline requires an authenticated session."
+        }
+        if ([string]$last.view_mode -notin @("web", "official")) {
+            Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "chatgpt_select_view" `
+                -Arguments @{ view_mode = "official" } | Out-Null
+            Start-Sleep -Milliseconds 500
+            continue
+        }
+
+        $blockingControls = @(
+            @($last.ui_manifest.controls) |
+                Where-Object { [string]$_.region -in @("overlay", "dialog") }
+        )
+        $interactivePage = [string]$last.page_kind -in @("conversation", "home")
+        if (
+            $last.surface -eq "chatgpt_web" -and
+            $last.bridge_state -eq "ready" -and
+            $last.adapter_current -eq $true -and
+            $last.authenticated -eq $true -and
+            $last.composer_ready -eq $true -and
+            $interactivePage -and
+            $blockingControls.Count -eq 0
+        ) {
+            return [pscustomobject]@{
+                schema = "elon.chatgpt_web.interactive_baseline.v1"
+                ready = $true
+                recovery = if ($blankConversationRequested) {
+                    "blank_conversation"
+                } elseif ($backAttempts -gt 0) {
+                    "back_navigation"
+                } else {
+                    "none"
+                }
+                back_attempts = $backAttempts
+                blank_conversation_requested = $blankConversationRequested
+            }
+        }
+
+        if (
+            $blockingControls.Count -gt 0 -or
+            [string]$last.page_kind -eq "feature"
+        ) {
+            if ($backAttempts -lt $MaxBackAttempts) {
+                Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+                    -Arguments @("shell", "input", "keyevent", "4") `
+                    -TimeoutSec 8 -Label "restore ChatGPT Web interactive baseline" | Out-Null
+                $backAttempts += 1
+                Start-Sleep -Seconds $Runtime.poll_interval_sec
+                if (-not (Test-ChatGptWebSmokeActivityForeground -Runtime $Runtime)) {
+                    Open-ChatGptWebSmokeSurface -Runtime $Runtime | Out-Null
+                }
+                continue
+            }
+            if (-not $blankConversationRequested) {
+                Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+                    -Action "chatgpt_new_conversation" | Out-Null
+                $blankConversationRequested = $true
+                Start-Sleep -Seconds $Runtime.poll_interval_sec
+                continue
+            }
+        }
+        Start-Sleep -Seconds $Runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+
+    $lastPage = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $last.page_kind -MaxLength 32
+    throw "Timed out restoring ChatGPT Web interactive baseline. Last page=$lastPage."
+}
+
 function Wait-ChatGptWebSmokeAuthenticatedReady {
     param(
         [Parameter(Mandatory = $true)]$Runtime,

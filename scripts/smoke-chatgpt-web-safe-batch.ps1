@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 89,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 90,
     [switch]$SkipUnlockNotification
 )
 
@@ -76,14 +76,42 @@ try {
     $results = [System.Collections.Generic.List[object]]::new()
     foreach ($case in $cases) {
         $path = Join-Path $PSScriptRoot $case.script
+        $caseWatch = [System.Diagnostics.Stopwatch]::StartNew()
+        Write-Output "CHATGPT_WEB_SAFE_CASE_PROGRESS=running case=$($case.id)"
         try {
+            $baseline = Restore-ChatGptWebSmokeInteractiveBaseline `
+                -Runtime $runtime -TimeoutSec ([Math]::Min(60, $ReadyTimeoutSec))
+            Write-Output (
+                "CHATGPT_WEB_SAFE_CASE_BASELINE=ready case=$($case.id) " +
+                    "recovery=$($baseline.recovery)"
+            )
             $caseArguments = $case.arguments
             & $path @caseArguments | Out-Null
-            $results.Add([pscustomobject]@{ id = $case.id; passed = $true; detail = "" })
+            $caseWatch.Stop()
+            $results.Add([pscustomobject]@{
+                id = $case.id
+                passed = $true
+                detail = ""
+                elapsed_seconds = [Math]::Round($caseWatch.Elapsed.TotalSeconds, 1)
+            })
+            Write-Output (
+                "CHATGPT_WEB_SAFE_CASE_PROGRESS=passed case=$($case.id) " +
+                    "elapsed_seconds=$([Math]::Round($caseWatch.Elapsed.TotalSeconds, 1))"
+            )
         } catch {
+            $caseWatch.Stop()
             $detail = ([string]$_.Exception.Message).Replace("`r", " ").Replace("`n", " ").Trim()
             if ($detail.Length -gt 160) { $detail = $detail.Substring(0, 160) }
-            $results.Add([pscustomobject]@{ id = $case.id; passed = $false; detail = $detail })
+            $results.Add([pscustomobject]@{
+                id = $case.id
+                passed = $false
+                detail = $detail
+                elapsed_seconds = [Math]::Round($caseWatch.Elapsed.TotalSeconds, 1)
+            })
+            Write-Output (
+                "CHATGPT_WEB_SAFE_CASE_PROGRESS=failed case=$($case.id) " +
+                    "elapsed_seconds=$([Math]::Round($caseWatch.Elapsed.TotalSeconds, 1))"
+            )
         }
     }
 
