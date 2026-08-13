@@ -3,7 +3,7 @@ title: 外部矿池 Provider 激活候选与 owner delegation 权威
 status: current
 reviewed_at: 2026-08-13
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Provider 激活候选与 owner delegation 权威
@@ -54,3 +54,9 @@ admin 只有 currentness/preflight GET，位于同形 `/api/admin/compute/extern
 V254 之后仍是 NO-GO。下一批若要推进 `registering -> active`，必须在同一 `BEGIN IMMEDIATE` 内重新消费 V249 Prepared、同次 current V250/V252/V253、未撤销 candidate/delegation、精确 owner-issued service actor、Provider-specific v213 compatibility/route authority，并原子创建所有 runtime authority与 Provider 新版本。secret resolver、sidecar/transport、Start send/ACK 生产实现没有 readiness/currentness 证明时不得激活。
 
 V254 已安装 temporary absolute deny：`external_pool` CapacityPool 的 `active` insert/update/version，以及 Offer 的 `draft|active` insert/update/version 均由数据库触发器失败关闭，并覆盖 direct SQL；Provider kind 进入或离开 `external_pool` 也固定失败，避免借 legacy 身份绕过。下一 atomic activation 批不得简单删除这些 fence，而必须在同一事务显式替换为完整 admission gate：验证 Provider exact current `active` revision/digest、activation authority current、runtime readiness current、route/credential/service actor current 后，才允许 CapacityPool 从任何前置状态进入 `active`，或 Offer 从任何前置状态进入 `draft|active`。legacy Provider 继续走原路径；新 gate 只在 `provider_kind=external_pool` 时启用。直接 SQL、已有 Offer 状态推进、version/replay 都必须由约束/触发器或同一 Store kernel 覆盖，不能只在 HTTP 层检查。
+
+## 6. 当前验证证据
+
+V254 已通过 8 项 migration/源码合同测试与 2 项进程内 Axum HTTP 测试。验证覆盖 fresh current schema 与重复 V254 migration、三张持久化表与物化投影的一致性、静态根与动态 preflight 分离、线性 lineage 和撤销终态、temporary fence/precheck 源码合同，以及 owner/admin 鉴权、未知字段拒绝、创建/重放、currentness、dynamic preflight、脱敏、零经济副作用与撤销失败关闭。正式验证指纹为 `806e156cb21d15700a304cf6d0843a793ef4a1c97c623af85dca985d0f4c000b`，回执为 `bbd5addbb5ae1bb71ca86d687fe6c38e2c0e6cebcdadf29511906e18e6278af9`。
+
+这些证据不包含 V253→V254 文件数据库原位升级、重复 migration、文件重开、并发/崩溃、真实 TCP、生产数据库、MCP/PC、真实 secret custody、Sidecar/transport、Runner/ACK、market、usage 或 settlement。V254 因此仍是 inert candidate 的局部验收，不是 Provider activation 或生产 readiness 证明。

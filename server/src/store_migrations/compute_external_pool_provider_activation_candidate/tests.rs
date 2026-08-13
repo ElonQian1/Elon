@@ -10,6 +10,35 @@ const PERSISTENCE: &str =
     include_str!("../../store/compute_external_pool_provider_activation_candidate/persistence.rs");
 
 #[test]
+fn v254_migration_is_repeatable_on_fresh_current_schema() {
+    let connection = rusqlite::Connection::open_in_memory().unwrap();
+    crate::store_schema::apply_migrations(&connection).unwrap();
+    migration_v254(&connection).unwrap();
+    migration_v254(&connection).unwrap();
+
+    for object in [
+        "compute_external_pool_provider_activation_delegations",
+        "compute_external_pool_provider_activation_candidates",
+        "compute_external_pool_provider_activation_delegation_revocations",
+        "external_pool_provider_activation_delegation_exact_roots",
+        "external_pool_provider_activation_candidate_lineage",
+        "external_pool_provider_activation_revocation_json_projection",
+        "v254_external_pool_provider_activation_fence",
+        "v254_external_pool_capacity_pool_insert_active_fence",
+        "v254_external_pool_offer_insert_market_fence",
+    ] {
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name=?1",
+                [object],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1, "missing or duplicated V254 object {object}");
+    }
+}
+
+#[test]
 fn v254_persistence_columns_match_frozen_tables() {
     for (table, expected) in [
         ("compute_external_pool_provider_activation_delegations", 41),
@@ -94,7 +123,7 @@ fn v254_full_json_projection_covers_every_persisted_scalar() {
     ] {
         let columns = insert_columns(PERSISTENCE, table);
         assert_eq!(columns.len(), top + material);
-        for column in columns.into_iter().filter(|column| column != json) {
+        for column in columns.into_iter().filter(|column| *column != json) {
             assert!(
                 PROJECTION.contains(&format!("\"{column}\"")),
                 "projection lacks {table}.{column}"
@@ -226,7 +255,7 @@ fn v254_upgrade_precheck_refuses_preexisting_partial_activation() {
     }
 }
 
-fn insert_columns(source: &str, table: &str) -> Vec<&str> {
+fn insert_columns<'a>(source: &'a str, table: &str) -> Vec<&'a str> {
     let marker = format!("INSERT INTO {table}(");
     let after = source
         .split_once(&marker)
