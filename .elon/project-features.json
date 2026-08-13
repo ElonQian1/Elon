@@ -123,6 +123,67 @@
       "updated_at_ms": 1786625457423
     },
     {
+      "id": "delivery-allocation-expiry-worker-v234-verification",
+      "title": "v234 Delivery Allocation 到期公平恢复验收",
+      "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/distributed-compute/delivery-allocation-authority.md",
+        "content_hash": "bc42819db5f84e46d1cd12f5a9582e1c7ae9c97317f7a008ea22b79fa54c6de2",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "db954af521c548703b5d9f8a6b4848398d3c987a",
+          "head_blob_oid": "162a6662a72d1352d89c75fdadf0d1aa2a973856",
+          "worktree_blob_oid": "162a6662a72d1352d89c75fdadf0d1aa2a973856",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-compute",
+      "tags": [
+        "distributed-compute",
+        "delivery-allocation",
+        "v234",
+        "expiry-recovery",
+        "verification"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/delivery-allocation-acceptance.md",
+        "docs/distributed-compute/delivery-allocation-authority.md",
+        "server/src/compute_federation/delivery_allocation_expiry_worker.rs",
+        "server/src/compute_federation/delivery_allocation_expiry_worker_tests.rs",
+        "server/src/compute_federation/delivery_allocation_reservation_expiry_api_tests.rs",
+        "server/src/compute_federation/delivery_allocation_reservation_expiry_store_tests.rs",
+        "server/src/store/compute_delivery_allocations/reservation_expiry_recovery.rs",
+        "server/src/store/compute_delivery_allocations/reservation_expiry_scan.rs",
+        "server/src/store_migrations/compute_delivery_allocation_expiry_worker.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "v234 源码完成完整 elon-server 测试目标真实编译",
+        "fresh current schema 与重复 v234 migration 通过并保留单一 checkpoint/index/trigger 合同",
+        "Store/worker 测试覆盖到期退款、容量归还、幂等、固定 cutoff/keyset、公平越过失败项、文件重开和下一 sweep 重试",
+        "HTTP 测试覆盖 admin/owner、无会话、普通成员、未知字段、确认和 limit 边界",
+        "文档明确 Grant/Commitment 终态不改写，Provider 收益、settlement、真实支付与生产派发均无副作用",
+        "未覆盖并发 CAS、崩溃、历史库升级、真实 TCP 与生产 worker 的范围保持未验收"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_bd7a5e39bb014c03a6f30048ee2bc06f",
+        "agent_id": "codex-goal-019f3b86",
+        "claimed_at_ms": 1786638416750,
+        "expires_at_ms": 1786652816750
+      },
+      "created_at_ms": 1786638401675,
+      "updated_at_ms": 1786638416777
+    },
+    {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
@@ -1525,6 +1586,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786638099721
+    },
+    {
+      "id": "feature_event_af144d2f171348a3b257062fab4aa99b",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Goal 持续批次：收敛已有 v234 source_written/passed=0 候选。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786638401675
+    },
+    {
+      "id": "feature_event_67a2a4f65d744e10ac480febfe62d801",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "已复核 v234 权威与现有测试，范围只做本地运行验收。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786638416707
+    },
+    {
+      "id": "feature_event_57b00e3675144b268b19a19686b64648",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "无需外部依赖，测试入口与 NO-GO 边界明确。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786638416738
+    },
+    {
+      "id": "feature_event_a0eed1d35b584ecb83e3fc4d2cd3eae7",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786638416751
+    },
+    {
+      "id": "feature_event_4072a067cd5a4590bead1dfd5df4a13c",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "开始真实编译并运行 v234 expiry worker 定向测试。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786638416777
     }
   ]
 }
