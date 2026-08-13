@@ -11,7 +11,7 @@
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
-  const overlayPolicy = window.__elonChatGptOverlayPolicy;
+  const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy;
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -651,16 +651,15 @@
 
   function invoke(id, emitEvent, result) {
     discover();
-    const node = controlsById.get(String(id || ''));
-    const control = controlMetadataById.get(String(id || ''));
+    const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
+    const contextMenuRetry = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots);
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
     function dispatch() {
       if (!node.isConnected || !isVisible(node)) {
         return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
       }
       const rect = node.getBoundingClientRect();
-      const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
-      const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
+      const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth); const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
       if (!isInViewport(rect) || xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
         return result('invoke_ui_control', false, '官网控件滚动后仍不在可操作区域。');
       }
@@ -674,8 +673,10 @@
         if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }
       emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
-      result('invoke_ui_control', true, '');
-      window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
+      result('invoke_ui_control', true, ''); window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
+      contextMenuRetry && contextMenuRetry(() => {
+        if (node.isConnected && isVisible(node)) emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
+      });
     }
     const rect = node.getBoundingClientRect();
     if (isInViewport(rect)) return dispatch();

@@ -5,6 +5,7 @@
 
   const MAX_CONVERSATIONS = 100;
   const MAX_PROJECTS = 40;
+  const projectPolicy = window.__elonChatGptProjectPolicy;
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/(g-p-[A-Za-z0-9_-]{1,160})\/c\/[A-Za-z0-9_-]{1,160})$/;
   const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
   const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|pinned|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早|已置顶)$/i;
@@ -56,6 +57,19 @@
   }
 
   function readProjects() {
+    if (projectPolicy && typeof projectPolicy.read === 'function') {
+      return projectPolicy.read(document, isVisible, (node) => cleanText(
+        node.getAttribute('data-project-title') ||
+          node.getAttribute('title') ||
+          node.getAttribute('aria-label') ||
+          node.textContent
+      )).map(({ id, title, path }) => ({
+        id,
+        title,
+        path,
+        active: location.pathname.startsWith('/g/' + id + '/')
+      })).slice(0, MAX_PROJECTS);
+    }
     const seen = new Set();
     return Array.from(document.querySelectorAll('a[href*="/g/g-p-"]')).map((node) => {
       const path = sameOriginPath(node);
@@ -333,8 +347,15 @@
     if (!PROJECT_PATH.test(path)) {
       return result('open_project', false, '项目地址无效。');
     }
-    const target = Array.from(document.querySelectorAll('a[href*="/g/g-p-"]'))
-      .find((node) => sameOriginPath(node) === path);
+    const target = projectPolicy && typeof projectPolicy.findNode === 'function'
+      ? projectPolicy.findNode(document, path, isVisible, (node) => cleanText(
+          node.getAttribute('data-project-title') ||
+            node.getAttribute('title') ||
+            node.getAttribute('aria-label') ||
+            node.textContent
+        ))
+      : Array.from(document.querySelectorAll('a[href*="/g/g-p-"]'))
+        .find((node) => sameOriginPath(node) === path);
     result('open_project', true, '');
     if (target) target.click();
     else location.assign(new URL(path, location.origin).href);

@@ -14,6 +14,8 @@
 
   [
     '__elonChatGptConversations',
+    '__elonChatGptProjectPolicy',
+    '__elonChatGptContextMenuPolicy',
     '__elonChatGptConversationHistory',
     '__elonChatGptMessageActionPolicy',
     '__elonChatGptMessages',
