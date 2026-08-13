@@ -11,6 +11,7 @@ class ChatGptWebSideMenuContractTest {
     @Test
     fun socialAiSidebarKeepsDateStripAndShowsDailyWebConversations() {
         val view = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt")
+        val dateStrip = read("android/app/src/main/kotlin/com/elon/app/ChatSocialSideMenuDateStrip.kt")
         val controller = read("android/app/src/main/kotlin/com/elon/app/ChatSideMenuController.kt")
 
         assertTrue(view.contains("createSocialSidebarDateStrip("))
@@ -18,6 +19,7 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(view.contains("val countLabel = \"\$activeCount 个活跃 · 共 \${state.conversations.size} 个会话\""))
         assertTrue(view.contains("renderProjects(this)"))
         assertTrue(view.contains("ChatGptNativeNavigationSelector::date"))
+        assertTrue(dateStrip.contains("isSelected = selected"))
         assertTrue(controller.contains("applyChatSideMenuContentMode("))
         assertTrue(controller.contains("sideMenus.webChat.attach("))
     }

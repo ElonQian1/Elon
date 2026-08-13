@@ -58,6 +58,7 @@ private fun socialSidebarDateCell(
     contentDescription: String,
 ): FrameLayout = FrameLayout(context).apply {
     isClickable = true
+    isSelected = selected
     foreground = selectableForeground()
     this.contentDescription = contentDescription
     if (selected) addView(ImageView(context).apply {
