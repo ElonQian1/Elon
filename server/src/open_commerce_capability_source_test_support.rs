@@ -15,23 +15,23 @@ use crate::{
     store::Store,
 };
 
-pub(super) struct Fixture {
-    pub(super) store: Store,
-    pub(super) owner_id: String,
-    pub(super) viewer_id: String,
-    pub(super) project_id: String,
-    pub(super) other_project_id: String,
-    pub(super) merchant_id: String,
-    pub(super) capability_id: String,
-    pub(super) integration_id: String,
-    pub(super) other_merchant_integration_id: String,
-    pub(super) other_project_integration_id: String,
-    pub(super) succeeded_receipt_id: String,
-    pub(super) partial_receipt_id: String,
-    pub(super) health_receipt_id: String,
-    pub(super) failed_receipt_id: String,
-    pub(super) other_integration_receipt_id: String,
-    pub(super) other_project_receipt_id: String,
+pub(crate) struct Fixture {
+    pub(crate) store: Store,
+    pub(crate) owner_id: String,
+    pub(crate) viewer_id: String,
+    pub(crate) project_id: String,
+    pub(crate) other_project_id: String,
+    pub(crate) merchant_id: String,
+    pub(crate) capability_id: String,
+    pub(crate) integration_id: String,
+    pub(crate) other_merchant_integration_id: String,
+    pub(crate) other_project_integration_id: String,
+    pub(crate) succeeded_receipt_id: String,
+    pub(crate) partial_receipt_id: String,
+    pub(crate) health_receipt_id: String,
+    pub(crate) failed_receipt_id: String,
+    pub(crate) other_integration_receipt_id: String,
+    pub(crate) other_project_receipt_id: String,
 }
 
 impl Fixture {
@@ -62,7 +62,7 @@ impl Fixture {
     }
 }
 
-pub(super) fn fixture(name: &str) -> Fixture {
+pub(crate) fn fixture(name: &str) -> Fixture {
     let path = std::env::temp_dir().join(format!(
         "elon-open-commerce-capability-source-{name}-{}.sqlite",
         Uuid::new_v4().simple()
@@ -324,7 +324,7 @@ fn receipt(
     .unwrap()
 }
 
-pub(super) fn publish_directory(fixture: &Fixture) {
+pub(crate) fn publish_directory(fixture: &Fixture) {
     open_commerce_directory_service::set_publication(
         &fixture.store,
         &fixture.project_id,
@@ -335,7 +335,7 @@ pub(super) fn publish_directory(fixture: &Fixture) {
     .unwrap();
 }
 
-pub(super) fn assert_source_kind(fixture: &Fixture, expected: &str) {
+pub(crate) fn assert_source_kind(fixture: &Fixture, expected: &str) {
     let detail =
         open_commerce_directory_service::discover_merchant(&fixture.store, &fixture.merchant_id)
             .unwrap();
@@ -348,7 +348,7 @@ pub(super) fn assert_source_kind(fixture: &Fixture, expected: &str) {
     assert_eq!(source.kind, expected);
 }
 
-pub(super) fn current_link(fixture: &Fixture) -> OpenCommerceCapabilitySourceLink {
+pub(crate) fn current_link(fixture: &Fixture) -> OpenCommerceCapabilitySourceLink {
     fixture
         .store
         .list_project_open_commerce_capability_source_links(&fixture.project_id)
@@ -358,7 +358,7 @@ pub(super) fn current_link(fixture: &Fixture) -> OpenCommerceCapabilitySourceLin
         .unwrap()
 }
 
-pub(super) fn source_audit_count(fixture: &Fixture) -> usize {
+pub(crate) fn source_audit_count(fixture: &Fixture) -> usize {
     fixture
         .store
         .list_project_open_commerce_audit(&fixture.project_id, 200)

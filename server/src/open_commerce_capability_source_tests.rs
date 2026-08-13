@@ -1,4 +1,4 @@
-use super::{link_source, remove_source};
+use super::{link_source, remove_source, test_support as support};
 use crate::{
     open_commerce_capability_source_migration::migration_v164,
     open_commerce_capability_source_model::LinkCapabilitySourceRequest,
@@ -6,8 +6,6 @@ use crate::{
     open_commerce_service,
 };
 
-#[path = "open_commerce_capability_source_test_support.rs"]
-mod support;
 use support::{assert_source_kind, current_link, fixture, publish_directory, source_audit_count};
 
 #[test]

@@ -57,3 +57,7 @@ fn require_editor(actor: &OpenCommerceActor<'_>) -> Result<()> {
 #[cfg(test)]
 #[path = "open_commerce_capability_source_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "open_commerce_capability_source_test_support.rs"]
+pub(crate) mod test_support;

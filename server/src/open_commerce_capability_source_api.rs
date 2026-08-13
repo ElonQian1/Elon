@@ -11,7 +11,7 @@ use crate::{
     open_commerce_capability_source_model::LinkCapabilitySourceRequest,
     open_commerce_capability_source_service,
     open_commerce_service::OpenCommerceActor,
-    project_auth::{auth_from_headers, json_error, project_access},
+    project_auth::{auth_from_headers, can_edit, json_error, project_access},
     types::AppState,
 };
 
@@ -67,6 +67,9 @@ fn project_caller(
         .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error))?;
     let access = project_access(state, &user.id, project_id)
         .map_err(|error| json_error(StatusCode::FORBIDDEN, error))?;
+    if !can_edit(&access.role) {
+        return Err(json_error(StatusCode::FORBIDDEN, "需要项目编辑权限"));
+    }
     Ok((user.id, access.role))
 }
 
@@ -84,3 +87,7 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
         Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
     }
 }
+
+#[cfg(test)]
+#[path = "open_commerce_capability_source_api_tests.rs"]
+mod tests;
