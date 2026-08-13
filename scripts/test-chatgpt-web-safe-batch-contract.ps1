@@ -44,6 +44,7 @@ $required = @(
     'id = "settings_structure"',
     'id = "session_recovery"',
     'id = "conversation_management_structure"',
+    'TimeoutSec = $ReadyTimeoutSec',
     "user_assisted_remaining",
     "attachment_lifecycle",
     "dictation_audio_capture",

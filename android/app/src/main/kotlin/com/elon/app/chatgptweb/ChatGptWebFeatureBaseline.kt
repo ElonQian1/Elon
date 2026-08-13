@@ -373,6 +373,13 @@ internal object ChatGptWebFeatureBaseline {
             semantics = setOf("new_conversation", "conversation"),
         ),
         feature(
+            id = "temporary_chat",
+            group = "history",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("chatgpt_find_controls", "chatgpt_invoke_control"),
+            semantics = setOf("temporary_chat"),
+        ),
+        feature(
             id = "model_selection",
             group = "composer",
             acceptance = Acceptance.INTERACTIVE_DEVICE,

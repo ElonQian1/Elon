@@ -5,6 +5,7 @@ internal object ChatGptNativeNavigationSelector {
     const val CONVERSATION_LIST_TRIGGER = "chatgpt-native:conversation-list:会话历史"
     const val FEATURE_LIST_TRIGGER = "chatgpt-native:feature-list:ChatGPT 功能"
     const val NEW_CONVERSATION = "chatgpt-native:new-conversation:新建会话"
+    const val TEMPORARY_CHAT = "chatgpt-native:temporary-chat:临时聊天"
     const val COMPOSER_INPUT = "chatgpt-native:composer-input:消息输入"
     const val COMPOSER_MODEL_TRIGGER = "chatgpt-native:composer-model:模型与能力"
     const val COMPOSER_TOOLS_TRIGGER = "chatgpt-native:composer-tools:工具与附件"

@@ -67,6 +67,9 @@
     if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
     if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
     if (/^(?:chats?|聊天|整理聊天)$/.test(label || signal)) return 'conversation_group';
+    if (/temporary\s+(?:chat|conversation)|临时(?:聊天|对话)|暫時聊天/.test(label || signal)) {
+      return 'temporary_chat';
+    }
     if (/^(?:projects?|项目)$/.test(section)) return 'project';
     if (region === 'content') {
       const route = contentRoutes.find((candidate) => candidate.pattern.test(pathname));

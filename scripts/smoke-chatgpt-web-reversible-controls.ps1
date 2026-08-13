@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 86
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 87
 )
 
 $ErrorActionPreference = "Stop"
@@ -278,6 +278,30 @@ function Get-ControlMatch {
         Select-Object -First 1
 }
 
+function Get-TemporaryChatControl {
+    return @(Get-ManifestControls) |
+        Where-Object {
+            [string]$_.semantic -eq "temporary_chat" -and
+            [string]$_.region -eq "header" -and
+            $_.enabled -eq $true
+        } |
+        Select-Object -First 1
+}
+
+function Wait-TemporaryChatSelection {
+    param([Parameter(Mandatory = $true)][bool]$Expected)
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    do {
+        $control = Get-TemporaryChatControl
+        if ($null -ne $control -and [bool]$control.selected -eq $Expected) {
+            return $control
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Temporary Chat did not reach the requested selected state."
+}
+
 Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
     -EnsureMainActivity | Out-Null
 $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
@@ -293,6 +317,35 @@ Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originViewMode = [string]$origin.view_mode
 $originConversationPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url)
+
+$temporaryChatOrigin = Get-TemporaryChatControl
+if ($null -eq $temporaryChatOrigin) {
+    throw "Temporary Chat is not observable as a dedicated header control."
+}
+$temporaryChatOriginalSelected = [bool]$temporaryChatOrigin.selected
+$temporaryChatRestored = $false
+try {
+    Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
+        -ExpectedAction "invoke_ui_control" -Arguments @{
+            control_id = [string]$temporaryChatOrigin.control_id
+        } | Out-Null
+    $temporaryChatChanged = Wait-TemporaryChatSelection `
+        -Expected (-not $temporaryChatOriginalSelected)
+} finally {
+    $restoreTemporaryChat = Get-TemporaryChatControl
+    if ($null -eq $restoreTemporaryChat) {
+        throw "Temporary Chat control disappeared before restoration."
+    }
+    if ([bool]$restoreTemporaryChat.selected -ne $temporaryChatOriginalSelected) {
+        Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
+            -ExpectedAction "invoke_ui_control" -Arguments @{
+                control_id = [string]$restoreTemporaryChat.control_id
+            } | Out-Null
+    }
+    Wait-TemporaryChatSelection -Expected $temporaryChatOriginalSelected | Out-Null
+    $temporaryChatRestored = $true
+}
+if (-not $temporaryChatRestored) { throw "Temporary Chat state was not restored." }
 
 $modelRestored = $false
 $modelViewRestored = $false
@@ -409,7 +462,10 @@ if ($originViewMode -in @("web", "native")) {
 }
 
 Register-ChatGptWebVerificationCases -Runtime $runtime `
-    -CaseIds @("reversible/reversible_controls") `
+    -CaseIds @(
+        "reversible/reversible_controls",
+        "reversible/temporary_chat_toggle"
+    ) `
     -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
 [ordered]@{
@@ -427,6 +483,10 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
     disclosure_control = [ordered]@{
         idempotent_request_passed = $true
         original_state_restored = $disclosureRestored
+    }
+    temporary_chat = [ordered]@{
+        changed = $true
+        original_state_restored = $temporaryChatRestored
     }
     original_view_mode_restored = $modelViewRestored
 } | ConvertTo-Json -Depth 10

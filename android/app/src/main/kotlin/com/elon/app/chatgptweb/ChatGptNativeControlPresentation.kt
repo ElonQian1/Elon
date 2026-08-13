@@ -88,10 +88,12 @@ internal object ChatGptNativeControlPresentation {
         .toList()
 
     fun directSelector(control: ChatGptWebUiControl): String =
-        if (control.region == ChatGptWebUiRegion.SUGGESTIONS && control.semantic == "project") {
-            "chatgpt-project:${stableContextId(control.id)}"
-        } else {
-            control.accessibilityLabel
+        when {
+            control.region == ChatGptWebUiRegion.SUGGESTIONS && control.semantic == "project" ->
+                "chatgpt-project:${stableContextId(control.id)}"
+            control.region == ChatGptWebUiRegion.HEADER && control.semantic == "temporary_chat" ->
+                ChatGptNativeNavigationSelector.TEMPORARY_CHAT
+            else -> control.accessibilityLabel
         }
 
     fun usesHeaderIcon(control: ChatGptWebUiControl): Boolean = control.semantic == "sources"

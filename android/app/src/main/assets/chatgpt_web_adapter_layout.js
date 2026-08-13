@@ -267,6 +267,7 @@
       title: '切换工作区',
       profile: '账户',
       new_conversation: '新建会话',
+      temporary_chat: '临时聊天',
       attachment: '添加附件',
       model: '选择模型',
       dictation: '开始听写',

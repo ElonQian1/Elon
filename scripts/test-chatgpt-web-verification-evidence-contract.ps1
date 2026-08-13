@@ -9,7 +9,10 @@ $expected = [ordered]@{
         "safe/account_menu_structure",
         "reversible/send_probe"
     )
-    "smoke-chatgpt-web-reversible-controls.ps1" = @("reversible/reversible_controls")
+    "smoke-chatgpt-web-reversible-controls.ps1" = @(
+        "reversible/reversible_controls",
+        "reversible/temporary_chat_toggle"
+    )
     "smoke-chatgpt-web-tool-execution.ps1" = @(
         "reversible/tool_execution_with_citations",
         "reversible/composer_tool_execution/deep_research",

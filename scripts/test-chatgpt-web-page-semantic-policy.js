@@ -101,6 +101,9 @@ expectEqual(policy.classify({ pathname: '/', signal: '插件' }), 'apps', 'apps'
 expectEqual(policy.classify({ pathname: '/', signal: '已置顶' }), 'pinned', 'pinned');
 expectEqual(policy.classify({ pathname: '/', signal: '下载应用' }), 'download_app', 'download app');
 expectEqual(policy.classify({ pathname: '/', signal: '整理聊天' }), 'conversation_group', 'chat group');
+expectEqual(policy.classify({ pathname: '/', signal: '临时聊天' }), 'temporary_chat', 'temporary chat');
+expectEqual(policy.classify({ pathname: '/', signal: 'Temporary chat' }), 'temporary_chat', 'temporary chat English');
+expectEqual(policy.classify({ pathname: '/', signal: 'Temporary conversation' }), 'temporary_chat', 'temporary conversation');
 expectEqual(policy.classify({
   pathname: '/', region: 'overlay', signal: 'Personalization'
 }), 'personalization', 'account personalization');

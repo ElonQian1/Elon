@@ -9,6 +9,7 @@ internal object ChatGptWebAcceptanceCaseCatalog {
         "conversation_context_paging" to "safe/read_only_surface",
         "conversation_history" to "safe/read_only_surface",
         "conversation_create_and_switch" to "reversible/send_probe",
+        "temporary_chat" to "reversible/temporary_chat_toggle",
         "model_selection" to "reversible/reversible_controls",
         "attachment_lifecycle" to "supervised/attachment_lifecycle",
         "composer_tools" to "reversible/tool_execution_with_citations",

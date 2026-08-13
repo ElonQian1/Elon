@@ -10,6 +10,7 @@ internal object ChatGptWebUiSemantics {
         "title",
         "profile",
         "new_conversation",
+        "temporary_chat",
         "attachment",
         "model",
         WEB_SEARCH,

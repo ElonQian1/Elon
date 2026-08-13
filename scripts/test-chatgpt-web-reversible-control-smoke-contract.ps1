@@ -56,6 +56,11 @@ $required = @(
     '[string]$_.semantic -in @("model", "attachment")',
     "original_state_restored = `$modelRestored",
     "original_state_restored = `$disclosureRestored",
+    'semantic -eq "temporary_chat"',
+    "Wait-TemporaryChatSelection",
+    'ExpectedAction "invoke_ui_control"',
+    '"reversible/temporary_chat_toggle"',
+    "original_state_restored = `$temporaryChatRestored",
     "sent_messages = 0",
     "uploaded_attachments = 0",
     "CHATGPT_WEB_REVERSIBLE_CONTROL_SMOKE_STATUS=passed"

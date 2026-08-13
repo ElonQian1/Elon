@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory = $true)][ValidateSet("health", "finances")][string]$FeatureKind,
     [switch]$UserConfirmedSensitiveFeature,
     [ValidateRange(20, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 86
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 87
 )
 
 $ErrorActionPreference = "Stop"

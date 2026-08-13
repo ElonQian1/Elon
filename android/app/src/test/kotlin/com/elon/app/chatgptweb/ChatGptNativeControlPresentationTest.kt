@@ -70,6 +70,22 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun givesTemporaryChatAStableNativeHeaderSelector() {
+        val temporary = control(
+            "temporary",
+            "temporary_chat",
+            "临时聊天",
+            ChatGptWebUiRegion.HEADER,
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(temporary))
+            .getValue("temporary")
+
+        assertEquals("direct", coverage.kind.wireName)
+        assertEquals(ChatGptNativeNavigationSelector.TEMPORARY_CHAT, coverage.nativeSelector)
+    }
+
+    @Test
     fun givesOverlayEntriesStableNativeSelectorsAndTrigger() {
         val controls = listOf(
             control("timestamp", "timestamp", "今天，4:40", ChatGptWebUiRegion.OVERLAY),
