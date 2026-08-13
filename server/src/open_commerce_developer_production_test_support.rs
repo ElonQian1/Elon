@@ -25,6 +25,7 @@ pub(crate) struct ApprovedDeveloperFixture {
     pub(crate) project_id: String,
     pub(crate) owner_user_id: String,
     pub(crate) app: OpenCommerceDeveloperApp,
+    pub(crate) test_token: String,
     pub(crate) admission_id: String,
 }
 
@@ -63,6 +64,7 @@ pub(crate) fn approved_developer_fixture_for(
             },
         )
         .unwrap();
+    let test_token = created.test_token;
     let actor = OpenCommerceActor {
         user_id: &owner.id,
         app_id: "pc-web",
@@ -152,6 +154,7 @@ pub(crate) fn approved_developer_fixture_for(
         project_id: project.id,
         owner_user_id: owner.id,
         app,
+        test_token,
         admission_id: admission.id,
     }
 }

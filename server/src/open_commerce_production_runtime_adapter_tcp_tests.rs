@@ -229,6 +229,18 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(committed["result"]["order_id"], "order-consumer-runtime-1");
     assert_eq!(committed["settlement_receipt"]["funds_moved"], false);
 
+    let replayed = developer_post(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/invoke"),
+        &live.live_token,
+        &invocation,
+    )
+    .await;
+    assert_eq!(replayed["replayed"], true);
+    assert_eq!(replayed["invocation_id"], invocation_id);
+    assert_eq!(replayed["result"], committed["result"]);
+    assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 2);
+
     let events = developer_get(
         &client,
         &format!("{base_url}/api/open-commerce/developer/events?limit=1"),
@@ -243,6 +255,27 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(events["events"][0]["result_available"], true);
     assert_eq!(events["events"][0]["funds_moved"], false);
     assert_developer_event_redacted(&events, &live.live_token);
+    let production_cursor = events["next_cursor"].as_str().unwrap();
+
+    let sandbox_events = developer_get(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/events"),
+        &developer.test_token,
+    )
+    .await;
+    assert_eq!(sandbox_events["app_id"], PRODUCTION_APP_ID);
+    assert_eq!(sandbox_events["credential_environment"], "sandbox");
+    assert!(sandbox_events["events"].as_array().unwrap().is_empty());
+    assert_developer_event_redacted(&sandbox_events, &developer.test_token);
+
+    let (cross_environment_status, cross_environment_body) = developer_get_response(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/events?cursor={production_cursor}"),
+        &developer.test_token,
+    )
+    .await;
+    assert_eq!(cross_environment_status, StatusCode::BAD_REQUEST);
+    assert_developer_event_redacted(&cross_environment_body, &developer.test_token);
 
     let event_detail = developer_get(
         &client,
@@ -257,6 +290,15 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     );
     assert_eq!(event_detail["result"], committed["result"]);
     assert_developer_event_redacted(&event_detail, &live.live_token);
+
+    let (sandbox_detail_status, sandbox_detail) = developer_get_response(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/events/{invocation_id}"),
+        &developer.test_token,
+    )
+    .await;
+    assert_eq!(sandbox_detail_status, StatusCode::NOT_FOUND);
+    assert_developer_event_redacted(&sandbox_detail, &developer.test_token);
 
     let claims_url = format!("{base_url}/api/open-commerce/adapter/business-handoff-claims");
     let claimed = adapter_post(
@@ -318,8 +360,20 @@ async fn developer_post(client: &reqwest::Client, url: &str, token: &str, body: 
 }
 
 async fn developer_get(client: &reqwest::Client, url: &str, token: &str) -> Value {
+    let (status, body) = developer_get_response(client, url, token).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body
+}
+
+async fn developer_get_response(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+) -> (StatusCode, Value) {
     let response = client.get(url).bearer_auth(token).send().await.unwrap();
-    response_json(response).await
+    let status = response.status();
+    let body = response.json().await.unwrap();
+    (status, body)
 }
 
 fn assert_developer_event_redacted(value: &Value, live_token: &str) {
