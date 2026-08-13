@@ -296,19 +296,19 @@
       "id": "compute-v256-runtime-bundle-resolver-verification",
       "title": "V256 易失运行时包解析器动态验收",
       "summary": "编译并执行 V256 server-only runtime bundle resolver，补足 strict manifest、锁定内存与失败关闭边界的可执行测试，修复真实缺口；不读取生产 secret、不启动进程、不激活 Provider 或市场。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/external-pool-adapter-runtime-bundle-resolver-authority.md",
-        "content_hash": "adbfdcaf2805a52d95c0f5190b4d8fade26f1a75043bb3853ddb77239b077049",
+        "content_hash": "5d7b908b61c448f7c77d8bed10be3fbf82b8cd6b0a4a57d2f808f42a8a26f7d7",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-          "head_blob_oid": "6b36983a443a99d3c3ca393c5499ccc314959477",
-          "worktree_blob_oid": "32bfcde2a32655a32ca301d03f1ffb14b7873e96",
-          "state": "tracked_modified"
+          "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+          "head_blob_oid": "8dfa4ec6c9a578f7b4551f2e6c6f9bc04aaf32ba",
+          "worktree_blob_oid": "8dfa4ec6c9a578f7b4551f2e6c6f9bc04aaf32ba",
+          "state": "tracked_clean"
         }
       },
       "knowledge_node_id": "",
@@ -339,28 +339,28 @@
       "implementation_evidence": [
         {
           "path": "AI_CURRENT.md",
-          "content_hash": "3e76e8715c7162219a51ecea25ec373c0591a2323ba1c541fa2f91464cca1967",
-          "locator": "current V256 and V257 status",
+          "content_hash": "037bef93df8a0e29f5e9c7718d783fd541c92e43d5bc2849b45dd559969dd922",
+          "locator": "current V256 through V258 status",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "e68791f7fd3492a3ecc06e03e174d0a5d4b707b0",
-            "worktree_blob_oid": "cdf9b497107933b0596c065f9e99bd7c92719563",
-            "state": "tracked_modified"
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "3515dc46189760f2667291ee3562f7ae8b8a2648",
+            "worktree_blob_oid": "3515dc46189760f2667291ee3562f7ae8b8a2648",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/distributed-compute/external-pool-adapter-runtime-bundle-resolver-acceptance.md",
-          "content_hash": "a0fcfc8fd6eaad8940abe1692fb5dc6320c309eb471f00ad66cfb601880cf03f",
-          "locator": "14-test acceptance evidence",
+          "content_hash": "def63443ad617c6434eb2ab72cd428bbd6f1f009de9176622ed6a5ef47681b04",
+          "locator": "rebased 14-test acceptance evidence",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "2151c4bda802815a8d5d70911aad4ab70fc0d281",
-            "worktree_blob_oid": "1f22302eb253c60a25f2d7ad0d2b2228b7e7f9ce",
-            "state": "tracked_modified"
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "7c24ad7bfc93d85ba2885832dd295ba16c3fccb7",
+            "worktree_blob_oid": "7c24ad7bfc93d85ba2885832dd295ba16c3fccb7",
+            "state": "tracked_clean"
           }
         },
         {
@@ -370,10 +370,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "de36be674e841399349a4edbe23b2318ea9fa4cb",
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "81096b32a81038e22224c1219f49f4c60a3c020d",
             "worktree_blob_oid": "81096b32a81038e22224c1219f49f4c60a3c020d",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -383,10 +383,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "",
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "219f6c8b5c77cae5218039c8c1759e1277719399",
             "worktree_blob_oid": "219f6c8b5c77cae5218039c8c1759e1277719399",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -396,10 +396,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "",
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "ecbbf56e2c4081d4f84de0980b4befb1a63e1c0f",
             "worktree_blob_oid": "ecbbf56e2c4081d4f84de0980b4befb1a63e1c0f",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -409,10 +409,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "",
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "11b5bc371cfe4c2d97d1f4dd238c455f74ac4b74",
             "worktree_blob_oid": "11b5bc371cfe4c2d97d1f4dd238c455f74ac4b74",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -422,15 +422,15 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "776ff66b0531ca30cb0e86af05b4ebb952199573",
-            "head_blob_oid": "6a65bbc5100551c63dafc556a4371d11bd994ee9",
+            "head_commit": "f29795e500974412215d6e0e0999e2d8a6d3f3f7",
+            "head_blob_oid": "551416f36da6f9531ef7a3348c59db120c3046a1",
             "worktree_blob_oid": "551416f36da6f9531ef7a3348c59db120c3046a1",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1786654355853,
-      "updated_at_ms": 1786657795077
+      "updated_at_ms": 1786659172557
     },
     {
       "id": "delivery-allocation-expiry-worker-v234-verification",
@@ -2725,6 +2725,106 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1786657795077
+    },
+    {
+      "id": "feature_event_3e3b660861ce43579556ae4a13a0ba4e",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Final rebased evidence changed the authority hash; block before explicit requirement rebind.",
+      "from_status": "implemented",
+      "to_status": "blocked",
+      "at_ms": 1786659124031
+    },
+    {
+      "id": "feature_event_a34c3726e5844df9becde812d303e941",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-goal",
+      "reason": "Bind the final rebased validation fingerprint and committed authority document.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786659133225
+    },
+    {
+      "id": "feature_event_2cfec4080334426b8e145d7542843539",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Reviewed the final rebased authority and retained all fail-closed non-goals.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786659165764
+    },
+    {
+      "id": "feature_event_45c31cd7264e421f877f27f368d613b0",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Final committed requirement and verified dependency are ready for evidence binding.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786659166065
+    },
+    {
+      "id": "feature_event_575e05962e924c74a2ef33a4a1f1993f",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "claimed",
+      "actor": "codex-goal",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786659166352
+    },
+    {
+      "id": "feature_event_061183e0149242d4bfef60fe661a9615",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Bind final committed implementation and rebased dynamic test evidence.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786659166698
+    },
+    {
+      "id": "feature_event_4fe47fc10585413f8e76b2bd0217bd56",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786659171494
+    },
+    {
+      "id": "feature_event_5ed8a1e2d9bb45d39fed9aebcc20b084",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Final implementation and committed evidence are bound.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786659171870
+    },
+    {
+      "id": "feature_event_010eba7d9e134fce80d9c2d2f43abd14",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Rebased full elon-server target passed 14 focused tests with fingerprint fd22ac143bc522669a3b224a4375fdc40e748d26d69bbb3330d1b408f3860618.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786659172228
+    },
+    {
+      "id": "feature_event_5b1c283fd7a145389554c821bfe27c92",
+      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Verified source and documentation are ready on the push branch; no runtime deployment is required for this test-only boundary batch.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786659172557
     }
   ]
 }
