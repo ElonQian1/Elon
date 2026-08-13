@@ -64,6 +64,9 @@ class ChatGptWebLabContractTest {
         val controlOwnershipPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_control_ownership_policy.js"
         )
+        val overlayPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_overlay_policy.js"
+        )
         val formCommands = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_form_commands.js"
         )
@@ -97,6 +100,8 @@ class ChatGptWebLabContractTest {
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") <
                 bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") &&
                 bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_overlay_policy.js") &&
+                bridge.indexOf("chatgpt_web_adapter_overlay_policy.js") <
                 bridge.indexOf("chatgpt_web_adapter_form_commands.js") &&
                 bridge.indexOf("chatgpt_web_adapter_form_commands.js") <
                 bridge.indexOf("chatgpt_web_adapter_disclosure_controls.js") &&
@@ -305,10 +310,10 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("turns.some((turn) => turn.contains(node))"))
         assertTrue(adapterLayout.contains("node.closest('aside, nav, [role=\"navigation\"]')"))
         assertTrue(adapterLayout.contains("[header, composer, suggestions].concat(overlays)"))
-        assertTrue(adapterLayout.contains("[data-radix-menu-content]"))
-        assertTrue(adapterLayout.contains("[data-headlessui-menu-items]"))
-        assertTrue(adapterLayout.contains("[data-headlessui-portal]"))
-        assertTrue(adapterLayout.contains("[data-slot=\"dropdown-menu-content\"]"))
+        assertTrue(overlayPolicy.contains("[data-radix-menu-content]"))
+        assertTrue(overlayPolicy.contains("[data-headlessui-portal]"))
+        assertTrue(overlayPolicy.contains("actions.filter(isManagementAction).length >= 2"))
+        assertTrue(adapterLayout.contains("overlayPolicy.visibleRoots(document, isVisible, actionableNodes)"))
         assertTrue(adapterLayout.contains("const overlay = overlays[overlays.length - 1]"))
         listOf("personalization", "help", "logout", "plan").forEach { semantic ->
             assertTrue(ChatGptWebUiSemantics.KNOWN.contains(semantic))
