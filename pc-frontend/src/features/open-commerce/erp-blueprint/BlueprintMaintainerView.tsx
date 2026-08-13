@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, FolderInput, GitBranch, PackagePlus, Plus, RotateCcw, X } from 'lucide-react'
+import { useState } from 'react'
+import { Check, GitBranch, PackagePlus, RotateCcw, X } from 'lucide-react'
 import { erpBlueprintApi } from './erpBlueprintApi'
 import BlueprintEvolutionForm from './BlueprintEvolutionForm'
-import ErpExistingProjectRegistrar from './ErpExistingProjectRegistrar'
-import type { ErpOverview, ErpReleaseManifest, ErpTargetProject } from './erpBlueprintTypes'
+import ErpInstanceOnboardingPanel from './ErpInstanceOnboardingPanel'
+import type { ErpOverview, ErpReleaseManifest } from './erpBlueprintTypes'
 import { errorMessage, shortDate } from './erpBlueprintUi'
 import styles from './ErpBlueprintPanel.module.css'
 
@@ -12,83 +12,20 @@ export default function BlueprintMaintainerView({
   canEdit,
   overview,
   refresh,
+  onOpenProject,
 }: {
   projectId: string
   canEdit: boolean
   overview: ErpOverview
   refresh: () => Promise<void>
+  onOpenProject: (projectId: string) => Promise<void>
 }) {
   const blueprint = overview.blueprint!
   const [version, setVersion] = useState('1.0.0')
   const [commit, setCommit] = useState('')
-  const [instanceName, setInstanceName] = useState('')
-  const [instanceKey, setInstanceKey] = useState('')
-  const [onboardingMode, setOnboardingMode] = useState<'new_project' | 'existing_project'>('new_project')
-  const [targetProjectId, setTargetProjectId] = useState('')
-  const [targetProjects, setTargetProjects] = useState<ErpTargetProject[]>([])
-  const [industry, setIndustry] = useState('local_retail')
-  const [theme, setTheme] = useState(blueprint.definition.themes[0] ?? 'default.clean')
-  const [targetVersion, setTargetVersion] = useState(overview.versions[0]?.manifest.version ?? '')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const latest = overview.versions[0]
-  const versionOptions = useMemo(
-    () => overview.versions.map((item) => item.manifest.version),
-    [overview.versions],
-  )
-  const eligibleTargetProjects = useMemo(() => {
-    const boundProjectIds = new Set(overview.instances.map((instance) => instance.project_id))
-    return targetProjects.filter((project) => (
-      project.id !== projectId
-      && !boundProjectIds.has(project.id)
-      && ['owner', 'admin', 'editor'].includes(
-        project.viewer_role ?? project.role ?? project.my_role ?? '',
-      )
-    ))
-  }, [overview.instances, projectId, targetProjects])
-
-  const loadTargetProjects = useCallback(async (preferredProjectId?: string) => {
-    const response = await erpBlueprintApi.listTargetProjects()
-    const projects = response.projects ?? []
-    const boundProjectIds = new Set(overview.instances.map((instance) => instance.project_id))
-    const eligible = projects.filter((project) => (
-      project.id !== projectId
-      && !boundProjectIds.has(project.id)
-      && ['owner', 'admin', 'editor'].includes(
-        project.viewer_role ?? project.role ?? project.my_role ?? '',
-      )
-    ))
-    setTargetProjects(projects)
-    setTargetProjectId((current) => {
-      const requested = preferredProjectId || current
-      return eligible.some((project) => project.id === requested)
-        ? requested
-        : eligible[0]?.id ?? ''
-    })
-    if (preferredProjectId && !eligible.some((project) => project.id === preferredProjectId)) {
-      throw new Error('项目已登记，但当前账号没有编辑权，或该项目已经纳入 ERP。')
-    }
-  }, [overview.instances, projectId])
-
-  useEffect(() => {
-    let active = true
-    erpBlueprintApi.listTargetProjects()
-      .then((response) => {
-        if (active) setTargetProjects(response.projects ?? [])
-      })
-      .catch(() => {
-        if (active) setTargetProjects([])
-      })
-    return () => { active = false }
-  }, [])
-
-  function selectOnboardingMode(mode: 'new_project' | 'existing_project') {
-    setOnboardingMode(mode)
-    if (mode === 'existing_project' && !targetProjectId) {
-      setTargetProjectId(eligibleTargetProjects[0]?.id ?? '')
-    }
-  }
-
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true)
     setMessage('')
@@ -173,76 +110,13 @@ export default function BlueprintMaintainerView({
         refresh={refresh}
       />
 
-      <section className={styles.band}>
-        <header><Plus size={17} /><h3>创建或纳入商户项目</h3></header>
-        <div className={styles.formGrid}>
-          <div className={styles.wideField}>
-            <div className={styles.segmented} aria-label="商户项目纳入方式">
-              <button type="button" data-active={onboardingMode === 'new_project'} onClick={() => selectOnboardingMode('new_project')}>新建项目</button>
-              <button type="button" data-active={onboardingMode === 'existing_project'} onClick={() => selectOnboardingMode('existing_project')}>纳入现有项目</button>
-            </div>
-          </div>
-          {onboardingMode === 'new_project' ? (
-            <label>项目名称<input value={instanceName} onChange={(event) => setInstanceName(event.target.value)} /></label>
-          ) : (
-            <>
-              <label>现有项目
-                <select value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)}>
-                  <option value="">请选择可编辑项目</option>
-                  {eligibleTargetProjects.map((project) => (
-                    <option key={project.id} value={project.id}>{project.display_name || project.name}</option>
-                  ))}
-                </select>
-              </label>
-              <ErpExistingProjectRegistrar
-                canEdit={canEdit}
-                disabled={busy}
-                onRegistered={loadTargetProjects}
-              />
-            </>
-          )}
-          <label>实例标识<input value={instanceKey} onChange={(event) => setInstanceKey(event.target.value)} /></label>
-          <label>行业<input value={industry} onChange={(event) => setIndustry(event.target.value)} /></label>
-          <label>主题<select value={theme} onChange={(event) => setTheme(event.target.value)}>{blueprint.definition.themes.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>蓝图版本<select value={targetVersion} onChange={(event) => setTargetVersion(event.target.value)}>{versionOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <div className={styles.formAction}>
-            <button
-              type="button"
-              disabled={
-                !canEdit
-                || busy
-                || !targetVersion
-                || !instanceKey.trim()
-                || (onboardingMode === 'new_project' ? !instanceName.trim() : !targetProjectId)
-              }
-              onClick={() => run(
-                () => erpBlueprintApi.createInstance(projectId, blueprint.id, {
-                  instance_key: instanceKey,
-                  project_name: onboardingMode === 'new_project' ? instanceName : '',
-                  target_project_id: onboardingMode === 'existing_project' ? targetProjectId : undefined,
-                  version: targetVersion,
-                  industry,
-                  theme_key: theme,
-                  enabled_modules: [],
-                  plugins: [],
-                  private_extensions: [],
-                }),
-                onboardingMode === 'existing_project' ? '现有项目已纳入 ERP。' : '独立商户项目已创建。',
-              )}
-            >{onboardingMode === 'existing_project' ? <FolderInput size={15} /> : <Plus size={15} />}{onboardingMode === 'existing_project' ? '纳入' : '创建'}</button>
-          </div>
-        </div>
-        <div className={styles.rowList}>
-          {overview.instances.map((instance) => (
-            <div key={instance.id} className={styles.row}>
-              <strong>{instance.instance_key}</strong>
-              <span>{instance.industry}</span>
-              <span>{instance.theme_key} · {instance.onboarding_mode === 'existing_project' ? '已有项目' : '新建项目'}</span>
-              <span>v{instance.pinned_version}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <ErpInstanceOnboardingPanel
+        projectId={projectId}
+        canEdit={canEdit}
+        overview={overview}
+        refresh={refresh}
+        onOpenProject={onOpenProject}
+      />
 
       <section className={styles.band}>
         <header><Check size={17} /><h3>通用功能提案</h3></header>

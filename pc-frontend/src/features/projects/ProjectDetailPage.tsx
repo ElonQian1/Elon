@@ -190,7 +190,16 @@ export default function ProjectDetailPage() {
           />
         )}
         {tab === 'groupAi' && <GroupAiPanel projectId={id ?? ''} channels={space?.channels ?? []} />}
-        {tab === 'openCommerce' && <OpenCommercePanel projectId={id ?? ''} canEdit={canEditProject} />}
+        {tab === 'openCommerce' && (
+          <OpenCommercePanel
+            projectId={id ?? ''}
+            canEdit={canEditProject}
+            onOpenProject={async (targetProjectId) => {
+              await loadProjects().catch(() => {})
+              navigate(`/projects/${encodeURIComponent(targetProjectId)}?tab=openCommerce&commerce=erp`)
+            }}
+          />
+        )}
         {tab === 'workspace' && (
           <>
             <WorkspaceAccessPanel

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Blocks,
   Bot,
@@ -34,11 +35,29 @@ const views: Array<{
 export default function OpenCommercePanel({
   projectId,
   canEdit,
+  onOpenProject,
 }: {
   projectId: string
   canEdit: boolean
+  onOpenProject: (projectId: string) => Promise<void>
 }) {
-  const [view, setView] = useState<WorkspaceView>('merchant')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedView = workspaceView(searchParams.get('commerce'))
+  const [view, setView] = useState<WorkspaceView>(requestedView)
+
+  useEffect(() => {
+    setView(requestedView)
+  }, [requestedView])
+
+  function selectView(nextView: WorkspaceView) {
+    setView(nextView)
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('tab', 'openCommerce')
+      next.set('commerce', nextView)
+      return next
+    })
+  }
 
   return (
     <div className={base.panel}>
@@ -49,7 +68,7 @@ export default function OpenCommercePanel({
             type="button"
             data-active={view === id}
             style={tabStyle(view === id)}
-            onClick={() => setView(id)}
+            onClick={() => selectView(id)}
           >
             <Icon size={15} aria-hidden="true" />
             <span>{label}</span>
@@ -60,7 +79,13 @@ export default function OpenCommercePanel({
       {view === 'merchant' && (
         <OpenCommerceMerchantWorkspace projectId={projectId} canEdit={canEdit} />
       )}
-      {view === 'erp' && <ErpBlueprintPanel projectId={projectId} canEdit={canEdit} />}
+      {view === 'erp' && (
+        <ErpBlueprintPanel
+          projectId={projectId}
+          canEdit={canEdit}
+          onOpenProject={onOpenProject}
+        />
+      )}
       {view === 'consumer' && <ConsumerCommerceSandbox projectId={projectId} />}
       {view === 'developer' && (
         <DeveloperCommercePortal projectId={projectId} canEdit={canEdit} />
@@ -73,4 +98,8 @@ export default function OpenCommercePanel({
       )}
     </div>
   )
+}
+
+function workspaceView(value: string | null): WorkspaceView {
+  return views.some((view) => view.id === value) ? value as WorkspaceView : 'merchant'
 }

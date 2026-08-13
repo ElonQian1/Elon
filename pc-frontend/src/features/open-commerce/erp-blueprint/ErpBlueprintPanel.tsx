@@ -11,9 +11,11 @@ import styles from './ErpBlueprintPanel.module.css'
 export default function ErpBlueprintPanel({
   projectId,
   canEdit,
+  onOpenProject,
 }: {
   projectId: string
   canEdit: boolean
+  onOpenProject: (projectId: string) => Promise<void>
 }) {
   const [overview, setOverview] = useState<ErpOverview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -55,7 +57,13 @@ export default function ErpBlueprintPanel({
         <BlueprintSetupForm projectId={projectId} canEdit={canEdit} onCreated={refresh} />
       )}
       {overview?.blueprint && isMaintainer && (
-        <BlueprintMaintainerView projectId={projectId} canEdit={canEdit} overview={overview} refresh={refresh} />
+        <BlueprintMaintainerView
+          projectId={projectId}
+          canEdit={canEdit}
+          overview={overview}
+          refresh={refresh}
+          onOpenProject={onOpenProject}
+        />
       )}
       {overview?.blueprint && overview.instance && !isMaintainer && (
         <ErpInstanceView projectId={projectId} canEdit={canEdit} overview={overview} refresh={refresh} />
