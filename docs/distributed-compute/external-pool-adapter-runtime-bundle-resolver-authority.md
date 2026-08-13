@@ -73,7 +73,7 @@ config 与 credential 直接读入 OS page-backed locked memory；allocation、l
 
 ## 6. readiness 的下一道门
 
-V256 只把生产 bundle 的 server-only custody/resolution seam 推进到 `implementation_partially_verified`。完整 `elon-server` 测试目标已编译，14 项定向测试通过；其中 8 项执行 manifest、摘要和 locked-memory 行为，6 项锁定私有边界、Store composition 与 V254 绝对市场门。证据指纹为 `bf17a791bd94e135404950399a2ba0e7322ce236b23b980c9295fa9fb862acfc`。未来 atomic activation 至少还要：
+V256 只把生产 bundle 的 server-only custody/resolution seam 推进到 `implementation_partially_verified`。完整 `elon-server` 测试目标已编译，14 项定向测试通过；其中 8 项执行 manifest、摘要和 locked-memory 行为，6 项锁定私有边界、Store composition 与 V254 绝对市场门。证据指纹为 `fd22ac143bc522669a3b224a4375fdc40e748d26d69bbb3330d1b408f3860618`。未来 atomic activation 至少还要：
 
 - 在 authenticated supervisor 内以 fresh handles 和短借用启动隔离 runtime；
 - 用 no-work authenticated probe 或新签名 generation ABI，把实际消费的 exact credential/config generation 与 Provider/release/profile 绑定；

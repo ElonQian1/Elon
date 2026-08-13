@@ -10,7 +10,7 @@ verification_status: local_target_verified
 
 ## 本批状态
 
-V256 的 server-only ephemeral operator-mounted resolver 与 Store-private composition seam 已进入完整 `elon-server` 测试目标。定向验证实际运行 14 项测试，`14 passed / 0 failed`：6 项既有 source-contract，3 项 strict manifest 行为、3 项摘要/路径格式行为、2 项 test-only 文件的 locked-memory 精确读取与短读/超读拒绝。验证指纹为 `bf17a791bd94e135404950399a2ba0e7322ce236b23b980c9295fa9fb862acfc`。
+V256 的 server-only ephemeral operator-mounted resolver 与 Store-private composition seam 已进入完整 `elon-server` 测试目标。定向验证实际运行 14 项测试，`14 passed / 0 failed`：6 项既有 source-contract，3 项 strict manifest 行为、3 项摘要/路径格式行为、2 项 test-only 文件的 locked-memory 精确读取与短读/超读拒绝。验证指纹为 `fd22ac143bc522669a3b224a4375fdc40e748d26d69bbb3330d1b408f3860618`。
 
 Windows 源码已经编译，错误的 `DRIVE_FIXED` 模块导入已修复；protected-DACL parser 尚未实现，当前实现仍固定返回 `UnsafeCustody`，所以 Windows resolver 明确 fail-closed/unavailable。Linux 分支在本次 Windows 目标上未编译或运行；不能把任一平台的 handle/identity 骨架表述成生产 bundle 已解析。
 
