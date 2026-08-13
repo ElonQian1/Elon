@@ -37,6 +37,9 @@ class ChatGptWebProjectAndMenuContractTest {
             .forEach { forbidden -> assertFalse(project.contains(forbidden)) }
         assertTrue(project.contains("[data-project-id]"))
         assertTrue(project.contains("canonicalPath"))
+        assertTrue(project.contains("runtimeProjectId"))
+        assertTrue(project.contains("Object.getOwnPropertyDescriptor"))
+        assertFalse(project.contains("descriptor.get"))
         assertTrue(conversations.contains("projectPolicy.read"))
         assertTrue(conversations.contains("projectPolicy.findNode"))
         assertTrue(menu.contains("hasNewRoot"))

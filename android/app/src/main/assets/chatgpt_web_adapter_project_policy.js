@@ -34,6 +34,40 @@
       .map((name) => node.getAttribute(name)).filter(Boolean);
   }
 
+  function runtimeProjectId(node) {
+    if (!node || typeof node !== 'object') return '';
+    const roots = Object.getOwnPropertyNames(node).filter((name) =>
+      /^__(?:react|next|remix)/i.test(name)
+    ).slice(0, 12).map((name) => {
+      const descriptor = Object.getOwnPropertyDescriptor(node, name);
+      return descriptor && 'value' in descriptor ? descriptor.value : null;
+    }).filter(Boolean);
+    const queue = roots.map((value) => ({ value, depth: 0 }));
+    const seen = new Set();
+    let visited = 0;
+    while (queue.length && visited < 240) {
+      const entry = queue.shift();
+      const value = entry.value;
+      if (typeof value === 'string') {
+        const id = projectId(value);
+        if (id) return id;
+        continue;
+      }
+      if (!value || typeof value !== 'object' || seen.has(value) || entry.depth >= 6) continue;
+      seen.add(value);
+      visited += 1;
+      Object.getOwnPropertyNames(value).slice(0, 50).forEach((name) => {
+        const keyId = projectId(name);
+        if (keyId) queue.unshift({ value: keyId, depth: entry.depth + 1 });
+        const descriptor = Object.getOwnPropertyDescriptor(value, name);
+        if (descriptor && 'value' in descriptor) {
+          queue.push({ value: descriptor.value, depth: entry.depth + 1 });
+        }
+      });
+    }
+    return '';
+  }
+
   function projectIdForNode(node) {
     const candidates = [];
     let current = node;
@@ -44,7 +78,7 @@
       Array.from(node.querySelectorAll('[href], [data-project-id], [data-project-gizmo-id]'))
         .slice(0, 40).forEach((child) => candidates.push.apply(candidates, attributeValues(child)));
     }
-    return candidates.map(projectId).find(Boolean) || '';
+    return candidates.map(projectId).find(Boolean) || runtimeProjectId(node);
   }
 
   function referencedTitle(value) {
@@ -82,7 +116,7 @@
       }
     });
     Array.from(document.querySelectorAll('*')).slice(0, 6000).forEach((node) => {
-      const id = attributeValues(node).map(projectId).find(Boolean);
+      const id = attributeValues(node).map(projectId).find(Boolean) || runtimeProjectId(node);
       if (!id) return;
       const nearby = actionable.find((candidate) => candidate === node || candidate.contains(node) || node.contains(candidate));
       if (!nearby) return;
@@ -117,5 +151,5 @@
     return read(document, isVisible, labelOf).find((project) => project.id === id)?.node || null;
   }
 
-  return Object.freeze({ canonicalPath, findNode, projectId, read, referencedTitle });
+  return Object.freeze({ canonicalPath, findNode, projectId, read, referencedTitle, runtimeProjectId });
 });
