@@ -7,7 +7,7 @@ use crate::{
     },
     open_commerce_developer_credential_service,
     open_commerce_developer_production_test_support::{
-        approved_developer_fixture_for, test_app_state,
+        approved_developer_app_for, approved_developer_fixture_for, test_app_state,
     },
 };
 
@@ -15,6 +15,7 @@ use super::*;
 
 const CHILD_ENV: &str = "ELON_TEST_OPEN_COMMERCE_PRODUCTION_RUNTIME_CHILD";
 const PRODUCTION_APP_ID: &str = "consumer.production.runtime.ai";
+const SECOND_PRODUCTION_APP_ID: &str = "consumer.production.isolated.ai";
 const CHILD_TEST: &str = "open_commerce_runtime_service_tests::adapter_tcp_tests::production_credential_tests::production_live_credential_reaches_runtime_and_adapter_claim_child";
 
 #[test]
@@ -67,6 +68,24 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert!(live.live_token.starts_with("oc_live_"));
     assert_eq!(live.credential.environment, "production");
     assert_eq!(live.credential.scopes, vec!["menu.preview", "order.commit"]);
+    let second_app = approved_developer_app_for(
+        &developer.store,
+        &developer.project_id,
+        &developer.owner_user_id,
+        SECOND_PRODUCTION_APP_ID,
+        &["menu.preview"],
+    );
+    let second_live = open_commerce_developer_credential_service::issue_credential(
+        &developer.store,
+        &second_app.app.id,
+        IssueDeveloperProductionCredentialRequest {
+            expected_manifest_revision: second_app.app.manifest_revision,
+            scopes: vec!["menu.preview".to_string()],
+            expires_in_days: 30,
+        },
+        "reviewer-user",
+    )
+    .unwrap();
 
     let merchant_owner = developer
         .store
@@ -323,6 +342,14 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     }
     assert_developer_event_redacted(&events, &live.live_token);
     let production_cursor = events["next_cursor"].as_str().unwrap();
+    app_isolation::assert_second_production_app_isolated(
+        &client,
+        &base_url,
+        &second_live.live_token,
+        production_cursor,
+        &[invocation_id, query_invocation_id],
+    )
+    .await;
 
     let sandbox_events = developer_get(
         &client,
@@ -468,3 +495,6 @@ fn assert_developer_event_redacted(value: &Value, live_token: &str) {
     }
     assert!(!serialized.contains(live_token), "leaked live credential");
 }
+
+#[path = "open_commerce_production_app_isolation_tcp_tests.rs"]
+mod app_isolation;

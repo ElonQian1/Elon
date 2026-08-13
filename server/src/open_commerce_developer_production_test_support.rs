@@ -29,6 +29,12 @@ pub(crate) struct ApprovedDeveloperFixture {
     pub(crate) admission_id: String,
 }
 
+pub(crate) struct ApprovedDeveloperAppFixture {
+    pub(crate) app: OpenCommerceDeveloperApp,
+    pub(crate) test_token: String,
+    pub(crate) admission_id: String,
+}
+
 pub(crate) fn approved_developer_fixture() -> ApprovedDeveloperFixture {
     approved_developer_fixture_for("consumer.production.state", &["menu.preview"])
 }
@@ -54,10 +60,30 @@ pub(crate) fn approved_developer_fixture_for(
         .create_project(&owner.id, "Production State", None, None)
         .unwrap()
         .project;
+    let approved =
+        approved_developer_app_for(&store, &project.id, &owner.id, app_id, requested_scopes);
+
+    ApprovedDeveloperFixture {
+        store,
+        project_id: project.id,
+        owner_user_id: owner.id,
+        app: approved.app,
+        test_token: approved.test_token,
+        admission_id: approved.admission_id,
+    }
+}
+
+pub(crate) fn approved_developer_app_for(
+    store: &Store,
+    project_id: &str,
+    owner_user_id: &str,
+    app_id: &str,
+    requested_scopes: &[&str],
+) -> ApprovedDeveloperAppFixture {
     let created = store
         .create_open_commerce_developer_app(
-            &project.id,
-            &owner.id,
+            project_id,
+            owner_user_id,
             CreateDeveloperAppRequest {
                 app_id: app_id.to_string(),
                 display_name: "Production State Consumer".to_string(),
@@ -66,13 +92,13 @@ pub(crate) fn approved_developer_fixture_for(
         .unwrap();
     let test_token = created.test_token;
     let actor = OpenCommerceActor {
-        user_id: &owner.id,
+        user_id: owner_user_id,
         app_id: "pc-web",
         project_role: Some("owner"),
     };
     let app = open_commerce_developer_manifest_service::update_manifest(
-        &store,
-        &project.id,
+        store,
+        project_id,
         &created.app.id,
         UpdateDeveloperAppManifestRequest {
             expected_manifest_revision: created.app.manifest_revision,
@@ -92,7 +118,7 @@ pub(crate) fn approved_developer_fixture_for(
     // Direct store transitions only prepare local state. They are not DNS/TLS proof.
     let app = store
         .issue_open_commerce_developer_app_domain_challenge(
-            &project.id,
+            project_id,
             &app.id,
             app.manifest_revision,
             "shop.example.test",
@@ -101,18 +127,18 @@ pub(crate) fn approved_developer_fixture_for(
         )
         .unwrap();
     let app = store
-        .verify_open_commerce_developer_app_domain(&project.id, &app.id, app.manifest_revision)
+        .verify_open_commerce_developer_app_domain(project_id, &app.id, app.manifest_revision)
         .unwrap();
     let app = open_commerce_developer_manifest_service::submit_manifest(
-        &store,
-        &project.id,
+        store,
+        project_id,
         &app.id,
         app.manifest_revision,
         &actor,
     )
     .unwrap();
     let app = open_commerce_developer_manifest_service::review_manifest(
-        &store,
+        store,
         &app.id,
         ReviewDeveloperAppManifestRequest {
             expected_manifest_revision: app.manifest_revision,
@@ -123,8 +149,8 @@ pub(crate) fn approved_developer_fixture_for(
     )
     .unwrap();
     open_commerce_developer_admission_service::submit_admission(
-        &store,
-        &project.id,
+        store,
+        project_id,
         &app.id,
         SubmitDeveloperAppAdmissionRequest {
             expected_manifest_revision: app.manifest_revision,
@@ -137,7 +163,7 @@ pub(crate) fn approved_developer_fixture_for(
     )
     .unwrap();
     let admission = open_commerce_developer_admission_service::review_admission(
-        &store,
+        store,
         &app.id,
         ReviewDeveloperAppAdmissionRequest {
             expected_manifest_revision: app.manifest_revision,
@@ -149,10 +175,7 @@ pub(crate) fn approved_developer_fixture_for(
     )
     .unwrap();
 
-    ApprovedDeveloperFixture {
-        store,
-        project_id: project.id,
-        owner_user_id: owner.id,
+    ApprovedDeveloperAppFixture {
         app,
         test_token,
         admission_id: admission.id,
