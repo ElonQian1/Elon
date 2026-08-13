@@ -50,19 +50,21 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
   useEffect(() => {
     if (!ownerKey || !provider || state !== 'ready') return
     let active = true
+    let timer = 0
     const poll = async () => {
       try {
         const next = await getLocalAiWebSessionState(provider.id, ownerKey)
         if (active) setSessionState(next)
       } catch {
         // 能力检查负责显示兼容性错误；短暂轮询失败不覆盖用户正在看的消息。
+      } finally {
+        if (active) timer = window.setTimeout(() => void poll(), 1_500)
       }
     }
     void poll()
-    const timer = window.setInterval(() => void poll(), 1_200)
     return () => {
       active = false
-      window.clearInterval(timer)
+      window.clearTimeout(timer)
     }
   }, [ownerKey, provider, state])
 
@@ -72,14 +74,25 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
     setMessage('')
     try {
       const session = await openLocalAiWebSession(item.id, ownerKey)
-      const next = await getLocalAiWebSessionState(item.id, ownerKey)
-      setSessionState(next)
-      await openLocalAiNativeChatWindow(item.id, ownerKey)
-      setMessage(session.status === 'created'
+      let nativeError = ''
+      try {
+        await openLocalAiNativeChatWindow(item.id, ownerKey)
+      } catch (error) {
+        nativeError = localAiBrowserErrorMessage(error)
+      }
+      try {
+        setSessionState(await getLocalAiWebSessionState(item.id, ownerKey))
+      } catch {
+        // 官方窗口已成功恢复时，状态刷新失败不能把整个组合动作判为失败。
+      }
+      const successMessage = session.status === 'created'
         ? item.loginMode === 'guest_web_system_login'
           ? `已打开 ${item.displayName} 官方页面和独立一龙聊天窗。若 Google 要求登录，请使用“系统浏览器”。`
           : `已打开 ${item.displayName} 官方页面和独立一龙聊天窗，请本人完成登录。`
-        : `已恢复 ${item.displayName} 官方页面和一龙聊天窗。`)
+        : `已恢复 ${item.displayName} 官方页面和一龙聊天窗。`
+      setMessage(nativeError
+        ? `${item.displayName} 官方页面已恢复；一龙聊天窗未能恢复：${nativeError}`
+        : successMessage)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
     } finally {

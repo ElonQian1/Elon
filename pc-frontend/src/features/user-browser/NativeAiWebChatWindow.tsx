@@ -72,19 +72,21 @@ export default function NativeAiWebChatWindow() {
   useEffect(() => {
     if (!provider || !ownerKey) return
     let active = true
+    let timer = 0
     const poll = async () => {
       try {
         const next = await getLocalAiWebSessionState(provider.id, ownerKey)
         if (active) setSessionState(next)
       } catch (error) {
         if (active) setMessage(localAiBrowserErrorMessage(error))
+      } finally {
+        if (active) timer = window.setTimeout(() => void poll(), 1_500)
       }
     }
     void poll()
-    const timer = window.setInterval(() => void poll(), 900)
     return () => {
       active = false
-      window.clearInterval(timer)
+      window.clearTimeout(timer)
     }
   }, [ownerKey, provider])
 
@@ -98,7 +100,11 @@ export default function NativeAiWebChatWindow() {
     setMessage('')
     try {
       await openLocalAiWebSession(provider.id, ownerKey)
-      setSessionState(await getLocalAiWebSessionState(provider.id, ownerKey))
+      try {
+        setSessionState(await getLocalAiWebSessionState(provider.id, ownerKey))
+      } catch {
+        // 窗口恢复成功后，单次状态刷新失败交给下一轮有界轮询恢复。
+      }
       setMessage(`已显示 ${provider.displayName} 官方窗口，请在那里完成登录或真人验证。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))

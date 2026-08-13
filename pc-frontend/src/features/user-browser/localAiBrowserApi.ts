@@ -96,7 +96,17 @@ export type LocalAiAdapterAction =
   | 'new_conversation'
   | 'start_google_login'
 
-type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed'
+type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed' | 'invoke_timeout'
+
+const LOCAL_AI_INVOKE_TIMEOUTS = {
+  capability: 4_000,
+  state: 3_000,
+  window: 12_000,
+  action: 8_000,
+  clear: 15_000,
+} as const
+
+const pendingDesktopInvokes = new Map<string, Promise<unknown>>()
 
 class LocalAiBrowserError extends Error {
   constructor(readonly code: LocalAiBrowserErrorCode, message: string) {
@@ -110,7 +120,11 @@ export function isLocalAiBrowserAvailable(): boolean {
 }
 
 export async function listLocalAiWebProviders(): Promise<LocalAiWebProvider[]> {
-  const providers = await invokeDesktop<LocalAiWebProvider[]>('list_local_ai_web_providers')
+  const providers = await invokeDesktop<LocalAiWebProvider[]>(
+    'list_local_ai_web_providers',
+    undefined,
+    LOCAL_AI_INVOKE_TIMEOUTS.capability,
+  )
   if (!Array.isArray(providers)) throw new Error('桌面壳返回了无效的 AI 网页厂商列表。')
   for (const provider of providers) assertProvider(provider)
   return providers
@@ -124,7 +138,7 @@ export async function openLocalAiWebSession(
   const session = await invokeDesktop<LocalAiWebSession>('open_local_ai_web_session', {
     providerId,
     ownerKey,
-  })
+  }, LOCAL_AI_INVOKE_TIMEOUTS.window)
   if (session.providerId !== providerId
     || session.profileScope !== 'local_owner_provider'
     || session.cookieAccess !== 'webview_only'
@@ -142,7 +156,7 @@ export async function openLocalAiNativeChatWindow(
   const window = await invokeDesktop<LocalAiNativeChatWindow>('open_local_ai_native_chat_window', {
     providerId,
     ownerKey,
-  })
+  }, LOCAL_AI_INVOKE_TIMEOUTS.window)
   if (window.providerId !== providerId || !window.windowLabel.startsWith(`local-ai-native-${providerId}-`)) {
     throw new Error('桌面壳返回了不受支持的一龙聊天窗口。')
   }
@@ -157,7 +171,7 @@ export async function clearLocalAiWebSession(
   return invokeDesktop<ClearedLocalAiWebSession>('clear_local_ai_web_session', {
     providerId,
     ownerKey,
-  })
+  }, LOCAL_AI_INVOKE_TIMEOUTS.clear)
 }
 
 export async function getLocalAiWebSessionState(
@@ -168,7 +182,7 @@ export async function getLocalAiWebSessionState(
   return invokeDesktop<LocalAiWebSessionState>('get_local_ai_web_session_state', {
     providerId,
     ownerKey,
-  })
+  }, LOCAL_AI_INVOKE_TIMEOUTS.state, `state:${providerId}:${ownerKey}`)
 }
 
 export async function controlLocalAiWebSession(
@@ -181,7 +195,7 @@ export async function controlLocalAiWebSession(
     providerId,
     ownerKey,
     action,
-  })
+  }, LOCAL_AI_INVOKE_TIMEOUTS.action)
 }
 
 export async function runLocalAiWebAdapterCommand(
@@ -198,7 +212,7 @@ export async function runLocalAiWebAdapterCommand(
     action,
     value,
     expectedDraft,
-  })
+  }, LOCAL_AI_INVOKE_TIMEOUTS.action)
 }
 
 export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessageSnapshot {
@@ -226,15 +240,40 @@ export async function waitForLocalAiAdapterResult(
 async function invokeDesktop<T>(
   command: string,
   args?: Record<string, unknown>,
+  timeoutMs: number = LOCAL_AI_INVOKE_TIMEOUTS.action,
+  coalesceKey?: string,
 ): Promise<T> {
   const invoke = getDesktopInvoke()
   if (!invoke) {
     throw new LocalAiBrowserError('desktop_required', '本地 AI 浏览器仅在一龙 Windows 客户端中可用。')
   }
+  let timeout = 0
   try {
-    return await invoke<T>(command, args)
+    let invokePromise = coalesceKey
+      ? pendingDesktopInvokes.get(coalesceKey) as Promise<T> | undefined
+      : undefined
+    if (!invokePromise) {
+      let trackedPromise: Promise<T>
+      trackedPromise = invoke<T>(command, args).finally(() => {
+        if (coalesceKey && pendingDesktopInvokes.get(coalesceKey) === trackedPromise) {
+          pendingDesktopInvokes.delete(coalesceKey)
+        }
+      })
+      invokePromise = trackedPromise
+      if (coalesceKey) pendingDesktopInvokes.set(coalesceKey, trackedPromise)
+    }
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = window.setTimeout(() => reject(new LocalAiBrowserError(
+        'invoke_timeout',
+        'Win 桌面壳响应超时。窗口操作已停止等待；请关闭卡住的官方页或聊天窗后重试。',
+      )), timeoutMs)
+    })
+    return await Promise.race([invokePromise, timeoutPromise])
   } catch (error) {
+    if (error instanceof LocalAiBrowserError) throw error
     throw normalizeDesktopInvokeError(error)
+  } finally {
+    window.clearTimeout(timeout)
   }
 }
 

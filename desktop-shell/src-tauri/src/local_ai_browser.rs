@@ -116,13 +116,13 @@ pub struct ClearLocalAiWebSession {
 }
 
 #[tauri::command]
-pub fn open_local_ai_native_chat_window(
+pub async fn open_local_ai_native_chat_window(
     app: AppHandle,
     webview: WebviewWindow,
     provider_id: String,
     owner_key: String,
 ) -> Result<native_window::LocalAiNativeChatWindow, String> {
-    native_window::open(app, webview, provider_id, owner_key)
+    native_window::open(app, webview, provider_id, owner_key).await
 }
 
 #[tauri::command]
@@ -263,7 +263,7 @@ pub async fn open_local_ai_web_session(
 }
 
 #[tauri::command]
-pub fn get_local_ai_web_session_state(
+pub async fn get_local_ai_web_session_state(
     app: AppHandle,
     webview: WebviewWindow,
     runtime: State<'_, LocalAiBrowserRuntime>,
@@ -275,19 +275,10 @@ pub fn get_local_ai_web_session_state(
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
-    if let Some(window) = app.get_webview_window(&label) {
-        if window.is_minimized().unwrap_or(false) {
-            runtime.mark_window_status(&label, "minimized");
-        } else if runtime
-            .snapshot(&label)
-            .is_some_and(|state| state.window_status == "minimized")
-        {
-            runtime.mark_window_status(&label, "ready");
-        }
-        if let Ok(url) = window.url() {
-            runtime.observe_url(&label, &url);
-        }
-    } else {
+    // 高频状态轮询只能读取宿主内存，不能向 Windows UI 线程发送同步 getter。
+    // WebView2 加载或聚焦期间，url()/is_minimized() 会等待同一条消息循环，曾导致
+    // 官方页和原生聊天窗一起不响应。URL 与关闭状态均由窗口事件回调持续维护。
+    if app.get_webview_window(&label).is_none() {
         runtime.mark_window_status(&label, "closed");
     }
     runtime
@@ -296,7 +287,7 @@ pub fn get_local_ai_web_session_state(
 }
 
 #[tauri::command]
-pub fn control_local_ai_web_session(
+pub async fn control_local_ai_web_session(
     app: AppHandle,
     webview: WebviewWindow,
     runtime: State<'_, LocalAiBrowserRuntime>,
@@ -320,7 +311,7 @@ pub fn control_local_ai_web_session(
         .ok_or_else(|| format!("请先打开 {} 本地网页会话。", provider.display_name))?;
 
     match action.as_str() {
-        "restore" => restore_window(&window)?,
+        "restore" => {}
         "reload" => window.reload().map_err(display_error)?,
         "back" => window.eval("history.back();").map_err(display_error)?,
         "home" => window
@@ -336,7 +327,7 @@ pub fn control_local_ai_web_session(
 }
 
 #[tauri::command]
-pub fn run_local_ai_web_adapter_command(
+pub async fn run_local_ai_web_adapter_command(
     app: AppHandle,
     webview: WebviewWindow,
     runtime: State<'_, LocalAiBrowserRuntime>,
@@ -368,8 +359,7 @@ pub fn run_local_ai_web_adapter_command(
         .eval(format!(
             "window.{bridge} && window.{bridge}.command({encoded});"
         ))
-        .map_err(display_error)?;
-    restore_window(&window)
+        .map_err(display_error)
 }
 
 #[tauri::command]
@@ -392,7 +382,7 @@ pub fn publish_local_ai_web_event(
 }
 
 #[tauri::command]
-pub fn clear_local_ai_web_session(
+pub async fn clear_local_ai_web_session(
     app: AppHandle,
     webview: WebviewWindow,
     runtime: State<'_, LocalAiBrowserRuntime>,
@@ -557,9 +547,8 @@ fn allows_navigation(provider: &ProviderDefinition, url: &Url) -> bool {
 }
 
 fn restore_window(window: &WebviewWindow) -> Result<(), String> {
-    if window.is_minimized().unwrap_or(false) {
-        window.unminimize().map_err(display_error)?;
-    }
+    // Setter 调用只投递到事件循环，不执行会阻塞等待回执的窗口 getter。
+    window.unminimize().map_err(display_error)?;
     window.show().map_err(display_error)?;
     window.set_focus().map_err(display_error)
 }

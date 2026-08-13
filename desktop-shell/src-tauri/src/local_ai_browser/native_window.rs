@@ -19,7 +19,7 @@ pub struct LocalAiNativeChatWindow {
     status: &'static str,
 }
 
-pub(super) fn open(
+pub(super) async fn open(
     app: AppHandle,
     webview: WebviewWindow,
     provider_id: String,
@@ -60,13 +60,13 @@ pub(super) fn open(
 }
 
 pub(super) fn native_window_label(provider: &ProviderDefinition, fingerprint: &str) -> String {
-    format!("{LOCAL_AI_NATIVE_WINDOW_PREFIX}{}-{fingerprint}", provider.id)
+    format!(
+        "{LOCAL_AI_NATIVE_WINDOW_PREFIX}{}-{fingerprint}",
+        provider.id
+    )
 }
 
-fn native_chat_url(
-    webview: &WebviewWindow,
-    provider: &ProviderDefinition,
-) -> Result<Url, String> {
+fn native_chat_url(webview: &WebviewWindow, provider: &ProviderDefinition) -> Result<Url, String> {
     let mut url = webview.url().map_err(display_error)?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
         return Err("当前一龙页面地址不能创建原生聊天窗口。".to_string());
@@ -111,7 +111,9 @@ impl PageOrigin {
 
     fn allows(&self, url: &Url) -> bool {
         url.scheme() == self.scheme
-            && url.host_str().is_some_and(|host| host.eq_ignore_ascii_case(&self.host))
+            && url
+                .host_str()
+                .is_some_and(|host| host.eq_ignore_ascii_case(&self.host))
             && url.port_or_known_default() == self.port
             && (url.path() == NATIVE_CHAT_PATH || url.path().starts_with("/pc/assets/"))
     }
