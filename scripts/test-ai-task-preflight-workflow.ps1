@@ -42,6 +42,7 @@ $repoRoot = $repoRoot.Trim()
 $preflightScript = Join-Path $repoRoot "scripts\ai-task-preflight.ps1"
 $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
+$appUiTaskPushScopeScript = Join-Path $repoRoot "scripts\app-ui-task-push-scope.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
 $gitPathResolutionScript = Join-Path $repoRoot "scripts\git-path-resolution.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
@@ -323,11 +324,12 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $seedRepo "scripts") | Out-Null
     Copy-Item -LiteralPath $preflightScript -Destination (Join-Path $seedRepo "scripts\ai-task-preflight.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $seedRepo "scripts\direct-network.ps1")
+    Copy-Item -LiteralPath $appUiTaskPushScopeScript -Destination (Join-Path $seedRepo "scripts\app-ui-task-push-scope.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $seedRepo "scripts\ai-task-finish-contract.ps1")
     Copy-Item -LiteralPath $gitPathResolutionScript -Destination (Join-Path $seedRepo "scripts\git-path-resolution.ps1")
     Set-Content -LiteralPath (Join-Path $seedRepo "README.md") -Value "preflight workflow test`n" -Encoding UTF8
 
-    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/direct-network.ps1", "scripts/ai-task-finish-contract.ps1", "scripts/git-path-resolution.ps1") | Out-Null
+    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/direct-network.ps1", "scripts/app-ui-task-push-scope.ps1", "scripts/ai-task-finish-contract.ps1", "scripts/git-path-resolution.ps1") | Out-Null
     Invoke-Git $seedRepo @("commit", "-m", "seed preflight workflow test") | Out-Null
     Invoke-Git $seedRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $seedRepo @("push", "-u", "origin", "main") | Out-Null

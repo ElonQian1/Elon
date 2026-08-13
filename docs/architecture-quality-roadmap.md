@@ -23,7 +23,7 @@
 
 ### 第一阶段：稳定质量门禁
 
-- CI 覆盖 `check-source-size.ps1`、`check-release-runbook.ps1`、`check-ci-quality-gates.ps1`、`check-realtime-runbook.ps1`、`check-realtime-ownership.ps1`、`check-realtime-diagnostics-snapshot.ps1`、`check-dependency-audit.ps1`、`check-rust-warning-budget.ps1`、`cargo test`、`npm run lint`、`npm run build`、`npm run check:bundle-budget`、`npm run test:message-flow`、`npm run test:workspace-access` 和 `npm run test:admin-realtime`。
+- CI 覆盖 `check-source-size.ps1`、`check-release-runbook.ps1`、PC 前端发布门禁、`check-ci-quality-gates.ps1`、实时链路门禁、依赖审计、Rust 测试及 PC 前端构建与专项测试。
 - 所有新功能必须先满足“不要增加 warning、不要扩大红区文件、测试可重复”。
 - 对 flaky 测试优先修测试环境和等待条件，不通过放宽断言来掩盖问题。
 

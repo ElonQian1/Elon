@@ -431,8 +431,54 @@ if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
     if ([string]::IsNullOrWhiteSpace($serverSha)) {
         Stop-Check "Server version check did not include gitSha; deployed provenance is unknown."
     }
-    if ($serverSha -ne $head) {
+    $serverReleaseStatus = 'published'
+    $pcRelease = $null
+    if ($Kind -eq 'Server' -and $serverSha -ne $head) {
         Stop-Check "Server gitSha mismatch: local $($head.Substring(0, 7)), server $($serverSha.Substring(0, [Math]::Min(7, $serverSha.Length)))."
+    }
+    if ($Kind -eq 'PcFrontend') {
+        try {
+            $releaseParams = @{
+                Uri = "$ServerUrl/pc/release.json"
+                TimeoutSec = 10
+            }
+            $releaseParams = Add-ElonProjectDirectRequestParameters -Params $releaseParams -CommandName 'Invoke-RestMethod'
+            $pcRelease = Invoke-RestMethod @releaseParams
+        } catch {
+            if ($serverSha -ne $head) {
+                Stop-Check "PC frontend release marker is unavailable and the legacy server gitSha does not match HEAD."
+            }
+        }
+        if ($null -ne $pcRelease) {
+            if ([string]$pcRelease.schema -ne 'elon.pc_frontend_release.v1') {
+                Stop-Check "PC frontend release marker schema is unsupported."
+            }
+            $pcReleaseSha = [string]$pcRelease.gitSha
+            $compatibleServerSha = [string]$pcRelease.compatibleServerGitSha
+            foreach ($sha in @($pcReleaseSha, $compatibleServerSha)) {
+                if ($sha -notmatch '^[0-9a-f]{40}$') { Stop-Check "PC frontend release marker contains an invalid Git SHA." }
+                & git cat-file -e "$sha^{commit}" 2>$null
+                if ($LASTEXITCODE -ne 0) { Stop-Check "PC frontend release marker commit is unavailable locally: $sha" }
+            }
+            if ($compatibleServerSha -ne $serverSha) {
+                Stop-Check "PC frontend marker is bound to server $compatibleServerSha but live server is $serverSha."
+            }
+            git merge-base --is-ancestor $head $pcReleaseSha | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Stop-Check "PC frontend release $pcReleaseSha does not contain task HEAD $head."
+            }
+            git merge-base --is-ancestor $serverSha $pcReleaseSha | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Stop-Check "PC frontend release is not based on the live server commit."
+            }
+            $blockingChanges = @(git diff --name-only "$serverSha..$pcReleaseSha" -- server contracts sdk)
+            if ($blockingChanges.Count -gt 0) {
+                Stop-Check "PC frontend release crosses server/API changes: $($blockingChanges -join ', ')"
+            }
+            if ([string]$pcRelease.releaseMode -eq 'frontend_only') {
+                $serverReleaseStatus = 'compatible_existing'
+            }
+        }
     }
 
     $pcStatus = $null
@@ -470,9 +516,12 @@ if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
     Write-Host "  CODE_SYNC_STATUS=synced"
     Write-Host "  NODE_AGENT_RELEASE_STATUS=not_attempted"
     Write-Host "  APK_RELEASE_STATUS=not_attempted"
-    Write-Host "  SERVER_RELEASE_STATUS=published"
+    Write-Host "  SERVER_RELEASE_STATUS=$serverReleaseStatus"
     if ($Kind -eq "PcFrontend") {
         Write-Host "  PC_FRONTEND_RELEASE_STATUS=published"
+        if ($null -ne $pcRelease) {
+            Write-Host "  frontend:    $($pcRelease.gitSha) ($($pcRelease.releaseMode))"
+        }
         Write-Host "  /pc:         HTTP $pcStatus"
     }
     Write-Host "  health:      $($health | ConvertTo-Json -Compress)"

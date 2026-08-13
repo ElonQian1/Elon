@@ -104,6 +104,8 @@ Invoke-RepoPowerShellScript -Name "PC Entrypoint Contract" -ScriptPath "scripts\
 Invoke-RepoPowerShellScript -Name "Feature Parity Audit" -ScriptPath "scripts\check-feature-parity.ps1"
 Invoke-RepoPowerShellScript -Name "Document Modularity Guard" -ScriptPath "scripts\check-document-modularity.ps1"
 Invoke-RepoPowerShellScript -Name "Release Runbook Guard" -ScriptPath "scripts\check-release-runbook.ps1"
+Invoke-RepoPowerShellScript -Name "PC Frontend Publish Guard" -ScriptPath "scripts\test-pc-frontend-only-publish.ps1"
+Invoke-RepoPowerShellScript -Name "PC Static Publish Guard" -ScriptPath "scripts\test-pc-static-publish.ps1"
 Invoke-RepoPowerShellScript -Name "CI Quality Gates Guard" -ScriptPath "scripts\check-ci-quality-gates.ps1"
 Invoke-RepoPowerShellScript -Name "APP UI Fast Lane Guard" -ScriptPath "scripts\test-app-ui-fast-lane.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Runbook Guard" -ScriptPath "scripts\check-realtime-runbook.ps1"

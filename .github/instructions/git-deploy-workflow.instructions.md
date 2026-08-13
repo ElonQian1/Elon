@@ -83,11 +83,11 @@ Linux/macOS 使用 `bash scripts/format-rust.sh --apply --files ...`。脚本按
 |---|---|---|
 | 只同步代码 | 无 | `finish-ai-task.*` + `CodePushed` |
 | 后端 | `scripts/publish-server.ps1` / `.sh` | `Server` |
-| PC 前端 | 先构建，再运行 `publish-server.*` | `PcFrontend` |
+| PC 前端 | 纯前端：`publish-pc-frontend.ps1`；含 API：`publish-server.*` | `PcFrontend` |
 | Win 节点 | `scripts/publish-node-agent.ps1` | `NodeAgent` |
 | Android APK | `publish-apk.*`，提供 changelog | `AndroidFeature` |
 
-发布脚本负责版本 claim/finish、构建、上传、并发保护和线上验证。不要直接改版本字段、手搓上传或部署未提交内容。
+发布脚本负责版本、构建、上传、并发保护和验证。不要手改版本、上传或部署未提交内容。
 
 ## PowerShell 与网络
 

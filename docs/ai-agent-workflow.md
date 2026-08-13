@@ -23,7 +23,7 @@
 6. 任务最后执行 `WF-FINISH`。统一收尾会验证远端、快进主基线、审计未跟踪文件并回收已合并 worktree；不要再手工拼接这些步骤。
 7. AI 任务状态拆成业务状态和本机收尾状态。业务已经进入 `origin/main` 后不会被清理告警改回失败，但只有 `FINALIZABLE=true` 才能正常宣告完整结束。
 8. Android APK 用户可见改动默认先进入 `origin/main`，再由 `publish-apk.*` 发布并以 `AndroidFeature` 收尾；只有用户或并行协调明确要求“只同步代码/暂不发布”时才用 `CodePushed` 收尾。
-9. `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI 改动必须拆成三层：代码进入 `origin/main`、前端构建通过、服务器 `$DATA_DIR/pc-next-dist/` 已由 `publish-server.*` 发布并通过 `/pc` 与 `/api/server/version` 校验。除非用户明确要求只同步代码或暂不发布，否则不能只以 `CodePushed` 作为最终完成。
+9. `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI 改动必须拆成三层：代码进入 `origin/main`、前端构建通过、服务器 `$DATA_DIR/pc-next-dist/` 已发布并通过 `/pc/release.json`、`/pc` 与 `/api/server/version` 校验。Windows 纯前端用 `publish-pc-frontend.ps1`；含后端/API 或其它系统用 `publish-server.*`。除非用户明确要求只同步代码或暂不发布，否则不能只以 `CodePushed` 作为最终完成。
 10. 截图、遮挡、错位、层级、弹窗或按图修复类 UI 问题，必须先把截图区域定位到真实组件/样式文件，再用本地预览、浏览器截图、DOM/坐标/层级检查之一做视觉验收。无法截图时必须说明替代证据；构建通过只能证明没有编译错误，不能单独证明用户可见问题已解决。
 11. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
 

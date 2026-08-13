@@ -691,7 +691,7 @@ if ($SkipUpload) {
 }
 
 # ─────────────────────────────────────────────────────────────
-# 3.5  构建 PC 前端并上传到服务器
+# 3.5  构建 PC 前端；待服务端冒烟成功后再切换线上入口
 # ─────────────────────────────────────────────────────────────
 $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir     = Join-Path $PcFrontendDir "dist"
@@ -755,10 +755,7 @@ if ($SkipPcFrontend) {
     }
 
     Invoke-PcFrontendBundleBudget -FrontendDir $PcFrontendDir
-    $pcPublished = Publish-StaticDist -LocalDir $PcDistDir -RemoteDir $RemotePcDist `
-        -Label "新版 PC 前端 dist" -Required
-    if (-not $pcPublished) { throw '新版 PC 前端发布未完成' }
-    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'succeeded'
+    $PcReleaseBaseline = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot -CandidateGitSha $Sha -ServerUrl 'http://43.139.149.158:8080'
 } else {
     throw 'pc-frontend/ 不存在，统一发布批次失败关闭'
 }
@@ -929,6 +926,8 @@ try {
     Complete-Release -Success $false -ErrorMessage "post-deploy smoke failed: $_"
     Write-Error "❌ 部署后 smoke 失败：$_"
 }
+
+if (-not $SkipPcFrontend) { Publish-PcFrontendRelease -FrontendDir $PcFrontendDir -DistDir $PcDistDir -RepoRoot $RepoRoot -GitSha $Sha -CompatibleServerGitSha $Sha -ReleaseMode server_bundle -ServerUrl $ServerHttpBase -RemoteDir $RemotePcDist -Label '新版 PC 前端 dist' -ExpectedCurrentReleaseSha $PcReleaseBaseline }
 
 # The first deployment from a legacy release API resumes a token that did not
 # persist batch fields. Replay completed stages against the new API before

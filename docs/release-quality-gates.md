@@ -16,7 +16,7 @@
 | 发布对象 | 触发场景 | 发布前本地检查 | 发布脚本 | 脚本内阻断门禁 | 完成验收 |
 | --- | --- | --- | --- | --- | --- |
 | Rust server | `server/` 后端行为、API、任务调度、计费、存储、AI CLI 流程变更 | `scripts\check-build-prerequisites.ps1 -Scope Server`；`scripts\check-rust-warning-budget.ps1 -MaxWarnings 0`；`scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml`；`scripts\check-source-size.ps1` | `scripts\publish-server.ps1` | release claim；git 最新性；musl build 注入版本和 git SHA；上传前 SHA 顺序检查；flock CAS；重启后 `/health`、`/api/server/version` 阻断式 smoke | `scripts\check-task-complete.ps1 -Kind Server` |
-| PC frontend `/pc` | `pc-frontend/`、用户可见 Web 工作台、路由、样式、会话页、模型/节点/项目页面变更 | `npm run build`；`npm run check:bundle-budget`；相关前端专项测试，例如 `npm run test:message-flow`、`npm run test:admin-realtime` | `scripts\publish-server.ps1` | PC dist rebuild 或复用旧 dist；bundle budget；server post-deploy smoke；上传 `/pc` dist 前预算检查 | `scripts\check-task-complete.ps1 -Kind PcFrontend` |
+| PC frontend `/pc` | 仅 `pc-frontend/`、文档或发布脚本变化，且相对线上后端无 `server/`、`contracts/`、`sdk/` 变化 | `npm run build`；`npm run check:bundle-budget`；相关前端专项测试，例如 `npm run test:message-flow`、`npm run test:admin-realtime` | `scripts\publish-pc-frontend.ps1`；同时含后端/API 合同变化时使用 `scripts\publish-server.ps1` | PC dist build、bundle budget、前端/后端 SHA 兼容检查、远程 CAS 原子上传、`/pc/release.json` 与 React shell smoke | `scripts\check-task-complete.ps1 -Kind PcFrontend` |
 | PC node agent | `server/src/node_*`、Windows 客户端、launcher、节点自动更新、内置 PC 工作台包变更 | Rust/前端相关测试按变更面选择；确认 `pc-frontend` 可构建 | `scripts\publish-node-agent.ps1` | Linux/Windows agent build；内置 PC 工作台 build；bundle budget；manifest 写入；上传后 node-agent manifest 与下载端点 HEAD smoke；广播前公开开发节点握手等待 | `scripts\check-task-complete.ps1 -Kind NodeAgent` |
 | Android APK | `android/`、移动端可安装能力、APK 更新、Android 原生交互或 APK 发布脚本变更 | `scripts\check-build-prerequisites.ps1 -Scope Android`；Android/后端相关测试按变更面选择；先用 `scripts\check-task-complete.ps1 -Kind CodePushed` 确认业务提交已进入 `origin/main` | `scripts\publish-apk.ps1 -Changelog "<说明>"` | release claim 分配 `versionName/versionCode`；临时写入 Gradle 且不提交；`assembleRelease`；本地 APK manifest 版本校验；origin/main freshness；服务器 APK freshness；上传后 `/app/version.json` 和远端 APK manifest 校验 | `scripts\check-task-complete.ps1 -Kind AndroidFeature` |
 
@@ -61,6 +61,7 @@ SMOKE=<health/version/download result>
 - `scripts\publish-node-agent.ps1`：PC node agent 构建、打包、上传、manifest/download smoke、广播更新。
 - `scripts\publish-apk.ps1`：Android APK 版本 claim、Gradle release build、APK manifest 校验、上传和 APK 完成验收前置发布。
 - `scripts\publish-server-pc-frontend.ps1`：PC frontend 构建辅助和 bundle budget 发布侧检查。
+- `scripts\publish-pc-frontend.ps1`：仅前端快速发布；候选必须已进入 `origin/main`，基于线上后端且中间不含后端/API 合同变化，发布后以独立前端 SHA 标记验收。
 - `scripts\publish-health-checks.ps1`：发布后 server/node-agent smoke helper。
 - `scripts\check-local-quality.ps1`：本地统一质量预检入口，支持 `Static`、`Server`、`Frontend` 和 `All` 四种范围。
 - `scripts\check-pc-frontend-bundle-budget.js`：Vite 产物分级预算门禁；入口、关键页面和最大单分包保护真实加载性能，全项目懒加载资产总量只报告增长趋势。

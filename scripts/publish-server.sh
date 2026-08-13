@@ -624,50 +624,6 @@ REMOTE_DATA_DIR="/opt/elon/data"
 REMOTE_PC_DIST="$REMOTE_DATA_DIR/pc-next-dist"
 REMOTE_PC_LEGACY_DIST="$REMOTE_DATA_DIR/pc-legacy-dist"
 
-upload_static_dist() {
-  local local_dir="$1"
-  local remote_dir="$2"
-  local label="$3"
-  local required="${4:-0}"
-  local staging_dir="${remote_dir}-staging-$SHA"
-
-  if [ -z "$local_dir" ] || [ ! -f "$local_dir/index.html" ]; then
-    echo -e "${YELLOW}3.5⃣  ⚠️  $label 不存在，跳过上传${NC}"
-    [ "$required" -eq 1 ] && return 1
-    return 0
-  fi
-
-  echo -e "${YELLOW}3.5⃣  上传 $label 到 $remote_dir ...${NC}"
-  if [ "$LOCAL_DEPLOY" -eq 1 ]; then
-    rm -rf "$staging_dir"
-    mkdir -p "$staging_dir"
-    cp -a "$local_dir"/. "$staging_dir"/
-    activate_static_dist "$staging_dir" "$remote_dir" "$SHA"
-  else
-    # shellcheck disable=SC2086
-    if ! ssh $SSH_OPTS "$SERVER" "mkdir -p '$staging_dir'"; then
-      echo -e "${YELLOW}   ⚠️  $label staging 目录创建失败（不中止后端部署）${NC}"
-      [ "$required" -eq 1 ] && return 1
-      return 0
-    fi
-    if ! scp $SSH_OPTS -r "$local_dir/." "${SERVER}:${staging_dir}"; then
-      # shellcheck disable=SC2086
-      ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
-      echo -e "${YELLOW}   ⚠️  $label 上传失败（不中止后端部署）${NC}"
-      [ "$required" -eq 1 ] && return 1
-      return 0
-    fi
-    if ! activate_remote_static_dist "$staging_dir" "$remote_dir" "$SHA"; then
-      # shellcheck disable=SC2086
-      ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
-      echo -e "${YELLOW}   ⚠️  $label 目录替换失败（staging 已清理）${NC}"
-      [ "$required" -eq 1 ] && return 1
-      return 0
-    fi
-  fi
-  echo -e "${GREEN}   ✅ $label 原子入口发布完成（旧 hash 保留宽限期）→ $remote_dir${NC}"
-}
-
 export_pc_legacy_dist() {
   local commit="$1"
   local out_dir="$2"
@@ -768,8 +724,14 @@ if [ -f "$PC_FRONTEND_DIR/package.json" ]; then
       exit 1
     fi
   fi
-  upload_static_dist "$PC_DIST_DIR" "$REMOTE_PC_DIST" "新版 PC 前端 dist" 1
-  update_release_stage server "$RELEASE_TOKEN" "$RELEASE_BATCH_ID" pc_frontend succeeded
+  current_pc_release_sha=$(curl --noproxy '*' -sS --fail --max-time 10 "$SERVER_HTTP_BASE/pc/release-sha.txt" 2>/dev/null | tr -d '[:space:]' || true)
+  if [ -z "$current_pc_release_sha" ]; then
+    current_pc_release_sha="__missing__"
+  elif [[ ! "$current_pc_release_sha" =~ ^[0-9a-f]{40}$ ]] ||
+       ! git -C "$REPO_ROOT" merge-base --is-ancestor "$current_pc_release_sha" "$SHA_BIG" 2>/dev/null; then
+    echo -e "${RED}   ❌ 线上 PC 前端版本无法安全推进: $current_pc_release_sha -> $SHA_BIG${NC}" >&2
+    exit 1
+  fi
 else
   echo -e "${RED}3.5⃣  ❌ pc-frontend/ 不存在，统一发布批次失败关闭${NC}"
   exit 1
@@ -933,6 +895,13 @@ if [ "$DEPLOYED_VERSION_NAME" != "$ASSIGNED_VERSION" ] || [ "$DEPLOYED_GIT_SHA" 
   echo -e "${YELLOW}   实际 SHA: ${DEPLOYED_GIT_SHA:-unknown}${NC}" >&2
   exit 1
 fi
+
+built_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+cat > "$PC_DIST_DIR/release.json" <<EOF
+{"schema":"elon.pc_frontend_release.v1","gitSha":"$SHA_BIG","compatibleServerGitSha":"$SHA_BIG","releaseMode":"server_bundle","builtAtUtc":"$built_at_utc"}
+EOF
+printf '%s\n' "$SHA_BIG" > "$PC_DIST_DIR/release-sha.txt"
+upload_static_dist "$PC_DIST_DIR" "$REMOTE_PC_DIST" "新版 PC 前端 dist" 1 "$current_pc_release_sha"
 
 # A legacy release API did not persist batch fields from claim. Once the new
 # server is healthy, replay completed stages so the token adopts the

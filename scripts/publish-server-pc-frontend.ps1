@@ -20,7 +20,9 @@ function Publish-StaticDist {
         [string]$LocalDir,
         [string]$RemoteDir,
         [string]$Label,
-        [switch]$Required
+        [switch]$Required,
+        [string]$ExpectedCurrentReleaseSha = "",
+        [string]$ReleaseShaRelativePath = ""
     )
     if (-not $LocalDir -or -not (Test-Path (Join-Path $LocalDir "index.html"))) {
         Write-Host "3.5⃣  ⚠️  $Label 不存在，跳过上传" -ForegroundColor Yellow
@@ -62,7 +64,22 @@ function Publish-StaticDist {
         "elif find '$RemoteDir/.atomic-static-retention' -mtime +14 -print -quit | grep -q .; then " +
         "find '$RemoteDir/assets' -type f -mtime +14 -delete; touch '$RemoteDir/.atomic-static-retention'; fi; " +
         "rm -rf '$stagingDist'"
-    $swap = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 90 -Label "$Label atomic swap" `
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseShaRelativePath)) {
+        if ($ExpectedCurrentReleaseSha -notmatch '^(?:__missing__|[0-9a-f]{40})$') {
+            throw "Invalid expected static release SHA: $ExpectedCurrentReleaseSha"
+        }
+        if ($ReleaseShaRelativePath -notmatch '^[A-Za-z0-9._-]+$') {
+            throw "Invalid static release SHA path: $ReleaseShaRelativePath"
+        }
+        $releaseShaPath = "$RemoteDir/$ReleaseShaRelativePath"
+        $swapScript = "set -eu; mkdir -p '$RemoteDir'; exec 9>'$RemoteDir/.pc-static-publish.lock'; flock -w 60 9; " +
+            "current='__missing__'; if [ -f '$releaseShaPath' ]; then current=`$(tr -d '\r\n' < '$releaseShaPath'); fi; " +
+            "if [ `"`$current`" != '$ExpectedCurrentReleaseSha' ]; then echo `"static release changed: expected=$ExpectedCurrentReleaseSha actual=`$current`" >&2; exit 42; fi; " +
+            $swapScript
+        $encodedSwap = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($swapScript))
+        $swapScript = "printf '%s' '$encodedSwap' | base64 -d | sh"
+    }
+    $swap = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 120 -Label "$Label atomic swap" `
         -ArgumentList (@($SshOpts) + @('-n') + $networkOptions + @($Server, $swapScript))
     if ($swap.ExitCode -eq 0) {
         Write-Host "   ✅ $Label 原子入口发布完成（旧 hash 保留宽限期）→ $RemoteDir" -ForegroundColor Green
@@ -74,6 +91,87 @@ function Publish-StaticDist {
     Write-Host "   ⚠️  $Label 目录替换失败（staging 已清理）" -ForegroundColor Yellow
     if ($Required) { throw "$Label 目录替换失败，发布批次失败关闭" }
     return $false
+}
+
+function Write-PcFrontendReleaseMarker {
+    param(
+        [Parameter(Mandatory = $true)][string]$DistDir,
+        [Parameter(Mandatory = $true)][string]$GitSha,
+        [Parameter(Mandatory = $true)][string]$CompatibleServerGitSha,
+        [ValidateSet('server_bundle', 'frontend_only')][string]$ReleaseMode
+    )
+
+    foreach ($value in @($GitSha, $CompatibleServerGitSha)) {
+        if ($value -notmatch '^[0-9a-f]{40}$') { throw "Invalid release marker Git SHA: $value" }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $DistDir 'index.html') -PathType Leaf)) {
+        throw "PC frontend dist is missing index.html: $DistDir"
+    }
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    $marker = [ordered]@{
+        schema = 'elon.pc_frontend_release.v1'
+        gitSha = $GitSha
+        compatibleServerGitSha = $CompatibleServerGitSha
+        releaseMode = $ReleaseMode
+        builtAtUtc = [DateTime]::UtcNow.ToString('o')
+    }
+    [System.IO.File]::WriteAllText(
+        (Join-Path $DistDir 'release.json'),
+        ($marker | ConvertTo-Json -Compress),
+        $encoding
+    )
+    [System.IO.File]::WriteAllText((Join-Path $DistDir 'release-sha.txt'), "$GitSha`n", $encoding)
+}
+
+function Get-PcFrontendReleaseBaseline {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$CandidateGitSha,
+        [Parameter(Mandatory = $true)][string]$ServerUrl
+    )
+
+    $releaseSha = try {
+        (Invoke-ElonPublishTextGet -Uri "$ServerUrl/pc/release-sha.txt" -TimeoutSec 10).Trim()
+    } catch {
+        if ($_.Exception.Message -match '404') { '__missing__' } else { throw }
+    }
+    if ($releaseSha -eq '__missing__') { return $releaseSha }
+    if ($releaseSha -notmatch '^[0-9a-f]{40}$') {
+        throw "Invalid live PC frontend release marker: $releaseSha"
+    }
+    & git -C $RepoRoot cat-file -e "$releaseSha^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Live PC frontend commit is unavailable locally: $releaseSha" }
+    & git -C $RepoRoot merge-base --is-ancestor $releaseSha $CandidateGitSha *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Live PC frontend $releaseSha is newer than candidate $CandidateGitSha"
+    }
+    return $releaseSha
+}
+
+function Publish-PcFrontendRelease {
+    param(
+        [Parameter(Mandatory = $true)][string]$FrontendDir,
+        [Parameter(Mandatory = $true)][string]$DistDir,
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$GitSha,
+        [Parameter(Mandatory = $true)][string]$CompatibleServerGitSha,
+        [ValidateSet('server_bundle', 'frontend_only')][string]$ReleaseMode,
+        [Parameter(Mandatory = $true)][string]$ServerUrl,
+        [Parameter(Mandatory = $true)][string]$RemoteDir,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [string]$ExpectedCurrentReleaseSha = ''
+    )
+
+    Invoke-PcFrontendBundleBudget -FrontendDir $FrontendDir
+    Write-PcFrontendReleaseMarker -DistDir $DistDir -GitSha $GitSha `
+        -CompatibleServerGitSha $CompatibleServerGitSha -ReleaseMode $ReleaseMode
+    if ([string]::IsNullOrWhiteSpace($ExpectedCurrentReleaseSha)) {
+        $ExpectedCurrentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot `
+            -CandidateGitSha $GitSha -ServerUrl $ServerUrl
+    }
+    $published = Publish-StaticDist -LocalDir $DistDir -RemoteDir $RemoteDir -Label $Label `
+        -Required -ExpectedCurrentReleaseSha $ExpectedCurrentReleaseSha -ReleaseShaRelativePath 'release-sha.txt'
+    if (-not $published) { throw "$Label did not complete" }
 }
 
 function Export-PcLegacyDist {

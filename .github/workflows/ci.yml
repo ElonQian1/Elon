@@ -54,6 +54,12 @@ jobs:
         shell: pwsh
         run: scripts\check-release-runbook.ps1
 
+      - name: PC Frontend Publish Guard
+        shell: pwsh
+        run: |
+          scripts\test-pc-frontend-only-publish.ps1
+          scripts\test-pc-static-publish.ps1
+
       - name: CI Quality Gates Guard
         shell: pwsh
         run: scripts\check-ci-quality-gates.ps1

@@ -100,6 +100,7 @@ $validateSetKinds = Get-ValidateSetKinds $completionScript
 
 $requiredScriptRefs = @(
     "scripts\publish-server.ps1",
+    "scripts\publish-pc-frontend.ps1",
     "scripts\publish-node-agent.ps1",
     "scripts\publish-apk.ps1",
     "scripts\publish-server-pc-frontend.ps1",

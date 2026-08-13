@@ -54,7 +54,7 @@ Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器
 |---|---|---|
 | 文档、配置或只要求代码同步 | 不发布 | `DocsOnly` 或 `CodePushed` |
 | 后端运行代码 | 默认运行 `publish-server.*`，除非用户明确只同步代码 | `Server`；只同步时 `CodePushed` |
-| `pc-frontend/`、`/pc` 用户可见改动 | 构建后默认 `publish-server.*` 并验证 `/pc` | `PcFrontend`；只同步时 `CodePushed` |
+| PC 前端 | 纯前端用 `publish-pc-frontend.ps1`；含 API 用 `publish-server.*` | `PcFrontend`；只同步用 `CodePushed` |
 | Win 节点客户端用户可见改动 | 默认 `publish-node-agent.ps1` | `NodeAgent`；只同步时 `CodePushed` |
 | Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
 | Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |

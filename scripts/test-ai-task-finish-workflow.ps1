@@ -6,6 +6,7 @@ $checkScript = Join-Path $repoRoot "scripts\check-task-complete.ps1"
 $androidProvenanceScript = Join-Path $repoRoot "scripts\android-task-provenance.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
+$appUiTaskPushScopeScript = Join-Path $repoRoot "scripts\app-ui-task-push-scope.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
 $gitPathResolutionScript = Join-Path $repoRoot "scripts\git-path-resolution.ps1"
 $terminalFinalizationScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization.ps1"
@@ -185,6 +186,7 @@ try {
     Copy-Item -LiteralPath $androidProvenanceScript -Destination (Join-Path $mainRepo "scripts\android-task-provenance.ps1")
     Copy-Item -LiteralPath $cleanupScript -Destination (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $mainRepo "scripts\direct-network.ps1")
+    Copy-Item -LiteralPath $appUiTaskPushScopeScript -Destination (Join-Path $mainRepo "scripts\app-ui-task-push-scope.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $mainRepo "scripts\ai-task-finish-contract.ps1")
     Copy-Item -LiteralPath $gitPathResolutionScript -Destination (Join-Path $mainRepo "scripts\git-path-resolution.ps1")
     Copy-Item -LiteralPath $terminalFinalizationScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization.ps1")
