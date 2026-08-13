@@ -126,7 +126,7 @@
       "id": "compute-v255-runtime-launch-profile-verification",
       "title": "V255 惰性 runtime launch profile 验收闭环",
       "summary": "编译并执行已落地的 V255 Domain、migration、Store、Service 与 HTTP 测试，修复真实缺口并把 passed=0 更新为可复核的局部验收证据；不扩张到 Sidecar、真实凭据、Provider activation、市场或结算。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-authority.md",
@@ -173,54 +173,54 @@
       "implementation_evidence": [
         {
           "path": "AI_CURRENT.md",
-          "content_hash": "01a43f6b12ffab6af76626eb3b5a87cee593192cb3394375f10ddb8627ca369d",
+          "content_hash": "d6ff8f11ceeaf4095d8f9d754751ef7809faaf9d04bcf8a1cd7bbf2e45169802",
           "locator": "V255",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "b06895f801d6b912e1338a40952e398713145fca",
-            "worktree_blob_oid": "a5b9738bc28972248cd9ff79e2e9848df4e81797",
-            "state": "tracked_modified"
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "e68791f7fd3492a3ecc06e03e174d0a5d4b707b0",
+            "worktree_blob_oid": "e68791f7fd3492a3ecc06e03e174d0a5d4b707b0",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/distributed-compute/current-implementation-status.md",
-          "content_hash": "a11277f95c41648d9fd0d50228196c15104cabbf8ec4e39e7e539b107a76c857",
+          "content_hash": "6cafc06d120ae369a407e1ccda1450015f587b419a86c8beb76f8d2c3ac7d657",
           "locator": "V255",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "e4ade40f3367e6e031f565623ca76fcbb4d0631a",
-            "worktree_blob_oid": "49361591ec974bd4e5476ab662362ebd34dc48d5",
-            "state": "tracked_modified"
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "5a2fc5028faec738ace97b15bea5d8353f26be39",
+            "worktree_blob_oid": "5a2fc5028faec738ace97b15bea5d8353f26be39",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-acceptance.md",
-          "content_hash": "5aaefdcd1674900b3ed828310c27f6781f7e326a960dd924661c7d1ba04eaa51",
+          "content_hash": "6b3f3cfe382895911543552f1a8a746c7d9da3f0aa972a19185d3bc89a8acad2",
           "locator": "本批状态",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "553e920f616e1b3ab7c4d15c05d89aca107d1531",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "e35da6be0de737366837d9163ca1c52115f9b5de",
             "worktree_blob_oid": "e35da6be0de737366837d9163ca1c52115f9b5de",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/distributed-compute/external-pool-adapter-runtime-launch-profile-authority.md",
-          "content_hash": "b7d06ff5b644170d6d1856507b01ac081155fe42987386013f4246a4fecf2993",
+          "content_hash": "819f6349b0ee0cc9f3560a4008079a4962b414b0fa495f6954537567098147d3",
           "locator": "6. 本地实现与验证状态",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "24ef6f207406e9be97a69f96e35c26fa74264246",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "fedd7a972b3313b992ea6593c17460d1e9f58731",
             "worktree_blob_oid": "fedd7a972b3313b992ea6593c17460d1e9f58731",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -230,7 +230,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
             "head_blob_oid": "14c315d90c5b049a461f18eb1d960a44137a74f6",
             "worktree_blob_oid": "14c315d90c5b049a461f18eb1d960a44137a74f6",
             "state": "tracked_clean"
@@ -243,7 +243,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
             "head_blob_oid": "01d5f0409a9ad33bdf1d24135417892330923c5f",
             "worktree_blob_oid": "01d5f0409a9ad33bdf1d24135417892330923c5f",
             "state": "tracked_clean"
@@ -256,10 +256,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "45685b1b02f240a2b7f863503a3901909c4b609e",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "c7db550214ea2dae064674d9ded04bbdd8cc433b",
             "worktree_blob_oid": "c7db550214ea2dae064674d9ded04bbdd8cc433b",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -269,10 +269,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "f3e8b97ade38bffa95d0977539564ebc783eee5d",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "c2416012db1ac16075454436ad980ad086940f64",
             "worktree_blob_oid": "c2416012db1ac16075454436ad980ad086940f64",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -282,15 +282,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "aed03d7494f4b5ab36d4ae297bb2c4515b66d055",
-            "head_blob_oid": "d201784559666a10d7f1f8982c2d76dbf139f560",
+            "head_commit": "fdd92efdff0b3984d5f68b1b19b24e603fadaf09",
+            "head_blob_oid": "4fd8a4354c5331832856adbc9ffed95c03057e00",
             "worktree_blob_oid": "4fd8a4354c5331832856adbc9ffed95c03057e00",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1786647694990,
-      "updated_at_ms": 1786652715138
+      "updated_at_ms": 1786653763041
     },
     {
       "id": "delivery-allocation-expiry-worker-v234-verification",
@@ -939,7 +939,7 @@
       "id": "project-feature-registry-growth-contract-v1",
       "title": "项目功能注册表增长门禁修正",
       "summary": "使 adoption CI 门禁与服务端 512 项、有界分页和当前状态机保持一致，同时保留 8 MiB 文件上限。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/project-feature-registry-growth-contract-v1.md",
@@ -1002,7 +1002,7 @@
         }
       ],
       "created_at_ms": 1786653173582,
-      "updated_at_ms": 1786653174384
+      "updated_at_ms": 1786653716050
     },
     {
       "id": "project-feature-registry-normalized-hash-v1",
@@ -2395,6 +2395,86 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786653174384
+    },
+    {
+      "id": "feature_event_1e422ce6afba4f4c9f246365236aa774",
+      "feature_id": "project-feature-registry-growth-contract-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Implementation and verification commit fdd92efdf was pushed to origin/main.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786653716050
+    },
+    {
+      "id": "feature_event_3d09d7d702c04ce4a719cb1a47b37c27",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Reopen after rebase so merged V256/V257 status documents can be rebound as current evidence.",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1786653759360
+    },
+    {
+      "id": "feature_event_c36573402d5145bfb85dfc6a98ee082f",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "claimed",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786653759713
+    },
+    {
+      "id": "feature_event_1454a9fb9b9d45218e461284def8ce3c",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Refresh evidence after conflict-resolved status documents.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786653759727
+    },
+    {
+      "id": "feature_event_cc5c34bd5141431fa41bbe62ad4f6f45",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786653762992
+    },
+    {
+      "id": "feature_event_bd91003f49304dc7b4b08697f0ada712",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Merged V255 evidence is current; implementation commit fdd92efdf is on origin/main.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786653763008
+    },
+    {
+      "id": "feature_event_f023a9c5129049019bb8b4f2509172f9",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Merged V255 evidence is current; implementation commit fdd92efdf is on origin/main.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786653763026
+    },
+    {
+      "id": "feature_event_e0dbe2e427304a01a0a1c0c95d48c4f7",
+      "feature_id": "compute-v255-runtime-launch-profile-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-v255-20260814",
+      "reason": "Merged V255 evidence is current; implementation commit fdd92efdf is on origin/main.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786653763041
     }
   ]
 }
