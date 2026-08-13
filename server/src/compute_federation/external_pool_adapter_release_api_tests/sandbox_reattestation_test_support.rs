@@ -39,8 +39,9 @@ pub(super) async fn create_sandbox_reattestation_fixture(
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{vulnerability_reattestation}");
+    let verifier_suffix = format!("{suffix}-reattestation");
     let (sandbox_private, sandbox_verifier) =
-        create_active_sandbox_verifier_key(fixture, suffix).await;
+        create_active_sandbox_verifier_key(fixture, &verifier_suffix).await;
     SandboxReattestationFixture {
         roots,
         vulnerability_reattestation,
@@ -56,9 +57,7 @@ pub(super) fn challenge_body(roots: &SandboxReattestationFixture, suffix: &str) 
             .unwrap()
             .with_timezone(&Utc);
     let intelligence_expires = chrono::DateTime::parse_from_rfc3339(
-        reattestation["vulnerability_intelligence_expires_at"]
-            .as_str()
-            .unwrap(),
+        reattestation["intelligence_expires_at"].as_str().unwrap(),
     )
     .unwrap()
     .with_timezone(&Utc);
