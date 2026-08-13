@@ -285,6 +285,26 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun currentConversationHeaderOptionsExposeConversationScopedNativeSelector() {
+        val contextId = "current-conversation-123"
+        val control = control(
+            "conversation-more",
+            "conversation_options",
+            "更多",
+            ChatGptWebUiRegion.HEADER,
+            contextId,
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(control)).getValue(control.id)
+        val selector = ChatGptNativeControlPresentation.conversationOverlayActionsSelector(contextId)
+
+        assertEquals("direct", coverage.kind.wireName)
+        assertEquals(selector, ChatGptNativeControlPresentation.directSelector(control))
+        assertEquals(selector, coverage.nativeSelector)
+        assertEquals(selector, coverage.nativeTriggerSelector)
+    }
+
+    @Test
     fun mixedMessageAndConversationContextsKeepDistinctNativeSelectors() {
         val controls = listOf(
             control(

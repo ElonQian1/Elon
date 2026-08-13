@@ -35,6 +35,12 @@ internal object ChatGptNativeControlPresentation {
             val coverage = when {
                 control.region == ChatGptWebUiRegion.HEADER && control.semantic == "title" ->
                     Coverage(control.id, Kind.METADATA)
+                control.semantic == "conversation_options" && control.contextId != null -> Coverage(
+                    control.id,
+                    Kind.DIRECT,
+                    nativeSelector = conversationOverlayActionsSelector(control.contextId),
+                    nativeTriggerSelector = conversationOverlayActionsSelector(control.contextId),
+                )
                 control.id in headerIds || control.id in suggestionIds -> Coverage(
                     control.id,
                     Kind.DIRECT,
@@ -89,6 +95,8 @@ internal object ChatGptNativeControlPresentation {
 
     fun directSelector(control: ChatGptWebUiControl): String =
         when {
+            control.semantic == "conversation_options" && control.contextId != null ->
+                conversationOverlayActionsSelector(control.contextId)
             control.region == ChatGptWebUiRegion.SUGGESTIONS && control.semantic == "project" ->
                 "chatgpt-project:${stableContextId(control.id)}"
             control.region == ChatGptWebUiRegion.HEADER && control.semantic == "temporary_chat" ->
