@@ -8,7 +8,10 @@
     marker and remote compare-and-swap lock prevent stale frontend rollback.
 #>
 [CmdletBinding()]
-param([switch]$SkipBuild)
+param(
+    [switch]$SkipBuild,
+    [switch]$ReuseLiveServer
+)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'direct-network.ps1')
@@ -52,9 +55,19 @@ try {
     if ($LASTEXITCODE -ne 0) { Stop-PcFrontendPublish "live server commit is unavailable locally: $serverSha" }
     Assert-GitAncestor $serverSha $Sha 'candidate is not based on the live server commit'
 
+    $compatibilityMode = 'direct_server_ancestry'
     $blocking = @(& git diff --name-only "$serverSha..$Sha" -- server contracts sdk)
     if ($blocking.Count -gt 0) {
-        Stop-PcFrontendPublish "server/API inputs changed and require publish-server.ps1: $($blocking -join ', ')"
+        if (-not $ReuseLiveServer) {
+            Stop-PcFrontendPublish "server/API inputs changed since the live server. If this frontend is independent, rerun with -ReuseLiveServer; otherwise use publish-server.ps1: $($blocking -join ', ')"
+        }
+        $coupledCommits = @(Get-PcFrontendBackendCoupledCommits -RepoRoot $RepoRoot `
+            -BaseGitSha $serverSha -CandidateGitSha $Sha)
+        if ($coupledCommits.Count -gt 0) {
+            Stop-PcFrontendPublish "frontend commits also changed server/API inputs and cannot reuse the live server: $($coupledCommits -join '; ')"
+        }
+        $compatibilityMode = 'isolated_frontend_commits'
+        Write-Host "PC_FRONTEND_COMPATIBILITY=isolated_frontend_commits live_server=$serverSha"
     }
 
     $currentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot -CandidateGitSha $Sha `
@@ -83,6 +96,7 @@ try {
     }
     Publish-PcFrontendRelease -FrontendDir $FrontendDir -DistDir $DistDir -RepoRoot $RepoRoot `
         -GitSha $Sha -CompatibleServerGitSha $serverSha -ReleaseMode frontend_only `
+        -CompatibilityMode $compatibilityMode `
         -ServerUrl $ServerUrl -RemoteDir $RemotePcDist -Label '新版 PC 前端 dist' `
         -ExpectedCurrentReleaseSha $currentReleaseSha
 

@@ -400,6 +400,9 @@ if ($Kind -eq "DocsOnly") {
 }
 
 if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
+    if ($Kind -eq 'PcFrontend') {
+        . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
+    }
     git merge-base --is-ancestor $head $originMain | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Stop-Check "$Kind task is not complete: local HEAD is not contained in origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
@@ -473,7 +476,14 @@ if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
             }
             $blockingChanges = @(git diff --name-only "$serverSha..$pcReleaseSha" -- server contracts sdk)
             if ($blockingChanges.Count -gt 0) {
-                Stop-Check "PC frontend release crosses server/API changes: $($blockingChanges -join ', ')"
+                if ([string]$pcRelease.compatibilityMode -ne 'isolated_frontend_commits') {
+                    Stop-Check "PC frontend release crosses server/API changes without an isolation proof: $($blockingChanges -join ', ')"
+                }
+                $coupledCommits = @(Get-PcFrontendBackendCoupledCommits -RepoRoot $RepoRoot `
+                    -BaseGitSha $serverSha -CandidateGitSha $pcReleaseSha)
+                if ($coupledCommits.Count -gt 0) {
+                    Stop-Check "PC frontend release contains backend-coupled frontend commits: $($coupledCommits -join '; ')"
+                }
             }
             if ([string]$pcRelease.releaseMode -eq 'frontend_only') {
                 $serverReleaseStatus = 'compatible_existing'

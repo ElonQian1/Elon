@@ -10,6 +10,9 @@ function Assert-Contains([string]$Text, [string]$Pattern, [string]$Label) {
 }
 
 Assert-Contains $entry "git diff --name-only `"`$serverSha..`$Sha`" -- server contracts sdk" 'backend change gate'
+Assert-Contains $entry '[switch]$ReuseLiveServer' 'explicit live server reuse option'
+Assert-Contains $entry 'Get-PcFrontendBackendCoupledCommits' 'frontend commit isolation proof'
+Assert-Contains $entry "`$compatibilityMode = 'isolated_frontend_commits'" 'isolated frontend marker mode'
 Assert-Contains $entry "Assert-GitAncestor `$Sha 'origin/main'" 'pushed commit gate'
 Assert-Contains $entry '-ExpectedCurrentReleaseSha $currentReleaseSha' 'remote release CAS'
 Assert-Contains $entry 'Publish-PcFrontendRelease' 'shared frontend publisher'
@@ -23,6 +26,7 @@ if ($entry -match '(?m)^\s*&\s+.*publish-server\.ps1' -or
 Assert-Contains $helper '.pc-static-publish.lock' 'remote static publish lock'
 Assert-Contains $helper "static release changed: expected=" 'remote static release CAS check'
 Assert-Contains $helper 'elon.pc_frontend_release.v1' 'versioned frontend release marker'
+Assert-Contains $helper 'function Get-PcFrontendBackendCoupledCommits' 'shared frontend commit isolation verifier'
 Assert-Contains $serverPublisher 'Publish-PcFrontendRelease' 'server bundle shared frontend publisher'
 Assert-Contains $serverPublisher '-GitSha $ShaBig -CompatibleServerGitSha $ShaBig' 'server bundle full frontend release SHA'
 Assert-Contains $helper 'Get-PcFrontendReleaseBaseline' 'server bundle frontend rollback guard'
@@ -33,6 +37,8 @@ if ($serverPublisher.IndexOf('Invoke-ElonServerPostDeploySmoke') -gt
 }
 Assert-Contains $completion 'compatibleServerGitSha' 'frontend/server compatibility completion gate'
 Assert-Contains $completion 'server contracts sdk' 'completion backend change gate'
+Assert-Contains $completion "compatibilityMode -ne 'isolated_frontend_commits'" 'completion isolation marker gate'
+Assert-Contains $completion 'Get-PcFrontendBackendCoupledCommits' 'completion isolation proof verification'
 Assert-Contains $completion "SERVER_RELEASE_STATUS=`$serverReleaseStatus" 'separate frontend-only completion status'
 
 . (Join-Path $repo 'scripts/publish-server-pc-frontend.ps1')
@@ -43,12 +49,14 @@ try {
     $frontendSha = '1111111111111111111111111111111111111111'
     $serverSha = '2222222222222222222222222222222222222222'
     Write-PcFrontendReleaseMarker -DistDir $temp -GitSha $frontendSha `
-        -CompatibleServerGitSha $serverSha -ReleaseMode frontend_only
+        -CompatibleServerGitSha $serverSha -ReleaseMode frontend_only `
+        -CompatibilityMode isolated_frontend_commits
     $marker = Get-Content (Join-Path $temp 'release.json') -Raw | ConvertFrom-Json
     if ($marker.schema -ne 'elon.pc_frontend_release.v1' -or
         $marker.gitSha -ne $frontendSha -or
         $marker.compatibleServerGitSha -ne $serverSha -or
-        $marker.releaseMode -ne 'frontend_only') {
+        $marker.releaseMode -ne 'frontend_only' -or
+        $marker.compatibilityMode -ne 'isolated_frontend_commits') {
         throw 'frontend release marker content is invalid'
     }
     if ((Get-Content (Join-Path $temp 'release-sha.txt') -Raw).Trim() -ne $frontendSha) {

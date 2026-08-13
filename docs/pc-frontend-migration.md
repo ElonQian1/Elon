@@ -118,6 +118,12 @@ server/src/
 | 账号信息 + 登录方式 + 账号安全 | 🟡 中 | `src/features/account/AccountPage.tsx`、`src/features/account/LinkedIdentitiesCard.tsx`、`src/features/account/AccountSecurityCard.tsx`、`src/features/auth/GoogleIdentityButton.tsx`、`src/features/auth/PasswordRecoveryPanel.tsx` | 🟡 源码与编译级完成：账号信息、Google OIDC 登录/主动绑定/解绑/最后入口保护，以及设置或修改密码、一次性恢复码、设备会话撤销和登录页离线恢复均已接入并通过 PC 构建与 ESLint；真实 OAuth、真实账号、邮件/短信投递和页面视觉验收仍待统一执行 |
 | OpenAI ChatKit（API 聊天） | 🟡 中 | `src/features/chatkit/`、`src/features/account/OpenAiChatKitCard.tsx`、`server/src/openai_chatkit_api.rs` | 🟡 源码与编译级完成：使用一龙登录态和服务端 OpenAI 配置创建短时 ChatKit session，明确不冒充 ChatGPT 账号登录、不读取 Cookie/历史/Plus/Codex 凭据；Win、PWA、APK 入口已同步，真实 Key/Workflow、会话网络、视觉验收和发布仍待统一执行 |
 | Win 官方 AI 网页 | 🟡 中 | `src/features/user-browser/`、`desktop-shell/src-tauri/src/local_ai_browser.rs` | 🟡 ChatGPT 与 Google AI 模式本地语义界面已接线；按一龙账号和厂商隔离 WebView2 Profile。Google 适配器只同步可见问题、回答、引用和受限动作，不读取或复制 Cookie；Google 地区/账号开放状态、真实 DOM 与登录仍需用户环境验收 |
+
+纯 PC 前端发布默认仍要求候选与线上服务器之间没有 `server/contracts/sdk` 差异。若差异来自
+其他已经进入主线但尚未发布的服务器任务，且本次前端明确不依赖它们，可显式运行
+`publish-pc-frontend.ps1 -ReuseLiveServer`。脚本会逐个检查从线上服务器提交到候选之间所有
+改动过 `pc-frontend/` 的提交；只要其中任一提交同时改动服务器/API，发布立即失败。通过后
+发布标记绑定当前线上服务器 SHA，服务器不会重新编译或重启，统一收尾会重复验证该隔离证明。
 | 绑定手机/邮箱 | 🟢 低 | `src/features/account/` | ⬜ 未开始 |
 | 积分/余额查看 | 🟢 低 | `src/features/account/AccountPage.tsx`、`src/features/billing/` | 🟡 部分完成：账号页已展示余额、试用额度和最近账单；独立账单分页/充值页继续补 |
 

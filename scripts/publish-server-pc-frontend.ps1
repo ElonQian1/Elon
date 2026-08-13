@@ -98,7 +98,9 @@ function Write-PcFrontendReleaseMarker {
         [Parameter(Mandatory = $true)][string]$DistDir,
         [Parameter(Mandatory = $true)][string]$GitSha,
         [Parameter(Mandatory = $true)][string]$CompatibleServerGitSha,
-        [ValidateSet('server_bundle', 'frontend_only')][string]$ReleaseMode
+        [ValidateSet('server_bundle', 'frontend_only')][string]$ReleaseMode,
+        [ValidateSet('same_source_commit', 'direct_server_ancestry', 'isolated_frontend_commits')]
+        [string]$CompatibilityMode = 'direct_server_ancestry'
     )
 
     foreach ($value in @($GitSha, $CompatibleServerGitSha)) {
@@ -115,6 +117,7 @@ function Write-PcFrontendReleaseMarker {
         gitSha = $GitSha
         compatibleServerGitSha = $CompatibleServerGitSha
         releaseMode = $ReleaseMode
+        compatibilityMode = $CompatibilityMode
         builtAtUtc = [DateTime]::UtcNow.ToString('o')
     }
     $markerJson = $marker | ConvertTo-Json -Compress
@@ -158,6 +161,8 @@ function Publish-PcFrontendRelease {
         [Parameter(Mandatory = $true)][string]$GitSha,
         [Parameter(Mandatory = $true)][string]$CompatibleServerGitSha,
         [ValidateSet('server_bundle', 'frontend_only')][string]$ReleaseMode,
+        [ValidateSet('same_source_commit', 'direct_server_ancestry', 'isolated_frontend_commits')]
+        [string]$CompatibilityMode = 'direct_server_ancestry',
         [Parameter(Mandatory = $true)][string]$ServerUrl,
         [Parameter(Mandatory = $true)][string]$RemoteDir,
         [Parameter(Mandatory = $true)][string]$Label,
@@ -166,7 +171,8 @@ function Publish-PcFrontendRelease {
 
     Invoke-PcFrontendBundleBudget -FrontendDir $FrontendDir
     Write-PcFrontendReleaseMarker -DistDir $DistDir -GitSha $GitSha `
-        -CompatibleServerGitSha $CompatibleServerGitSha -ReleaseMode $ReleaseMode
+        -CompatibleServerGitSha $CompatibleServerGitSha -ReleaseMode $ReleaseMode `
+        -CompatibilityMode $CompatibilityMode
     if ([string]::IsNullOrWhiteSpace($ExpectedCurrentReleaseSha)) {
         $ExpectedCurrentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot `
             -CandidateGitSha $GitSha -RemoteDir $RemoteDir -SshServer $Server -SshOptions $SshOpts
@@ -174,6 +180,31 @@ function Publish-PcFrontendRelease {
     $published = Publish-StaticDist -LocalDir $DistDir -RemoteDir $RemoteDir -Label $Label `
         -Required -ExpectedCurrentReleaseSha $ExpectedCurrentReleaseSha -ReleaseShaRelativePath 'release-sha.txt'
     if (-not $published) { throw "$Label did not complete" }
+}
+
+function Get-PcFrontendBackendCoupledCommits {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$BaseGitSha,
+        [Parameter(Mandatory = $true)][string]$CandidateGitSha
+    )
+
+    $frontendCommits = @(& git -C $RepoRoot rev-list --reverse "$BaseGitSha..$CandidateGitSha" -- pc-frontend)
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to enumerate PC frontend commits for compatibility proof.' }
+    $coupled = [System.Collections.Generic.List[string]]::new()
+    foreach ($commit in $frontendCommits) {
+        $parents = @((& git -C $RepoRoot rev-list --parents -n 1 $commit).Trim().Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries))
+        if ($LASTEXITCODE -ne 0 -or $parents.Count -ne 2) {
+            $coupled.Add("${commit}:merge_or_unknown_parent")
+            continue
+        }
+        $backendPaths = @(& git -C $RepoRoot diff --name-only $parents[1] $commit -- server contracts sdk)
+        if ($LASTEXITCODE -ne 0) { throw "Unable to inspect PC frontend commit $commit." }
+        if ($backendPaths.Count -gt 0) {
+            $coupled.Add("${commit}:$($backendPaths -join ',')")
+        }
+    }
+    return @($coupled)
 }
 
 function Export-PcLegacyDist {
