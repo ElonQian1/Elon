@@ -11,6 +11,7 @@
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
+  const overlayPolicy = window.__elonChatGptOverlayPolicy;
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -163,9 +164,9 @@
   }
 
   function visibleOverlayRoots() {
-    const selector = '[role="dialog"], [role="menu"], [data-radix-menu-content], ' +
-      '[data-headlessui-menu-items], [data-headlessui-portal], [data-slot="dropdown-menu-content"], [data-slot="menu-content"]';
-    return Array.from(document.querySelectorAll(selector)).filter(isVisible);
+    return overlayPolicy && typeof overlayPolicy.visibleRoots === 'function'
+      ? overlayPolicy.visibleRoots(document, isVisible, actionableNodes)
+      : Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
   }
 
   function semanticFor(node, region, index) {

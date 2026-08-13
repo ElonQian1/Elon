@@ -31,6 +31,7 @@
     '__elonChatGptTemporaryChat',
     '__elonChatGptFormControls',
     '__elonChatGptControlOwnershipPolicy',
+    '__elonChatGptOverlayPolicy',
     '__elonChatGptFormCommands',
     '__elonChatGptDisclosureControls',
     '__elonChatGptSnapshotScheduler',

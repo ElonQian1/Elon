@@ -1,0 +1,57 @@
+(function (root, factory) {
+  'use strict';
+
+  const policy = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = policy;
+  if (root) root.__elonChatGptOverlayPolicy = Object.freeze(policy);
+})(typeof window !== 'undefined' ? window : null, function () {
+  'use strict';
+
+  const EXPLICIT_SELECTOR = [
+    '[role="dialog"]',
+    '[role="menu"]',
+    '[data-radix-menu-content]',
+    '[data-headlessui-menu-items]',
+    '[data-headlessui-portal]',
+    '[data-slot="dropdown-menu-content"]',
+    '[data-slot="menu-content"]'
+  ].join(', ');
+  const MANAGEMENT_ACTION = /view.*files.*chat|rename|unpin|pin.chat|unarchive|archive|share|delete|在聊天中查看文件|重命名|重新命名|取消置顶|置顶聊天|取消归档|归档|分享|删除/i;
+
+  function signal(node) {
+    return [
+      node && node.id,
+      node && node.getAttribute && node.getAttribute('data-testid'),
+      node && node.getAttribute && node.getAttribute('aria-label'),
+      node && node.getAttribute && node.getAttribute('title'),
+      node && node.textContent
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function isManagementAction(node) {
+    return MANAGEMENT_ACTION.test(signal(node));
+  }
+
+  function inferredRoot(node, isVisible, actionableNodes) {
+    let current = node && node.parentElement;
+    for (let depth = 0; current && depth < 7; depth += 1, current = current.parentElement) {
+      if (!isVisible(current)) continue;
+      const actions = actionableNodes(current);
+      if (actions.length > 24) continue;
+      if (actions.filter(isManagementAction).length >= 2) return current;
+    }
+    return null;
+  }
+
+  function visibleRoots(document, isVisible, actionableNodes) {
+    if (!document || typeof document.querySelectorAll !== 'function') return [];
+    const explicit = Array.from(document.querySelectorAll(EXPLICIT_SELECTOR)).filter(isVisible);
+    const inferred = Array.from(document.querySelectorAll(
+      'button, [role="button"], [role="menuitem"], a[href]'
+    )).filter(isVisible).filter(isManagementAction)
+      .map((node) => inferredRoot(node, isVisible, actionableNodes)).filter(Boolean);
+    return Array.from(new Set(explicit.concat(inferred)));
+  }
+
+  return Object.freeze({ isManagementAction, visibleRoots });
+});
