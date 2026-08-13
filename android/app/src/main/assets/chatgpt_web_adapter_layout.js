@@ -212,6 +212,7 @@
     if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
     if (/create.*(?:file|website)|创建.*(?:文件|网站)/.test(signal)) return 'create_asset';
     if (/view.*files.*chat|在聊天中查看文件/.test(signal)) return 'conversation_files';
+    if (/rename|重命名|重新命名/.test(signal)) return 'rename';
     if (/unpin|pin.chat|取消置顶|置顶聊天/.test(signal)) return 'pin';
     if (/unarchive|archive|取消归档|归档/.test(signal)) return 'archive';
     if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
@@ -305,6 +306,7 @@
       create_asset: '创建文件或网站',
       sources: '文件和来源',
       conversation_files: '在聊天中查看文件',
+      rename: '重命名会话',
       pin: '置顶聊天',
       archive: '归档',
       more: '更多操作',

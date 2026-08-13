@@ -6,7 +6,7 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [Parameter(Mandatory = $true)][string]$ExpectedHardwareSerial,
     [ValidateRange(20, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 87
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 88
 )
 
 $ErrorActionPreference = "Stop"
@@ -94,7 +94,7 @@ try {
         throw "Conversation menu contains unknown generic controls."
     }
     if (@($observedSemantics | Where-Object {
-        $_ -in @("conversation_files", "pin", "archive", "share", "delete")
+        $_ -in @("conversation_files", "rename", "pin", "archive", "share", "delete")
     }).Count -eq 0) {
         throw "Conversation menu contains no recognized management action."
     }

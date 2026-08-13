@@ -60,6 +60,7 @@ internal object ChatGptWebUiSemantics {
         "create_asset",
         "sources",
         "conversation_files",
+        "rename",
         "pin",
         "archive",
         "more",

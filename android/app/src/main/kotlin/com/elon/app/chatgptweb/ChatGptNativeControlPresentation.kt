@@ -265,6 +265,7 @@ internal object ChatGptNativeControlPresentation {
     private val CONVERSATION_CONTEXT_SEMANTICS = setOf(
         "conversation_options",
         "conversation_files",
+        "rename",
         "pin",
         "archive",
     )

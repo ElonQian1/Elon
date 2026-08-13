@@ -20,7 +20,7 @@ foreach ($required in @(
     'context_id = $conversationContextId',
     'region = "overlay"',
     'chatgpt-conversation-actions:*',
-    '"conversation_files", "pin", "archive", "share", "delete"',
+    '"conversation_files", "rename", "pin", "archive", "share", "delete"',
     '"safe/conversation_management_structure"',
     "mutations_invoked = 0",
     "sent_messages = 0",

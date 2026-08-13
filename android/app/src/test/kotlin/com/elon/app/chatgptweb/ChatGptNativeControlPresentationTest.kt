@@ -269,6 +269,7 @@ class ChatGptNativeControlPresentationTest {
                 ChatGptWebUiRegion.OVERLAY,
                 contextId,
             ),
+            control("rename", "rename", "重命名", ChatGptWebUiRegion.OVERLAY, contextId),
             control("pin", "pin", "置顶", ChatGptWebUiRegion.OVERLAY, contextId),
             control("delete", "delete", "删除", ChatGptWebUiRegion.OVERLAY, contextId),
         )
@@ -278,6 +279,7 @@ class ChatGptNativeControlPresentationTest {
 
         assertEquals(selector, ChatGptNativeControlPresentation.contextActionsSelector(controls))
         assertEquals(selector, coverage.getValue("conversation-more").nativeTriggerSelector)
+        assertEquals(selector, coverage.getValue("rename").nativeTriggerSelector)
         assertEquals(selector, coverage.getValue("pin").nativeTriggerSelector)
         assertEquals(selector, coverage.getValue("delete").nativeTriggerSelector)
     }

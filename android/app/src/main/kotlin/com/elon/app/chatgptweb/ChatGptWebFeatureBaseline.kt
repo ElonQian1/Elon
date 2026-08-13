@@ -542,7 +542,14 @@ internal object ChatGptWebFeatureBaseline {
             group = "history",
             delivery = Delivery.ADAPTIVE_NATIVE,
             mcpActions = listOf("chatgpt_invoke_control"),
-            semantics = setOf("conversation_files", "pin", "archive", "share", "delete"),
+            semantics = setOf(
+                "conversation_files",
+                "rename",
+                "pin",
+                "archive",
+                "share",
+                "delete",
+            ),
             verificationGap = "conversation_menu_structure_device_acceptance",
         ),
         feature(
@@ -551,7 +558,7 @@ internal object ChatGptWebFeatureBaseline {
             delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
             acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control", "chatgpt_select_view"),
-            semantics = setOf("pin", "archive", "share", "delete"),
+            semantics = setOf("rename", "pin", "archive", "share", "delete"),
             verificationGap = "conversation_mutation_device_acceptance",
         ),
         feature(

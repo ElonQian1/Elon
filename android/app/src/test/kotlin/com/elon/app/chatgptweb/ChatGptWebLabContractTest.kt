@@ -254,6 +254,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("return 'next_response'"))
         assertTrue(ChatGptWebUiSemantics.KNOWN.contains("previous_response"))
         assertTrue(ChatGptWebUiSemantics.KNOWN.contains("temporary_chat"))
+        assertTrue(ChatGptWebUiSemantics.KNOWN.contains("rename"))
         assertTrue(ChatGptWebUiSemantics.KNOWN.contains("next_response"))
         assertTrue(adapterLayout.contains("文件和来源|查看来源|来源"))
         assertTrue(adapterLayout.contains("return 'conversation_files'"))
