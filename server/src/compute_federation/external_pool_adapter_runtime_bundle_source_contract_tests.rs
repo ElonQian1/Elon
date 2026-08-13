@@ -73,7 +73,10 @@ fn runtime_bundle_path_and_filesystem_custody_are_fail_closed() {
         "validate_profile_digest(&expected.profile_digest)",
         "platform_open_bundle(root, &expected.profile_digest)",
         "opened.revalidate()?",
-        "retained_handles: opened.into_handles()",
+        "retained_bundle: Box::new(opened)",
+        "bundle_generation: manifest.bundle_generation",
+        "config_sha256",
+        "credential_sha256",
     ] {
         assert!(
             FILESYSTEM.contains(required),
@@ -161,7 +164,28 @@ fn runtime_bundle_sensitive_bytes_are_locked_borrowed_and_zeroized() {
     assert!(!LOCKED_BYTES.contains("derive(Clone"));
     assert!(!LOCKED_BYTES.contains("Serialize"));
     assert!(!LOCKED_BYTES.contains("Debug for LockedSensitiveBytes"));
-    assert!(STORE_TYPES.contains("retained_handles: Vec<std::fs::File>"));
+    assert!(
+        STORE_TYPES.contains("retained_bundle: Box<dyn super::filesystem::OpenedRuntimeBundle>")
+    );
+    assert!(STORE_TYPES.contains("pub(super) bundle_generation: u64"));
+    assert!(STORE_TYPES.contains("pub(super) config_sha256: [u8; 32]"));
+    assert!(STORE_TYPES.contains("pub(super) credential_sha256: [u8; 32]"));
+    assert!(STORE_TYPES.contains("pub(super) fn revalidate(&self) -> Result<()>"));
+    assert!(STORE_TYPES.contains("impl Drop for PreparedExternalPoolAdapterRuntimeBundle"));
+    assert!(STORE_TYPES.contains("self.config_sha256.zeroize()"));
+    assert!(STORE_TYPES.contains("self.credential_sha256.zeroize()"));
+    assert!(STORE_TYPES.contains("pub(super) struct ExternalPoolAdapterRuntimeBundleRoots<'a>"));
+    assert!(STORE_TYPES.contains("config_sha256: &'a [u8; 32]"));
+    assert!(STORE_TYPES.contains("credential_sha256: &'a [u8; 32]"));
+    assert!(FILESYSTEM.contains("fn exact_sha256("));
+    assert!(FILESYSTEM.contains("Result<[u8; 32], ExternalPoolAdapterRuntimeBundleError>"));
+    assert!(FILESYSTEM.contains("hex::decode_to_slice(expected, &mut expected_digest)"));
+    assert!(!FILESYSTEM.contains("hex::encode"));
+    assert!(!FILESYSTEM.contains("retained_handles"));
+    assert!(!FILESYSTEM.contains("into_handles"));
+    assert!(!STORE_TYPES.contains("pub(in crate::store) config_sha256:"));
+    assert!(!STORE_TYPES.contains("pub(in crate::store) credential_sha256:"));
+    assert!(!STORE_FACADE.contains("ExternalPoolAdapterRuntimeBundleRoots"));
     assert!(STORE_TYPES.contains("RUNTIME_LAUNCH_READY: bool = false"));
     assert!(STORE_TYPES.contains("RUNTIME_BUNDLE_EFFECT: &str = \"resolved_ephemeral\""));
     assert!(STORE_TYPES.contains("CONFIG_ACCESS_EFFECT: &str = \"memory_only\""));

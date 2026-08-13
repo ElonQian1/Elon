@@ -55,6 +55,8 @@ pub(crate) mod external_pool_adapter_credential_verifier_key;
 pub(crate) mod external_pool_adapter_credential_verifier_key_api;
 pub(crate) mod external_pool_adapter_credential_verifier_key_service;
 pub(crate) mod external_pool_adapter_credential_verifier_service;
+#[cfg(test)]
+mod external_pool_adapter_entrypoint_capsule_source_contract_tests;
 pub(crate) mod external_pool_adapter_installation;
 pub(crate) mod external_pool_adapter_installation_api;
 pub(crate) mod external_pool_adapter_installation_service;

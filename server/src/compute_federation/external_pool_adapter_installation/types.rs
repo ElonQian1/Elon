@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::compute_federation::{
     external_pool_adapter_adoption::ExternalPoolAdapterAdoptionReceipt,
-    external_pool_adapter_artifact_package::ExternalPoolAdapterArtifactPackageReceipt,
+    external_pool_adapter_artifact_package::{
+        ExternalPoolAdapterArtifactPackageReceipt, ARTIFACT_PACKAGE_ENTRYPOINT_ROLE,
+    },
 };
 
 pub(crate) const INSTALLATION_RECEIPT_SCHEMA: &str =
@@ -151,6 +153,7 @@ pub(crate) struct PreparedExternalPoolAdapterInstallation {
     pub(super) _reopened_files: Vec<File>,
     pub(super) _pinned_directories: Vec<File>,
     pub(super) _final_root: PathBuf,
+    pub(super) entrypoint_index: usize,
 }
 
 impl PreparedExternalPoolAdapterInstallation {
@@ -168,5 +171,33 @@ impl PreparedExternalPoolAdapterInstallation {
 
     pub(crate) fn storage_namespace(&self) -> &str {
         &self.binding.storage_namespace
+    }
+
+    /// Borrows the exact entrypoint handle retained by the filesystem audit.
+    ///
+    /// The local installation path is intentionally not part of this seam.
+    pub(crate) fn retained_entrypoint(&self) -> anyhow::Result<(&File, &str, u64)> {
+        let expected = self
+            .binding
+            .installed_files
+            .get(self.entrypoint_index)
+            .ok_or_else(|| anyhow::anyhow!("retained entrypoint inventory is no longer exact"))?;
+        let retained = self
+            ._reopened_files
+            .get(self.entrypoint_index)
+            .ok_or_else(|| anyhow::anyhow!("retained entrypoint handle is unavailable"))?;
+        if self._reopened_files.len() != self.binding.installed_files.len()
+            || expected.role != ARTIFACT_PACKAGE_ENTRYPOINT_ROLE
+            || expected.path != self.binding.entrypoint_path
+            || expected.sha256 != self.binding.entrypoint_sha256
+            || expected.size_bytes != self.binding.entrypoint_size_bytes
+        {
+            anyhow::bail!("retained entrypoint authority is no longer exact");
+        }
+        Ok((
+            retained,
+            &self.binding.entrypoint_sha256,
+            self.binding.entrypoint_size_bytes,
+        ))
     }
 }

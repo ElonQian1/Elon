@@ -99,11 +99,21 @@ pub(crate) fn audit_external_pool_adapter_installation(
         }
         reopened.push(file);
     }
+    let entrypoint_index = binding
+        .installed_files
+        .iter()
+        .position(|file| {
+            file.path == binding.entrypoint_path
+                && file.sha256 == binding.entrypoint_sha256
+                && file.size_bytes == binding.entrypoint_size_bytes
+        })
+        .ok_or(ExternalPoolAdapterInstallationFsError::ContentDrift)?;
     Ok(PreparedExternalPoolAdapterInstallation {
         binding,
         _reopened_files: reopened,
         _pinned_directories: paths.pinned_directories,
         _final_root: paths.final_root,
+        entrypoint_index,
     })
 }
 

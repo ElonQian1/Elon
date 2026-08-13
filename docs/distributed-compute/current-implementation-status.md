@@ -1,7 +1,7 @@
 ---
 title: 分布式算力当前实现状态
 status: current
-reviewed_at: 2026-08-13
+reviewed_at: 2026-08-14
 owners: backend, pc, node-agent, ai-economy
 implementation_status: mixed
 ---
@@ -28,6 +28,8 @@ implementation_status: mixed
 - V255 在 V254 之上追加 Provider-specific、server-fixed inert runtime launch profile authority：fresh create/currentness 重审 V249 sealed installation tree 并消费 current V249/V254 与本机 45 字段 policy root；exact replay 只重审历史 V254、历史安装根和 Prepared 文件，撤销及撤销重放不依赖后来 upstream/policy/FS currentness。profile 固定 `launch_profile_current_inert`、`runtime_launch_ready=false`，不启动 entrypoint/Sidecar，不读取或解析 secret，不调用 resolver，不激活 Provider，不创建 v213 authority/route、Pool、Offer、Job、Attempt、Start、usage 或 settlement，也不消费 V250/V252/V253 短 TTL evidence。V254 的 18 个 temporary absolute deny 保持原样。V255 源码、migration、owner/admin API 与源码合同已写入但未编译、未执行 migration、未运行测试或服务，`passed=0`；生产 resolver、Sidecar/transport、probe/Runner/ACK、runtime readiness、atomic activation、完整 market admission gate、生产 TCP/数据库/部署/MCP/PC 仍缺。见 `external-pool-adapter-runtime-launch-profile-authority.md` 与对应 acceptance。
 
 - V256 不再追加 durable receipt，而是实现 server-only ephemeral operator-mounted bundle resolver 源码。固定 path 只由 exact profile digest 派生；strict manifest 同一 `checked_at` 绑定 current V255 与 Store 内部选择的 current V253 receipt/material/expiry，config/credential 只在 retained handles 和 locked、zeroize-on-drop memory 中短时存在。raw owner vault-ref locator 只作私有 commitment subject，绝不参与 path/env/key；V253 只认证逻辑 subject，未证明 exact bundle bytes。V256 数据库 schema 保持 V255，无 migration/no-op/receipt/HTTP/MCP/PC，也无 process/network/probe/activation/route/market/usage/settlement；SQLite 与 filesystem 不是原子快照。源码与 source-contract tests 未编译或运行，状态为 `implementation_uncompiled/source_review_only/passed=0`；Windows protected-DACL parser 尚未实现并固定 `UnsafeCustody`，故 Windows resolver 明确不可用。Provider 继续 exact `registering`、`runtime_launch_ready=false`，V254 18 个 absolute deny 原样保留；真实 OS custody、authenticated supervisor/no-work probe、atomic activation 与完整 market admission gate 仍缺。见 `external-pool-adapter-runtime-bundle-resolver-authority.md` 与对应 acceptance。
+
+- V257 在 V256 之上新增 Linux-only ephemeral entrypoint capsule 与 Store-private 同时点 evidence 聚合源码。source 只能是 fresh V249 Prepared retained entrypoint handle；copy 到 exact `0500`、四项 seals 完整的匿名 memfd 后复验 source/capsule size、SHA-256 与 handle identity。独立的 V257 ephemeral companion policy 固定审计 x86-64 little-endian ELF64 `EM_X86_64` static `ET_EXEC`、至少一个 `PT_LOAD`、有界非重叠 file ranges、entry point 属于 executable load segment，并拒绝 `PT_INTERP/PT_DYNAMIC/ET_DYN/W+X`；它不回写或重解释 V255 45-field durable profile。Store 自己生成同一近当前 `checked_at`，内部选择 current V250/V252/V253 heads并组合 exact V249/V255/V256 roots；不新增 migration/receipt/API，不 spawn/probe/deliver secret/activate。Windows unavailable；`materialized_ephemeral`、`probe_observed=false`、`runtime_launch_ready=false`、`activation_ready=false`。源码/tests 未编译或运行，`passed=0`；Provider 保持 `registering`，V254 18 deny 原样保留。见 `external-pool-adapter-entrypoint-capsule-authority.md` 与对应 acceptance。
 
 ## 节点插件与端点会话
 

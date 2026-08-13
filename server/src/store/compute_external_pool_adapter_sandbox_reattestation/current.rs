@@ -110,6 +110,25 @@ fn currentness_on(
     }))
 }
 
+pub(in crate::store) fn current_external_pool_adapter_sandbox_reattestation_head_authority_on(
+    conn: &Connection,
+    release_id: &str,
+    checked_at: &str,
+) -> Result<Option<CurrentExternalPoolAdapterSandboxReattestationAuthority>> {
+    let Some(stored) = head_by_release_on(conn, release_id)? else {
+        return Ok(None);
+    };
+    let receipt_id = stored.receipt.reattestation_receipt_id.clone();
+    let receipt_digest = stored.receipt.reattestation_receipt_digest.clone();
+    current_external_pool_adapter_sandbox_reattestation_authority_on(
+        conn,
+        release_id,
+        &receipt_id,
+        &receipt_digest,
+        checked_at,
+    )
+}
+
 impl Store {
     pub(crate) fn external_pool_adapter_sandbox_reattestation_currentness(
         &self,

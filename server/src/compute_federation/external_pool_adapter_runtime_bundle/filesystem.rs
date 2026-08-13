@@ -30,28 +30,41 @@ pub(super) fn resolve_external_pool_adapter_runtime_bundle(
     let manifest_bytes = opened.read_manifest(MAX_MANIFEST_BYTES as u64)?;
     let manifest = parse_and_validate_manifest(manifest_bytes.as_slice(), expected)?;
     let config = opened.read_sensitive(CONFIG_FILE, manifest.config_size_bytes)?;
-    if !matches_sha256(config.as_slice(), &manifest.config_sha256) {
-        return Err(ExternalPoolAdapterRuntimeBundleError::ContentDrift);
-    }
+    let config_sha256 = exact_sha256(config.as_slice(), &manifest.config_sha256)?;
     let credential = opened.read_sensitive(CREDENTIAL_FILE, manifest.credential_size_bytes)?;
-    if !matches_sha256(credential.as_slice(), &manifest.credential_sha256) {
-        return Err(ExternalPoolAdapterRuntimeBundleError::ContentDrift);
-    }
+    let credential_sha256 = exact_sha256(credential.as_slice(), &manifest.credential_sha256)?;
     opened.revalidate()?;
     Ok(PreparedExternalPoolAdapterRuntimeBundle {
         config,
         credential,
-        retained_handles: opened.into_handles(),
+        bundle_generation: manifest.bundle_generation,
+        config_sha256,
+        config_size_bytes: manifest.config_size_bytes,
+        credential_sha256,
+        credential_size_bytes: manifest.credential_size_bytes,
+        retained_bundle: Box::new(opened),
     })
 }
 
-fn matches_sha256(bytes: &[u8], expected: &str) -> bool {
-    let mut digest = Sha256::digest(bytes);
-    let mut observed = hex::encode(digest.as_slice());
-    let matches = observed == expected;
-    observed.zeroize();
-    digest.as_mut_slice().zeroize();
-    matches
+fn exact_sha256(
+    bytes: &[u8],
+    expected: &str,
+) -> Result<[u8; 32], ExternalPoolAdapterRuntimeBundleError> {
+    let mut digest: [u8; 32] = Sha256::digest(bytes).into();
+    let mut expected_digest = [0_u8; 32];
+    if hex::decode_to_slice(expected, &mut expected_digest).is_err() {
+        digest.zeroize();
+        expected_digest.zeroize();
+        return Err(ExternalPoolAdapterRuntimeBundleError::InvalidAuthority);
+    }
+    let matches = digest == expected_digest;
+    expected_digest.zeroize();
+    if matches {
+        Ok(digest)
+    } else {
+        digest.zeroize();
+        Err(ExternalPoolAdapterRuntimeBundleError::ContentDrift)
+    }
 }
 
 fn validate_profile_digest(value: &str) -> Result<(), ExternalPoolAdapterRuntimeBundleError> {
@@ -66,7 +79,7 @@ fn validate_profile_digest(value: &str) -> Result<(), ExternalPoolAdapterRuntime
     }
 }
 
-trait OpenedRuntimeBundle {
+pub(super) trait OpenedRuntimeBundle {
     fn read_manifest(
         &mut self,
         max_bytes: u64,
@@ -77,7 +90,6 @@ trait OpenedRuntimeBundle {
         expected_size: u64,
     ) -> Result<LockedSensitiveBytes, ExternalPoolAdapterRuntimeBundleError>;
     fn revalidate(&self) -> Result<(), ExternalPoolAdapterRuntimeBundleError>;
-    fn into_handles(self) -> Vec<std::fs::File>;
 }
 
 #[cfg(target_os = "linux")]
@@ -124,8 +136,5 @@ impl OpenedRuntimeBundle for UnsupportedOpenedRuntimeBundle {
     }
     fn revalidate(&self) -> Result<(), ExternalPoolAdapterRuntimeBundleError> {
         Err(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody)
-    }
-    fn into_handles(self) -> Vec<std::fs::File> {
-        Vec::new()
     }
 }

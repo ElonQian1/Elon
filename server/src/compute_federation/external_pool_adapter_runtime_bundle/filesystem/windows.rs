@@ -118,13 +118,6 @@ impl OpenedRuntimeBundle for WindowsOpenedRuntimeBundle {
         }
         require_exact_entries(&self.bundle_path)
     }
-
-    fn into_handles(self) -> Vec<File> {
-        self.directories
-            .into_iter()
-            .chain([self.manifest, self.config, self.credential])
-            .collect()
-    }
 }
 
 fn validate_local_absolute_root(path: &Path) -> Result<(), ExternalPoolAdapterRuntimeBundleError> {

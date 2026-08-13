@@ -135,13 +135,6 @@ impl OpenedRuntimeBundle for LinuxOpenedRuntimeBundle {
             &[MANIFEST_FILE, CONFIG_FILE, CREDENTIAL_FILE],
         )
     }
-
-    fn into_handles(self) -> Vec<File> {
-        self.directories
-            .into_iter()
-            .chain([self.manifest, self.config, self.credential])
-            .collect()
-    }
 }
 
 fn open_absolute_root(path: &Path) -> Result<Vec<File>, ExternalPoolAdapterRuntimeBundleError> {
