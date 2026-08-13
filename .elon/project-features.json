@@ -126,19 +126,19 @@
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/external-pool-adapter-credential-reattestation-authority.md",
-        "content_hash": "8e6481a0c9c5cbc0128325fe2ddd3ba9d72fa0d8c1f2a58a9db4173bba6052c4",
+        "content_hash": "7034657441fb1307e6d34c235776b6f5bdd2f0edab6668090c091e3deb6e247c",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "a573fd9a9abb5e1a90e2484fe99c0f59a6e599d4",
+          "head_commit": "871a81b2828c130157bd71142ffe50f37c4a5e9f",
           "head_blob_oid": "86f877fc1a0936a23161791d99c18b71a3bab54b",
-          "worktree_blob_oid": "86f877fc1a0936a23161791d99c18b71a3bab54b",
-          "state": "tracked_clean"
+          "worktree_blob_oid": "c82fb62e38c085e752d21e2dcd0677e2b57b8bac",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -174,15 +174,62 @@
         "测试证明 route、执行、用量、结算和付款零旁路效果",
         "权威文档更新为实际通过项并保留生产与 activation NO-GO 边界"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_4b8a9096e44144859f303df64415f572",
-        "agent_id": "codex-goal-019f3b86",
-        "claimed_at_ms": 1786629844445,
-        "expires_at_ms": 1786644244445
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-credential-reattestation-acceptance.md",
+          "content_hash": "7960af7a1c0111d346d4c5234b67780a5bf1705f17979f66e57c0b922871514b",
+          "locator": "本批状态",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "871a81b2828c130157bd71142ffe50f37c4a5e9f",
+            "head_blob_oid": "c626c4a9840d5b59cd8ace03b9e43106e4b020e7",
+            "worktree_blob_oid": "bf9fd6b3b27ec6eb5b512dcc1c0fd6ddf791228a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_credential_reattestation_service.rs",
+          "content_hash": "91516a10a1c9895112742ab051a5bdef41bde596e9a09809aef566203241199c",
+          "locator": "V253 service",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "871a81b2828c130157bd71142ffe50f37c4a5e9f",
+            "head_blob_oid": "5f3bfc5714e63b7d6b63222881300797c07ad999",
+            "worktree_blob_oid": "5f3bfc5714e63b7d6b63222881300797c07ad999",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/credential_reattestation_http_test.rs",
+          "content_hash": "e0d78f0c3404918a6fc26a01b564d5a1f6afb250777ce6e1b5ebd53916717eaf",
+          "locator": "credential_reattestation_http_*",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "871a81b2828c130157bd71142ffe50f37c4a5e9f",
+            "head_blob_oid": "ccab4d95046a2daffd842b46da1089e2ffde738b",
+            "worktree_blob_oid": "ccab4d95046a2daffd842b46da1089e2ffde738b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/compute_external_pool_adapter_credential_reattestation/tests.rs",
+          "content_hash": "3a462b126576892875b20e7c45afacf23b3782f11bfba06b1d22afbde77f87c6",
+          "locator": "canonical_projection_counts_are_frozen_and_complete",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "871a81b2828c130157bd71142ffe50f37c4a5e9f",
+            "head_blob_oid": "3c61e6f6e1f5a677991978ae63b5a0d8cbdd10fe",
+            "worktree_blob_oid": "010d01a48e3ca89a6a1ed000738eed9c4bb4baee",
+            "state": "tracked_modified"
+          }
+        }
+      ],
       "created_at_ms": 1786629844411,
-      "updated_at_ms": 1786629844457
+      "updated_at_ms": 1786633083825
     },
     {
       "id": "open-commerce-consumer-order-closure-v1",
@@ -1055,6 +1102,96 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1786629844457
+    },
+    {
+      "id": "feature_event_8221474ca0f54c6ea1afb796550bf587",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "claim_released",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Release old claim before intentional requirement rebind after verified status update",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786632991959
+    },
+    {
+      "id": "feature_event_cfe5ecc9c66547248675d8e3437e16de",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Bind intentional authority status update after V253 local verification",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786633013848
+    },
+    {
+      "id": "feature_event_4689fc2ec9db4c468fb41ba198081051",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Reviewed status-only authority update and retained all production NO-GO boundaries",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786633036035
+    },
+    {
+      "id": "feature_event_a4678f603e71471391bf5fa7174d0d7e",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Verification scope remains ready for evidence binding",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786633036082
+    },
+    {
+      "id": "feature_event_21a6d66aa32046c38c9a1e320dc4d541",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786633036092
+    },
+    {
+      "id": "feature_event_dbe181528ca547498f6088cb4793e77c",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Bind verified V253 implementation and test evidence",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786633036103
+    },
+    {
+      "id": "feature_event_d1047d2bc5d9435899c4cc2c96a2b1d2",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786633059149
+    },
+    {
+      "id": "feature_event_2fa224f1070e47d487b9290159c49982",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "V253 source, migration, Store and HTTP evidence are bound",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786633083790
+    },
+    {
+      "id": "feature_event_2513e9d20e4141b4b00427349ca37dd5",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Rust/SQLite/Axum filtered suite passed 8 tests with validation fingerprint 8c9c1fe9f6c0df7c5e56cc280c171ff06ea3dfd2498b27e4a1ba6a791f71c4c5",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786633083825
     }
   ]
 }

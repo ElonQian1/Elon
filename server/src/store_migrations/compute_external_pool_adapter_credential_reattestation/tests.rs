@@ -59,7 +59,14 @@ fn store_insert_columns_match_migration_columns_in_exact_order() {
 
 #[test]
 fn canonical_projection_counts_are_frozen_and_complete() {
-    assert_eq!(guards::projection_counts(), (29, 79, 24));
+    assert_eq!(guards::projection_counts(), (29, 77, 24));
+
+    // The receipt keeps 72 relational columns. Challenge issue/expiry timestamps
+    // remain inside the canonical binding and are fenced by exact JSON equality
+    // against the durable challenge instead of duplicate receipt columns.
+    let roots = include_str!("guards/roots.rs");
+    assert!(roots.contains("json(json_extract(challenge.challenge_json,'$.binding'))="));
+    assert!(roots.contains("json(json_extract(NEW.receipt_json,'$.reattestation.binding'))"));
 }
 
 #[test]

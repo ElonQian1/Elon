@@ -3,17 +3,21 @@ title: 外部矿池 Adapter Provider-specific 凭据续签验收边界
 status: current
 reviewed_at: 2026-08-13
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: local_rust_sqlite_axum_verified
 ---
 
 # 外部矿池 Adapter Provider-specific 凭据续签验收边界
 
 ## 本批状态
 
-V253 的领域合同、migration、Store、管理员 Service/HTTP 与源码测试已写入，但按架构铺设阶段约束未编译、未执行 migration、未运行测试或服务，也未连接真实 credential resolver、KMS、gateway、verifier runtime 或外部矿池。实际执行结果固定为 `passed=0`；以下矩阵是后续必须运行的源码合同，不是通过证据。
+V253 的领域合同、migration、Store、管理员 Service/HTTP 已完成本地专项验证：migration/源码合同 `5 passed`，进程内 Axum HTTP `3 passed`，共 `8 passed`。验证覆盖重复 migration、append-only 对象、Store/DDL 列顺序、canonical projection、隔离边界、genesis/replay/successor、撤销、脱敏、`registering -> 紧邻 active` 窄桥、later active 续签及局部零效果检查。正式证据指纹为 `8c9c1fe9f6c0df7c5e56cc280c171ff06ea3dfd2498b27e4a1ba6a791f71c4c5`，receipt 为 `fa0cdd61ad97a5fccd8d839ac5d8f75b7db6a12f092d01762b2dcb9ca26e2184`。
 
-## 后续正向矩阵
+本轮发现并修正一处冻结测试期望偏差：receipt canonical projection 的真实合同是 `77` 项而非 `79` 项。challenge 签发/过期时间不在 72 列 receipt 表中重复存储，而是通过 receipt binding 与 durable challenge binding 的完整 JSON 等式校验，因此不应虚构两个额外投影列。该修正没有扩大 V253 的数据库或业务权限。
+
+本地通过不等于生产可用。V253 仍未连接真实 credential resolver、KMS、gateway、verifier runtime 或外部矿池；以下未覆盖矩阵仍是后续验收要求。
+
+## 已覆盖与后续正向矩阵
 
 - fresh database、V252→V253 升级、重复 migration、两次重开和历史 V243/V249 保持逐字兼容；
 - exact V249 Provider binding + current neutral V249 release + current V241/V242 key 签发 durable challenge，验证 RSA genesis、currentness、exact replay 与 successor；
@@ -42,6 +46,6 @@ V253 的领域合同、migration、Store、管理员 Service/HTTP 与源码测�
 
 ## 零效果与仍未验收
 
-运行验收必须比较写前写后 Provider current version、v213 Adapter/credential/service actor/route/capability/seal/outbox、Capacity/Offer/Job/Attempt/Lease/ACK/event、usage/Receipt/settlement/付款表，证明 V253 无旁路效果。源码中的固定 `none` 字段不单独构成证明。
+当前 HTTP 测试已确认 route adapter/credential/capability、service actor、attempt start outbox、Offer 和 Job 七类表未被 V253 写入，并确认 receipt/revocation 的 Adapter/Provider/route/execution/usage/settlement 效果为 `none`。完整运行验收仍须比较写前写后 Provider current version、v213 seal、Capacity/Reservation/Attempt/Lease/ACK/event、usage/Receipt/settlement/付款表；当前局部检查不能替代完整零效果证明。
 
-尚未验收 Rust 编译、SQLite fresh/upgrade/reopen/concurrency/crash、进程内或真实 TCP HTTP、真实 secret custody、外部认证、生产数据库/部署/MCP/PC、Provider activation、Sidecar/worker/ACK、派发、计量与结算。因此状态只能是 `implementation_uncompiled / implementation_unrun / passed=0`。
+尚未验收 SQLite V252→V253 文件库升级、两次重开、并发 sibling challenge、崩溃恢复、真实 TCP HTTP、真实 secret custody、外部认证、生产数据库/部署/MCP/PC、Provider activation、Sidecar/worker/ACK、派发、计量与结算。因此状态是 `implementation_partially_verified / local_rust_sqlite_axum_verified`，不能升级为生产可用。

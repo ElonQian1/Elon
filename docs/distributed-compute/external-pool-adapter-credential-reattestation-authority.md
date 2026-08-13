@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Provider-specific 凭据续签权威
 status: current
 reviewed_at: 2026-08-13
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter Provider-specific 凭据续签权威
