@@ -619,6 +619,10 @@ try {
         'the worker must preserve explicit Linux intent from the durable event'
     Assert-True ($workerText.Contains('$gitExit = $LASTEXITCODE')) `
         'PS5.1 worker must judge git worktree recovery by exit code instead of stderr progress'
+    Assert-True ($workerText.Contains('git -c core.longpaths=true --git-dir=$gitDir worktree add')) `
+        'Windows outbox recovery must support repository paths beyond the legacy MAX_PATH limit'
+    Assert-True ($workerText.Contains('Git detail: $gitDetail')) `
+        'failed immutable source reconstruction must preserve actionable Git diagnostics'
 
     Write-Host 'NODE_AGENT_LOCAL_FIRST_TESTS=passed'
 } finally {

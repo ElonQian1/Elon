@@ -33,13 +33,19 @@ function Resolve-EventSourceWorktree {
     if (-not (Test-Path -LiteralPath $gitDir -PathType Container)) { throw 'Durable Git common directory is unavailable.' }
     $previousPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
+    $gitOutput = @()
     try {
-        & git --git-dir=$gitDir worktree add --detach $sourceRoot ([string]$Event.git_sha) 2>&1 | Out-Null
+        $gitOutput = @(& git -c core.longpaths=true --git-dir=$gitDir worktree add --detach `
+            $sourceRoot ([string]$Event.git_sha) 2>&1)
         $gitExit = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousPreference
     }
-    if ($gitExit -ne 0) { throw 'Could not reconstruct the immutable remote release source worktree.' }
+    if ($gitExit -ne 0) {
+        $gitDetail = (@($gitOutput | Select-Object -Last 8) -join ' | ').Trim()
+        if ([string]::IsNullOrWhiteSpace($gitDetail)) { $gitDetail = 'git returned no diagnostic output' }
+        throw "Could not reconstruct the immutable remote release source worktree. Git detail: $gitDetail"
+    }
     return $sourceRoot
 }
 
