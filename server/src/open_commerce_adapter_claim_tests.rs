@@ -1,4 +1,5 @@
 use serde_json::json;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::{
@@ -16,15 +17,16 @@ use crate::{
     store::{OpenCommerceInvocationStart, Store},
 };
 
-struct Fixture {
-    store: Store,
-    user_id: String,
-    project_id: String,
-    integration_id: String,
-    invocation_id: String,
+pub(crate) struct Fixture {
+    pub(crate) store: Store,
+    pub(crate) path: PathBuf,
+    pub(crate) user_id: String,
+    pub(crate) project_id: String,
+    pub(crate) integration_id: String,
+    pub(crate) invocation_id: String,
 }
 
-fn fixture() -> Fixture {
+pub(crate) fn fixture() -> Fixture {
     let path = std::env::temp_dir().join(format!(
         "elon_open_commerce_adapter_claim_{}.db",
         Uuid::new_v4().simple()
@@ -128,6 +130,7 @@ fn fixture() -> Fixture {
         .unwrap();
     Fixture {
         store,
+        path,
         user_id: owner.id,
         project_id: project.id,
         integration_id: integration.id,
@@ -483,7 +486,7 @@ fn repeated_rejections_pause_retry_until_an_editor_explicitly_resumes_it() {
     assert_eq!(next.claim.attempt_no, 7);
 }
 
-fn claim_enabled_credential(
+pub(crate) fn claim_enabled_credential(
     fixture: &Fixture,
 ) -> crate::open_commerce_adapter_model::OpenCommerceAdapterCredential {
     open_commerce_adapter_service::rotate_credential(

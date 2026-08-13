@@ -42,4 +42,5 @@ implementation_status: verified_rust_sqlite_axum_tcp
 - MCP：`server/src/open_commerce_adapter_mcp.rs`
 - PC：`pc-frontend/src/features/open-commerce/OpenCommerceAdapterClaimMonitor.tsx`
 - 测试：`server/src/open_commerce_adapter_claim_tests.rs`、`server/src/open_commerce_adapter_claim_api_tests.rs`
+- 独立连接并发测试：`server/src/open_commerce_adapter_claim_concurrency_tests.rs`
 - 真实 TCP 测试：`server/src/open_commerce_adapter_claim_tcp_tests.rs`

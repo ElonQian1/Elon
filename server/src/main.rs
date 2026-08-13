@@ -284,6 +284,8 @@ mod open_commerce_action_confirmation_service;
 mod open_commerce_action_confirmation_tests;
 mod open_commerce_adapter_api;
 mod open_commerce_adapter_claim_api;
+#[cfg(test)]
+mod open_commerce_adapter_claim_concurrency_tests;
 mod open_commerce_adapter_claim_migration;
 mod open_commerce_adapter_claim_model;
 mod open_commerce_adapter_claim_service;
