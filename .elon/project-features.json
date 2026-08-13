@@ -126,7 +126,7 @@
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/external-pool-adapter-credential-reattestation-authority.md",
@@ -229,7 +229,7 @@
         }
       ],
       "created_at_ms": 1786629844411,
-      "updated_at_ms": 1786633083825
+      "updated_at_ms": 1786633532930
     },
     {
       "id": "open-commerce-consumer-order-closure-v1",
@@ -1192,6 +1192,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786633083825
+    },
+    {
+      "id": "feature_event_9e97280387d54c8ba3cee635c3919db6",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "V253 verification commits e52a59c93 and e93c5e4ce were pushed to origin/main",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786633532930
     }
   ]
 }
