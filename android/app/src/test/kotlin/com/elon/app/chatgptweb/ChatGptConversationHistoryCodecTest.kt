@@ -35,6 +35,16 @@ class ChatGptConversationHistoryCodecTest {
     }
 
     @Test
+    fun decodeCleansLegacyNullMetadata() {
+        val decoded = ChatGptConversationHistoryCodec.decode(
+            """{"schema":"elon.chatgpt_web.conversation_index.v2","saved_at_ms":1,"conversations":[{"id":"one","title":"Greeting exchange","path":"/c/one","group_label":"null","project_id":null,"project_title":"null","project_path":null,"activity_dates":["2026-08-14"]}],"projects":[]}""",
+        )!!
+
+        assertEquals("", decoded.conversations.single().groupLabel)
+        assertNull(decoded.conversations.single().projectTitle)
+    }
+
+    @Test
     fun rejectsUnknownSchemaAndUnsafeOrEmptyIndexes() {
         assertNull(ChatGptConversationHistoryCodec.decode("{}"))
         assertNull(ChatGptConversationHistoryCodec.decode(

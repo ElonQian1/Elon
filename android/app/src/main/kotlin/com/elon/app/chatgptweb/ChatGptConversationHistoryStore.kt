@@ -116,18 +116,19 @@ internal object ChatGptConversationHistoryCodec {
                 val title = value.optString("title").trim().take(MAX_TITLE_LENGTH)
                 val normalizedPath = ChatGptWebConversationPath.normalize(path) ?: continue
                 if (title.isBlank() || !seen.add(normalizedPath)) continue
-                add(ChatGptWebConversation(
+                add(ChatGptWebConversationIndex.sanitize(ChatGptWebConversation(
                     id = value.optString("id").ifBlank { normalizedPath.substringAfterLast('/') }
                         .take(MAX_ID_LENGTH),
                     title = title,
                     path = normalizedPath,
                     active = false,
-                    groupLabel = value.optString("group_label").trim().take(MAX_GROUP_LABEL_LENGTH),
+                    groupLabel = value.optionalString("group_label")
+                        .orEmpty()
+                        .take(MAX_GROUP_LABEL_LENGTH),
                     projectId = value.optString("project_id").takeIf(PROJECT_ID::matches)
                         ?: ChatGptWebConversationPath.projectId(normalizedPath),
-                    projectTitle = value.optString("project_title").trim()
-                        .take(MAX_TITLE_LENGTH)
-                        .takeIf(String::isNotBlank),
+                    projectTitle = value.optionalString("project_title")
+                        ?.take(MAX_TITLE_LENGTH),
                     projectPath = ChatGptWebConversationPath.normalizeProject(
                         value.optString("project_path"),
                     ),
@@ -138,7 +139,7 @@ internal object ChatGptConversationHistoryCodec {
                             dates.optString(dateIndex).takeIf(ACTIVITY_DATE::matches)?.let(::add)
                         }
                     },
-                ))
+                )))
             }
         }
         val projects = buildList {
@@ -158,6 +159,13 @@ internal object ChatGptConversationHistoryCodec {
         if (conversations.isEmpty() && projects.isEmpty()) return null
         return ChatGptConversationHistoryCache(conversations, savedAtMs, projects)
     }
+
+    private fun JSONObject.optionalString(key: String): String? =
+        opt(key)
+            ?.takeUnless { it == JSONObject.NULL }
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 
     private const val MAX_GROUP_LABEL_LENGTH = 80
     private val PROJECT_ID = Regex("g-p-[A-Za-z0-9_-]{1,160}")

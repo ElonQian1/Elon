@@ -75,6 +75,21 @@ class ChatGptWebConversationIndexTest {
         )
     }
 
+    @Test
+    fun mergeCleansLegacyNullMetadataWithoutDroppingActivity() {
+        val cached = conversation("one", "null", null).copy(
+            projectTitle = "null",
+            activityDates = setOf("2026-08-14"),
+        )
+        val observed = conversation("one", "", null)
+
+        val merged = ChatGptWebConversationIndex.merge(listOf(cached), listOf(observed)).single()
+
+        assertEquals("", merged.groupLabel)
+        assertNull(merged.projectTitle)
+        assertEquals(setOf("2026-08-14"), merged.activityDates)
+    }
+
     private fun conversation(id: String, group: String, projectId: String?) = ChatGptWebConversation(
         id = id,
         title = "会话 $id",

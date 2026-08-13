@@ -13,7 +13,7 @@ internal object ChatGptWebConversationIndex {
     fun sections(values: List<ChatGptWebConversation>): List<ChatGptWebConversationSection> {
         val grouped = linkedMapOf<String, MutableList<ChatGptWebConversation>>()
         values.forEach { conversation ->
-            val label = conversation.groupLabel.trim().ifBlank { FALLBACK_GROUP }
+            val label = metadataLabel(conversation.groupLabel) ?: FALLBACK_GROUP
             grouped.getOrPut(label) { mutableListOf() }.add(conversation)
         }
         return grouped.map { (label, conversations) ->
@@ -32,8 +32,7 @@ internal object ChatGptWebConversationIndex {
             val path = conversation.projectPath
                 ?.let(ChatGptWebConversationPath::normalizeProject)
                 ?: "/g/$id/project"
-            val title = conversation.projectTitle?.trim().orEmpty()
-            if (title.isBlank()) return@forEach
+            val title = metadataLabel(conversation.projectTitle) ?: return@forEach
             values.putIfAbsent(path, ChatGptWebProject(id, title, path))
         }
         return values.values.toList()
@@ -52,14 +51,26 @@ internal object ChatGptWebConversationIndex {
         val merged = observed.map { next ->
             val old = previousByPath[next.path] ?: return@map next
             next.copy(
-                groupLabel = next.groupLabel.ifBlank { old.groupLabel },
+                groupLabel = metadataLabel(next.groupLabel)
+                    ?: metadataLabel(old.groupLabel)
+                    .orEmpty(),
                 projectId = next.projectId ?: old.projectId,
-                projectTitle = next.projectTitle ?: old.projectTitle,
+                projectTitle = metadataLabel(next.projectTitle)
+                    ?: metadataLabel(old.projectTitle),
                 projectPath = next.projectPath ?: old.projectPath,
                 activityDates = old.activityDates + next.activityDates,
             )
         }
         val observedPaths = observed.asSequence().map(ChatGptWebConversation::path).toSet()
-        return merged + previous.filterNot { it.path in observedPaths }
+        return merged + previous.filterNot { it.path in observedPaths }.map(::sanitize)
     }
+
+    fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation = value.copy(
+        groupLabel = metadataLabel(value.groupLabel).orEmpty(),
+        projectTitle = metadataLabel(value.projectTitle),
+    )
+
+    private fun metadataLabel(value: String?): String? = value
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 }
