@@ -24,6 +24,7 @@ Assert-Contains $helper '.pc-static-publish.lock' 'remote static publish lock'
 Assert-Contains $helper "static release changed: expected=" 'remote static release CAS check'
 Assert-Contains $helper 'elon.pc_frontend_release.v1' 'versioned frontend release marker'
 Assert-Contains $serverPublisher 'Publish-PcFrontendRelease' 'server bundle shared frontend publisher'
+Assert-Contains $serverPublisher '-GitSha $ShaBig -CompatibleServerGitSha $ShaBig' 'server bundle full frontend release SHA'
 Assert-Contains $helper 'Get-PcFrontendReleaseBaseline' 'server bundle frontend rollback guard'
 Assert-Contains $helper "cat '`$RemoteDir/release-sha.txt'" 'authoritative SSH release baseline'
 if ($serverPublisher.IndexOf('Invoke-ElonServerPostDeploySmoke') -gt
