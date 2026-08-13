@@ -31,6 +31,7 @@ foreach ($required in @(
     'Assert-ChatGptWebSmokeTrustedDevice',
     'Assert-ChatGptWebSmokeAdapterVersion',
     'Wait-ChatGptWebSmokeAuthenticatedReady',
+    'Open-ChatGptWebSmokeSurface -Runtime $runtime',
     'Start-ChatGptWebSmokeAwakeLease',
     'Stop-ChatGptWebSmokeAwakeLease',
     'conversation_binding_sha256',
@@ -67,6 +68,10 @@ foreach ($required in @(
     'CHATGPT_WEB_ATTACHMENT_LIFECYCLE_STATUS=passed'
 )) {
     Assert-Contains $required
+}
+
+if ($source.Contains('-Action "open_chatgpt_web"')) {
+    throw "Attachment lifecycle phases must preserve the isolated conversation instead of reopening the entry route."
 }
 
 foreach ($forbidden in @(

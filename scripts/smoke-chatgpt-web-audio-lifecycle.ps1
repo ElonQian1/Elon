@@ -19,6 +19,7 @@ param(
     [switch]$UserConfirmedVoiceRoundTrip,
     [switch]$UserConfirmedVoiceClosed,
     [string]$CheckpointPath = "",
+    [ValidateRange(5, 60)][int]$ManualDictationGraceSec = 30,
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
     [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 90
 )
@@ -121,6 +122,32 @@ function Get-ConversationBinding {
     $url = [string]$State.conversation.url
     if (-not $url.Trim()) { throw "Current ChatGPT conversation has no stable binding." }
     return Get-Sha256Text -Value $url
+}
+
+function Promote-FirstTurnConversationBinding {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)]$Checkpoint
+    )
+
+    if ((Get-ConversationBinding $State) -eq [string]$Checkpoint.conversation_binding_sha256) {
+        return
+    }
+    $currentPath = Get-ChatGptWebSmokeConversationPath -Url ([string]$State.conversation.url)
+    if (
+        [string]$Checkpoint.phase -ne "realtime_voice_started" -or
+        [string]$Checkpoint.isolated_conversation_path -or
+        [int]$Checkpoint.message_count -ne 0 -or
+        [int]$State.conversation.message_count -lt 2 -or
+        -not $currentPath
+    ) {
+        throw "The isolated audio conversation changed during acceptance."
+    }
+    $Checkpoint | Add-Member -NotePropertyName isolated_conversation_path `
+        -NotePropertyValue $currentPath -Force
+    $Checkpoint.conversation_binding_sha256 = Get-ConversationBinding $State
+    $Checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
+    Write-Checkpoint $Checkpoint
 }
 
 function Assert-ConversationUnchanged {
@@ -285,6 +312,8 @@ try {
                 origin_conversation_path = [string]$isolation.origin_conversation_path
                 origin_view_mode = [string]$isolation.origin_view_mode
                 conversation_binding_sha256 = Get-ConversationBinding $isolated
+                isolated_conversation_path = Get-ChatGptWebSmokeConversationPath `
+                    -Url ([string]$isolated.conversation.url)
                 adapter_version = [int]$isolated.adapter_version
                 initial_view_mode = [string]$isolated.view_mode
                 message_count = 0
@@ -315,21 +344,6 @@ try {
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             $checkpoint.dictation_request_id = [string]$started.command_receipt.request_id
             Write-Checkpoint $checkpoint
-            $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
-            Write-Report -ReportPhase "dictation_requested" -State $state `
-                -Status "waiting_for_user_microphone_permission"
-        }
-        "VerifyAndClearDictation" {
-            if (-not $UserConfirmedMicrophone) {
-                throw "Run this phase with -UserConfirmedMicrophone only while the user supervises active dictation."
-            }
-            $checkpoint = Read-Checkpoint
-            Assert-CheckpointIdentity $checkpoint
-            if ([string]$checkpoint.phase -ne "dictation_requested") {
-                throw "Checkpoint is not waiting for dictation verification."
-            }
-            Wait-CommandReceipt -RequestId ([string]$checkpoint.dictation_request_id) `
-                -ExpectedAction "start_dictation" | Out-Null
             $active = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
                 -RequireChatGptForeground -Description "active ChatGPT dictation" -Predicate {
                     param($state)
@@ -338,10 +352,37 @@ try {
                         [string]$state.audio.request_state -in @("local_action_ready", "web_permission_granted")
                 }
             Assert-ConversationUnchanged -State $active -Checkpoint $checkpoint
-            Invoke-ReceiptAction -Action "chatgpt_submit_dictation" `
-                -ExpectedAction "submit_dictation" | Out-Null
+            $checkpoint.phase = "dictation_active"
+            $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
+            Write-Checkpoint $checkpoint
+            Write-Report -ReportPhase "dictation_active" -State $active `
+                -Status "waiting_for_user_microphone_permission"
+        }
+        "VerifyAndClearDictation" {
+            if (-not $UserConfirmedMicrophone) {
+                throw "Run this phase with -UserConfirmedMicrophone only while the user supervises active dictation."
+            }
+            $checkpoint = Read-Checkpoint
+            Assert-CheckpointIdentity $checkpoint
+            if ([string]$checkpoint.phase -notin @("dictation_requested", "dictation_active")) {
+                throw "Checkpoint is not waiting for dictation verification."
+            }
+            $manualDeadline = [DateTimeOffset]::UtcNow.AddSeconds(
+                [Math]::Min($ManualDictationGraceSec, $TimeoutSec)
+            )
+            do {
+                $completionState = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+                Assert-ConversationUnchanged -State $completionState -Checkpoint $checkpoint `
+                    -AllowNonEmptyDraft
+                if ($completionState.dictation_active -ne $true) { break }
+                Start-Sleep -Seconds $runtime.poll_interval_sec
+            } while ([DateTimeOffset]::UtcNow -lt $manualDeadline)
+            if ($completionState.dictation_active -eq $true) {
+                Invoke-ReceiptAction -Action "chatgpt_submit_dictation" `
+                    -ExpectedAction "submit_dictation" | Out-Null
+            }
             $transcribed = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-                -RequireChatGptForeground -Description "non-empty ChatGPT dictation draft" -Predicate {
+                -RequireChatGptForeground -Description "completed non-empty ChatGPT dictation draft" -Predicate {
                     param($state)
                     $state.dictation_active -ne $true -and
                         [int]$state.input.text_length -gt 0 -and
@@ -409,6 +450,7 @@ try {
                         [string]$state.audio.android_permission -eq "granted" -and
                         [string]$state.audio.request_state -eq "web_permission_granted"
                 }
+            Promote-FirstTurnConversationBinding -State $activeVoice -Checkpoint $checkpoint
             Assert-AudioSessionBinding -State $activeVoice -Checkpoint $checkpoint
             $checkpoint.phase = "realtime_voice_observed"
             $checkpoint.voice_round_trip_confirmed = $true
