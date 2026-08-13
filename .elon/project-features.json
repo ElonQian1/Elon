@@ -436,7 +436,7 @@
       "id": "compute-v258-upstream-transport-target-verification",
       "title": "V258 惰性上游传输目标动态验收",
       "summary": "编译并执行现有 V258 migration、Store、owner/admin HTTP 与零副作用合同，修复真实集成缺口；不执行 DNS/TLS、真实密钥、进程、Provider 激活、市场、资金或部署。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/v258-upstream-transport-target-verification.md",
@@ -479,15 +479,15 @@
       "implementation_evidence": [
         {
           "path": "docs/distributed-compute/external-pool-adapter-upstream-transport-target-acceptance.md",
-          "content_hash": "bd012560215edfe44728ba9c1f768daa1796e99529ce91cc4bbd2578707376d8",
+          "content_hash": "44d9ef0e4aca233e10767cf78ac9baaf9e45bf37c139128ddf8e82651d2bc390",
           "locator": "本批状态",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
-            "head_blob_oid": "6c32cf18bb3bc6ea36f4614d1f4432b7d297021e",
+            "head_commit": "2ef086750b71fe60b782d5f9d75d889a17fd9e23",
+            "head_blob_oid": "fdf21d8224d6d0a31122893acce8cbb17c7866bb",
             "worktree_blob_oid": "fdf21d8224d6d0a31122893acce8cbb17c7866bb",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -497,7 +497,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_commit": "2ef086750b71fe60b782d5f9d75d889a17fd9e23",
             "head_blob_oid": "998be28b854563b72ca358db80076d7ea00f2791",
             "worktree_blob_oid": "998be28b854563b72ca358db80076d7ea00f2791",
             "state": "tracked_clean"
@@ -510,7 +510,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_commit": "2ef086750b71fe60b782d5f9d75d889a17fd9e23",
             "head_blob_oid": "3be4abb19ee05b57bb69115952f595754185c8c4",
             "worktree_blob_oid": "3be4abb19ee05b57bb69115952f595754185c8c4",
             "state": "tracked_clean"
@@ -523,10 +523,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
-            "head_blob_oid": "e8bd274c60f4bc4ff1befcc1f3bce1a4f2e62380",
+            "head_commit": "2ef086750b71fe60b782d5f9d75d889a17fd9e23",
+            "head_blob_oid": "d48b8083c75dc2ed544b26cc2170e9a75989d37c",
             "worktree_blob_oid": "d48b8083c75dc2ed544b26cc2170e9a75989d37c",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -536,7 +536,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_commit": "2ef086750b71fe60b782d5f9d75d889a17fd9e23",
             "head_blob_oid": "c3828e3eb5fa3fd539f21ad84495738de0150cf3",
             "worktree_blob_oid": "c3828e3eb5fa3fd539f21ad84495738de0150cf3",
             "state": "tracked_clean"
@@ -549,7 +549,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_commit": "2ef086750b71fe60b782d5f9d75d889a17fd9e23",
             "head_blob_oid": "980e5d27c672fa7258ba52cdf1ce7d1d22117548",
             "worktree_blob_oid": "980e5d27c672fa7258ba52cdf1ce7d1d22117548",
             "state": "tracked_clean"
@@ -557,7 +557,7 @@
         }
       ],
       "created_at_ms": 1786659489990,
-      "updated_at_ms": 1786661968441
+      "updated_at_ms": 1786662093158
     },
     {
       "id": "delivery-allocation-expiry-worker-v234-verification",
@@ -3002,6 +3002,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1786661968441
+    },
+    {
+      "id": "feature_event_c12d9edcff32485e8b1ff4fd154573ac",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1786662071676
+    },
+    {
+      "id": "feature_event_8b8de88b74674291af9aecb978c6c0d6",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Full target compilation and 11 focused tests passed; committed test and document evidence is current.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786662083279
+    },
+    {
+      "id": "feature_event_1965980181fa446db2f04c10d9c10614",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Verified V258 acceptance is ready for mainline delivery; this release is code and evidence only, with no server deployment or production transport claim.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786662093158
     }
   ]
 }
