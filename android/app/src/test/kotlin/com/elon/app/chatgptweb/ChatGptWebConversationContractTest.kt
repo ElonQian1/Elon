@@ -58,7 +58,8 @@ class ChatGptWebConversationContractTest {
 
         assertTrue(conversations.contains("activityDates:"))
         assertTrue(conversations.contains("projectTitle:"))
-        assertTrue(conversations.contains("projects: readProjects()"))
+        assertTrue(conversations.contains("collectProjects(readProjects(), (projects) =>"))
+        assertTrue(conversations.contains("projects,"))
         assertTrue(conversations.contains("function openProject"))
         assertTrue(conversations.contains("path.split('/').filter(Boolean).pop()"))
         assertTrue(history.contains("previous.activityDates"))
