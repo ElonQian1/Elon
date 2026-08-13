@@ -11,7 +11,7 @@ param(
     [ValidateRange(30, 300)][int]$ReadyTimeoutSec = 120,
     [ValidateRange(30, 1200)][int]$ReplyTimeoutSec = 600,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 90
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91
 )
 
 $ErrorActionPreference = "Stop"

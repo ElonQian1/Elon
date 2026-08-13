@@ -49,15 +49,22 @@
   function relatedSameOriginPath(node) {
     const direct = sameOriginPath(node);
     if (direct) return direct;
+    const triggerLabel = cleanText(node && (
+      node.getAttribute('aria-label') || node.textContent || node.getAttribute('title')
+    ));
     let container = node && node.parentElement;
-    for (let depth = 0; container && depth < 4; depth += 1, container = container.parentElement) {
-      const paths = Array.from(container.querySelectorAll('a[href]'))
-        .map(sameOriginPath)
-        .filter(Boolean);
-      const contextual = paths.filter((path) => /^\/c\//.test(path) || /^\/g\/g-p-/.test(path));
-      if (contextual.length === 1) return contextual[0];
-      if (contextual.length > 1) return '';
-      if (paths.length === 1) return paths[0];
+    for (let depth = 0; container && depth < 8; depth += 1, container = container.parentElement) {
+      const candidates = Array.from(container.querySelectorAll('a[href]')).map((anchor) => ({
+        path: sameOriginPath(anchor),
+        label: cleanText(anchor.textContent || anchor.getAttribute('aria-label'))
+      })).filter((candidate) => candidate.path);
+      const contextual = candidates.filter((candidate) => /^\/(?:c\/|g\/g-p-)/.test(candidate.path));
+      if (contextual.length === 1) return contextual[0].path;
+      const policy = window.__elonChatGptPageSemanticPolicy;
+      const recovered = policy && typeof policy.selectRelatedConversationPath === 'function'
+        ? policy.selectRelatedConversationPath({ triggerLabel, candidates: contextual }) : '';
+      if (recovered) return recovered;
+      if (candidates.length === 1) return candidates[0].path;
     }
     return '';
   }

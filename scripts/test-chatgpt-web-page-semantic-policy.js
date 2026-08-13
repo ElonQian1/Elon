@@ -109,6 +109,20 @@ expectEqual(policy.conversationContextId({
   region: 'header',
   pathname: '/c/current_conversation_123'
 }), '', 'generic header controls do not inherit conversation context');
+expectEqual(policy.selectRelatedConversationPath({
+  triggerLabel: '打开“今晚行情分析”的对话选项',
+  candidates: [
+    { path: '/c/other_conversation', label: '其他会话' },
+    { path: '/c/market_conversation', label: '今晚行情分析' }
+  ]
+}), '/c/market_conversation', 'sidebar options recover their path from the referenced row label');
+expectEqual(policy.selectRelatedConversationPath({
+  triggerLabel: '打开对话选项',
+  candidates: [
+    { path: '/c/first_conversation', label: '第一条' },
+    { path: '/c/second_conversation', label: '第二条' }
+  ]
+}), '', 'ambiguous sidebar options fail closed');
 
 expectEqual(policy.classify({
   pathname: '/',

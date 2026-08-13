@@ -7,6 +7,7 @@ for (const label of [
   'GPT-5.6 Sol',
   '5.6 Terra 中',
   '5.5 Pro',
+  '极速',
   '思考强度 极高',
   '模型 Auto'
 ]) {

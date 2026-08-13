@@ -70,6 +70,33 @@
     return '';
   }
 
+  function selectRelatedConversationPath(input) {
+    const candidates = Array.isArray(input && input.candidates)
+      ? input.candidates
+      : [];
+    const conversations = candidates
+      .map((candidate) => ({
+        path: String(candidate && candidate.path || '').trim(),
+        label: clean(candidate && candidate.label)
+      }))
+      .filter((candidate) => /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(candidate.path));
+    const uniquePaths = Array.from(new Set(conversations.map((candidate) => candidate.path)));
+    if (uniquePaths.length === 1) return uniquePaths[0];
+    if (uniquePaths.length === 0) return '';
+
+    const triggerLabel = clean(input && input.triggerLabel);
+    const referencedLabel = triggerLabel
+      .replace(/^(?:open|show)\s+[“\"']?/i, '')
+      .replace(/[”\"']?\s*(?:conversation|chat)\s+(?:options|actions|menu)$/i, '')
+      .replace(/^打开[“\"']?/, '')
+      .replace(/[”\"']?的?(?:对话|聊天)?(?:选项|操作|菜单)$/, '')
+      .trim();
+    if (!referencedLabel) return '';
+    const matches = conversations.filter((candidate) => candidate.label === referencedLabel);
+    const matchingPaths = Array.from(new Set(matches.map((candidate) => candidate.path)));
+    return matchingPaths.length === 1 ? matchingPaths[0] : '';
+  }
+
   function classify(input) {
     const pathname = clean(input && input.pathname);
     const path = clean(input && input.path);
@@ -127,6 +154,7 @@
     conversationContextId,
     isTimestampLabel,
     planTemporaryChatSelection,
+    selectRelatedConversationPath,
     temporaryChatState
   });
 });

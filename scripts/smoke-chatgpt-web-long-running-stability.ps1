@@ -8,7 +8,7 @@ param(
     [ValidateRange(15, 480)][int]$DurationMinutes = 120,
     [ValidateRange(10, 120)][int]$PollIntervalSec = 30,
     [ValidateRange(20, 180)][int]$RecoveryTimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 90,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91,
     [string]$CheckpointPath = ""
 )
 

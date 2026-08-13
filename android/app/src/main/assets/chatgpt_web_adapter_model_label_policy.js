@@ -16,7 +16,7 @@
     if (!signal) return false;
     return /\b(?:gpt|o\d|auto|thinking|instant|sol)\b/i.test(signal) ||
       /\b\d+(?:\.\d+)+\b/.test(signal) ||
-      /model|模型|能力|推理|思考强度/.test(signal) ||
+      /model|模型|能力|推理|思考强度|极速/.test(signal) ||
       /(^|\s)(?:轻度|标准|中度|重度|极高)($|\s)/.test(signal);
   }
 

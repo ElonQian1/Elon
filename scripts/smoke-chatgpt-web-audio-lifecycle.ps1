@@ -21,7 +21,7 @@ param(
     [string]$CheckpointPath = "",
     [ValidateRange(5, 60)][int]$ManualDictationGraceSec = 30,
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 90
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91
 )
 
 $ErrorActionPreference = "Stop"
