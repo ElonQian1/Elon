@@ -111,6 +111,7 @@ mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
+mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_onboarding;
 mod compute_external_pool_provider_activation_candidate;
@@ -586,6 +587,7 @@ pub(crate) use compute_external_pool_adapter_scanner_key::{
     ExternalPoolAdapterScannerKeyRevocationWriteReceipt, RegisterExternalPoolAdapterScannerKey,
     RevokeExternalPoolAdapterScannerKey,
 };
+pub(crate) use compute_external_pool_adapter_upstream_transport_target::api::*;
 pub(crate) use compute_external_pool_adapter_vulnerability_reattestation::{
     CreateExternalPoolAdapterVulnerabilityReattestation,
     ExternalPoolAdapterVulnerabilityReattestationCurrentness,
@@ -734,7 +736,6 @@ pub struct Store {
     conn: Mutex<Connection>,
 }
 const MAX_TASK_EVENTS_PER_TASK: i64 = 1000;
-
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
@@ -787,7 +788,6 @@ impl Store {
         drop(conn);
         Ok(user)
     }
-
     pub(crate) fn conn(&self) -> Result<MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }

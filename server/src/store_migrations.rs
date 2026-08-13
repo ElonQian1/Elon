@@ -29,6 +29,7 @@ mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
+mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_provider_activation_candidate;
 mod compute_platform_reference_price_curve;
@@ -321,6 +322,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (253, "外部矿池 Adapter Provider-specific 非 Bearer 凭据可续签再认证", compute_external_pool_adapter_credential_reattestation::migration_v253),
     (254, "外部矿池 Provider owner delegation 与静态激活候选", compute_external_pool_provider_activation_candidate::migration_v254),
     (255, "外部矿池 Adapter Provider-specific 惰性 runtime launch profile", compute_external_pool_adapter_runtime_launch_profile::migration_v255),
+    (258, "外部矿池 Adapter 惰性 brokered upstream transport target", compute_external_pool_adapter_upstream_transport_target::migration_v258),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

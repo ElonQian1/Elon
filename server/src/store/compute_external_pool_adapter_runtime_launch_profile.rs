@@ -26,4 +26,5 @@ pub(crate) mod api {
 }
 
 pub(in crate::store) use current::current_external_pool_adapter_runtime_launch_profile_authority_on;
+pub(in crate::store) use read::historical_external_pool_adapter_runtime_launch_profile_authority_on;
 pub(in crate::store) use types::CurrentExternalPoolAdapterRuntimeLaunchProfileAuthority;
