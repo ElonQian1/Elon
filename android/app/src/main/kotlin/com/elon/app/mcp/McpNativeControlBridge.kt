@@ -72,14 +72,41 @@ internal object McpNativeControlBridge {
                     }
                 }
         }
-        val current = controller ?: return JSONObject()
+        var current = controller ?: return JSONObject()
             .put("schema", "elon.apk.native_mcp_control_result.v1")
             .put("action", action)
             .put("activity_bound", false)
             .put("error", "main_activity_not_bound")
             .put("hint", "Call action=open_main, then retry after MainActivity registers the native MCP controller.")
-        val sourceResult = current.control(args)
         val targetSurface = targetSurfaceFor(action)
+        if (targetSurface == MAIN_SURFACE && current.surfaceId != MAIN_SURFACE) {
+            val openError = runCatching { openMainActivity(context) }.exceptionOrNull()
+            if (openError != null) {
+                return decorateControlResult(JSONObject(), action)
+                    .put("control_ok", false)
+                    .put("target_surface", targetSurface)
+                    .put("target_activity_bound", false)
+                    .put("error", "open_main_failed")
+                    .put("message", openError.message ?: openError.javaClass.simpleName)
+            }
+            val waitMs = args.optLong("wait_for_target_bind_ms", DEFAULT_TARGET_BIND_WAIT_MS)
+                .coerceIn(0L, 15_000L)
+            current = waitForControllerSurface(targetSurface, waitMs)
+                ?: return decorateControlResult(JSONObject(), action)
+                    .put("control_ok", false)
+                    .put("target_surface", targetSurface)
+                    .put("target_activity_bound", false)
+                    .put("error", "target_activity_not_bound_after_open")
+                    .put("retryable", true)
+                    .put("hint", "Retry the same action after MainActivity finishes starting.")
+        }
+        if (action == "open_chatgpt_official_fallback" && current.surfaceId == targetSurface) {
+            return decorateControlResult(current.uiState(), action)
+                .put("control_ok", true)
+                .put("target_surface", targetSurface)
+                .put("target_activity_bound", true)
+        }
+        val sourceResult = current.control(args)
         if (
             targetSurface == null ||
             current.surfaceId == targetSurface ||
@@ -167,9 +194,18 @@ internal object McpNativeControlBridge {
 
     internal fun targetSurfaceFor(action: String): String? = when (action) {
         "open_chatgpt_official_fallback" -> "chatgpt_web"
+        "open_social_ai_chat",
+        "open_chatgpt_web",
+        "set_social_ai_interaction_mode",
+        "select_web_chat_provider",
+        "start_new_web_chat_conversation",
+        "open_web_chat_conversation",
+        "open_web_chat_project",
+        "refresh_web_chat_conversations" -> MAIN_SURFACE
         else -> null
     }
 
+    private const val MAIN_SURFACE = "main"
     private const val CONTROL_RESULT_SCHEMA = "elon.apk.native_mcp_control_result.v1"
 }
 

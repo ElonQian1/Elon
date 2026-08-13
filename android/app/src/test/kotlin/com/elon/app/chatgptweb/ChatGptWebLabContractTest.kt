@@ -314,6 +314,19 @@ class ChatGptWebLabContractTest {
             adapterLayout.indexOf("function semanticFor"),
             adapterLayout.indexOf("function defaultLabel"),
         )
+        val conversationLinkIndex = semanticFunction.indexOf(
+            "node.matches('a[href]')) return 'conversation'",
+        )
+        listOf(
+            "return 'conversation_files'",
+            "return 'rename'",
+            "return 'pin'",
+            "return 'archive'",
+            "return 'share'",
+            "return 'delete'",
+        ).forEach { managementResult ->
+            assertTrue(semanticFunction.indexOf(managementResult) in 0 until conversationLinkIndex)
+        }
         val emittedSemantics = Regex("return '([a-z_]+)'")
             .findAll(semanticFunction)
             .map { it.groupValues[1] }

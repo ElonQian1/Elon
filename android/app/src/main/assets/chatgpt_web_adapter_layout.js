@@ -209,6 +209,12 @@
       typeof modelLabelPolicy.isModelLabel === 'function' &&
       modelLabelPolicy.isModelLabel(modelSignal)
     ) return 'model';
+    if (/view.*files.*chat|在聊天中查看文件/.test(signal)) return 'conversation_files';
+    if (/rename|重命名|重新命名/.test(signal)) return 'rename';
+    if (/unpin|pin.chat|取消置顶|置顶聊天/.test(signal)) return 'pin';
+    if (/unarchive|archive|取消归档|归档/.test(signal)) return 'archive';
+    if (/share|分享/.test(signal)) return 'share';
+    if (/delete|删除/.test(signal)) return 'delete';
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
       /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)
@@ -233,10 +239,6 @@
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(signal + ' ' + path)) return 'gpts';
     if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
     if (/create.*(?:file|website)|创建.*(?:文件|网站)/.test(signal)) return 'create_asset';
-    if (/view.*files.*chat|在聊天中查看文件/.test(signal)) return 'conversation_files';
-    if (/rename|重命名|重新命名/.test(signal)) return 'rename';
-    if (/unpin|pin.chat|取消置顶|置顶聊天/.test(signal)) return 'pin';
-    if (/unarchive|archive|取消归档|归档/.test(signal)) return 'archive';
     if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
     if (/open.*(?:image|photo|media)|打开.*(?:图片|照片|媒体)/.test(signal)) return 'open_media';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
@@ -257,10 +259,8 @@
     if (/stop|停止/.test(signal)) return 'stop';
     if (/copy|复制/.test(signal)) return 'copy';
     if (/edit|编辑/.test(signal)) return 'edit';
-    if (/share|分享/.test(signal)) return 'share';
     if (/branch|分支/.test(signal)) return 'branch';
     if (/feedback|good.response|bad.response|点赞|点踩|反馈/.test(signal)) return 'feedback';
-    if (/delete|删除/.test(signal)) return 'delete';
     if (/close|dismiss|关闭|取消/.test(signal)) return 'close';
     if (/confirm|确定|确认/.test(signal)) return 'confirm';
     if (/new.chat|create.new|新建.*会话|新聊天/.test(signal)) return 'new_conversation';

@@ -51,7 +51,9 @@ class McpNativeControlBridgeTest {
                 McpNativeControlBridge.waitForControllerSurface("chatgpt_web", 1_000L, active::get),
             )
             assertNull(McpNativeControlBridge.waitForControllerSurface("missing", 0L, active::get))
-            assertNull(McpNativeControlBridge.targetSurfaceFor("open_chatgpt_web"))
+            assertEquals("main", McpNativeControlBridge.targetSurfaceFor("open_social_ai_chat"))
+            assertEquals("main", McpNativeControlBridge.targetSurfaceFor("open_chatgpt_web"))
+            assertEquals("main", McpNativeControlBridge.targetSurfaceFor("select_web_chat_provider"))
             assertEquals(
                 "chatgpt_web",
                 McpNativeControlBridge.targetSurfaceFor("open_chatgpt_official_fallback"),

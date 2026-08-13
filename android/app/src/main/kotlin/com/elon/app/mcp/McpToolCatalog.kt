@@ -220,7 +220,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("message_offset", intProperty("Zero-based message offset for chatgpt_get_context."))
                         .put("message_limit", intProperty("Page size from 1 to 40 for chatgpt_get_context."))
                         .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false."))
-                        .put("wait_for_target_bind_ms", intProperty("How long open_chatgpt_official_fallback waits for the full-screen official Activity controller, 0-15000. Defaults to 8000."))
+                        .put("wait_for_target_bind_ms", intProperty("How long cross-surface ChatGPT actions wait for the target native or official Activity controller, 0-15000. Defaults to 8000."))
                         .put("mode", stringProperty("Interaction mode for set_social_ai_interaction_mode: work or chat."))
                         .put("provider_id", stringProperty("Web chat provider for select_web_chat_provider. Currently chatgpt_web."))
                         .put("fixture_id", stringProperty("Pinned harmless fixture id for stage/remove_chatgpt_web_acceptance_attachment. Currently fixed_ascii_text_v1."))
