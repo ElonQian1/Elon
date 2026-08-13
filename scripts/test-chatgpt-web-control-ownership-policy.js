@@ -13,8 +13,8 @@ const layoutSource = fs.readFileSync(path.join(
 ), 'utf8');
 assert.match(
   layoutSource,
-  /overlayOwnership\.rememberMessageTrigger\(/,
-  'layout records the message control that requested a new overlay'
+  /overlayOwnership\.rememberContextTrigger\(/,
+  'layout records the context-bound control that requested a new overlay'
 );
 assert.match(
   layoutSource,
@@ -150,6 +150,23 @@ assert.equal(
   '',
   'closing the menu clears active ownership'
 );
+
+const conversationTrigger = {
+  region: 'overlay',
+  semantic: 'conversation_options',
+  contextId: 'conversation_123'
+};
+assert.equal(
+  tracker.rememberContextTrigger(conversationTrigger, source, [], '/'),
+  true,
+  'a conversation overflow trigger starts a bounded ownership claim'
+);
+assert.equal(
+  tracker.resolveOverlayContext({ isConnected: true }, '/'),
+  'conversation_123',
+  'the conversation action menu inherits the selected conversation context'
+);
+tracker.observeNoOverlay('/');
 
 tracker.rememberMessageTrigger(trigger, source, [], '/c/example');
 now += 501;

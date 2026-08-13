@@ -141,14 +141,10 @@ function Get-ChatGptWebSmokeUserReadiness {
     $notificationPosted = $false
     if ($NotifyWhenLocked) {
         try {
-            Invoke-ChatGptWebSmokeAdb -Runtime $Runtime -Arguments @(
-                "shell", "cmd", "notification", "post",
-                "-t", "Codex needs your help",
-                "-i", "@android:drawable/stat_sys_warning",
-                "codex-chatgpt",
-                "Unlock the phone, then reply: ready now"
-            ) -TimeoutSec 8 -Label "post ChatGPT Web user-action notification" | Out-Null
-            $notificationPosted = $true
+            $attention = Request-ChatGptWebSmokeUserAttention -Runtime $Runtime `
+                -Action "unlock_device" `
+                -Message "Unlock the phone, then reply in Codex: ready now"
+            $notificationPosted = $attention.notification_posted -eq $true
         } catch {
             $detail = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.Exception.Message
             Write-Warning "Unable to post ChatGPT Web user-action notification: $detail"
@@ -161,6 +157,51 @@ function Get-ChatGptWebSmokeUserReadiness {
         status = "user_action_required"
         required_action = "unlock_device"
         notification_posted = $notificationPosted
+    }
+}
+
+function Request-ChatGptWebSmokeUserAttention {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("unlock_device", "attachment", "dictation", "realtime_voice", "sensitive_action")]
+        [string]$Action,
+        [Parameter(Mandatory = $true)][ValidateLength(1, 120)][string]$Message,
+        [switch]$SkipHaptic
+    )
+
+    $safeMessage = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $Message -MaxLength 120
+    if (-not $safeMessage) { throw "User-attention notification message is empty." }
+    Invoke-ChatGptWebSmokeAdb -Runtime $Runtime -Arguments @(
+        "shell", "cmd", "notification", "post",
+        "-t", "Codex needs your help",
+        "-i", "@android:drawable/stat_sys_warning",
+        "codex-chatgpt-$Action",
+        $safeMessage
+    ) -TimeoutSec 8 -Label "post ChatGPT Web user-action notification" | Out-Null
+
+    $hapticPosted = $false
+    if (-not $SkipHaptic) {
+        try {
+            Invoke-ChatGptWebSmokeAdb -Runtime $Runtime -Arguments @(
+                "shell", "cmd", "vibrator_manager", "synced", "-f", "-B",
+                "waveform", "180", "120", "180"
+            ) -TimeoutSec 8 -Label "signal ChatGPT Web user action" | Out-Null
+            $hapticPosted = $true
+        } catch {
+            $detail = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.Exception.Message
+            Write-Warning "Unable to vibrate for ChatGPT Web user action: $detail"
+        }
+    }
+
+    return [pscustomobject]@{
+        schema = "elon.chatgpt_web.user_attention.v1"
+        status = "user_action_required"
+        required_action = $Action
+        notification_posted = $true
+        haptic_posted = $hapticPosted
+        continuation_requires_explicit_reply = $true
+        automatic_sensitive_action = $false
     }
 }
 

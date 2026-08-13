@@ -16,7 +16,7 @@ param(
     [switch]$UserConfirmedAttachmentSend,
     [string]$CheckpointPath = "",
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 86
 )
 
 $ErrorActionPreference = "Stop"

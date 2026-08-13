@@ -8,7 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 86,
     [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,
@@ -768,7 +768,11 @@ if ($failed.Count -gt 0) {
     throw "ChatGPT Web smoke failed: $($failed.Count) check(s)."
 }
 
-$verifiedCases = @("safe/read_only_surface")
+$verifiedCases = @(
+    "safe/read_only_surface"
+    "safe/authenticated_session"
+    "safe/account_menu_structure"
+)
 if ($SendProbe) { $verifiedCases += "reversible/send_probe" }
 if ($VerifyStop) { $verifiedCases += "reversible/send_probe_with_stop" }
 Register-ChatGptWebVerificationCases -Runtime $smokeRuntime `

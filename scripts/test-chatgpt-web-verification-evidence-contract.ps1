@@ -3,7 +3,12 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $runtime = Get-Content (Join-Path $repoRoot "scripts/chatgpt-web-smoke-runtime.ps1") -Raw
 $expected = [ordered]@{
-    "smoke-chatgpt-web-apk.ps1" = @("safe/read_only_surface", "reversible/send_probe")
+    "smoke-chatgpt-web-apk.ps1" = @(
+        "safe/read_only_surface",
+        "safe/authenticated_session",
+        "safe/account_menu_structure",
+        "reversible/send_probe"
+    )
     "smoke-chatgpt-web-reversible-controls.ps1" = @("reversible/reversible_controls")
     "smoke-chatgpt-web-tool-execution.ps1" = @("reversible/tool_execution_with_citations")
     "smoke-chatgpt-web-composer-controls.ps1" = @(
@@ -39,6 +44,16 @@ $expected = [ordered]@{
         "safe/settings_overlay_idempotent_form_controls"
     )
     "smoke-chatgpt-web-session-recovery.ps1" = @("safe/session_recovery")
+    "smoke-chatgpt-web-conversation-management.ps1" = @(
+        "safe/conversation_management_structure"
+    )
+    "smoke-chatgpt-web-long-running-stability.ps1" = @(
+        "safe/session_long_running_stability"
+    )
+    "smoke-chatgpt-web-sensitive-feature-page.ps1" = @(
+        "supervised/feature_page/health",
+        "supervised/feature_page/finances"
+    )
 }
 
 foreach ($token in @(

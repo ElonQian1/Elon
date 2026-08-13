@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85,
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 86,
     [switch]$SkipUnlockNotification
 )
 
@@ -57,6 +57,11 @@ $cases = @(
         id = "session_recovery"
         script = "smoke-chatgpt-web-session-recovery.ps1"
         arguments = $pinned
+    },
+    [pscustomobject]@{
+        id = "conversation_management_structure"
+        script = "smoke-chatgpt-web-conversation-management.ps1"
+        arguments = $pinned
     }
 )
 
@@ -86,7 +91,6 @@ try {
         failed_count = $failed.Count
         cases = $results
         user_assisted_remaining = @(
-            "official_authentication",
             "attachment_lifecycle",
             "dictation_audio_capture",
             "realtime_voice",
