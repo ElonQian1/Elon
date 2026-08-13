@@ -441,14 +441,15 @@ internal object ChatGptWebProtocol {
                         title = title,
                         path = path,
                         active = item.optBoolean("active"),
-                        groupLabel = item.optString("groupLabel").trim().take(MAX_GROUP_LABEL_LENGTH),
-                        projectId = item.optString("projectId").trim()
-                            .take(MAX_PROJECT_ID_LENGTH)
-                            .takeIf(PROJECT_ID::matches)
+                        groupLabel = item.optionalString("groupLabel")
+                            .orEmpty()
+                            .take(MAX_GROUP_LABEL_LENGTH),
+                        projectId = item.optionalString("projectId")
+                            ?.take(MAX_PROJECT_ID_LENGTH)
+                            ?.takeIf(PROJECT_ID::matches)
                             ?: ChatGptWebConversationPath.projectId(path),
-                        projectTitle = item.optString("projectTitle").trim()
-                            .take(MAX_TITLE_LENGTH)
-                            .takeIf(String::isNotBlank),
+                        projectTitle = item.optionalString("projectTitle")
+                            ?.take(MAX_TITLE_LENGTH),
                         projectPath = projectPath,
                         activityDates = parseActivityDates(item),
                     ),
@@ -484,6 +485,13 @@ internal object ChatGptWebProtocol {
             values.optString(index).takeIf(ACTIVITY_DATE::matches)?.let(::add)
         }
     }
+
+    private fun JSONObject.optionalString(key: String): String? =
+        opt(key)
+            ?.takeUnless { it == JSONObject.NULL }
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 
     private fun parseConversationCollection(
         event: JSONObject,

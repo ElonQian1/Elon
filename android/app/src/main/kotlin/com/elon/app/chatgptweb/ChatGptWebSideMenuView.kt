@@ -177,10 +177,12 @@ internal class ChatGptWebSideMenuView(
         textSize = 12f
         setTextColor(Color.parseColor("#80BEBEBA"))
         val state = index()
+        val activeCount = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate).size
+        val countLabel = "$activeCount 个活跃 · 共 ${state.conversations.size} 个会话"
         text = when (state.collection.officialLoadState) {
-            ChatGptWebConversationCollection.LOAD_LOADING -> "${state.conversations.size} 个会话 · 正在刷新"
-            ChatGptWebConversationCollection.LOAD_FAILED -> "${state.conversations.size} 个会话 · 显示本机缓存"
-            else -> "${state.conversations.size} 个会话"
+            ChatGptWebConversationCollection.LOAD_LOADING -> "$countLabel · 正在刷新"
+            ChatGptWebConversationCollection.LOAD_FAILED -> "$countLabel · 显示本机缓存"
+            else -> countLabel
         }
         contentDescription = ChatGptNativeNavigationSelector.STATUS
     }

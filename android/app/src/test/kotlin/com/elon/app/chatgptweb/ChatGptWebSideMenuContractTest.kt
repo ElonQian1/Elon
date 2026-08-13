@@ -15,6 +15,7 @@ class ChatGptWebSideMenuContractTest {
 
         assertTrue(view.contains("createSocialSidebarDateStrip("))
         assertTrue(view.contains("ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)"))
+        assertTrue(view.contains("val countLabel = \"\$activeCount 个活跃 · 共 \${state.conversations.size} 个会话\""))
         assertTrue(view.contains("renderProjects(this)"))
         assertTrue(view.contains("ChatGptNativeNavigationSelector::date"))
         assertTrue(controller.contains("applyChatSideMenuContentMode("))

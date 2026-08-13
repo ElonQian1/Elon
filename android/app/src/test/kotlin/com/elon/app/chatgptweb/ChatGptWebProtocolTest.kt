@@ -321,6 +321,18 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun treatsJsonNullConversationMetadataAsAbsent() {
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"conversation_snapshot","conversations":[{"id":"one","title":"Greeting exchange","path":"/c/one","groupLabel":null,"projectId":null,"projectTitle":null,"projectPath":null,"activityDates":["2026-08-14"]}],"projects":[],"collection":{}}}""",
+        ) as ChatGptWebEvent.ConversationList
+
+        val conversation = event.conversations.single()
+        assertEquals("", conversation.groupLabel)
+        assertNull(conversation.projectId)
+        assertNull(conversation.projectTitle)
+    }
+
+    @Test
     fun parsesBoundedDynamicFeatureNavigation() {
         val event = ChatGptWebProtocol.parse(
             """
