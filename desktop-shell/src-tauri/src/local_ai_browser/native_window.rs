@@ -36,10 +36,13 @@ pub(super) async fn open(
     }
 
     let url = native_chat_url(&webview, provider)?;
+    let bootstrap_url = "about:blank"
+        .parse()
+        .map_err(|error| format!("一龙聊天窗启动页无效：{error}"))?;
     let origin = PageOrigin::from_url(&url)?;
     let navigation_origin = origin.clone();
     let popup_origin = origin;
-    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
+    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(bootstrap_url))
         .title(format!("{} · 一龙聊天", provider.display_name))
         .inner_size(940.0, 760.0)
         .min_inner_size(720.0, 560.0)
@@ -55,6 +58,10 @@ pub(super) async fn open(
         })
         .build()
         .map_err(display_error)?;
+    if let Err(error) = window.navigate(url) {
+        let _ = window.close();
+        return Err(format!("一龙聊天窗导航失败：{}", display_error(error)));
+    }
     restore_window(&window)?;
     Ok(response(provider, label, "created"))
 }
@@ -110,11 +117,12 @@ impl PageOrigin {
     }
 
     fn allows(&self, url: &Url) -> bool {
-        url.scheme() == self.scheme
-            && url
-                .host_str()
-                .is_some_and(|host| host.eq_ignore_ascii_case(&self.host))
-            && url.port_or_known_default() == self.port
-            && (url.path() == NATIVE_CHAT_PATH || url.path().starts_with("/pc/assets/"))
+        url.as_str() == "about:blank"
+            || (url.scheme() == self.scheme
+                && url
+                    .host_str()
+                    .is_some_and(|host| host.eq_ignore_ascii_case(&self.host))
+                && url.port_or_known_default() == self.port
+                && (url.path() == NATIVE_CHAT_PATH || url.path().starts_with("/pc/assets/")))
     }
 }

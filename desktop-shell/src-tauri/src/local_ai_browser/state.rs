@@ -111,15 +111,6 @@ impl LocalAiBrowserRuntime {
         });
     }
 
-    pub fn observe_url(&self, label: &str, url: &Url) {
-        let safe_url = safe_visible_url(url);
-        let host = url.host_str().unwrap_or_default().to_string();
-        self.update(label, |record| {
-            record.current_url = safe_url;
-            record.current_host = host;
-        });
-    }
-
     pub fn mark_window_status(&self, label: &str, status: &str) {
         self.update(label, |record| {
             record.window_status = status.to_string();
