@@ -36,3 +36,7 @@ pub(crate) fn migration_v154(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "open_commerce_developer_credential_migration_tests.rs"]
+mod tests;
