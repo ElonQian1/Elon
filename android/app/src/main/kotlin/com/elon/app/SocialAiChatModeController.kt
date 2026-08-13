@@ -101,21 +101,27 @@ internal class SocialAiChatModeController(
     }
 
     private fun showSelector() {
-        val checked = if (interactionMode == SocialAiInteractionMode.WORK) MODE_WORK else MODE_CHAT
+        val providers = WebChatProviderRegistry.available()
+        val workIndex = providers.size
+        val checked = if (interactionMode == SocialAiInteractionMode.WORK) {
+            workIndex
+        } else {
+            providers.indexOfFirst { it.id == providerId }.coerceAtLeast(0)
+        }
+        val labels = buildList {
+            providers.forEach { provider ->
+                add(activity.getString(R.string.social_ai_mode_chat_provider, provider.displayName))
+            }
+            add(activity.getString(R.string.social_ai_mode_work))
+        }
         val dialog = AlertDialog.Builder(activity)
             .setTitle(R.string.social_ai_mode_picker_title)
-            .setSingleChoiceItems(
-                arrayOf(
-                    activity.getString(R.string.social_ai_mode_work),
-                    activity.getString(R.string.social_ai_mode_chat),
-                ),
-                checked,
-            ) { selector, which ->
+            .setSingleChoiceItems(labels.toTypedArray(), checked) { selector, which ->
                 selector.dismiss()
-                if (which == MODE_WORK) {
+                if (which == workIndex) {
                     selectInteractionMode(SocialAiInteractionMode.WORK)
                 } else {
-                    showProviderSelector()
+                    providers.getOrNull(which)?.let { selectChatProvider(it.id) }
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -129,19 +135,6 @@ internal class SocialAiChatModeController(
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener { openOfficialFallback() }
         }
         dialog.show()
-    }
-
-    private fun showProviderSelector() {
-        val providers = WebChatProviderRegistry.available()
-        val checked = providers.indexOfFirst { it.id == providerId }.coerceAtLeast(0)
-        AlertDialog.Builder(activity)
-            .setTitle(R.string.web_chat_provider_picker_title)
-            .setSingleChoiceItems(providers.map { it.displayName }.toTypedArray(), checked) { dialog, which ->
-                providers.getOrNull(which)?.let { selectChatProvider(it.id) }
-                dialog.dismiss()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     private fun activeTitle(): String = when (interactionMode) {
@@ -181,9 +174,4 @@ internal class SocialAiChatModeController(
     private fun persist() = modeStore.save(interactionMode, providerId)
 
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
-
-    private companion object {
-        const val MODE_WORK = 0
-        const val MODE_CHAT = 1
-    }
 }

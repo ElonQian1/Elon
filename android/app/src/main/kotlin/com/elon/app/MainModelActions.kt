@@ -178,6 +178,7 @@ internal class MainModelActions(
     }
 
     fun updateModelButton() {
+        if (binding.modelButton.tag == WEB_CHAT_MODEL_BUTTON_OWNER) return
         binding.modelButton.text = selectedRuntimeRoute.buttonLabel
         binding.modelButton.contentDescription = "AI方式：${selectedRuntimeRoute.title}；模型：$currentModelLabel"
         modelButtonShellProvider()?.contentDescription = "AI方式：${selectedRuntimeRoute.title}；模型：$currentModelLabel"

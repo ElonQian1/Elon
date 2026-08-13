@@ -182,9 +182,13 @@
   function findModelButton(composer) {
     const scope = composerScope(composer);
     const directSelectors = [
+      '[data-testid="model-switcher"]',
+      '[data-testid*="model-switcher" i]',
       '[data-testid*="model-selector" i]',
+      '[data-testid*="model-button" i]',
       '[aria-label*="model selector" i]',
-      '[aria-label*="选择模型"]'
+      '[aria-label*="选择模型"]',
+      '[aria-label*="模型选择"]'
     ];
     for (const selector of directSelectors) {
       const node = scope.querySelector(selector) || document.querySelector(selector);
@@ -292,8 +296,22 @@
 
   function currentModel(composer) {
     const button = findModelButton(composer);
-    const visibleLabel = cleanText(button && button.textContent);
-    return (visibleLabel || nodeLabel(button)).slice(0, 80);
+    if (!button) return '';
+    const candidates = [
+      button.textContent,
+      button.getAttribute('data-model-title'),
+      button.getAttribute('data-model-name'),
+      button.getAttribute('title'),
+      button.getAttribute('aria-label')
+    ].map(cleanText).filter(Boolean);
+    const explicit = candidates.find((label) =>
+      modelLabelPolicy && typeof modelLabelPolicy.isModelLabel === 'function'
+        ? modelLabelPolicy.isModelLabel(label)
+        : false
+    );
+    return (explicit || candidates[0] || '')
+      .replace(/^(?:model selector|choose model|选择模型|模型选择器?)\s*[,，:：-]?\s*/i, '')
+      .slice(0, 80);
   }
 
   function optionId(section, label, occurrence) {

@@ -26,6 +26,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(strings.contains("聊天模式"))
         assertTrue(controller.contains("SocialAiInteractionMode.WORK"))
         assertTrue(controller.contains("SocialAiInteractionMode.CHAT"))
+        assertTrue(controller.contains("social_ai_mode_chat_provider"))
+        assertTrue(!controller.contains("showProviderSelector"))
         assertTrue(controller.contains("openOfficialFallback"))
         assertTrue(provider.contains("GOOGLE_WEB"))
         assertTrue(provider.contains("available = false"))
@@ -38,12 +40,14 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(feature.contains("activateWorkMode"))
         assertTrue(feature.contains("activateChatProvider"))
         assertTrue(feature.contains("deactivateChatProvider"))
+        assertTrue(feature.contains("WEB_CHAT_MODEL_BUTTON_OWNER"))
         assertTrue(mainMcp.contains("set_social_ai_interaction_mode"))
         assertTrue(mainMcp.contains("select_web_chat_provider"))
         assertTrue(mainMcp.contains("open_chatgpt_official_fallback"))
         assertTrue(mainMcp.contains("web_chat_attachment_phase"))
         assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
         assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
+        assertTrue(activity.contains("ChatGptWebAccessPolicy.canChat(snapshot)"))
     }
 
     @Test

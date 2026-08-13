@@ -14,6 +14,10 @@ internal class ChatGptWebSessionContinuity {
             authenticatedObserved = true
             return snapshot
         }
+        if (snapshot.composerReady) {
+            authenticatedObserved = false
+            return snapshot
+        }
         if (authenticatedObserved) {
             return snapshot.copy(authenticated = true)
         }

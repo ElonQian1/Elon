@@ -6,6 +6,19 @@ import org.junit.Test
 
 class ChatGptWebSessionContinuityTest {
     @Test
+    fun anonymousComposerClearsPreviouslyObservedAccountSession() {
+        val continuity = ChatGptWebSessionContinuity()
+        continuity.reconcile(snapshot(authenticated = true, pageKind = "conversation"))
+
+        val anonymous = continuity.reconcile(
+            snapshot(pageKind = "conversation").copy(composerReady = true),
+        )
+
+        assertFalse(anonymous.authenticated)
+        assertFalse(continuity.reconcile(snapshot(pageKind = "feature")).authenticated)
+    }
+
+    @Test
     fun doesNotPromoteFeaturePageWithoutPriorAuthenticationEvidence() {
         val continuity = ChatGptWebSessionContinuity()
 

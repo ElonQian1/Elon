@@ -6,6 +6,9 @@ internal enum class SocialAiInteractionMode(val wireValue: String) {
 
     companion object {
         fun fromWireValue(value: String?): SocialAiInteractionMode =
-            entries.firstOrNull { it.wireValue == value } ?: WORK
+            parse(value) ?: CHAT
+
+        fun parse(value: String?): SocialAiInteractionMode? =
+            entries.firstOrNull { it.wireValue == value }
     }
 }

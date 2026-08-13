@@ -229,11 +229,11 @@ internal class ChatGptBackgroundSession(
                 val snapshot = sessionContinuity.reconcile(event.value)
                 latestSnapshot = snapshot
                 when {
-                    snapshot.loginRequired || snapshot.pageKind == "auth" -> {
+                    ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
                         pageAdapter?.markLoginRequired()
                         updateState(State.LOGIN_REQUIRED)
                     }
-                    snapshot.authenticated && snapshot.composerReady -> {
+                    ChatGptWebAccessPolicy.canChat(snapshot) -> {
                         pageAdapter?.markReady()
                         updateState(State.READY)
                     }

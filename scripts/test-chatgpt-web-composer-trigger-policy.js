@@ -77,6 +77,48 @@ assert.equal(events[0].purpose, 'list_model_options');
 assert.equal(events[0].xRatio, 0.5);
 assert.equal(events[0].yRatio, 0.875);
 
+const mobileModelButton = {
+  id: '',
+  textContent: 'Auto',
+  getBoundingClientRect() {
+    return { left: 60, top: 640, right: 160, bottom: 680, width: 100, height: 40 };
+  },
+  getAttribute(name) {
+    return ({
+      'data-testid': 'model-switcher',
+      'aria-label': 'Model selector, GPT-5.6 Instant'
+    })[name] || null;
+  }
+};
+const mobileScope = {
+  querySelector(selector) {
+    return selector.includes('model-switcher') ? mobileModelButton : null;
+  },
+  querySelectorAll: () => []
+};
+const mobileComposer = {
+  closest(selector) {
+    return selector === 'form' ? mobileScope : null;
+  }
+};
+const mobileSandbox = {
+  document: { querySelector: () => null, querySelectorAll: () => [] },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+    __elonChatGptModelLabelPolicy: {
+      isModelLabel: (label) => /gpt|auto/i.test(label)
+    },
+    __elonChatGptComposerOptionPolicy: { filter: (_section, options) => options },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+  }
+};
+mobileSandbox.window.window = mobileSandbox.window;
+mobileSandbox.window.document = mobileSandbox.document;
+mobileSandbox.window.location = mobileSandbox.location;
+vm.runInNewContext(source, mobileSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+assert.equal(mobileSandbox.window.__elonChatGptComposer.currentModel(mobileComposer), 'Auto');
+
 const renamedModelButton = {
   id: '',
   textContent: '5.6 Terra 中',

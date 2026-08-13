@@ -531,6 +531,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     if (!modeRestored && (authenticationCompleted || modeController.isQuickSelected())) {
                         modeController.select(ChatGptWebModeController.Mode.NATIVE)
                     }
+                } else if (ChatGptWebAccessPolicy.canChat(snapshot)) {
+                    pageAdapter.markReady()
+                    sessionRestorer.restorePreferredMode(binding.chatGptModeNative.isEnabled, modeController)
                 } else {
                     pageAdapter.markLoginRequired()
                 }

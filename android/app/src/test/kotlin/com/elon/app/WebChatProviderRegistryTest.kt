@@ -10,7 +10,9 @@ class WebChatProviderRegistryTest {
     fun keepsWorkAndChatAsOrthogonalInteractionModes() {
         assertEquals(SocialAiInteractionMode.WORK, SocialAiInteractionMode.fromWireValue("work"))
         assertEquals(SocialAiInteractionMode.CHAT, SocialAiInteractionMode.fromWireValue("chat"))
-        assertEquals(SocialAiInteractionMode.WORK, SocialAiInteractionMode.fromWireValue("unknown"))
+        assertEquals(SocialAiInteractionMode.CHAT, SocialAiInteractionMode.fromWireValue("unknown"))
+        assertEquals(SocialAiInteractionMode.CHAT, SocialAiInteractionMode.fromWireValue(null))
+        assertEquals(null, SocialAiInteractionMode.parse("unknown"))
     }
 
     @Test

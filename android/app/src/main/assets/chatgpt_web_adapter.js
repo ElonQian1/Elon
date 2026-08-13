@@ -148,7 +148,7 @@
     const pageKind = layoutAdapter && typeof layoutAdapter.pageKind === 'function'
       ? layoutAdapter.pageKind()
       : 'unknown';
-    const loginRequired = pageKind === 'auth' || hasVisibleLoginEntry();
+    const loginRequired = pageKind === 'auth';
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),

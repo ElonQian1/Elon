@@ -63,6 +63,8 @@ internal class ChatGptSocialChatController(
 
     fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 
+    fun refreshComposerModel() = updateComposerModel(currentModel())
+
     fun attachmentSendPhase(): String = session.attachmentSendPhase()
 
     fun pendingAttachmentCount(): Int = maxOf(session.pendingAttachmentCount(), pendingAttachments.size)
@@ -172,7 +174,7 @@ internal class ChatGptSocialChatController(
         if (messages.isEmpty()) when (state) {
             ChatGptBackgroundSession.State.LOADING -> renderStatusMessage("正在连接 ChatGPT 网页 AI…")
             ChatGptBackgroundSession.State.LOGIN_REQUIRED -> renderStatusMessage(
-                "登录状态已失效，请在顶部模式菜单打开“官网功能”完成登录。",
+                "当前页面需要登录。可打开“官网功能”登录，也可在官网支持时直接匿名聊天。",
             )
             ChatGptBackgroundSession.State.ERROR -> renderStatusMessage(
                 detail?.takeIf(String::isNotBlank) ?: "ChatGPT 网页 AI 暂时不可用。",
@@ -265,5 +267,6 @@ internal class ChatGptSocialChatController(
         val label = model.ifBlank { provider.displayName }
         binding.modelButton.text = label
         binding.modelButton.contentDescription = "聊天模式；提供方：${provider.displayName}；模型：$label"
+        (binding.modelButton.parent as? View)?.contentDescription = binding.modelButton.contentDescription
     }
 }

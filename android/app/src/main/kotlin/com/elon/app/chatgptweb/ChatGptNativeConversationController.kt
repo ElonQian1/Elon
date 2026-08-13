@@ -303,13 +303,13 @@ internal class ChatGptNativeConversationController(
     }
 
     private fun setControls(value: ChatGptWebSnapshot) {
-        val authenticated = value.authenticated && value.composerReady
-        setAvailable(authenticated && !value.streaming && pendingPrompt == null)
+        val canChat = ChatGptWebAccessPolicy.canChat(value)
+        setAvailable(canChat && !value.streaming && pendingPrompt == null)
         sendButton.visibility = if (value.streaming) View.GONE else View.VISIBLE
         stopButton.visibility = if (value.streaming) View.VISIBLE else View.GONE
         stopButton.isEnabled = value.streaming
         stopButton.alpha = if (value.streaming) 1f else DISABLED_ALPHA
-        newConversationButton.isEnabled = value.authenticated && !value.streaming
+        newConversationButton.isEnabled = canChat && !value.streaming
         newConversationButton.alpha = if (newConversationButton.isEnabled) 1f else DISABLED_ALPHA
     }
 

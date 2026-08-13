@@ -65,6 +65,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("layout.findSemanticNode('attachment', 'composer')"))
         assertTrue(adapter.contains("scope.querySelectorAll('button, [role=\"button\"]')"))
         assertTrue(adapter.contains("layout.findSemanticNode('model', 'composer')"))
+        assertTrue(adapter.contains("[data-testid=\"model-switcher\"]"))
+        assertTrue(adapter.contains("button.getAttribute('data-model-title')"))
         assertTrue(adapter.contains("modelLabelPolicy.isModelLabel"))
         assertTrue(layoutAdapter.contains("const modelSignal = cleanText(signal + ' ' + labelOf(node, ''))"))
         assertTrue(layoutAdapter.contains("modelLabelPolicy.isModelLabel(modelSignal)"))

@@ -77,8 +77,10 @@ internal class MainSocialAiChatFeature(
 
     fun webChatPendingAttachmentCount(): Int = webChatController.pendingAttachmentCount()
 
-    fun selectInteractionMode(value: String): Boolean =
-        modeController.selectInteractionMode(SocialAiInteractionMode.fromWireValue(value))
+    fun selectInteractionMode(value: String): Boolean {
+        val mode = SocialAiInteractionMode.parse(value) ?: return false
+        return modeController.selectInteractionMode(mode)
+    }
 
     fun selectProvider(value: String): Boolean {
         val id = WebChatProviderId.fromWireValue(value)
@@ -100,7 +102,12 @@ internal class MainSocialAiChatFeature(
 
     private fun deactivateChatProvider() {
         webChatController.deactivate()
+        binding.modelButton.tag = null
         inputComposerViews()?.let { views ->
+            views.modelButtonShell.tag = null
+            views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
+                width = dp(MODEL_BUTTON_WORK_WIDTH_DP)
+            }
             views.planModeButton.visibility = View.VISIBLE
             views.modelButtonShell.setOnClickListener { showWorkModelSelector() }
             binding.modelButton.setOnClickListener { showWorkModelSelector() }
@@ -110,11 +117,26 @@ internal class MainSocialAiChatFeature(
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
+        binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         webChatController.activate(provider)
         inputComposerViews()?.let { views ->
+            views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
+            views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
+                width = dp(MODEL_BUTTON_CHAT_WIDTH_DP)
+            }
             views.planModeButton.visibility = View.GONE
             views.modelButtonShell.setOnClickListener { webChatController.requestModelOptions() }
             binding.modelButton.setOnClickListener { webChatController.requestModelOptions() }
         }
+        binding.root.post { webChatController.refreshComposerModel() }
+    }
+
+    private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val MODEL_BUTTON_WORK_WIDTH_DP = 76
+        const val MODEL_BUTTON_CHAT_WIDTH_DP = 144
     }
 }
+
+internal const val WEB_CHAT_MODEL_BUTTON_OWNER = "web_chat_model_button"
