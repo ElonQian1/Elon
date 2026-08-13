@@ -724,13 +724,13 @@ if [ -f "$PC_FRONTEND_DIR/package.json" ]; then
       exit 1
     fi
   fi
-  current_pc_release_sha=$(curl --noproxy '*' -sS --fail --max-time 10 "$SERVER_HTTP_BASE/pc/release-sha.txt" 2>/dev/null | tr -d '[:space:]' || true)
-  if [ -z "$current_pc_release_sha" ]; then
-    current_pc_release_sha="__missing__"
-  elif [[ ! "$current_pc_release_sha" =~ ^[0-9a-f]{40}$ ]] ||
+  current_pc_release_sha=$(read_static_release_baseline "$REMOTE_PC_DIST")
+  if [ "$current_pc_release_sha" != "__missing__" ]; then
+    if [[ ! "$current_pc_release_sha" =~ ^[0-9a-f]{40}$ ]] ||
        ! git -C "$REPO_ROOT" merge-base --is-ancestor "$current_pc_release_sha" "$SHA_BIG" 2>/dev/null; then
-    echo -e "${RED}   ❌ 线上 PC 前端版本无法安全推进: $current_pc_release_sha -> $SHA_BIG${NC}" >&2
-    exit 1
+      echo -e "${RED}   ❌ 线上 PC 前端版本无法安全推进: $current_pc_release_sha -> $SHA_BIG${NC}" >&2
+      exit 1
+    fi
   fi
 else
   echo -e "${RED}3.5⃣  ❌ pc-frontend/ 不存在，统一发布批次失败关闭${NC}"
@@ -896,11 +896,7 @@ if [ "$DEPLOYED_VERSION_NAME" != "$ASSIGNED_VERSION" ] || [ "$DEPLOYED_GIT_SHA" 
   exit 1
 fi
 
-built_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-cat > "$PC_DIST_DIR/release.json" <<EOF
-{"schema":"elon.pc_frontend_release.v1","gitSha":"$SHA_BIG","compatibleServerGitSha":"$SHA_BIG","releaseMode":"server_bundle","builtAtUtc":"$built_at_utc"}
-EOF
-printf '%s\n' "$SHA_BIG" > "$PC_DIST_DIR/release-sha.txt"
+write_static_release_marker "$PC_DIST_DIR" "{\"schema\":\"elon.pc_frontend_release.v1\",\"gitSha\":\"$SHA_BIG\",\"compatibleServerGitSha\":\"$SHA_BIG\",\"releaseMode\":\"server_bundle\",\"builtAtUtc\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" "$SHA_BIG"
 upload_static_dist "$PC_DIST_DIR" "$REMOTE_PC_DIST" "新版 PC 前端 dist" 1 "$current_pc_release_sha"
 
 # A legacy release API did not persist batch fields from claim. Once the new

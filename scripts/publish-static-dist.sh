@@ -122,3 +122,22 @@ upload_static_dist() {
   fi
   echo -e "${GREEN}   ✅ $label 原子入口发布完成（旧 hash 保留宽限期）→ $remote_dir${NC}"
 }
+
+read_static_release_baseline() {
+  local remote_dir="$1" value
+  if [ "$LOCAL_DEPLOY" -eq 1 ]; then
+    value=$(cat "$remote_dir/release-sha.txt" 2>/dev/null || true)
+  else
+    # shellcheck disable=SC2086
+    value=$(ssh $SSH_OPTS "$SERVER" "cat '$remote_dir/release-sha.txt' 2>/dev/null || true" | tr -d '[:space:]')
+  fi
+  printf '%s\n' "${value:-__missing__}"
+}
+
+write_static_release_marker() {
+  local dist_dir="$1" json="$2" sha="$3"
+  mkdir -p "$dist_dir/assets"
+  printf '%s\n' "$json" > "$dist_dir/release.json"
+  printf '%s\n' "$sha" > "$dist_dir/release-sha.txt"
+  cp "$dist_dir/release.json" "$dist_dir/release-sha.txt" "$dist_dir/assets/"
+}

@@ -439,7 +439,7 @@ if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
     if ($Kind -eq 'PcFrontend') {
         try {
             $releaseParams = @{
-                Uri = "$ServerUrl/pc/release.json"
+                Uri = "$ServerUrl/pc/assets/release.json"
                 TimeoutSec = 10
             }
             $releaseParams = Add-ElonProjectDirectRequestParameters -Params $releaseParams -CommandName 'Invoke-RestMethod'

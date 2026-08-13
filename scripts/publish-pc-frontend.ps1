@@ -57,8 +57,8 @@ try {
         Stop-PcFrontendPublish "server/API inputs changed and require publish-server.ps1: $($blocking -join ', ')"
     }
 
-    $currentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot `
-        -CandidateGitSha $Sha -ServerUrl $ServerUrl
+    $currentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot -CandidateGitSha $Sha `
+        -RemoteDir $RemotePcDist -SshServer $Server -SshOptions $SshOpts
 
     if (-not $SkipBuild) {
         if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
@@ -86,7 +86,7 @@ try {
         -ServerUrl $ServerUrl -RemoteDir $RemotePcDist -Label '新版 PC 前端 dist' `
         -ExpectedCurrentReleaseSha $currentReleaseSha
 
-    $publishedMarker = Invoke-ElonPublishJsonGet -Uri "$ServerUrl/pc/release.json" -TimeoutSec 10
+    $publishedMarker = Invoke-ElonPublishJsonGet -Uri "$ServerUrl/pc/assets/release.json" -TimeoutSec 10
     if ([string]$publishedMarker.gitSha -ne $Sha -or
         [string]$publishedMarker.compatibleServerGitSha -ne $serverSha) {
         throw 'published PC frontend release marker does not match the candidate'

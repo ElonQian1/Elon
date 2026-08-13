@@ -108,6 +108,8 @@ function Write-PcFrontendReleaseMarker {
         throw "PC frontend dist is missing index.html: $DistDir"
     }
     $encoding = [System.Text.UTF8Encoding]::new($false)
+    $assetsDir = Join-Path $DistDir 'assets'
+    New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
     $marker = [ordered]@{
         schema = 'elon.pc_frontend_release.v1'
         gitSha = $GitSha
@@ -115,29 +117,26 @@ function Write-PcFrontendReleaseMarker {
         releaseMode = $ReleaseMode
         builtAtUtc = [DateTime]::UtcNow.ToString('o')
     }
-    [System.IO.File]::WriteAllText(
-        (Join-Path $DistDir 'release.json'),
-        ($marker | ConvertTo-Json -Compress),
-        $encoding
-    )
-    [System.IO.File]::WriteAllText((Join-Path $DistDir 'release-sha.txt'), "$GitSha`n", $encoding)
+    $markerJson = $marker | ConvertTo-Json -Compress
+    foreach ($dir in @($DistDir, $assetsDir)) {
+        [System.IO.File]::WriteAllText((Join-Path $dir 'release.json'), $markerJson, $encoding)
+        [System.IO.File]::WriteAllText((Join-Path $dir 'release-sha.txt'), "$GitSha`n", $encoding)
+    }
 }
 
 function Get-PcFrontendReleaseBaseline {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$CandidateGitSha,
-        [Parameter(Mandatory = $true)][string]$ServerUrl
+        [Parameter(Mandatory = $true)][string]$RemoteDir,
+        [Parameter(Mandatory = $true)][string]$SshServer,
+        [Parameter(Mandatory = $true)][string[]]$SshOptions
     )
 
-    $releaseSha = try {
-        (Invoke-ElonPublishTextGet -Uri "$ServerUrl/pc/release-sha.txt" -TimeoutSec 10).Trim()
-    } catch {
-        if ($_.Exception.Message -match '404') { '__missing__' } else { throw }
-    }
-    if ($releaseSha -match '(?i)<!doctype\s+html|<div\s+id=["'']root["'']') {
-        return '__missing__'
-    }
+    $read = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'read PC frontend release baseline' `
+        -ArgumentList (@($SshOptions) + @('-n', $SshServer, "cat '$RemoteDir/release-sha.txt' 2>/dev/null || printf '__missing__'"))
+    Assert-ElonNativeCommand -Result $read -FailureMessage 'PC frontend release baseline read failed.'
+    $releaseSha = $read.Stdout.Trim()
     if ($releaseSha -eq '__missing__') { return $releaseSha }
     if ($releaseSha -notmatch '^[0-9a-f]{40}$') {
         throw "Invalid live PC frontend release marker: $releaseSha"
@@ -170,7 +169,7 @@ function Publish-PcFrontendRelease {
         -CompatibleServerGitSha $CompatibleServerGitSha -ReleaseMode $ReleaseMode
     if ([string]::IsNullOrWhiteSpace($ExpectedCurrentReleaseSha)) {
         $ExpectedCurrentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot `
-            -CandidateGitSha $GitSha -ServerUrl $ServerUrl
+            -CandidateGitSha $GitSha -RemoteDir $RemoteDir -SshServer $Server -SshOptions $SshOpts
     }
     $published = Publish-StaticDist -LocalDir $DistDir -RemoteDir $RemoteDir -Label $Label `
         -Required -ExpectedCurrentReleaseSha $ExpectedCurrentReleaseSha -ReleaseShaRelativePath 'release-sha.txt'

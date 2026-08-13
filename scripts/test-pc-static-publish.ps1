@@ -29,6 +29,8 @@ $checks = [ordered]@{
     shell_frontend_only_cas = $shellPublish.Contains('.pc-static-publish.lock') -and
         $shellPublish.Contains('static release changed: expected=') -and
         $shellPublish.Contains('current_pc_release_sha')
+    shell_public_release_marker = $shellPublish.Contains('write_static_release_marker') -and
+        $shellPublish.Contains('read_static_release_baseline')
     shell_writes_frontend_release_marker = $shellPublish.Contains('elon.pc_frontend_release.v1') -and
         $shellPublish.Contains('compatibleServerGitSha') -and
         $shellPublish.Contains('release-sha.txt')

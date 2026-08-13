@@ -755,7 +755,7 @@ if ($SkipPcFrontend) {
     }
 
     Invoke-PcFrontendBundleBudget -FrontendDir $PcFrontendDir
-    $PcReleaseBaseline = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot -CandidateGitSha $Sha -ServerUrl 'http://43.139.149.158:8080'
+    $PcReleaseBaseline = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot -CandidateGitSha $Sha -RemoteDir $RemotePcDist -SshServer $Server -SshOptions $SshOpts
 } else {
     throw 'pc-frontend/ 不存在，统一发布批次失败关闭'
 }
