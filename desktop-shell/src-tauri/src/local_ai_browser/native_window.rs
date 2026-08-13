@@ -147,6 +147,9 @@ pub(super) async fn open(
         .inner_size(940.0, 760.0)
         .min_inner_size(720.0, 560.0)
         .center()
+        .parent(&webview)
+        .map_err(display_error)?
+        .focused(true)
         .enable_clipboard_access()
         .initialization_script(include_str!("native_window_probe.js"))
         .on_navigation(move |candidate| {
@@ -239,17 +242,38 @@ pub(super) async fn open(
             );
             display_error(error)
         })?;
-    window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Destroyed) {
+    window.on_window_event(move |event| match event {
+        WindowEvent::Focused(focused) => {
             record(
                 &event_app,
                 &event_label,
-                "info",
-                "native_window.destroyed",
-                "一龙 AI 子窗口已关闭",
-                json!({}),
+                "debug",
+                "native_window.focus_changed",
+                if *focused {
+                    "一龙 AI 子窗口已获得焦点"
+                } else {
+                    "一龙 AI 子窗口已失去焦点"
+                },
+                json!({"focused": focused}),
             );
         }
+        WindowEvent::CloseRequested { .. } => record(
+            &event_app,
+            &event_label,
+            "info",
+            "native_window.close_requested",
+            "一龙 AI 子窗口收到关闭请求",
+            json!({}),
+        ),
+        WindowEvent::Destroyed => record(
+            &event_app,
+            &event_label,
+            "info",
+            "native_window.destroyed",
+            "一龙 AI 子窗口已关闭",
+            json!({}),
+        ),
+        _ => {}
     });
     restore_window(&window)?;
     record(
@@ -258,7 +282,10 @@ pub(super) async fn open(
         "info",
         "native_window.created",
         "一龙 AI 子窗口已创建",
-        json!({}),
+        json!({
+            "parent_label": webview.label(),
+            "window_role": "managed_child",
+        }),
     );
     Ok(response(provider, label, "created"))
 }

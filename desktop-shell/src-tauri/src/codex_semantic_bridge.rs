@@ -12,6 +12,8 @@ use std::{
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 
 const MAX_NATIVE_EVENTS: usize = 600;
+const MAX_PERSISTED_EVENTS: usize = 64;
+const MAX_PERSISTED_HEARTBEATS: usize = 4;
 static PERSIST_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Clone, Debug, Deserialize)]
@@ -114,7 +116,7 @@ fn persist_events(events: &VecDeque<NativeEvent>) {
             "prompt_bodies": false,
             "page_text": false
         },
-        "events": events.iter().rev().take(64).cloned().collect::<Vec<_>>(),
+        "events": diagnostic_snapshot_events(events),
     });
     let Ok(bytes) = serde_json::to_vec(&payload) else {
         return;
@@ -130,6 +132,23 @@ fn persist_events(events: &VecDeque<NativeEvent>) {
         let _ = fs::remove_file(&path);
         let _ = fs::rename(temporary, path);
     }
+}
+
+fn diagnostic_snapshot_events(events: &VecDeque<NativeEvent>) -> Vec<NativeEvent> {
+    let mut heartbeat_count = 0usize;
+    events
+        .iter()
+        .rev()
+        .filter(|event| {
+            if event.kind != "bridge.heartbeat" {
+                return true;
+            }
+            heartbeat_count = heartbeat_count.saturating_add(1);
+            heartbeat_count <= MAX_PERSISTED_HEARTBEATS
+        })
+        .take(MAX_PERSISTED_EVENTS)
+        .cloned()
+        .collect()
 }
 
 fn existing_snapshot_seq(path: &PathBuf, desktop_pid: u32) -> u64 {
@@ -480,5 +499,36 @@ mod tests {
         assert_eq!(existing_snapshot_seq(&path, 41), 99);
         assert_eq!(existing_snapshot_seq(&path, 42), 0);
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn diagnostic_snapshot_keeps_window_events_when_heartbeats_are_noisy() {
+        let event = |seq: u64, kind: &str| NativeEvent {
+            seq,
+            event_id: format!("event-{seq}"),
+            trace_id: "trace".to_string(),
+            level: "debug".to_string(),
+            kind: kind.to_string(),
+            summary: kind.to_string(),
+            at_ms: u128::from(seq),
+            fields: json!({}),
+        };
+        let mut events = VecDeque::new();
+        events.push_back(event(1, "native_window.created"));
+        for seq in 2..=100 {
+            events.push_back(event(seq, "bridge.heartbeat"));
+        }
+
+        let snapshot = diagnostic_snapshot_events(&events);
+        assert_eq!(
+            snapshot
+                .iter()
+                .filter(|item| item.kind == "bridge.heartbeat")
+                .count(),
+            MAX_PERSISTED_HEARTBEATS
+        );
+        assert!(snapshot
+            .iter()
+            .any(|item| item.kind == "native_window.created"));
     }
 }
