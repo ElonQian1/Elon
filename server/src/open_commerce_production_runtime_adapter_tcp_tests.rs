@@ -229,6 +229,35 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(committed["result"]["order_id"], "order-consumer-runtime-1");
     assert_eq!(committed["settlement_receipt"]["funds_moved"], false);
 
+    let events = developer_get(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/events?limit=1"),
+        &live.live_token,
+    )
+    .await;
+    assert_eq!(events["app_id"], PRODUCTION_APP_ID);
+    assert_eq!(events["credential_environment"], "production");
+    assert_eq!(events["events"].as_array().unwrap().len(), 1);
+    assert_eq!(events["events"][0]["invocation_id"], invocation_id);
+    assert_eq!(events["events"][0]["credential_id"], live.credential.id);
+    assert_eq!(events["events"][0]["result_available"], true);
+    assert_eq!(events["events"][0]["funds_moved"], false);
+    assert_developer_event_redacted(&events, &live.live_token);
+
+    let event_detail = developer_get(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/events/{invocation_id}"),
+        &live.live_token,
+    )
+    .await;
+    assert_eq!(event_detail["event"]["invocation_id"], invocation_id);
+    assert_eq!(
+        event_detail["event"]["credential_environment"],
+        "production"
+    );
+    assert_eq!(event_detail["result"], committed["result"]);
+    assert_developer_event_redacted(&event_detail, &live.live_token);
+
     let claims_url = format!("{base_url}/api/open-commerce/adapter/business-handoff-claims");
     let claimed = adapter_post(
         &client,
@@ -286,4 +315,26 @@ async fn developer_post(client: &reqwest::Client, url: &str, token: &str, body: 
         .await
         .unwrap();
     response_json(response).await
+}
+
+async fn developer_get(client: &reqwest::Client, url: &str, token: &str) -> Value {
+    let response = client.get(url).bearer_auth(token).send().await.unwrap();
+    response_json(response).await
+}
+
+fn assert_developer_event_redacted(value: &Value, live_token: &str) {
+    let serialized = value.to_string();
+    for field in [
+        "request_hash",
+        "request_shape",
+        "grant_id",
+        "requester_user_id",
+        "project_id",
+        "live_token",
+        "adapter_token",
+        "lease_token",
+    ] {
+        assert!(!serialized.contains(field), "leaked field: {field}");
+    }
+    assert!(!serialized.contains(live_token), "leaked live credential");
 }

@@ -2,7 +2,7 @@
 title: 开放商业开发者终态调用事件流 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-13
 ---
 
 # 开放商业开发者终态调用事件流 V1
@@ -15,7 +15,7 @@ reviewed_at: 2026-08-11
 
 ## 决定
 
-1. V1 提供测试 Token 认证的终态调用事件列表和单条详情。App 身份完全由 Token 派生，不接受查询参数或请求头另行指定 App。
+1. V1 提供开发者凭据认证的终态调用事件列表和单条详情；默认使用沙箱凭据，生产开关显式启用后也接受当前有效的限权生产凭据。App 身份和凭据环境完全由 Token 派生，不接受查询参数或请求头另行指定 App。
 2. 事件只来自已有 Invocation 从 `started` 进入 `succeeded` 或 `failed` 的终态转换，不创建第二套调用、订单或结算状态机。
 3. V134 追加只增不改的终态序号表。数据库触发器在终态更新或终态插入时原子登记一次，已有终态调用按完成时间回填；唯一约束阻止重复事件。
 4. 列表按全局终态序号升序读取，但查询同时绑定 Token 所属用户、App 和凭据环境。V2 游标包含版本、App ID、凭据环境和最后序号；跨 App、跨环境、非正数或不可解析游标失败关闭。沙箱可兼容没有环境字段的旧 V1 游标，但不会读取平台调用；生产不读取旧来源记录。
@@ -30,6 +30,12 @@ reviewed_at: 2026-08-11
 - `GET /api/open-commerce/developer/events/:invocation_id`：读取当前 App 的单条终态结果。
 - 两个接口都使用 `Authorization: Bearer <developer-credential>`，身份和环境完全由当前沙箱或已启用的生产凭据派生；停用、轮换或重新启用 App 后，旧 Token 不能读取事件。生产凭据入口仍受独立默认关闭开关约束。
 
+## 当前验证边界
+
+- 服务层与 2 项进程内 Axum 专项覆盖沙箱凭据分页、游标/App/环境隔离、同 App 平台事件隐藏、详情越权统一未找到和响应脱敏。
+- 本机真实 TCP 纵向专项在隔离子进程显式开启生产开关，由服务层签发 `oc_live_` 并完成商户运行时调用后，使用同一凭据读取该 App 的 `production` 终态摘要与结果详情；响应不包含完整凭据、原始请求、Grant、内部用户或项目字段。验证指纹为 `ec2dfce09a9cef207f437fd3009d86ff3b43bde350d17bca899e6a1866d0495f`，验证收据为 `8c53c53122bc05740cafe7b6d6f2c31cf893db77b969e295df1c4118c581acd3`。
+- 上述生产专项仍只使用全新 SQLite、本机回环 TCP、本地准入状态和模拟商户/ERP；未验证公网 DNS/TLS、真实组织审核、PC 浏览器、长轮询负载或跨运营方推送。
+
 ## 实现引用
 
 - `server/src/open_commerce_developer_event_api.rs`
@@ -38,4 +44,5 @@ reviewed_at: 2026-08-11
 - `server/src/open_commerce_developer_event_migration.rs`
 - `server/src/open_commerce_developer_event_tests.rs`
 - `server/src/open_commerce_developer_event_api_tests.rs`
+- `server/src/open_commerce_production_runtime_adapter_tcp_tests.rs`
 - `pc-frontend/src/features/open-commerce/DeveloperInvocationEvents.tsx`
