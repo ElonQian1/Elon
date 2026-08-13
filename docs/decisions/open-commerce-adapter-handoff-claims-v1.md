@@ -36,6 +36,7 @@ implementation_status: verified_rust_sqlite_axum_tcp
 ## 实现入口
 
 - 迁移：`server/src/open_commerce_adapter_claim_migration.rs`
+- V137 磁盘升级测试：`server/src/open_commerce_adapter_claim_migration_tests.rs`
 - 领取与验证：`server/src/store/open_commerce_adapter_claims.rs`
 - 原子完成：`server/src/store/open_commerce_business_handoffs.rs`
 - HTTP：`server/src/open_commerce_adapter_claim_api.rs`

@@ -31,6 +31,10 @@ pub(crate) fn fixture() -> Fixture {
         "elon_open_commerce_adapter_claim_{}.db",
         Uuid::new_v4().simple()
     ));
+    fixture_at_path(path)
+}
+
+pub(crate) fn fixture_at_path(path: PathBuf) -> Fixture {
     let store = Store::open(&path).unwrap();
     let owner = store
         .create_user(

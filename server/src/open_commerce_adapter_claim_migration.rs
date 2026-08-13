@@ -188,3 +188,7 @@ mod tests {
         assert_eq!(lease_deadline_column, 1);
     }
 }
+
+#[cfg(test)]
+#[path = "open_commerce_adapter_claim_migration_tests.rs"]
+mod disk_tests;
