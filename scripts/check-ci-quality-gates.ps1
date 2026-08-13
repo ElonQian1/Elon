@@ -63,6 +63,8 @@ $requiredEntries = @(
     "scripts\check-pc-entrypoint-contract.ps1",
     "Feature Parity Audit",
     "scripts\check-feature-parity.ps1",
+    "Project Feature Registry Adoption",
+    "scripts\test-project-feature-registry-adoption.ps1",
     "Document Modularity Guard",
     "scripts\check-document-modularity.ps1",
     "Release Runbook Guard",

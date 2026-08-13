@@ -5,7 +5,7 @@
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
-      "status": "proposed",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/project-feature-registry-adoption-v1.md",
@@ -43,9 +43,88 @@
         "AI_CURRENT 记录启用状态和首批小规模边界",
         "文档及功能工作流回归通过并与需求同提交"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "content_hash": "6aae66dbaaa050c440f8b38002f7301c357604231ec0ff315533c9537b3121e1",
+          "locator": "Project Feature Registry Adoption",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "02f70d58c681b4ed633abf6603bb68ec0dd3505c",
+            "head_blob_oid": "d47da5b6bd13553cca894071140514eb43b03ae8",
+            "worktree_blob_oid": "2c4aa0a2642ad116975eef675023b6d0ea49ed76",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "2e750bbcc9e904f325491a539b2c093a09fb63317e7b2060859428200359434f",
+          "locator": ".elon/project-features.json",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "02f70d58c681b4ed633abf6603bb68ec0dd3505c",
+            "head_blob_oid": "ae631be6c1f8231a21c14beb0f9b51366cd35e08",
+            "worktree_blob_oid": "ae631be6c1f8231a21c14beb0f9b51366cd35e08",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/project-feature-registry-adoption-v1.md",
+          "content_hash": "d20c1ad74fcb07fcd8ed6e4880e9cb022be1f727515e7a4cc65d6b84cb952a3b",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "02f70d58c681b4ed633abf6603bb68ec0dd3505c",
+            "head_blob_oid": "4438f8f14ce42117ff06b6189ac3810a5d96f464",
+            "worktree_blob_oid": "4438f8f14ce42117ff06b6189ac3810a5d96f464",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/check-ci-quality-gates.ps1",
+          "content_hash": "e3d0667e9f3df118739313d13b3f39863ac2ba4c5af4bf6b20b5513a8a6d8294",
+          "locator": "Project Feature Registry Adoption",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "02f70d58c681b4ed633abf6603bb68ec0dd3505c",
+            "head_blob_oid": "125e03aa3f6da7cda9cdb0cdb28515bea4e1c8c9",
+            "worktree_blob_oid": "9fa1724a6d5f00f6c9f4a3c6d2080861e876c8c6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/check-local-quality.ps1",
+          "content_hash": "b7aa8190dc051a4a60c29ce43767164e1ec87b440730b626c84a23a57221b86b",
+          "locator": "Project Feature Registry Adoption",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "02f70d58c681b4ed633abf6603bb68ec0dd3505c",
+            "head_blob_oid": "2c563a8d7a7eb026af4c24907b61b7314d20ba00",
+            "worktree_blob_oid": "ce002c03c6a28db75bd34e738abd4e24fcdbb785",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-project-feature-registry-adoption.ps1",
+          "content_hash": "1b97c20c001490ab988c52cfd4d176065ff4e0895b1c7386a51e1338f7bc4bdc",
+          "locator": "PROJECT_FEATURE_REGISTRY_ADOPTION",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "02f70d58c681b4ed633abf6603bb68ec0dd3505c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2e43cf52ed2df9f14a34ba077035074ed2528bc4",
+            "state": "untracked"
+          }
+        }
+      ],
       "created_at_ms": 1786619748837,
-      "updated_at_ms": 1786619748837
+      "updated_at_ms": 1786620211812
     }
   ],
   "audit_log": [
@@ -58,6 +137,76 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1786619748837
+    },
+    {
+      "id": "feature_event_64aed099c0f449d09293c963e528fea1",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "当前需求范围单一，非目标明确，并以现有 MCP 状态机为实现边界。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786619880203
+    },
+    {
+      "id": "feature_event_d34b7360867245799c7552177a5c51ae",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "需求已评审且无依赖阻塞，可进入首批采用验证。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786619906819
+    },
+    {
+      "id": "feature_event_b25e67ca05df46d6a13257cacb035c45",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786619915876
+    },
+    {
+      "id": "feature_event_cbe6f1d9fe5f414ba502c9f3ebf7b79c",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "开始添加跨 clone 可运行的采用门禁和正式证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786619929645
+    },
+    {
+      "id": "feature_event_dcd7b264a7204a04a960c19bbc3a803a",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786620144978
+    },
+    {
+      "id": "feature_event_ff24f0e7e7664c6db1ed2f68167fac17",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "注册表采用门禁、CI/本地入口和哈希绑定证据均已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786620202693
+    },
+    {
+      "id": "feature_event_219a371078e746ca89b9e8d9dd4a7d0b",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "采用门禁、CI 合约、文档模块化、源码大小、项目入口和项目记忆代理集成回归均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786620211812
     }
   ]
 }

@@ -102,6 +102,7 @@ Invoke-RepoPowerShellScript -Name "Source Size Guard" -ScriptPath "scripts\check
 Invoke-RepoPowerShellScript -Name "Source Ownership Guard" -ScriptPath "scripts\check-source-ownership.ps1"
 Invoke-RepoPowerShellScript -Name "PC Entrypoint Contract" -ScriptPath "scripts\check-pc-entrypoint-contract.ps1"
 Invoke-RepoPowerShellScript -Name "Feature Parity Audit" -ScriptPath "scripts\check-feature-parity.ps1"
+Invoke-RepoPowerShellScript -Name "Project Feature Registry Adoption" -ScriptPath "scripts\test-project-feature-registry-adoption.ps1"
 Invoke-RepoPowerShellScript -Name "Document Modularity Guard" -ScriptPath "scripts\check-document-modularity.ps1"
 Invoke-RepoPowerShellScript -Name "Release Runbook Guard" -ScriptPath "scripts\check-release-runbook.ps1"
 Invoke-RepoPowerShellScript -Name "PC Frontend Publish Guard" -ScriptPath "scripts\test-pc-frontend-only-publish.ps1"
