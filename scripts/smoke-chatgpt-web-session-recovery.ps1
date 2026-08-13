@@ -4,7 +4,7 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
-    [string]$ExpectedHardwareSerial = "",
+    [Parameter(Mandatory = $true)][string]$ExpectedHardwareSerial,
     [ValidateRange(15, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0
@@ -12,26 +12,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
-
-$runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
-    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
-Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
-
-function Wait-ReadySession {
-    $state = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "restored authenticated ChatGPT session" -Predicate {
-            param($state)
-            $state.surface -eq "chatgpt_web" -and
-                $state.bridge_state -eq "ready" -and
-                $state.adapter_current -eq $true -and
-                $state.authenticated -eq $true -and
-                $state.composer_ready -eq $true
-        }
-    Assert-ChatGptWebSmokeAdapterVersion -State $state `
-        -ExpectedAdapterVersion $ExpectedAdapterVersion
-    return $state
-}
 
 function Get-AppPid {
     $result = Invoke-ElonNativeCommand -FilePath $runtime.adb `
@@ -42,111 +24,157 @@ function Get-AppPid {
     return ([string]$result.Stdout).Trim()
 }
 
-function Get-ContextIdentity {
-    $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_get_context"
-    if (
-        [string]::IsNullOrWhiteSpace([string]$context.context_revision) -or
-        [int]$context.message_count -lt 0
-    ) {
-        throw "ChatGPT context identity is unavailable."
-    }
-    return [pscustomobject]@{
-        revision = [string]$context.context_revision
-        message_count = [int]$context.message_count
-        available_message_count = [int]$context.available_message_count
+function Get-Sha256 {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $sha.Dispose()
     }
 }
 
-function Wait-ContextIdentity {
+function Assert-NativeReadyState {
+    param([Parameter(Mandatory = $true)]$State)
+
+    if ($State.active_surface -ne "social_ai" -or
+        [string]$State.social_chat.interaction_mode -ne "chat" -or
+        [string]$State.social_chat.web_chat_provider_id -ne "chatgpt_web" -or
+        [string]$State.social_chat.web_chat_state -ne "ready" -or
+        $State.social_chat.web_chat_composer_ready -ne $true) {
+        throw "Native ChatGPT Web AI chat is not ready."
+    }
+    if ([int]$State.social_chat.web_chat_adapter_version -ne $ExpectedAdapterVersion) {
+        throw "Native ChatGPT Web AI adapter version does not match this recovery run."
+    }
+    if ([int]$State.input.text_length -ne 0) {
+        throw "Native composer draft must be empty before session recovery acceptance."
+    }
+    if ([int]$State.social_chat.web_chat_pending_attachment_count -ne 0 -or
+        [string]$State.social_chat.web_chat_attachment_phase -in @("uploading", "sending")) {
+        throw "Native attachment send must be idle before session recovery acceptance."
+    }
+}
+
+function Get-NativeIdentity {
+    param([Parameter(Mandatory = $true)]$State)
+
+    Assert-NativeReadyState -State $State
+    $conversationPath = [string]$State.social_chat.web_chat_conversation_path
+    $messageCount = [int]$State.social_chat.message_count
+    if ($messageCount -gt 0 -and [string]::IsNullOrWhiteSpace($conversationPath)) {
+        throw "A non-empty native ChatGPT Web AI conversation has no safe restorable path."
+    }
+    $messageShape = @($State.social_chat.messages) | ForEach-Object {
+        $messageId = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.id -MaxLength 220
+        $messageRole = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.role -MaxLength 24
+        "$messageId|$messageRole|$([int]$_.content_chars)"
+    }
+    return [pscustomobject]@{
+        authenticated = $State.social_chat.web_chat_authenticated -eq $true
+        conversation_path = $conversationPath
+        message_count = $messageCount
+        visible_message_count = @($State.social_chat.messages).Count
+        message_shape_sha256 = Get-Sha256 -Value ($messageShape -join "`n")
+    }
+}
+
+function Wait-NativeIdentity {
     param([Parameter(Mandatory = $true)]$Expected)
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
-        $current = Get-ContextIdentity
-        if (
-            $current.revision -eq $Expected.revision -and
-            $current.message_count -eq $Expected.message_count -and
-            $current.available_message_count -eq $Expected.available_message_count
-        ) {
-            return $current
+        $state = Get-ChatGptWebNativeChatState -Runtime $runtime
+        try {
+            $current = Get-NativeIdentity -State $state
+            if ($current.authenticated -eq $Expected.authenticated -and
+                $current.conversation_path -eq $Expected.conversation_path -and
+                $current.message_count -eq $Expected.message_count -and
+                $current.visible_message_count -eq $Expected.visible_message_count -and
+                $current.message_shape_sha256 -eq $Expected.message_shape_sha256) {
+                return [pscustomobject]@{ state = $state; identity = $current }
+            }
+        } catch {
+            if ($_.Exception.Message -notmatch "not ready") { throw }
         }
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "ChatGPT conversation window did not recover before timeout."
+    throw "Native ChatGPT Web AI conversation did not recover before timeout."
 }
 
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-    -EnsureMainActivity | Out-Null
-$before = Wait-ReadySession
-$beforePid = Get-AppPid
-if ([string]::IsNullOrWhiteSpace($beforePid)) { throw "Elon app pid is unavailable before restart." }
-$beforeContext = Get-ContextIdentity
-$beforeMode = [string]$before.view_mode
-
-$restartRequested = $false
-$processStopObserved = $false
+$runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
+    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
+Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
+Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
-    Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-        -Arguments @("shell", "am", "force-stop", "com.elon.app") -TimeoutSec 15 `
-        -Label "force-stop Elon app for session recovery" | Out-Null
-    $restartRequested = $true
-    $stoppedDeadline = [DateTimeOffset]::UtcNow.AddSeconds(15)
-    do {
-        if ([string]::IsNullOrWhiteSpace((Get-AppPid))) { break }
-        Start-Sleep -Seconds 1
-    } while ([DateTimeOffset]::UtcNow -lt $stoppedDeadline)
-    if (-not [string]::IsNullOrWhiteSpace((Get-AppPid))) {
-        throw "Elon app process did not stop before recovery."
-    }
-    $processStopObserved = $true
+    $beforeState = Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $ReadyTimeoutSec
+    $beforeIdentity = Get-NativeIdentity -State $beforeState
+    $beforePid = Get-AppPid
+    if ([string]::IsNullOrWhiteSpace($beforePid)) { throw "Elon app pid is unavailable before restart." }
 
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-        -EnsureMainActivity | Out-Null
-    $after = Wait-ReadySession
-    $afterPid = Get-AppPid
-    $afterContext = Wait-ContextIdentity -Expected $beforeContext
+    $restartRequested = $false
+    $processStopObserved = $false
+    try {
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "am", "force-stop", "com.elon.app") -TimeoutSec 15 `
+            -Label "force-stop Elon app for native session recovery" | Out-Null
+        $restartRequested = $true
+        $stoppedDeadline = [DateTimeOffset]::UtcNow.AddSeconds(15)
+        do {
+            if ([string]::IsNullOrWhiteSpace((Get-AppPid))) { break }
+            Start-Sleep -Seconds 1
+        } while ([DateTimeOffset]::UtcNow -lt $stoppedDeadline)
+        if (-not [string]::IsNullOrWhiteSpace((Get-AppPid))) {
+            throw "Elon app process did not stop before native recovery."
+        }
+        $processStopObserved = $true
 
-    if ([string]::IsNullOrWhiteSpace($afterPid) -or -not $processStopObserved) {
-        throw "Elon app process was not recreated."
-    }
-    if ([string]$after.view_mode -ne $beforeMode) {
-        throw "ChatGPT view mode was not restored after process recreation."
-    }
-    if ($afterContext.revision -ne $beforeContext.revision) {
-        throw "ChatGPT conversation identity changed after process recreation."
-    }
-    if (
-        $afterContext.message_count -ne $beforeContext.message_count -or
-        $afterContext.available_message_count -ne $beforeContext.available_message_count
-    ) {
-        throw "ChatGPT conversation window changed after process recreation."
-    }
+        Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $ReadyTimeoutSec | Out-Null
+        $recovered = Wait-NativeIdentity -Expected $beforeIdentity
+        $afterPid = Get-AppPid
+        if ([string]::IsNullOrWhiteSpace($afterPid) -or -not $processStopObserved) {
+            throw "Elon app process was not recreated."
+        }
 
-    Register-ChatGptWebVerificationCases -Runtime $runtime `
-        -CaseIds @("safe/session_recovery") `
-        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+        $official = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "open_chatgpt_official_fallback"
+        if ($official.target_activity_bound -ne $true) {
+            throw "Official fallback did not bind for recovery evidence registration."
+        }
+        Register-ChatGptWebVerificationCases -Runtime $runtime `
+            -CaseIds @("safe/session_recovery") `
+            -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 8 `
+            -Label "return to native ChatGPT Web AI after recovery evidence" | Out-Null
+        Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $ReadyTimeoutSec | Out-Null
 
-    [ordered]@{
-        schema = "elon.chatgpt_web.session_recovery_smoke.v1"
-        passed = $true
-        device_serial = $DeviceSerial
-        process_recreated = $true
-        process_stop_observed = $true
-        authenticated_restored = $true
-        composer_restored = $true
-        adapter_current = $after.adapter_current -eq $true
-        view_mode_restored = $true
-        conversation_identity_restored = $true
-        context_window_restored = $true
-        sent_messages = 0
-        uploaded_attachments = 0
-        cleared_cookies = $false
-        cleared_app_data = $false
-    } | ConvertTo-Json -Depth 5
-    Write-Output "CHATGPT_WEB_SESSION_RECOVERY_SMOKE_STATUS=passed"
+        [ordered]@{
+            schema = "elon.chatgpt_web.native_session_recovery_smoke.v2"
+            passed = $true
+            native_chat_surface = $true
+            process_recreated = $true
+            process_stop_observed = $true
+            authenticated_state_restored = $recovered.identity.authenticated -eq $beforeIdentity.authenticated
+            anonymous_session_supported = -not $beforeIdentity.authenticated
+            composer_restored = $recovered.state.social_chat.web_chat_composer_ready -eq $true
+            adapter_version_restored = [int]$recovered.state.social_chat.web_chat_adapter_version -eq $ExpectedAdapterVersion
+            conversation_identity_restored = $true
+            context_window_restored = $true
+            private_content_emitted = $false
+            sent_messages = 0
+            uploaded_attachments = 0
+            cleared_cookies = $false
+            cleared_app_data = $false
+        } | ConvertTo-Json -Depth 5
+        Write-Output "CHATGPT_WEB_NATIVE_SESSION_RECOVERY_STATUS=passed"
+    } finally {
+        if ($restartRequested -and [string]::IsNullOrWhiteSpace((Get-AppPid))) {
+            Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $ReadyTimeoutSec | Out-Null
+        }
+    }
 } finally {
-    if ($restartRequested -and [string]::IsNullOrWhiteSpace((Get-AppPid))) {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-            -EnsureMainActivity | Out-Null
-    }
+    Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 }
