@@ -180,14 +180,11 @@ $commandRoot = Join-Path $logRoot "command-files"
 New-Item -ItemType Directory -Path $commandRoot -Force | Out-Null
 $commandToken = "$stamp-$([Guid]::NewGuid().ToString('N'))"
 $commandFile = Join-Path $commandRoot "$commandToken.cmd"
-$commandExitFile = Join-Path $commandRoot "$commandToken.exit"
 [System.IO.File]::WriteAllText(
     $commandFile,
     "@echo off`r`nchcp 65001>nul`r`n" +
-        "call $CommandLine 1>`"$stdoutLog`" 2>`"$stderrLog`"`r`n" +
-        "set `"ELON_COMMAND_EXIT=%errorlevel%`"`r`n" +
-        ">`"$commandExitFile`" echo %ELON_COMMAND_EXIT%`r`n" +
-        "exit /b %ELON_COMMAND_EXIT%`r`n",
+        "cmd /d /s /c `"call $CommandLine`" 1>`"$stdoutLog`" 2>`"$stderrLog`"`r`n" +
+        "exit /b %errorlevel%`r`n",
     [System.Text.UTF8Encoding]::new($false)
 )
 $startedAt = [DateTimeOffset]::UtcNow
@@ -262,13 +259,7 @@ try {
         $exitCode = if ($timedOut) { 124 } else { 125 }
     } else {
         $process.WaitForExit()
-        $recordedExitCode = 0
-        $hasRecordedExitCode = (Test-Path -LiteralPath $commandExitFile -PathType Leaf) -and
-            [int]::TryParse(
-                (Get-Content -LiteralPath $commandExitFile -Raw).Trim(),
-                [ref]$recordedExitCode
-            )
-        $exitCode = if ($hasRecordedExitCode) { $recordedExitCode } else { [int]$process.ExitCode }
+        $exitCode = [int]$process.ExitCode
     }
 } finally {
     $watch.Stop()
@@ -276,7 +267,7 @@ try {
         Stop-CommandProcessTree -RootPid $process.Id
     }
     Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $commandFile, $commandExitFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $commandFile -Force -ErrorAction SilentlyContinue
 }
 
 $stdoutLines = Get-LineCount -Path $stdoutLog

@@ -29,6 +29,10 @@ Assert-True (-not $runnerSource.Contains('[ValidateRange(0, 86400)]')) `
     "Command runner must not allow callers to disable the hard time bounds."
 Assert-True (-not $runnerSource.Contains('$heartbeatCount -lt')) `
     "Command runner must not silently stop heartbeat output while still running."
+Assert-True ($runnerSource.Contains('cmd /d /s /c `"call $CommandLine`"')) `
+    "Command runner must isolate batch-compatible commands in a child cmd process."
+Assert-True ($runnerSource.Contains('$exitCode = [int]$process.ExitCode')) `
+    "Command runner must use the wrapper process exit code."
 $gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
 if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
     $gitCommonDir = Join-Path $repoRoot $gitCommonDir
@@ -41,6 +45,7 @@ $failureFixture = Join-Path $fixtureRoot "failure.cmd"
 $timeoutFixture = Join-Path $fixtureRoot "timeout.cmd"
 $silentFixture = Join-Path $fixtureRoot "silent.cmd"
 $heartbeatFixture = Join-Path $fixtureRoot "heartbeat.cmd"
+$nestedFailureFixture = Join-Path $fixtureRoot "nested-failure.cmd"
 
 Set-Content -LiteralPath $successFixture -Encoding ASCII -Value @(
     "@echo off",
@@ -66,6 +71,11 @@ Set-Content -LiteralPath $heartbeatFixture -Encoding ASCII -Value @(
     "@echo off",
     "powershell -NoProfile -Command `"Start-Sleep -Seconds 6; Write-Output heartbeat-complete`"",
     "exit /b 0"
+)
+Set-Content -LiteralPath $nestedFailureFixture -Encoding ASCII -Value @(
+    "@echo off",
+    "echo error: nested batch failure 1>&2",
+    "exit /b 9"
 )
 
 $oldPreference = $ErrorActionPreference
@@ -114,6 +124,12 @@ try {
         -HeartbeatSeconds 5 `
         -CommandLine "`"$heartbeatFixture`"" 2>&1)
     $heartbeatExit = $LASTEXITCODE
+
+    $nestedFailureOutput = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -LogName "bounded-nested-failure" `
+        -WorkingDirectory $repoRoot `
+        -CommandLine "`"$nestedFailureFixture`"" 2>&1)
+    $nestedFailureExit = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
 }
@@ -152,6 +168,12 @@ $heartbeatText = $heartbeatOutput -join "`n"
 Assert-True ($heartbeatExit -eq 0) "Heartbeat fixture must complete successfully."
 Assert-True ($heartbeatText.Contains("AI_COMMAND_PROGRESS=running")) `
     "A running command must emit a heartbeat before it completes."
+
+$nestedFailureText = $nestedFailureOutput -join "`n"
+Assert-True ($nestedFailureExit -eq 9) `
+    "Nested batch failure must preserve the called script exit code."
+Assert-True ($nestedFailureText.Contains("AI_COMMAND_STATUS=failed")) `
+    "Nested batch failure summary is missing."
 
 $recoveryName = "bounded-recovery-$([Guid]::NewGuid().ToString('N'))"
 $recoveryBase = Join-Path $commandLogRoot "$recoveryName-20000101-000000-000"
