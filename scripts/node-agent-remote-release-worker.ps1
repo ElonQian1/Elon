@@ -20,7 +20,11 @@ function Write-OutboxWorkerLog {
 
 function Resolve-EventSourceWorktree {
     param($Event)
-    $sourceRoot = Join-Path $OutboxRoot (Join-Path 'sources' ([string]$Event.git_sha))
+    # Keep the reconstructed checkout shallow enough for Windows PowerShell 5.1/.NET,
+    # which can still fail to read a file at the legacy MAX_PATH boundary even when
+    # Git itself is configured with core.longpaths=true.
+    $sourceRoot = Join-Path (Split-Path -Parent $OutboxRoot) `
+        (Join-Path 'rs' ([string]$Event.git_sha))
     $manifest = Join-Path $sourceRoot 'scripts\publish-node-agent.ps1'
     if (Test-Path -LiteralPath $manifest -PathType Leaf) {
         $actual = (& git -C $sourceRoot rev-parse HEAD 2>$null | Select-Object -First 1)

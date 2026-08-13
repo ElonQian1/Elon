@@ -621,6 +621,8 @@ try {
         'PS5.1 worker must judge git worktree recovery by exit code instead of stderr progress'
     Assert-True ($workerText.Contains('git -c core.longpaths=true --git-dir=$gitDir worktree add')) `
         'Windows outbox recovery must support repository paths beyond the legacy MAX_PATH limit'
+    Assert-True ($workerText.Contains("Join-Path 'rs' ([string]`$Event.git_sha)")) `
+        'reconstructed outbox sources must leave headroom for PowerShell 5.1 MAX_PATH reads'
     Assert-True ($workerText.Contains('Git detail: $gitDetail')) `
         'failed immutable source reconstruction must preserve actionable Git diagnostics'
 
