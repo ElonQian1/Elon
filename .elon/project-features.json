@@ -123,6 +123,68 @@
       "updated_at_ms": 1786625457423
     },
     {
+      "id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "title": "V253 Provider 凭据续签运行验收",
+      "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/distributed-compute/external-pool-adapter-credential-reattestation-authority.md",
+        "content_hash": "8e6481a0c9c5cbc0128325fe2ddd3ba9d72fa0d8c1f2a58a9db4173bba6052c4",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "a573fd9a9abb5e1a90e2484fe99c0f59a6e599d4",
+          "head_blob_oid": "86f877fc1a0936a23161791d99c18b71a3bab54b",
+          "worktree_blob_oid": "86f877fc1a0936a23161791d99c18b71a3bab54b",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security",
+      "tags": [
+        "distributed-compute",
+        "external-pool-adapter",
+        "v253",
+        "credential",
+        "verification"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "AI_INDEX.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/external-pool-adapter-credential-reattestation-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-credential-reattestation-authority.md",
+        "server/src/compute_federation/external_pool_adapter_credential_reattestation_api.rs",
+        "server/src/compute_federation/external_pool_adapter_credential_reattestation_service.rs",
+        "server/src/compute_federation/external_pool_adapter_release_api_tests/credential_reattestation_http_test.rs",
+        "server/src/compute_federation/external_pool_adapter_release_api_tests/credential_reattestation_test_support.rs",
+        "server/src/store/compute_external_pool_adapter_credential_reattestation.rs",
+        "server/src/store_migrations/compute_external_pool_adapter_credential_reattestation.rs",
+        "server/src/store_migrations/compute_external_pool_adapter_credential_reattestation/tests.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "V253 源码完成 Rust server 真实编译",
+        "fresh/repeat migration 与 Store 列合同测试通过",
+        "管理员 HTTP 覆盖 genesis、幂等重放、successor、撤销、失败分类和响应脱敏",
+        "registering 到紧邻 active 桥及 later active 续签通过",
+        "测试证明 route、执行、用量、结算和付款零旁路效果",
+        "权威文档更新为实际通过项并保留生产与 activation NO-GO 边界"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_4b8a9096e44144859f303df64415f572",
+        "agent_id": "codex-goal-019f3b86",
+        "claimed_at_ms": 1786629844445,
+        "expires_at_ms": 1786644244445
+      },
+      "created_at_ms": 1786629844411,
+      "updated_at_ms": 1786629844457
+    },
+    {
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
@@ -953,6 +1015,46 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786629063314
+    },
+    {
+      "id": "feature_event_b1087a6786a9409fb5d7a8ca8fcf6303",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "AI_CURRENT 明确标记 V253 源码已接线但 passed=0，本批只做本地运行验收与必要修复。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1786629844411
+    },
+    {
+      "id": "feature_event_365aa74233b445b4bcb987da4ba007e7",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "V253 authority 和验收矩阵已 current，任务不依赖外部平台、真实资金或生产密钥。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786629844433
+    },
+    {
+      "id": "feature_event_90469518c36d4a4f95f469c92a611eae",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786629844446
+    },
+    {
+      "id": "feature_event_8b18fee9c1774006a764877b910fad2a",
+      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "开始真实编译、migration 与进程内 HTTP 验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786629844457
     }
   ]
 }
