@@ -255,8 +255,9 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-        -EnsureMainActivity | Out-Null
+    # Preserve the isolated conversation between supervised phases. Reopening the
+    # entry action can navigate back to the previously persisted conversation.
+    Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
     $ready = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
         -TimeoutSec $TimeoutSec -InitialWaitSec ([Math]::Min(15, $TimeoutSec))
     Assert-AudioContract -State $ready

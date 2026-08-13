@@ -37,6 +37,7 @@ foreach ($required in @(
     'Assert-ChatGptWebSmokeTrustedDevice',
     'Assert-ChatGptWebSmokeAdapterVersion',
     'Wait-ChatGptWebSmokeAuthenticatedReady',
+    'Open-ChatGptWebSmokeSurface -Runtime $runtime',
     'Start-ChatGptWebSmokeAwakeLease',
     'Stop-ChatGptWebSmokeAwakeLease',
     'conversation_binding_sha256',
@@ -87,6 +88,10 @@ foreach ($required in @(
     '-Status "passed"'
 )) {
     Assert-Contains $required
+}
+
+if ($source.Contains('-Action "open_chatgpt_web"')) {
+    throw "Audio lifecycle phases must preserve the isolated conversation instead of reopening the entry route."
 }
 
 foreach ($forbidden in @(
