@@ -144,6 +144,11 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId,
     )
 
+    fun openProject(path: String) = runCommand(
+        action = "open_project",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+    )
+
     fun startGoogleLogin() = runCommand("start_google_login")
 
     fun listModelOptions(requestId: String? = null) = runCommand("list_model_options", requestId = requestId)
@@ -331,7 +336,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 93
+        internal const val ADAPTER_VERSION = 94
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

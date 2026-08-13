@@ -12,6 +12,10 @@ class ChatGptWebConversationPathTest {
             "/c/demo-123",
             ChatGptWebConversationPath.fromUrl("https://chatgpt.com/c/demo-123?temporary=true"),
         )
+        assertEquals(
+            "/g/g-p-demo/c/project-chat",
+            ChatGptWebConversationPath.normalize("/g/g-p-demo/c/project-chat"),
+        )
         assertNull(ChatGptWebConversationPath.normalize("/g/demo"))
         assertNull(ChatGptWebConversationPath.normalize("https://chatgpt.com/c/demo"))
         assertNull(ChatGptWebConversationPath.normalize("/c/../auth/login"))

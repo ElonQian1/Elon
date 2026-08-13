@@ -294,7 +294,8 @@ class ChatGptWebProtocolTest {
                   "steps":4
                 },
                 "conversations":[
-                  {"id":"one","title":"第一场会话","path":"/c/one","active":true},
+                  {"id":"one","title":"第一场会话","path":"/c/one","active":true,"groupLabel":"今天","activityDates":["2026-08-14"]},
+                  {"id":"project-chat","title":"项目会话","path":"/g/g-p-demo/c/project-chat","projectId":"g-p-demo","projectTitle":"安卓项目","projectPath":"/g/g-p-demo/project","activityDates":["2026-08-13"]},
                   {"id":"bad","title":"越界地址","path":"https://example.com/c/bad"},
                   {"id":"blank","title":"  ","path":"/c/blank"}
                 ]
@@ -303,16 +304,19 @@ class ChatGptWebProtocolTest {
             """.trimIndent(),
         ) as ChatGptWebEvent.ConversationList
 
-        assertEquals(1, event.conversations.size)
-        assertEquals("第一场会话", event.conversations.single().title)
-        assertTrue(event.conversations.single().active)
+        assertEquals(2, event.conversations.size)
+        assertEquals("第一场会话", event.conversations.first().title)
+        assertTrue(event.conversations.first().active)
+        assertEquals("今天", event.conversations.first().groupLabel)
+        assertEquals(setOf("2026-08-14"), event.conversations.first().activityDates)
+        assertEquals("g-p-demo", event.conversations.last().projectId)
         assertTrue(event.collection.scrollerFound)
         assertTrue(event.collection.scrolled)
         assertTrue(event.collection.scrollRestored)
         assertTrue(event.collection.reachedEnd)
         assertFalse(event.collection.truncated)
         assertFalse(event.collection.timedOut)
-        assertEquals(1, event.collection.observedCount)
+        assertEquals(2, event.collection.observedCount)
         assertEquals(4, event.collection.steps)
     }
 

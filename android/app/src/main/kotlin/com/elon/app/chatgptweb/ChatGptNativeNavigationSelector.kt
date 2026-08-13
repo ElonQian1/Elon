@@ -14,6 +14,13 @@ internal object ChatGptNativeNavigationSelector {
     const val REALTIME_VOICE = "chatgpt-native:realtime-voice:实时语音"
     const val SEND = "chatgpt-native:send:发送"
     const val STOP = "chatgpt-native:stop:停止生成"
+    const val DATE_TAB = "chatgpt-native:sidebar-date:每日会话"
+    const val PROJECTS_TAB = "chatgpt-native:sidebar-projects:项目"
+    const val SEARCH = "chatgpt-native:sidebar-search:搜索会话"
+    const val STATUS = "chatgpt-native:sidebar-status:会话索引状态"
+
+    fun date(value: java.time.LocalDate): String =
+        "chatgpt-native:sidebar-date:${value}"
 
     fun conversation(value: ChatGptWebConversation): String = selector(
         prefix = "chatgpt-conversation",
@@ -25,6 +32,12 @@ internal object ChatGptNativeNavigationSelector {
         prefix = "chatgpt-feature",
         id = value.id,
         label = value.label,
+    )
+
+    fun project(value: ChatGptWebProject): String = selector(
+        prefix = "chatgpt-project",
+        id = value.id,
+        label = value.title,
     )
 
     fun composerOption(section: String, value: ChatGptWebComposerOption): String = selector(

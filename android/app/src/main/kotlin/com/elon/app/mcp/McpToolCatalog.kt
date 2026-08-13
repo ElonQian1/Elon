@@ -211,6 +211,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("region", stringProperty("Optional region filter for chatgpt_find_controls."))
                         .put("context_id", stringProperty("Optional message or conversation context id for chatgpt_find_controls."))
                         .put("conversation_path", stringProperty("Official ChatGPT conversation path such as /c/example."))
+                        .put("project_path", stringProperty("Official ChatGPT project path such as /g/g-p-example/project."))
                         .put("view_mode", stringProperty("ChatGPT view mode: native, official, or login."))
                         .put("section", stringProperty("ChatGPT composer section model or tools; also filters chatgpt_get_navigation."))
                         .put("offset", intProperty("Zero-based page offset for ChatGPT control and conversation queries."))

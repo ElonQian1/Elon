@@ -304,8 +304,8 @@ internal class ChatGptWebMcpActions(
                 }
             }
             "chatgpt_open_conversation" -> {
-                val path = args.optString("conversation_path")
-                if (!CONVERSATION_PATH.matches(path)) return error(action, "invalid_conversation_path")
+                val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
+                    ?: return error(action, "invalid_conversation_path")
                 dispatch("open_conversation") { requestId ->
                     commands.openConversation(path, requestId)
                 }
@@ -455,6 +455,7 @@ internal class ChatGptWebMcpActions(
             .put("query", query)
             .put("cached_at_ms", observed.updatedAtMs)
             .put("source_count", observed.conversations.size)
+            .put("project_count", observed.projects.size)
             .put("source", observed.conversationCollection.source)
             .put("stale", observed.conversationCollection.stale)
             .put("collection", ChatGptWebConversationCollectionJson.encode(observed.conversationCollection))
@@ -470,6 +471,11 @@ internal class ChatGptWebMcpActions(
                         .put("title", conversation.title)
                         .put("path", conversation.path)
                         .put("active", conversation.active)
+                        .put("group_label", conversation.groupLabel)
+                        .put("project_id", conversation.projectId ?: JSONObject.NULL)
+                        .put("project_title", conversation.projectTitle ?: JSONObject.NULL)
+                        .put("project_path", conversation.projectPath ?: JSONObject.NULL)
+                        .put("activity_dates", JSONArray(conversation.activityDates.sorted()))
                         .put("native_action", "chatgpt_open_conversation")
                         .put(
                             "native_adb_content_description",
@@ -705,7 +711,6 @@ internal class ChatGptWebMcpActions(
         const val NAVIGATION_SCHEMA = "elon.chatgpt_web.navigation.v2"
         const val CONVERSATION_SUMMARY_SCHEMA = "elon.chatgpt_web.conversation_summary.v2"
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
-        val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
         val COMPOSER_SECTIONS = setOf("model", "tools")
         val LOCAL_ACTIONS = setOf(
             "state",

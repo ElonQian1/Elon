@@ -482,7 +482,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         when (event) {
             is ChatGptWebEvent.AdapterReady -> Unit
             is ChatGptWebEvent.ConversationList -> {
-                conversationHistoryStore.save(event.conversations)
+                conversationHistoryStore.save(event.conversations, event.projects)
                 conversationListController.render(
                     event.conversations,
                     observedMcpState.snapshot().conversationCollection,

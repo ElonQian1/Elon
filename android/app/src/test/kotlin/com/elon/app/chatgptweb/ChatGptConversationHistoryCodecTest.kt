@@ -11,7 +11,14 @@ class ChatGptConversationHistoryCodecTest {
         val encoded = ChatGptConversationHistoryCodec.encode(
             ChatGptConversationHistoryCache(
                 conversations = listOf(
-                    ChatGptWebConversation("one", "第一场会话", "/c/one", active = true),
+                    ChatGptWebConversation(
+                        "one",
+                        "第一场会话",
+                        "/c/one",
+                        active = true,
+                        groupLabel = "今天",
+                        activityDates = setOf("2026-08-14"),
+                    ),
                     ChatGptWebConversation("two", "第二场会话", "/c/two", active = false),
                 ),
                 savedAtMs = 1234L,
@@ -23,6 +30,8 @@ class ChatGptConversationHistoryCodecTest {
         assertEquals(1234L, decoded.savedAtMs)
         assertEquals(listOf("/c/one", "/c/two"), decoded.conversations.map { it.path })
         assertFalse(decoded.conversations.any { it.active })
+        assertEquals("今天", decoded.conversations.first().groupLabel)
+        assertEquals(setOf("2026-08-14"), decoded.conversations.first().activityDates)
     }
 
     @Test

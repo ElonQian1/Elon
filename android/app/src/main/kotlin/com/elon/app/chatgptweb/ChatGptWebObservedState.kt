@@ -6,6 +6,8 @@ internal class ChatGptWebObservedState(
 ) {
     private var conversations: List<ChatGptWebConversation> =
         initialConversationHistory?.conversations.orEmpty()
+    private var projects: List<ChatGptWebProject> =
+        initialConversationHistory?.projects.orEmpty()
     private var conversationCollection = initialConversationHistory?.let {
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
@@ -23,7 +25,11 @@ internal class ChatGptWebObservedState(
         val observedAtMs = nowMs()
         when (event) {
             is ChatGptWebEvent.ConversationList -> {
-                conversations = event.conversations
+                conversations = ChatGptWebConversationIndex.merge(conversations, event.conversations)
+                projects = ChatGptWebConversationIndex.projects(
+                    conversations,
+                    event.projects + projects,
+                )
                 conversationCollection = event.collection.copy(
                     source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
                     stale = false,
@@ -59,6 +65,7 @@ internal class ChatGptWebObservedState(
 
     fun clearConversationHistory() {
         conversations = emptyList()
+        projects = emptyList()
         conversationCollection = ChatGptWebConversationCollection()
         updatedAtMs = nowMs()
     }
@@ -120,8 +127,7 @@ internal class ChatGptWebObservedState(
     }
 
     private fun updateActiveConversation(rawUrl: String) {
-        val path = runCatching { java.net.URI(rawUrl).path.orEmpty() }.getOrDefault("")
-        if (!path.startsWith("/c/")) return
+        val path = ChatGptWebConversationPath.fromUrl(rawUrl) ?: return
         conversations = conversations.map { it.copy(active = it.path == path) }
     }
 
@@ -138,6 +144,7 @@ internal class ChatGptWebObservedState(
         expirePendingCommands()
         return Snapshot(
             conversations = conversations,
+            projects = projects,
             features = features,
             composerSections = composerSections,
             lastCommand = lastCommand,
@@ -200,12 +207,21 @@ internal class ChatGptWebObservedState(
         val conversationCollection: ChatGptWebConversationCollection = ChatGptWebConversationCollection(
             observedCount = conversations.size,
         ),
+        val projects: List<ChatGptWebProject> = emptyList(),
     ) {
         val adapterCurrent: Boolean
             get() = pageGeneration > 0 && adapterGeneration == pageGeneration
 
         companion object {
-            val EMPTY = Snapshot(emptyList(), emptyList(), emptyMap(), null, emptyList(), 0L)
+            val EMPTY = Snapshot(
+                conversations = emptyList(),
+                projects = emptyList(),
+                features = emptyList(),
+                composerSections = emptyMap(),
+                lastCommand = null,
+                commandRequests = emptyList(),
+                updatedAtMs = 0L,
+            )
         }
     }
 

@@ -39,7 +39,7 @@ internal class ChatSideMenuController(
     private val renameConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
     private val showProjectShareSideMenu: () -> Boolean,
-    private val socialSideMenu: ChatSocialSideMenuCoordinator,
+    private val sideMenus: ChatSideMenuContentSources,
     private val projects: () -> List<AppProject>,
     private val activeProjectIndex: () -> Int,
     private val openPersonalProject: (Int) -> Unit,
@@ -115,7 +115,7 @@ internal class ChatSideMenuController(
             translationZ = dp(48).toFloat()
             setOnClickListener { close() }
             setOnDragListener { _, event ->
-                socialSideMenu.handleDrag(event, panel.width, this) { close(animate = true) }
+                sideMenus.social.handleDrag(event, panel.width, this) { close(animate = true) }
                     ?: handleChatProjectSideMenuDrag(event, showProjectShareSideMenu(), panel.width, this, binding.contentContainer, { close(animate = true) }, sendProjectShare)
             }
         }
@@ -415,7 +415,14 @@ internal class ChatSideMenuController(
         )
         projectMenuView.visibility = View.GONE
 
-        socialSideMenu.attach(panel, { animate -> close(animate) }, { toggleSettingsBubble() }, dp, selectableForeground)
+        sideMenus.social.attach(panel, { animate -> close(animate) }, { toggleSettingsBubble() }, dp, selectableForeground)
+        sideMenus.webChat.attach(
+            panel,
+            { animate -> close(animate) },
+            { toggleSettingsBubble() },
+            dp,
+            selectableForeground,
+        )
 
         settingsBubble = buildSettingsBubble()
         panel.addView(
@@ -428,29 +435,13 @@ internal class ChatSideMenuController(
         )
     }
 
-    private fun applyContentMode() {
-        when {
-            showProjectShareSideMenu() -> {
-                aiMenuView.visibility = View.GONE
-                aiMenuView.stopAnimations()
-                projectMenuView.visibility = View.GONE
-                socialSideMenu.show()
-            }
-            isConversationHomeVisible() -> {
-                aiMenuView.visibility = View.GONE
-                aiMenuView.stopAnimations()
-                socialSideMenu.hide()
-                projectMenuView.visibility = View.VISIBLE
-                projectMenuView.render()
-            }
-            else -> {
-                projectMenuView.visibility = View.GONE
-                socialSideMenu.hide()
-                aiMenuView.visibility = View.VISIBLE
-                aiMenuView.render()
-            }
-        }
-    }
+    private fun applyContentMode() = applyChatSideMenuContentMode(
+        aiMenuView,
+        projectMenuView,
+        sideMenus,
+        showProjectShareSideMenu(),
+        isConversationHomeVisible(),
+    )
     private fun isConversationHomeVisible(): Boolean = binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE
     private fun isSideMenuHandleContextActive(): Boolean = binding.chatPage.visibility == View.VISIBLE
     private fun buildSettingsBubble(): FrameLayout {

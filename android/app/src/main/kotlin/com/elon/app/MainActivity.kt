@@ -738,7 +738,7 @@ class MainActivity : AppCompatActivity() {
             renameConversation = { index -> conversationActions.showRenameConversationDialog(index) },
             isConversationWorking = homeListActions::isConversationWorking,
             showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
-            socialSideMenu = chatSocialSidebarActions.coordinator,
+            sideMenus = ChatSideMenuContentSources(chatSocialSidebarActions.coordinator, socialAiChatFeature.createWebChatSideMenuCoordinator()),
             projects = { s.projects },
             activeProjectIndex = { s.activeProjectIndex },
             openPersonalProject = { index ->

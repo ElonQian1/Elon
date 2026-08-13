@@ -211,6 +211,47 @@ class ChatGptWebObservedStateTest {
         assertTrue(snapshot.conversationCollection.stale)
     }
 
+    @Test
+    fun projectChatsRemainActiveAndProjectMetadataSurvivesSparseRefreshes() {
+        val path = "/g/g-p-demo/c/chat-one"
+        val state = ChatGptWebObservedState()
+        state.accept(ChatGptWebEvent.ConversationList(
+            conversations = listOf(ChatGptWebConversation(
+                id = "chat-one",
+                title = "项目会话",
+                path = path,
+                active = false,
+                projectId = "g-p-demo",
+                projectTitle = "安卓项目",
+                projectPath = "/g/g-p-demo/project",
+                activityDates = setOf("2026-08-13"),
+            )),
+            projects = listOf(ChatGptWebProject("g-p-demo", "安卓项目", "/g/g-p-demo/project")),
+        ))
+        state.accept(ChatGptWebEvent.ConversationList(listOf(
+            ChatGptWebConversation("chat-one", "项目会话", path, active = false),
+        )))
+        state.accept(ChatGptWebEvent.Snapshot(ChatGptWebSnapshot(
+            title = "项目会话",
+            url = "https://chatgpt.com$path",
+            draft = "",
+            messages = emptyList(),
+            authenticated = true,
+            composerReady = true,
+            streaming = false,
+            dictationActive = false,
+            currentModel = "",
+            attachments = emptyList(),
+            capabilities = ChatGptWebCapabilities.EMPTY,
+        )))
+
+        val snapshot = state.snapshot()
+        assertTrue(snapshot.conversations.single().active)
+        assertEquals("安卓项目", snapshot.conversations.single().projectTitle)
+        assertEquals("安卓项目", snapshot.projects.single().title)
+        assertEquals(setOf("2026-08-13"), snapshot.conversations.single().activityDates)
+    }
+
     private fun document(page: Long, adapter: Long) = ChatGptWebDocumentSession.Snapshot(
         pageGeneration = page,
         adapterGeneration = adapter,

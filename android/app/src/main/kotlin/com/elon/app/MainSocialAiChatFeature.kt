@@ -22,6 +22,7 @@ internal class MainSocialAiChatFeature(
     private val showWorkModelSelector: () -> Unit,
     private val updateWorkModel: () -> Unit,
 ) {
+    private var onWebChatNavigationChanged: () -> Unit = {}
     private val webChatController: ChatGptSocialChatController by lazy {
         ChatGptSocialChatController(
             activity = activity,
@@ -31,6 +32,7 @@ internal class MainSocialAiChatFeature(
             clearPendingSendState = clearPendingSendState,
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
+            onConversationIndexChanged = { onWebChatNavigationChanged() },
         )
     }
     private val modeController: SocialAiChatModeController by lazy {
@@ -87,6 +89,27 @@ internal class MainSocialAiChatFeature(
 
     fun webChatConversationPath(): String? = webChatController.currentConversationPath()
 
+    fun webChatConversationIndex() = webChatController.conversationIndex()
+
+    fun createWebChatSideMenuCoordinator(): com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator {
+        lateinit var coordinator: com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator
+        coordinator = com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator(
+            activity = activity,
+            index = ::webChatConversationIndex,
+            refreshIndex = ::refreshWebChatConversationIndex,
+            newConversation = { startNewWebChatConversation() },
+            openConversation = ::openWebChatConversation,
+            openProject = ::openWebChatProject,
+            openOfficialFallback = ::openOfficialFallback,
+            active = ::isChatModeActive,
+        )
+        onWebChatNavigationChanged = coordinator::onIndexChanged
+        return coordinator
+    }
+
+    fun refreshWebChatConversationIndex(): Boolean =
+        isChatModeActive() && webChatController.requestConversationIndex()
+
     fun startNewWebChatConversation(): Boolean {
         if (!isChatModeActive() || webChatState() != "ready") return false
         webChatController.startNewConversation()
@@ -95,6 +118,9 @@ internal class MainSocialAiChatFeature(
 
     fun openWebChatConversation(path: String): Boolean =
         isChatModeActive() && webChatController.openConversation(path)
+
+    fun openWebChatProject(path: String): Boolean =
+        isChatModeActive() && webChatController.openProject(path)
 
     fun discardWebChatAcceptanceAttachmentSend(): Boolean =
         webChatController.discardAcceptanceAttachmentSend()

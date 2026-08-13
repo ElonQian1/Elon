@@ -14,6 +14,7 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
+import java.time.LocalDate
 
 internal class ChatGptBackgroundSession(
     private val activity: AppCompatActivity,
@@ -23,6 +24,7 @@ internal class ChatGptBackgroundSession(
     private val onComposerOptions: (List<ChatGptWebComposerOption>) -> Unit,
     private val onCommandResult: (ChatGptWebEvent.CommandResult) -> Unit,
     private val onAttachmentSendChanged: (ChatGptWebAttachmentSendUpdate) -> Unit,
+    private val onConversationIndexChanged: (ChatGptWebConversationIndexState) -> Unit,
 ) {
     enum class State(val wireValue: String) {
         IDLE("idle"),
@@ -37,6 +39,8 @@ internal class ChatGptBackgroundSession(
     private val sessionContinuity = ChatGptWebSessionContinuity()
     private val proxyController = ChatGptWebProxyController(activity)
     private val uploadStager = ChatGptWebUploadStager(activity)
+    private val conversationHistoryStore = ChatGptConversationHistoryStore(activity)
+    private val restoredConversationHistory = conversationHistoryStore.restore()
     private val attachmentHandler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
@@ -46,12 +50,19 @@ internal class ChatGptBackgroundSession(
     private var queuedUploadUris = emptyList<Uri>()
     private var attachmentSendTracker: ChatGptWebAttachmentSendTracker? = null
     private var lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
+    private var conversations = restoredConversationHistory?.conversations.orEmpty()
+    private var projects = restoredConversationHistory?.projects.orEmpty()
+    private var conversationCollection = restoredConversationHistory?.let {
+        ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
+    } ?: ChatGptWebConversationCollection()
+    private var conversationListRequested = false
 
     fun activate() {
         ensureInitialized()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
         latestSnapshot?.let(onSnapshot)
+        onConversationIndexChanged(conversationIndex())
     }
 
     fun onHostResumed() {
@@ -67,6 +78,25 @@ internal class ChatGptBackgroundSession(
     }
 
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
+
+    fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
+        conversations = conversations,
+        projects = ChatGptWebConversationIndex.projects(conversations, projects),
+        collection = conversationCollection,
+    )
+
+    fun requestConversationIndex(): Boolean {
+        val adapter = pageAdapter ?: return false
+        if (state != State.READY) return false
+        conversationCollection = conversationCollection.copy(
+            stale = conversations.isNotEmpty(),
+            officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
+        )
+        onConversationIndexChanged(conversationIndex())
+        conversationListRequested = true
+        adapter.listConversations()
+        return true
+    }
 
     fun state(): State = state
 
@@ -128,6 +158,13 @@ internal class ChatGptBackgroundSession(
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
         if (state != State.READY) return false
         pageAdapter?.openConversation(normalized) ?: return false
+        return true
+    }
+
+    fun openProject(path: String): Boolean {
+        val normalized = ChatGptWebConversationPath.normalizeProject(path) ?: return false
+        if (state != State.READY) return false
+        pageAdapter?.openProject(normalized) ?: return false
         return true
     }
 
@@ -195,6 +232,7 @@ internal class ChatGptBackgroundSession(
         )
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
+                conversationListRequested = false
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
             },
@@ -237,6 +275,20 @@ internal class ChatGptBackgroundSession(
             is ChatGptWebEvent.Snapshot -> {
                 val snapshot = sessionContinuity.reconcile(event.value)
                 latestSnapshot = snapshot
+                ChatGptWebConversationPath.fromUrl(snapshot.url)?.let { activePath ->
+                    conversations = conversations.map { conversation ->
+                        conversation.copy(
+                            active = conversation.path == activePath,
+                            activityDates = if (conversation.path == activePath) {
+                                conversation.activityDates + LocalDate.now().toString()
+                            } else {
+                                conversation.activityDates
+                            },
+                        )
+                    }
+                    conversationHistoryStore.save(conversations, projects)
+                    onConversationIndexChanged(conversationIndex())
+                }
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
                         pageAdapter?.markLoginRequired()
@@ -245,6 +297,12 @@ internal class ChatGptBackgroundSession(
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
                         pageAdapter?.markReady()
                         updateState(State.READY)
+                        if (
+                            !conversationListRequested &&
+                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST)
+                        ) {
+                            requestConversationIndex()
+                        }
                     }
                     else -> updateState(State.LOADING)
                 }
@@ -260,11 +318,32 @@ internal class ChatGptBackgroundSession(
                 if (event.ok) {
                     pageAdapter?.requestSnapshot()
                 } else {
+                    if (event.action == "list_conversations") {
+                        conversationCollection = conversationCollection.copy(
+                            stale = conversations.isNotEmpty(),
+                            officialLoadState = ChatGptWebConversationCollection.LOAD_FAILED,
+                        )
+                        onConversationIndexChanged(conversationIndex())
+                    }
                     onStateChanged(state, event.detail.ifBlank { "官网操作失败" })
                 }
             }
+            is ChatGptWebEvent.ConversationList -> {
+                conversations = ChatGptWebConversationIndex.merge(conversations, event.conversations)
+                projects = ChatGptWebConversationIndex.projects(
+                    conversations,
+                    event.projects + projects,
+                )
+                conversationCollection = event.collection.copy(
+                    source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+                    stale = false,
+                    officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
+                    cachedAtMs = System.currentTimeMillis(),
+                )
+                conversationHistoryStore.save(conversations, projects)
+                onConversationIndexChanged(conversationIndex())
+            }
             is ChatGptWebEvent.AdapterReady,
-            is ChatGptWebEvent.ConversationList,
             is ChatGptWebEvent.FeatureNavigation,
             is ChatGptWebEvent.UiManifest -> Unit
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
@@ -403,3 +482,9 @@ internal class ChatGptBackgroundSession(
         const val ATTACHMENT_TIMEOUT_MS = 120_000L
     }
 }
+
+internal data class ChatGptWebConversationIndexState(
+    val conversations: List<ChatGptWebConversation> = emptyList(),
+    val projects: List<ChatGptWebProject> = emptyList(),
+    val collection: ChatGptWebConversationCollection = ChatGptWebConversationCollection(),
+)

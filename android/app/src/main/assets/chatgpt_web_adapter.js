@@ -415,6 +415,12 @@
       }
       return conversationAdapter.openConversation(String(command.value || ''), respond);
     }
+    if (action === 'open_project' && conversationAdapter) {
+      if (comparableText(composerValue(findComposer()))) {
+        return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
+      }
+      return conversationAdapter.openProject(String(command.value || ''), respond);
+    }
     if (action === 'regenerate_response' && messageAdapter) {
       return messageAdapter.regenerate(emitEvent, respond);
     }

@@ -17,7 +17,16 @@
 
   function mergeConversations(target, conversations, maximum) {
     (Array.isArray(conversations) ? conversations : []).some((conversation) => {
-      if (!conversation || typeof conversation.path !== 'string' || target.has(conversation.path)) {
+      if (!conversation || typeof conversation.path !== 'string') {
+        return false;
+      }
+      const previous = target.get(conversation.path);
+      if (previous) {
+        target.set(conversation.path, Object.assign({}, previous, conversation, {
+          activityDates: Array.from(new Set(
+            [].concat(previous.activityDates || [], conversation.activityDates || [])
+          ))
+        }));
         return false;
       }
       target.set(conversation.path, conversation);

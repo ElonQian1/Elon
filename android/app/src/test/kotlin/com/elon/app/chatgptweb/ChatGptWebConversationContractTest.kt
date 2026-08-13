@@ -47,6 +47,23 @@ class ChatGptWebConversationContractTest {
             }
     }
 
+    @Test
+    fun conversationAdapterEmitsDailyActivityAndProjectMembership() {
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val history = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js",
+        )
+
+        assertTrue(conversations.contains("activityDates:"))
+        assertTrue(conversations.contains("projectTitle:"))
+        assertTrue(conversations.contains("projects: readProjects()"))
+        assertTrue(conversations.contains("function openProject"))
+        assertTrue(conversations.contains("path.split('/').filter(Boolean).pop()"))
+        assertTrue(history.contains("previous.activityDates"))
+    }
+
     private fun readRepositoryFile(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 

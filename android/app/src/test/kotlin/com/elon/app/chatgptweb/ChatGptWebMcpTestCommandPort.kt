@@ -15,6 +15,7 @@ internal class ChatGptWebMcpTestCommandPort(
     private val onSelectComposerOption: (String, String) -> Unit = { _, _ -> },
     private val onRequestFeatures: () -> Unit = {},
     private val onSelectFeature: (String) -> Unit = {},
+    private val onOpenConversation: (String) -> Unit = {},
     private val onDispatch: (String, String) -> Unit = { _, _ -> },
     private val onSetDraft: (String, String) -> Unit = { _, _ -> },
 ) : ChatGptWebMcpCommandPort {
@@ -102,8 +103,10 @@ internal class ChatGptWebMcpTestCommandPort(
         dispatch("select_navigation", requestId)
     }
 
-    override fun openConversation(path: String, requestId: String) =
+    override fun openConversation(path: String, requestId: String) {
+        onOpenConversation(path)
         dispatch("open_conversation", requestId)
+    }
 
     private fun dispatch(action: String, requestId: String) = onDispatch(action, requestId)
 }

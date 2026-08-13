@@ -4,7 +4,10 @@
   if (window.__elonChatGptConversations || location.origin !== 'https://chatgpt.com') return;
 
   const MAX_CONVERSATIONS = 100;
-  const CONVERSATION_PATH = /^\/c\/[A-Za-z0-9_-]{1,160}$/;
+  const MAX_PROJECTS = 40;
+  const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/(g-p-[A-Za-z0-9_-]{1,160})\/c\/[A-Za-z0-9_-]{1,160})$/;
+  const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
+  const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|pinned|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早|已置顶)$/i;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -38,12 +41,91 @@
     }
   }
 
+  function sameOriginPath(node) {
+    try {
+      const url = new URL(node.getAttribute('href') || '', location.origin);
+      return url.origin === location.origin ? url.pathname : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function projectIdFromPath(path) {
+    const match = String(path || '').match(CONVERSATION_PATH) || String(path || '').match(PROJECT_PATH);
+    return match && match[1] ? match[1] : '';
+  }
+
+  function readProjects() {
+    const seen = new Set();
+    return Array.from(document.querySelectorAll('a[href*="/g/g-p-"]')).map((node) => {
+      const path = sameOriginPath(node);
+      const match = path.match(PROJECT_PATH);
+      if (!match || seen.has(path)) return null;
+      const title = cleanText(
+        node.getAttribute('data-project-title') ||
+          node.getAttribute('title') ||
+          node.getAttribute('aria-label') ||
+          node.textContent
+      ).slice(0, 160);
+      if (!title) return null;
+      seen.add(path);
+      return {
+        id: match[1],
+        title,
+        path,
+        active: location.pathname.startsWith('/g/' + match[1] + '/')
+      };
+    }).filter(Boolean).slice(0, MAX_PROJECTS);
+  }
+
+  function groupLabelFor(node) {
+    const nodeTop = node.getBoundingClientRect().top;
+    let scope = node.parentElement;
+    for (let depth = 0; scope && depth < 7; depth += 1, scope = scope.parentElement) {
+      const candidates = Array.from(scope.children).filter((candidate) => {
+        if (candidate === node || candidate.contains(node)) return false;
+        const text = cleanText(candidate.textContent || candidate.getAttribute('aria-label'));
+        if (!text || text.length > 80 || !GROUP_LABEL.test(text)) return false;
+        return candidate.getBoundingClientRect().top <= nodeTop + 1;
+      });
+      const nearest = candidates.sort((left, right) =>
+        right.getBoundingClientRect().top - left.getBoundingClientRect().top
+      )[0];
+      if (nearest) return cleanText(nearest.textContent || nearest.getAttribute('aria-label')).slice(0, 80);
+    }
+    return '';
+  }
+
+  function localIsoDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function activityDateFor(node, groupLabel) {
+    const time = node.querySelector('time[datetime]') ||
+      (node.parentElement && node.parentElement.querySelector('time[datetime]'));
+    const parsedTime = time && new Date(time.getAttribute('datetime'));
+    if (parsedTime && !Number.isNaN(parsedTime.getTime())) return localIsoDate(parsedTime);
+    const normalized = cleanText(groupLabel).toLowerCase();
+    if (/^(?:today|今天)$/.test(normalized)) return localIsoDate(new Date());
+    if (/^(?:yesterday|昨天)$/.test(normalized)) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      return localIsoDate(yesterday);
+    }
+    return '';
+  }
+
   function conversationLinks() {
     return Array.from(document.querySelectorAll('a[href*="/c/"]'))
       .filter((node) => conversationPath(node));
   }
 
   function readConversations() {
+    const projects = readProjects();
+    const projectsById = new Map(projects.map((project) => [project.id, project]));
     const seen = new Set();
     return conversationLinks().map((node) => {
       const path = conversationPath(node);
@@ -57,11 +139,19 @@
           || node.getAttribute('aria-label')
       ).slice(0, 160);
       if (!title) return null;
+      const projectId = projectIdFromPath(path);
+      const project = projectsById.get(projectId);
+      const groupLabel = groupLabelFor(node);
       return {
-        id: path.slice(3),
+        id: path.split('/').filter(Boolean).pop() || path,
         title,
         path,
-        active: path === location.pathname || node.getAttribute('aria-current') === 'page'
+        active: path === location.pathname || node.getAttribute('aria-current') === 'page',
+        groupLabel,
+        projectId: projectId || null,
+        projectTitle: project ? project.title : null,
+        projectPath: project ? project.path : null,
+        activityDates: [activityDateFor(node, groupLabel)].filter(Boolean)
       };
     }).filter(Boolean).slice(0, MAX_CONVERSATIONS);
   }
@@ -183,6 +273,7 @@
             emitEvent({
               type: 'conversation_snapshot',
               conversations: snapshot.conversations,
+              projects: readProjects(),
               collection: snapshot.collection
             });
             result('list_conversations', true, '');
@@ -200,6 +291,7 @@
       emitEvent({
         type: 'conversation_snapshot',
         conversations: snapshot.conversations,
+        projects: readProjects(),
         collection: snapshot.collection
       });
       result('list_conversations', true, '');
@@ -237,6 +329,17 @@
     else location.assign(new URL(path, location.origin).href);
   }
 
+  function openProject(path, result) {
+    if (!PROJECT_PATH.test(path)) {
+      return result('open_project', false, '项目地址无效。');
+    }
+    const target = Array.from(document.querySelectorAll('a[href*="/g/g-p-"]'))
+      .find((node) => sameOriginPath(node) === path);
+    result('open_project', true, '');
+    if (target) target.click();
+    else location.assign(new URL(path, location.origin).href);
+  }
+
   function capabilities() {
     const available = !!findSidebarButton(true) || conversationLinks().length > 0;
     return available ? ['conversation_list', 'conversation_search'] : [];
@@ -246,6 +349,7 @@
     capabilities,
     newConversation,
     openConversation,
+    openProject,
     requestList
   });
 })();

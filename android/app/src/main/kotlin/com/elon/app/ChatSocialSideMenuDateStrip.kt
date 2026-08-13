@@ -18,7 +18,10 @@ internal fun createSocialSidebarDateStrip(
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
     dp: (Int) -> Int,
-    selectableForeground: () -> Drawable?
+    selectableForeground: () -> Drawable?,
+    dateContentDescription: (LocalDate) -> String = { date ->
+        "${date.monthValue}月${date.dayOfMonth}日"
+    },
 ): LinearLayout = LinearLayout(context).apply {
     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(84)).apply {
         topMargin = dp(4)
@@ -36,7 +39,8 @@ internal fun createSocialSidebarDateStrip(
                 offset = offset,
                 onDateSelected = onDateSelected,
                 dp = dp,
-                selectableForeground = selectableForeground
+                selectableForeground = selectableForeground,
+                contentDescription = dateContentDescription(date),
             ),
             LinearLayout.LayoutParams(0, dp(76), 1f)
         )
@@ -50,11 +54,12 @@ private fun socialSidebarDateCell(
     offset: Long,
     onDateSelected: (LocalDate) -> Unit,
     dp: (Int) -> Int,
-    selectableForeground: () -> Drawable?
+    selectableForeground: () -> Drawable?,
+    contentDescription: String,
 ): FrameLayout = FrameLayout(context).apply {
     isClickable = true
     foreground = selectableForeground()
-    contentDescription = "${date.monthValue}月${date.dayOfMonth}日"
+    this.contentDescription = contentDescription
     if (selected) addView(ImageView(context).apply {
         setImageResource(R.drawable.social_sidebar_date_pill)
         scaleType = ImageView.ScaleType.FIT_XY

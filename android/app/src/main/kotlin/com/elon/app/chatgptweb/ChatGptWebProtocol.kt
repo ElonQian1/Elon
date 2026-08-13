@@ -103,6 +103,7 @@ internal sealed interface ChatGptWebEvent {
         val conversations: List<ChatGptWebConversation>,
         val collection: ChatGptWebConversationCollection =
             ChatGptWebConversationCollection.official(conversations.size),
+        val projects: List<ChatGptWebProject> = emptyList(),
     ) : ChatGptWebEvent
 
     data class ComposerControls(
@@ -160,6 +161,7 @@ internal object ChatGptWebProtocol {
                     val conversations = parseConversations(event)
                     ChatGptWebEvent.ConversationList(
                         conversations = conversations,
+                        projects = parseProjects(event),
                         collection = parseConversationCollection(event, conversations.size),
                     )
                 }
@@ -424,20 +426,62 @@ internal object ChatGptWebProtocol {
         return buildList {
             for (index in 0 until minOf(items.length(), MAX_CONVERSATIONS)) {
                 val item = items.optJSONObject(index) ?: continue
-                val path = item.optString("path").take(MAX_PATH_LENGTH)
-                if (!CONVERSATION_PATH.matches(path)) continue
-                val id = item.optString("id").ifBlank { path.removePrefix("/c/") }
+                val path = ChatGptWebConversationPath.normalize(
+                    item.optString("path").take(MAX_PATH_LENGTH),
+                ) ?: continue
+                val id = item.optString("id").ifBlank { path.substringAfterLast('/') }
                 val title = item.optString("title").trim().take(MAX_TITLE_LENGTH)
                 if (title.isBlank()) continue
+                val projectPath = ChatGptWebConversationPath.normalizeProject(
+                    item.optString("projectPath").take(MAX_PATH_LENGTH),
+                )
                 add(
                     ChatGptWebConversation(
                         id = id.take(MAX_ID_LENGTH),
                         title = title,
                         path = path,
                         active = item.optBoolean("active"),
+                        groupLabel = item.optString("groupLabel").trim().take(MAX_GROUP_LABEL_LENGTH),
+                        projectId = item.optString("projectId").trim()
+                            .take(MAX_PROJECT_ID_LENGTH)
+                            .takeIf(PROJECT_ID::matches)
+                            ?: ChatGptWebConversationPath.projectId(path),
+                        projectTitle = item.optString("projectTitle").trim()
+                            .take(MAX_TITLE_LENGTH)
+                            .takeIf(String::isNotBlank),
+                        projectPath = projectPath,
+                        activityDates = parseActivityDates(item),
                     ),
                 )
             }
+        }
+    }
+
+    private fun parseProjects(event: JSONObject): List<ChatGptWebProject> {
+        val items = event.optJSONArray("projects") ?: return emptyList()
+        return buildList {
+            val seen = mutableSetOf<String>()
+            for (index in 0 until minOf(items.length(), MAX_PROJECTS)) {
+                val item = items.optJSONObject(index) ?: continue
+                val path = ChatGptWebConversationPath.normalizeProject(
+                    item.optString("path").take(MAX_PATH_LENGTH),
+                ) ?: continue
+                val id = item.optString("id").trim().take(MAX_PROJECT_ID_LENGTH)
+                    .takeIf(PROJECT_ID::matches)
+                    ?: ChatGptWebConversationPath.projectId(path)
+                    ?: continue
+                val title = item.optString("title").trim().take(MAX_TITLE_LENGTH)
+                if (title.isBlank() || !seen.add(path)) continue
+                add(ChatGptWebProject(id, title, path, item.optBoolean("active")))
+            }
+        }
+    }
+
+    private fun parseActivityDates(item: JSONObject): Set<String> = buildSet {
+        item.optString("activityDate").takeIf(ACTIVITY_DATE::matches)?.let(::add)
+        val values = item.optJSONArray("activityDates") ?: return@buildSet
+        for (index in 0 until minOf(values.length(), MAX_ACTIVITY_DATES)) {
+            values.optString(index).takeIf(ACTIVITY_DATE::matches)?.let(::add)
         }
     }
 
@@ -533,6 +577,10 @@ internal object ChatGptWebProtocol {
     private const val MAX_CONTENT_PARTS = 20
     private const val MAX_DRAFT_LENGTH = 20_000
     private const val MAX_CONVERSATIONS = 100
+    private const val MAX_PROJECTS = 40
+    private const val MAX_PROJECT_ID_LENGTH = 166
+    private const val MAX_GROUP_LABEL_LENGTH = 80
+    private const val MAX_ACTIVITY_DATES = 32
     private const val MAX_CONVERSATION_COLLECTION_STEPS = 80
     private const val MAX_CAPABILITIES = 40
     private const val MAX_CAPABILITY_LENGTH = 48
@@ -565,7 +613,8 @@ internal object ChatGptWebProtocol {
     private val UI_CONTEXT_ID = Regex("[A-Za-z0-9_.:-]{1,160}")
     private val ATTACHMENT_STATES = setOf("uploading", "ready", "error")
     private val FEATURE_KINDS = ChatGptWebProductCapabilityCatalog.FEATURE_KINDS
-    private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
+    private val PROJECT_ID = Regex("g-p-[A-Za-z0-9_-]{1,160}")
+    private val ACTIVITY_DATE = Regex("\\d{4}-\\d{2}-\\d{2}")
     private val UI_REGIONS = setOf(
         ChatGptWebUiRegion.HEADER,
         ChatGptWebUiRegion.SUGGESTIONS,

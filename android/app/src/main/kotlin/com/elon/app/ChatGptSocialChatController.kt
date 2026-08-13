@@ -20,6 +20,7 @@ internal class ChatGptSocialChatController(
     private val clearPendingSendState: () -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val openOfficialFallback: () -> Unit,
+    private val onConversationIndexChanged: () -> Unit,
 ) {
     private val messages = mutableListOf<ChatMessage>()
     private val timestamps = linkedMapOf<String, Long>()
@@ -32,6 +33,7 @@ internal class ChatGptSocialChatController(
         onComposerOptions = ::showModelOptions,
         onCommandResult = ::handleCommandResult,
         onAttachmentSendChanged = ::handleAttachmentSendUpdate,
+        onConversationIndexChanged = { onConversationIndexChanged() },
     )
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
@@ -145,9 +147,18 @@ internal class ChatGptSocialChatController(
 
     fun currentConversationPath(): String? = session.currentConversationPath()
 
+    fun conversationIndex() = session.conversationIndex()
+
+    fun requestConversationIndex(): Boolean = session.requestConversationIndex()
+
     fun openConversation(path: String): Boolean {
         pendingPrompt = null
         return session.openConversation(path)
+    }
+
+    fun openProject(path: String): Boolean {
+        pendingPrompt = null
+        return session.openProject(path)
     }
 
     fun discardAcceptanceAttachmentSend(): Boolean {

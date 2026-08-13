@@ -86,10 +86,23 @@ async function reportsAConservativeSnapshotWhenNoScrollerExists() {
   assert.strictEqual(result.collection.scrollRestored, true);
 }
 
+async function mergesActivityDatesWhenVirtualizedRowsAreObservedAgain() {
+  const first = Object.assign(conversation('one'), { activityDates: ['2026-08-13'] });
+  const refreshed = Object.assign(conversation('one'), { activityDates: ['2026-08-14'] });
+  const result = await runCollection({
+    initial: [first],
+    read: () => [refreshed],
+    findScroller: () => null,
+  });
+
+  assert.deepStrictEqual(result.conversations[0].activityDates, ['2026-08-13', '2026-08-14']);
+}
+
 Promise.resolve()
   .then(collectsVirtualizedPagesAndRestoresTheOriginalScrollPosition)
   .then(capsResultsAndReportsTruncation)
   .then(reportsAConservativeSnapshotWhenNoScrollerExists)
+  .then(mergesActivityDatesWhenVirtualizedRowsAreObservedAgain)
   .then(() => process.stdout.write('chatgpt conversation history policy tests passed\n'))
   .catch((error) => {
     process.stderr.write(`${error.stack || error}\n`);

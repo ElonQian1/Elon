@@ -133,6 +133,19 @@ internal class MainMcpNativeControlActions(
                 }
                 uiState()
             }
+            "open_web_chat_project" -> {
+                val path = args.optString("project_path")
+                if (socialAiChatFeature()?.openWebChatProject(path) != true) {
+                    return errorJson(action, "invalid_or_unavailable_project")
+                }
+                uiState()
+            }
+            "refresh_web_chat_conversations" -> {
+                if (socialAiChatFeature()?.refreshWebChatConversationIndex() != true) {
+                    return errorJson(action, "web_chat_not_ready")
+                }
+                uiState()
+            }
             "open_project_chat" -> {
                 val beforeProject = activeProject()
                 val beforeConversationId = activeConversation().id
@@ -452,6 +465,7 @@ internal class MainMcpNativeControlActions(
         val friend = activeFriend() ?: return JSONObject.NULL
         val messages = activeFriendMessages()
         val feature = socialAiChatFeature()
+        val webChatIndex = feature?.webChatConversationIndex()
         return JSONObject()
             .put("friend_id", friend.id)
             .put("friend_name", friend.name)
@@ -494,6 +508,22 @@ internal class MainMcpNativeControlActions(
                 "web_chat_conversation_path",
                 if (friend.isSocialAi()) {
                     feature?.webChatConversationPath() ?: JSONObject.NULL
+                } else {
+                    JSONObject.NULL
+                },
+            )
+            .put(
+                "web_chat_conversation_count",
+                if (friend.isSocialAi()) webChatIndex?.conversations?.size ?: 0 else 0,
+            )
+            .put(
+                "web_chat_project_count",
+                if (friend.isSocialAi()) webChatIndex?.projects?.size ?: 0 else 0,
+            )
+            .put(
+                "web_chat_conversation_index_state",
+                if (friend.isSocialAi()) {
+                    webChatIndex?.collection?.officialLoadState ?: JSONObject.NULL
                 } else {
                     JSONObject.NULL
                 },

@@ -495,7 +495,7 @@ class ChatGptWebLabContractTest {
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeHistory\""))
         assertTrue(activity.contains("pageAdapter.listConversations()"))
         assertTrue(activity.contains("pageAdapter.openConversation(path)"))
-        assertTrue(activity.contains("conversationHistoryStore.save(event.conversations)"))
+        assertTrue(activity.contains("conversationHistoryStore.save(event.conversations, event.projects)"))
         assertTrue(activity.contains("observedMcpState.snapshot().conversationCollection"))
         assertTrue(activity.contains("renderCapabilities(snapshot.capabilities)"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.CONVERSATION_LIST"))
