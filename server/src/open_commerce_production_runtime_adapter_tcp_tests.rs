@@ -230,6 +230,8 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     )
     .unwrap()
     .adapter_token;
+    let developer_owner_session =
+        feature_switch::owner_session(&developer.store, &developer.owner_user_id);
 
     let root = std::env::temp_dir().join(format!(
         "elon-open-commerce-production-runtime-tcp-{}",
@@ -394,35 +396,13 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(sandbox_detail_status, StatusCode::NOT_FOUND);
     assert_developer_event_redacted(&sandbox_detail, &developer.test_token);
 
-    let claims_url = format!("{base_url}/api/open-commerce/adapter/business-handoff-claims");
-    let claimed = adapter_post(
+    adapter_handoff::assert_adapter_applies_invocation(
         &client,
-        &claims_url,
+        &base_url,
         &adapter_token,
-        &json!({"lease_seconds":300}),
+        invocation_id,
     )
     .await;
-    assert_eq!(claimed["claimed"], true);
-    assert_eq!(claimed["issue"]["claim"]["invocation_id"], invocation_id);
-    let claim_id = claimed["issue"]["claim"]["id"].as_str().unwrap();
-    let lease_token = claimed["issue"]["lease_token"].as_str().unwrap();
-    let completed = adapter_post(
-        &client,
-        &format!("{claims_url}/{claim_id}/complete"),
-        &adapter_token,
-        &json!({
-            "lease_token":lease_token,
-            "receipt_key":"production-runtime-adapter-applied-1",
-            "status":"applied",
-            "target_domain":"erp",
-            "target_reference":"erp-order-production-runtime-1",
-            "completed_at":Utc::now().to_rfc3339()
-        }),
-    )
-    .await;
-    assert_eq!(completed["invocation_id"], invocation_id);
-    assert_eq!(completed["status"], "applied");
-    assert_eq!(completed["funds_moved"], false);
 
     assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 3);
     let envelopes = runtime_state.envelopes.lock().unwrap();
@@ -445,6 +425,19 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(query_envelope["credential_id"], live.credential.id);
     assert!(query_envelope["action_confirmation_id"].is_null());
     drop(envelopes);
+
+    feature_switch::assert_production_switch_fails_closed_and_revoke_remains_available(
+        &client,
+        &base_url,
+        &live.live_token,
+        &live.credential.id,
+        &developer.project_id,
+        &developer.app.id,
+        &developer_owner_session,
+        &query,
+        &runtime_state,
+    )
+    .await;
 
     platform_server.stop().await;
     runtime_server.stop().await;
@@ -498,3 +491,9 @@ fn assert_developer_event_redacted(value: &Value, live_token: &str) {
 
 #[path = "open_commerce_production_app_isolation_tcp_tests.rs"]
 mod app_isolation;
+
+#[path = "open_commerce_production_feature_switch_tcp_tests.rs"]
+mod feature_switch;
+
+#[path = "open_commerce_production_adapter_handoff_tcp_tests.rs"]
+mod adapter_handoff;
