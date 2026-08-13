@@ -66,6 +66,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .merge(super::external_pool_adapter_vulnerability_reattestation_api::routes())
         .merge(super::external_pool_adapter_sandbox_reattestation_api::routes())
         .merge(super::external_pool_adapter_credential_reattestation_api::routes())
+        .merge(super::external_pool_provider_activation_candidate_api::routes())
         .merge(super::external_pool_adapter_release_lifecycle_api::routes())
 }
 

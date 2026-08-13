@@ -111,6 +111,7 @@ mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_onboarding;
+mod compute_external_pool_provider_activation_candidate;
 mod compute_job_contract_validation;
 mod compute_job_registry;
 mod compute_metering;
@@ -598,6 +599,7 @@ pub(crate) use compute_external_pool_onboarding::{
     ReviewExternalPoolOnboardingRequest, SubmitExternalPoolOnboardingRequest,
     EXTERNAL_POOL_ONBOARDING_APPLY_CONFIRMATION,
 };
+pub(crate) use compute_external_pool_provider_activation_candidate::api::*;
 pub(crate) use compute_job_registry::ComputeJobRegistrationReceipt;
 pub use compute_metering::ComputeMeterEvent;
 pub(crate) use compute_offer_contract_validation::{compute_offer_digest, compute_sku_digest};

@@ -16,6 +16,10 @@ use crate::{
 
 use super::routes;
 
+#[path = "external_pool_adapter_release_api_tests/activation_candidate_http_test.rs"]
+mod activation_candidate_http_test;
+#[path = "external_pool_adapter_release_api_tests/activation_candidate_test_support.rs"]
+mod activation_candidate_test_support;
 #[path = "external_pool_adapter_release_api_tests/adapter_adoption_http_test.rs"]
 mod adapter_adoption_http_test;
 #[path = "external_pool_adapter_release_api_tests/adapter_installation_http_test.rs"]
