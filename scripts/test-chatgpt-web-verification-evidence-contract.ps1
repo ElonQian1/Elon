@@ -3,6 +3,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $runtime = Get-Content (Join-Path $repoRoot "scripts/chatgpt-web-smoke-runtime.ps1") -Raw
 $expected = [ordered]@{
+    "smoke-chatgpt-web-anonymous-chat.ps1" = @(
+        "reversible/anonymous_send_probe"
+    )
     "smoke-chatgpt-web-apk.ps1" = @(
         "safe/read_only_surface",
         "safe/authenticated_session",

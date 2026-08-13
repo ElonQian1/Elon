@@ -134,3 +134,30 @@ CHATGPT_WEB_SMOKE_STATUS=passed mode=send_probe
 ```
 
 任何检查失败、未登录、bridge 未就绪、未知语义或等待超时都必须保持非零退出码。
+
+## 匿名聊天验收
+
+匿名能力使用独立脚本，不在已登录账号 smoke 中弱化历史、账户菜单等账号能力检查，也不通过退出登录或清 Cookie 制造匿名状态。请使用一个本来就未登录的独立 APK/Profile；脚本发现 `authenticated=true` 或 `login_required=true` 时会失败关闭。
+
+默认只读检查匿名编辑器和能力矩阵：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-anonymous-chat.ps1 `
+  -DeviceSerial "<device-serial>" `
+  -ExpectedHardwareSerial "<physical-device-serial>"
+```
+
+只有明确授权发送无敏感探针时才增加 `-SendProbe`。发送阶段创建隔离空白会话、等待结构化回复证据，再恢复原来的空白匿名视图；报告不包含账号、会话路径、消息正文或模型回复。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-anonymous-chat.ps1 `
+  -DeviceSerial "<device-serial>" `
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -SendProbe
+```
+
+脚本通过后登记独立证据 `reversible/anonymous_send_probe`。它不会覆盖 `safe/authenticated_session`，两种访问方式分别验收。
+
+所有 ChatGPT Web smoke 的 `ExpectedAdapterVersion` 默认从 `ChatGptWebPageAdapter.ADAPTER_VERSION` 解析；发布验收仍可显式传入版本号锁定目标 APK。源码与已安装 APK 版本不一致时继续失败关闭。

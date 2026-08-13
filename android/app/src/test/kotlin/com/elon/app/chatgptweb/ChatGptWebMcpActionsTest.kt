@@ -570,7 +570,7 @@ class ChatGptWebMcpActionsTest {
         val matrix = actions().control(JSONObject().put("action", "chatgpt_get_capability_matrix"))
 
         assertTrue(matrix.getBoolean("control_ok"))
-        assertEquals("elon.chatgpt_web.capability_matrix.v2", matrix.getString("schema"))
+        assertEquals("elon.chatgpt_web.capability_matrix.v3", matrix.getString("schema"))
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, matrix.getInt("adapter_version"))
         assertTrue(matrix.getBoolean("ready_for_chat"))
     }

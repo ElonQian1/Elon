@@ -97,6 +97,9 @@ internal object ChatGptWebFeatureBaseline {
             )
             val currentPageObserved = when (feature.id) {
                 "official_authentication" -> snapshot?.authenticated == true
+                "anonymous_chat_access" -> snapshot?.let {
+                    !it.authenticated && ChatGptWebAccessPolicy.canChat(it)
+                } == true
                 "official_fullscreen_fallback" -> mode == ChatGptWebModeController.Mode.WEB
                 "native_chat_composer" -> snapshot?.composerReady == true
                 "disclosure_controls" -> manifest?.controls.orEmpty()
@@ -324,6 +327,15 @@ internal object ChatGptWebFeatureBaseline {
             mcpActions = listOf("chatgpt_select_view", "state"),
             capabilityIds = setOf(ChatGptWebCapabilityId.GOOGLE_LOGIN_ENTRY),
             verificationGap = "identity_provider_completion_remains_user_driven",
+        ),
+        feature(
+            id = "anonymous_chat_access",
+            group = "session",
+            acceptance = Acceptance.INTERACTIVE_DEVICE,
+            mcpActions = listOf("state", "set_input_text", "send_input"),
+            capabilityIds = setOf(ChatGptWebCapabilityId.DRAFT_SYNC),
+            semantics = setOf("send"),
+            verificationGap = "anonymous_isolated_send_and_reply_acceptance",
         ),
         feature(
             id = "official_fullscreen_fallback",

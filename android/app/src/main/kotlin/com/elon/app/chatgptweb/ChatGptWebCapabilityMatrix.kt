@@ -45,14 +45,18 @@ internal object ChatGptWebCapabilityMatrix {
                 .put("official_fallback", true)
                 .put("coverage", if (observed) "native_and_mcp" else "not_observed")
         }
+        val loginRequired = snapshot?.let(ChatGptWebAccessPolicy::requiresLogin) == true
+        val canChat = snapshot?.let(ChatGptWebAccessPolicy::canChat) == true
         val blockingGaps = buildList {
             if (bridgeState != ChatGptWebPageAdapter.State.READY) add("bridge_not_ready")
             if (!adapterCurrent) add("adapter_generation_not_ready")
-            if (snapshot?.authenticated != true) add("not_authenticated")
+            if (snapshot == null) add("snapshot_unavailable")
+            if (loginRequired) add("login_required")
             if (
-                snapshot?.authenticated == true &&
-                snapshot.composerReady.not() &&
-                snapshot.dictationActive.not()
+                snapshot != null &&
+                !loginRequired &&
+                !canChat &&
+                !snapshot.dictationActive
             ) add("composer_not_ready")
             if (manifest == null) add("manifest_unavailable")
             if (
@@ -76,7 +80,7 @@ internal object ChatGptWebCapabilityMatrix {
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_capability_matrix")
-            .put("schema", "elon.chatgpt_web.capability_matrix.v2")
+            .put("schema", "elon.chatgpt_web.capability_matrix.v3")
             .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
             .put("page_generation", document?.pageGeneration ?: 0L)
             .put("adapter_generation", document?.adapterGeneration ?: 0L)
@@ -90,6 +94,8 @@ internal object ChatGptWebCapabilityMatrix {
             .put("bridge_state", bridgeState.name.lowercase())
             .put("view_mode", mode.name.lowercase())
             .put("authenticated", snapshot?.authenticated ?: false)
+            .put("login_required", loginRequired)
+            .put("chat_access_available", canChat)
             .put("dictation_active", snapshot?.dictationActive ?: false)
             .put("ready_for_chat", blockingGaps.isEmpty())
             .put(

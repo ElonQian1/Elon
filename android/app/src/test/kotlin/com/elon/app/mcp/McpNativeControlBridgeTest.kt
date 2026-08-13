@@ -14,11 +14,11 @@ class McpNativeControlBridgeTest {
     @Test
     fun preservesPayloadSchemaAndAddsEnvelopeSchema() {
         val result = McpNativeControlBridge.decorateControlResult(
-            JSONObject().put("schema", "elon.chatgpt_web.capability_matrix.v2"),
+            JSONObject().put("schema", "elon.chatgpt_web.capability_matrix.v3"),
             "chatgpt_get_capability_matrix",
         )
 
-        assertEquals("elon.chatgpt_web.capability_matrix.v2", result.getString("schema"))
+        assertEquals("elon.chatgpt_web.capability_matrix.v3", result.getString("schema"))
         assertEquals("elon.apk.native_mcp_control_result.v1", result.getString("envelope_schema"))
         assertEquals("chatgpt_get_capability_matrix", result.getString("action"))
         assertTrue(result.getBoolean("activity_bound"))

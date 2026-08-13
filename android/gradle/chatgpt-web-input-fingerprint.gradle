@@ -109,6 +109,7 @@ def filesMatching = { List<String> patterns ->
 }
 
 def coreCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebCapabilityMatrix.kt",
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebBridge*.kt",
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebCommandReceipts.kt",
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebDocumentSession.kt",
@@ -190,6 +191,10 @@ verificationCaseFiles["safe/read_only_surface"] = allCaseInputs + filesMatching(
 verificationCaseFiles["safe/authenticated_session"] = caseInputs(
     sessionCaseInputs,
     "smoke-chatgpt-web-apk.ps1",
+)
+verificationCaseFiles["reversible/anonymous_send_probe"] = caseInputs(
+    sessionCaseInputs + composerCaseInputs + messageCaseInputs,
+    "smoke-chatgpt-web-anonymous-chat.ps1",
 )
 verificationCaseFiles["reversible/send_probe"] = caseInputs(
     composerCaseInputs + messageCaseInputs,

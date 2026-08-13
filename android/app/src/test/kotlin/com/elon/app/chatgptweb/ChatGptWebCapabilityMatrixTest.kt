@@ -111,7 +111,7 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
-    fun reportsAuthenticationAndBridgeFailuresAsBlocking() {
+    fun reportsUnavailableComposerAndBridgeFailuresAsBlocking() {
         val snapshot = snapshot(emptySet()).copy(authenticated = false, composerReady = false)
         val matrix = ChatGptWebCapabilityMatrix.build(
             snapshot = snapshot,
@@ -123,9 +123,64 @@ class ChatGptWebCapabilityMatrixTest {
         val gaps = matrix.getJSONArray("blocking_gaps")
         assertEquals(3, gaps.length())
         assertEquals("bridge_not_ready", gaps.getString(0))
-        assertEquals("not_authenticated", gaps.getString(1))
+        assertEquals("composer_not_ready", gaps.getString(1))
         assertEquals("manifest_unavailable", gaps.getString(2))
         assertFalse(matrix.getBoolean("ready_for_mcp"))
+    }
+
+    @Test
+    fun missingPageSnapshotCannotBeReportedAsChatReady() {
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = null,
+            manifest = manifest("healthy", "action"),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        assertFalse(matrix.getBoolean("chat_access_available"))
+        assertFalse(matrix.getBoolean("ready_for_chat"))
+        assertEquals("snapshot_unavailable", matrix.getJSONArray("blocking_gaps").getString(0))
+    }
+
+    @Test
+    fun anonymousComposerIsReadyWithoutPretendingTheUserIsAuthenticated() {
+        val anonymous = snapshot(emptySet()).copy(authenticated = false)
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = anonymous,
+            manifest = manifest("healthy", "action"),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        assertFalse(matrix.getBoolean("authenticated"))
+        assertFalse(matrix.getBoolean("login_required"))
+        assertTrue(matrix.getBoolean("chat_access_available"))
+        assertTrue(matrix.getBoolean("ready_for_chat"))
+        assertEquals(0, matrix.getJSONArray("blocking_gaps").length())
+    }
+
+    @Test
+    fun explicitAuthenticationPageRemainsBlocking() {
+        val authenticationPage = snapshot(emptySet()).copy(
+            authenticated = false,
+            composerReady = false,
+            pageKind = "auth",
+            loginRequired = true,
+        )
+
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = authenticationPage,
+            manifest = manifest("healthy", "action").copy(pageKind = "auth"),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.WEB,
+        )
+
+        assertFalse(matrix.getBoolean("authenticated"))
+        assertTrue(matrix.getBoolean("login_required"))
+        assertFalse(matrix.getBoolean("chat_access_available"))
+        assertFalse(matrix.getBoolean("ready_for_chat"))
+        assertEquals("login_required", matrix.getJSONArray("blocking_gaps").getString(0))
     }
 
     @Test

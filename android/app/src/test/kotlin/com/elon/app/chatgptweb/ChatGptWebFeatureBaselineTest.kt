@@ -567,6 +567,7 @@ class ChatGptWebFeatureBaselineTest {
     private companion object {
         val REQUIRED_FEATURE_IDS = setOf(
             "official_authentication",
+            "anonymous_chat_access",
             "official_fullscreen_fallback",
             "native_chat_composer",
             "streaming_and_stop",
