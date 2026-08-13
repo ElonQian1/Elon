@@ -5,7 +5,7 @@
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/project-feature-registry-adoption-v1.md",
@@ -124,7 +124,7 @@
         }
       ],
       "created_at_ms": 1786619748837,
-      "updated_at_ms": 1786620211812
+      "updated_at_ms": 1786620439206
     }
   ],
   "audit_log": [
@@ -207,6 +207,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786620211812
+    },
+    {
+      "id": "feature_event_1b11c56aa58446e9b0ad43feb2c27367",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "功能注册表启用、自动门禁与证据已验证并推送至 origin/main。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786620439206
     }
   ]
 }
