@@ -1,0 +1,47 @@
+.quickActions {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quickActions button {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 28px minmax(0,1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(46,168,97,.14);
+  color: #effff4;
+  text-align: left;
+}
+
+.quickActions button:hover:not(:disabled) { background: rgba(46,168,97,.25); }
+.quickActions button:disabled { opacity: .45; cursor: not-allowed; }
+.quickActions button > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.quickActions strong { overflow: hidden; color: inherit; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.quickActions small { overflow: hidden; color: #8f9b94; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+.providerPane { min-height: 0; overflow-y: auto; padding: 10px 8px 14px; }
+.heading { padding: 4px 8px 8px; color: #8e94a0; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.provider {
+  width: 100%; min-height: 48px; display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 9px;
+  align-items: center; padding: 7px 9px; border: 0; border-radius: 6px; color: #afb4c0; background: transparent; text-align: left;
+}
+.provider:hover { background: rgba(255,255,255,.055); color: #eef2f7; }
+.provider[data-active="true"] { background: rgba(60,111,162,.24); color: #edf5ff; }
+.provider > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.provider strong, .provider small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider strong { font-size: 13px; }
+.provider small { color: #77808d; font-size: 10px; }
+.logo { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.06); color: #76d49a; font-weight: 800; }
+.status { margin: 12px 5px 0; padding: 9px; display: flex; flex-direction: column; gap: 4px; border: 1px solid rgba(255,255,255,.06); border-radius: 6px; background: rgba(0,0,0,.08); }
+.status strong { color: #aeb5c0; font-size: 11px; }
+.status span { color: #7e8590; font-size: 10px; line-height: 1.45; }
+.status[data-error="true"] { border-color: rgba(218,93,93,.28); }
+.privacy { margin: 10px 7px 0; display: flex; align-items: flex-start; gap: 6px; color: #707782; font-size: 10px; line-height: 1.45; }
+.privacy svg { flex: 0 0 auto; color: #58be6a; }

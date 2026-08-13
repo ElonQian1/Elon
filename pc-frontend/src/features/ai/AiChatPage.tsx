@@ -27,10 +27,15 @@ import AuthDialog from '../auth/AuthDialog'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import { formatTime, safeNodeAdminUrl } from '../../lib/utils'
 import { compactDisplayMessageContent } from '../../lib/messageDisplay'
-import { DEFAULT_POPOVER_ANCHOR, fixedPopoverPosition, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
+import { DEFAULT_POPOVER_ANCHOR, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
+import AiWebChatSidebar from '../user-browser/AiWebChatSidebar'
+import AiWebProviderPopover from '../user-browser/AiWebProviderPopover'
+import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
+import type { AiHomeMode } from './AiHomeModeSwitch'
 import AiPinnedTools from './AiPinnedTools'
+import AiUserProfilePopover, { type AiChatFriend } from './AiUserProfilePopover'
 import AiChatMessageRow, {
   type AiHandoff,
   type AiMessage,
@@ -48,15 +53,6 @@ interface AiConversation {
   project_id?: string
   project_name?: string
   first_user_message?: string
-}
-
-interface Friend {
-  id: string
-  account: string
-  nickname?: string
-  avatar_data_url?: string | null
-  is_online?: boolean
-  already_friend?: boolean
 }
 
 interface RemoteNodeInfo {
@@ -169,9 +165,10 @@ function shouldRetryRemoteNodeExec(result: { output?: string; error?: string; ex
   )
 }
 
-export default function AiChatPage() {
+export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; onModeChange: (mode: AiHomeMode) => void }) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const web = useAiWebChatBackend(mode, user?.id || '')
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
   const modelOptions = useModelStore((s) => s.options)
@@ -198,12 +195,12 @@ export default function AiChatPage() {
     typeof window === 'undefined' ? null : window.localStorage,
     user?.id,
   ))
-  const [friends, setFriends] = useState<Friend[]>([])
+  const [friends, setFriends] = useState<AiChatFriend[]>([])
   const [totalUserCount, setTotalUserCount] = useState(0)
   const [userQuery, setUserQuery] = useState('')
   const [usersLoading, setUsersLoading] = useState(true)
   const [usersError, setUsersError] = useState('')
-  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
+  const [selectedFriend, setSelectedFriend] = useState<AiChatFriend | null>(null)
   const [friendPopoverAnchor, setFriendPopoverAnchor] = useState<PopoverAnchor>(DEFAULT_POPOVER_ANCHOR)
   const [userPanelCollapsed, setUserPanelCollapsed] = useState(() => (
     typeof window !== 'undefined'
@@ -224,7 +221,7 @@ export default function AiChatPage() {
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)
   const remoteNodeIdRef = useRef<string | null>(null)
-  const modelButtonCopy = useMemo(
+  const workModelButtonCopy = useMemo(
     () => {
       const copy = routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent)
       if (runtimeRoute === 'route_c3' && remoteNodeNameValue) {
@@ -238,6 +235,17 @@ export default function AiChatPage() {
     },
     [runtimeRoute, modelLabel, modelOptions, selectedAgent, remoteNodeNameValue],
   )
+  const chatMode = mode === 'chat'
+  const visibleMessages = chatMode ? web.messages : messages
+  const visibleInput = chatMode ? web.controller.draft : input
+  const visibleSending = chatMode ? Boolean(web.controller.busyAction) : sending
+  const visibleMessageLoading = chatMode ? web.capability.state === 'checking' : messagesLoading
+  const modelButtonCopy = chatMode ? web.modelButtonCopy : workModelButtonCopy
+
+  useEffect(() => {
+    setError('')
+    setShowModelPicker(false)
+  }, [mode])
 
   useEffect(() => {
     setRuntimeRoute(initialRuntimeRouteFromStorage(window.localStorage, user?.id))
@@ -275,7 +283,7 @@ export default function AiChatPage() {
     loadConversations()
     setUsersLoading(true)
     setUsersError('')
-    api.get<{ recommendations?: Friend[]; total_count?: number }>('/api/me/friends/recommendations?limit=50')
+    api.get<{ recommendations?: AiChatFriend[]; total_count?: number }>('/api/me/friends/recommendations?limit=50')
       .then(d => {
         if (cancelled) return
         setFriends(d.recommendations ?? [])
@@ -447,7 +455,7 @@ export default function AiChatPage() {
     if (atBottomRef.current && feedRef.current) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight
     }
-  }, [messages])
+  }, [messages, web.messages])
 
   async function loadConversations() {
     setConversationsLoaded(false)
@@ -481,6 +489,10 @@ export default function AiChatPage() {
 
   async function openForkedConversation(convId: string) { await loadConversations(); await selectConversation(convId) }
   function newConversation() {
+    if (chatMode) {
+      void web.controller.run('new_conversation')
+      return
+    }
     const id = uuidv4()
     setActiveConvId(id)
     setMessages([])
@@ -638,6 +650,27 @@ export default function AiChatPage() {
 
   async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
+    if (chatMode) {
+      const text = web.controller.draft.trim()
+      if (!user?.id) {
+        setError('请先登录一龙账号后开始对话。')
+        setLoginDialogOpen(true)
+        return
+      }
+      if (web.controller.snapshot?.streaming) {
+        await web.controller.run('stop_generation')
+        return
+      }
+      if (!web.canCompose) {
+        setError('请先打开官方页面并完成登录或验证，再回到当前聊天界面。')
+        return
+      }
+      if (text && !web.controller.busyAction) {
+        setError('')
+        await web.controller.run('send_prompt', text, web.controller.snapshot?.draft ?? '')
+      }
+      return
+    }
     const text = input.trim()
     if (!text || sending) return
     if (!user?.id) {
@@ -821,15 +854,14 @@ export default function AiChatPage() {
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
           <span>一龙 AI</span>
-          <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button">+</button>
+          <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.canCompose)}>+</button>
         </div>
-        <AiPinnedTools
+        {chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
           sending={sending}
           onNewConversation={newConversation}
           onOpenDoctor={() => navigate('/doctor')}
           onCodexVaultBackup={handleCodexVaultShortcut}
-        />
-        <div className={styles.convList} data-testid="ai-conversation-list">
+        /><div className={styles.convList} data-testid="ai-conversation-list">
           {historyGroups.length === 0 && (
             <p className={styles.hint}>{conversationsLoaded ? '还没有对话记录' : '正在加载对话记录...'}</p>
           )}
@@ -879,17 +911,19 @@ export default function AiChatPage() {
               </section>
             )
           })}
-        </div>
+        </div></>}
         <SidebarUserStrip />
       </aside>
 
       {/* 聊天区 */}
       <div className={styles.chat}>
         <AiChatTopbar
-          title={activeConversationTitle}
+          title={chatMode ? web.title : activeConversationTitle}
           userPanelCollapsed={userPanelCollapsed}
           modelButtonCopy={modelButtonCopy}
-          sending={sending}
+          sending={visibleSending}
+          mode={mode}
+          onModeChange={onModeChange}
           onToggleUserPanel={() => setUserPanelCollapsed((collapsed) => !collapsed)}
           onCodexVaultBackup={handleCodexVaultShortcut}
         />
@@ -902,14 +936,16 @@ export default function AiChatPage() {
             if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
           }}
         >
-          {onlineNodeId && (
+          {!chatMode && onlineNodeId && (
             <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
           )}
-          {messages.length === 0 && !messagesLoading && (
+          {visibleMessages.length === 0 && !visibleMessageLoading && (
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
               <p>{!user?.id
                 ? '登录账号后即可开始和我对话。'
+                : chatMode
+                  ? `${web.provider?.displayName || '官方网页 AI'} 是当前消息来源；登录和真人验证在官方窗口完成，聊天仍留在这里。`
                 : onlineNodeId
                   ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。`
                   : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
@@ -925,20 +961,28 @@ export default function AiChatPage() {
                   <span>登录后可以开始对话，并同步你的项目、好友和电脑节点。</span>
                 </div>
               )}
+              {user?.id && chatMode && !web.canCompose && (
+                <div className={styles.loginPrompt}>
+                  <button className={styles.startBtn} type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || visibleSending}>
+                    登录 / 打开官方页
+                  </button>
+                  <span>{web.status}</span>
+                </div>
+              )}
             </div>
           )}
-          {messagesLoading && <p className={styles.hint}>读取消息…</p>}
-          {messages.filter((m) => m.role !== 'system').map((m, i) => (
+          {visibleMessageLoading && <p className={styles.hint}>{chatMode ? '正在连接本地网页 AI…' : '读取消息…'}</p>}
+          {visibleMessages.filter((m) => m.role !== 'system').map((m, i) => (
             <AiChatMessageRow
               key={m.id ?? `${m.role}:${m.created_at ?? i}`}
-              activeConvId={activeConvId}
+              activeConvId={chatMode ? '' : activeConvId}
               index={i}
               message={m}
               user={user}
-              streaming={m.id === streamingMessageId}
-              streamingStatus={streamStatus || '正在处理…'}
-              onConversationForked={openForkedConversation}
-              onProjectHandoff={handleProjectHandoff}
+              streaming={m.id === (chatMode ? web.streamingMessageId : streamingMessageId)}
+              streamingStatus={chatMode ? `${web.provider?.displayName || '网页 AI'} 正在回答…` : streamStatus || '正在处理…'}
+              onConversationForked={chatMode ? undefined : openForkedConversation}
+              onProjectHandoff={chatMode ? undefined : handleProjectHandoff}
             />
           ))}
         </div>
@@ -957,19 +1001,25 @@ export default function AiChatPage() {
             <textarea
               ref={textareaRef}
               className={styles.composerInput}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize() }}
+              value={visibleInput}
+              onChange={(e) => {
+                if (chatMode) web.controller.setDraft(e.target.value)
+                else setInput(e.target.value)
+                autoResize()
+              }}
               onKeyDown={handleKeyDown}
               placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-              disabled={sending}
+              disabled={visibleSending || (chatMode && !web.canCompose)}
               rows={1}
             />
             <button
               className={styles.sendBtn}
               type="submit"
-              disabled={!input.trim() || sending}
+              disabled={visibleSending || (chatMode
+                ? !web.controller.snapshot?.streaming && (!visibleInput.trim() || !web.canCompose)
+                : !visibleInput.trim())}
             >
-              {sending ? '…' : '发送'}
+              {visibleSending ? '…' : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
             </button>
           </form>
         {error && <p className={styles.sendError}>{error}</p>}
@@ -988,7 +1038,7 @@ export default function AiChatPage() {
         </div>
         <div className={styles.userPanelList}>
           {selectedFriend && createPortal(
-            <UserProfilePopover
+            <AiUserProfilePopover
               friend={selectedFriend}
               anchor={friendPopoverAnchor}
               onClose={() => setSelectedFriend(null)}
@@ -1106,133 +1156,20 @@ export default function AiChatPage() {
         onClose={() => setLoginDialogOpen(false)}
       />
 
-      {showModelPicker && (
+      {showModelPicker && (chatMode ? (
+        <AiWebProviderPopover
+          anchorRef={modelBtnRef}
+          web={web}
+          onClose={() => setShowModelPicker(false)}
+        />
+      ) : (
         <ModelPickerPopover
           anchorRef={modelBtnRef}
           runtimeRoute={runtimeRoute}
           onRuntimeRouteChange={setRuntimeRoute}
           onClose={() => setShowModelPicker(false)}
         />
-      )}
-    </div>
-  )
-}
-
-function UserProfilePopover({ friend, anchor, onClose }: { friend: Friend; anchor: PopoverAnchor; onClose: () => void }) {
-  const navigate = useNavigate()
-  const popRef = useRef<HTMLDivElement>(null)
-  const name = friend.nickname ?? friend.account
-  const isOnline = !!friend.is_online
-  const [isFriend, setIsFriend] = useState(!!friend.already_friend)
-  const [addingFriend, setAddingFriend] = useState(false)
-  const [addMsg, setAddMsg] = useState('')
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [onClose])
-
-  const POPOVER_WIDTH = 284
-  const POPOVER_HEIGHT = 280
-  const { left: popLeft, top: popTop } = fixedPopoverPosition(anchor, POPOVER_WIDTH, POPOVER_HEIGHT)
-
-  function copyId() {
-    navigator.clipboard.writeText(friend.id).catch(() => {})
-  }
-
-  async function addFriend() {
-    if (isFriend || addingFriend) return
-    setAddingFriend(true)
-    try {
-      await api.post('/api/me/friends', { query: friend.id, search_type: 'user_id' })
-      setIsFriend(true)
-      setAddMsg('已添加')
-    } catch (err) {
-      setAddMsg((err as { message?: string }).message ?? '添加失败')
-    } finally {
-      setAddingFriend(false)
-    }
-  }
-
-  return (
-    <div ref={popRef} style={{
-      position: 'fixed', left: popLeft, top: popTop, zIndex: 9999,
-      width: POPOVER_WIDTH, background: '#1e1f22',
-      border: '1px solid rgba(255,255,255,.12)', borderRadius: 10,
-      overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.55)',
-    }}>
-      {/* 头部 */}
-      <div style={{ position: 'relative', height: 72, background: isOnline ? 'linear-gradient(135deg,#0a2d1f,#0d2012)' : '#2c2e35' }}>
-        <div style={{
-          position: 'absolute', bottom: -18, left: 14,
-          width: 56, height: 56, borderRadius: '50%', border: '4px solid #1e1f22',
-          background: '#38414a', display: 'grid', placeItems: 'center', overflow: 'hidden',
-        }}>
-          {friend.avatar_data_url
-            ? <img src={friend.avatar_data_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : <span style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>{name[0]?.toUpperCase()}</span>
-          }
-          {/* 在线小点 */}
-          <span style={{
-            position: 'absolute', right: 1, bottom: 1,
-            width: 13, height: 13, borderRadius: '50%', border: '3px solid #1e1f22',
-            background: isOnline ? 'var(--green,#58BE6A)' : '#545862',
-          }} />
-        </div>
-        <button onClick={onClose} type="button" style={{
-          position: 'absolute', top: 8, right: 8,
-          width: 28, height: 28, border: 0, borderRadius: '50%',
-          background: 'rgba(0,0,0,.35)', color: '#c4c8d4', fontSize: 18,
-          cursor: 'pointer', display: 'grid', placeItems: 'center',
-        }}>×</button>
-      </div>
-      {/* 主体 */}
-      <div style={{ padding: '24px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <strong style={{ display: 'block', fontSize: 15, fontWeight: 800, color: 'var(--text)', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</strong>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{isOnline ? '在线' : '离线'}</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-          <em style={{ display: 'inline-flex', alignItems: 'center', height: 17, padding: '0 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: isOnline ? 'var(--green,#58BE6A)' : '#aab0bd', fontSize: 10, fontWeight: 800, fontStyle: 'normal' }}>
-            {isOnline ? '在线' : '离线'}
-          </em>
-          {friend.id && (
-            <em style={{ display: 'inline-flex', alignItems: 'center', height: 17, padding: '0 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#aab0bd', fontSize: 10, fontWeight: 800, fontStyle: 'normal' }}>
-              {friend.id.slice(0, 7).toUpperCase()}
-            </em>
-          )}
-        </div>
-        <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {friend.account && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 8 }}>
-              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>账号</span>
-              <strong style={{ color: 'var(--text-soft)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>{friend.account}</strong>
-            </div>
-          )}
-          {friend.id && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 8 }}>
-              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>用户 ID</span>
-              <strong style={{ color: 'var(--text-soft)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }} title={friend.id}>{friend.id.slice(0, 14).toUpperCase()}</strong>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          <button style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: 'rgba(255,255,255,.04)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-            type="button" onClick={() => { onClose(); navigate('/friends') }}>
-            发消息
-          </button>
-          <button
-            style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: isFriend ? 'rgba(88,190,106,.1)' : 'rgba(255,255,255,.04)', color: isFriend ? 'var(--green,#58BE6A)' : 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: isFriend ? 'default' : 'pointer', opacity: addingFriend ? 0.6 : 1 }}
-            type="button" onClick={addFriend} disabled={isFriend || addingFriend}>
-            {addMsg || (isFriend ? '已是好友' : addingFriend ? '添加中…' : '加好友')}
-          </button>
-          <button style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: 'rgba(255,255,255,.04)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-            type="button" onClick={copyId}>
-            复制 ID
-          </button>
-        </div>
-      </div>
+      ))}
     </div>
   )
 }

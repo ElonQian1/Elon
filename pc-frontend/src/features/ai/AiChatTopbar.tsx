@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import AiHomeModeSwitch, { type AiHomeMode } from './AiHomeModeSwitch'
 import styles from './AiChatPage.module.css'
 
 export default function AiChatTopbar({
@@ -8,6 +9,8 @@ export default function AiChatTopbar({
   sending,
   onToggleUserPanel,
   onCodexVaultBackup,
+  mode,
+  onModeChange,
 }: {
   title: string
   userPanelCollapsed: boolean
@@ -15,10 +18,13 @@ export default function AiChatTopbar({
   sending: boolean
   onToggleUserPanel: () => void
   onCodexVaultBackup: () => void
+  mode: AiHomeMode
+  onModeChange: (mode: AiHomeMode) => void
 }) {
   return (
     <header className={styles.topbar}>
       <span className={styles.topbarTitle}>{title}</span>
+      <AiHomeModeSwitch mode={mode} onChange={onModeChange} />
       <div className={styles.topbarRight}>
         <button
           className={[styles.topbarBtn, styles.panelToggleBtn].join(' ')}
@@ -36,7 +42,7 @@ export default function AiChatTopbar({
         <button className={styles.topbarBtn} type="button" title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
           分享算力
         </button>
-        <button
+        {mode === 'work' && <button
           className={styles.topbarBtn}
           type="button"
           title="把这台电脑的 Codex 账号保存到云端账号保险箱"
@@ -44,7 +50,7 @@ export default function AiChatTopbar({
           disabled={sending}
         >
           保存 Codex 账号
-        </button>
+        </button>}
         <button className={styles.topbarBtn} type="button" title="打开移动端入口" onClick={() => window.open('/app/download', '_blank', 'noopener')}>
           打开移动端
         </button>

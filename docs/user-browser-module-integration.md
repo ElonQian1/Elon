@@ -19,7 +19,8 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。需要登录时�
 - PWA：我的 → ChatGPT 账号与聊天；PWA 在新标签打开官方 ChatGPT，受同源隔离影响，
   不宣称可以读取登录状态或重渲染官方页面。
 - Win：首页“一龙 AI”分为 **Chat** 与 **工作**。Chat 默认使用一龙原有消息流，可选择
-  ChatGPT 或 Google AI 模式；工作模式保持原 Codex 项目与代理工作流。官方页面负责账号
+  ChatGPT 或 Google AI 模式；两种模式始终挂载同一个 `AiChatPage`，共用原消息列表、输入框、
+  用户侧栏和交互规范，仅替换消息发送与会话数据源。工作模式保持原 Codex 项目与代理工作流。官方页面负责账号
   状态、推理与搜索，一龙适配器只把可见问题、回答、来源和输入框状态同步到统一聊天 UI。
   Google AI 模式固定打开 `https://www.google.com/aimode`；若 Google 要求账号登录，用户
   改用系统浏览器。
