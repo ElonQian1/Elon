@@ -151,5 +151,24 @@
     return read(document, isVisible, labelOf).find((project) => project.id === id)?.node || null;
   }
 
-  return Object.freeze({ canonicalPath, findNode, projectId, read, referencedTitle, runtimeProjectId });
+  function unresolved(document, isVisible, labelOf) {
+    if (!document || typeof document.querySelectorAll !== 'function') return [];
+    const label = typeof labelOf === 'function' ? labelOf : (node) => clean(node && node.textContent);
+    const visible = typeof isVisible === 'function' ? isVisible : () => true;
+    const actionable = Array.from(document.querySelectorAll('button, [role="button"]')).filter(visible);
+    const optionTitles = new Set(actionable.map((node) => referencedTitle(label(node))).filter(Boolean));
+    const seen = new Set();
+    return actionable.filter((node) => {
+      if (!visible(node) || node.getAttribute('aria-expanded') !== null) return false;
+      const title = clean(label(node));
+      if (!title || !optionTitles.has(title) || RESERVED_TITLE.test(title) || PROJECT_OPTIONS.test(title)) return false;
+      if (projectIdForNode(node) || seen.has(title)) return false;
+      seen.add(title);
+      return true;
+    }).map((node) => ({ node, title: clean(label(node)).slice(0, 160) })).slice(0, 20);
+  }
+
+  return Object.freeze({
+    canonicalPath, findNode, projectId, read, referencedTitle, runtimeProjectId, unresolved
+  });
 });

@@ -92,6 +92,27 @@
     }).filter(Boolean).slice(0, MAX_PROJECTS);
   }
 
+  function projectLabel(node) {
+    return cleanText(
+      node.getAttribute('data-project-title') ||
+        node.getAttribute('title') ||
+        node.getAttribute('aria-label') ||
+        node.textContent
+    );
+  }
+
+  function enrichProjectConversations(conversations, projects) {
+    const byId = new Map(projects.map((project) => [project.id, project]));
+    return conversations.map((conversation) => {
+      const project = byId.get(conversation.projectId);
+      if (!project) return conversation;
+      return Object.assign({}, conversation, {
+        projectTitle: project.title,
+        projectPath: project.path
+      });
+    });
+  }
+
   function groupLabelFor(node) {
     const nodeTop = node.getBoundingClientRect().top;
     let scope = node.parentElement;
@@ -277,6 +298,94 @@
     poll();
   }
 
+  function waitForRoute(predicate, onReady, onTimeout) {
+    const started = Date.now();
+    function poll() {
+      if (predicate(location.pathname)) return onReady(location.pathname);
+      if (Date.now() - started >= 3000) return onTimeout();
+      window.setTimeout(poll, 80);
+    }
+    poll();
+  }
+
+  function collectProjects(initial, onDone) {
+    if (!projectPolicy || typeof projectPolicy.unresolved !== 'function') return onDone(initial);
+    const originalPath = location.pathname;
+    const titles = projectPolicy.unresolved(document, isVisible, projectLabel)
+      .map((project) => project.title);
+    const values = initial.slice();
+    const seen = new Set(values.map((project) => project.id));
+    let index = 0;
+
+    function ensureSidebar(next) {
+      if (projectPolicy.unresolved(document, isVisible, projectLabel).length) return next();
+      const open = findSidebarButton(true);
+      if (!open) return onDone(values);
+      open.click();
+      const started = Date.now();
+      function poll() {
+        if (projectPolicy.unresolved(document, isVisible, projectLabel).length) return next();
+        if (Date.now() - started >= 3000) return onDone(values);
+        window.setTimeout(poll, 80);
+      }
+      poll();
+    }
+
+    function restore(next) {
+      if (location.pathname === originalPath) return ensureSidebar(next);
+      history.back();
+      waitForRoute(
+        (path) => path === originalPath,
+        () => ensureSidebar(next),
+        () => onDone(values)
+      );
+    }
+
+    function visitNext() {
+      if (index >= titles.length) return restore(() => onDone(values));
+      const title = titles[index++];
+      const candidate = projectPolicy.unresolved(document, isVisible, projectLabel)
+        .find((project) => project.title === title);
+      if (!candidate) return visitNext();
+      const before = location.pathname;
+      try {
+        candidate.node.click();
+      } catch {
+        return restore(visitNext);
+      }
+      waitForRoute(
+        (path) => path !== before && /^\/g\/g-p-[A-Za-z0-9_-]{1,160}\/project$/.test(path),
+        (path) => {
+          const id = projectIdFromPath(path);
+          if (id && !seen.has(id)) {
+            seen.add(id);
+            values.push({ id, title, path, active: originalPath.startsWith('/g/' + id + '/') });
+          }
+          restore(visitNext);
+        },
+        () => restore(visitNext)
+      );
+    }
+
+    visitNext();
+  }
+
+  function emitConversationSnapshot(snapshot, emitEvent, result, closeAfter) {
+    collectProjects(readProjects(), (projects) => {
+      emitEvent({
+        type: 'conversation_snapshot',
+        conversations: enrichProjectConversations(snapshot.conversations, projects),
+        projects,
+        collection: snapshot.collection
+      });
+      result('list_conversations', true, '');
+      if (closeAfter) {
+        const close = findSidebarButton(false);
+        if (close) close.click();
+      }
+    });
+  }
+
   function requestList(emitEvent, result) {
     const open = findSidebarButton(true);
     if (open) {
@@ -284,15 +393,7 @@
       return waitForConversations(
         (conversations) => {
           collectConversationHistory(conversations, (snapshot) => {
-            emitEvent({
-              type: 'conversation_snapshot',
-              conversations: snapshot.conversations,
-              projects: readProjects(),
-              collection: snapshot.collection
-            });
-            result('list_conversations', true, '');
-            const close = findSidebarButton(false);
-            if (close) close.click();
+            emitConversationSnapshot(snapshot, emitEvent, result, true);
           });
         },
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
@@ -302,13 +403,7 @@
     const existing = readConversations();
     if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
     collectConversationHistory(existing, (snapshot) => {
-      emitEvent({
-        type: 'conversation_snapshot',
-        conversations: snapshot.conversations,
-        projects: readProjects(),
-        collection: snapshot.collection
-      });
-      result('list_conversations', true, '');
+      emitConversationSnapshot(snapshot, emitEvent, result, false);
     });
   }
 

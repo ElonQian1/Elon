@@ -31,12 +31,15 @@ const modern = node('Modern project', { 'data-project-id': 'g-p-modern_2' }, roo
 const react = node('React project', {}, root);
 react.__reactProps$test = { project: { id: 'g-p-react_3' } };
 const modernOptions = node('Open Modern project project options', {}, root);
+const unresolved = node('Unresolved project', {}, root);
+const unresolvedOptions = node('Open Unresolved project project options', {}, root);
 const create = node('New project', {}, root);
 const hidden = node('Private script metadata', { content: 'g-p-hidden_4' }, null);
 const documentMock = {
   querySelectorAll(selector) {
-    if (selector === '*') return [root, legacy, modern, react, modernOptions, create, hidden];
-    return [legacy, modern, react, modernOptions, create];
+    if (selector === '*') return [root, legacy, modern, react, modernOptions, unresolved, unresolvedOptions, create, hidden];
+    if (selector === 'button, [role="button"]') return [modernOptions, unresolved, unresolvedOptions, create];
+    return [legacy, modern, react, modernOptions, unresolved, unresolvedOptions, create];
   }
 };
 
@@ -50,4 +53,6 @@ assert.deepEqual(projects.map((project) => project.id), ['g-p-legacy_1', 'g-p-mo
 assert.equal(policy.findNode(documentMock, '/g/g-p-modern_2/project', () => true, (value) => value.textContent), modern);
 assert.equal(projects.some((project) => project.title === 'New project'), false);
 assert.equal(projects.some((project) => project.id === 'g-p-hidden_4'), false);
+assert.deepEqual(policy.unresolved(documentMock, () => true, (value) => value.textContent)
+  .map((project) => project.title), ['Unresolved project']);
 process.stdout.write('chatgpt project policy tests passed\n');
