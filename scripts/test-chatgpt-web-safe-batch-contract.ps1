@@ -30,6 +30,10 @@ if (-not $mismatchRejected) {
 
 $required = @(
     "Assert-ChatGptWebSmokeTrustedDevice",
+    "Get-ChatGptWebSmokeUserReadiness",
+    "NotifyWhenLocked:(-not `$SkipUnlockNotification)",
+    "CHATGPT_WEB_SAFE_ACCEPTANCE_STATUS=user_action_required",
+    "required_action=unlock_device",
     "Start-ChatGptWebSmokeAwakeLease",
     "Stop-ChatGptWebSmokeAwakeLease",
     "ExpectedHardwareSerial = `$ExpectedHardwareSerial",

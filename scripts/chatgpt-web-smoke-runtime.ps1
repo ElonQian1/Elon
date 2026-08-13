@@ -121,6 +121,49 @@ function Get-ChatGptWebSmokeDisplayState {
     }
 }
 
+function Get-ChatGptWebSmokeUserReadiness {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [switch]$NotifyWhenLocked
+    )
+
+    $display = Get-ChatGptWebSmokeDisplayState -Runtime $Runtime
+    if (-not $display.keyguard_showing) {
+        return [pscustomobject]@{
+            schema = "elon.chatgpt_web.user_readiness.v1"
+            ready = $true
+            status = "ready"
+            required_action = ""
+            notification_posted = $false
+        }
+    }
+
+    $notificationPosted = $false
+    if ($NotifyWhenLocked) {
+        try {
+            Invoke-ChatGptWebSmokeAdb -Runtime $Runtime -Arguments @(
+                "shell", "cmd", "notification", "post",
+                "-t", "Codex needs your help",
+                "-i", "@android:drawable/stat_sys_warning",
+                "codex-chatgpt",
+                "Unlock the phone, then reply: ready now"
+            ) -TimeoutSec 8 -Label "post ChatGPT Web user-action notification" | Out-Null
+            $notificationPosted = $true
+        } catch {
+            $detail = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.Exception.Message
+            Write-Warning "Unable to post ChatGPT Web user-action notification: $detail"
+        }
+    }
+
+    return [pscustomobject]@{
+        schema = "elon.chatgpt_web.user_readiness.v1"
+        ready = $false
+        status = "user_action_required"
+        required_action = "unlock_device"
+        notification_posted = $notificationPosted
+    }
+}
+
 function Start-ChatGptWebSmokeAwakeLease {
     param([Parameter(Mandatory = $true)]$Runtime)
 

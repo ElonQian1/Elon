@@ -7,7 +7,8 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85,
+    [switch]$SkipUnlockNotification
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +17,12 @@ $ErrorActionPreference = "Stop"
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
+$readiness = Get-ChatGptWebSmokeUserReadiness -Runtime $runtime `
+    -NotifyWhenLocked:(-not $SkipUnlockNotification)
+if (-not $readiness.ready) {
+    $readiness | ConvertTo-Json -Compress
+    throw "CHATGPT_WEB_SAFE_ACCEPTANCE_STATUS=user_action_required required_action=unlock_device notification_posted=$($readiness.notification_posted.ToString().ToLowerInvariant())"
+}
 
 $common = @{
     Adb = $Adb
