@@ -52,6 +52,8 @@ mod compute_attempt_consumer_reviews;
 mod compute_attempt_dispatches;
 mod compute_attempt_execution_plans;
 mod compute_attempt_execution_receipts;
+#[cfg(test)]
+mod compute_attempt_final_usage_fence_tests;
 mod compute_attempt_finalizations;
 mod compute_attempt_leases;
 mod compute_attempt_platform_observations;

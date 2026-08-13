@@ -3,7 +3,7 @@ title: 分布式算力 Attempt 最终声明用量栅栏权威
 status: current
 reviewed_at: 2026-08-12
 owners: backend, node, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: verified_rust_sqlite
 ---
 
 # 分布式算力 Attempt 最终声明用量栅栏权威
@@ -12,7 +12,7 @@ implementation_status: implementation_uncompiled
 
 本权威冻结 v226 的最窄修复合同：v189 Provider 终态候选必须原子绑定当时最新的 v188 累计声明用量；候选一旦存在，同一 Lease 的声明用量流即被封口。之后只允许对候选前已经保存的声明做精确幂等重放，不允许追加任何新序号。
 
-v226 迁移、Store 写入封口、模板门卫和统一候选 currentness 源码已经写入，状态为 `implementation_uncompiled/implementation_unrun`。本批仍不编译、不执行迁移、不运行 SQLite、HTTP、PC 或节点链路。
+v226 迁移、Store 写入封口、模板门卫和统一候选 currentness 已完成 Rust/SQLite 动态验收。定向测试覆盖全量新库迁移、精确重放、候选后封口、两个独立连接竞争、legacy 一致历史迁移、legacy 漂移拒绝和历史漂移阻断下游审核。真实 Gateway Adapter 尚不可构造，HTTP/TCP、PC、节点、生产数据库原位升级和发布仍未验收。
 
 ## 2. 被修复的完整性缺口
 
@@ -90,11 +90,19 @@ v226 不改变既有证据级别：
 - 不静默忽略 legacy 漂移，也不在 pending 队列中继续消费漂移候选；
 - 不借本修复引入节点签名、真实计量、自动 Verification、容量或资金效果。
 
-## 9. 静态验收与后续验证
+## 9. 动态验收与后续验证
 
-本批静态验收必须覆盖：迁移注册唯一、双向 trigger 文本、legacy fail-closed 查询、Store 重放顺序、统一候选 currentness 入口、v190-v195 调用可达性、源码尺寸、格式与文档模块化。
+2026-08-13 已通过 5 项定向 Rust/SQLite 测试：
 
-由于当前阶段禁止编译和运行，本批完成后状态最多为 `implementation_uncompiled/implementation_unrun`。Cargo 编译、全量迁移、两连接竞争、候选与用量并发写、旧库漂移夹具、HTTP/PC/节点集成仍需后续独立验证。
+- 新库全量迁移只安装一组双向 trigger；
+- 候选绑定当前流头，候选后的原请求可精确重放，新幂等键、新序号和不同内容失败关闭；
+- 两个独立 SQLite 连接竞争追加用量与登记候选时只有一个方向成功，不产生落后流头的候选；
+- 一致 legacy 历史可安装 v226，漂移历史拒绝迁移且不留下半安装 trigger；
+- 人工构造的历史漂移使候选读取和消费者审核失败，审核表保持零写入。
+
+验证命令为 `scripts/validate-rust.ps1 ... compute_attempt_final_usage_fence_tests -- --test-threads=1`，指纹为 `4c63c04f42aae96180be0ec3d53e93e4f4d6789d18f8ee828ea9e1353ea2b32a`。测试仅为建立 V226 前置 running Lease 临时移除 v211 Gateway acceptance trigger，并在进入 V226 被测阶段前立即幂等重装；这不证明真实 Gateway、Adapter ACK 或生产派发已实现。
+
+仍需后续独立验证 HTTP/TCP、PC、节点、真实 Gateway/Adapter、生产数据库备份恢复与原位升级、异常断电和发布链路。
 
 ## 10. 实现入口
 

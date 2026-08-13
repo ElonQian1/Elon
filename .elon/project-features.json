@@ -5,7 +5,7 @@
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
-      "status": "proposed",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/compute-attempt-final-usage-fence-verification-v1.md",
@@ -29,13 +29,15 @@
         "settlement"
       ],
       "task_paths": [
+        "docs/distributed-compute/README.md",
         "docs/distributed-compute/attempt-final-usage-fence-authority.md",
         "docs/distributed-compute/current-implementation-status.md",
         "docs/requirements/compute-attempt-final-usage-fence-verification-v1.md",
-        "server/src/compute_attempt_final_usage_fence_tests.rs",
         "server/src/compute_attempt_terminal_migration.rs",
         "server/src/compute_attempt_terminal_migration/final_usage_fence.rs",
         "server/src/store.rs",
+        "server/src/store/compute_attempt_final_usage_fence_tests.rs",
+        "server/src/store/compute_attempt_final_usage_fence_tests/support.rs",
         "server/src/store/compute_attempt_terminals.rs",
         "server/src/store/compute_attempt_terminals/final_usage.rs",
         "server/src/store/compute_attempt_usage.rs"
@@ -50,9 +52,75 @@
         "历史漂移读取与下游审核失败关闭",
         "Rust 与仓库门禁通过并绑定证据"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/attempt-final-usage-fence-authority.md",
+          "content_hash": "32619c62bd783c678eb6c30ec70dcde3e1c4b390a462f92df3ace1ba3b391b4d",
+          "locator": "verified_rust_sqlite status and evidence boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "57282471137242bbe260216f3d6c5d8043afa2b9",
+            "worktree_blob_oid": "d0737658cea4106111cee7681caf30c89702b266",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_attempt_terminal_migration/final_usage_fence.rs",
+          "content_hash": "fae3e27600948c84d333923c1eeb3e144291d3e9b32e1d3b349d1fc57ff176bb",
+          "locator": "migration_v226_final_usage_fence",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "62080726413257fda7b7395dd801da9742efb88a",
+            "worktree_blob_oid": "62080726413257fda7b7395dd801da9742efb88a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_attempt_final_usage_fence_tests.rs",
+          "content_hash": "c638c32f61535d283d6ada20e8d4dd4c066ad9ede713ff7ba655287b6a9e716e",
+          "locator": "five V226 Rust/SQLite acceptance tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5678e68468c63ed5f39a20771c2557bdde49bc79",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/compute_attempt_final_usage_fence_tests/support.rs",
+          "content_hash": "9f0c5ce66c7d134f8a4ec919e11899986e9094508974cbff61da8d449f542f58",
+          "locator": "BrokerFixture-based V226 test support",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "84a70993c3f1cff01bad57b786fecdcd9bf27afc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/compute_attempt_terminals/final_usage.rs",
+          "content_hash": "a0e33686364d2106e6d075c0098ca0afd25a530480eeacfc7ba4642a2b0bddbc",
+          "locator": "write_compute_attempt_terminal_candidate",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "5fc5dd4e499fc2d8aa535ad41458376199328884",
+            "worktree_blob_oid": "5fc5dd4e499fc2d8aa535ad41458376199328884",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1786620865523,
-      "updated_at_ms": 1786620865523
+      "updated_at_ms": 1786625098662
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -178,6 +246,86 @@
       ],
       "created_at_ms": 1786619748837,
       "updated_at_ms": 1786620439206
+    },
+    {
+      "id": "project-feature-registry-normalized-hash-v1",
+      "title": "功能注册表跨平台文本哈希 V1",
+      "summary": "统一注册表服务与 Windows 验收脚本的文本换行规范化哈希，避免 CRLF 被误判为需求漂移。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/project-feature-registry-normalized-hash-v1.md",
+        "content_hash": "24ef3d2b80a4178e1c3f60a15f49b37fab6b8da0488c1baaa44b8a3fbb2692b6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "2caf523e80afe8f12ef2d09e680b7bc4152f569f",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "project-governance",
+      "tags": [
+        "governance",
+        "windows",
+        "feature-registry"
+      ],
+      "task_paths": [
+        "docs/requirements/project-feature-registry-normalized-hash-v1.md",
+        "scripts/test-project-feature-registry-adoption.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "CRLF 与 LF 文本获得一致规范化 SHA-256",
+        "真实正文变化仍失败关闭",
+        "功能注册表采用和 CI 门禁通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/project-feature-registry-normalized-hash-v1.md",
+          "content_hash": "24ef3d2b80a4178e1c3f60a15f49b37fab6b8da0488c1baaa44b8a3fbb2692b6",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2caf523e80afe8f12ef2d09e680b7bc4152f569f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-project-feature-registry-adoption.ps1",
+          "content_hash": "52f0b8284f8b338d18978c8285e54b85c4664013822a9c32d88814fee7483358",
+          "locator": "Get-NormalizedTextSha256",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "2e43cf52ed2df9f14a34ba077035074ed2528bc4",
+            "worktree_blob_oid": "eb21500cf0f513ba3717cc539b6da5d6b42df98f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-project-feature-registry-adoption.ps1",
+          "content_hash": "52f0b8284f8b338d18978c8285e54b85c4664013822a9c32d88814fee7483358",
+          "locator": "PROJECT_FEATURE_REGISTRY_ADOPTION=passed",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c2c99ad7051d32e65c3355a3caf7ac9534d1ab62",
+            "head_blob_oid": "2e43cf52ed2df9f14a34ba077035074ed2528bc4",
+            "worktree_blob_oid": "eb21500cf0f513ba3717cc539b6da5d6b42df98f",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786624803541,
+      "updated_at_ms": 1786624891188
     }
   ],
   "audit_log": [
@@ -280,6 +428,236 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1786620865523
+    },
+    {
+      "id": "feature_event_70a8fc0c8414425bb035a29ef2f6d452",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "目标、动态范围、禁线和完成边界明确。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786620891776
+    },
+    {
+      "id": "feature_event_43c2820d5d2a49e0a9fcd224f9b88642",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "既有 V226 源码已完成静态实现，无外部依赖，可进入动态验收。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786620892045
+    },
+    {
+      "id": "feature_event_89c98f7449f44cd3a7f3030d47871d6f",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786620901386
+    },
+    {
+      "id": "feature_event_c092c93741384afca99df847fbbb5dfa",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "开始构建完整 Attempt 夹具并运行 V226 动态验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786620911764
+    },
+    {
+      "id": "feature_event_7060d5603ab24ba687964a8052910b4b",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786624585260
+    },
+    {
+      "id": "feature_event_cd311ba1810042ffa58d3b520753decd",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "V226 迁移、写入封口和历史漂移防护已有当前源码与动态测试证据。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786624598607
+    },
+    {
+      "id": "feature_event_8187f9e595af47a098e4a1706d93ecee",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "五个定向 Rust/SQLite 验收场景全部通过；保留 Gateway/Adapter 与生产升级外部边界。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786624615429
+    },
+    {
+      "id": "feature_event_2319a1a521e04f779cea7db9a0ea36be",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "修复动态验收收尾中发现的跨平台换行误报。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1786624803541
+    },
+    {
+      "id": "feature_event_b98a1c91913044a9a3b9e623235c9517",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "范围、验收和跨平台边界已明确，可进入实现验收。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786624819678
+    },
+    {
+      "id": "feature_event_5983cca86a6c4fc2adce5093ebca27b8",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786624836168
+    },
+    {
+      "id": "feature_event_249e24caecc84c5bb86736229be8ecb8",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "已修正脚本并开始绑定当前实现与测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786624848447
+    },
+    {
+      "id": "feature_event_700e3765c3fc46c092c37023a982dfe4",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786624863283
+    },
+    {
+      "id": "feature_event_0caaf787bfa744be92dfc79c90e11198",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "脚本采用服务端一致的 LF 规范化 UTF-8 SHA-256。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786624874699
+    },
+    {
+      "id": "feature_event_e8d1e8377e8445dca744ff97e87e11aa",
+      "feature_id": "project-feature-registry-normalized-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Windows CRLF 工作区内采用测试已通过，且 CI 门禁登记保持有效。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786624891188
+    },
+    {
+      "id": "feature_event_0a2059ecf71b4d448c076a92c4e12b5f",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "重新打开已验证功能以修正实际测试模块路径，完成后重新绑定证据和验收。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1786624977103
+    },
+    {
+      "id": "feature_event_4de351ffa6bb4ce4bcddd6a447077c7b",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "metadata_updated",
+      "actor": "codex-goal-019f3b86",
+      "reason": "修正动态验收测试的实际 store 子模块路径，并纳入状态总览。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1786624997076
+    },
+    {
+      "id": "feature_event_fc96e1b86f6e4b80a7eff9edd99fb67a",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "实际测试路径已修正，原验收边界和通过结果保持不变。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786625013799
+    },
+    {
+      "id": "feature_event_b410d99db367443fb9ce4ee272109ff0",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "修正后的任务路径和原有验收标准已复审，可重新绑定实现证据。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786625023378
+    },
+    {
+      "id": "feature_event_ba94c7a3443c4a57b204b9c78aef665e",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786625036897
+    },
+    {
+      "id": "feature_event_faad467b3172467b8be970d45a9914db",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "重新绑定修正路径后的实现与测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786625050548
+    },
+    {
+      "id": "feature_event_0750476a89364ec884b2a916beed89d5",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786625068932
+    },
+    {
+      "id": "feature_event_ef798628fc294413a0c173673a73e9b3",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "修正路径后的当前源码与五项测试证据已重新绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786625085461
+    },
+    {
+      "id": "feature_event_50c4797005b54175804ed2bf16caa5f3",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "路径修正后重新核对五项 Rust/SQLite 验收全部通过；外部 Gateway/Adapter 与生产升级边界保持未声明。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786625098662
     }
   ]
 }

@@ -21,6 +21,20 @@ function Assert-RegistryAdoption {
     }
 }
 
+function Get-NormalizedTextSha256 {
+    param([string]$Path)
+
+    $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+    $normalizedText = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($normalizedText)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return (($sha256.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
 function Get-RepoRoot {
     $root = (& git rev-parse --show-toplevel).Trim()
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($root)) {
@@ -65,7 +79,7 @@ Assert-RegistryAdoption (-not [System.IO.Path]::IsPathRooted($requirementRelativ
 $requirementFullPath = Join-Path $repoRoot $requirementRelativePath
 Assert-RegistryAdoption (Test-Path -LiteralPath $requirementFullPath -PathType Leaf) "Bound requirement is missing: $requirementRelativePath"
 
-$actualRequirementHash = (Get-FileHash -LiteralPath $requirementFullPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$actualRequirementHash = Get-NormalizedTextSha256 -Path $requirementFullPath
 $expectedRequirementHash = ([string]$feature.requirement.content_hash).ToLowerInvariant()
 Assert-RegistryAdoption ($actualRequirementHash -eq $expectedRequirementHash) "Requirement content hash drifted; review it through project_feature_workflow before work continues."
 
