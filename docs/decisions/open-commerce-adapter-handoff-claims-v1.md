@@ -3,6 +3,8 @@ title: ADR：开放商业接入器任务领取与租约 V1
 status: accepted
 owner: backend
 date: 2026-08-03
+reviewed_at: 2026-08-13
+implementation_status: verified_rust_sqlite_axum_tcp
 ---
 
 # ADR：开放商业接入器任务领取与租约 V1
@@ -40,3 +42,4 @@ date: 2026-08-03
 - MCP：`server/src/open_commerce_adapter_mcp.rs`
 - PC：`pc-frontend/src/features/open-commerce/OpenCommerceAdapterClaimMonitor.tsx`
 - 测试：`server/src/open_commerce_adapter_claim_tests.rs`、`server/src/open_commerce_adapter_claim_api_tests.rs`
+- 真实 TCP 测试：`server/src/open_commerce_adapter_claim_tcp_tests.rs`

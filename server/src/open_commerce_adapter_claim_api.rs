@@ -228,3 +228,7 @@ fn default_limit() -> usize {
 #[cfg(test)]
 #[path = "open_commerce_adapter_claim_api_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "open_commerce_adapter_claim_tcp_tests.rs"]
+mod tcp_tests;

@@ -23,13 +23,13 @@ use crate::{
     types::AppState,
 };
 
-struct ApiFixture {
-    state: Arc<AppState>,
+pub(super) struct ApiFixture {
+    pub(super) state: Arc<AppState>,
     router: Router,
-    project_id: String,
+    pub(super) project_id: String,
     owner_user_id: String,
     integration_id: String,
-    owner_token: String,
+    pub(super) owner_token: String,
     outsider_token: String,
     write_only_token: String,
 }
@@ -210,7 +210,7 @@ async fn claim_http_renews_releases_reclaims_and_completes_idempotently() {
     assert!(!list.to_string().contains(second_lease));
 }
 
-fn rotate_claim_token(fixture: &ApiFixture) -> String {
+pub(super) fn rotate_claim_token(fixture: &ApiFixture) -> String {
     open_commerce_adapter_service::rotate_credential(
         &fixture.state.store,
         &fixture.project_id,
@@ -257,7 +257,7 @@ async fn call(
     (status, body)
 }
 
-fn fixture() -> ApiFixture {
+pub(super) fn fixture() -> ApiFixture {
     let path = std::env::temp_dir().join(format!(
         "elon_open_commerce_adapter_claim_api_{}.db",
         Uuid::new_v4().simple()
