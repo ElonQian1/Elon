@@ -90,7 +90,7 @@ internal class ChatSideMenuController(
     private var handleToggleColorAnimator: ValueAnimator? = null
 
     val isOpen: Boolean
-        get() = isSetup && overlay.visibility == View.VISIBLE && !isAnimating
+        get() = isSetup && overlay.visibility == View.VISIBLE
 
     fun setup() {
         if (isSetup) return
@@ -185,7 +185,7 @@ internal class ChatSideMenuController(
     }
     fun openFromHandle() {
         if (!isSetup || !sideMenuHandleEnabled || !isSideMenuHandleContextActive()) return
-        show()
+        open()
     }
     fun refreshVisibleContent() {
         if (!isSetup || overlay.visibility != View.VISIBLE) return
@@ -286,7 +286,7 @@ internal class ChatSideMenuController(
 
                 if (overlay.visibility != View.VISIBLE && dx > 0f) {
                     beginConsumingDrawerGesture(event)
-                    show()
+                    open()
                     return true
                 }
                 if (overlay.visibility == View.VISIBLE && dx < 0f) {
@@ -333,7 +333,7 @@ internal class ChatSideMenuController(
         cancelChildTouch(event)
     }
 
-    private fun show() {
+    fun open() {
         if (!isSetup || isAnimating || overlay.visibility == View.VISIBLE) return
         dismissActionPopup()
         applyContentMode()

@@ -34,6 +34,7 @@ internal class MainMcpNativeControlActions(
     private val activeFriend: () -> AppFriend? = { null },
     private val activeFriendMessages: () -> List<ChatMessage> = { emptyList() },
     private val socialAiChatFeature: () -> MainSocialAiChatFeature? = { null },
+    private val chatSideMenuControl: ChatSideMenuMcpControl? = null,
     private val chatGptAttachmentFixtureActions: ChatGptWebAcceptanceAttachmentNativeActions? = null,
     private val rememberMcpConversationSeed: (McpConversationSeed) -> Unit = {}
 ) {
@@ -44,6 +45,7 @@ internal class MainMcpNativeControlActions(
         return JSONObject()
             .put("active_page", activePage())
             .put("active_surface", activeSurface())
+            .put("chat_side_menu_open", chatSideMenuControl?.isOpen() == true)
             .put("toolbar_title", binding.topTitleText.text?.toString().orEmpty())
             .put("bottom_tab", activeBottomTab())
             .put("project_top_tab", activeProjectTopTab())
@@ -144,6 +146,14 @@ internal class MainMcpNativeControlActions(
                 if (socialAiChatFeature()?.refreshWebChatConversationIndex() != true) {
                     return errorJson(action, "web_chat_not_ready")
                 }
+                uiState()
+            }
+            "open_chat_side_menu" -> {
+                chatSideMenuControl?.open() ?: return errorJson(action, "chat_side_menu_unavailable")
+                uiState()
+            }
+            "close_chat_side_menu" -> {
+                chatSideMenuControl?.close() ?: return errorJson(action, "chat_side_menu_unavailable")
                 uiState()
             }
             "open_project_chat" -> {

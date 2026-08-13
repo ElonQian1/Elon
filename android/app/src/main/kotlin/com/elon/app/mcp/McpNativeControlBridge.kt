@@ -201,7 +201,9 @@ internal object McpNativeControlBridge {
         "start_new_web_chat_conversation",
         "open_web_chat_conversation",
         "open_web_chat_project",
-        "refresh_web_chat_conversations" -> MAIN_SURFACE
+        "refresh_web_chat_conversations",
+        "open_chat_side_menu",
+        "close_chat_side_menu" -> MAIN_SURFACE
         else -> null
     }
 

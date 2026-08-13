@@ -274,7 +274,7 @@ class MainActivity : AppCompatActivity() {
                     friendChatActions.currentMessages()
                 }
             },
-            socialAiChatFeature = { socialAiChatFeature },
+            socialAiChatFeature = { socialAiChatFeature }, chatSideMenuControl = ChatSideMenuMcpControl(chatSideMenuController),
             chatGptAttachmentFixtureActions = createChatGptWebAcceptanceAttachmentActions(socialAiChatFeature, inputActions.pendingAttachmentActions),
             rememberMcpConversationSeed = { seed ->
                 rememberPendingMcpConversationSeed(prefs, s.gson, seed)

@@ -54,6 +54,8 @@ class McpNativeControlBridgeTest {
             assertEquals("main", McpNativeControlBridge.targetSurfaceFor("open_social_ai_chat"))
             assertEquals("main", McpNativeControlBridge.targetSurfaceFor("open_chatgpt_web"))
             assertEquals("main", McpNativeControlBridge.targetSurfaceFor("select_web_chat_provider"))
+            assertEquals("main", McpNativeControlBridge.targetSurfaceFor("open_chat_side_menu"))
+            assertEquals("main", McpNativeControlBridge.targetSurfaceFor("close_chat_side_menu"))
             assertEquals(
                 "chatgpt_web",
                 McpNativeControlBridge.targetSurfaceFor("open_chatgpt_official_fallback"),
