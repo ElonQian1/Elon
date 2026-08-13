@@ -13,6 +13,10 @@ use super::{
 };
 
 const NATIVE_CHAT_PATH: &str = "/pc/user-browser/native";
+#[cfg(windows)]
+const NATIVE_WINDOW_ROLE: &str = "standalone_top_level";
+#[cfg(not(windows))]
+const NATIVE_WINDOW_ROLE: &str = "managed_child";
 const NAVIGATION_ERROR_SCRIPT: &str = r#"
 (function () {
   var root = document.getElementById('__elon_native_window_status__');
@@ -150,13 +154,10 @@ pub(super) async fn open(
         .focused(true)
         .enable_clipboard_access()
         .initialization_script(include_str!("native_window_probe.js"));
-    // Windows 的 `parent` 会创建 WS_CHILD：在 WebView2/Tao 下表现为 16x16
-    // 占位窗口，日志虽显示创建成功，用户却看不到独立聊天窗。Windows 顶层附属窗
-    // 必须用 `owner`；其它平台继续使用各自的 parent/transient 语义。
-    #[cfg(windows)]
-    {
-        builder = builder.owner(&webview).map_err(display_error)?;
-    }
+    // Windows 的 parent/owner 都会让动态 WebViewWindow 落到 Tao 的 16x16
+    // 内部消息窗口，而不是用户可见的顶层窗口。官方网页窗口已经验证过：不设置
+    // 关系时能稳定创建真实顶层 WebView2，因此 Windows 独立聊天窗也保持 standalone。
+    // 其它平台继续使用各自的 parent/transient 语义。
     #[cfg(not(windows))]
     {
         builder = builder.parent(&webview).map_err(display_error)?;
@@ -278,7 +279,7 @@ pub(super) async fn open(
         "一龙 AI 子窗口已创建",
         json!({
             "parent_label": webview.label(),
-            "window_role": "owned_top_level",
+            "window_role": NATIVE_WINDOW_ROLE,
             "requested_inner_width": 940,
             "requested_inner_height": 760,
         }),
