@@ -433,6 +433,133 @@
       "updated_at_ms": 1786659172557
     },
     {
+      "id": "compute-v258-upstream-transport-target-verification",
+      "title": "V258 惰性上游传输目标动态验收",
+      "summary": "编译并执行现有 V258 migration、Store、owner/admin HTTP 与零副作用合同，修复真实集成缺口；不执行 DNS/TLS、真实密钥、进程、Provider 激活、市场、资金或部署。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/v258-upstream-transport-target-verification.md",
+        "content_hash": "593fa1a0cf1681de82a51c1d8b05812a58a74e280a647e9489ea66d623302c44",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "157a883d78aca9c4426d460b26a76a1c78cb1096",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "v258",
+        "verification"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/external-pool-adapter-upstream-transport-target-acceptance.md",
+        "server/src/compute_federation/external_pool_adapter_release_api_tests",
+        "server/src/compute_federation/external_pool_adapter_upstream_transport_target",
+        "server/src/store/compute_external_pool_adapter_upstream_transport_target",
+        "server/src/store_migrations/compute_external_pool_adapter_upstream_transport_target"
+      ],
+      "dependencies": [
+        "compute-v256-runtime-bundle-resolver-verification"
+      ],
+      "acceptance_criteria": [
+        "The full elon-server test target compiles with V258 enabled.",
+        "Focused migration and owner/admin HTTP tests execute successfully.",
+        "Strict validation, redaction, replay, lineage, currentness and revocation are covered.",
+        "No network, process, secret delivery, probe, activation, route, market, usage or settlement effect is added.",
+        "Authority and acceptance documents record exact dynamic evidence and residual production gaps."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-upstream-transport-target-acceptance.md",
+          "content_hash": "bd012560215edfe44728ba9c1f768daa1796e99529ce91cc4bbd2578707376d8",
+          "locator": "本批状态",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_blob_oid": "6c32cf18bb3bc6ea36f4614d1f4432b7d297021e",
+            "worktree_blob_oid": "fdf21d8224d6d0a31122893acce8cbb17c7866bb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/upstream_transport_target_admin_http_test.rs",
+          "content_hash": "afa95457e011a3909adfa41347d6ef1b0fe7d8f4e317be38f38ad91cd3e4b00f",
+          "locator": "admin_can_revoke_and_record_a_linear_successor",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_blob_oid": "998be28b854563b72ca358db80076d7ea00f2791",
+            "worktree_blob_oid": "998be28b854563b72ca358db80076d7ea00f2791",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/upstream_transport_target_owner_http_test.rs",
+          "content_hash": "ff88f6078295698d70e98745f5a94c9c773ed078067aec9bcb1d596c69ab42c0",
+          "locator": "owner_surface_is_minimal_redacted_and_inert",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_blob_oid": "3be4abb19ee05b57bb69115952f595754185c8c4",
+            "worktree_blob_oid": "3be4abb19ee05b57bb69115952f595754185c8c4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/upstream_transport_target_source_contract_test.rs",
+          "content_hash": "d86ed7d1da65faf25655cbeb285f0f011f84ed85aaac0f49bed8a0475ba9690a",
+          "locator": "upstream_transport_http_source_keeps_policy_server_fixed_and_response_private",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_blob_oid": "e8bd274c60f4bc4ff1befcc1f3bce1a4f2e62380",
+            "worktree_blob_oid": "d48b8083c75dc2ed544b26cc2170e9a75989d37c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_upstream_transport_target_service.rs",
+          "content_hash": "35237c73511c19d6caff98ee8c7bea4d0dd4b9e51c08ef8a30e77d95a9a688a3",
+          "locator": "UpstreamTransportTargetActor and service boundary",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_blob_oid": "c3828e3eb5fa3fd539f21ad84495738de0150cf3",
+            "worktree_blob_oid": "c3828e3eb5fa3fd539f21ad84495738de0150cf3",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/compute_external_pool_adapter_upstream_transport_target/tests.rs",
+          "content_hash": "abb0f49df7939c1fa9efebf2669e0c36d36feae809af15146f6ee03e88a6cb0c",
+          "locator": "V258 migration and persistence contracts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0211fa4638de0139b36666626715fb9a85c4d291",
+            "head_blob_oid": "980e5d27c672fa7258ba52cdf1ce7d1d22117548",
+            "worktree_blob_oid": "980e5d27c672fa7258ba52cdf1ce7d1d22117548",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786659489990,
+      "updated_at_ms": 1786661968441
+    },
+    {
       "id": "delivery-allocation-expiry-worker-v234-verification",
       "title": "v234 Delivery Allocation 到期公平恢复验收",
       "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
@@ -2825,6 +2952,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786659172557
+    },
+    {
+      "id": "feature_event_2fce8543a5a3441ea4fc9aa0f69a8307",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "registered",
+      "actor": "codex-goal",
+      "reason": "Register a stable verification requirement before editing implementation or status documents.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786659489990
+    },
+    {
+      "id": "feature_event_2b26e6c19ac84327a59e303565451b87",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "claimed",
+      "actor": "codex-goal",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786659500169
+    },
+    {
+      "id": "feature_event_f1397b8465894767a23bd99c77ff3c7b",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Begin compile and dynamic verification of the existing inert V258 implementation.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786659509849
+    },
+    {
+      "id": "feature_event_7fc7b35520614e53b7a258068b7f2784",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786661959580
+    },
+    {
+      "id": "feature_event_9a18b7fadebc434fb10d80c5ea095258",
+      "feature_id": "compute-v258-upstream-transport-target-verification",
+      "action": "transitioned",
+      "actor": "codex-goal",
+      "reason": "Full elon-server target compiled and 11 focused V258 tests passed; dynamic evidence and residual production boundaries are recorded.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786661968441
     }
   ]
 }

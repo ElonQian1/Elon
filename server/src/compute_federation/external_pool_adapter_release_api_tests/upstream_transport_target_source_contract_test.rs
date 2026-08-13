@@ -14,8 +14,10 @@ fn upstream_transport_http_source_keeps_policy_server_fixed_and_response_private
         "expected_target_policy_digest",
         "draft: UpstreamTransportTargetDraftBody",
         "expected_predecessor: Option<ExpectedUpstreamTransportTargetPredecessor>",
-        "UpstreamTransportTargetActor::ProviderOwner",
-        "UpstreamTransportTargetActor::PlatformAdmin",
+        "ProviderOwner(String)",
+        "PlatformAdmin(String)",
+        "Self::ProviderOwner",
+        "Self::PlatformAdmin",
         "audit_external_pool_adapter_installation",
         "external_pool_adapter_upstream_transport_target_policy_summary",
         "external_pool_adapter_upstream_transport_target_currentness",
@@ -57,6 +59,9 @@ fn upstream_transport_http_source_keeps_policy_server_fixed_and_response_private
         "owner_revoke",
         "admin_revoke",
         "JsonRejection",
+        "authenticated_user(state, headers).map(UpstreamTransportTargetActor::ProviderOwner)",
+        "Ok(UpstreamTransportTargetActor::PlatformAdmin(user.id))",
+        "matches!(user.role.as_str(), \"admin\" | \"owner\")",
     ] {
         assert!(api.contains(required), "missing HTTP boundary {required}");
     }

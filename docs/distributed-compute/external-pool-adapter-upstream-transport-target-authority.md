@@ -3,7 +3,7 @@ title: 外部矿池 Adapter upstream transport target 惰性权威
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter upstream transport target 惰性权威
@@ -57,3 +57,7 @@ V255 的 `u32_be_length_prefixed_utf8_jcs_v1` 只适用于 canonical JCS control
 下一批必须先增加 durable、server-fixed supervisor/session policy companion，明确 control 与 binary-sensitive frame 的双层 framing、长度上限、streaming authentication、KDF/key custody、nonce/sequence/transcript binding、timeout、resource/isolation/egress及 shutdown/reap。随后才能实现 authenticated child-only IPC no-work handshake；只有再由 server broker 按 V258 target 执行 DNS/TLS 并生成 authenticated observation，才可宣称真实 upstream probe。以上均不属于 V258。
 
 V254 的 18 个 temporary absolute market deny trigger 必须名称与 SQL body逐字保留。V258 currentness 不能替代完整 admission gate；在 atomic activation、route/service actor、secret custody、broker/session/probe/runtime currentness 同批实现前，不得删除或缩窄这 18 项 fence。
+
+## 6. 当前验证强度
+
+V258 已随完整 `elon-server` 测试目标编译，并通过 11 项定向测试：7 项 migration/Store/ABI 合同、2 项源码边界合同和 2 项 owner/admin 进程内 Axum HTTP。验证指纹为 `bb3faae9295d682d573a5bc5a1d608be711a18c021be273120bf5181b1312aac`。本地 HTTP 夹具会在全新 SQLite 上执行当前 migration，但尚未单独覆盖 V257→V258 文件升级、重复 migration、文件重开、并发/崩溃、真实 TCP、DNS、TLS、公网或生产部署；因此状态只提升为 `implementation_partially_verified`，不代表 transport、probe、runtime 或 activation ready。
