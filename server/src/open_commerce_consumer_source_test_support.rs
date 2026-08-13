@@ -33,16 +33,16 @@ pub(super) struct ReadSnapshot {
     counts: Vec<(&'static str, i64)>,
 }
 
-pub(super) struct Fixture {
-    pub(super) store: Store,
-    pub(super) consumer_id: String,
+pub(crate) struct Fixture {
+    pub(crate) store: Store,
+    pub(crate) consumer_id: String,
     pub(super) static_merchant_id: String,
     pub(super) recent_merchant_id: String,
     pub(super) stale_link_merchant_id: String,
     pub(super) disabled_link_merchant_id: String,
 }
 
-pub(super) fn fixture() -> Fixture {
+pub(crate) fn fixture() -> Fixture {
     let path = std::env::temp_dir().join(format!(
         "elon-consumer-source-filter-{}.sqlite",
         Uuid::new_v4().simple()

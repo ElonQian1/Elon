@@ -28,7 +28,7 @@ implementation_status: verified_rust_sqlite
 - 关闭筛选不代表消费者认可过期数据，只表示目录不会替用户作隐藏决定。
 - V1 不提供按分钟、来源、外部回执或行业 SLA 的高级过滤表达式。
 - 已通过真实 SQLite 夹具验证字段省略、默认关闭、`current/stale/unknown` 混合能力、指定能力键、五种排序器、匹配原因、输入指纹、排序凭证回显及发现只读性；状态为 `verified_rust_sqlite`。
-- HTTP 实例、PC 浏览器、外部同步真实性和自动暂停策略仍未验证。
+- 进程内 Axum HTTP 已验证声明期筛选和结果投影；真实 TCP、PC 浏览器、外部同步真实性和自动暂停策略仍未验证。
 
 ## 实现入口
 

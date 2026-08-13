@@ -686,7 +686,7 @@ mod input_tests;
 
 #[cfg(test)]
 #[path = "open_commerce_consumer_source_test_support.rs"]
-mod source_test_support;
+pub(crate) mod source_test_support;
 
 #[cfg(test)]
 #[path = "open_commerce_consumer_source_tests.rs"]

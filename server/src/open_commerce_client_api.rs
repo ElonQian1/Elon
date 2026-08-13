@@ -456,3 +456,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 }
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_discovery_api_tests.rs"]
+mod discovery_api_tests;

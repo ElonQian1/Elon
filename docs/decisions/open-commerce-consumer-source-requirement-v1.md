@@ -28,7 +28,7 @@ implementation_status: verified_rust_sqlite
 - 内部回执由商户项目或受控适配器提交，固定 `externally_verified=false`。
 - 筛选不证明外部平台授权、数据真实性、实时库存、价格、营业状态、支付或履约。
 - 已通过真实 SQLite 夹具验证默认兼容、同商户混合来源、失效绑定、声明期四种组合、五种排序器、匹配原因和排序凭证；状态为 `verified_rust_sqlite`。
-- 尚未执行携带来源条件的 HTTP 实例请求、专项 MCP 协议请求或 PC 浏览器交互与视觉验证。
+- 已执行携带来源条件的 MCP 与进程内 Axum HTTP 请求；尚未执行绑定真实 TCP 端口的请求或 PC 浏览器交互与视觉验证。
 
 ## 实现入口
 
