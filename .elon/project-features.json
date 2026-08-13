@@ -2,6 +2,59 @@
   "version": 1,
   "features": [
     {
+      "id": "compute-attempt-final-usage-fence-verification-v1",
+      "title": "Attempt 最终声明用量栅栏动态验收 V1",
+      "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
+      "status": "proposed",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/compute-attempt-final-usage-fence-verification-v1.md",
+        "content_hash": "715985d54c360c99016765d0115ed355488473031a66cb210091782e09721e03",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "f3cebe24a8442f17329f08c148f172ea253fd1d9",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "15ff44bb5722223cf1e2eaf42016decf08aa65db",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "ai-economy",
+      "tags": [
+        "distributed-compute",
+        "attempt",
+        "integrity",
+        "settlement"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/attempt-final-usage-fence-authority.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/requirements/compute-attempt-final-usage-fence-verification-v1.md",
+        "server/src/compute_attempt_final_usage_fence_tests.rs",
+        "server/src/compute_attempt_terminal_migration.rs",
+        "server/src/compute_attempt_terminal_migration/final_usage_fence.rs",
+        "server/src/store.rs",
+        "server/src/store/compute_attempt_terminals.rs",
+        "server/src/store/compute_attempt_terminals/final_usage.rs",
+        "server/src/store/compute_attempt_usage.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "全量迁移在新库安装唯一双 trigger",
+        "终态候选精确绑定当前用量流头",
+        "候选后只允许精确重放并拒绝新声明",
+        "独立连接竞争不会产生候选落后流头",
+        "V225 漂移旧库拒绝 V226 且零半迁移",
+        "历史漂移读取与下游审核失败关闭",
+        "Rust 与仓库门禁通过并绑定证据"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1786620865523,
+      "updated_at_ms": 1786620865523
+    },
+    {
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
@@ -217,6 +270,16 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786620439206
+    },
+    {
+      "id": "feature_event_a1fe6314b3ff4198b1a9958f39853548",
+      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
+      "action": "registered",
+      "actor": "codex-goal",
+      "reason": "当前源码已写但权威状态仍为 implementation_uncompiled/implementation_unrun，且该门卫直接保护审核与结算事实链。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786620865523
     }
   ]
 }
