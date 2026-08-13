@@ -4,6 +4,8 @@ mod admission_api_tests;
 mod credential_api_tests;
 #[path = "open_commerce_developer_credential_auth_time_tests.rs"]
 mod credential_auth_time_tests;
+#[path = "open_commerce_developer_credential_concurrency_tests.rs"]
+mod credential_concurrency_tests;
 #[path = "open_commerce_developer_credential_policy_tests.rs"]
 mod credential_policy_tests;
 #[path = "open_commerce_developer_credential_restart_tests.rs"]

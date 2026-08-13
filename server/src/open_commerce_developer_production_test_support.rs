@@ -22,6 +22,7 @@ use crate::{
 
 pub(crate) struct ApprovedDeveloperFixture {
     pub(crate) store: Store,
+    pub(crate) database_path: std::path::PathBuf,
     pub(crate) project_id: String,
     pub(crate) owner_user_id: String,
     pub(crate) app: OpenCommerceDeveloperApp,
@@ -65,6 +66,7 @@ pub(crate) fn approved_developer_fixture_for(
 
     ApprovedDeveloperFixture {
         store,
+        database_path: path,
         project_id: project.id,
         owner_user_id: owner.id,
         app: approved.app,

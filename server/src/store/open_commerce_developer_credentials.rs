@@ -2,7 +2,9 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Utc};
-use rusqlite::{params, types::Type, Connection, OptionalExtension, Row, Transaction};
+use rusqlite::{
+    params, types::Type, Connection, OptionalExtension, Row, Transaction, TransactionBehavior,
+};
 
 use crate::{
     open_commerce_developer_credential_model::{
@@ -28,7 +30,7 @@ impl Store {
         let timestamp = now();
         let scopes_json = serde_json::to_string(scopes)?;
         let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let eligible: bool = tx.query_row(
             "SELECT EXISTS(
                 SELECT 1
