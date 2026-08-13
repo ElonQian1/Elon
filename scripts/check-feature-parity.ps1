@@ -67,7 +67,7 @@ function Assert-Text {
 }
 
 $matrix = [System.IO.File]::ReadAllText($matrixPath, [System.Text.Encoding]::UTF8)
-if ($matrix -notmatch '(?m)^\|.+\|.+\|.+\|.+\|.+\|.+\|$') {
+if ($matrix -notmatch '(?m)^\|.+\|.+\|.+\|.+\|.+\|.+\|\r?$') {
     Stop-FeatureParityAudit "Feature parity matrix is missing its canonical table structure."
 }
 
