@@ -331,3 +331,6 @@ fn session(store: &Store, user_id: &str) -> String {
         .unwrap()
         .0
 }
+
+#[path = "open_commerce_developer_credential_role_api_tests.rs"]
+mod role_tests;
