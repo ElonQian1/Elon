@@ -126,7 +126,7 @@
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/open-commerce-consumer-order-closure-v1.md",
@@ -177,28 +177,28 @@
       "implementation_evidence": [
         {
           "path": "AI_CURRENT.md",
-          "content_hash": "7d5890f8e79b7bd25651fa5c4172664c28636b7cc184144ee7e7b7d1b6f78b4d",
+          "content_hash": "60db9eb7d33c10e2b6e04ba4c8e68856c535b80fd84b91b0a0b7a233f2bd13e5",
           "locator": "consumer order closure current fact",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
-            "head_blob_oid": "a8d9e9bae4f3ec6380fb7c50e80d78e9ddbc15a9",
-            "worktree_blob_oid": "5f4a1f8d5b2e48683a665d3f9184b43a8be36ef8",
-            "state": "tracked_modified"
+            "head_commit": "a01a52ca5b894d044ffbeb771e2a987c478ab658",
+            "head_blob_oid": "d9a6415b20cb3954c346f2e5d4f3747c3db78b2a",
+            "worktree_blob_oid": "d9a6415b20cb3954c346f2e5d4f3747c3db78b2a",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/open-commerce-consumer-order-closure-v1-acceptance.md",
-          "content_hash": "c3db5b4be94e7f66cc879c4980a4ef1db9005134a253e6ada6152d4df89813b7",
+          "content_hash": "d5d1406f225e55488fc27ab2b04d07af75a824be08b1736dad296bb8e1ac2c91",
           "locator": "verification fingerprint 88e72aa",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
-            "head_blob_oid": "",
+            "head_commit": "a01a52ca5b894d044ffbeb771e2a987c478ab658",
+            "head_blob_oid": "3733b4fd1ae896bd4292ea270adb55fbd072c989",
             "worktree_blob_oid": "3733b4fd1ae896bd4292ea270adb55fbd072c989",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -208,10 +208,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
-            "head_blob_oid": "",
+            "head_commit": "a01a52ca5b894d044ffbeb771e2a987c478ab658",
+            "head_blob_oid": "37696b87194594aaac50f75ff56a4df914c302da",
             "worktree_blob_oid": "37696b87194594aaac50f75ff56a4df914c302da",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -221,10 +221,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
-            "head_blob_oid": "",
+            "head_commit": "a01a52ca5b894d044ffbeb771e2a987c478ab658",
+            "head_blob_oid": "96e69bfd7c8680a6b5949e7b76744385c38cd8a3",
             "worktree_blob_oid": "96e69bfd7c8680a6b5949e7b76744385c38cd8a3",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -234,10 +234,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
-            "head_blob_oid": "",
+            "head_commit": "a01a52ca5b894d044ffbeb771e2a987c478ab658",
+            "head_blob_oid": "f6175b383f051cfeef23356ffef49634cc83eee6",
             "worktree_blob_oid": "f6175b383f051cfeef23356ffef49634cc83eee6",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -247,15 +247,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b5989800eae5e9eb78077583e45fc9e825d6e3cc",
-            "head_blob_oid": "",
+            "head_commit": "a01a52ca5b894d044ffbeb771e2a987c478ab658",
+            "head_blob_oid": "0c67a0dca037941b742fca56e9b3d128577d11ab",
             "worktree_blob_oid": "0c67a0dca037941b742fca56e9b3d128577d11ab",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1786626114513,
-      "updated_at_ms": 1786628571617
+      "updated_at_ms": 1786629063314
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -883,6 +883,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786628571617
+    },
+    {
+      "id": "feature_event_ea1df7cc420c4c57aa2e873599b83eb4",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "远端 rebase 合入 AI_CURRENT 更新，按漂移门禁重新绑定当前实现证据。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1786629060797
+    },
+    {
+      "id": "feature_event_8b271b6dbcc44319adafd7a43bee7c57",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786629061154
+    },
+    {
+      "id": "feature_event_fe0e357cc6af473a8f353e8cfacbe9d1",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "刷新 rebase 后当前文件证据，不改变已验证业务范围。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786629061166
+    },
+    {
+      "id": "feature_event_4f93ca87acb34d8c9c1340984076d833",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786629063277
+    },
+    {
+      "id": "feature_event_225243fa049a4a5685062c983e832c08",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "rebase 后证据已重新绑定当前文件。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786629063292
+    },
+    {
+      "id": "feature_event_184c3113252d45518ebbaa3b030623c2",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "原定向编译和 4 项 Rust/SQLite 测试仍适用，rebase 无相关源码冲突。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786629063302
+    },
+    {
+      "id": "feature_event_929cf4470812480bb24a0b782c47b55c",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "实现与验收证据已推送到 origin/main 提交 a01a52ca5。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786629063314
     }
   ]
 }
