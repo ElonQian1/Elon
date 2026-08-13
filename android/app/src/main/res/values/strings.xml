@@ -127,7 +127,9 @@
     <string name="web_chat_open_official">官网功能</string>
     <string name="web_chat_login_required">请先在官网完成登录</string>
     <string name="web_chat_not_ready">ChatGPT 网页 AI 正在连接，请稍后重试</string>
-    <string name="web_chat_attachment_fallback">该附件功能暂需在官网页面完成</string>
+    <string name="web_chat_attachment_fallback">当前附件类型暂需在官网页面完成</string>
+    <string name="web_chat_attachment_upload_failed">附件未能交给 ChatGPT 网页 AI，请重试</string>
+    <string name="web_chat_attachment_uploading">附件正在上传，请稍候</string>
     <string name="web_chat_model_picker_title">ChatGPT 模型</string>
     <string name="web_chat_model_options_empty">官网暂未返回可选模型</string>
     <string name="chatgpt_message_streaming">正在生成</string>

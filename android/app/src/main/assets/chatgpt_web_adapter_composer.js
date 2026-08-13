@@ -54,6 +54,13 @@
     return candidates.find((node) => node && !node.disabled) || null;
   }
 
+  function requestAttachmentUpload(result) {
+    const input = findAttachmentInput();
+    if (!input) return result('request_attachment_upload', false, '官网当前没有可用的附件入口。');
+    input.click();
+    result('request_attachment_upload', true, '已请求原生附件。');
+  }
+
   function attachmentState(node) {
     const value = nodeLabel(node).toLowerCase();
     if (/failed|error|失败|错误/.test(value)) return 'error';
@@ -703,6 +710,7 @@
     capabilities,
     currentModel,
     readAttachments,
+    requestAttachmentUpload,
     dictationActive,
     requestOptions,
     collectRequestedOptions,

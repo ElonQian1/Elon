@@ -3,6 +3,9 @@
     <cache-path
         name="attachment_cache"
         path="attachments/" />
+    <cache-path
+        name="chatgpt_web_uploads"
+        path="chatgpt_web_uploads/" />
     <external-files-path
         name="elon_updates"
         path="." />

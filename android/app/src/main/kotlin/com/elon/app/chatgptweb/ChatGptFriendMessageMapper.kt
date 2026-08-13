@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import com.elon.app.ChatMessage
+import com.elon.app.ChatAttachment
 import com.elon.app.WebChatProviderIdentity
 
 internal object ChatGptFriendMessageMapper {
@@ -8,10 +9,16 @@ internal object ChatGptFriendMessageMapper {
         snapshot: ChatGptWebSnapshot,
         provider: WebChatProviderIdentity,
         pendingPrompt: String?,
+        pendingAttachments: List<ChatAttachment> = emptyList(),
+        pendingSendStatus: String = "发送中…",
+        attachmentsForMessage: (String) -> List<ChatAttachment> = { emptyList() },
         timestampFor: (String) -> Long,
     ): List<ChatMessage> {
         val result = snapshot.messages.map { message ->
             val id = "${provider.id.wireValue}:${message.id}"
+            val messageAttachments = attachmentsForMessage(message.id).ifEmpty {
+                message.parts.mapNotNull(::attachmentFromPart)
+            }
             ChatMessage(
                 role = if (message.role == "user") "user" else "friend",
                 content = message.content,
@@ -20,6 +27,7 @@ internal object ChatGptFriendMessageMapper {
                 senderAvatarResId = if (message.role == "assistant") provider.avatarResId else null,
                 createdAtMs = timestampFor(id),
                 modelUsed = snapshot.currentModel.takeIf { message.role == "assistant" && it.isNotBlank() },
+                attachments = messageAttachments.takeIf(List<ChatAttachment>::isNotEmpty),
             )
         }.toMutableList()
 
@@ -27,14 +35,15 @@ internal object ChatGptFriendMessageMapper {
         val promptObserved = snapshot.messages.lastOrNull { it.role == "user" }
             ?.content
             ?.trim() == cleanPending
-        if (cleanPending.isNotEmpty() && !promptObserved) {
+        if ((cleanPending.isNotEmpty() || pendingAttachments.isNotEmpty()) && !promptObserved) {
             val id = "${provider.id.wireValue}:pending_user"
             result += ChatMessage(
                 role = "user",
                 content = cleanPending,
-                sendStatus = "发送中…",
+                sendStatus = pendingSendStatus,
                 id = id,
                 createdAtMs = timestampFor(id),
+                attachments = pendingAttachments.takeIf(List<ChatAttachment>::isNotEmpty),
             )
         }
         if (snapshot.streaming && result.lastOrNull()?.role != "friend") {
@@ -50,5 +59,19 @@ internal object ChatGptFriendMessageMapper {
             )
         }
         return result
+    }
+
+    private fun attachmentFromPart(part: ChatGptWebMessagePart): ChatAttachment? = when (part.type) {
+        "image" -> ChatAttachment(
+            kind = "image",
+            displayName = part.label,
+            mimeType = part.metadata?.mediaType,
+        )
+        "file" -> ChatAttachment(
+            kind = "file",
+            displayName = part.label,
+            mimeType = part.metadata?.mediaType,
+        )
+        else -> null
     }
 }

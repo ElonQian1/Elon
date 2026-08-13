@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.ChatAttachment
 import com.elon.app.WebChatProviderId
 import com.elon.app.WebChatProviderRegistry
 import org.junit.Assert.assertEquals
@@ -43,6 +44,55 @@ class ChatGptFriendMessageMapperTest {
         assertEquals(1, result.size)
         assertEquals("user", result.single().role)
         assertEquals("发送中…", result.single().sendStatus)
+    }
+
+    @Test
+    fun keepsNativeAttachmentsOnTheOptimisticFriendChatBubble() {
+        val attachment = ChatAttachment(
+            kind = "file",
+            displayName = "fixture.txt",
+            localPath = "fixture.txt",
+        )
+
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot(messages = emptyList()),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = "",
+            pendingAttachments = listOf(attachment),
+            pendingSendStatus = "上传中…",
+            timestampFor = { 42L },
+        )
+
+        assertEquals("user", result.single().role)
+        assertEquals("上传中…", result.single().sendStatus)
+        assertEquals("fixture.txt", result.single().attachments?.single()?.displayName)
+    }
+
+    @Test
+    fun restoresOfficialFilePartsIntoTheExistingAttachmentBubble() {
+        val message = ChatGptWebMessage(
+            id = "u-file",
+            role = "user",
+            content = "查看文件",
+            state = "completed",
+            parts = listOf(
+                ChatGptWebMessagePart(
+                    type = "file",
+                    label = "fixture.pdf",
+                    metadata = ChatGptWebMessagePartMetadata(mediaType = "application/pdf"),
+                ),
+            ),
+        )
+
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot(messages = listOf(message)),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = null,
+            timestampFor = { 42L },
+        )
+
+        assertEquals("fixture.pdf", result.single().attachments?.single()?.displayName)
+        assertEquals("application/pdf", result.single().attachments?.single()?.mimeType)
     }
 
     private fun snapshot(messages: List<ChatGptWebMessage>) = ChatGptWebSnapshot(

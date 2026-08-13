@@ -345,6 +345,9 @@
         'tools', String(command.value || ''), findComposer(), emitEvent, respond, scheduleSnapshot
       );
     }
+    if (action === 'request_attachment_upload' && composerAdapter) {
+      return composerAdapter.requestAttachmentUpload(respond);
+    }
     if (action === 'open_model_selector' && composerAdapter) {
       return composerAdapter.openOfficial('model', findComposer(), emitEvent, respond);
     }

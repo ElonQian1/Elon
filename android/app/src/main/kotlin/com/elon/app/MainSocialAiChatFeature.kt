@@ -73,6 +73,10 @@ internal class MainSocialAiChatFeature(
 
     fun webChatModel(): String = webChatController.currentModel()
 
+    fun webChatAttachmentPhase(): String = webChatController.attachmentSendPhase()
+
+    fun webChatPendingAttachmentCount(): Int = webChatController.pendingAttachmentCount()
+
     fun selectInteractionMode(value: String): Boolean =
         modeController.selectInteractionMode(SocialAiInteractionMode.fromWireValue(value))
 

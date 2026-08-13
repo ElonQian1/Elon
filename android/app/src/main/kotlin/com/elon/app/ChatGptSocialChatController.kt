@@ -6,6 +6,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptBackgroundSession
 import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
+import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
@@ -30,10 +31,14 @@ internal class ChatGptSocialChatController(
         onStateChanged = ::renderState,
         onComposerOptions = ::showModelOptions,
         onCommandResult = ::handleCommandResult,
+        onAttachmentSendChanged = ::handleAttachmentSendUpdate,
     )
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
     private var pendingPrompt: String? = null
+    private var pendingAttachments = emptyList<PendingAttachment>()
+    private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
+    private var waitingForAttachmentCompletion = false
 
     fun activate(identity: WebChatProviderIdentity) {
         provider = identity
@@ -58,11 +63,35 @@ internal class ChatGptSocialChatController(
 
     fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 
+    fun attachmentSendPhase(): String = session.attachmentSendPhase()
+
+    fun pendingAttachmentCount(): Int = maxOf(session.pendingAttachmentCount(), pendingAttachments.size)
+
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
         if (pendingAttachments.isNotEmpty()) {
-            Toast.makeText(activity, R.string.web_chat_attachment_fallback, Toast.LENGTH_LONG).show()
-            openOfficialFallback()
+            if (waitingForAttachmentCompletion) {
+                Toast.makeText(activity, R.string.web_chat_attachment_uploading, Toast.LENGTH_SHORT).show()
+                return true
+            }
+            if (!session.canSend()) {
+                Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_LONG).show()
+                return true
+            }
+            val prompt = rawText.trim()
+            this.pendingPrompt = prompt
+            this.pendingAttachments = pendingAttachments.toList()
+            waitingForAttachmentCompletion = true
+            renderSnapshot(session.currentSnapshot() ?: return true)
+            if (!session.sendAttachments(prompt, pendingAttachments)) {
+                this.pendingPrompt = null
+                this.pendingAttachments = emptyList()
+                waitingForAttachmentCompletion = false
+                session.currentSnapshot()?.let(::renderSnapshot)
+                Toast.makeText(activity, R.string.web_chat_attachment_upload_failed, Toast.LENGTH_LONG).show()
+            } else {
+                collapseInputComposer()
+            }
             return true
         }
         val prompt = rawText.trim()
@@ -121,6 +150,13 @@ internal class ChatGptSocialChatController(
             snapshot = snapshot,
             provider = provider,
             pendingPrompt = pendingPrompt,
+            pendingAttachments = chatAttachmentsFromPending(pendingAttachments),
+            pendingSendStatus = when (session.attachmentSendPhase()) {
+                "uploading" -> "上传中…"
+                "failed" -> "发送失败，请重新点击发送"
+                else -> "发送中…"
+            },
+            attachmentsForMessage = { id -> sentAttachments[id].orEmpty() },
             timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
         )
         messages.clear()
@@ -149,6 +185,7 @@ internal class ChatGptSocialChatController(
     }
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
+        if (pendingAttachments.isNotEmpty()) return
         if (event.action != "send_prompt" || event.ok) return
         pendingPrompt = null
         session.currentSnapshot()?.let(::renderSnapshot)
@@ -157,6 +194,31 @@ internal class ChatGptSocialChatController(
             event.detail.ifBlank { activity.getString(R.string.chatgpt_native_command_failed) },
             Toast.LENGTH_LONG,
         ).show()
+    }
+
+    private fun handleAttachmentSendUpdate(update: ChatGptWebAttachmentSendUpdate) {
+        when (update.phase) {
+            "completed" -> {
+                update.userMessageId?.let { id ->
+                    sentAttachments[id] = chatAttachmentsFromPending(pendingAttachments)
+                }
+                pendingPrompt = null
+                pendingAttachments = emptyList()
+                waitingForAttachmentCompletion = false
+                binding.inputEdit.text?.clear()
+                clearPendingSendState()
+                session.currentSnapshot()?.let(::renderSnapshot)
+            }
+            "failed" -> {
+                waitingForAttachmentCompletion = false
+                Toast.makeText(
+                    activity,
+                    update.detail ?: activity.getString(R.string.web_chat_attachment_upload_failed),
+                    Toast.LENGTH_LONG,
+                ).show()
+                session.currentSnapshot()?.let(::renderSnapshot)
+            }
+        }
     }
 
     private fun renderStatusMessage(content: String) {

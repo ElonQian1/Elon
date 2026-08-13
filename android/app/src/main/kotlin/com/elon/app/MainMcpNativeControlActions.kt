@@ -446,6 +446,15 @@ internal class MainMcpNativeControlActions(
                 if (friend.isSocialAi()) feature?.webChatModel()?.takeIf(String::isNotBlank) ?: JSONObject.NULL
                 else JSONObject.NULL,
             )
+            .put(
+                "web_chat_attachment_phase",
+                if (friend.isSocialAi()) feature?.webChatAttachmentPhase() ?: JSONObject.NULL
+                else JSONObject.NULL,
+            )
+            .put(
+                "web_chat_pending_attachment_count",
+                if (friend.isSocialAi()) feature?.webChatPendingAttachmentCount() ?: 0 else 0,
+            )
             .put("message_count", messages.size)
             .put("messages", JSONArray().apply {
                 messages.takeLast(MAX_SOCIAL_MESSAGES).forEachIndexed { offset, message ->

@@ -168,6 +168,8 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId,
     )
 
+    fun requestAttachmentUpload() = runCommand("request_attachment_upload")
+
     fun startDictation() = runCommand("start_dictation")
 
     fun startDictation(requestId: String) = runCommand("start_dictation", requestId = requestId)
@@ -329,7 +331,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 91
+        internal const val ADAPTER_VERSION = 92
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

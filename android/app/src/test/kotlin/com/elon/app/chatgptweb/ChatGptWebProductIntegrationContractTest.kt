@@ -30,6 +30,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(provider.contains("GOOGLE_WEB"))
         assertTrue(provider.contains("available = false"))
         assertTrue(chatController.contains("ChatGptFriendMessageMapper.map"))
+        assertTrue(chatController.contains("session.sendAttachments"))
+        assertTrue(chatController.contains("chatAttachmentsFromPending"))
         assertTrue(friendChat.contains("onActiveFriendChanged(friend)"))
         assertTrue(friendChat.contains("suspendForExternalChat"))
         assertTrue(main.contains("socialAiChatFeature.trySendMessage"))
@@ -39,6 +41,7 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("set_social_ai_interaction_mode"))
         assertTrue(mainMcp.contains("select_web_chat_provider"))
         assertTrue(mainMcp.contains("open_chatgpt_official_fallback"))
+        assertTrue(mainMcp.contains("web_chat_attachment_phase"))
         assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
         assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
     }
