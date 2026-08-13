@@ -124,9 +124,6 @@ pub(super) async fn open(
         return Ok(response(provider, label, "focused"));
     }
 
-    let bootstrap_url = "about:blank"
-        .parse()
-        .map_err(|error| format!("一龙聊天窗启动页无效：{error}"))?;
     let origin = PageOrigin::from_url(&url)?;
     let navigation_origin = origin.clone();
     let popup_origin = origin;
@@ -146,7 +143,9 @@ pub(super) async fn open(
         "target": safe_url(&url),
         }),
     );
-    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(bootstrap_url))
+    // 直接用目标页创建 WebView。Windows 上先以 about:blank 创建再 navigate，
+    // 会只留下 Tao 的 16x16 内部消息窗口，并且永远没有 page-load 事件。
+    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url.clone()))
         .title(format!("{} · 一龙聊天", provider.display_name))
         .inner_size(940.0, 760.0)
         .min_inner_size(720.0, 560.0)
@@ -262,14 +261,6 @@ pub(super) async fn open(
         ),
         _ => {}
     });
-    dispatch_navigation(
-        &app,
-        &label,
-        &window,
-        url,
-        "native_window.navigation_dispatched",
-        "一龙 AI 子窗口已开始导航",
-    )?;
     restore_window(&window)?;
     record(
         &app,
@@ -282,6 +273,7 @@ pub(super) async fn open(
             "window_role": NATIVE_WINDOW_ROLE,
             "requested_inner_width": 940,
             "requested_inner_height": 760,
+            "initial_url": safe_url(&url),
         }),
     );
     Ok(response(provider, label, "created"))
@@ -307,42 +299,6 @@ fn safe_url(url: &Url) -> String {
 
 fn show_navigation_error(window: &WebviewWindow) {
     let _ = window.eval(NAVIGATION_ERROR_SCRIPT);
-}
-
-fn dispatch_navigation(
-    app: &AppHandle,
-    label: &str,
-    window: &WebviewWindow,
-    target_url: Url,
-    success_kind: &str,
-    success_summary: &str,
-) -> Result<(), String> {
-    match window.navigate(target_url.clone()) {
-        Ok(()) => {
-            record(
-                app,
-                label,
-                "info",
-                success_kind,
-                success_summary,
-                json!({"url": safe_url(&target_url)}),
-            );
-            Ok(())
-        }
-        Err(_error) => {
-            record(
-                app,
-                label,
-                "error",
-                "native_window.navigation_failed",
-                "一龙 AI 子窗口导航失败，窗口已保留",
-                json!({"error_code": "host_navigation_failed"}),
-            );
-            show_navigation_error(window);
-            let _ = restore_window(window);
-            Err("一龙聊天窗导航失败；诊断窗口已保留。".to_string())
-        }
-    }
 }
 
 fn dispatch_recovery_navigation(
