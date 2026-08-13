@@ -32,7 +32,7 @@ $expected = [ordered]@{
         "reversible/composer_tool_discovery/study_mode",
         "reversible/composer_tool_discovery/agent_mode"
     )
-    "smoke-chatgpt-web-attachment-lifecycle.ps1" = @(
+    "smoke-chatgpt-web-native-attachment-lifecycle.ps1" = @(
         "supervised/attachment_lifecycle"
     )
     "smoke-chatgpt-web-audio-lifecycle.ps1" = @(

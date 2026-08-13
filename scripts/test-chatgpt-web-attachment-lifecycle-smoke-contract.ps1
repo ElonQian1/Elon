@@ -56,8 +56,8 @@ foreach ($required in @(
     'attachment_message_sent = $true',
     'assistant_completed = $true',
     'original_view_restored = $true',
-    'Register-ChatGptWebVerificationCases',
-    '-CaseIds @("supervised/attachment_lifecycle")',
+    'evidence_registered = $false',
+    'diagnostic_only = $true',
     'message_count_unchanged = $true',
     'sent_messages = 0',
     'cleared_cookies = $false',
@@ -96,10 +96,8 @@ if ($source -match '(?m)^\s*exit\s+[1-9]') {
     throw "Attachment lifecycle smoke must fail through exceptions, not nested exit."
 }
 
-$registerIndex = $source.IndexOf('-CaseIds @("supervised/attachment_lifecycle")')
-$restoredIndex = $source.IndexOf('Restore-ChatGptWebSmokeOrigin')
-if ($registerIndex -le $restoredIndex) {
-    throw "Attachment evidence must be recorded only after the restored state is verified."
+if ($source.Contains('Register-ChatGptWebVerificationCases')) {
+    throw "Legacy full-screen attachment diagnostics must not record native-chat evidence."
 }
 if (@([regex]::Matches($source, '-Action "send_input"')).Count -ne 1) {
     throw "Attachment lifecycle must dispatch exactly one supervised message send."

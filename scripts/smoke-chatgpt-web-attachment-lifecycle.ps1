@@ -385,9 +385,6 @@ try {
             Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
                 -ConversationPath ([string]$checkpoint.origin_conversation_path) `
                 -ViewMode ([string]$checkpoint.origin_view_mode) -TimeoutSec $TimeoutSec | Out-Null
-            Register-ChatGptWebVerificationCases -Runtime $runtime `
-                -CaseIds @("supervised/attachment_lifecycle") `
-                -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
             $checkpoint.phase = "passed"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint -Value $checkpoint
@@ -401,6 +398,8 @@ try {
                 attachment_message_sent = $true
                 assistant_completed = $true
                 original_view_restored = $true
+                evidence_registered = $false
+                diagnostic_only = $true
                 sent_messages = 1
                 cleared_cookies = $false
                 cleared_app_data = $false

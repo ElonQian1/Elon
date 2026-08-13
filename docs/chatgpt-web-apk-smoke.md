@@ -46,29 +46,32 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-chatgpt-web-ap
 
 如果不带 `-SendProbe` 却传入 `-ProbeMarker`，脚本会立即失败，防止默认只读模式意外发送消息。
 
-## 附件选择与删除验收
+## 原生聊天附件验收
 
-附件完整链路需要真人在 Android 系统选择器中选择测试文件，因此拆成三个可中断阶段。阶段之间的检查点只保存设备与会话的 SHA-256 绑定、版本和计数，不保存会话 URL、消息正文或文件名。
+正式附件能力从好友聊天中的「ChatGPT 网页 AI」原生界面验收。脚本只生成固定 ASCII 文本夹具，不打开系统文件选择器，不扫描相册或下载目录，也不读取用户文件。流程拆成三个可恢复阶段；前两阶段只在本地添加和移除夹具，不上传、不发送。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File scripts\smoke-chatgpt-web-attachment-lifecycle.ps1 `
+  -File scripts\smoke-chatgpt-web-native-attachment-lifecycle.ps1 `
   -DeviceSerial "192.168.31.171:5555" `
-  -ExpectedHardwareSerial "<physical-device-serial>" -Phase Prepare
+  -ExpectedHardwareSerial "<physical-device-serial>" -Phase PrepareAndRemove
 
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File scripts\smoke-chatgpt-web-attachment-lifecycle.ps1 `
+  -File scripts\smoke-chatgpt-web-native-attachment-lifecycle.ps1 `
   -DeviceSerial "192.168.31.171:5555" `
-  -ExpectedHardwareSerial "<physical-device-serial>" -Phase OpenPicker
+  -ExpectedHardwareSerial "<physical-device-serial>" -Phase StageForSend
 
-# 此时由用户在系统选择器中选一个非敏感测试文件，返回 ChatGPT 后继续：
+# 只有用户在场并明确同意上传固定夹具和发送一条测试消息时运行：
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File scripts\smoke-chatgpt-web-attachment-lifecycle.ps1 `
+  -File scripts\smoke-chatgpt-web-native-attachment-lifecycle.ps1 `
   -DeviceSerial "192.168.31.171:5555" `
-  -ExpectedHardwareSerial "<physical-device-serial>" -Phase VerifyAndRemove
+  -ExpectedHardwareSerial "<physical-device-serial>" `
+  -Phase SendAndVerifyReply -UserConfirmedAttachmentSend
 ```
 
-`Prepare` 要求当前输入为空、没有附件且未生成回复；`OpenPicker` 只按 `attachment_file` 语义打开系统选择器；`VerifyAndRemove` 要求 adapter 识别到唯一 `ready` 附件，再通过 `chatgpt_remove_attachment` 删除并确认附件数恢复为 0。整个流程不创建会话、不发送消息、不清 Cookie 或应用数据。检查点默认位于被忽略的 `.ai-tmp/chatgpt-web-attachment-lifecycle.json`，12 小时后失效。
+`PrepareAndRemove` 在隔离网页会话里验证原生附件栏可添加并移除固定夹具；`StageForSend` 只把同一个夹具放回原生附件栏；最后阶段才走真实的原生附件栏 -> FileProvider -> 后台 WebView 上传 -> 回复链路，并恢复原会话。只有这条原生路径能登记 `supervised/attachment_lifecycle` 正式证据。检查点不保存账号、会话正文、用户文件名或 Cookie，默认位于 `.ai-tmp/chatgpt-web-native-attachment.json`，12 小时后失效。
+
+旧的 `smoke-chatgpt-web-attachment-lifecycle.ps1` 保留用于全屏官网和 Android 系统文件选择器诊断，但不再登记原生聊天附件能力的正式通过证据。
 
 ## 听写与实时语音验收
 

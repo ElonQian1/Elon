@@ -485,6 +485,43 @@ function Open-ChatGptWebSmokeSurface {
         -EnsureMainActivity
 }
 
+function Open-ChatGptWebNativeChatSurface {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [ValidateRange(10, 180)][int]$TimeoutSec = 90
+    )
+
+    $opened = Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+        -Action "open_social_ai_chat" -EnsureMainActivity
+    if ($opened.control_ok -ne $true) {
+        throw "Unable to open the social AI chat surface."
+    }
+    $selected = Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+        -Action "select_web_chat_provider" -Arguments @{ provider_id = "chatgpt_web" }
+    if ($selected.control_ok -ne $true) {
+        throw "Unable to select ChatGPT Web AI in the native chat surface."
+    }
+
+    return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $TimeoutSec `
+        -Description "ready ChatGPT Web AI native chat surface" -Predicate {
+            param($state)
+            $state.active_surface -eq "social_ai" -and
+                [string]$state.social_chat.interaction_mode -eq "chat" -and
+                [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
+                [string]$state.social_chat.web_chat_state -eq "ready"
+        }
+}
+
+function Get-ChatGptWebNativeChatState {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+    if ($state.active_surface -ne "social_ai") {
+        throw "The native social AI chat surface is not active."
+    }
+    return $state
+}
+
 function Restore-ChatGptWebSmokeInteractiveBaseline {
     param(
         [Parameter(Mandatory = $true)]$Runtime,

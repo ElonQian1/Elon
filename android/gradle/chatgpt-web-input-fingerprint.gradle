@@ -139,7 +139,16 @@ def composerDiscoveryCaseInputs = filesMatching([
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebVerificationEvidence*.kt",
 ])
 def attachmentCaseInputs = filesMatching([
+    "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
+    "android/app/src/main/kotlin/com/elon/app/ChatGptWebAcceptanceAttachment*.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainActivity.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainMcpNativeControlActions.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainPendingAttachmentActions.kt",
+    "android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt",
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeAttachmentController.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAttachmentSendTracker.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebFeatureBaseline.kt",
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebUploadStager.kt",
     "android/app/src/main/assets/chatgpt_web_adapter_attachment_policy.js",
 ])
 def audioCaseInputs = filesMatching([
@@ -230,7 +239,7 @@ verificationCaseFiles["reversible/composer_controls"] = caseInputs(
 }
 verificationCaseFiles["supervised/attachment_lifecycle"] = caseInputs(
     composerCaseInputs + attachmentCaseInputs,
-    "smoke-chatgpt-web-attachment-lifecycle.ps1",
+    "smoke-chatgpt-web-native-attachment-lifecycle.ps1",
 )
 verificationCaseFiles["supervised/dictation_transcription"] = caseInputs(
     composerCaseInputs + audioCaseInputs,
