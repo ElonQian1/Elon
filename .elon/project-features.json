@@ -126,7 +126,7 @@
       "id": "delivery-allocation-expiry-worker-v234-verification",
       "title": "v234 Delivery Allocation 到期公平恢复验收",
       "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/delivery-allocation-authority.md",
@@ -271,7 +271,7 @@
         }
       ],
       "created_at_ms": 1786638401675,
-      "updated_at_ms": 1786645066566
+      "updated_at_ms": 1786647275788
     },
     {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
@@ -1966,6 +1966,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786645066566
+    },
+    {
+      "id": "feature_event_3dfafad8cc744b49913e9c5b6bbc2454",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "7 项定向验收与 rebase 后受影响回归均通过，实现已推送 origin/main@f3aa96e16",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786647275788
     }
   ]
 }
