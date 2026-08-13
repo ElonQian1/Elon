@@ -63,6 +63,28 @@ class ChatGptWebUiControlInvocationCoordinatorTest {
     }
 
     @Test
+    fun conversationOptionsOpenOfficialLayoutBeforeInvocation() {
+        val fixture = Fixture(officialVisible = false)
+
+        fixture.coordinator.invoke(
+            control(
+                semantic = "conversation_options",
+                region = ChatGptWebUiRegion.OVERLAY,
+            ),
+            "conversation-options",
+            "request-conversation",
+        )
+
+        assertEquals(1, fixture.showOfficialCount)
+        assertTrue(fixture.invocations.isEmpty())
+        fixture.scheduled?.invoke()
+        assertEquals(
+            listOf("conversation-options" to "request-conversation"),
+            fixture.invocations,
+        )
+    }
+
+    @Test
     fun nonMessageMoreControlsKeepNativeInvocationPath() {
         val fixture = Fixture(officialVisible = false)
 

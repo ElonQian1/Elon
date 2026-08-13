@@ -67,6 +67,7 @@ internal class ChatGptWebUiControlInvocationCoordinator(
         fun requiresOfficialLayout(control: ChatGptWebUiControl?): Boolean = when {
             control?.semantic == ChatGptRealtimeVoicePolicy.SEMANTIC -> true
             control?.region == ChatGptWebUiRegion.MESSAGE && control.semantic == "more" -> true
+            control?.semantic == "conversation_options" -> true
             else -> false
         }
     }

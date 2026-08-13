@@ -68,11 +68,14 @@
       return true;
     }
 
-    function rememberMessageTrigger(control, sourceNode, visibleOverlays, pageKey) {
+    function rememberContextTrigger(control, sourceNode, visibleOverlays, pageKey) {
       usePage(pageKey);
       if (
-        !control || control.region !== 'message' || control.semantic !== 'more' ||
-        !control.contextId || !sourceNode
+        !control || !control.contextId || !sourceNode ||
+        !(
+          (control.region === 'message' && control.semantic === 'more') ||
+          control.semantic === 'conversation_options'
+        )
       ) {
         pending = null;
         return false;
@@ -85,6 +88,10 @@
       };
       active = null;
       return true;
+    }
+
+    function rememberMessageTrigger(control, sourceNode, visibleOverlays, pageKey) {
+      return rememberContextTrigger(control, sourceNode, visibleOverlays, pageKey);
     }
 
     function resolveOverlayContext(overlay, pageKey) {
@@ -119,6 +126,7 @@
     return Object.freeze({
       cancelPending,
       observeNoOverlay,
+      rememberContextTrigger,
       rememberMessageTrigger,
       resolveOverlayContext
     });

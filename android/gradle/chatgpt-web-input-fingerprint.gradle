@@ -187,6 +187,10 @@ def caseInputs = { Collection<File> specific, String smokeScript ->
 }
 def verificationCaseFiles = new LinkedHashMap<String, Collection<File>>()
 verificationCaseFiles["safe/read_only_surface"] = allCaseInputs + filesMatching(["scripts/smoke-chatgpt-web-apk.ps1"])
+verificationCaseFiles["safe/authenticated_session"] = caseInputs(
+    sessionCaseInputs,
+    "smoke-chatgpt-web-apk.ps1",
+)
 verificationCaseFiles["reversible/send_probe"] = caseInputs(
     composerCaseInputs + messageCaseInputs,
     "smoke-chatgpt-web-apk.ps1",
@@ -247,6 +251,10 @@ verificationCaseFiles["safe/message_actions"] = caseInputs(
     messageCaseInputs + adaptiveCaseInputs,
     "smoke-chatgpt-web-message-actions.ps1",
 )
+verificationCaseFiles["supervised/message_actions"] = caseInputs(
+    messageCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-message-actions.ps1",
+)
 verificationCaseFiles["safe/feature_pages"] = caseInputs(
     navigationCaseInputs,
     "smoke-chatgpt-web-feature-pages.ps1",
@@ -255,6 +263,12 @@ verificationCaseFiles["safe/feature_pages"] = caseInputs(
     verificationCaseFiles["safe/feature_page/${featureKind}"] = caseInputs(
         navigationCaseInputs,
         "smoke-chatgpt-web-feature-pages.ps1",
+    )
+}
+["health", "finances"].each { featureKind ->
+    verificationCaseFiles["supervised/feature_page/${featureKind}"] = caseInputs(
+        navigationCaseInputs + adaptiveCaseInputs,
+        "smoke-chatgpt-web-sensitive-feature-page.ps1",
     )
 }
 verificationCaseFiles["safe/settings_overlay_form_controls"] = caseInputs(
@@ -268,6 +282,26 @@ verificationCaseFiles["safe/settings_overlay_idempotent_form_controls"] = caseIn
 verificationCaseFiles["safe/session_recovery"] = caseInputs(
     sessionCaseInputs,
     "smoke-chatgpt-web-session-recovery.ps1",
+)
+verificationCaseFiles["safe/account_menu_structure"] = caseInputs(
+    navigationCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-apk.ps1",
+)
+verificationCaseFiles["supervised/account_mutations"] = caseInputs(
+    navigationCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-apk.ps1",
+)
+verificationCaseFiles["safe/conversation_management_structure"] = caseInputs(
+    navigationCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-conversation-management.ps1",
+)
+verificationCaseFiles["supervised/conversation_mutations"] = caseInputs(
+    navigationCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-conversation-management.ps1",
+)
+verificationCaseFiles["safe/session_long_running_stability"] = caseInputs(
+    sessionCaseInputs,
+    "smoke-chatgpt-web-long-running-stability.ps1",
 )
 def verificationCaseHashes = verificationCaseFiles.collectEntries { caseId, files ->
     [(caseId): digestFiles(files)]

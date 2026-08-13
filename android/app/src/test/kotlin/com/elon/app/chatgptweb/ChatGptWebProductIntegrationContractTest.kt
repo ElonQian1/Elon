@@ -38,6 +38,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(layoutAdapter.contains("compatibility:"))
         assertTrue(layoutAdapter.contains("addMessageControls"))
         assertTrue(layoutAdapter.contains("semantic === 'conversation'"))
+        assertTrue(layoutAdapter.contains("semantic === 'conversation_options'"))
+        assertTrue(layoutAdapter.contains("return 'conversation_options'"))
         assertTrue(layoutAdapter.contains("contextId: resolvedContextId"))
         assertTrue(layoutAdapter.contains("scrollIntoView"))
         val baseAdapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")

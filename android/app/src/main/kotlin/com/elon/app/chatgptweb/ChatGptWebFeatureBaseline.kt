@@ -282,11 +282,10 @@ internal object ChatGptWebFeatureBaseline {
 
     fun ids(): Set<String> = FEATURES.mapTo(linkedSetOf(), Feature::id)
 
-    fun verificationCaseIds(): Set<String> = DEVICE_VERIFICATION_CASES.values.toSortedSet()
+    fun verificationCaseIds(): Set<String> =
+        ChatGptWebAcceptanceCaseCatalog.verificationCaseIds()
 
-    fun evidenceCaseIds(): Set<String> = (
-        DEVICE_VERIFICATION_CASES.values + DISCOVERY_CASES.values
-    ).toSortedSet()
+    fun evidenceCaseIds(): Set<String> = ChatGptWebAcceptanceCaseCatalog.evidenceCaseIds()
 
     private fun Feature.withVerificationEvidence(
         evidence: ChatGptWebVerificationEvidenceStore.Snapshot,
@@ -315,47 +314,6 @@ internal object ChatGptWebFeatureBaseline {
     }
 
     private fun Int?.orZero(): Int = this ?: 0
-
-    private val DEVICE_VERIFICATION_CASES = mapOf(
-        "official_fullscreen_fallback" to "safe/read_only_surface",
-        "native_chat_composer" to "reversible/send_probe",
-        "streaming_and_stop" to "reversible/send_probe_with_stop",
-        "conversation_context_paging" to "safe/read_only_surface",
-        "conversation_history" to "safe/read_only_surface",
-        "conversation_create_and_switch" to "reversible/send_probe",
-        "model_selection" to "reversible/reversible_controls",
-        "attachment_lifecycle" to "supervised/attachment_lifecycle",
-        "composer_tools" to "reversible/tool_execution_with_citations",
-        "web_search" to "reversible/composer_controls",
-        "dictation" to "supervised/dictation_transcription",
-        "realtime_voice" to "supervised/realtime_voice_round_trip",
-        "rich_message_rendering" to "reversible/message_structure",
-        "complex_output_rendering" to "reversible/message_structure",
-        "message_copy" to "reversible/copy_receipt_without_content_readback",
-        "message_regenerate" to "reversible/regenerate_response",
-        "message_action_context" to "safe/message_actions",
-        "feature_navigation" to "safe/feature_pages",
-        "projects" to "safe/feature_page/projects",
-        "tasks" to "safe/feature_page/tasks",
-        "library" to "safe/feature_page/library",
-        "gpts" to "safe/feature_page/gpts",
-        "apps" to "safe/feature_page/apps",
-        "work" to "safe/feature_page/work",
-        "settings" to "safe/settings_overlay_form_controls",
-        "adaptive_form_controls" to "safe/settings_overlay_idempotent_form_controls",
-        "disclosure_controls" to "reversible/reversible_controls",
-        "official_change_detection" to "safe/read_only_surface",
-        "stable_mcp_and_adb_controls" to "safe/read_only_surface",
-        "session_continuity_and_recovery" to "safe/session_recovery",
-    )
-
-    private val DISCOVERY_CASES = mapOf(
-        "deep_research" to "reversible/composer_tool_discovery/deep_research",
-        "image_generation" to "reversible/composer_tool_discovery/image_generation",
-        "canvas" to "reversible/composer_tool_discovery/canvas",
-        "study_mode" to "reversible/composer_tool_discovery/study_mode",
-        "agent_mode" to "reversible/composer_tool_discovery/agent_mode",
-    )
 
     private val FEATURES = listOf(
         feature(
@@ -555,18 +513,34 @@ internal object ChatGptWebFeatureBaseline {
             id = "account_menu",
             group = "account",
             delivery = Delivery.ADAPTIVE_NATIVE,
-            acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control"),
             semantics = setOf("profile", "personalization", "help", "plan", "logout"),
+            verificationGap = "account_menu_structure_device_acceptance",
+        ),
+        feature(
+            id = "account_mutations",
+            group = "account",
+            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control", "chatgpt_select_view"),
+            semantics = setOf("personalization", "plan", "logout"),
             verificationGap = "logout_and_account_mutation_actions_remain_user_driven",
         ),
         feature(
             id = "conversation_management",
             group = "history",
             delivery = Delivery.ADAPTIVE_NATIVE,
-            acceptance = Acceptance.USER_DRIVEN_DEVICE,
             mcpActions = listOf("chatgpt_invoke_control"),
             semantics = setOf("conversation_files", "pin", "archive", "share", "delete"),
+            verificationGap = "conversation_menu_structure_device_acceptance",
+        ),
+        feature(
+            id = "conversation_mutations",
+            group = "history",
+            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            acceptance = Acceptance.USER_DRIVEN_DEVICE,
+            mcpActions = listOf("chatgpt_invoke_control", "chatgpt_select_view"),
+            semantics = setOf("pin", "archive", "share", "delete"),
             verificationGap = "conversation_mutation_device_acceptance",
         ),
         feature(
@@ -645,7 +619,7 @@ internal object ChatGptWebFeatureBaseline {
             "chatgpt_select_composer_option",
         ),
         composerOptionSemantics = setOf(semantic),
-        discoveryCase = DISCOVERY_CASES.getValue(id),
+        discoveryCase = ChatGptWebAcceptanceCaseCatalog.discoveryCase(id),
         verificationGap = "${id}_end_to_end_device_acceptance",
     )
 
@@ -673,10 +647,11 @@ internal object ChatGptWebFeatureBaseline {
         val resolvedVerificationStatus = verificationStatus ?: when {
             acceptance == Acceptance.USER_DRIVEN_DEVICE ->
                 VerificationStatus.USER_ACTION_REQUIRED
-            id in DEVICE_VERIFICATION_CASES &&
+            ChatGptWebAcceptanceCaseCatalog.verificationCase(id) != null &&
                 DEVICE_VERIFICATION_CURRENT ->
                 VerificationStatus.DEVICE_VERIFIED
-            id in DEVICE_VERIFICATION_CASES -> VerificationStatus.DEFERRED
+            ChatGptWebAcceptanceCaseCatalog.verificationCase(id) != null ->
+                VerificationStatus.DEFERRED
             else -> VerificationStatus.OFFLINE_VERIFIED
         }
         val resolvedVerificationGap = when (resolvedVerificationStatus) {
@@ -704,7 +679,7 @@ internal object ChatGptWebFeatureBaseline {
             composerOptionSemantics = composerOptionSemantics,
             codeGap = codeGap,
             verificationGap = resolvedVerificationGap,
-            verificationCase = DEVICE_VERIFICATION_CASES[id],
+            verificationCase = ChatGptWebAcceptanceCaseCatalog.verificationCase(id),
             discoveryCase = discoveryCase,
             remainingGap = if (resolvedCodeStatus == CodeStatus.PARTIAL) codeGap else null,
         )

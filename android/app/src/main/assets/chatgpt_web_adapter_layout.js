@@ -189,6 +189,14 @@
     ) return 'model';
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
     if (
+      /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)
+      && !node.matches('a[href]')
+      && (
+        /\bmore\b|options?|menu|更多|操作|菜单/.test(signal)
+        || (!cleanText(node.textContent) && node.matches('button, [role="button"]'))
+      )
+    ) return 'conversation_options';
+    if (
       region === 'overlay'
       && (/timestamp|消息时间/.test(signal)
         || /(?:today|yesterday|今天|昨天)[,，]?\s*\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?/.test(signal))
@@ -337,7 +345,7 @@
       const label = labelOf(node, defaultLabel(semantic));
       const path = relatedSameOriginPath(node);
       const resolvedContextId = contextId || (
-        (semantic === 'conversation' || semantic === 'conversation_options') && /^\/c\//.test(path)
+        (semantic === 'conversation' || semantic === 'conversation_options') && /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)
           ? path.slice(3)
           : ''
       );
@@ -620,7 +628,7 @@
         return result('invoke_ui_control', false, '官网控件滚动后仍不在可操作区域。');
       }
       if (overlayOwnership) {
-        const remembered = overlayOwnership.rememberMessageTrigger(
+        const remembered = overlayOwnership.rememberContextTrigger(
           control,
           node,
           visibleOverlayRoots(),

@@ -243,6 +243,69 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun conversationMenuActionsExposeConversationScopedNativeSelectors() {
+        val contextId = "conversation-123"
+        val controls = listOf(
+            control(
+                "conversation-more",
+                "conversation_options",
+                "更多",
+                ChatGptWebUiRegion.OVERLAY,
+                contextId,
+            ),
+            control("pin", "pin", "置顶", ChatGptWebUiRegion.OVERLAY, contextId),
+            control("delete", "delete", "删除", ChatGptWebUiRegion.OVERLAY, contextId),
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+        val selector = ChatGptNativeControlPresentation.conversationOverlayActionsSelector(contextId)
+
+        assertEquals(selector, ChatGptNativeControlPresentation.contextActionsSelector(controls))
+        assertEquals(selector, coverage.getValue("conversation-more").nativeTriggerSelector)
+        assertEquals(selector, coverage.getValue("pin").nativeTriggerSelector)
+        assertEquals(selector, coverage.getValue("delete").nativeTriggerSelector)
+    }
+
+    @Test
+    fun mixedMessageAndConversationContextsKeepDistinctNativeSelectors() {
+        val controls = listOf(
+            control(
+                "conversation-more",
+                "conversation_options",
+                "更多",
+                ChatGptWebUiRegion.OVERLAY,
+                "conversation-123",
+            ),
+            control(
+                "conversation-delete",
+                "delete",
+                "删除会话",
+                ChatGptWebUiRegion.OVERLAY,
+                "conversation-123",
+            ),
+            control(
+                "message-share",
+                "share",
+                "分享回复",
+                ChatGptWebUiRegion.OVERLAY,
+                "message-456",
+            ),
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(controls)
+
+        assertEquals(
+            "chatgpt-conversation-actions:conversation-123",
+            coverage.getValue("conversation-delete").nativeTriggerSelector,
+        )
+        assertEquals(
+            "chatgpt-message-overlay-actions:message-456",
+            coverage.getValue("message-share").nativeTriggerSelector,
+        )
+        assertEquals(null, ChatGptNativeControlPresentation.contextActionsSelector(controls))
+    }
+
+    @Test
     fun mapsDedicatedControlsToTheirRealNativeSurfaceAndRequiredTrigger() {
         val controls = listOf(
             control("navigation", "navigation", "会话", ChatGptWebUiRegion.HEADER),

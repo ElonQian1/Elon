@@ -52,9 +52,8 @@ internal class ChatGptNativeOverlayControlsController(
         setImageResource(R.drawable.ic_more_horizontal)
         imageTintList = activity.getColorStateList(R.color.elon_icon_primary)
         setPadding(dp(10), dp(10), dp(10), dp(10))
-        contentDescription = controls.firstNotNullOfOrNull(ChatGptWebUiControl::contextId)?.let { contextId ->
-            ChatGptNativeControlPresentation.messageOverlayActionsSelector(contextId)
-        } ?: ChatGptNativeControlPresentation.pageActionsSelector(controls)
+        contentDescription = ChatGptNativeControlPresentation.contextActionsSelector(controls)
+            ?: ChatGptNativeControlPresentation.pageActionsSelector(controls)
         tooltipText = activity.getString(R.string.chatgpt_official_page_actions)
         setOnClickListener { showActions() }
     }

@@ -64,7 +64,7 @@ internal object ChatGptNativeControlPresentation {
                     Kind.MENU,
                     nativeSelector = control.accessibilityLabel,
                     nativeTriggerSelector = control.contextId?.let { contextId ->
-                        messageOverlayActionsSelector(contextId)
+                        contextActionsSelector(controls, contextId)
                     } ?: pageActionTrigger,
                 )
                 else -> Coverage(control.id, Kind.OFFICIAL_FALLBACK)
@@ -156,6 +156,29 @@ internal object ChatGptNativeControlPresentation {
     fun messageOverlayActionsSelector(contextId: String): String =
         "chatgpt-message-overlay-actions:${stableContextId(contextId)}"
 
+    fun conversationOverlayActionsSelector(contextId: String): String =
+        "chatgpt-conversation-actions:${stableContextId(contextId)}"
+
+    fun contextActionsSelector(controls: List<ChatGptWebUiControl>): String? {
+        val contextIds = controls.mapNotNull(ChatGptWebUiControl::contextId).distinct()
+        val contextId = contextIds.singleOrNull() ?: return null
+        return contextActionsSelector(controls, contextId)
+    }
+
+    private fun contextActionsSelector(
+        controls: List<ChatGptWebUiControl>,
+        contextId: String,
+    ): String {
+        val conversationContext = controls.any { control ->
+            control.contextId == contextId && control.semantic in CONVERSATION_CONTEXT_SEMANTICS
+        }
+        return if (conversationContext) {
+            conversationOverlayActionsSelector(contextId)
+        } else {
+            messageOverlayActionsSelector(contextId)
+        }
+    }
+
     fun messageSelector(contextId: String, role: String): String =
         "chatgpt-message:${stableContextId(contextId)}:${stableContextId(role)}"
 
@@ -237,6 +260,12 @@ internal object ChatGptNativeControlPresentation {
     )
     private val OVERLAY_DEDICATED_SEMANTICS = setOf("conversation", "project")
     private val SUGGESTION_SEMANTICS = setOf("suggestion", "project")
+    private val CONVERSATION_CONTEXT_SEMANTICS = setOf(
+        "conversation_options",
+        "conversation_files",
+        "pin",
+        "archive",
+    )
     private val PRIMARY_COPY_LABELS = setOf(
         "复制回复",
         "复制消息",
