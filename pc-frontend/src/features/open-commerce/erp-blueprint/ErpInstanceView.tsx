@@ -14,11 +14,13 @@ export default function ErpInstanceView({
   canEdit,
   overview,
   refresh,
+  onSelectWorkspace,
 }: {
   projectId: string
   canEdit: boolean
   overview: ErpOverview
   refresh: () => Promise<void>
+  onSelectWorkspace: (workspace: 'merchant' | 'consumer') => void
 }) {
   const instance = overview.instance!
   const [requirement, setRequirement] = useState('')
@@ -79,6 +81,7 @@ export default function ErpInstanceView({
         instance={instance}
         canEdit={canEdit}
         refresh={refresh}
+        onSelectWorkspace={onSelectWorkspace}
       />
 
       <section className={styles.band}>

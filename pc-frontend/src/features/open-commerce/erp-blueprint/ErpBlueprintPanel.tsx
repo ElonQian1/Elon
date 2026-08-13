@@ -12,10 +12,12 @@ export default function ErpBlueprintPanel({
   projectId,
   canEdit,
   onOpenProject,
+  onSelectWorkspace,
 }: {
   projectId: string
   canEdit: boolean
   onOpenProject: (projectId: string) => Promise<void>
+  onSelectWorkspace: (workspace: 'merchant' | 'consumer') => void
 }) {
   const [overview, setOverview] = useState<ErpOverview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,7 +68,13 @@ export default function ErpBlueprintPanel({
         />
       )}
       {overview?.blueprint && overview.instance && !isMaintainer && (
-        <ErpInstanceView projectId={projectId} canEdit={canEdit} overview={overview} refresh={refresh} />
+        <ErpInstanceView
+          projectId={projectId}
+          canEdit={canEdit}
+          overview={overview}
+          refresh={refresh}
+          onSelectWorkspace={onSelectWorkspace}
+        />
       )}
       {overview?.blueprint && !overview.instance && !isMaintainer && (
         <div className={styles.emptyState}><Boxes size={24} /><p>当前项目已关联蓝图，但不是可管理的商户实例。</p></div>

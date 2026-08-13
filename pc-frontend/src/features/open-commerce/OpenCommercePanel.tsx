@@ -84,6 +84,7 @@ export default function OpenCommercePanel({
           projectId={projectId}
           canEdit={canEdit}
           onOpenProject={onOpenProject}
+          onSelectWorkspace={selectView}
         />
       )}
       {view === 'consumer' && <ConsumerCommerceSandbox projectId={projectId} />}

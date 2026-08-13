@@ -89,7 +89,7 @@ export default function ErpInstanceConfigurationPanel({
   }
 
   return (
-    <section className={styles.band}>
+    <section className={styles.band} id="erp-instance-configuration">
       <header><Save size={17} /><h3>商户实例配置</h3></header>
       <div className={styles.configurationGrid}>
         <label>主题<select value={theme} onChange={(event) => setTheme(event.target.value)}>{themes.map((item) => <option key={item}>{item}</option>)}</select></label>

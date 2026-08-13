@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bot, CheckCircle2, Link2, RefreshCw, Store, Unlink, XCircle } from 'lucide-react'
+import { Bot, CheckCircle2, Compass, Link2, ListChecks, RefreshCw, Store, Unlink, XCircle } from 'lucide-react'
 import { erpBlueprintApi } from './erpBlueprintApi'
 import type { ErpInstance, ErpOpenCommerceReadiness } from './erpBlueprintTypes'
 import { errorMessage } from './erpBlueprintUi'
@@ -10,11 +10,13 @@ export default function ErpOpenCommerceReadinessPanel({
   instance,
   canEdit,
   refresh,
+  onSelectWorkspace,
 }: {
   projectId: string
   instance: ErpInstance
   canEdit: boolean
   refresh: () => Promise<void>
+  onSelectWorkspace: (workspace: 'merchant' | 'consumer') => void
 }) {
   const [readiness, setReadiness] = useState<ErpOpenCommerceReadiness | null>(null)
   const [merchantId, setMerchantId] = useState('')
@@ -60,6 +62,13 @@ export default function ErpOpenCommerceReadinessPanel({
     } finally {
       setLoading(false)
     }
+  }
+
+  function focusInstanceConfiguration() {
+    document.getElementById('erp-instance-configuration')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
   }
 
   return (
@@ -131,6 +140,28 @@ export default function ErpOpenCommerceReadinessPanel({
             <ReadinessGate label="ERP 项目验收" ready={readiness.erp_onboarding_ready} detail={readiness.materialization.state} />
             <ReadinessGate label="消费者 AI 调用" ready={readiness.consumer_invocation_ready} detail={`${readiness.active_runtime_capability_keys.length} 项运行时能力`} />
             <ReadinessGate label="开放目录发现" ready={readiness.consumer_discovery_ready} detail={readiness.directory?.status ?? '未发布'} />
+          </div>
+          <div className={styles.readinessActions}>
+            {!readiness.erp_onboarding_ready && (
+              <button type="button" onClick={focusInstanceConfiguration}>
+                <ListChecks size={15} />处理 ERP 验收
+              </button>
+            )}
+            {!readiness.consumer_invocation_ready && (
+              <button type="button" onClick={() => onSelectWorkspace('merchant')}>
+                <Store size={15} />配置商户节点
+              </button>
+            )}
+            {readiness.consumer_invocation_ready && !readiness.consumer_discovery_ready && (
+              <button type="button" onClick={() => onSelectWorkspace('merchant')}>
+                <Store size={15} />发布开放目录
+              </button>
+            )}
+            {readiness.consumer_discovery_ready && (
+              <button type="button" onClick={() => onSelectWorkspace('consumer')}>
+                <Compass size={15} />消费者沙盒验证
+              </button>
+            )}
           </div>
           {readiness.merchant_selection.selected && (
             <p className={styles.selectedMerchantLine}>
