@@ -211,6 +211,18 @@ verificationCaseFiles["reversible/composer_controls"] = caseInputs(
     composerCaseInputs,
     "smoke-chatgpt-web-composer-controls.ps1",
 )
+[
+    deep_research: "reversible/composer_tool_execution/deep_research",
+    image_generation: "reversible/composer_tool_execution/image_generation",
+    canvas: "reversible/composer_tool_execution/canvas",
+    study_mode: "reversible/composer_tool_execution/study_mode",
+    agent_mode: "supervised/composer_tool_execution/agent_mode",
+].each { toolId, caseId ->
+    verificationCaseFiles[caseId] = caseInputs(
+        composerCaseInputs + messageCaseInputs,
+        "smoke-chatgpt-web-tool-execution.ps1",
+    )
+}
 verificationCaseFiles["supervised/attachment_lifecycle"] = caseInputs(
     composerCaseInputs + attachmentCaseInputs,
     "smoke-chatgpt-web-attachment-lifecycle.ps1",

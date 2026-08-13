@@ -211,12 +211,12 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
-        assertEquals(5, verificationSummary.getInt("offline_verified"))
+        assertEquals(0, verificationSummary.getInt("offline_verified"))
         assertEquals(0, verificationSummary.getInt("device_verified"))
         assertEquals(0, verificationSummary.getInt("verified"))
-        assertEquals(35, verificationSummary.getInt("pending"))
-        assertEquals(9, verificationSummary.getInt("user_action_required"))
-        assertEquals(30, verificationSummary.getInt("deferred"))
+        assertEquals(34, verificationSummary.getInt("pending"))
+        assertEquals(10, verificationSummary.getInt("user_action_required"))
+        assertEquals(34, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
         assertEquals(44, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
@@ -299,10 +299,18 @@ class ChatGptWebFeatureBaselineTest {
             "image_generation",
             "canvas",
             "study_mode",
-            "agent_mode",
         ).forEach { id ->
-            assertEquals("offline_verified", feature(baseline, id).getString("verification_status"))
+            assertEquals("deferred", feature(baseline, id).getString("verification_status"))
+            assertTrue(feature(baseline, id).getString("verification_case").contains("tool_execution"))
         }
+        assertEquals(
+            "user_action_required",
+            feature(baseline, "agent_mode").getString("verification_status"),
+        )
+        assertEquals(
+            "supervised/composer_tool_execution/agent_mode",
+            feature(baseline, "agent_mode").getString("verification_case"),
+        )
     }
 
     @Test
@@ -508,7 +516,7 @@ class ChatGptWebFeatureBaselineTest {
         val deepResearch = feature(baseline, "deep_research")
         assertEquals("device_observed", deepResearch.getString("discovery_status"))
         assertTrue(deepResearch.isNull("discovery_gap"))
-        assertEquals("offline_verified", deepResearch.getString("verification_status"))
+        assertEquals("deferred", deepResearch.getString("verification_status"))
         val image = feature(baseline, "image_generation")
         assertEquals("not_recorded", image.getString("discovery_status"))
         assertFalse(image.isNull("discovery_gap"))
@@ -516,6 +524,37 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(5, summary.getInt("required"))
         assertEquals(1, summary.getInt("device_observed"))
         assertEquals(4, summary.getInt("remaining"))
+    }
+
+    @Test
+    fun promotesOnlyTheComposerToolWhoseExecutionCaseWasRecorded() {
+        val caseId = "reversible/composer_tool_execution/deep_research"
+        val currentHash = "9".repeat(64)
+        val evidence = ChatGptWebVerificationEvidenceStore.Snapshot(
+            currentInputs = linkedMapOf(caseId to currentHash),
+            records = linkedMapOf(
+                caseId to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = caseId,
+                    inputSha256 = currentHash,
+                    current = true,
+                    adapterVersion = ChatGptWebPageAdapter.ADAPTER_VERSION,
+                    apkVersionName = "test",
+                    apkVersionCode = 1,
+                    recordedAtMs = 123L,
+                ),
+            ),
+        )
+
+        val baseline = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            verificationEvidence = evidence,
+        )
+
+        assertEquals("device_verified", feature(baseline, "deep_research").getString("verification_status"))
+        assertEquals("deferred", feature(baseline, "image_generation").getString("verification_status"))
+        assertEquals("user_action_required", feature(baseline, "agent_mode").getString("verification_status"))
     }
 
     private fun feature(baseline: org.json.JSONObject, id: String): org.json.JSONObject {

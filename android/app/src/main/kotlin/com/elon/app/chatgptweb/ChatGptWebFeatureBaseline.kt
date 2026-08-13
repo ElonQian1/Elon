@@ -418,7 +418,11 @@ internal object ChatGptWebFeatureBaseline {
         composerTool("image_generation", ChatGptWebComposerOptionSemantics.IMAGE_GENERATION),
         composerTool("canvas", ChatGptWebComposerOptionSemantics.CANVAS),
         composerTool("study_mode", ChatGptWebComposerOptionSemantics.STUDY),
-        composerTool("agent_mode", ChatGptWebComposerOptionSemantics.AGENT),
+        composerTool(
+            "agent_mode",
+            ChatGptWebComposerOptionSemantics.AGENT,
+            Acceptance.USER_DRIVEN_DEVICE,
+        ),
         feature(
             id = "dictation",
             group = "voice",
@@ -609,11 +613,15 @@ internal object ChatGptWebFeatureBaseline {
         verificationGap = "${id}_workflow_end_to_end_acceptance",
     )
 
-    private fun composerTool(id: String, semantic: String): Feature = feature(
+    private fun composerTool(
+        id: String,
+        semantic: String,
+        acceptance: Acceptance = Acceptance.INTERACTIVE_DEVICE,
+    ): Feature = feature(
         id = id,
         group = "composer",
         delivery = Delivery.DEDICATED_NATIVE,
-        acceptance = Acceptance.INTERACTIVE_DEVICE,
+        acceptance = acceptance,
         mcpActions = listOf(
             "chatgpt_list_composer_options",
             "chatgpt_select_composer_option",
