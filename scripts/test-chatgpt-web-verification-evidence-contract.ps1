@@ -14,6 +14,13 @@ $expected = [ordered]@{
         "reversible/composer_tool_discovery/study_mode",
         "reversible/composer_tool_discovery/agent_mode"
     )
+    "smoke-chatgpt-web-attachment-lifecycle.ps1" = @(
+        "supervised/attachment_lifecycle"
+    )
+    "smoke-chatgpt-web-audio-lifecycle.ps1" = @(
+        "supervised/dictation_transcription",
+        "supervised/realtime_voice_round_trip"
+    )
     "smoke-chatgpt-web-message-structure.ps1" = @("reversible/message_structure")
     "smoke-chatgpt-web-copy.ps1" = @("reversible/copy_receipt_without_content_readback")
     "smoke-chatgpt-web-regenerate.ps1" = @("reversible/regenerate_response")

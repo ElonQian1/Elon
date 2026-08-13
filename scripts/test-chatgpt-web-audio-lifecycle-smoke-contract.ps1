@@ -23,12 +23,13 @@ function Assert-Contains {
 foreach ($required in @(
     '"Prepare",',
     '"StartDictation",',
-    '"VerifyAndCancelDictation",',
+    '"VerifyAndClearDictation",',
     '"StartRealtimeVoice",',
     '"VerifyRealtimeVoice",',
     '"VerifyRestored"',
     '[switch]$UserConfirmedMicrophone',
     '[switch]$UserConfirmedRealtimeVoice',
+    '[switch]$UserConfirmedVoiceRoundTrip',
     '[switch]$UserConfirmedVoiceClosed',
     'audio_lifecycle_checkpoint.v1',
     'audio_lifecycle_smoke.v1',
@@ -40,21 +41,30 @@ foreach ($required in @(
     'Stop-ChatGptWebSmokeAwakeLease',
     'conversation_binding_sha256',
     'device_binding_sha256',
+    'Start-ChatGptWebSmokeIsolatedConversation',
+    'Restore-ChatGptWebSmokeOrigin',
+    'dictation_request_id = ""',
+    'realtime_voice_request_id = ""',
+    'voice_round_trip_confirmed = $false',
     '-Action "chatgpt_start_dictation"',
     '-ExpectedAction "start_dictation"',
-    '-Action "chatgpt_cancel_dictation"',
-    '-ExpectedAction "cancel_dictation"',
+    '-Action "chatgpt_submit_dictation"',
+    '-ExpectedAction "submit_dictation"',
     'finally {',
     '-AllowNonEmptyDraft',
     '-Action "chatgpt_start_realtime_voice"',
     '-ExpectedAction "invoke_ui_control"',
     '[string]$state.audio.request_state -eq "web_permission_granted"',
+    '[int]$state.input.text_length -gt 0',
+    '-Action "set_input_text" -Arguments @{ text = "" }',
+    '-ExpectedAction "set_draft"',
     'Run this phase with -UserConfirmedMicrophone',
     'while the user supervises active dictation',
     'Run this phase with -UserConfirmedRealtimeVoice',
     'run this phase with -UserConfirmedVoiceClosed',
     'Move-Item -LiteralPath $temporary -Destination $CheckpointPath -Force',
-    'message_count_unchanged = $true',
+    '[bool]$MessageCountUnchanged = $true',
+    'message_count_unchanged = $MessageCountUnchanged',
     'sent_messages = 0',
     'uploaded_attachments = 0',
     'cleared_cookies = $false',
@@ -65,6 +75,15 @@ foreach ($required in @(
     'waiting_for_user_microphone_permission',
     'waiting_for_user_realtime_voice_confirmation',
     'waiting_for_user_to_close_realtime_voice',
+    'Register-ChatGptWebVerificationCases',
+    '-CaseIds @("supervised/dictation_transcription")',
+    '-CaseIds @("supervised/realtime_voice_round_trip")',
+    'voice_round_trip_confirmed = $true',
+    'voice_message_count_added = $messagesAdded',
+    '$messagesAdded -lt 2',
+    'Realtime voice did not persist a complete user and assistant round trip.',
+    '-MessageCountUnchanged:$false',
+    'only after the user spoke and heard a ChatGPT voice reply',
     '-Status "passed"'
 )) {
     Assert-Contains $required
@@ -72,7 +91,6 @@ foreach ($required in @(
 
 foreach ($forbidden in @(
     'send_input',
-    'set_input_text',
     'pm clear',
     'removeAllCookies',
     'input tap',
@@ -90,8 +108,28 @@ foreach ($forbidden in @(
 if ($source -match '\.input\.text(?!_length)') {
     throw "Audio lifecycle smoke must not read or emit draft text."
 }
+if (@([regex]::Matches($source, '-Action "set_input_text"')).Count -ne 1 -or
+    -not $source.Contains('-Action "set_input_text" -Arguments @{ text = "" }')) {
+    throw "Audio lifecycle may only clear the recognized draft without reading or replacing it."
+}
 if ($source -match '(?m)^\s*exit\s+[1-9]') {
     throw "Audio lifecycle smoke must fail through exceptions, not nested exit."
+}
+
+
+$dictationRegister = $source.IndexOf('-CaseIds @("supervised/dictation_transcription")')
+$dictationRestored = $source.IndexOf('Assert-IdleComposer -State $restored -Checkpoint $checkpoint')
+if ($dictationRegister -le $dictationRestored) {
+    throw "Dictation evidence must be recorded only after cancel and restoration."
+}
+$voiceRegister = $source.IndexOf('-CaseIds @("supervised/realtime_voice_round_trip")')
+$voiceRestored = $source.LastIndexOf('Assert-IdleComposer -State $restored -Checkpoint $checkpoint')
+if ($voiceRegister -le $voiceRestored) {
+    throw "Realtime voice evidence must be recorded only after the official voice UI is closed."
+}
+$originRestore = $source.LastIndexOf('Restore-ChatGptWebSmokeOrigin')
+if ($voiceRegister -le $originRestore) {
+    throw "Realtime voice evidence must be recorded only after the original conversation is restored."
 }
 
 $lineCount = @($source -split "`n").Count

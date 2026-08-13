@@ -305,7 +305,11 @@ internal object ChatGptWebFeatureBaseline {
             "verification_case_inputs_changed_since_device_acceptance"
         }
         return copy(
-            verificationStatus = VerificationStatus.DEFERRED,
+            verificationStatus = if (acceptance == Acceptance.USER_DRIVEN_DEVICE) {
+                VerificationStatus.USER_ACTION_REQUIRED
+            } else {
+                VerificationStatus.DEFERRED
+            },
             verificationGap = gap,
         )
     }
@@ -320,8 +324,11 @@ internal object ChatGptWebFeatureBaseline {
         "conversation_history" to "safe/read_only_surface",
         "conversation_create_and_switch" to "reversible/send_probe",
         "model_selection" to "reversible/reversible_controls",
+        "attachment_lifecycle" to "supervised/attachment_lifecycle",
         "composer_tools" to "reversible/tool_execution_with_citations",
         "web_search" to "reversible/composer_controls",
+        "dictation" to "supervised/dictation_transcription",
+        "realtime_voice" to "supervised/realtime_voice_round_trip",
         "rich_message_rendering" to "reversible/message_structure",
         "complex_output_rendering" to "reversible/message_structure",
         "message_copy" to "reversible/copy_receipt_without_content_readback",
@@ -676,12 +683,12 @@ internal object ChatGptWebFeatureBaseline {
             else -> CodeStatus.IMPLEMENTED
         }
         val resolvedVerificationStatus = verificationStatus ?: when {
+            acceptance == Acceptance.USER_DRIVEN_DEVICE ->
+                VerificationStatus.USER_ACTION_REQUIRED
             id in DEVICE_VERIFICATION_CASES &&
                 DEVICE_VERIFICATION_CURRENT ->
                 VerificationStatus.DEVICE_VERIFIED
             id in DEVICE_VERIFICATION_CASES -> VerificationStatus.DEFERRED
-            acceptance == Acceptance.USER_DRIVEN_DEVICE ->
-                VerificationStatus.USER_ACTION_REQUIRED
             else -> VerificationStatus.OFFLINE_VERIFIED
         }
         val resolvedVerificationGap = when (resolvedVerificationStatus) {

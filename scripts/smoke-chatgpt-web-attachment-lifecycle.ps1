@@ -6,7 +6,14 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [Parameter(Mandatory = $true)][string]$ExpectedHardwareSerial,
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Prepare", "OpenPicker", "VerifyAndRemove")][string]$Phase,
+    [ValidateSet(
+        "Prepare",
+        "OpenPickerForRemove",
+        "VerifyAndRemove",
+        "OpenPickerForSend",
+        "SendAndVerifyReply"
+    )][string]$Phase,
+    [switch]$UserConfirmedAttachmentSend,
     [string]$CheckpointPath = "",
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
     [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 85
@@ -14,6 +21,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-supervised-runtime.ps1")
 
 $checkpointSchema = "elon.chatgpt_web.attachment_lifecycle_checkpoint.v1"
 $reportSchema = "elon.chatgpt_web.attachment_lifecycle_smoke.v1"
@@ -159,6 +168,24 @@ function Wait-ExternalPicker {
     throw "Android file picker did not take the foreground."
 }
 
+function Open-AttachmentPicker {
+    Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
+        -ExpectedAction "list_composer_tools" -Arguments @{ section = "tools" } | Out-Null
+    $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        -Action "chatgpt_get_navigation" -Arguments @{ section = "tools" }
+    $option = @($navigation.composer_sections.tools) |
+        Where-Object { [string]$_.semantic -eq "attachment_file" } |
+        Select-Object -First 1
+    if ($null -eq $option) { throw "Semantic attachment_file composer option is unavailable." }
+    $selected = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        -Action "chatgpt_select_composer_option" -Arguments @{
+            section = "tools"
+            option_id = [string]$option.id
+        }
+    if ($selected.control_ok -ne $true) { throw "Unable to open Android file picker." }
+    Wait-ExternalPicker
+}
+
 function Assert-CheckpointIdentity {
     param([Parameter(Mandatory = $true)]$Checkpoint)
 
@@ -194,15 +221,23 @@ try {
             if (@($ready.conversation.attachments).Count -ne 0) {
                 throw "Remove existing attachments before creating a checkpoint."
             }
+            $isolation = Start-ChatGptWebSmokeIsolatedConversation -Runtime $runtime `
+                -OriginState $ready -TimeoutSec $TimeoutSec
+            $isolated = $isolation.isolated_state
             $checkpoint = [ordered]@{
                 schema = $checkpointSchema
                 phase = "prepared"
                 created_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 device_binding_sha256 = Get-Sha256Text -Value $ExpectedHardwareSerial.Trim()
-                conversation_binding_sha256 = Get-ConversationBinding -State $ready
-                adapter_version = [int]$ready.adapter_version
-                message_count = [int]$ready.conversation.message_count
+                origin_conversation_path = [string]$isolation.origin_conversation_path
+                origin_view_mode = [string]$isolation.origin_view_mode
+                conversation_binding_sha256 = Get-ConversationBinding -State $isolated
+                adapter_version = [int]$isolated.adapter_version
+                message_count = 0
+                marker = "ELON-CHATGPT-ATTACHMENT-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+                send_request_id = ""
+                send_after_ms = 0
                 sent_messages = 0
                 cleared_cookies = $false
                 cleared_app_data = $false
@@ -212,15 +247,16 @@ try {
                 schema = $reportSchema
                 phase = "prepared"
                 passed = $true
-                adapter_version = [int]$ready.adapter_version
-                message_count = [int]$ready.conversation.message_count
+                adapter_version = [int]$isolated.adapter_version
+                message_count = 0
+                isolated_conversation = $true
                 attachment_count = 0
                 sent_messages = 0
                 private_content_emitted = $false
             } | ConvertTo-Json -Depth 6
             Write-Output "CHATGPT_WEB_ATTACHMENT_LIFECYCLE_STATUS=prepared"
         }
-        "OpenPicker" {
+        "OpenPickerForRemove" {
             $checkpoint = Read-Checkpoint
             Assert-CheckpointIdentity -Checkpoint $checkpoint
             Assert-CommonState -State $ready -Checkpoint $checkpoint
@@ -228,23 +264,9 @@ try {
                 throw "Attachment already exists; use -Phase VerifyAndRemove or prepare again."
             }
 
-            Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
-                -ExpectedAction "list_composer_tools" -Arguments @{ section = "tools" } | Out-Null
-            $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-                -Action "chatgpt_get_navigation" -Arguments @{ section = "tools" }
-            $option = @($navigation.composer_sections.tools) |
-                Where-Object { [string]$_.semantic -eq "attachment_file" } |
-                Select-Object -First 1
-            if ($null -eq $option) { throw "Semantic attachment_file composer option is unavailable." }
-            $selected = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-                -Action "chatgpt_select_composer_option" -Arguments @{
-                    section = "tools"
-                    option_id = [string]$option.id
-                }
-            if ($selected.control_ok -ne $true) { throw "Unable to open Android file picker." }
-            Wait-ExternalPicker
+            Open-AttachmentPicker
 
-            $checkpoint.phase = "picker_opened"
+            $checkpoint.phase = "picker_opened_for_remove"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint -Value $checkpoint
             [ordered]@{
@@ -262,7 +284,7 @@ try {
         "VerifyAndRemove" {
             $checkpoint = Read-Checkpoint
             Assert-CheckpointIdentity -Checkpoint $checkpoint
-            if ([string]$checkpoint.phase -notin @("prepared", "picker_opened")) {
+            if ([string]$checkpoint.phase -ne "picker_opened_for_remove") {
                 throw "Checkpoint is not waiting for attachment verification."
             }
             Assert-CommonState -State $ready -Checkpoint $checkpoint
@@ -284,13 +306,12 @@ try {
                     @($state.conversation.attachments).Count -eq 0
                 }
             Assert-CommonState -State $restored -Checkpoint $checkpoint
-
-            $checkpoint.phase = "passed"
+            $checkpoint.phase = "attachment_removed"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint -Value $checkpoint
             [ordered]@{
                 schema = $reportSchema
-                phase = "passed"
+                phase = "attachment_removed"
                 passed = $true
                 adapter_version = [int]$restored.adapter_version
                 selected_local_files = 1
@@ -300,6 +321,85 @@ try {
                 message_count_unchanged = $true
                 input_empty = $true
                 sent_messages = 0
+                cleared_cookies = $false
+                cleared_app_data = $false
+                private_content_emitted = $false
+            } | ConvertTo-Json -Depth 6
+            Write-Output "CHATGPT_WEB_ATTACHMENT_LIFECYCLE_STATUS=waiting_for_send_picker"
+        }
+        "OpenPickerForSend" {
+            $checkpoint = Read-Checkpoint
+            Assert-CheckpointIdentity -Checkpoint $checkpoint
+            if ([string]$checkpoint.phase -ne "attachment_removed") {
+                throw "Complete attachment removal before opening the send picker."
+            }
+            Assert-CommonState -State $ready -Checkpoint $checkpoint
+            Open-AttachmentPicker
+            $checkpoint.phase = "picker_opened_for_send"
+            $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
+            Write-Checkpoint -Value $checkpoint
+            Write-Output "CHATGPT_WEB_ATTACHMENT_LIFECYCLE_STATUS=waiting_for_send_selection"
+        }
+        "SendAndVerifyReply" {
+            if (-not $UserConfirmedAttachmentSend) {
+                throw "Run this phase with -UserConfirmedAttachmentSend only while the user supervises file upload and message send."
+            }
+            $checkpoint = Read-Checkpoint
+            Assert-CheckpointIdentity -Checkpoint $checkpoint
+            if ([string]$checkpoint.phase -eq "picker_opened_for_send") {
+                Assert-CommonState -State $ready -Checkpoint $checkpoint
+                $attached = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+                    -RequireChatGptForeground -Description "one ready attachment for send" -Predicate {
+                        param($state)
+                        $items = @($state.conversation.attachments)
+                        $items.Count -eq 1 -and [string]$items[0].state -eq "ready"
+                    }
+                Assert-CommonState -State $attached -Checkpoint $checkpoint
+                $draft = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
+                    -Arguments @{ text = "Read the attached test file and reply only with: $($checkpoint.marker)" }
+                Wait-ChatGptCommandReceipt `
+                    -InvokeUiState { Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" } `
+                    -RequestId ([string]$draft.command_receipt.request_id) `
+                    -ExpectedAction "set_draft" -TimeoutSec $TimeoutSec `
+                    -PollIntervalSec $runtime.poll_interval_sec | Out-Null
+                $beforeSend = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+                $send = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input"
+                $requestId = [string]$send.command_receipt.request_id
+                if (-not $requestId) { throw "Attachment send did not return a receipt id." }
+                $checkpoint.phase = "reply_requested"
+                $checkpoint.send_request_id = $requestId
+                $checkpoint.send_after_ms = [long]$beforeSend.last_command.observed_at_ms
+                $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
+                Write-Checkpoint -Value $checkpoint
+            } elseif ([string]$checkpoint.phase -ne "reply_requested") {
+                throw "Checkpoint is not waiting for attachment send verification."
+            }
+
+            Wait-ChatGptProbeReply `
+                -InvokeUiState { Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" } `
+                -RequestId ([string]$checkpoint.send_request_id) `
+                -Marker ([string]$checkpoint.marker) -AfterMs ([long]$checkpoint.send_after_ms) `
+                -TimeoutSec $TimeoutSec -PollIntervalSec $runtime.poll_interval_sec | Out-Null
+            Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
+                -ConversationPath ([string]$checkpoint.origin_conversation_path) `
+                -ViewMode ([string]$checkpoint.origin_view_mode) -TimeoutSec $TimeoutSec | Out-Null
+            Register-ChatGptWebVerificationCases -Runtime $runtime `
+                -CaseIds @("supervised/attachment_lifecycle") `
+                -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+            $checkpoint.phase = "passed"
+            $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
+            Write-Checkpoint -Value $checkpoint
+            [ordered]@{
+                schema = $reportSchema
+                phase = "passed"
+                passed = $true
+                isolated_conversation = $true
+                selected_local_files = 2
+                attachment_removed_count = 1
+                attachment_message_sent = $true
+                assistant_completed = $true
+                original_view_restored = $true
+                sent_messages = 1
                 cleared_cookies = $false
                 cleared_app_data = $false
                 private_content_emitted = $false

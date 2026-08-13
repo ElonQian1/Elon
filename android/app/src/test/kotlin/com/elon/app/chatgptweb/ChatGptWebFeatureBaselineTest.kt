@@ -70,7 +70,10 @@ class ChatGptWebFeatureBaselineTest {
             } else {
                 assertFalse(feature.isNull("verification_gap"))
                 if (!feature.isNull("verification_case")) {
-                    assertEquals("deferred", feature.getString("verification_status"))
+                    assertTrue(
+                        feature.getString("verification_status") in
+                            setOf("deferred", "user_action_required"),
+                    )
                 }
             }
         }
@@ -422,6 +425,53 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(caseId, regenerate.getString("verification_case"))
         assertEquals("device_verified", regenerate.getString("verification_status"))
         assertTrue(regenerate.isNull("verification_gap"))
+    }
+
+    @Test
+    fun supervisedCasesRemainUserDrivenUntilCurrentEvidenceIsRecorded() {
+        val caseId = "supervised/attachment_lifecycle"
+        val withoutEvidence = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+        val pending = feature(withoutEvidence, "attachment_lifecycle")
+        assertEquals(caseId, pending.getString("verification_case"))
+        assertEquals("user_action_required", pending.getString("verification_status"))
+        assertEquals(
+            "supervised/dictation_transcription",
+            feature(withoutEvidence, "dictation").getString("verification_case"),
+        )
+        assertEquals(
+            "supervised/realtime_voice_round_trip",
+            feature(withoutEvidence, "realtime_voice").getString("verification_case"),
+        )
+
+        val hash = "a".repeat(64)
+        val evidence = ChatGptWebVerificationEvidenceStore.Snapshot(
+            currentInputs = linkedMapOf(caseId to hash),
+            records = linkedMapOf(
+                caseId to ChatGptWebVerificationEvidenceStore.Record(
+                    caseId = caseId,
+                    inputSha256 = hash,
+                    current = true,
+                    adapterVersion = ChatGptWebPageAdapter.ADAPTER_VERSION,
+                    apkVersionName = "test",
+                    apkVersionCode = 1,
+                    recordedAtMs = 123L,
+                ),
+            ),
+        )
+        val verified = ChatGptWebFeatureBaseline.describe(
+            snapshot = null,
+            manifest = null,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+            verificationEvidence = evidence,
+        )
+        assertEquals(
+            "device_verified",
+            feature(verified, "attachment_lifecycle").getString("verification_status"),
+        )
     }
 
     @Test

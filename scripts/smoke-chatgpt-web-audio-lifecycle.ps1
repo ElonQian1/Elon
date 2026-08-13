@@ -9,13 +9,14 @@ param(
     [ValidateSet(
         "Prepare",
         "StartDictation",
-        "VerifyAndCancelDictation",
+        "VerifyAndClearDictation",
         "StartRealtimeVoice",
         "VerifyRealtimeVoice",
         "VerifyRestored"
     )][string]$Phase,
     [switch]$UserConfirmedMicrophone,
     [switch]$UserConfirmedRealtimeVoice,
+    [switch]$UserConfirmedVoiceRoundTrip,
     [switch]$UserConfirmedVoiceClosed,
     [string]$CheckpointPath = "",
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
@@ -24,6 +25,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-supervised-runtime.ps1")
 
 $checkpointSchema = "elon.chatgpt_web.audio_lifecycle_checkpoint.v1"
 $reportSchema = "elon.chatgpt_web.audio_lifecycle_smoke.v1"
@@ -145,6 +148,23 @@ function Assert-ConversationUnchanged {
     }
 }
 
+function Assert-AudioSessionBinding {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)]$Checkpoint
+    )
+
+    Assert-ChatGptWebSmokeAdapterVersion -State $State -ExpectedAdapterVersion $ExpectedAdapterVersion
+    Assert-AudioContract -State $State
+    if ($State.authenticated -ne $true) { throw "ChatGPT authentication is not available." }
+    if ((Get-ConversationBinding $State) -ne [string]$Checkpoint.conversation_binding_sha256) {
+        throw "The isolated audio conversation changed during acceptance."
+    }
+    if (@($State.conversation.attachments).Count -ne 0) {
+        throw "Audio acceptance requires an empty attachment list."
+    }
+}
+
 function Assert-IdleComposer {
     param(
         [Parameter(Mandatory = $true)]$State,
@@ -204,7 +224,8 @@ function Write-Report {
     param(
         [Parameter(Mandatory = $true)][string]$ReportPhase,
         [Parameter(Mandatory = $true)]$State,
-        [Parameter(Mandatory = $true)][string]$Status
+        [Parameter(Mandatory = $true)][string]$Status,
+        [bool]$MessageCountUnchanged = $true
     )
 
     [ordered]@{
@@ -217,7 +238,7 @@ function Write-Report {
         android_permission = [string]$State.audio.android_permission
         audio_request_state = [string]$State.audio.request_state
         audio_capture_state = [string]$State.audio.audio_capture_state
-        message_count_unchanged = $true
+        message_count_unchanged = $MessageCountUnchanged
         input_empty = $true
         sent_messages = 0
         uploaded_attachments = 0
@@ -251,22 +272,31 @@ try {
             if (@($ready.conversation.attachments).Count -ne 0) {
                 throw "Remove attachments before preparing audio acceptance."
             }
+            $isolation = Start-ChatGptWebSmokeIsolatedConversation -Runtime $runtime `
+                -OriginState $ready -TimeoutSec $TimeoutSec
+            $isolated = $isolation.isolated_state
             $checkpoint = [ordered]@{
                 schema = $checkpointSchema
                 phase = "prepared"
                 created_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 device_binding_sha256 = Get-Sha256Text $ExpectedHardwareSerial.Trim()
-                conversation_binding_sha256 = Get-ConversationBinding $ready
-                adapter_version = [int]$ready.adapter_version
-                initial_view_mode = [string]$ready.view_mode
-                message_count = [int]$ready.conversation.message_count
+                origin_conversation_path = [string]$isolation.origin_conversation_path
+                origin_view_mode = [string]$isolation.origin_view_mode
+                conversation_binding_sha256 = Get-ConversationBinding $isolated
+                adapter_version = [int]$isolated.adapter_version
+                initial_view_mode = [string]$isolated.view_mode
+                message_count = 0
+                dictation_request_id = ""
+                realtime_voice_request_id = ""
+                voice_round_trip_confirmed = $false
+                voice_message_count_added = 0
                 sent_messages = 0
                 cleared_cookies = $false
                 cleared_app_data = $false
             }
             Write-Checkpoint $checkpoint
-            Write-Report -ReportPhase "prepared" -State $ready -Status "prepared"
+            Write-Report -ReportPhase "prepared" -State $isolated -Status "prepared"
         }
         "StartDictation" {
             if (-not $UserConfirmedMicrophone) {
@@ -288,7 +318,7 @@ try {
             Write-Report -ReportPhase "dictation_requested" -State $state `
                 -Status "waiting_for_user_microphone_permission"
         }
-        "VerifyAndCancelDictation" {
+        "VerifyAndClearDictation" {
             if (-not $UserConfirmedMicrophone) {
                 throw "Run this phase with -UserConfirmedMicrophone only while the user supervises active dictation."
             }
@@ -306,24 +336,35 @@ try {
                         [string]$state.audio.android_permission -eq "granted" -and
                         [string]$state.audio.request_state -in @("local_action_ready", "web_permission_granted")
                 }
-            try {
-                Assert-ConversationUnchanged -State $active -Checkpoint $checkpoint `
-                    -AllowNonEmptyDraft
-            } finally {
-                Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
-                    -ExpectedAction "cancel_dictation" | Out-Null
-            }
-            $restored = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-                -RequireChatGptForeground -Description "canceled ChatGPT dictation" -Predicate {
+            Assert-ConversationUnchanged -State $active -Checkpoint $checkpoint
+            Invoke-ReceiptAction -Action "chatgpt_submit_dictation" `
+                -ExpectedAction "submit_dictation" | Out-Null
+            $transcribed = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+                -RequireChatGptForeground -Description "non-empty ChatGPT dictation draft" -Predicate {
                     param($state)
                     $state.dictation_active -ne $true -and
+                        [int]$state.input.text_length -gt 0 -and
                         [string]$state.view_mode -eq [string]$checkpoint.initial_view_mode
                 }
+            Assert-ConversationUnchanged -State $transcribed -Checkpoint $checkpoint `
+                -AllowNonEmptyDraft
+            $cleared = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+                -Action "set_input_text" -Arguments @{ text = "" } -TimeoutSec $TimeoutSec
+            Wait-CommandReceipt -RequestId ([string]$cleared.command_receipt.request_id) `
+                -ExpectedAction "set_draft" | Out-Null
+            $restored = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+                -RequireChatGptForeground -Description "cleared dictation draft" -Predicate {
+                    param($state)
+                    $state.dictation_active -ne $true -and [int]$state.input.text_length -eq 0
+                }
             Assert-IdleComposer -State $restored -Checkpoint $checkpoint
-            $checkpoint.phase = "dictation_canceled"
+            Register-ChatGptWebVerificationCases -Runtime $runtime `
+                -CaseIds @("supervised/dictation_transcription") `
+                -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+            $checkpoint.phase = "dictation_cleared"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint $checkpoint
-            Write-Report -ReportPhase "dictation_canceled" -State $restored `
+            Write-Report -ReportPhase "dictation_cleared" -State $restored `
                 -Status "dictation_passed"
         }
         "StartRealtimeVoice" {
@@ -332,8 +373,8 @@ try {
             }
             $checkpoint = Read-Checkpoint
             Assert-CheckpointIdentity $checkpoint
-            if ([string]$checkpoint.phase -ne "dictation_canceled") {
-                throw "Complete and cancel dictation before starting realtime voice."
+            if ([string]$checkpoint.phase -ne "dictation_cleared") {
+                throw "Complete, verify, and clear dictation before starting realtime voice."
             }
             Assert-IdleComposer -State $ready -Checkpoint $checkpoint
             $voice = Invoke-ReceiptAction -Action "chatgpt_start_realtime_voice" `
@@ -352,8 +393,8 @@ try {
                 -Status "waiting_for_user_realtime_voice_confirmation"
         }
         "VerifyRealtimeVoice" {
-            if (-not $UserConfirmedRealtimeVoice) {
-                throw "Run this phase with -UserConfirmedRealtimeVoice only while the official voice UI is visibly active."
+            if (-not $UserConfirmedVoiceRoundTrip) {
+                throw "Run this phase with -UserConfirmedVoiceRoundTrip only after the user spoke and heard a ChatGPT voice reply."
             }
             $checkpoint = Read-Checkpoint
             Assert-CheckpointIdentity $checkpoint
@@ -367,8 +408,9 @@ try {
                         [string]$state.audio.android_permission -eq "granted" -and
                         [string]$state.audio.request_state -eq "web_permission_granted"
                 }
-            Assert-ConversationUnchanged -State $activeVoice -Checkpoint $checkpoint
+            Assert-AudioSessionBinding -State $activeVoice -Checkpoint $checkpoint
             $checkpoint.phase = "realtime_voice_observed"
+            $checkpoint.voice_round_trip_confirmed = $true
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint $checkpoint
             Write-Report -ReportPhase "realtime_voice_observed" -State $activeVoice `
@@ -382,6 +424,9 @@ try {
             Assert-CheckpointIdentity $checkpoint
             if ([string]$checkpoint.phase -ne "realtime_voice_observed") {
                 throw "Checkpoint is not waiting for realtime voice closure."
+            }
+            if ($checkpoint.voice_round_trip_confirmed -ne $true) {
+                throw "Realtime voice round-trip confirmation is missing."
             }
             $targetMode = switch ([string]$checkpoint.initial_view_mode) {
                 "native" { "native" }
@@ -399,11 +444,23 @@ try {
                         $state.audio.local_request_pending -ne $true -and
                         $state.audio.web_request_pending -ne $true
                 }
-            Assert-IdleComposer -State $restored -Checkpoint $checkpoint
+            Assert-AudioSessionBinding -State $restored -Checkpoint $checkpoint
+            $messagesAdded = [int]$restored.conversation.message_count - [int]$checkpoint.message_count
+            if ($messagesAdded -lt 2) {
+                throw "Realtime voice did not persist a complete user and assistant round trip."
+            }
+            Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
+                -ConversationPath ([string]$checkpoint.origin_conversation_path) `
+                -ViewMode ([string]$checkpoint.origin_view_mode) -TimeoutSec $TimeoutSec | Out-Null
+            Register-ChatGptWebVerificationCases -Runtime $runtime `
+                -CaseIds @("supervised/realtime_voice_round_trip") `
+                -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
             $checkpoint.phase = "passed"
+            $checkpoint.voice_message_count_added = $messagesAdded
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint $checkpoint
-            Write-Report -ReportPhase "passed" -State $restored -Status "passed"
+            Write-Report -ReportPhase "passed" -State $restored -Status "passed" `
+                -MessageCountUnchanged:$false
         }
     }
 } finally {
