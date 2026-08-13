@@ -415,14 +415,14 @@ async fn runtime_handler(
     let envelope: Value = serde_json::from_slice(&body).unwrap();
     state.envelopes.lock().unwrap().push(envelope.clone());
     let capability_key = envelope["capability_key"].as_str().unwrap();
-    let result = if capability_key == "system.health" {
-        json!({
+    let result = match capability_key {
+        "system.health" => json!({
             "merchant_id":envelope["merchant_id"],
             "status":"ok",
             "manifest_sha256":RUNTIME_MANIFEST_SHA256
-        })
-    } else {
-        json!({
+        }),
+        "menu.preview" => json!({"items":["拿铁","美式"]}),
+        _ => json!({
             "order_id":"order-consumer-runtime-1",
             "status":"confirmed",
             "_yilong_business_receipt":{
@@ -434,7 +434,7 @@ async fn runtime_handler(
                 "amount_minor":2600,
                 "currency":"CNY"
             }
-        })
+        }),
     };
     Json(json!({
         "schema":"merchant_runtime.result.v1",

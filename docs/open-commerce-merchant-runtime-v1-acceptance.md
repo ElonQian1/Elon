@@ -23,7 +23,7 @@ reviewed_at: 2026-08-13
 - Node 运行时专项 18 项和连接器 SDK 全量 55 项已实际通过，覆盖签名、来源身份、Grant、动作确认、不可变 Manifest、结果上限、并发忙碌、幂等冲突、失败释放和成功重放。
 - Rust 本地端到端专项已实际通过：登记消费者开发者 App 后，由消费者 MCP 准备并确认动作，再调用临时回环商户节点完成 `order.commit`；测试同时确认 HMAC 信封携带已消费的 `action_confirmation_id`、计量仍为 `recorded_not_charged`，并从同一 Invocation 派生出引用同一商户订单号的有效标准业务回执。最新验证指纹为 `058e16928580a66d1ee5e11007f178a220078969ad9296a96065f4e18923da5e`。
 - 双 TCP 纵向专项已实际通过：独立消费者账号使用自己项目内的注册 App 和登录会话，经完整生产 Router 的消费者 HTTP 入口准备、确认并调用 `order.commit`；平台再以 HMAC 调用另一回环端口的商户运行时。测试确认信封中的用户、App 和动作确认身份均来自消费者侧，商户运行时返回有效标准业务回执，随后独立 ERP 机器凭证领取的正是同一个 Invocation。验证指纹为 `1db875411f8c307187426ead6c909dbfa3d09499f1d92757ec1aaaa48eacc87e`，验证收据为 `19dffabb51bbef967cf1c13f61ff0015db97d781d3f604a0d69e0227abe4cf19`。
-- 生产凭据双 TCP 纵向专项已实际通过：测试在隔离子进程中显式开启生产开关，由服务层向本地已准入开发者 App 签发一次性 `oc_live_`，经完整生产 Router 的开发者入口准备、确认并调用 `order.commit`，再由 ERP 机器凭据接管同一个 Invocation。商户运行信封中的用户、App、`production` 环境、凭据 ID 和动作确认 ID 均与生产调用一致；验证指纹为 `f4cb3ffc40393de9934df023db15016d6c8368917626e94a79c96bce7641f246`，验证收据为 `8c53c53122bc05740cafe7b6d6f2c31cf893db77b969e295df1c4118c581acd3`。
+- 生产凭据双 TCP 纵向专项已实际通过：测试在隔离子进程中显式开启生产开关，由服务层向本地已准入开发者 App 签发一次性 `oc_live_`，经完整生产 Router 先调用无需确认的 `menu.preview`，再准备、确认并调用 `order.commit`，最后由 ERP 机器凭据接管订单 Invocation。商户运行信封中的用户、App、`production` 环境、凭据 ID 均与生产调用一致，只有动作信封携带确认 ID；查询和动作重放都不再次访问商户运行时。最新验证指纹为 `128a74b2aac22c6341976c1d3a25569fb109841b4c5e90963f5f1052881ec3c3`，验证收据为 `8c53c53122bc05740cafe7b6d6f2c31cf893db77b969e295df1c4118c581acd3`。
 
 补充的运行时公网 DNS 拒绝和单次连接地址固定代码已通过 Rust 编译检查，但尚未执行 DNS、TLS 或真实网络回归，见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。
 

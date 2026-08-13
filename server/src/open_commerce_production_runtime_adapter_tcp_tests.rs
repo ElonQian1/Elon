@@ -51,13 +51,14 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     )
     .await;
 
-    let developer = approved_developer_fixture_for(PRODUCTION_APP_ID, &["order.commit"]);
+    let developer =
+        approved_developer_fixture_for(PRODUCTION_APP_ID, &["menu.preview", "order.commit"]);
     let live = open_commerce_developer_credential_service::issue_credential(
         &developer.store,
         &developer.app.id,
         IssueDeveloperProductionCredentialRequest {
             expected_manifest_revision: developer.app.manifest_revision,
-            scopes: vec!["order.commit".to_string()],
+            scopes: vec!["menu.preview".to_string(), "order.commit".to_string()],
             expires_in_days: 30,
         },
         "reviewer-user",
@@ -65,7 +66,7 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     .unwrap();
     assert!(live.live_token.starts_with("oc_live_"));
     assert_eq!(live.credential.environment, "production");
-    assert_eq!(live.credential.scopes, vec!["order.commit"]);
+    assert_eq!(live.credential.scopes, vec!["menu.preview", "order.commit"]);
 
     let merchant_owner = developer
         .store
@@ -144,6 +145,36 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
             unit_price_micros: 2_000,
             currency: "CNY".to_string(),
             freshness_seconds: 0,
+        },
+    )
+    .unwrap();
+    open_commerce_service::publish_capability(
+        &developer.store,
+        &merchant_project.id,
+        &merchant.id,
+        &merchant_actor,
+        CreateCapabilityRequest {
+            capability_key: "menu.preview".to_string(),
+            display_name: "预览菜单".to_string(),
+            description: String::new(),
+            kind: "query".to_string(),
+            access_level: ACCESS_PUBLIC.to_string(),
+            input_schema: json!({
+                "type":"object",
+                "properties":{"category":{"type":"string"}},
+                "additionalProperties":false
+            }),
+            output_schema: json!({
+                "type":"object",
+                "required":["items"],
+                "properties":{"items":{"type":"array"}},
+                "additionalProperties":false
+            }),
+            handler_type: HANDLER_MERCHANT_RUNTIME.to_string(),
+            handler_config: None,
+            unit_price_micros: 500,
+            currency: "CNY".to_string(),
+            freshness_seconds: 60,
         },
     )
     .unwrap();
@@ -241,19 +272,55 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(replayed["result"], committed["result"]);
     assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 2);
 
+    let query = json!({
+        "merchant_id":merchant.id,
+        "capability_key":"menu.preview",
+        "idempotency_key":"production-runtime-menu-1",
+        "input":{"category":"coffee"}
+    });
+    let queried = developer_post(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/invoke"),
+        &live.live_token,
+        &query,
+    )
+    .await;
+    let query_invocation_id = queried["invocation_id"].as_str().unwrap();
+    assert_eq!(queried["replayed"], false);
+    assert_eq!(queried["result"]["items"][0], "拿铁");
+    assert_eq!(queried["settlement_receipt"]["funds_moved"], false);
+
+    let replayed_query = developer_post(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/invoke"),
+        &live.live_token,
+        &query,
+    )
+    .await;
+    assert_eq!(replayed_query["replayed"], true);
+    assert_eq!(replayed_query["invocation_id"], query_invocation_id);
+    assert_eq!(replayed_query["result"], queried["result"]);
+    assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 3);
+
     let events = developer_get(
         &client,
-        &format!("{base_url}/api/open-commerce/developer/events?limit=1"),
+        &format!("{base_url}/api/open-commerce/developer/events?limit=10"),
         &live.live_token,
     )
     .await;
     assert_eq!(events["app_id"], PRODUCTION_APP_ID);
     assert_eq!(events["credential_environment"], "production");
-    assert_eq!(events["events"].as_array().unwrap().len(), 1);
-    assert_eq!(events["events"][0]["invocation_id"], invocation_id);
-    assert_eq!(events["events"][0]["credential_id"], live.credential.id);
-    assert_eq!(events["events"][0]["result_available"], true);
-    assert_eq!(events["events"][0]["funds_moved"], false);
+    let production_events = events["events"].as_array().unwrap();
+    assert_eq!(production_events.len(), 2);
+    for expected_invocation_id in [invocation_id, query_invocation_id] {
+        let event = production_events
+            .iter()
+            .find(|event| event["invocation_id"] == expected_invocation_id)
+            .unwrap();
+        assert_eq!(event["credential_id"], live.credential.id);
+        assert_eq!(event["result_available"], true);
+        assert_eq!(event["funds_moved"], false);
+    }
     assert_developer_event_redacted(&events, &live.live_token);
     let production_cursor = events["next_cursor"].as_str().unwrap();
 
@@ -330,7 +397,7 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(completed["status"], "applied");
     assert_eq!(completed["funds_moved"], false);
 
-    assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 2);
+    assert_eq!(runtime_state.invocation_count.load(Ordering::SeqCst), 3);
     let envelopes = runtime_state.envelopes.lock().unwrap();
     let order = envelopes
         .iter()
@@ -341,6 +408,15 @@ async fn production_live_credential_reaches_runtime_and_adapter_claim_child() {
     assert_eq!(order["credential_environment"], "production");
     assert_eq!(order["credential_id"], live.credential.id);
     assert_eq!(order["action_confirmation_id"], confirmation_id);
+    let query_envelope = envelopes
+        .iter()
+        .find(|value| value["capability_key"] == "menu.preview")
+        .unwrap();
+    assert_eq!(query_envelope["requester_user_id"], developer.owner_user_id);
+    assert_eq!(query_envelope["requester_app_id"], PRODUCTION_APP_ID);
+    assert_eq!(query_envelope["credential_environment"], "production");
+    assert_eq!(query_envelope["credential_id"], live.credential.id);
+    assert!(query_envelope["action_confirmation_id"].is_null());
     drop(envelopes);
 
     platform_server.stop().await;
