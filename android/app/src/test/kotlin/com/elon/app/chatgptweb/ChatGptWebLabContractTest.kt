@@ -52,6 +52,9 @@ class ChatGptWebLabContractTest {
         val pageSemanticPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js"
         )
+        val temporaryChatAdapter = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_temporary_chat.js"
+        )
         val navigationPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_navigation_policy.js"
         )
@@ -88,6 +91,8 @@ class ChatGptWebLabContractTest {
         )
         assertTrue(
                 bridge.indexOf("chatgpt_web_adapter_page_semantic_policy.js") <
+                bridge.indexOf("chatgpt_web_adapter_temporary_chat.js") &&
+                bridge.indexOf("chatgpt_web_adapter_temporary_chat.js") <
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") &&
                 bridge.indexOf("chatgpt_web_adapter_form_controls.js") <
                 bridge.indexOf("chatgpt_web_adapter_control_ownership_policy.js") &&
@@ -271,6 +276,12 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("hasFeatureContent"))
         assertTrue(adapterLayout.contains("compatibility: compatibilityFor(controls, kind)"))
         assertTrue(adapterLayout.contains("window.__elonChatGptPageSemanticPolicy.classify"))
+        assertTrue(pageSemanticPolicy.contains("function temporaryChatState"))
+        assertTrue(pageSemanticPolicy.contains("function planTemporaryChatSelection"))
+        assertTrue(temporaryChatAdapter.contains("control.semantic !== 'temporary_chat'"))
+        assertTrue(temporaryChatAdapter.contains("planTemporaryChatSelection"))
+        assertTrue(temporaryChatAdapter.contains("plan.needsActivation"))
+        assertTrue(adapterLayout.contains("temporaryChatAdapter.setSelected"))
         assertTrue(pageSemanticPolicy.contains("/^\\/scheduled(?:\\/|$)/"))
         assertTrue(pageSemanticPolicy.contains("/^\\/library(?:\\/|$)/"))
         assertTrue(pageSemanticPolicy.contains("/^\\/plugins(?:\\/|$)/"))

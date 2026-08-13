@@ -57,8 +57,13 @@ $required = @(
     "original_state_restored = `$modelRestored",
     "original_state_restored = `$disclosureRestored",
     'semantic -eq "temporary_chat"',
-    "Wait-TemporaryChatSelection",
-    'ExpectedAction "invoke_ui_control"',
+    "Wait-TemporaryChatState",
+    "temporaryChatFirstReceiptSucceeded",
+    "temporaryChatIdempotentReceiptSucceeded",
+    "temporaryChatRestoreReceiptSucceeded",
+    'restoration_strategy = "desired_state"',
+    "selection_state_observable = `$temporaryChatSelectionObservable",
+    'ExpectedAction "set_ui_control_selected"',
     '"reversible/temporary_chat_toggle"',
     "original_state_restored = `$temporaryChatRestored",
     "sent_messages = 0",
@@ -148,6 +153,12 @@ try {
     $emulatorRejected = $_.Exception.Message -match "emulator transport"
 }
 if (-not $emulatorRejected) { throw "Emulator smoke runtime must be rejected." }
+if ($smoke.Contains('ExpectedAction "invoke_ui_control"')) {
+    throw "Temporary Chat acceptance must use desired-state commands, not blind invocation."
+}
+if ($smoke -notmatch '(?s)finally\s*\{.*?if \(\$temporaryChatFirstReceiptSucceeded\).*?chatgpt_set_control_selected.*?selected = \$temporaryChatOriginalSelected.*?\$temporaryChatRestoreReceiptSucceeded = \$true') {
+    throw "Temporary Chat acceptance must restore every successful state change in finally."
+}
 foreach ($forbidden in @("send_input", "chatgpt_remove_attachment")) {
     if ($smoke.Contains($forbidden)) {
         throw "Reversible control smoke must not use unsafe action: $forbidden"

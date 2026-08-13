@@ -104,6 +104,42 @@ expectEqual(policy.classify({ pathname: '/', signal: '整理聊天' }), 'convers
 expectEqual(policy.classify({ pathname: '/', signal: '临时聊天' }), 'temporary_chat', 'temporary chat');
 expectEqual(policy.classify({ pathname: '/', signal: 'Temporary chat' }), 'temporary_chat', 'temporary chat English');
 expectEqual(policy.classify({ pathname: '/', signal: 'Temporary conversation' }), 'temporary_chat', 'temporary conversation');
+expectEqual(policy.classify({ pathname: '/', signal: '关闭临时聊天' }), 'temporary_chat', 'close temporary chat');
+expectEqual(policy.classify({ pathname: '/', signal: 'Exit temporary chat' }), 'temporary_chat', 'exit temporary chat English');
+const inactiveTemporaryChat = policy.temporaryChatState({ signal: '临时聊天' });
+expectEqual(inactiveTemporaryChat.semantic, 'temporary_chat', 'temporary chat inactive semantic');
+expectEqual(inactiveTemporaryChat.selected, false, 'temporary chat inactive state');
+expectEqual(inactiveTemporaryChat.stateSettable, true, 'temporary chat inactive settable state');
+const activeTemporaryChat = policy.temporaryChatState({ signal: '关闭临时聊天' });
+expectEqual(activeTemporaryChat.semantic, 'temporary_chat', 'temporary chat active semantic');
+expectEqual(activeTemporaryChat.selected, true, 'temporary chat active state');
+expectEqual(activeTemporaryChat.stateSettable, true, 'temporary chat active settable state');
+expectEqual(policy.temporaryChatState({ signal: '关闭设置' }), null, 'unrelated close is not temporary chat');
+expectEqual(
+  policy.planTemporaryChatSelection(false, false).needsActivation,
+  false,
+  'temporary chat repeated inactive state is idempotent'
+);
+expectEqual(
+  policy.planTemporaryChatSelection(true, true).needsActivation,
+  false,
+  'temporary chat repeated active state is idempotent'
+);
+expectEqual(
+  policy.planTemporaryChatSelection(false, true).needsActivation,
+  true,
+  'temporary chat activates once when desired state differs'
+);
+expectEqual(
+  policy.planTemporaryChatSelection(true, false).needsActivation,
+  true,
+  'temporary chat deactivates once when desired state differs'
+);
+expectEqual(
+  policy.planTemporaryChatSelection(null, true).ok,
+  false,
+  'temporary chat unknown current state fails closed'
+);
 expectEqual(policy.classify({
   pathname: '/', region: 'overlay', signal: 'Personalization'
 }), 'personalization', 'account personalization');

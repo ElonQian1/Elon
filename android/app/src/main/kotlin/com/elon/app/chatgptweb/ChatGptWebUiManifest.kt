@@ -35,9 +35,11 @@ internal data class ChatGptWebUiControl(
         get() = role == "textbox" && writable && inputKind != "password"
 
     val supportsSelectedState: Boolean
-        get() = stateSettable && enabled && role in setOf(
-            "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch", "tab",
-        )
+        get() = stateSettable && enabled && (
+            role in setOf(
+                "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch", "tab",
+            ) || semantic == "temporary_chat"
+            )
 
     val supportsChoiceSelection: Boolean
         get() = enabled && role == "combobox" && inputKind == "select" && choiceLabels.isNotEmpty()

@@ -2,6 +2,7 @@ package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGptWebSelectedStatePolicyTest {
@@ -28,6 +29,23 @@ class ChatGptWebSelectedStatePolicyTest {
             "control_state_not_settable",
             ChatGptWebSelectedStatePolicy.rejection(control, true),
         )
+    }
+
+    @Test
+    fun permitsDesiredStateForTemporaryChatButton() {
+        val control = ChatGptWebUiControl(
+            id = "control_temporary_chat",
+            semantic = "temporary_chat",
+            label = "关闭临时聊天",
+            region = ChatGptWebUiRegion.HEADER,
+            role = "button",
+            enabled = true,
+            selected = true,
+            stateSettable = true,
+        )
+
+        assertTrue(control.supportsSelectedState)
+        assertNull(ChatGptWebSelectedStatePolicy.rejection(control, false))
     }
 
     private fun control(

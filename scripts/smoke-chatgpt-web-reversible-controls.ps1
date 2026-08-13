@@ -7,7 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 180)][int]$ReadyTimeoutSec = 60,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 1,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 88
+    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 89
 )
 
 $ErrorActionPreference = "Stop"
@@ -288,13 +288,22 @@ function Get-TemporaryChatControl {
         Select-Object -First 1
 }
 
-function Wait-TemporaryChatSelection {
+function Wait-TemporaryChatState {
     param([Parameter(Mandatory = $true)][bool]$Expected)
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
         $control = Get-TemporaryChatControl
-        if ($null -ne $control -and [bool]$control.selected -eq $Expected) {
+        if (
+            $null -ne $control -and
+            $state.bridge_state -eq "ready" -and
+            $state.authenticated -eq $true -and
+            $state.composer_ready -eq $true -and
+            $state.streaming -eq $false -and
+            $control.state_settable -eq $true -and
+            [bool]$control.selected -eq $Expected
+        ) {
             return $control
         }
         Start-Sleep -Seconds $runtime.poll_interval_sec
@@ -322,30 +331,47 @@ $temporaryChatOrigin = Get-TemporaryChatControl
 if ($null -eq $temporaryChatOrigin) {
     throw "Temporary Chat is not observable as a dedicated header control."
 }
+$temporaryChatSelectionObservable = [bool]$temporaryChatOrigin.state_settable
 $temporaryChatOriginalSelected = [bool]$temporaryChatOrigin.selected
+$temporaryChatTargetSelected = -not $temporaryChatOriginalSelected
+$temporaryChatFirstReceiptSucceeded = $false
+$temporaryChatIdempotentReceiptSucceeded = $false
+$temporaryChatRestoreReceiptSucceeded = $false
 $temporaryChatRestored = $false
 try {
-    Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
-        -ExpectedAction "invoke_ui_control" -Arguments @{
+    Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+        -ExpectedAction "set_ui_control_selected" -Arguments @{
             control_id = [string]$temporaryChatOrigin.control_id
+            selected = $temporaryChatTargetSelected
         } | Out-Null
-    $temporaryChatChanged = Wait-TemporaryChatSelection `
-        -Expected (-not $temporaryChatOriginalSelected)
+    $temporaryChatFirstReceiptSucceeded = $true
+    $temporaryChatChanged = Wait-TemporaryChatState -Expected $temporaryChatTargetSelected
+    Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+        -ExpectedAction "set_ui_control_selected" -Arguments @{
+            control_id = [string]$temporaryChatChanged.control_id
+            selected = $temporaryChatTargetSelected
+        } | Out-Null
+    $temporaryChatIdempotentReceiptSucceeded = $true
+    Wait-TemporaryChatState -Expected $temporaryChatTargetSelected | Out-Null
 } finally {
-    $restoreTemporaryChat = Get-TemporaryChatControl
-    if ($null -eq $restoreTemporaryChat) {
-        throw "Temporary Chat control disappeared before restoration."
-    }
-    if ([bool]$restoreTemporaryChat.selected -ne $temporaryChatOriginalSelected) {
-        Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
-            -ExpectedAction "invoke_ui_control" -Arguments @{
+    if ($temporaryChatFirstReceiptSucceeded) {
+        $restoreTemporaryChat = Get-TemporaryChatControl
+        if ($null -eq $restoreTemporaryChat) {
+            throw "Temporary Chat control disappeared before desired-state restoration."
+        }
+        Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+            -ExpectedAction "set_ui_control_selected" -Arguments @{
                 control_id = [string]$restoreTemporaryChat.control_id
+                selected = $temporaryChatOriginalSelected
             } | Out-Null
+        $temporaryChatRestoreReceiptSucceeded = $true
+        Wait-TemporaryChatState -Expected $temporaryChatOriginalSelected | Out-Null
+        $temporaryChatRestored = $true
     }
-    Wait-TemporaryChatSelection -Expected $temporaryChatOriginalSelected | Out-Null
-    $temporaryChatRestored = $true
 }
-if (-not $temporaryChatRestored) { throw "Temporary Chat state was not restored." }
+if (-not $temporaryChatFirstReceiptSucceeded -or -not $temporaryChatRestored) {
+    throw "Temporary Chat desired-state command round trip was not completed."
+}
 
 $modelRestored = $false
 $modelViewRestored = $false
@@ -485,7 +511,12 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
         original_state_restored = $disclosureRestored
     }
     temporary_chat = [ordered]@{
-        changed = $true
+        command_round_trip = $true
+        first_receipt_succeeded = $temporaryChatFirstReceiptSucceeded
+        idempotent_receipt_succeeded = $temporaryChatIdempotentReceiptSucceeded
+        restore_receipt_succeeded = $temporaryChatRestoreReceiptSucceeded
+        selection_state_observable = $temporaryChatSelectionObservable
+        restoration_strategy = "desired_state"
         original_state_restored = $temporaryChatRestored
     }
     original_view_mode_restored = $modelViewRestored

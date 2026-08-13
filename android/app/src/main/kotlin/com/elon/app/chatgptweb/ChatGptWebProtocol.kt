@@ -312,8 +312,9 @@ internal object ChatGptWebProtocol {
                     .takeIf { it.isNotBlank() && it in UI_INPUT_KINDS }
                 val writable = item.optBoolean("writable") &&
                     role == "textbox" && inputKind != null && inputKind in WRITABLE_UI_INPUT_KINDS
-                val stateSettable = item.optBoolean("stateSettable") &&
-                    role in STATE_SETTABLE_UI_ROLES
+                val stateSettable = item.optBoolean("stateSettable") && (
+                    role in STATE_SETTABLE_UI_ROLES || semantic == "temporary_chat"
+                    )
                 val choiceLabels = buildList {
                     val rawChoices = item.optJSONArray("choiceLabels") ?: return@buildList
                     for (choiceIndex in 0 until minOf(rawChoices.length(), MAX_UI_CHOICE_OPTIONS)) {

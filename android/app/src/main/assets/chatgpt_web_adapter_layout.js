@@ -10,6 +10,7 @@
   const formCommands = window.__elonChatGptFormCommands;
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
+  const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -168,6 +169,18 @@
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
     const modelSignal = cleanText(signal + ' ' + labelOf(node, ''));
+    const pageSemantic = window.__elonChatGptPageSemanticPolicy
+      && window.__elonChatGptPageSemanticPolicy.classify({
+        pathname: location.pathname,
+        path,
+        region,
+        signal,
+        label: labelOf(node, ''),
+        context: semanticContext(node),
+        section: navigationSection(node),
+        isLink: node.matches('a[href]')
+      });
+    if (pageSemantic === 'temporary_chat') return pageSemantic;
     const composerToolSemantic = composerToolStatePolicy &&
       typeof composerToolStatePolicy.semantic === 'function'
       ? composerToolStatePolicy.semantic({
@@ -247,17 +260,6 @@
     if (region === 'suggestions') return 'suggestion';
     if (region === 'header' && index === 0) return 'navigation';
     if (region === 'header' && /workspace|工作区|(^|\s)工作($|\s)|personal|team|business/.test(signal)) return 'title';
-    const pageSemantic = window.__elonChatGptPageSemanticPolicy
-      && window.__elonChatGptPageSemanticPolicy.classify({
-        pathname: location.pathname,
-        path,
-        region,
-        signal,
-        label: labelOf(node, ''),
-        context: semanticContext(node),
-        section: navigationSection(node),
-        isLink: node.matches('a[href]')
-      });
     if (pageSemantic) return pageSemantic;
     return 'action';
   }
@@ -321,7 +323,7 @@
   }
 
   function controlId(semantic, node, label, region, used, contextId) {
-    const fixed = ['navigation', 'title', 'profile', 'new_conversation', 'attachment', 'model', 'dictation', 'send', 'stop'];
+    const fixed = ['navigation', 'title', 'profile', 'new_conversation', 'temporary_chat', 'attachment', 'model', 'dictation', 'send', 'stop'];
     const identity = contextId || [node.id, node.getAttribute('data-testid'), label].join('|');
     const base = fixed.includes(semantic) && !contextId
       ? 'control_' + semantic
@@ -356,6 +358,17 @@
       const rect = node.getBoundingClientRect();
       const form = formAdapter && formAdapter.describe(node);
       const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
+      const semanticState = temporaryChatAdapter
+        ? temporaryChatAdapter.describe(window.__elonChatGptPageSemanticPolicy, {
+            signal: [
+              node.id,
+              node.getAttribute('data-testid'),
+              node.getAttribute('aria-label'),
+              node.textContent
+            ].filter(Boolean).join(' '),
+            label
+          })
+        : null;
       used.add(id);
       const selection = form ? { known: true, selected: form.selected } :
         composerToolStatePolicy && typeof composerToolStatePolicy.directSelection === 'function'
@@ -370,8 +383,8 @@
               selected: node.getAttribute('aria-selected') === 'true' ||
                 node.getAttribute('aria-checked') === 'true'
             };
-      const directSelected = selection.selected;
-      const selected = composerToolStatePolicy &&
+      const directSelected = semanticState ? semanticState.selected : selection.selected;
+      const selected = semanticState ? semanticState.selected : composerToolStatePolicy &&
         typeof composerToolStatePolicy.controlSelected === 'function'
         ? composerToolStatePolicy.controlSelected({
             semantic, region, directSelected, directKnown: selection.known
@@ -387,7 +400,10 @@
         selected,
         inputKind: form && form.inputKind || undefined,
         writable: !!(form && form.writable),
-        stateSettable: !!(form && form.stateSettable),
+        stateSettable: !!(
+          (form && form.stateSettable) ||
+          (semanticState && semanticState.stateSettable)
+        ),
         choiceLabels: form && form.choiceLabels.length ? form.choiceLabels : undefined,
         selectedChoiceIndex: form && form.selectedChoiceIndex >= 0
           ? form.selectedChoiceIndex
@@ -670,8 +686,24 @@
   function setSelected(id, selected, emitEvent, result) {
     discover();
     const node = controlsById.get(String(id || ''));
-    if (!node || !isVisible(node) || !formCommands) {
+    const control = controlMetadataById.get(String(id || ''));
+    if (!node || !isVisible(node)) {
       return result('set_ui_control_selected', false, '官网控件已变化，请刷新结构后重试。');
+    }
+    if (temporaryChatAdapter && temporaryChatAdapter.setSelected({
+      node,
+      control,
+      controlId: id,
+      desiredSelected: selected,
+      pageSemanticPolicy: window.__elonChatGptPageSemanticPolicy,
+      isVisible,
+      isInViewport,
+      emitEvent,
+      result,
+      emitSnapshot: () => emitSnapshot(emitEvent, true)
+    })) return;
+    if (!formCommands) {
+      return result('set_ui_control_selected', false, '官网表单适配器尚未就绪。');
     }
     return formCommands.setSelected(
       node, id, selected, formAdapter, emitEvent, result,

@@ -28,6 +28,7 @@
     '__elonChatGptNavigationPolicy',
     '__elonChatGptNavigation',
     '__elonChatGptPageSemanticPolicy',
+    '__elonChatGptTemporaryChat',
     '__elonChatGptFormControls',
     '__elonChatGptControlOwnershipPolicy',
     '__elonChatGptFormCommands',

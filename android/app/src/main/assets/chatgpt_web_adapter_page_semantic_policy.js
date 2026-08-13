@@ -30,6 +30,31 @@
       /(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,\s*\d{4})?[,\s]+\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?/.test(text);
   }
 
+  function temporaryChatState(input) {
+    const value = clean([
+      input && input.signal,
+      input && input.label
+    ].filter(Boolean).join(' '));
+    if (!/temporary\s+(?:chat|conversation)|临时(?:聊天|对话)|暫時聊天/.test(value)) {
+      return null;
+    }
+    return Object.freeze({
+      semantic: 'temporary_chat',
+      selected: /(?:close|exit|leave|end|disable|turn\s+off)\s+(?:the\s+)?temporary|关闭临时|退出临时|结束临时/.test(value),
+      stateSettable: true
+    });
+  }
+
+  function planTemporaryChatSelection(currentSelected, desiredSelected) {
+    if (typeof currentSelected !== 'boolean' || typeof desiredSelected !== 'boolean') {
+      return Object.freeze({ ok: false, needsActivation: false });
+    }
+    return Object.freeze({
+      ok: true,
+      needsActivation: currentSelected !== desiredSelected
+    });
+  }
+
   function classify(input) {
     const pathname = clean(input && input.pathname);
     const path = clean(input && input.path);
@@ -67,9 +92,8 @@
     if (/plugin|connector|\bapps?\b|插件|应用/.test(combined)) return 'apps';
     if (/\bpinned\b|已置顶|置顶内容/.test(combined)) return 'pinned';
     if (/^(?:chats?|聊天|整理聊天)$/.test(label || signal)) return 'conversation_group';
-    if (/temporary\s+(?:chat|conversation)|临时(?:聊天|对话)|暫時聊天/.test(label || signal)) {
-      return 'temporary_chat';
-    }
+    const temporaryChat = temporaryChatState({ signal, label });
+    if (temporaryChat) return temporaryChat.semantic;
     if (/^(?:projects?|项目)$/.test(section)) return 'project';
     if (region === 'content') {
       const route = contentRoutes.find((candidate) => candidate.pattern.test(pathname));
@@ -78,5 +102,10 @@
     return '';
   }
 
-  return Object.freeze({ classify, isTimestampLabel });
+  return Object.freeze({
+    classify,
+    isTimestampLabel,
+    planTemporaryChatSelection,
+    temporaryChatState
+  });
 });
