@@ -123,6 +123,62 @@
       "updated_at_ms": 1786625457423
     },
     {
+      "id": "open-commerce-consumer-order-closure-v1",
+      "title": "消费者订单闭环视图 V1",
+      "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
+      "status": "accepted",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/open-commerce-consumer-order-closure-v1.md",
+        "content_hash": "cc24359926f209eb1b6699d8958cae38afde5bef0f2e60802f5bcef2b009099a",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "99a85b599030d1e01f178123bf7bdeb6b11e7176",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a16429aa4eed34be0b6822bd9295fe5128f15e15",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "open-commerce",
+      "tags": [
+        "open-commerce",
+        "consumer-ai",
+        "erp",
+        "order",
+        "evidence"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "docs/open-commerce-consumer-order-closure-v1-acceptance.md",
+        "docs/requirements/open-commerce-consumer-order-closure-v1.md",
+        "server/src/main.rs",
+        "server/src/open_commerce_consumer_order_closure.rs",
+        "server/src/open_commerce_consumer_order_closure/api.rs",
+        "server/src/open_commerce_consumer_order_closure/mcp.rs",
+        "server/src/open_commerce_consumer_order_closure/model.rs",
+        "server/src/open_commerce_consumer_order_closure/service.rs",
+        "server/src/open_commerce_consumer_order_closure/support.rs",
+        "server/src/open_commerce_consumer_order_closure/tests.rs",
+        "server/src/open_commerce_mcp.rs",
+        "server/src/router.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "消费者本人可读取且其他用户统一不存在",
+        "有效订单回执按最新 ERP 衔接结果派生闭环状态",
+        "非终态、无效和非订单回执失败关闭",
+        "响应不泄露项目、授权、接入器、Claim、租约或原始 ERP 记录号",
+        "funds_moved 固定 false 且订单金额与调用计量分离",
+        "HTTP 与 MCP 共用服务并通过 Rust/SQLite 验证"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1786626114513,
+      "updated_at_ms": 1786626114513
+    },
+    {
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
@@ -678,6 +734,16 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786625470065
+    },
+    {
+      "id": "feature_event_df9fb05acea84feabe8bad4e8116be40",
+      "feature_id": "open-commerce-consumer-order-closure-v1",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "纵向链路已有分散证据，但消费者端缺少同一订单的连续只读闭环视图。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1786626114513
     }
   ]
 }
