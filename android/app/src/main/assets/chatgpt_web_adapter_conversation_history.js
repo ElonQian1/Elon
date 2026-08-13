@@ -15,21 +15,42 @@
     return Math.min(maximum, Math.max(minimum, Math.floor(parsed)));
   }
 
+  function conversationKey(conversation) {
+    if (!conversation) return '';
+    const id = typeof conversation.id === 'string' ? conversation.id.trim() : '';
+    if (id) return id;
+    const path = typeof conversation.path === 'string' ? conversation.path : '';
+    return path.split('/').filter(Boolean).pop() || '';
+  }
+
+  function mergeConversation(previous, conversation) {
+    const nextHasProject = !!conversation.projectId;
+    const previousHasProject = !!previous.projectId;
+    return Object.assign({}, previous, conversation, {
+      path: nextHasProject || !previousHasProject ? conversation.path : previous.path,
+      projectId: conversation.projectId || previous.projectId || null,
+      projectTitle: conversation.projectTitle || previous.projectTitle || null,
+      projectPath: conversation.projectPath || previous.projectPath || null,
+      active: !!previous.active || !!conversation.active,
+      activityDates: Array.from(new Set(
+        [].concat(previous.activityDates || [], conversation.activityDates || [])
+      ))
+    });
+  }
+
   function mergeConversations(target, conversations, maximum) {
     (Array.isArray(conversations) ? conversations : []).some((conversation) => {
       if (!conversation || typeof conversation.path !== 'string') {
         return false;
       }
-      const previous = target.get(conversation.path);
+      const key = conversationKey(conversation);
+      if (!key) return false;
+      const previous = target.get(key);
       if (previous) {
-        target.set(conversation.path, Object.assign({}, previous, conversation, {
-          activityDates: Array.from(new Set(
-            [].concat(previous.activityDates || [], conversation.activityDates || [])
-          ))
-        }));
+        target.set(key, mergeConversation(previous, conversation));
         return false;
       }
-      target.set(conversation.path, conversation);
+      target.set(key, conversation);
       return target.size >= maximum;
     });
   }

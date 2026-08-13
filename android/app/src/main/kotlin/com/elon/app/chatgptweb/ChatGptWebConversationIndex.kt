@@ -47,28 +47,50 @@ internal object ChatGptWebConversationIndex {
         previous: List<ChatGptWebConversation>,
         observed: List<ChatGptWebConversation>,
     ): List<ChatGptWebConversation> {
-        val previousByPath = previous.associateBy(ChatGptWebConversation::path)
-        val merged = observed.map { next ->
-            val old = previousByPath[next.path] ?: return@map next
-            next.copy(
-                groupLabel = metadataLabel(next.groupLabel)
-                    ?: metadataLabel(old.groupLabel)
-                    .orEmpty(),
-                projectId = next.projectId ?: old.projectId,
-                projectTitle = metadataLabel(next.projectTitle)
-                    ?: metadataLabel(old.projectTitle),
-                projectPath = next.projectPath ?: old.projectPath,
-                activityDates = old.activityDates + next.activityDates,
-            )
+        val previousByIdentity = collapse(previous)
+        val observedByIdentity = collapse(observed)
+        val merged = observedByIdentity.map { (identity, next) ->
+            val old = previousByIdentity[identity] ?: return@map sanitize(next)
+            combine(old, next).copy(active = next.active)
         }
-        val observedPaths = observed.asSequence().map(ChatGptWebConversation::path).toSet()
-        return merged + previous.filterNot { it.path in observedPaths }.map(::sanitize)
+        return merged + previousByIdentity
+            .filterKeys { it !in observedByIdentity }
+            .values
+            .map(::sanitize)
     }
 
     fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation = value.copy(
         groupLabel = metadataLabel(value.groupLabel).orEmpty(),
         projectTitle = metadataLabel(value.projectTitle),
     )
+
+    private fun collapse(values: List<ChatGptWebConversation>): LinkedHashMap<String, ChatGptWebConversation> =
+        linkedMapOf<String, ChatGptWebConversation>().apply {
+            values.forEach { conversation ->
+                val identity = ChatGptWebConversationPath.identity(conversation.path) ?: return@forEach
+                this[identity] = this[identity]?.let { combine(it, conversation) } ?: sanitize(conversation)
+            }
+        }
+
+    private fun combine(
+        previous: ChatGptWebConversation,
+        next: ChatGptWebConversation,
+    ): ChatGptWebConversation {
+        val nextHasProject = next.projectId != null
+        val previousHasProject = previous.projectId != null
+        return next.copy(
+            path = if (nextHasProject || !previousHasProject) next.path else previous.path,
+            active = previous.active || next.active,
+            groupLabel = metadataLabel(next.groupLabel)
+                ?: metadataLabel(previous.groupLabel)
+                .orEmpty(),
+            projectId = next.projectId ?: previous.projectId,
+            projectTitle = metadataLabel(next.projectTitle)
+                ?: metadataLabel(previous.projectTitle),
+            projectPath = next.projectPath ?: previous.projectPath,
+            activityDates = previous.activityDates + next.activityDates,
+        )
+    }
 
     private fun metadataLabel(value: String?): String? = value
         ?.trim()

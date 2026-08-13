@@ -12,6 +12,10 @@ internal object ChatGptWebConversationPath {
 
     fun normalizeProject(path: String?): String? = path?.trim()?.takeIf(PROJECT_PATH::matches)
 
+    fun identity(path: String?): String? = normalize(path)
+        ?.substringAfterLast('/')
+        ?.takeIf(String::isNotBlank)
+
     fun projectId(path: String?): String? = path?.trim()?.let { value ->
         SAFE_PATH.matchEntire(value)?.groupValues?.getOrNull(1)?.takeIf(String::isNotBlank)
             ?: PROJECT_PATH.matchEntire(value)?.groupValues?.getOrNull(1)?.takeIf(String::isNotBlank)

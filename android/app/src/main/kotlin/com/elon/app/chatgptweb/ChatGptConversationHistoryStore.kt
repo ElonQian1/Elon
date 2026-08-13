@@ -109,13 +109,12 @@ internal object ChatGptConversationHistoryCodec {
         if (savedAtMs < 0L) return null
         val values = root.optJSONArray("conversations") ?: return null
         val conversations = buildList {
-            val seen = mutableSetOf<String>()
             for (index in 0 until minOf(values.length(), MAX_ITEMS)) {
                 val value = values.optJSONObject(index) ?: continue
                 val path = value.optString("path")
                 val title = value.optString("title").trim().take(MAX_TITLE_LENGTH)
                 val normalizedPath = ChatGptWebConversationPath.normalize(path) ?: continue
-                if (title.isBlank() || !seen.add(normalizedPath)) continue
+                if (title.isBlank()) continue
                 add(ChatGptWebConversationIndex.sanitize(ChatGptWebConversation(
                     id = value.optString("id").ifBlank { normalizedPath.substringAfterLast('/') }
                         .take(MAX_ID_LENGTH),
@@ -141,7 +140,7 @@ internal object ChatGptConversationHistoryCodec {
                     },
                 )))
             }
-        }
+        }.let { ChatGptWebConversationIndex.merge(emptyList(), it) }
         val projects = buildList {
             val projectValues = root.optJSONArray("projects") ?: return@buildList
             val seen = mutableSetOf<String>()

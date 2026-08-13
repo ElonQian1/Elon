@@ -163,7 +163,9 @@
   }
 
   function visibleOverlayRoots() {
-    return Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
+    const selector = '[role="dialog"], [role="menu"], [data-radix-menu-content], ' +
+      '[data-headlessui-menu-items], [data-headlessui-portal], [data-slot="dropdown-menu-content"], [data-slot="menu-content"]';
+    return Array.from(document.querySelectorAll(selector)).filter(isVisible);
   }
 
   function semanticFor(node, region, index) {
