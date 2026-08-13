@@ -2,6 +2,8 @@
 mod admission_api_tests;
 #[path = "open_commerce_developer_credential_api_tests.rs"]
 mod credential_api_tests;
+#[path = "open_commerce_developer_credential_policy_tests.rs"]
+mod credential_policy_tests;
 #[path = "open_commerce_developer_credential_restart_tests.rs"]
 mod credential_restart_tests;
 #[path = "open_commerce_developer_domain_state_tests.rs"]
