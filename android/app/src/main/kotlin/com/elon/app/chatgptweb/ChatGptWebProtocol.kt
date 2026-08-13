@@ -60,7 +60,37 @@ internal data class ChatGptWebConversationCollection(
     val timedOut: Boolean = false,
     val observedCount: Int = 0,
     val steps: Int = 0,
-)
+    val source: String = SOURCE_NONE,
+    val stale: Boolean = false,
+    val officialLoadState: String = LOAD_IDLE,
+    val cachedAtMs: Long = 0L,
+) {
+    companion object {
+        const val SOURCE_NONE = "none"
+        const val SOURCE_OFFICIAL = "official_dom"
+        const val SOURCE_CACHE = "local_cache"
+        const val LOAD_IDLE = "idle"
+        const val LOAD_LOADING = "loading"
+        const val LOAD_READY = "ready"
+        const val LOAD_FAILED = "failed"
+
+        fun official(count: Int): ChatGptWebConversationCollection =
+            ChatGptWebConversationCollection(
+                observedCount = count,
+                source = SOURCE_OFFICIAL,
+                officialLoadState = LOAD_READY,
+            )
+
+        fun cached(count: Int, savedAtMs: Long): ChatGptWebConversationCollection =
+            ChatGptWebConversationCollection(
+                observedCount = count,
+                source = SOURCE_CACHE,
+                stale = true,
+                officialLoadState = LOAD_IDLE,
+                cachedAtMs = savedAtMs,
+            )
+    }
+}
 
 internal sealed interface ChatGptWebEvent {
     data class AdapterReady(
@@ -71,9 +101,8 @@ internal sealed interface ChatGptWebEvent {
 
     data class ConversationList(
         val conversations: List<ChatGptWebConversation>,
-        val collection: ChatGptWebConversationCollection = ChatGptWebConversationCollection(
-            observedCount = conversations.size,
-        ),
+        val collection: ChatGptWebConversationCollection =
+            ChatGptWebConversationCollection.official(conversations.size),
     ) : ChatGptWebEvent
 
     data class ComposerControls(
@@ -417,7 +446,7 @@ internal object ChatGptWebProtocol {
         conversationCount: Int,
     ): ChatGptWebConversationCollection {
         val collection = event.optJSONObject("collection")
-            ?: return ChatGptWebConversationCollection(observedCount = conversationCount)
+            ?: return ChatGptWebConversationCollection.official(conversationCount)
         return ChatGptWebConversationCollection(
             scrollerFound = collection.optBoolean("scrollerFound"),
             scrolled = collection.optBoolean("scrolled"),
@@ -427,6 +456,8 @@ internal object ChatGptWebProtocol {
             timedOut = collection.optBoolean("timedOut"),
             observedCount = conversationCount,
             steps = collection.optInt("steps", 0).coerceIn(0, MAX_CONVERSATION_COLLECTION_STEPS),
+            source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+            officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
         )
     }
 

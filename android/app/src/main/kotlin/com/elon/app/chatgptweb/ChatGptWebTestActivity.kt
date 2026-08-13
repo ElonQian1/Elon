@@ -50,13 +50,18 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
     private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
     private val sessionRestorer by lazy { ChatGptWebSessionRestorer(this) }
+    private val conversationHistoryStore by lazy {
+        ChatGptConversationHistoryStore(applicationContext)
+    }
     private val messageClipboard by lazy { ChatGptMessageClipboard(this) }
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private var latestSnapshot: ChatGptWebSnapshot? = null
     private var latestUiManifest: ChatGptWebUiManifest? = null
     private val sessionContinuity = ChatGptWebSessionContinuity()
-    private val observedMcpState = ChatGptWebObservedState()
+    private val observedMcpState by lazy {
+        ChatGptWebObservedState(initialConversationHistory = conversationHistoryStore.restore())
+    }
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var latestMode = ChatGptWebModeController.Mode.QUICK
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
@@ -210,6 +215,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onOpenConversation = { path -> pageAdapter.openConversation(path) },
             onNewConversation = { pageAdapter.startNewConversation() },
         )
+        observedMcpState.snapshot().let {
+            conversationListController.render(it.conversations, it.conversationCollection)
+        }
         featureHubController = ChatGptNativeFeatureHubController(
             activity = this,
             trigger = binding.chatGptNativeFeatures,
@@ -473,7 +481,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         observedMcpState.accept(event)
         when (event) {
             is ChatGptWebEvent.AdapterReady -> Unit
-            is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
+            is ChatGptWebEvent.ConversationList -> {
+                conversationHistoryStore.save(event.conversations)
+                conversationListController.render(
+                    event.conversations,
+                    observedMcpState.snapshot().conversationCollection,
+                )
+            }
             is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
             is ChatGptWebEvent.FeatureNavigation -> featureHubController.render(event.features)
             is ChatGptWebEvent.UiManifest -> {
@@ -493,6 +507,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
             is ChatGptWebEvent.Snapshot -> {
                 val snapshot = sessionContinuity.reconcile(event.value)
+                if (snapshot.loginRequired || snapshot.pageKind == "auth") {
+                    conversationHistoryStore.clear()
+                    observedMcpState.clearConversationHistory()
+                    conversationListController.render(
+                        emptyList(),
+                        observedMcpState.snapshot().conversationCollection,
+                    )
+                }
                 latestSnapshot = snapshot
                 nativeController.render(snapshot)
                 composerToolsController.render(snapshot)
@@ -519,6 +541,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     dictationSessionController.onStartFailed()
                 }
                 if (googleAccountHintController.onCommandResult(event)) return
+                if (event.action == "list_conversations") {
+                    observedMcpState.snapshot().let {
+                        conversationListController.render(it.conversations, it.conversationCollection)
+                    }
+                }
                 if (conversationListController.onCommandResult(event)) return
                 if (featureHubController.onCommandResult(event)) return
                 nativeController.onCommandResult(event)
@@ -540,6 +567,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             latestUiManifest = null
         }
         observedMcpState.updateDocument(document)
+        if (::conversationListController.isInitialized) {
+            observedMcpState.snapshot().let {
+                conversationListController.render(it.conversations, it.conversationCollection)
+            }
+        }
     }
 
     private fun handleWebTouchRequest(event: ChatGptWebEvent.WebTouchRequest) {
@@ -682,6 +714,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         googleAccountHintController.reset()
         sessionContinuity.clear()
         sessionRestorer.clear()
+        conversationHistoryStore.clear()
+        observedMcpState.clearConversationHistory()
+        conversationListController.render(
+            emptyList(),
+            observedMcpState.snapshot().conversationCollection,
+        )
         cookieManager.removeAllCookies {
             cookieManager.flush()
             WebStorage.getInstance().deleteAllData()

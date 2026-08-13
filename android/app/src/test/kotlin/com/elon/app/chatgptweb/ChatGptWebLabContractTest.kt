@@ -495,10 +495,13 @@ class ChatGptWebLabContractTest {
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeHistory\""))
         assertTrue(activity.contains("pageAdapter.listConversations()"))
         assertTrue(activity.contains("pageAdapter.openConversation(path)"))
-        assertTrue(activity.contains("conversationListController.render(event.conversations)"))
+        assertTrue(activity.contains("conversationHistoryStore.save(event.conversations)"))
+        assertTrue(activity.contains("observedMcpState.snapshot().conversationCollection"))
         assertTrue(activity.contains("renderCapabilities(snapshot.capabilities)"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.CONVERSATION_LIST"))
         assertTrue(controller.contains("bridgeReady && listSupported"))
+        assertTrue(controller.contains("ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS"))
+        assertTrue(controller.contains("chatgpt_conversations_cached_failed"))
     }
 
     @Test

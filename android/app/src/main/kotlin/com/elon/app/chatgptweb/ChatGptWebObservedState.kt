@@ -1,10 +1,14 @@
 package com.elon.app.chatgptweb
 
 internal class ChatGptWebObservedState(
+    initialConversationHistory: ChatGptConversationHistoryCache? = null,
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
-    private var conversations: List<ChatGptWebConversation> = emptyList()
-    private var conversationCollection = ChatGptWebConversationCollection()
+    private var conversations: List<ChatGptWebConversation> =
+        initialConversationHistory?.conversations.orEmpty()
+    private var conversationCollection = initialConversationHistory?.let {
+        ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
+    } ?: ChatGptWebConversationCollection()
     private var features: List<ChatGptWebFeature> = emptyList()
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
     private var lastCommand: ChatGptWebEvent.CommandResult? = null
@@ -20,8 +24,14 @@ internal class ChatGptWebObservedState(
         when (event) {
             is ChatGptWebEvent.ConversationList -> {
                 conversations = event.conversations
-                conversationCollection = event.collection
+                conversationCollection = event.collection.copy(
+                    source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+                    stale = false,
+                    officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
+                    cachedAtMs = observedAtMs,
+                )
             }
+            is ChatGptWebEvent.Snapshot -> updateActiveConversation(event.value.url)
             is ChatGptWebEvent.FeatureNavigation -> features = event.features
             is ChatGptWebEvent.ComposerControls -> {
                 composerSections = composerSections + (event.section to event.options)
@@ -30,6 +40,12 @@ internal class ChatGptWebObservedState(
                 lastCommand = event
                 lastCommandObservedAtMs = observedAtMs
                 completeRequest(event, observedAtMs)
+                if (event.action == "list_conversations" && !event.ok) {
+                    conversationCollection = conversationCollection.copy(
+                        stale = conversations.isNotEmpty(),
+                        officialLoadState = ChatGptWebConversationCollection.LOAD_FAILED,
+                    )
+                }
             }
             else -> return
         }
@@ -41,12 +57,25 @@ internal class ChatGptWebObservedState(
         updatedAtMs = nowMs()
     }
 
+    fun clearConversationHistory() {
+        conversations = emptyList()
+        conversationCollection = ChatGptWebConversationCollection()
+        updatedAtMs = nowMs()
+    }
+
     fun updateDocument(document: ChatGptWebDocumentSession.Snapshot) {
         if (document.pageGeneration < pageGeneration) return
         val observedAtMs = nowMs()
         if (document.pageGeneration > pageGeneration) {
-            conversations = emptyList()
-            conversationCollection = ChatGptWebConversationCollection()
+            conversationCollection = if (conversations.isEmpty()) {
+                ChatGptWebConversationCollection()
+            } else {
+                conversationCollection.copy(
+                    source = ChatGptWebConversationCollection.SOURCE_CACHE,
+                    stale = true,
+                    officialLoadState = ChatGptWebConversationCollection.LOAD_IDLE,
+                )
+            }
             features = emptyList()
             composerSections = emptyMap()
             lastCommand = null
@@ -79,8 +108,21 @@ internal class ChatGptWebObservedState(
             startedAtMs = startedAt,
         )
         commandRequests = (commandRequests + request).takeLast(MAX_COMMAND_REQUESTS)
+        if (expectedAction == "list_conversations") {
+            conversationCollection = conversationCollection.copy(
+                stale = conversations.isNotEmpty() &&
+                    conversationCollection.source != ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+                officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
+            )
+        }
         updatedAtMs = startedAt
         return request
+    }
+
+    private fun updateActiveConversation(rawUrl: String) {
+        val path = runCatching { java.net.URI(rawUrl).path.orEmpty() }.getOrDefault("")
+        if (!path.startsWith("/c/")) return
+        conversations = conversations.map { it.copy(active = it.path == path) }
     }
 
     fun failCommand(requestId: String, expectedAction: String, detail: String) {

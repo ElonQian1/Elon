@@ -36,6 +36,10 @@ class ChatGptNativeNavigationSelectorTest {
             ChatGptNativeNavigationSelector.NEW_CONVERSATION,
         )
         assertEquals(
+            "chatgpt-native:refresh-conversations:刷新会话历史",
+            ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS,
+        )
+        assertEquals(
             "chatgpt-native:realtime-voice:实时语音",
             ChatGptNativeNavigationSelector.REALTIME_VOICE,
         )

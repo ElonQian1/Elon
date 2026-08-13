@@ -98,6 +98,9 @@
     <string name="chatgpt_native_open_official">官网设置</string>
     <string name="chatgpt_conversations_title">会话历史</string>
     <string name="chatgpt_conversations_count">%1$d 个会话</string>
+    <string name="chatgpt_conversations_cached_loading">%1$d 个上次读取会话 · 正在更新</string>
+    <string name="chatgpt_conversations_cached_failed">%1$d 个上次读取会话 · 官网暂不可用</string>
+    <string name="chatgpt_conversations_refresh">刷新会话历史</string>
     <string name="chatgpt_conversations_close">关闭会话历史</string>
     <string name="chatgpt_conversations_search_hint">搜索当前已加载的会话</string>
     <string name="chatgpt_conversations_loading">正在读取官网会话列表</string>

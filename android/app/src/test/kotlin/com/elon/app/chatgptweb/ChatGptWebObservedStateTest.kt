@@ -168,8 +168,9 @@ class ChatGptWebObservedStateTest {
         state.updateDocument(document(page = 2, adapter = 0))
 
         val reloading = state.snapshot()
-        assertTrue(reloading.conversations.isEmpty())
-        assertEquals(0, reloading.conversationCollection.observedCount)
+        assertEquals(1, reloading.conversations.size)
+        assertTrue(reloading.conversationCollection.stale)
+        assertEquals(ChatGptWebConversationCollection.SOURCE_CACHE, reloading.conversationCollection.source)
         assertTrue(reloading.composerSections.isEmpty())
         assertEquals(2L, reloading.pageGeneration)
         assertEquals(0L, reloading.adapterGeneration)
@@ -181,6 +182,33 @@ class ChatGptWebObservedStateTest {
         now += 10
         state.updateDocument(document(page = 2, adapter = 2))
         assertTrue(state.snapshot().adapterCurrent)
+    }
+
+    @Test
+    fun cachedHistorySurvivesReloadAndReportsOfficialRefreshFailure() {
+        var now = 40_000L
+        val state = ChatGptWebObservedState(
+            nowMs = { now },
+            initialConversationHistory = ChatGptConversationHistoryCache(
+                listOf(ChatGptWebConversation("cached", "上次会话", "/c/cached", false)),
+                savedAtMs = 30_000L,
+            ),
+        )
+
+        var snapshot = state.snapshot()
+        assertEquals(ChatGptWebConversationCollection.SOURCE_CACHE, snapshot.conversationCollection.source)
+        assertTrue(snapshot.conversationCollection.stale)
+
+        state.beginCommand("list_conversations")
+        state.accept(ChatGptWebEvent.CommandResult("list_conversations", false, "暂不可用"))
+        snapshot = state.snapshot()
+
+        assertEquals("/c/cached", snapshot.conversations.single().path)
+        assertEquals(
+            ChatGptWebConversationCollection.LOAD_FAILED,
+            snapshot.conversationCollection.officialLoadState,
+        )
+        assertTrue(snapshot.conversationCollection.stale)
     }
 
     private fun document(page: Long, adapter: Long) = ChatGptWebDocumentSession.Snapshot(

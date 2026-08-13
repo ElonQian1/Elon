@@ -29,6 +29,7 @@ internal class ChatGptNativeConversationListController(
         false,
     )
     private val dialog = BottomSheetDialog(activity)
+    private val refreshButton = content.findViewById<ImageButton>(R.id.chatGptConversationRefresh)
     private val newButton = content.findViewById<ImageButton>(R.id.chatGptConversationNew)
     private val closeButton = content.findViewById<ImageButton>(R.id.chatGptConversationClose)
     private val countView = content.findViewById<TextView>(R.id.chatGptConversationCount)
@@ -37,6 +38,7 @@ internal class ChatGptNativeConversationListController(
     private val listView = content.findViewById<RecyclerView>(R.id.chatGptConversationList)
     private val listAdapter = ConversationAdapter(::selectConversation)
     private var conversations: List<ChatGptWebConversation> = emptyList()
+    private var collection = ChatGptWebConversationCollection()
     private var bridgeReady = false
     private var listSupported = false
 
@@ -46,6 +48,8 @@ internal class ChatGptNativeConversationListController(
         dialog.setOnShowListener { expandSheet() }
         trigger.contentDescription = ChatGptNativeNavigationSelector.CONVERSATION_LIST_TRIGGER
         trigger.setOnClickListener { show() }
+        refreshButton.contentDescription = ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS
+        refreshButton.setOnClickListener { requestList() }
         newButton.contentDescription = ChatGptNativeNavigationSelector.NEW_CONVERSATION
         newButton.setOnClickListener {
             dialog.dismiss()
@@ -69,17 +73,32 @@ internal class ChatGptNativeConversationListController(
         if (!bridgeReady && dialog.isShowing) dialog.dismiss()
     }
 
-    fun render(items: List<ChatGptWebConversation>) {
+    fun render(
+        items: List<ChatGptWebConversation>,
+        nextCollection: ChatGptWebConversationCollection,
+    ) {
         conversations = items
-        countView.text = activity.getString(R.string.chatgpt_conversations_count, items.size)
+        collection = nextCollection
+        renderCount()
         renderFilteredList()
     }
 
     fun onCommandResult(event: ChatGptWebEvent.CommandResult): Boolean = when (event.action) {
         "list_conversations" -> {
-            if (!event.ok) showState(event.detail.ifBlank {
-                activity.getString(R.string.chatgpt_conversations_failed)
-            })
+            if (!event.ok) {
+                collection = collection.copy(
+                    stale = conversations.isNotEmpty(),
+                    officialLoadState = ChatGptWebConversationCollection.LOAD_FAILED,
+                )
+                if (conversations.isEmpty()) {
+                    showState(event.detail.ifBlank {
+                        activity.getString(R.string.chatgpt_conversations_failed)
+                    })
+                } else {
+                    renderCount()
+                    renderFilteredList()
+                }
+            }
             true
         }
         "open_conversation" -> {
@@ -97,6 +116,7 @@ internal class ChatGptNativeConversationListController(
 
     fun dispose() {
         trigger.setOnClickListener(null)
+        refreshButton.setOnClickListener(null)
         newButton.setOnClickListener(null)
         if (dialog.isShowing) dialog.dismiss()
         listView.adapter = null
@@ -104,13 +124,23 @@ internal class ChatGptNativeConversationListController(
 
     private fun show() {
         if (!bridgeReady || !listSupported) return
-        conversations = emptyList()
-        listAdapter.submit(emptyList())
-        countView.text = ""
         searchView.setText("")
-        searchView.isEnabled = false
-        showState(activity.getString(R.string.chatgpt_conversations_loading))
         dialog.show()
+        requestList()
+    }
+
+    private fun requestList() {
+        collection = collection.copy(
+            stale = conversations.isNotEmpty(),
+            officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
+        )
+        if (conversations.isEmpty()) {
+            searchView.isEnabled = false
+            showState(activity.getString(R.string.chatgpt_conversations_loading))
+        } else {
+            renderCount()
+            renderFilteredList()
+        }
         onRequestList()
     }
 
@@ -139,6 +169,20 @@ internal class ChatGptNativeConversationListController(
         if (filtered.isEmpty()) stateView.setText(R.string.chatgpt_conversations_no_results)
         searchView.isEnabled = true
         listView.isEnabled = true
+    }
+
+    private fun renderCount() {
+        countView.text = activity.getString(
+            when {
+                collection.officialLoadState == ChatGptWebConversationCollection.LOAD_FAILED &&
+                    conversations.isNotEmpty() -> R.string.chatgpt_conversations_cached_failed
+                collection.stale ||
+                    collection.officialLoadState == ChatGptWebConversationCollection.LOAD_LOADING ->
+                    R.string.chatgpt_conversations_cached_loading
+                else -> R.string.chatgpt_conversations_count
+            },
+            conversations.size,
+        )
     }
 
     private fun showState(message: String) {

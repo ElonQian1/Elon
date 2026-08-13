@@ -455,7 +455,9 @@ internal class ChatGptWebMcpActions(
             .put("query", query)
             .put("cached_at_ms", observed.updatedAtMs)
             .put("source_count", observed.conversations.size)
-            .put("collection", conversationCollectionJson(observed.conversationCollection))
+            .put("source", observed.conversationCollection.source)
+            .put("stale", observed.conversationCollection.stale)
+            .put("collection", ChatGptWebConversationCollectionJson.encode(observed.conversationCollection))
             .put("match_count", matches.size)
             .put("offset", page.offset)
             .put("limit", page.limit)
@@ -561,21 +563,13 @@ internal class ChatGptWebMcpActions(
 
     private fun navigationSummary(value: ChatGptWebObservedState.Snapshot): JSONObject = JSONObject()
         .put("conversation_count", value.conversations.size)
-        .put("conversation_collection", conversationCollectionJson(value.conversationCollection))
+        .put(
+            "conversation_collection",
+            ChatGptWebConversationCollectionJson.encode(value.conversationCollection),
+        )
         .put("feature_count", value.features.size)
         .put("composer_sections", JSONArray(value.composerSections.keys.sorted()))
         .put("cached_at_ms", value.updatedAtMs)
-
-    private fun conversationCollectionJson(value: ChatGptWebConversationCollection): JSONObject = JSONObject()
-        .put("scroller_found", value.scrollerFound)
-        .put("scrolled", value.scrolled)
-        .put("scroll_restored", value.scrollRestored)
-        .put("reached_end", value.reachedEnd)
-        .put("truncated", value.truncated)
-        .put("timed_out", value.timedOut)
-        .put("complete", value.reachedEnd && !value.truncated && !value.timedOut)
-        .put("observed_count", value.observedCount)
-        .put("steps", value.steps)
 
     private fun manifestJson(value: ChatGptWebUiManifest?): Any {
         if (value == null) return JSONObject.NULL
