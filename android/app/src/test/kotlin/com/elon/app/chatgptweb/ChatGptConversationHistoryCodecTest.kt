@@ -45,6 +45,17 @@ class ChatGptConversationHistoryCodecTest {
     }
 
     @Test
+    fun decodeCollapsesCachedRecentAndProjectRoutesWithoutClearingData() {
+        val decoded = ChatGptConversationHistoryCodec.decode(
+            """{"schema":"elon.chatgpt_web.conversation_index.v2","saved_at_ms":1,"conversations":[{"id":"shared","title":"Recent","path":"/c/shared","group_label":"昨天","activity_dates":["2026-08-13"]},{"id":"shared","title":"Project","path":"/g/g-p-demo/c/shared","group_label":"今天","project_id":"g-p-demo","project_title":"Mobile","project_path":"/g/g-p-demo/project","activity_dates":["2026-08-14"]}],"projects":[]}""",
+        )!!
+
+        assertEquals(1, decoded.conversations.size)
+        assertEquals("/g/g-p-demo/c/shared", decoded.conversations.single().path)
+        assertEquals(setOf("2026-08-13", "2026-08-14"), decoded.conversations.single().activityDates)
+    }
+
+    @Test
     fun rejectsUnknownSchemaAndUnsafeOrEmptyIndexes() {
         assertNull(ChatGptConversationHistoryCodec.decode("{}"))
         assertNull(ChatGptConversationHistoryCodec.decode(

@@ -98,11 +98,32 @@ async function mergesActivityDatesWhenVirtualizedRowsAreObservedAgain() {
   assert.deepStrictEqual(result.conversations[0].activityDates, ['2026-08-13', '2026-08-14']);
 }
 
+async function collapsesRecentAndProjectRoutesForTheSameConversation() {
+  const recent = Object.assign(conversation('one'), { activityDates: ['2026-08-13'] });
+  const project = Object.assign(conversation('one'), {
+    path: '/g/g-p-demo/c/one',
+    projectId: 'g-p-demo',
+    projectTitle: 'Mobile project',
+    projectPath: '/g/g-p-demo/project',
+    activityDates: ['2026-08-14']
+  });
+  const result = await runCollection({
+    initial: [recent, project],
+    read: () => [recent, project],
+    findScroller: () => null,
+  });
+
+  assert.strictEqual(result.conversations.length, 1);
+  assert.strictEqual(result.conversations[0].path, '/g/g-p-demo/c/one');
+  assert.deepStrictEqual(result.conversations[0].activityDates, ['2026-08-13', '2026-08-14']);
+}
+
 Promise.resolve()
   .then(collectsVirtualizedPagesAndRestoresTheOriginalScrollPosition)
   .then(capsResultsAndReportsTruncation)
   .then(reportsAConservativeSnapshotWhenNoScrollerExists)
   .then(mergesActivityDatesWhenVirtualizedRowsAreObservedAgain)
+  .then(collapsesRecentAndProjectRoutesForTheSameConversation)
   .then(() => process.stdout.write('chatgpt conversation history policy tests passed\n'))
   .catch((error) => {
     process.stderr.write(`${error.stack || error}\n`);

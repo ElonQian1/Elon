@@ -90,6 +90,28 @@ class ChatGptWebConversationIndexTest {
         assertEquals(setOf("2026-08-14"), merged.activityDates)
     }
 
+    @Test
+    fun mergeCollapsesRecentAndProjectRoutesForTheSameConversation() {
+        val recent = conversation("shared", "昨天", null).copy(
+            activityDates = setOf("2026-08-13"),
+        )
+        val project = recent.copy(
+            path = "/g/g-p-demo/c/shared",
+            groupLabel = "今天",
+            projectId = "g-p-demo",
+            projectTitle = "移动端项目",
+            projectPath = "/g/g-p-demo/project",
+            activityDates = setOf("2026-08-14"),
+        )
+
+        val merged = ChatGptWebConversationIndex.merge(listOf(recent), listOf(recent, project))
+
+        assertEquals(1, merged.size)
+        assertEquals("/g/g-p-demo/c/shared", merged.single().path)
+        assertEquals("g-p-demo", merged.single().projectId)
+        assertEquals(setOf("2026-08-13", "2026-08-14"), merged.single().activityDates)
+    }
+
     private fun conversation(id: String, group: String, projectId: String?) = ChatGptWebConversation(
         id = id,
         title = "会话 $id",

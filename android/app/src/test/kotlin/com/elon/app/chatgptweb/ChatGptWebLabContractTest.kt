@@ -305,6 +305,10 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.contains("turns.some((turn) => turn.contains(node))"))
         assertTrue(adapterLayout.contains("node.closest('aside, nav, [role=\"navigation\"]')"))
         assertTrue(adapterLayout.contains("[header, composer, suggestions].concat(overlays)"))
+        assertTrue(adapterLayout.contains("[data-radix-menu-content]"))
+        assertTrue(adapterLayout.contains("[data-headlessui-menu-items]"))
+        assertTrue(adapterLayout.contains("[data-headlessui-portal]"))
+        assertTrue(adapterLayout.contains("[data-slot=\"dropdown-menu-content\"]"))
         assertTrue(adapterLayout.contains("const overlay = overlays[overlays.length - 1]"))
         listOf("personalization", "help", "logout", "plan").forEach { semantic ->
             assertTrue(ChatGptWebUiSemantics.KNOWN.contains(semantic))
