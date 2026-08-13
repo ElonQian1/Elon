@@ -111,10 +111,20 @@ fn validate_job_times(job: &ComputeJob) -> Result<()> {
     let submitted_at = parse_utc("Job 提交时间", &job.submitted_at)?;
     let updated_at = parse_utc("Job 更新时间", &job.updated_at)?;
     let deadline_at = parse_utc("Workload 截止时间", &job.workload.deadline_at)?;
-    if submitted_at > updated_at || updated_at >= deadline_at {
-        bail!("算力 Job 必须满足 submitted_at <= updated_at < deadline_at");
+    if submitted_at > updated_at {
+        bail!("算力 Job 必须满足 submitted_at <= updated_at");
+    }
+    if job_requires_live_deadline(&job.status) && updated_at >= deadline_at {
+        bail!("非终态算力 Job 必须满足 updated_at < deadline_at");
     }
     Ok(())
+}
+
+fn job_requires_live_deadline(status: &str) -> bool {
+    !matches!(
+        status,
+        JOB_STATUS_SETTLED | JOB_STATUS_FAILED | JOB_STATUS_CANCELED
+    )
 }
 
 fn validate_selection_shape(

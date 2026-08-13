@@ -42,7 +42,7 @@ owners: backend, node, ai-economy
 | Provider 与 Offer 版本注册表 | v169/v170 当前投影和追加式历史已随 Provider、Offer、Price Snapshot 与 Broker 定向链验证；进程内 HTTP/MCP 与 Offer 文件重开已验证，并发和生产磁盘仍未验证 |
 | Price Snapshot 锁价控制面 | v171 Store/Service 已通过临时 SQLite 发布、幂等与审计专项；平台四眼 reference fallback v223/v224 已通过管理员 HTTP/MCP、原子 v171 Snapshot、拒绝零副作用、旧 TTL 触发器升级和文件重开专项，PC `/compute-reference-curves` 已通过跨层契约、严格类型、lint、生产构建和 bundle budget。两条来源都固定为 fallback_curve，不预留容量、不冻结余额，也不代表真实市场价格。真实 TCP、浏览器、并发压力、生产数据库副本与部署仍未验证，状态为 `implementation_partially_verified` |
 | Provider Capacity Commitment v225 | `implementation_partially_verified`：immutable `committed` 主事实、唯一 `canceled|expired` terminal receipt、Store 原子 create/read/cancel/expire、generic bypass 与 owner/admin HTTP 已接线；数量/余额复用同一 Claim/ledger。生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP、磁盘重开和 PC `/compute-supply` 静态构建已通过；真实 TCP、生产升级、跨连接并发、浏览器及交付结算未验证 |
-| Delivery Allocation v228 | `design_frozen/implementation_partially_verified`：whole-only 双边 Grant 只允许 exact consumer 把一份 v225 Commitment 一次性行权到一个 quoted Job；临时 SQLite 新库迁移和 3 项 Store/Service 专项已验证预算、父 Claim release、标准 parented Reservation Claim hold、Reservation/Job、既有 Broker receipt、幂等重放、余额不足回滚和 Decline 无容量效果。HTTP 鉴权、并发、重开、历史库升级和生产运行仍未验证 |
+| Delivery Allocation v228/v234 | `design_frozen/implementation_partially_verified`：whole-only Grant/Exercise 已有原 3 项 Store/Service 证据；到期恢复又通过完整服务端测试目标编译、fresh/repeat migration 和 7 项管理员/Store/HTTP、worker、公平扫描专项，覆盖退款、容量归还、幂等、公平越过失败项、文件重开与下一 sweep 重试。真实并发 CAS、进程崩溃、历史库升级、真实 TCP 和生产运行仍未验证 |
 | ComputeJob 版本注册表 | v172 Job 创建、候选发现、锁价、幂等、CAS 和依赖审计已随 Broker 组合链通过临时 SQLite 测试；项目级 HTTP/MCP、并发、生产磁盘和自动撮合仍未验证 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
@@ -189,7 +189,7 @@ v238 CapacityInstrument 已通过完整服务端编译和全新文件数据库�
 
 v225 Capacity Commitment 为 `implementation_partially_verified`，不包含外部矿池、交付授权、资金或结算。见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md) 与 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。
 
-v228 Delivery Allocation 的 Grant/Exercise 纵切面为 `design_frozen/implementation_partially_verified`；v234 公平恢复仍未完成专项验证。见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)、[`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md) 和 [`current-implementation-status.md`](current-implementation-status.md)。
+v228 Delivery Allocation 的 Grant/Exercise 纵切面为 `design_frozen/implementation_partially_verified`；v234 公平恢复已完成 7 项本地专项，但并发、崩溃、历史升级、真实 TCP 和生产周期仍未验收。见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)、[`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md) 和 [`current-implementation-status.md`](current-implementation-status.md)。
 
 ## 当前工程指令
 

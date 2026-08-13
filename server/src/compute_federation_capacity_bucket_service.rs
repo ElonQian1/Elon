@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -222,7 +222,9 @@ fn canonical_utc(label: &str, value: &str) -> Result<String> {
     if parsed.offset().local_minus_utc() != 0 {
         bail!("{label}必须使用 UTC 时区");
     }
-    Ok(parsed.with_timezone(&Utc).to_rfc3339())
+    Ok(parsed
+        .with_timezone(&Utc)
+        .to_rfc3339_opts(SecondsFormat::Nanos, true))
 }
 
 fn validate_bounded(label: &str, value: &str, max_len: usize) -> Result<()> {

@@ -75,7 +75,7 @@ fn exercised_reservation_expiry_refunds_and_releases_capacity_exactly_once() {
         .unwrap();
 
     assert_eq!(report.selected_count, 1);
-    assert_eq!(report.expired_count, 1);
+    assert_eq!(report.expired_count, 1, "report={report:#?}");
     assert_eq!(report.replayed_count, 0);
     assert_eq!(report.blocked_count, 0);
     assert_eq!(report.failed_count, 0);
@@ -253,7 +253,7 @@ fn worker_checkpoint_advances_past_failure_survives_reopen_and_retries_next_swee
         .expire_due_compute_delivery_allocation_reservations_worker_page(1)
         .unwrap();
     assert_eq!(continued.selected_count, 1);
-    assert_eq!(continued.expired_count, 1);
+    assert_eq!(continued.expired_count, 1, "continued={continued:#?}");
     assert_eq!(continued.failed_count, 0);
     assert!(!continued.sweep_completed);
     assert_eq!(continued.checkpoint_effect, "advanced");

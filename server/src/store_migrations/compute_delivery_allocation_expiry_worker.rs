@@ -82,3 +82,43 @@ pub(crate) fn migration_v234(conn: &Connection) -> Result<()> {
     transaction.commit()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delivery_allocation_expiry_migration_is_repeatable_on_fresh_current_schema() {
+        let connection = Connection::open_in_memory().expect("in-memory db should open");
+        crate::store_schema::apply_migrations(&connection)
+            .expect("fresh current schema should apply");
+
+        migration_v234(&connection).expect("first repeat should succeed");
+        migration_v234(&connection).expect("second repeat should succeed");
+
+        for (object_type, object_name) in [
+            (
+                "table",
+                "compute_delivery_allocation_expiry_worker_checkpoint",
+            ),
+            ("index", "idx_compute_reservations_delivery_expiry_due"),
+            (
+                "trigger",
+                "trg_delivery_allocation_expiry_checkpoint_immutable_sweep",
+            ),
+            (
+                "trigger",
+                "trg_delivery_allocation_expiry_checkpoint_forward_only",
+            ),
+        ] {
+            let count: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type=?1 AND name=?2",
+                    (object_type, object_name),
+                    |row| row.get(0),
+                )
+                .expect("migration object should be queryable");
+            assert_eq!(count, 1, "missing or duplicate {object_type} {object_name}");
+        }
+    }
+}

@@ -3,7 +3,7 @@ title: Delivery Allocation v228/v234 本地验收
 status: current
 design_status: design_frozen
 implementation_status: implementation_partially_verified
-last_updated: 2026-08-12
+last_updated: 2026-08-14
 ---
 
 # Delivery Allocation v228/v234 本地验收
@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -D
 5. 余额不足时预算、父 Claim、子 Claim、Reservation、Job 和 terminal receipt 整体回滚；Job 保持 `quoted`、Commitment Grant 保持 `granted`。
 6. Consumer Decline 可幂等重放，不冻结预算、不移动容量，terminal receipt 不携带 exercise evidence。
 
-## v228 管理员到期恢复与 v234 公平 worker 源码
+## v228 管理员到期恢复与 v234 公平 worker 本地验收
 
 2026-08-12 已写入管理员有界恢复入口及其 Store/Service/HTTP 和专项测试源码，用于选择 immutable terminal 已为 `exercised`、current Reservation 已到期且仍 `active`、Job 仍 `reserved`、parented child Claim 仍 `held`、尚无 Broker finish receipt 的记录，并逐项复用既有 Broker `Expire` 事务。调用方不能提交 cutoff、consumer、发生时间、revision/digest、金额或结果状态；若存在 dispatch command，仍须通过 exact no-start proof，远端状态未知时失败关闭。
 
@@ -39,9 +39,18 @@ v234 又写入 migration、单行持久 checkpoint、与三元游标一致的 ac
 
 worker 首 tick 即运行，默认 60 秒，环境配置仅接受不少于 10 秒，missed tick 采用 Skip；每 tick 固定至多处理 100 项。它不经过管理员 API，不冒充 admin actor 或人工确认，只输出 selected/expired/replayed/blocked/failed/sweep-completed 聚合计数。checkpoint 只负责扫描公平性，不是 Job、Reservation、Claim、Broker 或结算权威。
 
-预期成功效果仅为：退回 `platform_balance_cny` 预授权；child Claim `held r1 -> expired r2` 并归还容量；Job `reserved -> failed`；Reservation `active -> expired`；追加既有 Broker finish receipt。v228 terminal 不改写，仍为 `exercised`；v225 Commitment 仍为 `allocated`。恢复不产生 verified usage、Provider 收益、settlement、处罚或新经济权威。
+已验证的成功效果仅为：退回 `platform_balance_cny` 预授权；child Claim `held r1 -> expired r2` 并归还容量；Job `reserved -> failed`；Reservation `active -> expired`；追加既有 Broker finish receipt。v228 terminal 不改写，仍为 `exercised`；v225 Commitment 仍为 `allocated`。恢复不产生 verified usage、Provider 收益、settlement、处罚或新经济权威。
 
-本节是源码冻结记录，不是新增通过证据：v228 管理员恢复本身未新增 migration，v234 公平 worker 新增 checkpoint migration；两者新增范围均未编译、执行 migration、运行测试或启动服务，`passed=0`，无新增验证指纹或运行回执。上方 3 项旧专项和其指纹不得用于声称 v228 到期恢复或 v234 worker 已验证。
+2026-08-14 使用当前完整 `elon-server` 测试目标完成两组专项，合计 7 项通过、0 项失败：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-federation-v234 -- test --manifest-path server\Cargo.toml --bin elon-server reservation_expiry -- --nocapture --test-threads=1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Domain compute-federation-v234 -- test --manifest-path server\Cargo.toml --bin elon-server delivery_allocation_expiry -- --nocapture --test-threads=1
+```
+
+第一组实际运行 3 项，验证指纹为 `0c3277319bb99a0db433a1c19f58f88ed80b0e44222a844b1ba7a826c7bd23df`，回执为 `d8a36d5093c0a9281f98900310d3f56585a4cb91bc53e7a5a7e63800988bbb4b`；覆盖管理员/owner HTTP 关闭合同、Store 到期退款与容量精确一次归还、失败项后 checkpoint 前进、数据库重开和下一 sweep 重试。第二组实际运行 4 项，验证指纹为 `eb86e2b38686c7315650b7f1a925a9fd062ea93c947e2171a284ecbfd900e501`，回执为 `6f1185474c092338f68adb69eee9179b5b3c0c97d1309e01e05ce8c2f5e49a22`；覆盖 fresh current schema/repeat v234 migration、worker 配置失败关闭、空 Store 单周期聚合，以及消费者不能占用系统到期幂等键。两组都编译完整测试二进制，但没有启动真实 TCP 服务或生产周期。
+
+专项同时修复两处被真实回收链暴露的共享合同：Capacity bucket 的窗口时间统一输出 canonical UTC nanoseconds；Job 时间校验继续要求所有状态满足 `submitted_at <= updated_at`，并仅对非终态要求 `updated_at < deadline_at`，使 `settled|failed|canceled` 可以在截止后按事实落账，而运行态仍不能越过截止时间。
 
 ## 源码证据
 
@@ -49,26 +58,28 @@ worker 首 tick 即运行，默认 60 秒，环境配置仅接受不少于 10 �
 - Service 边界：`server/src/compute_federation/delivery_allocation_service.rs`。
 - Store 编排：`server/src/store/compute_delivery_allocations/`。
 - 到期恢复 Store 叶文件：`server/src/store/compute_delivery_allocations/reservation_expiry_recovery.rs`。
-- 到期恢复未执行 HTTP 合同测试：`server/src/compute_federation/delivery_allocation_reservation_expiry_api_tests.rs`。
+- 到期恢复 HTTP 合同测试：`server/src/compute_federation/delivery_allocation_reservation_expiry_api_tests.rs`。
 - v234 checkpoint migration：`server/src/store_migrations/compute_delivery_allocation_expiry_worker.rs`。
 - v234 keyset/checkpoint Store 叶文件：`server/src/store/compute_delivery_allocations/reservation_expiry_scan.rs`。
 - v234 server-owned worker：`server/src/compute_federation/delivery_allocation_expiry_worker.rs`。
-- v234 未执行 worker/公平扫描专项：`server/src/compute_federation/delivery_allocation_expiry_worker_tests.rs`、`server/src/compute_federation/delivery_allocation_reservation_expiry_store_tests.rs` 与 `server/src/compute_federation/delivery_allocation_reservation_expiry_fairness_support.rs`。
+- v234 worker/公平扫描专项：`server/src/compute_federation/delivery_allocation_expiry_worker_tests.rs`、`server/src/compute_federation/delivery_allocation_reservation_expiry_store_tests.rs` 与 `server/src/compute_federation/delivery_allocation_reservation_expiry_fairness_support.rs`。
+- 共享时间合同修复：`server/src/compute_federation_capacity_bucket_service.rs` 与 `server/src/store/compute_job_contract_validation.rs`。
 - Claim、Broker、Reservation 私有入口：`server/src/store/compute_capacity_claims/delivery_allocation.rs`、`server/src/store/compute_broker_reservation/orchestrate/delivery_allocation.rs`、`server/src/store/compute_reservation_contract_validation/delivery_allocation.rs`。
 
 ## 尚未证明
 
-- v228 管理员恢复与 v234 migration/worker 源码未编译或运行；未证明 selector、固定 cutoff/keyset 公平性、checkpoint CAS/清除、并发 supersede、崩溃幂等重放、部分成功、no-start 失败关闭与零副作用。
-- 未执行 HTTP 路由、会话鉴权、跨账户隐藏，以及 Grant/Reservation 两类 admin 到期入口验收。
-- 未执行同 Grant 并发行权/Decline/Expire 竞争、文件重开或历史数据库升级。
+- 未执行两个真实并发连接争用 checkpoint 的 CAS/supersede 压力测试；现有测试只证明串行失败项越过、重开和下一 sweep 重试。
+- 未注入进程在 Broker 提交后、checkpoint CAS 前真实崩溃；确定性幂等重放仍是源码合同而非 crash-process 证据。
+- 未执行同 Grant 并发行权/Decline/Expire 竞争或历史数据库升级；文件数据库重开已由专项覆盖。
+- HTTP 已覆盖 Reservation 到期恢复的 admin/owner、无会话、普通成员、未知字段、确认与 limit 边界，但未覆盖真实 TCP 或跨进程会话。
 - 未运行真实 TCP、PC、MCP、worker 周期、dispatch、Attempt、Lease 或生产部署。
 - `platform_balance_cny` 仅为本地预算预授权；没有真实支付、提现、Provider 收益、链上资金或 Sui 提交。
 - 不包含 partial、多 Job、转让、转售、Order、Trade、Position、Clearing 或真实未来交付结算。
 
-因此，v228 整体状态只能表述为 `implementation_partially_verified`，其中 downstream Reservation due-expiry recovery 与 v234 公平 worker 必须单独标记 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。后续验收必须继续引用 [`delivery-allocation-authority.md`](delivery-allocation-authority.md) 的 whole-only、单终态、固定 sweep 和 Store-private authority 边界。
+因此，v228/v234 整体状态仍只能表述为 `implementation_partially_verified`：downstream Reservation due-expiry recovery 与 v234 公平 worker 已有 7 项本地专项，不再是 `passed=0`，但不能据此声称并发、崩溃、历史升级、真实 TCP 或生产运行已经完成。后续验收必须继续引用 [`delivery-allocation-authority.md`](delivery-allocation-authority.md) 的 whole-only、单终态、固定 sweep 和 Store-private authority 边界。
 
 ## v238 CapacityInstrument 接入不继承旧证据
 
 v238 已在新 Grant 前要求 current active exact Offer 的 immutable Instrument adoption，并在 Exercise 前允许重审 Grant 所绑定的 historical exact Offer（含 stable `active -> active` 升版及后续 `draining`），但 Instrument 仍必须 active、未退休且 adoption/publication identity 不漂移。SQLite 对 Grant 与 `exercised` terminal 的 raw insert 同样增加门卫。Retirement 只阻止 fresh Grant/Exercise；既有 Decline/Expire，以及已形成 Reservation 的到期退款和容量归还仍须按原权威收尾，不能因 Instrument 退役被锁死。
 
-上述接入当前为 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`。本页既有 3 项 v228 测试与指纹未执行 v238 migration/门卫，不能作为 v238 通过证据；v234 的未运行状态也不改变。后续须分别验证 current active、active 升版后的 historical Exercise、draining historical Exercise、retired rejection、direct-SQL bypass 和历史终态兼容。该门不产生 Position、成交、真实价格、verified usage、Provider 收益或 settlement，权威见 [`capacity-instrument-authority.md`](capacity-instrument-authority.md)。
+上述 v238 接入当前仍以其专题验收页为准。本页 v228/v234 的通过指纹不覆盖 v238 migration/门卫，不能作为 v238 lifecycle/adoption、historical Exercise、retired rejection、direct-SQL bypass 或历史终态兼容的行为证据。该门不产生 Position、成交、真实价格、verified usage、Provider 收益或 settlement，权威见 [`capacity-instrument-authority.md`](capacity-instrument-authority.md)。

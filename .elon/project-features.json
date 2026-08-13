@@ -126,19 +126,19 @@
       "id": "delivery-allocation-expiry-worker-v234-verification",
       "title": "v234 Delivery Allocation 到期公平恢复验收",
       "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/delivery-allocation-authority.md",
-        "content_hash": "bc42819db5f84e46d1cd12f5a9582e1c7ae9c97317f7a008ea22b79fa54c6de2",
+        "content_hash": "eacbbca218e8c65f989300393b49c1f8035a15db1acdee6ea6486f9141c330a0",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "db954af521c548703b5d9f8a6b4848398d3c987a",
+          "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
           "head_blob_oid": "162a6662a72d1352d89c75fdadf0d1aa2a973856",
-          "worktree_blob_oid": "162a6662a72d1352d89c75fdadf0d1aa2a973856",
-          "state": "tracked_clean"
+          "worktree_blob_oid": "a53186085efcbe6f15a2934f776ba58e709a0c6b",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -156,12 +156,16 @@
         "docs/distributed-compute/current-implementation-status.md",
         "docs/distributed-compute/delivery-allocation-acceptance.md",
         "docs/distributed-compute/delivery-allocation-authority.md",
+        "docs/distributed-compute/market-and-settlement.md",
+        "server/src/compute_federation/capacity_commitment_test_support.rs",
         "server/src/compute_federation/delivery_allocation_expiry_worker.rs",
         "server/src/compute_federation/delivery_allocation_expiry_worker_tests.rs",
         "server/src/compute_federation/delivery_allocation_reservation_expiry_api_tests.rs",
         "server/src/compute_federation/delivery_allocation_reservation_expiry_store_tests.rs",
+        "server/src/compute_federation_capacity_bucket_service.rs",
         "server/src/store/compute_delivery_allocations/reservation_expiry_recovery.rs",
         "server/src/store/compute_delivery_allocations/reservation_expiry_scan.rs",
+        "server/src/store/compute_job_contract_validation.rs",
         "server/src/store_migrations/compute_delivery_allocation_expiry_worker.rs"
       ],
       "dependencies": [],
@@ -173,15 +177,101 @@
         "文档明确 Grant/Commitment 终态不改写，Provider 收益、settlement、真实支付与生产派发均无副作用",
         "未覆盖并发 CAS、崩溃、历史库升级、真实 TCP 与生产 worker 的范围保持未验收"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_bd7a5e39bb014c03a6f30048ee2bc06f",
-        "agent_id": "codex-goal-019f3b86",
-        "claimed_at_ms": 1786638416750,
-        "expires_at_ms": 1786652816750
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/delivery-allocation-acceptance.md",
+          "content_hash": "78f95b7302d297a4c791b34880f06ab071edaed844c01bd6796ad861c5986f20",
+          "locator": "v228 管理员到期恢复与 v234 公平 worker 本地验收",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "e168eb89e7b1b765c81d29f57ddbd81f76b36b9b",
+            "worktree_blob_oid": "355f4fc1c96300a0ad747a9cbc3cdd06221df0e7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/delivery_allocation_expiry_worker_tests.rs",
+          "content_hash": "f71159aac7b182dfdce04d33313b301bfd0d17c9d0e7f8a91b25b302f00f99fe",
+          "locator": "worker configuration and empty cycle",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "efd2dbedbfbdf6d51763a05b254994f908ca621b",
+            "worktree_blob_oid": "efd2dbedbfbdf6d51763a05b254994f908ca621b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/delivery_allocation_reservation_expiry_api_tests.rs",
+          "content_hash": "df1a0969a642109526f8444befeb606380cd88ce3bfe95dba5c3bac29e069b1b",
+          "locator": "reservation_expiry_http_is_admin_only_and_has_a_closed_request_contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "c6d7fafaaccfe895ac8c584070aa0da3826be715",
+            "worktree_blob_oid": "c6d7fafaaccfe895ac8c584070aa0da3826be715",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/delivery_allocation_reservation_expiry_store_tests.rs",
+          "content_hash": "9ac6345cb40e0b80745ddaf48d01965da236dabd11c1b553ba89c48c8c6de914",
+          "locator": "reservation_expiry",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "a44213b549a8f2758825bd54f63fb56c4a8b6429",
+            "worktree_blob_oid": "452f0631996cdc472f7b109860200d492e2b1ae2",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation_capacity_bucket_service.rs",
+          "content_hash": "a48e46c2e6dd5c4133b7b375c8e3406327e68ca6a8da80db1d7b659729b91735",
+          "locator": "canonical_utc",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "cf612f35354bb1347fd3c32b4fe3bc0f4dfbfe6c",
+            "worktree_blob_oid": "d3043168a6ecdb77fdfc85b22d611beb43be2f0e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/compute_job_contract_validation.rs",
+          "content_hash": "30d582f1f5bb3a05c35dca25d70bd58ada435a65688ca00da508e68056523d4e",
+          "locator": "validate_job_times",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "bf5f2f404eaee19397ddb12ea64ecb8873cfe425",
+            "worktree_blob_oid": "ef7eb9cf1b0abf35e5150f531300e4689457f97f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/compute_delivery_allocation_expiry_worker.rs",
+          "content_hash": "e74c83382557aab74988921f60e1b2ff0e19acf261f58d5d994f8fa01268f7db",
+          "locator": "delivery_allocation_expiry_migration_is_repeatable_on_fresh_current_schema",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df91d2adb4d0969ded409576a82dd8831eb0586b",
+            "head_blob_oid": "b24c118021a8f9cc115c7e18c7563b90065e914b",
+            "worktree_blob_oid": "50ca3bbb9e15ec8b511b9855ac7d6f2aa25ed2cb",
+            "state": "tracked_modified"
+          }
+        }
+      ],
       "created_at_ms": 1786638401675,
-      "updated_at_ms": 1786638416777
+      "updated_at_ms": 1786645066566
     },
     {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
@@ -1636,6 +1726,246 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1786638416777
+    },
+    {
+      "id": "feature_event_97ab09fedd2c4054bce47a6ebc2137a7",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claim_released",
+      "actor": "codex-goal-019f3b86",
+      "reason": "将仍含 v234 未编译旧结论的市场权威页纳入受控文档范围后重新评审",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1786640136192
+    },
+    {
+      "id": "feature_event_80624aa3f3244b22a823c6963b04a339",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "metadata_updated",
+      "actor": "codex-goal-019f3b86",
+      "reason": "纳入仍引用 v234 passed=0 的市场边界文档，统一消除状态矛盾",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1786640151210
+    },
+    {
+      "id": "feature_event_7a23fc5c466a49cd96ec586bfa050c12",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "新增市场边界文档仅用于同步同一验收事实，功能边界与验收标准不变",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786640164949
+    },
+    {
+      "id": "feature_event_df7aaa7021c24bafb72af688c7daf517",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "更新后的文档范围已评审可执行",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786640165026
+    },
+    {
+      "id": "feature_event_fd9d5e5ff347487b8da915d1144ea294",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786640165037
+    },
+    {
+      "id": "feature_event_e603a1df97b7411bab06e1375d6fc24e",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "范围更新后继续同步验证事实",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786640178710
+    },
+    {
+      "id": "feature_event_66944e89a0be4384b4e4502fec0ac8e4",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claim_released",
+      "actor": "codex-goal-019f3b86",
+      "reason": "真实过滤器暴露共享测试夹具时间精度漂移，扩展受控修复路径",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786641171536
+    },
+    {
+      "id": "feature_event_b6e1e6db0100459d8c645bc243e53311",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-019f3b86",
+      "reason": "绑定本次本地验收结果与未验收边界更新后的权威文档",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786641202289
+    },
+    {
+      "id": "feature_event_9c83b35187b044e896f9c32c3ad9bbf6",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "metadata_updated",
+      "actor": "codex-goal-019f3b86",
+      "reason": "纳入共享测试夹具，修复 V238 canonical UTC nanoseconds 合同漂移后复验 V234",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1786641218106
+    },
+    {
+      "id": "feature_event_7ad036f72f484aa7b1e074112a3f8097",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "metadata_updated",
+      "actor": "codex-goal-019f3b86",
+      "reason": "真实回归定位到交付窗口首次落库规范化与 V238 固定纳秒合同不一致，纳入最早权威边界修复",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1786641372928
+    },
+    {
+      "id": "feature_event_efa5651512874b91afe20ebf7e0baa33",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "评审确认修复位于交付窗口首次落库权威边界，保持原验收和经济边界",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786641401891
+    },
+    {
+      "id": "feature_event_3c055bf44be2465ab89c9ebefd96daf8",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "更新后的跨版本时间合同可执行",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786641401966
+    },
+    {
+      "id": "feature_event_76c379ff2955409bac2614ae9990aa97",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786641401978
+    },
+    {
+      "id": "feature_event_5ad80a5a02d1449f8ee4309832c3286a",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "修复规范化并复验真实测试过滤器",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786641402003
+    },
+    {
+      "id": "feature_event_5583fd77aae74b75ad8ed991ff354735",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claim_released",
+      "actor": "codex-goal-019f3b86",
+      "reason": "最终 7 项证据与共享 Job 终态时间合同已形成，重新绑定更新后的权威文档与受控路径",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786645020745
+    },
+    {
+      "id": "feature_event_608632df18d943279a6f327f27b97803",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-019f3b86",
+      "reason": "绑定 2026-08-14 最终 7 项验收与明确未验收边界后的权威文档",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786645024839
+    },
+    {
+      "id": "feature_event_47a33d9a3b714befad2bd40cd472be74",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "metadata_updated",
+      "actor": "codex-goal-019f3b86",
+      "reason": "真实回归暴露并修复 Job 终态在 deadline 后无法按事实落账的共享合同缺口",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1786645024996
+    },
+    {
+      "id": "feature_event_2131d2cb80cd43a1a8d9ac804718feb4",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "最终范围仅补齐 V234 本地验收与两处共享时间合同，经济及生产边界不扩大",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786645042844
+    },
+    {
+      "id": "feature_event_d3964b2c4ae04f158c0adeadb1ee9f92",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "7 项定向验收、迁移与文档边界均有可执行入口",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786645042969
+    },
+    {
+      "id": "feature_event_74229959d8fa4a66b52530189bf37c96",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786645042994
+    },
+    {
+      "id": "feature_event_61768d04feee4c95a7b9b2e079acf4c5",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "登记最终实现和验证证据",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786645043006
+    },
+    {
+      "id": "feature_event_17d19ef1737644d496229676270af2be",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786645066472
+    },
+    {
+      "id": "feature_event_81a620de16c7479da7de9ca96417136b",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "V234 migration、共享时间合同与验收文档已形成，7 项真实定向测试通过",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786645066553
+    },
+    {
+      "id": "feature_event_072328c7373e424b8ccc18da703e064e",
+      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "reservation_expiry 3 项和 delivery_allocation_expiry 4 项均实际运行通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786645066566
     }
   ]
 }

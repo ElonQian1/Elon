@@ -3,7 +3,7 @@ title: Delivery Allocation v228/v234 权威
 status: current
 design_status: design_frozen
 implementation_status: implementation_partially_verified
-last_updated: 2026-08-12
+last_updated: 2026-08-14
 ---
 
 # Delivery Allocation v228/v234 权威
@@ -12,7 +12,7 @@ last_updated: 2026-08-12
 
 v228 以 **GO** 冻结一个非 staging 的最窄真实交付纵切面：Provider 把一份 exact v225 Capacity Commitment 全量、双边地授权给一个消费者的一个 exact quoted Job；消费者在交付窗口开始前显式行权；Store 在一个 `BEGIN IMMEDIATE` 中把既有 Commitment Claim 的全部 held 容量转成既有 Broker 能消费的标准 Reservation Claim，并原子登记预算、Reservation、Job 与 Broker reserve receipt。
 
-设计状态保持 `design_frozen`，实现状态为 `implementation_partially_verified`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；临时 SQLite 新库迁移及 3 项 Store/Service 专项已实际通过。2026-08-12 又以 **FREEZE** 冻结并写入行权后到期 Reservation 的管理员有界恢复源码；随后 v234 冻结单行持久 checkpoint、Store keyset page 与 server-owned worker/main 接线，以固定 cutoff 和跨 tick 游标提供公平恢复。v234 新增 migration，但所有 v234 源码尚未编译、迁移或运行，`passed=0`，不能复用既有验证指纹。HTTP 鉴权、并发竞争、崩溃恢复、文件重开、历史库升级、真实任务执行和生产部署仍未证明，详见 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。
+设计状态保持 `design_frozen`，实现状态为 `implementation_partially_verified`。领域合同、v228 两张不可变表与门卫、Store-private Grant/Exercise/Decline/Expire 编排、Claim/Reservation/Broker 旁路封口、Service、HTTP 和中央注册源码已经写入；临时 SQLite 新库迁移及 3 项 Store/Service 专项已实际通过。2026-08-12 又以 **FREEZE** 冻结并写入行权后到期 Reservation 的管理员有界恢复源码；随后 v234 冻结单行持久 checkpoint、Store keyset page 与 server-owned worker/main 接线，以固定 cutoff 和跨 tick 游标提供公平恢复。2026-08-14 已完成完整 `elon-server` 测试目标编译、fresh current schema/repeat migration，以及管理员/Store/HTTP、worker 和公平扫描共 7 项本地专项；退款、容量归还、幂等、固定 cutoff/keyset、失败项后公平前进、文件重开和下一 sweep 重试已有本地证据。真实并发 CAS、进程崩溃窗口、历史库升级、真实 TCP、真实任务执行、生产 worker 周期和部署仍未证明，详见 [`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md)。
 
 该纵切面不是 Order、Trade、Position、ClearingReceipt 或买方可转售持仓，也不声明真实成交价、指数价、标记价、保证金、交割差额或结算成功。它只复用 v225 Commitment、v165-v168/v173 Claim/ledger、v172 Job、v174 Reservation 和 v175 Broker 的本地 `platform_balance_cny` 预授权链。
 
@@ -175,4 +175,4 @@ P1 才可讨论部分分配、多 Job、可转让 Position、真实市场价格�
 
 ## 12. 冻结结论
 
-v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。原纵切面已通过编译、临时 SQLite 新库迁移和 Store/Service 成功、回滚、Decline 三项专项，整体状态保持 `implementation_partially_verified`。v234 公平恢复的 migration、持久 checkpoint、Store page、worker/main 接线及专项测试已经写入，但仍为 `source_written/implementation_uncompiled/implementation_unrun`、`passed=0`；编译、migration、worker 周期、keyset 公平性、CAS 竞争、崩溃重放、重开、历史库升级和生产运行均未验证。任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得把预算退款和容量归还宣称为未来交付、verified usage、Provider 收益或 settlement 已生产可用。
+v228 的完整性来自单一事务内的父 Claim 全量释放、标准子 Reservation Claim 全量持有、既有 Broker 预算/Job/Reservation 登记和 immutable exercised receipt。原纵切面已通过编译、临时 SQLite 新库迁移和 Store/Service 成功、回滚、Decline 三项专项，整体状态保持 `implementation_partially_verified`。v234 公平恢复也已通过完整测试目标编译、fresh/repeat migration、管理员/Store/HTTP、worker 与公平扫描 7 项本地专项；其实现不再是 `implementation_uncompiled/implementation_unrun`。当前证据仍不覆盖真实并发 CAS、进程崩溃、历史库升级、真实 TCP、生产周期或部署。任一环无法形成同事务闭环就必须失败关闭，不得降级成只写 Grant/receipt 的 staging 能力，也不得把预算退款和容量归还宣称为未来交付、verified usage、Provider 收益或 settlement 已生产可用。
