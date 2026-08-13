@@ -142,6 +142,7 @@ mod node_agent_supervision_terminal_lease;
 mod node_agent_supervision_terminal_lease_safety;
 mod node_agent_terminal_finalization;
 mod node_agent_terminal_journal;
+mod node_agent_windows_shutdown;
 use node_agent_local_llm::discover_models;
 mod node_agent_local_pc_frontend;
 mod node_agent_local_task_cloud_sync;
@@ -399,6 +400,7 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 // ── 入口 ─────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
+    node_agent_windows_shutdown::initialize_process_behavior();
     if node_agent_project_memory_hook::is_hook_invocation() {
         return node_agent_project_memory_hook::run_stdio();
     }
@@ -573,6 +575,10 @@ async fn run_agent_runtime() -> Result<()> {
     let runtime_for_loop = runtime.clone();
     tokio::select! {
         _ = run_loop(runtime_for_loop) => {}
+        _ = node_agent_windows_shutdown::wait_for_shutdown() => {
+            runtime.mark_lifecycle_planned_shutdown("operating_system_shutdown");
+            runtime.mark_lifecycle_shutdown_completed("operating_system_shutdown");
+        }
         signal = tokio::signal::ctrl_c() => {
             if let Err(error) = signal {
                 warn!("监听 Win 端关闭信号失败: {error}");

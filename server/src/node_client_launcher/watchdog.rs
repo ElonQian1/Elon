@@ -25,6 +25,9 @@ pub(crate) fn ensure_running(install_dir: &Path) -> Result<()> {
 
     #[cfg(windows)]
     {
+        if crate::node_agent_windows_shutdown::shutdown_requested() {
+            return Ok(());
+        }
         if watchdog_running(install_dir) {
             return Ok(());
         }
@@ -104,6 +107,15 @@ pub(crate) fn run_loop(install_dir: &Path) -> Result<()> {
     );
 
     loop {
+        if crate::node_agent_windows_shutdown::shutdown_requested() {
+            log_file::record_event(
+                install_dir,
+                "watchdog_shutdown_exit",
+                true,
+                "Windows shutdown or logoff detected; runtime restart is disabled",
+            );
+            return Ok(());
+        }
         let started = Instant::now();
         if let Err(error) = check_once(install_dir, &client, &mut state) {
             log_file::record_event(
@@ -114,8 +126,14 @@ pub(crate) fn run_loop(install_dir: &Path) -> Result<()> {
             );
         }
         let elapsed = started.elapsed();
-        if elapsed < interval {
-            std::thread::sleep(interval - elapsed);
+        if elapsed < interval && !wait_for_next_check(interval - elapsed) {
+            log_file::record_event(
+                install_dir,
+                "watchdog_shutdown_exit",
+                true,
+                "Windows shutdown or logoff detected while waiting",
+            );
+            return Ok(());
         }
     }
 }
@@ -141,6 +159,9 @@ pub(super) fn acquire_watchdog_lock(install_dir: &Path) -> std::io::Result<Watch
 }
 
 fn check_once(install_dir: &Path, client: &Path, state: &mut WatchdogState) -> Result<()> {
+    if crate::node_agent_windows_shutdown::shutdown_requested() {
+        return Ok(());
+    }
     let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
     let port = process::admin_port_from_env_values(&env_values);
     if process::admin_healthy(port, ADMIN_PROBE_TIMEOUT) {
@@ -157,6 +178,9 @@ fn check_once(install_dir: &Path, client: &Path, state: &mut WatchdogState) -> R
     }
 
     let runtime_running = process::agent_runtime_running(install_dir);
+    if crate::node_agent_windows_shutdown::shutdown_requested() {
+        return Ok(());
+    }
     if !runtime_running {
         state.consecutive_admin_failures = 0;
         log_file::record_event(
@@ -210,6 +234,9 @@ fn check_once(install_dir: &Path, client: &Path, state: &mut WatchdogState) -> R
         );
         process::stop_agent();
         let _ = process::wait_for_port_closed(port, PORT_CLOSE_WAIT);
+        if crate::node_agent_windows_shutdown::shutdown_requested() {
+            return Ok(());
+        }
         process::spawn_agent_runtime(client, install_dir, port, &env_values)?;
         if process::wait_for_admin_ready(port, ADMIN_RESTART_WAIT) {
             log_file::record_event(
@@ -231,6 +258,18 @@ fn check_once(install_dir: &Path, client: &Path, state: &mut WatchdogState) -> R
     }
 
     Ok(())
+}
+
+fn wait_for_next_check(duration: Duration) -> bool {
+    let deadline = Instant::now() + duration;
+    while Instant::now() < deadline {
+        if crate::node_agent_windows_shutdown::shutdown_requested() {
+            return false;
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        std::thread::sleep(remaining.min(Duration::from_millis(100)));
+    }
+    true
 }
 
 #[derive(Default)]

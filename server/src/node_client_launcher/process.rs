@@ -198,6 +198,9 @@ fn spawn_agent_runtime_via_powershell(
     port: u16,
     env_values: &HashMap<String, String>,
 ) -> Result<u32> {
+    if crate::node_agent_windows_shutdown::shutdown_requested() {
+        bail!("Windows is shutting down; refusing to start the node runtime");
+    }
     let pid_file = runtime_spawn_pid_file(install_dir)?;
     let _ = std::fs::remove_file(&pid_file);
     let script = spawn_agent_runtime_script(client, install_dir, port, env_values, &pid_file);

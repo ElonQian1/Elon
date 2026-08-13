@@ -21,19 +21,32 @@ pub(crate) fn silent_command<S: AsRef<OsStr>>(program: S) -> Command {
 }
 
 pub(crate) fn spawn_hidden(command: &mut Command) -> std::io::Result<Child> {
+    ensure_child_process_allowed()?;
     apply_hidden_window(command);
     command.spawn()
 }
 
 pub(crate) fn status_hidden(command: &mut Command) -> std::io::Result<ExitStatus> {
+    ensure_child_process_allowed()?;
     apply_hidden_window(command);
     command.status()
 }
 
 pub(crate) fn output_hidden(command: &mut Command) -> std::io::Result<Output> {
+    ensure_child_process_allowed()?;
     apply_hidden_window(command);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     command.output()
+}
+
+fn ensure_child_process_allowed() -> io::Result<()> {
+    if crate::node_agent_windows_shutdown::shutdown_requested() {
+        return Err(io::Error::new(
+            io::ErrorKind::Interrupted,
+            "system shutdown is in progress; refusing to start a background child process",
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(windows)]

@@ -233,3 +233,30 @@ fn watchdog_defers_restart_while_cli_sidecar_is_active() {
     assert!(source.contains("active_cli_sidecar_running(install_dir)"));
     assert!(source.contains("state.consecutive_admin_failures = 0"));
 }
+
+#[test]
+fn watchdog_stops_restart_work_during_windows_shutdown() {
+    let source = include_str!("watchdog.rs");
+    let runtime_spawn = source
+        .find("process::spawn_agent_runtime(client, install_dir, port, &env_values)?")
+        .unwrap();
+    let shutdown_guard = source[..runtime_spawn]
+        .rfind("node_agent_windows_shutdown::shutdown_requested()")
+        .expect("shutdown guard must precede runtime spawn");
+
+    assert!(shutdown_guard < runtime_spawn);
+    assert!(source.contains("watchdog_shutdown_exit"));
+    assert!(source.contains("wait_for_next_check"));
+}
+
+#[test]
+fn runtime_spawn_has_a_final_shutdown_gate() {
+    let source = include_str!("process.rs");
+    let function = source
+        .split("pub(crate) fn spawn_agent_runtime")
+        .nth(1)
+        .unwrap();
+
+    assert!(function.contains("node_agent_windows_shutdown::shutdown_requested()"));
+    assert!(function.contains("refusing to start the node runtime"));
+}
