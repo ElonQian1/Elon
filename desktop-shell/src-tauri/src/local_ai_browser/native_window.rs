@@ -104,8 +104,10 @@ pub(super) async fn open(
     let provider = provider(&provider_id)?;
     let fingerprint = owner_fingerprint(&owner_key)?;
     let label = native_window_label(provider, &fingerprint);
+    let url = native_chat_url(&webview, provider)?;
 
     if let Some(window) = app.get_webview_window(&label) {
+        dispatch_recovery_navigation(&app, &label, &window, &url)?;
         restore_window(&window)?;
         record(
             &app,
@@ -118,7 +120,6 @@ pub(super) async fn open(
         return Ok(response(provider, label, "focused"));
     }
 
-    let url = native_chat_url(&webview, provider)?;
     let bootstrap_url = "about:blank"
         .parse()
         .map_err(|error| format!("一龙聊天窗启动页无效：{error}"))?;
@@ -129,7 +130,6 @@ pub(super) async fn open(
     let navigation_label = label.clone();
     let page_app = app.clone();
     let page_label = label.clone();
-    let target_url = url.clone();
     let event_app = app.clone();
     let event_label = label.clone();
     record(
@@ -193,30 +193,6 @@ pub(super) async fn open(
                 json!({"url": safe_url(page_url)}),
             );
             if matches!(payload.event(), PageLoadEvent::Finished)
-                && page_url.as_str() == "about:blank"
-            {
-                match window.navigate(target_url.clone()) {
-                    Ok(()) => record(
-                        &page_app,
-                        &page_label,
-                        "info",
-                        "native_window.navigation_dispatched",
-                        "一龙 AI 子窗口已开始导航",
-                        json!({"url": safe_url(&target_url)}),
-                    ),
-                    Err(_error) => {
-                        record(
-                            &page_app,
-                            &page_label,
-                            "error",
-                            "native_window.navigation_failed",
-                            "一龙 AI 子窗口导航失败，窗口已保留",
-                            json!({"error_code": "host_navigation_failed"}),
-                        );
-                        show_navigation_error(&window);
-                    }
-                }
-            } else if matches!(payload.event(), PageLoadEvent::Finished)
                 && page_url.scheme() == "edge-error"
             {
                 record(
@@ -275,6 +251,14 @@ pub(super) async fn open(
         ),
         _ => {}
     });
+    dispatch_navigation(
+        &app,
+        &label,
+        &window,
+        url,
+        "native_window.navigation_dispatched",
+        "一龙 AI 子窗口已开始导航",
+    )?;
     restore_window(&window)?;
     record(
         &app,
@@ -285,6 +269,8 @@ pub(super) async fn open(
         json!({
             "parent_label": webview.label(),
             "window_role": "managed_child",
+            "requested_inner_width": 940,
+            "requested_inner_height": 760,
         }),
     );
     Ok(response(provider, label, "created"))
@@ -310,6 +296,75 @@ fn safe_url(url: &Url) -> String {
 
 fn show_navigation_error(window: &WebviewWindow) {
     let _ = window.eval(NAVIGATION_ERROR_SCRIPT);
+}
+
+fn dispatch_navigation(
+    app: &AppHandle,
+    label: &str,
+    window: &WebviewWindow,
+    target_url: Url,
+    success_kind: &str,
+    success_summary: &str,
+) -> Result<(), String> {
+    match window.navigate(target_url.clone()) {
+        Ok(()) => {
+            record(
+                app,
+                label,
+                "info",
+                success_kind,
+                success_summary,
+                json!({"url": safe_url(&target_url)}),
+            );
+            Ok(())
+        }
+        Err(_error) => {
+            record(
+                app,
+                label,
+                "error",
+                "native_window.navigation_failed",
+                "一龙 AI 子窗口导航失败，窗口已保留",
+                json!({"error_code": "host_navigation_failed"}),
+            );
+            show_navigation_error(window);
+            let _ = restore_window(window);
+            Err("一龙聊天窗导航失败；诊断窗口已保留。".to_string())
+        }
+    }
+}
+
+fn dispatch_recovery_navigation(
+    app: &AppHandle,
+    label: &str,
+    window: &WebviewWindow,
+    target_url: &Url,
+) -> Result<(), String> {
+    let target = serde_json::to_string(target_url.as_str())
+        .map_err(|error| format!("一龙聊天窗恢复地址无效：{error}"))?;
+    let script = format!(
+        "(function () {{ if (location.href === 'about:blank' || location.protocol === 'edge-error:') location.replace({target}); }})();"
+    );
+    window.eval(script).map_err(|_error| {
+        record(
+            app,
+            label,
+            "error",
+            "native_window.recovery_navigation_failed",
+            "一龙 AI 子窗口恢复导航失败",
+            json!({"error_code": "recovery_script_failed"}),
+        );
+        "一龙聊天窗恢复失败；请关闭子窗口后重试。".to_string()
+    })?;
+    record(
+        app,
+        label,
+        "info",
+        "native_window.recovery_navigation_dispatched",
+        "一龙 AI 子窗口已检查并恢复空白启动页",
+        json!({"url": safe_url(target_url)}),
+    );
+    Ok(())
 }
 
 pub(super) fn native_window_label(provider: &ProviderDefinition, fingerprint: &str) -> String {
