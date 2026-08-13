@@ -70,11 +70,24 @@ export interface LocalAiConversationDirectoryItem {
   title: string
   path: string
   active: boolean
+  groupLabel: string
+  projectId?: string | null
+  projectTitle?: string
+  projectPath?: string | null
+  activityDates: string[]
+}
+
+export interface LocalAiProjectDirectoryItem {
+  id: string
+  title: string
+  path: string
+  active: boolean
 }
 
 export interface LocalAiConversationSnapshot {
   type: 'conversation_snapshot'
   conversations: LocalAiConversationDirectoryItem[]
+  projects: LocalAiProjectDirectoryItem[]
 }
 
 export interface LocalAiCommandResult {
@@ -110,6 +123,7 @@ export type LocalAiAdapterAction =
   | 'new_conversation'
   | 'list_conversations'
   | 'open_conversation'
+  | 'open_project'
   | 'start_google_login'
 
 type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed' | 'invoke_timeout'
@@ -245,6 +259,7 @@ export function isLocalAiConversationSnapshot(value: unknown): value is LocalAiC
   const snapshot = value as Partial<LocalAiConversationSnapshot>
   return snapshot.type === 'conversation_snapshot'
     && Array.isArray(snapshot.conversations)
+    && Array.isArray(snapshot.projects)
 }
 
 export async function waitForLocalAiAdapterResult(

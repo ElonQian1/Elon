@@ -5,6 +5,7 @@ const MAX_MESSAGES: usize = 80;
 const MAX_MESSAGE_CHARS: usize = 40_000;
 const MAX_DRAFT_CHARS: usize = 20_000;
 const MAX_OPTIONS: usize = 100;
+const MAX_PROJECTS: usize = 40;
 
 pub struct SanitizedAdapterEvent {
     pub kind: String,
@@ -13,6 +14,12 @@ pub struct SanitizedAdapterEvent {
 
 pub fn initialization_script() -> String {
     let adapters = [
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_adapter_project_policy.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js"
+        ),
         include_str!(
             "../../../../android/app/src/main/assets/chatgpt_web_adapter_conversations.js"
         ),
@@ -139,6 +146,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
         "conversation_snapshot" => json!({
             "type": kind,
             "conversations": sanitize_conversations(event.get("conversations")),
+            "projects": sanitize_projects(event.get("projects")),
         }),
         "composer_controls_snapshot" => json!({
             "type": kind,
@@ -207,17 +215,107 @@ fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
         .filter_map(|item| {
             let item = item.as_object()?;
             let path = clean_string(item.get("path"), 256);
-            if !path.starts_with("/c/") || path.contains('?') || path.contains('#') {
+            if !is_safe_conversation_path(&path) {
                 return None;
             }
+            let project_id = clean_string(item.get("projectId"), 164);
+            let project_path = clean_string(item.get("projectPath"), 256);
             Some(json!({
                 "id": clean_string(item.get("id"), 160),
                 "title": clean_string(item.get("title"), 160),
                 "path": path,
                 "active": item.get("active").and_then(Value::as_bool).unwrap_or(false),
+                "groupLabel": clean_string(item.get("groupLabel"), 80),
+                "projectId": is_safe_project_id(&project_id).then_some(project_id),
+                "projectTitle": clean_string(item.get("projectTitle"), 160),
+                "projectPath": is_safe_project_path(&project_path).then_some(project_path),
+                "activityDates": sanitize_activity_dates(item.get("activityDates")),
             }))
         })
         .collect()
+}
+
+fn sanitize_projects(value: Option<&Value>) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(MAX_PROJECTS)
+        .filter_map(|item| {
+            let item = item.as_object()?;
+            let id = clean_string(item.get("id"), 164);
+            let path = clean_string(item.get("path"), 256);
+            let title = clean_string(item.get("title"), 160);
+            if !is_safe_project_id(&id) || !is_safe_project_path(&path) || title.is_empty() {
+                return None;
+            }
+            Some(json!({
+                "id": id,
+                "title": title,
+                "path": path,
+                "active": item.get("active").and_then(Value::as_bool).unwrap_or(false),
+            }))
+        })
+        .collect()
+}
+
+fn sanitize_activity_dates(value: Option<&Value>) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(10)
+        .filter_map(Value::as_str)
+        .filter(|value| is_iso_date(value))
+        .map(str::to_string)
+        .collect()
+}
+
+fn is_safe_conversation_path(path: &str) -> bool {
+    let segments = path
+        .strip_prefix('/')
+        .map(|value| value.split('/').collect::<Vec<_>>());
+    match segments.as_deref() {
+        Some(["c", conversation_id]) => is_safe_route_id(conversation_id, 160),
+        Some(["g", project_id, "c", conversation_id]) => {
+            is_safe_project_id(project_id) && is_safe_route_id(conversation_id, 160)
+        }
+        _ => false,
+    }
+}
+
+fn is_safe_project_path(path: &str) -> bool {
+    let segments = path
+        .strip_prefix('/')
+        .map(|value| value.split('/').collect::<Vec<_>>());
+    match segments.as_deref() {
+        Some(["g", project_id]) | Some(["g", project_id, "project"]) => {
+            is_safe_project_id(project_id)
+        }
+        _ => false,
+    }
+}
+
+fn is_safe_project_id(value: &str) -> bool {
+    value
+        .strip_prefix("g-p-")
+        .is_some_and(|suffix| is_safe_route_id(suffix, 160))
+}
+
+fn is_safe_route_id(value: &str, max: usize) -> bool {
+    !value.is_empty()
+        && value.len() <= max
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+}
+
+fn is_iso_date(value: &str) -> bool {
+    value.len() == 10
+        && value.bytes().enumerate().all(|(index, byte)| match index {
+            4 | 7 => byte == b'-',
+            _ => byte.is_ascii_digit(),
+        })
 }
 
 fn sanitize_options(value: Option<&Value>) -> Vec<Value> {
@@ -320,5 +418,41 @@ mod tests {
     fn oversized_and_unknown_events_are_rejected() {
         assert!(sanitize_event(&"x".repeat(MAX_EVENT_BYTES + 1)).is_err());
         assert!(sanitize_event(r#"{"type":"cookie_dump"}"#).is_err());
+    }
+
+    #[test]
+    fn conversation_directory_keeps_safe_projects_and_project_chats() {
+        let raw = serde_json::to_string(&json!({
+            "schema": "yilong.ai.ui.v1",
+            "providerId": "chatgpt",
+            "event": {
+                "type": "conversation_snapshot",
+                "projects": [
+                    {"id": "g-p-roadmap", "title": "路线图", "path": "/g/g-p-roadmap/project"},
+                    {"id": "bad", "title": "丢弃", "path": "https://example.com"}
+                ],
+                "conversations": [
+                    {
+                        "id": "chat-1",
+                        "title": "规划",
+                        "path": "/g/g-p-roadmap/c/chat-1",
+                        "projectId": "g-p-roadmap",
+                        "projectTitle": "路线图",
+                        "projectPath": "/g/g-p-roadmap/project",
+                        "groupLabel": "已置顶",
+                        "activityDates": ["2026-08-14", "not-a-date"]
+                    },
+                    {"id": "bad", "title": "丢弃", "path": "/g/../../secret"}
+                ]
+            }
+        }))
+        .unwrap();
+        let event = sanitize_event(&raw).unwrap();
+        assert_eq!(event.payload["projects"].as_array().unwrap().len(), 1);
+        assert_eq!(event.payload["conversations"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            event.payload["conversations"][0]["activityDates"],
+            json!(["2026-08-14"])
+        );
     }
 }

@@ -17,8 +17,9 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const officialVisible = Boolean(web.controller.sessionState?.windowVisible)
   const directory = web.controller.navigationSnapshot
   const conversations = directory?.conversations ?? []
-  const current = conversations.filter((item) => item.active)
-  const recent = conversations.filter((item) => !item.active)
+  const pinned = conversations.filter((item) => /pinned|置顶/i.test(item.groupLabel))
+  const recent = conversations.filter((item) => !/pinned|置顶/i.test(item.groupLabel))
+  const projects = directory?.projects ?? []
   const autoSyncKey = useRef('')
 
   useEffect(() => {
@@ -98,15 +99,17 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
             <DirectorySection
               icon={<Pin size={13} />}
               title="置顶"
-              items={current}
-              empty="打开一个聊天后显示在这里"
+              items={pinned}
+              empty={directory ? '官网暂无可见置顶聊天' : '登录后同步官网置顶聊天'}
               action="open_conversation"
               web={web}
             />
             <DirectorySection
               icon={<FolderClosed size={13} />}
               title="项目"
-              empty="ChatGPT 网页项目同步入口已保留"
+              items={projects}
+              empty={directory ? '官网暂无可见项目' : '登录后同步官网项目'}
+              action="open_project"
               web={web}
             />
             <DirectorySection
@@ -147,9 +150,14 @@ function DirectorySection({
 }: {
   icon: ReactNode
   title: string
-  items?: NonNullable<AiWebChatBackend['controller']['navigationSnapshot']>['conversations']
+  items?: Array<{
+    id: string
+    title: string
+    path: string
+    active: boolean
+  }>
   empty: string
-  action?: 'open_conversation'
+  action?: 'open_conversation' | 'open_project'
   web: AiWebChatBackend
 }) {
   const visibleItems = items ?? []
