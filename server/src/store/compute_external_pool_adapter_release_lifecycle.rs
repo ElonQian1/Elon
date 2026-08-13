@@ -17,5 +17,8 @@ pub(crate) use types::{
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_WITHDRAWAL_CONFIRMATION,
 };
 
-pub(in crate::store) use read::current_external_pool_adapter_release_admission_authority_on;
+pub(in crate::store) use read::{
+    current_external_pool_adapter_release_admission_authority_on,
+    external_pool_adapter_release_admission_is_current_exact_on,
+};
 pub(in crate::store) use types::CurrentExternalPoolAdapterReleaseAdmissionAuthority;

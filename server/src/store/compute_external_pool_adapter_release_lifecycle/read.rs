@@ -332,6 +332,18 @@ pub(in crate::store) fn current_external_pool_adapter_release_admission_authorit
     ))
 }
 
+pub(in crate::store) fn external_pool_adapter_release_admission_is_current_exact_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_admission_digest: &str,
+) -> Result<bool> {
+    let Some((_, currentness)) = lifecycle_on(conn, admission_id, expected_admission_digest)?
+    else {
+        return Ok(false);
+    };
+    Ok(currentness.current_status == EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_STATUS_STAGED)
+}
+
 impl Store {
     pub(crate) fn external_pool_adapter_release_admission_currentness(
         &self,

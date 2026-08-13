@@ -218,6 +218,20 @@ pub(in crate::store) fn current_credential_verifier_key_authority_on(
     Ok(record_by_id_on(conn, id)?.map(|x| CurrentCredentialVerifierKeyAuthority::new(&x)))
 }
 
+pub(in crate::store) fn credential_verifier_key_is_current_exact_on(
+    conn: &Connection,
+    id: &str,
+    expected_digest: &str,
+    expected_key_id: &str,
+) -> Result<bool> {
+    let Some(current) = currentness_on(conn, id)? else {
+        return Ok(false);
+    };
+    Ok(current.current_status == STATUS_ACTIVE
+        && current.key_record.key_record_digest == expected_digest
+        && current.key_record.key_id == expected_key_id)
+}
+
 pub(in crate::store) fn credential_verifier_key_record_authority_on(
     conn: &Connection,
     id: &str,

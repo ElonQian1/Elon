@@ -13,13 +13,18 @@ use crate::{
             external_pool_adapter_adoption_is_revoked_on,
             external_pool_adapter_adoption_receipt_authority_on,
         },
-        compute_external_pool_adapter_artifact_package::current_artifact_package_authority_on,
+        compute_external_pool_adapter_artifact_package::{
+            artifact_package_is_current_exact_on, current_artifact_package_authority_on,
+        },
         compute_external_pool_adapter_artifact_source::external_pool_adapter_artifact_source_authority_on,
         compute_external_pool_adapter_installation::{
             external_pool_adapter_installation_is_revoked_on,
             external_pool_adapter_installation_receipt_authority_on,
         },
-        compute_external_pool_adapter_release_lifecycle::current_external_pool_adapter_release_admission_authority_on,
+        compute_external_pool_adapter_release_lifecycle::{
+            current_external_pool_adapter_release_admission_authority_on,
+            external_pool_adapter_release_admission_is_current_exact_on,
+        },
         compute_provider_registry::current_registered_provider_on,
         Store,
     },
@@ -81,6 +86,45 @@ pub(in crate::store) fn current_external_pool_adapter_registry_release_authority
             checked_at.to_string(),
         ),
     ))
+}
+
+pub(in crate::store) fn external_pool_adapter_registry_release_is_current_exact_on(
+    conn: &Connection,
+    registry_release_id: &str,
+    expected_registry_release_digest: &str,
+    checked_at: &str,
+) -> Result<bool> {
+    let Some(release) = release_by_id_on(conn, registry_release_id)? else {
+        return Ok(false);
+    };
+    let item = &release.receipt.release;
+    validate_release_checked_at(checked_at, &item.registered_at)?;
+    if release.receipt.registry_release_digest != expected_registry_release_digest
+        || !external_pool_adapter_release_admission_is_current_exact_on(
+            conn,
+            &item.admission_id,
+            &item.admission_digest,
+        )?
+        || !artifact_package_is_current_exact_on(
+            conn,
+            &item.admission_id,
+            &item.package_receipt_digest,
+        )?
+    {
+        return Ok(false);
+    }
+    let Some(source) = external_pool_adapter_artifact_source_authority_on(
+        conn,
+        &item.admission_id,
+        &item.admission_digest,
+        &item.source_receipt_digest,
+    )?
+    else {
+        return Ok(false);
+    };
+    Ok(source.source_receipt_id() == item.source_receipt_id
+        && source.source_receipt_digest() == item.source_receipt_digest
+        && source.artifact_sha256() == item.archive_sha256)
 }
 
 fn validate_release_checked_at(checked_at: &str, registered_at: &str) -> Result<()> {

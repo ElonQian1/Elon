@@ -1,0 +1,247 @@
+use anyhow::Result;
+use rusqlite::Connection;
+
+pub(super) fn install(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TRIGGER IF NOT EXISTS external_pool_adapter_credential_reattestation_challenge_exact_roots
+        BEFORE INSERT ON compute_external_pool_adapter_credential_reattestation_challenges
+        WHEN NOT EXISTS (
+          SELECT 1 FROM compute_external_pool_adapter_registry_provider_bindings binding
+          JOIN compute_external_pool_adapter_registry_release_current release
+            ON release.registry_release_id=binding.registry_release_id
+           AND release.registry_release_digest=binding.registry_release_digest
+           AND release.current_status='release_current'
+          JOIN compute_external_pool_adapter_registry_releases release_root
+            ON release_root.registry_release_id=release.registry_release_id
+           AND release_root.registry_release_digest=release.registry_release_digest
+          JOIN compute_external_pool_adapter_credential_verification_receipts legacy
+            ON legacy.credential_verification_receipt_id=binding.credential_verification_receipt_id
+           AND legacy.credential_verification_receipt_digest=binding.credential_verification_receipt_digest
+          JOIN compute_external_pool_adapter_credential_verifier_key_current verifier
+            ON verifier.key_record_id=NEW.credential_verifier_key_record_id
+           AND verifier.key_record_digest=NEW.credential_verifier_key_record_digest
+           AND verifier.key_id=NEW.credential_verifier_key_id
+           AND verifier.current_status='active'
+          JOIN compute_providers provider ON provider.provider_id=binding.provider_id
+          JOIN compute_provider_versions version
+            ON version.provider_id=provider.provider_id
+           AND version.policy_revision=provider.current_policy_revision
+           AND version.provider_digest=provider.current_provider_digest
+          JOIN compute_external_pool_onboarding_applications onboarding
+            ON onboarding.application_id=binding.application_id
+           AND onboarding.application_digest=binding.application_digest
+         WHERE binding.provider_binding_id=NEW.provider_binding_id
+           AND binding.provider_binding_digest=NEW.provider_binding_digest
+           AND binding.provider_binding_material_digest=NEW.provider_binding_material_digest
+           AND binding.registry_release_id=NEW.registry_release_id
+           AND binding.registry_release_digest=NEW.registry_release_digest
+           AND release.registry_release_id=NEW.registry_release_id
+           AND release_root.registry_release_material_digest=NEW.registry_release_material_digest
+           AND release_root.credential_verifier_digest=verifier.verifier_digest
+           AND json_extract(release_root.credential_verifier_json,'$.verification_kind')=verifier.verification_kind
+           AND json_extract(release_root.credential_verifier_json,'$.verifier_id')=verifier.verifier_id
+           AND json_extract(release_root.credential_verifier_json,'$.verifier_revision')=verifier.verifier_revision
+           AND json_extract(release_root.credential_verifier_json,'$.verifier_digest')=verifier.verifier_digest
+           AND json_extract(NEW.challenge_json,'$.binding.route_adapter_projection_id')=binding.route_adapter_projection_id
+           AND json_extract(NEW.challenge_json,'$.binding.installation_receipt_id')=binding.installation_receipt_id
+           AND json_extract(NEW.challenge_json,'$.binding.installation_receipt_digest')=binding.installation_receipt_digest
+           AND json_extract(NEW.challenge_json,'$.binding.installation_content_digest')=binding.installation_content_digest
+           AND json_extract(NEW.challenge_json,'$.binding.application_id')=binding.application_id
+           AND json_extract(NEW.challenge_json,'$.binding.application_digest')=binding.application_digest
+           AND legacy.application_id=binding.application_id
+           AND legacy.application_digest=binding.application_digest
+           AND json_extract(NEW.challenge_json,'$.binding.adoption_receipt_id')=binding.adoption_receipt_id
+           AND json_extract(NEW.challenge_json,'$.binding.adoption_receipt_digest')=binding.adoption_receipt_digest
+           AND json_extract(NEW.challenge_json,'$.binding.provider_id')=binding.provider_id
+           AND legacy.provider_id=binding.provider_id
+           AND legacy.provider_policy_revision=binding.provider_policy_revision
+           AND legacy.provider_digest=binding.provider_digest
+           AND json_extract(NEW.challenge_json,'$.binding.provider_kind')='external_pool'
+           AND json_extract(NEW.challenge_json,'$.binding.provider_owner_account_id')=binding.provider_owner_account_id
+           AND json_extract(NEW.challenge_json,'$.binding.observed_settlement_account_id')=provider.settlement_account_id
+           AND json_extract(NEW.challenge_json,'$.binding.adapter_id')=binding.adapter_id
+           AND json_extract(NEW.challenge_json,'$.binding.release_version')=binding.release_version
+           AND json_extract(NEW.challenge_json,'$.binding.adapter_config_revision')=binding.adapter_config_revision
+           AND json_extract(NEW.challenge_json,'$.binding.adapter_config_digest')=binding.adapter_config_digest
+           AND legacy.adapter_id=binding.adapter_id
+           AND legacy.adapter_release_version=binding.release_version
+           AND legacy.adapter_config_revision=binding.adapter_config_revision
+           AND legacy.adapter_config_digest=binding.adapter_config_digest
+           AND json_extract(NEW.challenge_json,'$.binding.admission_id')=binding.admission_id
+           AND json_extract(NEW.challenge_json,'$.binding.admission_digest')=binding.admission_digest
+           AND legacy.admission_id=binding.admission_id
+           AND legacy.admission_digest=binding.admission_digest
+           AND json_extract(NEW.challenge_json,'$.binding.legacy_credential_verification_receipt_id')=legacy.credential_verification_receipt_id
+           AND json_extract(NEW.challenge_json,'$.binding.legacy_credential_verification_receipt_digest')=legacy.credential_verification_receipt_digest
+           AND json_extract(NEW.challenge_json,'$.binding.credential_ref_scheme')=legacy.credential_ref_scheme
+           AND json_extract(NEW.challenge_json,'$.binding.credential_locator_commitment')=binding.credential_locator_commitment
+           AND legacy.credential_locator_commitment=binding.credential_locator_commitment
+           AND json(json_extract(NEW.challenge_json,'$.binding.expected_credential_verifier'))=json(release_root.credential_verifier_json)
+           AND json_extract(NEW.challenge_json,'$.binding.credential_verifier_digest')=release_root.credential_verifier_digest
+           AND json_extract(NEW.challenge_json,'$.binding.credential_verifier_record_id')=verifier.verifier_record_id
+           AND json_extract(NEW.challenge_json,'$.binding.credential_verifier_record_digest')=verifier.verifier_record_digest
+           AND provider.provider_kind='external_pool'
+           AND provider.owner_account_id=binding.provider_owner_account_id
+           AND provider.current_policy_revision=NEW.observed_provider_policy_revision
+           AND provider.current_provider_digest=NEW.observed_provider_digest
+           AND provider.status=NEW.observed_provider_status
+           AND ((provider.status='registering'
+                 AND provider.current_policy_revision=binding.provider_policy_revision
+                 AND provider.current_provider_digest=binding.provider_digest)
+                OR (provider.status='active'
+                    AND provider.current_policy_revision>binding.provider_policy_revision))
+           AND json_extract(version.provider_json,'$.provider_id')=binding.provider_id
+           AND json_extract(version.provider_json,'$.provider_kind')='external_pool'
+           AND json_extract(version.provider_json,'$.owner_account_id')=binding.provider_owner_account_id
+           AND json_extract(version.provider_json,'$.created_at')=json_extract(onboarding.target_provider_jcs,'$.created_at')
+           AND json_extract(version.provider_json,'$.adapter.adapter_id')=binding.adapter_id
+           AND json_extract(version.provider_json,'$.adapter.adapter_version')=binding.release_version
+           AND json_extract(version.provider_json,'$.adapter.config_revision')=binding.adapter_config_revision
+           AND json_extract(version.provider_json,'$.adapter.config_digest')=binding.adapter_config_digest)
+          OR EXISTS (
+            SELECT 1 FROM compute_external_pool_adapter_registry_provider_bindings binding
+            JOIN compute_external_pool_adapter_installation_terminal_receipts terminal
+              ON terminal.installation_receipt_id=binding.installation_receipt_id
+             AND terminal.installation_receipt_digest=binding.installation_receipt_digest
+           WHERE binding.provider_binding_id=NEW.provider_binding_id)
+          OR EXISTS (
+            SELECT 1 FROM compute_external_pool_adapter_registry_provider_bindings binding
+            JOIN compute_external_pool_adapter_adoption_terminal_receipts terminal
+              ON terminal.adoption_receipt_id=binding.adoption_receipt_id
+             AND terminal.adoption_receipt_digest=binding.adoption_receipt_digest
+           WHERE binding.provider_binding_id=NEW.provider_binding_id)
+        BEGIN SELECT RAISE(ABORT,'V253 challenge lacks exact current release/binding/verifier roots'); END;
+
+        CREATE TRIGGER IF NOT EXISTS external_pool_adapter_credential_reattestation_receipt_exact_challenge
+        BEFORE INSERT ON compute_external_pool_adapter_credential_reattestation_receipts
+        WHEN NOT EXISTS (
+          SELECT 1 FROM compute_external_pool_adapter_credential_reattestation_challenges challenge
+           WHERE challenge.challenge_id=NEW.challenge_id
+             AND challenge.challenge_nonce_digest=NEW.challenge_nonce_digest
+             AND challenge.provider_binding_id=NEW.provider_binding_id
+             AND challenge.provider_binding_digest=NEW.provider_binding_digest
+             AND challenge.provider_binding_material_digest=NEW.provider_binding_material_digest
+             AND challenge.registry_release_id=NEW.registry_release_id
+             AND challenge.registry_release_digest=NEW.registry_release_digest
+             AND challenge.registry_release_material_digest=NEW.registry_release_material_digest
+             AND challenge.credential_verifier_key_record_id=NEW.credential_verifier_key_record_id
+             AND challenge.credential_verifier_key_record_digest=NEW.credential_verifier_key_record_digest
+             AND challenge.credential_verifier_key_id=NEW.credential_verifier_key_id
+             AND challenge.observed_provider_policy_revision=NEW.observed_provider_policy_revision
+             AND challenge.observed_provider_digest=NEW.observed_provider_digest
+             AND challenge.observed_provider_status=NEW.observed_provider_status
+             AND challenge.sequence=NEW.sequence
+             AND challenge.predecessor_receipt_id IS NEW.predecessor_receipt_id
+             AND challenge.predecessor_receipt_digest IS NEW.predecessor_receipt_digest
+             AND challenge.signature_message_digest=NEW.signature_message_digest
+             AND json(json_extract(challenge.challenge_json,'$.binding'))=
+                 json(json_extract(NEW.receipt_json,'$.reattestation.binding'))
+             AND NEW.verified_at>=challenge.issued_at
+             AND NEW.verified_at<challenge.expires_at)
+        BEGIN SELECT RAISE(ABORT,'V253 receipt lacks exact live single-use challenge'); END;
+
+        CREATE TRIGGER IF NOT EXISTS external_pool_adapter_credential_reattestation_receipt_historical_roots
+        BEFORE INSERT ON compute_external_pool_adapter_credential_reattestation_receipts
+        WHEN NOT EXISTS (
+          SELECT 1 FROM compute_external_pool_adapter_registry_provider_bindings binding
+          JOIN compute_external_pool_adapter_registry_releases release
+            ON release.registry_release_id=binding.registry_release_id
+           AND release.registry_release_digest=binding.registry_release_digest
+          JOIN compute_external_pool_adapter_credential_verification_receipts legacy
+            ON legacy.credential_verification_receipt_id=binding.credential_verification_receipt_id
+           AND legacy.credential_verification_receipt_digest=binding.credential_verification_receipt_digest
+          JOIN compute_external_pool_adapter_credential_verifier_keys verifier_key
+            ON verifier_key.key_record_id=NEW.credential_verifier_key_record_id
+           AND verifier_key.key_record_digest=NEW.credential_verifier_key_record_digest
+           AND verifier_key.key_id=NEW.credential_verifier_key_id
+           AND verifier_key.verifier_record_id=NEW.credential_verifier_record_id
+           AND verifier_key.verifier_record_digest=NEW.credential_verifier_record_digest
+         WHERE binding.provider_binding_id=NEW.provider_binding_id
+           AND binding.provider_binding_digest=NEW.provider_binding_digest
+           AND binding.provider_binding_material_digest=NEW.provider_binding_material_digest
+           AND binding.registry_release_id=NEW.registry_release_id
+           AND binding.registry_release_digest=NEW.registry_release_digest
+           AND binding.route_adapter_projection_id=NEW.route_adapter_projection_id
+           AND binding.installation_receipt_id=NEW.installation_receipt_id
+           AND binding.installation_receipt_digest=NEW.installation_receipt_digest
+           AND binding.installation_content_digest=NEW.installation_content_digest
+           AND binding.application_id=NEW.application_id
+           AND binding.application_digest=NEW.application_digest
+           AND binding.adoption_receipt_id=NEW.adoption_receipt_id
+           AND binding.adoption_receipt_digest=NEW.adoption_receipt_digest
+           AND binding.provider_id=NEW.provider_id
+           AND binding.provider_owner_account_id=NEW.provider_owner_account_id
+           AND binding.adapter_id=NEW.adapter_id
+           AND binding.release_version=NEW.release_version
+           AND binding.adapter_config_revision=NEW.adapter_config_revision
+           AND binding.adapter_config_digest=NEW.adapter_config_digest
+           AND binding.admission_id=NEW.admission_id
+           AND binding.admission_digest=NEW.admission_digest
+           AND binding.credential_locator_commitment=NEW.credential_locator_commitment
+           AND legacy.credential_verification_receipt_id=NEW.legacy_credential_verification_receipt_id
+           AND legacy.credential_verification_receipt_digest=NEW.legacy_credential_verification_receipt_digest
+           AND legacy.application_id=NEW.application_id
+           AND legacy.application_digest=NEW.application_digest
+           AND legacy.provider_id=NEW.provider_id
+           AND legacy.adapter_id=NEW.adapter_id
+           AND legacy.adapter_release_version=NEW.release_version
+           AND legacy.adapter_config_revision=NEW.adapter_config_revision
+           AND legacy.adapter_config_digest=NEW.adapter_config_digest
+           AND legacy.admission_id=NEW.admission_id
+           AND legacy.admission_digest=NEW.admission_digest
+           AND legacy.credential_ref_scheme=NEW.credential_ref_scheme
+           AND legacy.credential_locator_commitment=NEW.credential_locator_commitment
+           AND release.registry_release_material_digest=NEW.registry_release_material_digest
+           AND release.credential_verifier_digest=NEW.credential_verifier_digest
+           AND json(release.credential_verifier_json)=json(NEW.expected_credential_verifier_json))
+        BEGIN SELECT RAISE(ABORT,'V253 receipt lacks exact V249/V243 historical roots'); END;
+
+        CREATE TRIGGER IF NOT EXISTS external_pool_adapter_credential_reattestation_receipt_current_roots
+        BEFORE INSERT ON compute_external_pool_adapter_credential_reattestation_receipts
+        WHEN NOT EXISTS (
+          SELECT 1 FROM compute_external_pool_adapter_registry_release_current release
+          JOIN compute_external_pool_adapter_credential_verifier_key_current verifier
+            ON verifier.key_record_id=NEW.credential_verifier_key_record_id
+           AND verifier.key_record_digest=NEW.credential_verifier_key_record_digest
+           AND verifier.verifier_record_id=NEW.credential_verifier_record_id
+           AND verifier.verifier_record_digest=NEW.credential_verifier_record_digest
+           AND verifier.key_id=NEW.credential_verifier_key_id
+           AND verifier.current_status='active'
+          JOIN compute_providers provider ON provider.provider_id=NEW.provider_id
+          JOIN compute_provider_versions version
+            ON version.provider_id=provider.provider_id
+           AND version.policy_revision=provider.current_policy_revision
+           AND version.provider_digest=provider.current_provider_digest
+          JOIN compute_external_pool_onboarding_applications onboarding
+            ON onboarding.application_id=NEW.application_id
+           AND onboarding.application_digest=NEW.application_digest
+         WHERE release.registry_release_id=NEW.registry_release_id
+           AND release.registry_release_digest=NEW.registry_release_digest
+           AND release.current_status='release_current'
+           AND provider.provider_kind='external_pool'
+           AND provider.owner_account_id=NEW.provider_owner_account_id
+           AND provider.status=NEW.observed_provider_status
+           AND provider.current_policy_revision=NEW.observed_provider_policy_revision
+           AND provider.current_provider_digest=NEW.observed_provider_digest
+           AND json_extract(version.provider_json,'$.provider_id')=NEW.provider_id
+           AND json_extract(version.provider_json,'$.provider_kind')='external_pool'
+           AND json_extract(version.provider_json,'$.owner_account_id')=NEW.provider_owner_account_id
+           AND json_extract(version.provider_json,'$.created_at')=json_extract(onboarding.target_provider_jcs,'$.created_at')
+           AND json_extract(version.provider_json,'$.adapter.adapter_id')=NEW.adapter_id
+           AND json_extract(version.provider_json,'$.adapter.adapter_version')=NEW.release_version
+           AND json_extract(version.provider_json,'$.adapter.config_revision')=NEW.adapter_config_revision
+           AND json_extract(version.provider_json,'$.adapter.config_digest')=NEW.adapter_config_digest)
+          OR EXISTS (
+            SELECT 1 FROM compute_external_pool_adapter_installation_terminal_receipts terminal
+             WHERE terminal.installation_receipt_id=NEW.installation_receipt_id
+               AND terminal.installation_receipt_digest=NEW.installation_receipt_digest)
+          OR EXISTS (
+            SELECT 1 FROM compute_external_pool_adapter_adoption_terminal_receipts terminal
+             WHERE terminal.adoption_receipt_id=NEW.adoption_receipt_id
+               AND terminal.adoption_receipt_digest=NEW.adoption_receipt_digest)
+        BEGIN SELECT RAISE(ABORT,'V253 receipt lacks current release/verifier or has terminal roots'); END;
+        "#,
+    )?;
+    Ok(())
+}

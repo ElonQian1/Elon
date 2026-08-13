@@ -1,0 +1,213 @@
+use anyhow::Result;
+use rusqlite::{params, Transaction};
+
+use crate::compute_federation::external_pool_adapter_credential_reattestation::{
+    canonical_credential_reattestation_json, ExternalPoolAdapterCredentialReattestationChallenge,
+    ExternalPoolAdapterCredentialReattestationReceipt,
+    ExternalPoolAdapterCredentialReattestationRevocationReceipt,
+};
+
+pub(super) fn insert_challenge(
+    tx: &Transaction<'_>,
+    challenge: &ExternalPoolAdapterCredentialReattestationChallenge,
+    json: &str,
+) -> Result<()> {
+    let b = &challenge.binding;
+    tx.execute(
+        "INSERT INTO compute_external_pool_adapter_credential_reattestation_challenges(
+          challenge_id,challenge_nonce_base64,challenge_nonce_digest,signature_message_base64,
+          signature_message_digest,provider_binding_id,provider_binding_digest,
+          provider_binding_material_digest,registry_release_id,registry_release_digest,
+          registry_release_material_digest,credential_verifier_key_record_id,
+          credential_verifier_key_record_digest,credential_verifier_key_id,
+          observed_provider_policy_revision,observed_provider_digest,observed_provider_status,
+          sequence,predecessor_receipt_id,predecessor_receipt_digest,challenge_json,issued_at,expires_at
+        ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,
+                  ?19,?20,?21,?22,?23)",
+        params![
+            b.challenge_id,
+            b.challenge_nonce_base64,
+            b.challenge_nonce_digest,
+            challenge.signature_message_base64,
+            challenge.signature_message_digest,
+            b.provider_binding_id,
+            b.provider_binding_digest,
+            b.provider_binding_material_digest,
+            b.registry_release_id,
+            b.registry_release_digest,
+            b.registry_release_material_digest,
+            b.credential_verifier_key_record_id,
+            b.credential_verifier_key_record_digest,
+            b.credential_verifier_key_id,
+            b.observed_provider_policy_revision,
+            b.observed_provider_digest,
+            b.observed_provider_status,
+            i64::try_from(b.sequence)?,
+            b.predecessor_receipt_id,
+            b.predecessor_receipt_digest,
+            json,
+            b.challenge_issued_at,
+            b.challenge_expires_at,
+        ],
+    )?;
+    Ok(())
+}
+
+pub(super) fn insert_receipt(
+    tx: &Transaction<'_>,
+    receipt: &ExternalPoolAdapterCredentialReattestationReceipt,
+    json: &str,
+) -> Result<()> {
+    let item = &receipt.reattestation;
+    let b = &item.binding;
+    let verifier_json = canonical_credential_reattestation_json(&b.expected_credential_verifier)?;
+    tx.execute(
+        "INSERT INTO compute_external_pool_adapter_credential_reattestation_receipts(
+          reattestation_receipt_id,reattestation_receipt_digest,receipt_json,
+          reattestation_material_digest,challenge_id,challenge_nonce_digest,provider_binding_id,
+          provider_binding_digest,provider_binding_material_digest,registry_release_id,
+          registry_release_digest,registry_release_material_digest,route_adapter_projection_id,
+          installation_receipt_id,installation_receipt_digest,installation_content_digest,
+          application_id,application_digest,adoption_receipt_id,adoption_receipt_digest,
+          provider_id,provider_kind,provider_owner_account_id,observed_settlement_account_id,
+          observed_provider_policy_revision,observed_provider_digest,observed_provider_status,
+          adapter_id,release_version,adapter_config_revision,adapter_config_digest,admission_id,
+          admission_digest,legacy_credential_verification_receipt_id,
+          legacy_credential_verification_receipt_digest,credential_ref_scheme,
+          credential_locator_commitment,expected_credential_verifier_json,
+          credential_verifier_digest,credential_verifier_key_record_id,
+          credential_verifier_key_record_digest,credential_verifier_key_id,
+          credential_verifier_record_id,credential_verifier_record_digest,sequence,
+          predecessor_receipt_id,predecessor_receipt_digest,verifier_report_id,
+          verification_started_at,verification_completed_at,report_generated_at,report_expires_at,
+          credential_resolution_outcome,provider_authentication_outcome,
+          provider_response_evidence_digest,signature_message_digest,signature_base64,
+          signature_digest,recorded_by_admin_user_id,confirmation,idempotency_scope,
+          idempotency_key,verified_at,recorded_at,evidence_scope,credential_reattestation_effect,
+          adapter_effect,provider_effect,route_effect,execution_effect,usage_effect,settlement_effect
+        ) VALUES (
+          ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,
+          ?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,
+          ?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,
+          ?51,?52,?53,?54,?55,?56,?57,?58,?59,?60,?61,?62,?63,?64,?65,?66,
+          ?67,?68,?69,?70,?71,?72)",
+        params![
+            receipt.reattestation_receipt_id,
+            receipt.reattestation_receipt_digest,
+            json,
+            receipt.reattestation_material_digest,
+            b.challenge_id,
+            b.challenge_nonce_digest,
+            b.provider_binding_id,
+            b.provider_binding_digest,
+            b.provider_binding_material_digest,
+            b.registry_release_id,
+            b.registry_release_digest,
+            b.registry_release_material_digest,
+            b.route_adapter_projection_id,
+            b.installation_receipt_id,
+            b.installation_receipt_digest,
+            b.installation_content_digest,
+            b.application_id,
+            b.application_digest,
+            b.adoption_receipt_id,
+            b.adoption_receipt_digest,
+            b.provider_id,
+            b.provider_kind,
+            b.provider_owner_account_id,
+            b.observed_settlement_account_id,
+            b.observed_provider_policy_revision,
+            b.observed_provider_digest,
+            b.observed_provider_status,
+            b.adapter_id,
+            b.release_version,
+            b.adapter_config_revision,
+            b.adapter_config_digest,
+            b.admission_id,
+            b.admission_digest,
+            b.legacy_credential_verification_receipt_id,
+            b.legacy_credential_verification_receipt_digest,
+            b.credential_ref_scheme,
+            b.credential_locator_commitment,
+            verifier_json,
+            b.credential_verifier_digest,
+            b.credential_verifier_key_record_id,
+            b.credential_verifier_key_record_digest,
+            b.credential_verifier_key_id,
+            b.credential_verifier_record_id,
+            b.credential_verifier_record_digest,
+            i64::try_from(b.sequence)?,
+            b.predecessor_receipt_id,
+            b.predecessor_receipt_digest,
+            b.verifier_report_id,
+            b.verification_started_at,
+            b.verification_completed_at,
+            b.report_generated_at,
+            b.report_expires_at,
+            b.credential_resolution_outcome,
+            b.provider_authentication_outcome,
+            b.provider_response_evidence_digest,
+            item.signature_message_digest,
+            item.signature_base64,
+            item.signature_digest,
+            item.recorded_by_admin_user_id,
+            item.confirmation,
+            item.idempotency_scope,
+            item.idempotency_key,
+            item.verified_at,
+            item.recorded_at,
+            item.evidence_scope,
+            item.credential_reattestation_effect,
+            item.adapter_effect,
+            item.provider_effect,
+            item.route_effect,
+            item.execution_effect,
+            item.usage_effect,
+            item.settlement_effect,
+        ],
+    )?;
+    Ok(())
+}
+
+pub(super) fn insert_revocation(
+    tx: &Transaction<'_>,
+    receipt: &ExternalPoolAdapterCredentialReattestationRevocationReceipt,
+    json: &str,
+) -> Result<()> {
+    let item = &receipt.revocation;
+    tx.execute(
+        "INSERT INTO compute_external_pool_adapter_credential_reattestation_revocations(
+          revocation_receipt_id,revocation_receipt_digest,receipt_json,revocation_material_digest,
+          reattestation_receipt_id,reattestation_receipt_digest,provider_binding_id,
+          provider_binding_digest,revoked_by_admin_user_id,reason,confirmation,idempotency_scope,
+          idempotency_key,revoked_at,recorded_at,revocation_effect,adapter_effect,provider_effect,
+          route_effect,execution_effect,usage_effect,settlement_effect
+        ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,
+                  ?19,?20,?21,?22)",
+        params![
+            receipt.revocation_receipt_id,
+            receipt.revocation_receipt_digest,
+            json,
+            receipt.revocation_material_digest,
+            item.reattestation_receipt_id,
+            item.reattestation_receipt_digest,
+            item.provider_binding_id,
+            item.provider_binding_digest,
+            item.revoked_by_admin_user_id,
+            item.reason,
+            item.confirmation,
+            item.idempotency_scope,
+            item.idempotency_key,
+            item.revoked_at,
+            item.recorded_at,
+            item.revocation_effect,
+            item.adapter_effect,
+            item.provider_effect,
+            item.route_effect,
+            item.execution_effect,
+            item.usage_effect,
+            item.settlement_effect,
+        ],
+    )?;
+    Ok(())
+}

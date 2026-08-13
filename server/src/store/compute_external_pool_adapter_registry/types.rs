@@ -141,6 +141,10 @@ pub(in crate::store) struct HistoricalExternalPoolAdapterRegistryReleaseAuthorit
     release: ExternalPoolAdapterRegistryReleaseReceipt,
 }
 
+pub(in crate::store) struct HistoricalExternalPoolAdapterRegistryProviderBindingAuthority {
+    binding: ExternalPoolAdapterRegistryProviderBindingReceipt,
+}
+
 pub(in crate::store) struct CurrentExternalPoolAdapterRegistryReleaseAuthority {
     release: ExternalPoolAdapterRegistryReleaseReceipt,
     checked_at: String,
@@ -152,6 +156,16 @@ impl HistoricalExternalPoolAdapterRegistryReleaseAuthority {
     }
     pub(in crate::store) fn release(&self) -> &ExternalPoolAdapterRegistryReleaseReceipt {
         &self.release
+    }
+}
+
+impl HistoricalExternalPoolAdapterRegistryProviderBindingAuthority {
+    pub(super) fn new(binding: ExternalPoolAdapterRegistryProviderBindingReceipt) -> Self {
+        Self { binding }
+    }
+
+    pub(in crate::store) fn binding(&self) -> &ExternalPoolAdapterRegistryProviderBindingReceipt {
+        &self.binding
     }
 }
 

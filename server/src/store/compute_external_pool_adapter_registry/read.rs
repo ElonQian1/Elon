@@ -57,6 +57,22 @@ pub(super) fn binding_by_id_on(
     binding_on(conn, "provider_binding_id=?1", params![id])
 }
 
+pub(in crate::store) fn historical_external_pool_adapter_registry_provider_binding_authority_on(
+    conn: &Connection,
+    id: &str,
+    expected_digest: &str,
+) -> Result<Option<HistoricalExternalPoolAdapterRegistryProviderBindingAuthority>> {
+    let Some(stored) = binding_by_id_on(conn, id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.provider_binding_digest != expected_digest {
+        anyhow::bail!("Adapter registry Provider binding history is not exact");
+    }
+    Ok(Some(
+        HistoricalExternalPoolAdapterRegistryProviderBindingAuthority::new(stored.receipt),
+    ))
+}
+
 pub(super) fn binding_by_idempotency_on(
     conn: &Connection,
     scope: &str,

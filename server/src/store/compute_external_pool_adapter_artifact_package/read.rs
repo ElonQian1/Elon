@@ -65,6 +65,18 @@ pub(in crate::store) fn current_artifact_package_authority_on(
     Ok(Some(authority))
 }
 
+pub(in crate::store) fn artifact_package_is_current_exact_on(
+    conn: &Connection,
+    admission_id: &str,
+    expected_package_receipt_digest: &str,
+) -> Result<bool> {
+    let Some(currentness) = currentness_on(conn, admission_id)? else {
+        return Ok(false);
+    };
+    Ok(currentness.current_status == "verified_current"
+        && currentness.package.package_receipt_digest == expected_package_receipt_digest)
+}
+
 pub(super) fn receipt_by_admission_on(
     conn: &Connection,
     admission_id: &str,

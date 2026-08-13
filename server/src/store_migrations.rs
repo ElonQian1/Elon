@@ -15,6 +15,7 @@ mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_artifact_vulnerability_report;
+mod compute_external_pool_adapter_credential_reattestation;
 mod compute_external_pool_adapter_credential_verification;
 mod compute_external_pool_adapter_credential_verification_hardening;
 mod compute_external_pool_adapter_credential_verifier;
@@ -315,6 +316,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (250, "外部矿池 Adapter Provider-neutral release 可续签漏洞情报证明", compute_external_pool_adapter_vulnerability_reattestation::migration_v250),
     (251, "修复外部矿池 Adapter registry 凭据验证器 JSON 键序兼容", compute_external_pool_adapter_registry::migration_v251),
     (252, "外部矿池 Adapter Provider-neutral release 可续签沙箱符合性证明", compute_external_pool_adapter_sandbox_reattestation::migration_v252),
+    (253, "外部矿池 Adapter Provider-specific 非 Bearer 凭据可续签再认证", compute_external_pool_adapter_credential_reattestation::migration_v253),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

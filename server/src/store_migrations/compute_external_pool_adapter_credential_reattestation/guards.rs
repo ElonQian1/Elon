@@ -1,0 +1,20 @@
+use anyhow::Result;
+use rusqlite::Connection;
+
+mod immutability;
+mod lineage;
+mod projection;
+mod roots;
+
+pub(super) fn install(conn: &Connection) -> Result<()> {
+    immutability::install(conn)?;
+    roots::install(conn)?;
+    lineage::install(conn)?;
+    projection::install(conn)?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(super) fn projection_counts() -> (usize, usize, usize) {
+    projection::counts()
+}
