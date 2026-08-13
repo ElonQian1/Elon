@@ -135,6 +135,9 @@ function Get-PcFrontendReleaseBaseline {
     } catch {
         if ($_.Exception.Message -match '404') { '__missing__' } else { throw }
     }
+    if ($releaseSha -match '(?i)<!doctype\s+html|<div\s+id=["'']root["'']') {
+        return '__missing__'
+    }
     if ($releaseSha -eq '__missing__') { return $releaseSha }
     if ($releaseSha -notmatch '^[0-9a-f]{40}$') {
         throw "Invalid live PC frontend release marker: $releaseSha"

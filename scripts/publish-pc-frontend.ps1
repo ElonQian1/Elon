@@ -34,15 +34,6 @@ function Assert-GitAncestor([string]$Ancestor, [string]$Descendant, [string]$Mes
     if ($LASTEXITCODE -ne 0) { Stop-PcFrontendPublish $Message }
 }
 
-function Get-CurrentPcReleaseSha {
-    try {
-        return (Invoke-ElonPublishTextGet -Uri "$ServerUrl/pc/release-sha.txt" -TimeoutSec 10).Trim()
-    } catch {
-        if ($_.Exception.Message -match '404') { return '__missing__' }
-        throw
-    }
-}
-
 Push-Location $RepoRoot
 try {
     if (& git status --porcelain --untracked-files=all) {
@@ -66,15 +57,8 @@ try {
         Stop-PcFrontendPublish "server/API inputs changed and require publish-server.ps1: $($blocking -join ', ')"
     }
 
-    $currentReleaseSha = Get-CurrentPcReleaseSha
-    if ($currentReleaseSha -ne '__missing__') {
-        if ($currentReleaseSha -notmatch '^[0-9a-f]{40}$') {
-            Stop-PcFrontendPublish "remote frontend release marker is invalid: $currentReleaseSha"
-        }
-        & git cat-file -e "$currentReleaseSha^{commit}" 2>$null
-        if ($LASTEXITCODE -ne 0) { Stop-PcFrontendPublish "remote frontend commit is unavailable locally: $currentReleaseSha" }
-        Assert-GitAncestor $currentReleaseSha $Sha 'candidate would roll back a newer frontend release'
-    }
+    $currentReleaseSha = Get-PcFrontendReleaseBaseline -RepoRoot $RepoRoot `
+        -CandidateGitSha $Sha -ServerUrl $ServerUrl
 
     if (-not $SkipBuild) {
         if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {

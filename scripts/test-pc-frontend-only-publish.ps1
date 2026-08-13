@@ -25,6 +25,7 @@ Assert-Contains $helper "static release changed: expected=" 'remote static relea
 Assert-Contains $helper 'elon.pc_frontend_release.v1' 'versioned frontend release marker'
 Assert-Contains $serverPublisher 'Publish-PcFrontendRelease' 'server bundle shared frontend publisher'
 Assert-Contains $helper 'Get-PcFrontendReleaseBaseline' 'server bundle frontend rollback guard'
+Assert-Contains $helper '<!doctype\s+html' 'legacy SPA fallback migration'
 if ($serverPublisher.IndexOf('Invoke-ElonServerPostDeploySmoke') -gt
     $serverPublisher.IndexOf('Publish-PcFrontendRelease')) {
     throw 'server publisher must switch the PC frontend only after backend smoke succeeds'
