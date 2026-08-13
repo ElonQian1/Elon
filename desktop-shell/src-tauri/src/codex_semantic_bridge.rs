@@ -273,7 +273,8 @@ fn execute(window: &WebviewWindow, action: &SemanticAction) -> Result<String, St
         }
         "navigate" => {
             let route = action.route.as_deref().ok_or("navigate 缺少 route")?;
-            let encoded = serde_json::to_string(route).map_err(display_error)?;
+            let browser_route = pc_browser_route(route)?;
+            let encoded = serde_json::to_string(&browser_route).map_err(display_error)?;
             window
                 .eval(&format!(
                     "window.history.pushState({{}}, '', {encoded}); window.dispatchEvent(new PopStateEvent('popstate'));"
@@ -399,6 +400,11 @@ fn validate_route(route: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn pc_browser_route(route: &str) -> Result<String, String> {
+    validate_route(route)?;
+    Ok(format!("/pc{}", route.trim()))
+}
+
 fn clean_identifier(value: &str, fallback: &str) -> String {
     let cleaned = value
         .trim()
@@ -472,6 +478,13 @@ mod tests {
         assert!(validate_route("https://example.com").is_err());
         assert!(validate_route("/unknown").is_err());
         assert!(validate_route("/projects/../account").is_err());
+    }
+
+    #[test]
+    fn semantic_navigation_preserves_the_pc_browser_basename() {
+        assert_eq!(pc_browser_route("/user-browser").unwrap(), "/pc/user-browser");
+        assert_eq!(pc_browser_route("/projects/demo").unwrap(), "/pc/projects/demo");
+        assert!(pc_browser_route("/pc/user-browser").is_err());
     }
 
     #[test]

@@ -20,7 +20,7 @@ implementation_status: compiled
 第一版只允许：
 
 1. `show_window`、`focus_window`：呼出并聚焦主窗口。
-2. `navigate`：只接受已登记的一龙 PC 相对路由，不接受完整 URL、协议、host、query secret 或任意脚本。
+2. `navigate`：只接受已登记的一龙 PC 相对路由，不接受完整 URL、协议、host、query secret 或任意脚本；Tauri 执行时固定补齐 `/pc` 浏览器 basename，回执成功后必须仍由 PC Router 接管，不能落到站点根的空白页。
 3. `reload_page`：刷新主工作台。
 4. `open_devtools`、`close_devtools`：只由 Tauri 壳执行并写回回执；生产是否允许由壳能力明确报告。
 5. `capture_state`：读取当前路由、标题、可见/聚焦状态和版本等非秘密状态，不截图、不读输入框正文。
