@@ -456,6 +456,7 @@ internal class ChatGptWebMcpActions(
             .put("cached_at_ms", observed.updatedAtMs)
             .put("source_count", observed.conversations.size)
             .put("project_count", observed.projects.size)
+            .put("projects", ChatGptWebProjectJson.encode(observed.projects))
             .put("source", observed.conversationCollection.source)
             .put("stale", observed.conversationCollection.stale)
             .put("collection", ChatGptWebConversationCollectionJson.encode(observed.conversationCollection))

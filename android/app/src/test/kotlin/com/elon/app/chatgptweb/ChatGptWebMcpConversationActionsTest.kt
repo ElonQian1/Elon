@@ -59,6 +59,13 @@ class ChatGptWebMcpConversationActionsTest {
         val listed = actions.control(JSONObject().put("action", "chatgpt_get_conversations"))
         val item = listed.getJSONArray("conversations").getJSONObject(0)
         assertEquals(1, listed.getInt("project_count"))
+        val project = listed.getJSONArray("projects").getJSONObject(0)
+        assertEquals("g-p-demo", project.getString("id"))
+        assertEquals("open_web_chat_project", project.getString("native_action"))
+        assertEquals(
+            "chatgpt-project:g-p-demo:安卓项目",
+            project.getString("native_adb_content_description"),
+        )
         assertEquals("g-p-demo", item.getString("project_id"))
         assertEquals("今天", item.getString("group_label"))
         assertEquals("2026-08-14", item.getJSONArray("activity_dates").getString(0))
