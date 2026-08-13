@@ -66,6 +66,13 @@
                 android:textColor="@color/elon_text_primary"
                 android:textSize="16sp" />
 
+            <FrameLayout
+                android:id="@+id/socialAiModeControlHost"
+                android:layout_width="188dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:id="@+id/projectTopTabs"
                 android:layout_width="match_parent"

@@ -1,6 +1,5 @@
 package com.elon.app
 
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebTestActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -18,6 +17,11 @@ internal class SocialAiChatModeController(
     private val deactivateChatProvider: () -> Unit,
 ) {
     private val modeStore = SocialAiModeStore(activity)
+    private val modeControl = SocialAiModeSegmentedControl(
+        activity = activity,
+        host = binding.socialAiModeControlHost,
+        onSelected = ::selectInteractionMode,
+    )
     private var activeFriendIsSocialAi = false
     private var interactionMode = modeStore.interactionMode()
     private var providerId = modeStore.providerId()
@@ -26,10 +30,11 @@ internal class SocialAiChatModeController(
         activeFriendIsSocialAi = friend.isSocialAi()
         if (!activeFriendIsSocialAi) {
             deactivateChatProvider()
+            modeControl.hide()
             configureTitle(friend?.name.orEmpty(), false)
             return
         }
-        configureTitle(activeTitle(), true)
+        configureSocialAiToolbar()
         binding.root.post {
             if (activeFriendIsSocialAi) applyCurrentMode()
         }
@@ -97,52 +102,16 @@ internal class SocialAiChatModeController(
                 }
             }
         }
-        configureTitle(activeTitle(), true)
+        configureSocialAiToolbar()
     }
 
-    private fun showSelector() {
-        val providers = WebChatProviderRegistry.available()
-        val workIndex = providers.size
-        val checked = if (interactionMode == SocialAiInteractionMode.WORK) {
-            workIndex
-        } else {
-            providers.indexOfFirst { it.id == providerId }.coerceAtLeast(0)
-        }
-        val labels = buildList {
-            providers.forEach { provider ->
-                add(activity.getString(R.string.social_ai_mode_chat_provider, provider.displayName))
-            }
-            add(activity.getString(R.string.social_ai_mode_work))
-        }
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle(R.string.social_ai_mode_picker_title)
-            .setSingleChoiceItems(labels.toTypedArray(), checked) { selector, which ->
-                selector.dismiss()
-                if (which == workIndex) {
-                    selectInteractionMode(SocialAiInteractionMode.WORK)
-                } else {
-                    providers.getOrNull(which)?.let { selectChatProvider(it.id) }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .apply {
-                if (interactionMode == SocialAiInteractionMode.CHAT) {
-                    setNeutralButton(R.string.web_chat_open_official, null)
-                }
-            }
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener { openOfficialFallback() }
-        }
-        dialog.show()
-    }
-
-    private fun activeTitle(): String = when (interactionMode) {
-        SocialAiInteractionMode.WORK -> activity.getString(R.string.social_ai_mode_work_title)
-        SocialAiInteractionMode.CHAT -> WebChatProviderRegistry.get(providerId).displayName
+    private fun configureSocialAiToolbar() {
+        binding.topTitleText.visibility = android.view.View.GONE
+        modeControl.show(interactionMode)
     }
 
     private fun configureTitle(title: String, selectable: Boolean) {
+        binding.topTitleText.visibility = android.view.View.VISIBLE
         binding.topTitleText.apply {
             text = title
             isClickable = selectable
@@ -160,18 +129,12 @@ internal class SocialAiChatModeController(
             } else {
                 title
             }
-            setCompoundDrawablesRelativeWithIntrinsicBounds(
-                0,
-                0,
-                if (selectable) R.drawable.ic_input_chevron_new else 0,
-                0,
-            )
-            compoundDrawablePadding = if (selectable) dp(6) else 0
-            setOnClickListener(if (selectable) android.view.View.OnClickListener { showSelector() } else null)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
+            compoundDrawablePadding = 0
+            setOnClickListener(null)
         }
     }
 
     private fun persist() = modeStore.save(interactionMode, providerId)
 
-    private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 }

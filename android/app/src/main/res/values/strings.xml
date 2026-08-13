@@ -124,6 +124,10 @@
     <string name="social_ai_mode_chat_short">聊天模式</string>
     <string name="social_ai_mode_work_title">一龙 AI · 工作模式</string>
     <string name="social_ai_mode_current_description">AI 交互模式：%1$s；当前：%2$s；点击切换</string>
+    <string name="social_ai_mode_chat_tab">聊天</string>
+    <string name="social_ai_mode_work_tab">工作</string>
+    <string name="social_ai_mode_selected">已选中</string>
+    <string name="social_ai_mode_tab_description">%1$s模式 %2$s</string>
     <string name="web_chat_provider_picker_title">选择网页 AI</string>
     <string name="web_chat_open_official">官网功能</string>
     <string name="web_chat_login_required">当前页面需要登录；官网支持匿名聊天时可直接使用</string>
@@ -133,6 +137,12 @@
     <string name="web_chat_attachment_uploading">附件正在上传，请稍候</string>
     <string name="web_chat_model_picker_title">ChatGPT 模型</string>
     <string name="web_chat_model_options_empty">官网暂未返回可选模型</string>
+    <string name="chatgpt_side_menu_projects">项目</string>
+    <string name="chatgpt_side_menu_search_hint">搜索会话或项目</string>
+    <string name="chatgpt_side_menu_empty_date">这一天暂无 ChatGPT 会话活动</string>
+    <string name="chatgpt_side_menu_no_results">没有匹配的 ChatGPT 会话</string>
+    <string name="chatgpt_side_menu_empty_projects">官网暂未返回项目</string>
+    <string name="chatgpt_side_menu_settings">设置</string>
     <string name="chatgpt_message_streaming">正在生成</string>
     <string name="chatgpt_message_sending">正在发送</string>
     <string name="chatgpt_message_part_format">%1$s · %2$s</string>
