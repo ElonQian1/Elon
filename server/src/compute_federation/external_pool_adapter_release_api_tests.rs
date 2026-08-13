@@ -66,6 +66,14 @@ mod lifecycle_http_test;
 mod lifecycle_support;
 #[path = "external_pool_adapter_release_api_tests/management.rs"]
 mod management;
+#[path = "external_pool_adapter_release_api_tests/runtime_launch_profile_admin_http_test.rs"]
+mod runtime_launch_profile_admin_http_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_launch_profile_owner_http_test.rs"]
+mod runtime_launch_profile_owner_http_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_launch_profile_source_contract_test.rs"]
+mod runtime_launch_profile_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_launch_profile_test_support.rs"]
+mod runtime_launch_profile_test_support;
 #[path = "external_pool_adapter_release_api_tests/sandbox_reattestation_http_test.rs"]
 mod sandbox_reattestation_http_test;
 #[path = "external_pool_adapter_release_api_tests/sandbox_reattestation_test_support.rs"]

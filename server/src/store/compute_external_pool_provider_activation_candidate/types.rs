@@ -310,6 +310,68 @@ pub(in crate::store) struct CurrentExternalPoolProviderActivationPreflightAuthor
     pub(super) checked_at: String,
 }
 
+/// Store-only static V254+V249 current authority; it deliberately excludes V250/V252/V253.
+pub(in crate::store) struct CurrentExternalPoolProviderActivationCandidateStaticAuthority {
+    registry: CurrentExternalPoolAdapterRegistryProviderBindingAuthority,
+    delegation: ExternalPoolProviderActivationDelegationReceipt,
+    candidate: ExternalPoolProviderActivationCandidateReceipt,
+    checked_at: String,
+}
+
+pub(in crate::store) struct HistoricalExternalPoolProviderActivationCandidateAuthority {
+    delegation: ExternalPoolProviderActivationDelegationReceipt,
+    candidate: ExternalPoolProviderActivationCandidateReceipt,
+}
+
+impl CurrentExternalPoolProviderActivationCandidateStaticAuthority {
+    pub(super) fn new(
+        registry: CurrentExternalPoolAdapterRegistryProviderBindingAuthority,
+        delegation: ExternalPoolProviderActivationDelegationReceipt,
+        candidate: ExternalPoolProviderActivationCandidateReceipt,
+        checked_at: String,
+    ) -> Self {
+        Self {
+            registry,
+            delegation,
+            candidate,
+            checked_at,
+        }
+    }
+
+    pub(in crate::store) fn registry(
+        &self,
+    ) -> &CurrentExternalPoolAdapterRegistryProviderBindingAuthority {
+        &self.registry
+    }
+    pub(in crate::store) fn delegation(&self) -> &ExternalPoolProviderActivationDelegationReceipt {
+        &self.delegation
+    }
+    pub(in crate::store) fn candidate(&self) -> &ExternalPoolProviderActivationCandidateReceipt {
+        &self.candidate
+    }
+    pub(in crate::store) fn checked_at(&self) -> &str {
+        &self.checked_at
+    }
+}
+
+impl HistoricalExternalPoolProviderActivationCandidateAuthority {
+    pub(super) fn new(
+        delegation: ExternalPoolProviderActivationDelegationReceipt,
+        candidate: ExternalPoolProviderActivationCandidateReceipt,
+    ) -> Self {
+        Self {
+            delegation,
+            candidate,
+        }
+    }
+    pub(in crate::store) fn delegation(&self) -> &ExternalPoolProviderActivationDelegationReceipt {
+        &self.delegation
+    }
+    pub(in crate::store) fn candidate(&self) -> &ExternalPoolProviderActivationCandidateReceipt {
+        &self.candidate
+    }
+}
+
 impl CurrentExternalPoolProviderActivationPreflightAuthority {
     pub(in crate::store) fn registry(
         &self,

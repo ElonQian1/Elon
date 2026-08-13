@@ -154,6 +154,62 @@ pub(in crate::store) fn current_external_pool_provider_activation_preflight_auth
     Ok(Some(authority))
 }
 
+pub(in crate::store) fn current_external_pool_provider_activation_candidate_static_authority_on(
+    conn: &Connection,
+    prepared: crate::compute_federation::external_pool_adapter_installation::PreparedExternalPoolAdapterInstallation,
+    candidate_id: &str,
+    expected_candidate_digest: &str,
+    checked_at: &str,
+) -> Result<Option<CurrentExternalPoolProviderActivationCandidateStaticAuthority>> {
+    let Some(candidate) = candidate_by_id_on(conn, candidate_id)? else {
+        return Ok(None);
+    };
+    if candidate.receipt.candidate_digest != expected_candidate_digest {
+        bail!("activation candidate static authority digest is not exact");
+    }
+    let delegation = current_delegation_for_candidate(conn, &candidate)?;
+    let registry = current_external_pool_adapter_registry_provider_binding_authority_on(
+        conn,
+        &candidate.receipt.candidate.provider_binding_id,
+        prepared,
+        checked_at,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("current exact V249 Provider binding was not found"))?;
+    audit_static_roots(&registry, &delegation.receipt, &candidate.receipt)?;
+    Ok(Some(
+        CurrentExternalPoolProviderActivationCandidateStaticAuthority::new(
+            registry,
+            delegation.receipt,
+            candidate.receipt,
+            checked_at.to_string(),
+        ),
+    ))
+}
+
+pub(in crate::store) fn historical_external_pool_provider_activation_candidate_authority_on(
+    conn: &Connection,
+    candidate_id: &str,
+    expected_candidate_digest: &str,
+) -> Result<Option<HistoricalExternalPoolProviderActivationCandidateAuthority>> {
+    let Some(candidate) = candidate_by_id_on(conn, candidate_id)? else {
+        return Ok(None);
+    };
+    if candidate.receipt.candidate_digest != expected_candidate_digest {
+        bail!("historical activation candidate digest is not exact");
+    }
+    let delegation = delegation_by_id_on(conn, &candidate.receipt.candidate.delegation_id)?
+        .ok_or_else(|| anyhow::anyhow!("historical activation candidate lost delegation"))?;
+    if delegation.receipt.delegation_digest != candidate.receipt.candidate.delegation_digest {
+        bail!("historical activation candidate delegation root is not exact");
+    }
+    Ok(Some(
+        HistoricalExternalPoolProviderActivationCandidateAuthority::new(
+            delegation.receipt,
+            candidate.receipt,
+        ),
+    ))
+}
+
 fn current_delegation_for_candidate(
     conn: &rusqlite::Connection,
     candidate: &StoredCandidate,

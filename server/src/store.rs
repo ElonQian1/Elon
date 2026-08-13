@@ -106,6 +106,7 @@ mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
@@ -560,6 +561,7 @@ pub(crate) use compute_external_pool_adapter_release_lifecycle::{
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SUPERSESSION_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_WITHDRAWAL_CONFIRMATION,
 };
+pub(crate) use compute_external_pool_adapter_runtime_launch_profile::api::*;
 pub(crate) use compute_external_pool_adapter_sandbox_reattestation::{
     CreateExternalPoolAdapterSandboxReattestation,
     ExternalPoolAdapterSandboxReattestationCurrentness,
@@ -737,13 +739,11 @@ impl Store {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", 5000)?;
         apply_migrations(&conn)?;
-
         Ok(Self {
             conn: Mutex::new(conn),
         })
