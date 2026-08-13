@@ -18,9 +18,11 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。需要登录时�
   登录完成可留在官方网页或切换“一龙界面”。
 - PWA：我的 → ChatGPT 账号与聊天；PWA 在新标签打开官方 ChatGPT，受同源隔离影响，
   不宣称可以读取登录状态或重渲染官方页面。
-- Win：入口同时展示 ChatGPT 与 Google AI 模式。官方页面负责账号状态、推理与搜索，
-  一龙适配器只把可见问题、回答、来源和输入框状态同步到统一聊天 UI。Google AI 模式
-  固定打开 `https://www.google.com/aimode`；若 Google 要求账号登录，用户改用系统浏览器。
+- Win：首页“一龙 AI”分为 **Chat** 与 **工作**。Chat 默认使用一龙原有消息流，可选择
+  ChatGPT 或 Google AI 模式；工作模式保持原 Codex 项目与代理工作流。官方页面负责账号
+  状态、推理与搜索，一龙适配器只把可见问题、回答、来源和输入框状态同步到统一聊天 UI。
+  Google AI 模式固定打开 `https://www.google.com/aimode`；若 Google 要求账号登录，用户
+  改用系统浏览器。
 
 这里的“登录”是设备内的官方网页会话，不是把 ChatGPT 云端账号或 Cookie 绑定到一龙
 云端账号。登录状态由官方页面确认。
@@ -42,6 +44,10 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 不上传这些数据；“清除会话”只调用 WebView2 的整 Profile 浏览数据清理。OpenAI 官方
 文档也明确区分浏览器中的 ChatGPT 网页会话与 Codex 客户端的浏览器回调登录：
 [OpenAI authentication](https://learn.chatgpt.com/docs/auth)。
+
+首次登录、Cloudflare 或厂商真人验证期间，官方 WebView2 必须保持可见并由用户本人操作；
+会话就绪后用户可将官方页收起到本机后台，在一龙 Chat UI 中继续发送、停止、新建会话和
+读取可见回复。刷新后台页面不会强制把官方窗口重新弹出，“显示官方页”始终可以一键恢复。
 
 ### Win 壳版本握手
 

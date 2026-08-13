@@ -8,7 +8,7 @@ const LoginPage = lazy(() => import('./features/auth/LoginPage'))
 const ConversationPage = lazy(() => import('./features/conversation/ConversationPage'))
 const ProjectsPage = lazy(() => import('./features/projects/ProjectsPage'))
 const ProjectDetailPage = lazy(() => import('./features/projects/ProjectDetailPage'))
-const AiChatPage = lazy(() => import('./features/ai/AiChatPage'))
+const AiHomePage = lazy(() => import('./features/ai/AiHomePage'))
 const FriendsPage = lazy(() => import('./features/friends/FriendsPage'))
 const PlazaPage = lazy(() => import('./features/plaza/PlazaPage'))
 const AccountPage = lazy(() => import('./features/account/AccountPage'))
@@ -61,7 +61,7 @@ export default function App() {
       <Route path="/*" element={<Shell />}>
         {/* 首页：一龙 AI 工作台 */}
         <Route index element={<Navigate to={defaultPath} replace />} />
-        <Route path="ai" element={lazyRoute(<AiChatPage />)} />
+        <Route path="ai" element={lazyRoute(<AiHomePage />)} />
         <Route path="workspace" element={lazyRoute(<ConversationPage />)} />
         <Route path="friends" element={lazyRoute(<FriendsPage />)} />
         <Route path="plaza" element={lazyRoute(<PlazaPage />)} />

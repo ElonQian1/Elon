@@ -15,6 +15,7 @@ interface NativeAiWebChatProps {
   onDraftChange: (value: string) => void
   onRun: (action: LocalAiAdapterAction, value?: string, expectedDraft?: string) => void
   standalone?: boolean
+  emptyTitle?: string
 }
 
 export default function NativeAiWebChat({
@@ -26,6 +27,7 @@ export default function NativeAiWebChat({
   onDraftChange,
   onRun,
   standalone = false,
+  emptyTitle,
 }: NativeAiWebChatProps) {
   const guestMode = provider.loginMode === 'guest_web_system_login'
   const canCompose = Boolean(snapshot?.composerReady && (snapshot.authenticated || guestMode))
@@ -81,7 +83,7 @@ export default function NativeAiWebChat({
         )) : (
           <div className={styles.emptyChat}>
             <MonitorUp size={24} />
-            <strong>{sessionOpen ? `等待 ${providerName} 官方页面` : `尚未打开 ${providerName}`}</strong>
+            <strong>{emptyTitle || (sessionOpen ? `等待 ${providerName} 官方页面` : `尚未打开 ${providerName}`)}</strong>
             <p>
               {guestMode
                 ? 'AI 模式可用后，可见问题、回答和来源会同步到这里；地区或账号未开放时请使用官方窗口。'
@@ -100,6 +102,13 @@ export default function NativeAiWebChat({
         <textarea
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            if (canCompose && draft.trim() && !busy) {
+              onRun('send_prompt', draft, snapshot?.draft ?? '')
+            }
+          }}
           placeholder={canCompose ? `向 ${providerName} 发送消息…` : '官方页面就绪后即可使用原生输入框'}
           disabled={!canCompose || busy}
           maxLength={20_000}

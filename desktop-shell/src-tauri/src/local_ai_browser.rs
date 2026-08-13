@@ -162,6 +162,7 @@ pub async fn open_local_ai_web_session(
     if let Some(window) = app.get_webview_window(&window_label) {
         restore_window(&window)?;
         runtime.mark_window_status(&window_label, "ready");
+        runtime.mark_window_visible(&window_label, true);
         request_adapter_snapshot(provider, &window);
         return Ok(session_response(provider, window_label, "focused"));
     }
@@ -260,6 +261,7 @@ pub async fn open_local_ai_web_session(
         }
     });
     restore_window(&window)?;
+    runtime.mark_window_visible(&window_label, true);
     window.navigate(start_url).map_err(|error| {
         runtime.record_error(
             &window_label,
@@ -318,8 +320,20 @@ pub async fn control_local_ai_web_session(
         .get_webview_window(&label)
         .ok_or_else(|| format!("请先打开 {} 本地网页会话。", provider.display_name))?;
 
+    if action == "background" {
+        window.hide().map_err(display_error)?;
+        runtime.mark_window_visible(&label, false);
+        return runtime
+            .snapshot(&label)
+            .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name));
+    }
+
     match action.as_str() {
-        "restore" => {}
+        "restore" => {
+            restore_window(&window)?;
+            runtime.mark_window_status(&label, "ready");
+            runtime.mark_window_visible(&label, true);
+        }
         "reload" => window.reload().map_err(display_error)?,
         "back" => window.eval("history.back();").map_err(display_error)?,
         "home" => window
@@ -327,8 +341,6 @@ pub async fn control_local_ai_web_session(
             .map_err(display_error)?,
         _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
     }
-    restore_window(&window)?;
-    runtime.mark_window_status(&label, "ready");
     runtime
         .snapshot(&label)
         .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))

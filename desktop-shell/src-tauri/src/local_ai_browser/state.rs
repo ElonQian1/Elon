@@ -18,6 +18,7 @@ struct SessionRecord {
     provider_id: String,
     window_label: String,
     window_status: String,
+    window_visible: bool,
     current_url: String,
     current_host: String,
     loading: bool,
@@ -34,6 +35,7 @@ pub struct LocalAiWebSessionState {
     pub provider_id: String,
     pub window_label: String,
     pub window_status: String,
+    pub window_visible: bool,
     pub current_url: String,
     pub current_host: String,
     pub loading: bool,
@@ -53,6 +55,7 @@ impl LocalAiBrowserRuntime {
                 provider_id: provider_id.to_string(),
                 window_label: label.to_string(),
                 window_status: "opening".to_string(),
+                window_visible: false,
                 current_url: String::new(),
                 current_host: String::new(),
                 loading: true,
@@ -67,6 +70,7 @@ impl LocalAiBrowserRuntime {
     pub fn mark_opening(&self, label: &str) {
         self.update(label, |record| {
             record.window_status = "opening".to_string();
+            record.window_visible = true;
             record.loading = true;
             record.last_error = None;
         });
@@ -116,7 +120,14 @@ impl LocalAiBrowserRuntime {
             record.window_status = status.to_string();
             if matches!(status, "closed" | "error") {
                 record.loading = false;
+                record.window_visible = false;
             }
+        });
+    }
+
+    pub fn mark_window_visible(&self, label: &str, visible: bool) {
+        self.update(label, |record| {
+            record.window_visible = visible;
         });
     }
 
@@ -181,6 +192,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             provider_id: record.provider_id,
             window_label: record.window_label,
             window_status: record.window_status,
+            window_visible: record.window_visible,
             current_url: record.current_url,
             current_host: record.current_host,
             loading: record.loading,

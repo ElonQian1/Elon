@@ -76,6 +76,7 @@ export interface LocalAiWebSessionState {
   providerId: string
   windowLabel: string
   windowStatus: LocalAiBrowserWindowStatus
+  windowVisible: boolean
   currentUrl: string
   currentHost: string
   loading: boolean
@@ -86,7 +87,7 @@ export interface LocalAiWebSessionState {
   updatedAtMs: number
 }
 
-export type LocalAiBrowserControlAction = 'restore' | 'reload' | 'back' | 'home' | 'external'
+export type LocalAiBrowserControlAction = 'restore' | 'background' | 'reload' | 'back' | 'home' | 'external'
 
 export type LocalAiAdapterAction =
   | 'snapshot'
