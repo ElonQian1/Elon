@@ -63,6 +63,15 @@ internal class ChatGptSocialChatController(
 
     fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 
+    fun adapterVersion(): Int = com.elon.app.chatgptweb.ChatGptWebPageAdapter.ADAPTER_VERSION
+
+    fun authenticated(): Boolean = session.currentSnapshot()?.authenticated == true
+
+    fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
+
+    fun attachmentSupported(): Boolean = session.currentSnapshot()?.capabilities
+        ?.supports(com.elon.app.chatgptweb.ChatGptWebCapabilityId.ATTACHMENTS) == true
+
     fun refreshComposerModel() = updateComposerModel(currentModel())
 
     fun attachmentSendPhase(): String = session.attachmentSendPhase()
@@ -132,6 +141,25 @@ internal class ChatGptSocialChatController(
     fun startNewConversation() {
         pendingPrompt = null
         session.startNewConversation()
+    }
+
+    fun currentConversationPath(): String? = session.currentConversationPath()
+
+    fun openConversation(path: String): Boolean {
+        pendingPrompt = null
+        return session.openConversation(path)
+    }
+
+    fun discardAcceptanceAttachmentSend(): Boolean {
+        if (waitingForAttachmentCompletion) return false
+        val hadFixture = pendingAttachments.any {
+            ChatGptWebAcceptanceAttachmentFixture.matches(activity.cacheDir, it)
+        }
+        if (!hadFixture) return false
+        pendingPrompt = null
+        pendingAttachments = emptyList()
+        session.currentSnapshot()?.let(::renderSnapshot)
+        return true
     }
 
     fun onHostResumed() = session.onHostResumed()

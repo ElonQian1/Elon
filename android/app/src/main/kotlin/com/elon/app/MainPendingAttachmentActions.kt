@@ -89,6 +89,36 @@ internal class MainPendingAttachmentActions(
         pendingAttachments.clear()
         refreshPendingAttachmentPreview()
     }
+
+    fun stageChatGptWebAcceptanceFixture(): ChatGptWebAcceptanceFixtureStageResult {
+        if (pendingAttachments.any { ChatGptWebAcceptanceAttachmentFixture.matches(activity.cacheDir, it) }) {
+            return ChatGptWebAcceptanceFixtureStageResult.ALREADY_STAGED
+        }
+        if (pendingAttachments.isNotEmpty()) {
+            return ChatGptWebAcceptanceFixtureStageResult.PENDING_ATTACHMENTS_PRESENT
+        }
+        val attachment = runCatching {
+            ChatGptWebAcceptanceAttachmentFixture.prepare(activity.cacheDir)
+        }.getOrNull() ?: return ChatGptWebAcceptanceFixtureStageResult.FAILED
+        addPreparedAttachment(attachment)
+        return ChatGptWebAcceptanceFixtureStageResult.STAGED
+    }
+
+    fun removeChatGptWebAcceptanceFixture(): Boolean {
+        val removed = pendingAttachments.filter {
+            ChatGptWebAcceptanceAttachmentFixture.matches(activity.cacheDir, it)
+        }
+        pendingAttachments.removeAll(removed.toSet())
+        ChatGptWebAcceptanceAttachmentFixture.cleanup(activity.cacheDir)
+        if (removed.isNotEmpty()) refreshPendingAttachmentPreview()
+        return removed.isNotEmpty()
+    }
+
+    fun hasChatGptWebAcceptanceFixture(): Boolean = pendingAttachments.any {
+        ChatGptWebAcceptanceAttachmentFixture.matches(activity.cacheDir, it)
+    }
+
+    fun pendingAttachmentCount(): Int = pendingAttachments.size
 }
 
 internal const val MAX_PENDING_ATTACHMENTS = 9

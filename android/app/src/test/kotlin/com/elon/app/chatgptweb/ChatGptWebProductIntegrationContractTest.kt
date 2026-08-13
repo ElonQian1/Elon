@@ -17,6 +17,9 @@ class ChatGptWebProductIntegrationContractTest {
         val friendChat = read("android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt")
         val main = read("android/app/src/main/kotlin/com/elon/app/MainActivity.kt")
         val mainMcp = read("android/app/src/main/kotlin/com/elon/app/MainMcpNativeControlActions.kt")
+        val fixtureActions = read(
+            "android/app/src/main/kotlin/com/elon/app/ChatGptWebAcceptanceAttachmentNativeActions.kt",
+        )
         val activity = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt")
         val layout = read("android/app/src/main/res/layout/activity_chatgpt_web_test.xml")
         val strings = read("android/app/src/main/res/values/strings.xml")
@@ -45,6 +48,11 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("select_web_chat_provider"))
         assertTrue(mainMcp.contains("open_chatgpt_official_fallback"))
         assertTrue(mainMcp.contains("web_chat_attachment_phase"))
+        assertTrue(mainMcp.contains("start_new_web_chat_conversation"))
+        assertTrue(mainMcp.contains("open_web_chat_conversation"))
+        assertTrue(mainMcp.contains("chatgpt_web_acceptance_attachment"))
+        assertTrue(fixtureActions.contains("stage_chatgpt_web_acceptance_attachment"))
+        assertTrue(fixtureActions.contains("remove_chatgpt_web_acceptance_attachment"))
         assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
         assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
         assertTrue(activity.contains("ChatGptWebAccessPolicy.canChat(snapshot)"))

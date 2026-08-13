@@ -122,6 +122,15 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.startNewConversation()
     }
 
+    fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
+
+    fun openConversation(path: String): Boolean {
+        val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
+        if (state != State.READY) return false
+        pageAdapter?.openConversation(normalized) ?: return false
+        return true
+    }
+
     fun destroy() {
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)

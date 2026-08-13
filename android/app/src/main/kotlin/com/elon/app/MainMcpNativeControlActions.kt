@@ -34,6 +34,7 @@ internal class MainMcpNativeControlActions(
     private val activeFriend: () -> AppFriend? = { null },
     private val activeFriendMessages: () -> List<ChatMessage> = { emptyList() },
     private val socialAiChatFeature: () -> MainSocialAiChatFeature? = { null },
+    private val chatGptAttachmentFixtureActions: ChatGptWebAcceptanceAttachmentNativeActions? = null,
     private val rememberMcpConversationSeed: (McpConversationSeed) -> Unit = {}
 ) {
     fun uiState(): JSONObject {
@@ -52,6 +53,10 @@ internal class MainMcpNativeControlActions(
             .put("projects", projectsJson())
             .put("active_conversation", conversationJson(conversation, activeConversationIndex(), lastMessage))
             .put("social_chat", socialChatJson())
+            .put(
+                "chatgpt_web_acceptance_attachment",
+                chatGptAttachmentFixtureActions?.stateJson() ?: JSONObject.NULL,
+            )
             .put("input", inputJson())
             .put("runtime", runtimeJson())
     }
@@ -115,6 +120,19 @@ internal class MainMcpNativeControlActions(
                 }
                 uiState()
             }
+            "start_new_web_chat_conversation" -> {
+                if (socialAiChatFeature()?.startNewWebChatConversation() != true) {
+                    return errorJson(action, "web_chat_not_ready")
+                }
+                uiState()
+            }
+            "open_web_chat_conversation" -> {
+                val path = args.optString("conversation_path")
+                if (socialAiChatFeature()?.openWebChatConversation(path) != true) {
+                    return errorJson(action, "invalid_or_unavailable_conversation")
+                }
+                uiState()
+            }
             "open_project_chat" -> {
                 val beforeProject = activeProject()
                 val beforeConversationId = activeConversation().id
@@ -161,7 +179,8 @@ internal class MainMcpNativeControlActions(
                 sendMessage()
                 uiState()
             }
-            else -> return errorJson(action, "unsupported_action")
+            else -> return chatGptAttachmentFixtureActions?.control(action, args)
+                ?: errorJson(action, "unsupported_action")
         }
         return result.put("control_ok", true)
     }
@@ -454,6 +473,30 @@ internal class MainMcpNativeControlActions(
             .put(
                 "web_chat_pending_attachment_count",
                 if (friend.isSocialAi()) feature?.webChatPendingAttachmentCount() ?: 0 else 0,
+            )
+            .put(
+                "web_chat_adapter_version",
+                if (friend.isSocialAi()) feature?.webChatAdapterVersion() ?: 0 else 0,
+            )
+            .put(
+                "web_chat_authenticated",
+                friend.isSocialAi() && feature?.webChatAuthenticated() == true,
+            )
+            .put(
+                "web_chat_composer_ready",
+                friend.isSocialAi() && feature?.webChatComposerReady() == true,
+            )
+            .put(
+                "web_chat_attachment_supported",
+                friend.isSocialAi() && feature?.webChatAttachmentSupported() == true,
+            )
+            .put(
+                "web_chat_conversation_path",
+                if (friend.isSocialAi()) {
+                    feature?.webChatConversationPath() ?: JSONObject.NULL
+                } else {
+                    JSONObject.NULL
+                },
             )
             .put("message_count", messages.size)
             .put("messages", JSONArray().apply {

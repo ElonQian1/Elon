@@ -73,9 +73,31 @@ internal class MainSocialAiChatFeature(
 
     fun webChatModel(): String = webChatController.currentModel()
 
+    fun webChatAdapterVersion(): Int = webChatController.adapterVersion()
+
+    fun webChatAuthenticated(): Boolean = webChatController.authenticated()
+
+    fun webChatComposerReady(): Boolean = webChatController.composerReady()
+
+    fun webChatAttachmentSupported(): Boolean = webChatController.attachmentSupported()
+
     fun webChatAttachmentPhase(): String = webChatController.attachmentSendPhase()
 
     fun webChatPendingAttachmentCount(): Int = webChatController.pendingAttachmentCount()
+
+    fun webChatConversationPath(): String? = webChatController.currentConversationPath()
+
+    fun startNewWebChatConversation(): Boolean {
+        if (!isChatModeActive() || webChatState() != "ready") return false
+        webChatController.startNewConversation()
+        return true
+    }
+
+    fun openWebChatConversation(path: String): Boolean =
+        isChatModeActive() && webChatController.openConversation(path)
+
+    fun discardWebChatAcceptanceAttachmentSend(): Boolean =
+        webChatController.discardAcceptanceAttachmentSend()
 
     fun selectInteractionMode(value: String): Boolean {
         val mode = SocialAiInteractionMode.parse(value) ?: return false

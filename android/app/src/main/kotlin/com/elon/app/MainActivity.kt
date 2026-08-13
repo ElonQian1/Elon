@@ -275,12 +275,12 @@ class MainActivity : AppCompatActivity() {
                 }
             },
             socialAiChatFeature = { socialAiChatFeature },
+            chatGptAttachmentFixtureActions = createChatGptWebAcceptanceAttachmentActions(socialAiChatFeature, inputActions.pendingAttachmentActions),
             rememberMcpConversationSeed = { seed ->
                 rememberPendingMcpConversationSeed(prefs, s.gson, seed)
             }
         )
     }
-
     private val mcpNativeControlBinding: McpNativeControlBinding by lazy {
         McpNativeControlBinding(
             activity = this,

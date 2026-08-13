@@ -406,10 +406,14 @@ internal object ChatGptWebFeatureBaseline {
             id = "attachment_lifecycle",
             group = "composer",
             acceptance = Acceptance.USER_DRIVEN_DEVICE,
-            mcpActions = listOf("chatgpt_invoke_control", "chatgpt_remove_attachment"),
+            mcpActions = listOf(
+                "stage_chatgpt_web_acceptance_attachment",
+                "remove_chatgpt_web_acceptance_attachment",
+                "send_input",
+            ),
             capabilityIds = setOf(ChatGptWebCapabilityId.ATTACHMENTS),
             semantics = setOf("attachment"),
-            verificationGap = "real_file_upload_and_reply_acceptance",
+            verificationGap = "native_fixture_upload_and_reply_acceptance",
         ),
         feature(
             id = "composer_tools",

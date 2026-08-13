@@ -193,7 +193,7 @@ internal fun mcpToolsListResult(): JSONObject {
                     title = "Native UI Control",
                     description = "Control project chat, social AI chat, and the ChatGPT Web mirror through stable native actions and semantic control ids.",
                     properties = JSONObject()
-                        .put("action", stringProperty("Includes open_main, state, project actions, open_social_ai_chat, open_chatgpt_web, set_social_ai_interaction_mode, select_web_chat_provider, open_chatgpt_official_fallback, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
+                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, isolated web chat conversation actions, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
                         .put("project_id", stringProperty("Optional project id or project space id."))
                         .put("project_index", intProperty("Optional project index."))
                         .put("conversation_id", stringProperty("Optional local conversation id."))
@@ -222,6 +222,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("wait_for_target_bind_ms", intProperty("How long open_chatgpt_official_fallback waits for the full-screen official Activity controller, 0-15000. Defaults to 8000."))
                         .put("mode", stringProperty("Interaction mode for set_social_ai_interaction_mode: work or chat."))
                         .put("provider_id", stringProperty("Web chat provider for select_web_chat_provider. Currently chatgpt_web."))
+                        .put("fixture_id", stringProperty("Pinned harmless fixture id for stage/remove_chatgpt_web_acceptance_attachment. Currently fixed_ascii_text_v1."))
                         .put("main_thread_timeout_ms", intProperty("How long native MCP waits for the APK main thread, 1000-60000. Defaults to 15000.")),
                     required = JSONArray().put("action")
                 )
