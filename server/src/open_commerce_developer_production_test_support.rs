@@ -29,6 +29,13 @@ pub(crate) struct ApprovedDeveloperFixture {
 }
 
 pub(crate) fn approved_developer_fixture() -> ApprovedDeveloperFixture {
+    approved_developer_fixture_for("consumer.production.state", &["menu.preview"])
+}
+
+pub(crate) fn approved_developer_fixture_for(
+    app_id: &str,
+    requested_scopes: &[&str],
+) -> ApprovedDeveloperFixture {
     let path = std::env::temp_dir().join(format!(
         "elon_open_commerce_production_state_{}.db",
         Uuid::new_v4().simple()
@@ -51,7 +58,7 @@ pub(crate) fn approved_developer_fixture() -> ApprovedDeveloperFixture {
             &project.id,
             &owner.id,
             CreateDeveloperAppRequest {
-                app_id: "consumer.production.state".to_string(),
+                app_id: app_id.to_string(),
                 display_name: "Production State Consumer".to_string(),
             },
         )
@@ -71,7 +78,10 @@ pub(crate) fn approved_developer_fixture() -> ApprovedDeveloperFixture {
             privacy_policy_url: Some("https://shop.example.test/privacy".to_string()),
             terms_url: Some("https://shop.example.test/terms".to_string()),
             support_email: Some("support@example.test".to_string()),
-            requested_scopes: vec!["menu.preview".to_string()],
+            requested_scopes: requested_scopes
+                .iter()
+                .map(|scope| (*scope).to_string())
+                .collect(),
         },
         &actor,
     )

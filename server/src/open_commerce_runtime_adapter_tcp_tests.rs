@@ -466,3 +466,6 @@ fn temp_store() -> Store {
     ));
     Store::open(&path).expect("runtime adapter TCP test store should open")
 }
+
+#[path = "open_commerce_production_runtime_adapter_tcp_tests.rs"]
+mod production_credential_tests;
