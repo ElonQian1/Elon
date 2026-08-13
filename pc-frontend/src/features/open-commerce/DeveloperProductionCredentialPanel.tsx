@@ -3,6 +3,7 @@ import { Ban, Copy, KeyRound, RefreshCw } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type { OpenCommerceDeveloperApp } from './openCommerceClientTypes'
 import type { DeveloperProductionCredential } from './developerProductionCredentialTypes'
+import { normalizeProductionCredentialRevocationReason } from './developerProductionCredentialUiModel'
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
@@ -62,7 +63,13 @@ export default function DeveloperProductionCredentialPanel({
 
   async function revoke(credential: DeveloperProductionCredential) {
     if (!selectedApp) return
-    const reason = reasons[credential.id]?.trim() || '项目方主动撤销生产凭据'
+    let reason: string
+    try {
+      reason = normalizeProductionCredentialRevocationReason(reasons[credential.id] ?? '')
+    } catch (error) {
+      setMessage(errorText(error))
+      return
+    }
     setBusyId(credential.id)
     setMessage('')
     try {
@@ -107,8 +114,8 @@ export default function DeveloperProductionCredentialPanel({
                 <code style={commerceStyles.itemMeta}>R{credential.manifest_revision} · {credential.scopes.join(', ')}</code>
                 <small style={commerceStyles.itemMeta}>到期：{new Date(credential.expires_at).toLocaleString()} · 最近使用：{credential.last_used_at ? new Date(credential.last_used_at).toLocaleString() : '尚未使用'}</small>
                 {credential.revocation_reason && <p style={commerceStyles.itemText}>撤销原因：{credential.revocation_reason}</p>}
-                {active && <footer style={commerceStyles.itemHeader}>
-                  <input value={reasons[credential.id] ?? ''} onChange={(event) => setReasons((current) => ({ ...current, [credential.id]: event.target.value }))} placeholder="撤销原因（可选）" disabled={busy} />
+                 {active && <footer className={base.credentialRevokeActions} style={commerceStyles.itemHeader}>
+                   <input value={reasons[credential.id] ?? ''} onChange={(event) => setReasons((current) => ({ ...current, [credential.id]: event.target.value }))} placeholder="撤销原因（可选，4 至 500 字）" maxLength={500} disabled={busy} />
                   <button style={actionStyle('danger', busy)} type="button" onClick={() => revoke(credential)} disabled={busy}><Ban size={13} />立即撤销</button>
                 </footer>}
               </article>

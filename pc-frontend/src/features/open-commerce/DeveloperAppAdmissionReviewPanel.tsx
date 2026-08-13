@@ -5,6 +5,7 @@ import type {
   DeveloperAppAdmissionReviewItem,
   DeveloperAppAdmissionRiskTier,
 } from './developerAppAdmissionTypes'
+import { updateOneTimeProductionCredentialSecrets } from './developerProductionCredentialUiModel'
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
@@ -18,17 +19,18 @@ export default function DeveloperAppAdmissionReviewPanel() {
   const [liveSecrets, setLiveSecrets] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (preserveMessage = false) => {
     try {
       const response = await openCommerceClientApi.listReviewableDeveloperAppAdmissions()
       setItems(response.items)
       setProductionEnabled(response.production_credentials_enabled)
+      if (!preserveMessage) setMessage('')
     } catch (error) {
       setMessage(errorText(error))
     }
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { void refresh() }, [refresh])
 
   async function review(
     item: DeveloperAppAdmissionReviewItem,
@@ -50,7 +52,7 @@ export default function DeveloperAppAdmissionReviewPanel() {
       })
       setNotes((current) => ({ ...current, [item.app.id]: '' }))
       setMessage(decision === 'approved' ? '准入记录已批准。' : decision === 'suspended' ? '准入记录已暂停。' : '补充要求已退回。')
-      await refresh()
+      await refresh(true)
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -61,19 +63,38 @@ export default function DeveloperAppAdmissionReviewPanel() {
   async function issue(item: DeveloperAppAdmissionReviewItem) {
     setBusyId(item.app.id)
     setMessage('')
+    setLiveSecrets((current) => updateOneTimeProductionCredentialSecrets(current, {
+      type: 'issue_started',
+      appRecordId: item.app.id,
+    }))
     try {
       const result = await openCommerceClientApi.issueDeveloperProductionCredential(item.app.id, {
         expected_manifest_revision: item.admission.manifest_revision,
         scopes: item.app.requested_scopes,
         expires_in_days: item.admission.risk_tier === 'low' ? 180 : item.admission.risk_tier === 'enhanced' ? 30 : 90,
       })
-      setLiveSecrets((current) => ({ ...current, [item.app.id]: result.live_token }))
+      setLiveSecrets((current) => updateOneTimeProductionCredentialSecrets(current, {
+        type: 'issue_succeeded',
+        appRecordId: item.app.id,
+        liveToken: result.live_token,
+      }))
       setMessage('生产凭据已签发。完整密钥只显示这一次，请立即交给对应 App 运营方。')
-      await refresh()
+      await refresh(true)
     } catch (error) {
       setMessage(errorText(error))
     } finally {
       setBusyId('')
+    }
+  }
+
+  async function copyLiveSecret(appRecordId: string) {
+    const liveToken = liveSecrets[appRecordId]
+    try {
+      if (!liveToken || !globalThis.navigator?.clipboard) throw new Error('clipboard_unavailable')
+      await globalThis.navigator.clipboard.writeText(liveToken)
+      setMessage('一次性密钥已复制。请保存到受控密钥管理工具，完成后立即清除页面中的明文。')
+    } catch {
+      setMessage('复制失败。浏览器未授权剪贴板，请使用受信任环境手动选中密钥。')
     }
   }
 
@@ -83,7 +104,7 @@ export default function DeveloperAppAdmissionReviewPanel() {
         <strong>平台 App 准入审查</strong>
         <div style={commerceStyles.headerActions}>
           <span style={badgeStyle(productionEnabled ? 'neutral' : 'warn')}>{productionEnabled ? `${items.length} 条` : '生产开关关闭'}</span>
-          <button style={actionStyle('icon')} type="button" onClick={refresh} title="刷新准入队列"><RefreshCw size={13} /></button>
+          <button style={actionStyle('icon')} type="button" onClick={() => void refresh()} title="刷新准入队列"><RefreshCw size={13} /></button>
         </div>
       </header>
       <div className={base.formCard} style={commerceStyles.sectionBody}>
@@ -100,11 +121,11 @@ export default function DeveloperAppAdmissionReviewPanel() {
                 <code style={commerceStyles.itemMeta}>{item.app.app_id} · R{item.admission.manifest_revision}</code>
                 <p style={commerceStyles.itemText}>{item.admission.organization_name}</p>
                 <code style={commerceStyles.itemMeta}>{item.admission.jurisdiction} · {item.admission.registration_id}</code>
-                {liveSecrets[item.app.id] && <div style={commerceStyles.message}>
+                {liveSecrets[item.app.id] && <div className={base.credentialSecret} style={commerceStyles.message}>
                   <code>{liveSecrets[item.app.id]}</code>
-                  <div style={commerceStyles.headerActions}>
-                    <button style={actionStyle('secondary')} type="button" onClick={() => navigator.clipboard.writeText(liveSecrets[item.app.id])}><Copy size={13} />复制一次性密钥</button>
-                    <button style={actionStyle('icon')} type="button" title="清除一次性密钥" onClick={() => setLiveSecrets((current) => ({ ...current, [item.app.id]: '' }))}><X size={13} /></button>
+                  <div className={base.credentialActionRow} style={commerceStyles.headerActions}>
+                    <button style={actionStyle('secondary')} type="button" onClick={() => copyLiveSecret(item.app.id)}><Copy size={13} />复制一次性密钥</button>
+                    <button style={actionStyle('icon')} type="button" title="清除一次性密钥" onClick={() => setLiveSecrets((current) => updateOneTimeProductionCredentialSecrets(current, { type: 'cleared', appRecordId: item.app.id }))}><X size={13} /></button>
                   </div>
                 </div>}
                 {pending && <label>风险层级<select value={riskTiers[item.app.id] ?? 'standard'} onChange={(event) => setRiskTiers((current) => ({ ...current, [item.app.id]: event.target.value as DeveloperAppAdmissionRiskTier }))} disabled={busy}>

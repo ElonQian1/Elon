@@ -581,6 +581,25 @@
   padding: 12px 14px;
 }
 
+.credentialSecret {
+  display: grid;
+  gap: 8px;
+}
+
+.credentialSecret code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.credentialActionRow,
+.credentialRevokeActions {
+  min-width: 0;
+}
+
+.credentialRevokeActions input {
+  flex: 1 1 220px;
+}
+
 @media (max-width: 1180px) {
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -610,6 +629,21 @@
 
   .stats {
     grid-template-columns: 1fr;
+  }
+
+  .credentialActionRow,
+  .credentialRevokeActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .credentialActionRow button,
+  .credentialRevokeActions button {
+    width: 100%;
+  }
+
+  .credentialRevokeActions input {
+    flex-basis: auto;
   }
 }
 
