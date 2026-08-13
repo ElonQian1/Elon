@@ -85,8 +85,7 @@ $composerToolDiscoveryCases = [ordered]@{
     agent = "reversible/composer_tool_discovery/agent_mode"
 }
 
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-    -EnsureMainActivity | Out-Null
+Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
 $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
     -Description "authenticated ChatGPT composer" -Predicate {
         param($state)

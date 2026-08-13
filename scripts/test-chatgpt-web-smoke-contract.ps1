@@ -231,7 +231,7 @@ if ($source -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMain
 }
 
 $featuresIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_list_features"')
-$openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_web"')
+$openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_official_fallback"')
 $officialIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }')
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
 $toolsIndex = $source.IndexOf('Get-ComposerOptions -Section "tools"')

@@ -350,7 +350,9 @@ $smokeRuntime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $smokeRuntime
 Start-ChatGptWebSmokeAwakeLease -Runtime $smokeRuntime | Out-Null
 try {
-$opened = Invoke-UiAction -Action "open_chatgpt_web" -EnsureMainActivity
+$opened = Invoke-UiAction -Action "open_chatgpt_official_fallback" -Arguments @{
+    wait_for_target_bind_ms = 12000
+} -EnsureMainActivity
 $officialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
 $state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT Web readiness" -Predicate {
     param($value)
@@ -363,7 +365,7 @@ Assert-ChatGptWebSmokeAdapterVersion -State $state `
 $topResumedActivity = Wait-ChatGptActivityForeground
 $officialUiXml = Get-VisibleUiXml
 
-Add-Check "open_chatgpt_web" ($opened.control_ok -eq $true) ([string]$opened.action)
+Add-Check "open_chatgpt_official_fallback" ($opened.control_ok -eq $true) ([string]$opened.action)
 Add-Check "official_view_selected" ($officialView.control_ok -eq $true) ([string]$officialView.view_mode)
 Add-Check "chatgpt_target_bound" (
     $opened.target_activity_bound -eq $true -or $opened.surface -eq "chatgpt_web"

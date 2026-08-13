@@ -479,10 +479,15 @@ function Open-ChatGptWebSmokeSurface {
         return $state
     }
     if ($state.activity_bound -eq $true) {
-        return Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "open_chatgpt_web"
+        return Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+            -Action "open_chatgpt_official_fallback" -Arguments @{
+                wait_for_target_bind_ms = 12000
+            }
     }
-    return Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "open_chatgpt_web" `
-        -EnsureMainActivity
+    return Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+        -Action "open_chatgpt_official_fallback" -Arguments @{
+            wait_for_target_bind_ms = 12000
+        } -EnsureMainActivity
 }
 
 function Open-ChatGptWebNativeChatSurface {
@@ -492,7 +497,9 @@ function Open-ChatGptWebNativeChatSurface {
     )
 
     $opened = Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
-        -Action "open_social_ai_chat" -EnsureMainActivity
+        -Action "open_social_ai_chat" -Arguments @{
+            wait_for_target_bind_ms = 12000
+        } -EnsureMainActivity
     if ($opened.control_ok -ne $true) {
         throw "Unable to open the social AI chat surface."
     }

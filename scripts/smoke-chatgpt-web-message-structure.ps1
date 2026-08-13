@@ -200,8 +200,7 @@ function Restore-Origin {
         } | Out-Null
 }
 
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-    -EnsureMainActivity | Out-Null
+Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
 $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
     -Description "authenticated ChatGPT message surface" -Predicate {
         param($state)

@@ -312,8 +312,7 @@ function Wait-TemporaryChatState {
     throw "Temporary Chat did not reach the requested selected state."
 }
 
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-    -EnsureMainActivity | Out-Null
+Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
 $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
     -Description "authenticated ChatGPT composer" -Predicate {
         param($state)

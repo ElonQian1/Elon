@@ -114,8 +114,7 @@ function Restore-ChatGptActivity {
 
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "open_chatgpt_web" `
-        -EnsureMainActivity | Out-Null
+    Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
     $ready = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
         -TimeoutSec $TimeoutSec -InitialWaitSec ([Math]::Min(10, $TimeoutSec))
     Assert-ChatGptWebSmokeAdapterVersion -State $ready `

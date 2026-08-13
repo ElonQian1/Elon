@@ -25,7 +25,7 @@ function Get-AppPid {
 }
 
 function Get-Sha256 {
-    param([Parameter(Mandatory = $true)][string]$Value)
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
 
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
@@ -139,7 +139,9 @@ try {
         }
 
         $official = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "open_chatgpt_official_fallback"
+            -Action "open_chatgpt_official_fallback" -Arguments @{
+                wait_for_target_bind_ms = 12000
+            }
         if ($official.target_activity_bound -ne $true) {
             throw "Official fallback did not bind for recovery evidence registration."
         }

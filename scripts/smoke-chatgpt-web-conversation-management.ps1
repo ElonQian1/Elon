@@ -115,6 +115,12 @@ try {
             ForEach-Object { [string]$_.semantic } |
             Sort-Object -Unique
     )
+    $observedRoles = @(
+        $menuControls |
+            ForEach-Object { [string]$_.role } |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
     if ($menuControls.Count -eq 0) { throw "Conversation menu exposed no scoped controls." }
     if (@($menuControls | Where-Object { [string]$_.context_id -ne $conversationContextId }).Count -gt 0) {
         throw "Conversation menu controls escaped their triggering conversation context."
@@ -125,7 +131,9 @@ try {
     if (@($observedSemantics | Where-Object {
         $_ -in @("conversation_files", "rename", "pin", "archive", "share", "delete")
     }).Count -eq 0) {
-        throw "Conversation menu contains no recognized management action."
+        $safeSemantics = ($observedSemantics -join ",").Replace(" ", "")
+        $safeRoles = ($observedRoles -join ",").Replace(" ", "")
+        throw "Conversation menu contains no recognized management action; semantics=$safeSemantics roles=$safeRoles."
     }
 
     Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
