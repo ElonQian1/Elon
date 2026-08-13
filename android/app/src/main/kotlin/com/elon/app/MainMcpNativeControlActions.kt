@@ -33,8 +33,7 @@ internal class MainMcpNativeControlActions(
     private val currentStage: () -> String,
     private val activeFriend: () -> AppFriend? = { null },
     private val activeFriendMessages: () -> List<ChatMessage> = { emptyList() },
-    private val openSocialAiChat: () -> Boolean = { false },
-    private val openChatGptWeb: () -> Unit = {},
+    private val socialAiChatFeature: () -> MainSocialAiChatFeature? = { null },
     private val rememberMcpConversationSeed: (McpConversationSeed) -> Unit = {}
 ) {
     fun uiState(): JSONObject {
@@ -87,11 +86,33 @@ internal class MainMcpNativeControlActions(
                 uiState()
             }
             "open_social_ai_chat" -> {
-                if (!openSocialAiChat()) return errorJson(action, "social_ai_friend_not_found")
+                if (socialAiChatFeature()?.openSocialAiChat() != true) {
+                    return errorJson(action, "social_ai_friend_not_found")
+                }
                 uiState()
             }
             "open_chatgpt_web" -> {
-                openChatGptWeb()
+                socialAiChatFeature()?.openChatGptWeb()
+                    ?: return errorJson(action, "social_ai_feature_unavailable")
+                uiState()
+            }
+            "open_chatgpt_official_fallback" -> {
+                socialAiChatFeature()?.openOfficialFallback()
+                    ?: return errorJson(action, "social_ai_feature_unavailable")
+                uiState()
+            }
+            "set_social_ai_interaction_mode" -> {
+                val mode = args.optString("mode").trim().lowercase(Locale.ROOT)
+                if (mode !in setOf("work", "chat") || socialAiChatFeature()?.selectInteractionMode(mode) != true) {
+                    return errorJson(action, "unsupported_interaction_mode")
+                }
+                uiState()
+            }
+            "select_web_chat_provider" -> {
+                val providerId = args.optString("provider_id").trim().lowercase(Locale.ROOT)
+                if (socialAiChatFeature()?.selectProvider(providerId) != true) {
+                    return errorJson(action, "web_chat_provider_unavailable")
+                }
                 uiState()
             }
             "open_project_chat" -> {
@@ -411,10 +432,20 @@ internal class MainMcpNativeControlActions(
     private fun socialChatJson(): Any {
         val friend = activeFriend() ?: return JSONObject.NULL
         val messages = activeFriendMessages()
+        val feature = socialAiChatFeature()
         return JSONObject()
             .put("friend_id", friend.id)
             .put("friend_name", friend.name)
             .put("is_social_ai", friend.isSocialAi())
+            .put("interaction_mode", if (friend.isSocialAi()) feature?.interactionMode()?.wireValue ?: JSONObject.NULL else JSONObject.NULL)
+            .put("web_chat_provider_id", if (friend.isSocialAi()) feature?.providerId()?.wireValue ?: JSONObject.NULL else JSONObject.NULL)
+            .put("web_chat_provider_name", if (friend.isSocialAi()) feature?.providerName() ?: JSONObject.NULL else JSONObject.NULL)
+            .put("web_chat_state", if (friend.isSocialAi()) feature?.webChatState() ?: JSONObject.NULL else JSONObject.NULL)
+            .put(
+                "web_chat_model",
+                if (friend.isSocialAi()) feature?.webChatModel()?.takeIf(String::isNotBlank) ?: JSONObject.NULL
+                else JSONObject.NULL,
+            )
             .put("message_count", messages.size)
             .put("messages", JSONArray().apply {
                 messages.takeLast(MAX_SOCIAL_MESSAGES).forEachIndexed { offset, message ->

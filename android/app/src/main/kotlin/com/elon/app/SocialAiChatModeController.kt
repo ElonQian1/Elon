@@ -13,29 +13,40 @@ internal class SocialAiChatModeController(
     private val closeProjectChat: () -> Unit,
     private val openFriend: (AppFriend) -> Unit,
     private val onFriendOpened: () -> Unit,
+    private val activateWorkMode: () -> Unit,
+    private val activateChatProvider: (WebChatProviderIdentity) -> Unit,
+    private val deactivateChatProvider: () -> Unit,
 ) {
+    private val modeStore = SocialAiModeStore(activity)
+    private var activeFriendIsSocialAi = false
+    private var interactionMode = modeStore.interactionMode()
+    private var providerId = modeStore.providerId()
+
     fun onFriendChanged(friend: AppFriend?) {
-        val active = friend.isSocialAi()
-        binding.topTitleText.apply {
-            isClickable = active
-            isFocusable = active
-            contentDescription = if (active) {
-                activity.getString(R.string.social_ai_mode_current_description)
-            } else {
-                friend?.name.orEmpty()
-            }
-            setCompoundDrawablesRelativeWithIntrinsicBounds(
-                0,
-                0,
-                if (active) R.drawable.ic_input_chevron_new else 0,
-                0,
-            )
-            compoundDrawablePadding = if (active) dp(6) else 0
-            setOnClickListener(if (active) android.view.View.OnClickListener { showSelector() } else null)
+        activeFriendIsSocialAi = friend.isSocialAi()
+        if (!activeFriendIsSocialAi) {
+            deactivateChatProvider()
+            configureTitle(friend?.name.orEmpty(), false)
+            return
+        }
+        configureTitle(activeTitle(), true)
+        binding.root.post {
+            if (activeFriendIsSocialAi) applyCurrentMode()
         }
     }
 
     fun openChatGptWeb() {
+        providerId = WebChatProviderId.CHATGPT_WEB
+        interactionMode = SocialAiInteractionMode.CHAT
+        persist()
+        if (activeFriendIsSocialAi) {
+            applyCurrentMode()
+        } else {
+            openSocialAiChat()
+        }
+    }
+
+    fun openOfficialFallback() {
         activity.startActivity(ChatGptWebTestActivity.createProductIntent(activity))
     }
 
@@ -48,27 +59,131 @@ internal class SocialAiChatModeController(
         return true
     }
 
+    fun selectInteractionMode(mode: SocialAiInteractionMode): Boolean {
+        interactionMode = mode
+        persist()
+        if (activeFriendIsSocialAi) applyCurrentMode()
+        return true
+    }
+
+    fun selectChatProvider(id: WebChatProviderId): Boolean {
+        val provider = WebChatProviderRegistry.get(id)
+        if (!provider.available) return false
+        providerId = id
+        interactionMode = SocialAiInteractionMode.CHAT
+        persist()
+        if (activeFriendIsSocialAi) applyCurrentMode()
+        return true
+    }
+
+    fun interactionMode(): SocialAiInteractionMode = interactionMode
+
+    fun providerId(): WebChatProviderId = providerId
+
+    fun isChatModeActive(): Boolean =
+        activeFriendIsSocialAi && interactionMode == SocialAiInteractionMode.CHAT
+
+    private fun applyCurrentMode() {
+        when (interactionMode) {
+            SocialAiInteractionMode.WORK -> activateWorkMode()
+            SocialAiInteractionMode.CHAT -> {
+                val provider = WebChatProviderRegistry.get(providerId)
+                if (provider.available) {
+                    activateChatProvider(provider)
+                } else {
+                    interactionMode = SocialAiInteractionMode.WORK
+                    persist()
+                    activateWorkMode()
+                }
+            }
+        }
+        configureTitle(activeTitle(), true)
+    }
+
     private fun showSelector() {
-        AlertDialog.Builder(activity)
+        val checked = if (interactionMode == SocialAiInteractionMode.WORK) MODE_WORK else MODE_CHAT
+        val dialog = AlertDialog.Builder(activity)
             .setTitle(R.string.social_ai_mode_picker_title)
             .setSingleChoiceItems(
                 arrayOf(
-                    activity.getString(R.string.social_ai_mode_yilong),
-                    activity.getString(R.string.social_ai_mode_chatgpt_web),
+                    activity.getString(R.string.social_ai_mode_work),
+                    activity.getString(R.string.social_ai_mode_chat),
                 ),
-                MODE_YILONG,
-            ) { dialog, which ->
-                dialog.dismiss()
-                if (which == MODE_CHATGPT_WEB) openChatGptWeb()
+                checked,
+            ) { selector, which ->
+                selector.dismiss()
+                if (which == MODE_WORK) {
+                    selectInteractionMode(SocialAiInteractionMode.WORK)
+                } else {
+                    showProviderSelector()
+                }
             }
-            .setNegativeButton("取消", null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .apply {
+                if (interactionMode == SocialAiInteractionMode.CHAT) {
+                    setNeutralButton(R.string.web_chat_open_official, null)
+                }
+            }
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener { openOfficialFallback() }
+        }
+        dialog.show()
+    }
+
+    private fun showProviderSelector() {
+        val providers = WebChatProviderRegistry.available()
+        val checked = providers.indexOfFirst { it.id == providerId }.coerceAtLeast(0)
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.web_chat_provider_picker_title)
+            .setSingleChoiceItems(providers.map { it.displayName }.toTypedArray(), checked) { dialog, which ->
+                providers.getOrNull(which)?.let { selectChatProvider(it.id) }
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
+    private fun activeTitle(): String = when (interactionMode) {
+        SocialAiInteractionMode.WORK -> activity.getString(R.string.social_ai_mode_work_title)
+        SocialAiInteractionMode.CHAT -> WebChatProviderRegistry.get(providerId).displayName
+    }
+
+    private fun configureTitle(title: String, selectable: Boolean) {
+        binding.topTitleText.apply {
+            text = title
+            isClickable = selectable
+            isFocusable = selectable
+            contentDescription = if (selectable) {
+                activity.getString(
+                    R.string.social_ai_mode_current_description,
+                    if (interactionMode == SocialAiInteractionMode.WORK) {
+                        activity.getString(R.string.social_ai_mode_work_short)
+                    } else {
+                        activity.getString(R.string.social_ai_mode_chat_short)
+                    },
+                    title,
+                )
+            } else {
+                title
+            }
+            setCompoundDrawablesRelativeWithIntrinsicBounds(
+                0,
+                0,
+                if (selectable) R.drawable.ic_input_chevron_new else 0,
+                0,
+            )
+            compoundDrawablePadding = if (selectable) dp(6) else 0
+            setOnClickListener(if (selectable) android.view.View.OnClickListener { showSelector() } else null)
+        }
+    }
+
+    private fun persist() = modeStore.save(interactionMode, providerId)
+
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 
-    companion object {
-        private const val MODE_YILONG = 0
-        private const val MODE_CHATGPT_WEB = 1
+    private companion object {
+        const val MODE_WORK = 0
+        const val MODE_CHAT = 1
     }
 }

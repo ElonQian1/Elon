@@ -76,12 +76,7 @@ internal class MainFriendChatActions(
     fun openFriend(friend: AppFriend, animate: Boolean) {
         activeFriend = friend
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
-        val adapter = ChatAdapter(
-            messages = messages,
-            onMessageLongPress = showMessageActions,
-            onProjectShareAction = onProjectShareAction,
-            onProjectShareLongPress = onProjectShareLongPress
-        )
+        val adapter = createAdapter(messages)
         activeAdapter = adapter
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
@@ -117,6 +112,28 @@ internal class MainFriendChatActions(
         ?.let(messagesByFriend::get)
         ?.toList()
         .orEmpty()
+
+    fun rebindCurrentFriend() {
+        val friend = activeFriend ?: return
+        val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+        val adapter = createAdapter(messages)
+        activeAdapter = adapter
+        setChatAdapter(adapter)
+        binding.chatList.adapter = adapter
+        savedFriendTitle = friend.name
+        binding.topTitleText.text = friend.name
+        binding.inputEdit.removeTextChangedListener(typingWatcher)
+        binding.inputEdit.addTextChangedListener(typingWatcher)
+        if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        startPolling()
+    }
+
+    fun suspendForExternalChat() {
+        binding.inputEdit.removeTextChangedListener(typingWatcher)
+        typingHandler.removeCallbacks(hideTypingRunnable)
+        typingShowing = false
+        stopPolling()
+    }
 
     fun clearCurrentMessages() {
         val friend = activeFriend ?: return
@@ -172,6 +189,13 @@ internal class MainFriendChatActions(
         polling = false
         pollHandler.removeCallbacks(pollRunnable)
     }
+
+    private fun createAdapter(messages: MutableList<ChatMessage>): ChatAdapter = ChatAdapter(
+        messages = messages,
+        onMessageLongPress = showMessageActions,
+        onProjectShareAction = onProjectShareAction,
+        onProjectShareLongPress = onProjectShareLongPress,
+    )
 
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         val friend = activeFriend ?: return false

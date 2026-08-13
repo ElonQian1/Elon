@@ -1,0 +1,207 @@
+package com.elon.app
+
+import android.view.View
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.chatgptweb.ChatGptBackgroundSession
+import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
+import com.elon.app.chatgptweb.ChatGptWebComposerOption
+import com.elon.app.chatgptweb.ChatGptWebEvent
+import com.elon.app.chatgptweb.ChatGptWebSnapshot
+import com.elon.app.databinding.ActivityMainBinding
+
+internal class ChatGptSocialChatController(
+    private val activity: AppCompatActivity,
+    private val binding: ActivityMainBinding,
+    private val setChatAdapter: (ChatAdapter) -> Unit,
+    private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val clearPendingSendState: () -> Unit,
+    private val collapseInputComposer: () -> Unit,
+    private val openOfficialFallback: () -> Unit,
+) {
+    private val messages = mutableListOf<ChatMessage>()
+    private val timestamps = linkedMapOf<String, Long>()
+    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions)
+    private val session = ChatGptBackgroundSession(
+        activity = activity,
+        host = binding.chatListFrame,
+        onSnapshot = ::renderSnapshot,
+        onStateChanged = ::renderState,
+        onComposerOptions = ::showModelOptions,
+        onCommandResult = ::handleCommandResult,
+    )
+    private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+    private var active = false
+    private var pendingPrompt: String? = null
+
+    fun activate(identity: WebChatProviderIdentity) {
+        provider = identity
+        active = true
+        setChatAdapter(adapter)
+        binding.chatList.adapter = adapter
+        if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        session.activate()
+        session.currentSnapshot()?.let(::renderSnapshot)
+        updateComposerModel(session.currentSnapshot()?.currentModel.orEmpty())
+    }
+
+    fun deactivate() {
+        active = false
+    }
+
+    fun isActive(): Boolean = active
+
+    fun currentMessages(): List<ChatMessage> = messages.toList()
+
+    fun stateWireValue(): String = session.state().wireValue
+
+    fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
+
+    fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
+        if (!active) return false
+        if (pendingAttachments.isNotEmpty()) {
+            Toast.makeText(activity, R.string.web_chat_attachment_fallback, Toast.LENGTH_LONG).show()
+            openOfficialFallback()
+            return true
+        }
+        val prompt = rawText.trim()
+        if (prompt.isBlank()) return true
+        if (!session.canSend()) {
+            val message = if (session.state() == ChatGptBackgroundSession.State.LOGIN_REQUIRED) {
+                R.string.web_chat_login_required
+            } else {
+                R.string.web_chat_not_ready
+            }
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+            openOfficialFallback()
+            return true
+        }
+        pendingPrompt = prompt
+        renderSnapshot(session.currentSnapshot() ?: return true)
+        if (!session.sendPrompt(prompt)) {
+            pendingPrompt = null
+            Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_LONG).show()
+            return true
+        }
+        binding.inputEdit.text?.clear()
+        clearPendingSendState()
+        collapseInputComposer()
+        return true
+    }
+
+    fun requestModelOptions() {
+        if (!session.requestModelOptions()) {
+            Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun stopGeneration() = session.stopGeneration()
+
+    fun startNewConversation() {
+        pendingPrompt = null
+        session.startNewConversation()
+    }
+
+    fun onHostResumed() = session.onHostResumed()
+
+    fun onHostPaused() = session.onHostPaused()
+
+    fun destroy() = session.destroy()
+
+    private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
+        val cleanPending = pendingPrompt?.trim().orEmpty()
+        if (
+            cleanPending.isNotEmpty() &&
+            snapshot.messages.lastOrNull { it.role == "user" }?.content?.trim() == cleanPending
+        ) {
+            pendingPrompt = null
+        }
+        val mapped = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot,
+            provider = provider,
+            pendingPrompt = pendingPrompt,
+            timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
+        )
+        messages.clear()
+        messages.addAll(mapped)
+        if (!active) return
+        adapter.notifyDataSetChanged()
+        if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        updateComposerModel(snapshot.currentModel)
+    }
+
+    private fun renderState(state: ChatGptBackgroundSession.State, detail: String?) {
+        if (!active) return
+        if (messages.isEmpty()) when (state) {
+            ChatGptBackgroundSession.State.LOADING -> renderStatusMessage("正在连接 ChatGPT 网页 AI…")
+            ChatGptBackgroundSession.State.LOGIN_REQUIRED -> renderStatusMessage(
+                "登录状态已失效，请在顶部模式菜单打开“官网功能”完成登录。",
+            )
+            ChatGptBackgroundSession.State.ERROR -> renderStatusMessage(
+                detail?.takeIf(String::isNotBlank) ?: "ChatGPT 网页 AI 暂时不可用。",
+            )
+            ChatGptBackgroundSession.State.IDLE, ChatGptBackgroundSession.State.READY -> Unit
+        }
+        if (state == ChatGptBackgroundSession.State.ERROR && !detail.isNullOrBlank()) {
+            Toast.makeText(activity, detail, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
+        if (event.action != "send_prompt" || event.ok) return
+        pendingPrompt = null
+        session.currentSnapshot()?.let(::renderSnapshot)
+        Toast.makeText(
+            activity,
+            event.detail.ifBlank { activity.getString(R.string.chatgpt_native_command_failed) },
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
+    private fun renderStatusMessage(content: String) {
+        val id = "${provider.id.wireValue}:status"
+        messages.clear()
+        messages += ChatMessage(
+            role = "friend",
+            content = content,
+            senderLabel = provider.displayName,
+            senderAvatarResId = provider.avatarResId,
+            id = id,
+            createdAtMs = timestamps.getOrPut(id) { System.currentTimeMillis() },
+        )
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun showModelOptions(options: List<ChatGptWebComposerOption>) {
+        if (!active) return
+        val selectable = options.filter { it.id.isNotBlank() }
+        if (selectable.isEmpty()) {
+            Toast.makeText(activity, R.string.web_chat_model_options_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val selected = selectable.indexOfFirst(ChatGptWebComposerOption::selected).coerceAtLeast(0)
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.web_chat_model_picker_title)
+            .setSingleChoiceItems(selectable.map { it.label }.toTypedArray(), selected) { dialog, which ->
+                selectable.getOrNull(which)?.let { session.selectModel(it.id) }
+                dialog.dismiss()
+            }
+            .setNeutralButton(R.string.web_chat_open_official, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+            .also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { openOfficialFallback() }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun updateComposerModel(model: String) {
+        if (!active) return
+        val label = model.ifBlank { provider.displayName }
+        binding.modelButton.text = label
+        binding.modelButton.contentDescription = "聊天模式；提供方：${provider.displayName}；模型：$label"
+    }
+}

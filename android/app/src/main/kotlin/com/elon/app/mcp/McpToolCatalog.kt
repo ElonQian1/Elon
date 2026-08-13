@@ -193,7 +193,7 @@ internal fun mcpToolsListResult(): JSONObject {
                     title = "Native UI Control",
                     description = "Control project chat, social AI chat, and the ChatGPT Web mirror through stable native actions and semantic control ids.",
                     properties = JSONObject()
-                        .put("action", stringProperty("Includes open_main, state, project actions, open_social_ai_chat, open_chatgpt_web, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
+                        .put("action", stringProperty("Includes open_main, state, project actions, open_social_ai_chat, open_chatgpt_web, set_social_ai_interaction_mode, select_web_chat_provider, open_chatgpt_official_fallback, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
                         .put("project_id", stringProperty("Optional project id or project space id."))
                         .put("project_index", intProperty("Optional project index."))
                         .put("conversation_id", stringProperty("Optional local conversation id."))
@@ -219,7 +219,9 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("message_offset", intProperty("Zero-based message offset for chatgpt_get_context."))
                         .put("message_limit", intProperty("Page size from 1 to 40 for chatgpt_get_context."))
                         .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false."))
-                        .put("wait_for_target_bind_ms", intProperty("How long open_chatgpt_web waits for the target Activity controller, 0-15000. Defaults to 8000."))
+                        .put("wait_for_target_bind_ms", intProperty("How long open_chatgpt_official_fallback waits for the full-screen official Activity controller, 0-15000. Defaults to 8000."))
+                        .put("mode", stringProperty("Interaction mode for set_social_ai_interaction_mode: work or chat."))
+                        .put("provider_id", stringProperty("Web chat provider for select_web_chat_provider. Currently chatgpt_web."))
                         .put("main_thread_timeout_ms", intProperty("How long native MCP waits for the APK main thread, 1000-60000. Defaults to 15000.")),
                     required = JSONArray().put("action")
                 )

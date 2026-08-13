@@ -166,7 +166,7 @@ internal object McpNativeControlBridge {
     }
 
     internal fun targetSurfaceFor(action: String): String? = when (action) {
-        "open_chatgpt_web" -> "chatgpt_web"
+        "open_chatgpt_official_fallback" -> "chatgpt_web"
         else -> null
     }
 

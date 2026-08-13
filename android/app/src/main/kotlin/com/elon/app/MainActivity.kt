@@ -2,8 +2,6 @@ package com.elon.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -20,8 +18,6 @@ import com.elon.app.update.AppUpdateManager
 import java.util.Date
 import kotlin.concurrent.thread
 
-private const val SOCIAL_SUMMARY_REFRESH_MS = 8_000L
-
 private sealed class SuspendedSocialChat {
     data class Friend(val friend: AppFriend) : SuspendedSocialChat()
     data class Group(val group: AppGroup) : SuspendedSocialChat()
@@ -32,13 +28,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var agentPageController: AgentPageController
-    private val socialSummaryHandler = Handler(Looper.getMainLooper())
-    private val socialSummaryRefreshRunnable = object : Runnable {
-        override fun run() {
-            refreshSocialSummaries()
-            socialSummaryHandler.postDelayed(this, SOCIAL_SUMMARY_REFRESH_MS)
-        }
-    }
     private var pendingProjectIconId: String? = null
     private var suspendedSocialChatForProjectReturn: SuspendedSocialChat? = null
     private val projectIconPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -228,7 +217,8 @@ class MainActivity : AppCompatActivity() {
                 friendChatActions.isActive() || groupChatActions.isActive()
             },
             trySendFriendMessage = { text, attachments ->
-                projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
+                socialAiChatFeature.trySendMessage(text, attachments) ||
+                    projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
                     groupChatActions.trySendMessage(text, attachments) ||
                     friendChatActions.trySendMessage(text, attachments)
             },
@@ -277,9 +267,14 @@ class MainActivity : AppCompatActivity() {
             runningTaskCount = { s.runningConversationTasks.size },
             currentStage = { projectStateActions.currentStage },
             activeFriend = friendChatActions::currentFriend,
-            activeFriendMessages = friendChatActions::currentMessages,
-            openSocialAiChat = socialAiChatModeController::openSocialAiChat,
-            openChatGptWeb = socialAiChatModeController::openChatGptWeb,
+            activeFriendMessages = {
+                if (socialAiChatFeature.isChatModeActive()) {
+                    socialAiChatFeature.currentMessages()
+                } else {
+                    friendChatActions.currentMessages()
+                }
+            },
+            socialAiChatFeature = { socialAiChatFeature },
             rememberMcpConversationSeed = { seed ->
                 rememberPendingMcpConversationSeed(prefs, s.gson, seed)
             }
@@ -357,10 +352,10 @@ class MainActivity : AppCompatActivity() {
             profileQuickActions.refreshProfileSummary()
             if (::chatAdapter.isInitialized) chatAdapter.refreshUserProfile()
         }
-        friendChatActions.resumeIfActive()
+        socialAiChatFeature.onHostResumed { friendChatActions.resumeIfActive() }
         groupChatActions.resumeIfActive()
         projectSpaceController.resumeIfActive()
-        startSocialSummaryPolling()
+        socialSummaryPolling.start()
         syncVisibleChatNotificationState()
         if (AuthManager.isLoggedIn(this)) {
             TaskBackgroundKeepAlive.maybePromptForChatKeepAlive(this, prefs)
@@ -403,8 +398,9 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         s.appInForeground = false
         syncVisibleChatNotificationState()
-        stopSocialSummaryPolling()
+        socialSummaryPolling.stop()
         friendChatActions.stopPolling()
+        socialAiChatFeature.onHostPaused()
         groupChatActions.stopPolling()
         projectSpaceController.stopPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
@@ -413,7 +409,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         s.appInForeground = false
-        stopSocialSummaryPolling()
+        socialSummaryPolling.stop()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         projectStateActions.saveProjects()
         val gws = (application as ElonApplication).globalWs
@@ -999,19 +995,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startSocialSummaryPolling() {
-        socialSummaryHandler.removeCallbacks(socialSummaryRefreshRunnable)
-        refreshSocialSummaries()
-        socialSummaryHandler.postDelayed(socialSummaryRefreshRunnable, SOCIAL_SUMMARY_REFRESH_MS)
-    }
-
-    private fun stopSocialSummaryPolling() {
-        socialSummaryHandler.removeCallbacks(socialSummaryRefreshRunnable)
-    }
-
-    private fun refreshSocialSummaries() {
-        friendActions.loadFriends()
-        groupActions.loadGroups()
+    private val socialSummaryPolling by lazy {
+        MainSocialSummaryPolling {
+            friendActions.loadFriends()
+            groupActions.loadGroups()
+        }
     }
 
     private val friendChatActions: MainFriendChatActions by lazy {
@@ -1031,12 +1019,12 @@ class MainActivity : AppCompatActivity() {
             clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() },
-            onActiveFriendChanged = socialAiChatModeController::onFriendChanged,
+            onActiveFriendChanged = socialAiChatFeature::onFriendChanged,
         )
     }
 
-    private val socialAiChatModeController: SocialAiChatModeController by lazy {
-        SocialAiChatModeController(
+    private val socialAiChatFeature: MainSocialAiChatFeature by lazy {
+        MainSocialAiChatFeature(
             activity = this,
             binding = binding,
             findSocialAiFriend = { SocialAiIdentity.resolve(s.friends) },
@@ -1044,6 +1032,15 @@ class MainActivity : AppCompatActivity() {
             closeProjectChat = { projectSpaceController.closeChannelChat() },
             openFriend = { friend -> friendChatActions.openFriend(friend, animate = false) },
             onFriendOpened = ::syncVisibleChatNotificationState,
+            rebindWorkFriend = { friendChatActions.rebindCurrentFriend() },
+            suspendWorkFriend = { friendChatActions.suspendForExternalChat() },
+            setChatAdapter = ::setAdapterAndWireApkActions,
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            clearPendingSendState = inputActions::clearPendingSendState,
+            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
+            inputComposerViews = inputActions::inputComposerViewsOrNull,
+            showWorkModelSelector = modelActions::showModelPopupOrLoad,
+            updateWorkModel = modelActions::updateModelButton,
         )
     }
 
@@ -1589,10 +1586,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         mcpNativeControlBinding.unregister()
-        stopSocialSummaryPolling()
+        socialSummaryPolling.stop()
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
         projectSpaceController.stopPolling()
+        socialAiChatFeature.destroy()
         lifecycleEdgeActions.onDestroy()
         super.onDestroy()
     }
