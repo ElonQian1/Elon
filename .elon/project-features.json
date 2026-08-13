@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "features": [
+    {
+      "id": "project-feature-registry-adoption-v1",
+      "title": "一龙项目功能注册表启用 V1",
+      "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
+      "status": "proposed",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/project-feature-registry-adoption-v1.md",
+        "content_hash": "d20c1ad74fcb07fcd8ed6e4880e9cb022be1f727515e7a4cc65d6b84cb952a3b",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "8f7b832f54fb708960bb3cc9a6d8a4b7bcf6ab07",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "4438f8f14ce42117ff06b6189ac3810a5d96f464",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "project-governance",
+      "tags": [
+        "governance",
+        "agent-workflow",
+        "deduplication"
+      ],
+      "task_paths": [
+        ".elon/project-features.json",
+        "AI_CURRENT.md",
+        "docs/project-feature-registry.md",
+        "docs/requirements/project-feature-registry-adoption-v1.md",
+        "server/src/node_agent_project_feature_mcp.rs",
+        "server/src/project_feature_registry.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "注册表由正式 MCP 创建并绑定当前需求哈希",
+        "list/plan/check_drift 返回有界结果且不返回正文",
+        "功能状态机、认领、证据和漂移失败关闭可用",
+        "AI_CURRENT 记录启用状态和首批小规模边界",
+        "文档及功能工作流回归通过并与需求同提交"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1786619748837,
+      "updated_at_ms": 1786619748837
+    }
+  ],
+  "audit_log": [
+    {
+      "id": "feature_event_e7ffc6c68fa24e25912951f0f58a48fe",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "registered",
+      "actor": "codex-goal",
+      "reason": "当前功能工作流已实现，但一龙项目自身注册表为空，其他代理仍依赖长文档猜测功能状态。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786619748837
+    }
+  ]
+}
