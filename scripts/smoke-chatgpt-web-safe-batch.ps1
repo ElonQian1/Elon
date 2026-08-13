@@ -7,12 +7,13 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(30, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91,
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$SkipUnlockNotification
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec

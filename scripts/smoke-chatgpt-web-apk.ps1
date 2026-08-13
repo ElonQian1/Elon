@@ -8,7 +8,7 @@ param(
     [int]$ReadyTimeoutSec = 90,
     [int]$ReplyTimeoutSec = 90,
     [int]$PollIntervalSec = 3,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91,
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$AllowStaleDeviceEvidence,
     [switch]$SendProbe,
     [switch]$VerifyStop,
@@ -27,6 +27,7 @@ foreach ($helper in @($invokeMcp, $evidenceHelper, $runtimeHelper)) {
 }
 . $evidenceHelper
 . $runtimeHelper
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
     throw "adb not found: $Adb"
 }

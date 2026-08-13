@@ -8,12 +8,13 @@ param(
     [ValidateRange(15, 480)][int]$DurationMinutes = 120,
     [ValidateRange(10, 120)][int]$PollIntervalSec = 30,
     [ValidateRange(20, 180)][int]$RecoveryTimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91,
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [string]$CheckpointPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 
 if (-not $CheckpointPath.Trim()) {
     $CheckpointPath = Join-Path (Split-Path $PSScriptRoot -Parent) `

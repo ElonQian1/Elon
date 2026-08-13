@@ -8,11 +8,12 @@ param(
     [Parameter(Mandatory = $true)][ValidateSet("health", "finances")][string]$FeatureKind,
     [switch]$UserConfirmedSensitiveFeature,
     [ValidateRange(20, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-feature-audit-policy.ps1")
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
 

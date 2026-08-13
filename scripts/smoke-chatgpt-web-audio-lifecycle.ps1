@@ -21,11 +21,12 @@ param(
     [string]$CheckpointPath = "",
     [ValidateRange(5, 60)][int]$ManualDictationGraceSec = 30,
     [ValidateRange(10, 180)][int]$TimeoutSec = 90,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-supervised-runtime.ps1")
 

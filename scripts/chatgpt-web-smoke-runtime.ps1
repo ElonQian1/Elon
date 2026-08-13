@@ -6,6 +6,28 @@ if (-not (Test-Path -LiteralPath $nativeCommandModule -PathType Leaf)) {
 }
 . $nativeCommandModule
 
+function Resolve-ChatGptWebSmokeExpectedAdapterVersion {
+    param(
+        [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
+        [string]$RepositoryRoot = ""
+    )
+
+    if ($ExpectedAdapterVersion -gt 0) { return $ExpectedAdapterVersion }
+    $root = $RepositoryRoot.Trim()
+    if (-not $root) { $root = Split-Path -Parent $PSScriptRoot }
+    $adapterPath = Join-Path $root `
+        "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
+    if (-not (Test-Path -LiteralPath $adapterPath -PathType Leaf)) {
+        throw "Unable to resolve ChatGPT adapter version; source not found: $adapterPath"
+    }
+    $source = Get-Content -LiteralPath $adapterPath -Raw
+    $match = [regex]::Match($source, 'ADAPTER_VERSION\s*=\s*(\d+)')
+    if (-not $match.Success) {
+        throw "Unable to resolve ChatGPT adapter version from: $adapterPath"
+    }
+    return [int]$match.Groups[1].Value
+}
+
 function New-ChatGptWebSmokeRuntime {
     param(
         [Parameter(Mandatory = $true)][string]$Adb,

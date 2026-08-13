@@ -9,11 +9,12 @@ param(
     [ValidateRange(30, 600)][int]$TotalTimeoutSec = 180,
     [ValidateRange(1, 10)][int]$PollIntervalSec = 2,
     [ValidateRange(1, 12)][int]$MaxFeaturePages = 8,
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 91
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-feature-audit-policy.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `

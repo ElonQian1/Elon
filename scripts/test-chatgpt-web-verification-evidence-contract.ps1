@@ -67,6 +67,7 @@ $expected = [ordered]@{
 }
 
 foreach ($token in @(
+    "function Resolve-ChatGptWebSmokeExpectedAdapterVersion",
     "function Register-ChatGptWebVerificationCases",
     'Action "chatgpt_record_verification_cases"',
     "expected_adapter_version = `$ExpectedAdapterVersion",
@@ -98,10 +99,18 @@ Get-ChildItem (Join-Path $repoRoot "scripts") -Filter "*chatgpt-web*.ps1" | ForE
     $content = Get-Content $_.FullName -Raw
     $matches = [regex]::Matches($content, "ExpectedAdapterVersion\s*=\s*(\d+)")
     foreach ($match in $matches) {
-        if ([int]$match.Groups[1].Value -ne $adapterVersion) {
+        if ([int]$match.Groups[1].Value -notin @(0, $adapterVersion)) {
             throw "Stale ChatGPT Web adapter default in $($_.Name): $($match.Groups[1].Value)"
         }
     }
+}
+
+. (Join-Path $repoRoot "scripts/chatgpt-web-smoke-runtime.ps1")
+if ((Resolve-ChatGptWebSmokeExpectedAdapterVersion) -ne $adapterVersion) {
+    throw "ChatGPT Web smoke runtime did not resolve the current adapter version."
+}
+if ((Resolve-ChatGptWebSmokeExpectedAdapterVersion -ExpectedAdapterVersion 77) -ne 77) {
+    throw "Explicit ChatGPT Web smoke adapter pin was not preserved."
 }
 
 Write-Output "ChatGPT Web verification evidence contracts passed."
