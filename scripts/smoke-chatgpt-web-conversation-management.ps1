@@ -42,6 +42,40 @@ function Wait-ConversationOptions {
     throw "No conversation-scoped options control is available."
 }
 
+function Wait-ConversationManagementMenu {
+    param([Parameter(Mandatory = $true)][string]$ContextId)
+
+    $managementSemantics = @(
+        "conversation_files",
+        "rename",
+        "pin",
+        "archive",
+        "share",
+        "delete"
+    )
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $lastControls = @()
+    do {
+        Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_refresh_controls" -TimeoutSec 15 | Out-Null
+        $menu = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_find_controls" -Arguments @{
+                context_id = $ContextId
+                region = "overlay"
+                limit = 100
+            }
+        $lastControls = @($menu.controls)
+        $recognized = @($lastControls | Where-Object {
+            [string]$_.semantic -in $managementSemantics
+        })
+        if ($recognized.Count -gt 0) {
+            return $lastControls
+        }
+        Start-Sleep -Seconds 1
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $lastControls
+}
+
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
@@ -73,13 +107,7 @@ try {
     }
     $menuOpened = $true
 
-    $menu = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action "chatgpt_find_controls" -Arguments @{
-            context_id = $conversationContextId
-            region = "overlay"
-            limit = 100
-        }
-    $menuControls = @($menu.controls)
+    $menuControls = @(Wait-ConversationManagementMenu -ContextId $conversationContextId)
     $observedSemantics = @(
         $menuControls |
             Where-Object { [string]$_.semantic -ne "conversation_options" } |
