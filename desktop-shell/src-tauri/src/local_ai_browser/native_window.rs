@@ -142,16 +142,26 @@ pub(super) async fn open(
         "target": safe_url(&url),
         }),
     );
-    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(bootstrap_url))
+    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(bootstrap_url))
         .title(format!("{} · 一龙聊天", provider.display_name))
         .inner_size(940.0, 760.0)
         .min_inner_size(720.0, 560.0)
         .center()
-        .parent(&webview)
-        .map_err(display_error)?
         .focused(true)
         .enable_clipboard_access()
-        .initialization_script(include_str!("native_window_probe.js"))
+        .initialization_script(include_str!("native_window_probe.js"));
+    // Windows 的 `parent` 会创建 WS_CHILD：在 WebView2/Tao 下表现为 16x16
+    // 占位窗口，日志虽显示创建成功，用户却看不到独立聊天窗。Windows 顶层附属窗
+    // 必须用 `owner`；其它平台继续使用各自的 parent/transient 语义。
+    #[cfg(windows)]
+    {
+        builder = builder.owner(&webview).map_err(display_error)?;
+    }
+    #[cfg(not(windows))]
+    {
+        builder = builder.parent(&webview).map_err(display_error)?;
+    }
+    let window = builder
         .on_navigation(move |candidate| {
             let allowed = navigation_origin.allows(candidate);
             record(
@@ -268,7 +278,7 @@ pub(super) async fn open(
         "一龙 AI 子窗口已创建",
         json!({
             "parent_label": webview.label(),
-            "window_role": "managed_child",
+            "window_role": "owned_top_level",
             "requested_inner_width": 940,
             "requested_inner_height": 760,
         }),
