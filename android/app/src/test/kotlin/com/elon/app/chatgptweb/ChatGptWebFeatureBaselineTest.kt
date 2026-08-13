@@ -19,7 +19,7 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v6", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v7", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
             ChatGptWebFeatureBaseline.DEVICE_VERIFICATION_ADAPTER_VERSION,
@@ -56,7 +56,7 @@ class ChatGptWebFeatureBaselineTest {
             (0 until actions.length()).forEach { actionIndex ->
                 assertTrue(actions.getString(actionIndex) in AVAILABLE_MCP_ACTIONS)
             }
-            if (feature.getString("implementation_status") == "complete") {
+            if (feature.getString("code_status") != "partial") {
                 assertTrue(feature.isNull("remaining_gap"))
             } else {
                 assertFalse(feature.isNull("remaining_gap"))
@@ -204,8 +204,9 @@ class ChatGptWebFeatureBaselineTest {
             baseline.getJSONArray("remaining_feature_ids").length(),
         )
         assertTrue(summary.getInt("complete") > 0)
-        assertTrue(summary.getInt("partial") > 0)
-        assertTrue(summary.getInt("fallback_only") > 0)
+        assertEquals(0, summary.getInt("partial"))
+        assertEquals(1, summary.getInt("fallback_only"))
+        assertEquals(0, summary.getInt("remaining"))
         assertEquals(41, codeSummary.getInt("implemented"))
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
@@ -268,6 +269,10 @@ class ChatGptWebFeatureBaselineTest {
             feature(baseline, "session_long_running_stability").getString("verification_status"),
         )
         assertFalse(feature(baseline, "session_long_running_stability").isNull("verification_gap"))
+        assertEquals(
+            "complete",
+            feature(baseline, "session_long_running_stability").getString("implementation_status"),
+        )
         listOf(
             "projects",
             "tasks",
