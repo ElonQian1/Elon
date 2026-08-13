@@ -326,68 +326,66 @@ Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originViewMode = [string]$origin.view_mode
 $originConversationPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url)
-
-$temporaryChatOrigin = Get-TemporaryChatControl
-if ($null -eq $temporaryChatOrigin) {
-    throw "Temporary Chat is not observable as a dedicated header control."
+$temporaryConversationUsed = $false
+if ($originViewMode -ne "web") {
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
+        -Arguments @{ view_mode = "web" } | Out-Null
+    Wait-ViewMode -ExpectedMode "web" | Out-Null
 }
-$temporaryChatSelectionObservable = [bool]$temporaryChatOrigin.state_settable
-$temporaryChatOriginalSelected = [bool]$temporaryChatOrigin.selected
-$temporaryChatTargetSelected = -not $temporaryChatOriginalSelected
-$temporaryChatFirstReceiptSucceeded = $false
-$temporaryChatIdempotentReceiptSucceeded = $false
-$temporaryChatRestoreReceiptSucceeded = $false
-$temporaryChatRestored = $false
-try {
-    Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
-        -ExpectedAction "set_ui_control_selected" -Arguments @{
-            control_id = [string]$temporaryChatOrigin.control_id
-            selected = $temporaryChatTargetSelected
-        } | Out-Null
-    $temporaryChatFirstReceiptSucceeded = $true
-    $temporaryChatChanged = Wait-TemporaryChatState -Expected $temporaryChatTargetSelected
-    Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
-        -ExpectedAction "set_ui_control_selected" -Arguments @{
-            control_id = [string]$temporaryChatChanged.control_id
-            selected = $temporaryChatTargetSelected
-        } | Out-Null
-    $temporaryChatIdempotentReceiptSucceeded = $true
-    Wait-TemporaryChatState -Expected $temporaryChatTargetSelected | Out-Null
-} finally {
-    if ($temporaryChatFirstReceiptSucceeded) {
-        $restoreTemporaryChat = Get-TemporaryChatControl
-        if ($null -eq $restoreTemporaryChat) {
-            throw "Temporary Chat control disappeared before desired-state restoration."
-        }
-        Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
-            -ExpectedAction "set_ui_control_selected" -Arguments @{
-                control_id = [string]$restoreTemporaryChat.control_id
-                selected = $temporaryChatOriginalSelected
-            } | Out-Null
-        $temporaryChatRestoreReceiptSucceeded = $true
-        Wait-TemporaryChatState -Expected $temporaryChatOriginalSelected | Out-Null
-        $temporaryChatRestored = $true
-    }
-}
-if (-not $temporaryChatFirstReceiptSucceeded -or -not $temporaryChatRestored) {
-    throw "Temporary Chat desired-state command round trip was not completed."
+if ($originConversationPath) {
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation" | Out-Null
+    Wait-BlankConversation | Out-Null
+    $temporaryConversationUsed = $true
 }
 
 $modelRestored = $false
 $modelViewRestored = $false
 $modelConversationRestored = $false
-$temporaryConversationUsed = $false
 try {
-    if ($originViewMode -ne "web") {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = "web" } | Out-Null
-        Wait-ViewMode -ExpectedMode "web" | Out-Null
+    $temporaryChatOrigin = Get-TemporaryChatControl
+    if ($null -eq $temporaryChatOrigin) {
+        throw "Temporary Chat is not observable in a blank conversation."
     }
-
-    if ($originConversationPath) {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation" | Out-Null
-        Wait-BlankConversation | Out-Null
-        $temporaryConversationUsed = $true
+    $temporaryChatSelectionObservable = [bool]$temporaryChatOrigin.state_settable
+    $temporaryChatOriginalSelected = [bool]$temporaryChatOrigin.selected
+    $temporaryChatTargetSelected = -not $temporaryChatOriginalSelected
+    $temporaryChatFirstReceiptSucceeded = $false
+    $temporaryChatIdempotentReceiptSucceeded = $false
+    $temporaryChatRestoreReceiptSucceeded = $false
+    $temporaryChatRestored = $false
+    try {
+        Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+            -ExpectedAction "set_ui_control_selected" -Arguments @{
+                control_id = [string]$temporaryChatOrigin.control_id
+                selected = $temporaryChatTargetSelected
+            } | Out-Null
+        $temporaryChatFirstReceiptSucceeded = $true
+        $temporaryChatChanged = Wait-TemporaryChatState -Expected $temporaryChatTargetSelected
+        Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+            -ExpectedAction "set_ui_control_selected" -Arguments @{
+                control_id = [string]$temporaryChatChanged.control_id
+                selected = $temporaryChatTargetSelected
+            } | Out-Null
+        $temporaryChatIdempotentReceiptSucceeded = $true
+        Wait-TemporaryChatState -Expected $temporaryChatTargetSelected | Out-Null
+    } finally {
+        if ($temporaryChatFirstReceiptSucceeded) {
+            $restoreTemporaryChat = Get-TemporaryChatControl
+            if ($null -eq $restoreTemporaryChat) {
+                throw "Temporary Chat control disappeared before desired-state restoration."
+            }
+            Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+                -ExpectedAction "set_ui_control_selected" -Arguments @{
+                    control_id = [string]$restoreTemporaryChat.control_id
+                    selected = $temporaryChatOriginalSelected
+                } | Out-Null
+            $temporaryChatRestoreReceiptSucceeded = $true
+            Wait-TemporaryChatState -Expected $temporaryChatOriginalSelected | Out-Null
+            $temporaryChatRestored = $true
+        }
+    }
+    if (-not $temporaryChatFirstReceiptSucceeded -or -not $temporaryChatRestored) {
+        throw "Temporary Chat desired-state command round trip was not completed."
     }
 
     $modelOrigin = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"

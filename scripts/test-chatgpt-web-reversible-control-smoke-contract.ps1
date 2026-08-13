@@ -41,6 +41,8 @@ $required = @(
     "Wait-BlankConversation",
     'Action "chatgpt_new_conversation"',
     'Action "chatgpt_open_conversation"',
+    "`$temporaryConversationUsed = `$false",
+    "Temporary Chat is not observable in a blank conversation",
     "original_conversation_restored = `$modelConversationRestored",
     'view_mode = "web"',
     "original_view_mode_restored = `$modelViewRestored",
@@ -158,6 +160,9 @@ if ($smoke.Contains('ExpectedAction "invoke_ui_control"')) {
 }
 if ($smoke -notmatch '(?s)finally\s*\{.*?if \(\$temporaryChatFirstReceiptSucceeded\).*?chatgpt_set_control_selected.*?selected = \$temporaryChatOriginalSelected.*?\$temporaryChatRestoreReceiptSucceeded = \$true') {
     throw "Temporary Chat acceptance must restore every successful state change in finally."
+}
+if ($smoke.IndexOf('Action "chatgpt_new_conversation"') -gt $smoke.IndexOf('$temporaryChatOrigin = Get-TemporaryChatControl')) {
+    throw "Temporary Chat acceptance must enter a blank conversation before discovering the control."
 }
 foreach ($forbidden in @("send_input", "chatgpt_remove_attachment")) {
     if ($smoke.Contains($forbidden)) {
