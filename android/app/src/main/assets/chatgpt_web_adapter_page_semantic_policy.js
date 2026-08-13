@@ -55,6 +55,21 @@
     });
   }
 
+  function conversationContextId(input) {
+    const semantic = clean(input && input.semantic);
+    if (semantic !== 'conversation' && semantic !== 'conversation_options') return '';
+    const relatedPath = String(input && input.path || '').trim();
+    const currentPath = String(input && input.pathname || '').trim();
+    const conversationPath = /^\/c\/[A-Za-z0-9_-]{1,160}$/;
+    if (conversationPath.test(relatedPath)) return relatedPath.slice(3);
+    if (
+      semantic === 'conversation_options' &&
+      clean(input && input.region) === 'header' &&
+      conversationPath.test(currentPath)
+    ) return currentPath.slice(3);
+    return '';
+  }
+
   function classify(input) {
     const pathname = clean(input && input.pathname);
     const path = clean(input && input.path);
@@ -68,6 +83,11 @@
     if (/open[-\s]?sidebar|open sidebar|打开(?:侧边栏|边栏)/.test(signal)) {
       return 'navigation';
     }
+    if (
+      /^\/c\/[a-z0-9_-]{1,160}$/.test(pathname) &&
+      region === 'header' &&
+      /\bmore\b|options?|menu|更多|操作|菜单/.test(signal)
+    ) return 'conversation_options';
     if (/^\/c\/[a-z0-9_-]{1,160}$/.test(path) && !(input && input.isLink)) {
       return 'conversation_options';
     }
@@ -104,6 +124,7 @@
 
   return Object.freeze({
     classify,
+    conversationContextId,
     isTimestampLabel,
     planTemporaryChatSelection,
     temporaryChatState

@@ -89,6 +89,28 @@ expectEqual(policy.classify({
 }), 'conversation_options', 'conversation options');
 
 expectEqual(policy.classify({
+  pathname: '/c/current_conversation_123',
+  region: 'header',
+  signal: 'More options'
+}), 'conversation_options', 'current conversation header options');
+expectEqual(policy.conversationContextId({
+  semantic: 'conversation_options',
+  region: 'header',
+  pathname: '/c/Current_conversation_123'
+}), 'Current_conversation_123', 'header options inherit the current conversation context');
+expectEqual(policy.conversationContextId({
+  semantic: 'conversation_options',
+  region: 'overlay',
+  path: '/c/Sidebar_conversation_456',
+  pathname: '/c/current_conversation_123'
+}), 'Sidebar_conversation_456', 'sidebar options retain their related conversation context');
+expectEqual(policy.conversationContextId({
+  semantic: 'more',
+  region: 'header',
+  pathname: '/c/current_conversation_123'
+}), '', 'generic header controls do not inherit conversation context');
+
+expectEqual(policy.classify({
   pathname: '/',
   path: '/g/g-p-project_123/project',
   region: 'overlay',

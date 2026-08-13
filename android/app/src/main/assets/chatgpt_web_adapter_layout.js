@@ -180,7 +180,9 @@
         section: navigationSection(node),
         isLink: node.matches('a[href]')
       });
-    if (pageSemantic === 'temporary_chat') return pageSemantic;
+    if (pageSemantic === 'temporary_chat' || pageSemantic === 'conversation_options') {
+      return pageSemantic;
+    }
     const composerToolSemantic = composerToolStatePolicy &&
       typeof composerToolStatePolicy.semantic === 'function'
       ? composerToolStatePolicy.semantic({
@@ -350,8 +352,14 @@
       const label = labelOf(node, defaultLabel(semantic));
       const path = relatedSameOriginPath(node);
       const resolvedContextId = contextId || (
-        (semantic === 'conversation' || semantic === 'conversation_options') && /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)
-          ? path.slice(3)
+        window.__elonChatGptPageSemanticPolicy &&
+        typeof window.__elonChatGptPageSemanticPolicy.conversationContextId === 'function'
+          ? window.__elonChatGptPageSemanticPolicy.conversationContextId({
+              semantic,
+              region,
+              path,
+              pathname: location.pathname
+            })
           : ''
       );
       const id = controlId(semantic, node, label, region, used, resolvedContextId);
