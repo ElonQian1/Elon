@@ -12,7 +12,7 @@
 
 | 任务类型 | 继续读取或执行 |
 |---|---|
-| 状态/架构/模块/模板 | `AI_CURRENT.md`、`AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
+| 状态/架构/模板 | `AI_CURRENT.md`、`AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 文档/笔记/归档 | `.github/instructions/document-authority.instructions.md` |
 | 功能登记/认领/验收 | `docs/project-feature-registry.md`；普通 Codex 用 `project_feature_workflow`，治理用 `project_features_list/plan`；禁止手改注册表 |
 | 长聊天/讨论分叉/脑图 | `.github/instructions/discussion-knowledge.instructions.md` |
@@ -33,7 +33,7 @@
 | APP 版本记忆 | `docs/app-version-memory.md` |
 | 一龙自身品牌 Logo 替换 | `docs/brand-logo-workflow.md`；统一运行 `scripts/replace-brand-logo.ps1` |
 | Prompt/Agent/Skill | 仅按目标读取；去重先运行 `scripts/audit-ai-prompt-assets.ps1` |
-| 聊天记录、时间线、下载地址溯源、慢任务诊断 | `docs/query-chat-records.md` |
+| 聊天记录/时间线/下载溯源/慢任务 | `docs/query-chat-records.md` |
 
 ## 脚本信号
 
