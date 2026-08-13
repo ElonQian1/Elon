@@ -12,7 +12,10 @@ mod roots;
 mod types;
 mod write;
 
-pub(in crate::store) use current::current_external_pool_adapter_credential_reattestation_authority_on;
+pub(in crate::store) use current::{
+    current_external_pool_adapter_credential_reattestation_authority_on,
+    current_external_pool_adapter_credential_reattestation_head_authority_on,
+};
 pub(in crate::store) use read::historical_external_pool_adapter_credential_reattestation_authority_on;
 pub(crate) use types::{
     CreateExternalPoolAdapterCredentialReattestation,

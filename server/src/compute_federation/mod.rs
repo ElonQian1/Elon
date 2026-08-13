@@ -68,6 +68,8 @@ pub(crate) mod external_pool_adapter_release_lifecycle_api;
 pub(crate) mod external_pool_adapter_release_lifecycle_service;
 pub(crate) mod external_pool_adapter_release_mcp;
 pub(crate) mod external_pool_adapter_release_service;
+#[cfg(test)]
+mod external_pool_adapter_runtime_bundle_source_contract_tests;
 pub(crate) mod external_pool_adapter_runtime_launch_profile;
 pub(crate) mod external_pool_adapter_runtime_launch_profile_api;
 pub(crate) mod external_pool_adapter_runtime_launch_profile_service;

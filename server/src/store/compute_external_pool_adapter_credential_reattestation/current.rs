@@ -99,6 +99,27 @@ pub(in crate::store) fn current_external_pool_adapter_credential_reattestation_a
     ))
 }
 
+/// Selects the current V253 head inside Store instead of trusting caller-supplied receipt roots.
+pub(in crate::store) fn current_external_pool_adapter_credential_reattestation_head_authority_on(
+    conn: &Connection,
+    provider_binding_id: &str,
+    checked_at: &str,
+) -> Result<Option<CurrentExternalPoolAdapterCredentialReattestationAuthority>> {
+    let Some(currentness) = currentness_on(conn, provider_binding_id, checked_at)? else {
+        return Ok(None);
+    };
+    if currentness.current_status != "verified_current" {
+        bail!("credential re-attestation head authority is not current");
+    }
+    current_external_pool_adapter_credential_reattestation_authority_on(
+        conn,
+        provider_binding_id,
+        &currentness.reattestation.reattestation_receipt_id,
+        &currentness.reattestation.reattestation_receipt_digest,
+        checked_at,
+    )
+}
+
 fn release_is_current(
     conn: &Connection,
     b: &crate::compute_federation::external_pool_adapter_credential_reattestation::ExternalPoolAdapterCredentialReattestationBinding,

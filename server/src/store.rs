@@ -106,6 +106,7 @@ mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_runtime_bundle;
 mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -791,7 +792,6 @@ impl Store {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
 }
-
 mod project_helpers;
 use self::project_helpers::{
     apply_effective_project_summary_role, find_owner_project_by_name,
