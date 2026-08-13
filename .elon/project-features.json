@@ -235,7 +235,7 @@
       "id": "external-pool-provider-activation-candidate-v254-verification",
       "title": "V254 Provider 激活候选运行验收",
       "summary": "把已接线但 passed=0 的 V254 owner delegation 与 inert activation candidate 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，不实现 Provider activation 或 market admission。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/external-pool-provider-activation-candidate-authority.md",
@@ -352,7 +352,7 @@
         }
       ],
       "created_at_ms": 1786633910224,
-      "updated_at_ms": 1786637323929
+      "updated_at_ms": 1786638099721
     },
     {
       "id": "open-commerce-consumer-order-closure-v1",
@@ -1515,6 +1515,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786637323929
+    },
+    {
+      "id": "feature_event_c6ed3af6455e4226ade27cc861816010",
+      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "V254 验证代码与权威文档已推送 origin/main；10 项本地验收通过，生产 activation/market/runtime 继续 NO-GO。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786638099721
     }
   ]
 }
