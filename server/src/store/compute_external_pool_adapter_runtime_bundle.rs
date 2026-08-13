@@ -16,3 +16,13 @@ pub(in crate::store) use types::{
     CurrentExternalPoolAdapterProbePreparationAuthority,
     CurrentExternalPoolAdapterRuntimeBundleAuthority, ExternalPoolAdapterRuntimeBundleRoot,
 };
+
+pub(in crate::store) fn external_pool_adapter_entrypoint_capsule_policy_root(
+) -> anyhow::Result<(String, u64, String)> {
+    let root = entrypoint_capsule::external_pool_adapter_entrypoint_capsule_policy_root()?;
+    Ok((
+        root.policy_id.to_string(),
+        root.policy_revision,
+        root.policy_digest,
+    ))
+}

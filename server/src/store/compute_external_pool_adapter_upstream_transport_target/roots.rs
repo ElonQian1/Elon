@@ -66,7 +66,7 @@ fn audit_profile_roots(
     Ok(())
 }
 
-pub(super) fn audit_replay_prepared(
+pub(in crate::store) fn audit_replay_prepared(
     prepared: &PreparedExternalPoolAdapterInstallation,
     profile: &ExternalPoolAdapterRuntimeLaunchProfileReceipt,
 ) -> Result<()> {

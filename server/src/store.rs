@@ -111,6 +111,7 @@ mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
+mod compute_external_pool_adapter_supervisor_session_policy_companion;
 mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_onboarding;
@@ -587,6 +588,7 @@ pub(crate) use compute_external_pool_adapter_scanner_key::{
     ExternalPoolAdapterScannerKeyRevocationWriteReceipt, RegisterExternalPoolAdapterScannerKey,
     RevokeExternalPoolAdapterScannerKey,
 };
+pub(crate) use compute_external_pool_adapter_supervisor_session_policy_companion::*;
 pub(crate) use compute_external_pool_adapter_upstream_transport_target::api::*;
 pub(crate) use compute_external_pool_adapter_vulnerability_reattestation::{
     CreateExternalPoolAdapterVulnerabilityReattestation,
@@ -750,7 +752,6 @@ impl Store {
             conn: Mutex::new(conn),
         })
     }
-
     pub fn ensure_device_user(&self, user_id: &str) -> Result<PublicUser> {
         let id = safe_external_id(user_id, "default");
         let now = now();
@@ -766,7 +767,6 @@ impl Store {
                 now
             ],
         )?;
-
         let user = conn.query_row(
             "SELECT id, phone, email, nickname, role, status FROM users WHERE id = ?1",
             params![safe_external_id(user_id, "default")],

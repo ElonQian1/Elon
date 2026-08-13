@@ -82,6 +82,14 @@ mod sandbox_reattestation_test_support;
 mod sandbox_verifier_key_http_test;
 #[path = "external_pool_adapter_release_api_tests/scanner_key_http_test.rs"]
 mod scanner_key_http_test;
+#[path = "external_pool_adapter_release_api_tests/supervisor_session_policy_companion_admin_http_test.rs"]
+mod supervisor_session_policy_companion_admin_http_test;
+#[path = "external_pool_adapter_release_api_tests/supervisor_session_policy_companion_owner_http_test.rs"]
+mod supervisor_session_policy_companion_owner_http_test;
+#[path = "external_pool_adapter_release_api_tests/supervisor_session_policy_companion_source_contract_test.rs"]
+mod supervisor_session_policy_companion_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/supervisor_session_policy_companion_test_support.rs"]
+mod supervisor_session_policy_companion_test_support;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_admin_http_test.rs"]
 mod upstream_transport_target_admin_http_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_owner_http_test.rs"]

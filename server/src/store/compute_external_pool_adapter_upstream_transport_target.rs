@@ -27,4 +27,6 @@ pub(crate) mod api {
 }
 
 pub(in crate::store) use current::current_external_pool_adapter_upstream_transport_target_authority_on;
+pub(in crate::store) use read::historical_external_pool_adapter_upstream_transport_target_authority_on;
+pub(in crate::store) use roots::audit_replay_prepared;
 pub(in crate::store) use types::CurrentExternalPoolAdapterUpstreamTransportTargetAuthority;

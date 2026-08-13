@@ -29,6 +29,7 @@ mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
+mod compute_external_pool_adapter_supervisor_session_policy_companion;
 mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_provider_activation_candidate;
@@ -46,6 +47,12 @@ use migrations_v1_v16::*;
 use migrations_v35_v53::*;
 use migrations_v54_v70::*;
 use migrations_v71_v82::*;
+
+pub(crate) fn register_v259_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_supervisor_session_policy_companion::register_receipt_integrity_functions(
+        conn,
+    )
+}
 
 #[rustfmt::skip]
 pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
@@ -323,6 +330,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (254, "外部矿池 Provider owner delegation 与静态激活候选", compute_external_pool_provider_activation_candidate::migration_v254),
     (255, "外部矿池 Adapter Provider-specific 惰性 runtime launch profile", compute_external_pool_adapter_runtime_launch_profile::migration_v255),
     (258, "外部矿池 Adapter 惰性 brokered upstream transport target", compute_external_pool_adapter_upstream_transport_target::migration_v258),
+    (259, "外部矿池 Adapter 惰性 supervisor/session policy companion", compute_external_pool_adapter_supervisor_session_policy_companion::migration_v259),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

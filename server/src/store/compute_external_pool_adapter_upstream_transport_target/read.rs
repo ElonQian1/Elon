@@ -21,6 +21,20 @@ pub(super) fn target_by_id_on(
     target_on(conn, "target_id=?1", params![id])
 }
 
+pub(in crate::store) fn historical_external_pool_adapter_upstream_transport_target_authority_on(
+    conn: &Connection,
+    target_id: &str,
+    expected_target_digest: &str,
+) -> Result<Option<ExternalPoolAdapterUpstreamTransportTargetReceipt>> {
+    let Some(stored) = target_by_id_on(conn, target_id)? else {
+        return Ok(None);
+    };
+    if stored.receipt.target_digest != expected_target_digest {
+        bail!("historical upstream transport target digest is not exact");
+    }
+    Ok(Some(stored.receipt))
+}
+
 pub(super) fn target_by_idempotency_on(
     conn: &Connection,
     scope: &str,
