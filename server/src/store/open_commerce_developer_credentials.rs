@@ -1,7 +1,7 @@
 //! Production developer credential persistence and fail-closed authentication.
 
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use rusqlite::{
     params, types::Type, Connection, OptionalExtension, Row, Transaction, TransactionBehavior,
 };
@@ -174,6 +174,8 @@ impl Store {
             bail!("生产开发者凭据无效");
         }
         let timestamp = now();
+        let checked_at =
+            DateTime::parse_from_rfc3339(&timestamp).context("生产开发者凭据鉴权时钟无效")?;
         let conn = self.conn()?;
         let credential = conn
             .query_row(
@@ -188,7 +190,7 @@ impl Store {
         }
         let expires_at = DateTime::parse_from_rfc3339(&credential.expires_at)
             .context("生产开发者凭据到期时间无效")?;
-        if expires_at <= Utc::now() {
+        if expires_at <= checked_at {
             bail!("生产开发者凭据已到期");
         }
         let eligible: bool = conn.query_row(

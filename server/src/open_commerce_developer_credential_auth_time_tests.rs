@@ -98,6 +98,35 @@ fn production_credential_auth_format_and_time_child() {
     assert!(credential(&fixture, &secret.credential.id)
         .last_used_at
         .is_none());
+
+    let checked_at = chrono::DateTime::parse_from_rfc3339("2035-06-01T12:00:00Z").unwrap();
+    let _clock = crate::store::override_now_for_test("2035-06-01T12:00:00Z").unwrap();
+    set_auth_state(
+        &fixture,
+        &secret.credential.id,
+        &(checked_at + Duration::seconds(1)).to_rfc3339(),
+    );
+    fixture
+        .store
+        .authenticate_open_commerce_developer_credential(&secret.live_token)
+        .expect("credential should remain valid one second before expiry");
+    let used_at = credential(&fixture, &secret.credential.id)
+        .last_used_at
+        .expect("controlled authentication should record its checked time");
+    assert_eq!(
+        chrono::DateTime::parse_from_rfc3339(&used_at).unwrap(),
+        checked_at
+    );
+
+    set_auth_state(&fixture, &secret.credential.id, &checked_at.to_rfc3339());
+    let error = fixture
+        .store
+        .authenticate_open_commerce_developer_credential(&secret.live_token)
+        .expect_err("credential should be expired at the exact boundary");
+    assert!(error.to_string().contains("已到期"));
+    assert!(credential(&fixture, &secret.credential.id)
+        .last_used_at
+        .is_none());
 }
 
 fn set_auth_state(
