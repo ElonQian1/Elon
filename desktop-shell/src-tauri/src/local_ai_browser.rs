@@ -6,6 +6,8 @@
 
 #[path = "local_ai_browser/adapter.rs"]
 mod adapter;
+#[path = "local_ai_browser/adapter_command.rs"]
+mod adapter_command;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
 #[path = "local_ai_browser/native_window.rs"]
@@ -16,7 +18,6 @@ mod state;
 use std::{fs, path::PathBuf, process::Command};
 
 use serde::Serialize;
-use serde_json::{Map, Value};
 use tauri::{
     webview::{NewWindowResponse, PageLoadEvent},
     AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
@@ -371,7 +372,14 @@ pub async fn run_local_ai_web_adapter_command(
         .get_webview_window(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
     runtime.mark_command_pending(&label);
-    let command = adapter_command(provider, &action, value, expected_draft)?;
+    let command = adapter_command::build(
+        provider.id,
+        provider.display_name,
+        GOOGLE_AI_MODE.id,
+        &action,
+        value,
+        expected_draft,
+    )?;
     let raw = serde_json::to_string(&command).map_err(display_error)?;
     let encoded = serde_json::to_string(&raw).map_err(display_error)?;
     let bridge = adapter_bridge_name(provider);
@@ -623,59 +631,6 @@ fn adapter_bridge_name(provider: &ProviderDefinition) -> &'static str {
     }
 }
 
-fn adapter_command(
-    provider: &ProviderDefinition,
-    action: &str,
-    value: Option<String>,
-    expected_draft: Option<String>,
-) -> Result<Value, String> {
-    const CHATGPT_ACTIONS: &[&str] = &[
-        "snapshot",
-        "send_prompt",
-        "stop_generation",
-        "regenerate_response",
-        "new_conversation",
-        "list_conversations",
-        "open_conversation",
-        "start_google_login",
-        "list_model_options",
-        "list_composer_tools",
-        "collect_model_options",
-        "collect_composer_tools",
-        "select_model_option",
-        "select_composer_tool",
-    ];
-    const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
-        "snapshot",
-        "send_prompt",
-        "stop_generation",
-        "new_conversation",
-    ];
-    let actions = if provider.id == GOOGLE_AI_MODE.id {
-        GOOGLE_AI_MODE_ACTIONS
-    } else {
-        CHATGPT_ACTIONS
-    };
-    if !actions.contains(&action) {
-        return Err(format!("不支持的 {} 原生界面动作。", provider.display_name));
-    }
-    let mut command = Map::new();
-    command.insert("action".to_string(), Value::String(action.to_string()));
-    if let Some(value) = value {
-        if value.chars().count() > 20_000 {
-            return Err(format!("{} 输入内容过长。", provider.display_name));
-        }
-        command.insert("value".to_string(), Value::String(value));
-    }
-    if let Some(expected_draft) = expected_draft {
-        if expected_draft.chars().count() > 20_000 {
-            return Err(format!("{} 网页草稿过长。", provider.display_name));
-        }
-        command.insert("expectedDraft".to_string(), Value::String(expected_draft));
-    }
-    Ok(Value::Object(command))
-}
-
 #[cfg(windows)]
 fn open_fixed_external_url(url: &str) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
@@ -790,11 +745,32 @@ mod tests {
 
     #[test]
     fn adapter_command_does_not_accept_arbitrary_javascript() {
-        assert!(adapter_command(&CHATGPT, "eval", Some("alert(1)".to_string()), None).is_err());
-        assert!(adapter_command(&CHATGPT, "snapshot", None, None).is_ok());
-        assert!(
-            adapter_command(&GOOGLE_AI_MODE, "send_prompt", Some("hi".to_string()), None).is_ok()
-        );
-        assert!(adapter_command(&GOOGLE_AI_MODE, "start_google_login", None, None).is_err());
+        assert!(adapter_command::build(
+            CHATGPT.id,
+            CHATGPT.display_name,
+            GOOGLE_AI_MODE.id,
+            "eval",
+            Some("alert(1)".to_string()),
+            None,
+        ).is_err());
+        assert!(adapter_command::build(
+            CHATGPT.id, CHATGPT.display_name, GOOGLE_AI_MODE.id, "snapshot", None, None,
+        ).is_ok());
+        assert!(adapter_command::build(
+            GOOGLE_AI_MODE.id,
+            GOOGLE_AI_MODE.display_name,
+            GOOGLE_AI_MODE.id,
+            "send_prompt",
+            Some("hi".to_string()),
+            None,
+        ).is_ok());
+        assert!(adapter_command::build(
+            GOOGLE_AI_MODE.id,
+            GOOGLE_AI_MODE.display_name,
+            GOOGLE_AI_MODE.id,
+            "start_google_login",
+            None,
+            None,
+        ).is_err());
     }
 }

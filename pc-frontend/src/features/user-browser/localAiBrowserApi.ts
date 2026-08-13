@@ -65,6 +65,18 @@ export interface LocalAiMessageSnapshot {
   capabilities: string[]
 }
 
+export interface LocalAiConversationDirectoryItem {
+  id: string
+  title: string
+  path: string
+  active: boolean
+}
+
+export interface LocalAiConversationSnapshot {
+  type: 'conversation_snapshot'
+  conversations: LocalAiConversationDirectoryItem[]
+}
+
 export interface LocalAiCommandResult {
   type: 'command_result'
   action: string
@@ -83,6 +95,7 @@ export interface LocalAiWebSessionState {
   rendererStatus: 'connecting' | 'reserved' | 'active'
   lastError?: string | null
   semanticEvent?: LocalAiMessageSnapshot | Record<string, unknown> | null
+  navigationEvent?: LocalAiConversationSnapshot | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
   updatedAtMs: number
 }
@@ -95,6 +108,8 @@ export type LocalAiAdapterAction =
   | 'stop_generation'
   | 'regenerate_response'
   | 'new_conversation'
+  | 'list_conversations'
+  | 'open_conversation'
   | 'start_google_login'
 
 type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed' | 'invoke_timeout'
@@ -223,6 +238,13 @@ export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessag
     && Array.isArray(snapshot.messages)
     && typeof snapshot.authenticated === 'boolean'
     && typeof snapshot.composerReady === 'boolean'
+}
+
+export function isLocalAiConversationSnapshot(value: unknown): value is LocalAiConversationSnapshot {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const snapshot = value as Partial<LocalAiConversationSnapshot>
+  return snapshot.type === 'conversation_snapshot'
+    && Array.isArray(snapshot.conversations)
 }
 
 export async function waitForLocalAiAdapterResult(

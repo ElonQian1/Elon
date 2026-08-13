@@ -255,14 +255,15 @@
 }
 
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 0 16px;
   border-bottom: 1px solid #1b1c20;
 }
-.topbarTitle { font-size: 15px; font-weight: 700; color: var(--text); }
-.topbarRight { display: flex; gap: 8px; align-items: center; }
+.topbarTitle { overflow: hidden; font-size: 15px; font-weight: 700; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+.topbarRight { min-width: 0; display: flex; justify-self: end; gap: 8px; align-items: center; }
 .modelBadge {
   padding: 3px 10px;
   border-radius: 10px;

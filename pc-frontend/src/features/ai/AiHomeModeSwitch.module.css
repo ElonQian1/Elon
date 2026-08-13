@@ -1,28 +1,29 @@
 .modeSwitch {
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(72px, 1fr));
-  gap: 3px;
-  padding: 3px;
+  grid-template-columns: repeat(2, minmax(96px, 1fr));
+  gap: 2px;
+  padding: 2px;
   border: 1px solid rgba(255,255,255,.08);
-  border-radius: 9px;
-  background: #1b1c20;
-  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  border-radius: 999px;
+  background: #17181b;
+  box-shadow: 0 5px 18px rgba(0,0,0,.22);
 }
 
 .modeSwitch button {
-  min-height: 32px;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 9px;
+  min-height: 31px;
+  padding: 0 18px;
   border: 0;
-  border-radius: 6px;
-  color: #858994;
+  border-radius: 999px;
+  color: #9b9fa9;
   background: transparent;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .02em;
 }
 
-.modeSwitch button:hover { color: #c8ccd4; background: rgba(255,255,255,.045); }
-.modeSwitch button[data-active="true"] { color: #eafff0; background: rgba(46,168,97,.2); }
-.modeSwitch strong { font-size: 11px; }
-.modeSwitch span { color: inherit; font-size: 9px; opacity: .7; }
+.modeSwitch button:hover { color: #d8dbe2; }
+.modeSwitch button[data-active="true"] {
+  color: #f4f5f7;
+  background: #2b2c30;
+  box-shadow: 0 1px 5px rgba(0,0,0,.2);
+}

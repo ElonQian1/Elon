@@ -10,14 +10,24 @@ export default function AiHomeModeSwitch({
   onChange: (mode: AiHomeMode) => void
 }) {
   return (
-    <div className={styles.modeSwitch} aria-label="一龙 AI 模式">
-      <button type="button" data-active={mode === 'chat'} onClick={() => onChange('chat')}>
-        <strong>Chat</strong>
-        <span>网页 AI</span>
+    <div className={styles.modeSwitch} role="tablist" aria-label="一龙 AI 模式">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'chat'}
+        data-active={mode === 'chat'}
+        onClick={() => onChange('chat')}
+      >
+        聊天
       </button>
-      <button type="button" data-active={mode === 'work'} onClick={() => onChange('work')}>
-        <strong>工作</strong>
-        <span>Codex</span>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'work'}
+        data-active={mode === 'work'}
+        onClick={() => onChange('work')}
+      >
+        工作
       </button>
     </div>
   )

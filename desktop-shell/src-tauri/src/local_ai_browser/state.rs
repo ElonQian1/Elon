@@ -25,6 +25,7 @@ struct SessionRecord {
     renderer_status: String,
     last_error: Option<String>,
     semantic_event: Option<Value>,
+    navigation_event: Option<Value>,
     command_result: Option<Value>,
     updated_at_ms: u64,
 }
@@ -42,6 +43,7 @@ pub struct LocalAiWebSessionState {
     pub renderer_status: String,
     pub last_error: Option<String>,
     pub semantic_event: Option<Value>,
+    pub navigation_event: Option<Value>,
     pub command_result: Option<Value>,
     pub updated_at_ms: u64,
 }
@@ -62,6 +64,7 @@ impl LocalAiBrowserRuntime {
                 renderer_status: renderer_status.to_string(),
                 last_error: None,
                 semantic_event: None,
+                navigation_event: None,
                 command_result: None,
                 updated_at_ms: now_ms(),
             });
@@ -148,9 +151,18 @@ impl LocalAiBrowserRuntime {
 
     pub fn record_adapter_event(&self, label: &str, kind: &str, payload: Value) {
         self.update(label, |record| match kind {
-            "adapter_ready" | "message_snapshot" | "conversation_snapshot" => {
+            "adapter_ready" => {
+                record.renderer_status = "active".to_string();
+                record.last_error = None;
+            }
+            "message_snapshot" => {
                 record.renderer_status = "active".to_string();
                 record.semantic_event = Some(payload);
+                record.last_error = None;
+            }
+            "conversation_snapshot" => {
+                record.renderer_status = "active".to_string();
+                record.navigation_event = Some(payload);
                 record.last_error = None;
             }
             "command_result" => record.command_result = Some(payload),
@@ -199,6 +211,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             renderer_status: record.renderer_status,
             last_error: record.last_error,
             semantic_event: record.semantic_event,
+            navigation_event: record.navigation_event,
             command_result: record.command_result,
             updated_at_ms: record.updated_at_ms,
         }
@@ -228,4 +241,30 @@ fn now_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
+        let runtime = LocalAiBrowserRuntime::default();
+        runtime.ensure_session("session", "chatgpt", "reserved");
+        runtime.record_adapter_event(
+            "session",
+            "message_snapshot",
+            json!({"type": "message_snapshot", "messages": [{"id": "answer"}]}),
+        );
+        runtime.record_adapter_event(
+            "session",
+            "conversation_snapshot",
+            json!({"type": "conversation_snapshot", "projects": [{"id": "project"}]}),
+        );
+
+        let snapshot = runtime.snapshot("session").unwrap();
+        assert_eq!(snapshot.semantic_event.unwrap()["type"], "message_snapshot");
+        assert_eq!(snapshot.navigation_event.unwrap()["type"], "conversation_snapshot");
+    }
 }

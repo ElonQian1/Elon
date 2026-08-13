@@ -1,14 +1,55 @@
-import { EyeOff, MonitorUp, ShieldCheck } from 'lucide-react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import {
+  EyeOff,
+  FolderClosed,
+  MessageSquare,
+  MonitorUp,
+  Pin,
+  RefreshCw,
+  ShieldCheck,
+  SquarePen,
+} from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import styles from './AiWebChatSidebar.module.css'
 
 export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const busy = Boolean(web.controller.busyAction)
   const officialVisible = Boolean(web.controller.sessionState?.windowVisible)
+  const directory = web.controller.navigationSnapshot
+  const conversations = directory?.conversations ?? []
+  const current = conversations.filter((item) => item.active)
+  const recent = conversations.filter((item) => !item.active)
+  const autoSyncKey = useRef('')
+
+  useEffect(() => {
+    if (web.provider?.id !== 'chatgpt'
+      || !web.controller.snapshot?.authenticated
+      || !web.controller.sessionOpen
+      || directory
+      || busy) return
+    const key = web.controller.sessionState?.windowLabel || web.provider.id
+    if (autoSyncKey.current === key) return
+    autoSyncKey.current = key
+    void web.controller.run('list_conversations')
+  }, [
+    busy,
+    directory,
+    web.controller,
+    web.provider?.id,
+  ])
 
   return (
     <>
       <section className={styles.quickActions} aria-label="网页 AI 会话操作">
+        <button
+          className={styles.newChat}
+          type="button"
+          onClick={() => void web.controller.run('new_conversation')}
+          disabled={!web.ready || !web.controller.sessionOpen || busy}
+        >
+          <SquarePen size={17} />
+          <span><strong>新聊天</strong><small>在 {web.provider?.displayName || '网页 AI'} 新建会话</small></span>
+        </button>
         <button type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || busy}>
           <MonitorUp size={16} />
           <span><strong>{web.controller.sessionOpen ? '显示官方登录页' : '登录 / 打开官方页'}</strong><small>仅登录、验证或故障回退时显示</small></span>
@@ -23,19 +64,69 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
         </button>
       </section>
       <div className={styles.providerPane}>
-        <div className={styles.heading}>当前 Chat 来源</div>
-        {web.providers.map((provider) => (
-          <button
-            className={styles.provider}
-            data-active={provider.id === web.provider?.id}
-            key={provider.id}
-            type="button"
-            onClick={() => web.selectProvider(provider.id)}
-          >
-            <span className={styles.logo}>{provider.id === 'chatgpt' ? '◎' : 'G'}</span>
-            <span><strong>{provider.displayName}</strong><small>{provider.id === 'chatgpt' ? '官方网页 Chat' : 'Google 搜索 AI 模式'}</small></span>
-          </button>
-        ))}
+        <div className={styles.heading}>聊天来源</div>
+        <div className={styles.providerTabs} role="tablist" aria-label="网页 AI 来源">
+          {web.providers.map((provider) => (
+            <button
+              className={styles.provider}
+              data-active={provider.id === web.provider?.id}
+              key={provider.id}
+              type="button"
+              role="tab"
+              aria-selected={provider.id === web.provider?.id}
+              onClick={() => web.selectProvider(provider.id)}
+            >
+              <span className={styles.logo}>{provider.id === 'chatgpt' ? '◎' : 'G'}</span>
+              <span><strong>{provider.id === 'chatgpt' ? 'ChatGPT' : 'Google AI'}</strong></span>
+            </button>
+          ))}
+        </div>
+        {web.provider?.id === 'chatgpt' ? (
+          <nav className={styles.directory} aria-label="ChatGPT 网页聊天项目与会话">
+            <div className={styles.directoryTitle}>
+              <span>ChatGPT 网页聊天</span>
+              <button
+                type="button"
+                title="同步官网侧栏"
+                aria-label="同步 ChatGPT 官网侧栏"
+                onClick={() => void web.controller.run('list_conversations')}
+                disabled={!web.controller.sessionOpen || busy}
+              >
+                <RefreshCw size={13} className={web.controller.busyAction === 'list_conversations' ? styles.spinning : ''} />
+              </button>
+            </div>
+            <DirectorySection
+              icon={<Pin size={13} />}
+              title="置顶"
+              items={current}
+              empty="打开一个聊天后显示在这里"
+              action="open_conversation"
+              web={web}
+            />
+            <DirectorySection
+              icon={<FolderClosed size={13} />}
+              title="项目"
+              empty="ChatGPT 网页项目同步入口已保留"
+              web={web}
+            />
+            <DirectorySection
+              icon={<MessageSquare size={13} />}
+              title="聊天"
+              items={recent}
+              empty={directory ? '官网暂无可见聊天' : '打开官网登录后自动同步'}
+              action="open_conversation"
+              web={web}
+            />
+          </nav>
+        ) : (
+          <section className={styles.googleSession} aria-label="Google AI 搜索会话">
+            <div className={styles.sectionHeading}><MessageSquare size={13} /><span>搜索会话</span></div>
+            <button type="button" data-active disabled>
+              <strong>{web.controller.snapshot?.title || '新 AI 搜索'}</strong>
+              <small>Google AI 模式当前网页会话</small>
+            </button>
+          </section>
+        )}
         <div className={styles.status} data-error={Boolean(web.controller.sessionState?.lastError)}>
           <strong>{web.status}</strong>
           {web.message && <span>{web.message}</span>}
@@ -43,5 +134,41 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
         <p className={styles.privacy}><ShieldCheck size={14} />Cookie 仅保存在这台电脑的 WebView2 Profile</p>
       </div>
     </>
+  )
+}
+
+function DirectorySection({
+  icon,
+  title,
+  items,
+  empty,
+  action,
+  web,
+}: {
+  icon: ReactNode
+  title: string
+  items?: NonNullable<AiWebChatBackend['controller']['navigationSnapshot']>['conversations']
+  empty: string
+  action?: 'open_conversation'
+  web: AiWebChatBackend
+}) {
+  const visibleItems = items ?? []
+  return (
+    <section className={styles.directorySection}>
+      <div className={styles.sectionHeading}>{icon}<span>{title}</span>{visibleItems.length > 0 && <em>{visibleItems.length}</em>}</div>
+      {visibleItems.length ? visibleItems.map((item) => (
+        <button
+          className={styles.directoryItem}
+          type="button"
+          key={item.path}
+          data-active={item.active}
+          title={item.title}
+          onClick={() => action && void web.controller.run(action, item.path)}
+          disabled={Boolean(web.controller.busyAction)}
+        >
+          <span>{item.title}</span>
+        </button>
+      )) : <p className={styles.empty}>{empty}</p>}
+    </section>
   )
 }

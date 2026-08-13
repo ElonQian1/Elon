@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   controlLocalAiWebSession,
   getLocalAiWebSessionState,
+  isLocalAiConversationSnapshot,
   isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
   openLocalAiWebSession,
@@ -25,6 +26,12 @@ export default function useLocalAiWebChatController(
   const snapshot = useMemo(
     () => isLocalAiMessageSnapshot(sessionState?.semanticEvent) ? sessionState.semanticEvent : null,
     [sessionState?.semanticEvent],
+  )
+  const navigationSnapshot = useMemo(
+    () => isLocalAiConversationSnapshot(sessionState?.navigationEvent)
+      ? sessionState.navigationEvent
+      : null,
+    [sessionState?.navigationEvent],
   )
   const sessionOpen = Boolean(sessionState && sessionState.windowStatus !== 'closed')
 
@@ -126,6 +133,7 @@ export default function useLocalAiWebChatController(
   return {
     sessionState,
     snapshot,
+    navigationSnapshot,
     sessionOpen,
     draft,
     setDraft: (value: string) => {
