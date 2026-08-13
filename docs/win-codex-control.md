@@ -40,6 +40,11 @@ implementation_status: compiled
 
 默认最多保留 2,000 条控制域事件，查询最多返回 500 条。导出只生成脱敏 JSON；原始 CLI 输出仍由既有 task journal 的授权详情页读取，不复制成第二份日志。
 
+Tauri 原生桥还在后台把最近 64 条原生事件写入本机 `desktop-diagnostics-v1` 快照。节点读取时
+限制为 512 KiB、校验 schema 并最多返回 32 条；HTTP 响应和 MCP 不返回快照文件路径。
+因此即使子窗口页面尚未加载、无法把日志回传给 PC 前端，Codex 仍可从节点读取创建、
+导航、错误码、根节点健康和销毁状态。快照遵守同一正文与凭证禁采集边界。
+
 ## 权限与失败关闭
 
 - HTTP 写操作只在 `127.0.0.1` 上提供，并复用 `x-elon-local-admin-token` 与可信 Origin 校验。

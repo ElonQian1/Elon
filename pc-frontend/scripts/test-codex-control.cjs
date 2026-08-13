@@ -8,6 +8,8 @@ const shell = read('src/features/shell/Shell.tsx')
 const bridge = read('src/features/codex-control/useCodexControlBridge.ts')
 const api = read('src/features/codex-control/codexControlApi.ts')
 const page = read('src/features/codex-control/CodexControlPage.tsx')
+const rustApi = read('../server/src/node_agent_win_codex_control_api.rs')
+const rustMcp = read('../server/src/node_agent_win_codex_control_mcp.rs')
 
 if (!app.includes('path="codex-control"')) throw new Error('Codex control route missing')
 if (!shell.includes('useCodexControlBridge()')) throw new Error('global Codex control bridge missing')
@@ -15,6 +17,10 @@ if (!bridge.includes('isControlEventUrl') || !bridge.includes("url.path === '/ap
 if (bridge.includes('response.text()') || bridge.includes('request.body')) throw new Error('network diagnostics must not read request/response bodies')
 if (!bridge.includes('claimWinAction') || !bridge.includes('codex_execute_semantic_action') || !bridge.includes('postWinActionReceipt')) throw new Error('Tauri actions must atomically claim and return receipts')
 if (!api.includes("'/api/codex-control'")) throw new Error('loopback Codex control API missing')
+if (!rustApi.includes('tauri_diagnostic_snapshot')) throw new Error('persistent Tauri diagnostic snapshot missing')
+if (!rustApi.includes('/api/codex-control/tauri-diagnostics')) throw new Error('lightweight Tauri diagnostic endpoint missing')
+if (!rustApi.includes('desktop_snapshot_too_large')) throw new Error('Tauri diagnostic snapshot size guard missing')
+if (!rustMcp.includes('tauri_diagnostics')) throw new Error('MCP status must expose persistent Tauri diagnostics')
 for (const source of ['frontend', 'rust', 'cli', 'network', 'tauri', 'control']) {
   if (!page.includes(`id: '${source}'`)) throw new Error(`timeline source missing: ${source}`)
 }

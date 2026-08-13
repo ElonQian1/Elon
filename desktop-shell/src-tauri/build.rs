@@ -9,6 +9,7 @@ fn main() {
             "publish_local_ai_web_event",
             "clear_local_ai_web_session",
             "open_local_ai_native_chat_window",
+            "publish_local_ai_native_window_health",
         ]),
     ))
     .expect("一龙桌面壳 Tauri 构建配置失败")

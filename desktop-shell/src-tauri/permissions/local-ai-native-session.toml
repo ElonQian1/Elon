@@ -7,4 +7,5 @@ commands.allow = [
   "get_local_ai_web_session_state",
   "control_local_ai_web_session",
   "run_local_ai_web_adapter_command",
+  "publish_local_ai_native_window_health",
 ]

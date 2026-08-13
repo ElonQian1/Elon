@@ -4,12 +4,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::VecDeque,
+    fs,
+    path::PathBuf,
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{State, WebviewWindow};
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 
 const MAX_NATIVE_EVENTS: usize = 600;
+static PERSIST_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct SemanticAction {
@@ -81,6 +84,85 @@ impl CodexSemanticBridge {
             .cloned()
             .collect()
     }
+
+    fn persist(&self) {
+        let events = lock(&self.state).events.clone();
+        std::thread::spawn(move || {
+            let _guard = lock(&PERSIST_LOCK);
+            persist_events(&events);
+        });
+    }
+}
+
+fn persist_events(events: &VecDeque<NativeEvent>) {
+    let Some(path) = diagnostic_snapshot_path() else {
+        return;
+    };
+    let latest_seq = events.back().map(|event| event.seq).unwrap_or_default();
+    if existing_snapshot_seq(&path, std::process::id()) >= latest_seq {
+        return;
+    }
+    let payload = json!({
+        "schema": "elon.tauri_native_diagnostics.v1",
+        "generated_at_ms": now_ms(),
+        "latest_seq": latest_seq,
+        "desktop_pid": std::process::id(),
+        "privacy": {
+            "cookies": false,
+            "tokens": false,
+            "request_bodies": false,
+            "prompt_bodies": false,
+            "page_text": false
+        },
+        "events": events.iter().rev().take(64).cloned().collect::<Vec<_>>(),
+    });
+    let Ok(bytes) = serde_json::to_vec(&payload) else {
+        return;
+    };
+    let Some(parent) = path.parent() else {
+        return;
+    };
+    if fs::create_dir_all(parent).is_err() {
+        return;
+    }
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    if fs::write(&temporary, bytes).is_ok() {
+        let _ = fs::remove_file(&path);
+        let _ = fs::rename(temporary, path);
+    }
+}
+
+fn existing_snapshot_seq(path: &PathBuf, desktop_pid: u32) -> u64 {
+    fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .filter(|value| {
+            value.get("desktop_pid").and_then(Value::as_u64) == Some(u64::from(desktop_pid))
+        })
+        .and_then(|value| value.get("latest_seq").and_then(Value::as_u64))
+        .unwrap_or_default()
+}
+
+fn diagnostic_snapshot_path() -> Option<PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(|root| {
+        PathBuf::from(root)
+            .join("Elon")
+            .join("desktop-diagnostics-v1")
+            .join("native-events.json")
+    })
+}
+
+pub(crate) fn record_app_event(
+    app: &AppHandle,
+    trace_id: &str,
+    level: &str,
+    kind: &str,
+    summary: &str,
+    fields: Value,
+) {
+    let bridge = app.state::<CodexSemanticBridge>();
+    bridge.record(trace_id, level, kind, summary, fields);
+    bridge.persist();
 }
 
 #[tauri::command]
@@ -116,7 +198,7 @@ pub(crate) fn codex_execute_semantic_action(
     validate_action(&action)?;
     let result = execute(&window, &action);
     let captured_state = (action.kind == "capture_state").then(|| window_state(&window));
-    let (status, level, message) = match &result {
+    let (status, level, _message) = match &result {
         Ok(message) => ("succeeded", "info", message.clone()),
         Err(error) => ("failed", "error", error.clone()),
     };
@@ -194,6 +276,12 @@ fn execute(window: &WebviewWindow, action: &SemanticAction) -> Result<String, St
 }
 
 fn window_state(window: &WebviewWindow) -> Value {
+    let window_labels = window
+        .app_handle()
+        .webview_windows()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
     json!({
         "label": window.label(),
         "visible": window.is_visible().ok(),
@@ -201,6 +289,7 @@ fn window_state(window: &WebviewWindow) -> Value {
         "maximized": window.is_maximized().ok(),
         "minimized": window.is_minimized().ok(),
         "devtools_open": devtools_open(window),
+        "window_labels": window_labels,
     })
 }
 
@@ -375,5 +464,21 @@ mod tests {
             route: None,
         };
         assert!(validate_action(&action).is_err());
+    }
+
+    #[test]
+    fn existing_snapshot_sequence_is_scoped_to_the_current_desktop_process() {
+        let path = std::env::temp_dir().join(format!(
+            "elon_native_diagnostics_{}.json",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({"desktop_pid": 41, "latest_seq": 99})).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(existing_snapshot_seq(&path, 41), 99);
+        assert_eq!(existing_snapshot_seq(&path, 42), 0);
+        let _ = std::fs::remove_file(path);
     }
 }

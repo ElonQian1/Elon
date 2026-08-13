@@ -96,6 +96,7 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
             "schema":"elon.win_codex_control_status.v1",
             "project_root":workspace.to_string_lossy(),
             "capabilities":runtime.win_codex_control.capabilities(),
+            "tauri_diagnostics":crate::node_agent_win_codex_control::tauri_diagnostic_snapshot(),
         }),
         "win_control_timeline" => {
             let input: TimelineArguments = serde_json::from_value(arguments)?;

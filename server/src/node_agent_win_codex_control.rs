@@ -10,7 +10,7 @@ use std::{
 
 #[path = "node_agent_win_codex_control_api.rs"]
 mod api;
-pub(crate) use api::{routes, timeline_payload};
+pub(crate) use api::{routes, tauri_diagnostic_snapshot, timeline_payload};
 
 const MAX_EVENTS: usize = 2_000;
 const MAX_ACTIONS: usize = 256;

@@ -126,6 +126,14 @@ pub async fn open_local_ai_native_chat_window(
 }
 
 #[tauri::command]
+pub fn publish_local_ai_native_window_health(
+    webview: WebviewWindow,
+    report: native_window::LocalAiNativeWindowHealth,
+) -> Result<(), String> {
+    native_window::publish_health(webview, report)
+}
+
+#[tauri::command]
 pub fn list_local_ai_web_providers(
     webview: WebviewWindow,
 ) -> Result<Vec<LocalAiWebProvider>, String> {

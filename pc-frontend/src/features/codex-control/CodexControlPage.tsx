@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bot, Download, Focus, PanelTopOpen, RefreshCw, RotateCw, ScanSearch, TerminalSquare } from 'lucide-react'
 import {
-  exportWinDiagnostics, fetchWinControlCapabilities, fetchWinDiagnostics,
+  exportWinDiagnostics, fetchTauriDiagnostics, fetchWinControlCapabilities, fetchWinDiagnostics,
   fetchWinTimeline, queueWinAction,
 } from './codexControlApi'
 import type { WinActionKind, WinControlCapabilities, WinControlEvent, WinLogSource } from './types'
@@ -19,17 +19,19 @@ export default function CodexControlPage() {
   const [sources, setSources] = useState<WinLogSource[]>(SOURCES.map((item) => item.id))
   const [route, setRoute] = useState('/codex-control')
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null)
+  const [tauriDiagnostics, setTauriDiagnostics] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
   const refresh = useCallback(async () => {
     try {
-      const [nextCapabilities, timeline] = await Promise.all([
-        fetchWinControlCapabilities(), fetchWinTimeline(sources),
+      const [nextCapabilities, timeline, nextTauriDiagnostics] = await Promise.all([
+        fetchWinControlCapabilities(), fetchWinTimeline(sources), fetchTauriDiagnostics(),
       ])
       setCapabilities(nextCapabilities)
       setEvents(Array.isArray(timeline.events) ? timeline.events : [])
+      setTauriDiagnostics(nextTauriDiagnostics.tauri ?? null)
       setError('')
     } catch (reason) {
       setError(message(reason))
@@ -126,6 +128,7 @@ export default function CodexControlPage() {
             <Fact label="事件保留" value={`${capabilities?.retention?.events ?? '—'} 条`} />
             <Fact label="动作 TTL" value={`${Math.round((capabilities?.retention?.action_ttl_ms ?? 0) / 1000)} 秒`} />
             <Fact label="节点版本" value={diagnosticVersion(diagnostics)} />
+            <Fact label="子窗口快照" value={tauriDiagnostics?.available === true ? '可读取' : '等待桌面壳'} />
             <Fact label="任意脚本" value="禁止" />
             <Fact label="请求正文" value="不采集" />
           </section>

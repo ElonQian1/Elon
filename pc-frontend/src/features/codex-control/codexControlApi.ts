@@ -59,8 +59,15 @@ export function postWinActionReceipt(
   })
 }
 
-export function fetchWinDiagnostics(): Promise<{ diagnostics?: Record<string, unknown> }> {
+export function fetchWinDiagnostics(): Promise<{
+  diagnostics?: Record<string, unknown>
+  tauri?: Record<string, unknown>
+}> {
   return nodeApi(safeNodeAdminUrl(), `${BASE}/diagnostics`)
+}
+
+export function fetchTauriDiagnostics(): Promise<{ tauri?: Record<string, unknown> }> {
+  return nodeApi(safeNodeAdminUrl(), `${BASE}/tauri-diagnostics`)
 }
 
 export function exportWinDiagnostics(): Promise<{ path?: string; message?: string }> {

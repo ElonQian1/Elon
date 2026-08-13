@@ -74,6 +74,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             post(claim_handler),
         )
         .route("/api/codex-control/diagnostics", get(diagnostics_handler))
+        .route(
+            "/api/codex-control/tauri-diagnostics",
+            get(tauri_diagnostics_handler),
+        )
         .route("/api/codex-control/export", post(export_handler))
 }
 
@@ -161,9 +165,15 @@ async fn claim_handler(
 }
 
 async fn diagnostics_handler() -> Json<Value> {
-    Json(
-        json!({"ok": true, "diagnostics": crate::node_agent_client_diagnostics::diagnostic_snapshot()}),
-    )
+    Json(json!({
+        "ok": true,
+        "diagnostics": crate::node_agent_client_diagnostics::diagnostic_snapshot(),
+        "tauri": tauri_diagnostic_snapshot(),
+    }))
+}
+
+async fn tauri_diagnostics_handler() -> Json<Value> {
+    Json(json!({"ok": true, "tauri": tauri_diagnostic_snapshot()}))
 }
 
 async fn export_handler(State(runtime): State<Arc<NodeRuntime>>) -> Response {
@@ -330,12 +340,49 @@ fn export_bundle(runtime: &NodeRuntime) -> Result<PathBuf, String> {
         "privacy": {"cookies": false, "tokens": false, "request_bodies": false, "prompt_bodies": false, "raw_cli_output": false},
         "timeline": timeline_payload(runtime, None, 0, 500, &HashSet::new()),
         "node": crate::node_agent_client_diagnostics::diagnostic_snapshot(),
+        "tauri": tauri_diagnostic_snapshot(),
     });
     let bytes = serde_json::to_vec_pretty(&payload)
         .map_err(|error| format!("生成诊断 JSON 失败: {error}"))?;
     crate::node_agent_atomic_file::write(&path, &bytes)
         .map_err(|error| format!("写入诊断包失败: {error:#}"))?;
     Ok(path)
+}
+
+pub(crate) fn tauri_diagnostic_snapshot() -> Value {
+    let Some(root) = std::env::var_os("LOCALAPPDATA") else {
+        return json!({"available": false, "reason": "local_app_data_unavailable"});
+    };
+    let path = PathBuf::from(root)
+        .join("Elon")
+        .join("desktop-diagnostics-v1")
+        .join("native-events.json");
+    let Ok(metadata) = fs::metadata(&path) else {
+        return json!({"available": false, "reason": "desktop_snapshot_missing"});
+    };
+    if metadata.len() > 512 * 1024 {
+        return json!({"available": false, "reason": "desktop_snapshot_too_large"});
+    }
+    let Ok(bytes) = fs::read(&path) else {
+        return json!({"available": false, "reason": "desktop_snapshot_unreadable"});
+    };
+    parse_tauri_diagnostic_snapshot(&bytes)
+        .map(|snapshot| json!({"available": true, "snapshot": snapshot}))
+        .unwrap_or_else(|reason| json!({"available": false, "reason": reason}))
+}
+
+fn parse_tauri_diagnostic_snapshot(bytes: &[u8]) -> Result<Value, &'static str> {
+    let mut snapshot =
+        serde_json::from_slice::<Value>(bytes).map_err(|_| "desktop_snapshot_invalid")?;
+    if snapshot.get("schema").and_then(Value::as_str) != Some("elon.tauri_native_diagnostics.v1") {
+        return Err("desktop_snapshot_invalid");
+    }
+    let events = snapshot
+        .get_mut("events")
+        .and_then(Value::as_array_mut)
+        .ok_or("desktop_snapshot_invalid")?;
+    events.truncate(32);
+    Ok(snapshot)
 }
 
 fn parse_sources(raw: Option<&str>) -> HashSet<String> {
@@ -358,4 +405,31 @@ fn bad_request(message: impl Into<String>) -> Response {
         Json(json!({"ok": false, "error": message.into()})),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod desktop_snapshot_tests {
+    use super::parse_tauri_diagnostic_snapshot;
+    use serde_json::json;
+
+    #[test]
+    fn desktop_snapshot_requires_schema_and_event_array() {
+        assert!(parse_tauri_diagnostic_snapshot(b"not-json").is_err());
+        assert!(parse_tauri_diagnostic_snapshot(br#"{"schema":"wrong","events":[]}"#).is_err());
+        assert!(parse_tauri_diagnostic_snapshot(
+            br#"{"schema":"elon.tauri_native_diagnostics.v1"}"#
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn desktop_snapshot_is_bounded_to_thirty_two_events() {
+        let payload = json!({
+            "schema": "elon.tauri_native_diagnostics.v1",
+            "events": (0..80).map(|value| json!({"seq": value})).collect::<Vec<_>>()
+        });
+        let parsed =
+            parse_tauri_diagnostic_snapshot(&serde_json::to_vec(&payload).unwrap()).unwrap();
+        assert_eq!(parsed["events"].as_array().unwrap().len(), 32);
+    }
 }
