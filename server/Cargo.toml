@@ -124,3 +124,6 @@ elon-external-pool-adapter-session-core = { path = "external-pool-adapter-sessio
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 elon-external-pool-adapter-session-core = { path = "external-pool-adapter-session-core", features = ["test-support"] }
+
+[dev-dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

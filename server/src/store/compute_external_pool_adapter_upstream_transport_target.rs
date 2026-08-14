@@ -1,6 +1,7 @@
 //! Append-only storage for durable inert brokered upstream transport targets.
 
 mod audit;
+mod broker_tls;
 mod build;
 mod current;
 mod input;

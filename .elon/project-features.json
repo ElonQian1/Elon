@@ -357,6 +357,185 @@
       "updated_at_ms": 1786727523769
     },
     {
+      "id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "title": "外部矿池 Adapter 服务端 Broker TLS 传输 V1",
+      "summary": "由服务端 broker 对 V258 exact target 执行有界 DNS、公共单播门卫、直连 TCP、TLS 1.3 WebPKI 与 leaf SPKI pin，并在后验 currentness 事务内短时暴露私有通道；不发送应用数据或激活 Provider。",
+      "status": "released",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/compute-external-pool-adapter-broker-tls-transport-v1.md",
+        "content_hash": "d037ac2c27591939f34a143920fe45f511eb11e71a21562f403e89d94d6481c9",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "de5fcd4782ff5b73d20f4d3571cd0a29433f58de",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "broker",
+        "tls",
+        "security"
+      ],
+      "task_paths": [
+        "docs/distributed-compute",
+        "server/src/compute_federation/external_pool_adapter_broker_tls",
+        "server/src/store/compute_external_pool_adapter_broker_tls.rs"
+      ],
+      "dependencies": [
+        "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+        "compute-v258-upstream-transport-target-verification"
+      ],
+      "acceptance_criteria": [
+        "DNS 结果有界、去重且所有地址必须为公共单播，混合私网答案失败关闭。",
+        "broker 只允许直连已固定地址、TLS 1.3、WebPKI hostname/time 与 exact leaf SPKI pin。",
+        "本地 TLS fixture 覆盖正向、hostname/pin/CA/TLS 版本/连接失败且不发送应用字节。",
+        "Store 使用两个独立 Prepared handles，网络在事务外，后验 Immediate 事务重验 exact target 与 installation binding。",
+        "V254 deny 与 V258-V263 边界保持，不创建 Provider、route、市场或经济副作用。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-broker-tls-transport-acceptance.md",
+          "content_hash": "6f09f7fe894b5f4ac717cc7ee5fc4522ed1054fa246162e7850281473accb602",
+          "locator": "V264 acceptance evidence",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e4d3e2df27fc351ce66b0494d20dfa7a6fa17f3f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-broker-tls-transport-authority.md",
+          "content_hash": "5a7b8af050a2eddea74469831277c1dd2405a33cdc0739ab558a2edf0f47b417",
+          "locator": "V264 authority boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9797ff307bcef8fb0b19378209c6987c817af6fc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/Cargo.toml",
+          "content_hash": "cc41603aaace9e4fe4c1676716599d23a2b47b0e53bbf6b4383cf382c880b091",
+          "locator": "rustls dev fixture dependency",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "b9341b14fd3855e27c03120be80a78ca997fa941",
+            "worktree_blob_oid": "2396d139fc01bc10ecdf6913bc9b0c9b7b6bf08a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls.rs",
+          "content_hash": "90ebb6277de06735ba27d158d68c822939f8862820701d19d60ba0e41e68c775",
+          "locator": "broker TLS authority and channel contract",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8c308d5bcb767fe3d84bf5b7631c2c62076654c6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/address_policy.rs",
+          "content_hash": "779a741aa163255d7245241ca4025f7b90a03a39256a191536204d8933b55852",
+          "locator": "bounded public-unicast DNS policy",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "656ab3fc46b58ad1b6ccff3cf1ad6910ff7ef6be",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/target.rs",
+          "content_hash": "c748577b3d93efdc4d97001c09fc6abb2a3208e46fad576dcf5c13e3681a8f27",
+          "locator": "exact target and DER SPKI extraction",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3e03f3557028cf528e8112838e06a0b602c22505",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/tests.rs",
+          "content_hash": "ddef0b9f48c11df95d6a4cd6747566a6b27097ef2dd40471d8cba4a2c95b9c9a",
+          "locator": "local TLS failure-closed matrix",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bbdd6d087a010123fd268a63c5023d20347ebf2f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/transport.rs",
+          "content_hash": "ecf11803f2a1b16f52a1c0875567a244800d5b0175ae2413babbd1c0ce1c6f4d",
+          "locator": "direct TCP TLS1.3 WebPKI and SPKI pin",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "535ce6cdb3aeeaae5e072a51f683d79e1039110e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls_source_contract_tests.rs",
+          "content_hash": "bc30fe99dfca6dd42947f88296cacadadc98f0c0c21c4ae997ff5a886d2eb921",
+          "locator": "V254 and V258-V263 source contracts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "09691ef83796c1f7e3cbcbaee0697c06cf3733da",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_upstream_transport_target/broker_tls.rs",
+          "content_hash": "ad9ad2a228991d86b672e143c6910a2990ad2ea6eb2044645ee079335cb2da46",
+          "locator": "two-phase Store currentness authority",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b4bd8d23560c030e23c57471fe636efdac019f1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8ea7a68d84d5e4850875ce85e894135b20407df6",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1786735398977,
+      "updated_at_ms": 1786740800005
+    },
+    {
       "id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
       "title": "外部矿池 Adapter 易失配置与凭据交付 V1",
       "summary": "把 V256 的短时 config/credential 通过 V262 已认证 ELSP session 一次性交付给同一 sealed child，完成 root-bound receipt/commit/ready；失败由 pidfd 回收且不产生网络、Provider 或经济副作用。",
@@ -3361,76 +3540,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_426c58a43cf74ec7bfc1ad369bbab1c4",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "claim_released",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V254 编译与 9 项定向测试已通过；权威文档据实更新导致需求哈希变化，先释放旧认领再重绑。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786636305946
-    },
-    {
-      "id": "feature_event_f515c15ebe7d467f973855dea25d598f",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-019f3b86",
-      "reason": "将 V254 权威从未编译更新为 9 项本地定向验证后的部分验证状态，重新绑定当前权威文档。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786636319125
-    },
-    {
-      "id": "feature_event_f9d619f20c5148d5b299ba8d07465ee2",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "已复核更新后的 V254 权威，范围仍限于本地验证，不包含 activation 或 market admission。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786636340487
-    },
-    {
-      "id": "feature_event_d6fddef35fe246c286bd3972caff7d2c",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "验证代码与定向测试边界明确，可重新认领完成证据登记。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786636340572
-    },
-    {
-      "id": "feature_event_9bcb053ee78d41aba196dca5d2282c18",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786636340584
-    },
-    {
-      "id": "feature_event_bf5b8a07a7134664a1a038b1b2d9bbad",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V254 编译与 9 项定向验收已通过，开始登记当前实现证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786636340596
-    },
-    {
-      "id": "feature_event_0f8dd612dcd549358acf62cd27565a36",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "claim_released",
-      "actor": "codex-goal-019f3b86",
-      "reason": "补充 fresh/repeat migration 动态测试并更新正式证据后，权威哈希再次变化，释放旧认领。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786637271908
-    },
-    {
       "id": "feature_event_6291b08666f949649216f9561241d4a6",
       "feature_id": "external-pool-provider-activation-candidate-v254-verification",
       "action": "requirement_rebound",
@@ -5359,6 +5468,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786734638141
+    },
+    {
+      "id": "feature_event_8cd9e98839ae463ca938a92bd910ee06",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "registered",
+      "actor": "codex-v264",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786735398977
+    },
+    {
+      "id": "feature_event_28edc5bc82ad423baaca7747e37b7ee5",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "claimed",
+      "actor": "codex-v264",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786735408932
+    },
+    {
+      "id": "feature_event_b98665a3c7f240ed9e1d1630ac55cead",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-v264",
+      "reason": "Begin scoped broker TLS transport implementation",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786735425492
+    },
+    {
+      "id": "feature_event_d9ae6698adfb49f7ad383aa4b40645ce",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-v264",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786740696664
+    },
+    {
+      "id": "feature_event_9d67e01dafe44079a6db8912a46da769",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-v264",
+      "reason": "Broker TLS implementation, source contracts, local TLS matrix, and authority documentation are complete.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786740710661
+    },
+    {
+      "id": "feature_event_392dc9a7818c41899adf9e0e91cc4c13",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-v264",
+      "reason": "Production cargo check and 11 targeted broker TLS source/dynamic tests passed with recorded validation receipts.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786740780723
+    },
+    {
+      "id": "feature_event_ffd7b2e6358943cf88f4b6402befee3d",
+      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-v264",
+      "reason": "Package the verified V264 capability and evidence in the same Git delivery commit.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786740800005
     }
   ]
 }
