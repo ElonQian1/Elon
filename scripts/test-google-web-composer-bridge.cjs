@@ -29,4 +29,25 @@ const topSearch = bridge.scoreMeta({
 assert.ok(aiComposer > topSearch)
 assert.equal(bridge.scoreMeta({ ...base, tag: 'textarea', inNavigation: true }), -1000)
 assert.equal(bridge.scoreMeta({ ...base, tag: 'textarea', visible: false }), -1000)
+
+const adjacentSubmit = bridge.scoreSubmitAction({
+  visible: true,
+  disabled: false,
+  negativeLabel: false,
+  positiveLabel: true,
+  submitType: true,
+  sameForm: false,
+  nearComposer: true,
+})
+const microphone = bridge.scoreSubmitAction({
+  visible: true,
+  disabled: false,
+  negativeLabel: true,
+  positiveLabel: false,
+  submitType: false,
+  sameForm: false,
+  nearComposer: true,
+})
+assert.ok(adjacentSubmit > 0)
+assert.equal(microphone, -1000)
 console.log('google web composer bridge passed')

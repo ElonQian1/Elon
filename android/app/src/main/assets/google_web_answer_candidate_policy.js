@@ -15,13 +15,14 @@
   }
 
   function accepts(metrics) {
+    const hasQuery = metrics && metrics.hasQuery === true;
     const textLength = nonNegative(metrics && metrics.textLength);
     const citations = nonNegative(metrics && metrics.citations);
     const semanticBlocks = nonNegative(metrics && metrics.semanticBlocks);
     const links = nonNegative(metrics && metrics.links);
     const tabControls = nonNegative(metrics && metrics.tabControls);
     const explicit = metrics && metrics.explicit === true;
-    if (textLength < 8) return false;
+    if (!hasQuery || textLength < 8) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
     if (links >= 3 && semanticBlocks === 0 && citations === 0) return false;
     if (!explicit && semanticBlocks === 0 && citations === 0 && textLength < 80) return false;

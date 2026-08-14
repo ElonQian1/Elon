@@ -1,12 +1,13 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 2;
+  const extractorVersion = 3;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
   const allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   const candidatePolicy = window.__elonGoogleWebAnswerCandidatePolicy;
+  const queryPolicy = window.__elonGoogleWebQueryPolicy;
   let rememberedQueryValue = '';
 
   function cleanText(value) {
@@ -41,33 +42,30 @@
 
   function currentQuery() {
     const urlQuery = cleanText(new URLSearchParams(location.search).get('q')).slice(0, 40000);
-    if (urlQuery) {
-      rememberQuery(urlQuery);
-      return urlQuery;
-    }
     const selectors = [
       'main [data-user-query]',
       'main [data-query]',
       'main [aria-label*="your question" i]',
       'main [aria-label*="您的问题" i]'
     ];
-    const heading = Array.from(document.querySelectorAll(selectors.join(',')))
+    const headings = Array.from(document.querySelectorAll(selectors.join(',')))
       .filter(isVisible)
       .map((node) => cleanText(node.innerText || node.textContent))
-      .find((text) => text.length > 1 && text.length <= 40000);
-    if (heading) {
-      rememberQuery(heading);
-      return heading;
-    }
-    const remembered = rememberedQuery();
-    if (remembered) return remembered;
-    if (location.pathname !== '/search') return '';
-    const searchHeading = Array.from(document.querySelectorAll(
-      'main h1, main [role="heading"][aria-level="1"]'
-    )).filter(isVisible)
-      .map((node) => cleanText(node.innerText || node.textContent))
-      .find((text) => text.length > 1 && text.length <= 40000);
-    return searchHeading || '';
+      .filter((text) => text.length > 1 && text.length <= 40000);
+    const explicitQuery = headings[headings.length - 1] || '';
+    const selected = queryPolicy && typeof queryPolicy.select === 'function'
+      ? queryPolicy.select({ explicitQuery, rememberedQuery: rememberedQuery(), urlQuery })
+      : explicitQuery || rememberedQuery() || urlQuery;
+    if (selected) rememberQuery(selected);
+    return selected;
+  }
+
+  function hasCurrentQuery() {
+    return !!currentQuery();
+  }
+
+  function currentQueryMatches(value) {
+    return cleanText(currentQuery()) === cleanText(value);
   }
 
   function citationParts(container) {
@@ -122,6 +120,7 @@
     const tabControls = node.querySelectorAll('[role="tab"], [role="tablist"], [role="toolbar"]').length +
       (node.matches('[role="tab"], [role="tablist"], [role="toolbar"]') ? 1 : 0);
     const metrics = {
+      hasQuery: !!query,
       textLength: text.length,
       citations: citations.length,
       semanticBlocks,
@@ -187,8 +186,7 @@
 
   function extract(composer, streaming) {
     const query = currentQuery();
-    const answer = query || location.pathname === '/search'
-      ? answerCandidate(composer, query) : null;
+    const answer = query ? answerCandidate(composer, query) : null;
     const messages = [];
     if (query) messages.push({
       id: 'google-query-current',
@@ -234,6 +232,8 @@
     version: extractorVersion,
     rememberQuery,
     clearRememberedQuery,
+    hasCurrentQuery,
+    currentQueryMatches,
     extract,
     diagnostics
   });

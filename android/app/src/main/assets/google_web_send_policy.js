@@ -18,15 +18,18 @@
       .trim();
   }
 
-  function reconcile(currentDraft, expectedDraft, prompt) {
+  function reconcile(currentDraft, expectedDraft, prompt, ownedComposer) {
     if (!prompt) return Object.freeze({ allowed: false, write: false, staged: false });
     if (currentDraft === prompt) {
-      return Object.freeze({ allowed: true, write: false, staged: true });
+      return Object.freeze({ allowed: true, write: false, staged: true, replacedOwnedDraft: false });
     }
     if (currentDraft === expectedDraft) {
-      return Object.freeze({ allowed: true, write: true, staged: false });
+      return Object.freeze({ allowed: true, write: true, staged: false, replacedOwnedDraft: false });
     }
-    return Object.freeze({ allowed: false, write: false, staged: false });
+    if (ownedComposer === true) {
+      return Object.freeze({ allowed: true, write: true, staged: false, replacedOwnedDraft: true });
+    }
+    return Object.freeze({ allowed: false, write: false, staged: false, replacedOwnedDraft: false });
   }
 
   function confirmed(observation) {
@@ -53,11 +56,12 @@
     if (observation.buttonReady === true) return 'button';
     if (observation.formReady === true) return 'form';
     if (Number(observation.elapsedMs || 0) < Number(observation.timeoutMs || 0)) return 'wait';
+    if (observation.navigationFallbackAllowed === true) return 'navigate';
     return observation.enterAvailable === true ? 'enter' : 'fail';
   }
 
   return Object.freeze({
-    version: 3,
+    version: 4,
     reconcile,
     confirmed,
     latestUserQueryMatches,

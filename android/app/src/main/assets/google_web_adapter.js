@@ -11,7 +11,10 @@
   if (!allowedOrigins.has(location.origin) || !adapterVersion ||
       !/^doc_[a-z0-9_]{3,80}$/.test(documentToken) || !nativeBridge ||
       typeof nativeBridge.postMessage !== 'function' || !messageExtractor || !composerBridge || !sendPolicy ||
-      typeof messageExtractor.extract !== 'function') return;
+      typeof messageExtractor.extract !== 'function' ||
+      typeof messageExtractor.currentQueryMatches !== 'function' ||
+      typeof messageExtractor.hasCurrentQuery !== 'function' ||
+      typeof composerBridge.findSubmitAction !== 'function') return;
   if (window.__elonGoogleWebBridge &&
       window.__elonGoogleWebBridge.version === adapterVersion &&
       window.__elonGoogleWebBridge.documentToken === documentToken) return;
@@ -21,6 +24,7 @@
   let lastSnapshot = '';
   let lastDiagnostics = '';
   const SUBMIT_READY_TIMEOUT_MS = 1600;
+  const MAX_NAVIGATION_PROMPT_LENGTH = 4000;
 
   function cleanText(value) {
     return String(value || '')
@@ -175,12 +179,25 @@
     emitTimer = window.setTimeout(snapshot, 320);
   }
 
-  function sendPrompt(value, expectedDraft) {
+  function firstPromptNavigationUrl(prompt) {
+    const url = new URL('https://www.google.com/search');
+    url.searchParams.set('udm', '50');
+    url.searchParams.set('aep', '11');
+    url.searchParams.set('q', prompt);
+    return url.href;
+  }
+
+  function sendPrompt(value, expectedDraft, ownedComposer) {
     const composer = findComposer();
     if (!composer) return emitResult('send_prompt', false, 'Google AI 输入框尚未就绪。');
     const prompt = cleanText(value);
     const draft = cleanText(composerValue(composer));
-    const reconciliation = sendPolicy.reconcile(draft, cleanText(expectedDraft), prompt);
+    const reconciliation = sendPolicy.reconcile(
+      draft,
+      cleanText(expectedDraft),
+      prompt,
+      ownedComposer === true
+    );
     if (!reconciliation.allowed) {
       scheduleSnapshot();
       return emitResult('send_prompt', false, '官方网页草稿已经变化，请确认后重试。');
@@ -194,8 +211,7 @@
     function confirmSubmission(startedAt) {
       const currentComposer = findComposer();
       const streaming = isStreaming();
-      const extraction = messageExtractor.extract(currentComposer, streaming);
-      const queryMatches = sendPolicy.latestUserQueryMatches(extraction.messages, prompt);
+      const queryMatches = messageExtractor.currentQueryMatches(prompt);
       if (sendPolicy.confirmed({
         hrefChanged: location.href !== beforeHref,
         streaming,
@@ -219,13 +235,18 @@
       const form = composerBridge.form(currentComposer);
       const scope = form || currentComposer.parentElement?.parentElement?.parentElement ||
         currentComposer.parentElement;
-      const button = composerBridge.findAction(currentComposer, ['send', 'submit', '发送', '提交']) ||
+      const button = composerBridge.findSubmitAction(currentComposer) ||
+        composerBridge.findAction(currentComposer, ['send', 'submit', '发送', '提交']) ||
         findButton(['send', 'submit', '发送', '提交'], scope || document);
+      const elapsedMs = Date.now() - submitStartedAt;
+      const navigationFallbackAllowed = elapsedMs >= SUBMIT_READY_TIMEOUT_MS &&
+        prompt.length <= MAX_NAVIGATION_PROMPT_LENGTH && !messageExtractor.hasCurrentQuery();
       const step = sendPolicy.submissionStep({
         buttonReady: !!button,
         formReady: !!form && typeof form.requestSubmit === 'function',
         enterAvailable: !!currentComposer,
-        elapsedMs: Date.now() - submitStartedAt,
+        navigationFallbackAllowed,
+        elapsedMs,
         timeoutMs: SUBMIT_READY_TIMEOUT_MS
       });
       if (step === 'wait') return window.setTimeout(submitWhenReady, 80);
@@ -238,6 +259,10 @@
         submitted = true;
       } else if (step === 'enter') {
         submitted = composerBridge.pressEnter(currentComposer);
+      } else if (step === 'navigate') {
+        messageExtractor.rememberQuery(prompt);
+        location.assign(firstPromptNavigationUrl(prompt));
+        return;
       }
       if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
       confirmSubmission(Date.now());
@@ -254,7 +279,8 @@
     if (action === 'snapshot') return snapshot();
     if (action === 'send_prompt') return sendPrompt(
       String(command.value || '').slice(0, 20000),
-      String(command.expectedDraft || '').slice(0, 20000)
+      String(command.expectedDraft || '').slice(0, 20000),
+      command.ownedComposer === true
     );
     if (action === 'stop_generation') {
       const stop = findButton(['stop response', 'stop generating', '停止回答', '停止生成', '停止']);

@@ -3,7 +3,8 @@
 
   const api = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root && !root.__elonGoogleWebComposerBridge) {
+  if (root && (!root.__elonGoogleWebComposerBridge ||
+      Number(root.__elonGoogleWebComposerBridge.version || 0) < api.version)) {
     root.__elonGoogleWebComposerBridge = Object.freeze(api);
   }
 })(typeof window !== 'undefined' ? window : null, function (root) {
@@ -175,6 +176,49 @@
     return matches[0] || null;
   }
 
+  function scoreSubmitAction(meta) {
+    if (!meta || !meta.visible || meta.disabled || meta.negativeLabel) return -1000;
+    let score = 0;
+    if (meta.positiveLabel) score += 140;
+    if (meta.submitType) score += 90;
+    if (meta.sameForm) score += 45;
+    if (meta.nearComposer) score += 35;
+    return score;
+  }
+
+  function findSubmitAction(composer) {
+    if (!composer) return null;
+    const composerRect = composer.getBoundingClientRect();
+    const composerForm = form(composer);
+    const scopes = [composerForm, composer.getRootNode(), composer.ownerDocument].filter(Boolean);
+    const seen = new Set();
+    const matches = [];
+    for (const scope of scopes) {
+      for (const node of scope.querySelectorAll('button, [role="button"]')) {
+        if (seen.has(node)) continue;
+        seen.add(node);
+        const label = cleanText([
+          node.getAttribute('aria-label'), node.getAttribute('title'), node.textContent
+        ].filter(Boolean).join(' '));
+        const rect = node.getBoundingClientRect();
+        const meta = {
+          visible: visible(node),
+          disabled: node.matches(':disabled') || node.getAttribute('aria-disabled') === 'true',
+          positiveLabel: /send|submit|ask|发送|提交|询问/i.test(label),
+          negativeLabel: /microphone|voice|attach|upload|add|clear|close|history|new topic|麦克风|语音|附件|上传|添加|清除|关闭|历史|新话题/i.test(label),
+          submitType: String(node.getAttribute('type') || '').toLowerCase() === 'submit',
+          sameForm: !!composerForm && node.closest('form') === composerForm,
+          nearComposer: Math.abs(rect.bottom - composerRect.bottom) <= 120 &&
+            rect.left >= composerRect.left - 120 && rect.right <= composerRect.right + 120
+        };
+        const score = scoreSubmitAction(meta);
+        if (score > 0) matches.push({ node, score, right: rect.right });
+      }
+      if (matches.length) break;
+    }
+    return matches.sort((left, right) => right.score - left.score || right.right - left.right)[0]?.node || null;
+  }
+
   function pressEnter(composer) {
     if (!composer) return false;
     const KeyboardEventType = composer.ownerDocument.defaultView.KeyboardEvent;
@@ -194,5 +238,17 @@
       '|entries=' + values.length + '|visible=' + values.filter((value) => value.meta.visible).length;
   }
 
-  return Object.freeze({ version: 1, scoreMeta, find, value, setValue, form, findAction, pressEnter, diagnostics });
+  return Object.freeze({
+    version: 2,
+    scoreMeta,
+    scoreSubmitAction,
+    find,
+    value,
+    setValue,
+    form,
+    findAction,
+    findSubmitAction,
+    pressEnter,
+    diagnostics
+  });
 });

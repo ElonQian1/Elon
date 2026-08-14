@@ -98,6 +98,7 @@ internal class GoogleWebPageAdapter(
         action = "send_prompt",
         value = value.take(MAX_PROMPT_LENGTH),
         expectedDraft = expectedDraft.take(MAX_PROMPT_LENGTH),
+        ownedComposer = true,
     )
 
     fun stopGeneration() = runCommand("stop_generation")
@@ -118,11 +119,13 @@ internal class GoogleWebPageAdapter(
         action: String,
         value: String = "",
         expectedDraft: String = "",
+        ownedComposer: Boolean = false,
     ) {
         val command = JSONObject()
             .put("action", action)
             .put("value", value)
             .put("expectedDraft", expectedDraft)
+            .put("ownedComposer", ownedComposer)
             .toString()
         val encoded = JSONObject.quote(command)
         webView.evaluateJavascript(
@@ -137,9 +140,10 @@ internal class GoogleWebPageAdapter(
         origin.scheme == "https" && origin.port == -1 && origin.host?.lowercase() in ALLOWED_HOSTS
 
     companion object {
-        const val ADAPTER_VERSION = 7
+        const val ADAPTER_VERSION = 8
         private val ADAPTER_ASSETS = listOf(
             "google_web_answer_candidate_policy.js",
+            "google_web_query_policy.js",
             "google_web_message_extractor.js",
             "google_web_composer_bridge.js",
             "google_web_send_policy.js",
