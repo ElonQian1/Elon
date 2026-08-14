@@ -170,8 +170,29 @@ pub(super) fn initialization_script() -> String {
   if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ''))) {
     window.__elonChatGptDocumentToken = documentToken();
   }
-  window.__elonChatGptAdapterTargetVersion = __ADAPTER_VERSION__;
-  __ADAPTER_ASSETS__
+  function installAdapter() {
+    try {
+      window.__elonChatGptAdapterTargetVersion = __ADAPTER_VERSION__;
+      __ADAPTER_ASSETS__
+      if (!window.__elonChatGptBridge || typeof window.__elonChatGptBridge.command !== 'function') {
+        throw new Error('bridge_missing');
+      }
+    } catch (error) {
+      var errorName = String(error && error.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
+      invoke(JSON.stringify({
+        type: 'browser_diagnostic',
+        kind: 'adapter_bootstrap_failed',
+        detail: 'ChatGPT 语义桥初始化失败（' + (errorName || 'Error') + '）。',
+        url: location.origin + location.pathname
+      }));
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', installAdapter, { once: true });
+  } else {
+    installAdapter();
+  }
 })();
 "#
     .replace("__ALLOWED_ORIGIN__", ALLOWED_ORIGIN)
@@ -192,5 +213,7 @@ mod tests {
         assert!(script.contains("__elonChatGptSnapshotScheduler"));
         assert!(script.contains("__elonChatGptLayout"));
         assert!(script.contains("window.__elonChatGptBridge"));
+        assert!(script.contains("DOMContentLoaded"));
+        assert!(script.contains("adapter_bootstrap_failed"));
     }
 }

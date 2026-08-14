@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager, State, WebviewWindow};
 #[path = "codex_semantic_bridge/ai_window_control.rs"]
 mod ai_window_control;
 
-use crate::local_ai_browser::LocalAiNativeWindowRuntime;
+use crate::local_ai_browser::{LocalAiBrowserRuntime, LocalAiNativeWindowRuntime};
 
 const MAX_NATIVE_EVENTS: usize = 600;
 const MAX_PERSISTED_EVENTS: usize = 64;
@@ -225,10 +225,16 @@ pub(crate) fn codex_execute_semantic_action(
     window: WebviewWindow,
     bridge: State<'_, CodexSemanticBridge>,
     ai_windows: State<'_, LocalAiNativeWindowRuntime>,
+    ai_web_sessions: State<'_, LocalAiBrowserRuntime>,
     action: SemanticAction,
 ) -> Result<Value, String> {
     validate_action(&action)?;
-    let result = execute(&window, ai_windows.inner(), &action);
+    let result = execute(
+        &window,
+        ai_windows.inner(),
+        ai_web_sessions.inner(),
+        &action,
+    );
     let captured_state = result.as_ref().ok().and_then(|result| result.state.clone());
     let (status, level) = match &result {
         Ok(_) => ("succeeded", "info"),
@@ -291,6 +297,7 @@ fn outcome(
 fn execute(
     window: &WebviewWindow,
     ai_windows: &LocalAiNativeWindowRuntime,
+    ai_web_sessions: &LocalAiBrowserRuntime,
     action: &SemanticAction,
 ) -> Result<SemanticActionResult, String> {
     match action.kind.as_str() {
@@ -325,7 +332,11 @@ fn execute(
         "capture_state" => outcome("已捕获非秘密窗口状态", Some(window_state(window))),
         "list_ai_windows" => outcome(
             "已列出一龙 AI 逻辑子窗口",
-            Some(ai_window_control::list(window.app_handle(), ai_windows)),
+            Some(ai_window_control::list(
+                window.app_handle(),
+                ai_windows,
+                ai_web_sessions,
+            )),
         ),
         "capture_ai_window_state" => {
             let provider_id =
@@ -335,6 +346,7 @@ fn execute(
                 Some(ai_window_control::capture(
                     window.app_handle(),
                     ai_windows,
+                    ai_web_sessions,
                     provider_id,
                 )),
             )
@@ -342,7 +354,12 @@ fn execute(
         "focus_ai_window" => {
             let provider_id =
                 ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
-            let state = ai_window_control::focus(window.app_handle(), ai_windows, provider_id)?;
+            let state = ai_window_control::focus(
+                window.app_handle(),
+                ai_windows,
+                ai_web_sessions,
+                provider_id,
+            )?;
             outcome("一龙 AI 子窗口已聚焦", Some(state))
         }
         _ => Err("不支持的 Tauri 语义动作".to_string()),

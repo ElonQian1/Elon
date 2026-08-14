@@ -24,6 +24,7 @@ struct SessionRecord {
     loading: bool,
     renderer_status: String,
     last_error: Option<String>,
+    last_error_code: Option<String>,
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
     command_result: Option<Value>,
@@ -42,6 +43,7 @@ pub struct LocalAiWebSessionState {
     pub loading: bool,
     pub renderer_status: String,
     pub last_error: Option<String>,
+    pub last_error_code: Option<String>,
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
     pub command_result: Option<Value>,
@@ -63,6 +65,7 @@ impl LocalAiBrowserRuntime {
                 loading: true,
                 renderer_status: renderer_status.to_string(),
                 last_error: None,
+                last_error_code: None,
                 semantic_event: None,
                 navigation_event: None,
                 command_result: None,
@@ -75,7 +78,12 @@ impl LocalAiBrowserRuntime {
             record.window_status = "opening".to_string();
             record.window_visible = window_visible;
             record.loading = true;
+            record.renderer_status = "connecting".to_string();
             record.last_error = None;
+            record.last_error_code = None;
+            record.semantic_event = None;
+            record.navigation_event = None;
+            record.command_result = None;
         });
     }
 
@@ -94,7 +102,12 @@ impl LocalAiBrowserRuntime {
             if allowed {
                 record.window_status = "loading".to_string();
                 record.loading = true;
+                record.renderer_status = "connecting".to_string();
                 record.last_error = None;
+                record.last_error_code = None;
+                record.semantic_event = None;
+                record.navigation_event = None;
+                record.command_result = None;
             } else {
                 record.window_status = "blocked".to_string();
                 record.loading = false;
@@ -103,6 +116,7 @@ impl LocalAiBrowserRuntime {
                         .unwrap_or("页面尝试离开允许的本地 AI 网页域名，已由一龙拦截。")
                         .to_string(),
                 );
+                record.last_error_code = Some("navigation_blocked".to_string());
             }
         });
     }
@@ -140,6 +154,7 @@ impl LocalAiBrowserRuntime {
             record.window_status = "error".to_string();
             record.loading = false;
             record.last_error = Some(detail);
+            record.last_error_code = Some("host_error".to_string());
         });
     }
 
@@ -154,16 +169,19 @@ impl LocalAiBrowserRuntime {
             "adapter_ready" => {
                 record.renderer_status = "active".to_string();
                 record.last_error = None;
+                record.last_error_code = None;
             }
             "message_snapshot" => {
                 record.renderer_status = "active".to_string();
                 record.semantic_event = Some(payload);
                 record.last_error = None;
+                record.last_error_code = None;
             }
             "conversation_snapshot" => {
                 record.renderer_status = "active".to_string();
                 record.navigation_event = Some(payload);
                 record.last_error = None;
+                record.last_error_code = None;
             }
             "command_result" => record.command_result = Some(payload),
             "browser_diagnostic" => {
@@ -173,6 +191,10 @@ impl LocalAiBrowserRuntime {
                     .unwrap_or("ChatGPT 页面暂未完成加载。")
                     .to_string();
                 record.last_error = Some(truncate(detail, 240));
+                record.last_error_code = payload
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .map(|kind| truncate(kind.to_string(), 48));
             }
             _ => {}
         });
@@ -180,6 +202,26 @@ impl LocalAiBrowserRuntime {
 
     pub fn snapshot(&self, label: &str) -> Option<LocalAiWebSessionState> {
         self.sessions().get(label).cloned().map(Into::into)
+    }
+
+    pub fn diagnostic_for_provider(&self, provider_id: &str) -> Option<Value> {
+        let sessions = self.sessions();
+        let record = sessions
+            .values()
+            .filter(|record| record.provider_id == provider_id)
+            .max_by_key(|record| record.updated_at_ms)?;
+        let snapshot = record.semantic_event.as_ref();
+        Some(serde_json::json!({
+            "window_status": record.window_status,
+            "window_visible": record.window_visible,
+            "loading": record.loading,
+            "adapter_connected": record.renderer_status == "active",
+            "semantic_snapshot_ready": snapshot.is_some_and(|event| event.get("type").and_then(Value::as_str) == Some("message_snapshot")),
+            "composer_ready": snapshot.and_then(|event| event.get("composerReady")).and_then(Value::as_bool).unwrap_or(false),
+            "page_kind": snapshot.and_then(|event| event.get("pageKind")).and_then(Value::as_str).unwrap_or("unknown"),
+            "last_error_code": record.last_error_code,
+            "updated_at_ms": record.updated_at_ms,
+        }))
     }
 
     fn update(&self, label: &str, update: impl FnOnce(&mut SessionRecord)) {
@@ -210,6 +252,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             loading: record.loading,
             renderer_status: record.renderer_status,
             last_error: record.last_error,
+            last_error_code: record.last_error_code,
             semantic_event: record.semantic_event,
             navigation_event: record.navigation_event,
             command_result: record.command_result,
@@ -283,5 +326,41 @@ mod tests {
 
         runtime.mark_opening("session", true);
         assert!(runtime.snapshot("session").unwrap().window_visible);
+    }
+
+    #[test]
+    fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
+        let runtime = LocalAiBrowserRuntime::default();
+        runtime.ensure_session("local-ai-chatgpt-owner-secret", "chatgpt", "connecting");
+        runtime.record_adapter_event(
+            "local-ai-chatgpt-owner-secret",
+            "message_snapshot",
+            json!({
+                "type": "message_snapshot",
+                "composerReady": true,
+                "pageKind": "home",
+                "draft": "private prompt",
+                "messages": [{"content": "private answer"}],
+            }),
+        );
+        runtime.record_adapter_event(
+            "local-ai-chatgpt-owner-secret",
+            "browser_diagnostic",
+            json!({
+                "kind": "adapter_bootstrap_failed",
+                "detail": "private exception detail",
+            }),
+        );
+
+        let diagnostic = runtime.diagnostic_for_provider("chatgpt").unwrap();
+        assert_eq!(diagnostic["adapter_connected"], true);
+        assert_eq!(diagnostic["semantic_snapshot_ready"], true);
+        assert_eq!(diagnostic["composer_ready"], true);
+        assert_eq!(diagnostic["last_error_code"], "adapter_bootstrap_failed");
+        let encoded = diagnostic.to_string();
+        assert!(!encoded.contains("owner-secret"));
+        assert!(!encoded.contains("private prompt"));
+        assert!(!encoded.contains("private answer"));
+        assert!(!encoded.contains("private exception detail"));
     }
 }

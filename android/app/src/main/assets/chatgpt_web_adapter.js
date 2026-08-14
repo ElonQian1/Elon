@@ -43,6 +43,11 @@
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\r\n/g, '\n').trim();
   }
 
+  function optional(fallback, read) {
+    try { return read(); }
+    catch { return fallback; }
+  }
+
   function isVisible(node) {
     if (!node) return false;
     const rect = node.getBoundingClientRect();
@@ -139,15 +144,17 @@
   function snapshot() {
     if (disposed) return;
     const composer = findComposer();
-    const dictationActive = composerAdapter ? composerAdapter.dictationActive(composer) : false;
-    const streaming = isStreaming();
-    const messageWindow = messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
-      ? messageAdapter.readMessageWindow(streaming)
-      : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 };
-    const messages = messageWindow.messages;
-    const pageKind = layoutAdapter && typeof layoutAdapter.pageKind === 'function'
+    const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
+    const streaming = optional(false, isStreaming);
+    const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
+      messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
+        ? messageAdapter.readMessageWindow(streaming)
+        : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 }
+    );
+    const messages = Array.isArray(messageWindow.messages) ? messageWindow.messages : [];
+    const pageKind = optional('unknown', () => layoutAdapter && typeof layoutAdapter.pageKind === 'function'
       ? layoutAdapter.pageKind()
-      : 'unknown';
+      : 'unknown');
     const loginRequired = pageKind === 'auth';
     const event = {
       type: 'message_snapshot',
@@ -162,17 +169,17 @@
       loginRequired,
       composerReady: !!composer,
       streaming,
-      currentModel: composerAdapter ? composerAdapter.currentModel(composer) : '',
-      attachments: composerAdapter ? composerAdapter.readAttachments(composer) : [],
+      currentModel: optional('', () => composerAdapter ? composerAdapter.currentModel(composer) : ''),
+      attachments: optional([], () => composerAdapter ? composerAdapter.readAttachments(composer) : []),
       dictationActive,
-      capabilities: detectCapabilities(composer)
+      capabilities: optional([], () => detectCapabilities(composer))
     };
     const fingerprint = JSON.stringify(event);
     if (fingerprint !== lastSnapshot) {
       lastSnapshot = fingerprint;
       emitEvent(event);
     }
-    if (layoutAdapter) layoutAdapter.emitSnapshot(emitEvent);
+    optional(undefined, () => layoutAdapter && layoutAdapter.emitSnapshot(emitEvent));
   }
 
   function scheduleSnapshot() {
@@ -466,23 +473,25 @@
   });
   emitEvent({
     type: 'adapter_ready',
-    capabilities: detectCapabilities(findComposer())
+    capabilities: optional([], () => detectCapabilities(findComposer()))
   });
-  snapshotScheduler = snapshotSchedulerModule && snapshotSchedulerModule.create({
+  snapshotScheduler = optional(null, () => snapshotSchedulerModule && snapshotSchedulerModule.create({
     scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
     cancelTimer: (timer) => clearTimeout(timer),
     snapshot,
     quietDelayMs: 120,
     maxDelayMs: 1000
-  });
+  }));
   observer = new MutationObserver(scheduleSnapshot);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['aria-selected', 'aria-checked', 'aria-disabled', 'disabled', 'data-state', 'hidden'],
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
+  if (document.documentElement) {
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['aria-selected', 'aria-checked', 'aria-disabled', 'disabled', 'data-state', 'hidden'],
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  }
   window.addEventListener('popstate', scheduleSnapshot);
   snapshot();
 })();

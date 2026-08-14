@@ -1,7 +1,9 @@
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 
-use crate::local_ai_browser::{LocalAiNativeWindowRuntime, LocalAiNativeWindowState};
+use crate::local_ai_browser::{
+    LocalAiBrowserRuntime, LocalAiNativeWindowRuntime, LocalAiNativeWindowState,
+};
 
 const PROVIDERS: [&str; 2] = ["chatgpt", "google-ai-mode"];
 
@@ -16,10 +18,14 @@ pub(super) fn validate_provider_id(provider_id: Option<&str>) -> Result<&str, St
         .ok_or_else(|| "provider_id 不在 AI 子窗口白名单。".to_string())
 }
 
-pub(super) fn list(app: &AppHandle, runtime: &LocalAiNativeWindowRuntime) -> Value {
+pub(super) fn list(
+    app: &AppHandle,
+    runtime: &LocalAiNativeWindowRuntime,
+    web_runtime: &LocalAiBrowserRuntime,
+) -> Value {
     let windows = PROVIDERS
         .iter()
-        .map(|provider_id| state(app, runtime, provider_id))
+        .map(|provider_id| state(app, runtime, web_runtime, provider_id))
         .collect::<Vec<_>>();
     json!({
         "schema": "elon.tauri_ai_window_list.v1",
@@ -31,11 +37,12 @@ pub(super) fn list(app: &AppHandle, runtime: &LocalAiNativeWindowRuntime) -> Val
 pub(super) fn capture(
     app: &AppHandle,
     runtime: &LocalAiNativeWindowRuntime,
+    web_runtime: &LocalAiBrowserRuntime,
     provider_id: &str,
 ) -> Value {
     json!({
         "schema": "elon.tauri_ai_window_capture.v1",
-        "window": state(app, runtime, provider_id),
+        "window": state(app, runtime, web_runtime, provider_id),
         "privacy": privacy(),
     })
 }
@@ -43,6 +50,7 @@ pub(super) fn capture(
 pub(super) fn focus(
     app: &AppHandle,
     runtime: &LocalAiNativeWindowRuntime,
+    web_runtime: &LocalAiBrowserRuntime,
     provider_id: &str,
 ) -> Result<Value, String> {
     let snapshot = current_snapshot(app, runtime, provider_id)
@@ -56,10 +64,16 @@ pub(super) fn focus(
     }
     window.set_focus().map_err(display_error)?;
     runtime.mark_focus(&snapshot.window_label, true);
-    Ok(capture(app, runtime, provider_id))
+    Ok(capture(app, runtime, web_runtime, provider_id))
 }
 
-fn state(app: &AppHandle, runtime: &LocalAiNativeWindowRuntime, provider_id: &str) -> Value {
+fn state(
+    app: &AppHandle,
+    runtime: &LocalAiNativeWindowRuntime,
+    web_runtime: &LocalAiBrowserRuntime,
+    provider_id: &str,
+) -> Value {
+    let official_session = web_runtime.diagnostic_for_provider(provider_id);
     let Some(snapshot) = current_snapshot(app, runtime, provider_id) else {
         return json!({
             "provider_id": provider_id,
@@ -72,9 +86,10 @@ fn state(app: &AppHandle, runtime: &LocalAiNativeWindowRuntime, provider_id: &st
             "last_error_code": null,
             "retryable": true,
             "updated_at_ms": 0,
+            "official_session": official_session,
         });
     };
-    view(app, snapshot)
+    view(app, snapshot, official_session)
 }
 
 fn current_snapshot(
@@ -90,7 +105,11 @@ fn current_snapshot(
         .or_else(|| states.into_iter().next())
 }
 
-fn view(app: &AppHandle, snapshot: LocalAiNativeWindowState) -> Value {
+fn view(
+    app: &AppHandle,
+    snapshot: LocalAiNativeWindowState,
+    official_session: Option<Value>,
+) -> Value {
     let open = app.get_webview_window(&snapshot.window_label).is_some();
     json!({
         "provider_id": snapshot.provider_id,
@@ -103,6 +122,7 @@ fn view(app: &AppHandle, snapshot: LocalAiNativeWindowState) -> Value {
         "last_error_code": snapshot.last_error_code,
         "retryable": snapshot.retryable || !open,
         "updated_at_ms": snapshot.updated_at_ms,
+        "official_session": official_session,
     })
 }
 
