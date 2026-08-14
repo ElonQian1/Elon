@@ -6,10 +6,11 @@
   const documentToken = String(window.__elonGoogleWebDocumentToken || '');
   const nativeBridge = window.elonGoogleWebNative;
   const messageExtractor = window.__elonGoogleWebMessageExtractor;
+  const composerBridge = window.__elonGoogleWebComposerBridge;
   const sendPolicy = window.__elonGoogleWebSendPolicy;
   if (!allowedOrigins.has(location.origin) || !adapterVersion ||
       !/^doc_[a-z0-9_]{3,80}$/.test(documentToken) || !nativeBridge ||
-      typeof nativeBridge.postMessage !== 'function' || !messageExtractor || !sendPolicy ||
+      typeof nativeBridge.postMessage !== 'function' || !messageExtractor || !composerBridge || !sendPolicy ||
       typeof messageExtractor.extract !== 'function') return;
   if (window.__elonGoogleWebBridge &&
       window.__elonGoogleWebBridge.version === adapterVersion &&
@@ -81,58 +82,15 @@
 
   function findComposer() {
     if (!isAiModePage()) return null;
-    const selectors = [
-      'main textarea',
-      'main [role="searchbox"]',
-      'main [role="textbox"][contenteditable="true"]',
-      'form textarea',
-      'form [role="searchbox"]',
-      'form [contenteditable="true"]',
-      'textarea[placeholder]',
-      'textarea[aria-label]',
-      'input[type="text"][aria-label]',
-      '[role="textbox"]',
-      '[contenteditable="true"]',
-      '[contenteditable="plaintext-only"]'
-    ];
-    for (const selector of selectors) {
-      const matches = Array.from(document.querySelectorAll(selector)).filter(isVisible);
-      const preferred = matches.find((node) => /ask|search|anything|follow.?up|chat|prompt|提问|尽情|搜索|追问|输入/i.test(
-        cleanText([node.getAttribute('aria-label'), node.getAttribute('placeholder')]
-          .filter(Boolean).join(' '))
-      ));
-      if (preferred || matches[0]) return preferred || matches[0];
-    }
-    return null;
+    return composerBridge.find();
   }
 
   function composerValue(composer) {
-    if (!composer) return '';
-    if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
-      return String(composer.value || '');
-    }
-    return String(composer.innerText || composer.textContent || '');
+    return composerBridge.value(composer);
   }
 
   function setComposerValue(composer, value) {
-    composer.focus();
-    if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
-      const prototype = composer instanceof HTMLTextAreaElement
-        ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      const setter = Object.getOwnPropertyDescriptor(prototype, 'value');
-      if (!setter || typeof setter.set !== 'function') return false;
-      setter.set.call(composer, value);
-    } else {
-      composer.textContent = value;
-    }
-    composer.dispatchEvent(new InputEvent('input', {
-      bubbles: true,
-      composed: true,
-      inputType: 'insertText',
-      data: value
-    }));
-    composer.dispatchEvent(new Event('change', { bubbles: true }));
-    return cleanText(composerValue(composer)) === cleanText(value);
+    return composerBridge.setValue(composer, value);
   }
 
   function findButton(labels, root) {
@@ -203,7 +161,8 @@
     if (fingerprint === lastSnapshot) return;
     lastSnapshot = fingerprint;
     emitEvent(event);
-    const diagnostics = messageExtractor.diagnostics(composer, extraction);
+    const diagnostics = messageExtractor.diagnostics(composer, extraction) + '|' +
+      composerBridge.diagnostics();
     if (diagnostics && diagnostics !== lastDiagnostics) {
       lastDiagnostics = diagnostics;
       emitResult('dom_diagnostics', true, diagnostics);
@@ -228,9 +187,10 @@
     if (reconciliation.write && !setComposerValue(composer, value)) {
       return emitResult('send_prompt', false, 'Google 官方输入框未接受文本。');
     }
-    const form = composer.closest('form');
+    const form = composerBridge.form(composer);
     const scope = form || composer.parentElement?.parentElement?.parentElement || composer.parentElement;
-    const button = findButton(['send', 'submit', '发送', '提交'], scope || document);
+    const button = composerBridge.findAction(composer, ['send', 'submit', '发送', '提交']) ||
+      findButton(['send', 'submit', '发送', '提交'], scope || document);
     const beforeHref = location.href;
     let submitted = false;
     if (button) {
@@ -240,20 +200,7 @@
       form.requestSubmit();
       submitted = true;
     } else {
-      const event = new KeyboardEvent('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        bubbles: true,
-        cancelable: true
-      });
-      composer.dispatchEvent(event);
-      composer.dispatchEvent(new KeyboardEvent('keyup', {
-        key: 'Enter',
-        code: 'Enter',
-        bubbles: true,
-        cancelable: true
-      }));
-      submitted = true;
+      submitted = composerBridge.pressEnter(composer);
     }
     if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
 
