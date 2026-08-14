@@ -40,12 +40,13 @@ internal class ChatGptBackgroundSession(
     private val proxyController = ChatGptWebProxyController(activity)
     private val uploadStager = ChatGptWebUploadStager(activity)
     private val conversationHistoryStore = ChatGptConversationHistoryStore(activity)
+    private val snapshotStore = WebChatSnapshotStore(activity, "chatgpt")
     private val restoredConversationHistory = conversationHistoryStore.restore()
     private val attachmentHandler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
-    private var latestSnapshot: ChatGptWebSnapshot? = null
+    private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
     private var state = State.IDLE
     private var queuedUploadUris = emptyList<Uri>()
     private var attachmentSendTracker: ChatGptWebAttachmentSendTracker? = null
@@ -58,11 +59,11 @@ internal class ChatGptBackgroundSession(
     private var conversationListRequested = false
 
     fun activate() {
+        latestSnapshot?.let(onSnapshot)
+        onConversationIndexChanged(conversationIndex())
         ensureInitialized()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
-        latestSnapshot?.let(onSnapshot)
-        onConversationIndexChanged(conversationIndex())
     }
 
     fun onHostResumed() {
@@ -291,10 +292,12 @@ internal class ChatGptBackgroundSession(
                 }
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
+                        snapshotStore.clear()
                         pageAdapter?.markLoginRequired()
                         updateState(State.LOGIN_REQUIRED)
                     }
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
+                        if (!snapshot.streaming) snapshotStore.save(snapshot)
                         pageAdapter?.markReady()
                         updateState(State.READY)
                         if (

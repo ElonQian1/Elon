@@ -16,6 +16,7 @@ import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebProxyController
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
+import com.elon.app.chatgptweb.WebChatSnapshotStore
 import java.time.LocalDate
 
 internal class GoogleWebBackgroundSession(
@@ -33,20 +34,21 @@ internal class GoogleWebBackgroundSession(
     private val cookieManager = CookieManager.getInstance()
     private val proxyController = ChatGptWebProxyController(activity)
     private val conversationStore = GoogleWebConversationStore(activity)
+    private val snapshotStore = WebChatSnapshotStore(activity, "google")
     private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val handler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
     private var pageAdapter: GoogleWebPageAdapter? = null
-    private var latestSnapshot: ChatGptWebSnapshot? = null
+    private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
     private var activePath: String? = null
     private var state = State.IDLE
 
     fun activate() {
+        latestSnapshot?.let(onSnapshot)
+        onConversationIndexChanged(conversationIndex())
         ensureInitialized()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
-        latestSnapshot?.let(onSnapshot)
-        onConversationIndexChanged(conversationIndex())
     }
 
     fun deactivate() = Unit
@@ -183,6 +185,7 @@ internal class GoogleWebBackgroundSession(
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 latestSnapshot = event.value
+                if (event.value.composerReady && !event.value.streaming) snapshotStore.save(event.value)
                 val pageTitle = event.value.title.trim().takeUnless {
                     it.equals("Google", ignoreCase = true) ||
                         it.equals("Google AI 模式", ignoreCase = true)

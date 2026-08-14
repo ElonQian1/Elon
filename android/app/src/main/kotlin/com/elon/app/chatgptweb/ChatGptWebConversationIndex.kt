@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import java.time.LocalDate
+import java.util.Locale
 
 internal data class ChatGptWebConversationSection(
     val label: String,
@@ -13,7 +14,7 @@ internal object ChatGptWebConversationIndex {
     fun sections(values: List<ChatGptWebConversation>): List<ChatGptWebConversationSection> {
         val grouped = linkedMapOf<String, MutableList<ChatGptWebConversation>>()
         values.forEach { conversation ->
-            val label = metadataLabel(conversation.groupLabel) ?: FALLBACK_GROUP
+            val label = groupLabel(conversation.groupLabel) ?: FALLBACK_GROUP
             grouped.getOrPut(label) { mutableListOf() }.add(conversation)
         }
         return grouped.map { (label, conversations) ->
@@ -109,7 +110,7 @@ internal object ChatGptWebConversationIndex {
     }
 
     fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation = value.copy(
-        groupLabel = metadataLabel(value.groupLabel).orEmpty(),
+        groupLabel = groupLabel(value.groupLabel).orEmpty(),
         projectTitle = metadataLabel(value.projectTitle),
     )
 
@@ -130,8 +131,8 @@ internal object ChatGptWebConversationIndex {
         return next.copy(
             path = if (nextHasProject || !previousHasProject) next.path else previous.path,
             active = previous.active || next.active,
-            groupLabel = metadataLabel(next.groupLabel)
-                ?: metadataLabel(previous.groupLabel)
+            groupLabel = groupLabel(next.groupLabel)
+                ?: groupLabel(previous.groupLabel)
                 .orEmpty(),
             projectId = next.projectId ?: previous.projectId,
             projectTitle = metadataLabel(next.projectTitle)
@@ -144,5 +145,10 @@ internal object ChatGptWebConversationIndex {
     private fun metadataLabel(value: String?): String? = value
         ?.trim()
         ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+
+    private fun groupLabel(value: String?): String? = metadataLabel(value)
+        ?.takeUnless { it.lowercase(Locale.ROOT) in NON_TEMPORAL_GROUP_LABELS }
+
+    private val NON_TEMPORAL_GROUP_LABELS = setOf("pinned", "已置顶", "置顶")
 
 }

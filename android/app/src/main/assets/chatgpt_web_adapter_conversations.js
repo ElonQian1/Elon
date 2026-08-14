@@ -8,7 +8,7 @@
   const projectPolicy = window.__elonChatGptProjectPolicy;
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/(g-p-[A-Za-z0-9_-]{1,160})\/c\/[A-Za-z0-9_-]{1,160})$/;
   const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
-  const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|pinned|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早|已置顶)$/i;
+  const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早)$/i;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();

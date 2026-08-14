@@ -439,7 +439,7 @@ internal object ChatGptWebProtocol {
                     item.optString("projectPath").take(MAX_PATH_LENGTH),
                 )
                 add(
-                    ChatGptWebConversation(
+                    ChatGptWebConversationIndex.sanitize(ChatGptWebConversation(
                         id = id.take(MAX_ID_LENGTH),
                         title = title,
                         path = path,
@@ -455,7 +455,7 @@ internal object ChatGptWebProtocol {
                             ?.take(MAX_TITLE_LENGTH),
                         projectPath = projectPath,
                         activityDates = parseActivityDates(item),
-                    ),
+                    )),
                 )
             }
         }

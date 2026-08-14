@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -77,6 +78,49 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
         assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
         assertTrue(activity.contains("ChatGptWebAccessPolicy.canChat(snapshot)"))
+    }
+
+    @Test
+    fun webChatProvidersReplayPrivateCachesBeforeStartingTheirWebViews() {
+        val chatGpt = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+        val google = read(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
+        )
+        val store = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/WebChatSnapshotStore.kt",
+        )
+
+        assertTrue(chatGpt.contains("WebChatSnapshotStore(activity, \"chatgpt\")"))
+        assertTrue(google.contains("WebChatSnapshotStore(activity, \"google\")"))
+        assertTrue(chatGpt.indexOf("latestSnapshot?.let(onSnapshot)") < chatGpt.indexOf("ensureInitialized()"))
+        assertTrue(google.indexOf("latestSnapshot?.let(onSnapshot)") < google.indexOf("ensureInitialized()"))
+        assertTrue(
+            chatGpt.indexOf("onConversationIndexChanged(conversationIndex())") <
+                chatGpt.indexOf("ensureInitialized()"),
+        )
+        assertTrue(
+            google.indexOf("onConversationIndexChanged(conversationIndex())") <
+                google.indexOf("ensureInitialized()"),
+        )
+        assertTrue(store.contains("context.noBackupFilesDir"))
+        assertTrue(store.contains("AtomicFile"))
+        assertFalse(store.contains("CookieManager"))
+    }
+
+    @Test
+    fun conversationRowsDoNotPresentPinnedHeadingsAsPerConversationState() {
+        val adapter = read(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val sideMenu = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
+        )
+
+        assertFalse(adapter.substringBefore("function cleanText").contains("pinned", ignoreCase = true))
+        assertFalse(adapter.substringBefore("function cleanText").contains("已置顶"))
+        assertFalse(sideMenu.contains("conversation.groupLabel.takeIf"))
     }
 
     @Test

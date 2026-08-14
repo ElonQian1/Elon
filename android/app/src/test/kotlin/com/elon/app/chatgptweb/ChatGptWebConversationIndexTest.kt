@@ -205,6 +205,17 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun pinnedLabelsAreNotTreatedAsTemporalConversationGroups() {
+        val cached = conversation("one", "已置顶", null)
+        val observed = conversation("one", "", null)
+
+        val merged = ChatGptWebConversationIndex.merge(listOf(cached), listOf(observed)).single()
+
+        assertEquals("", merged.groupLabel)
+        assertEquals("历史会话", ChatGptWebConversationIndex.sections(listOf(cached)).single().label)
+    }
+
+    @Test
     fun mergeCollapsesRecentAndProjectRoutesForTheSameConversation() {
         val recent = conversation("shared", "昨天", null).copy(
             activityDates = setOf("2026-08-13"),
