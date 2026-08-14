@@ -177,6 +177,7 @@
 167. `docs/open-commerce-consumer-portability-crypto-v2-acceptance.md`：查看运营方签名、PC/SDK 加密归档双向互操作和生产构建证据。
 168. `docs/decisions/open-commerce-consumer-portability-reauthorization-v1.md`：查看消费者人工映射来源关系、目标商户重新决定和旧 Grant 不复制的边界。
 169. `docs/open-commerce-consumer-portability-reauthorization-v1-acceptance.md`：查看关系映射与重新授权的 Rust、HTTP 和 PC 构建验证证据。
+170. `docs/open-commerce-cofficethinking-real-server-acceptance.md`：查看咖啡商户真实服务器、真实 PostgreSQL、库存事务、幂等下单和原 ERP 回读的隔离验收，以及尚未完成的公网平台链边界。
 
 ## 专题地图
 
