@@ -48,6 +48,17 @@ internal object ChatGptWebConversationIndex {
         if (retainMissing) observed + previous else observed,
     )
 
+    fun mergeObservedProjects(
+        conversations: List<ChatGptWebConversation>,
+        previous: List<ChatGptWebProject>,
+        observed: List<ChatGptWebProject>,
+    ): List<ChatGptWebProject> = mergeProjects(
+        conversations = conversations,
+        previous = previous,
+        observed = observed,
+        retainMissing = true,
+    )
+
     fun activeOn(
         values: List<ChatGptWebConversation>,
         date: LocalDate,

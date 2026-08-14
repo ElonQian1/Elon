@@ -58,8 +58,11 @@ class ChatGptWebConversationContractTest {
 
         assertTrue(conversations.contains("activityDates:"))
         assertTrue(conversations.contains("projectTitle:"))
-        assertTrue(conversations.contains("collectProjects(readProjects(), (projects) =>"))
+        assertTrue(conversations.contains("mergeObservedProjects(observedProjects, readProjects())"))
         assertTrue(conversations.contains("timeoutMs: 10000"))
+        assertTrue(conversations.contains("const observeProjects = () =>"))
+        assertTrue(conversations.contains("snapshot.projects = Array.from(observedProjects.values())"))
+        assertTrue(conversations.contains("collectProjects(snapshot.projects || readProjects(), (projects) =>"))
         assertTrue(conversations.contains("projects,"))
         assertTrue(conversations.contains("function openProject"))
         assertTrue(conversations.contains("path.split('/').filter(Boolean).pop()"))

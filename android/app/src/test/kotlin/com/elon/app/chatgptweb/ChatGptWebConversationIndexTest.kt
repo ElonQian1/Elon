@@ -151,6 +151,20 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun partialProjectObservationNeverErasesPreviouslyIndexedProjects() {
+        val current = ChatGptWebProject("g-p-current", "当前项目", "/g/g-p-current/project")
+        val temporarilyHidden = ChatGptWebProject("g-p-hidden", "暂时不可见", "/g/g-p-hidden/project")
+
+        val merged = ChatGptWebConversationIndex.mergeObservedProjects(
+            conversations = emptyList(),
+            previous = listOf(current, temporarilyHidden),
+            observed = listOf(current),
+        )
+
+        assertEquals(listOf("g-p-current", "g-p-hidden"), merged.map { it.id })
+    }
+
+    @Test
     fun mergeCleansLegacyNullMetadataWithoutDroppingActivity() {
         val cached = conversation("one", "null", null).copy(
             projectTitle = "null",

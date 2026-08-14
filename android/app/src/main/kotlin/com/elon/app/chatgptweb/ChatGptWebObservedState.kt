@@ -30,11 +30,10 @@ internal class ChatGptWebObservedState(
                     event.conversations,
                     retainMissing = !event.collection.isComplete,
                 )
-                projects = ChatGptWebConversationIndex.mergeProjects(
+                projects = ChatGptWebConversationIndex.mergeObservedProjects(
                     conversations,
                     previous = projects,
                     observed = event.projects,
-                    retainMissing = !event.collection.isComplete,
                 )
                 conversationCollection = event.collection.copy(
                     source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,

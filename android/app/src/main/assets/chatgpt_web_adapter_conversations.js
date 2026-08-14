@@ -92,6 +92,16 @@
     }).filter(Boolean).slice(0, MAX_PROJECTS);
   }
 
+  function mergeObservedProjects(target, values) {
+    (Array.isArray(values) ? values : []).forEach((project) => {
+      if (!project || !project.id || !project.path) return;
+      const previous = target.get(project.id);
+      target.set(project.id, Object.assign({}, previous || {}, project, {
+        active: !!(previous && previous.active) || !!project.active
+      }));
+    });
+  }
+
   function projectLabel(node) {
     return cleanText(
       node.getAttribute('data-project-title') ||
@@ -211,9 +221,13 @@
 
   function collectConversationHistory(initial, onDone) {
     const history = window.__elonChatGptConversationHistory;
+    const observedProjects = new Map();
+    const observeProjects = () => mergeObservedProjects(observedProjects, readProjects());
+    observeProjects();
     if (!history || typeof history.collect !== 'function') {
       return onDone({
         conversations: initial,
+        projects: Array.from(observedProjects.values()),
         collection: {
           scrollerFound: false,
           scrolled: false,
@@ -228,14 +242,21 @@
     }
     history.collect({
       initial,
-      read: readConversations,
+      read: () => {
+        observeProjects();
+        return readConversations();
+      },
       findScroller: findConversationScroller,
       maximum: MAX_CONVERSATIONS,
       timeoutMs: 10000,
       delayMs: 180,
       maxSteps: 40,
       stablePasses: 3
-    }, onDone);
+    }, (snapshot) => {
+      observeProjects();
+      snapshot.projects = Array.from(observedProjects.values()).slice(0, MAX_PROJECTS);
+      onDone(snapshot);
+    });
   }
 
   function findSidebarButton(open) {
@@ -368,7 +389,7 @@
   }
 
   function emitConversationSnapshot(snapshot, emitEvent, result, closeAfter) {
-    collectProjects(readProjects(), (projects) => {
+    collectProjects(snapshot.projects || readProjects(), (projects) => {
       emitEvent({
         type: 'conversation_snapshot',
         conversations: enrichProjectConversations(snapshot.conversations, projects),
