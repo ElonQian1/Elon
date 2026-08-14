@@ -2212,7 +2212,7 @@
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "title": "Win Google AI 语义桥启动恢复 V1",
       "summary": "修复 WebView2 会话已连接但 Google AI 语义桥因缺少消息提取器、文档令牌及 DOM 就绪门禁而无法发送或接收回复的问题。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-semantic-bootstrap-recovery-v1.md",
@@ -2305,7 +2305,7 @@
         }
       ],
       "created_at_ms": 1786710137772,
-      "updated_at_ms": 1786710138865
+      "updated_at_ms": 1786710654944
     },
     {
       "id": "win-native-multi-provider-web-ai-bridge-v1",
@@ -2682,16 +2682,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_ba94c7a3443c4a57b204b9c78aef665e",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786625036897
-    },
     {
       "id": "feature_event_faad467b3172467b8be970d45a9914db",
       "feature_id": "compute-attempt-final-usage-fence-verification-v1",
@@ -4681,6 +4671,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786710138865
+    },
+    {
+      "id": "feature_event_6ac786466c1e4a6aaf847dccf730ae72",
+      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Windows 工件 0.3.69+089b748e7 已完成本机构建验证并由远端 outbox 同步；本机激活等待当前终端任务结束。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786710654944
     }
   ]
 }
