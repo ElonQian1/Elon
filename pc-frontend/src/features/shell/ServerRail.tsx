@@ -17,6 +17,14 @@ interface RailItem {
   hoverColor: string
 }
 
+const OFFICIAL_AI_ITEM: RailItem = {
+  path: '/user-browser',
+  Icon: Globe2,
+  label: '官方 AI',
+  color: '#26342f',
+  hoverColor: '#315046',
+}
+
 const RAIL_ITEMS: RailItem[] = [
   { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/projects', Icon: Boxes,       label: '项目中心',  color: '#2a2b2f', hoverColor: '#34363b' },
@@ -33,7 +41,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
   { path: '/compute-challenges', Icon: Scale, label: '结算申诉', color: '#362d29', hoverColor: '#493a33' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
-  { path: '/user-browser', Icon: Globe2, label: '官方 AI', color: '#26342f', hoverColor: '#315046' },
+  OFFICIAL_AI_ITEM,
   { path: '/chatkit', Icon: MessageCircleMore, label: 'OpenAI ChatKit', color: '#26342f', hoverColor: '#315046' },
 ]
 
@@ -125,7 +133,7 @@ export default function ServerRail() {
 
   return (
     <nav className={styles.rail}>
-      {(localMode ? [LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM] : railItems).map((item) => {
+      {(localMode ? [LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, OFFICIAL_AI_ITEM] : railItems).map((item) => {
         const active = isActive(item.path)
         const Icon = item.Icon
         return (
