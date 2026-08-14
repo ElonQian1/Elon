@@ -28,6 +28,17 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。需要登录时�
 这里的“登录”是设备内的官方网页会话，不是把 ChatGPT 云端账号或 Cookie 绑定到一龙
 云端账号。登录状态由官方页面确认。
 
+Win 的“账号与本机会话中心”固定把三层状态分开显示：
+
+1. 一龙账号：决定本机 Profile 的 owner 隔离键；
+2. Google 作为一龙登录方式：只允许用户用同一 Google 身份进入一龙账号；
+3. ChatGPT / Google AI 官方网页：仍在各自 WebView2 Profile 内单独登录。
+
+绑定 Google 到一龙账号不会把 Google Cookie、OAuth token 或系统浏览器登录态复制给
+Google AI 模式，也不会让 ChatGPT 自动登录。云端账号资料短暂不可用时，Win 可从已经登录
+且绑定的一龙本机节点恢复同一个稳定 owner；若云端账号和本机节点 owner 不一致则失败关闭，
+不会打开或清除任一方的厂商 Profile。
+
 ## Win 本地模式
 
 桌面壳固定登记厂商入口，PC 前端只能传 `providerId` 和当前一龙 `ownerKey`，不能传
@@ -60,12 +71,12 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 - 升级提示提供正式 Windows 安装包入口，并说明完全退出旧客户端后重新打开；
 - 其他调用错误使用可重试状态，不能吞掉 Tauri 字符串 rejection 后只显示泛化失败。
 
-Windows 上创建子 WebView 的 Tauri command 必须保持为 `async`；同步 command 会在
-WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色窗口。子窗口先以
-`about:blank` 完成创建，再由 `PageLoadEvent::Finished` 回调导航到登记的官方入口，契约
-测试固定检查这两个条件。宿主导航失败时不得销毁窗口：保留窗口并显示稳定诊断码，防止
-用户只看到“一闪而过”。一龙原生聊天窗作为主工作台的托管子窗口创建并主动取得焦点，
-避免 command 返回后落到主窗口后方而被误判为闪退；Google 官方页仍保持独立窗口语义。
+Windows 上创建 WebView 的 Tauri command 必须保持为 `async`；同步 command 会在
+WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色窗口。一龙原生聊天窗在 Windows
+作为独立顶层窗口直接加载登记的 `/pc/user-browser/native` 地址；主窗口与原生聊天窗必须
+使用完全相同的 WebView2 browser arguments，否则共享默认用户数据目录的 WebView2 环境会
+拒绝初始化，而 Rust build 返回后用户只看到窗口一闪而过。非 Windows 平台继续使用 parent
+关系。宿主导航失败时不得销毁窗口：保留窗口并显示稳定诊断码，防止用户只看到“一闪而过”。
 
 ### IPC 与导航边界
 
@@ -130,11 +141,15 @@ confirmation，再调用商户模块运行时：
 
 - Tauri crate 编译与本地宿主安全测试通过。
 - Win 实机已验证未登录状态的 ChatGPT 官方页面可完整加载、关闭后状态可恢复并可再次打开。
+- 正式安装版 `0.3.69+8eacc54c5c6b356dbce0c50838e875edfc03cdfb` 已验证一龙原生聊天窗
+  独立创建、取得焦点并完成 React 根节点渲染；本机诊断收到 `created`、`page_started`、
+  `page_finished` 和 `page_health/settled`，窗口未再白屏或闪退。
 - Google AI 模式提供商固定指向官方 `google.com/aimode`，以独立 Profile 打开；Win 代码已
   接通问题、回答、引用、草稿、发送、停止和新对话的可见语义路径。账号登录仍定向到系统
   浏览器；地区、语言、设备或账号灰度未开放时保留完整 Google 官方窗口。
 - PC TypeScript/Vite 生产构建、ESLint 和本地浏览器安全契约测试通过。
-- 未登录一龙账号时不能创建本地 Profile。
+- 没有可验证的一龙云端 owner 或已登录本机节点 owner 时不能创建本地 Profile；两者同时存在
+  但不一致时同样失败关闭。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。
 - 用户确认本人账号后才能打开本地会话，清除会话前再次确认。
 - 普通浏览器不显示可调用的本地命令，继续使用托管模式。

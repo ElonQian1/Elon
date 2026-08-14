@@ -24,15 +24,17 @@ import {
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
 import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
+import type { LocalAiOwnerSource } from './useLocalAiOwnerIdentity'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface LocalAiBrowserPanelProps {
   ownerKey?: string
   ownerLabel: string
+  ownerSource: LocalAiOwnerSource
   capability: LocalAiBrowserCapability
 }
 
-export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }: LocalAiBrowserPanelProps) {
+export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource, capability }: LocalAiBrowserPanelProps) {
   const { state, providers, message: capabilityMessage, refresh } = capability
   const [ownerConfirmed, setOwnerConfirmed] = useState(false)
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
@@ -177,7 +179,8 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
         )}
         <dl>
           <div><dt>一龙账号</dt><dd>{ownerLabel}</dd></div>
-          <div><dt>登录位置</dt><dd>仅当前电脑</dd></div>
+          <div><dt>身份来源</dt><dd>{ownerSourceLabel(ownerSource)}</dd></div>
+          <div><dt>网页登录</dt><dd>仅当前电脑</dd></div>
           <div><dt>窗口状态</dt><dd>{sessionStatusLabel(sessionState)}</dd></div>
           <div><dt>当前站点</dt><dd>{sessionState?.currentHost || '尚未打开'}</dd></div>
         </dl>
@@ -385,4 +388,11 @@ function sessionStatusLabel(state: LocalAiWebSessionState | null): string {
 function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): string {
   if (sessionOpen) return '恢复官方页和聊天窗'
   return provider.id === 'chatgpt' ? '登录 ChatGPT 并打开聊天窗' : `打开 ${provider.displayName} 和聊天窗`
+}
+
+function ownerSourceLabel(source: LocalAiOwnerSource): string {
+  if (source === 'cloud_account') return '一龙云端账号'
+  if (source === 'local_node') return '本机节点恢复'
+  if (source === 'conflict') return '账号不一致 · 已暂停'
+  return '尚未识别'
 }

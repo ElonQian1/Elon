@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, EyeOff, LoaderCircle, MonitorUp, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { useAuthStore } from '../../store/auth'
 import NativeAiWebChat from './NativeAiWebChat'
 import { listLocalAiWebProviders, localAiBrowserErrorMessage, type LocalAiWebProvider, type LocalAiWebSessionState } from './localAiBrowserApi'
 import { LOCAL_AI_PROVIDER_FALLBACKS } from './localAiWebProviders'
 import useLocalAiWebChatController from './useLocalAiWebChatController'
+import useLocalAiOwnerIdentity from './useLocalAiOwnerIdentity'
 import styles from './NativeAiWebChatWindow.module.css'
 
 export default function NativeAiWebChatWindow() {
   const [searchParams] = useSearchParams()
   const requestedProviderId = searchParams.get('provider') || ''
-  const user = useAuthStore((state) => state.user)
-  const ownerKey = user?.id || ''
+  const identity = useLocalAiOwnerIdentity()
+  const ownerKey = identity.ownerKey
   const [providers, setProviders] = useState<LocalAiWebProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -30,7 +30,8 @@ export default function NativeAiWebChatWindow() {
   }, [])
 
   if (loading) return <WindowNotice icon="loading" title="正在打开一龙聊天窗" detail="正在读取本机官方 AI 能力…" />
-  if (!ownerKey) return <WindowNotice title="请先登录一龙账号" detail="关闭此窗口，在一龙主窗口登录后重新打开。" />
+  if (identity.checking) return <WindowNotice icon="loading" title="正在恢复本机会话" detail={identity.detail} />
+  if (!ownerKey) return <WindowNotice title="无法识别一龙账号" detail={identity.detail} />
   if (!provider) return <WindowNotice title="厂商窗口无效" detail="请从一龙主窗口的“官方 AI”入口重新打开。" />
 
   return (

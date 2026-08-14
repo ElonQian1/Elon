@@ -13,7 +13,9 @@ import {
   launchChatGptBrowser,
 } from './userBrowserLauncherApi'
 import type { ConsumerDiscoveryMatch } from '../open-commerce/openCommerceClientTypes'
+import LocalAiAccountSessionCard from './LocalAiAccountSessionCard'
 import LocalAiBrowserPanel from './LocalAiBrowserPanel'
+import useLocalAiOwnerIdentity from './useLocalAiOwnerIdentity'
 import useLocalAiBrowserCapability, { type LocalAiBrowserCapabilityState } from './useLocalAiBrowserCapability'
 import styles from './UserBrowserLauncherPage.module.css'
 
@@ -28,6 +30,7 @@ export default function UserBrowserLauncherPage() {
   const [launching, setLaunching] = useState(false)
   const [message, setMessage] = useState('')
   const localBrowser = useLocalAiBrowserCapability()
+  const localOwner = useLocalAiOwnerIdentity()
   const localBrowserAvailable = localBrowser.state === 'ready'
 
   const checkAvailability = useCallback(async () => {
@@ -94,9 +97,15 @@ export default function UserBrowserLauncherPage() {
 
       <div className={styles.rule} />
 
+      <LocalAiAccountSessionCard
+        identity={localOwner}
+        cloudAccountAvailable={Boolean(token && user)}
+      />
+
       <LocalAiBrowserPanel
-        ownerKey={user?.id}
-        ownerLabel={user?.nickname || user?.account || '未登录'}
+        ownerKey={localOwner.ownerKey}
+        ownerLabel={localOwner.ownerLabel}
+        ownerSource={localOwner.source}
         capability={localBrowser}
       />
 
