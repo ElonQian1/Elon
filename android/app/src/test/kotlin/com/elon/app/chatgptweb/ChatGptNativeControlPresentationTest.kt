@@ -47,6 +47,27 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun keepsSaveToProjectInTheMessageScopedNativeActionMenu() {
+        val save = control(
+            "save-to-project",
+            "save_to_project",
+            "添加至项目源",
+            ChatGptWebUiRegion.MESSAGE,
+            CONTEXT,
+        )
+
+        val actions = ChatGptNativeControlPresentation.messageActions(listOf(save)).getValue(CONTEXT)
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(save)).getValue(save.id)
+
+        assertEquals(listOf(save), actions)
+        assertEquals("menu", coverage.kind.wireName)
+        assertEquals(
+            "chatgpt-message-actions:$CONTEXT",
+            coverage.nativeTriggerSelector,
+        )
+    }
+
+    @Test
     fun exposesTwoHeaderActionsAndMovesOverflowIntoTheNativeMenu() {
         val controls = listOf(
             control("more", "more", "更多", ChatGptWebUiRegion.HEADER),
