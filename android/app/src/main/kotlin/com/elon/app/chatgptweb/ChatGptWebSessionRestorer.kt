@@ -20,9 +20,13 @@ internal class ChatGptWebSessionRestorer(context: Context) {
         nativeModeEnabled: Boolean,
         controller: ChatGptWebModeController,
     ): Boolean {
-        val target = pendingMode ?: return false
-        if (target == ChatGptWebModeController.Mode.NATIVE && !nativeModeEnabled) return false
-        pendingMode = null
+        val decision = ChatGptWebModeRestorePolicy.decide(
+            pending = pendingMode,
+            current = controller.selectedMode(),
+            nativeModeEnabled = nativeModeEnabled,
+        )
+        val target = decision.target ?: return false
+        if (decision.consumePending) pendingMode = null
         controller.select(target)
         return true
     }

@@ -60,6 +60,8 @@ internal class ChatGptWebModeController(
 
     fun isWebSelected(): Boolean = toggle.checkedButtonId == R.id.chatGptModeWeb
 
+    fun selectedMode(): Mode = modeFor(toggle.checkedButtonId)
+
     fun exitOfficialView(): Boolean {
         if (!isWebSelected()) return false
         select(if (nativeButton.isEnabled) Mode.NATIVE else Mode.QUICK)
