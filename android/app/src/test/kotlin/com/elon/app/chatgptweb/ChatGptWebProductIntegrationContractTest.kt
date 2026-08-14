@@ -158,6 +158,29 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(!mcpBinding.contains("private val control: (JSONObject)"))
     }
 
+    @Test
+    fun ordinaryFriendChatReusesTheCanonicalChatGptMcpEndpoint() {
+        val port = read("android/app/src/main/kotlin/com/elon/app/WebChatSocialMcpPort.kt")
+        val actions = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt")
+        val session = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt")
+        val controller = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
+        val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val mainMcp = read("android/app/src/main/kotlin/com/elon/app/MainMcpNativeControlActions.kt")
+
+        assertTrue(port.contains("interface WebChatSocialMcpPort"))
+        assertTrue(actions.contains(": WebChatSocialMcpPort"))
+        assertTrue(session.contains("fun createMcpPort("))
+        assertTrue(session.contains("observedMcpState.accept(event)"))
+        assertTrue(session.contains("onDocumentChanged = ::handleDocumentChanged"))
+        assertTrue(session.contains("uiManifest = { latestUiManifest }"))
+        assertTrue(controller.contains("override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort"))
+        assertTrue(controller.contains("revealMessage = ::revealMessageFromMcp"))
+        assertTrue(feature.contains("providerId() == WebChatProviderId.CHATGPT_WEB"))
+        assertTrue(mainMcp.contains("action.startsWith(\"chatgpt_\")"))
+        assertTrue(mainMcp.contains("return port.control(args)"))
+        assertTrue(mainMcp.contains("\"chatgpt_web_mcp\""))
+    }
+
     private fun read(relative: String): String =
         String(Files.readAllBytes(root().resolve(relative)), StandardCharsets.UTF_8)
 

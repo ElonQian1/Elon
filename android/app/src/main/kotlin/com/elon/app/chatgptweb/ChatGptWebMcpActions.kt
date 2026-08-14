@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatSocialMcpPort
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -22,8 +23,8 @@ internal class ChatGptWebMcpActions(
     private val refresh: () -> Unit,
     private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
     private val revealMessage: (String, Int?, String) -> Boolean,
-) {
-    fun uiState(): JSONObject {
+) : WebChatSocialMcpPort {
+    override fun uiState(): JSONObject {
         val observed = observedState()
         val current = snapshot().takeIf { observed.adapterCurrent }
         val currentManifest = uiManifest().takeIf { observed.adapterCurrent }
@@ -55,7 +56,7 @@ internal class ChatGptWebMcpActions(
             .put("available_actions", JSONArray(AVAILABLE_ACTIONS))
     }
 
-    fun control(args: JSONObject): JSONObject {
+    override fun control(args: JSONObject): JSONObject {
         val action = args.optString("action", "state").trim().lowercase()
         val observedAtDispatch = observedState()
         val refreshFromPageGeneration = observedAtDispatch.pageGeneration

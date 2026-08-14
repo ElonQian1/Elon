@@ -6,9 +6,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptBackgroundSession
 import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
+import com.elon.app.chatgptweb.ChatGptMessageClipboard
 import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
+import com.elon.app.chatgptweb.ChatGptWebModeController
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -26,6 +28,7 @@ internal class ChatGptSocialChatController(
     private val messages = mutableListOf<ChatMessage>()
     private val timestamps = linkedMapOf<String, Long>()
     private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions)
+    private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(
         activity = activity,
         host = binding.chatListFrame,
@@ -42,6 +45,17 @@ internal class ChatGptSocialChatController(
     private var pendingAttachments = emptyList<PendingAttachment>()
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
+    private val socialMcpPort: WebChatSocialMcpPort by lazy {
+        session.createMcpPort(
+            inputText = { binding.inputEdit.text?.toString().orEmpty() },
+            setInputText = ::setInputTextFromMcp,
+            copyMessage = messageClipboard::copy,
+            selectMode = { mode ->
+                if (mode != ChatGptWebModeController.Mode.NATIVE) openOfficialFallback()
+            },
+            revealMessage = ::revealMessageFromMcp,
+        )
+    }
 
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
@@ -162,6 +176,8 @@ internal class ChatGptSocialChatController(
         return session.openProject(path)
     }
 
+    override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort
+
     override fun discardAcceptanceAttachmentSend(): Boolean {
         if (waitingForAttachmentCompletion) return false
         val hadFixture = pendingAttachments.any {
@@ -179,6 +195,29 @@ internal class ChatGptSocialChatController(
     override fun onHostPaused() = session.onHostPaused()
 
     override fun destroy() = session.destroy()
+
+    private fun setInputTextFromMcp(value: String) {
+        binding.inputEdit.setText(value)
+        binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+    }
+
+    private fun revealMessageFromMcp(messageId: String, partIndex: Int?, target: String): Boolean {
+        val nativeId = "${provider.id.wireValue}:$messageId"
+        val index = messages.indexOfFirst { it.id == nativeId }
+        if (index < 0) return false
+        binding.chatList.scrollToPosition(index)
+        binding.chatList.post {
+            binding.chatList.findViewHolderForAdapterPosition(index)?.itemView?.apply {
+                contentDescription = listOfNotNull(
+                    "ChatGPT message $messageId",
+                    partIndex?.let { "part $it" },
+                    target.takeIf(String::isNotBlank),
+                ).joinToString("; ")
+                requestFocus()
+            }
+        }
+        return true
+    }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
         val cleanPending = pendingPrompt?.trim().orEmpty()

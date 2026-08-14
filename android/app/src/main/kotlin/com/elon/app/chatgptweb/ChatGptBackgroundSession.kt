@@ -14,6 +14,7 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
+import com.elon.app.WebChatSocialMcpPort
 import java.time.LocalDate
 
 internal class ChatGptBackgroundSession(
@@ -42,11 +43,15 @@ internal class ChatGptBackgroundSession(
     private val conversationHistoryStore = ChatGptConversationHistoryStore(activity)
     private val snapshotStore = WebChatSnapshotStore(activity, "chatgpt")
     private val restoredConversationHistory = conversationHistoryStore.restore()
+    private val observedMcpState = ChatGptWebObservedState(restoredConversationHistory)
+    private val verificationEvidenceStore = ChatGptWebVerificationEvidenceStore(activity.applicationContext)
     private val attachmentHandler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
     private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
+    private var latestUiManifest: ChatGptWebUiManifest? = null
+    private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var state = State.IDLE
     private var queuedUploadUris = emptyList<Uri>()
     private var attachmentSendTracker: ChatGptWebAttachmentSendTracker? = null
@@ -169,6 +174,51 @@ internal class ChatGptBackgroundSession(
         return true
     }
 
+    fun createMcpPort(
+        inputText: () -> String,
+        setInputText: (String) -> Unit,
+        copyMessage: (String) -> ChatGptClipboardMetadata,
+        selectMode: (ChatGptWebModeController.Mode) -> Unit,
+        revealMessage: (String, Int?, String) -> Boolean,
+    ): WebChatSocialMcpPort {
+        ensureInitialized()
+        val adapter = checkNotNull(pageAdapter) { "ChatGPT background session is not active" }
+        val commands = ChatGptWebMcpCommandAdapter(
+            pageAdapter = adapter,
+            sendInputAction = { requestId ->
+                adapter.sendPrompt(
+                    inputText().trim(),
+                    latestSnapshot?.draft.orEmpty(),
+                    requestId,
+                )
+            },
+            invokeControlAction = adapter::invokeUiControl,
+            startDictationAction = adapter::startDictation,
+            requestComposerOptionsAction = { section, requestId ->
+                observedMcpState.beginComposerRequest(section)
+                if (section == "model") adapter.listModelOptions(requestId)
+                else adapter.listComposerTools(requestId)
+            },
+        )
+        return ChatGptWebMcpActions(
+            snapshot = { latestSnapshot },
+            uiManifest = { latestUiManifest },
+            observedState = observedMcpState::snapshot,
+            beginCommand = observedMcpState::beginCommand,
+            bridgeState = { latestBridgeState },
+            mode = { ChatGptWebModeController.Mode.NATIVE },
+            inputText = inputText,
+            verificationEvidence = verificationEvidenceStore::snapshot,
+            recordVerificationCases = verificationEvidenceStore::record,
+            setInputText = setInputText,
+            copyMessage = copyMessage,
+            commands = commands,
+            refresh = { webView?.reload() },
+            selectMode = selectMode,
+            revealMessage = revealMessage,
+        )
+    }
+
     fun destroy() {
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)
@@ -182,6 +232,8 @@ internal class ChatGptBackgroundSession(
         }
         webView = null
         latestSnapshot = null
+        latestUiManifest = null
+        latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
         cancelAttachmentSend()
         updateState(State.IDLE)
     }
@@ -230,6 +282,7 @@ internal class ChatGptBackgroundSession(
             webView = view,
             onEvent = ::handleEvent,
             onStateChanged = ::handleAdapterState,
+            onDocumentChanged = ::handleDocumentChanged,
         )
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
@@ -272,6 +325,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun handleEvent(event: ChatGptWebEvent) {
+        observedMcpState.accept(event)
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 val snapshot = sessionContinuity.reconcile(event.value)
@@ -293,6 +347,7 @@ internal class ChatGptBackgroundSession(
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
                         snapshotStore.clear()
+                        observedMcpState.clearConversationHistory()
                         pageAdapter?.markLoginRequired()
                         updateState(State.LOGIN_REQUIRED)
                     }
@@ -351,11 +406,24 @@ internal class ChatGptBackgroundSession(
                 conversationHistoryStore.save(conversations, projects)
                 onConversationIndexChanged(conversationIndex())
             }
+            is ChatGptWebEvent.UiManifest -> {
+                latestUiManifest = event.value
+                if (ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(latestSnapshot, event.value)) {
+                    pageAdapter?.markReady()
+                }
+            }
             is ChatGptWebEvent.AdapterReady,
-            is ChatGptWebEvent.FeatureNavigation,
-            is ChatGptWebEvent.UiManifest -> Unit
+            is ChatGptWebEvent.FeatureNavigation -> Unit
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
         }
+    }
+
+    private fun handleDocumentChanged(document: com.elon.app.WebBridgeDocumentSession.Snapshot) {
+        if (document.pageGeneration > observedMcpState.snapshot().pageGeneration) {
+            latestSnapshot = null
+            latestUiManifest = null
+        }
+        observedMcpState.updateDocument(document)
     }
 
     private fun chatRestorableUrl(savedUrl: String): String {
@@ -397,6 +465,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun handleAdapterState(adapterState: ChatGptWebPageAdapter.State) {
+        latestBridgeState = adapterState
         if (adapterState == ChatGptWebPageAdapter.State.UNSUPPORTED) {
             updateState(State.ERROR, "当前 WebView 不支持网页 AI 语义桥接")
         }

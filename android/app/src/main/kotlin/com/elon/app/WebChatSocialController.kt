@@ -27,6 +27,7 @@ internal interface WebChatSocialController {
     fun requestConversationIndex(): Boolean
     fun openConversation(path: String): Boolean
     fun openProject(path: String): Boolean
+    fun mcpPort(): WebChatSocialMcpPort? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false
     fun onHostResumed()
     fun onHostPaused()

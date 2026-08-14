@@ -57,6 +57,10 @@ internal class MainMcpNativeControlActions(
             .put("projects", projectsJson())
             .put("active_conversation", conversationJson(conversation, activeConversationIndex(), lastMessage))
             .put("social_chat", socialChatJson())
+            .put(
+                "chatgpt_web_mcp",
+                socialAiChatFeature()?.chatGptMcpPort()?.uiState() ?: JSONObject.NULL,
+            )
             .put("web_chat_sidebar", webChatSidebarJson())
             .put(
                 "chatgpt_web_acceptance_attachment",
@@ -225,8 +229,15 @@ internal class MainMcpNativeControlActions(
                 sendMessage()
                 uiState()
             }
-            else -> return chatGptAttachmentFixtureActions?.control(action, args)
-                ?: errorJson(action, "unsupported_action")
+            else -> {
+                if (action.startsWith("chatgpt_")) {
+                    val port = socialAiChatFeature()?.chatGptMcpPort()
+                        ?: return errorJson(action, "chatgpt_web_chat_inactive")
+                    return port.control(args)
+                }
+                return chatGptAttachmentFixtureActions?.control(action, args)
+                    ?: errorJson(action, "unsupported_action")
+            }
         }
         return result.put("control_ok", true)
     }

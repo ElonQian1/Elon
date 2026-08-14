@@ -155,6 +155,11 @@ internal class MainSocialAiChatFeature(
     fun webChatConversationIndex(): ChatGptWebConversationIndexState =
         webChatNavigationSession()?.index() ?: ChatGptWebConversationIndexState()
 
+    fun chatGptMcpPort(): WebChatSocialMcpPort? {
+        if (!isChatModeActive()) return null
+        return if (providerId() == WebChatProviderId.CHATGPT_WEB) chatGptController.mcpPort() else null
+    }
+
     fun webChatNavigationAvailable(): Boolean = webChatNavigationSession() != null
 
     fun createWebChatSideMenuCoordinator(): com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator {
