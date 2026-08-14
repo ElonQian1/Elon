@@ -265,6 +265,9 @@ mod tests {
 
         let snapshot = runtime.snapshot("session").unwrap();
         assert_eq!(snapshot.semantic_event.unwrap()["type"], "message_snapshot");
-        assert_eq!(snapshot.navigation_event.unwrap()["type"], "conversation_snapshot");
+        assert_eq!(
+            snapshot.navigation_event.unwrap()["type"],
+            "conversation_snapshot"
+        );
     }
 }

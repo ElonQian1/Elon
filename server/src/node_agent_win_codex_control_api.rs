@@ -37,6 +37,8 @@ struct ActionInput {
     #[serde(default)]
     route: Option<String>,
     #[serde(default)]
+    provider_id: Option<String>,
+    #[serde(default)]
     requested_by: Option<String>,
 }
 
@@ -61,6 +63,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             get(timeline_handler).post(event_handler),
         )
         .route("/api/codex-control/actions", post(action_handler))
+        .route(
+            "/api/codex-control/actions/:action_id",
+            get(action_status_handler),
+        )
         .route(
             "/api/codex-control/actions/pending",
             get(pending_actions_handler),
@@ -124,10 +130,25 @@ async fn action_handler(
         &input.trace_id,
         &input.kind,
         input.route.as_deref(),
+        input.provider_id.as_deref(),
         input.requested_by.as_deref().unwrap_or("pc_ui"),
     ) {
         Ok(action) => Json(json!({"ok": true, "action": action})).into_response(),
         Err(error) => bad_request(error),
+    }
+}
+
+async fn action_status_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    AxumPath(action_id): AxumPath<String>,
+) -> Response {
+    match runtime.win_codex_control.action(action_id.trim()) {
+        Ok(action) => Json(json!({"ok": true, "action": action})).into_response(),
+        Err(error) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"ok": false, "error": error})),
+        )
+            .into_response(),
     }
 }
 

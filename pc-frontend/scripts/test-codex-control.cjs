@@ -10,17 +10,27 @@ const api = read('src/features/codex-control/codexControlApi.ts')
 const page = read('src/features/codex-control/CodexControlPage.tsx')
 const rustApi = read('../server/src/node_agent_win_codex_control_api.rs')
 const rustMcp = read('../server/src/node_agent_win_codex_control_mcp.rs')
+const nativeBridge = read('../desktop-shell/src-tauri/src/codex_semantic_bridge.rs')
+const aiWindowControl = read('../desktop-shell/src-tauri/src/codex_semantic_bridge/ai_window_control.rs')
 
 if (!app.includes('path="codex-control"')) throw new Error('Codex control route missing')
 if (!shell.includes('useCodexControlBridge()')) throw new Error('global Codex control bridge missing')
 if (!bridge.includes('isControlEventUrl') || !bridge.includes("url.path === '/api/codex-control/events'")) throw new Error('network recorder must avoid recursive event logging')
 if (bridge.includes('response.text()') || bridge.includes('request.body')) throw new Error('network diagnostics must not read request/response bodies')
 if (!bridge.includes('claimWinAction') || !bridge.includes('codex_execute_semantic_action') || !bridge.includes('postWinActionReceipt')) throw new Error('Tauri actions must atomically claim and return receipts')
+if (!bridge.includes('window_state: receipt.window_state')) throw new Error('Tauri window state receipt must reach the bounded node sanitizer')
 if (!api.includes("'/api/codex-control'")) throw new Error('loopback Codex control API missing')
 if (!rustApi.includes('tauri_diagnostic_snapshot')) throw new Error('persistent Tauri diagnostic snapshot missing')
 if (!rustApi.includes('/api/codex-control/tauri-diagnostics')) throw new Error('lightweight Tauri diagnostic endpoint missing')
 if (!rustApi.includes('desktop_snapshot_too_large')) throw new Error('Tauri diagnostic snapshot size guard missing')
 if (!rustMcp.includes('tauri_diagnostics')) throw new Error('MCP status must expose persistent Tauri diagnostics')
+for (const action of ['list_ai_windows', 'capture_ai_window_state', 'focus_ai_window']) {
+  if (!rustMcp.includes(action) || !nativeBridge.includes(action)) throw new Error(`AI window action missing: ${action}`)
+}
+if (!rustMcp.includes('win_control_action_status')) throw new Error('MCP must expose exact action status lookup')
+if (!api.includes('fetchWinAction') || !api.includes('waitForWinAction') || !page.includes('await waitForWinAction(action.action_id)') || !rustApi.includes('/api/codex-control/actions/:action_id')) throw new Error('exact HTTP action status polling missing')
+if (!aiWindowControl.includes('window_labels": false') || !aiWindowControl.includes('owner_fingerprints": false')) throw new Error('AI window receipt privacy contract missing')
+if (aiWindowControl.includes('document.cookie') || aiWindowControl.includes('eval(')) throw new Error('AI window control must not inspect web content')
 for (const source of ['frontend', 'rust', 'cli', 'network', 'tauri', 'control']) {
   if (!page.includes(`id: '${source}'`)) throw new Error(`timeline source missing: ${source}`)
 }

@@ -118,13 +118,7 @@ impl LocalAiNativeWindowRuntime {
         });
     }
 
-    pub fn mark_health(
-        &self,
-        label: &str,
-        phase: &str,
-        root_exists: bool,
-        root_child_count: u32,
-    ) {
+    pub fn mark_health(&self, label: &str, phase: &str, root_exists: bool, root_child_count: u32) {
         self.update(label, |record| {
             record.root_exists = root_exists;
             record.root_child_count = root_child_count;
@@ -184,6 +178,18 @@ impl LocalAiNativeWindowRuntime {
 
     pub fn snapshot(&self, label: &str) -> Option<LocalAiNativeWindowState> {
         self.windows().get(label).cloned().map(Into::into)
+    }
+
+    pub(crate) fn states_for_provider(&self, provider_id: &str) -> Vec<LocalAiNativeWindowState> {
+        let mut states = self
+            .windows()
+            .values()
+            .filter(|record| record.provider_id == provider_id)
+            .cloned()
+            .map(Into::into)
+            .collect::<Vec<LocalAiNativeWindowState>>();
+        states.sort_by_key(|state| std::cmp::Reverse(state.updated_at_ms));
+        states
     }
 
     fn update(&self, label: &str, update: impl FnOnce(&mut NativeWindowRecord)) {

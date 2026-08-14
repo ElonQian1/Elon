@@ -23,7 +23,14 @@ struct ActionArguments {
     #[serde(default)]
     route: Option<String>,
     #[serde(default)]
+    provider_id: Option<String>,
+    #[serde(default)]
     trace_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ActionStatusArguments {
+    action_id: String,
 }
 
 pub(crate) fn handles(profile: Option<&str>) -> bool {
@@ -73,10 +80,19 @@ fn definitions() -> Vec<Value> {
             "inputSchema":{
                 "type":"object","required":["kind"],"additionalProperties":false,
                 "properties":{
-                    "kind":{"type":"string","enum":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state"]},
+                    "kind":{"type":"string","enum":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window"]},
                     "route":{"type":"string","maxLength":180,"description":"仅 navigate 使用的已登记相对路径，不含 URL/query/hash。"},
+                    "provider_id":{"type":"string","enum":["chatgpt","google-ai-mode"],"description":"仅 AI 子窗口定向动作使用。"},
                     "trace_id":{"type":"string","maxLength":160}
                 }
+            }
+        }),
+        json!({
+            "name":"win_control_action_status",
+            "description":"按 action_id 精确读取动作状态与脱敏 Tauri 回执；用于确认 queued 动作是否真正完成。",
+            "inputSchema":{
+                "type":"object","required":["action_id"],"additionalProperties":false,
+                "properties":{"action_id":{"type":"string","minLength":1,"maxLength":100}}
             }
         }),
     ]
@@ -126,6 +142,7 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
                     input.trace_id.as_deref().unwrap_or("codex_mcp"),
                     &input.kind,
                     input.route.as_deref(),
+                    input.provider_id.as_deref(),
                     "codex_mcp",
                 )
                 .map_err(anyhow::Error::msg)?;
@@ -133,6 +150,18 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
                 "schema":"elon.win_codex_action.v1",
                 "action":action,
                 "completion_rule":"queued is not success; wait for a succeeded Tauri receipt",
+            })
+        }
+        "win_control_action_status" => {
+            let input: ActionStatusArguments = serde_json::from_value(arguments)?;
+            let action = runtime
+                .win_codex_control
+                .action(&input.action_id)
+                .map_err(anyhow::Error::msg)?;
+            json!({
+                "schema":"elon.win_codex_action_status.v1",
+                "terminal": matches!(action.status.as_str(), "succeeded" | "failed" | "host_unavailable" | "rejected" | "expired"),
+                "action": action,
             })
         }
         _ => bail!("Win 控制 profile 不支持工具：{name}"),
@@ -147,4 +176,35 @@ fn tool_result(name: &str, value: Value) -> Value {
         "structuredContent":value,
         "isError":false,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn definitions_expose_exact_ai_window_status_loop_without_unsafe_inputs() {
+        let definitions = definitions();
+        let names = definitions
+            .iter()
+            .filter_map(|definition| definition.get("name").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"win_control_action"));
+        assert!(names.contains(&"win_control_action_status"));
+
+        let serialized = serde_json::to_string(&definitions).unwrap();
+        for action in [
+            "list_ai_windows",
+            "capture_ai_window_state",
+            "focus_ai_window",
+        ] {
+            assert!(serialized.contains(action));
+        }
+        for provider in ["chatgpt", "google-ai-mode"] {
+            assert!(serialized.contains(provider));
+        }
+        assert!(!serialized.contains("eval_javascript"));
+        assert!(!serialized.contains("window_label"));
+        assert!(!serialized.contains("cookie"));
+    }
 }

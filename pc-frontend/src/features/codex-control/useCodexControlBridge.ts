@@ -23,6 +23,7 @@ interface NativeReceipt {
   status?: string
   message?: string
   route?: string
+  window_state?: Record<string, unknown>
   at_ms?: number
 }
 
@@ -108,6 +109,7 @@ async function executeAction(
       status: receipt.status || 'succeeded',
       message: receipt.message,
       route: receipt.route,
+      window_state: receipt.window_state,
       at_ms: receipt.at_ms || Date.now(),
     })
   } catch (error) {

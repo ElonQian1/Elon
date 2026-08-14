@@ -1,5 +1,6 @@
 export type WinLogSource = 'frontend' | 'rust' | 'cli' | 'network' | 'tauri' | 'control'
-export type WinActionKind = 'show_window' | 'focus_window' | 'navigate' | 'reload_page' | 'open_devtools' | 'close_devtools' | 'capture_state'
+export type WinActionKind = 'show_window' | 'focus_window' | 'navigate' | 'reload_page' | 'open_devtools' | 'close_devtools' | 'capture_state' | 'list_ai_windows' | 'capture_ai_window_state' | 'focus_ai_window'
+export type WinAiProviderId = 'chatgpt' | 'google-ai-mode'
 
 export interface WinControlCapabilities {
   schema: string
@@ -29,9 +30,17 @@ export interface WinControlAction {
   trace_id: string
   kind: WinActionKind
   route?: string | null
+  provider_id?: WinAiProviderId | null
   requested_at_ms: number
   expires_at_ms: number
   status: string
+  receipt?: {
+    status: string
+    message?: string | null
+    route?: string | null
+    window_state?: Record<string, unknown> | null
+    at_ms?: number | null
+  } | null
 }
 
 export interface WinTimelineResponse {

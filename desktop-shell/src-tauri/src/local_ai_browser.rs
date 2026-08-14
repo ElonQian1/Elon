@@ -25,7 +25,7 @@ use tauri::{
     AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
-pub use native_window_state::LocalAiNativeWindowRuntime;
+pub use native_window_state::{LocalAiNativeWindowRuntime, LocalAiNativeWindowState};
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
 
@@ -127,7 +127,14 @@ pub async fn open_local_ai_native_chat_window(
     provider_id: String,
     owner_key: String,
 ) -> Result<native_window::LocalAiNativeChatWindow, String> {
-    native_window::open(app, webview, runtime.inner().clone(), provider_id, owner_key).await
+    native_window::open(
+        app,
+        webview,
+        runtime.inner().clone(),
+        provider_id,
+        owner_key,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -757,10 +764,17 @@ mod tests {
             "eval",
             Some("alert(1)".to_string()),
             None,
-        ).is_err());
+        )
+        .is_err());
         assert!(adapter_command::build(
-            CHATGPT.id, CHATGPT.display_name, GOOGLE_AI_MODE.id, "snapshot", None, None,
-        ).is_ok());
+            CHATGPT.id,
+            CHATGPT.display_name,
+            GOOGLE_AI_MODE.id,
+            "snapshot",
+            None,
+            None,
+        )
+        .is_ok());
         assert!(adapter_command::build(
             GOOGLE_AI_MODE.id,
             GOOGLE_AI_MODE.display_name,
@@ -768,7 +782,8 @@ mod tests {
             "send_prompt",
             Some("hi".to_string()),
             None,
-        ).is_ok());
+        )
+        .is_ok());
         assert!(adapter_command::build(
             GOOGLE_AI_MODE.id,
             GOOGLE_AI_MODE.display_name,
@@ -776,6 +791,7 @@ mod tests {
             "start_google_login",
             None,
             None,
-        ).is_err());
+        )
+        .is_err());
     }
 }

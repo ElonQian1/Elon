@@ -11,6 +11,11 @@ use std::{
 };
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 
+#[path = "codex_semantic_bridge/ai_window_control.rs"]
+mod ai_window_control;
+
+use crate::local_ai_browser::LocalAiNativeWindowRuntime;
+
 const MAX_NATIVE_EVENTS: usize = 600;
 const MAX_PERSISTED_EVENTS: usize = 64;
 const MAX_PERSISTED_HEARTBEATS: usize = 4;
@@ -24,6 +29,8 @@ pub(crate) struct SemanticAction {
     pub kind: String,
     #[serde(default)]
     pub route: Option<String>,
+    #[serde(default)]
+    pub provider_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -200,7 +207,8 @@ pub(crate) fn codex_win_capabilities(
         "schema":"elon.tauri_codex_bridge.v1",
         "available":true,
         "window_label":window.label(),
-        "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state"],
+        "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window"],
+        "ai_window_providers":["chatgpt","google-ai-mode"],
         "devtools_supported":cfg!(debug_assertions),
         "arbitrary_javascript":false,
         "arbitrary_command":false,
@@ -212,29 +220,30 @@ pub(crate) fn codex_win_capabilities(
 pub(crate) fn codex_execute_semantic_action(
     window: WebviewWindow,
     bridge: State<'_, CodexSemanticBridge>,
+    ai_windows: State<'_, LocalAiNativeWindowRuntime>,
     action: SemanticAction,
 ) -> Result<Value, String> {
     validate_action(&action)?;
-    let result = execute(&window, &action);
-    let captured_state = (action.kind == "capture_state").then(|| window_state(&window));
-    let (status, level, _message) = match &result {
-        Ok(message) => ("succeeded", "info", message.clone()),
-        Err(error) => ("failed", "error", error.clone()),
+    let result = execute(&window, ai_windows.inner(), &action);
+    let captured_state = result.as_ref().ok().and_then(|result| result.state.clone());
+    let (status, level) = match &result {
+        Ok(_) => ("succeeded", "info"),
+        Err(_) => ("failed", "error"),
     };
     bridge.record(
         &action.trace_id,
         level,
         "action.executed",
         &format!("{}: {}", action.kind, status),
-        json!({"action_id": action.action_id, "kind": action.kind, "status": status, "route": action.route, "window_state": captured_state}),
+        json!({"action_id": action.action_id, "kind": action.kind, "status": status, "route": action.route, "window_state": captured_state.clone()}),
     );
-    result.map(|message| {
+    result.map(|result| {
         json!({
             "schema":"elon.tauri_codex_action_receipt.v1",
             "action_id":action.action_id,
             "trace_id":clean_identifier(&action.trace_id, "tauri"),
             "status":"succeeded",
-            "message":message,
+            "message":result.message,
             "route":action.route,
             "window_state":captured_state,
             "at_ms":now_ms(),
@@ -260,16 +269,35 @@ pub(crate) fn codex_read_native_events(
     })
 }
 
-fn execute(window: &WebviewWindow, action: &SemanticAction) -> Result<String, String> {
+struct SemanticActionResult {
+    message: String,
+    state: Option<Value>,
+}
+
+fn outcome(
+    message: impl Into<String>,
+    state: Option<Value>,
+) -> Result<SemanticActionResult, String> {
+    Ok(SemanticActionResult {
+        message: message.into(),
+        state,
+    })
+}
+
+fn execute(
+    window: &WebviewWindow,
+    ai_windows: &LocalAiNativeWindowRuntime,
+    action: &SemanticAction,
+) -> Result<SemanticActionResult, String> {
     match action.kind.as_str() {
         "show_window" => {
             window.show().map_err(display_error)?;
-            Ok("主窗口已显示".to_string())
+            outcome("主窗口已显示", None)
         }
         "focus_window" => {
             window.show().map_err(display_error)?;
             window.set_focus().map_err(display_error)?;
-            Ok("主窗口已显示并聚焦".to_string())
+            outcome("主窗口已显示并聚焦", None)
         }
         "navigate" => {
             let route = action.route.as_deref().ok_or("navigate 缺少 route")?;
@@ -280,28 +308,52 @@ fn execute(window: &WebviewWindow, action: &SemanticAction) -> Result<String, St
                     "window.history.pushState({{}}, '', {encoded}); window.dispatchEvent(new PopStateEvent('popstate'));"
                 ))
                 .map_err(display_error)?;
-            Ok(format!("已导航到 {route}"))
+            outcome(format!("已导航到 {route}"), None)
         }
         "reload_page" => {
             window
                 .eval("window.setTimeout(function () { window.location.reload(); }, 500);")
                 .map_err(display_error)?;
-            Ok("页面刷新将在回执写回后触发".to_string())
+            outcome("页面刷新将在回执写回后触发", None)
         }
-        "open_devtools" => devtools(window, true),
-        "close_devtools" => devtools(window, false),
-        "capture_state" => Ok("已捕获非秘密窗口状态".to_string()),
+        "open_devtools" => devtools(window, true).and_then(|message| outcome(message, None)),
+        "close_devtools" => devtools(window, false).and_then(|message| outcome(message, None)),
+        "capture_state" => outcome("已捕获非秘密窗口状态", Some(window_state(window))),
+        "list_ai_windows" => outcome(
+            "已列出一龙 AI 逻辑子窗口",
+            Some(ai_window_control::list(window.app_handle(), ai_windows)),
+        ),
+        "capture_ai_window_state" => {
+            let provider_id =
+                ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
+            outcome(
+                "已捕获一龙 AI 子窗口脱敏状态",
+                Some(ai_window_control::capture(
+                    window.app_handle(),
+                    ai_windows,
+                    provider_id,
+                )),
+            )
+        }
+        "focus_ai_window" => {
+            let provider_id =
+                ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
+            let state = ai_window_control::focus(window.app_handle(), ai_windows, provider_id)?;
+            outcome("一龙 AI 子窗口已聚焦", Some(state))
+        }
         _ => Err("不支持的 Tauri 语义动作".to_string()),
     }
 }
 
 fn window_state(window: &WebviewWindow) -> Value {
-    let window_labels = window
+    let mut window_roles = window
         .app_handle()
         .webview_windows()
         .keys()
-        .cloned()
+        .map(|label| semantic_window_role(label))
         .collect::<Vec<_>>();
+    window_roles.sort_unstable();
+    window_roles.dedup();
     json!({
         "label": window.label(),
         "visible": window.is_visible().ok(),
@@ -309,8 +361,24 @@ fn window_state(window: &WebviewWindow) -> Value {
         "maximized": window.is_maximized().ok(),
         "minimized": window.is_minimized().ok(),
         "devtools_open": devtools_open(window),
-        "window_labels": window_labels,
+        "window_roles": window_roles,
     })
+}
+
+fn semantic_window_role(label: &str) -> &'static str {
+    if label == "main" {
+        "main"
+    } else if label.starts_with("local-ai-native-chatgpt-") {
+        "ai:chatgpt"
+    } else if label.starts_with("local-ai-native-google-ai-mode-") {
+        "ai:google-ai-mode"
+    } else if label.starts_with("local-ai-web-chatgpt-") {
+        "official:chatgpt"
+    } else if label.starts_with("local-ai-web-google-ai-mode-") {
+        "official:google-ai-mode"
+    } else {
+        "other"
+    }
 }
 
 #[cfg(debug_assertions)]
@@ -352,6 +420,9 @@ fn validate_action(action: &SemanticAction) -> Result<(), String> {
             | "open_devtools"
             | "close_devtools"
             | "capture_state"
+            | "list_ai_windows"
+            | "capture_ai_window_state"
+            | "focus_ai_window"
     ) {
         return Err("动作不在 Tauri 白名单".to_string());
     }
@@ -363,6 +434,19 @@ fn validate_action(action: &SemanticAction) -> Result<(), String> {
         .is_some_and(|route| !route.trim().is_empty())
     {
         return Err("只有 navigate 允许 route".to_string());
+    }
+    let provider_action = matches!(
+        action.kind.as_str(),
+        "capture_ai_window_state" | "focus_ai_window"
+    );
+    if provider_action {
+        ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
+    } else if action
+        .provider_id
+        .as_deref()
+        .is_some_and(|provider_id| !provider_id.trim().is_empty())
+    {
+        return Err("只有 AI 子窗口定向动作允许 provider_id".to_string());
     }
     Ok(())
 }
@@ -482,8 +566,14 @@ mod tests {
 
     #[test]
     fn semantic_navigation_preserves_the_pc_browser_basename() {
-        assert_eq!(pc_browser_route("/user-browser").unwrap(), "/pc/user-browser");
-        assert_eq!(pc_browser_route("/projects/demo").unwrap(), "/pc/projects/demo");
+        assert_eq!(
+            pc_browser_route("/user-browser").unwrap(),
+            "/pc/user-browser"
+        );
+        assert_eq!(
+            pc_browser_route("/projects/demo").unwrap(),
+            "/pc/projects/demo"
+        );
         assert!(pc_browser_route("/pc/user-browser").is_err());
     }
 
@@ -494,6 +584,7 @@ mod tests {
             trace_id: "t".to_string(),
             kind: "eval_javascript".to_string(),
             route: None,
+            provider_id: None,
         };
         assert!(validate_action(&action).is_err());
     }

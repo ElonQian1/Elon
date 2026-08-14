@@ -4,16 +4,40 @@ use super::*;
 fn action_contract_rejects_arbitrary_urls_scripts_and_routes() {
     let hub = WinCodexControlHub::default();
     assert!(hub
-        .enqueue_action("trace", "navigate", Some("/codex-control"), "test")
+        .enqueue_action("trace", "navigate", Some("/codex-control"), None, "test")
         .is_ok());
     assert!(hub
-        .enqueue_action("trace", "navigate", Some("https://example.com"), "test")
+        .enqueue_action(
+            "trace",
+            "navigate",
+            Some("https://example.com"),
+            None,
+            "test"
+        )
         .is_err());
     assert!(hub
-        .enqueue_action("trace", "navigate", Some("/unknown"), "test")
+        .enqueue_action("trace", "navigate", Some("/unknown"), None, "test")
         .is_err());
     assert!(hub
-        .enqueue_action("trace", "eval_javascript", None, "test")
+        .enqueue_action("trace", "eval_javascript", None, None, "test")
+        .is_err());
+    assert!(hub
+        .enqueue_action("trace", "focus_ai_window", None, Some("chatgpt"), "test",)
+        .is_ok());
+    assert!(hub
+        .enqueue_action("trace", "focus_ai_window", None, None, "test")
+        .is_err());
+    assert!(hub
+        .enqueue_action(
+            "trace",
+            "capture_ai_window_state",
+            None,
+            Some("local-ai-native-chatgpt-owner"),
+            "test",
+        )
+        .is_err());
+    assert!(hub
+        .enqueue_action("trace", "list_ai_windows", None, Some("chatgpt"), "test",)
         .is_err());
 }
 
@@ -37,12 +61,13 @@ fn event_fields_and_sensitive_summaries_are_redacted() {
 fn receipts_are_idempotent_but_conflicting_terminal_states_fail() {
     let hub = WinCodexControlHub::default();
     let action = hub
-        .enqueue_action("trace", "focus_window", None, "test")
+        .enqueue_action("trace", "focus_window", None, None, "test")
         .unwrap();
     let receipt = WinControlReceipt {
         status: "succeeded".to_string(),
         message: Some("focused".to_string()),
         route: None,
+        window_state: None,
         at_ms: None,
     };
     assert_eq!(
@@ -60,6 +85,7 @@ fn receipts_are_idempotent_but_conflicting_terminal_states_fail() {
                 status: "failed".to_string(),
                 message: None,
                 route: None,
+                window_state: None,
                 at_ms: None,
             },
         )
@@ -70,7 +96,7 @@ fn receipts_are_idempotent_but_conflicting_terminal_states_fail() {
 fn claiming_an_action_removes_it_from_the_pending_queue() {
     let hub = WinCodexControlHub::default();
     let action = hub
-        .enqueue_action("trace", "reload_page", None, "test")
+        .enqueue_action("trace", "reload_page", None, None, "test")
         .unwrap();
     assert_eq!(hub.pending_actions(10).len(), 1);
     hub.claim_action(&action.action_id).unwrap();
@@ -79,6 +105,114 @@ fn claiming_an_action_removes_it_from_the_pending_queue() {
         hub.claim_action(&action.action_id).unwrap().status,
         "executing"
     );
+}
+
+#[test]
+fn action_lookup_returns_only_sanitized_ai_window_receipts() {
+    let hub = WinCodexControlHub::default();
+    let action = hub
+        .enqueue_action("trace", "list_ai_windows", None, None, "test")
+        .unwrap();
+    hub.claim_action(&action.action_id).unwrap();
+    hub.record_receipt(
+        &action.action_id,
+        WinControlReceipt {
+            status: "succeeded".to_string(),
+            message: Some("listed".to_string()),
+            route: None,
+            window_state: Some(json!({
+                "schema":"elon.tauri_ai_window_list.v1",
+                "windows":[{
+                    "provider_id":"chatgpt",
+                    "phase":"ready",
+                    "open":true,
+                    "focused":false,
+                    "page_ready":true,
+                    "root_exists":true,
+                    "root_child_count":1,
+                    "last_error_code":null,
+                    "retryable":false,
+                    "updated_at_ms":42,
+                    "window_label":"local-ai-native-chatgpt-owner-secret",
+                    "url":"https://chatgpt.com/private"
+                },{
+                    "provider_id":"google-ai-mode",
+                    "phase":"not_created",
+                    "open":false,
+                    "focused":false,
+                    "page_ready":false,
+                    "root_exists":false,
+                    "root_child_count":0,
+                    "last_error_code":null,
+                    "retryable":true,
+                    "updated_at_ms":0
+                }],
+                "privacy":{"cookies":true}
+            })),
+            at_ms: None,
+        },
+    )
+    .unwrap();
+
+    let completed = hub.action(&action.action_id).unwrap();
+    let state = completed.receipt.unwrap().window_state.unwrap();
+    let serialized = serde_json::to_string(&state).unwrap();
+    assert_eq!(state["windows"][0]["provider_id"], "chatgpt");
+    assert_eq!(state["privacy"]["cookies"], false);
+    assert!(!serialized.contains("\"window_label\":"));
+    assert!(!serialized.contains("chatgpt.com"));
+    assert!(!serialized.contains("owner-secret"));
+}
+
+#[test]
+fn ai_window_receipts_are_bound_to_action_kind_and_provider() {
+    let hub = WinCodexControlHub::default();
+    let action = hub
+        .enqueue_action(
+            "trace",
+            "capture_ai_window_state",
+            None,
+            Some("google-ai-mode"),
+            "test",
+        )
+        .unwrap();
+    hub.claim_action(&action.action_id).unwrap();
+    let mismatched = hub.record_receipt(
+        &action.action_id,
+        WinControlReceipt {
+            status: "succeeded".to_string(),
+            message: None,
+            route: None,
+            window_state: Some(json!({
+                "schema":"elon.tauri_ai_window_capture.v1",
+                "window":{
+                    "provider_id":"chatgpt",
+                    "phase":"ready",
+                    "open":true,
+                    "focused":true,
+                    "page_ready":true,
+                    "root_exists":true,
+                    "root_child_count":1,
+                    "retryable":false,
+                    "updated_at_ms":1
+                }
+            })),
+            at_ms: None,
+        },
+    );
+    assert!(mismatched.is_err());
+
+    let missing = hub.record_receipt(
+        &action.action_id,
+        WinControlReceipt {
+            status: "succeeded".to_string(),
+            message: None,
+            route: None,
+            window_state: None,
+            at_ms: None,
+        },
+    );
+    assert!(missing.is_err());
 }
 
 #[test]

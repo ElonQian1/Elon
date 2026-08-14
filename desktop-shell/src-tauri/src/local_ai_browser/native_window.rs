@@ -8,9 +8,8 @@ use tauri::{
 use crate::codex_semantic_bridge;
 
 use super::{
-    display_error, ensure_main_webview, owner_fingerprint, provider, restore_window,
-    native_window_state::LocalAiNativeWindowRuntime,
-    ProviderDefinition, LOCAL_AI_NATIVE_WINDOW_PREFIX,
+    display_error, ensure_main_webview, native_window_state::LocalAiNativeWindowRuntime,
+    owner_fingerprint, provider, restore_window, ProviderDefinition, LOCAL_AI_NATIVE_WINDOW_PREFIX,
 };
 
 const NATIVE_CHAT_PATH: &str = "/pc/user-browser/native";

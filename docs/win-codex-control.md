@@ -24,8 +24,17 @@ implementation_status: compiled
 3. `reload_page`：刷新主工作台。
 4. `open_devtools`、`close_devtools`：只由 Tauri 壳执行并写回回执；生产是否允许由壳能力明确报告。
 5. `capture_state`：读取当前路由、标题、可见/聚焦状态和版本等非秘密状态，不截图、不读输入框正文。
+6. `list_ai_windows`：列出 `chatgpt` 与 `google-ai-mode` 两个固定厂商的逻辑窗口状态；不返回 Tauri label、owner 指纹、窗口句柄或 URL。
+7. `capture_ai_window_state`：按固定 `provider_id` 读取阶段、是否打开/聚焦、页面根节点健康、稳定错误码和可重试标记。
+8. `focus_ai_window`：按固定 `provider_id` 恢复、显示并聚焦已存在的一龙原生 AI 子窗口；找不到窗口时失败关闭，不隐式创建网页会话。
 
 动作由节点 loopback API 排队，Win 页面先原子领取为 `executing`，再调用 Tauri 白名单 command 并写回成功或失败回执。刷新等会中断页面的动作会延迟到回执发起后执行；领取后页面崩溃时动作只会过期，不会被新页面重复执行。Codex MCP 只调用同一领域服务，不直接操作进程、窗口句柄或 WebView2 profile。
+
+动作提交成功只代表进入队列。Codex 必须调用 MCP `win_control_action_status` 或 HTTP
+`GET /api/codex-control/actions/:action_id`，一直查询到 `succeeded`、`failed`、
+`host_unavailable`、`rejected` 或 `expired`。AI 窗口回执的 `window_state` 在节点再次按固定
+schema 清洗并限制为 16 KiB；即使被篡改的 Tauri 页面提交 label、URL、Cookie 或 token，
+节点也不会把这些字段返回给 Codex。
 
 ## 统一时间线
 
@@ -53,12 +62,14 @@ Tauri 原生桥还在后台把最近 64 条原生事件写入本机 `desktop-dia
 - MCP descriptor 使用随机短期 token、项目根绑定和 profile 固定，不能在同一会话切换权限。
 - 页面领取动作后必须核对 `action_id`，重复回执幂等；过期动作不再执行。
 - 事件字段按 key 和内容双重脱敏；Cookie、token、password、secret、authorization、API key 一律替换。
+- AI 窗口控制只接受 `chatgpt`、`google-ai-mode` 两个逻辑 provider；不接受窗口 label、任意厂商字符串、任意 URL 或任意 JavaScript。
+- AI 窗口回执只公开逻辑 provider、阶段、焦点、页面健康、稳定错误码和更新时间；窗口 label、owner 指纹、URL、页面正文、Cookie 与 token 均为明确的 `false` 采集能力。
 - 没有 Tauri 宿主时，浏览器/PWA 控制台仍能读取日志，但 Tauri 动作返回明确 `host_unavailable`。
 - 此能力不恢复已暂停的跨项目自动派发、自动验收、自动续跑或后台自进化。
 
 ## 验收
 
-- Rust 单元测试覆盖动作/路由白名单、事件脱敏、分页、回执幂等和 MCP profile 隔离。
+- Rust 单元测试覆盖动作/路由/provider 白名单、AI 窗口回执二次清洗、事件脱敏、分页、回执幂等、精确 action 查询和 MCP profile 隔离。
 - Tauri 测试覆盖相对路由校验、事件有界化和白名单动作。
 - PC 静态测试覆盖路由、全局桥、网络无正文日志、Tauri 回执和控制台五类来源筛选。
 - 编译通过只证明合同和类型闭合；真实 Codex App Server、MCP 客户端、WebView2、DevTools、长时间事件量和发布安装节点仍需分别记录现场证据，不能互相冒充。

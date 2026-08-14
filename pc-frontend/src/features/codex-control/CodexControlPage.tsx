@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bot, Download, Focus, PanelTopOpen, RefreshCw, RotateCw, ScanSearch, TerminalSquare } from 'lucide-react'
 import {
   exportWinDiagnostics, fetchTauriDiagnostics, fetchWinControlCapabilities, fetchWinDiagnostics,
-  fetchWinTimeline, queueWinAction,
+  fetchWinTimeline, queueWinAction, waitForWinAction,
 } from './codexControlApi'
-import type { WinActionKind, WinControlCapabilities, WinControlEvent, WinLogSource } from './types'
+import type { WinActionKind, WinAiProviderId, WinControlAction, WinControlCapabilities, WinControlEvent, WinLogSource } from './types'
 import styles from './CodexControlPage.module.css'
 
 const SOURCES: Array<{ id: WinLogSource; label: string }> = [
@@ -23,6 +23,7 @@ export default function CodexControlPage() {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [lastAction, setLastAction] = useState<WinControlAction | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -48,13 +49,18 @@ export default function CodexControlPage() {
     fetchWinDiagnostics().then((result) => setDiagnostics(result.diagnostics ?? null)).catch(() => {})
   }, [])
 
-  async function run(kind: WinActionKind, targetRoute?: string) {
+  async function run(kind: WinActionKind, targetRoute?: string, providerId?: WinAiProviderId) {
     setBusy(kind)
     setNotice('')
     setError('')
     try {
-      const action = await queueWinAction(kind, targetRoute)
+      const action = await queueWinAction(kind, targetRoute, providerId)
       setNotice(`动作 ${action.action_id} 已排队；等待 Tauri 成功回执。`)
+      const completed = await waitForWinAction(action.action_id)
+      setLastAction(completed)
+      const message = completed.receipt?.message || `动作返回 ${completed.status}`
+      if (completed.status === 'succeeded') setNotice(`${message}（${completed.action_id}）`)
+      else setError(`${message}（${completed.action_id} · ${completed.status}）`)
       await refresh()
     } catch (reason) {
       setError(message(reason))
@@ -113,9 +119,12 @@ export default function CodexControlPage() {
               <button type="button" onClick={() => void run('focus_window')} disabled={!!busy}><Focus size={14} />聚焦窗口</button>
               <button type="button" onClick={() => void run('reload_page')} disabled={!!busy}><RotateCw size={14} />刷新页面</button>
               <button type="button" onClick={() => void run('capture_state')} disabled={!!busy}><ScanSearch size={14} />捕获状态</button>
+              <button type="button" onClick={() => void run('list_ai_windows')} disabled={!!busy}>列出 AI 窗口</button>
               <button type="button" onClick={() => void run('open_devtools')} disabled={!!busy}>打开 DevTools</button>
               <button type="button" onClick={() => void run('close_devtools')} disabled={!!busy}>关闭 DevTools</button>
             </div>
+            <AiWindowActions providerId="chatgpt" label="ChatGPT" busy={!!busy} run={run} />
+            <AiWindowActions providerId="google-ai-mode" label="Google AI" busy={!!busy} run={run} />
             <label className={styles.routeField}>目标路由
               <select value={route} onChange={(event) => setRoute(event.target.value)}>
                 {(capabilities?.routes ?? ['/codex-control']).map((item) => <option key={item} value={item}>{item}</option>)}
@@ -131,6 +140,12 @@ export default function CodexControlPage() {
             <Fact label="子窗口快照" value={tauriDiagnostics?.available === true ? '可读取' : '等待桌面壳'} />
             <Fact label="任意脚本" value="禁止" />
             <Fact label="请求正文" value="不采集" />
+            {lastAction && <details>
+              <summary>最近动作 · {lastAction.status}</summary>
+              <pre>{JSON.stringify(lastAction.receipt?.window_state ?? {
+                action_id: lastAction.action_id, status: lastAction.status,
+              }, null, 2)}</pre>
+            </details>}
           </section>
         </aside>
 
@@ -151,6 +166,18 @@ export default function CodexControlPage() {
       </div>
     </div>
   )
+}
+
+function AiWindowActions({ providerId, label, busy, run }: {
+  providerId: WinAiProviderId
+  label: string
+  busy: boolean
+  run: (kind: WinActionKind, route?: string, providerId?: WinAiProviderId) => Promise<void>
+}) {
+  return <div className={styles.actionGrid}>
+    <button type="button" onClick={() => void run('capture_ai_window_state', undefined, providerId)} disabled={busy}>读取 {label} 窗口</button>
+    <button type="button" onClick={() => void run('focus_ai_window', undefined, providerId)} disabled={busy}>聚焦 {label} 窗口</button>
+  </div>
 }
 
 function StatusCard({ label, active, detail, inverted = false }: { label: string; active: boolean; detail: string; inverted?: boolean }) {

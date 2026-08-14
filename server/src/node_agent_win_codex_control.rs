@@ -38,6 +38,7 @@ pub(crate) struct WinControlAction {
     pub trace_id: String,
     pub kind: String,
     pub route: Option<String>,
+    pub provider_id: Option<String>,
     pub requested_by: String,
     pub requested_at_ms: u128,
     pub expires_at_ms: u128,
@@ -52,6 +53,8 @@ pub(crate) struct WinControlReceipt {
     pub message: Option<String>,
     #[serde(default)]
     pub route: Option<String>,
+    #[serde(default)]
+    pub window_state: Option<Value>,
     #[serde(default)]
     pub at_ms: Option<u128>,
 }
@@ -112,16 +115,19 @@ impl WinCodexControlHub {
         trace_id: &str,
         kind: &str,
         route: Option<&str>,
+        provider_id: Option<&str>,
         requested_by: &str,
     ) -> Result<WinControlAction, String> {
         let kind = validate_action_kind(kind)?;
         let route = validate_action_route(kind, route)?;
+        let provider_id = validate_action_provider(kind, provider_id)?;
         let now = now_ms();
         let action = WinControlAction {
             action_id: format!("win_act_{}", uuid::Uuid::new_v4().simple()),
             trace_id: clean_identifier(trace_id, "win_action"),
             kind: kind.to_string(),
             route,
+            provider_id,
             requested_by: clean_identifier(requested_by, "local_admin"),
             requested_at_ms: now,
             expires_at_ms: now.saturating_add(ACTION_TTL_MS),
@@ -141,7 +147,7 @@ impl WinCodexControlHub {
             "info",
             "action.queued",
             &format!("已排队 Win 语义动作 {}", action.kind),
-            json!({"action_id": action.action_id, "kind": action.kind, "route": action.route}),
+            json!({"action_id": action.action_id, "kind": action.kind, "route": action.route, "provider_id": action.provider_id}),
         );
         Ok(action)
     }
@@ -193,6 +199,18 @@ impl WinCodexControlHub {
         Ok(claimed)
     }
 
+    pub(crate) fn action(&self, action_id: &str) -> Result<WinControlAction, String> {
+        let now = now_ms();
+        let mut state = lock(&self.inner);
+        expire_actions(&mut state, now);
+        state
+            .actions
+            .iter()
+            .find(|action| action.action_id == action_id.trim())
+            .cloned()
+            .ok_or_else(|| "Win 语义动作不存在或已超出保留窗口。".to_string())
+    }
+
     pub(crate) fn record_receipt(
         &self,
         action_id: &str,
@@ -228,6 +246,20 @@ impl WinCodexControlHub {
             .route
             .as_deref()
             .and_then(|route| validate_route(route).ok());
+        receipt.window_state = receipt
+            .window_state
+            .take()
+            .map(|value| sanitize_receipt_state(&action.kind, action.provider_id.as_deref(), value))
+            .transpose()?;
+        if receipt.status == "succeeded"
+            && matches!(
+                action.kind.as_str(),
+                "capture_state" | "list_ai_windows" | "capture_ai_window_state" | "focus_ai_window"
+            )
+            && receipt.window_state.is_none()
+        {
+            return Err("成功的窗口状态动作必须携带脱敏状态回执。".to_string());
+        }
         action.status = receipt.status.clone();
         action.receipt = Some(receipt);
         let completed = action.clone();
@@ -269,6 +301,7 @@ impl WinCodexControlHub {
         json!({
             "schema": "elon.win_codex_control.v1",
             "actions": allowed_actions(),
+            "ai_window_providers": ["chatgpt", "google-ai-mode"],
             "routes": allowed_route_roots(),
             "sources": ["frontend", "rust", "cli", "network", "tauri", "control"],
             "security": {
@@ -377,6 +410,25 @@ fn validate_action_route(kind: &str, route: Option<&str>) -> Result<Option<Strin
     Ok(None)
 }
 
+fn validate_action_provider(
+    kind: &str,
+    provider_id: Option<&str>,
+) -> Result<Option<String>, String> {
+    let requires_provider = matches!(kind, "capture_ai_window_state" | "focus_ai_window");
+    let provider_id = provider_id.map(str::trim).filter(|value| !value.is_empty());
+    if requires_provider {
+        let provider_id =
+            provider_id.ok_or_else(|| "AI 子窗口动作必须提供 provider_id。".to_string())?;
+        return matches!(provider_id, "chatgpt" | "google-ai-mode")
+            .then(|| Some(provider_id.to_string()))
+            .ok_or_else(|| "provider_id 不在 AI 子窗口白名单。".to_string());
+    }
+    if provider_id.is_some() {
+        return Err("只有 AI 子窗口定向动作允许 provider_id。".to_string());
+    }
+    Ok(None)
+}
+
 fn validate_route(route: &str) -> Result<String, String> {
     let route = route.trim();
     if route.is_empty()
@@ -412,6 +464,134 @@ fn validate_receipt(receipt: &WinControlReceipt) -> Result<(), String> {
     Ok(())
 }
 
+fn sanitize_receipt_state(
+    action_kind: &str,
+    provider_id: Option<&str>,
+    value: Value,
+) -> Result<Value, String> {
+    if serde_json::to_vec(&value)
+        .map(|bytes| bytes.len())
+        .unwrap_or(usize::MAX)
+        > 16 * 1024
+    {
+        return Err("窗口状态回执超过 16 KiB。".to_string());
+    }
+    let schema = value.get("schema").and_then(Value::as_str);
+    match (action_kind, schema) {
+        ("list_ai_windows", Some("elon.tauri_ai_window_list.v1")) => {
+            let sanitized = value
+                .get("windows")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "AI 窗口列表回执缺少 windows。".to_string())?
+                .iter()
+                .map(sanitize_ai_window)
+                .collect::<Result<Vec<_>, _>>()?;
+            let windows = ["chatgpt", "google-ai-mode"]
+                .iter()
+                .map(|expected| {
+                    let matches = sanitized
+                        .iter()
+                        .filter(|window| {
+                            window.get("provider_id").and_then(Value::as_str) == Some(*expected)
+                        })
+                        .collect::<Vec<_>>();
+                    (matches.len() == 1)
+                        .then(|| matches[0].clone())
+                        .ok_or_else(|| "AI 窗口列表必须精确包含两个固定 provider。".to_string())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(json!({"schema": schema, "windows": windows, "privacy": receipt_privacy()}))
+        }
+        (
+            "capture_ai_window_state" | "focus_ai_window",
+            Some("elon.tauri_ai_window_capture.v1"),
+        ) => {
+            let window = sanitize_ai_window(
+                value
+                    .get("window")
+                    .ok_or_else(|| "AI 窗口状态回执缺少 window。".to_string())?,
+            )?;
+            let expected =
+                provider_id.ok_or_else(|| "AI 窗口动作缺少 provider_id。".to_string())?;
+            if window.get("provider_id").and_then(Value::as_str) != Some(expected) {
+                return Err("AI 窗口状态回执与请求 provider_id 不一致。".to_string());
+            }
+            Ok(json!({"schema": schema, "window": window, "privacy": receipt_privacy()}))
+        }
+        ("capture_state", None) => Ok(json!({
+            "role": "main",
+            "visible": optional_bool(&value, "visible"),
+            "focused": optional_bool(&value, "focused"),
+            "maximized": optional_bool(&value, "maximized"),
+            "minimized": optional_bool(&value, "minimized"),
+            "devtools_open": optional_bool(&value, "devtools_open"),
+            "window_roles": value.get("window_roles").and_then(Value::as_array).into_iter().flatten()
+                .filter_map(Value::as_str).filter(|role| matches!(*role, "main" | "ai:chatgpt" | "ai:google-ai-mode" | "official:chatgpt" | "official:google-ai-mode" | "other"))
+                .take(8).collect::<Vec<_>>(),
+        })),
+        _ => Err("窗口状态回执与动作类型或 schema 不匹配。".to_string()),
+    }
+}
+
+fn sanitize_ai_window(value: &Value) -> Result<Value, String> {
+    let provider_id = value
+        .get("provider_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !matches!(provider_id, "chatgpt" | "google-ai-mode") {
+        return Err("AI 窗口状态包含无效 provider_id。".to_string());
+    }
+    let phase = value
+        .get("phase")
+        .and_then(Value::as_str)
+        .unwrap_or("error");
+    if !matches!(
+        phase,
+        "not_created" | "creating" | "loading" | "loaded" | "ready" | "error" | "closed"
+    ) {
+        return Err("AI 窗口状态包含无效 phase。".to_string());
+    }
+    let error_code = value
+        .get("last_error_code")
+        .and_then(Value::as_str)
+        .filter(|code| {
+            matches!(
+                *code,
+                "root_empty"
+                    | "page_runtime_error"
+                    | "webview_navigation_error"
+                    | "webview_create_failed"
+            )
+        });
+    Ok(json!({
+        "provider_id": provider_id,
+        "phase": phase,
+        "open": value.get("open").and_then(Value::as_bool).unwrap_or(false),
+        "focused": value.get("focused").and_then(Value::as_bool).unwrap_or(false),
+        "page_ready": value.get("page_ready").and_then(Value::as_bool).unwrap_or(false),
+        "root_exists": value.get("root_exists").and_then(Value::as_bool).unwrap_or(false),
+        "root_child_count": value.get("root_child_count").and_then(Value::as_u64).unwrap_or(0).min(10_000),
+        "last_error_code": error_code,
+        "retryable": value.get("retryable").and_then(Value::as_bool).unwrap_or(false),
+        "updated_at_ms": value.get("updated_at_ms").and_then(Value::as_u64).unwrap_or(0),
+    }))
+}
+
+fn optional_bool(value: &Value, key: &str) -> Option<bool> {
+    value.get(key).and_then(Value::as_bool)
+}
+
+fn receipt_privacy() -> Value {
+    json!({
+        "window_labels": false,
+        "owner_fingerprints": false,
+        "urls": false,
+        "page_text": false,
+        "cookies": false,
+        "tokens": false,
+    })
+}
+
 fn expire_actions(state: &mut WinControlState, now: u128) {
     for action in &mut state.actions {
         if matches!(action.status.as_str(), "queued" | "executing") && action.expires_at_ms < now {
@@ -429,6 +609,9 @@ fn allowed_actions() -> &'static [&'static str] {
         "open_devtools",
         "close_devtools",
         "capture_state",
+        "list_ai_windows",
+        "capture_ai_window_state",
+        "focus_ai_window",
     ]
 }
 
