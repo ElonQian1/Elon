@@ -139,6 +139,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-cross.ps1 -- `
 V260、V261 证据中出现的 `target-v260-linux-musl`、`target-v261-linux-musl` 与 WSL
 `/tmp/elon-v*-target` 是历史执行路径，不是后续模板。现存外部 target 不会被平台
 自动删除；先用 `register-legacy -Retired` 登记，再用 `purge-legacy` 预演和显式回收。
+历史 AI 任务使用的 `target-v<数字>-<名称>` 只有在名称严格匹配、同时存在 Cargo
+`.rustc_info.json` 与 `CACHEDIR.TAG` 标记、已经登记 retired 时才进入同一预演流程；
+缺任一条件都失败关闭。
 
 正式验证不再为每个 worktree 永久保留一套完整中间产物。调度器把两个轻任务槽分别绑定到
 `shared-validation-light-0`、`shared-validation-light-1`，重任务绑定到

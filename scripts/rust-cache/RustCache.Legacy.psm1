@@ -26,7 +26,8 @@ function Assert-RustCacheLegacyPurgePath {
         throw "Refusing broad legacy purge path: $fullPath"
     }
     $leaf = Split-Path $fullPath -Leaf
-    if ($leaf -ine "target" -and $leaf -ine "sccache" -and $leaf -notmatch '(?i)-target$') {
+    $versionedTarget = $leaf -cmatch '^target-v[0-9]+-[a-z0-9][a-z0-9._-]*$'
+    if ($leaf -ine "target" -and $leaf -ine "sccache" -and $leaf -notmatch '(?i)-target$' -and -not $versionedTarget) {
         throw "Legacy purge path must name a target or sccache directory: $fullPath"
     }
     if (Test-Path -LiteralPath $fullPath) {
@@ -36,6 +37,13 @@ function Assert-RustCacheLegacyPurgePath {
         }
         if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
             throw "Refusing to recursively purge a reparse point: $fullPath"
+        }
+        if ($versionedTarget) {
+            $hasRustcMarker = Test-Path -LiteralPath (Join-Path $fullPath '.rustc_info.json') -PathType Leaf
+            $hasCacheMarker = Test-Path -LiteralPath (Join-Path $fullPath 'CACHEDIR.TAG') -PathType Leaf
+            if (-not $hasRustcMarker -or -not $hasCacheMarker) {
+                throw "Versioned legacy target is missing Cargo cache markers: $fullPath"
+            }
         }
     }
     return $fullPath

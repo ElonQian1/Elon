@@ -322,6 +322,21 @@ retry = 3
     try { Invoke-RustCacheLegacyPurge -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -LegacyPath (Join-Path $TempRoot "unregistered-target") } catch { $unregisteredRejected = $true }
     Assert-True $unregisteredRejected "legacy purge should reject unregistered paths"
 
+    $versionedTarget = Join-Path $TempRoot 'target-v261-linux-musl'
+    New-Item -ItemType Directory -Force -Path $versionedTarget | Out-Null
+    Set-Content -LiteralPath (Join-Path $versionedTarget '.rustc_info.json') -Value '{}'
+    Set-Content -LiteralPath (Join-Path $versionedTarget 'CACHEDIR.TAG') -Value 'Signature: 8a477f597d28d172789f06886806bc55'
+    Add-RustCacheLegacyRecord -CacheRoot $CacheRoot -Path $versionedTarget -Label 'versioned-target' -Retired | Out-Null
+    $versionedPlan = Invoke-RustCacheLegacyPurge -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -LegacyPath $versionedTarget
+    Assert-Equal 'would-delete' $versionedPlan.action 'marked versioned targets should support dry-run purge'
+    Assert-True (Test-Path -LiteralPath $versionedTarget) 'versioned target dry-run must preserve files'
+    $unmarkedVersionedTarget = Join-Path $TempRoot 'target-v262-linux-musl'
+    New-Item -ItemType Directory -Force -Path $unmarkedVersionedTarget | Out-Null
+    Add-RustCacheLegacyRecord -CacheRoot $CacheRoot -Path $unmarkedVersionedTarget -Label 'unmarked-versioned-target' -Retired | Out-Null
+    $unmarkedRejected = $false
+    try { Invoke-RustCacheLegacyPurge -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -LegacyPath $unmarkedVersionedTarget } catch { $unmarkedRejected = $_.Exception.Message -match 'missing Cargo cache markers' }
+    Assert-True $unmarkedRejected 'versioned targets without both Cargo markers must fail closed'
+
     $activeGcPartition = Join-Path $CacheRoot "build\rustc-old\test-project\dev-host\eeeeeeeeeeeeeeee"
     New-Item -ItemType Directory -Force -Path $activeGcPartition | Out-Null
     '{"last_used_utc":"2000-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $activeGcPartition ".last-used.json") -Encoding UTF8

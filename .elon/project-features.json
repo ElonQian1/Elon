@@ -2322,6 +2322,105 @@
       "updated_at_ms": 1786711596449
     },
     {
+      "id": "rust-versioned-legacy-target-purge-v1",
+      "title": "Rust versioned legacy target safe purge V1",
+      "summary": "Allow strictly named and Cargo-marked target-vN-* directories to use the existing registered retired dry-run purge workflow without broadening automatic cleanup.",
+      "status": "released",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/rust-versioned-legacy-target-purge-v1.md",
+        "content_hash": "95b8285db2d466b8c7eee5780393e35d44fcb0b3353a52b45d52d9f657bf223d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "41887a683d5c8c809556a1829c30045f155d873f",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "91b9c0daabee813a908d6eab9d4a0442b2b53ceb",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "developer-infrastructure",
+      "tags": [
+        "rust",
+        "cache",
+        "legacy",
+        "safety",
+        "cleanup"
+      ],
+      "task_paths": [
+        "docs/rust-cache-platform.md",
+        "scripts/rust-cache/RustCache.Legacy.psm1",
+        "scripts/test-rust-cache-platform.ps1"
+      ],
+      "dependencies": [
+        "rust-cross-target-cache-routing-v1"
+      ],
+      "acceptance_criteria": [
+        "Registered retired Cargo-marked target-vN-* directories produce bounded dry-run purge reports.",
+        "Versioned target directories missing either Cargo marker fail closed.",
+        "Unregistered active reparse-point and broad paths remain rejected.",
+        "Existing target suffix and sccache purge contracts remain compatible."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/rust-versioned-legacy-target-purge-v1.md",
+          "content_hash": "95b8285db2d466b8c7eee5780393e35d44fcb0b3353a52b45d52d9f657bf223d",
+          "locator": "strict scope and acceptance",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "41887a683d5c8c809556a1829c30045f155d873f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "91b9c0daabee813a908d6eab9d4a0442b2b53ceb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/rust-cache-platform.md",
+          "content_hash": "424ab8d58214bca211b216b39aa570ae70247a24821b472fe76c35035ae08eac",
+          "locator": "versioned legacy target safety contract",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "41887a683d5c8c809556a1829c30045f155d873f",
+            "head_blob_oid": "217547aaed271827d8fe37327f660da4fb79bcac",
+            "worktree_blob_oid": "08d0fce2ee56ac1c7b9a5b1b37fdc554f2a0562b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Legacy.psm1",
+          "content_hash": "0840a3c8d0e82b98d6515ec7cb5bd4f85af85e91f85e1c9276bcb355c2ffcb01",
+          "locator": "versioned target name and dual marker gate",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "41887a683d5c8c809556a1829c30045f155d873f",
+            "head_blob_oid": "cf52b916f3df319df7286cbfb2d51d7c8cee5ab1",
+            "worktree_blob_oid": "9af00d5d5b48cf178ea4a2957d764c433d4036b1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-platform.ps1",
+          "content_hash": "6d5160499a7540aaf21725562eb567cd7fadac2cedb3ea2fcfd727f6cf490e9e",
+          "locator": "98 assertion platform regression including versioned target dry-run",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "41887a683d5c8c809556a1829c30045f155d873f",
+            "head_blob_oid": "ea3e610a8b369f0e8578c5a38cc5546382b1c529",
+            "worktree_blob_oid": "7b02e3d1e78e362f52d23f7c36ce33ceada1a53f",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786711857138,
+      "updated_at_ms": 1786711941712
+    },
+    {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "title": "Win Google AI 语义桥启动恢复 V1",
       "summary": "修复 WebView2 会话已连接但 Google AI 语义桥因缺少消息提取器、文档令牌及 DOM 就绪门禁而无法发送或接收回复的问题。",
@@ -2795,76 +2894,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_e18bd2454d334bf79831bdd4a0b23b1e",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "需求已提交，范围只读、真源和隐私边界明确，现有依赖均已存在。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786626165590
-    },
-    {
-      "id": "feature_event_fb3f032266904f57a46839831ccb3fdf",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786626184885
-    },
-    {
-      "id": "feature_event_ad6c411d139346eea63f79675915dd4e",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "开始实现消费者本人权限下的只读订单闭环聚合与 HTTP/MCP 入口。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786626204872
-    },
-    {
-      "id": "feature_event_b710797b079047ea9406a74fc42901ac",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786628523151
-    },
-    {
-      "id": "feature_event_9445097de53b4ede81fe0e55e9a7faff",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "只读聚合服务、HTTP/MCP 入口、隐私投影和四态测试已完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786628571543
-    },
-    {
-      "id": "feature_event_b60c0bd884174e9fa699099c0a327a03",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Rust server 编译及 4 项定向 Rust/SQLite 测试通过，验证指纹 88e72aa16558。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786628571617
-    },
-    {
-      "id": "feature_event_ea1df7cc420c4c57aa2e873599b83eb4",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "远端 rebase 合入 AI_CURRENT 更新，按漂移门禁重新绑定当前实现证据。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1786629060797
-    },
     {
       "id": "feature_event_8b271b6dbcc44319adafd7a43bee7c57",
       "feature_id": "open-commerce-consumer-order-closure-v1",
@@ -4794,6 +4823,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786711596449
+    },
+    {
+      "id": "feature_event_651e37f2ac71442f95da7b1e843cb3ae",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "registered",
+      "actor": "codex-goal-cache",
+      "reason": "The V261 one-off target can be registered but the current purge validator cannot preview it.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786711857138
+    },
+    {
+      "id": "feature_event_6373e59afbf44c56ad5b114174f8baba",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "claimed",
+      "actor": "codex-goal-cache",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786711857264
+    },
+    {
+      "id": "feature_event_2d5a9e5637ee431598c100f66a97e2c2",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache",
+      "reason": "Implementing the strict name and dual Cargo marker gate.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786711857363
+    },
+    {
+      "id": "feature_event_5d90bf5e7fdd4eeb80f168ef8838ddd1",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-cache",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786711941412
+    },
+    {
+      "id": "feature_event_642513c5dcbe4a82b869fcb9f6f6f3b4",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache",
+      "reason": "Strict versioned target validation and regression coverage are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786711941518
+    },
+    {
+      "id": "feature_event_63dad71003264ab4a4a8e2fc2a00d400",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache",
+      "reason": "98 platform assertions passed and the real V261 path produced a non-destructive 14.14 GiB dry-run report.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786711941615
+    },
+    {
+      "id": "feature_event_d4b1b5cf3862461aaa1373e6c36b240b",
+      "feature_id": "rust-versioned-legacy-target-purge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache",
+      "reason": "No deployment is required; real deletion remains explicit and was not executed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786711941712
     }
   ]
 }
