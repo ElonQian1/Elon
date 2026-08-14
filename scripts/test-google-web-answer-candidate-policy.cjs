@@ -41,5 +41,28 @@ assert.equal(policy.accepts({
   explicit: true,
 }), false)
 
+assert.equal(policy.navigationOnlyText(
+  'AI 模式\n全部\n图片\n视频\n新闻\n地图\n购物\n图书\n航班\n财经',
+), true)
+
+assert.equal(policy.navigationOnlyText(
+  'AI Mode All Images Videos News Maps Shopping Books Flights Finance',
+), true)
+
+assert.equal(policy.navigationOnlyText(
+  '你可以在 AI 模式里查看新闻和地图，下面是详细回答。',
+), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: 'AI 模式 全部 图片 视频 新闻 地图 购物 图书 航班 财经',
+  textLength: 31,
+  citations: 0,
+  semanticBlocks: 3,
+  links: 0,
+  tabControls: 0,
+  explicit: true,
+}), false)
+
 assert.ok(policy.penalty({ links: 3, tabControls: 2 }) > policy.penalty({ links: 0, tabControls: 0 }))
 console.log('google web answer candidate policy passed')

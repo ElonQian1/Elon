@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 3;
+  const extractorVersion = 4;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -121,6 +121,7 @@
       (node.matches('[role="tab"], [role="tablist"], [role="toolbar"]') ? 1 : 0);
     const metrics = {
       hasQuery: !!query,
+      text,
       textLength: text.length,
       citations: citations.length,
       semanticBlocks,
