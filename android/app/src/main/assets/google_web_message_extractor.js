@@ -1,11 +1,12 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 1;
+  const extractorVersion = 2;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
   const allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
+  const candidatePolicy = window.__elonGoogleWebAnswerCandidatePolicy;
   let rememberedQueryValue = '';
 
   function cleanText(value) {
@@ -102,7 +103,10 @@
 
   function excludedContainer(node, composer) {
     if (!isVisible(node) || containsComposer(node, composer)) return true;
-    if (node.closest('header, nav, footer, form, [role="navigation"], [role="dialog"]')) return true;
+    if (node.closest(
+      'header, nav, footer, form, [role="navigation"], [role="dialog"], ' +
+      '[role="tablist"], [role="toolbar"]'
+    )) return true;
     return false;
   }
 
@@ -114,10 +118,23 @@
     const citations = citationParts(node);
     const semanticBlocks = node.querySelectorAll('p, li, blockquote, pre, table, h2, h3').length;
     const controls = node.querySelectorAll('button, [role="button"], input, textarea').length;
+    const links = node.querySelectorAll('a[href]').length;
+    const tabControls = node.querySelectorAll('[role="tab"], [role="tablist"], [role="toolbar"]').length +
+      (node.matches('[role="tab"], [role="tablist"], [role="toolbar"]') ? 1 : 0);
+    const metrics = {
+      textLength: text.length,
+      citations: citations.length,
+      semanticBlocks,
+      links,
+      tabControls,
+      explicit
+    };
+    if (candidatePolicy && !candidatePolicy.accepts(metrics)) return null;
     const depth = Math.min(12, node.closest('main, [role="main"]') ? 1 : 0);
     const score = Math.min(text.length, 8000) + citations.length * 900 +
       Math.min(semanticBlocks, 20) * 90 + (explicit ? 1400 : 0) + depth * 30 -
-      Math.min(controls, 20) * 120;
+      Math.min(controls, 20) * 120 -
+      (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);
     return { node, text, citations, score, explicit };
   }
 

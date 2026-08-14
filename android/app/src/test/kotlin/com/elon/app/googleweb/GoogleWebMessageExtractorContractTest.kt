@@ -11,6 +11,7 @@ class GoogleWebMessageExtractorContractTest {
     @Test
     fun extractorUsesSemanticFallbacksAndKeepsDiagnosticsContentFree() {
         val source = read("android/app/src/main/assets/google_web_message_extractor.js")
+        val policy = read("android/app/src/main/assets/google_web_answer_candidate_policy.js")
 
         assertTrue(source.contains("'[role=\"article\"]'"))
         assertTrue(source.contains("'body [aria-live=\"polite\"]'"))
@@ -18,6 +19,10 @@ class GoogleWebMessageExtractorContractTest {
         assertTrue(source.contains("rememberQuery"))
         assertTrue(source.contains("queryFound"))
         assertTrue(source.contains("answerFound"))
+        assertTrue(source.contains("candidatePolicy.accepts(metrics)"))
+        assertTrue(source.contains("[role=\"tablist\"]"))
+        assertTrue(policy.contains("links >= 3"))
+        assertTrue(policy.contains("textLength < 80"))
         assertTrue(source.contains(".slice(0, 160)"))
         assertTrue(!source.contains("outerHTML"))
         assertTrue(!source.contains("document.documentElement.innerHTML"))
