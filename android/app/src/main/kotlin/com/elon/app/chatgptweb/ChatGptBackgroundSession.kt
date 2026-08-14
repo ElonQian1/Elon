@@ -329,10 +329,10 @@ internal class ChatGptBackgroundSession(
                 }
             }
             is ChatGptWebEvent.ConversationList -> {
-                conversations = ChatGptWebConversationIndex.merge(
+                conversations = ChatGptWebConversationIndex.mergeOfficialHistory(
                     conversations,
                     event.conversations,
-                    retainMissing = !event.collection.isComplete,
+                    collectionComplete = event.collection.isComplete,
                 )
                 projects = ChatGptWebConversationIndex.mergeObservedProjects(
                     conversations,

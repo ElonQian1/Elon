@@ -123,6 +123,44 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun completeGlobalRefreshDropsStaleUnassignedButPreservesProjectHistory() {
+        val current = conversation("current", "今天", null)
+        val staleUnassigned = conversation("stale", "昨天", null)
+        val cachedProject = conversation("project", "昨天", "g-p-demo").copy(
+            path = "/g/g-p-demo/c/project",
+            projectTitle = "移动端项目",
+            projectPath = "/g/g-p-demo/project",
+        )
+
+        val merged = ChatGptWebConversationIndex.mergeOfficialHistory(
+            previous = listOf(current, staleUnassigned, cachedProject),
+            observed = listOf(current),
+            collectionComplete = true,
+        )
+
+        assertEquals(listOf("current", "project"), merged.map { it.id })
+        assertEquals("g-p-demo", merged.last().projectId)
+    }
+
+    @Test
+    fun partialGlobalRefreshPreservesEveryCachedConversationDomain() {
+        val current = conversation("current", "今天", null)
+        val staleUnassigned = conversation("stale", "昨天", null)
+        val cachedProject = conversation("project", "昨天", "g-p-demo").copy(
+            path = "/g/g-p-demo/c/project",
+        )
+
+        assertEquals(
+            listOf("current", "stale", "project"),
+            ChatGptWebConversationIndex.mergeOfficialHistory(
+                previous = listOf(current, staleUnassigned, cachedProject),
+                observed = listOf(current),
+                collectionComplete = false,
+            ).map { it.id },
+        )
+    }
+
+    @Test
     fun completeOfficialRefreshDropsProjectsMissingFromTheOfficialList() {
         val current = ChatGptWebProject("g-p-current", "当前项目", "/g/g-p-current/project")
         val stale = ChatGptWebProject("g-p-stale", "过期项目", "/g/g-p-stale/project")

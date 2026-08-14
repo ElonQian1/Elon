@@ -88,6 +88,26 @@ internal object ChatGptWebConversationIndex {
             .map(::sanitize)
     }
 
+    fun mergeOfficialHistory(
+        previous: List<ChatGptWebConversation>,
+        observed: List<ChatGptWebConversation>,
+        collectionComplete: Boolean,
+    ): List<ChatGptWebConversation> {
+        if (!collectionComplete) return merge(previous, observed, retainMissing = true)
+
+        val merged = merge(previous, observed, retainMissing = false)
+        // A complete global sidebar scan is not authoritative for conversations owned by projects.
+        val observedIdentities = observed.mapNotNullTo(linkedSetOf()) {
+            ChatGptWebConversationPath.identity(it.path)
+        }
+        val cachedProjectConversations = collapse(previous)
+            .filterKeys { it !in observedIdentities }
+            .values
+            .filter { it.projectId != null }
+            .map(::sanitize)
+        return merged + cachedProjectConversations
+    }
+
     fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation = value.copy(
         groupLabel = metadataLabel(value.groupLabel).orEmpty(),
         projectTitle = metadataLabel(value.projectTitle),
