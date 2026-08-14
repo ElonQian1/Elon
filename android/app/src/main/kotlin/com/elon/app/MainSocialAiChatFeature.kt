@@ -50,6 +50,28 @@ internal class MainSocialAiChatFeature(
             deactivateChatProvider = ::deactivateChatProvider,
         )
     }
+    private val webChatNavigationSessions: WebChatNavigationSessionRegistry by lazy {
+        WebChatNavigationSessionRegistry(
+            listOf(
+                WebChatNavigationSession(
+                    providerId = WebChatProviderId.CHATGPT_WEB,
+                    capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
+                    indexSource = webChatController::conversationIndex,
+                    refreshSource = webChatController::requestConversationIndex,
+                    newConversationSource = {
+                        if (webChatState() != "ready") {
+                            false
+                        } else {
+                            webChatController.startNewConversation()
+                            true
+                        }
+                    },
+                    openConversationSource = webChatController::openConversation,
+                    openProjectSource = webChatController::openProject,
+                ),
+            ),
+        )
+    }
 
     fun onFriendChanged(friend: AppFriend?) = modeController.onFriendChanged(friend)
 
@@ -91,11 +113,9 @@ internal class MainSocialAiChatFeature(
     fun webChatConversationPath(): String? = webChatController.currentConversationPath()
 
     fun webChatConversationIndex(): ChatGptWebConversationIndexState =
-        if (providerId() == WebChatProviderId.CHATGPT_WEB) {
-            webChatController.conversationIndex()
-        } else {
-            ChatGptWebConversationIndexState()
-        }
+        webChatNavigationSession()?.index() ?: ChatGptWebConversationIndexState()
+
+    fun webChatNavigationAvailable(): Boolean = webChatNavigationSession() != null
 
     fun createWebChatSideMenuCoordinator(): com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator {
         lateinit var coordinator: com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator
@@ -107,36 +127,27 @@ internal class MainSocialAiChatFeature(
             openConversation = ::openWebChatConversation,
             openProject = ::openWebChatProject,
             openOfficialFallback = ::openOfficialFallback,
-            active = ::isChatModeActive,
+            active = { isChatModeActive() && webChatNavigationAvailable() },
         )
         onWebChatNavigationChanged = coordinator::onIndexChanged
         return coordinator
     }
 
     fun refreshWebChatConversationIndex(): Boolean =
-        isChatModeActive() &&
-            providerId() == WebChatProviderId.CHATGPT_WEB &&
-            webChatController.requestConversationIndex()
+        isChatModeActive() && webChatNavigationSession()?.refresh() == true
 
     fun startNewWebChatConversation(): Boolean {
-        if (
-            !isChatModeActive() ||
-            providerId() != WebChatProviderId.CHATGPT_WEB ||
-            webChatState() != "ready"
-        ) return false
-        webChatController.startNewConversation()
-        return true
+        if (!isChatModeActive()) return false
+        return webChatNavigationSession()?.newConversation() == true
     }
 
     fun openWebChatConversation(path: String): Boolean =
         isChatModeActive() &&
-            providerId() == WebChatProviderId.CHATGPT_WEB &&
-            webChatController.openConversation(path)
+            webChatNavigationSession()?.openConversation(path) == true
 
     fun openWebChatProject(path: String): Boolean =
         isChatModeActive() &&
-            providerId() == WebChatProviderId.CHATGPT_WEB &&
-            webChatController.openProject(path)
+            webChatNavigationSession()?.openProject(path) == true
 
     fun discardWebChatAcceptanceAttachmentSend(): Boolean =
         webChatController.discardAcceptanceAttachmentSend()
@@ -194,6 +205,9 @@ internal class MainSocialAiChatFeature(
         }
         binding.root.post { webChatController.refreshComposerModel() }
     }
+
+    private fun webChatNavigationSession(): WebChatNavigationSession? =
+        webChatNavigationSessions.session(providerId())
 
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 

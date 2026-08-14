@@ -591,7 +591,7 @@ internal class MainMcpNativeControlActions(
         if (!feature.isChatModeActive()) {
             return errorJson(args.optString("action"), "web_chat_mode_inactive")
         }
-        if (feature.providerId() != WebChatProviderId.CHATGPT_WEB) {
+        if (!feature.webChatNavigationAvailable()) {
             return errorJson(args.optString("action"), "web_chat_provider_navigation_unavailable")
         }
         val query = args.optString("query").trim()
