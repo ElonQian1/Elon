@@ -63,18 +63,21 @@ internal class ChatGptWebPageAdapter(
     }
 
     fun onPageReady(url: String) {
-        if (!ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) {
-            onStateChanged(State.WEB_ONLY)
-            return
-        }
-        if (!listenerInstalled) {
-            onStateChanged(State.UNSUPPORTED)
-            return
-        }
-        if (documentSession.snapshot().pageGeneration == 0L) {
+        val enhancedModeSupported = ChatGptWebNavigationPolicy.supportsEnhancedMode(url)
+        if (
+            enhancedModeSupported &&
+            listenerInstalled &&
+            documentSession.snapshot().pageGeneration == 0L
+        ) {
             onDocumentChanged(documentSession.ensurePage())
         }
-        onStateChanged(State.CONNECTING)
+        val document = documentSession.snapshot()
+        onStateChanged(ChatGptWebBridgeReadinessPolicy.stateAfterPageReady(
+            listenerInstalled = listenerInstalled,
+            enhancedModeSupported = enhancedModeSupported,
+            document = document,
+        ))
+        if (!enhancedModeSupported || !listenerInstalled) return
         handshake.start()
     }
 

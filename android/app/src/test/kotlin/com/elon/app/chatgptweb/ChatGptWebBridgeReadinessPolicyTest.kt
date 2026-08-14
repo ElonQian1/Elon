@@ -1,10 +1,63 @@
 package com.elon.app.chatgptweb
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGptWebBridgeReadinessPolicyTest {
+    @Test
+    fun pageFinishKeepsTheCurrentAdapterReady() {
+        val session = ChatGptWebDocumentSession { "doc_1_current" }
+        val loading = session.beginPage()
+        val current = session.accept(loading.documentToken)!!
+
+        assertEquals(
+            ChatGptWebPageAdapter.State.READY,
+            ChatGptWebBridgeReadinessPolicy.stateAfterPageReady(
+                listenerInstalled = true,
+                enhancedModeSupported = true,
+                document = current,
+            ),
+        )
+    }
+
+    @Test
+    fun pageFinishWaitsWhenTheCurrentDocumentHasNotConnected() {
+        val loading = ChatGptWebDocumentSession { "doc_1_loading" }.beginPage()
+
+        assertEquals(
+            ChatGptWebPageAdapter.State.CONNECTING,
+            ChatGptWebBridgeReadinessPolicy.stateAfterPageReady(
+                listenerInstalled = true,
+                enhancedModeSupported = true,
+                document = loading,
+            ),
+        )
+    }
+
+    @Test
+    fun pageFinishStillHonorsUnsupportedAndWebOnlySurfaces() {
+        val document = ChatGptWebDocumentSession.Snapshot(0, 0, "")
+
+        assertEquals(
+            ChatGptWebPageAdapter.State.WEB_ONLY,
+            ChatGptWebBridgeReadinessPolicy.stateAfterPageReady(
+                listenerInstalled = true,
+                enhancedModeSupported = false,
+                document = document,
+            ),
+        )
+        assertEquals(
+            ChatGptWebPageAdapter.State.UNSUPPORTED,
+            ChatGptWebBridgeReadinessPolicy.stateAfterPageReady(
+                listenerInstalled = false,
+                enhancedModeSupported = true,
+                document = document,
+            ),
+        )
+    }
+
     @Test
     fun authenticatedDocumentCanRecoverFromAnOverlayManifest() {
         assertTrue(ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
