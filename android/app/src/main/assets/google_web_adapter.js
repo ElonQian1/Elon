@@ -209,10 +209,7 @@
       const currentComposer = findComposer();
       const streaming = isStreaming();
       const extraction = messageExtractor.extract(currentComposer, streaming);
-      const userMessage = extraction.messages.find((message) => message.role === 'user');
-      const queryMatches = !!userMessage && cleanText(
-        (userMessage.content || []).map((part) => part.text || '').join('\n')
-      ) === prompt;
+      const queryMatches = sendPolicy.latestUserQueryMatches(extraction.messages, prompt);
       if (sendPolicy.confirmed({
         hrefChanged: location.href !== beforeHref,
         streaming,
