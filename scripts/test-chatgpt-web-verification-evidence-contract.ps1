@@ -94,6 +94,50 @@ foreach ($entry in $expected.GetEnumerator()) {
     }
 }
 
+$catalogSource = Get-Content (Join-Path $repoRoot `
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAcceptanceCaseCatalog.kt") -Raw
+$catalogCaseIds = @(
+    [regex]::Matches(
+        $catalogSource,
+        '"((?:safe|reversible|supervised)/[a-z0-9_/-]+)"'
+    ) |
+        ForEach-Object { $_.Groups[1].Value } |
+        Sort-Object -Unique
+)
+$registeredCaseIds = @(
+    Get-ChildItem (Join-Path $repoRoot "scripts") -Filter "smoke-chatgpt-web-*.ps1" |
+        ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -notlike "*Register-ChatGptWebVerificationCases*") { return }
+            [regex]::Matches(
+                $content,
+                '"((?:safe|reversible|supervised)/[a-z0-9_/-]+)"'
+            ) | ForEach-Object { $_.Groups[1].Value }
+        } |
+        Sort-Object -Unique
+)
+$manualOnlyCaseIds = @(
+    "supervised/account_mutations",
+    "supervised/message_actions"
+)
+$unknownRegistered = @($registeredCaseIds | Where-Object { $_ -notin $catalogCaseIds })
+if ($unknownRegistered.Count -gt 0) {
+    throw "Smoke scripts register cases missing from the acceptance catalog: $($unknownRegistered -join ', ')"
+}
+$unregisteredCaseIds = @($catalogCaseIds | Where-Object { $_ -notin $registeredCaseIds })
+$unexpectedUnregistered = @($unregisteredCaseIds | Where-Object { $_ -notin $manualOnlyCaseIds })
+if ($unexpectedUnregistered.Count -gt 0) {
+    throw "Acceptance cases have no evidence script or manual-only classification: $($unexpectedUnregistered -join ', ')"
+}
+$staleManualCases = @($manualOnlyCaseIds | Where-Object { $_ -notin $unregisteredCaseIds })
+if ($staleManualCases.Count -gt 0) {
+    throw "Manual-only acceptance classification is stale: $($staleManualCases -join ', ')"
+}
+$missingManualCases = @($unregisteredCaseIds | Where-Object { $_ -notin $manualOnlyCaseIds })
+if ($missingManualCases.Count -gt 0 -or $unregisteredCaseIds.Count -ne $manualOnlyCaseIds.Count) {
+    throw "Manual-only acceptance coverage does not exactly match the catalog gap."
+}
+
 $adapterSource = Get-Content (Join-Path $repoRoot `
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt") -Raw
 $adapterMatch = [regex]::Match($adapterSource, "ADAPTER_VERSION\s*=\s*(\d+)")
@@ -117,4 +161,7 @@ if ((Resolve-ChatGptWebSmokeExpectedAdapterVersion -ExpectedAdapterVersion 77) -
     throw "Explicit ChatGPT Web smoke adapter pin was not preserved."
 }
 
-Write-Output "ChatGPT Web verification evidence contracts passed."
+Write-Output (
+    "ChatGPT Web verification evidence contracts passed: " +
+        "$($registeredCaseIds.Count) scripted, $($manualOnlyCaseIds.Count) manual-only."
+)
