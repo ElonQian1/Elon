@@ -20,6 +20,7 @@
   let emitTimer = 0;
   let lastSnapshot = '';
   let lastDiagnostics = '';
+  const SUBMIT_READY_TIMEOUT_MS = 1600;
 
   function cleanText(value) {
     return String(value || '')
@@ -187,25 +188,10 @@
     if (reconciliation.write && !setComposerValue(composer, value)) {
       return emitResult('send_prompt', false, 'Google 官方输入框未接受文本。');
     }
-    const form = composerBridge.form(composer);
-    const scope = form || composer.parentElement?.parentElement?.parentElement || composer.parentElement;
-    const button = composerBridge.findAction(composer, ['send', 'submit', '发送', '提交']) ||
-      findButton(['send', 'submit', '发送', '提交'], scope || document);
     const beforeHref = location.href;
-    let submitted = false;
-    if (button) {
-      button.click();
-      submitted = true;
-    } else if (form && typeof form.requestSubmit === 'function') {
-      form.requestSubmit();
-      submitted = true;
-    } else {
-      submitted = composerBridge.pressEnter(composer);
-    }
-    if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
+    const submitStartedAt = Date.now();
 
-    const startedAt = Date.now();
-    function confirmSubmission() {
+    function confirmSubmission(startedAt) {
       const currentComposer = findComposer();
       const streaming = isStreaming();
       const extraction = messageExtractor.extract(currentComposer, streaming);
@@ -225,9 +211,39 @@
         scheduleSnapshot();
         return emitResult('send_prompt', false, 'Google 官方页未确认发送，请重试。');
       }
-      window.setTimeout(confirmSubmission, 160);
+      window.setTimeout(() => confirmSubmission(startedAt), 160);
     }
-    window.setTimeout(confirmSubmission, 160);
+
+    function submitWhenReady() {
+      const currentComposer = findComposer() || composer;
+      const form = composerBridge.form(currentComposer);
+      const scope = form || currentComposer.parentElement?.parentElement?.parentElement ||
+        currentComposer.parentElement;
+      const button = composerBridge.findAction(currentComposer, ['send', 'submit', '发送', '提交']) ||
+        findButton(['send', 'submit', '发送', '提交'], scope || document);
+      const step = sendPolicy.submissionStep({
+        buttonReady: !!button,
+        formReady: !!form && typeof form.requestSubmit === 'function',
+        enterAvailable: !!currentComposer,
+        elapsedMs: Date.now() - submitStartedAt,
+        timeoutMs: SUBMIT_READY_TIMEOUT_MS
+      });
+      if (step === 'wait') return window.setTimeout(submitWhenReady, 80);
+      let submitted = false;
+      if (step === 'button') {
+        button.click();
+        submitted = true;
+      } else if (step === 'form') {
+        form.requestSubmit();
+        submitted = true;
+      } else if (step === 'enter') {
+        submitted = composerBridge.pressEnter(currentComposer);
+      }
+      if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
+      confirmSubmission(Date.now());
+    }
+
+    submitWhenReady();
   }
 
   function runCommand(raw) {

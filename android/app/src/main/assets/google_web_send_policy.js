@@ -48,5 +48,19 @@
     return false;
   }
 
-  return Object.freeze({ version: 2, reconcile, confirmed, latestUserQueryMatches });
+  function submissionStep(observation) {
+    if (!observation) return 'fail';
+    if (observation.buttonReady === true) return 'button';
+    if (observation.formReady === true) return 'form';
+    if (Number(observation.elapsedMs || 0) < Number(observation.timeoutMs || 0)) return 'wait';
+    return observation.enterAvailable === true ? 'enter' : 'fail';
+  }
+
+  return Object.freeze({
+    version: 3,
+    reconcile,
+    confirmed,
+    latestUserQueryMatches,
+    submissionStep
+  });
 });

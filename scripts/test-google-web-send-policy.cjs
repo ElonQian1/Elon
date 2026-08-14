@@ -20,7 +20,7 @@ assert.equal(policy.confirmed({ currentDraft: 'hello', prompt: 'hello' }), false
 assert.equal(policy.confirmed({ currentDraft: '', prompt: 'hello' }), true)
 assert.equal(policy.confirmed({ currentDraft: 'hello', prompt: 'hello', streaming: true }), true)
 assert.equal(policy.confirmed({ currentDraft: 'hello', prompt: 'hello', queryMatches: true }), true)
-assert.equal(policy.version, 2)
+assert.equal(policy.version, 3)
 assert.equal(policy.latestUserQueryMatches([
   { role: 'user', content: [{ type: 'text', text: 'first prompt' }] },
   { role: 'assistant', content: [{ type: 'text', text: 'first answer' }] },
@@ -35,4 +35,13 @@ assert.equal(policy.latestUserQueryMatches([
   { role: 'user', content: [{ type: 'text', text: '  multi\u00a0space  ' }] },
 ], 'multi space'), true)
 assert.equal(policy.latestUserQueryMatches([], 'missing'), false)
+assert.equal(policy.submissionStep({ buttonReady: true }), 'button')
+assert.equal(policy.submissionStep({ formReady: true }), 'form')
+assert.equal(policy.submissionStep({ elapsedMs: 300, timeoutMs: 1600 }), 'wait')
+assert.equal(policy.submissionStep({
+  elapsedMs: 1600,
+  timeoutMs: 1600,
+  enterAvailable: true,
+}), 'enter')
+assert.equal(policy.submissionStep({ elapsedMs: 1600, timeoutMs: 1600 }), 'fail')
 console.log('google web send policy passed')
