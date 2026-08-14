@@ -41,7 +41,9 @@ internal class GoogleWebBackgroundSession(
     private var webView: WebView? = null
     private var pageAdapter: GoogleWebPageAdapter? = null
     private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
+    private var latestSnapshotPath: String? = latestSnapshot?.url?.let(conversationStore::currentPath)
     private var activePath: String? = null
+    private var awaitingNewConversationBoundary = false
     private var state = State.IDLE
 
     fun activate() {
@@ -81,6 +83,7 @@ internal class GoogleWebBackgroundSession(
 
     fun startNewConversation() {
         activePath = null
+        awaitingNewConversationBoundary = true
         pageAdapter?.startNewConversation()
     }
 
@@ -97,6 +100,7 @@ internal class GoogleWebBackgroundSession(
     fun openConversation(path: String): Boolean {
         val url = conversationStore.restorableUrl(path) ?: return false
         if (!GoogleWebNavigationPolicy.supportsAiMode(url)) return false
+        awaitingNewConversationBoundary = false
         activePath = path
         updateState(State.LOADING)
         webView?.loadUrl(url) ?: return false
@@ -185,22 +189,54 @@ internal class GoogleWebBackgroundSession(
     private fun handleEvent(event: ChatGptWebEvent) {
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
-                latestSnapshot = event.value
-                if (event.value.composerReady && !event.value.streaming) snapshotStore.save(event.value)
+                val rawSnapshot = event.value
+                when (GoogleWebNewConversationPolicy.transition(
+                    awaitingBoundary = awaitingNewConversationBoundary,
+                    previous = latestSnapshot,
+                    incoming = rawSnapshot,
+                )) {
+                    GoogleWebNewConversationTransition.IGNORE_STALE -> return
+                    GoogleWebNewConversationTransition.START_NEW -> {
+                        awaitingNewConversationBoundary = false
+                        latestSnapshot = null
+                        latestSnapshotPath = null
+                    }
+                    GoogleWebNewConversationTransition.CONTINUE_CURRENT -> Unit
+                }
                 val pageTitle = event.value.title.trim().takeUnless {
                     it.equals("Google", ignoreCase = true) ||
                         it.equals("Google AI 模式", ignoreCase = true)
                 }
-                val title = pageTitle
-                    ?: event.value.messages.firstOrNull { it.role == "user" }?.content.orEmpty()
-                activePath = conversationStore.observe(event.value.url, title, LocalDate.now())
-                    ?: conversationStore.currentPath(event.value.url)
-                GoogleWebNavigationPolicy.sanitizeRestorableUrl(event.value.url)?.let { url ->
+                val title = rawSnapshot.messages.lastOrNull { it.role == "user" }
+                    ?.content
+                    ?.takeIf(String::isNotBlank)
+                    ?: pageTitle.orEmpty()
+                val preferredPath = activePath ?: latestSnapshotPath
+                val observedPath = if (rawSnapshot.messages.any { it.role == "user" }) {
+                    conversationStore.observe(
+                        rawSnapshot.url,
+                        title,
+                        LocalDate.now(),
+                        preferredPath,
+                    )
+                } else {
+                    conversationStore.currentPath(rawSnapshot.url)
+                }
+                val nextSnapshot = GoogleWebSnapshotMerger.merge(
+                    previous = latestSnapshot,
+                    incoming = rawSnapshot,
+                    sameConversation = observedPath != null && observedPath == latestSnapshotPath,
+                )
+                latestSnapshot = nextSnapshot
+                latestSnapshotPath = observedPath
+                activePath = observedPath
+                if (nextSnapshot.composerReady && !nextSnapshot.streaming) snapshotStore.save(nextSnapshot)
+                GoogleWebNavigationPolicy.sanitizeRestorableUrl(rawSnapshot.url)?.let { url ->
                     preferences.edit().putString(KEY_LAST_URL, url).apply()
                 }
-                updateState(if (event.value.composerReady) State.READY else State.LOADING)
+                updateState(if (nextSnapshot.composerReady) State.READY else State.LOADING)
                 onConversationIndexChanged(conversationIndex())
-                onSnapshot(event.value)
+                onSnapshot(nextSnapshot)
             }
             is ChatGptWebEvent.CommandResult -> {
                 if (event.action == DOM_DIAGNOSTICS_ACTION) {

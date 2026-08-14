@@ -7,7 +7,6 @@ import com.elon.app.chatgptweb.ChatGptWebConversationCollection
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 import java.io.File
 import java.io.FileOutputStream
-import java.security.MessageDigest
 import java.time.LocalDate
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,23 +44,26 @@ internal class GoogleWebConversationStore(context: Context) {
         ),
     )
 
-    fun observe(url: String, title: String, date: LocalDate = LocalDate.now()): String? {
+    fun observe(
+        url: String,
+        title: String,
+        date: LocalDate = LocalDate.now(),
+        preferredPath: String? = null,
+    ): String? {
         val safeUrl = GoogleWebNavigationPolicy.sanitizeRestorableUrl(url) ?: return null
         if (!safeUrl.contains('?')) return null
-        val id = sha256(safeUrl)
-        val path = "$PATH_PREFIX$id"
-        val cleanTitle = title.trim().ifBlank { "Google AI 搜索" }.take(MAX_TITLE_LENGTH)
-        val previous = records.firstOrNull { it.id == id }
-        val next = GoogleWebConversationRecord(
-            id = id,
-            title = cleanTitle,
-            path = path,
+        val upsert = GoogleWebConversationIndexPolicy.upsert(
+            records = records,
             restorableUrl = safeUrl,
-            activityDates = previous?.activityDates.orEmpty() + date.toString(),
+            title = title,
+            date = date,
+            preferredPath = preferredPath,
         )
-        records = listOf(next) + records.filterNot { it.id == id }
-        save()
-        return path
+        if (records != upsert.records) {
+            records = upsert.records
+            save()
+        }
+        return upsert.path
     }
 
     fun restorableUrl(path: String): String? = records
@@ -71,7 +73,7 @@ internal class GoogleWebConversationStore(context: Context) {
     fun currentPath(url: String?): String? {
         val safeUrl = GoogleWebNavigationPolicy.sanitizeRestorableUrl(url) ?: return null
         if (!safeUrl.contains('?')) return null
-        return "$PATH_PREFIX${sha256(safeUrl)}"
+        return GoogleWebConversationIndexPolicy.currentPath(records, safeUrl)
     }
 
     private fun restore(): List<GoogleWebConversationRecord> {
@@ -91,16 +93,10 @@ internal class GoogleWebConversationStore(context: Context) {
         }
     }
 
-    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(value.toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(it) }
-
     private companion object {
         const val FILE_NAME = "google-web-conversation-index-v1.json"
-        const val PATH_PREFIX = "/google-ai-mode/conversation/"
         const val MAX_ITEMS = 200
         const val MAX_BYTES = 256 * 1024
-        const val MAX_TITLE_LENGTH = 160
     }
 }
 
@@ -132,12 +128,14 @@ internal object GoogleWebConversationCodec {
         val values = root.optJSONArray("conversations") ?: return emptyList()
         return buildList {
             val seen = mutableSetOf<String>()
+            val seenUrls = mutableSetOf<String>()
             for (index in 0 until minOf(values.length(), MAX_ITEMS)) {
                 val value = values.optJSONObject(index) ?: continue
                 val id = value.optString("id").takeIf(ID::matches) ?: continue
                 if (!seen.add(id)) continue
                 val path = value.optString("path").takeIf { it == "$PATH_PREFIX$id" } ?: continue
                 val url = GoogleWebNavigationPolicy.sanitizeRestorableUrl(value.optString("url")) ?: continue
+                if (!seenUrls.add(url)) continue
                 val title = value.optString("title").trim().take(MAX_TITLE_LENGTH)
                 if (title.isBlank()) continue
                 val dates = buildSet {

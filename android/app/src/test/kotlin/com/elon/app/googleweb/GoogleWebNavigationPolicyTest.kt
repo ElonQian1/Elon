@@ -1,6 +1,7 @@
 package com.elon.app.googleweb
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,5 +17,21 @@ class GoogleWebNavigationPolicyTest {
         assertFalse(GoogleWebNavigationPolicy.supportsAiMode("http://www.google.com/aimode"))
         assertFalse(GoogleWebNavigationPolicy.supportsAiMode("https://www.google.com/search?q=test"))
         assertFalse(GoogleWebNavigationPolicy.supportsAiMode("https://www.google.com/webhp"))
+    }
+
+    @Test
+    fun stripsVolatileTrackingParametersFromRestorableUrls() {
+        assertEquals(
+            "https://www.google.com/search?q=hello%20world&udm=50&aep=11&hl=zh-CN",
+            GoogleWebNavigationPolicy.sanitizeRestorableUrl(
+                "https://google.com/search?sei=volatile&q=hello%20world&udm=50&ved=tracking&aep=11&hl=zh-CN",
+            ),
+        )
+        assertEquals(
+            "https://www.google.com/aimode",
+            GoogleWebNavigationPolicy.sanitizeRestorableUrl(
+                "https://www.google.com/aimode?sei=volatile",
+            ),
+        )
     }
 }
