@@ -159,8 +159,6 @@
   }
 
   function readConversations() {
-    const projects = readProjects();
-    const projectsById = new Map(projects.map((project) => [project.id, project]));
     const seen = new Set();
     return conversationLinks().map((node) => {
       const path = conversationPath(node);
@@ -175,7 +173,6 @@
       ).slice(0, 160);
       if (!title) return null;
       const projectId = projectIdFromPath(path);
-      const project = projectsById.get(projectId);
       const groupLabel = groupLabelFor(node);
       return {
         id: path.split('/').filter(Boolean).pop() || path,
@@ -184,8 +181,8 @@
         active: path === location.pathname || node.getAttribute('aria-current') === 'page',
         groupLabel,
         projectId: projectId || null,
-        projectTitle: project ? project.title : null,
-        projectPath: project ? project.path : null,
+        projectTitle: null,
+        projectPath: projectId ? '/g/' + projectId + '/project' : null,
         activityDates: [activityDateFor(node, groupLabel)].filter(Boolean)
       };
     }).filter(Boolean).slice(0, MAX_CONVERSATIONS);

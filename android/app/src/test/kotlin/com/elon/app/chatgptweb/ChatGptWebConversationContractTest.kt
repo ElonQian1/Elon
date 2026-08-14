@@ -65,6 +65,19 @@ class ChatGptWebConversationContractTest {
         assertTrue(history.contains("previous.activityDates"))
     }
 
+    @Test
+    fun virtualHistoryTicksDoNotRepeatTheExpensiveProjectScan() {
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val reader = conversations.substringAfter("function readConversations()")
+            .substringBefore("function findConversationScroller()")
+
+        assertFalse(reader.contains("readProjects()"))
+        assertTrue(reader.contains("projectIdFromPath(path)"))
+        assertTrue(conversations.contains("enrichProjectConversations(snapshot.conversations, projects)"))
+    }
+
     private fun readRepositoryFile(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 
