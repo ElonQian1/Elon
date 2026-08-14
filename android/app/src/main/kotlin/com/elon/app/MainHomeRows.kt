@@ -1,12 +1,10 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.os.SystemClock
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -31,8 +29,6 @@ private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", 
 private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
 private const val HOME_LIST_PREVIEW_COLOR = "#80BEBEBA"
-private const val PROJECT_MARKER_VISUAL_OFFSET_DP = 8
-private const val PROJECT_MARKER_WORK_PULSE_MS = 1350L
 
 private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
     if (timestampMs <= 0L) return ""
@@ -62,6 +58,7 @@ internal class MainHomeRows(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
+    private val statusDecorations = HomeRowStatusDecorations(activity, dp)
     private var conversationHomeRowAnimator: ValueAnimator? = null
     private var conversationHomeRowTarget: View? = null
     private val conversationHomeRowDetachListener = object : View.OnAttachStateChangeListener {
@@ -104,7 +101,14 @@ internal class MainHomeRows(
             }
             orientation = LinearLayout.VERTICAL
         }
-        middle.addView(createHomeChatTitle(friend.name))
+        middle.addView(statusDecorations.createTitle(
+            friend.name,
+            when {
+                friend.isSocialAi() -> HomeRowBadge.AI
+                showProjectMarker -> HomeRowBadge.PROJECT
+                else -> null
+            },
+        ))
         middle.addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -121,7 +125,7 @@ internal class MainHomeRows(
         })
         row.addView(middle)
 
-        createHomeRowTrailing(friend.lastMessageAt, showProjectMarker, projectWorking)?.let { trailing ->
+        createHomeRowTrailing(friend.lastMessageAt, projectWorking)?.let { trailing ->
             row.addView(trailing)
         }
         return row
@@ -158,7 +162,10 @@ internal class MainHomeRows(
             }
             orientation = LinearLayout.VERTICAL
         }
-        middle.addView(createHomeChatTitle(group.name))
+        middle.addView(statusDecorations.createTitle(
+            group.name,
+            if (showProjectMarker) HomeRowBadge.PROJECT else null,
+        ))
         middle.addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -175,14 +182,14 @@ internal class MainHomeRows(
         })
         row.addView(middle)
 
-        createHomeRowTrailing(group.lastMessageAt ?: group.createdAt, showProjectMarker, projectWorking)?.let { trailing ->
+        createHomeRowTrailing(group.lastMessageAt ?: group.createdAt, projectWorking)?.let { trailing ->
             row.addView(trailing)
         }
         return row
     }
 
-    private fun createHomeRowTrailing(time: Long?, showProjectMarker: Boolean, projectWorking: Boolean): View? {
-        if (time == null && !showProjectMarker) return null
+    private fun createHomeRowTrailing(time: Long?, projectWorking: Boolean): View? {
+        if (time == null && !projectWorking) return null
 
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -191,7 +198,7 @@ internal class MainHomeRows(
             ).apply {
                 marginStart = dp(8)
             }
-            if (showProjectMarker) {
+            if (projectWorking) {
                 minimumWidth = dp(44)
             }
             gravity = Gravity.END
@@ -213,70 +220,11 @@ internal class MainHomeRows(
                 })
             }
 
-            if (showProjectMarker) {
-                addView(createProjectMarkerIcon(projectWorking), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+            if (projectWorking) {
+                addView(statusDecorations.createWorkingIndicator(), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
                     topMargin = if (time == null) 0 else dp(2)
                 })
             }
-        }
-    }
-
-    private fun createProjectMarkerIcon(projectWorking: Boolean): ImageView {
-        return ImageView(activity).apply {
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            translationX = dp(PROJECT_MARKER_VISUAL_OFFSET_DP).toFloat()
-            setImageResource(R.drawable.ic_home_project_marker)
-            imageTintList = ColorStateList.valueOf(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            if (projectWorking) startProjectMarkerWorkingPulse(this)
-        }
-    }
-
-    private fun startProjectMarkerWorkingPulse(icon: ImageView) {
-        val idleColor = Color.parseColor(HOME_LIST_PREVIEW_COLOR)
-        val activeColor = activity.elonColor(R.color.elon_button_primary_bg)
-        updateProjectMarkerWorkingPulse(icon, idleColor, activeColor)
-        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = PROJECT_MARKER_WORK_PULSE_MS
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-            interpolator = LinearInterpolator()
-            addUpdateListener {
-                updateProjectMarkerWorkingPulse(icon, idleColor, activeColor)
-            }
-        }
-        icon.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(v: View) = Unit
-            override fun onViewDetachedFromWindow(v: View) {
-                animator.cancel()
-            }
-        })
-        animator.start()
-    }
-
-    private fun updateProjectMarkerWorkingPulse(icon: ImageView, idleColor: Int, activeColor: Int) {
-        val fraction = (SystemClock.uptimeMillis() % PROJECT_MARKER_WORK_PULSE_MS).toFloat() /
-            PROJECT_MARKER_WORK_PULSE_MS
-        val pulse = sin(Math.PI * fraction).toFloat()
-        icon.imageTintList = ColorStateList.valueOf(blendColor(idleColor, activeColor, pulse))
-        val scale = 0.94f + 0.06f * pulse
-        icon.scaleX = scale
-        icon.scaleY = scale
-        icon.alpha = 0.58f + 0.42f * pulse
-    }
-
-    private fun createHomeChatTitle(title: String): TextView {
-        return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = title
-            setTextColor(Color.parseColor("#F8F7F4"))
-            textSize = 16f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
     }
 

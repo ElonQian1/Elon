@@ -484,9 +484,36 @@
     }
     .group-avatar-tile img { width: 100%; height: 100%; object-fit: cover; }
     .conversation-item .text { flex: 1; min-width: 0; }
+    .conversation-item .title-row {
+      display: flex; align-items: center; min-width: 0;
+    }
     .conversation-item .title {
       font-size: 16px; color: var(--ink);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .conversation-item .home-row-badge {
+      flex: 0 0 auto;
+      height: 20px;
+      margin-left: 7px;
+      padding: 0 6px;
+      border-radius: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      font-size: 11.5px;
+      line-height: 1;
+      font-weight: 400;
+    }
+    .conversation-item .home-row-badge.ai {
+      min-width: 34px;
+      border: 1px solid #8EAAC4;
+      color: #B8CDE0;
+    }
+    .conversation-item .home-row-badge.project {
+      min-width: 42px;
+      background: #9CBAD5;
+      color: #111820;
     }
     .conversation-item .sub {
       font-size: 13px; color: var(--ink-list-preview);
@@ -508,32 +535,25 @@
       text-align: right;
       white-space: nowrap;
     }
-    .conversation-item .project-marker {
-      display: block;
+    .conversation-item .project-working-dot-slot {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       width: 42px;
       height: 42px;
       margin-top: 2px;
       pointer-events: none;
-      transform: translateX(8px);
-      background: var(--ink-list-preview);
-      -webkit-mask: var(--project-marker-url) center / contain no-repeat;
-      mask: var(--project-marker-url) center / contain no-repeat;
     }
-    .conversation-item .project-marker.working {
-      animation: project-marker-work-pulse 1.35s linear infinite;
-      animation-delay: var(--project-marker-pulse-delay, 0ms);
+    .conversation-item .project-working-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #F8F7F4;
+      animation: project-working-breath 900ms ease-in-out infinite alternate;
     }
-    @keyframes project-marker-work-pulse {
-      0%, 100% {
-        background: var(--ink-list-preview);
-        opacity: 0.58;
-        transform: translateX(8px) scale(0.94);
-      }
-      50% {
-        background: #FFFFFF;
-        opacity: 1;
-        transform: translateX(8px) scale(1);
-      }
+    @keyframes project-working-breath {
+      from { transform: scale(0.62); }
+      to { transform: scale(1); }
     }
     .conversation-item .item-delete {
       display: none;
@@ -7338,7 +7358,8 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   function createContactTrailing(item) {
     const timeText = formatListTimeMs(contactSortTime(item));
-    if (!timeText && item.kind !== 'project') return null;
+    const projectWorking = item.kind === 'project' && projectIsWorkingForHome(item.data);
+    if (!timeText && !projectWorking) return null;
 
     const trailing = document.createElement('span');
     trailing.className = 'trailing';
@@ -7348,16 +7369,14 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       time.textContent = timeText;
       trailing.appendChild(time);
     }
-    if (item.kind === 'project') {
-      const marker = document.createElement('span');
-      const projectWorking = projectIsWorkingForHome(item.data);
-      marker.className = 'project-marker' + (projectWorking ? ' working' : '');
-      marker.style.setProperty('--project-marker-url', 'url("data:image/png;base64,__HOME_PROJECT_MARKER_PNG_B64__")');
-      if (projectWorking) {
-        marker.style.setProperty('--project-marker-pulse-delay', `-${Date.now() % 1350}ms`);
-      }
-      marker.setAttribute('aria-hidden', 'true');
-      trailing.appendChild(marker);
+    if (projectWorking) {
+      const slot = document.createElement('span');
+      slot.className = 'project-working-dot-slot';
+      slot.setAttribute('aria-hidden', 'true');
+      const dot = document.createElement('span');
+      dot.className = 'project-working-dot';
+      slot.appendChild(dot);
+      trailing.appendChild(slot);
     }
     return trailing;
   }
@@ -7376,13 +7395,22 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
     const text = document.createElement('span');
     text.className = 'text';
+    const titleRow = document.createElement('span');
+    titleRow.className = 'title-row';
     const title = document.createElement('span');
     title.className = 'title';
     title.textContent = contactTitle(item);
     const sub = document.createElement('span');
     sub.className = 'sub';
     sub.textContent = contactSubtitle(item);
-    text.appendChild(title);
+    titleRow.appendChild(title);
+    if ((item.kind === 'friend' && String(data && data.id || '') === 'usr_elon_ai') || item.kind === 'project') {
+      const badge = document.createElement('span');
+      badge.className = 'home-row-badge ' + (item.kind === 'project' ? 'project' : 'ai');
+      badge.textContent = item.kind === 'project' ? '项目' : 'AI';
+      titleRow.appendChild(badge);
+    }
+    text.appendChild(titleRow);
     text.appendChild(sub);
     row.appendChild(text);
     const trailing = createContactTrailing(item);
