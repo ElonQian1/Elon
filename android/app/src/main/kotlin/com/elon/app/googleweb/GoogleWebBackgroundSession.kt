@@ -35,6 +35,7 @@ internal class GoogleWebBackgroundSession(
     private val cookieManager = CookieManager.getInstance()
     private val proxyController = ChatGptWebProxyController(activity)
     private val conversationStore = GoogleWebConversationStore(activity)
+    private val conversationSnapshotStore = GoogleWebConversationSnapshotStore(activity)
     private val snapshotStore = WebChatSnapshotStore(activity, "google")
     private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val handler = Handler(Looper.getMainLooper())
@@ -100,10 +101,18 @@ internal class GoogleWebBackgroundSession(
     fun openConversation(path: String): Boolean {
         val url = conversationStore.restorableUrl(path) ?: return false
         if (!GoogleWebNavigationPolicy.supportsAiMode(url)) return false
+        val view = webView ?: return false
         awaitingNewConversationBoundary = false
         activePath = path
+        latestSnapshotPath = path
+        latestSnapshot = conversationSnapshotStore.restore(path)?.takeIf { cached ->
+            GoogleWebNavigationPolicy.sanitizeRestorableUrl(cached.url) == url
+        }
+            ?: GoogleWebSnapshotPresentation.loading(latestSnapshot, url)
+        latestSnapshot?.let(onSnapshot)
+        onConversationIndexChanged(conversationIndex())
         updateState(State.LOADING)
-        webView?.loadUrl(url) ?: return false
+        view.loadUrl(url)
         return true
     }
 
@@ -230,7 +239,10 @@ internal class GoogleWebBackgroundSession(
                 latestSnapshot = nextSnapshot
                 latestSnapshotPath = observedPath
                 activePath = observedPath
-                if (nextSnapshot.composerReady && !nextSnapshot.streaming) snapshotStore.save(nextSnapshot)
+                if (nextSnapshot.composerReady && !nextSnapshot.streaming) {
+                    snapshotStore.save(nextSnapshot)
+                    observedPath?.let { conversationSnapshotStore.save(it, nextSnapshot) }
+                }
                 GoogleWebNavigationPolicy.sanitizeRestorableUrl(rawSnapshot.url)?.let { url ->
                     preferences.edit().putString(KEY_LAST_URL, url).apply()
                 }

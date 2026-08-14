@@ -82,6 +82,8 @@ class GoogleWebAdapterContractTest {
         assertTrue(pageAdapter.contains("ChatGptWebProtocol.parseMessage"))
         assertTrue(pageAdapter.contains("ownedComposer = true"))
         assertTrue(session.contains("GoogleWebConversationStore"))
+        assertTrue(session.contains("GoogleWebConversationSnapshotStore"))
+        assertTrue(session.contains("GoogleWebSnapshotPresentation.loading"))
         assertTrue(session.contains("ChatGptWebProxyController"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
