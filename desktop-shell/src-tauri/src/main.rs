@@ -137,6 +137,7 @@ fn main() {
     tauri::Builder::default()
         .manage(codex_semantic_bridge::CodexSemanticBridge::default())
         .manage(local_ai_browser::LocalAiBrowserRuntime::default())
+        .manage(local_ai_browser::LocalAiNativeWindowRuntime::default())
         .invoke_handler(tauri::generate_handler![
             local_ai_browser::list_local_ai_web_providers,
             local_ai_browser::open_local_ai_web_session,
@@ -146,6 +147,7 @@ fn main() {
             local_ai_browser::publish_local_ai_web_event,
             local_ai_browser::clear_local_ai_web_session,
             local_ai_browser::open_local_ai_native_chat_window,
+            local_ai_browser::native_window_state::get_local_ai_native_window_state,
             local_ai_browser::publish_local_ai_native_window_health,
             codex_semantic_bridge::codex_win_capabilities,
             codex_semantic_bridge::codex_execute_semantic_action,

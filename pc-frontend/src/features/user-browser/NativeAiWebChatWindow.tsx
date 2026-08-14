@@ -6,6 +6,7 @@ import { listLocalAiWebProviders, localAiBrowserErrorMessage, type LocalAiWebPro
 import { LOCAL_AI_PROVIDER_FALLBACKS } from './localAiWebProviders'
 import useLocalAiWebChatController from './useLocalAiWebChatController'
 import useLocalAiOwnerIdentity from './useLocalAiOwnerIdentity'
+import NativeWindowStatusCard from './NativeWindowStatusCard'
 import styles from './NativeAiWebChatWindow.module.css'
 
 export default function NativeAiWebChatWindow() {
@@ -65,6 +66,7 @@ export default function NativeAiWebChatWindow() {
 
       {(loadError || controller.message) && <p className={styles.message}>{loadError || controller.message}</p>}
       {controller.sessionState?.lastError && <p className={styles.error}>{controller.sessionState.lastError}</p>}
+      <NativeWindowStatusCard provider={provider} ownerKey={ownerKey} compact />
 
       <div className={styles.chatFrame}>
         <NativeAiWebChat

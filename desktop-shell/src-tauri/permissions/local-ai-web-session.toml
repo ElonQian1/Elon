@@ -9,4 +9,5 @@ commands.allow = [
   "run_local_ai_web_adapter_command",
   "clear_local_ai_web_session",
   "open_local_ai_native_chat_window",
+  "get_local_ai_native_window_state",
 ]

@@ -9,6 +9,7 @@ fn main() {
             "publish_local_ai_web_event",
             "clear_local_ai_web_session",
             "open_local_ai_native_chat_window",
+            "get_local_ai_native_window_state",
             "publish_local_ai_native_window_health",
         ]),
     ))

@@ -25,6 +25,7 @@ import {
 } from './localAiBrowserApi'
 import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
 import type { LocalAiOwnerSource } from './useLocalAiOwnerIdentity'
+import NativeWindowStatusCard from './NativeWindowStatusCard'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface LocalAiBrowserPanelProps {
@@ -328,14 +329,12 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
             )}
 
             {provider?.rendererStatus === 'active' ? (
-              <section className={styles.nativeWindowCard} aria-label={`${provider.displayName} 一龙独立聊天窗`}>
-                <MonitorUp size={26} aria-hidden="true" />
-                <div>
-                  <strong>一龙原生 UI 在独立窗口显示</strong>
-                  <p>官方窗口负责登录和真人验证；独立窗口按一龙聊天样式展示可见对话、输入消息与控制生成。</p>
-                  <small>两个窗口共用同一段本机会话状态，但一龙不会读取 Cookie、密码或访问令牌。</small>
-                </div>
-              </section>
+              <NativeWindowStatusCard
+                provider={provider}
+                ownerKey={ownerKey || ''}
+                busy={busy}
+                onRecover={ownerConfirmed ? () => void openNativeChat(provider) : undefined}
+              />
             ) : (
               <section className={styles.officialWebOnly} aria-label={`${provider?.displayName || '官方 AI'}接入说明`}>
                 <ExternalLink size={24} aria-hidden="true" />

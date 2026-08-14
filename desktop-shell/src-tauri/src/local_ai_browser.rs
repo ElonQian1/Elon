@@ -12,6 +12,8 @@ mod adapter_command;
 mod google_ai_mode;
 #[path = "local_ai_browser/native_window.rs"]
 mod native_window;
+#[path = "local_ai_browser/native_window_state.rs"]
+pub(crate) mod native_window_state;
 #[path = "local_ai_browser/state.rs"]
 mod state;
 
@@ -23,6 +25,7 @@ use tauri::{
     AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
+pub use native_window_state::LocalAiNativeWindowRuntime;
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
 
@@ -120,18 +123,20 @@ pub struct ClearLocalAiWebSession {
 pub async fn open_local_ai_native_chat_window(
     app: AppHandle,
     webview: WebviewWindow,
+    runtime: State<'_, LocalAiNativeWindowRuntime>,
     provider_id: String,
     owner_key: String,
 ) -> Result<native_window::LocalAiNativeChatWindow, String> {
-    native_window::open(app, webview, provider_id, owner_key).await
+    native_window::open(app, webview, runtime.inner().clone(), provider_id, owner_key).await
 }
 
 #[tauri::command]
 pub fn publish_local_ai_native_window_health(
     webview: WebviewWindow,
+    runtime: State<'_, LocalAiNativeWindowRuntime>,
     report: native_window::LocalAiNativeWindowHealth,
 ) -> Result<(), String> {
-    native_window::publish_health(webview, report)
+    native_window::publish_health(webview, runtime.inner().clone(), report)
 }
 
 #[tauri::command]

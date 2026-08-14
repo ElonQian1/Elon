@@ -9,6 +9,7 @@ use crate::codex_semantic_bridge;
 
 use super::{
     display_error, ensure_main_webview, owner_fingerprint, provider, restore_window,
+    native_window_state::LocalAiNativeWindowRuntime,
     ProviderDefinition, LOCAL_AI_NATIVE_WINDOW_PREFIX,
 };
 
@@ -51,6 +52,7 @@ pub(crate) struct LocalAiNativeWindowHealth {
 
 pub(super) fn publish_health(
     webview: WebviewWindow,
+    runtime: LocalAiNativeWindowRuntime,
     report: LocalAiNativeWindowHealth,
 ) -> Result<(), String> {
     if !webview.label().starts_with(LOCAL_AI_NATIVE_WINDOW_PREFIX) {
@@ -76,6 +78,12 @@ pub(super) fn publish_health(
     }
     let is_error = matches!(report.phase.as_str(), "window_error" | "promise_rejection")
         || (report.phase == "settled" && (!report.root_exists || report.root_child_count == 0));
+    runtime.mark_health(
+        webview.label(),
+        &report.phase,
+        report.root_exists,
+        report.root_child_count,
+    );
     codex_semantic_bridge::record_app_event(
         webview.app_handle(),
         webview.label(),
@@ -101,6 +109,7 @@ pub(super) fn publish_health(
 pub(super) async fn open(
     app: AppHandle,
     webview: WebviewWindow,
+    runtime: LocalAiNativeWindowRuntime,
     provider_id: String,
     owner_key: String,
 ) -> Result<LocalAiNativeChatWindow, String> {
@@ -111,8 +120,10 @@ pub(super) async fn open(
     let url = native_chat_url(&webview, provider)?;
 
     if let Some(window) = app.get_webview_window(&label) {
+        runtime.mark_recovering(&label);
         dispatch_recovery_navigation(&app, &label, &window, &url)?;
         restore_window(&window)?;
+        runtime.mark_focus(&label, true);
         record(
             &app,
             &label,
@@ -131,8 +142,12 @@ pub(super) async fn open(
     let navigation_label = label.clone();
     let page_app = app.clone();
     let page_label = label.clone();
+    let page_runtime = runtime.clone();
     let event_app = app.clone();
     let event_label = label.clone();
+    let event_provider_id = provider.id;
+    let event_runtime = runtime.clone();
+    runtime.mark_creating(&label, provider.id);
     record(
         &app,
         &label,
@@ -192,6 +207,10 @@ pub(super) async fn open(
         })
         .on_page_load(move |window, payload| {
             let page_url = payload.url();
+            match payload.event() {
+                PageLoadEvent::Started => page_runtime.mark_page_started(&page_label),
+                PageLoadEvent::Finished => page_runtime.mark_page_finished(&page_label),
+            }
             record(
                 &page_app,
                 &page_label,
@@ -214,11 +233,13 @@ pub(super) async fn open(
                     "一龙 AI 子窗口加载失败，窗口已保留",
                     json!({"error_code": "webview_navigation_error"}),
                 );
+                page_runtime.mark_error(&page_label, "webview_navigation_error");
                 show_navigation_error(&window);
             }
         })
         .build()
         .map_err(|error| {
+            runtime.mark_error(&label, "webview_create_failed");
             record(
                 &app,
                 &label,
@@ -231,6 +252,7 @@ pub(super) async fn open(
         })?;
     window.on_window_event(move |event| match event {
         WindowEvent::Focused(focused) => {
+            event_runtime.mark_focus(&event_label, *focused);
             record(
                 &event_app,
                 &event_label,
@@ -252,17 +274,21 @@ pub(super) async fn open(
             "一龙 AI 子窗口收到关闭请求",
             json!({}),
         ),
-        WindowEvent::Destroyed => record(
-            &event_app,
-            &event_label,
-            "info",
-            "native_window.destroyed",
-            "一龙 AI 子窗口已关闭",
-            json!({}),
-        ),
+        WindowEvent::Destroyed => {
+            event_runtime.mark_closed(&event_label, event_provider_id);
+            record(
+                &event_app,
+                &event_label,
+                "info",
+                "native_window.destroyed",
+                "一龙 AI 子窗口已关闭",
+                json!({}),
+            )
+        }
         _ => {}
     });
     restore_window(&window)?;
+    runtime.mark_created(&label);
     record(
         &app,
         &label,

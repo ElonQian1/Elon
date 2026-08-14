@@ -27,6 +27,19 @@ export interface LocalAiNativeChatWindow {
   status: 'created' | 'focused'
 }
 
+export interface LocalAiNativeWindowState {
+  providerId: string
+  windowLabel: string
+  phase: 'creating' | 'loading' | 'loaded' | 'ready' | 'error' | 'closed'
+  focused: boolean
+  pageReady: boolean
+  rootExists: boolean
+  rootChildCount: number
+  lastErrorCode?: 'root_empty' | 'page_runtime_error' | 'webview_navigation_error' | 'webview_create_failed' | string | null
+  retryable: boolean
+  updatedAtMs: number
+}
+
 export interface ClearedLocalAiWebSession {
   providerId: string
   status: 'cleared'
@@ -191,6 +204,23 @@ export async function openLocalAiNativeChatWindow(
     throw new Error('桌面壳返回了不受支持的一龙聊天窗口。')
   }
   return window
+}
+
+export async function getLocalAiNativeWindowState(
+  providerId: string,
+  ownerKey: string,
+): Promise<LocalAiNativeWindowState> {
+  assertIdentity(providerId, ownerKey)
+  const state = await invokeDesktop<LocalAiNativeWindowState>('get_local_ai_native_window_state', {
+    providerId,
+    ownerKey,
+  }, LOCAL_AI_INVOKE_TIMEOUTS.state, `native-state:${providerId}:${ownerKey}`)
+  if (state.providerId !== providerId
+    || !state.windowLabel.startsWith(`local-ai-native-${providerId}-`)
+    || !['creating', 'loading', 'loaded', 'ready', 'error', 'closed'].includes(state.phase)) {
+    throw new Error('桌面壳返回了无效的一龙聊天窗状态。')
+  }
+  return state
 }
 
 export async function clearLocalAiWebSession(

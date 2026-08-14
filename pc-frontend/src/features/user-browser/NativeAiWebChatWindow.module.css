@@ -2,7 +2,7 @@
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto repeat(3, auto) minmax(0, 1fr);
   overflow: hidden;
   color: var(--text-primary);
   background:
