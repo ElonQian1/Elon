@@ -502,7 +502,7 @@ internal object ChatGptWebFeatureBaseline {
             group = "messages",
             delivery = Delivery.ADAPTIVE_NATIVE,
             mcpActions = listOf("chatgpt_find_controls", "chatgpt_invoke_control"),
-            semantics = setOf("more", "timestamp", "sources", "read_aloud", "branch"),
+            semantics = setOf("more", "timestamp", "sources", "read_aloud", "branch", "save_to_project"),
         ),
         feature(
             id = "message_actions",
@@ -516,6 +516,7 @@ internal object ChatGptWebFeatureBaseline {
                 "feedback",
                 "read_aloud",
                 "branch",
+                "save_to_project",
                 "delete",
             ),
             verificationGap = "destructive_and_external_message_actions_acceptance",

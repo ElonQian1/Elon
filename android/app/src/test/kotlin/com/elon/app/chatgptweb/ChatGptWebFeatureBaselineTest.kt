@@ -151,6 +151,15 @@ class ChatGptWebFeatureBaselineTest {
                     expanded = false,
                     expandable = true,
                 ),
+                ChatGptWebUiControl(
+                    id = "save_response_to_project",
+                    semantic = "save_to_project",
+                    label = "Save to project",
+                    region = ChatGptWebUiRegion.CONTENT,
+                    role = "button",
+                    enabled = true,
+                    selected = false,
+                ),
             ),
         )
 
@@ -179,6 +188,8 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals("user_action_required", voice.getString("verification_status"))
         assertTrue(feature(baseline, "disclosure_controls").getBoolean("current_page_observed"))
         assertFalse(feature(baseline, "projects").getBoolean("current_page_observed"))
+        assertTrue(feature(baseline, "message_action_context").getBoolean("current_page_observed"))
+        assertTrue(feature(baseline, "message_actions").getBoolean("current_page_observed"))
         assertTrue(feature(baseline, "study_mode").getBoolean("current_page_observed"))
     }
 

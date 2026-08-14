@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 106;
+pub(super) const ADAPTER_VERSION: u32 = 107;
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -208,7 +208,7 @@ mod tests {
     fn win_bootstrap_tracks_the_complete_android_adapter_bundle() {
         let script = initialization_script();
         assert_eq!(ADAPTER_ASSETS.len(), 27);
-        assert!(script.contains("__elonChatGptAdapterTargetVersion = 106"));
+        assert!(script.contains("__elonChatGptAdapterTargetVersion = 107"));
         assert!(script.contains("__elonChatGptDocumentToken"));
         assert!(script.contains("__elonChatGptSnapshotScheduler"));
         assert!(script.contains("__elonChatGptLayout"));
