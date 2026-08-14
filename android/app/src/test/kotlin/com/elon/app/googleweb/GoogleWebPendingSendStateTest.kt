@@ -30,6 +30,21 @@ class GoogleWebPendingSendStateTest {
         assertEquals(GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING, result.action)
         assertNull(result.prompt)
         assertEquals("hello", state.prompt())
+        assertEquals(
+            GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING,
+            state.onConfirmationTimeout(generation).action,
+        )
+        assertEquals("hello", state.prompt())
+        assertEquals(
+            GoogleWebPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION,
+            state.onConfirmationTimeout(generation).action,
+        )
+        assertTrue(state.requiresOfficialConfirmation())
+        assertEquals(
+            GoogleWebPendingSendState.TimeoutAction.IGNORE,
+            state.onConfirmationTimeout(generation).action,
+        )
+        assertEquals("hello", state.prompt())
     }
 
     @Test
@@ -41,6 +56,7 @@ class GoogleWebPendingSendStateTest {
         assertFalse(state.observeUserPrompt("different"))
         assertTrue(state.observeUserPrompt(" hello "))
         assertNull(state.prompt())
+        assertFalse(state.requiresOfficialConfirmation())
         assertEquals(
             GoogleWebPendingSendState.TimeoutAction.IGNORE,
             state.onConfirmationTimeout(generation).action,

@@ -85,14 +85,22 @@ class GoogleWebAdapterContractTest {
         assertTrue(session.contains("GoogleWebConversationSnapshotStore"))
         assertTrue(session.contains("GoogleWebSnapshotPresentation.loading"))
         assertTrue(session.contains("ChatGptWebProxyController"))
+        assertTrue(session.contains("snapshot.composerReady && !snapshot.streaming"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
         assertTrue(controller.contains("pendingSend.confirmSubmission()"))
         assertTrue(controller.contains("restorePrompt(failedPrompt)"))
         assertTrue(controller.contains("pendingSend.onConfirmationTimeout(generation)"))
+        assertTrue(Regex(
+            """TimeoutAction\.KEEP_WAITING\s*->\s*\{.*?scheduleSubmissionConfirmationWatchdog\(generation\)""",
+            RegexOption.DOT_MATCHES_ALL,
+        ).containsMatchIn(controller))
+        assertTrue(controller.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
+        assertTrue(controller.contains("pendingSend.requiresOfficialConfirmation()"))
         assertTrue(controller.contains("binding.root::removeCallbacks"))
         assertTrue(controller.contains("session.requestConversationIndex()"))
         assertTrue(pendingSendState.contains("TimeoutAction.KEEP_WAITING"))
+        assertTrue(pendingSendState.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
         assertTrue(pendingSendState.contains("TimeoutAction.RESTORE"))
     }
 

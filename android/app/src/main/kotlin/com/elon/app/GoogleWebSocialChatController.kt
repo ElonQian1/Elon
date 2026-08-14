@@ -83,7 +83,12 @@ internal class GoogleWebSocialChatController(
         val prompt = rawText.trim()
         if (prompt.isBlank()) return true
         if (pendingSend.prompt() != null) {
-            Toast.makeText(activity, "上一条消息仍在提交，请稍候", Toast.LENGTH_SHORT).show()
+            val detail = if (pendingSend.requiresOfficialConfirmation()) {
+                "上一条已发送，但回答尚未同步，请打开官方页确认"
+            } else {
+                "上一条消息仍在提交，请稍候"
+            }
+            Toast.makeText(activity, detail, Toast.LENGTH_LONG).show()
             return true
         }
         if (!session.canSend()) {
@@ -199,6 +204,15 @@ internal class GoogleWebSocialChatController(
                 GoogleWebPendingSendState.TimeoutAction.IGNORE -> Unit
                 GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING -> {
                     session.requestConversationIndex()
+                    scheduleSubmissionConfirmationWatchdog(generation)
+                }
+                GoogleWebPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
+                    session.requestConversationIndex()
+                    if (active) Toast.makeText(
+                        activity,
+                        "官网已确认发送，但回答同步超时，请打开官方页确认",
+                        Toast.LENGTH_LONG,
+                    ).show()
                 }
                 GoogleWebPendingSendState.TimeoutAction.RESTORE -> {
                     session.currentSnapshot()?.let(::renderSnapshot)

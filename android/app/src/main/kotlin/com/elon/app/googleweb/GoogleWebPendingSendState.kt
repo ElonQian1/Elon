@@ -4,6 +4,7 @@ internal class GoogleWebPendingSendState {
     enum class TimeoutAction {
         IGNORE,
         KEEP_WAITING,
+        REQUIRE_OFFICIAL_CONFIRMATION,
         RESTORE,
     }
 
@@ -16,6 +17,8 @@ internal class GoogleWebPendingSendState {
         val prompt: String,
         val generation: Long,
         var submissionConfirmed: Boolean = false,
+        var confirmationRechecks: Int = 0,
+        var requiresOfficialConfirmation: Boolean = false,
     )
 
     private var generation = 0L
@@ -28,6 +31,9 @@ internal class GoogleWebPendingSendState {
     }
 
     fun prompt(): String? = pending?.prompt
+
+    fun requiresOfficialConfirmation(): Boolean =
+        pending?.requiresOfficialConfirmation == true
 
     fun confirmSubmission(): Boolean {
         val current = pending ?: return false
@@ -55,6 +61,14 @@ internal class GoogleWebPendingSendState {
             return TimeoutResult(TimeoutAction.IGNORE)
         }
         if (current.submissionConfirmed) {
+            if (current.requiresOfficialConfirmation) {
+                return TimeoutResult(TimeoutAction.IGNORE)
+            }
+            current.confirmationRechecks += 1
+            if (current.confirmationRechecks > MAX_CONFIRMATION_RECHECKS) {
+                current.requiresOfficialConfirmation = true
+                return TimeoutResult(TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION)
+            }
             return TimeoutResult(TimeoutAction.KEEP_WAITING)
         }
         val prompt = current.prompt
@@ -69,5 +83,9 @@ internal class GoogleWebPendingSendState {
     private fun invalidate() {
         generation += 1
         pending = null
+    }
+
+    private companion object {
+        const val MAX_CONFIRMATION_RECHECKS = 2
     }
 }

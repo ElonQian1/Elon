@@ -71,7 +71,9 @@ internal class GoogleWebBackgroundSession(
 
     fun state(): State = state
 
-    fun canSend(): Boolean = state == State.READY && latestSnapshot?.composerReady == true
+    fun canSend(): Boolean = state == State.READY && latestSnapshot?.let { snapshot ->
+        snapshot.composerReady && !snapshot.streaming
+    } == true
 
     fun sendPrompt(prompt: String): Boolean {
         val snapshot = latestSnapshot ?: return false
