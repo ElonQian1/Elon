@@ -5,9 +5,11 @@
   const adapterVersion = Number(window.__elonGoogleWebAdapterVersion || 0);
   const documentToken = String(window.__elonGoogleWebDocumentToken || '');
   const nativeBridge = window.elonGoogleWebNative;
+  const messageExtractor = window.__elonGoogleWebMessageExtractor;
   if (!allowedOrigins.has(location.origin) || !adapterVersion ||
       !/^doc_[a-z0-9_]{3,80}$/.test(documentToken) || !nativeBridge ||
-      typeof nativeBridge.postMessage !== 'function') return;
+      typeof nativeBridge.postMessage !== 'function' || !messageExtractor ||
+      typeof messageExtractor.extract !== 'function') return;
   if (window.__elonGoogleWebBridge &&
       window.__elonGoogleWebBridge.version === adapterVersion &&
       window.__elonGoogleWebBridge.documentToken === documentToken) return;
@@ -15,6 +17,7 @@
   let sequence = 0;
   let emitTimer = 0;
   let lastSnapshot = '';
+  let lastDiagnostics = '';
 
   function cleanText(value) {
     return String(value || '')
@@ -145,87 +148,6 @@
       .some(isVisible);
   }
 
-  function currentQuery() {
-    const query = cleanText(new URLSearchParams(location.search).get('q')).slice(0, 40000);
-    if (query) return query;
-    const heading = Array.from(document.querySelectorAll('main h1, main [data-user-query], main [data-query]'))
-      .find(isVisible);
-    return cleanText(heading && heading.textContent).slice(0, 40000);
-  }
-
-  function citationParts(container) {
-    if (!container) return [];
-    const seen = new Set();
-    const parts = [];
-    for (const link of container.querySelectorAll('a[href^="https://"]')) {
-      if (!isVisible(link)) continue;
-      try {
-        const url = new URL(link.href);
-        if (allowedOrigins.has(url.origin)) continue;
-        const safeUrl = url.origin + url.pathname;
-        if (seen.has(safeUrl)) continue;
-        seen.add(safeUrl);
-        const title = cleanText(link.textContent || link.getAttribute('aria-label')) || url.hostname;
-        parts.push({
-          type: 'citation',
-          text: title.slice(0, 160),
-          title: title.slice(0, 160),
-          url: safeUrl.slice(0, 1200),
-          targetKind: 'external',
-          targetHost: url.hostname.slice(0, 253)
-        });
-        if (parts.length >= 12) break;
-      } catch (_) {}
-    }
-    return parts;
-  }
-
-  function answerCandidate() {
-    const selectors = [
-      'main [data-container-id]',
-      'main [data-snhf]',
-      'main [data-attrid*="ai" i]',
-      'main article',
-      'main [role="region"]',
-      '[role="main"] article',
-      '[role="main"] [role="region"]'
-    ];
-    return Array.from(document.querySelectorAll(selectors.join(',')))
-      .filter((node) => isVisible(node) && !node.querySelector('textarea, [contenteditable="true"]'))
-      .map((node) => {
-        const text = cleanText(node.innerText).slice(0, 40000);
-        const citations = citationParts(node);
-        return { text, citations, score: Math.min(text.length, 6000) + citations.length * 800 };
-      })
-      .filter((item) => item.text.length >= 40)
-      .sort((left, right) => right.score - left.score || left.text.length - right.text.length)[0] || null;
-  }
-
-  function visibleMessages(streaming) {
-    const query = currentQuery();
-    const answer = answerCandidate();
-    const messages = [];
-    if (query) messages.push({
-      id: 'google-query-current',
-      role: 'user',
-      state: 'completed',
-      content: [{ type: 'text', text: query }]
-    });
-    if (answer) {
-      let text = answer.text;
-      if (query && text.startsWith(query)) text = cleanText(text.slice(query.length));
-      const content = text ? [{ type: 'text', text }] : [];
-      content.push(...answer.citations);
-      if (content.length) messages.push({
-        id: 'google-answer-current',
-        role: 'assistant',
-        state: streaming ? 'streaming' : 'completed',
-        content
-      });
-    }
-    return messages;
-  }
-
   function hasVisibleLoginEntry() {
     return Array.from(document.querySelectorAll('a, button, [role="button"]')).some((node) => {
       if (!isVisible(node)) return false;
@@ -256,12 +178,13 @@
   function snapshot() {
     const composer = findComposer();
     const streaming = isStreaming();
+    const extraction = messageExtractor.extract(composer, streaming);
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*Google.*$/i, '')).slice(0, 160),
       url: location.href.slice(0, 8192),
       draft: composerValue(composer).slice(0, 20000),
-      messages: visibleMessages(streaming),
+      messages: extraction.messages,
       authenticated: isAuthenticated(),
       pageKind: isAiModePage() ? 'conversation' : 'unknown',
       loginRequired: false,
@@ -276,6 +199,11 @@
     if (fingerprint === lastSnapshot) return;
     lastSnapshot = fingerprint;
     emitEvent(event);
+    const diagnostics = messageExtractor.diagnostics(composer, extraction);
+    if (diagnostics && diagnostics !== lastDiagnostics) {
+      lastDiagnostics = diagnostics;
+      emitResult('dom_diagnostics', true, diagnostics);
+    }
   }
 
   function scheduleSnapshot() {
@@ -292,6 +220,7 @@
     if (!setComposerValue(composer, value)) {
       return emitResult('send_prompt', false, 'Google 官方输入框未接受文本。');
     }
+    messageExtractor.rememberQuery(value);
     const form = composer.closest('form');
     const button = findButton(['send', 'submit', 'search', '发送', '提交', '搜索'], form || document);
     if (button) {
@@ -324,6 +253,7 @@
       return scheduleSnapshot();
     }
     if (action === 'new_conversation') {
+      messageExtractor.clearRememberedQuery();
       emitResult(action, true, '');
       location.assign('https://www.google.com/aimode');
       return;

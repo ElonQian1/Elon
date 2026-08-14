@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebSettings
@@ -202,6 +203,10 @@ internal class GoogleWebBackgroundSession(
                 onSnapshot(event.value)
             }
             is ChatGptWebEvent.CommandResult -> {
+                if (event.action == DOM_DIAGNOSTICS_ACTION) {
+                    Log.i(DOM_DIAGNOSTICS_TAG, event.detail.take(160))
+                    return
+                }
                 onCommandResult(event)
                 if (event.ok) handler.postDelayed({ pageAdapter?.requestSnapshot() }, 500L)
             }
@@ -230,5 +235,7 @@ internal class GoogleWebBackgroundSession(
     private companion object {
         const val PREFERENCES_NAME = "google_web_session"
         const val KEY_LAST_URL = "last_ai_mode_url"
+        const val DOM_DIAGNOSTICS_ACTION = "dom_diagnostics"
+        const val DOM_DIAGNOSTICS_TAG = "ElonGoogleWebDom"
     }
 }

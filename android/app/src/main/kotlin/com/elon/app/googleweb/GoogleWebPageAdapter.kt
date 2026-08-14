@@ -23,8 +23,10 @@ internal class GoogleWebPageAdapter(
 ) {
     enum class State { WEB_ONLY, CONNECTING, READY, UNSUPPORTED }
 
-    private val script = context.assets.open(ADAPTER_ASSET).use { input ->
-        input.reader(StandardCharsets.UTF_8).readText()
+    private val script = ADAPTER_ASSETS.joinToString("\n") { asset ->
+        context.assets.open(asset).use { input ->
+            input.reader(StandardCharsets.UTF_8).readText()
+        }
     }
     private val handler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
@@ -135,8 +137,11 @@ internal class GoogleWebPageAdapter(
         origin.scheme == "https" && origin.port == -1 && origin.host?.lowercase() in ALLOWED_HOSTS
 
     companion object {
-        const val ADAPTER_VERSION = 1
-        private const val ADAPTER_ASSET = "google_web_adapter.js"
+        const val ADAPTER_VERSION = 2
+        private val ADAPTER_ASSETS = listOf(
+            "google_web_message_extractor.js",
+            "google_web_adapter.js",
+        )
         private const val BRIDGE_OBJECT = "elonGoogleWebNative"
         private const val PROVIDER_ID = "google_web"
         private const val MAX_PROMPT_LENGTH = 20_000

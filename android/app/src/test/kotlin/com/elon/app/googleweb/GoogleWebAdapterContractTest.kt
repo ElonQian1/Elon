@@ -11,6 +11,7 @@ class GoogleWebAdapterContractTest {
     @Test
     fun adapterExposesVisibleChatSemanticsWithoutCredentialsOrPrivateApis() {
         val adapter = read("android/app/src/main/assets/google_web_adapter.js")
+        val extractor = read("android/app/src/main/assets/google_web_message_extractor.js")
         val pageAdapter = read(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPageAdapter.kt",
         )
@@ -21,6 +22,8 @@ class GoogleWebAdapterContractTest {
         assertTrue(adapter.contains("providerId: 'google_web'"))
         assertTrue(adapter.contains("documentToken"))
         assertTrue(adapter.contains("type: 'message_snapshot'"))
+        assertTrue(adapter.contains("messageExtractor.extract"))
+        assertTrue(adapter.contains("'dom_diagnostics'"))
         assertTrue(adapter.contains("action === 'send_prompt'"))
         assertTrue(adapter.contains("action === 'stop_generation'"))
         assertTrue(adapter.contains("action === 'new_conversation'"))
@@ -28,6 +31,13 @@ class GoogleWebAdapterContractTest {
         assertTrue(!adapter.contains("document.cookie"))
         assertTrue(!adapter.contains("Authorization"))
         assertTrue(!adapter.contains("fetch("))
+        assertTrue(extractor.contains("answerCandidate"))
+        assertTrue(extractor.contains("rememberQuery"))
+        assertTrue(extractor.contains("diagnostics"))
+        assertTrue(!extractor.contains("document.cookie"))
+        assertTrue(!extractor.contains("Authorization"))
+        assertTrue(!extractor.contains("fetch("))
+        assertTrue(!extractor.contains("sessionStorage"))
         assertTrue(pageAdapter.contains("WEB_MESSAGE_LISTENER"))
         assertTrue(pageAdapter.contains("ALLOWED_ORIGINS"))
         assertTrue(pageAdapter.contains("WebBridgeDocumentSession"))
