@@ -103,7 +103,9 @@ internal class GoogleWebSocialChatController(
 
     override fun refreshComposerModel() = updateComposerModel()
 
-    override fun stopGeneration() = session.stopGeneration()
+    override fun stopGeneration() {
+        session.stopGeneration()
+    }
 
     override fun startNewConversation() {
         pendingPrompt = null
