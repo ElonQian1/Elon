@@ -1,12 +1,11 @@
 use anyhow::{anyhow, bail, Context, Result};
 use sha2::{Digest, Sha256};
 
-use crate::compute_federation::external_pool_adapter_supervisor_session_policy_companion::server_supervisor_session_policy_catalog;
-
 const ROOT_TRANSCRIPT_DOMAIN: &[u8] = b"elon.external_pool_adapter.supervisor_session.roots.v1\0";
 const KDF_SALT_DOMAIN: &[u8] = b"elon.external_pool_adapter.supervisor_session.kdf_salt.v1\0";
 
-pub(in crate::compute_federation) struct ExternalPoolAdapterSessionRoots {
+#[derive(Clone)]
+pub struct ExternalPoolAdapterSessionRoots {
     policy_digest: [u8; 32],
     profile_digest: [u8; 32],
     target_digest: [u8; 32],
@@ -16,34 +15,35 @@ pub(in crate::compute_federation) struct ExternalPoolAdapterSessionRoots {
 }
 
 impl ExternalPoolAdapterSessionRoots {
-    pub(in crate::compute_federation) fn new(
+    pub fn new(
+        policy_digest: &str,
         profile_digest: &str,
         target_digest: &str,
         companion_digest: &str,
         capsule_digest: &str,
         bundle_digest: &str,
     ) -> Result<Self> {
-        let (policy, policy_digest) = server_supervisor_session_policy_catalog()?;
-        if policy.wire.transport != "anonymous_child_socketpair_seqpacket_v1"
-            || policy.wire.protocol_id != "elon.external_pool_adapter.sidecar.v1"
-            || policy.wire.protocol_revision != 1
-            || policy.wire.frame_magic_ascii != "ELSP"
-            || policy.crypto.kdf != "hkdf_sha256_extract_expand_v1"
-            || policy.crypto.mac != "hmac_sha256_32_v1"
-            || policy.crypto.seed_bytes != 32
-            || policy.crypto.nonce_bytes != 32
-            || policy.crypto.directional_key_bytes != 32
-        {
-            bail!("V259 supervisor/session policy is not compatible with the V260 session core");
-        }
         Ok(Self {
-            policy_digest: decode_digest("policy", &policy_digest)?,
+            policy_digest: decode_digest("policy", policy_digest)?,
             profile_digest: decode_digest("profile", profile_digest)?,
             target_digest: decode_digest("target", target_digest)?,
             companion_digest: decode_digest("companion", companion_digest)?,
             capsule_digest: decode_digest("capsule", capsule_digest)?,
             bundle_digest: decode_digest("bundle", bundle_digest)?,
         })
+    }
+
+    pub fn launch_arguments(&self) -> ExternalPoolAdapterSessionRootArguments {
+        ExternalPoolAdapterSessionRootArguments {
+            values: [
+                hex::encode(self.policy_digest),
+                hex::encode(self.profile_digest),
+                hex::encode(self.target_digest),
+                hex::encode(self.companion_digest),
+                hex::encode(self.capsule_digest),
+                hex::encode(self.bundle_digest),
+            ],
+        }
     }
 
     pub(super) fn transcript_digest(&self) -> [u8; 32] {
@@ -67,6 +67,22 @@ impl ExternalPoolAdapterSessionRoots {
         update_labeled_digest(&mut digest, b"host_nonce\0", host_nonce);
         update_labeled_digest(&mut digest, b"child_nonce\0", child_nonce);
         digest.finalize().into()
+    }
+}
+
+#[derive(Clone)]
+pub struct ExternalPoolAdapterSessionRootArguments {
+    values: [String; 6],
+}
+
+impl ExternalPoolAdapterSessionRootArguments {
+    pub fn values(&self) -> &[String; 6] {
+        &self.values
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn replace_for_test(&mut self, index: usize, value: String) {
+        self.values[index] = value;
     }
 }
 

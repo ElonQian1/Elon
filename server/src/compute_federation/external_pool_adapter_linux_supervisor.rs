@@ -18,4 +18,6 @@ pub(crate) use launch::{
 pub(crate) use lifecycle::{ExternalPoolAdapterSupervisorChild, ExternalPoolAdapterSupervisorExit};
 
 #[cfg(test)]
+mod authenticated_runtime_tests;
+#[cfg(test)]
 mod linux_tests;

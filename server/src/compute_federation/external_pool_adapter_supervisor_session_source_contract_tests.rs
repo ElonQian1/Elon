@@ -1,11 +1,13 @@
 const COMPUTE_FEDERATION_MOD: &str = include_str!("mod.rs");
 const SESSION_FACADE: &str = include_str!("external_pool_adapter_supervisor_session.rs");
-const SESSION_ROOTS: &str = include_str!("external_pool_adapter_supervisor_session/roots.rs");
-const SESSION_CRYPTO: &str = include_str!("external_pool_adapter_supervisor_session/crypto.rs");
+const SESSION_CORE: &str = include_str!("../../external-pool-adapter-session-core/src/lib.rs");
+const SESSION_ROOTS: &str = include_str!("../../external-pool-adapter-session-core/src/roots.rs");
+const SESSION_CRYPTO: &str = include_str!("../../external-pool-adapter-session-core/src/crypto.rs");
 const SESSION_BOOTSTRAP: &str =
-    include_str!("external_pool_adapter_supervisor_session/bootstrap.rs");
+    include_str!("../../external-pool-adapter-session-core/src/bootstrap.rs");
 const SESSION_TRANSPORT: &str =
-    include_str!("external_pool_adapter_supervisor_session/transport.rs");
+    include_str!("../../external-pool-adapter-session-core/src/transport.rs");
+const SESSION_FIXTURE: &str = include_str!("../external_pool_adapter_session_fixture_main.rs");
 
 #[test]
 fn v260_is_linux_x86_64_only_and_has_no_runtime_route() {
@@ -15,6 +17,9 @@ fn v260_is_linux_x86_64_only_and_has_no_runtime_route() {
     assert!(COMPUTE_FEDERATION_MOD
         .contains("mod external_pool_adapter_supervisor_session_source_contract_tests;"));
     assert!(SESSION_FACADE.contains("It does not launch a"));
+    assert!(SESSION_FACADE.contains("elon-external-pool-adapter-session-core"));
+    assert!(SESSION_FACADE.contains("#[cfg(test)]\nmod linux_tests;"));
+    assert!(SESSION_CORE.contains("does not launch a process"));
     assert!(!include_str!("../main.rs").contains("external_pool_adapter_supervisor_session"));
     assert!(!include_str!("../router.rs").contains("external_pool_adapter_supervisor_session"));
 }
@@ -27,6 +32,15 @@ fn v260_binds_all_durable_roots_to_v259_policy() {
         "elon.external_pool_adapter.sidecar.v1",
         "hkdf_sha256_extract_expand_v1",
         "hmac_sha256_32_v1",
+        "ExternalPoolAdapterSessionRoots::new(",
+        "&policy_digest",
+    ] {
+        assert!(
+            SESSION_FACADE.contains(required),
+            "missing server policy gate {required}"
+        );
+    }
+    for required in [
         "policy_digest: [u8; 32]",
         "profile_digest: [u8; 32]",
         "target_digest: [u8; 32]",
@@ -90,7 +104,9 @@ fn v260_bootstrap_is_anonymous_fixed_size_and_mutually_authenticated() {
         "bootstrap_response\\0",
         "bootstrap_confirm\\0",
         "constant_time::verify_slices_are_equal",
-        "libc::shutdown(socket.as_raw_fd(), libc::SHUT_RDWR)",
+        "SocketTerminalStrategy::ShutdownAndClose",
+        "SocketTerminalStrategy::CloseOnly",
+        "adopt_supervisor_descriptors",
     ] {
         assert!(
             SESSION_BOOTSTRAP.contains(required),
@@ -123,6 +139,8 @@ fn v260_elsp_frames_are_bounded_ordered_directional_and_fail_closed() {
         "const MAX_FRAMES_PER_DIRECTION: u64 = 1_048_576",
         "SOCK_SEQPACKET | libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK",
         "libc::socketpair(libc::AF_UNIX",
+        "libc::sendmsg(fd, &message, libc::MSG_NOSIGNAL)",
+        "libc::recvmsg(fd, &mut message, libc::MSG_TRUNC)",
         "libc::MSG_TRUNC",
         "vec![0_u8; maximum_bytes]",
         "received > maximum_bytes",
@@ -152,6 +170,7 @@ fn v260_elsp_frames_are_bounded_ordered_directional_and_fail_closed() {
 fn v260_has_no_process_network_persistence_activation_or_real_secret_effect() {
     let production = [
         SESSION_FACADE,
+        SESSION_CORE,
         SESSION_ROOTS,
         SESSION_CRYPTO,
         SESSION_BOOTSTRAP,
@@ -179,6 +198,36 @@ fn v260_has_no_process_network_persistence_activation_or_real_secret_effect() {
         assert!(
             !production.contains(forbidden),
             "V260 crosses no-effect fence {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn v262_fixture_reuses_core_and_has_no_external_or_economic_consumer() {
+    for required in [
+        "ExternalPoolAdapterChildBootstrap::adopt_supervisor_descriptors()",
+        "ExternalPoolAdapterSessionRoots::new(",
+        "v262.host.authenticated",
+        "v262.child.authenticated",
+        "v262.shutdown",
+    ] {
+        assert!(SESSION_FIXTURE.contains(required));
+    }
+    for forbidden in [
+        "reqwest",
+        "TcpStream",
+        "UdpSocket",
+        "rusqlite",
+        "axum",
+        "provider_status",
+        "settlement",
+        "sui_client",
+        "credential_bytes",
+        "config_bytes",
+    ] {
+        assert!(
+            !SESSION_FIXTURE.contains(forbidden),
+            "V262 fixture crosses no-effect fence {forbidden}"
         );
     }
 }

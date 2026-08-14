@@ -1,0 +1,17 @@
+[package]
+name = "elon-external-pool-adapter-session-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+test-support = []
+
+[dependencies]
+anyhow = "1"
+hex = "0.4"
+hmac = "0.12"
+libc = "0.2"
+ring = "0.17"
+sha2 = "0.10"
+zeroize = "1"

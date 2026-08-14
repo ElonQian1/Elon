@@ -12,9 +12,10 @@ use super::{
         derive_directional_keys, mac_tag, random_array32, random_secret32, verify_mac, Secret32,
         CHILD_TO_HOST_DIRECTION, HOST_TO_CHILD_DIRECTION,
     },
-    roots::ExternalPoolAdapterSessionRoots,
+    roots::{ExternalPoolAdapterSessionRootArguments, ExternalPoolAdapterSessionRoots},
     transport::{
-        create_seqpacket_pair, receive_packet, send_packet, AuthenticatedExternalPoolAdapterSession,
+        create_seqpacket_pair, receive_packet, send_packet,
+        AuthenticatedExternalPoolAdapterSession, SocketTerminalStrategy,
     },
 };
 
@@ -31,13 +32,13 @@ const CONFIRM_BYTES: usize = CONFIRM_PREFIX_BYTES + 32;
 const RESPONSE_PROOF_LABEL: &[u8] = b"bootstrap_response\0";
 const CONFIRM_PROOF_LABEL: &[u8] = b"bootstrap_confirm\0";
 
-pub(in crate::compute_federation) struct PreparedExternalPoolAdapterSupervisorSession {
+pub struct PreparedExternalPoolAdapterSupervisorSession {
     host: ExternalPoolAdapterHostBootstrap,
     child: ExternalPoolAdapterChildBootstrap,
 }
 
 impl PreparedExternalPoolAdapterSupervisorSession {
-    pub(in crate::compute_federation) fn split(
+    pub fn split(
         self,
     ) -> (
         ExternalPoolAdapterHostBootstrap,
@@ -47,24 +48,39 @@ impl PreparedExternalPoolAdapterSupervisorSession {
     }
 }
 
-pub(in crate::compute_federation) struct ExternalPoolAdapterHostBootstrap {
+pub struct ExternalPoolAdapterHostBootstrap {
     socket: OwnedFd,
     seed: Secret32,
     host_nonce: [u8; 32],
     roots: ExternalPoolAdapterSessionRoots,
 }
 
-pub(in crate::compute_federation) struct ExternalPoolAdapterChildBootstrap {
+pub struct ExternalPoolAdapterChildBootstrap {
     socket: OwnedFd,
     seed_reader: OwnedFd,
+    root_arguments: Option<ExternalPoolAdapterSessionRootArguments>,
+    terminal_strategy: SocketTerminalStrategy,
 }
 
-pub(in crate::compute_federation) fn prepare_external_pool_adapter_supervisor_session(
+pub struct ExternalPoolAdapterSupervisorDescriptorTransfer {
+    socket: OwnedFd,
+    seed_reader: OwnedFd,
+    root_arguments: ExternalPoolAdapterSessionRootArguments,
+}
+
+impl ExternalPoolAdapterSupervisorDescriptorTransfer {
+    pub fn into_parts(self) -> (OwnedFd, OwnedFd, ExternalPoolAdapterSessionRootArguments) {
+        (self.socket, self.seed_reader, self.root_arguments)
+    }
+}
+
+pub fn prepare_external_pool_adapter_supervisor_session(
     roots: ExternalPoolAdapterSessionRoots,
 ) -> Result<PreparedExternalPoolAdapterSupervisorSession> {
     let (host_socket, child_socket) = create_seqpacket_pair()?;
     let seed = random_secret32()?;
     let child_seed_reader = create_seed_channel(seed.as_bytes())?;
+    let root_arguments = roots.launch_arguments();
     Ok(PreparedExternalPoolAdapterSupervisorSession {
         host: ExternalPoolAdapterHostBootstrap {
             socket: host_socket,
@@ -75,20 +91,20 @@ pub(in crate::compute_federation) fn prepare_external_pool_adapter_supervisor_se
         child: ExternalPoolAdapterChildBootstrap {
             socket: child_socket,
             seed_reader: child_seed_reader,
+            root_arguments: Some(root_arguments),
+            terminal_strategy: SocketTerminalStrategy::ShutdownAndClose,
         },
     })
 }
 
 impl ExternalPoolAdapterHostBootstrap {
-    pub(in crate::compute_federation) fn authenticate(
-        self,
-    ) -> Result<AuthenticatedExternalPoolAdapterSession> {
+    pub fn authenticate(self) -> Result<AuthenticatedExternalPoolAdapterSession> {
         let transcript_digest = self.roots.transcript_digest();
         let challenge = encode_challenge(&self.host_nonce, &transcript_digest);
         send_packet(self.socket.as_raw_fd(), &challenge, BOOTSTRAP_TIMEOUT)?;
         let response = receive_exact(self.socket.as_raw_fd(), RESPONSE_BYTES)?;
         if &response[..4] != RESPONSE_MAGIC || response[4] != BOOTSTRAP_VERSION {
-            return fail_bootstrap(&self.socket);
+            return fail_bootstrap(&self.socket, SocketTerminalStrategy::ShutdownAndClose);
         }
         let child_nonce: [u8; 32] = response[5..RESPONSE_PREFIX_BYTES]
             .try_into()
@@ -106,7 +122,7 @@ impl ExternalPoolAdapterHostBootstrap {
         )
         .is_err()
         {
-            return fail_bootstrap(&self.socket);
+            return fail_bootstrap(&self.socket, SocketTerminalStrategy::ShutdownAndClose);
         }
         let mut confirmation = Zeroizing::new(Vec::with_capacity(CONFIRM_BYTES));
         confirmation.extend_from_slice(CONFIRM_MAGIC);
@@ -127,25 +143,58 @@ impl ExternalPoolAdapterHostBootstrap {
             HOST_TO_CHILD_DIRECTION,
             CHILD_TO_HOST_DIRECTION,
             transcript_digest,
+            SocketTerminalStrategy::ShutdownAndClose,
         ))
     }
 
-    #[cfg(test)]
-    pub(in crate::compute_federation) fn socket_fd_for_supervisor_test(&self) -> RawFd {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn socket_fd_for_supervisor_test(&self) -> RawFd {
         self.socket.as_raw_fd()
     }
 }
 
 impl ExternalPoolAdapterChildBootstrap {
-    pub(in crate::compute_federation) fn authenticate(
+    pub fn authenticate(
         self,
         roots: ExternalPoolAdapterSessionRoots,
     ) -> Result<AuthenticatedExternalPoolAdapterSession> {
         self.authenticate_inner(roots, false, false)
     }
 
-    pub(in crate::compute_federation) fn into_supervisor_descriptors(self) -> (OwnedFd, OwnedFd) {
-        (self.socket, self.seed_reader)
+    pub fn into_supervisor_descriptors(
+        self,
+    ) -> Result<ExternalPoolAdapterSupervisorDescriptorTransfer> {
+        let root_arguments = self
+            .root_arguments
+            .ok_or_else(|| anyhow!("inherited child bootstrap cannot be transferred again"))?;
+        Ok(ExternalPoolAdapterSupervisorDescriptorTransfer {
+            socket: self.socket,
+            seed_reader: self.seed_reader,
+            root_arguments,
+        })
+    }
+
+    /// Adopts the exact fd3/fd5 topology established by the trusted Linux supervisor.
+    ///
+    /// # Safety
+    ///
+    /// The caller must invoke this exactly once after the supervisor's unique exec. File
+    /// descriptors 3 and 5 must be the inherited child socket and one-time seed pipe.
+    pub unsafe fn adopt_supervisor_descriptors() -> Self {
+        Self {
+            socket: OwnedFd::from_raw_fd(3),
+            seed_reader: OwnedFd::from_raw_fd(5),
+            root_arguments: None,
+            terminal_strategy: SocketTerminalStrategy::CloseOnly,
+        }
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn replace_root_argument_for_test(&mut self, index: usize, value: String) {
+        self.root_arguments
+            .as_mut()
+            .expect("prepared child bootstrap has launch roots")
+            .replace_for_test(index, value);
     }
 
     fn authenticate_inner(
@@ -163,12 +212,12 @@ impl ExternalPoolAdapterChildBootstrap {
         }
         let challenge = receive_exact(self.socket.as_raw_fd(), CHALLENGE_BYTES)?;
         if &challenge[..4] != CHALLENGE_MAGIC || challenge[4] != BOOTSTRAP_VERSION {
-            return fail_bootstrap(&self.socket);
+            return fail_bootstrap(&self.socket, self.terminal_strategy);
         }
         let host_nonce: [u8; 32] = challenge[5..37].try_into().expect("fixed host nonce range");
         let expected_transcript = roots.transcript_digest();
         if constant_time::verify_slices_are_equal(&challenge[37..], &expected_transcript).is_err() {
-            return fail_bootstrap(&self.socket);
+            return fail_bootstrap(&self.socket, self.terminal_strategy);
         }
         let child_nonce = random_array32()?;
         let keys = derive_directional_keys(&seed, &host_nonce, &child_nonce, &roots)?;
@@ -192,7 +241,7 @@ impl ExternalPoolAdapterChildBootstrap {
         send_packet(self.socket.as_raw_fd(), &response, BOOTSTRAP_TIMEOUT)?;
         let confirmation = receive_exact(self.socket.as_raw_fd(), CONFIRM_BYTES)?;
         if &confirmation[..4] != CONFIRM_MAGIC || confirmation[4] != BOOTSTRAP_VERSION {
-            return fail_bootstrap(&self.socket);
+            return fail_bootstrap(&self.socket, self.terminal_strategy);
         }
         if verify_mac(
             &receive_key,
@@ -204,7 +253,7 @@ impl ExternalPoolAdapterChildBootstrap {
         )
         .is_err()
         {
-            return fail_bootstrap(&self.socket);
+            return fail_bootstrap(&self.socket, self.terminal_strategy);
         }
         Ok(AuthenticatedExternalPoolAdapterSession::new(
             self.socket,
@@ -213,32 +262,33 @@ impl ExternalPoolAdapterChildBootstrap {
             CHILD_TO_HOST_DIRECTION,
             HOST_TO_CHILD_DIRECTION,
             transcript_digest,
+            self.terminal_strategy,
         ))
     }
 
-    #[cfg(test)]
-    pub(super) fn authenticate_with_wrong_seed_for_test(
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn authenticate_with_wrong_seed_for_test(
         self,
         roots: ExternalPoolAdapterSessionRoots,
     ) -> Result<AuthenticatedExternalPoolAdapterSession> {
         self.authenticate_inner(roots, true, false)
     }
 
-    #[cfg(test)]
-    pub(super) fn authenticate_with_tampered_proof_for_test(
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn authenticate_with_tampered_proof_for_test(
         self,
         roots: ExternalPoolAdapterSessionRoots,
     ) -> Result<AuthenticatedExternalPoolAdapterSession> {
         self.authenticate_inner(roots, false, true)
     }
 
-    #[cfg(test)]
-    pub(super) fn socket_fd_for_test(&self) -> RawFd {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn socket_fd_for_test(&self) -> RawFd {
         self.socket.as_raw_fd()
     }
 
-    #[cfg(test)]
-    pub(super) fn seed_fd_for_test(&self) -> RawFd {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn seed_fd_for_test(&self) -> RawFd {
         self.seed_reader.as_raw_fd()
     }
 }
@@ -327,9 +377,7 @@ fn read_seed(reader: OwnedFd) -> Result<Secret32> {
     Ok(Secret32::new(seed))
 }
 
-fn fail_bootstrap<T>(socket: &OwnedFd) -> Result<T> {
-    unsafe {
-        libc::shutdown(socket.as_raw_fd(), libc::SHUT_RDWR);
-    }
+fn fail_bootstrap<T>(socket: &OwnedFd, terminal_strategy: SocketTerminalStrategy) -> Result<T> {
+    terminal_strategy.terminate(socket.as_raw_fd());
     Err(anyhow!("authenticated session bootstrap rejected"))
 }

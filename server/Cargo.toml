@@ -18,6 +18,14 @@ path = "src/node_agent_main.rs"
 name = "elon-node-installer"
 path = "src/node_installer_main.rs"
 
+[[bin]]
+name = "elon-external-pool-adapter-session-fixture"
+path = "src/external_pool_adapter_session_fixture_main.rs"
+required-features = ["external-pool-adapter-session-fixture"]
+
+[features]
+external-pool-adapter-session-fixture = []
+
 [dependencies]
 # 异步运行时
 tokio = { version = "1", features = ["full"] }
@@ -112,3 +120,7 @@ windows-sys = { version = "0.59", features = [
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+elon-external-pool-adapter-session-core = { path = "external-pool-adapter-session-core" }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+elon-external-pool-adapter-session-core = { path = "external-pool-adapter-session-core", features = ["test-support"] }

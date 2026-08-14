@@ -122,8 +122,9 @@ fn validate_confinement(
                 "execveat_fd4_empty_path_only",
                 "mmap_prot_exec_denied",
                 "mprotect_prot_exec_denied",
-                "fcntl_dup_denied",
+                "fcntl_getfd_fd3_fd5_only",
                 "ioctl_denied",
+                "poll_nfds3_timeout0_or_nfds1_timeout1_5000_only",
             ]
     {
         bail!("supervisor seccomp policy drifted");

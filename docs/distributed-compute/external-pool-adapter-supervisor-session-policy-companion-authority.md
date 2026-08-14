@@ -1,7 +1,7 @@
 ---
 title: 外部矿池 Adapter supervisor/session policy companion 权威
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
 ---
@@ -62,4 +62,10 @@ V254 的 18 个 temporary absolute deny trigger必须名称及SQL body逐字保�
 
 截至 2026-08-14，V259 已完成完整 `elon-server` 测试目标编译，并通过 13 项 Windows 本地定向验收：6 项 migration/Store 合同、5 项源码边界合同和 2 项 owner/admin 进程内 Axum HTTP，`13 passed / 0 failed`，验证指纹为 `af27aff6c90e44409ee3da8d7fbc5a32dd2910766a962c2cbc1cc08ab5eda17f`。首次执行暴露并修正了源码合同把 API actor 构造错误绑定到 Service 文件的假失败；运行时 owner/admin 身份边界没有被放宽。
 
-该证据只把 V259 提升为 `implementation_partially_verified`：未运行文件升级/重开、并发或崩溃恢复、真实 TCP、生产数据库、Linux syscall/confinement fixture，也没有创建 process、IPC/session、secret delivery、DNS/TLS/network/probe/route/activation。下一批仍须先实现 authenticated child-only IPC 与真实 Linux enforcement；之后才可由 server broker 绑定 V258 target 执行 DNS/TLS 并形成 authenticated no-work observation。未完成 route/service actor、atomic activation、可信计量与结算前不得开放 market fence。
+该证据只把 V259 提升为 `implementation_partially_verified`：未运行文件升级/重开、并发或崩溃恢复、真实 TCP、生产数据库、Linux syscall/confinement fixture，也没有创建 process、IPC/session、secret delivery、DNS/TLS/network/probe/route/activation。V260/V261 后续分别实现独立 session 与 Linux enforcement，V262 又完成二者的 exec 后组合；仍须先完成 V256 ephemeral Secret delivery，之后才可由 server broker 绑定 V258 target 执行 DNS/TLS 并形成 authenticated no-work observation。未完成 route/service actor、atomic activation、可信计量与结算前不得开放 market fence。
+
+## 7. V262 实测修正与 digest 迁移
+
+2026-08-15，V262 在真实 static Rust capsule 中观察到 stdio 启动与认证 transport 需要 `F_GETFD` 和受限 `poll`。当前 server-fixed catalog 只增加 `fcntl(F_GETFD)` 的 fd3/fd5 形状，以及 `poll(nfds=3, timeout=0)` 或 `poll(nfds=1, timeout=1..5000)`；descriptor duplication、其他 poll 形状与未知 syscall 仍 `KILL_PROCESS`，真实 negative fixture 已验证。
+
+该 catalog 修正改变 supervisor/session policy digest。历史 companion/profile 继续绑定创建时的 exact digest，currentness 视图不会把它们静默升级到新策略；采用 V262 runtime 必须通过线性后继 companion 或明确重新验证形成新绑定。撤销、前驱和审计记录保持 append-only，不覆盖旧 digest，也不因为 policy id/revision 文字相同而放宽匹配。

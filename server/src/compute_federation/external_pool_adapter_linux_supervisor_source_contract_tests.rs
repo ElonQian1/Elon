@@ -6,7 +6,12 @@ const LAUNCH: &str = include_str!("external_pool_adapter_linux_supervisor/launch
 const LIFECYCLE: &str = include_str!("external_pool_adapter_linux_supervisor/lifecycle.rs");
 const SECCOMP: &str = include_str!("external_pool_adapter_linux_supervisor/seccomp.rs");
 const SESSION_BOOTSTRAP: &str =
-    include_str!("external_pool_adapter_supervisor_session/bootstrap.rs");
+    include_str!("../../external-pool-adapter-session-core/src/bootstrap.rs");
+const AUTHENTICATED_RUNTIME_TESTS: &str =
+    include_str!("external_pool_adapter_linux_supervisor/authenticated_runtime_tests.rs");
+const LINUX_KERNEL_TESTS: &str =
+    include_str!("external_pool_adapter_linux_supervisor/linux_tests.rs");
+const SESSION_FIXTURE: &str = include_str!("../external_pool_adapter_session_fixture_main.rs");
 const CAPSULE_FACADE: &str = include_str!("external_pool_adapter_entrypoint_capsule.rs");
 const COMPUTE_MOD: &str = include_str!("mod.rs");
 
@@ -130,6 +135,15 @@ fn v261_seccomp_kills_unknown_arch_syscalls_and_restricts_exec_memory() {
         "CAPSULE_FD as u32",
         "libc::AT_EMPTY_PATH as u32",
         "libc::PROT_EXEC as u32",
+        "libc::SYS_fcntl",
+        "libc::F_GETFD as u32",
+        "libc::SYS_poll",
+        "BPF_JGT",
+        "append_getfd_rule",
+        "append_bounded_poll_rule",
+        "argument_low_offset(0)",
+        "argument_low_offset(1)",
+        "argument_low_offset(2)",
         "unsupported supervisor syscall policy entry",
     ] {
         assert!(SECCOMP.contains(required));
@@ -138,6 +152,18 @@ fn v261_seccomp_kills_unknown_arch_syscalls_and_restricts_exec_memory() {
     assert!(CHILD.contains("CAPSULE_FD"));
     assert!(CHILD.contains("libc::AT_EMPTY_PATH"));
     assert!(!CHILD.contains("execve("));
+    for required in [
+        "linux_kernel_seccomp_rejects_unapproved_poll_shape",
+        "linux_kernel_seccomp_rejects_fcntl_descriptor_duplication",
+        "libc::SYS_poll as u32",
+        "libc::SYS_fcntl as u32",
+        "libc::F_DUPFD_CLOEXEC as u32",
+    ] {
+        assert!(
+            LINUX_KERNEL_TESTS.contains(required),
+            "missing V261 kernel seccomp regression {required}"
+        );
+    }
 }
 
 #[test]
@@ -158,6 +184,32 @@ fn v261_uses_pidfd_only_bounded_stderr_and_existing_v257_v260_seams() {
     assert!(CAPSULE_FACADE.contains("retained_sealed_image"));
     assert!(LAUNCH.contains("REQUIRED_CAPSULE_SEALS"));
     assert!(LAUNCH.contains("FD_CLOEXEC"));
+}
+
+#[test]
+fn v262_passes_only_fixed_root_arguments_and_reuses_fd3_fd5_session_core() {
+    for required in [
+        "set_blocking(child_ipc.as_raw_fd())?",
+        "--elon-session-policy=",
+        "--elon-session-profile=",
+        "--elon-session-target=",
+        "--elon-session-companion=",
+        "--elon-session-capsule=",
+        "--elon-session-bundle=",
+        "argv: [CString; 7]",
+        "ExternalPoolAdapterChildBootstrap::adopt_supervisor_descriptors()",
+        "host.authenticate()",
+        "open_fds(pid), BTreeSet::from([0, 1, 2, 3])",
+    ] {
+        assert!(
+            format!("{LAUNCH}\n{CHILD}\n{AUTHENTICATED_RUNTIME_TESTS}\n{SESSION_FIXTURE}")
+                .contains(required),
+            "missing V262 authenticated runtime rule {required}"
+        );
+    }
+    assert!(!LAUNCH.contains("credential"));
+    assert!(!LAUNCH.contains("config_bytes"));
+    assert!(!LAUNCH.contains("std::process::Command"));
 }
 
 #[test]

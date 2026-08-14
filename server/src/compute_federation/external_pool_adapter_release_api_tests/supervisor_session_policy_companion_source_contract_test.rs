@@ -162,7 +162,7 @@ fn supervisor_session_policy_source_freezes_fd_and_seccomp_catalog_exactly() {
         "execveat_fd4_empty_path_only",
         "mmap_prot_exec_denied",
         "mprotect_prot_exec_denied",
-        "fcntl_dup_denied",
+        "fcntl_getfd_fd3_fd5_only",
         "ioctl_denied",
     ] {
         assert!(
@@ -188,6 +188,8 @@ fn supervisor_session_policy_source_freezes_fd_and_seccomp_catalog_exactly() {
             "read",
             "write",
             "close",
+            "fcntl",
+            "poll",
             "recvmsg",
             "sendmsg",
             "exit",
@@ -221,8 +223,9 @@ fn supervisor_session_policy_source_freezes_fd_and_seccomp_catalog_exactly() {
             "execveat_fd4_empty_path_only",
             "mmap_prot_exec_denied",
             "mprotect_prot_exec_denied",
-            "fcntl_dup_denied",
+            "fcntl_getfd_fd3_fd5_only",
             "ioctl_denied",
+            "poll_nfds3_timeout0_or_nfds1_timeout1_5000_only",
         ]
     );
 }

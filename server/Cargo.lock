@@ -496,6 +496,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "elon-external-pool-adapter-session-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "hmac",
+ "libc",
+ "ring",
+ "sha2",
+ "zeroize",
+]
+
+[[package]]
 name = "elon-pc-dev-runtime"
 version = "0.1.0"
 dependencies = [
@@ -513,6 +526,7 @@ dependencies = [
  "base64",
  "chrono",
  "dotenvy",
+ "elon-external-pool-adapter-session-core",
  "elon-pc-dev-runtime",
  "futures",
  "hex",

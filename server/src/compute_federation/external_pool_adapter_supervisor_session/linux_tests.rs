@@ -166,12 +166,13 @@ where
 }
 
 fn roots(marker: u8) -> ExternalPoolAdapterSessionRoots {
+    let policy = digest(0x77);
     let profile = digest(marker);
     let target = digest(0x33);
     let companion = digest(0x44);
     let capsule = digest(0x55);
     let bundle = digest(0x66);
-    ExternalPoolAdapterSessionRoots::new(&profile, &target, &companion, &capsule, &bundle)
+    ExternalPoolAdapterSessionRoots::new(&policy, &profile, &target, &companion, &capsule, &bundle)
         .expect("construct exact V260 roots")
 }
 

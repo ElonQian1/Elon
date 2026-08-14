@@ -17,6 +17,7 @@ const BPF_W: u16 = 0x00;
 const BPF_ABS: u16 = 0x20;
 const BPF_JMP: u16 = 0x05;
 const BPF_JEQ: u16 = 0x10;
+const BPF_JGT: u16 = 0x20;
 const BPF_JSET: u16 = 0x40;
 const BPF_K: u16 = 0x00;
 const BPF_RET: u16 = 0x06;
@@ -34,7 +35,12 @@ pub(super) fn build_seccomp_program(policy: &SupervisorPolicy) -> Result<Vec<lib
         }
         syscalls.push((name.as_str(), syscall_number(name)?));
     }
-    if !seen.contains("execveat") || !seen.contains("mmap") || !seen.contains("mprotect") {
+    if !seen.contains("execveat")
+        || !seen.contains("mmap")
+        || !seen.contains("mprotect")
+        || !seen.contains("fcntl")
+        || !seen.contains("poll")
+    {
         bail!("supervisor seccomp allowlist is incomplete");
     }
 
@@ -50,6 +56,8 @@ pub(super) fn build_seccomp_program(policy: &SupervisorPolicy) -> Result<Vec<lib
         match name {
             "mmap" | "mprotect" => append_no_exec_memory_rule(&mut program, number),
             "execveat" => append_execveat_rule(&mut program, number),
+            "fcntl" => append_getfd_rule(&mut program, number),
+            "poll" => append_bounded_poll_rule(&mut program, number),
             _ => append_plain_allow(&mut program, number),
         }
     }
@@ -114,6 +122,44 @@ fn append_execveat_rule(program: &mut Vec<libc::sock_filter>, syscall: i64) {
     program.push(statement(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_NR_OFFSET));
 }
 
+fn append_getfd_rule(program: &mut Vec<libc::sock_filter>, syscall: i64) {
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, syscall as u32, 0, 11));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(1)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, libc::F_GETFD as u32, 0, 7));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(1)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 5));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(0)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 3));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(0)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 3, 2, 0));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 5, 1, 0));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_NR_OFFSET));
+}
+
+fn append_bounded_poll_rule(program: &mut Vec<libc::sock_filter>, syscall: i64) {
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, syscall as u32, 0, 17));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(1)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 13));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(1)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 3, 2, 0));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 1, 5, 0));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(2)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 7));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(2)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 6, 5));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(2)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 3));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(2)));
+    program.push(jump(BPF_JMP | BPF_JGT | BPF_K, 5_000, 1, 0));
+    program.push(jump(BPF_JMP | BPF_JGT | BPF_K, 0, 1, 0));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_NR_OFFSET));
+}
+
 const fn argument_low_offset(index: u32) -> u32 {
     SECCOMP_DATA_ARGS_OFFSET + index * 8
 }
@@ -145,6 +191,8 @@ fn syscall_number(name: &str) -> Result<i64> {
         "read" => libc::SYS_read,
         "write" => libc::SYS_write,
         "close" => libc::SYS_close,
+        "fcntl" => libc::SYS_fcntl,
+        "poll" => libc::SYS_poll,
         "recvmsg" => libc::SYS_recvmsg,
         "sendmsg" => libc::SYS_sendmsg,
         "exit" => libc::SYS_exit,

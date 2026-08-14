@@ -13,7 +13,9 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use ring::rand::{SecureRandom, SystemRandom};
 
-use crate::compute_federation::external_pool_adapter_supervisor_session::ExternalPoolAdapterChildBootstrap;
+use crate::compute_federation::external_pool_adapter_supervisor_session::{
+    ExternalPoolAdapterChildBootstrap, ExternalPoolAdapterSessionRootArguments,
+};
 
 use super::{
     cgroup::{ExternalPoolAdapterSupervisorCgroupParent, SupervisorCgroupLeaf},
@@ -49,7 +51,9 @@ pub(crate) fn launch_external_pool_adapter_supervisor_child(
     let mut cgroup = cgroup_parent.create_leaf(&policy)?;
     let scratch = SupervisorScratchRoot::create()?;
     let seccomp_program = build_seccomp_program(&policy)?;
-    let (child_ipc, seed_reader) = child_bootstrap.into_supervisor_descriptors();
+    let (child_ipc, seed_reader, root_arguments) =
+        child_bootstrap.into_supervisor_descriptors()?.into_parts();
+    set_blocking(child_ipc.as_raw_fd())?;
     let null = open_dev_null()?;
     let (stderr_reader, stderr_writer) = create_pipe(true)?;
     let (mapping_reader, mapping_writer) = create_pipe(false)?;
@@ -68,6 +72,7 @@ pub(crate) fn launch_external_pool_adapter_supervisor_child(
         child_ipc_fd: ipc_child.as_raw_fd(),
         capsule_fd: capsule_child.as_raw_fd(),
         seed_fd: seed_child.as_raw_fd(),
+        argv: child_launch_argv(&root_arguments)?,
         scratch_root: scratch.path_cstring.clone(),
         policy,
         seccomp_program,
@@ -228,6 +233,40 @@ fn duplicate_child_source(fd: i32) -> Result<OwnedFd> {
         return Err(std::io::Error::last_os_error()).context("duplicate child launch descriptor");
     }
     Ok(unsafe { OwnedFd::from_raw_fd(duplicate) })
+}
+
+fn set_blocking(fd: i32) -> Result<()> {
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags & !libc::O_NONBLOCK) } != 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("make inherited child session socket blocking");
+    }
+    Ok(())
+}
+
+fn child_launch_argv(roots: &ExternalPoolAdapterSessionRootArguments) -> Result<[CString; 7]> {
+    let [policy, profile, target, companion, capsule, bundle] = roots.values();
+    Ok([
+        CString::new("elon-external-pool-adapter")?,
+        digest_argument("policy", policy)?,
+        digest_argument("profile", profile)?,
+        digest_argument("target", target)?,
+        digest_argument("companion", companion)?,
+        digest_argument("capsule", capsule)?,
+        digest_argument("bundle", bundle)?,
+    ])
+}
+
+fn digest_argument(label: &str, digest: &str) -> Result<CString> {
+    if digest.len() != 64
+        || !digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        bail!("supervisor launch root digest is invalid");
+    }
+    CString::new(format!("--elon-session-{label}={digest}"))
+        .context("supervisor launch root argument contains NUL")
 }
 
 fn write_identity_maps(pid: libc::pid_t) -> Result<()> {

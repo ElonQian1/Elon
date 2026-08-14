@@ -15,7 +15,8 @@ use super::{
     ExternalPoolAdapterSupervisorCgroupParent,
 };
 use crate::compute_federation::external_pool_adapter_supervisor_session::{
-    prepare_external_pool_adapter_supervisor_session, ExternalPoolAdapterSessionRoots,
+    external_pool_adapter_session_roots, prepare_external_pool_adapter_supervisor_session,
+    ExternalPoolAdapterSessionRoots,
 };
 
 const REQUIRED_CAPSULE_SEALS: libc::c_int =
@@ -29,6 +30,13 @@ type RlimitResource = libc::__rlimit_resource_t;
 type RlimitResource = libc::c_int;
 
 struct TestCapsule(File);
+
+enum TestCapsuleBehavior {
+    BlockingMarker,
+    NetworkProbe,
+    DisallowedPollShape,
+    DisallowedFcntlDup,
+}
 
 impl ExternalPoolAdapterSupervisorCapsule for TestCapsule {
     fn retained_sealed_image(&self) -> &File {
@@ -52,7 +60,7 @@ fn rejects_non_cgroup_parent_before_clone() {
 fn linux_kernel_enforces_clone3_cgroup_namespaces_root_fd_and_limits() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_capsule(minimal_capsule(false));
+    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::BlockingMarker));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V260 descriptors for V261 launch");
     let (host, child_bootstrap) = prepared.split();
@@ -107,7 +115,7 @@ fn linux_kernel_enforces_clone3_cgroup_namespaces_root_fd_and_limits() {
 fn linux_kernel_seccomp_kills_network_syscall() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_capsule(minimal_capsule(true));
+    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::NetworkProbe));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V260 descriptors for seccomp fixture");
     let (_host, child_bootstrap) = prepared.split();
@@ -124,10 +132,48 @@ fn linux_kernel_seccomp_kills_network_syscall() {
 
 #[test]
 #[ignore = "requires an explicitly delegated cgroup v2 parent and root execution"]
+fn linux_kernel_seccomp_rejects_unapproved_poll_shape() {
+    let parent = delegated_cgroup_parent(&delegated_cgroup_parent_path());
+    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::DisallowedPollShape));
+    let prepared = prepare_external_pool_adapter_supervisor_session(roots())
+        .expect("prepare disallowed poll fixture");
+    let (_host, child_bootstrap) = prepared.split();
+    let mut child =
+        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
+            .expect("launch disallowed poll fixture");
+    let exit = child
+        .wait(Duration::from_secs(2))
+        .expect("wait for disallowed poll termination")
+        .expect("disallowed poll fixture terminated");
+    assert_eq!(exit.exit_code, None);
+    assert_eq!(exit.signal, Some(libc::SIGSYS));
+}
+
+#[test]
+#[ignore = "requires an explicitly delegated cgroup v2 parent and root execution"]
+fn linux_kernel_seccomp_rejects_fcntl_descriptor_duplication() {
+    let parent = delegated_cgroup_parent(&delegated_cgroup_parent_path());
+    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::DisallowedFcntlDup));
+    let prepared = prepare_external_pool_adapter_supervisor_session(roots())
+        .expect("prepare disallowed fcntl fixture");
+    let (_host, child_bootstrap) = prepared.split();
+    let mut child =
+        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
+            .expect("launch disallowed fcntl fixture");
+    let exit = child
+        .wait(Duration::from_secs(2))
+        .expect("wait for disallowed fcntl termination")
+        .expect("disallowed fcntl fixture terminated");
+    assert_eq!(exit.exit_code, None);
+    assert_eq!(exit.signal, Some(libc::SIGSYS));
+}
+
+#[test]
+#[ignore = "requires an explicitly delegated cgroup v2 parent and root execution"]
 fn linux_kernel_pidfd_termination_reaps_and_cleans() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_capsule(minimal_capsule(false));
+    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::BlockingMarker));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V260 descriptors for termination fixture");
     let (host, child_bootstrap) = prepared.split();
@@ -183,7 +229,7 @@ fn sealed_capsule(bytes: Vec<u8>) -> TestCapsule {
 }
 
 fn roots() -> ExternalPoolAdapterSessionRoots {
-    ExternalPoolAdapterSessionRoots::new(
+    external_pool_adapter_session_roots(
         &digest(0x11),
         &digest(0x22),
         &digest(0x33),
@@ -322,16 +368,17 @@ fn read_trimmed(path: &Path) -> String {
         .to_string()
 }
 
-fn minimal_capsule(network_probe: bool) -> Vec<u8> {
+fn minimal_capsule(behavior: TestCapsuleBehavior) -> Vec<u8> {
     const ELF_HEADER_BYTES: usize = 64;
     const PROGRAM_HEADER_BYTES: usize = 56;
     const CODE_OFFSET: usize = 4096;
     const LOAD_ADDRESS: u64 = 0x0040_0000;
 
-    let code = if network_probe {
-        network_probe_code()
-    } else {
-        blocking_marker_code()
+    let code = match behavior {
+        TestCapsuleBehavior::BlockingMarker => blocking_marker_code(),
+        TestCapsuleBehavior::NetworkProbe => network_probe_code(),
+        TestCapsuleBehavior::DisallowedPollShape => disallowed_poll_shape_code(),
+        TestCapsuleBehavior::DisallowedFcntlDup => disallowed_fcntl_dup_code(),
     };
     let mut image = vec![0_u8; CODE_OFFSET + code.len()];
     image[..4].copy_from_slice(b"\x7fELF");
@@ -405,6 +452,38 @@ fn network_probe_code() -> Vec<u8> {
     code.extend_from_slice(&[0x31, 0xd2]);
     emit_syscall(&mut code);
     emit_exit(&mut code, 112);
+    let failure = code.len();
+    emit_exit(&mut code, 111);
+    patch_rel32(&mut code, seed_failure, failure);
+    code
+}
+
+fn disallowed_poll_shape_code() -> Vec<u8> {
+    let mut code = seed_read_prefix();
+    let seed_failure = emit_jne(&mut code);
+    emit_close_seed(&mut code);
+    emit_mov_eax(&mut code, libc::SYS_poll as u32);
+    emit_mov_edi(&mut code, 0);
+    emit_mov_esi(&mut code, 2);
+    emit_mov_edx(&mut code, 0);
+    emit_syscall(&mut code);
+    emit_exit(&mut code, 113);
+    let failure = code.len();
+    emit_exit(&mut code, 111);
+    patch_rel32(&mut code, seed_failure, failure);
+    code
+}
+
+fn disallowed_fcntl_dup_code() -> Vec<u8> {
+    let mut code = seed_read_prefix();
+    let seed_failure = emit_jne(&mut code);
+    emit_close_seed(&mut code);
+    emit_mov_eax(&mut code, libc::SYS_fcntl as u32);
+    emit_mov_edi(&mut code, 3);
+    emit_mov_esi(&mut code, libc::F_DUPFD_CLOEXEC as u32);
+    emit_mov_edx(&mut code, 10);
+    emit_syscall(&mut code);
+    emit_exit(&mut code, 114);
     let failure = code.len();
     emit_exit(&mut code, 111);
     patch_rel32(&mut code, seed_failure, failure);

@@ -23,7 +23,7 @@ const FRAME_IO_TIMEOUT: Duration = Duration::from_millis(5_000);
 const FRAME_MAC_LABEL: &[u8] = b"frame\0";
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(in crate::compute_federation) enum ExternalPoolAdapterSessionFrameKind {
+pub enum ExternalPoolAdapterSessionFrameKind {
     Control = 1,
     Config = 2,
     Credential = 3,
@@ -48,22 +48,22 @@ impl ExternalPoolAdapterSessionFrameKind {
     }
 }
 
-pub(in crate::compute_federation) struct AuthenticatedExternalPoolAdapterSessionFrame {
+pub struct AuthenticatedExternalPoolAdapterSessionFrame {
     kind: ExternalPoolAdapterSessionFrameKind,
     payload: Zeroizing<Vec<u8>>,
 }
 
 impl AuthenticatedExternalPoolAdapterSessionFrame {
-    pub(in crate::compute_federation) fn kind(&self) -> ExternalPoolAdapterSessionFrameKind {
+    pub fn kind(&self) -> ExternalPoolAdapterSessionFrameKind {
         self.kind
     }
 
-    pub(in crate::compute_federation) fn payload(&self) -> &[u8] {
+    pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 }
 
-pub(in crate::compute_federation) struct AuthenticatedExternalPoolAdapterSession {
+pub struct AuthenticatedExternalPoolAdapterSession {
     socket: OwnedFd,
     send_key: Secret32,
     receive_key: Secret32,
@@ -73,6 +73,23 @@ pub(in crate::compute_federation) struct AuthenticatedExternalPoolAdapterSession
     next_send_sequence: u64,
     next_receive_sequence: u64,
     active: bool,
+    terminal_strategy: SocketTerminalStrategy,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum SocketTerminalStrategy {
+    ShutdownAndClose,
+    CloseOnly,
+}
+
+impl SocketTerminalStrategy {
+    pub(crate) fn terminate(self, fd: RawFd) {
+        if matches!(self, Self::ShutdownAndClose) {
+            unsafe {
+                libc::shutdown(fd, libc::SHUT_RDWR);
+            }
+        }
+    }
 }
 
 impl AuthenticatedExternalPoolAdapterSession {
@@ -83,6 +100,7 @@ impl AuthenticatedExternalPoolAdapterSession {
         send_direction: u8,
         receive_direction: u8,
         transcript_digest: [u8; 32],
+        terminal_strategy: SocketTerminalStrategy,
     ) -> Self {
         Self {
             socket,
@@ -94,10 +112,11 @@ impl AuthenticatedExternalPoolAdapterSession {
             next_send_sequence: 1,
             next_receive_sequence: 1,
             active: true,
+            terminal_strategy,
         }
     }
 
-    pub(in crate::compute_federation) fn send(
+    pub fn send(
         &mut self,
         kind: ExternalPoolAdapterSessionFrameKind,
         payload: &[u8],
@@ -109,9 +128,7 @@ impl AuthenticatedExternalPoolAdapterSession {
         Ok(())
     }
 
-    pub(in crate::compute_federation) fn receive(
-        &mut self,
-    ) -> Result<AuthenticatedExternalPoolAdapterSessionFrame> {
+    pub fn receive(&mut self) -> Result<AuthenticatedExternalPoolAdapterSessionFrame> {
         let result = self.receive_inner();
         match result {
             Ok(frame) => Ok(frame),
@@ -207,19 +224,12 @@ impl AuthenticatedExternalPoolAdapterSession {
         self.active = false;
         self.send_key.zeroize_now();
         self.receive_key.zeroize_now();
-        unsafe {
-            libc::shutdown(self.socket.as_raw_fd(), libc::SHUT_RDWR);
-        }
+        self.terminal_strategy.terminate(self.socket.as_raw_fd());
         Err(error)
     }
 
-    #[cfg(test)]
-    pub(super) fn encode_outgoing_for_test(
-        &self,
-        kind: u8,
-        sequence: u64,
-        payload: &[u8],
-    ) -> Vec<u8> {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn encode_outgoing_for_test(&self, kind: u8, sequence: u64, payload: &[u8]) -> Vec<u8> {
         encode_frame(
             &self.send_key,
             self.send_direction,
@@ -232,13 +242,8 @@ impl AuthenticatedExternalPoolAdapterSession {
         .to_vec()
     }
 
-    #[cfg(test)]
-    pub(super) fn encode_incoming_for_test(
-        &self,
-        kind: u8,
-        sequence: u64,
-        payload: &[u8],
-    ) -> Vec<u8> {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn encode_incoming_for_test(&self, kind: u8, sequence: u64, payload: &[u8]) -> Vec<u8> {
         encode_frame(
             &self.receive_key,
             self.receive_direction,
@@ -251,13 +256,13 @@ impl AuthenticatedExternalPoolAdapterSession {
         .to_vec()
     }
 
-    #[cfg(test)]
-    pub(super) fn send_raw_for_test(&self, packet: &[u8]) -> Result<()> {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn send_raw_for_test(&self, packet: &[u8]) -> Result<()> {
         send_packet(self.socket.as_raw_fd(), packet, FRAME_IO_TIMEOUT)
     }
 
-    #[cfg(test)]
-    pub(super) fn socket_fd_for_test(&self) -> RawFd {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn socket_fd_for_test(&self) -> RawFd {
         self.socket.as_raw_fd()
     }
 }
@@ -266,9 +271,7 @@ impl Drop for AuthenticatedExternalPoolAdapterSession {
     fn drop(&mut self) {
         self.send_key.zeroize_now();
         self.receive_key.zeroize_now();
-        unsafe {
-            libc::shutdown(self.socket.as_raw_fd(), libc::SHUT_RDWR);
-        }
+        self.terminal_strategy.terminate(self.socket.as_raw_fd());
     }
 }
 
@@ -317,8 +320,14 @@ pub(super) fn create_seqpacket_pair() -> Result<(OwnedFd, OwnedFd)> {
 pub(super) fn send_packet(fd: RawFd, packet: &[u8], timeout: Duration) -> Result<()> {
     let deadline = Instant::now() + timeout;
     loop {
-        let written =
-            unsafe { libc::send(fd, packet.as_ptr().cast(), packet.len(), libc::MSG_NOSIGNAL) };
+        let mut payload = libc::iovec {
+            iov_base: packet.as_ptr().cast_mut().cast(),
+            iov_len: packet.len(),
+        };
+        let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
+        message.msg_iov = &mut payload;
+        message.msg_iovlen = 1;
+        let written = unsafe { libc::sendmsg(fd, &message, libc::MSG_NOSIGNAL) };
         if written == packet.len() as isize {
             return Ok(());
         }
@@ -342,14 +351,14 @@ pub(super) fn receive_packet(
     let deadline = Instant::now() + timeout;
     let mut packet = Zeroizing::new(vec![0_u8; maximum_bytes]);
     loop {
-        let received = unsafe {
-            libc::recv(
-                fd,
-                packet.as_mut_ptr().cast(),
-                maximum_bytes,
-                libc::MSG_TRUNC,
-            )
+        let mut payload = libc::iovec {
+            iov_base: packet.as_mut_ptr().cast(),
+            iov_len: maximum_bytes,
         };
+        let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
+        message.msg_iov = &mut payload;
+        message.msg_iovlen = 1;
+        let received = unsafe { libc::recvmsg(fd, &mut message, libc::MSG_TRUNC) };
         if received >= 0 {
             let received = received as usize;
             if received > maximum_bytes {
@@ -397,5 +406,5 @@ fn wait_ready(fd: RawFd, events: libc::c_short, deadline: Instant) -> Result<()>
     }
 }
 
-#[cfg(test)]
-pub(super) const TEST_MAX_PACKET_BYTES: usize = MAX_PACKET_BYTES;
+#[cfg(any(test, feature = "test-support"))]
+pub const TEST_MAX_PACKET_BYTES: usize = MAX_PACKET_BYTES;

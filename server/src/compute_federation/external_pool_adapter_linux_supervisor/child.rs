@@ -52,6 +52,7 @@ pub(super) struct ChildLaunchPlan {
     pub(super) child_ipc_fd: i32,
     pub(super) capsule_fd: i32,
     pub(super) seed_fd: i32,
+    pub(super) argv: [CString; 7],
     pub(super) scratch_root: CString,
     pub(super) policy: SupervisorPolicy,
     pub(super) seccomp_program: Vec<libc::sock_filter>,
@@ -74,8 +75,16 @@ impl ChildLaunchPlan {
         }
 
         let empty_path = c"";
-        let argv0 = c"elon-external-pool-adapter";
-        let argv = [argv0.as_ptr(), std::ptr::null()];
+        let argv = [
+            self.argv[0].as_ptr(),
+            self.argv[1].as_ptr(),
+            self.argv[2].as_ptr(),
+            self.argv[3].as_ptr(),
+            self.argv[4].as_ptr(),
+            self.argv[5].as_ptr(),
+            self.argv[6].as_ptr(),
+            std::ptr::null(),
+        ];
         let environment = [std::ptr::null::<libc::c_char>()];
         libc::syscall(
             libc::SYS_execveat,

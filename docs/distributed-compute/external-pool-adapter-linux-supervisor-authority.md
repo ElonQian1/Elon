@@ -1,7 +1,7 @@
 ---
 title: 外部矿池 Adapter Linux supervisor enforcement core 权威
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
 verification_status: verified_source_cross_build_and_linux_kernel
@@ -80,4 +80,4 @@ stderr 生命周期上限为 1 MiB，超过上限会终止 child；公开错误�
 
 Windows source-contract、Linux-musl product/test 完整链接和 WSL2 Ubuntu 真实 kernel fixture 均已通过。动态矩阵覆盖 clone3/cgroup/namespaces/private root、exact fd、rlimit/capability/no-new-privileges/seccomp、pidfd terminate/wait，以及 cgroup/scratch cleanup。详细命令和组合证据见对应 acceptance。
 
-下一硬门是把 V260 mutual authenticated session 真正运行在 V261 child lifecycle 内，并在不扩大权限的前提下接入 V256 ephemeral secret delivery；之后才可使用 V258 target 实现 broker TLS 和 upstream no-work probe。完成这些门之前，不得声明 production Adapter、真实外部矿池连接或 Provider 可用。
+V261 当时的下一硬门“把 V260 mutual authenticated session 运行在 child lifecycle 内”已由 V262 完成，并在真实 static Rust capsule 中补充参数受限的 `F_GETFD`/`poll` seccomp 形状；V261 本批历史验收结论不因此被重写。当前下一硬门是在不扩大权限的前提下接入 V256 ephemeral Secret delivery；之后才可使用 V258 target 实现 broker TLS 和 upstream no-work probe。完成这些门之前，不得声明 production Adapter、真实外部矿池连接或 Provider 可用。
