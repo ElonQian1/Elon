@@ -53,6 +53,19 @@ internal object ChatGptWebConversationIndex {
         date: LocalDate,
     ): List<ChatGptWebConversation> = values.filter { date.toString() in it.activityDates }
 
+    fun unassignedExcluding(
+        values: List<ChatGptWebConversation>,
+        excluded: List<ChatGptWebConversation>,
+    ): List<ChatGptWebConversation> {
+        val excludedIdentities = excluded.mapTo(mutableSetOf(), ::identityOf)
+        return values.filter { conversation ->
+            conversation.projectId == null && identityOf(conversation) !in excludedIdentities
+        }
+    }
+
+    fun identityOf(value: ChatGptWebConversation): String =
+        ChatGptWebConversationPath.identity(value.path) ?: value.id
+
     fun merge(
         previous: List<ChatGptWebConversation>,
         observed: List<ChatGptWebConversation>,
@@ -107,4 +120,5 @@ internal object ChatGptWebConversationIndex {
     private fun metadataLabel(value: String?): String? = value
         ?.trim()
         ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+
 }

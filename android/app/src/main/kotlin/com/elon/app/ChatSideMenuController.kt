@@ -69,6 +69,7 @@ internal class ChatSideMenuController(
     private lateinit var aiMenuView: ChatAiSideMenuView
     private lateinit var projectMenuView: ChatProjectSideMenuView
     private var isSetup = false
+    internal val webChatControl = ChatSideMenuWebChatControl({ sideMenus.webChat }) { if (!isOpen) open() }
     private var isAnimating = false
     private var touchTracking = false
     private var consumingGesture = false
@@ -89,9 +90,7 @@ internal class ChatSideMenuController(
     private var handleToggleKnobColor = Color.WHITE
     private var handleToggleColorAnimator: ValueAnimator? = null
 
-    val isOpen: Boolean
-        get() = isSetup && overlay.visibility == View.VISIBLE
-
+    val isOpen: Boolean get() = isSetup && overlay.visibility == View.VISIBLE
     fun setup() {
         if (isSetup) return
         isSetup = true
@@ -191,6 +190,7 @@ internal class ChatSideMenuController(
         if (!isSetup || overlay.visibility != View.VISIBLE) return
         applyContentMode()
     }
+
     private fun handleSideMenuHandleTouch(view: View, event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {

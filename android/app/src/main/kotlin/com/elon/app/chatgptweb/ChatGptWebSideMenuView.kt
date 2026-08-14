@@ -33,14 +33,12 @@ internal class ChatGptWebSideMenuView(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
 ) : FrameLayout(activity) {
-    private enum class Tab { DATE, PROJECTS }
-
     private val root = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(22), dp(36), dp(18), dp(18))
         setBackgroundColor(Color.parseColor("#0D0D0D"))
     }
-    private var selectedTab = Tab.DATE
+    private var selectedTab = ChatGptWebSideMenuTab.DATE
     private var selectedDate = LocalDate.now()
     private var searchVisible = false
     private var searchQuery = ""
@@ -53,7 +51,7 @@ internal class ChatGptWebSideMenuView(
         root.removeAllViews()
         root.addView(topTabs())
         if (searchVisible) root.addView(searchField())
-        if (selectedTab == Tab.DATE && searchQuery.isBlank()) {
+        if (selectedTab == ChatGptWebSideMenuTab.DATE && searchQuery.isBlank()) {
             root.addView(createSocialSidebarDateStrip(
                 context = activity,
                 selectedDate = selectedDate,
@@ -80,24 +78,39 @@ internal class ChatGptWebSideMenuView(
         refreshIndex()
     }
 
+    fun state() = ChatGptWebSideMenuState(selectedTab, selectedDate)
+
+    fun selectTab(tab: ChatGptWebSideMenuTab) {
+        if (selectedTab == tab) return
+        selectedTab = tab
+        render()
+    }
+
+    fun selectDate(date: LocalDate) {
+        if (selectedTab == ChatGptWebSideMenuTab.DATE && selectedDate == date) return
+        selectedTab = ChatGptWebSideMenuTab.DATE
+        selectedDate = date
+        render()
+    }
+
     private fun topTabs(): LinearLayout = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48))
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
         addView(tabText(
             "${selectedDate.monthValue}月${selectedDate.dayOfMonth}号",
-            selectedTab == Tab.DATE,
+            selectedTab == ChatGptWebSideMenuTab.DATE,
             ChatGptNativeNavigationSelector.DATE_TAB,
         ) {
-            selectedTab = Tab.DATE
+            selectedTab = ChatGptWebSideMenuTab.DATE
             render()
         }, LinearLayout.LayoutParams(dp(92), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(tabText(
             activity.getString(R.string.chatgpt_side_menu_projects),
-            selectedTab == Tab.PROJECTS,
+            selectedTab == ChatGptWebSideMenuTab.PROJECTS,
             ChatGptNativeNavigationSelector.PROJECTS_TAB,
         ) {
-            selectedTab = Tab.PROJECTS
+            selectedTab = ChatGptWebSideMenuTab.PROJECTS
             render()
         }, LinearLayout.LayoutParams(dp(58), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
@@ -178,7 +191,8 @@ internal class ChatGptWebSideMenuView(
         setTextColor(Color.parseColor("#80BEBEBA"))
         val state = index()
         val activeCount = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate).size
-        val countLabel = "$activeCount 个活跃 · 共 ${state.conversations.size} 个会话"
+        val unassignedCount = state.conversations.count { it.projectId == null }
+        val countLabel = "$activeCount 个活跃 · $unassignedCount 个未归项目 · 共 ${state.conversations.size} 个会话"
         text = when (state.collection.officialLoadState) {
             ChatGptWebConversationCollection.LOAD_LOADING -> "$countLabel · 正在刷新"
             ChatGptWebConversationCollection.LOAD_FAILED -> "$countLabel · 显示本机缓存"
@@ -192,37 +206,53 @@ internal class ChatGptWebSideMenuView(
         overScrollMode = View.OVER_SCROLL_NEVER
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            if (selectedTab == Tab.PROJECTS) renderProjects(this) else renderConversations(this)
+            if (selectedTab == ChatGptWebSideMenuTab.PROJECTS) renderProjects(this) else renderConversations(this)
         })
     }
 
     private fun renderConversations(container: LinearLayout) {
         val state = index()
         val query = searchQuery.trim()
-        val values = if (query.isBlank()) {
-            ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)
-        } else {
-            state.conversations.filter { conversation ->
-                conversation.title.contains(query, ignoreCase = true) ||
-                    conversation.projectTitle.orEmpty().contains(query, ignoreCase = true)
+        if (query.isBlank()) {
+            val active = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)
+            val unassigned = ChatGptWebConversationIndex.unassignedExcluding(state.conversations, active)
+            if (active.isEmpty() && unassigned.isEmpty()) {
+                container.addView(emptyState(activity.getString(R.string.chatgpt_side_menu_empty_date)))
+                return
             }
-        }
-        if (values.isEmpty()) {
-            container.addView(emptyState(if (query.isBlank()) {
-                activity.getString(R.string.chatgpt_side_menu_empty_date)
-            } else {
-                activity.getString(R.string.chatgpt_side_menu_no_results)
-            }))
+            renderConversationSection(
+                container,
+                activity.getString(R.string.chatgpt_side_menu_daily_active),
+                active,
+            )
+            renderConversationSection(
+                container,
+                activity.getString(R.string.chatgpt_side_menu_unassigned),
+                unassigned,
+            )
             return
         }
-        if (query.isNotBlank()) {
-            ChatGptWebConversationIndex.sections(values).forEach { section ->
-                container.addView(sectionLabel(section.label))
-                section.conversations.forEach { container.addView(conversationRow(it)) }
-            }
-        } else {
-            values.forEach { container.addView(conversationRow(it)) }
+        val values = state.conversations.filter { conversation ->
+            conversation.title.contains(query, ignoreCase = true) ||
+                conversation.projectTitle.orEmpty().contains(query, ignoreCase = true)
         }
+        if (values.isEmpty()) {
+            container.addView(emptyState(activity.getString(R.string.chatgpt_side_menu_no_results)))
+            return
+        }
+        ChatGptWebConversationIndex.sections(values).forEach { section ->
+            renderConversationSection(container, section.label, section.conversations)
+        }
+    }
+
+    private fun renderConversationSection(
+        container: LinearLayout,
+        label: String,
+        conversations: List<ChatGptWebConversation>,
+    ) {
+        if (conversations.isEmpty()) return
+        container.addView(sectionLabel(label))
+        conversations.forEach { container.addView(conversationRow(it)) }
     }
 
     private fun renderProjects(container: LinearLayout) {

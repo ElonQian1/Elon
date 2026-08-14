@@ -73,7 +73,7 @@ internal class SocialAiChatModeController(
 
     fun selectChatProvider(id: WebChatProviderId): Boolean {
         val provider = WebChatProviderRegistry.get(id)
-        if (!provider.available) return false
+        if (!provider.selectable) return false
         providerId = id
         interactionMode = SocialAiInteractionMode.CHAT
         persist()
@@ -93,7 +93,7 @@ internal class SocialAiChatModeController(
             SocialAiInteractionMode.WORK -> activateWorkMode()
             SocialAiInteractionMode.CHAT -> {
                 val provider = WebChatProviderRegistry.get(providerId)
-                if (provider.available) {
+                if (provider.selectable) {
                     activateChatProvider(provider)
                 } else {
                     interactionMode = SocialAiInteractionMode.WORK

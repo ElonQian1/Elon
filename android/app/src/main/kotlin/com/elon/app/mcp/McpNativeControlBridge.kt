@@ -202,6 +202,8 @@ internal object McpNativeControlBridge {
         "open_web_chat_conversation",
         "open_web_chat_project",
         "refresh_web_chat_conversations",
+        "get_web_chat_navigation",
+        "set_web_chat_sidebar",
         "open_chat_side_menu",
         "close_chat_side_menu" -> MAIN_SURFACE
         else -> null

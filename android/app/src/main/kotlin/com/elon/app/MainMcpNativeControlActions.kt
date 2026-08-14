@@ -1,12 +1,14 @@
 package com.elon.app
 
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.chatgptweb.ChatGptWebSideMenuTab
 import com.elon.app.mcp.McpConversationSeed
 import com.elon.app.mcp.applyMcpConversationSeed
 import com.elon.app.mcp.mcpExecutionMode
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.time.LocalDate
 
 internal class MainMcpNativeControlActions(
     private val binding: ActivityMainBinding,
@@ -55,6 +57,7 @@ internal class MainMcpNativeControlActions(
             .put("projects", projectsJson())
             .put("active_conversation", conversationJson(conversation, activeConversationIndex(), lastMessage))
             .put("social_chat", socialChatJson())
+            .put("web_chat_sidebar", webChatSidebarJson())
             .put(
                 "chatgpt_web_acceptance_attachment",
                 chatGptAttachmentFixtureActions?.stateJson() ?: JSONObject.NULL,
@@ -145,6 +148,26 @@ internal class MainMcpNativeControlActions(
             "refresh_web_chat_conversations" -> {
                 if (socialAiChatFeature()?.refreshWebChatConversationIndex() != true) {
                     return errorJson(action, "web_chat_not_ready")
+                }
+                uiState()
+            }
+            "get_web_chat_navigation" -> webChatNavigationJson(args)
+            "set_web_chat_sidebar" -> {
+                val tab = ChatGptWebSideMenuTab.parse(args.optString("section"))
+                    ?: return errorJson(action, "unsupported_web_chat_sidebar_section")
+                val requestedDate = args.optString("date").trim()
+                val selected = if (requestedDate.isNotBlank()) {
+                    if (tab != ChatGptWebSideMenuTab.DATE) {
+                        return errorJson(action, "date_requires_date_section")
+                    }
+                    val date = runCatching { LocalDate.parse(requestedDate) }.getOrNull()
+                        ?: return errorJson(action, "invalid_web_chat_sidebar_date")
+                    chatSideMenuControl?.selectWebChatDate(date)
+                } else {
+                    chatSideMenuControl?.selectWebChatTab(tab)
+                }
+                if (selected != true) {
+                    return errorJson(action, "web_chat_sidebar_unavailable")
                 }
                 uiState()
             }
@@ -551,6 +574,42 @@ internal class MainMcpNativeControlActions(
                     )
                 }
             })
+    }
+
+    private fun webChatSidebarJson(): Any {
+        val state = chatSideMenuControl?.webChatState() ?: return JSONObject.NULL
+        return JSONObject()
+            .put("schema", "elon.web_chat.native_sidebar.v1")
+            .put("selected_section", state.tab.wireValue)
+            .put("selected_date", state.date.toString())
+            .put("open", chatSideMenuControl.isOpen())
+    }
+
+    private fun webChatNavigationJson(args: JSONObject): JSONObject {
+        val feature = socialAiChatFeature()
+            ?: return errorJson(args.optString("action"), "social_ai_feature_unavailable")
+        if (!feature.isChatModeActive()) {
+            return errorJson(args.optString("action"), "web_chat_mode_inactive")
+        }
+        if (feature.providerId() != WebChatProviderId.CHATGPT_WEB) {
+            return errorJson(args.optString("action"), "web_chat_provider_navigation_unavailable")
+        }
+        val query = args.optString("query").trim()
+        val date = args.optString("date").trim().takeIf(String::isNotBlank)?.let { value ->
+            runCatching { LocalDate.parse(value) }.getOrNull()
+                ?: return errorJson(args.optString("action"), "invalid_web_chat_navigation_date")
+        }
+        val offset = args.optInt("offset", 0).coerceAtLeast(0)
+        val limit = args.optInt("limit", 20).coerceIn(1, WebChatNavigationJson.MAX_PAGE_SIZE)
+        val state = feature.webChatConversationIndex()
+        return WebChatNavigationJson.page(
+            providerId = feature.providerId(),
+            state = state,
+            query = query,
+            date = date,
+            offset = offset,
+            limit = limit,
+        )
     }
 
     private fun messagesJson(messages: List<ChatMessage>): JSONArray {

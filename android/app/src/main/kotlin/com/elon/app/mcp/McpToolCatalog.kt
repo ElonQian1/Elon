@@ -214,6 +214,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("project_path", stringProperty("Official ChatGPT project path such as /g/g-p-example/project."))
                         .put("view_mode", stringProperty("ChatGPT view mode: native, official, or login."))
                         .put("section", stringProperty("ChatGPT composer section model or tools; also filters chatgpt_get_navigation."))
+                        .put("date", stringProperty("Optional ISO date for the native web chat sidebar or navigation query."))
                         .put("offset", intProperty("Zero-based page offset for ChatGPT control and conversation queries."))
                         .put("limit", intProperty("Page size for ChatGPT control and conversation queries."))
                         .put("message_cursor", stringProperty("Stable cursor returned by chatgpt_get_context for the next context page."))

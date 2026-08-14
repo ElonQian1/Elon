@@ -140,6 +140,8 @@
     <string name="chatgpt_side_menu_projects">项目</string>
     <string name="chatgpt_side_menu_search_hint">搜索会话或项目</string>
     <string name="chatgpt_side_menu_empty_date">这一天暂无 ChatGPT 会话活动</string>
+    <string name="chatgpt_side_menu_daily_active">当日活跃</string>
+    <string name="chatgpt_side_menu_unassigned">未归入项目</string>
     <string name="chatgpt_side_menu_no_results">没有匹配的 ChatGPT 会话</string>
     <string name="chatgpt_side_menu_empty_projects">官网暂未返回项目</string>
     <string name="chatgpt_side_menu_settings">设置</string>

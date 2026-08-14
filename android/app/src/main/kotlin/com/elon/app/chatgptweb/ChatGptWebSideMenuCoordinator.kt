@@ -4,6 +4,23 @@ import android.graphics.drawable.Drawable
 import android.view.View
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import java.time.LocalDate
+
+internal enum class ChatGptWebSideMenuTab(val wireValue: String) {
+    DATE("date"),
+    PROJECTS("projects");
+
+    companion object {
+        fun parse(value: String): ChatGptWebSideMenuTab? = entries.firstOrNull {
+            it.wireValue == value.trim().lowercase()
+        }
+    }
+}
+
+internal data class ChatGptWebSideMenuState(
+    val tab: ChatGptWebSideMenuTab,
+    val date: LocalDate,
+)
 
 internal class ChatGptWebSideMenuCoordinator(
     private val activity: AppCompatActivity,
@@ -54,6 +71,21 @@ internal class ChatGptWebSideMenuCoordinator(
 
     fun onIndexChanged() {
         if (::view.isInitialized && view.visibility == View.VISIBLE) view.render()
+    }
+
+    fun state(): ChatGptWebSideMenuState? =
+        if (::view.isInitialized) view.state() else null
+
+    fun selectTab(tab: ChatGptWebSideMenuTab): Boolean {
+        if (!active() || !::view.isInitialized) return false
+        view.selectTab(tab)
+        return true
+    }
+
+    fun selectDate(date: LocalDate): Boolean {
+        if (!active() || !::view.isInitialized) return false
+        view.selectDate(date)
+        return true
     }
 
     fun hide() {

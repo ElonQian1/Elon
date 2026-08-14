@@ -3,6 +3,7 @@ package com.elon.app
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 
 internal class MainSocialAiChatFeature(
     private val activity: AppCompatActivity,
@@ -89,7 +90,12 @@ internal class MainSocialAiChatFeature(
 
     fun webChatConversationPath(): String? = webChatController.currentConversationPath()
 
-    fun webChatConversationIndex() = webChatController.conversationIndex()
+    fun webChatConversationIndex(): ChatGptWebConversationIndexState =
+        if (providerId() == WebChatProviderId.CHATGPT_WEB) {
+            webChatController.conversationIndex()
+        } else {
+            ChatGptWebConversationIndexState()
+        }
 
     fun createWebChatSideMenuCoordinator(): com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator {
         lateinit var coordinator: com.elon.app.chatgptweb.ChatGptWebSideMenuCoordinator
@@ -108,19 +114,29 @@ internal class MainSocialAiChatFeature(
     }
 
     fun refreshWebChatConversationIndex(): Boolean =
-        isChatModeActive() && webChatController.requestConversationIndex()
+        isChatModeActive() &&
+            providerId() == WebChatProviderId.CHATGPT_WEB &&
+            webChatController.requestConversationIndex()
 
     fun startNewWebChatConversation(): Boolean {
-        if (!isChatModeActive() || webChatState() != "ready") return false
+        if (
+            !isChatModeActive() ||
+            providerId() != WebChatProviderId.CHATGPT_WEB ||
+            webChatState() != "ready"
+        ) return false
         webChatController.startNewConversation()
         return true
     }
 
     fun openWebChatConversation(path: String): Boolean =
-        isChatModeActive() && webChatController.openConversation(path)
+        isChatModeActive() &&
+            providerId() == WebChatProviderId.CHATGPT_WEB &&
+            webChatController.openConversation(path)
 
     fun openWebChatProject(path: String): Boolean =
-        isChatModeActive() && webChatController.openProject(path)
+        isChatModeActive() &&
+            providerId() == WebChatProviderId.CHATGPT_WEB &&
+            webChatController.openProject(path)
 
     fun discardWebChatAcceptanceAttachmentSend(): Boolean =
         webChatController.discardAcceptanceAttachmentSend()
