@@ -6,11 +6,17 @@ const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 12;
 const MAX_MESSAGE_CHARS: usize = 40_000;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 1;
+const ADAPTER_VERSION: u32 = 6;
 
 pub fn initialization_script() -> String {
+    let answer_candidate_policy =
+        include_str!("../../../../android/app/src/main/assets/google_web_answer_candidate_policy.js");
     let message_extractor =
         include_str!("../../../../android/app/src/main/assets/google_web_message_extractor.js");
+    let composer_bridge =
+        include_str!("../../../../android/app/src/main/assets/google_web_composer_bridge.js");
+    let send_policy =
+        include_str!("../../../../android/app/src/main/assets/google_web_send_policy.js");
     let adapter = include_str!("../../../../android/app/src/main/assets/google_web_adapter.js");
     r#"
 (function () {
@@ -72,7 +78,10 @@ pub fn initialization_script() -> String {
   function installAdapter() {
     try {
       window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
+      __ANSWER_CANDIDATE_POLICY_SOURCE__
       __MESSAGE_EXTRACTOR_SOURCE__
+      __COMPOSER_BRIDGE_SOURCE__
+      __SEND_POLICY_SOURCE__
       __ADAPTER_SOURCE__
       if (!window.__elonGoogleWebBridge ||
           typeof window.__elonGoogleWebBridge.command !== 'function') {
@@ -105,7 +114,13 @@ pub fn initialization_script() -> String {
 })();
 "#
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace(
+        "__ANSWER_CANDIDATE_POLICY_SOURCE__",
+        answer_candidate_policy,
+    )
     .replace("__MESSAGE_EXTRACTOR_SOURCE__", message_extractor)
+    .replace("__COMPOSER_BRIDGE_SOURCE__", composer_bridge)
+    .replace("__SEND_POLICY_SOURCE__", send_policy)
     .replace("__ADAPTER_SOURCE__", adapter)
 }
 
@@ -363,9 +378,12 @@ mod tests {
     #[test]
     fn desktop_bootstrap_reuses_the_android_google_adapter() {
         let script = initialization_script();
-        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 1"));
+        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 6"));
         assert!(script.contains("window.__elonGoogleWebDocumentToken"));
+        assert!(script.contains("window.__elonGoogleWebAnswerCandidatePolicy"));
         assert!(script.contains("window.__elonGoogleWebMessageExtractor"));
+        assert!(script.contains("window.__elonGoogleWebComposerBridge"));
+        assert!(script.contains("window.__elonGoogleWebSendPolicy"));
         assert!(script.contains("window.elonGoogleWebNative"));
         assert!(script.contains("window.__elonGoogleWebBridge"));
         assert!(script.contains("providerId: 'google_web'"));
