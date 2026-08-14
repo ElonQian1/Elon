@@ -34,7 +34,7 @@
       return 'finances';
     }
     if (/^\/work(?:\/|$)/.test(cleanPath) || /^(?:work|工作)$/.test(cleanLabel)) return 'work';
-    if (/library|文件库|资料库/.test(value)) return 'library';
+    if (/library|sidebar-item-recall|文件库|资料库/.test(value)) return 'library';
     if (/scheduled|schedule|task|已安排|任务/.test(value)) return 'tasks';
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(value)) return 'gpts';
     if (/memory|记忆/.test(value)) return 'memory';

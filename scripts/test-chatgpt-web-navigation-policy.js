@@ -31,6 +31,11 @@ expectEqual(
   'project disclosure header is not a feature page'
 );
 expectEqual(policy.classify('Library', '/library'), 'library', 'library route');
+expectEqual(
+  policy.classify('sidebar-item-recall', ''),
+  'library',
+  'current official recall test id maps to library'
+);
 expectEqual(policy.classify('Tasks', '/scheduled'), 'tasks', 'task route');
 expectEqual(policy.classify('Apps', '/plugins'), 'apps', 'apps route');
 expectEqual(policy.classify('Health', '/health'), 'health', 'health route');

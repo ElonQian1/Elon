@@ -32,6 +32,23 @@ class ChatGptWebConversationContractTest {
     }
 
     @Test
+    fun newConversationPrefersTheCurrentOfficialStableControl() {
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val finder = conversations.substringAfter("function findNewConversationNode()")
+            .substringBefore("function waitForNewConversation")
+
+        assertTrue(finder.contains("[data-testid=\"create-new-chat-button\"]"))
+        assertTrue(finder.contains("[data-testid=\"new-chat-button\"]"))
+        assertTrue(finder.contains("stableControl && isVisible(stableControl)"))
+        assertTrue(
+            finder.indexOf("stableControl && isVisible(stableControl)") <
+                finder.indexOf("/new chat|create chat|new conversation"),
+        )
+    }
+
+    @Test
     fun conversationAdapterRemainsVisibleDomOnly() {
         val conversations = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",

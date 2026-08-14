@@ -136,7 +136,11 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(layoutAdapter.contains("compatibility:"))
         assertTrue(layoutAdapter.contains("addMessageControls"))
         assertTrue(layoutAdapter.contains("return 'conversation';"))
-        assertTrue(layoutAdapter.contains("pageSemantic === 'conversation_options'"))
+        assertTrue(
+            layoutAdapter.contains(
+                "['temporary_chat', 'conversation_options', 'save_to_project'].includes(pageSemantic)",
+            ),
+        )
         assertTrue(layoutAdapter.contains("return 'conversation_options';"))
         assertTrue(layoutAdapter.contains("contextId: resolvedContextId"))
         assertTrue(layoutAdapter.contains("scrollIntoView"))

@@ -268,6 +268,11 @@
   }
 
   function findNewConversationNode() {
+    const stableControl = document.querySelector(
+      '[data-testid="create-new-chat-button"], [data-testid="new-chat-button"]'
+    );
+    if (stableControl && isVisible(stableControl)) return stableControl;
+
     return Array.from(document.querySelectorAll(
       'a[href="/"], [data-testid*="new-chat" i], [data-testid*="create-new-chat" i], ' +
       'button, [role="button"], [role="link"]'
