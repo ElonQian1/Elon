@@ -62,6 +62,9 @@
 
   function isAiModePage() {
     if (location.pathname === '/aimode') return true;
+    if (location.pathname === '/webhp') {
+      return new URLSearchParams(location.search).get('aep') === '11';
+    }
     if (location.pathname !== '/search') return false;
     const params = new URLSearchParams(location.search);
     return params.get('udm') === '50' || params.get('aep') === '11';

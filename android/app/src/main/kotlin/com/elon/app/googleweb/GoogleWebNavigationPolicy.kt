@@ -16,6 +16,7 @@ internal object GoogleWebNavigationPolicy {
         if (!allows(rawUrl)) return false
         return when (uri.path) {
             "/aimode" -> true
+            "/webhp" -> queryValue(uri.rawQuery, "aep") == "11"
             "/search" -> queryValue(uri.rawQuery, "udm") == "50" ||
                 queryValue(uri.rawQuery, "aep") == "11"
             else -> false
