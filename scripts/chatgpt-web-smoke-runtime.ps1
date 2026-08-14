@@ -490,12 +490,16 @@ function Open-ChatGptWebSmokeSurface {
         } -EnsureMainActivity
 }
 
-function Open-ChatGptWebNativeChatSurface {
+function Open-WebChatNativeChatSurface {
     param(
         [Parameter(Mandatory = $true)]$Runtime,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("chatgpt_web", "google_web")]
+        [string]$ProviderId,
         [ValidateRange(10, 180)][int]$TimeoutSec = 90
     )
 
+    $providerName = if ($ProviderId -eq "google_web") { "Google Web AI" } else { "ChatGPT Web AI" }
     $opened = Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
         -Action "open_social_ai_chat" -Arguments @{
             wait_for_target_bind_ms = 12000
@@ -504,19 +508,30 @@ function Open-ChatGptWebNativeChatSurface {
         throw "Unable to open the social AI chat surface."
     }
     $selected = Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
-        -Action "select_web_chat_provider" -Arguments @{ provider_id = "chatgpt_web" }
+        -Action "select_web_chat_provider" -Arguments @{ provider_id = $ProviderId }
     if ($selected.control_ok -ne $true) {
-        throw "Unable to select ChatGPT Web AI in the native chat surface."
+        throw "Unable to select $providerName in the native chat surface."
     }
 
     return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $TimeoutSec `
-        -Description "ready ChatGPT Web AI native chat surface" -Predicate {
+        -Description "ready $providerName native chat surface" -Predicate {
             param($state)
             $state.active_surface -eq "social_ai" -and
                 [string]$state.social_chat.interaction_mode -eq "chat" -and
-                [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
-                [string]$state.social_chat.web_chat_state -eq "ready"
-        }
+                [string]$state.social_chat.web_chat_provider_id -eq $ProviderId -and
+                [string]$state.social_chat.web_chat_state -eq "ready" -and
+                $state.social_chat.web_chat_composer_ready -eq $true
+        }.GetNewClosure()
+}
+
+function Open-ChatGptWebNativeChatSurface {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [ValidateRange(10, 180)][int]$TimeoutSec = 90
+    )
+
+    return Open-WebChatNativeChatSurface -Runtime $Runtime `
+        -ProviderId "chatgpt_web" -TimeoutSec $TimeoutSec
 }
 
 function Get-ChatGptWebNativeChatState {
