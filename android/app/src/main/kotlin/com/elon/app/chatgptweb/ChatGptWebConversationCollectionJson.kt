@@ -10,7 +10,7 @@ internal object ChatGptWebConversationCollectionJson {
         .put("reached_end", value.reachedEnd)
         .put("truncated", value.truncated)
         .put("timed_out", value.timedOut)
-        .put("complete", value.reachedEnd && !value.truncated && !value.timedOut)
+        .put("complete", value.isComplete)
         .put("observed_count", value.observedCount)
         .put("steps", value.steps)
         .put("source", value.source)

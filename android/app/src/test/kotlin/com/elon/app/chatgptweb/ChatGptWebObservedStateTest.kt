@@ -43,6 +43,28 @@ class ChatGptWebObservedStateTest {
     }
 
     @Test
+    fun completeOfficialCollectionReplacesStaleCachedEntries() {
+        val state = ChatGptWebObservedState(
+            initialConversationHistory = ChatGptConversationHistoryCache(
+                conversations = listOf(
+                    ChatGptWebConversation("current", "当前会话", "/c/current", false),
+                    ChatGptWebConversation("stale", "过期会话", "/c/stale", false),
+                ),
+                savedAtMs = 1L,
+            ),
+        )
+
+        state.accept(ChatGptWebEvent.ConversationList(
+            conversations = listOf(
+                ChatGptWebConversation("current", "当前会话", "/c/current", true),
+            ),
+            collection = ChatGptWebConversationCollection(reachedEnd = true),
+        ))
+
+        assertEquals(listOf("current"), state.snapshot().conversations.map { it.id })
+    }
+
+    @Test
     fun composerRequestClearsOnlyTheRequestedStaleSection() {
         val state = ChatGptWebObservedState()
         state.accept(composerEvent("model", "快速"))

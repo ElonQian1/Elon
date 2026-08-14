@@ -65,6 +65,9 @@ internal data class ChatGptWebConversationCollection(
     val officialLoadState: String = LOAD_IDLE,
     val cachedAtMs: Long = 0L,
 ) {
+    val isComplete: Boolean
+        get() = reachedEnd && !truncated && !timedOut
+
     companion object {
         const val SOURCE_NONE = "none"
         const val SOURCE_OFFICIAL = "official_dom"

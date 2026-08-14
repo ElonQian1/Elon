@@ -76,6 +76,39 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun completeOfficialRefreshDropsConversationsMissingFromTheOfficialList() {
+        val previous = listOf(
+            conversation("one", "今天", null).copy(activityDates = setOf("2026-08-14")),
+            conversation("stale", "昨天", null).copy(activityDates = setOf("2026-08-13")),
+        )
+        val observed = previous.first().copy(activityDates = setOf("2026-08-15"))
+
+        val merged = ChatGptWebConversationIndex.merge(
+            previous,
+            listOf(observed),
+            retainMissing = false,
+        )
+
+        assertEquals(listOf("one"), merged.map { it.id })
+        assertEquals(setOf("2026-08-14", "2026-08-15"), merged.single().activityDates)
+    }
+
+    @Test
+    fun completeOfficialRefreshDropsProjectsMissingFromTheOfficialList() {
+        val current = ChatGptWebProject("g-p-current", "当前项目", "/g/g-p-current/project")
+        val stale = ChatGptWebProject("g-p-stale", "过期项目", "/g/g-p-stale/project")
+
+        val merged = ChatGptWebConversationIndex.mergeProjects(
+            conversations = emptyList(),
+            previous = listOf(current, stale),
+            observed = listOf(current),
+            retainMissing = false,
+        )
+
+        assertEquals(listOf("g-p-current"), merged.map { it.id })
+    }
+
+    @Test
     fun mergeCleansLegacyNullMetadataWithoutDroppingActivity() {
         val cached = conversation("one", "null", null).copy(
             projectTitle = "null",

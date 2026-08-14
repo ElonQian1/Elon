@@ -25,10 +25,16 @@ internal class ChatGptWebObservedState(
         val observedAtMs = nowMs()
         when (event) {
             is ChatGptWebEvent.ConversationList -> {
-                conversations = ChatGptWebConversationIndex.merge(conversations, event.conversations)
-                projects = ChatGptWebConversationIndex.projects(
+                conversations = ChatGptWebConversationIndex.merge(
                     conversations,
-                    event.projects + projects,
+                    event.conversations,
+                    retainMissing = !event.collection.isComplete,
+                )
+                projects = ChatGptWebConversationIndex.mergeProjects(
+                    conversations,
+                    previous = projects,
+                    observed = event.projects,
+                    retainMissing = !event.collection.isComplete,
                 )
                 conversationCollection = event.collection.copy(
                     source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,

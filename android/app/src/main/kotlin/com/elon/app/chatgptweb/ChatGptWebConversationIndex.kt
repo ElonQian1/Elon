@@ -38,6 +38,16 @@ internal object ChatGptWebConversationIndex {
         return values.values.toList()
     }
 
+    fun mergeProjects(
+        conversations: List<ChatGptWebConversation>,
+        previous: List<ChatGptWebProject>,
+        observed: List<ChatGptWebProject>,
+        retainMissing: Boolean,
+    ): List<ChatGptWebProject> = projects(
+        conversations,
+        if (retainMissing) observed + previous else observed,
+    )
+
     fun activeOn(
         values: List<ChatGptWebConversation>,
         date: LocalDate,
@@ -46,6 +56,7 @@ internal object ChatGptWebConversationIndex {
     fun merge(
         previous: List<ChatGptWebConversation>,
         observed: List<ChatGptWebConversation>,
+        retainMissing: Boolean = true,
     ): List<ChatGptWebConversation> {
         val previousByIdentity = collapse(previous)
         val observedByIdentity = collapse(observed)
@@ -53,6 +64,7 @@ internal object ChatGptWebConversationIndex {
             val old = previousByIdentity[identity] ?: return@map sanitize(next)
             combine(old, next).copy(active = next.active)
         }
+        if (!retainMissing) return merged
         return merged + previousByIdentity
             .filterKeys { it !in observedByIdentity }
             .values
