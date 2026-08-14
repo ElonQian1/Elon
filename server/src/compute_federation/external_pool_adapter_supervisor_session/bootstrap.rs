@@ -129,6 +129,11 @@ impl ExternalPoolAdapterHostBootstrap {
             transcript_digest,
         ))
     }
+
+    #[cfg(test)]
+    pub(in crate::compute_federation) fn socket_fd_for_supervisor_test(&self) -> RawFd {
+        self.socket.as_raw_fd()
+    }
 }
 
 impl ExternalPoolAdapterChildBootstrap {
@@ -137,6 +142,10 @@ impl ExternalPoolAdapterChildBootstrap {
         roots: ExternalPoolAdapterSessionRoots,
     ) -> Result<AuthenticatedExternalPoolAdapterSession> {
         self.authenticate_inner(roots, false, false)
+    }
+
+    pub(in crate::compute_federation) fn into_supervisor_descriptors(self) -> (OwnedFd, OwnedFd) {
+        (self.socket, self.seed_reader)
     }
 
     fn authenticate_inner(

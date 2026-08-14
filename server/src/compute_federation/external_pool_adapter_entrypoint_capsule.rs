@@ -62,6 +62,15 @@ pub(super) fn with_external_pool_adapter_entrypoint_capsule(
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+impl crate::compute_federation::external_pool_adapter_linux_supervisor::ExternalPoolAdapterSupervisorCapsule
+    for PreparedExternalPoolAdapterEntrypointCapsule
+{
+    fn retained_sealed_image(&self) -> &File {
+        &self.sealed_image
+    }
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn platform_materialize(
     source: &impl ExternalPoolAdapterEntrypointSource,
 ) -> std::result::Result<

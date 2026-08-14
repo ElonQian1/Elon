@@ -1142,6 +1142,281 @@
       "updated_at_ms": 1786698081475
     },
     {
+      "id": "compute-v261-linux-supervisor-enforcement-core",
+      "title": "V261 Linux supervisor enforcement core",
+      "summary": "在 Linux x86-64 上把 V259 confinement 落实为 clone3、dedicated cgroup v2、namespace、pivot_root、exact fd、rlimit、capability、seccomp、execveat 与 pidfd lifecycle；不接真实 secret、network、probe、route 或 activation。",
+      "status": "released",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/v261-linux-supervisor-enforcement-core.md",
+        "content_hash": "f65661e1521c23c9388dcb0afbfd99c454b54c92a0c25556f9eb197609d5a587",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+          "head_blob_oid": "0e2ae234a2c7e6a8d0fbae9f41858c29d7ff07b6",
+          "worktree_blob_oid": "0e2ae234a2c7e6a8d0fbae9f41858c29d7ff07b6",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security-ai-economy",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "v261",
+        "linux",
+        "supervisor",
+        "confinement"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/external-pool-adapter-linux-supervisor-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-linux-supervisor-authority.md",
+        "docs/requirements/v261-linux-supervisor-enforcement-core.md",
+        "server/src/compute_federation/external_pool_adapter_entrypoint_capsule.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/cgroup.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/child.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/launch.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/lifecycle.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/linux_tests.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/policy.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor/seccomp.rs",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor_source_contract_tests.rs",
+        "server/src/compute_federation/external_pool_adapter_supervisor_session/bootstrap.rs",
+        "server/src/compute_federation/mod.rs"
+      ],
+      "dependencies": [
+        "compute-v260-authenticated-child-session-core"
+      ],
+      "acceptance_criteria": [
+        "Windows source-contract proves Linux-only private scope and no network, Store, secret, activation, settlement or chain wiring.",
+        "Linux-musl elon-server product and test targets compile and link.",
+        "WSL2 kernel fixture verifies clone3 with CLONE_PIDFD and CLONE_INTO_CGROUP plus user, mount, network, ipc and uts namespaces.",
+        "Positive fixture verifies exact cgroup limits, rlimits, tmpfs pivot root, zero capabilities, NoNewPrivs, seccomp and fd3/fd5 exec custody.",
+        "A minimal capsule closes fd5, observes only fd0-3 and returns a fixed non-sensitive marker before pidfd reap and cleanup.",
+        "A capsule attempting a network syscall is killed by seccomp and cannot report success.",
+        "Undelegated cgroup or descriptor/policy mismatch fails closed without fork, clone or PID fallback.",
+        "Active termination uses pidfd signals and waitid P_PIDFD only, then cleans cgroup and scratch state."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/current-implementation-status.md",
+          "content_hash": "6c4d913021970f05f7e8d0ec166e9ff4b3a88647625a0a1895555da78a2e6a13",
+          "locator": "V261 current implementation status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "f9b5831a39cebcc7415c06d7fb54a0dee89e8a2b",
+            "worktree_blob_oid": "f9b5831a39cebcc7415c06d7fb54a0dee89e8a2b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-linux-supervisor-acceptance.md",
+          "content_hash": "15137df00e925542cd9903ed88c090b8269739ed898aefc4d032bcc4795e4052",
+          "locator": "source cross-build and WSL2 kernel evidence",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "8a62e4066d3d8264c80ef9ff7a48282eaa5dd184",
+            "worktree_blob_oid": "8a62e4066d3d8264c80ef9ff7a48282eaa5dd184",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-linux-supervisor-authority.md",
+          "content_hash": "04664d5c201192ea47d8e925cd71990a9d24c07bc9c215fb0ae0e9b6b1deb4d4",
+          "locator": "V261 authority and residual boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "dfb7966d064796bd572e8aa3cc19ae1beaa476b2",
+            "worktree_blob_oid": "dfb7966d064796bd572e8aa3cc19ae1beaa476b2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/v261-linux-supervisor-enforcement-core.md",
+          "content_hash": "f65661e1521c23c9388dcb0afbfd99c454b54c92a0c25556f9eb197609d5a587",
+          "locator": "accepted scope and non-goals",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "0e2ae234a2c7e6a8d0fbae9f41858c29d7ff07b6",
+            "worktree_blob_oid": "0e2ae234a2c7e6a8d0fbae9f41858c29d7ff07b6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_entrypoint_capsule.rs",
+          "content_hash": "4e5f7b08f433d6a13c80beb5edc0cbca821242daedba5eb63266f39f7fddc890",
+          "locator": "retained sealed image transfer seam",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "fa6ffe0194ee7f85633ff7cac3f05fe469ad3fcd",
+            "worktree_blob_oid": "fa6ffe0194ee7f85633ff7cac3f05fe469ad3fcd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor.rs",
+          "content_hash": "6c52122da58bec78e99299a7557635a25350ae325df40f2b115e1c9dce99557d",
+          "locator": "private Linux supervisor module boundary",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "abffc6fd1b03260304546bc11fd926ab7aa876aa",
+            "worktree_blob_oid": "abffc6fd1b03260304546bc11fd926ab7aa876aa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/cgroup.rs",
+          "content_hash": "efafd1ddd174b542791d325cef39833ec931e7fa52a144afbabb0207b05feee2",
+          "locator": "delegated cgroup v2 leaf and cleanup",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "933047b0ce4d3cdecb18dcde5b665c98ec2cbc4b",
+            "worktree_blob_oid": "933047b0ce4d3cdecb18dcde5b665c98ec2cbc4b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/child.rs",
+          "content_hash": "2af8ad890b5a37e7998f4abf9f15a35c36e6315f7ea64e55f38dcc729587ae4f",
+          "locator": "namespace root fd capability and exec setup",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "5a87555ac05f485e4f5e1fc418092cf0671f95ac",
+            "worktree_blob_oid": "5a87555ac05f485e4f5e1fc418092cf0671f95ac",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/launch.rs",
+          "content_hash": "5129b494eda456aa3880ef9a05a956c2486e1fa61b7eb62bbc8a58970091593a",
+          "locator": "clone3 pidfd cgroup launch orchestration",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "74666dc6d8a176587ed02896f9bf5bd066b42e16",
+            "worktree_blob_oid": "74666dc6d8a176587ed02896f9bf5bd066b42e16",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/lifecycle.rs",
+          "content_hash": "a9c32bcb3beb2a8575965c911acdf302eaf2a81667850923ce09b5dfbf112f58",
+          "locator": "pidfd wait terminate stderr and cleanup",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "3864cb16d1f45e707c69325416579968e757d956",
+            "worktree_blob_oid": "3864cb16d1f45e707c69325416579968e757d956",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/linux_tests.rs",
+          "content_hash": "8bf4a4af090331c3c6863f6a1e8c21cfcdc2fbe5ea4091c8c502f9807306eba6",
+          "locator": "three real WSL2 Linux kernel fixtures",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "79738b6e89dcaf287e6f174c5fedba80ea23ec77",
+            "worktree_blob_oid": "79738b6e89dcaf287e6f174c5fedba80ea23ec77",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/policy.rs",
+          "content_hash": "d33b82f50388231b1c1539ff2dd0d92279c94d1a48182745efd2ba12bb6bbf11",
+          "locator": "fixed V259 policy and descriptor contract",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "9b47cbf7b4543b540569b85623ab56be094cb70a",
+            "worktree_blob_oid": "9b47cbf7b4543b540569b85623ab56be094cb70a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/seccomp.rs",
+          "content_hash": "e3c268d130e9ca1c8e80c5512cee5b56cb3ccde1f63beb5fd46fbc45795595ae",
+          "locator": "x86-64 fail-closed seccomp BPF",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "c55ebc2fb86330804b26bd833652fdde26733d34",
+            "worktree_blob_oid": "c55ebc2fb86330804b26bd833652fdde26733d34",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor_source_contract_tests.rs",
+          "content_hash": "579b07fcec200a54e057f6793e32adb36accb60426aeb03884002f162908f24f",
+          "locator": "cross-platform no-effect source contracts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "83b276de60d12c64bbe020c94d811f742c4f6f6b",
+            "worktree_blob_oid": "83b276de60d12c64bbe020c94d811f742c4f6f6b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_supervisor_session/bootstrap.rs",
+          "content_hash": "e2635af07bd143848eaafad958829c296e136cf4ad2f154773ff57998e5412b9",
+          "locator": "V260 child descriptor transfer seam",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "420ade0cf5c95d1f6df25712e1a1e15b3c9a03bc",
+            "worktree_blob_oid": "420ade0cf5c95d1f6df25712e1a1e15b3c9a03bc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/mod.rs",
+          "content_hash": "c2c061375bc4bd66d4cc3b38022fba017a1d691dffae489fe02cae2706f13fd6",
+          "locator": "Linux x86-64 private module registration",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e5acaa61a690c012a266f3c888175f9ca5e936f",
+            "head_blob_oid": "45d3682931647ccbf656d707bb5876aa3f399ace",
+            "worktree_blob_oid": "45d3682931647ccbf656d707bb5876aa3f399ace",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786709613473,
+      "updated_at_ms": 1786709619703
+    },
+    {
       "id": "delivery-allocation-expiry-worker-v234-verification",
       "title": "v234 Delivery Allocation 到期公平恢复验收",
       "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
@@ -2308,76 +2583,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_cd311ba1810042ffa58d3b520753decd",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V226 迁移、写入封口和历史漂移防护已有当前源码与动态测试证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786624598607
-    },
-    {
-      "id": "feature_event_8187f9e595af47a098e4a1706d93ecee",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "五个定向 Rust/SQLite 验收场景全部通过；保留 Gateway/Adapter 与生产升级外部边界。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786624615429
-    },
-    {
-      "id": "feature_event_2319a1a521e04f779cea7db9a0ea36be",
-      "feature_id": "project-feature-registry-normalized-hash-v1",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "修复动态验收收尾中发现的跨平台换行误报。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1786624803541
-    },
-    {
-      "id": "feature_event_b98a1c91913044a9a3b9e623235c9517",
-      "feature_id": "project-feature-registry-normalized-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "范围、验收和跨平台边界已明确，可进入实现验收。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786624819678
-    },
-    {
-      "id": "feature_event_5983cca86a6c4fc2adce5093ebca27b8",
-      "feature_id": "project-feature-registry-normalized-hash-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786624836168
-    },
-    {
-      "id": "feature_event_249e24caecc84c5bb86736229be8ecb8",
-      "feature_id": "project-feature-registry-normalized-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "已修正脚本并开始绑定当前实现与测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786624848447
-    },
-    {
-      "id": "feature_event_700e3765c3fc46c092c37023a982dfe4",
-      "feature_id": "project-feature-registry-normalized-hash-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786624863283
-    },
     {
       "id": "feature_event_0caaf787bfa744be92dfc79c90e11198",
       "feature_id": "project-feature-registry-normalized-hash-v1",
@@ -4307,6 +4512,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786705060526
+    },
+    {
+      "id": "feature_event_5412d0d9b8c04dcfae8e317c3e87919e",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "registered",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "Re-register V261 on the rebased mainline registry after preserving concurrent remote features.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786709613473
+    },
+    {
+      "id": "feature_event_1b06cac3fb4e4b2ca74f75eab73db643",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "claimed",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786709613559
+    },
+    {
+      "id": "feature_event_fc300784e0884a98b542ab78d423cf6c",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "transitioned",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "Bind rebased implementation and evidence identities.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786709613647
+    },
+    {
+      "id": "feature_event_9ce2eeda79614cffb633da2db15b8793",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786709619403
+    },
+    {
+      "id": "feature_event_bae439c7a5f541cf9aadffdd0e643ed7",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "transitioned",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "Rebased modular implementation and bounded evidence are complete.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786709619503
+    },
+    {
+      "id": "feature_event_f800a57c535541af9b6046e68cc56f4f",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "transitioned",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "Source contract, Linux-musl product/test builds, and three WSL2 real-kernel fixtures passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786709619603
+    },
+    {
+      "id": "feature_event_b7beae7c53684ea98df8ad3379a8c44a",
+      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
+      "action": "transitioned",
+      "actor": "codex-goal-v261-rebase",
+      "reason": "Release the private supervisor enforcement core; no production adapter activation or deployment is claimed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786709619703
     }
   ]
 }
