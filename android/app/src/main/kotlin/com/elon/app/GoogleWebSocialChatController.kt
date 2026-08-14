@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -9,6 +10,7 @@ import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.googleweb.GoogleWebBackgroundSession
 import com.elon.app.googleweb.GoogleWebPageAdapter
+import com.elon.app.googleweb.GoogleWebPendingSendState
 
 internal class GoogleWebSocialChatController(
     private val activity: AppCompatActivity,
@@ -34,7 +36,8 @@ internal class GoogleWebSocialChatController(
     )
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
     private var active = false
-    private var pendingPrompt: String? = null
+    private val pendingSend = GoogleWebPendingSendState()
+    private var pendingSendWatchdog: Runnable? = null
 
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
@@ -79,18 +82,24 @@ internal class GoogleWebSocialChatController(
         }
         val prompt = rawText.trim()
         if (prompt.isBlank()) return true
+        if (pendingSend.prompt() != null) {
+            Toast.makeText(activity, "上一条消息仍在提交，请稍候", Toast.LENGTH_SHORT).show()
+            return true
+        }
         if (!session.canSend()) {
             Toast.makeText(activity, "Google 网页 AI 尚未就绪，请打开官方页确认", Toast.LENGTH_LONG).show()
             openOfficialFallback()
             return true
         }
-        pendingPrompt = prompt
+        val sendGeneration = pendingSend.begin(prompt)
         session.currentSnapshot()?.let(::renderSnapshot)
         if (!session.sendPrompt(prompt)) {
-            pendingPrompt = null
+            pendingSend.failSubmission()
+            session.currentSnapshot()?.let(::renderSnapshot)
             Toast.makeText(activity, "Google 网页 AI 发送入口尚未就绪", Toast.LENGTH_LONG).show()
             return true
         }
+        scheduleSubmissionConfirmationWatchdog(sendGeneration)
         binding.inputEdit.text?.clear()
         clearPendingSendState()
         collapseInputComposer()
@@ -108,7 +117,7 @@ internal class GoogleWebSocialChatController(
     }
 
     override fun startNewConversation() {
-        pendingPrompt = null
+        clearPendingSend()
         session.startNewConversation()
     }
 
@@ -119,7 +128,7 @@ internal class GoogleWebSocialChatController(
     override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
 
     override fun openConversation(path: String): Boolean {
-        pendingPrompt = null
+        clearPendingSend()
         return session.openConversation(path)
     }
 
@@ -129,19 +138,19 @@ internal class GoogleWebSocialChatController(
 
     override fun onHostPaused() = session.onHostPaused()
 
-    override fun destroy() = session.destroy()
+    override fun destroy() {
+        clearPendingSend()
+        session.destroy()
+    }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
-        val pending = pendingPrompt?.trim().orEmpty()
-        if (pending.isNotEmpty() && snapshot.messages.lastOrNull { it.role == "user" }
-                ?.content?.trim() == pending
-        ) {
-            pendingPrompt = null
+        if (pendingSend.observeUserPrompt(snapshot.messages.lastOrNull { it.role == "user" }?.content)) {
+            cancelPendingSendWatchdog()
         }
         val mapped = ChatGptFriendMessageMapper.map(
             snapshot = snapshot,
             provider = provider,
-            pendingPrompt = pendingPrompt,
+            pendingPrompt = pendingSend.prompt(),
             pendingAttachments = emptyList(),
             pendingSendStatus = "发送中…",
             attachmentsForMessage = { emptyList() },
@@ -168,15 +177,58 @@ internal class GoogleWebSocialChatController(
     }
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
-        if (event.action != "send_prompt" || event.ok) return
-        val failedPrompt = pendingPrompt
-        pendingPrompt = null
-        session.currentSnapshot()?.let(::renderSnapshot)
-        if (active && !failedPrompt.isNullOrBlank() && binding.inputEdit.text.isNullOrBlank()) {
-            binding.inputEdit.setText(failedPrompt)
-            binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        if (event.action != "send_prompt") return
+        Log.i(SEND_LOG_TAG, "action=send_prompt ok=${event.ok}")
+        if (event.ok) {
+            pendingSend.confirmSubmission()
+            return
         }
+        val failedPrompt = pendingSend.failSubmission()
+        cancelPendingSendWatchdog()
+        session.currentSnapshot()?.let(::renderSnapshot)
+        restorePrompt(failedPrompt)
         Toast.makeText(activity, event.detail.ifBlank { "Google 网页 AI 操作失败" }, Toast.LENGTH_LONG).show()
+    }
+
+    private fun scheduleSubmissionConfirmationWatchdog(generation: Long) {
+        cancelPendingSendWatchdog()
+        val watchdog = Runnable {
+            pendingSendWatchdog = null
+            val result = pendingSend.onConfirmationTimeout(generation)
+            when (result.action) {
+                GoogleWebPendingSendState.TimeoutAction.IGNORE -> Unit
+                GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING -> {
+                    session.requestConversationIndex()
+                }
+                GoogleWebPendingSendState.TimeoutAction.RESTORE -> {
+                    session.currentSnapshot()?.let(::renderSnapshot)
+                    restorePrompt(result.prompt)
+                    if (active) Toast.makeText(
+                        activity,
+                        "官网未确认发送，消息已保留，请重试",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
+        pendingSendWatchdog = watchdog
+        binding.root.postDelayed(watchdog, SEND_CONFIRMATION_TIMEOUT_MS)
+    }
+
+    private fun clearPendingSend() {
+        pendingSend.clear()
+        cancelPendingSendWatchdog()
+    }
+
+    private fun cancelPendingSendWatchdog() {
+        pendingSendWatchdog?.let(binding.root::removeCallbacks)
+        pendingSendWatchdog = null
+    }
+
+    private fun restorePrompt(prompt: String?) {
+        if (!active || prompt.isNullOrBlank() || !binding.inputEdit.text.isNullOrBlank()) return
+        binding.inputEdit.setText(prompt)
+        binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
     }
 
     private fun renderStatus(content: String) {
@@ -199,5 +251,10 @@ internal class GoogleWebSocialChatController(
         binding.modelButton.text = label
         binding.modelButton.contentDescription = "聊天模式；提供方：${provider.displayName}；模型：$label"
         (binding.modelButton.parent as? View)?.contentDescription = binding.modelButton.contentDescription
+    }
+
+    private companion object {
+        const val SEND_CONFIRMATION_TIMEOUT_MS = 12_000L
+        const val SEND_LOG_TAG = "ElonGoogleWebSend"
     }
 }

@@ -20,6 +20,9 @@ class GoogleWebAdapterContractTest {
         val session = read(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
         )
+        val pendingSendState = read(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPendingSendState.kt",
+        )
 
         assertTrue(adapter.contains("providerId: 'google_web'"))
         assertTrue(adapter.contains("documentToken"))
@@ -58,7 +61,13 @@ class GoogleWebAdapterContractTest {
         assertTrue(session.contains("ChatGptWebProxyController"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
-        assertTrue(controller.contains("binding.inputEdit.setText(failedPrompt)"))
+        assertTrue(controller.contains("pendingSend.confirmSubmission()"))
+        assertTrue(controller.contains("restorePrompt(failedPrompt)"))
+        assertTrue(controller.contains("pendingSend.onConfirmationTimeout(generation)"))
+        assertTrue(controller.contains("binding.root::removeCallbacks"))
+        assertTrue(controller.contains("session.requestConversationIndex()"))
+        assertTrue(pendingSendState.contains("TimeoutAction.KEEP_WAITING"))
+        assertTrue(pendingSendState.contains("TimeoutAction.RESTORE"))
     }
 
     private fun read(relative: String): String =
