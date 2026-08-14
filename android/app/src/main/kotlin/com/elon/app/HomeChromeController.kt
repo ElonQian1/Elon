@@ -1,6 +1,8 @@
 package com.elon.app
 
 import android.widget.PopupWindow
+import android.widget.FrameLayout
+import android.view.Gravity
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -39,6 +41,15 @@ internal class HomeChromeController(
         setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.GONE
+        binding.topTitleText.apply {
+            text = "消息"
+            textSize = 22f
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = (layoutParams as FrameLayout.LayoutParams).apply {
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                marginStart = dp(16)
+            }
+        }
         projectCreateFab.hide()
     }
 
@@ -60,6 +71,14 @@ internal class HomeChromeController(
 
     fun hide() {
         binding.homeMenuButton.visibility = android.view.View.GONE
+        binding.topTitleText.apply {
+            textSize = 16f
+            gravity = Gravity.CENTER
+            layoutParams = (layoutParams as FrameLayout.LayoutParams).apply {
+                gravity = Gravity.CENTER
+                marginStart = 0
+            }
+        }
         projectCreateFab.hide()
     }
 

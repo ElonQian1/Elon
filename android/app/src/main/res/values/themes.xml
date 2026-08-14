@@ -12,7 +12,7 @@
         <item name="selectableItemBackgroundBorderless">@null</item>
         <item name="android:selectableItemBackgroundBorderless">@null</item>
         <item name="android:windowBackground">@color/elon_bg_app</item>
-        <item name="android:statusBarColor">@color/elon_bg_chrome</item>
+        <item name="android:statusBarColor">@color/elon_bg_app</item>
         <item name="android:navigationBarColor">@color/elon_bg_chrome</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>

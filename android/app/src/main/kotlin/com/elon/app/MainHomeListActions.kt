@@ -60,6 +60,7 @@ internal class MainHomeListActions(
     private var plazaBannerLoaded = false
     private val projectMemberCache = mutableMapOf<String, List<AppGroupMember>>()
     private val projectMemberRequests = mutableSetOf<String>()
+    private val conversationHeader = HomeConversationHeaderView(activity, dp, selectableForeground)
 
     init {
         binding.ensureConversationPageScrollable()
@@ -111,7 +112,7 @@ internal class MainHomeListActions(
             clearFriendSearchState()
         }
         if (listVisible) {
-            binding.topTitleText.text = currentConversationHomeTitle()
+            binding.topTitleText.text = if (friendSearchActive) "搜索" else "消息"
             binding.searchButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
             binding.addButton.visibility = View.GONE
         }
@@ -123,7 +124,15 @@ internal class MainHomeListActions(
             renderFriendSearchResults()
             return
         }
-        val chatItems = filterHomeChatItemsForMode(buildHomeChatItems())
+        val allChatItems = buildHomeChatItems()
+        binding.conversationPage.addView(
+            conversationHeader.create(
+                selected = homeListFilterMode,
+                counts = homeConversationCounts(allChatItems),
+                onSelect = ::applyHomeListFilterMode
+            )
+        )
+        val chatItems = filterHomeChatItemsForMode(allChatItems)
         if (chatItems.isEmpty()) {
             if (homeListFilterMode == HomeListFilterMode.All) {
                 binding.conversationPage.addView(
@@ -157,9 +166,6 @@ internal class MainHomeListActions(
 
     private fun renderHomeChatItems(chatItems: List<HomeChatItem>) {
         chatItems.forEachIndexed { index, item ->
-            if (index > 0) {
-                binding.conversationPage.addView(homeRows().createConversationDivider())
-            }
             when (item) {
                 is HomeChatItem.FriendItem -> binding.conversationPage.addView(
                     homeRows().createFriendRow(item.friend) {
@@ -229,11 +235,25 @@ internal class MainHomeListActions(
         return when (homeListFilterMode) {
             HomeListFilterMode.All -> items
             HomeListFilterMode.Projects -> items.filterIsInstance<HomeChatItem.ProjectItem>()
-            HomeListFilterMode.Friends -> items.filter { item ->
-                item is HomeChatItem.FriendItem || item is HomeChatItem.GroupItem
-            }
+            HomeListFilterMode.Friends -> items.filterIsInstance<HomeChatItem.FriendItem>()
+            HomeListFilterMode.Conversations -> items.filterIsInstance<HomeChatItem.GroupItem>()
+            HomeListFilterMode.Unread -> items.filter { item -> item.unreadCount() > 0 }
         }
     }
+
+    private fun homeConversationCounts(items: List<HomeChatItem>) = HomeConversationCounts(
+        all = items.size,
+        friends = items.count { it is HomeChatItem.FriendItem },
+        projects = items.count { it is HomeChatItem.ProjectItem },
+        conversations = items.count { it is HomeChatItem.GroupItem },
+        unread = items.sumOf { it.unreadCount() }
+    )
+
+    private fun HomeChatItem.unreadCount(): Int = when (this) {
+        is HomeChatItem.FriendItem -> friend.unreadCount
+        is HomeChatItem.GroupItem -> group.unreadCount
+        is HomeChatItem.ProjectItem -> projectCompletionCount(project)
+    }.coerceAtLeast(0)
 
     private fun createHomeFilterEmptyRow(): View {
         return TextView(activity).apply {
@@ -248,6 +268,8 @@ internal class MainHomeListActions(
                 HomeListFilterMode.Projects -> "\u6682\u65e0\u9879\u76ee"
                 HomeListFilterMode.Friends -> "\u6682\u65e0\u597d\u53cb\u6216\u7fa4\u804a"
                 HomeListFilterMode.All -> ""
+                HomeListFilterMode.Conversations -> "\u6682\u65e0\u5bf9\u8bdd"
+                HomeListFilterMode.Unread -> "\u6682\u65e0\u672a\u8bfb\u6d88\u606f"
             }
         }
     }
@@ -506,6 +528,8 @@ internal class MainHomeListActions(
         HomeListFilterMode.Friends -> "好友"
         HomeListFilterMode.Projects -> "项目"
         HomeListFilterMode.All -> "全部"
+        HomeListFilterMode.Conversations -> "对话"
+        HomeListFilterMode.Unread -> "未读"
     }
 
     fun renderProjectList() {

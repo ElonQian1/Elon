@@ -83,12 +83,12 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(76)
+                dp(72)
             )
             setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(14), 0)
+            setPadding(dp(16), 0, dp(16), 0)
             clipChildren = false
             clipToPadding = false
             isClickable = true
@@ -100,7 +100,7 @@ internal class MainHomeRows(
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(12)
+                marginStart = dp(13)
             }
             orientation = LinearLayout.VERTICAL
         }
@@ -117,7 +117,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = friend.lastMessage ?: "\u6682\u65e0\u6d88\u606f"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            textSize = 13f
+            textSize = 14f
         })
         row.addView(middle)
 
@@ -137,12 +137,12 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(76)
+                dp(72)
             )
             setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(14), 0)
+            setPadding(dp(16), 0, dp(16), 0)
             clipChildren = false
             clipToPadding = false
             isClickable = true
@@ -154,7 +154,7 @@ internal class MainHomeRows(
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(12)
+                marginStart = dp(13)
             }
             orientation = LinearLayout.VERTICAL
         }
@@ -171,7 +171,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = group.lastMessage ?: "${group.memberCount} 位成员"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            textSize = 13f
+            textSize = 14f
         })
         row.addView(middle)
 
@@ -276,7 +276,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = title
             setTextColor(Color.parseColor("#F8F7F4"))
-            textSize = 16f
+            textSize = 17f
         }
     }
 
