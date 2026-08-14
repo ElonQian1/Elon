@@ -1,6 +1,11 @@
 package com.elon.app.chatgptweb
 
 internal object ChatGptWebAcceptanceCaseCatalog {
+    private val manualOnlyCases = setOf(
+        "supervised/account_mutations",
+        "supervised/message_actions",
+    )
+
     private val verificationCases = mapOf(
         "official_authentication" to "safe/authenticated_session",
         "anonymous_chat_access" to "reversible/anonymous_send_probe",
@@ -66,4 +71,12 @@ internal object ChatGptWebAcceptanceCaseCatalog {
 
     fun evidenceCaseIds(): Set<String> =
         (verificationCases.values + discoveryCases.values).toSortedSet()
+
+    fun manualOnlyCaseIds(): Set<String> = manualOnlyCases.toSortedSet()
+
+    fun evidenceMode(caseId: String?): String = when {
+        caseId == null -> "none"
+        caseId in manualOnlyCases -> "manual_only"
+        else -> "scripted"
+    }
 }

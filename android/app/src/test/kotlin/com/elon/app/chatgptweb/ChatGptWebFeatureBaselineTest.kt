@@ -19,7 +19,7 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v7", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v8", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
             ChatGptWebFeatureBaseline.DEVICE_VERIFICATION_ADAPTER_VERSION,
@@ -48,6 +48,12 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(ChatGptWebFeatureBaseline.ids(), ids.toSet())
         assertTrue(ids.containsAll(REQUIRED_FEATURE_IDS))
         assertEquals(0, baseline.getJSONObject("verification_evidence").getInt("current_case_count"))
+        assertEquals(
+            setOf("supervised/account_mutations", "supervised/message_actions"),
+            baseline.getJSONArray("manual_only_verification_case_ids").let { values ->
+                (0 until values.length()).mapTo(linkedSetOf(), values::getString)
+            },
+        )
 
         (0 until features.length()).forEach { index ->
             val feature = features.getJSONObject(index)
@@ -76,7 +82,28 @@ class ChatGptWebFeatureBaselineTest {
                     )
                 }
             }
+            val caseId = if (feature.isNull("verification_case")) {
+                null
+            } else {
+                feature.getString("verification_case")
+            }
+            assertEquals(
+                ChatGptWebAcceptanceCaseCatalog.evidenceMode(caseId),
+                feature.getString("verification_evidence_mode"),
+            )
         }
+        assertEquals(
+            "manual_only",
+            feature(baseline, "message_actions").getString("verification_evidence_mode"),
+        )
+        assertEquals(
+            "manual_only",
+            feature(baseline, "account_mutations").getString("verification_evidence_mode"),
+        )
+        assertEquals(
+            "scripted",
+            feature(baseline, "attachment_lifecycle").getString("verification_evidence_mode"),
+        )
     }
 
     @Test

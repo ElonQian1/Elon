@@ -116,9 +116,20 @@ $registeredCaseIds = @(
         } |
         Sort-Object -Unique
 )
+$manualCasesMatch = [regex]::Match(
+    $catalogSource,
+    '(?s)private val manualOnlyCases\s*=\s*setOf\((.*?)\)'
+)
+if (-not $manualCasesMatch.Success) {
+    throw "Acceptance catalog is missing the manual-only evidence classification."
+}
 $manualOnlyCaseIds = @(
-    "supervised/account_mutations",
-    "supervised/message_actions"
+    [regex]::Matches(
+        $manualCasesMatch.Groups[1].Value,
+        '"((?:safe|reversible|supervised)/[a-z0-9_/-]+)"'
+    ) |
+        ForEach-Object { $_.Groups[1].Value } |
+        Sort-Object -Unique
 )
 $unknownRegistered = @($registeredCaseIds | Where-Object { $_ -notin $catalogCaseIds })
 if ($unknownRegistered.Count -gt 0) {

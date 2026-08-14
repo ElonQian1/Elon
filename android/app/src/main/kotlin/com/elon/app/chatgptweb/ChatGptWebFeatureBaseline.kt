@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 7
+    const val VERSION = 8
     internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 55
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
@@ -123,6 +123,10 @@ internal object ChatGptWebFeatureBaseline {
                 .put("composer_option_semantics", JSONArray(feature.composerOptionSemantics))
                 .put("code_gap", feature.codeGap ?: JSONObject.NULL)
                 .put("verification_case", feature.verificationCase ?: JSONObject.NULL)
+                .put(
+                    "verification_evidence_mode",
+                    ChatGptWebAcceptanceCaseCatalog.evidenceMode(feature.verificationCase),
+                )
                 .put("discovery_case", feature.discoveryCase ?: JSONObject.NULL)
                 .put("discovery_status", discovery.status)
                 .put("discovery_gap", discovery.gap ?: JSONObject.NULL)
@@ -141,7 +145,7 @@ internal object ChatGptWebFeatureBaseline {
             it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v7")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v8")
             .put("version", VERSION)
             .put("device_verification_adapter_version", DEVICE_VERIFICATION_ADAPTER_VERSION)
             .put("device_verification_current", DEVICE_VERIFICATION_CURRENT)
@@ -167,6 +171,10 @@ internal object ChatGptWebFeatureBaseline {
                     ),
             )
             .put("verification_evidence", verificationEvidence.toJson())
+            .put(
+                "manual_only_verification_case_ids",
+                JSONArray(ChatGptWebAcceptanceCaseCatalog.manualOnlyCaseIds()),
+            )
             .put("feature_count", resolvedFeatures.size)
             .put(
                 "summary",
