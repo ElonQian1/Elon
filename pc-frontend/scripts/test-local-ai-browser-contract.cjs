@@ -154,6 +154,8 @@ assert.match(googleAdapterScript, /isAiModePage/)
 assert.match(googleAdapterScript, /'textarea\[aria-label\]'/)
 assert.match(googleAdapterScript, /'\[role="textbox"\]'/)
 assert.match(googleAdapterScript, /'\[contenteditable="plaintext-only"\]'/)
+assert.match(googleAdapterScript, /href\.includes\('accounts\.google\.com'\)/)
+assert.doesNotMatch(googleAdapterScript, /\[data-ogsr-up\]/)
 assert.match(googleAdapterScript, /type: 'citation'/)
 assert.doesNotMatch(
   `${googleAdapter}\n${googleAdapterScript}`,

@@ -129,8 +129,9 @@
       if (!isVisible(node)) return false;
       const label = nodeLabel(node);
       const href = String(node.getAttribute('href') || '').toLowerCase();
-      return /^(sign in|log in|login|登录|登入)$/.test(label)
-        || href.includes('accounts.google.com/servicelogin');
+      return /(?:^|\s)(sign in|log in|login|登录|登入)(?:\s|$)/.test(label)
+        || href.includes('accounts.google.com')
+        || href.includes('/accounts/');
     });
   }
 
@@ -138,7 +139,14 @@
     const account = document.querySelector([
       'a[aria-label*="Google Account" i]',
       'button[aria-label*="Google Account" i]',
-      '[data-ogsr-up]'
+      'a[aria-label*="Google 账号" i]',
+      'button[aria-label*="Google 账号" i]',
+      'a[aria-label*="Google 帐号" i]',
+      'button[aria-label*="Google 帐号" i]',
+      'a[aria-label*="Google 帳戶" i]',
+      'button[aria-label*="Google 帳戶" i]',
+      'a[href*="SignOutOptions"]',
+      'img[src*="googleusercontent.com"]'
     ].join(','));
     return isVisible(account) || (!!findComposer() && !hasVisibleLoginEntry());
   }
