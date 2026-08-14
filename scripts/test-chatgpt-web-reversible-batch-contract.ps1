@@ -22,6 +22,7 @@ $required = @(
     'id = "reversible_controls"',
     'id = "composer_controls"',
     'id = "message_structure"',
+    'id = "message_actions_read_only"',
     'id = "message_actions_and_regenerate_menu"',
     'id = "regenerate_reply"',
     "SkipDictation = `$true",
@@ -30,6 +31,7 @@ $required = @(
     "attachment_lifecycle",
     "dictation_audio_capture",
     "realtime_voice",
+    "message_action_mutations",
     "sent_messages = 2",
     "regenerated_messages = 1",
     "uploaded_attachments = 0",
@@ -52,6 +54,7 @@ foreach ($childScript in @(
     "smoke-chatgpt-web-reversible-controls.ps1",
     "smoke-chatgpt-web-composer-controls.ps1",
     "smoke-chatgpt-web-message-structure.ps1",
+    "smoke-chatgpt-web-message-actions.ps1",
     "inspect-chatgpt-web-regenerate-menu.ps1",
     "smoke-chatgpt-web-regenerate.ps1"
 )) {

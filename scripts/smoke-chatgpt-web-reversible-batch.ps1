@@ -51,6 +51,11 @@ $cases = @(
         }
     },
     [pscustomobject]@{
+        id = "message_actions_read_only"
+        script = "smoke-chatgpt-web-message-actions.ps1"
+        arguments = $pinned
+    },
+    [pscustomobject]@{
         id = "message_actions_and_regenerate_menu"
         script = "inspect-chatgpt-web-regenerate-menu.ps1"
         arguments = $pinned + @{ ReplyTimeoutSec = 240 }
@@ -92,6 +97,7 @@ try {
             "attachment_lifecycle",
             "dictation_audio_capture",
             "realtime_voice",
+            "message_action_mutations",
             "account_mutations",
             "destructive_conversation_actions"
         )
