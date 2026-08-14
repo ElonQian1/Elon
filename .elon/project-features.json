@@ -1937,7 +1937,7 @@
       "id": "win-native-multi-provider-web-ai-bridge-v1",
       "title": "Win 原生多厂商网页 AI 语义桥 V1",
       "summary": "让 Win ChatGPT 与 Google AI 官方网页通过版本化可见语义桥稳定驱动一龙统一原生聊天 UI，并保留官方页回退。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-native-multi-provider-web-ai-bridge-v1.md",
@@ -2099,20 +2099,10 @@
         }
       ],
       "created_at_ms": 1786699261278,
-      "updated_at_ms": 1786699618886
+      "updated_at_ms": 1786700258667
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_219a371078e746ca89b9e8d9dd4a7d0b",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "采用门禁、CI 合约、文档模块化、源码大小、项目入口和项目记忆代理集成回归均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786620211812
-    },
     {
       "id": "feature_event_1b11c56aa58446e9b0ad43feb2c27367",
       "feature_id": "project-feature-registry-adoption-v1",
@@ -4102,6 +4092,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786699618886
+    },
+    {
+      "id": "feature_event_503e26c39b5342ca987dca439422f36a",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Windows release 0.3.69+9a93db344 已完成本机构建验证、远端 outbox 同步和本机安全激活排队；服务端依赖为 none。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786700258667
     }
   ]
 }
