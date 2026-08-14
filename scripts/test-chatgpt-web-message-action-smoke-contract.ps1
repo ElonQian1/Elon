@@ -27,6 +27,11 @@ $required = @(
     'target = "actions"',
     "native_message_revealed",
     "native_message_selector_found",
+    'Get-Controls -Semantic "save_to_project" -Region "message"',
+    "save_to_project_discovered = `$true",
+    "save_to_project_context_bound = `$true",
+    "save_to_project_native_selector_found",
+    "save_to_project_invoked = 0",
     "native_overlay_selector_exported",
     "Wait-ContextualOverlay",
     "context_bound = `$true",
@@ -49,6 +54,7 @@ foreach ($forbidden in @(
     "send_input",
     "chatgpt_remove_attachment",
     "chatgpt_stop_generation",
+    'control_id = [string]$saveToProject.control_id',
     "removeAllCookies",
     "pm clear"
 )) {

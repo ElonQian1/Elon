@@ -18,6 +18,7 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 $script:overlayOpened = $false
+$script:nativeActionDialogOpened = $false
 $script:originalViewMode = ""
 $script:viewModeChanged = $false
 
@@ -167,6 +168,23 @@ try {
 
     Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
         -ExpectedAction "snapshot_ui_manifest" | Out-Null
+    $saveToProject = @(Get-Controls -Semantic "save_to_project" -Region "message") |
+        Where-Object {
+            $_.enabled -eq $true -and
+            -not [string]::IsNullOrWhiteSpace([string]$_.context_id)
+        } |
+        Select-Object -Last 1
+    if ($null -eq $saveToProject) {
+        throw "No message-scoped save-to-project control is available for safe verification."
+    }
+    if ([string]$saveToProject.native_presentation -ne "menu") {
+        throw "The save-to-project control is not exposed through the native message menu."
+    }
+    $nativeMessageSelector = [string]$saveToProject.native_trigger_content_description
+    $nativeSaveSelector = [string]$saveToProject.native_adb_content_description
+    if (-not $nativeMessageSelector -or -not $nativeSaveSelector) {
+        throw "The save-to-project control did not export stable native selectors."
+    }
     $messageMore = @(Get-Controls -Semantic "more" -Region "message") |
         Where-Object {
             $_.enabled -eq $true -and $_.in_viewport -eq $true -and
@@ -176,20 +194,16 @@ try {
     if ($null -eq $messageMore) {
         throw "No visible message overflow control is available for safe verification."
     }
-    $nativeMessageSelector = [string]$messageMore.native_trigger_content_description
-    if (-not $nativeMessageSelector) {
-        throw "The message overflow control did not export a native menu selector."
-    }
-
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "native" } | Out-Null
     $script:viewModeChanged = $true
     Wait-ViewMode -ExpectedMode "native" | Out-Null
     $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
-        -Arguments @{ message_id = [string]$messageMore.context_id; target = "actions" }
+        -Arguments @{ message_id = [string]$saveToProject.context_id; target = "actions" }
     if ($reveal.control_ok -ne $true) {
         throw "The native message action target could not be revealed."
     }
+    $script:nativeActionDialogOpened = $true
 
     $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
     try {
@@ -202,8 +216,14 @@ try {
                 -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
                 -Label "read native ChatGPT message menu selectors"
             $nativeMessageSelectorFound = $uiXml.Contains($nativeMessageSelector)
-            if (-not $nativeMessageSelectorFound) { Start-Sleep -Milliseconds 500 }
-        } while (-not $nativeMessageSelectorFound -and [DateTimeOffset]::UtcNow -lt $selectorDeadline)
+            $nativeSaveSelectorFound = $uiXml.Contains($nativeSaveSelector)
+            if (-not ($nativeMessageSelectorFound -and $nativeSaveSelectorFound)) {
+                Start-Sleep -Milliseconds 500
+            }
+        } while (
+            -not ($nativeMessageSelectorFound -and $nativeSaveSelectorFound) -and
+            [DateTimeOffset]::UtcNow -lt $selectorDeadline
+        )
     } finally {
         Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
             -Arguments @("shell", "rm", "-f", $remoteDump) -TimeoutSec 5 `
@@ -212,6 +232,13 @@ try {
     if (-not $nativeMessageSelectorFound) {
         throw "The native message menu selector was not visible to ADB."
     }
+    if (-not $nativeSaveSelectorFound) {
+        throw "The native save-to-project selector was not visible to ADB."
+    }
+    Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+        -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
+        -Label "close native ChatGPT message action dialog" | Out-Null
+    $script:nativeActionDialogOpened = $false
 
     Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
         -ExpectedAction "invoke_ui_control" `
@@ -270,6 +297,10 @@ try {
         context_bound = $true
         native_message_revealed = $true
         native_message_selector_found = $nativeMessageSelectorFound
+        save_to_project_discovered = $true
+        save_to_project_context_bound = $true
+        save_to_project_native_selector_found = $nativeSaveSelectorFound
+        save_to_project_invoked = 0
         native_overlay_selector_exported = $true
         conversation_restored = $true
         view_mode_restored = $true
@@ -286,6 +317,13 @@ try {
             Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
                 -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
                 -Label "recover ChatGPT message action overlay" | Out-Null
+        } catch { }
+    }
+    if ($script:nativeActionDialogOpened) {
+        try {
+            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
+                -Label "recover native ChatGPT message action dialog" | Out-Null
         } catch { }
     }
     try { Restore-OriginalViewMode | Out-Null } catch { }
