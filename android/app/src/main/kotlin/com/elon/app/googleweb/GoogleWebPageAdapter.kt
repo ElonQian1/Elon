@@ -7,6 +7,9 @@ import android.os.Looper
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.elon.app.WebBridgeConnectionState
+import com.elon.app.WebBridgeDocumentSession
+import com.elon.app.WebBridgeReadinessPolicy
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebProtocol
 import java.nio.charset.StandardCharsets
@@ -24,6 +27,7 @@ internal class GoogleWebPageAdapter(
         input.reader(StandardCharsets.UTF_8).readText()
     }
     private val handler = Handler(Looper.getMainLooper())
+    private val documentSession = WebBridgeDocumentSession()
     private var listenerInstalled = false
 
     fun install() {
@@ -42,9 +46,13 @@ internal class GoogleWebPageAdapter(
             if (root.has("schema") && root.optString("providerId") != PROVIDER_ID) {
                 return@addWebMessageListener
             }
-            val event = ChatGptWebProtocol.parse(raw, ADAPTER_VERSION) ?: return@addWebMessageListener
-            if (event is ChatGptWebEvent.AdapterReady) onStateChanged(State.READY)
-            onEvent(event)
+            val parsed = ChatGptWebProtocol.parseMessage(raw, ADAPTER_VERSION)
+                ?: return@addWebMessageListener
+            val token = parsed.documentToken ?: return@addWebMessageListener
+            val wasCurrent = documentSession.snapshot().adapterCurrent
+            documentSession.accept(token) ?: return@addWebMessageListener
+            if (!wasCurrent) onStateChanged(State.READY)
+            onEvent(parsed.event)
         }
         listenerInstalled = true
         onStateChanged(State.WEB_ONLY)
@@ -52,24 +60,34 @@ internal class GoogleWebPageAdapter(
 
     fun onPageStarted(url: String) {
         handler.removeCallbacksAndMessages(null)
+        documentSession.beginPage()
         onStateChanged(if (supports(url) && listenerInstalled) State.CONNECTING else State.WEB_ONLY)
     }
 
     fun onPageReady(url: String) {
-        if (!supports(url)) {
-            onStateChanged(State.WEB_ONLY)
-            return
+        val pageSupported = supports(url)
+        if (pageSupported && listenerInstalled && documentSession.snapshot().pageGeneration == 0L) {
+            documentSession.ensurePage()
         }
-        if (!listenerInstalled) {
-            onStateChanged(State.UNSUPPORTED)
-            return
-        }
-        onStateChanged(State.CONNECTING)
+        onStateChanged(when (WebBridgeReadinessPolicy.stateAfterPageReady(
+            listenerInstalled = listenerInstalled,
+            pageSupported = pageSupported,
+            document = documentSession.snapshot(),
+        )) {
+            WebBridgeConnectionState.WEB_ONLY -> State.WEB_ONLY
+            WebBridgeConnectionState.CONNECTING -> State.CONNECTING
+            WebBridgeConnectionState.READY -> State.READY
+            WebBridgeConnectionState.UNSUPPORTED -> State.UNSUPPORTED
+        })
+        if (!pageSupported || !listenerInstalled) return
         RETRY_DELAYS_MS.forEach { delay -> handler.postDelayed(::injectAndSnapshot, delay) }
     }
 
     fun onHostResumed(url: String?) {
-        if (supports(url) && listenerInstalled) injectAndSnapshot()
+        if (supports(url) && listenerInstalled) {
+            documentSession.ensurePage()
+            injectAndSnapshot()
+        }
     }
 
     fun requestSnapshot() = runCommand("snapshot")
@@ -88,7 +106,9 @@ internal class GoogleWebPageAdapter(
 
     private fun injectAndSnapshot() {
         if (!supports(webView.url)) return
-        val bootstrap = "window.__elonGoogleWebAdapterVersion=$ADAPTER_VERSION;\n$script"
+        val document = documentSession.ensurePage()
+        val bootstrap = "window.__elonGoogleWebAdapterVersion=$ADAPTER_VERSION;" +
+            "window.__elonGoogleWebDocumentToken=${JSONObject.quote(document.documentToken)};\n$script"
         webView.evaluateJavascript(bootstrap) { runCommand("snapshot") }
     }
 

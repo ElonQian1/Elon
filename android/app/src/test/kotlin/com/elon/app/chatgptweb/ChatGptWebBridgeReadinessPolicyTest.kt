@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebBridgeDocumentSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -8,7 +9,7 @@ import org.junit.Test
 class ChatGptWebBridgeReadinessPolicyTest {
     @Test
     fun pageFinishKeepsTheCurrentAdapterReady() {
-        val session = ChatGptWebDocumentSession { "doc_1_current" }
+        val session = WebBridgeDocumentSession { "doc_1_current" }
         val loading = session.beginPage()
         val current = session.accept(loading.documentToken)!!
 
@@ -24,7 +25,7 @@ class ChatGptWebBridgeReadinessPolicyTest {
 
     @Test
     fun pageFinishWaitsWhenTheCurrentDocumentHasNotConnected() {
-        val loading = ChatGptWebDocumentSession { "doc_1_loading" }.beginPage()
+        val loading = WebBridgeDocumentSession { "doc_1_loading" }.beginPage()
 
         assertEquals(
             ChatGptWebPageAdapter.State.CONNECTING,
@@ -38,7 +39,7 @@ class ChatGptWebBridgeReadinessPolicyTest {
 
     @Test
     fun pageFinishStillHonorsUnsupportedAndWebOnlySurfaces() {
-        val document = ChatGptWebDocumentSession.Snapshot(0, 0, "")
+        val document = WebBridgeDocumentSession.Snapshot(0, 0, "")
 
         assertEquals(
             ChatGptWebPageAdapter.State.WEB_ONLY,

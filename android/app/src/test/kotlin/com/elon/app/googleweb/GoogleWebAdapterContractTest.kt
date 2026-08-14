@@ -19,6 +19,7 @@ class GoogleWebAdapterContractTest {
         )
 
         assertTrue(adapter.contains("providerId: 'google_web'"))
+        assertTrue(adapter.contains("documentToken"))
         assertTrue(adapter.contains("type: 'message_snapshot'"))
         assertTrue(adapter.contains("action === 'send_prompt'"))
         assertTrue(adapter.contains("action === 'stop_generation'"))
@@ -29,6 +30,9 @@ class GoogleWebAdapterContractTest {
         assertTrue(!adapter.contains("fetch("))
         assertTrue(pageAdapter.contains("WEB_MESSAGE_LISTENER"))
         assertTrue(pageAdapter.contains("ALLOWED_ORIGINS"))
+        assertTrue(pageAdapter.contains("WebBridgeDocumentSession"))
+        assertTrue(pageAdapter.contains("WebBridgeReadinessPolicy.stateAfterPageReady"))
+        assertTrue(pageAdapter.contains("ChatGptWebProtocol.parseMessage"))
         assertTrue(session.contains("GoogleWebConversationStore"))
         assertTrue(session.contains("ChatGptWebProxyController"))
     }

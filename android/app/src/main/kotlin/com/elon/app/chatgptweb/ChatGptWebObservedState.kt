@@ -1,5 +1,7 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebBridgeDocumentSession
+
 internal class ChatGptWebObservedState(
     initialConversationHistory: ChatGptConversationHistoryCache? = null,
     private val nowMs: () -> Long = System::currentTimeMillis,
@@ -75,7 +77,7 @@ internal class ChatGptWebObservedState(
         updatedAtMs = nowMs()
     }
 
-    fun updateDocument(document: ChatGptWebDocumentSession.Snapshot) {
+    fun updateDocument(document: WebBridgeDocumentSession.Snapshot) {
         if (document.pageGeneration < pageGeneration) return
         val observedAtMs = nowMs()
         if (document.pageGeneration > pageGeneration) {

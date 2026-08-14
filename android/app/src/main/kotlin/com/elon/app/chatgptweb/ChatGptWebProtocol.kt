@@ -1,5 +1,7 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebBridgeDocumentSession
+
 import org.json.JSONObject
 
 internal data class ChatGptWebMessage(
@@ -187,7 +189,7 @@ internal object ChatGptWebProtocol {
         }) ?: return null
         return ChatGptWebProtocolMessage(
             documentToken = payload.optString("documentToken")
-                .takeIf(ChatGptWebDocumentSession.DOCUMENT_TOKEN::matches),
+                .takeIf(WebBridgeDocumentSession.DOCUMENT_TOKEN::matches),
             event = parsedEvent,
         )
     }

@@ -1,8 +1,8 @@
-package com.elon.app.chatgptweb
+package com.elon.app
 
 import java.util.UUID
 
-internal class ChatGptWebDocumentSession(
+internal class WebBridgeDocumentSession(
     private val tokenFactory: (Long) -> String = { generation ->
         "doc_${generation.toString(36)}_${UUID.randomUUID().toString().replace("-", "")}"
     },
@@ -24,7 +24,7 @@ internal class ChatGptWebDocumentSession(
         pageGeneration++
         adapterGeneration = 0L
         documentToken = tokenFactory(pageGeneration).also { token ->
-            require(DOCUMENT_TOKEN.matches(token)) { "Invalid ChatGPT document token" }
+            require(DOCUMENT_TOKEN.matches(token)) { "Invalid web bridge document token" }
         }
         return snapshot()
     }

@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebBridgeDocumentSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -9,7 +10,7 @@ import org.junit.Test
 class ChatGptWebDocumentSessionTest {
     @Test
     fun acceptsOnlyTheCurrentDocumentTokenAndAdvancesGenerations() {
-        val session = ChatGptWebDocumentSession { generation -> "doc_test_$generation" }
+        val session = WebBridgeDocumentSession { generation -> "doc_test_$generation" }
 
         val first = session.beginPage()
         assertEquals(1L, first.pageGeneration)
@@ -27,6 +28,6 @@ class ChatGptWebDocumentSessionTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsUnsafeGeneratedTokens() {
-        ChatGptWebDocumentSession { "../../stale" }.beginPage()
+        WebBridgeDocumentSession { "../../stale" }.beginPage()
     }
 }

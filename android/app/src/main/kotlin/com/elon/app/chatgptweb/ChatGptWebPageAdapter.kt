@@ -7,6 +7,7 @@ import android.os.Looper
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.elon.app.WebBridgeDocumentSession
 import java.nio.charset.StandardCharsets
 import org.json.JSONObject
 
@@ -15,7 +16,7 @@ internal class ChatGptWebPageAdapter(
     private val webView: WebView,
     private val onEvent: (ChatGptWebEvent) -> Unit,
     private val onStateChanged: (State) -> Unit,
-    private val onDocumentChanged: (ChatGptWebDocumentSession.Snapshot) -> Unit = {},
+    private val onDocumentChanged: (WebBridgeDocumentSession.Snapshot) -> Unit = {},
 ) {
     enum class State {
         WEB_ONLY,
@@ -30,7 +31,7 @@ internal class ChatGptWebPageAdapter(
         }
     }
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val documentSession = ChatGptWebDocumentSession()
+    private val documentSession = WebBridgeDocumentSession()
     private val handshake = ChatGptWebBridgeHandshake(
         schedule = { delayMs, action -> mainHandler.postDelayed({ action() }, delayMs) },
         injectAndRequestSnapshot = ::injectAndRequestSnapshot,

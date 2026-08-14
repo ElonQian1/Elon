@@ -20,6 +20,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.R
+import com.elon.app.WebBridgeDocumentSession
 import com.elon.app.databinding.ActivityChatgptWebTestBinding
 import com.elon.app.mcp.McpNativeControlBinding
 
@@ -564,7 +565,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleDocumentChanged(document: ChatGptWebDocumentSession.Snapshot) {
+    private fun handleDocumentChanged(document: WebBridgeDocumentSession.Snapshot) {
         if (document.pageGeneration > observedMcpState.snapshot().pageGeneration) {
             latestSnapshot = null
             latestUiManifest = null

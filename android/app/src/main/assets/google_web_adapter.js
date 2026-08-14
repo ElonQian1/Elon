@@ -3,10 +3,14 @@
 
   const allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   const adapterVersion = Number(window.__elonGoogleWebAdapterVersion || 0);
+  const documentToken = String(window.__elonGoogleWebDocumentToken || '');
   const nativeBridge = window.elonGoogleWebNative;
-  if (!allowedOrigins.has(location.origin) || !adapterVersion || !nativeBridge ||
+  if (!allowedOrigins.has(location.origin) || !adapterVersion ||
+      !/^doc_[a-z0-9_]{3,80}$/.test(documentToken) || !nativeBridge ||
       typeof nativeBridge.postMessage !== 'function') return;
-  if (window.__elonGoogleWebBridge && window.__elonGoogleWebBridge.version === adapterVersion) return;
+  if (window.__elonGoogleWebBridge &&
+      window.__elonGoogleWebBridge.version === adapterVersion &&
+      window.__elonGoogleWebBridge.documentToken === documentToken) return;
 
   let sequence = 0;
   let emitTimer = 0;
@@ -27,6 +31,7 @@
       providerId: 'google_web',
       source: 'official_web',
       conversationId: location.pathname,
+      documentToken,
       sequence: ++sequence,
       emittedAt: new Date().toISOString(),
       event
@@ -36,6 +41,7 @@
   function emitResult(action, ok, detail) {
     nativeBridge.postMessage(JSON.stringify({
       adapterVersion,
+      documentToken,
       type: 'command_result',
       action: String(action || '').slice(0, 40),
       ok: !!ok,
@@ -325,7 +331,11 @@
     emitResult(action || 'unknown', false, 'Google AI 不支持这个本地动作。');
   }
 
-  window.__elonGoogleWebBridge = Object.freeze({ version: adapterVersion, command: runCommand });
+  window.__elonGoogleWebBridge = Object.freeze({
+    version: adapterVersion,
+    documentToken,
+    command: runCommand
+  });
   emitEvent({
     type: 'adapter_ready',
     capabilities: ['streaming', 'citations', 'new_conversation', 'conversation_history']

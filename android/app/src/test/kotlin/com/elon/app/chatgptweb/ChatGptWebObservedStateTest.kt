@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebBridgeDocumentSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -307,7 +308,7 @@ class ChatGptWebObservedStateTest {
         assertEquals(setOf("2026-08-13"), snapshot.conversations.single().activityDates)
     }
 
-    private fun document(page: Long, adapter: Long) = ChatGptWebDocumentSession.Snapshot(
+    private fun document(page: Long, adapter: Long) = WebBridgeDocumentSession.Snapshot(
         pageGeneration = page,
         adapterGeneration = adapter,
         documentToken = "doc_page_$page",
