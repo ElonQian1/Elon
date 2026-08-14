@@ -85,11 +85,15 @@ pub(crate) mod external_pool_adapter_sandbox_verifier_key_service;
 pub(crate) mod external_pool_adapter_scanner_key;
 pub(crate) mod external_pool_adapter_scanner_key_api;
 pub(crate) mod external_pool_adapter_scanner_key_service;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(crate) mod external_pool_adapter_supervisor_session;
 pub(crate) mod external_pool_adapter_supervisor_session_policy_companion;
 pub(crate) mod external_pool_adapter_supervisor_session_policy_companion_api;
 pub(crate) mod external_pool_adapter_supervisor_session_policy_companion_service;
 mod external_pool_adapter_supervisor_session_policy_companion_service_redaction;
 mod external_pool_adapter_supervisor_session_policy_companion_service_validation;
+#[cfg(test)]
+mod external_pool_adapter_supervisor_session_source_contract_tests;
 pub(crate) mod external_pool_adapter_upstream_transport_target;
 pub(crate) mod external_pool_adapter_upstream_transport_target_api;
 pub(crate) mod external_pool_adapter_upstream_transport_target_service;
