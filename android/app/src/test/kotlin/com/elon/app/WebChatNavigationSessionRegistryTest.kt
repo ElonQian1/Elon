@@ -52,6 +52,9 @@ class WebChatNavigationSessionRegistryTest {
     fun rejectsAnUnavailableProviderEvenWhenASessionWasRegistered() {
         val registry = WebChatNavigationSessionRegistry(
             sessions = listOf(navigationSession(WebChatProviderId.GOOGLE_WEB)),
+            identity = { id ->
+                completeIdentity(id).copy(available = false)
+            },
         )
 
         assertNull(registry.session(WebChatProviderId.GOOGLE_WEB))

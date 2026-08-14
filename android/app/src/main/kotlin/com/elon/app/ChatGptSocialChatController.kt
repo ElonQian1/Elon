@@ -21,7 +21,8 @@ internal class ChatGptSocialChatController(
     private val collapseInputComposer: () -> Unit,
     private val openOfficialFallback: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
-) {
+) : WebChatSocialController {
+    override val providerId = WebChatProviderId.CHATGPT_WEB
     private val messages = mutableListOf<ChatMessage>()
     private val timestamps = linkedMapOf<String, Long>()
     private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions)
@@ -42,7 +43,7 @@ internal class ChatGptSocialChatController(
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
 
-    fun activate(identity: WebChatProviderIdentity) {
+    override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
         active = true
         setChatAdapter(adapter)
@@ -53,34 +54,34 @@ internal class ChatGptSocialChatController(
         updateComposerModel(session.currentSnapshot()?.currentModel.orEmpty())
     }
 
-    fun deactivate() {
+    override fun deactivate() {
         active = false
     }
 
-    fun isActive(): Boolean = active
+    override fun isActive(): Boolean = active
 
-    fun currentMessages(): List<ChatMessage> = messages.toList()
+    override fun currentMessages(): List<ChatMessage> = messages.toList()
 
-    fun stateWireValue(): String = session.state().wireValue
+    override fun stateWireValue(): String = session.state().wireValue
 
-    fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
+    override fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 
-    fun adapterVersion(): Int = com.elon.app.chatgptweb.ChatGptWebPageAdapter.ADAPTER_VERSION
+    override fun adapterVersion(): Int = com.elon.app.chatgptweb.ChatGptWebPageAdapter.ADAPTER_VERSION
 
-    fun authenticated(): Boolean = session.currentSnapshot()?.authenticated == true
+    override fun authenticated(): Boolean = session.currentSnapshot()?.authenticated == true
 
-    fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
+    override fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
 
-    fun attachmentSupported(): Boolean = session.currentSnapshot()?.capabilities
+    override fun attachmentSupported(): Boolean = session.currentSnapshot()?.capabilities
         ?.supports(com.elon.app.chatgptweb.ChatGptWebCapabilityId.ATTACHMENTS) == true
 
-    fun refreshComposerModel() = updateComposerModel(currentModel())
+    override fun refreshComposerModel() = updateComposerModel(currentModel())
 
-    fun attachmentSendPhase(): String = session.attachmentSendPhase()
+    override fun attachmentSendPhase(): String = session.attachmentSendPhase()
 
-    fun pendingAttachmentCount(): Int = maxOf(session.pendingAttachmentCount(), pendingAttachments.size)
+    override fun pendingAttachmentCount(): Int = maxOf(session.pendingAttachmentCount(), pendingAttachments.size)
 
-    fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
+    override fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
         if (pendingAttachments.isNotEmpty()) {
             if (waitingForAttachmentCompletion) {
@@ -132,36 +133,36 @@ internal class ChatGptSocialChatController(
         return true
     }
 
-    fun requestModelOptions() {
+    override fun requestModelOptions() {
         if (!session.requestModelOptions()) {
             Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun stopGeneration() = session.stopGeneration()
+    override fun stopGeneration() = session.stopGeneration()
 
-    fun startNewConversation() {
+    override fun startNewConversation() {
         pendingPrompt = null
         session.startNewConversation()
     }
 
-    fun currentConversationPath(): String? = session.currentConversationPath()
+    override fun currentConversationPath(): String? = session.currentConversationPath()
 
-    fun conversationIndex() = session.conversationIndex()
+    override fun conversationIndex() = session.conversationIndex()
 
-    fun requestConversationIndex(): Boolean = session.requestConversationIndex()
+    override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
 
-    fun openConversation(path: String): Boolean {
+    override fun openConversation(path: String): Boolean {
         pendingPrompt = null
         return session.openConversation(path)
     }
 
-    fun openProject(path: String): Boolean {
+    override fun openProject(path: String): Boolean {
         pendingPrompt = null
         return session.openProject(path)
     }
 
-    fun discardAcceptanceAttachmentSend(): Boolean {
+    override fun discardAcceptanceAttachmentSend(): Boolean {
         if (waitingForAttachmentCompletion) return false
         val hadFixture = pendingAttachments.any {
             ChatGptWebAcceptanceAttachmentFixture.matches(activity.cacheDir, it)
@@ -173,11 +174,11 @@ internal class ChatGptSocialChatController(
         return true
     }
 
-    fun onHostResumed() = session.onHostResumed()
+    override fun onHostResumed() = session.onHostResumed()
 
-    fun onHostPaused() = session.onHostPaused()
+    override fun onHostPaused() = session.onHostPaused()
 
-    fun destroy() = session.destroy()
+    override fun destroy() = session.destroy()
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
         val cleanPending = pendingPrompt?.trim().orEmpty()

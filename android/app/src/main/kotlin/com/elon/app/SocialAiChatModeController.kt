@@ -3,6 +3,7 @@ package com.elon.app
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebTestActivity
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.googleweb.GoogleWebOfficialActivity
 
 internal class SocialAiChatModeController(
     private val activity: AppCompatActivity,
@@ -52,7 +53,11 @@ internal class SocialAiChatModeController(
     }
 
     fun openOfficialFallback() {
-        activity.startActivity(ChatGptWebTestActivity.createProductIntent(activity))
+        val intent = when (providerId) {
+            WebChatProviderId.CHATGPT_WEB -> ChatGptWebTestActivity.createProductIntent(activity)
+            WebChatProviderId.GOOGLE_WEB -> GoogleWebOfficialActivity.createIntent(activity)
+        }
+        activity.startActivity(intent)
     }
 
     fun openSocialAiChat(): Boolean {

@@ -24,7 +24,7 @@ internal class MainSocialAiChatFeature(
     private val updateWorkModel: () -> Unit,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
-    private val webChatController: ChatGptSocialChatController by lazy {
+    private val chatGptControllerDelegate = lazy {
         ChatGptSocialChatController(
             activity = activity,
             binding = binding,
@@ -36,6 +36,20 @@ internal class MainSocialAiChatFeature(
             onConversationIndexChanged = { onWebChatNavigationChanged() },
         )
     }
+    private val chatGptController by chatGptControllerDelegate
+    private val googleControllerDelegate = lazy {
+        GoogleWebSocialChatController(
+            activity = activity,
+            binding = binding,
+            setChatAdapter = setChatAdapter,
+            showMessageActions = showMessageActions,
+            clearPendingSendState = clearPendingSendState,
+            collapseInputComposer = collapseInputComposer,
+            openOfficialFallback = { modeController.openOfficialFallback() },
+            onConversationIndexChanged = { onWebChatNavigationChanged() },
+        )
+    }
+    private val googleController by googleControllerDelegate
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -56,18 +70,34 @@ internal class MainSocialAiChatFeature(
                 WebChatNavigationSession(
                     providerId = WebChatProviderId.CHATGPT_WEB,
                     capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
-                    indexSource = webChatController::conversationIndex,
-                    refreshSource = webChatController::requestConversationIndex,
+                    indexSource = chatGptController::conversationIndex,
+                    refreshSource = chatGptController::requestConversationIndex,
                     newConversationSource = {
                         if (webChatState() != "ready") {
                             false
                         } else {
-                            webChatController.startNewConversation()
+                            chatGptController.startNewConversation()
                             true
                         }
                     },
-                    openConversationSource = webChatController::openConversation,
-                    openProjectSource = webChatController::openProject,
+                    openConversationSource = chatGptController::openConversation,
+                    openProjectSource = chatGptController::openProject,
+                ),
+                WebChatNavigationSession(
+                    providerId = WebChatProviderId.GOOGLE_WEB,
+                    capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
+                    indexSource = googleController::conversationIndex,
+                    refreshSource = googleController::requestConversationIndex,
+                    newConversationSource = {
+                        if (webChatState() != "ready") {
+                            false
+                        } else {
+                            googleController.startNewConversation()
+                            true
+                        }
+                    },
+                    openConversationSource = googleController::openConversation,
+                    openProjectSource = googleController::openProject,
                 ),
             ),
         )
@@ -76,9 +106,9 @@ internal class MainSocialAiChatFeature(
     fun onFriendChanged(friend: AppFriend?) = modeController.onFriendChanged(friend)
 
     fun trySendMessage(text: String, attachments: List<PendingAttachment>): Boolean =
-        webChatController.trySendMessage(text, attachments)
+        activeController().trySendMessage(text, attachments)
 
-    fun currentMessages(): List<ChatMessage> = webChatController.currentMessages()
+    fun currentMessages(): List<ChatMessage> = activeController().currentMessages()
 
     fun openSocialAiChat(): Boolean = modeController.openSocialAiChat()
 
@@ -94,23 +124,23 @@ internal class MainSocialAiChatFeature(
 
     fun isChatModeActive(): Boolean = modeController.isChatModeActive()
 
-    fun webChatState(): String = webChatController.stateWireValue()
+    fun webChatState(): String = activeController().stateWireValue()
 
-    fun webChatModel(): String = webChatController.currentModel()
+    fun webChatModel(): String = activeController().currentModel()
 
-    fun webChatAdapterVersion(): Int = webChatController.adapterVersion()
+    fun webChatAdapterVersion(): Int = activeController().adapterVersion()
 
-    fun webChatAuthenticated(): Boolean = webChatController.authenticated()
+    fun webChatAuthenticated(): Boolean = activeController().authenticated()
 
-    fun webChatComposerReady(): Boolean = webChatController.composerReady()
+    fun webChatComposerReady(): Boolean = activeController().composerReady()
 
-    fun webChatAttachmentSupported(): Boolean = webChatController.attachmentSupported()
+    fun webChatAttachmentSupported(): Boolean = activeController().attachmentSupported()
 
-    fun webChatAttachmentPhase(): String = webChatController.attachmentSendPhase()
+    fun webChatAttachmentPhase(): String = activeController().attachmentSendPhase()
 
-    fun webChatPendingAttachmentCount(): Int = webChatController.pendingAttachmentCount()
+    fun webChatPendingAttachmentCount(): Int = activeController().pendingAttachmentCount()
 
-    fun webChatConversationPath(): String? = webChatController.currentConversationPath()
+    fun webChatConversationPath(): String? = activeController().currentConversationPath()
 
     fun webChatConversationIndex(): ChatGptWebConversationIndexState =
         webChatNavigationSession()?.index() ?: ChatGptWebConversationIndexState()
@@ -127,6 +157,7 @@ internal class MainSocialAiChatFeature(
             openConversation = ::openWebChatConversation,
             openProject = ::openWebChatProject,
             openOfficialFallback = ::openOfficialFallback,
+            providerName = ::providerName,
             active = { isChatModeActive() && webChatNavigationAvailable() },
         )
         onWebChatNavigationChanged = coordinator::onIndexChanged
@@ -150,7 +181,7 @@ internal class MainSocialAiChatFeature(
             webChatNavigationSession()?.openProject(path) == true
 
     fun discardWebChatAcceptanceAttachmentSend(): Boolean =
-        webChatController.discardAcceptanceAttachmentSend()
+        activeController().discardAcceptanceAttachmentSend()
 
     fun selectInteractionMode(value: String): Boolean {
         val mode = SocialAiInteractionMode.parse(value) ?: return false
@@ -163,12 +194,18 @@ internal class MainSocialAiChatFeature(
     }
 
     fun onHostResumed(resumeWorkChat: () -> Unit) {
-        if (isChatModeActive()) webChatController.onHostResumed() else resumeWorkChat()
+        if (isChatModeActive()) activeController().onHostResumed() else resumeWorkChat()
     }
 
-    fun onHostPaused() = webChatController.onHostPaused()
+    fun onHostPaused() {
+        if (chatGptControllerDelegate.isInitialized()) chatGptController.onHostPaused()
+        if (googleControllerDelegate.isInitialized()) googleController.onHostPaused()
+    }
 
-    fun destroy() = webChatController.destroy()
+    fun destroy() {
+        if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
+        if (googleControllerDelegate.isInitialized()) googleController.destroy()
+    }
 
     private fun activateWorkMode() {
         deactivateChatProvider()
@@ -176,7 +213,8 @@ internal class MainSocialAiChatFeature(
     }
 
     private fun deactivateChatProvider() {
-        webChatController.deactivate()
+        if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
+        if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         binding.modelButton.tag = null
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = null
@@ -193,17 +231,27 @@ internal class MainSocialAiChatFeature(
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
-        webChatController.activate(provider)
+        if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
+        if (googleControllerDelegate.isInitialized()) googleController.deactivate()
+        val controller = controllerFor(provider.id)
+        controller.activate(provider)
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
                 width = dp(MODEL_BUTTON_CHAT_WIDTH_DP)
             }
             views.planModeButton.visibility = View.GONE
-            views.modelButtonShell.setOnClickListener { webChatController.requestModelOptions() }
-            binding.modelButton.setOnClickListener { webChatController.requestModelOptions() }
+            views.modelButtonShell.setOnClickListener { activeController().requestModelOptions() }
+            binding.modelButton.setOnClickListener { activeController().requestModelOptions() }
         }
-        binding.root.post { webChatController.refreshComposerModel() }
+        binding.root.post { controller.refreshComposerModel() }
+    }
+
+    private fun activeController(): WebChatSocialController = controllerFor(providerId())
+
+    private fun controllerFor(id: WebChatProviderId): WebChatSocialController = when (id) {
+        WebChatProviderId.CHATGPT_WEB -> chatGptController
+        WebChatProviderId.GOOGLE_WEB -> googleController
     }
 
     private fun webChatNavigationSession(): WebChatNavigationSession? =

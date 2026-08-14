@@ -25,10 +25,13 @@ class WebChatProviderRegistryTest {
         assertTrue(chatGpt.selectable)
         assertEquals(WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION, chatGpt.capabilities)
         assertEquals("Google 搜索网页 AI", google.displayName)
-        assertFalse(google.available)
-        assertFalse(google.selectable)
-        assertTrue(google.capabilities.isEmpty())
-        assertEquals(listOf(WebChatProviderId.CHATGPT_WEB), WebChatProviderRegistry.available().map { it.id })
+        assertTrue(google.available)
+        assertTrue(google.selectable)
+        assertEquals(WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION, google.capabilities)
+        assertEquals(
+            listOf(WebChatProviderId.CHATGPT_WEB, WebChatProviderId.GOOGLE_WEB),
+            WebChatProviderRegistry.available().map { it.id },
+        )
     }
 
     @Test

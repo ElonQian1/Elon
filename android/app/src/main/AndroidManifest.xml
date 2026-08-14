@@ -118,6 +118,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".googleweb.GoogleWebOfficialActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".VoiceEngineActivity"
             android:exported="false"
             android:parentActivityName=".SettingsActivity" />

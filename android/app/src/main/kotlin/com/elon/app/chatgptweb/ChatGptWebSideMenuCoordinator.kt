@@ -30,6 +30,7 @@ internal class ChatGptWebSideMenuCoordinator(
     private val openConversation: (String) -> Unit,
     private val openProject: (String) -> Unit,
     private val openOfficialFallback: () -> Unit,
+    private val providerName: () -> String,
     private val active: () -> Boolean,
 ) {
     private lateinit var view: ChatGptWebSideMenuView
@@ -49,6 +50,7 @@ internal class ChatGptWebSideMenuCoordinator(
             openConversation = openConversation,
             openProject = openProject,
             openOfficialFallback = openOfficialFallback,
+            providerName = providerName,
             openSettings = openSettings,
             requestClose = requestClose,
             dp = dp,

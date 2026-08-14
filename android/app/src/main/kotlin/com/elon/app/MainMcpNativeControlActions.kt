@@ -106,7 +106,7 @@ internal class MainMcpNativeControlActions(
                     ?: return errorJson(action, "social_ai_feature_unavailable")
                 uiState()
             }
-            "open_chatgpt_official_fallback" -> {
+            "open_chatgpt_official_fallback", "open_web_chat_official_fallback" -> {
                 socialAiChatFeature()?.openOfficialFallback()
                     ?: return errorJson(action, "social_ai_feature_unavailable")
                 uiState()

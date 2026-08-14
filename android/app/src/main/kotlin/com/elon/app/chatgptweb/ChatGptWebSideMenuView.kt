@@ -28,6 +28,7 @@ internal class ChatGptWebSideMenuView(
     private val openConversation: (String) -> Unit,
     private val openProject: (String) -> Unit,
     private val openOfficialFallback: () -> Unit,
+    private val providerName: () -> String,
     private val openSettings: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
@@ -114,7 +115,7 @@ internal class ChatGptWebSideMenuView(
             render()
         }, LinearLayout.LayoutParams(dp(58), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-        addView(iconButton(R.drawable.social_sidebar_search, "搜索 ChatGPT 会话") {
+        addView(iconButton(R.drawable.social_sidebar_search, "搜索${providerName()}会话") {
             searchVisible = !searchVisible
             if (!searchVisible) searchQuery = ""
             render()
@@ -217,7 +218,7 @@ internal class ChatGptWebSideMenuView(
             val active = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)
             val unassigned = ChatGptWebConversationIndex.unassignedExcluding(state.conversations, active)
             if (active.isEmpty() && unassigned.isEmpty()) {
-                container.addView(emptyState(activity.getString(R.string.chatgpt_side_menu_empty_date)))
+                container.addView(emptyState("${providerName()}在这一天暂无会话活动"))
                 return
             }
             renderConversationSection(
@@ -237,7 +238,7 @@ internal class ChatGptWebSideMenuView(
                 conversation.projectTitle.orEmpty().contains(query, ignoreCase = true)
         }
         if (values.isEmpty()) {
-            container.addView(emptyState(activity.getString(R.string.chatgpt_side_menu_no_results)))
+            container.addView(emptyState("没有匹配的${providerName()}会话"))
             return
         }
         ChatGptWebConversationIndex.sections(values).forEach { section ->
@@ -262,7 +263,7 @@ internal class ChatGptWebSideMenuView(
             query.isBlank() || project.title.contains(query, ignoreCase = true)
         }
         if (projects.isEmpty()) {
-            container.addView(emptyState(activity.getString(R.string.chatgpt_side_menu_empty_projects)))
+            container.addView(emptyState("${providerName()}当前暂无项目"))
             return
         }
         projects.forEach { project ->
