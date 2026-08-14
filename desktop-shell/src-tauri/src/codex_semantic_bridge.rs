@@ -81,6 +81,11 @@ impl CodexSemanticBridge {
         while state.events.len() > MAX_NATIVE_EVENTS {
             state.events.pop_front();
         }
+        // Every native bridge event must reach the durable redacted snapshot. Keeping
+        // persistence inside record() prevents command handlers from silently creating
+        // an in-memory-only timeline after a desktop restart.
+        drop(state);
+        self.persist();
         event
     }
 
@@ -188,7 +193,6 @@ pub(crate) fn record_app_event(
 ) {
     let bridge = app.state::<CodexSemanticBridge>();
     bridge.record(trace_id, level, kind, summary, fields);
-    bridge.persist();
 }
 
 #[tauri::command]
