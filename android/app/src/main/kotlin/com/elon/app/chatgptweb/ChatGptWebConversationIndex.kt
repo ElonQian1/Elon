@@ -64,15 +64,8 @@ internal object ChatGptWebConversationIndex {
         date: LocalDate,
     ): List<ChatGptWebConversation> = values.filter { date.toString() in it.activityDates }
 
-    fun unassignedExcluding(
-        values: List<ChatGptWebConversation>,
-        excluded: List<ChatGptWebConversation>,
-    ): List<ChatGptWebConversation> {
-        val excludedIdentities = excluded.mapTo(mutableSetOf(), ::identityOf)
-        return values.filter { conversation ->
-            conversation.projectId == null && identityOf(conversation) !in excludedIdentities
-        }
-    }
+    fun unassigned(values: List<ChatGptWebConversation>): List<ChatGptWebConversation> =
+        values.filter { it.projectId == null }
 
     fun identityOf(value: ChatGptWebConversation): String =
         ChatGptWebConversationPath.identity(value.path) ?: value.id

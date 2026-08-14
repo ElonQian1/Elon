@@ -50,6 +50,16 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val googleController by googleControllerDelegate
+    private val providerPicker by lazy {
+        WebChatProviderPicker(
+            activity = activity,
+            currentProvider = ::providerId,
+            currentModel = ::webChatModel,
+            selectProvider = modeController::selectChatProvider,
+            requestModelOptions = { activeController().requestModelOptions() },
+            openOfficialFallback = ::openOfficialFallback,
+        )
+    }
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -241,8 +251,8 @@ internal class MainSocialAiChatFeature(
                 width = dp(MODEL_BUTTON_CHAT_WIDTH_DP)
             }
             views.planModeButton.visibility = View.GONE
-            views.modelButtonShell.setOnClickListener { activeController().requestModelOptions() }
-            binding.modelButton.setOnClickListener { activeController().requestModelOptions() }
+            views.modelButtonShell.setOnClickListener { providerPicker.show() }
+            binding.modelButton.setOnClickListener { providerPicker.show() }
         }
         binding.root.post { controller.refreshComposerModel() }
     }

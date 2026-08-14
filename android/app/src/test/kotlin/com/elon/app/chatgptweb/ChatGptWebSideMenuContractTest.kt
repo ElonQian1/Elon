@@ -19,7 +19,7 @@ class ChatGptWebSideMenuContractTest {
 
         assertTrue(view.contains("createSocialSidebarDateStrip("))
         assertTrue(view.contains("ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)"))
-        assertTrue(view.contains("ChatGptWebConversationIndex.unassignedExcluding(state.conversations, active)"))
+        assertTrue(view.contains("ChatGptWebConversationIndex.unassigned(state.conversations)"))
         assertTrue(view.contains("chatgpt_side_menu_daily_active"))
         assertTrue(view.contains("chatgpt_side_menu_unassigned"))
         assertTrue(view.contains("renderProjects(this)"))

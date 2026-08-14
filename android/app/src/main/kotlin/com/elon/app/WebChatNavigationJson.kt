@@ -24,12 +24,18 @@ internal object WebChatNavigationJson {
         }
         val daily = date?.let { ChatGptWebConversationIndex.activeOn(matchingConversations, it) }
             ?: emptyList()
-        val conversations = if (date == null) {
-            matchingConversations
+        val rows = if (date == null) {
+            matchingConversations.map { conversation ->
+                WebChatNavigationRow(
+                    conversation,
+                    if (conversation.projectId == null) "unassigned" else "project",
+                )
+            }
         } else {
-            daily + ChatGptWebConversationIndex.unassignedExcluding(matchingConversations, daily)
+            daily.map { WebChatNavigationRow(it, "daily_active") } +
+                ChatGptWebConversationIndex.unassigned(matchingConversations)
+                    .map { WebChatNavigationRow(it, "unassigned") }
         }
-        val dailyIdentities = daily.mapTo(mutableSetOf(), ChatGptWebConversationIndex::identityOf)
         val projects = state.projects.filter { project ->
             query.isBlank() || project.title.contains(query, ignoreCase = true)
         }
@@ -40,26 +46,21 @@ internal object WebChatNavigationJson {
             .put("limit", limit)
             .put("query_applied", query.isNotBlank())
             .put("date", date?.toString() ?: JSONObject.NULL)
-            .put("conversation_total", conversations.size)
+            .put("conversation_total", rows.size)
+            .put("unique_conversation_total", matchingConversations.size)
             .put("project_total", projects.size)
-            .put("conversation_has_more", offset + limit < conversations.size)
+            .put("conversation_has_more", offset + limit < rows.size)
             .put("project_has_more", offset + limit < projects.size)
             .put("collection_state", state.collection.officialLoadState)
             .put("conversations", JSONArray().apply {
-                conversations.drop(offset).take(limit).forEach { conversation ->
+                rows.drop(offset).take(limit).forEach { row ->
+                    val conversation = row.conversation
                     put(JSONObject()
                         .put("id", conversation.id)
                         .put("title", conversation.title)
                         .put("path", conversation.path)
                         .put("active", conversation.active)
-                        .put(
-                            "sidebar_group",
-                            when {
-                                ChatGptWebConversationIndex.identityOf(conversation) in dailyIdentities -> "daily_active"
-                                conversation.projectId == null -> "unassigned"
-                                else -> "project"
-                            },
-                        )
+                        .put("sidebar_group", row.sidebarGroup)
                         .put("project_id", conversation.projectId ?: JSONObject.NULL)
                         .put("project_title", conversation.projectTitle ?: JSONObject.NULL)
                         .put("activity_dates", JSONArray(conversation.activityDates.sorted())))
@@ -76,3 +77,8 @@ internal object WebChatNavigationJson {
             })
     }
 }
+
+private data class WebChatNavigationRow(
+    val conversation: com.elon.app.chatgptweb.ChatGptWebConversation,
+    val sidebarGroup: String,
+)

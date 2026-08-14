@@ -52,43 +52,30 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
-    fun dateViewAddsRemainingUnassignedConversationsWithoutDuplicates() {
+    fun dateViewKeepsEveryUnassignedConversationInItsOwnSection() {
         val selected = LocalDate.of(2026, 8, 14)
         val activeUnassigned = conversation("active", "今天", null).copy(
             activityDates = setOf(selected.toString()),
         )
         val oldUnassigned = conversation("old", "昨天", null)
         val oldProject = conversation("project", "昨天", "g-p-demo")
-        val active = ChatGptWebConversationIndex.activeOn(
-            listOf(activeUnassigned, oldUnassigned, oldProject),
-            selected,
-        )
-
         assertEquals(
-            listOf("old"),
-            ChatGptWebConversationIndex.unassignedExcluding(
+            listOf("active", "old"),
+            ChatGptWebConversationIndex.unassigned(
                 listOf(activeUnassigned, oldUnassigned, oldProject),
-                active,
             ).map { it.id },
         )
     }
 
     @Test
-    fun dateViewDeduplicatesAliasesByCanonicalConversationPath() {
-        val selected = LocalDate.of(2026, 8, 14)
-        val activeAlias = conversation("active-id", "今天", null).copy(
-            path = "/c/shared-conversation",
-            activityDates = setOf(selected.toString()),
-        )
-        val cachedAlias = conversation("cached-id", "旧缓存", null).copy(
-            path = "/g/g-p-demo/c/shared-conversation",
-        )
-
+    fun unassignedSectionExcludesEveryProjectConversation() {
         assertEquals(
-            emptyList<String>(),
-            ChatGptWebConversationIndex.unassignedExcluding(
-                listOf(activeAlias, cachedAlias),
-                listOf(activeAlias),
+            listOf("plain"),
+            ChatGptWebConversationIndex.unassigned(
+                listOf(
+                    conversation("plain", "今天", null),
+                    conversation("project", "今天", "g-p-demo"),
+                ),
             ).map { it.id },
         )
     }

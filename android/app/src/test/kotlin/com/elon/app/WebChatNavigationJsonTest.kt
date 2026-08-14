@@ -12,7 +12,7 @@ import org.junit.Test
 
 class WebChatNavigationJsonTest {
     @Test
-    fun datePageListsDailyActivityThenRemainingUnassignedWithoutProjectDuplicates() {
+    fun datePageListsDailyActivityThenEveryUnassignedConversation() {
         val selected = LocalDate.of(2026, 8, 14)
         val state = ChatGptWebConversationIndexState(
             conversations = listOf(
@@ -38,15 +38,16 @@ class WebChatNavigationJsonTest {
         )
 
         assertEquals("elon.web_chat.navigation.v1", page.getString("schema"))
-        assertEquals(3, page.getInt("conversation_total"))
+        assertEquals(4, page.getInt("conversation_total"))
+        assertEquals(4, page.getInt("unique_conversation_total"))
         assertEquals(
-            listOf("active-project", "active-unassigned", "old-unassigned"),
+            listOf("active-project", "active-unassigned", "active-unassigned", "old-unassigned"),
             page.getJSONArray("conversations").let { values ->
                 (0 until values.length()).map { values.getJSONObject(it).getString("id") }
             },
         )
         assertEquals(
-            listOf("daily_active", "daily_active", "unassigned"),
+            listOf("daily_active", "daily_active", "unassigned", "unassigned"),
             page.getJSONArray("conversations").let { values ->
                 (0 until values.length()).map { values.getJSONObject(it).getString("sidebar_group") }
             },

@@ -98,7 +98,7 @@ internal class GoogleWebSocialChatController(
     }
 
     override fun requestModelOptions() {
-        Toast.makeText(activity, "模型由 Google AI 模式官方页面选择", Toast.LENGTH_SHORT).show()
+        openOfficialFallback()
     }
 
     override fun refreshComposerModel() = updateComposerModel()

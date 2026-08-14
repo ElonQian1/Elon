@@ -216,7 +216,7 @@ internal class ChatGptWebSideMenuView(
         val query = searchQuery.trim()
         if (query.isBlank()) {
             val active = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)
-            val unassigned = ChatGptWebConversationIndex.unassignedExcluding(state.conversations, active)
+            val unassigned = ChatGptWebConversationIndex.unassigned(state.conversations)
             if (active.isEmpty() && unassigned.isEmpty()) {
                 container.addView(emptyState("${providerName()}在这一天暂无会话活动"))
                 return

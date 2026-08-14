@@ -129,6 +129,7 @@
     <string name="social_ai_mode_selected">已选中</string>
     <string name="social_ai_mode_tab_description">%1$s模式 %2$s</string>
     <string name="web_chat_provider_picker_title">选择网页 AI</string>
+    <string name="web_chat_provider_model_action">模型设置</string>
     <string name="web_chat_open_official">官网功能</string>
     <string name="web_chat_login_required">当前页面需要登录；官网支持匿名聊天时可直接使用</string>
     <string name="web_chat_not_ready">ChatGPT 网页 AI 正在连接，请稍后重试</string>
