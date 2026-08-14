@@ -208,7 +208,9 @@ internal class GoogleWebBackgroundSession(
                     return
                 }
                 onCommandResult(event)
-                if (event.ok) handler.postDelayed({ pageAdapter?.requestSnapshot() }, 500L)
+                if (event.ok || event.action == "send_prompt") {
+                    handler.postDelayed({ pageAdapter?.requestSnapshot() }, 500L)
+                }
             }
             is ChatGptWebEvent.AdapterReady -> Unit
             else -> Unit

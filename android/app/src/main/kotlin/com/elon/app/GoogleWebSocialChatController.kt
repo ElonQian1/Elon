@@ -169,8 +169,13 @@ internal class GoogleWebSocialChatController(
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
         if (event.action != "send_prompt" || event.ok) return
+        val failedPrompt = pendingPrompt
         pendingPrompt = null
         session.currentSnapshot()?.let(::renderSnapshot)
+        if (active && !failedPrompt.isNullOrBlank() && binding.inputEdit.text.isNullOrBlank()) {
+            binding.inputEdit.setText(failedPrompt)
+            binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        }
         Toast.makeText(activity, event.detail.ifBlank { "Google 网页 AI 操作失败" }, Toast.LENGTH_LONG).show()
     }
 

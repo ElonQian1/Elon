@@ -6,9 +6,10 @@
   const documentToken = String(window.__elonGoogleWebDocumentToken || '');
   const nativeBridge = window.elonGoogleWebNative;
   const messageExtractor = window.__elonGoogleWebMessageExtractor;
+  const sendPolicy = window.__elonGoogleWebSendPolicy;
   if (!allowedOrigins.has(location.origin) || !adapterVersion ||
       !/^doc_[a-z0-9_]{3,80}$/.test(documentToken) || !nativeBridge ||
-      typeof nativeBridge.postMessage !== 'function' || !messageExtractor ||
+      typeof nativeBridge.postMessage !== 'function' || !messageExtractor || !sendPolicy ||
       typeof messageExtractor.extract !== 'function') return;
   if (window.__elonGoogleWebBridge &&
       window.__elonGoogleWebBridge.version === adapterVersion &&
@@ -217,25 +218,72 @@
   function sendPrompt(value, expectedDraft) {
     const composer = findComposer();
     if (!composer) return emitResult('send_prompt', false, 'Google AI 输入框尚未就绪。');
-    if (cleanText(composerValue(composer)) !== cleanText(expectedDraft)) {
+    const prompt = cleanText(value);
+    const draft = cleanText(composerValue(composer));
+    const reconciliation = sendPolicy.reconcile(draft, cleanText(expectedDraft), prompt);
+    if (!reconciliation.allowed) {
+      scheduleSnapshot();
       return emitResult('send_prompt', false, '官方网页草稿已经变化，请确认后重试。');
     }
-    if (!setComposerValue(composer, value)) {
+    if (reconciliation.write && !setComposerValue(composer, value)) {
       return emitResult('send_prompt', false, 'Google 官方输入框未接受文本。');
     }
-    messageExtractor.rememberQuery(value);
     const form = composer.closest('form');
-    const button = findButton(['send', 'submit', 'search', '发送', '提交', '搜索'], form || document);
+    const scope = form || composer.parentElement?.parentElement?.parentElement || composer.parentElement;
+    const button = findButton(['send', 'submit', '发送', '提交'], scope || document);
+    const beforeHref = location.href;
+    let submitted = false;
     if (button) {
-      emitResult('send_prompt', true, '');
       button.click();
+      submitted = true;
     } else if (form && typeof form.requestSubmit === 'function') {
-      emitResult('send_prompt', true, '');
       form.requestSubmit();
+      submitted = true;
     } else {
-      return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        bubbles: true,
+        cancelable: true
+      });
+      composer.dispatchEvent(event);
+      composer.dispatchEvent(new KeyboardEvent('keyup', {
+        key: 'Enter',
+        code: 'Enter',
+        bubbles: true,
+        cancelable: true
+      }));
+      submitted = true;
     }
-    scheduleSnapshot();
+    if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
+
+    const startedAt = Date.now();
+    function confirmSubmission() {
+      const currentComposer = findComposer();
+      const streaming = isStreaming();
+      const extraction = messageExtractor.extract(currentComposer, streaming);
+      const userMessage = extraction.messages.find((message) => message.role === 'user');
+      const queryMatches = !!userMessage && cleanText(
+        (userMessage.content || []).map((part) => part.text || '').join('\n')
+      ) === prompt;
+      if (sendPolicy.confirmed({
+        hrefChanged: location.href !== beforeHref,
+        streaming,
+        queryMatches,
+        currentDraft: cleanText(composerValue(currentComposer)),
+        prompt
+      })) {
+        messageExtractor.rememberQuery(prompt);
+        emitResult('send_prompt', true, '');
+        return scheduleSnapshot();
+      }
+      if (Date.now() - startedAt >= 8000) {
+        scheduleSnapshot();
+        return emitResult('send_prompt', false, 'Google 官方页未确认发送，请重试。');
+      }
+      window.setTimeout(confirmSubmission, 160);
+    }
+    window.setTimeout(confirmSubmission, 160);
   }
 
   function runCommand(raw) {

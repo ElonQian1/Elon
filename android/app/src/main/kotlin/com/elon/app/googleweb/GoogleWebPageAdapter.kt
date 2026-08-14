@@ -137,10 +137,11 @@ internal class GoogleWebPageAdapter(
         origin.scheme == "https" && origin.port == -1 && origin.host?.lowercase() in ALLOWED_HOSTS
 
     companion object {
-        const val ADAPTER_VERSION = 3
+        const val ADAPTER_VERSION = 4
         private val ADAPTER_ASSETS = listOf(
             "google_web_answer_candidate_policy.js",
             "google_web_message_extractor.js",
+            "google_web_send_policy.js",
             "google_web_adapter.js",
         )
         private const val BRIDGE_OBJECT = "elonGoogleWebNative"
