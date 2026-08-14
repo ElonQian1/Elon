@@ -145,22 +145,23 @@ pub(super) async fn open(
     );
     // 直接用目标页创建 WebView。Windows 上先以 about:blank 创建再 navigate，
     // 会只留下 Tao 的 16x16 内部消息窗口，并且永远没有 page-load 事件。
-    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url.clone()))
+    let builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url.clone()))
         .title(format!("{} · 一龙聊天", provider.display_name))
         .inner_size(940.0, 760.0)
         .min_inner_size(720.0, 560.0)
         .center()
         .focused(true)
         .enable_clipboard_access()
+        // 与主窗口复用默认 WebView2 Profile 时，环境参数必须完全一致；否则
+        // WebView2 会在异步初始化阶段静默拒绝第二个环境，表现为窗口不出现。
+        .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
         .initialization_script(include_str!("native_window_probe.js"));
     // Windows 的 parent/owner 都会让动态 WebViewWindow 落到 Tao 的 16x16
     // 内部消息窗口，而不是用户可见的顶层窗口。官方网页窗口已经验证过：不设置
     // 关系时能稳定创建真实顶层 WebView2，因此 Windows 独立聊天窗也保持 standalone。
     // 其它平台继续使用各自的 parent/transient 语义。
     #[cfg(not(windows))]
-    {
-        builder = builder.parent(&webview).map_err(display_error)?;
-    }
+    let builder = builder.parent(&webview).map_err(display_error)?;
     let window = builder
         .on_navigation(move |candidate| {
             let allowed = navigation_origin.allows(candidate);

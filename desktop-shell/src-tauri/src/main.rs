@@ -40,6 +40,8 @@ use tauri_plugin_notification::NotificationExt;
 
 /// 主窗口 label，托盘菜单/左键点击/全局快捷键需要用它找回窗口。
 const MAIN_WINDOW_LABEL: &str = "main";
+pub(crate) const WEBVIEW2_BROWSER_ARGS: &str =
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --no-proxy-server";
 
 /// 只在本次进程生命周期里提醒一次"已最小化到托盘"，避免每次关闭都打扰用户。
 static NOTIFIED_BACKGROUND: AtomicBool = AtomicBool::new(false);
@@ -184,9 +186,7 @@ fn main() {
                 // （项目里 curl/SSH 访问该服务器都要求 --noproxy / ProxyCommand=none）。
                 // WebView2 默认走系统代理，这里强制直连，同时保留 wry 默认关闭的
                 // Edge 附加组件参数。
-                .additional_browser_args(
-                    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --no-proxy-server",
-                )
+                .additional_browser_args(WEBVIEW2_BROWSER_ARGS)
                 .initialization_script(LOADING_OVERLAY_SCRIPT)
                 .initialization_script(FRAMELESS_FLAG_SCRIPT)
                 .on_navigation(|url| {
