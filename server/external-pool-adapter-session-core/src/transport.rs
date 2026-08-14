@@ -39,7 +39,7 @@ impl ExternalPoolAdapterSessionFrameKind {
         }
     }
 
-    fn payload_limit(self) -> usize {
+    pub const fn maximum_payload_bytes(self) -> usize {
         match self {
             Self::Control => MAX_CONTROL_PAYLOAD_BYTES,
             Self::Config => MAX_CONFIG_PAYLOAD_BYTES,
@@ -142,7 +142,7 @@ impl AuthenticatedExternalPoolAdapterSession {
         payload: &[u8],
     ) -> Result<()> {
         self.ensure_active()?;
-        if payload.len() > kind.payload_limit() {
+        if payload.len() > kind.maximum_payload_bytes() {
             bail!("authenticated session frame rejected");
         }
         if self.next_send_sequence > MAX_FRAMES_PER_DIRECTION {
@@ -197,7 +197,7 @@ impl AuthenticatedExternalPoolAdapterSession {
             &packet[payload_end..],
         )?;
         let kind = ExternalPoolAdapterSessionFrameKind::from_byte(header[5])?;
-        if payload_length > kind.payload_limit()
+        if payload_length > kind.maximum_payload_bytes()
             || sequence != self.next_receive_sequence
             || sequence > MAX_FRAMES_PER_DIRECTION
         {
@@ -220,11 +220,18 @@ impl AuthenticatedExternalPoolAdapterSession {
         Ok(())
     }
 
+    /// Makes a locally detected protocol or authority mismatch terminal before returning it.
+    pub fn terminate(&mut self) {
+        if self.active {
+            self.active = false;
+            self.send_key.zeroize_now();
+            self.receive_key.zeroize_now();
+            self.terminal_strategy.terminate(self.socket.as_raw_fd());
+        }
+    }
+
     fn fail<T>(&mut self, error: anyhow::Error) -> Result<T> {
-        self.active = false;
-        self.send_key.zeroize_now();
-        self.receive_key.zeroize_now();
-        self.terminal_strategy.terminate(self.socket.as_raw_fd());
+        self.terminate();
         Err(error)
     }
 

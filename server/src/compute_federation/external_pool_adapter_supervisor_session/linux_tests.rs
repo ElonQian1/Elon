@@ -3,9 +3,14 @@ use std::{mem::MaybeUninit, os::fd::RawFd, thread};
 use anyhow::Result;
 
 use super::{
+    prepare_external_pool_adapter_ephemeral_bundle_delivery,
     prepare_external_pool_adapter_supervisor_session, AuthenticatedExternalPoolAdapterSession,
     ExternalPoolAdapterSessionFrameKind, ExternalPoolAdapterSessionRoots,
 };
+use elon_external_pool_adapter_session_core::receive_external_pool_adapter_ephemeral_bundle;
+
+const DELIVERY_CONFIG: &[u8] = br#"{"mode":"test-no-work"}"#;
+const DELIVERY_CREDENTIAL: &[u8] = b"test-credential-never-production";
 
 #[test]
 fn linux_kernel_uses_anonymous_cloexec_seqpacket_and_one_time_seed_pipe() {
@@ -130,6 +135,143 @@ fn authenticated_frames_reject_reflection_unknown_kind_and_credential_oversize()
     assert!(host.receive().is_err());
 }
 
+#[test]
+fn ephemeral_bundle_delivery_completes_exact_receipt_commit_ready_and_shutdown() {
+    let delivery = prepare_external_pool_adapter_ephemeral_bundle_delivery(
+        17,
+        DELIVERY_CONFIG,
+        DELIVERY_CREDENTIAL,
+    )
+    .expect("prepare delivery");
+    let bundle_root = delivery.bundle_root_hex();
+    let session_roots = roots_with_bundle(0x11, &bundle_root);
+    let prepared = prepare_external_pool_adapter_supervisor_session(session_roots.clone())
+        .expect("prepare authenticated delivery session");
+    let (host, child) = prepared.split();
+    let child_root = bundle_root.clone();
+    let child_thread = thread::spawn(move || {
+        let mut session = child
+            .authenticate(session_roots)
+            .expect("authenticate child");
+        let delivered = receive_external_pool_adapter_ephemeral_bundle(&mut session, &child_root)
+            .expect("receive exact delivery");
+        assert_eq!(delivered.generation(), 17);
+        assert_eq!(delivered.config(), DELIVERY_CONFIG);
+        assert_eq!(delivered.credential(), DELIVERY_CREDENTIAL);
+        delivered
+            .wait_for_shutdown(&mut session)
+            .expect("zeroize and acknowledge shutdown");
+    });
+    let mut session = host.authenticate().expect("authenticate host");
+    let receipt = delivery
+        .deliver(
+            &mut session,
+            &bundle_root,
+            DELIVERY_CONFIG,
+            DELIVERY_CREDENTIAL,
+        )
+        .expect("deliver exact material");
+    receipt.shutdown(&mut session).expect("shutdown delivery");
+    child_thread.join().expect("join child");
+}
+
+#[test]
+fn ephemeral_bundle_host_material_drift_is_terminal_before_delivery() {
+    let delivery = prepare_external_pool_adapter_ephemeral_bundle_delivery(
+        18,
+        DELIVERY_CONFIG,
+        DELIVERY_CREDENTIAL,
+    )
+    .expect("prepare delivery");
+    let bundle_root = delivery.bundle_root_hex();
+    let session_roots = roots_with_bundle(0x11, &bundle_root);
+    let prepared = prepare_external_pool_adapter_supervisor_session(session_roots.clone())
+        .expect("prepare authenticated delivery session");
+    let (host, child) = prepared.split();
+    let child_root = bundle_root.clone();
+    let child_thread = thread::spawn(move || {
+        let mut session = child
+            .authenticate(session_roots)
+            .expect("authenticate child");
+        assert!(receive_external_pool_adapter_ephemeral_bundle(&mut session, &child_root).is_err());
+    });
+    let mut session = host.authenticate().expect("authenticate host");
+    assert!(delivery
+        .deliver(
+            &mut session,
+            &bundle_root,
+            br#"{"mode":"drifted"}"#,
+            DELIVERY_CREDENTIAL,
+        )
+        .is_err());
+    assert!(session
+        .send(
+            ExternalPoolAdapterSessionFrameKind::Control,
+            b"after-terminal"
+        )
+        .is_err());
+    child_thread.join().expect("join rejected child");
+}
+
+#[test]
+fn ephemeral_bundle_wrong_first_frame_kind_is_terminal() {
+    let bundle_root = digest(0x66);
+    let session_roots = roots_with_bundle(0x11, &bundle_root);
+    let prepared = prepare_external_pool_adapter_supervisor_session(session_roots.clone())
+        .expect("prepare authenticated delivery session");
+    let (host, child) = prepared.split();
+    let child_thread = thread::spawn(move || {
+        let mut session = child
+            .authenticate(session_roots)
+            .expect("authenticate child");
+        assert!(
+            receive_external_pool_adapter_ephemeral_bundle(&mut session, &bundle_root).is_err()
+        );
+    });
+    let mut session = host.authenticate().expect("authenticate host");
+    session
+        .send(
+            ExternalPoolAdapterSessionFrameKind::Credential,
+            DELIVERY_CREDENTIAL,
+        )
+        .expect("send authenticated wrong-kind frame");
+    assert!(session.receive().is_err());
+    child_thread.join().expect("join rejected child");
+}
+
+#[test]
+fn ephemeral_bundle_preparation_rejects_invalid_bounds() {
+    assert!(prepare_external_pool_adapter_ephemeral_bundle_delivery(
+        0,
+        DELIVERY_CONFIG,
+        DELIVERY_CREDENTIAL,
+    )
+    .is_err());
+    assert!(
+        prepare_external_pool_adapter_ephemeral_bundle_delivery(1, &[], DELIVERY_CREDENTIAL,)
+            .is_err()
+    );
+    assert!(
+        prepare_external_pool_adapter_ephemeral_bundle_delivery(1, DELIVERY_CONFIG, &[],).is_err()
+    );
+    let oversized_config =
+        vec![0_u8; ExternalPoolAdapterSessionFrameKind::Config.maximum_payload_bytes() + 1];
+    let oversized_credential =
+        vec![0_u8; ExternalPoolAdapterSessionFrameKind::Credential.maximum_payload_bytes() + 1];
+    assert!(prepare_external_pool_adapter_ephemeral_bundle_delivery(
+        1,
+        &oversized_config,
+        DELIVERY_CREDENTIAL,
+    )
+    .is_err());
+    assert!(prepare_external_pool_adapter_ephemeral_bundle_delivery(
+        1,
+        DELIVERY_CONFIG,
+        &oversized_credential,
+    )
+    .is_err());
+}
+
 fn authenticated_pair() -> (
     AuthenticatedExternalPoolAdapterSession,
     AuthenticatedExternalPoolAdapterSession,
@@ -166,13 +308,16 @@ where
 }
 
 fn roots(marker: u8) -> ExternalPoolAdapterSessionRoots {
+    roots_with_bundle(marker, &digest(0x66))
+}
+
+fn roots_with_bundle(marker: u8, bundle: &str) -> ExternalPoolAdapterSessionRoots {
     let policy = digest(0x77);
     let profile = digest(marker);
     let target = digest(0x33);
     let companion = digest(0x44);
     let capsule = digest(0x55);
-    let bundle = digest(0x66);
-    ExternalPoolAdapterSessionRoots::new(&policy, &profile, &target, &companion, &capsule, &bundle)
+    ExternalPoolAdapterSessionRoots::new(&policy, &profile, &target, &companion, &capsule, bundle)
         .expect("construct exact V260 roots")
 }
 

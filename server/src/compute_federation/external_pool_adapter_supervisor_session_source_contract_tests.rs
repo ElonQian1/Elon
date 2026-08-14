@@ -7,6 +7,8 @@ const SESSION_BOOTSTRAP: &str =
     include_str!("../../external-pool-adapter-session-core/src/bootstrap.rs");
 const SESSION_TRANSPORT: &str =
     include_str!("../../external-pool-adapter-session-core/src/transport.rs");
+const SESSION_DELIVERY: &str =
+    include_str!("../../external-pool-adapter-session-core/src/delivery.rs");
 const SESSION_FIXTURE: &str = include_str!("../external_pool_adapter_session_fixture_main.rs");
 
 #[test]
@@ -175,6 +177,7 @@ fn v260_has_no_process_network_persistence_activation_or_real_secret_effect() {
         SESSION_CRYPTO,
         SESSION_BOOTSTRAP,
         SESSION_TRANSPORT,
+        SESSION_DELIVERY,
     ]
     .concat();
     for forbidden in [
@@ -203,6 +206,55 @@ fn v260_has_no_process_network_persistence_activation_or_real_secret_effect() {
 }
 
 #[test]
+fn v263_delivery_is_root_bound_ordered_ephemeral_and_fail_closed() {
+    for required in [
+        "ephemeral_bundle_delivery.root.v1\\0",
+        "const DELIVERY_MAGIC: &[u8; 4] = b\"ELSD\"",
+        "const DELIVERY_BEGIN: u8 = 1",
+        "const DELIVERY_RECEIPT: u8 = 2",
+        "const DELIVERY_COMMIT: u8 = 3",
+        "const DELIVERY_READY: u8 = 4",
+        "const DELIVERY_SHUTDOWN: u8 = 5",
+        "const DELIVERY_SHUTDOWN_ACK: u8 = 6",
+        "random_array32()?",
+        "generation.to_be_bytes()",
+        "config_sha256",
+        "credential_sha256",
+        "ExternalPoolAdapterSessionFrameKind::Config",
+        "ExternalPoolAdapterSessionFrameKind::Credential",
+        "receive_signal(session, DELIVERY_RECEIPT",
+        "receive_signal(session, DELIVERY_COMMIT",
+        "receive_signal(session, DELIVERY_READY",
+        "self.config.zeroize()",
+        "self.credential.zeroize()",
+        "session.terminate()",
+    ] {
+        assert!(
+            SESSION_DELIVERY.contains(required),
+            "missing V263 rule {required}"
+        );
+    }
+    for forbidden in [
+        "std::env",
+        "File::open",
+        "OpenOptions",
+        "temp_dir",
+        "TcpStream",
+        "TcpListener",
+        "reqwest::",
+        "Serialize",
+        "Deserialize",
+        "INSERT INTO",
+        "UPDATE compute_",
+    ] {
+        assert!(
+            !SESSION_DELIVERY.contains(forbidden),
+            "V263 delivery crosses private boundary {forbidden}"
+        );
+    }
+}
+
+#[test]
 fn v262_fixture_reuses_core_and_has_no_external_or_economic_consumer() {
     for required in [
         "ExternalPoolAdapterChildBootstrap::adopt_supervisor_descriptors()",
@@ -210,6 +262,9 @@ fn v262_fixture_reuses_core_and_has_no_external_or_economic_consumer() {
         "v262.host.authenticated",
         "v262.child.authenticated",
         "v262.shutdown",
+        "receive_external_pool_adapter_ephemeral_bundle_from_begin",
+        "test-credential-never-production",
+        "wait_for_shutdown",
     ] {
         assert!(SESSION_FIXTURE.contains(required));
     }

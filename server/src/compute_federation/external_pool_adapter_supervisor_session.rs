@@ -7,7 +7,8 @@
 
 use anyhow::{bail, Result};
 
-pub(in crate::compute_federation) use elon_external_pool_adapter_session_core::{
+pub(crate) use elon_external_pool_adapter_session_core::{
+    prepare_external_pool_adapter_ephemeral_bundle_delivery,
     prepare_external_pool_adapter_supervisor_session, AuthenticatedExternalPoolAdapterSession,
     AuthenticatedExternalPoolAdapterSessionFrame, ExternalPoolAdapterChildBootstrap,
     ExternalPoolAdapterHostBootstrap, ExternalPoolAdapterSessionFrameKind,
@@ -17,7 +18,7 @@ pub(in crate::compute_federation) use elon_external_pool_adapter_session_core::{
 
 use crate::compute_federation::external_pool_adapter_supervisor_session_policy_companion::server_supervisor_session_policy_catalog;
 
-pub(in crate::compute_federation) fn external_pool_adapter_session_roots(
+pub(crate) fn external_pool_adapter_session_roots(
     profile_digest: &str,
     target_digest: &str,
     companion_digest: &str,

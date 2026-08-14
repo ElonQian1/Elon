@@ -297,4 +297,12 @@ impl<'a, 'tx, 'conn> CurrentExternalPoolAdapterProbePreparationAuthority<'a, 'tx
         self.retain_complete_authority();
         ACTIVATION_READY
     }
+
+    pub(super) fn capsule(&self) -> &PreparedExternalPoolAdapterEntrypointCapsule {
+        self.capsule
+    }
+
+    pub(super) fn bundle(&self) -> &CurrentExternalPoolAdapterRuntimeBundleAuthority<'tx, 'conn> {
+        self.bundle
+    }
 }

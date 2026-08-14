@@ -11,6 +11,8 @@ const STORE_CURRENT: &str =
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/current.rs");
 const STORE_TYPES: &str =
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/types.rs");
+const STORE_SECRET_DELIVERY: &str =
+    include_str!("../store/compute_external_pool_adapter_runtime_bundle/secret_delivery.rs");
 const V253_CURRENT: &str =
     include_str!("../store/compute_external_pool_adapter_credential_reattestation/current.rs");
 const V254_FENCES: &str = include_str!(
@@ -296,6 +298,55 @@ fn runtime_bundle_has_no_public_route_migration_or_downstream_effect() {
         assert!(
             !domain_and_store.contains(forbidden),
             "V256 crosses no-effect fence {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn v263_store_composition_is_private_current_rooted_and_has_no_external_effect() {
+    for required in [
+        "pub(in crate::store) fn with_current_external_pool_adapter_ephemeral_secret_delivery",
+        "TransactionBehavior::Immediate",
+        "current_external_pool_adapter_runtime_bundle_authority_on",
+        "current_external_pool_adapter_supervisor_session_policy_companion_authority_on",
+        "select_current_probe_preparation_roots_on",
+        "materialize_probe_preparation",
+        "bundle.with_sensitive_bytes(|config, credential|",
+        "prepare_external_pool_adapter_ephemeral_bundle_delivery",
+        "external_pool_adapter_session_roots",
+        "prepare_external_pool_adapter_supervisor_session",
+        "launch_external_pool_adapter_supervisor_child",
+        "host.authenticate()?",
+        "delivery.deliver(&mut session, &delivery_root, config, credential)?",
+        "bundle_installation != session_installation",
+        "receipt.shutdown(&mut self.session)?",
+        ".wait(CHILD_EXIT_TIMEOUT)?",
+    ] {
+        assert!(
+            STORE_SECRET_DELIVERY.contains(required),
+            "missing V263 Store rule {required}"
+        );
+    }
+    assert!(STORE_FACADE.contains(
+        "#[cfg(all(target_os = \"linux\", target_arch = \"x86_64\"))]\nmod secret_delivery;"
+    ));
+    for forbidden in [
+        "pub fn ",
+        "std::env",
+        "Command::",
+        "TcpStream",
+        "TcpListener",
+        "reqwest::",
+        "INSERT INTO",
+        "UPDATE compute_",
+        "DELETE FROM",
+        "activate_external_pool",
+        "settlement",
+        "sui_client",
+    ] {
+        assert!(
+            !STORE_SECRET_DELIVERY.contains(forbidden),
+            "V263 Store composition crosses no-effect fence {forbidden}"
         );
     }
 }

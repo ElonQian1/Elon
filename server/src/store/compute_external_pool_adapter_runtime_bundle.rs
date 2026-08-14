@@ -10,6 +10,8 @@ mod locked_bytes;
 #[path = "../compute_federation/external_pool_adapter_runtime_bundle/manifest.rs"]
 mod manifest;
 mod probe_preparation;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod secret_delivery;
 mod types;
 
 pub(in crate::store) use types::{

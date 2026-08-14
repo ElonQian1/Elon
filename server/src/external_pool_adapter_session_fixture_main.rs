@@ -8,13 +8,15 @@
 
 use anyhow::{bail, Context, Result};
 use elon_external_pool_adapter_session_core::{
-    ExternalPoolAdapterChildBootstrap, ExternalPoolAdapterSessionFrameKind,
-    ExternalPoolAdapterSessionRoots,
+    receive_external_pool_adapter_ephemeral_bundle_from_begin, ExternalPoolAdapterChildBootstrap,
+    ExternalPoolAdapterSessionFrameKind, ExternalPoolAdapterSessionRoots,
 };
 
 const HOST_READY: &[u8] = b"v262.host.authenticated";
 const CHILD_READY: &[u8] = b"v262.child.authenticated";
 const SHUTDOWN: &[u8] = b"v262.shutdown";
+const V263_CONFIG: &[u8] = br#"{"mode":"test-no-work"}"#;
+const V263_CREDENTIAL: &[u8] = b"test-credential-never-production";
 const ROOT_ARGUMENT_PREFIXES: [&str; 6] = [
     "--elon-session-policy=",
     "--elon-session-profile=",
@@ -38,21 +40,39 @@ fn run() -> Result<()> {
     {
         bail!("fixed supervisor argv contract rejected");
     }
-    let roots = parse_roots(&arguments[1..])?;
+    let (roots, bundle_root) = parse_roots(&arguments[1..])?;
     let child = unsafe { ExternalPoolAdapterChildBootstrap::adopt_supervisor_descriptors() };
     let mut session = child
         .authenticate(roots)
         .context("authenticate inherited supervisor session")?;
 
-    require_control(&mut session, HOST_READY)?;
-    session
-        .send(ExternalPoolAdapterSessionFrameKind::Control, CHILD_READY)
-        .context("send authenticated child-ready frame")?;
-    require_control(&mut session, SHUTDOWN)?;
+    let first = session
+        .receive()
+        .context("receive first authenticated runtime frame")?;
+    if first.kind() == ExternalPoolAdapterSessionFrameKind::Control && first.payload() == HOST_READY
+    {
+        session
+            .send(ExternalPoolAdapterSessionFrameKind::Control, CHILD_READY)
+            .context("send authenticated child-ready frame")?;
+        require_control(&mut session, SHUTDOWN)?;
+        return Ok(());
+    }
+    let delivered = receive_external_pool_adapter_ephemeral_bundle_from_begin(
+        &mut session,
+        &bundle_root,
+        first,
+    )
+    .context("receive V263 ephemeral bundle")?;
+    if delivered.config() != V263_CONFIG || delivered.credential() != V263_CREDENTIAL {
+        bail!("V263 test-only material rejected");
+    }
+    delivered
+        .wait_for_shutdown(&mut session)
+        .context("zeroize V263 delivery and acknowledge shutdown")?;
     Ok(())
 }
 
-fn parse_roots(arguments: &[String]) -> Result<ExternalPoolAdapterSessionRoots> {
+fn parse_roots(arguments: &[String]) -> Result<(ExternalPoolAdapterSessionRoots, String)> {
     if arguments.len() != ROOT_ARGUMENT_PREFIXES.len() {
         bail!("fixed root argument count rejected");
     }
@@ -65,9 +85,12 @@ fn parse_roots(arguments: &[String]) -> Result<ExternalPoolAdapterSessionRoots> 
                 .ok_or_else(|| anyhow::anyhow!("fixed root argument prefix rejected"))
         })
         .collect::<Result<_>>()?;
-    ExternalPoolAdapterSessionRoots::new(
-        values[0], values[1], values[2], values[3], values[4], values[5],
-    )
+    Ok((
+        ExternalPoolAdapterSessionRoots::new(
+            values[0], values[1], values[2], values[3], values[4], values[5],
+        )?,
+        values[5].to_string(),
+    ))
 }
 
 fn require_control(

@@ -18,12 +18,15 @@ use crate::compute_federation::external_pool_adapter_supervisor_session::{
     external_pool_adapter_session_roots, prepare_external_pool_adapter_supervisor_session,
     ExternalPoolAdapterSessionFrameKind,
 };
+use elon_external_pool_adapter_session_core::prepare_external_pool_adapter_ephemeral_bundle_delivery;
 
 const REQUIRED_CAPSULE_SEALS: libc::c_int =
     libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
 const HOST_READY: &[u8] = b"v262.host.authenticated";
 const CHILD_READY: &[u8] = b"v262.child.authenticated";
 const SHUTDOWN: &[u8] = b"v262.shutdown";
+const V263_CONFIG: &[u8] = br#"{"mode":"test-no-work"}"#;
+const V263_CREDENTIAL: &[u8] = b"test-credential-never-production";
 
 struct TestCapsule(File);
 
@@ -107,13 +110,100 @@ fn linux_kernel_exec_root_drift_fails_closed_and_cleans_runtime() {
     assert!(!scratch_path.exists());
 }
 
+#[test]
+#[ignore = "requires delegated cgroup v2 root execution and the static V262/V263 fixture"]
+fn linux_kernel_exec_child_receives_exact_ephemeral_bundle_and_zeroizes_on_shutdown() {
+    let parent_path = delegated_cgroup_parent_path();
+    let parent = delegated_cgroup_parent(&parent_path);
+    let capsule = sealed_fixture_capsule();
+    let delivery =
+        prepare_external_pool_adapter_ephemeral_bundle_delivery(263, V263_CONFIG, V263_CREDENTIAL)
+            .expect("prepare V263 delivery");
+    let bundle_root = delivery.bundle_root_hex();
+    let prepared =
+        prepare_external_pool_adapter_supervisor_session(roots_with_bundle(&bundle_root))
+            .expect("prepare V263 authenticated runtime");
+    let (host, child_bootstrap) = prepared.split();
+    let mut child =
+        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
+            .expect("launch V263 authenticated runtime");
+    let pid = child.pid_for_test();
+    let cgroup_path = child_cgroup_path(&parent_path, &child);
+    let scratch_path = child.scratch_path_for_test().to_path_buf();
+
+    let mut session = host.authenticate().expect("authenticate V263 host");
+    let receipt = delivery
+        .deliver(&mut session, &bundle_root, V263_CONFIG, V263_CREDENTIAL)
+        .expect("deliver V263 ephemeral bundle");
+    assert_eq!(open_fds(pid), BTreeSet::from([0, 1, 2, 3]));
+    assert_eq!(
+        fs::read_to_string(cgroup_path.join("cgroup.procs"))
+            .expect("read V263 cgroup membership")
+            .trim(),
+        pid.to_string()
+    );
+    receipt
+        .shutdown(&mut session)
+        .expect("zeroize V263 delivery and shutdown");
+    drop(session);
+    let exit = child
+        .wait(Duration::from_secs(2))
+        .expect("wait for V263 runtime")
+        .expect("V263 runtime exited");
+    assert_eq!(exit.exit_code, Some(0));
+    assert_eq!(exit.signal, None);
+    assert!(!cgroup_path.exists());
+    assert!(!scratch_path.exists());
+}
+
+#[test]
+#[ignore = "requires delegated cgroup v2 root execution and the static V262/V263 fixture"]
+fn linux_kernel_ephemeral_bundle_root_drift_fails_closed_and_cleans_runtime() {
+    let parent_path = delegated_cgroup_parent_path();
+    let parent = delegated_cgroup_parent(&parent_path);
+    let capsule = sealed_fixture_capsule();
+    let delivery =
+        prepare_external_pool_adapter_ephemeral_bundle_delivery(264, V263_CONFIG, V263_CREDENTIAL)
+            .expect("prepare V263 drift delivery");
+    let exact_root = delivery.bundle_root_hex();
+    let prepared =
+        prepare_external_pool_adapter_supervisor_session(roots_with_bundle(&digest(0xaa)))
+            .expect("prepare V263 drift runtime");
+    let (host, child_bootstrap) = prepared.split();
+    let mut child =
+        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
+            .expect("launch V263 drift runtime");
+    let cgroup_path = child_cgroup_path(&parent_path, &child);
+    let scratch_path = child.scratch_path_for_test().to_path_buf();
+
+    let mut session = host.authenticate().expect("authenticate V263 drift host");
+    assert!(delivery
+        .deliver(&mut session, &exact_root, V263_CONFIG, V263_CREDENTIAL,)
+        .is_err());
+    drop(session);
+    let exit = child
+        .wait(Duration::from_secs(2))
+        .expect("wait for rejected V263 runtime")
+        .expect("rejected V263 runtime exited");
+    assert_eq!(exit.exit_code, Some(111));
+    assert_eq!(exit.signal, None);
+    assert!(!cgroup_path.exists());
+    assert!(!scratch_path.exists());
+}
+
 fn roots() -> elon_external_pool_adapter_session_core::ExternalPoolAdapterSessionRoots {
+    roots_with_bundle(&digest(0x66))
+}
+
+fn roots_with_bundle(
+    bundle_root: &str,
+) -> elon_external_pool_adapter_session_core::ExternalPoolAdapterSessionRoots {
     external_pool_adapter_session_roots(
         &digest(0x11),
         &digest(0x22),
         &digest(0x33),
         &digest(0x44),
-        &digest(0x55),
+        bundle_root,
     )
     .expect("construct V262 fixture roots")
 }

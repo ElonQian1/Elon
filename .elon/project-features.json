@@ -357,6 +357,238 @@
       "updated_at_ms": 1786727523769
     },
     {
+      "id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "title": "外部矿池 Adapter 易失配置与凭据交付 V1",
+      "summary": "把 V256 的短时 config/credential 通过 V262 已认证 ELSP session 一次性交付给同一 sealed child，完成 root-bound receipt/commit/ready；失败由 pidfd 回收且不产生网络、Provider 或经济副作用。",
+      "status": "released",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/compute-external-pool-adapter-ephemeral-secret-delivery-v1.md",
+        "content_hash": "8a264c79e972eda4ba39512746e3f87dc8527a2a3d3057fe7e8b83e9c23d2d94",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6bd7864643e15b53d827f84d3987558f73a3db2a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "secret-delivery",
+        "linux",
+        "security"
+      ],
+      "task_paths": [
+        "docs/distributed-compute",
+        "server/external-pool-adapter-session-core",
+        "server/src/compute_federation/external_pool_adapter_linux_supervisor",
+        "server/src/store/compute_external_pool_adapter_runtime_bundle"
+      ],
+      "dependencies": [
+        "compute-external-pool-adapter-authenticated-runtime-v1",
+        "compute-v256-runtime-bundle-resolver-verification"
+      ],
+      "acceptance_criteria": [
+        "V256 sensitive borrow 只能进入 Store-private V263 composition，不经过 argv、env、临时文件、持久化或公开 API。",
+        "共享 session core 固定 begin/config/credential/receipt/commit/ready，并对顺序、上限、generation、size 和 root 漂移 terminal fail-close。",
+        "Linux kernel fixture 用固定假 secret 证明 exec 后交付成功且 V261/V262 confinement 保持。",
+        "动态失败用例证明 root 或内容漂移时 child/cgroup/scratch 被清理且无网络、Provider、市场或经济副作用。",
+        "既有 V256/V259/V260/V261/V262 回归与 V254 absolute deny 保持。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "76048aff8175b98aab2da7f2ee6c72337c46395ea8f1721b88e2acd982fb19ca",
+          "locator": "current external adapter summary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "edd3deed0f4af445f3e7b412c5de2b2bf9b1640d",
+            "worktree_blob_oid": "31af7a710ee81a1a7eb0046672cc61d36134023d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/README.md",
+          "content_hash": "7baf8c24d1d87c9d87861de92e493ef5e9b80655138d460a49d690a9def770cb",
+          "locator": "external adapter capability index",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "20499c565616dfec974e4f3a2c6b38b324128cd8",
+            "worktree_blob_oid": "683b66f0e851985be8e2d012e9c92b3a55e4e461",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/current-implementation-status.md",
+          "content_hash": "23d6a066972163a5ce4b1f23745f38e17172ae246a8f05f460724c2d47c3b852",
+          "locator": "V263 current implementation status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "19ab0d3460e3e957a7272b1b3d326bfc0bdbf31a",
+            "worktree_blob_oid": "9564ce934e7097f6c20fcb0b2091f32ee7b336e7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-ephemeral-secret-delivery-acceptance.md",
+          "content_hash": "4ebe338334db83f94d0170bf71744a228a2efe43f818c2206d396a5c8e1db600",
+          "locator": "source cross-build and Linux kernel evidence",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4d9ad545b91f77cf3afffaa89bffc81c0ea7f704",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-ephemeral-secret-delivery-authority.md",
+          "content_hash": "c6a7de2109c903464b553d6d7f7e0390efc0fbdcf243eb3bb0a0dc9602c22e58",
+          "locator": "V263 authority",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ecb3248d213b624f2b4753661b29b14b142ee680",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/external-pool-adapter-session-core/src/delivery.rs",
+          "content_hash": "121c5412e7fe9bdbcf410919cdcb55a798c011fd63cf79078532ecf90bff830a",
+          "locator": "delivery root codec and state machine",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9719b32862b4ae9ceec073857e4152a40aa853ec",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/external-pool-adapter-session-core/src/transport.rs",
+          "content_hash": "07e523b38816b3c1bfd8148ddec3887e92213549143606e07a534c9e7bb8741c",
+          "locator": "zeroizing authenticated payload transport",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "72db86e28e5c82cb39f8e839ee77f2cc035bc901",
+            "worktree_blob_oid": "c95d34c51db9f745eb5d4dfb9f66c268a65b07fd",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/authenticated_runtime_tests.rs",
+          "content_hash": "8761a66a2426ea0d12ed0ffeae19e867a29aec39531cb5d65c4b1d3603ccee11",
+          "locator": "exec child delivery and drift tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "cad19bf12dcf529f5e780b9603ab06d288b2ad2f",
+            "worktree_blob_oid": "e75eb53263c7a11823014d1fa3c1724cd3de887d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_bundle_source_contract_tests.rs",
+          "content_hash": "ee18c05985f9d09f01925abd03d44dd4b68e673fab25021c772cb65c6a3e91ea",
+          "locator": "runtime bundle source contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "5dbc30e49d2ee7701a6289b7196a5198d8458a9f",
+            "worktree_blob_oid": "92f25673163df6863f3d62bd9962411411a81114",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_supervisor_session.rs",
+          "content_hash": "989f143f31ffa554a9dda971e3b030952478228c1aa3c9fb8a97127f5264b151",
+          "locator": "host delivery integration",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "abd3a3f878c2f2980cbd90c7fd021f73591b5f98",
+            "worktree_blob_oid": "35a7ca23f8ff5bf758a92458b4b67ce7756459e3",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_supervisor_session/linux_tests.rs",
+          "content_hash": "d103e28538ba770c3dcb628670bd2260403038b6c4e1cf71b3a5e659dd66ccf0",
+          "locator": "session delivery Linux tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "97f3bfcd50d944071d55fd207748d65665921d80",
+            "worktree_blob_oid": "331c5de38a9655c34bad558575ffd92cf78dc93e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_supervisor_session_source_contract_tests.rs",
+          "content_hash": "ea5912d136915f886fc9e22f7fabf124f21164d8a4bd690e7a35a5bcefc0d945",
+          "locator": "session no-egress source contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "e959ba0d91b53795a43658d10be830b67bbd6830",
+            "worktree_blob_oid": "ca3cf8551d387b1957a28abea53b05401e2ec4a1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/external_pool_adapter_session_fixture_main.rs",
+          "content_hash": "f43aa0a39c64aed9fb478354901cd6a852a9f7f7702947ba6ef90446d4066f76",
+          "locator": "fixed test capsule delivery path",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "b2fb778331e1faf56bca541e5914bb50900fd571",
+            "worktree_blob_oid": "7900e1bfa1d4c47a1598d2558546c652ee6c2c81",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_runtime_bundle/secret_delivery.rs",
+          "content_hash": "9ebd72c6ba8c4bbaa87f45591a59a12186fb97678edf3fef70f0ee838b69771d",
+          "locator": "Store-private V263 composition",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "15a43ffdfe5d5d8d6ae8ec8413c63b28a2a9213d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f9c4a6b233dec4601af8baf125bad5d38286546e",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1786729458479,
+      "updated_at_ms": 1786734638141
+    },
+    {
       "id": "compute-v255-runtime-launch-profile-verification",
       "title": "V255 惰性 runtime launch profile 验收闭环",
       "summary": "编译并执行已落地的 V255 Domain、migration、Store、Service 与 HTTP 测试，修复真实缺口并把 passed=0 更新为可复核的局部验收证据；不扩张到 Sidecar、真实凭据、Provider activation、市场或结算。",
@@ -3129,96 +3361,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_dbe181528ca547498f6088cb4793e77c",
-      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Bind verified V253 implementation and test evidence",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786633036103
-    },
-    {
-      "id": "feature_event_d1047d2bc5d9435899c4cc2c96a2b1d2",
-      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786633059149
-    },
-    {
-      "id": "feature_event_2fa224f1070e47d487b9290159c49982",
-      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V253 source, migration, Store and HTTP evidence are bound",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786633083790
-    },
-    {
-      "id": "feature_event_2513e9d20e4141b4b00427349ca37dd5",
-      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Rust/SQLite/Axum filtered suite passed 8 tests with validation fingerprint 8c9c1fe9f6c0df7c5e56cc280c171ff06ea3dfd2498b27e4a1ba6a791f71c4c5",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786633083825
-    },
-    {
-      "id": "feature_event_9e97280387d54c8ba3cee635c3919db6",
-      "feature_id": "external-pool-adapter-credential-reattestation-v253-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V253 verification commits e52a59c93 and e93c5e4ce were pushed to origin/main",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786633532930
-    },
-    {
-      "id": "feature_event_af56636713b640feaa2f353ac3ef2153",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V254 is the next independent source-written but unverified batch",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1786633910224
-    },
-    {
-      "id": "feature_event_17227dd272f748a6b05aaf00cf951605",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V254 verification boundary reviewed and independent of real activation",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786633930257
-    },
-    {
-      "id": "feature_event_505bd31507534238a9099177cb1eb097",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786633930300
-    },
-    {
-      "id": "feature_event_4b36bb3a4fcd460daea0252f6457d039",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Run and fix V254 local verification without enabling activation",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786633930326
-    },
-    {
       "id": "feature_event_426c58a43cf74ec7bfc1ad369bbab1c4",
       "feature_id": "external-pool-provider-activation-candidate-v254-verification",
       "action": "claim_released",
@@ -5127,6 +5269,96 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786727523769
+    },
+    {
+      "id": "feature_event_2ebf6e39abe64a589f7968a1461aa6d7",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "registered",
+      "actor": "codex-v263",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786729458479
+    },
+    {
+      "id": "feature_event_8f26f77f8fb24b02aa32a146427ee6fd",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "transitioned",
+      "actor": "codex-v263",
+      "reason": "P0 hard gate after V262; requirement preserves no-network and no-economic boundaries.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786729458507
+    },
+    {
+      "id": "feature_event_7ae985aaaef3420f808a594841ecb984",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "transitioned",
+      "actor": "codex-v263",
+      "reason": "V256 and V262 dependencies are released and implementation scope is bounded.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786729458525
+    },
+    {
+      "id": "feature_event_482a4e0119754dc1818eb939e28aeb14",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "claimed",
+      "actor": "codex-v263",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786729458544
+    },
+    {
+      "id": "feature_event_3b7161cf976b42178fa99055e8aebca1",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "transitioned",
+      "actor": "codex-v263",
+      "reason": "Implementation started in isolated worktree D:/wt/27928-c3f8264d.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786729458565
+    },
+    {
+      "id": "feature_event_d503c0f7830a4c41b9dc3044b5ec08cd",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-v263",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786734602442
+    },
+    {
+      "id": "feature_event_4e02fbc5545147de9aa652b6949dcd77",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "transitioned",
+      "actor": "codex-v263",
+      "reason": "V263 source implementation and bounded evidence recorded",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786734614503
+    },
+    {
+      "id": "feature_event_b780ea5640584ea8a255eedcad9d48ae",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "transitioned",
+      "actor": "codex-v263",
+      "reason": "Windows source contracts, Linux-musl links, and 18 WSL Linux kernel tests passed",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786734626788
+    },
+    {
+      "id": "feature_event_c2d411aaebda44ae931dd39f3d67bb9d",
+      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
+      "action": "transitioned",
+      "actor": "codex-v263",
+      "reason": "Verified repository capability is ready for mainline delivery; no production deploy or external activation claimed",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786734638141
     }
   ]
 }

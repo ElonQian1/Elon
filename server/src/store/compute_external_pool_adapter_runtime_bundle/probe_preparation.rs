@@ -79,7 +79,7 @@ impl ExternalPoolAdapterEntrypointSource for RetainedEntrypointSource<'_> {
     }
 }
 
-fn materialize_probe_preparation(
+pub(super) fn materialize_probe_preparation(
     bundle: &CurrentExternalPoolAdapterRuntimeBundleAuthority<'_, '_>,
     selected: &CurrentExternalPoolAdapterProbePreparationRoots,
     consume: impl FnOnce(&CurrentExternalPoolAdapterProbePreparationAuthority<'_, '_, '_>) -> Result<()>,

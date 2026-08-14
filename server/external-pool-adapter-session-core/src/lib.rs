@@ -8,6 +8,7 @@
 
 mod bootstrap;
 mod crypto;
+mod delivery;
 mod roots;
 mod transport;
 
@@ -15,6 +16,14 @@ pub use bootstrap::{
     prepare_external_pool_adapter_supervisor_session, ExternalPoolAdapterChildBootstrap,
     ExternalPoolAdapterHostBootstrap, ExternalPoolAdapterSupervisorDescriptorTransfer,
     PreparedExternalPoolAdapterSupervisorSession,
+};
+pub use delivery::{
+    prepare_external_pool_adapter_ephemeral_bundle_delivery,
+    receive_external_pool_adapter_ephemeral_bundle,
+    receive_external_pool_adapter_ephemeral_bundle_from_begin,
+    DeliveredExternalPoolAdapterEphemeralBundle,
+    ExternalPoolAdapterEphemeralBundleDeliveryHostReceipt,
+    PreparedExternalPoolAdapterEphemeralBundleDelivery,
 };
 pub use roots::{ExternalPoolAdapterSessionRootArguments, ExternalPoolAdapterSessionRoots};
 pub use transport::{
