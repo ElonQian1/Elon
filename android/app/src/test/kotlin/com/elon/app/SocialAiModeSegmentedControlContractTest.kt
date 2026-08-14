@@ -19,8 +19,21 @@ class SocialAiModeSegmentedControlContractTest {
         assertTrue(controller.contains("SocialAiModeSegmentedControl"))
         assertTrue(control.contains("onSelected(mode)"))
         assertTrue(control.contains("social_ai_mode_\${mode.wireValue}"))
+        assertTrue(layout.contains("android:layout_marginEnd=\"52dp\""))
         assertFalse(controller.contains("setSingleChoiceItems"))
         assertFalse(controller.contains("showSelector"))
+    }
+
+    @Test
+    fun socialAiToolbarAndComposerControlsKeepSeparateVisualHierarchy() {
+        val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
+        val selector = read("android/app/src/main/res/drawable/bg_bottom_mode_selector.xml")
+        val web = read("server/src/assets/web_page.html")
+
+        assertTrue(composer.contains("R.drawable.bg_bottom_mode_selector"))
+        assertTrue(composer.contains("LinearLayout.LayoutParams(dp(76), dp(34))"))
+        assertTrue(selector.contains("android:radius=\"12dp\""))
+        assertTrue(web.contains("border-radius: 12px"))
     }
 
     private fun read(relative: String): String =

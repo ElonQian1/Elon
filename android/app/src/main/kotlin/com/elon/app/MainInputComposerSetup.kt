@@ -293,10 +293,10 @@ internal class MainInputComposerSetup(
         }
 
         val modelButtonShell = FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(76), dp(36)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(76), dp(34)).apply {
                 marginEnd = dp(10)
             }
-            background = activity.getDrawable(R.drawable.bg_bottom_mode_pill_new)
+            background = activity.getDrawable(R.drawable.bg_bottom_mode_selector)
             alpha = 1f
             visibility = View.VISIBLE
             isClickable = true
@@ -316,7 +316,7 @@ internal class MainInputComposerSetup(
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(16), 0, dp(24), 0)
+            setPadding(dp(14), 0, dp(24), 0)
             setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
             setTextColor(Color.parseColor("#F8F7F4"))
             textSize = 14f
