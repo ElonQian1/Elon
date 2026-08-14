@@ -2105,7 +2105,7 @@
       "id": "win-web-ai-snapshot-cache-v1",
       "title": "Win 网页 AI 快照缓存 V1",
       "summary": "ChatGPT 与 Google AI 厂商切换、PC 页面刷新或客户端重启时，按一龙账号和厂商隔离地即时回显最近语义快照，再后台重验证官方页面；缓存不解锁实时动作。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-snapshot-cache-v1.md",
@@ -2145,48 +2145,169 @@
         "清除本地网页会话同时清除内存快照和加密磁盘快照。",
         "PC 构建、ESLint、合同测试和 Tauri Rust 定向测试通过。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_10fdf727dd7c4b75964e58ac6de811e2",
-        "agent_id": "codex/root",
-        "claimed_at_ms": 1786702023084,
-        "expires_at_ms": 1786716423084
-      },
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser.rs",
+          "content_hash": "e13379bc7f47d799da00072895389bffc9e95ea323f4545deee58ba92be32e2b",
+          "locator": "ensure_runtime_session",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "8c8c86cde36f7dd467f659919e9e56c18f99320c",
+            "worktree_blob_oid": "8c8c86cde36f7dd467f659919e9e56c18f99320c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs",
+          "content_hash": "cdf74c1bd4c39bbb1d42dbff6f555312365c197d16dc6de409c957e83e9a53fb",
+          "locator": "SnapshotEnvelope/store/load",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "92930b5cfae51bbcb23f91f07cfb72151743cd66",
+            "worktree_blob_oid": "92930b5cfae51bbcb23f91f07cfb72151743cd66",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs",
+          "content_hash": "cdf74c1bd4c39bbb1d42dbff6f555312365c197d16dc6de409c957e83e9a53fb",
+          "locator": "encrypted_file_round_trip_and_corruption_are_fail_closed",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "92930b5cfae51bbcb23f91f07cfb72151743cd66",
+            "worktree_blob_oid": "92930b5cfae51bbcb23f91f07cfb72151743cd66",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
+          "content_hash": "5b0fcc38197c4fd8206583a1bfb9461acdcf1fa1c5af3527d9162c6dcac8b23a",
+          "locator": "LocalAiBrowserRuntime::ensure_session_with_cache",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "6a53736c7bb480949404eb4557917bbe98ee6341",
+            "worktree_blob_oid": "6a53736c7bb480949404eb4557917bbe98ee6341",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "5eba64267a875e8688f52ccbaa06473170f4dde06ca3543233f7a0ffcb7a9634",
+          "locator": "stale-while-revalidate",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "882e631c3073a7387ab295989d46639e4ba8e6c9",
+            "worktree_blob_oid": "882e631c3073a7387ab295989d46639e4ba8e6c9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "f01aa915956273562aa032c751968dda1b4e3ad8df4b1d2e6b3ee7514eb9b12d",
+          "locator": "snapshot cache security contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "3c2b9ec14581dbc391f2c60a9bceaa1e87825c94",
+            "worktree_blob_oid": "3c2b9ec14581dbc391f2c60a9bceaa1e87825c94",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-snapshot-cache.cjs",
+          "content_hash": "4d85932177f1b353f7555341eac1cd3fbb232e18e50e9ff8e11cd850b45c223b",
+          "locator": "owner/provider hot-cache contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "2a32f8e327d1574c9c2b17879180e798ac8ec5d9",
+            "worktree_blob_oid": "2a32f8e327d1574c9c2b17879180e798ac8ec5d9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-user-state.cjs",
+          "content_hash": "988d027afad32643acd93b72a540529d460d5da96db79e55b8fff40bae93d36f",
+          "locator": "cached semantic state must never unlock live writes",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "f6987e5c5f9e1fafbd1a0c477f3b0dd0c00cbec4",
+            "worktree_blob_oid": "f6987e5c5f9e1fafbd1a0c477f3b0dd0c00cbec4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/AiWebChatSidebar.tsx",
+          "content_hash": "26bcf75cf55918846d77691b499b749ce6f373d15c0ed00671b7128c122d522a",
+          "locator": "navigationCacheStatus",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "95eb1602c11ce3eda1b50ad0ac784852ce818c43",
+            "worktree_blob_oid": "95eb1602c11ce3eda1b50ad0ac784852ce818c43",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiSnapshotCache.ts",
+          "content_hash": "43559a58c3f2a7547c9ff5077c767a74f6b31567efbeecda6ec273f3d9138344",
+          "locator": "LocalAiSnapshotCache",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "47f71c383aa8849a54352b70f6e3a37bc1a495ea",
+            "worktree_blob_oid": "47f71c383aa8849a54352b70f6e3a37bc1a495ea",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiUserState.ts",
+          "content_hash": "69f7c4bf5943ee77d3f72abfd73b36a4114a703b125022da326fdc3aa7a5e249",
+          "locator": "livePageReady",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "53b41d71ed00eecee4be2750fa86b64d76107af8",
+            "worktree_blob_oid": "53b41d71ed00eecee4be2750fa86b64d76107af8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts",
+          "content_hash": "1cd73a97385b81a211b4036b04d5d9891fbd4d5af16f1fb223b381cdd78eed67",
+          "locator": "visibleSessionState",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "690a6a5a09014c1328d13fae21eeb34561e45c27",
+            "head_blob_oid": "ef429080f74b50a7d60e5b9ed92d67d774051a67",
+            "worktree_blob_oid": "ef429080f74b50a7d60e5b9ed92d67d774051a67",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1786702015741,
-      "updated_at_ms": 1786702030449
+      "updated_at_ms": 1786704463474
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_43c2820d5d2a49e0a9fcd224f9b88642",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "既有 V226 源码已完成静态实现，无外部依赖，可进入动态验收。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786620892045
-    },
-    {
-      "id": "feature_event_89c98f7449f44cd3a7f3030d47871d6f",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786620901386
-    },
-    {
-      "id": "feature_event_c092c93741384afca99df847fbbb5dfa",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "开始构建完整 Attempt 夹具并运行 V226 动态验收。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786620911764
-    },
     {
       "id": "feature_event_7060d5603ab24ba687964a8052910b4b",
       "feature_id": "compute-attempt-final-usage-fence-verification-v1",
@@ -4156,6 +4277,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1786702030449
+    },
+    {
+      "id": "feature_event_359f61c3a61540a996b4a6d978c80e0e",
+      "feature_id": "win-web-ai-snapshot-cache-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786704445506
+    },
+    {
+      "id": "feature_event_25674ac973cf4fbda653bfd8ffc8a2b9",
+      "feature_id": "win-web-ai-snapshot-cache-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "三层缓存、实时写门禁与清理链路实现完成，当前源码和测试证据已绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786704455789
+    },
+    {
+      "id": "feature_event_c3adaa14ae0748e7b4462af8bb72e6c7",
+      "feature_id": "win-web-ai-snapshot-cache-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "PC 合同/热缓存/用户状态、ESLint、生产构建与 Tauri 30 项定向测试全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786704463474
     }
   ]
 }
