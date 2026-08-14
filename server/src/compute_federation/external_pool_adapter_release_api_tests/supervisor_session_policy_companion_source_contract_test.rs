@@ -42,8 +42,10 @@ fn supervisor_session_http_source_freezes_exact_owner_admin_and_store_abi() {
         "expected_provider_binding_digest",
         "expected_supervisor_session_policy_digest",
         "expected_predecessor: Option<ExpectedSupervisorSessionPolicyCompanionPredecessor>",
-        "SupervisorSessionPolicyCompanionActor::ProviderOwner",
-        "SupervisorSessionPolicyCompanionActor::PlatformAdmin",
+        "ProviderOwner(String)",
+        "PlatformAdmin(String)",
+        "Self::ProviderOwner",
+        "Self::PlatformAdmin",
         "audit_external_pool_adapter_installation",
         "external_pool_adapter_supervisor_session_policy_summary",
         "create_external_pool_adapter_supervisor_session_policy_companion",
@@ -79,6 +81,10 @@ fn supervisor_session_http_source_freezes_exact_owner_admin_and_store_abi() {
         "owner_revoke",
         "admin_revoke",
         "JsonRejection",
+        "auth_from_headers(state, headers)",
+        "SupervisorSessionPolicyCompanionActor::ProviderOwner(user.id)",
+        "Ok(SupervisorSessionPolicyCompanionActor::PlatformAdmin(",
+        "matches!(user.role.as_str(), \"admin\" | \"owner\")",
     ] {
         assert!(API.contains(required), "missing HTTP boundary {required}");
     }

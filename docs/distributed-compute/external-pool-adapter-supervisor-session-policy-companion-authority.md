@@ -3,7 +3,7 @@ title: 外部矿池 Adapter supervisor/session policy companion 权威
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter supervisor/session policy companion 权威
@@ -60,4 +60,6 @@ owner/admin 提供同形 policy、create、currentness、revoke 管理面，路�
 
 V254 的 18 个 temporary absolute deny trigger必须名称及SQL body逐字保留。V259 companion、currentness或任何 policy digest都不能替代 atomic activation/readiness admission gate；Provider继续 `registering`。
 
-截至 2026-08-14，V259 仅处于 `implementation_uncompiled / implementation_unrun / source_review_only / passed=0`。下一批仍须先实现 authenticated child-only IPC与真实 Linux enforcement；之后才可由 server broker绑定 V258 target执行 DNS/TLS并形成 authenticated no-work observation。未完成 route/service actor、atomic activation、可信计量与结算前不得开放 market fence。
+截至 2026-08-14，V259 已完成完整 `elon-server` 测试目标编译，并通过 13 项 Windows 本地定向验收：6 项 migration/Store 合同、5 项源码边界合同和 2 项 owner/admin 进程内 Axum HTTP，`13 passed / 0 failed`，验证指纹为 `af27aff6c90e44409ee3da8d7fbc5a32dd2910766a962c2cbc1cc08ab5eda17f`。首次执行暴露并修正了源码合同把 API actor 构造错误绑定到 Service 文件的假失败；运行时 owner/admin 身份边界没有被放宽。
+
+该证据只把 V259 提升为 `implementation_partially_verified`：未运行文件升级/重开、并发或崩溃恢复、真实 TCP、生产数据库、Linux syscall/confinement fixture，也没有创建 process、IPC/session、secret delivery、DNS/TLS/network/probe/route/activation。下一批仍须先实现 authenticated child-only IPC 与真实 Linux enforcement；之后才可由 server broker 绑定 V258 target 执行 DNS/TLS 并形成 authenticated no-work observation。未完成 route/service actor、atomic activation、可信计量与结算前不得开放 market fence。

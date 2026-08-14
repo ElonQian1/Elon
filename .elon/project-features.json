@@ -560,6 +560,188 @@
       "updated_at_ms": 1786662093158
     },
     {
+      "id": "compute-v259-supervisor-session-policy-companion-verification",
+      "title": "V259 惰性 supervisor/session policy companion 动态验收",
+      "summary": "编译并执行现有 V259 migration、Store、owner/admin HTTP 与零副作用合同，修复真实集成缺口；不启动进程、IPC、密钥交付、网络、Provider 激活、市场、资金或部署。",
+      "status": "released",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/v259-supervisor-session-policy-companion-verification.md",
+        "content_hash": "f66b9d4afe9ec4f4f2306968699b730d4ae9d770c1658e028d75e7765d8d430d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a5751e0e4bc972392dc33a26deda5661fd851619",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security-ai-economy",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "v259",
+        "verification"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/external-pool-adapter-supervisor-session-policy-companion-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-supervisor-session-policy-companion-authority.md",
+        "docs/requirements/v259-supervisor-session-policy-companion-verification.md",
+        "server/src/compute_federation/external_pool_adapter_release_api_tests",
+        "server/src/compute_federation/external_pool_adapter_supervisor_session_policy_companion",
+        "server/src/store/compute_external_pool_adapter_supervisor_session_policy_companion",
+        "server/src/store_migrations/compute_external_pool_adapter_supervisor_session_policy_companion"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The full elon-server test target compiles with V259 enabled.",
+        "Focused migration, source-contract and owner/admin HTTP tests execute successfully.",
+        "Strict validation, redaction, replay, lineage, currentness, revocation and V254 fence compatibility are covered.",
+        "No process, IPC, secret delivery, network, probe, activation, route, market, usage or settlement effect is added.",
+        "Authority and acceptance documents record exact dynamic evidence and residual production gaps."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "30320470e5e5054f4c969b5c5a18ff9d32399b3230a2460540287cae9cfb9a6f",
+          "locator": "V259 verified local status and residual boundaries",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "a02ec73f1b86caa2e5d1c4f1b2bbb0395fd114ca",
+            "worktree_blob_oid": "453e7ed301d99a1fbdee22dd68c55565d07e86e1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/README.md",
+          "content_hash": "bff6884914e80d5daef52d1c06f59404fb7bd8672275727aa836fd0fa32e262c",
+          "locator": "V259 catalog summary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "8e9be1f07f702a3d450d1bbf26e73f0fc331557c",
+            "worktree_blob_oid": "e555ea67224261e035ac2f5518ae0caa576efec5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/current-implementation-status.md",
+          "content_hash": "9551065495c4e5c4f0e47fa978560a1feb1b7bcca8371405afcad467bf926cb4",
+          "locator": "V259 current status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "0f99d672333ba2df389cd08a38eb86af91d1999f",
+            "worktree_blob_oid": "3edd7e2e351891cd3f4118bcce20cccbba259dc1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-supervisor-session-policy-companion-acceptance.md",
+          "content_hash": "93758addda1f551a8b7a3a58ae561073a7eb950109f99ba2b0eddad19b545de3",
+          "locator": "13 passed local acceptance boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "cd079437f40d1858062adc0e9c45ee65f61fab16",
+            "worktree_blob_oid": "230995ed78402252a4bd7d8556ecfdce91dc3e27",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-supervisor-session-policy-companion-authority.md",
+          "content_hash": "fdc6f5714d0094ec8186f34ed7f6f9e1352f0d68df56962104b973a3d7043858",
+          "locator": "implementation reality and evidence fingerprint",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "b7a5793a1c443e9e5df40c2d48d600b3182c4a1d",
+            "worktree_blob_oid": "49495dd6c81331529f062cb15883f32f7af2c6f3",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/v259-supervisor-session-policy-companion-verification.md",
+          "content_hash": "f66b9d4afe9ec4f4f2306968699b730d4ae9d770c1658e028d75e7765d8d430d",
+          "locator": "goal required evidence and non-goals",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a5751e0e4bc972392dc33a26deda5661fd851619",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/supervisor_session_policy_companion_admin_http_test.rs",
+          "content_hash": "9eca64a28d5315e61730448a6a869212d0ece41f614853d987b599b45ff1f766",
+          "locator": "admin recovery and revocation acceptance",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "eb89fe071d55acc9d131ec8f0f0c897d6c4a574e",
+            "worktree_blob_oid": "eb89fe071d55acc9d131ec8f0f0c897d6c4a574e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/supervisor_session_policy_companion_owner_http_test.rs",
+          "content_hash": "f68ac5785905acf569d60216c6c9d2b7ef45b51e35e1f15945dc7bbef3380b14",
+          "locator": "owner HTTP acceptance",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "35391535913d7e25ca71226c7cbd6580dacd3fa8",
+            "worktree_blob_oid": "35391535913d7e25ca71226c7cbd6580dacd3fa8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/supervisor_session_policy_companion_source_contract_test.rs",
+          "content_hash": "8e88434ec8ad8395645e4c71417ef5a5bf449aaefc78eff423ca2363698c246d",
+          "locator": "five source boundary tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "b0682c269c586250faa2e24df8eb49b011738030",
+            "worktree_blob_oid": "5c22877efce0f6cad0995df9d85d6f80c37fb96b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/compute_external_pool_adapter_supervisor_session_policy_companion/tests.rs",
+          "content_hash": "18c046a3d1084804e9c4bf2fb53f18b92f62315f3f3451bb988670ac4eaec3b2",
+          "locator": "six migration and Store contracts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "455f7633f50e2dcb8e6be0984efc8bf50c990569",
+            "head_blob_oid": "6a6f451ef74d750bd9a1aec76ce7b74ba242f434",
+            "worktree_blob_oid": "6a6f451ef74d750bd9a1aec76ce7b74ba242f434",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786686039310,
+      "updated_at_ms": 1786689620063
+    },
+    {
       "id": "delivery-allocation-expiry-worker-v234-verification",
       "title": "v234 Delivery Allocation 到期公平恢复验收",
       "summary": "把已写但 passed=0 的 v228 管理员到期恢复与 v234 持久 keyset 公平 worker 推进到真实 Rust、fresh/repeat migration、Store/worker/HTTP 本地验收，不扩大到真实派发、计量、结算或生产部署。",
@@ -3032,6 +3214,176 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786662093158
+    },
+    {
+      "id": "feature_event_42d314f20c8c4a1b88e8f6f3d3e4adae",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "registered",
+      "actor": "codex-goal-7x24",
+      "reason": "The current authority marks the complete inert V259 implementation uncompiled and unrun; this bounded batch closes that local evidence gap.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786686039310
+    },
+    {
+      "id": "feature_event_d0dc4e44b585474ba48d09de8b98c2bd",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "claimed",
+      "actor": "codex-task-20260814-132807-44964",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786686050376
+    },
+    {
+      "id": "feature_event_b5ffadbb91a24d22ba37e75f93447e1b",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-7x24",
+      "reason": "Begin focused local compilation and dynamic acceptance.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786686061509
+    },
+    {
+      "id": "feature_event_f288ad68ba664d51a1dee02a25cfb83c",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-7x24",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786688279529
+    },
+    {
+      "id": "feature_event_8ed8bef477e34eb7b92758c18a3babc4",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-7x24",
+      "reason": "V259 compiles and all 13 focused migration, source-contract and owner/admin HTTP tests pass after correcting the false source-contract binding.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786688296508
+    },
+    {
+      "id": "feature_event_46204a09c41d4a3f8025696c86971a8a",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-7x24",
+      "reason": "Focused validation completed with CARGO_OK and 13 passed, 0 failed; residual production and Linux boundaries remain explicit.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786688314982
+    },
+    {
+      "id": "feature_event_86bfb5c946ee45ff813babd0362bbdd7",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-goal-7x24",
+      "reason": "Local V259 verification is complete and documented; production and Linux runtime capabilities remain explicitly outside this release.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786688331449
+    },
+    {
+      "id": "feature_event_53146a46f7d448bb8df4dbbd6d73eb5a",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Reopen released V259 after intentional AI_CURRENT modularity compaction invalidated one evidence hash.",
+      "from_status": "released",
+      "to_status": "retired",
+      "at_ms": 1786689555059
+    },
+    {
+      "id": "feature_event_6f6a9b996a874376a7fb649ccd2747dd",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Re-propose unchanged verified scope after evidence document compaction.",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1786689555231
+    },
+    {
+      "id": "feature_event_55f56bac1c38412b9dab6adea9f5c620",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Re-accept unchanged V259 verification scope.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786689556332
+    },
+    {
+      "id": "feature_event_fa509ba4131b4c92806c89dd51806d15",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Scope and dependencies remain current; refresh evidence against compact status document.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786689556400
+    },
+    {
+      "id": "feature_event_ab06cf85858d43e7b3bb150455835335",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "claimed",
+      "actor": "codex-v259-verifier",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786689582747
+    },
+    {
+      "id": "feature_event_c1fabecd7ab74054ac44359e2d7ccd9c",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Refresh exact evidence after intentional status-document compaction.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786689582852
+    },
+    {
+      "id": "feature_event_2711bfaf9a054f03869efaab1891cc17",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-v259-verifier",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786689619698
+    },
+    {
+      "id": "feature_event_e34b0c1a1e4b4394aac4bf5ef25ce981",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Implementation and documentation match the completed focused verification.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786689619874
+    },
+    {
+      "id": "feature_event_3a2fa41d8053490e877a18bf090a6738",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Full target compile and 13 focused tests passed; test evidence is current.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786689619964
+    },
+    {
+      "id": "feature_event_f0fb4297ad3b44f3af7a0042cbc23783",
+      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
+      "action": "transitioned",
+      "actor": "codex-v259-verifier",
+      "reason": "Release the verification record; no runtime activation or deployment was performed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786689620063
     }
   ]
 }
