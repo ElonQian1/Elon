@@ -93,8 +93,9 @@ V254 的 18 项 temporary absolute deny 继续逐字保留，Provider 继续 `re
 `runtime_launch_ready=false`、`activation_ready=false`。V263 不创建 route/service actor，
 不开放市场准入，不生成 usage、settlement 或链上 effect，也不发布 Server、PC 或 APK。
 
-V263 已完成 Store 私有组合、cross-build 与真实 Linux kernel fixture。下一硬门才是让 server broker 在不向 child 扩大网络 authority 的前提下，
-使用 V258 exact target 完成 DNS、TLS/SPKI 和 authenticated upstream no-work probe。probe
-必须形成独立、可过期、可复验的 observation；它仍不能单独移除 V254 deny 或激活
-Provider。详细动态证据与尚未验收项见
+V263 已完成 Store 私有组合、cross-build 与真实 Linux kernel fixture。后继 V264/V265 已在
+不向 child 扩大网络 authority 的前提下，使用 V258 exact target 完成 Broker TLS seam，并在
+固定本地 fixture 上完成 authenticated upstream no-work probe。probe 形成独立、可过期、
+可复验的进程内 observation；它仍不能单独移除 V254 deny 或激活 Provider。V263 详细动态
+证据与尚未验收项见
 [`external-pool-adapter-ephemeral-secret-delivery-acceptance.md`](external-pool-adapter-ephemeral-secret-delivery-acceptance.md)。

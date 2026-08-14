@@ -19,6 +19,7 @@ pub(crate) struct ExternalPoolAdapterBrokerTlsChannel {
     target: ExternalPoolAdapterBrokerTlsTarget,
     selected_address: SocketAddr,
     connected_at: Instant,
+    application_exchange_used: bool,
 }
 
 impl ExternalPoolAdapterBrokerTlsChannel {
@@ -34,6 +35,14 @@ impl ExternalPoolAdapterBrokerTlsChannel {
         let (_, session) = self.stream.get_ref();
         session.protocol_version() == Some(rustls::ProtocolVersion::TLSv1_3)
             && self.connected_at.elapsed().as_secs() <= CHANNEL_MAX_AGE_SECONDS
+    }
+
+    pub(super) fn begin_application_exchange(&mut self) -> Result<&mut TlsStream<TcpStream>> {
+        if self.application_exchange_used || !self.is_current() {
+            bail!("broker TLS application exchange authority rejected");
+        }
+        self.application_exchange_used = true;
+        Ok(&mut self.stream)
     }
 }
 
@@ -100,6 +109,7 @@ async fn connect_resolved(
             target,
             selected_address: address,
             connected_at: Instant::now(),
+            application_exchange_used: false,
         });
     }
 

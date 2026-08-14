@@ -18,7 +18,10 @@ use crate::compute_federation::external_pool_adapter_supervisor_session::{
     external_pool_adapter_session_roots, prepare_external_pool_adapter_supervisor_session,
     ExternalPoolAdapterSessionFrameKind,
 };
-use elon_external_pool_adapter_session_core::prepare_external_pool_adapter_ephemeral_bundle_delivery;
+use elon_external_pool_adapter_session_core::{
+    prepare_external_pool_adapter_ephemeral_bundle_delivery,
+    receive_external_pool_adapter_no_work_probe_request,
+};
 
 const REQUIRED_CAPSULE_SEALS: libc::c_int =
     libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
@@ -26,7 +29,11 @@ const HOST_READY: &[u8] = b"v262.host.authenticated";
 const CHILD_READY: &[u8] = b"v262.child.authenticated";
 const SHUTDOWN: &[u8] = b"v262.shutdown";
 const V263_CONFIG: &[u8] = br#"{"mode":"test-no-work"}"#;
+const V265_CONFIG: &[u8] = br#"{"mode":"test-upstream-no-work"}"#;
 const V263_CREDENTIAL: &[u8] = b"test-credential-never-production";
+const V265_REQUEST: &[u8] = b"ELON-TEST-NO-WORK\n";
+const V265_RESPONSE: &[u8] = b"ELON-TEST-NO-TASK\n";
+const V265_PROBE_TIMEOUT: Duration = Duration::from_millis(15_000);
 
 struct TestCapsule(File);
 
@@ -186,6 +193,56 @@ fn linux_kernel_ephemeral_bundle_root_drift_fails_closed_and_cleans_runtime() {
         .expect("wait for rejected V263 runtime")
         .expect("rejected V263 runtime exited");
     assert_eq!(exit.exit_code, Some(111));
+    assert_eq!(exit.signal, None);
+    assert!(!cgroup_path.exists());
+    assert!(!scratch_path.exists());
+}
+
+#[test]
+#[ignore = "requires delegated cgroup v2 root execution and the static V265 fixture"]
+fn linux_kernel_exec_child_completes_authenticated_no_work_probe_and_reaps() {
+    let parent_path = delegated_cgroup_parent_path();
+    let parent = delegated_cgroup_parent(&parent_path);
+    let capsule = sealed_fixture_capsule();
+    let delivery =
+        prepare_external_pool_adapter_ephemeral_bundle_delivery(265, V265_CONFIG, V263_CREDENTIAL)
+            .expect("prepare V265 delivery");
+    let bundle_root = delivery.bundle_root_hex();
+    let prepared =
+        prepare_external_pool_adapter_supervisor_session(roots_with_bundle(&bundle_root))
+            .expect("prepare V265 authenticated runtime");
+    let (host, child_bootstrap) = prepared.split();
+    let mut child =
+        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
+            .expect("launch V265 authenticated runtime");
+    let pid = child.pid_for_test();
+    let cgroup_path = child_cgroup_path(&parent_path, &child);
+    let scratch_path = child.scratch_path_for_test().to_path_buf();
+
+    let mut session = host.authenticate().expect("authenticate V265 host");
+    let delivery_receipt = delivery
+        .deliver(&mut session, &bundle_root, V265_CONFIG, V263_CREDENTIAL)
+        .expect("deliver V265 ephemeral bundle");
+    let request =
+        receive_external_pool_adapter_no_work_probe_request(&mut session, V265_PROBE_TIMEOUT)
+            .expect("receive V265 child-generated request");
+    assert_eq!(request.request(), V265_REQUEST);
+    assert_eq!(request.expected_response_bytes(), V265_RESPONSE.len());
+    let probe_receipt = request
+        .complete(&mut session, V265_RESPONSE)
+        .expect("complete V265 child-validated response");
+    assert_eq!(probe_receipt.request_bytes(), V265_REQUEST.len() as u32);
+    assert_eq!(probe_receipt.response_bytes(), V265_RESPONSE.len() as u32);
+    assert_eq!(open_fds(pid), BTreeSet::from([0, 1, 2, 3]));
+    delivery_receipt
+        .shutdown(&mut session)
+        .expect("zeroize and shutdown V265 child");
+    drop(session);
+    let exit = child
+        .wait(Duration::from_secs(2))
+        .expect("wait for V265 runtime")
+        .expect("V265 runtime exited");
+    assert_eq!(exit.exit_code, Some(0));
     assert_eq!(exit.signal, None);
     assert!(!cgroup_path.exists());
     assert!(!scratch_path.exists());

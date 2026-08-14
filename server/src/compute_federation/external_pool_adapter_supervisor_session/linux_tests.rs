@@ -1,4 +1,4 @@
-use std::{mem::MaybeUninit, os::fd::RawFd, thread};
+use std::{mem::MaybeUninit, os::fd::RawFd, thread, time::Duration};
 
 use anyhow::Result;
 
@@ -8,9 +8,16 @@ use super::{
     ExternalPoolAdapterSessionFrameKind, ExternalPoolAdapterSessionRoots,
 };
 use elon_external_pool_adapter_session_core::receive_external_pool_adapter_ephemeral_bundle;
+use elon_external_pool_adapter_session_core::{
+    execute_external_pool_adapter_no_work_probe,
+    receive_external_pool_adapter_no_work_probe_request,
+};
 
 const DELIVERY_CONFIG: &[u8] = br#"{"mode":"test-no-work"}"#;
 const DELIVERY_CREDENTIAL: &[u8] = b"test-credential-never-production";
+const NO_WORK_REQUEST: &[u8] = b"ELON-TEST-NO-WORK\n";
+const NO_WORK_RESPONSE: &[u8] = b"ELON-TEST-NO-TASK\n";
+const NO_WORK_TIMEOUT: Duration = Duration::from_millis(15_000);
 
 #[test]
 fn linux_kernel_uses_anonymous_cloexec_seqpacket_and_one_time_seed_pipe() {
@@ -270,6 +277,75 @@ fn ephemeral_bundle_preparation_rejects_invalid_bounds() {
         &oversized_credential,
     )
     .is_err());
+}
+
+#[test]
+fn authenticated_no_work_probe_binds_child_request_exact_response_and_receipt() {
+    let (mut host, mut child) = authenticated_pair();
+    let child_thread = thread::spawn(move || {
+        execute_external_pool_adapter_no_work_probe(
+            &mut child,
+            NO_WORK_REQUEST,
+            NO_WORK_RESPONSE.len(),
+            NO_WORK_TIMEOUT,
+            |response| {
+                if response != NO_WORK_RESPONSE {
+                    anyhow::bail!("test no-task response rejected");
+                }
+                Ok(())
+            },
+        )
+    });
+    let request = receive_external_pool_adapter_no_work_probe_request(&mut host, NO_WORK_TIMEOUT)
+        .expect("receive child-generated no-work request");
+    assert_eq!(request.request(), NO_WORK_REQUEST);
+    assert_eq!(request.expected_response_bytes(), NO_WORK_RESPONSE.len());
+    let receipt = request
+        .complete(&mut host, NO_WORK_RESPONSE)
+        .expect("complete child-validated no-work probe");
+    assert_eq!(receipt.request_bytes(), NO_WORK_REQUEST.len() as u32);
+    assert_eq!(receipt.response_bytes(), NO_WORK_RESPONSE.len() as u32);
+    assert_eq!(receipt.probe_root_hex().len(), 64);
+    child_thread
+        .join()
+        .expect("join no-work child")
+        .expect("child accepts no-task response");
+}
+
+#[test]
+fn authenticated_no_work_probe_rejects_wrong_size_and_child_semantic_failure() {
+    let (mut host, mut child) = authenticated_pair();
+    let child_thread = thread::spawn(move || {
+        execute_external_pool_adapter_no_work_probe(
+            &mut child,
+            NO_WORK_REQUEST,
+            NO_WORK_RESPONSE.len(),
+            NO_WORK_TIMEOUT,
+            |_| anyhow::bail!("semantic rejection"),
+        )
+    });
+    let request = receive_external_pool_adapter_no_work_probe_request(&mut host, NO_WORK_TIMEOUT)
+        .expect("receive semantic-failure request");
+    assert!(request.complete(&mut host, NO_WORK_RESPONSE).is_err());
+    assert!(child_thread
+        .join()
+        .expect("join semantic-failure child")
+        .is_err());
+
+    let (mut host, mut child) = authenticated_pair();
+    let child_thread = thread::spawn(move || {
+        execute_external_pool_adapter_no_work_probe(
+            &mut child,
+            NO_WORK_REQUEST,
+            NO_WORK_RESPONSE.len(),
+            NO_WORK_TIMEOUT,
+            |_| Ok(()),
+        )
+    });
+    let request = receive_external_pool_adapter_no_work_probe_request(&mut host, NO_WORK_TIMEOUT)
+        .expect("receive wrong-size request");
+    assert!(request.complete(&mut host, b"short").is_err());
+    assert!(child_thread.join().expect("join wrong-size child").is_err());
 }
 
 fn authenticated_pair() -> (

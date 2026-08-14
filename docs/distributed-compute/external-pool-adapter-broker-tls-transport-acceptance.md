@@ -74,4 +74,6 @@ fixture 的 Windows 主动断开最初返回 `10053`，最终按“未收到应�
 - 未开放 HTTP/MCP/PC/APK，未发布服务器或安装包。
 
 因此只能声明 V264 的服务端 TLS transport core 已完成 Windows 源码和本地动态认证验收，
-不能声明生产外部矿池已接通、Adapter 能领取任务或算力交易链路已完成。
+不能声明生产外部矿池已接通、Adapter 能领取任务或算力交易链路已完成。后继 V265 已另行
+完成固定本地 fixture 的 bounded no-work seam，见
+[`external-pool-adapter-authenticated-no-work-probe-acceptance.md`](external-pool-adapter-authenticated-no-work-probe-acceptance.md)；它不回写或扩大本验收结论。

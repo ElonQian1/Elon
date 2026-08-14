@@ -67,6 +67,8 @@ pub(crate) mod external_pool_adapter_installation_service;
 pub(crate) mod external_pool_adapter_linux_supervisor;
 #[cfg(test)]
 mod external_pool_adapter_linux_supervisor_source_contract_tests;
+#[cfg(test)]
+mod external_pool_adapter_no_work_probe_source_contract_tests;
 pub(crate) mod external_pool_adapter_registry;
 pub(crate) mod external_pool_adapter_registry_api;
 pub(crate) mod external_pool_adapter_registry_service;

@@ -9,6 +9,8 @@ mod filesystem;
 mod locked_bytes;
 #[path = "../compute_federation/external_pool_adapter_runtime_bundle/manifest.rs"]
 mod manifest;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod no_work_probe;
 mod probe_preparation;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod secret_delivery;

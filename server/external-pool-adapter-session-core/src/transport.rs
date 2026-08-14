@@ -20,6 +20,7 @@ const MAX_PAYLOAD_BYTES: usize = MAX_CONTROL_PAYLOAD_BYTES;
 const MAX_PACKET_BYTES: usize = FRAME_HEADER_BYTES + MAX_PAYLOAD_BYTES + FRAME_TAG_BYTES;
 const MAX_FRAMES_PER_DIRECTION: u64 = 1_048_576;
 const FRAME_IO_TIMEOUT: Duration = Duration::from_millis(5_000);
+const MAX_FRAME_IO_TIMEOUT: Duration = Duration::from_millis(15_000);
 const FRAME_MAC_LABEL: &[u8] = b"frame\0";
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -129,7 +130,17 @@ impl AuthenticatedExternalPoolAdapterSession {
     }
 
     pub fn receive(&mut self) -> Result<AuthenticatedExternalPoolAdapterSessionFrame> {
-        let result = self.receive_inner();
+        self.receive_with_timeout(FRAME_IO_TIMEOUT)
+    }
+
+    pub fn receive_with_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<AuthenticatedExternalPoolAdapterSessionFrame> {
+        if timeout.is_zero() || timeout > MAX_FRAME_IO_TIMEOUT {
+            return self.fail(anyhow!("authenticated session timeout rejected"));
+        }
+        let result = self.receive_inner(timeout);
         match result {
             Ok(frame) => Ok(frame),
             Err(error) => self.fail(error),
@@ -164,9 +175,12 @@ impl AuthenticatedExternalPoolAdapterSession {
         Ok(())
     }
 
-    fn receive_inner(&mut self) -> Result<AuthenticatedExternalPoolAdapterSessionFrame> {
+    fn receive_inner(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<AuthenticatedExternalPoolAdapterSessionFrame> {
         self.ensure_active()?;
-        let packet = receive_packet(self.socket.as_raw_fd(), MAX_PACKET_BYTES, FRAME_IO_TIMEOUT)?;
+        let packet = receive_packet(self.socket.as_raw_fd(), MAX_PACKET_BYTES, timeout)?;
         if packet.len() < FRAME_HEADER_BYTES + FRAME_TAG_BYTES {
             bail!("authenticated session frame rejected");
         }

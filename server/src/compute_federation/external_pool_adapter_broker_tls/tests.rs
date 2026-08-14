@@ -8,11 +8,16 @@ use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rustls::{RootCertStore, ServerConfig, SupportedProtocolVersion};
 use rustls_pki_types::{CertificateDer, PrivatePkcs8KeyDer};
-use tokio::{io::AsyncReadExt, net::TcpListener, task::JoinHandle};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+    task::JoinHandle,
+};
 use tokio_rustls::TlsAcceptor;
 
 use super::{
     address_policy::{is_public_unicast, validate_and_order_dns_answers},
+    no_work::exchange_external_pool_adapter_broker_no_work,
     target::ExternalPoolAdapterBrokerTlsTarget,
     transport::{connect_external_pool_adapter_broker_tls_for_test, leaf_spki_sha256},
 };
@@ -184,6 +189,62 @@ async fn refused_tcp_connection_is_rejected() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn local_tls_fixture_relays_one_exact_bounded_no_work_exchange() -> Result<()> {
+    const REQUEST: &[u8] = b"ELON-TEST-NO-WORK\n";
+    const RESPONSE: &[u8] = b"ELON-TEST-NO-TASK\n";
+    let server = start_exchange_server(REQUEST, RESPONSE).await?;
+    let target = target(&server, "localhost", &server.spki_pin)?;
+    let mut channel = connect_external_pool_adapter_broker_tls_for_test(
+        target,
+        vec![server.address],
+        roots_with(&server.certificate)?,
+    )
+    .await?;
+    let response = exchange_external_pool_adapter_broker_no_work(
+        &mut channel,
+        REQUEST,
+        RESPONSE.len(),
+        Duration::from_secs(1),
+    )
+    .await?;
+    assert_eq!(&response[..], RESPONSE);
+    assert!(exchange_external_pool_adapter_broker_no_work(
+        &mut channel,
+        REQUEST,
+        RESPONSE.len(),
+        Duration::from_secs(1),
+    )
+    .await
+    .is_err());
+    assert_eq!(server.task.await??, REQUEST.len());
+    Ok(())
+}
+
+#[tokio::test]
+async fn local_tls_fixture_rejects_truncated_no_work_response() -> Result<()> {
+    const REQUEST: &[u8] = b"ELON-TEST-NO-WORK\n";
+    const TRUNCATED_RESPONSE: &[u8] = b"ELON-TEST-NO-TASK";
+    let server = start_exchange_server(REQUEST, TRUNCATED_RESPONSE).await?;
+    let target = target(&server, "localhost", &server.spki_pin)?;
+    let mut channel = connect_external_pool_adapter_broker_tls_for_test(
+        target,
+        vec![server.address],
+        roots_with(&server.certificate)?,
+    )
+    .await?;
+    assert!(exchange_external_pool_adapter_broker_no_work(
+        &mut channel,
+        REQUEST,
+        TRUNCATED_RESPONSE.len() + 1,
+        Duration::from_secs(1),
+    )
+    .await
+    .is_err());
+    assert_eq!(server.task.await??, REQUEST.len());
+    Ok(())
+}
+
 fn target(
     server: &LocalTlsServer,
     server_name: &str,
@@ -216,6 +277,41 @@ async fn start_server(protocols: &[&'static SupportedProtocolVersion]) -> Result
             Ok(Ok(read)) => Ok(read),
             Ok(Err(_)) => Ok(0),
         }
+    });
+    Ok(LocalTlsServer {
+        address,
+        spki_pin: spki_pin(&certificate)?,
+        certificate: trust_anchor,
+        task,
+    })
+}
+
+async fn start_exchange_server(
+    request: &'static [u8],
+    response: &'static [u8],
+) -> Result<LocalTlsServer> {
+    let certificate = fixture_certificate(TEST_LEAF_DER_BASE64)?;
+    let trust_anchor = fixture_certificate(TEST_CA_DER_BASE64)?;
+    let private_key = PrivatePkcs8KeyDer::from(STANDARD.decode(TEST_LEAF_KEY_DER_BASE64)?);
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = ServerConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13])?
+        .with_no_client_auth()
+        .with_single_cert(vec![certificate.clone()], private_key.into())?;
+    let acceptor = TlsAcceptor::from(Arc::new(config));
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let address = listener.local_addr()?;
+    let task = tokio::spawn(async move {
+        let (tcp, _) = listener.accept().await?;
+        let mut tls = acceptor.accept(tcp).await?;
+        let mut observed = vec![0_u8; request.len()];
+        tls.read_exact(&mut observed).await?;
+        if observed != request {
+            anyhow::bail!("local no-work request mismatch");
+        }
+        tls.write_all(response).await?;
+        tls.flush().await?;
+        Ok(observed.len())
     });
     Ok(LocalTlsServer {
         address,

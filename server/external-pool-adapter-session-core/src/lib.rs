@@ -9,6 +9,7 @@
 mod bootstrap;
 mod crypto;
 mod delivery;
+mod no_work;
 mod roots;
 mod transport;
 
@@ -24,6 +25,11 @@ pub use delivery::{
     DeliveredExternalPoolAdapterEphemeralBundle,
     ExternalPoolAdapterEphemeralBundleDeliveryHostReceipt,
     PreparedExternalPoolAdapterEphemeralBundleDelivery,
+};
+pub use no_work::{
+    execute_external_pool_adapter_no_work_probe,
+    receive_external_pool_adapter_no_work_probe_request, ExternalPoolAdapterNoWorkProbeHostReceipt,
+    ExternalPoolAdapterNoWorkProbeHostRequest,
 };
 pub use roots::{ExternalPoolAdapterSessionRootArguments, ExternalPoolAdapterSessionRoots};
 pub use transport::{

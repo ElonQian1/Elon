@@ -123,6 +123,226 @@
       "updated_at_ms": 1786625457423
     },
     {
+      "id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "title": "外部矿池 Adapter authenticated no-work probe V1",
+      "summary": "让已取得 V256 短时 bundle 的 authenticated child 生成严格有界 no-work request，由服务端 Broker 通过 V258 TLS target 完成一次 exact response relay，再由同一 child 验证并形成进程内短时 observation；不领取任务或激活 Provider。",
+      "status": "released",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/compute-external-pool-adapter-authenticated-no-work-probe-v1.md",
+        "content_hash": "420f9ad31174a127f4d5f85e4be8e2791c22d2dc51957fe3b94ba981a536e739",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ecfa901f3b5243c7ea942dfeb4af016964ef11da",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "no-work-probe",
+        "tls",
+        "security"
+      ],
+      "task_paths": [
+        "docs/distributed-compute",
+        "docs/requirements/compute-external-pool-adapter-authenticated-no-work-probe-v1.md",
+        "server/external-pool-adapter-session-core",
+        "server/src/compute_federation/external_pool_adapter_broker_tls",
+        "server/src/store/compute_external_pool_adapter_runtime_bundle"
+      ],
+      "dependencies": [
+        "compute-external-pool-adapter-broker-tls-transport-v1",
+        "compute-external-pool-adapter-ephemeral-secret-delivery-v1"
+      ],
+      "acceptance_criteria": [
+        "ELNW 子协议在既有 authenticated Control 帧内闭合 child-generated request、exact response 和 validation receipt。",
+        "request/response 非空、严格限长、一次性、zeroize-on-drop，错误长度、截断、timeout、错误语义均失败关闭。",
+        "SQLite transaction 和 Prepared handle 不跨网络 await，exchange 前后复验 V256/V258/V259/installation roots。",
+        "成功只生成不可序列化、会过期的 Store-private observation，Provider、route、market、usage、settlement 和 Sui 无副作用。",
+        "Windows 本地 TLS、Linux session/kernel 或 source-contract 验证通过，独立 acceptance 文档列出证据和未验收项。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-authenticated-no-work-probe-acceptance.md",
+          "content_hash": "43cdc0b882d0b0458fca3b9454080ddc1e822b5332298385d56de106d1e470e6",
+          "locator": "V265 acceptance and evidence fingerprints",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "aa5dba9c59b30eec861b0ac31075ba18ae4ad866",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-authenticated-no-work-probe-authority.md",
+          "content_hash": "cb0e7aedb70c69949eecb6aa4b06d0a46b58a4fe6ec0a58aa44f453768c493fb",
+          "locator": "V265 authority",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "11378a589e518890785690c6175c11807cefc1a0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/external-pool-adapter-session-core/src/no_work.rs",
+          "content_hash": "c33d6046d68f2cc6768c1504a9ddadbccc157b0c453b6fcb743aa7b7618cca6f",
+          "locator": "ELNW protocol and host/child state machine",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "76f8c5a83f424a1c55783fe04c5cf80eac888443",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/external-pool-adapter-session-core/src/no_work/tests.rs",
+          "content_hash": "aeef0f0e5adb0e48fe8a3433dc76b34890ecdf59d2eb96d396701834461a7041",
+          "locator": "ELNW positive and terminal failure tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "17ba0ae93bff58723754d55469371cc1d6d1163b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/no_work.rs",
+          "content_hash": "126240d9d583ed198320083633272a7fdef6f3a190797add0d387b525986295e",
+          "locator": "bounded one-shot TLS exchange",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b7b4896ba55b76adb2b60e7e91305cc449204a30",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/tests.rs",
+          "content_hash": "583f3f45426096348705a6710932236101cd44bd0da0725127c178b587ab3d08",
+          "locator": "local TLS exact and truncated response tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "bbdd6d087a010123fd268a63c5023d20347ebf2f",
+            "worktree_blob_oid": "9837692e9c3126c524892cc80b4f1d237075fd9a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_linux_supervisor/authenticated_runtime_tests.rs",
+          "content_hash": "7c893cf0b98148934f94a9bb06ea26951bec93437e03c955c8235e06a48b0ffd",
+          "locator": "real exec cgroup probe and reap fixture",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "e75eb53263c7a11823014d1fa3c1724cd3de887d",
+            "worktree_blob_oid": "28a63a4fed6ca7e5a54e51cbe4d449ddc0ec87b8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_no_work_probe_source_contract_tests.rs",
+          "content_hash": "d1a4f3ce62d0e58f650c048eeb6f9dd062dbe20b7968f18f315c21b88f6c8deb",
+          "locator": "V265 authority boundary contracts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "03f67a4ce951279d482434dbb2b57346031ab40d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_supervisor_session/linux_tests.rs",
+          "content_hash": "625d53a4f9fe15ddcb58772fddff4005dbbe5df7890e1f2f337e64742ad6db2f",
+          "locator": "authenticated session no-work tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "331c5de38a9655c34bad558575ffd92cf78dc93e",
+            "worktree_blob_oid": "acf288c74e9a43ac21a63b674b6529a0c822e93f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/external_pool_adapter_session_fixture_main.rs",
+          "content_hash": "0093863e5fc423fc63337f8d1937bb64100dc2507a14b7d6e5e9197fddaebed2",
+          "locator": "fixed V265 test Adapter behavior",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "7900e1bfa1d4c47a1598d2558546c652ee6c2c81",
+            "worktree_blob_oid": "dd8884eb070808366570b34ab9be7615e544fc87",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_runtime_bundle/no_work_probe.rs",
+          "content_hash": "3b0f9cd829427e79ce2c071fef42f3cf8b629507feb5ab38a78d274831181fd9",
+          "locator": "Store private orchestration and post-exchange reproof",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "82a16ce1ec88ae30edfcd2504f7d092a27dea423",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_runtime_bundle/secret_delivery.rs",
+          "content_hash": "aafb300cf46e60d25cce784eacfa60202110a5793e68b3fdc817fc21373a2cda",
+          "locator": "transaction-free ephemeral delivery handoff",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "f9c4a6b233dec4601af8baf125bad5d38286546e",
+            "worktree_blob_oid": "14bf2d88572b1c632d438386b2de496e788776d8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_upstream_transport_target/broker_tls.rs",
+          "content_hash": "1470a5bd77eda590660d20fd2c28eb0fa141a32f4c711e6f62ff0e0c2e9eff08",
+          "locator": "prepared one-shot authenticated channel",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e6513c60401793afba7e60f8d1368d03566a120",
+            "head_blob_oid": "8ea7a68d84d5e4850875ce85e894135b20407df6",
+            "worktree_blob_oid": "816653c018d9e7f1f0a8205773a84a8044f584d8",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786742279160,
+      "updated_at_ms": 1786748712051
+    },
+    {
       "id": "compute-external-pool-adapter-authenticated-runtime-v1",
       "title": "外部矿池 Adapter exec 后认证运行时 V1",
       "summary": "把 V260 mutual authenticated session 放入 V261 真实 Linux clone3/cgroup/namespace/seccomp/pidfd 生命周期，并以共享协议 core 和测试 capsule 验证 exec 后双向认证帧；不接真实 Secret、上游网络、Provider 激活或结算。",
@@ -3540,76 +3760,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6291b08666f949649216f9561241d4a6",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-019f3b86",
-      "reason": "重新绑定包含 10 项正式验证证据的 V254 当前权威文档。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786637272413
-    },
-    {
-      "id": "feature_event_a6a1566793cd4aa2b8a9b7ef33182a87",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "已复核 10 项验证边界，仍明确排除文件升级、生产激活与 market admission。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786637272427
-    },
-    {
-      "id": "feature_event_d53e7d27f33142ada3f343a8e5239b0f",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "更新后的验证需求与证据范围明确。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786637272437
-    },
-    {
-      "id": "feature_event_07bb889b283549ba81b87263a48ea0a3",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786637272448
-    },
-    {
-      "id": "feature_event_e4f944963c7c4a35a1c46f9d0e518a59",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "开始登记通过的 V254 fresh/repeat migration 与 HTTP 验收证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786637272460
-    },
-    {
-      "id": "feature_event_f614db547e7a4b6fb2753f44e2d6abc0",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786637293809
-    },
-    {
-      "id": "feature_event_a303a6a804bb4f2a8a0a589ada161053",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V254 已修复两处编译错误，补齐 fresh/repeat migration 动态测试，并完成 10 项定向实现证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786637323589
-    },
-    {
       "id": "feature_event_d2e41a96b78847f5845b18a4354083ea",
       "feature_id": "external-pool-provider-activation-candidate-v254-verification",
       "action": "transitioned",
@@ -5538,6 +5688,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786740800005
+    },
+    {
+      "id": "feature_event_136df046b6cd43bba9381cfdb94a2019",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "registered",
+      "actor": "codex-v265",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786742279160
+    },
+    {
+      "id": "feature_event_27abb43aadad418283ae763d60812099",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "claimed",
+      "actor": "codex-v265",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786742289191
+    },
+    {
+      "id": "feature_event_0cddca2d06b0431899e73f87924d20dc",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "transitioned",
+      "actor": "codex-v265",
+      "reason": "开始实现一次性 ELNW authenticated no-work relay 与 Store-private observation。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786742300273
+    },
+    {
+      "id": "feature_event_0b88e07dc45e45b5897398702b4e1bfd",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-v265",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786748671985
+    },
+    {
+      "id": "feature_event_f8fd7a0c30c1490f885d43c6a53740ae",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "transitioned",
+      "actor": "codex-v265",
+      "reason": "V265 source, tests, authority and acceptance evidence are complete.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786748684536
+    },
+    {
+      "id": "feature_event_9cd2c2fc5c99450785b3dedff211935e",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "transitioned",
+      "actor": "codex-v265",
+      "reason": "Production check, Windows, Linux core, Linux-musl and WSL kernel evidence passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786748696651
+    },
+    {
+      "id": "feature_event_843463f858f9499f9335022690f601f7",
+      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
+      "action": "transitioned",
+      "actor": "codex-v265",
+      "reason": "V265 is verified, documented, and ready for the normal Git release commit.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786748712051
     }
   ]
 }

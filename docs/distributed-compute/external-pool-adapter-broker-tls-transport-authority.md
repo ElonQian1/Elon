@@ -80,8 +80,8 @@ Provider 继续 `registering`，V254 的 18 项 temporary absolute deny 逐字�
 发送 V256 Secret，不连接真实生产矿池，不生成 route/service actor、probe observation、
 readiness、usage、settlement 或链上 effect，也不开放 HTTP/MCP/PC/APK，不部署服务器。
 
-下一硬门是在这条 authenticated channel 上定义 Adapter-generated、严格有界、无任务领取
-能力的 application no-work request/response，并把 observation 与 exact V258/V263 roots、
-时效和失败关闭状态绑定。该 observation 仍不能单独移除 V254 deny 或激活 Provider。动态
-证据见
+后继 V265 已在固定本地 fixture 上组合 Adapter-generated、严格有界、无任务领取能力的
+application no-work request/response，并把进程内 observation 与 exact V258/V263 roots、
+时效和失败关闭状态绑定；这不改变 V264 本身的零应用字节历史边界。该 observation 仍不能
+单独移除 V254 deny 或激活 Provider。V264 动态证据见
 [`external-pool-adapter-broker-tls-transport-acceptance.md`](external-pool-adapter-broker-tls-transport-acceptance.md)。

@@ -6,8 +6,11 @@
 
 #![cfg(all(target_os = "linux", target_arch = "x86_64"))]
 
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use elon_external_pool_adapter_session_core::{
+    execute_external_pool_adapter_no_work_probe,
     receive_external_pool_adapter_ephemeral_bundle_from_begin, ExternalPoolAdapterChildBootstrap,
     ExternalPoolAdapterSessionFrameKind, ExternalPoolAdapterSessionRoots,
 };
@@ -16,7 +19,11 @@ const HOST_READY: &[u8] = b"v262.host.authenticated";
 const CHILD_READY: &[u8] = b"v262.child.authenticated";
 const SHUTDOWN: &[u8] = b"v262.shutdown";
 const V263_CONFIG: &[u8] = br#"{"mode":"test-no-work"}"#;
+const V265_CONFIG: &[u8] = br#"{"mode":"test-upstream-no-work"}"#;
 const V263_CREDENTIAL: &[u8] = b"test-credential-never-production";
+const V265_REQUEST: &[u8] = b"ELON-TEST-NO-WORK\n";
+const V265_RESPONSE: &[u8] = b"ELON-TEST-NO-TASK\n";
+const V265_PROBE_TIMEOUT: Duration = Duration::from_millis(15_000);
 const ROOT_ARGUMENT_PREFIXES: [&str; 6] = [
     "--elon-session-policy=",
     "--elon-session-profile=",
@@ -63,8 +70,25 @@ fn run() -> Result<()> {
         first,
     )
     .context("receive V263 ephemeral bundle")?;
-    if delivered.config() != V263_CONFIG || delivered.credential() != V263_CREDENTIAL {
+    if (delivered.config() != V263_CONFIG && delivered.config() != V265_CONFIG)
+        || delivered.credential() != V263_CREDENTIAL
+    {
         bail!("V263 test-only material rejected");
+    }
+    if delivered.config() == V265_CONFIG {
+        execute_external_pool_adapter_no_work_probe(
+            &mut session,
+            V265_REQUEST,
+            V265_RESPONSE.len(),
+            V265_PROBE_TIMEOUT,
+            |response| {
+                if response != V265_RESPONSE {
+                    bail!("V265 test-only no-work response rejected");
+                }
+                Ok(())
+            },
+        )
+        .context("execute V265 authenticated no-work probe")?;
     }
     delivered
         .wait_for_shutdown(&mut session)
