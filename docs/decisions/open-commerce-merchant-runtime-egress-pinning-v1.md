@@ -2,8 +2,8 @@
 title: 商户运行时 HTTPS 出站地址固定 V1
 status: accepted
 owner: backend
-reviewed_at: 2026-08-03
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-14
+implementation_status: implemented_real_public_ip_subset_verified
 ---
 
 # 商户运行时 HTTPS 出站地址固定 V1

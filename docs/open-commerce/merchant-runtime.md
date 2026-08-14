@@ -2,7 +2,7 @@
 title: 商户自有运行时接入手册
 status: current
 owner: backend
-reviewed_at: 2026-08-10
+reviewed_at: 2026-08-14
 ---
 
 # 商户自有运行时接入手册
@@ -112,10 +112,16 @@ HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 powershell -NoProfile -File scripts\test-open-commerce-merchant-runtime-contract.ps1 `
   -CoffeeRepo D:\rust\active-projects\cofficethinking
 
+# Creates one real unpaid order in the fixed suspended acceptance store.
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\test-open-commerce-public-https-coffee.ps1 `
+  -CoffeeRepo D:\rust\active-projects\cofficethinking `
+  -AcknowledgeProductionWrite
+
 Set-Location sdk\open-commerce-connector
 npm test
 ```
 
-Node SDK 全量回归已覆盖签名、来源字段、Grant、平台动作确认、Manifest、结果边界、并发忙碌、幂等冲突、失败释放和成功重放。平台 Rust 测试代码还会启动临时商户服务，验证签名、Manifest、真实处理器调用、动作确认字段、计量、审计和平台幂等重放；本批已通过 `cargo check --bin elon-server --tests`，但本机共享 D 盘在链接测试二进制时写满，新增断言尚未实际执行。
+Node SDK 全量回归已覆盖签名、来源字段、Grant、平台动作确认、Manifest、结果边界、并发忙碌、幂等冲突、失败释放和成功重放。平台 Rust 测试代码会启动真实 Axum 路由并验证签名、Manifest、处理器调用、动作确认、计量、审计和平台幂等重放。2026-08-14 的公网纵向验收还通过标准 443 HTTPS 调用咖啡真实运行时，并在真实 PostgreSQL 与 ERP API 中核对同一笔未支付订单；边界和恢复核对命令见 `docs/open-commerce/public-https-coffee-runtime-acceptance.md`。
 
-商户运行时出站地址固定的代码状态和统一回归范围见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`；当前该批次为 `implementation_uncompiled`。
+商户运行时出站地址固定的代码状态和剩余回归范围见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。

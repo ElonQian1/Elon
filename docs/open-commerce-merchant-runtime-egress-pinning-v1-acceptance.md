@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-`implementation_compiled_network_unverified`
+`implemented_real_public_ip_subset_verified`
 
-代码已通过 `cargo check --bin elon-server --tests`，确认出站安全模块及其调用点可编译；尚未成功链接测试二进制、启动临时商户服务、解析真实 DNS、建立 TLS 连接或执行业务调用。限定服务端测试在链接阶段因共享 D 盘写满退出，不是测试断言失败。
+代码已通过完整测试目标编译。2026-08-14 的公网纵向验收使用一龙当前源码、真实 Axum HTTP 路由和隔离临时 SQLite，经受信任的标准 443 IP 证书连接固定公网地址，完成 Manifest 验证、HMAC 报价、动作确认下单、幂等重放和状态读取，并由咖啡真实 PostgreSQL 与 ERP API 回读同一笔未支付订单。证据见 `docs/open-commerce/public-https-coffee-runtime-acceptance.md`。
 
 ## 已形成代码
 
@@ -28,4 +28,5 @@
 
 - 多公网地址故障切换、网络级 egress 防火墙和独立出站代理。
 - 生产商户域名身份审核、证书策略、密钥托管和真实公网联调。
-- 测试二进制实际执行，以及 DNS、TLS、网络、并发和回归验证。
+- 域名多地址、IPv6、DNS 变化、混合公网/私网、并发压力和长时间回归。
+- 一龙线上生产部署、生产数据库和真实企业/App 审核下的同一公网链路。

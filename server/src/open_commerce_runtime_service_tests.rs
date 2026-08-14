@@ -353,3 +353,6 @@ fn temp_store() -> Store {
 
 #[path = "open_commerce_runtime_adapter_tcp_tests.rs"]
 mod adapter_tcp_tests;
+
+#[path = "open_commerce_runtime_public_https_acceptance_tests.rs"]
+mod public_https_acceptance_tests;

@@ -178,6 +178,7 @@
 168. `docs/decisions/open-commerce-consumer-portability-reauthorization-v1.md`：查看消费者人工映射来源关系、目标商户重新决定和旧 Grant 不复制的边界。
 169. `docs/open-commerce-consumer-portability-reauthorization-v1-acceptance.md`：查看关系映射与重新授权的 Rust、HTTP 和 PC 构建验证证据。
 170. `docs/open-commerce-cofficethinking-real-server-acceptance.md`：查看咖啡商户真实服务器、真实 PostgreSQL、库存事务、幂等下单和原 ERP 回读的隔离验收，以及尚未完成的公网平台链边界。
+171. `docs/open-commerce/public-https-coffee-runtime-acceptance.md`：查看一龙当前源码经限权生产凭据和公网标准 443 HTTPS 调用咖啡真实运行时、落入真实 PostgreSQL/ERP 的未支付纵向验收及其隔离边界。
 
 ## 专题地图
 

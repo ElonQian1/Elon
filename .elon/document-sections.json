@@ -312,6 +312,7 @@
     "docs/open-commerce/decision-register.md": "custom:open-commerce-network",
     "docs/open-commerce/integration-architecture.md": "custom:open-commerce-network",
     "docs/open-commerce/merchant-runtime.md": "custom:open-commerce-network",
+    "docs/open-commerce/public-https-coffee-runtime-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-integration-control-plane-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-merchant-runtime-v1-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-acceptance.md": "custom:open-commerce-network",
@@ -450,6 +451,7 @@
     "docs/open-commerce/connector-sdk.md": "on-demand",
     "docs/open-commerce/consumer-developer-sandbox.md": "on-demand",
     "docs/open-commerce/merchant-runtime.md": "on-demand",
+    "docs/open-commerce/public-https-coffee-runtime-acceptance.md": "evidence",
     "docs/open-commerce-integration-control-plane-acceptance.md": "evidence",
     "docs/open-commerce-merchant-runtime-v1-acceptance.md": "evidence",
     "docs/pc-frontend-migration.md": "on-demand",
@@ -755,6 +757,12 @@
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "technical_guide"
+    },
+    "docs/open-commerce/public-https-coffee-runtime-acceptance.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "acceptance"
     },
     "docs/open-commerce-integration-control-plane-acceptance.md": {
       "retrieval": "on_demand",
@@ -1574,7 +1582,7 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-31",
+      "reviewed_at": "2026-08-14",
       "review_interval_days": 90,
       "implementation_refs": [
         "file:server/src/open_commerce_integration_model.rs",
@@ -2054,7 +2062,7 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-31",
+      "reviewed_at": "2026-08-14",
       "review_interval_days": 60,
       "implementation_refs": [
         "file:server/src/open_commerce_runtime_service.rs",
@@ -2064,7 +2072,29 @@
       ],
       "related": [
         "docs/decisions/open-commerce-merchant-runtime-v1.md",
-        "contracts/open-commerce/merchant-runtime-v1.json"
+        "contracts/open-commerce/merchant-runtime-v1.json",
+        "docs/open-commerce/public-https-coffee-runtime-acceptance.md"
+      ]
+    },
+    "docs/open-commerce/public-https-coffee-runtime-acceptance.md": {
+      "doc_type": "acceptance",
+      "audience": [
+        "平台运维人员",
+        "商户系统开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-08-14",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "test:server/src/open_commerce_runtime_public_https_acceptance_tests.rs",
+        "file:scripts/test-open-commerce-public-https-coffee.ps1",
+        "file:scripts/verify-open-commerce-public-https-coffee.ps1"
+      ],
+      "related": [
+        "docs/open-commerce/merchant-runtime.md",
+        "docs/open-commerce-cofficethinking-real-server-acceptance.md",
+        "docs/decisions/open-commerce-merchant-runtime-egress-pinning-v1.md"
       ]
     },
     "docs/open-commerce-merchant-runtime-v1-acceptance.md": {
@@ -3315,14 +3345,16 @@
         "document_paths": [
           "docs/decisions/open-commerce-merchant-runtime-v1.md",
           "docs/open-commerce/merchant-runtime.md",
-          "docs/open-commerce-merchant-runtime-v1-acceptance.md"
+          "docs/open-commerce-merchant-runtime-v1-acceptance.md",
+          "docs/open-commerce/public-https-coffee-runtime-acceptance.md"
         ],
         "implementation_refs": [
           "file:server/src/open_commerce_runtime_service.rs",
           "file:server/src/open_commerce_runtime_client.rs",
           "file:server/src/store/open_commerce_runtime_bindings.rs",
           "file:pc-frontend/src/features/open-commerce/OpenCommerceRuntimeManager.tsx",
-          "test:server/src/open_commerce_runtime_service_tests.rs"
+          "test:server/src/open_commerce_runtime_service_tests.rs",
+          "test:server/src/open_commerce_runtime_public_https_acceptance_tests.rs"
         ],
         "tags": [
           "erp",
@@ -3622,13 +3654,15 @@
         "entrypoint": "docs/open-commerce/merchant-runtime.md",
         "document_paths": [
           "docs/open-commerce/merchant-runtime.md",
-          "docs/decisions/open-commerce-merchant-runtime-v1.md"
+          "docs/decisions/open-commerce-merchant-runtime-v1.md",
+          "docs/open-commerce/public-https-coffee-runtime-acceptance.md"
         ],
         "implementation_refs": [
           "file:server/src/open_commerce_runtime_client.rs",
           "file:server/src/open_commerce_runtime_security.rs",
           "file:server/src/open_commerce_runtime_service.rs",
-          "file:contracts/open-commerce/merchant-runtime-v1.json"
+          "file:contracts/open-commerce/merchant-runtime-v1.json",
+          "test:server/src/open_commerce_runtime_public_https_acceptance_tests.rs"
         ],
         "tags": [
           "binding",
