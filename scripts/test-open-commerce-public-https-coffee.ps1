@@ -71,6 +71,39 @@ $sshArgs = @(
     "-o", "ConnectTimeout=10",
     $sshTarget
 )
+
+function Disable-AcceptanceOffer {
+    param(
+        [Parameter(Mandatory = $true)][string]$OfferId,
+        [Parameter(Mandatory = $true)][string]$Sku
+    )
+
+    $cleanupScript = @'
+set -euo pipefail
+cd "$APP_DIR"
+. ./.env
+offers="$(curl -fsS http://127.0.0.1:8080/api/v1/open-commerce/offers -H "x-commerce-admin-token: $OPEN_COMMERCE_ADMIN_TOKEN")"
+current="$(printf '%s' "$offers" | jq -ec --arg id "$OFFER_ID" '.items[] | select(.id == $id)')"
+test "$(printf '%s' "$current" | jq -r '.sku')" = "$SKU"
+current_stock="$(printf '%s' "$current" | jq -er '.stock_quantity')"
+payload="$(printf '%s' "$current" | jq -c '{sku,name,description,unit_price_minor,currency,stock_quantity,is_active:false,image_url,attributes:(.attributes_json // {}),catalog_product_id}')"
+offer="$(printf '%s' "$payload" | curl -fsS -X PUT "http://127.0.0.1:8080/api/v1/open-commerce/offers/$OFFER_ID" -H 'content-type: application/json' -H "x-commerce-admin-token: $OPEN_COMMERCE_ADMIN_TOKEN" --data-binary @-)"
+test "$(printf '%s' "$offer" | jq -r '.offer.id')" = "$OFFER_ID"
+test "$(printf '%s' "$offer" | jq -r '.offer.is_active')" = "false"
+test "$(printf '%s' "$offer" | jq -r '.offer.stock_quantity')" = "$current_stock"
+printf 'DEACTIVATED_OFFER_ID=%s CURRENT_STOCK=%s\n' "$OFFER_ID" "$current_stock"
+'@
+    $cleanupScript = $cleanupScript.Replace("`r`n", "`n").Replace("`r", "`n")
+    $cleanupEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($cleanupScript))
+    $remoteCleanup = "echo '$cleanupEncoded' | base64 -d | APP_DIR='$appDir' OFFER_ID='$OfferId' SKU='$Sku' bash"
+    $cleanupOutput = @(& ssh @sshArgs $remoteCleanup)
+    $cleanupReceipt = @($cleanupOutput | Where-Object { $_ -like "DEACTIVATED_OFFER_ID=$OfferId CURRENT_STOCK=*" })
+    if ($LASTEXITCODE -ne 0 -or $cleanupReceipt.Count -ne 1) {
+        throw "Failed to deactivate acceptance offer $OfferId"
+    }
+    Write-Host "[public-https] deactivated acceptance offer $OfferId without changing stock"
+}
+
 $prepareScript = @'
 set -euo pipefail
 cd "$APP_DIR"
@@ -88,118 +121,143 @@ printf 'START_STOCK=%s\n' "$(printf '%s' "$offer" | jq -er '.offer.stock_quantit
 printf 'RUNTIME_KEY_ID=%s\n' "$OPEN_COMMERCE_RUNTIME_KEY_ID"
 printf 'RUNTIME_SECRET_B64=%s\n' "$(printf '%s' "$OPEN_COMMERCE_RUNTIME_SHARED_SECRET" | base64 -w0)"
 '@
+$prepareScript = $prepareScript.Replace("`r`n", "`n").Replace("`r", "`n")
 $prepareBytes = [Text.Encoding]::UTF8.GetBytes($prepareScript)
 $prepareEncoded = [Convert]::ToBase64String($prepareBytes)
 $remotePrepare = "echo '$prepareEncoded' | base64 -d | APP_DIR='$appDir' EXPECTED_STORE_ID='$AcceptanceStoreId' EXPECTED_MERCHANT_ID='$AcceptanceMerchantId' EXPECTED_KEY_ID='$RuntimeSecretRef' SKU='$sku' bash"
 
-Write-Host "[public-https] preparing one isolated offer in the suspended acceptance store"
-$prepareOutput = @(& ssh @sshArgs $remotePrepare)
-if ($LASTEXITCODE -ne 0) {
-    throw "Coffee acceptance offer preparation failed with exit code $LASTEXITCODE"
-}
-$prepared = @{}
-foreach ($line in $prepareOutput) {
-    $parts = ([string]$line).Split("=", 2)
-    if ($parts.Count -eq 2) { $prepared[$parts[0]] = $parts[1] }
-}
-$offerId = $prepared["OFFER_ID"]
-$startStock = $prepared["START_STOCK"]
-$runtimeKeyId = $prepared["RUNTIME_KEY_ID"]
-$secretB64 = $prepared["RUNTIME_SECRET_B64"]
-if (-not $offerId -or -not $secretB64 -or $runtimeKeyId -ne $RuntimeSecretRef -or $startStock -ne "5") {
-    throw "Coffee acceptance preparation returned an invalid or unsafe identity"
-}
-$runtimeSecret = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($secretB64))
-if ($runtimeSecret.Length -lt 32) { throw "Runtime secret is too short" }
-
-$receiptDir = Join-Path $repoRoot ".ai-tmp"
-New-Item -ItemType Directory -Path $receiptDir -Force | Out-Null
-$receiptPath = Join-Path $receiptDir "open-commerce-public-https-$runId.json"
-$previous = @{}
-foreach ($name in @(
-    "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ACCEPTANCE",
-    "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT",
-    "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_OFFER_ID",
-    "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RUN_ID",
-    "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RECEIPT_PATH",
-    $RuntimeSecretRef,
-    "OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS"
-)) {
-    $previous[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
-}
+$offerId = $null
 try {
-    $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ACCEPTANCE = $Acknowledgement
-    $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT = $RuntimeEndpoint.TrimEnd('/')
-    $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_OFFER_ID = $offerId
-    $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RUN_ID = $runId
-    $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RECEIPT_PATH = $receiptPath
-    [Environment]::SetEnvironmentVariable($RuntimeSecretRef, $runtimeSecret, "Process")
-    $env:OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS = ([Uri]$RuntimeEndpoint).Host
-
-    Write-Host "[public-https] running the real platform credential, confirmation, invocation and closure path"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\validate-rust.ps1") `
-        -Force -Domain open-commerce-public-https-acceptance -- `
-        test --manifest-path (Join-Path $repoRoot "server\Cargo.toml") `
-        open_commerce_runtime_service_tests::public_https_acceptance_tests::real_consumer_ai_order_reaches_public_coffee_erp `
-        -- --exact --nocapture
+    Write-Host "[public-https] preparing one isolated offer in the suspended acceptance store"
+    $prepareOutput = @(& ssh @sshArgs $remotePrepare)
     if ($LASTEXITCODE -ne 0) {
-        throw "Platform public HTTPS acceptance test failed with exit code $LASTEXITCODE"
+        throw "Coffee acceptance offer preparation failed with exit code $LASTEXITCODE"
     }
-} finally {
-    foreach ($entry in $previous.GetEnumerator()) {
-        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
+    $prepared = @{}
+    foreach ($line in $prepareOutput) {
+        $parts = ([string]$line).Split("=", 2)
+        if ($parts.Count -eq 2) { $prepared[$parts[0]] = $parts[1] }
     }
-    $runtimeSecret = $null
-    $secretB64 = $null
-}
-if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
-    throw "Platform acceptance receipt was not produced"
-}
-$receipt = Get-Content -Raw -LiteralPath $receiptPath | ConvertFrom-Json
-if ($receipt.schema -ne "open_commerce.public_https_acceptance.v1" -or
-    $receipt.payment_status -ne "unpaid" -or
-    $receipt.funds_moved -ne $false -or
-    $receipt.platform_store -ne "isolated_temporary_sqlite") {
-    throw "Platform acceptance receipt violated the zero-funds or isolation boundary"
-}
+    $offerId = $prepared["OFFER_ID"]
+    $startStock = $prepared["START_STOCK"]
+    $runtimeKeyId = $prepared["RUNTIME_KEY_ID"]
+    $secretB64 = $prepared["RUNTIME_SECRET_B64"]
+    if (-not $offerId -or -not $secretB64 -or $runtimeKeyId -ne $RuntimeSecretRef -or $startStock -ne "5") {
+        throw "Coffee acceptance preparation returned an invalid or unsafe identity"
+    }
 
-Write-Host "[public-https] cross-checking the same order in PostgreSQL and the ERP API"
-$verifyArgs = @(
-    "-NoProfile", "-ExecutionPolicy", "Bypass",
-    "-File", (Join-Path $repoRoot "scripts\verify-open-commerce-public-https-coffee.ps1"),
-    "-CoffeeRepo", $coffeeRoot,
-    "-ReceiptPath", $receiptPath,
-    "-ExpectedOfferId", $offerId,
-    "-ExpectedStartStock", $startStock
-)
-if ($CoffeeServerConfig) {
-    $verifyArgs += @("-CoffeeServerConfig", $configPath)
-}
-$verificationJson = (& powershell @verifyArgs | Select-Object -Last 1)
-if ($LASTEXITCODE -ne 0) {
-    throw "Coffee ERP cross-check failed with exit code $LASTEXITCODE"
-}
-$verification = $verificationJson | ConvertFrom-Json
-if ($verification.schema -ne "open_commerce.public_https_erp_verification.v1" -or
-    $verification.unified_order_id -ne $receipt.unified_order_id -or
-    $verification.funds_moved -ne $false) {
-    throw "Coffee ERP verification identity did not match the platform receipt"
-}
+    $runtimeSecret = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($secretB64))
+    if ($runtimeSecret.Length -lt 32) { throw "Runtime secret is too short" }
 
-[pscustomobject]@{
-    schema = "open_commerce.public_https_full_acceptance.v1"
-    runtime_endpoint = $RuntimeEndpoint.TrimEnd('/')
-    merchant_id = $AcceptanceMerchantId
-    invocation_id = $receipt.invocation_id
-    order_id = $receipt.order_id
-    unified_order_id = $receipt.unified_order_id
-    payment_status = "unpaid"
-    funds_moved = $false
-    idempotent_replay = $true
-    platform_store = "isolated_temporary_sqlite"
-    merchant_database = "real_postgresql"
-    erp_api_match_count = $verification.erp_api_match_count
-    commit_receipt_count = $verification.commit_receipt_count
-    start_stock = $verification.start_stock
-    end_stock = $verification.end_stock
-} | ConvertTo-Json -Compress
+    $receiptDir = Join-Path $repoRoot ".ai-tmp"
+    New-Item -ItemType Directory -Path $receiptDir -Force | Out-Null
+    $receiptPath = Join-Path $receiptDir "open-commerce-public-https-$runId.json"
+    $previous = @{}
+    foreach ($name in @(
+        "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ACCEPTANCE",
+        "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT",
+        "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RUN_ID",
+        "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RECEIPT_PATH",
+        $RuntimeSecretRef,
+        "OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS"
+    )) {
+        $previous[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    }
+    try {
+        $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ACCEPTANCE = $Acknowledgement
+        $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT = $RuntimeEndpoint.TrimEnd('/')
+        $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RUN_ID = $runId
+        $env:ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RECEIPT_PATH = $receiptPath
+        [Environment]::SetEnvironmentVariable($RuntimeSecretRef, $runtimeSecret, "Process")
+        $env:OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS = ([Uri]$RuntimeEndpoint).Host
+
+        Write-Host "[public-https] running directory discovery, catalog lookup, merchant approval and order closure"
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\validate-rust.ps1") `
+            -Force -Domain open-commerce-public-https-acceptance -- `
+            test --manifest-path (Join-Path $repoRoot "server\Cargo.toml") `
+            open_commerce_runtime_service_tests::public_https_acceptance_tests::real_consumer_ai_order_reaches_public_coffee_erp `
+            -- --exact --nocapture
+        if ($LASTEXITCODE -ne 0) {
+            throw "Platform public HTTPS acceptance test failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        foreach ($entry in $previous.GetEnumerator()) {
+            [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
+        }
+        $runtimeSecret = $null
+        $secretB64 = $null
+    }
+    if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+        throw "Platform acceptance receipt was not produced"
+    }
+    $receipt = Get-Content -Raw -LiteralPath $receiptPath | ConvertFrom-Json
+    if ($receipt.schema -ne "open_commerce.public_https_acceptance.v1" -or
+        $receipt.payment_status -ne "unpaid" -or
+        $receipt.funds_moved -ne $false -or
+        $receipt.directory_discovery -ne $true -or
+        $receipt.ranking_is_paid -ne $false -or
+        $receipt.authorization_status -ne "approved" -or
+        $receipt.discovered_offer_id -ne $offerId -or
+        $receipt.platform_store -ne "isolated_temporary_sqlite") {
+        throw "Platform acceptance receipt violated the zero-funds or isolation boundary"
+    }
+
+    Write-Host "[public-https] cross-checking the same order in PostgreSQL and the ERP API"
+    $verifyArgs = @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $repoRoot "scripts\verify-open-commerce-public-https-coffee.ps1"),
+        "-CoffeeRepo", $coffeeRoot,
+        "-ReceiptPath", $receiptPath,
+        "-ExpectedOfferId", $offerId,
+        "-ExpectedStartStock", $startStock
+    )
+    if ($CoffeeServerConfig) {
+        $verifyArgs += @("-CoffeeServerConfig", $configPath)
+    }
+    $verificationJson = (& powershell @verifyArgs | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Coffee ERP cross-check failed with exit code $LASTEXITCODE"
+    }
+    $verification = $verificationJson | ConvertFrom-Json
+    if ($verification.schema -ne "open_commerce.public_https_erp_verification.v1" -or
+        $verification.unified_order_id -ne $receipt.unified_order_id -or
+        $verification.funds_moved -ne $false) {
+        throw "Coffee ERP verification identity did not match the platform receipt"
+    }
+
+    $resultJson = [pscustomobject]@{
+        schema = "open_commerce.public_https_full_acceptance.v1"
+        runtime_endpoint = $RuntimeEndpoint.TrimEnd('/')
+        merchant_id = $AcceptanceMerchantId
+        invocation_id = $receipt.invocation_id
+        order_id = $receipt.order_id
+        unified_order_id = $receipt.unified_order_id
+        payment_status = "unpaid"
+        funds_moved = $false
+        idempotent_replay = $true
+        directory_discovery = $true
+        ranking_policy = $receipt.ranking_policy
+        ranking_is_paid = $false
+        catalog_offer_discovered = $true
+        authorization_status = $receipt.authorization_status
+        platform_store = "isolated_temporary_sqlite"
+        merchant_database = "real_postgresql"
+        erp_api_match_count = $verification.erp_api_match_count
+        commit_receipt_count = $verification.commit_receipt_count
+        start_stock = $verification.start_stock
+        end_stock = $verification.end_stock
+        offer_deactivated = $true
+    } | ConvertTo-Json -Compress
+    Disable-AcceptanceOffer -OfferId $offerId -Sku $sku
+} catch {
+    $acceptanceFailure = $_.Exception
+    if ($offerId) {
+        try {
+            Disable-AcceptanceOffer -OfferId $offerId -Sku $sku
+        } catch {
+            throw "Acceptance failed: $($acceptanceFailure.Message). Offer cleanup also failed: $($_.Exception.Message)"
+        }
+    }
+    throw $acceptanceFailure
+}
+Write-Output $resultJson

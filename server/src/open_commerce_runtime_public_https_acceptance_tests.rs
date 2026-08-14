@@ -1,9 +1,10 @@
-use std::{process::Command, sync::Arc};
+#[path = "open_commerce_runtime_public_https_acceptance_tests/support.rs"]
+mod support;
 
-use axum::Router;
+use std::{collections::BTreeMap, process::Command, sync::Arc};
+
 use chrono::{Duration, Utc};
-use serde_json::{json, Value};
-use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -17,14 +18,16 @@ use crate::{
     },
     open_commerce_directory_service,
     open_commerce_merchant_evidence_model::validate_optional_business_receipt,
-    open_commerce_model::{
-        CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest, ACCESS_AUTHORIZED,
-        HANDLER_MERCHANT_RUNTIME,
-    },
+    open_commerce_model::CreateMerchantRequest,
     open_commerce_runtime_model::UpsertRuntimeBindingRequest,
     open_commerce_runtime_service,
     open_commerce_service::{self, OpenCommerceActor},
     router,
+};
+
+use support::{
+    bearer_post, capabilities, discover_capability, redact, required_env, session_get,
+    session_post, TcpServer,
 };
 
 const CHILD_ENV: &str = "ELON_OPEN_COMMERCE_PUBLIC_HTTPS_CHILD";
@@ -44,10 +47,8 @@ fn real_consumer_ai_order_reaches_public_coffee_erp() {
         return;
     }
     let endpoint = required_env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT");
-    let offer_id = required_env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_OFFER_ID");
     let secret = required_env(RUNTIME_SECRET_REF);
     assert_eq!(endpoint, "https://182.254.168.75");
-    assert!(Uuid::parse_str(&offer_id).is_ok());
     assert!(secret.len() >= 32);
 
     let output = Command::new(std::env::current_exe().unwrap())
@@ -56,7 +57,6 @@ fn real_consumer_ai_order_reaches_public_coffee_erp() {
         .env(PRODUCTION_CREDENTIAL_ENV, "1")
         .env(ACCEPTANCE_ENV, ACKNOWLEDGEMENT)
         .env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT", endpoint)
-        .env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_OFFER_ID", offer_id)
         .env(RUNTIME_SECRET_REF, secret)
         .env("OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS", "182.254.168.75")
         .output()
@@ -77,11 +77,14 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     }
     assert_eq!(required_env(ACCEPTANCE_ENV), ACKNOWLEDGEMENT);
     let endpoint = required_env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT");
-    let offer_id = required_env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_OFFER_ID");
-
     let developer = approved_developer_fixture_for(
         APP_ID,
-        &["order.quote.create", "order.commit", "order.status.read"],
+        &[
+            "catalog.search",
+            "order.quote.create",
+            "order.commit",
+            "order.status.read",
+        ],
     );
     let live = open_commerce_developer_credential_service::issue_credential(
         &developer.store,
@@ -89,6 +92,7 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
         IssueDeveloperProductionCredentialRequest {
             expected_manifest_revision: developer.app.manifest_revision,
             scopes: vec![
+                "catalog.search".to_string(),
                 "order.quote.create".to_string(),
                 "order.commit".to_string(),
                 "order.status.read".to_string(),
@@ -189,26 +193,6 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
         true,
     )
     .unwrap();
-    let grant = open_commerce_service::create_grant(
-        &developer.store,
-        &merchant_project.id,
-        &merchant_actor,
-        CreateGrantRequest {
-            merchant_id: MERCHANT_ID.to_string(),
-            grantee_app_id: APP_ID.to_string(),
-            scopes: vec![
-                "order.quote.create".to_string(),
-                "order.commit".to_string(),
-                "order.status.read".to_string(),
-            ],
-            purpose: "isolated public HTTPS acceptance".to_string(),
-            expires_at: Some((Utc::now() + Duration::hours(1)).to_rfc3339()),
-            max_invocations: Some(3),
-            max_amount_micros: Some(6_000),
-            budget_currency: "CNY".to_string(),
-        },
-    )
-    .unwrap();
 
     let root = std::env::temp_dir().join(format!(
         "elon_public_https_acceptance_{}",
@@ -224,6 +208,15 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
         )
         .unwrap()
         .0;
+    let merchant_session = developer
+        .store
+        .create_session(
+            &merchant_owner.id,
+            Some("public-https-merchant-approval"),
+            None,
+        )
+        .unwrap()
+        .0;
     let server = TcpServer::start(router::build_app(Arc::new(test_app_state(
         developer.store,
         &root,
@@ -232,15 +225,127 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let base_url = format!("http://{}", server.address);
     let run_id = required_env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_RUN_ID");
+    let mut discovered = BTreeMap::new();
+    for capability_key in [
+        "catalog.search",
+        "order.quote.create",
+        "order.commit",
+        "order.status.read",
+    ] {
+        let discovery = discover_capability(
+            &client,
+            &base_url,
+            &consumer_session,
+            APP_ID,
+            capability_key,
+        )
+        .await;
+        assert_eq!(discovery["schema"], "open_commerce.consumer_discovery.v1");
+        assert_eq!(discovery["ranking_policy"], "merchant_name.v1");
+        assert_eq!(discovery["ranking_is_paid"], false);
+        let public_json = discovery.to_string();
+        assert!(!public_json.contains(&merchant_project.id));
+        assert!(!public_json.contains("https://182.254.168.75"));
+        assert!(!public_json.contains(RUNTIME_SECRET_REF));
+        assert!(!public_json.contains("handler_type"));
+        let matches = discovery["matches"].as_array().unwrap();
+        assert_eq!(matches.len(), 1);
+        let candidate = &matches[0];
+        assert_eq!(candidate["merchant"]["id"], MERCHANT_ID);
+        assert_eq!(candidate["capability"]["capability_key"], capability_key);
+        discovered.insert(capability_key.to_string(), candidate.clone());
+    }
+    assert_eq!(discovered.len(), 4);
+    assert_eq!(
+        discovered["catalog.search"]["authorization"]["status"],
+        "not_required"
+    );
+    let order_scopes = ["order.quote.create", "order.commit", "order.status.read"];
+    for capability_key in order_scopes {
+        assert_eq!(
+            discovered[capability_key]["authorization"]["status"],
+            "request_required"
+        );
+    }
 
-    let quote = developer_post(
+    let catalog = bearer_post(
         &client,
         &format!("{base_url}/api/open-commerce/developer/invoke"),
         &live.live_token,
         &json!({
+            "merchant_id":discovered["catalog.search"]["merchant"]["id"],
+            "capability_key":discovered["catalog.search"]["capability"]["capability_key"],
+            "idempotency_key":format!("public-catalog-{run_id}"),
+            "input":{"query":format!("YILONG-PUBLIC-HTTPS-{run_id}"),"limit":5}
+        }),
+    )
+    .await;
+    assert_eq!(catalog["settlement_receipt"]["funds_moved"], false);
+    let catalog_items = catalog["result"]["items"].as_array().unwrap();
+    assert_eq!(catalog_items.len(), 1);
+    assert_eq!(
+        catalog_items[0]["sku"],
+        format!("YILONG-PUBLIC-HTTPS-{run_id}")
+    );
+    let offer_id = catalog_items[0]["id"].as_str().unwrap().to_string();
+    assert!(Uuid::parse_str(&offer_id).is_ok());
+
+    let authorization = session_post(
+        &client,
+        &format!("{base_url}/api/open-commerce/authorization-requests"),
+        &consumer_session,
+        &json!({
             "merchant_id":MERCHANT_ID,
-            "capability_key":"order.quote.create",
-            "grant_id":grant.id,
+            "requester_app_id":APP_ID,
+            "scopes":order_scopes,
+            "purpose":"one unpaid order in the suspended acceptance store"
+        }),
+    )
+    .await;
+    assert_eq!(authorization["status"], "pending");
+    let authorization_request_id = authorization["id"].as_str().unwrap();
+    let approved = session_post(
+        &client,
+        &format!(
+            "{base_url}/api/projects/{}/open-commerce/authorization-requests/{authorization_request_id}/approve",
+            merchant_project.id
+        ),
+        &merchant_session,
+        &json!({
+            "reason":"dedicated suspended-store acceptance",
+            "expires_at":(Utc::now() + Duration::hours(1)).to_rfc3339(),
+            "max_invocations":3,
+            "max_amount_micros":6000,
+            "budget_currency":"CNY"
+        }),
+    )
+    .await;
+    assert_eq!(approved["status"], "approved");
+    let grant_id = approved["grant_id"].as_str().unwrap().to_string();
+
+    for capability_key in order_scopes {
+        let discovery = discover_capability(
+            &client,
+            &base_url,
+            &consumer_session,
+            APP_ID,
+            capability_key,
+        )
+        .await;
+        let matches = discovery["matches"].as_array().unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0]["authorization"]["status"], "granted");
+        assert_eq!(matches[0]["authorization"]["grant_id"], grant_id);
+    }
+
+    let quote = bearer_post(
+        &client,
+        &format!("{base_url}/api/open-commerce/developer/invoke"),
+        &live.live_token,
+        &json!({
+            "merchant_id":discovered["order.quote.create"]["merchant"]["id"],
+            "capability_key":discovered["order.quote.create"]["capability"]["capability_key"],
+            "grant_id":grant_id,
             "idempotency_key":format!("public-quote-{run_id}"),
             "input":{"items":[{"product_id":offer_id,"quantity":1}],"note":"public HTTPS acceptance"}
         }),
@@ -250,13 +355,13 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     let quote_id = quote["result"]["quote_id"].as_str().unwrap();
 
     let action = json!({
-        "merchant_id":MERCHANT_ID,
-        "capability_key":"order.commit",
-        "grant_id":grant.id,
+        "merchant_id":discovered["order.commit"]["merchant"]["id"],
+        "capability_key":discovered["order.commit"]["capability"]["capability_key"],
+        "grant_id":grant_id,
         "idempotency_key":format!("public-commit-{run_id}"),
         "input":{"quote_id":quote_id}
     });
-    let prepared = developer_post(
+    let prepared = bearer_post(
         &client,
         &format!("{base_url}/api/open-commerce/developer/action-confirmations"),
         &live.live_token,
@@ -264,7 +369,7 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     )
     .await;
     let confirmation_id = prepared["id"].as_str().unwrap();
-    let confirmed = developer_post(
+    let confirmed = bearer_post(
         &client,
         &format!(
             "{base_url}/api/open-commerce/developer/action-confirmations/{confirmation_id}/confirm"
@@ -277,14 +382,14 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
 
     let mut invocation = action;
     invocation["action_confirmation_id"] = json!(confirmation_id);
-    let committed = developer_post(
+    let committed = bearer_post(
         &client,
         &format!("{base_url}/api/open-commerce/developer/invoke"),
         &live.live_token,
         &invocation,
     )
     .await;
-    let replay = developer_post(
+    let replay = bearer_post(
         &client,
         &format!("{base_url}/api/open-commerce/developer/invoke"),
         &live.live_token,
@@ -304,14 +409,14 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     assert_eq!(receipt.entity_type, "order");
     assert_eq!(receipt.reference_id, merchant_order_id);
 
-    let order_status = developer_post(
+    let order_status = bearer_post(
         &client,
         &format!("{base_url}/api/open-commerce/developer/invoke"),
         &live.live_token,
         &json!({
-            "merchant_id":MERCHANT_ID,
-            "capability_key":"order.status.read",
-            "grant_id":grant.id,
+            "merchant_id":discovered["order.status.read"]["merchant"]["id"],
+            "capability_key":discovered["order.status.read"]["capability"]["capability_key"],
+            "grant_id":grant_id,
             "idempotency_key":format!("public-status-{run_id}"),
             "input":{"order_id":order_id}
         }),
@@ -325,7 +430,7 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     assert_eq!(order_status["result"]["payment_status"], "unpaid");
     assert_eq!(order_status["settlement_receipt"]["funds_moved"], false);
 
-    let closure = authenticated_get(
+    let closure = session_get(
         &client,
         &format!("{base_url}/api/open-commerce/consumer-order-closures/{invocation_id}"),
         &consumer_session,
@@ -340,6 +445,14 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
         "run_id":run_id,
         "endpoint":required_env("ELON_OPEN_COMMERCE_PUBLIC_HTTPS_ENDPOINT"),
         "merchant_id":MERCHANT_ID,
+        "discovered_offer_id":offer_id,
+        "directory_discovery":true,
+        "ranking_policy":"merchant_name.v1",
+        "ranking_is_paid":false,
+        "discovered_capability_count":discovered.len(),
+        "authorization_request_id":authorization_request_id,
+        "authorization_status":"approved",
+        "grant_id":grant_id,
         "invocation_id":invocation_id,
         "order_id":order_id,
         "unified_order_id":merchant_order_id,
@@ -359,143 +472,4 @@ async fn real_consumer_ai_order_reaches_public_coffee_erp_child() {
     .unwrap();
     println!("{acceptance_receipt}");
     server.stop().await;
-}
-
-fn capabilities() -> Vec<CreateCapabilityRequest> {
-    vec![
-        CreateCapabilityRequest {
-            capability_key: "order.quote.create".to_string(),
-            display_name: "Create quote".to_string(),
-            description: String::new(),
-            kind: "query".to_string(),
-            access_level: ACCESS_AUTHORIZED.to_string(),
-            input_schema: json!({
-                "type":"object",
-                "required":["items"],
-                "properties":{
-                    "items":{"type":"array","minItems":1,"maxItems":50,"items":{
-                        "type":"object","required":["product_id","quantity"],
-                        "properties":{"product_id":{"type":"string","format":"uuid"},"quantity":{"type":"integer","minimum":1,"maximum":100}},
-                        "additionalProperties":false
-                    }},
-                    "note":{"type":"string","maxLength":500}
-                },
-                "additionalProperties":false
-            }),
-            output_schema: json!({"type":"object"}),
-            handler_type: HANDLER_MERCHANT_RUNTIME.to_string(),
-            handler_config: None,
-            unit_price_micros: 1_000,
-            currency: "CNY".to_string(),
-            freshness_seconds: 0,
-        },
-        CreateCapabilityRequest {
-            capability_key: "order.commit".to_string(),
-            display_name: "Commit order".to_string(),
-            description: String::new(),
-            kind: "action".to_string(),
-            access_level: ACCESS_AUTHORIZED.to_string(),
-            input_schema: json!({
-                "type":"object","required":["quote_id"],
-                "properties":{"quote_id":{"type":"string","format":"uuid"}},
-                "additionalProperties":false
-            }),
-            output_schema: json!({"type":"object"}),
-            handler_type: HANDLER_MERCHANT_RUNTIME.to_string(),
-            handler_config: None,
-            unit_price_micros: 2_000,
-            currency: "CNY".to_string(),
-            freshness_seconds: 0,
-        },
-        CreateCapabilityRequest {
-            capability_key: "order.status.read".to_string(),
-            display_name: "Read order status".to_string(),
-            description: String::new(),
-            kind: "query".to_string(),
-            access_level: ACCESS_AUTHORIZED.to_string(),
-            input_schema: json!({
-                "type":"object","required":["order_id"],
-                "properties":{"order_id":{"type":"string","format":"uuid"}},
-                "additionalProperties":false
-            }),
-            output_schema: json!({"type":"object"}),
-            handler_type: HANDLER_MERCHANT_RUNTIME.to_string(),
-            handler_config: None,
-            unit_price_micros: 500,
-            currency: "CNY".to_string(),
-            freshness_seconds: 0,
-        },
-    ]
-}
-
-async fn developer_post(client: &reqwest::Client, url: &str, token: &str, body: &Value) -> Value {
-    let response = client
-        .post(url)
-        .bearer_auth(token)
-        .json(body)
-        .send()
-        .await
-        .unwrap();
-    let status = response.status();
-    let value: Value = response.json().await.unwrap();
-    assert!(status.is_success(), "developer request failed: {value}");
-    value
-}
-
-async fn authenticated_get(client: &reqwest::Client, url: &str, token: &str) -> Value {
-    let response = client.get(url).bearer_auth(token).send().await.unwrap();
-    let status = response.status();
-    let value: Value = response.json().await.unwrap();
-    assert!(status.is_success(), "authenticated request failed: {value}");
-    value
-}
-
-fn required_env(name: &str) -> String {
-    std::env::var(name)
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| panic!("required acceptance environment is missing: {name}"))
-}
-
-fn redact(value: &str) -> String {
-    let mut redacted = value.to_string();
-    for name in [RUNTIME_SECRET_REF] {
-        if let Ok(secret) = std::env::var(name) {
-            redacted = redacted.replace(&secret, "<redacted>");
-        }
-    }
-    redacted
-}
-
-struct TcpServer {
-    address: std::net::SocketAddr,
-    shutdown: oneshot::Sender<()>,
-    task: JoinHandle<()>,
-}
-
-impl TcpServer {
-    async fn start(app: Router) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let (shutdown, shutdown_rx) = oneshot::channel();
-        let task = tokio::spawn(async move {
-            axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_rx.await;
-                })
-                .await
-                .unwrap();
-        });
-        Self {
-            address,
-            shutdown,
-            task,
-        }
-    }
-
-    async fn stop(self) {
-        let _ = self.shutdown.send(());
-        self.task.await.unwrap();
-    }
 }

@@ -94,6 +94,7 @@ test "$receipt_count" = "1"
 test "$api_count" = "1"
 jq -cn --arg schema open_commerce.public_https_erp_verification.v1 --arg offer_id "$offer_id" --arg order_id "$ORDER_ID" --arg unified_order_id "$UNIFIED_ORDER_ID" --argjson start_stock "$EXPECTED_START_STOCK" --argjson end_stock "$end_stock" --argjson erp_api_match_count "$api_count" --argjson commit_receipt_count "$receipt_count" '{schema:$schema,offer_id:$offer_id,order_id:$order_id,unified_order_id:$unified_order_id,payment_status:"unpaid",funds_moved:false,start_stock:$start_stock,end_stock:$end_stock,erp_api_match_count:$erp_api_match_count,commit_receipt_count:$commit_receipt_count}'
 '@
+$verifyScript = $verifyScript.Replace("`r`n", "`n").Replace("`r", "`n")
 $verifyEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($verifyScript))
 $remoteVerify = "echo '$verifyEncoded' | base64 -d | APP_DIR='$appDir' EXPECTED_STORE_ID='$AcceptanceStoreId' EXPECTED_MERCHANT_ID='$AcceptanceMerchantId' EXPECTED_OFFER_ID='$ExpectedOfferId' ORDER_ID='$($receipt.order_id)' UNIFIED_ORDER_ID='$($receipt.unified_order_id)' COMMIT_KEY='$($receipt.commit_idempotency_key)' RUN_ID='$($receipt.run_id)' EXPECTED_START_STOCK='$ExpectedStartStock' bash"
 $verificationJson = (& ssh @sshArgs $remoteVerify | Select-Object -Last 1)
