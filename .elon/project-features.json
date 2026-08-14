@@ -1932,69 +1932,177 @@
       ],
       "created_at_ms": 1786624803541,
       "updated_at_ms": 1786625470065
+    },
+    {
+      "id": "win-native-multi-provider-web-ai-bridge-v1",
+      "title": "Win 原生多厂商网页 AI 语义桥 V1",
+      "summary": "让 Win ChatGPT 与 Google AI 官方网页通过版本化可见语义桥稳定驱动一龙统一原生聊天 UI，并保留官方页回退。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-native-multi-provider-web-ai-bridge-v1.md",
+        "content_hash": "37f577a6f3ffb3c5b344329d8399ee74b663dfa1ac4fdf5a07b5321a46fd25dd",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+          "head_blob_oid": "5390033a8a4ce1cba9f32347a7753dfe3e37180b",
+          "worktree_blob_oid": "5390033a8a4ce1cba9f32347a7753dfe3e37180b",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "desktop-ai-browser",
+      "tags": [
+        "windows",
+        "webview2",
+        "chatgpt",
+        "google-ai",
+        "native-ui"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/chatgpt_web_adapter.js",
+        "android/app/src/main/assets/google_web_adapter.js",
+        "desktop-shell/src-tauri/src/local_ai_browser",
+        "desktop-shell/src-tauri/src/local_ai_browser.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+        "pc-frontend/src/features/user-browser"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Win ChatGPT 初始化包含 APK 完整资产、版本和每文档令牌。",
+        "ChatGPT 命令绑定当前文档令牌，旧页面命令失败关闭。",
+        "Win Google 复用 APK Google 适配器，不保留重复 DOM 实现。",
+        "Provider Adapter 类型统一初始化、命令和事件清洗边界。",
+        "JS、Rust、PC 合同和生产构建通过。",
+        "Win 工件绑定 Git SHA；真实消息验收独立记录。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/google_web_adapter.js",
+          "content_hash": "24dd11be5c3b0fd515842c48130df81850a64c32826ebc66d1a38ba2b56d313d",
+          "locator": "findComposer",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "4a9333512fe3990f9df8923b084a597b0c2c90a2",
+            "worktree_blob_oid": "4a9333512fe3990f9df8923b084a597b0c2c90a2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser.rs",
+          "content_hash": "44c2d1d168c714fc4a232980e37c579ffa29dc896c8ae0df34d144057a5062df",
+          "locator": "reconnect_adapter",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "aafcbea4a088c84e5895f39fd7937813b10b7172",
+            "worktree_blob_oid": "aafcbea4a088c84e5895f39fd7937813b10b7172",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/adapter_command.rs",
+          "content_hash": "01e52d4d4db9db5667d3145bcab70d289229b9a292c62b7be6237586bea60b95",
+          "locator": "page_invocation_script",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "d924159b146078c6e7d6ac35db0675afd09d6e33",
+            "worktree_blob_oid": "d924159b146078c6e7d6ac35db0675afd09d6e33",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+          "content_hash": "3e7d0f0335afc9cf487d7edb8db6a217b29859328cc982d5e72fa415a59ca592",
+          "locator": "ADAPTER_ASSETS",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "0c3cb11bd34d69683c5b5742fdcd3cebcf51944b",
+            "worktree_blob_oid": "0c3cb11bd34d69683c5b5742fdcd3cebcf51944b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs",
+          "content_hash": "31758e5b3837de584037a7efb2b83f1ffb9437ff7242bc2c034000f8321b996c",
+          "locator": "initialization_script",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "10ab99a2fea7ac91fd56e992cb9662fd4576348f",
+            "worktree_blob_oid": "10ab99a2fea7ac91fd56e992cb9662fd4576348f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/provider_adapter.rs",
+          "content_hash": "a69ac628a454155c78320d9a278c4bce960961d4cfb73fb75320ed3b4be35bca",
+          "locator": "ProviderAdapter",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "fd7b1925997ed8353de55df41796bfcc31b851dd",
+            "worktree_blob_oid": "fd7b1925997ed8353de55df41796bfcc31b851dd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/tests.rs",
+          "content_hash": "50dc260f1658ff3e7f007811518b415cbaf34af388ffd09c855b576dcf2d0c66",
+          "locator": "adapter_command_does_not_accept_arbitrary_javascript",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "d1faf525489b690492a5ebc3be0256f5b6d4e3a1",
+            "worktree_blob_oid": "d1faf525489b690492a5ebc3be0256f5b6d4e3a1",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "537603afc60e187c1633bca68672cb0a560b2add7cd4f1d386d1aecb796b6983",
+          "locator": "统一原生渲染协议",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "2f6bf707d5f2897eb8bc050f8dfc7f6df16a7991",
+            "worktree_blob_oid": "2f6bf707d5f2897eb8bc050f8dfc7f6df16a7991",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "43c8d369f0436f7d4f96fe5c32c09ac3ed1e32492da3bb3cd2c6f4ca17051888",
+          "locator": "ProviderAdapter contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d72aa6377bc9e26095234f4fa87730303d524e31",
+            "head_blob_oid": "804bb2a45641d9ee651e39c55b6e1e813b900d27",
+            "worktree_blob_oid": "804bb2a45641d9ee651e39c55b6e1e813b900d27",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786699261278,
+      "updated_at_ms": 1786699618886
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_64aed099c0f449d09293c963e528fea1",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "当前需求范围单一，非目标明确，并以现有 MCP 状态机为实现边界。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786619880203
-    },
-    {
-      "id": "feature_event_d34b7360867245799c7552177a5c51ae",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "需求已评审且无依赖阻塞，可进入首批采用验证。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786619906819
-    },
-    {
-      "id": "feature_event_b25e67ca05df46d6a13257cacb035c45",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786619915876
-    },
-    {
-      "id": "feature_event_cbe6f1d9fe5f414ba502c9f3ebf7b79c",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "开始添加跨 clone 可运行的采用门禁和正式证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786619929645
-    },
-    {
-      "id": "feature_event_dcd7b264a7204a04a960c19bbc3a803a",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786620144978
-    },
-    {
-      "id": "feature_event_ff24f0e7e7664c6db1ed2f68167fac17",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "注册表采用门禁、CI/本地入口和哈希绑定证据均已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786620202693
-    },
     {
       "id": "feature_event_219a371078e746ca89b9e8d9dd4a7d0b",
       "feature_id": "project-feature-registry-adoption-v1",
@@ -3934,6 +4042,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786698081475
+    },
+    {
+      "id": "feature_event_d82e97e0d91d470f818a03783afa6300",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "需求与实现边界已评审，并已在最新 main 上完成结构性实现。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786699261278
+    },
+    {
+      "id": "feature_event_e8a35d3f7b1542adaecf60804297dc63",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786699269228
+    },
+    {
+      "id": "feature_event_21f9243d6d4942238f3c8846b097dd23",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "在最新 origin/main 上重新绑定实现与验证证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786699276182
+    },
+    {
+      "id": "feature_event_683defdd2efb467290c2b077ff546797",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786699597932
+    },
+    {
+      "id": "feature_event_d8bd559b31404d5abc390a618cb27ef8",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "最终代码已在最新 main 上完成并绑定精确源码与测试证据。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786699607020
+    },
+    {
+      "id": "feature_event_7d5a7807d1984a2ba236d4ac9c44d2b0",
+      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "最终 Tauri Rust 强制验证、PC 用户浏览器回归与生产构建均通过；真实账号消息验收独立保留。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786699618886
     }
   ]
 }
