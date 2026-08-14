@@ -58,7 +58,8 @@ $expected = [ordered]@{
     )
     "smoke-chatgpt-web-session-recovery.ps1" = @("safe/session_recovery")
     "smoke-chatgpt-web-conversation-management.ps1" = @(
-        "safe/conversation_management_structure"
+        "safe/conversation_management_structure",
+        "supervised/conversation_mutations"
     )
     "smoke-chatgpt-web-long-running-stability.ps1" = @(
         "safe/session_long_running_stability"
