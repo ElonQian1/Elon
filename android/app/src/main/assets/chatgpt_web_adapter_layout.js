@@ -524,7 +524,7 @@
     let overlayContextId = '';
     if (overlayOwnership) {
       if (overlay) {
-        overlayContextId = overlayOwnership.resolveOverlayContext(overlay, ownershipPageKey());
+        overlayContextId = overlayOwnership.resolveOverlayContext(overlay, ownershipPageKey(), overlayPolicy.managementSignature(overlay, isVisible, actionableNodes));
       } else {
         overlayOwnership.observeNoOverlay(ownershipPageKey());
       }
@@ -652,7 +652,7 @@
   function invoke(id, emitEvent, result) {
     discover();
     const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
-    const contextMenuRetry = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots);
+    const contextMenuRetry = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots, undefined, undefined, (root) => overlayPolicy.managementSignature(root, isVisible, actionableNodes));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
     function dispatch() {
       if (!node.isConnected || !isVisible(node)) {
@@ -668,7 +668,7 @@
           control,
           node,
           visibleOverlayRoots(),
-          ownershipPageKey()
+          ownershipPageKey(), (root) => overlayPolicy.managementSignature(root, isVisible, actionableNodes)
         );
         if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }

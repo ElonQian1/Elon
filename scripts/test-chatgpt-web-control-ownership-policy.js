@@ -134,6 +134,7 @@ assert.equal(
   '',
   'a menu that existed before the trigger is never claimed by the message'
 );
+
 assert.equal(
   tracker.resolveOverlayContext(openedOverlay, '/c/example'),
   'conversation-turn-2',
@@ -165,6 +166,22 @@ assert.equal(
   tracker.resolveOverlayContext({ isConnected: true }, '/'),
   'conversation_123',
   'the conversation action menu inherits the selected conversation context'
+);
+tracker.observeNoOverlay('/');
+
+const reusedOverlay = { isConnected: true, menu: '' };
+tracker.rememberContextTrigger(
+  conversationTrigger,
+  source,
+  [reusedOverlay],
+  '/',
+  (overlay) => overlay.menu
+);
+reusedOverlay.menu = 'rename|archive|delete';
+assert.equal(
+  tracker.resolveOverlayContext(reusedOverlay, '/', reusedOverlay.menu),
+  'conversation_123',
+  'management actions mounted into an existing overlay inherit the triggering conversation context'
 );
 tracker.observeNoOverlay('/');
 

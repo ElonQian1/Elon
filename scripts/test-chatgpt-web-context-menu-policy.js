@@ -31,4 +31,17 @@ roots = [sidebar, menu];
 skipWhenOpened(() => { retryCount += 1; });
 scheduled();
 assert.equal(retryCount, 1);
+
+sidebar.menu = '';
+const reusedRoot = policy.prepare(
+  { semantic: 'conversation_options', contextId: 'conversation_1' },
+  () => [sidebar],
+  (task) => { scheduled = task; },
+  260,
+  (root) => root.menu
+);
+sidebar.menu = 'rename|archive|delete';
+reusedRoot(() => { retryCount += 1; });
+scheduled();
+assert.equal(retryCount, 1, 'a menu mounted into an existing root must not be clicked closed');
 process.stdout.write('chatgpt context menu policy tests passed\n');

@@ -68,7 +68,7 @@
       return true;
     }
 
-    function rememberContextTrigger(control, sourceNode, visibleOverlays, pageKey) {
+    function rememberContextTrigger(control, sourceNode, visibleOverlays, pageKey, signatureFor) {
       usePage(pageKey);
       if (
         !control || !control.contextId || !sourceNode ||
@@ -83,7 +83,12 @@
       pending = {
         contextId: String(control.contextId),
         sourceNode,
-        existingOverlays: new Set(Array.isArray(visibleOverlays) ? visibleOverlays : []),
+        existingOverlays: new Map((Array.isArray(visibleOverlays) ? visibleOverlays : []).map(
+          (overlay) => [
+            overlay,
+            typeof signatureFor === 'function' ? String(signatureFor(overlay) || '') : ''
+          ]
+        )),
         requestedAt: currentTime()
       };
       active = null;
@@ -94,7 +99,7 @@
       return rememberContextTrigger(control, sourceNode, visibleOverlays, pageKey);
     }
 
-    function resolveOverlayContext(overlay, pageKey) {
+    function resolveOverlayContext(overlay, pageKey, signature) {
       usePage(pageKey);
       if (!overlay) {
         active = null;
@@ -106,7 +111,12 @@
         (!active.overlay || active.overlay.isConnected !== false)
       ) return active.contextId;
       active = null;
-      if (!pendingIsUsable() || pending.existingOverlays.has(overlay)) return '';
+      if (!pendingIsUsable()) return '';
+      if (pending.existingOverlays.has(overlay)) {
+        const previous = pending.existingOverlays.get(overlay);
+        const current = String(signature || '');
+        if (!current || current === previous) return '';
+      }
       active = { overlay, contextId: pending.contextId };
       pending = null;
       return active.contextId;

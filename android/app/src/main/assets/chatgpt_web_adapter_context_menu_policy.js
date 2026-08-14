@@ -16,18 +16,36 @@
     return (Array.isArray(after) ? after : []).some((root) => !existing.has(root));
   }
 
-  function prepare(control, visibleRoots, scheduleTask, delayMs) {
+  function snapshotRoots(roots, signatureFor) {
+    const snapshot = new Map();
+    (Array.isArray(roots) ? roots : []).forEach((root) => {
+      snapshot.set(root, typeof signatureFor === 'function' ? String(signatureFor(root) || '') : '');
+    });
+    return snapshot;
+  }
+
+  function hasNewOrChangedRoot(before, after, signatureFor) {
+    const current = Array.isArray(after) ? after : [];
+    if (current.some((root) => !before.has(root))) return true;
+    if (typeof signatureFor !== 'function') return false;
+    return current.some((root) => {
+      const next = String(signatureFor(root) || '');
+      return next && next !== before.get(root);
+    });
+  }
+
+  function prepare(control, visibleRoots, scheduleTask, delayMs, signatureFor) {
     if (!shouldArm(control) || typeof visibleRoots !== 'function') return null;
-    const before = visibleRoots();
+    const before = snapshotRoots(visibleRoots(), signatureFor);
     const schedule = typeof scheduleTask === 'function' ? scheduleTask : setTimeout;
     return function arm(retry) {
       if (typeof retry !== 'function') return false;
       schedule(() => {
-        if (!hasNewRoot(before, visibleRoots())) retry();
+        if (!hasNewOrChangedRoot(before, visibleRoots(), signatureFor)) retry();
       }, Number.isFinite(delayMs) ? delayMs : 260);
       return true;
     };
   }
 
-  return Object.freeze({ hasNewRoot, prepare, shouldArm });
+  return Object.freeze({ hasNewOrChangedRoot, hasNewRoot, prepare, shouldArm, snapshotRoots });
 });

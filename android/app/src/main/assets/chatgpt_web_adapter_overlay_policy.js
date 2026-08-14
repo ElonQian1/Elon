@@ -32,6 +32,17 @@
     return MANAGEMENT_ACTION.test(signal(node));
   }
 
+  function managementSignature(root, isVisible, actionableNodes) {
+    if (!root || typeof actionableNodes !== 'function') return '';
+    return actionableNodes(root)
+      .filter((node) => typeof isVisible !== 'function' || isVisible(node))
+      .filter(isManagementAction)
+      .map(signal)
+      .filter(Boolean)
+      .sort()
+      .join('|');
+  }
+
   function inferredRoot(node, isVisible, actionableNodes) {
     let current = node && node.parentElement;
     for (let depth = 0; current && depth < 7; depth += 1, current = current.parentElement) {
@@ -53,5 +64,5 @@
     return Array.from(new Set(explicit.concat(inferred)));
   }
 
-  return Object.freeze({ isManagementAction, visibleRoots });
+  return Object.freeze({ isManagementAction, managementSignature, visibleRoots });
 });
