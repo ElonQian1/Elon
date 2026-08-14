@@ -5,6 +5,7 @@ use crate::{
     compute_federation::external_pool_adapter_upstream_transport_target::{
         validate_upstream_transport_target_receipt,
         validate_upstream_transport_target_revocation_receipt,
+        ExternalPoolAdapterUpstreamTransportTargetReceipt,
     },
     store::{
         compute_external_pool_adapter_installation::external_pool_adapter_installation_receipt_authority_on,
