@@ -75,11 +75,16 @@
       'form textarea',
       'form [role="searchbox"]',
       'form [contenteditable="true"]',
-      'textarea[placeholder]'
+      'textarea[placeholder]',
+      'textarea[aria-label]',
+      'input[type="text"][aria-label]',
+      '[role="textbox"]',
+      '[contenteditable="true"]',
+      '[contenteditable="plaintext-only"]'
     ];
     for (const selector of selectors) {
       const matches = Array.from(document.querySelectorAll(selector)).filter(isVisible);
-      const preferred = matches.find((node) => /ask|search|anything|follow.?up|提问|搜索|追问|输入/i.test(
+      const preferred = matches.find((node) => /ask|search|anything|follow.?up|chat|prompt|提问|尽情|搜索|追问|输入/i.test(
         cleanText([node.getAttribute('aria-label'), node.getAttribute('placeholder')]
           .filter(Boolean).join(' '))
       ));
@@ -215,10 +220,31 @@
     return messages;
   }
 
+  function hasVisibleLoginEntry() {
+    return Array.from(document.querySelectorAll('a, button, [role="button"]')).some((node) => {
+      if (!isVisible(node)) return false;
+      const label = nodeLabel(node);
+      const href = String(node.getAttribute('href') || '').toLowerCase();
+      return /(?:^|\s)(sign in|log in|login|登录|登入)(?:\s|$)/.test(label)
+        || href.includes('accounts.google.com')
+        || href.includes('/accounts/');
+    });
+  }
+
   function isAuthenticated() {
-    return Array.from(document.querySelectorAll(
-      'a[aria-label*="Google Account" i], button[aria-label*="Google Account" i], [data-ogsr-up]'
-    )).some(isVisible);
+    const account = document.querySelector([
+      'a[aria-label*="Google Account" i]',
+      'button[aria-label*="Google Account" i]',
+      'a[aria-label*="Google 账号" i]',
+      'button[aria-label*="Google 账号" i]',
+      'a[aria-label*="Google 帐号" i]',
+      'button[aria-label*="Google 帐号" i]',
+      'a[aria-label*="Google 帳戶" i]',
+      'button[aria-label*="Google 帳戶" i]',
+      'a[href*="SignOutOptions"]',
+      'img[src*="googleusercontent.com"]'
+    ].join(','));
+    return isVisible(account) || (!!findComposer() && !hasVisibleLoginEntry());
   }
 
   function snapshot() {

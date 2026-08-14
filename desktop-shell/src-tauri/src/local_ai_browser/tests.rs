@@ -52,7 +52,8 @@ fn google_ai_mode_is_registered_with_semantic_adapter() {
     assert_eq!(summary.id, "google-ai-mode");
     assert_eq!(summary.login_mode, "guest_web_system_login");
     assert_eq!(summary.renderer_status, "active");
-    assert!(GOOGLE_AI_MODE.semantic_adapter);
+    assert_eq!(GOOGLE_AI_MODE.adapter, Some(ProviderAdapter::GoogleWeb));
+    assert!(summary.adapter_actions.contains(&"send_prompt"));
 }
 
 #[test]
@@ -90,36 +91,32 @@ fn owner_fingerprint_is_stable_separate_and_path_safe() {
 #[test]
 fn adapter_command_does_not_accept_arbitrary_javascript() {
     assert!(adapter_command::build(
-        CHATGPT.id,
         CHATGPT.display_name,
-        GOOGLE_AI_MODE.id,
+        CHATGPT.adapter.unwrap().supported_actions(),
         "eval",
         Some("alert(1)".to_string()),
         None,
     )
     .is_err());
     assert!(adapter_command::build(
-        CHATGPT.id,
         CHATGPT.display_name,
-        GOOGLE_AI_MODE.id,
+        CHATGPT.adapter.unwrap().supported_actions(),
         "snapshot",
         None,
         None,
     )
     .is_ok());
     assert!(adapter_command::build(
-        GOOGLE_AI_MODE.id,
         GOOGLE_AI_MODE.display_name,
-        GOOGLE_AI_MODE.id,
+        GOOGLE_AI_MODE.adapter.unwrap().supported_actions(),
         "send_prompt",
         Some("hi".to_string()),
         None,
     )
     .is_ok());
     assert!(adapter_command::build(
-        GOOGLE_AI_MODE.id,
         GOOGLE_AI_MODE.display_name,
-        GOOGLE_AI_MODE.id,
+        GOOGLE_AI_MODE.adapter.unwrap().supported_actions(),
         "start_google_login",
         None,
         None,

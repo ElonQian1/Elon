@@ -25,27 +25,20 @@ pub(super) const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
     "new_conversation",
 ];
 
-pub(super) fn supported_actions(
-    provider_id: &str,
-    google_ai_mode_id: &str,
-) -> &'static [&'static str] {
-    if provider_id == google_ai_mode_id {
-        GOOGLE_AI_MODE_ACTIONS
-    } else {
-        CHATGPT_ACTIONS
-    }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PageCommandBinding {
+    None,
+    ChatGptDocument,
 }
 
 pub fn build(
-    provider_id: &str,
     provider_name: &str,
-    google_ai_mode_id: &str,
+    supported_actions: &[&str],
     action: &str,
     value: Option<String>,
     expected_draft: Option<String>,
 ) -> Result<Value, String> {
-    let actions = supported_actions(provider_id, google_ai_mode_id);
-    if !actions.contains(&action) {
+    if !supported_actions.contains(&action) {
         return Err(format!("不支持的 {provider_name} 原生界面动作。"));
     }
     if matches!(action, "open_conversation" | "open_project") {
@@ -74,6 +67,35 @@ pub fn build(
         command.insert("expectedDraft".to_string(), Value::String(expected_draft));
     }
     Ok(Value::Object(command))
+}
+
+pub(super) fn page_invocation_script(
+    bridge: &str,
+    binding: PageCommandBinding,
+    raw_command: &str,
+) -> Result<String, String> {
+    if bridge.is_empty()
+        || !bridge
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return Err("本地 AI 页面桥名称无效。".to_string());
+    }
+    let encoded = serde_json::to_string(raw_command).map_err(|error| error.to_string())?;
+    Ok(match binding {
+        PageCommandBinding::None => {
+            format!("window.{bridge}&&window.{bridge}.command({encoded});")
+        }
+        PageCommandBinding::ChatGptDocument => format!(
+            r#"(function(raw){{
+var bridge=window.{bridge};
+if(!bridge||typeof bridge.command!=='function')return;
+var command=JSON.parse(raw);
+command.documentToken=String(window.__elonChatGptDocumentToken||'');
+bridge.command(JSON.stringify(command));
+}})({encoded});"#
+        ),
+    })
 }
 
 fn is_safe_conversation_path(path: &str) -> bool {
@@ -122,27 +144,24 @@ mod tests {
     #[test]
     fn project_and_conversation_navigation_only_accept_safe_chatgpt_paths() {
         assert!(build(
-            "chatgpt",
             "ChatGPT",
-            "google_ai_mode",
+            CHATGPT_ACTIONS,
             "open_project",
             Some("/g/g-p-roadmap/project".into()),
             None
         )
         .is_ok());
         assert!(build(
-            "chatgpt",
             "ChatGPT",
-            "google_ai_mode",
+            CHATGPT_ACTIONS,
             "open_conversation",
             Some("/g/g-p-roadmap/c/chat-1".into()),
             None
         )
         .is_ok());
         assert!(build(
-            "chatgpt",
             "ChatGPT",
-            "google_ai_mode",
+            CHATGPT_ACTIONS,
             "open_project",
             Some("https://evil.example".into()),
             None
@@ -152,11 +171,31 @@ mod tests {
 
     #[test]
     fn provider_action_matrix_is_explicit_and_provider_scoped() {
-        let chatgpt = supported_actions("chatgpt", "google-ai-mode");
-        let google = supported_actions("google-ai-mode", "google-ai-mode");
-        assert!(chatgpt.contains(&"list_conversations"));
-        assert!(chatgpt.contains(&"start_google_login"));
-        assert!(!google.contains(&"list_conversations"));
-        assert_eq!(google, GOOGLE_AI_MODE_ACTIONS);
+        assert!(CHATGPT_ACTIONS.contains(&"list_conversations"));
+        assert!(CHATGPT_ACTIONS.contains(&"start_google_login"));
+        assert!(!GOOGLE_AI_MODE_ACTIONS.contains(&"list_conversations"));
+    }
+
+    #[test]
+    fn chatgpt_commands_bind_the_live_document_without_exposing_it_to_frontend() {
+        let raw = r#"{"action":"send_prompt","value":"hello"}"#;
+        let chatgpt = page_invocation_script(
+            "__elonChatGptBridge",
+            PageCommandBinding::ChatGptDocument,
+            raw,
+        )
+        .unwrap();
+        assert!(chatgpt.contains("window.__elonChatGptDocumentToken"));
+        assert!(chatgpt.contains("bridge.command(JSON.stringify(command))"));
+        assert!(!chatgpt.contains("hello\"") || chatgpt.contains("\\\"hello\\\""));
+
+        let google = page_invocation_script(
+            "__elonGoogleWebBridge",
+            PageCommandBinding::None,
+            r#"{"action":"snapshot"}"#,
+        )
+        .unwrap();
+        assert!(!google.contains("documentToken"));
+        assert!(page_invocation_script("bad-bridge", PageCommandBinding::None, "{}").is_err());
     }
 }

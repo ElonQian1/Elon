@@ -8,12 +8,16 @@
 mod adapter;
 #[path = "local_ai_browser/adapter_command.rs"]
 mod adapter_command;
+#[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]
+mod chatgpt_adapter_bootstrap;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
 #[path = "local_ai_browser/native_window.rs"]
 mod native_window;
 #[path = "local_ai_browser/native_window_state.rs"]
 pub(crate) mod native_window_state;
+#[path = "local_ai_browser/provider_adapter.rs"]
+mod provider_adapter;
 #[path = "local_ai_browser/state.rs"]
 mod state;
 #[cfg(test)]
@@ -31,6 +35,7 @@ use tauri::{
 pub use native_window_state::{LocalAiNativeWindowRuntime, LocalAiNativeWindowState};
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
+use provider_adapter::ProviderAdapter;
 
 const RENDERER_PROTOCOL: &str = "yilong.ai.ui.v1";
 const PROFILE_ROOT: &str = "ai-web-profiles";
@@ -46,7 +51,7 @@ struct ProviderDefinition {
     start_host: &'static str,
     login_mode: &'static str,
     renderer_status: &'static str,
-    semantic_adapter: bool,
+    adapter: Option<ProviderAdapter>,
     allowed_hosts: &'static [&'static str],
     allowed_domain_suffixes: &'static [&'static str],
     allowed_identity_hosts: &'static [&'static str],
@@ -60,7 +65,7 @@ const CHATGPT: ProviderDefinition = ProviderDefinition {
     start_host: "chatgpt.com",
     login_mode: "manual_web",
     renderer_status: "active",
-    semantic_adapter: true,
+    adapter: Some(ProviderAdapter::ChatGpt),
     allowed_hosts: &[],
     allowed_domain_suffixes: &["chatgpt.com", "openai.com"],
     allowed_identity_hosts: &[
@@ -82,7 +87,7 @@ const GOOGLE_AI_MODE: ProviderDefinition = ProviderDefinition {
     start_host: "google.com/aimode",
     login_mode: "guest_web_system_login",
     renderer_status: "active",
-    semantic_adapter: true,
+    adapter: Some(ProviderAdapter::GoogleWeb),
     allowed_hosts: &["google.com", "www.google.com"],
     allowed_domain_suffixes: &[],
     allowed_identity_hosts: &[],
@@ -209,6 +214,7 @@ pub async fn open_local_ai_web_session(
     let popup_label = window_label.clone();
     let page_state = runtime.inner().clone();
     let page_label = window_label.clone();
+    let page_provider = *provider;
     let window_state = runtime.inner().clone();
     let window_state_label = window_label.clone();
 
@@ -222,8 +228,8 @@ pub async fn open_local_ai_web_session(
             .data_directory(profile_directory)
             .incognito(false)
             .enable_clipboard_access();
-    if provider.semantic_adapter {
-        builder = builder.initialization_script(adapter_initialization_script(provider));
+    if let Some(adapter) = provider.adapter {
+        builder = builder.initialization_script(adapter.initialization_script());
     }
     let window = builder
         .on_navigation(move |url| {
@@ -257,7 +263,7 @@ pub async fn open_local_ai_web_session(
                 NewWindowResponse::Deny
             }
         })
-        .on_page_load(move |_window, payload| {
+        .on_page_load(move |window, payload| {
             println!(
                 "[elon-desktop][local-ai] 页面事件 {:?} -> {}",
                 payload.event(),
@@ -268,7 +274,8 @@ pub async fn open_local_ai_web_session(
                     page_state.mark_navigation(&page_label, payload.url(), true, None)
                 }
                 PageLoadEvent::Finished => {
-                    page_state.mark_page_finished(&page_label, payload.url())
+                    page_state.mark_page_finished(&page_label, payload.url());
+                    reconnect_adapter(&page_provider, &window);
                 }
             }
         })
@@ -390,12 +397,12 @@ pub async fn run_local_ai_web_adapter_command(
     expected_draft: Option<String>,
 ) -> Result<(), String> {
     let provider = provider(&provider_id)?;
-    if !provider.semantic_adapter {
-        return Err(format!(
+    let adapter = provider.adapter.ok_or_else(|| {
+        format!(
             "{} 当前使用官方网页模式，尚未启用一龙原生语义界面。",
             provider.display_name
-        ));
-    }
+        )
+    })?;
     let fingerprint = owner_fingerprint(&owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
@@ -404,20 +411,15 @@ pub async fn run_local_ai_web_adapter_command(
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
     runtime.mark_command_pending(&label);
     let command = adapter_command::build(
-        provider.id,
         provider.display_name,
-        GOOGLE_AI_MODE.id,
+        adapter.supported_actions(),
         &action,
         value,
         expected_draft,
     )?;
     let raw = serde_json::to_string(&command).map_err(display_error)?;
-    let encoded = serde_json::to_string(&raw).map_err(display_error)?;
-    let bridge = adapter_bridge_name(provider);
     window
-        .eval(format!(
-            "window.{bridge} && window.{bridge}.command({encoded});"
-        ))
+        .eval(adapter.page_invocation_script(&raw)?)
         .map_err(display_error)
 }
 
@@ -429,13 +431,9 @@ pub fn publish_local_ai_web_event(
 ) -> Result<(), String> {
     let label = webview.label();
     let provider = provider_for_window_label(label)
-        .filter(|provider| provider.semantic_adapter)
+        .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
-    let event = if provider.id == GOOGLE_AI_MODE.id {
-        google_ai_mode::sanitize_event(&payload)?
-    } else {
-        adapter::sanitize_event(&payload)?
-    };
+    let event = provider.adapter.unwrap().sanitize_event(&payload)?;
     runtime.record_adapter_event(label, &event.kind, event.payload);
     Ok(())
 }
@@ -478,7 +476,9 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         profile_scope: "local_owner_provider",
         renderer_protocol: RENDERER_PROTOCOL,
         renderer_status: provider.renderer_status,
-        adapter_actions: adapter_command::supported_actions(provider.id, GOOGLE_AI_MODE.id),
+        adapter_actions: provider
+            .adapter
+            .map_or(&[] as &'static [&'static str], ProviderAdapter::supported_actions),
     }
 }
 
@@ -617,7 +617,7 @@ fn restore_window(window: &WebviewWindow) -> Result<(), String> {
 }
 
 fn initial_renderer_status(provider: &ProviderDefinition) -> &'static str {
-    if provider.semantic_adapter {
+    if provider.adapter.is_some() {
         "connecting"
     } else {
         provider.renderer_status
@@ -641,28 +641,17 @@ fn navigation_block_message(provider: &ProviderDefinition, url: &Url) -> Option<
 }
 
 fn request_adapter_snapshot(provider: &ProviderDefinition, window: &WebviewWindow) {
-    if !provider.semantic_adapter {
-        return;
-    }
-    let bridge = adapter_bridge_name(provider);
-    let _ = window.eval(format!(
-        "window.{bridge} && window.{bridge}.command('{{\"action\":\"snapshot\"}}');"
-    ));
-}
-
-fn adapter_initialization_script(provider: &ProviderDefinition) -> String {
-    if provider.id == GOOGLE_AI_MODE.id {
-        google_ai_mode::initialization_script()
-    } else {
-        adapter::initialization_script()
+    if let Some(adapter) = provider.adapter {
+        if let Ok(script) = adapter.page_invocation_script(r#"{"action":"snapshot"}"#) {
+            let _ = window.eval(script);
+        }
     }
 }
 
-fn adapter_bridge_name(provider: &ProviderDefinition) -> &'static str {
-    if provider.id == GOOGLE_AI_MODE.id {
-        "__elonGoogleAiModeBridge"
-    } else {
-        "__elonChatGptBridge"
+fn reconnect_adapter(provider: &ProviderDefinition, window: &WebviewWindow) {
+    if let Some(adapter) = provider.adapter {
+        let _ = window.eval(adapter.initialization_script());
+        request_adapter_snapshot(provider, window);
     }
 }
 

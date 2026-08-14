@@ -1,0 +1,196 @@
+const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
+pub(super) const ADAPTER_VERSION: u32 = 106;
+
+const ADAPTER_ASSETS: &[(&str, &str)] = &[
+    (
+        "chatgpt_web_adapter_bootstrap.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_bootstrap.js"),
+    ),
+    (
+        "chatgpt_web_adapter_project_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_project_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_context_menu_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_context_menu_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_conversation_history.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js"),
+    ),
+    (
+        "chatgpt_web_adapter_conversations.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_conversations.js"),
+    ),
+    (
+        "chatgpt_web_adapter_message_action_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_message_action_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_messages.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_messages.js"),
+    ),
+    (
+        "chatgpt_web_adapter_model_label_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_model_label_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_composer_option_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer_option_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_composer_tool_state_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer_tool_state_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_composer_tool_selection.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer_tool_selection.js"),
+    ),
+    (
+        "chatgpt_web_adapter_action_target_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_attachment_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_attachment_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_dictation_session_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_composer.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer.js"),
+    ),
+    (
+        "chatgpt_web_adapter_navigation_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_navigation_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_navigation.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_navigation.js"),
+    ),
+    (
+        "chatgpt_web_adapter_page_semantic_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_temporary_chat.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_temporary_chat.js"),
+    ),
+    (
+        "chatgpt_web_adapter_form_controls.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_form_controls.js"),
+    ),
+    (
+        "chatgpt_web_adapter_control_ownership_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_control_ownership_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_overlay_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_overlay_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_form_commands.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_form_commands.js"),
+    ),
+    (
+        "chatgpt_web_adapter_disclosure_controls.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_disclosure_controls.js"),
+    ),
+    (
+        "chatgpt_web_adapter_snapshot_scheduler.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_snapshot_scheduler.js"),
+    ),
+    (
+        "chatgpt_web_adapter_layout.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_layout.js"),
+    ),
+    (
+        "chatgpt_web_adapter.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter.js"),
+    ),
+];
+
+pub(super) fn initialization_script() -> String {
+    let adapters = ADAPTER_ASSETS
+        .iter()
+        .map(|(_, source)| *source)
+        .collect::<Vec<_>>()
+        .join("\n");
+    r#"
+(function () {
+  'use strict';
+  if (location.origin !== '__ALLOWED_ORIGIN__') return;
+
+  function invoke(payload) {
+    var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+    var publicInvoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+    var call = internalInvoke || publicInvoke;
+    if (typeof call === 'function') {
+      Promise.resolve(call('publish_local_ai_web_event', { payload: String(payload || '') })).catch(function () {});
+    }
+  }
+
+  window.elonChatGptNative = Object.freeze({ postMessage: invoke });
+  if (!window.__elonWinChatGptDiagnosticsInstalled) {
+    window.__elonWinChatGptDiagnosticsInstalled = true;
+    window.addEventListener('error', function (event) {
+      invoke(JSON.stringify({
+        type: 'browser_diagnostic',
+        kind: 'page_error',
+        detail: String(event && event.message || 'ChatGPT 页面脚本加载失败。').slice(0, 240),
+        url: location.origin + location.pathname
+      }));
+    });
+    window.addEventListener('unhandledrejection', function () {
+      invoke(JSON.stringify({
+        type: 'browser_diagnostic',
+        kind: 'promise_rejection',
+        detail: 'ChatGPT 页面尚未完成初始化，可尝试刷新或显示官方页。',
+        url: location.origin + location.pathname
+      }));
+    });
+  }
+
+  function documentToken() {
+    var words = new Uint32Array(4);
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      window.crypto.getRandomValues(words);
+    } else {
+      for (var index = 0; index < words.length; index += 1) {
+        words[index] = Math.floor(Math.random() * 0xffffffff) >>> 0;
+      }
+    }
+    return 'doc_win_' + Array.from(words, function (word) {
+      return word.toString(16).padStart(8, '0');
+    }).join('');
+  }
+
+  if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ''))) {
+    window.__elonChatGptDocumentToken = documentToken();
+  }
+  window.__elonChatGptAdapterTargetVersion = __ADAPTER_VERSION__;
+  __ADAPTER_ASSETS__
+})();
+"#
+    .replace("__ALLOWED_ORIGIN__", ALLOWED_ORIGIN)
+    .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__ADAPTER_ASSETS__", &adapters)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn win_bootstrap_tracks_the_complete_android_adapter_bundle() {
+        let script = initialization_script();
+        assert_eq!(ADAPTER_ASSETS.len(), 27);
+        assert!(script.contains("__elonChatGptAdapterTargetVersion = 106"));
+        assert!(script.contains("__elonChatGptDocumentToken"));
+        assert!(script.contains("__elonChatGptSnapshotScheduler"));
+        assert!(script.contains("__elonChatGptLayout"));
+        assert!(script.contains("window.__elonChatGptBridge"));
+    }
+}

@@ -6,63 +6,55 @@ const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 12;
 const MAX_MESSAGE_CHARS: usize = 40_000;
 const MAX_DRAFT_CHARS: usize = 20_000;
+const ADAPTER_VERSION: u32 = 1;
 
 pub fn initialization_script() -> String {
-    let adapter = include_str!("google_ai_mode_adapter.js");
-    format!(
-        r#"
-(function () {{
+    let adapter = include_str!("../../../../android/app/src/main/assets/google_web_adapter.js");
+    r#"
+(function () {
   'use strict';
-  if (window.__elonWinGoogleAiModeBootstrap) return;
-  window.__elonWinGoogleAiModeBootstrap = true;
 
-  function allowedOrigin() {{
+  function allowedOrigin() {
     return location.origin === 'https://google.com' || location.origin === 'https://www.google.com';
-  }}
+  }
 
-  function invoke(payload) {{
+  function invoke(payload) {
     if (!allowedOrigin()) return;
     var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
     var publicInvoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
     var call = internalInvoke || publicInvoke;
-    if (typeof call === 'function') {{
-      Promise.resolve(call('publish_local_ai_web_event', {{ payload: String(payload || '') }})).catch(function () {{}});
-    }}
-  }}
+    if (typeof call === 'function') {
+      Promise.resolve(call('publish_local_ai_web_event', { payload: String(payload || '') })).catch(function () {});
+    }
+  }
 
-  window.elonGoogleAiModeNative = Object.freeze({{ postMessage: invoke }});
+  window.elonGoogleWebNative = Object.freeze({ postMessage: invoke });
+  if (!window.__elonWinGoogleWebDiagnosticsInstalled) {
+    window.__elonWinGoogleWebDiagnosticsInstalled = true;
+    window.addEventListener('error', function (event) {
+      invoke(JSON.stringify({
+        type: 'browser_diagnostic',
+        kind: 'page_error',
+        detail: String(event && event.message || 'Google AI 页面脚本加载失败。').slice(0, 240),
+        url: location.origin + location.pathname
+      }));
+    });
+    window.addEventListener('unhandledrejection', function () {
+      invoke(JSON.stringify({
+        type: 'browser_diagnostic',
+        kind: 'promise_rejection',
+        detail: 'Google AI 页面尚未完成初始化，可显示官方窗口确认。',
+        url: location.origin + location.pathname
+      }));
+    });
+  }
 
-  function diagnostic(kind, detail) {{
-    invoke(JSON.stringify({{
-      type: 'browser_diagnostic',
-      kind: String(kind || '').slice(0, 48),
-      detail: String(detail || '').slice(0, 240),
-      url: location.origin + location.pathname
-    }}));
-  }}
-
-  window.addEventListener('error', function (event) {{
-    diagnostic('page_error', event && event.message ? event.message : 'Google AI 模式页面脚本加载失败。');
-  }});
-  window.addEventListener('unhandledrejection', function () {{
-    diagnostic('promise_rejection', 'Google AI 模式页面尚未完成初始化，可显示官方窗口确认。');
-  }});
-
-  function start() {{
-    if (!allowedOrigin()) return;
-    window.setTimeout(function () {{
-      if (!document.querySelector('main, [role="main"], form')) {{
-        diagnostic('page_not_ready', 'Google AI 模式页面尚未就绪；地区、语言或账号可能暂未开放。');
-      }}
-    }}, 9000);
-    {adapter}
-  }}
-
-  if (document.documentElement) start();
-  else document.addEventListener('DOMContentLoaded', start, {{ once: true }});
-}})();
+  window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
+  __ADAPTER_SOURCE__
+})();
 "#
-    )
+    .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__ADAPTER_SOURCE__", adapter)
 }
 
 pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
@@ -71,8 +63,13 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
     }
     let value: Value = serde_json::from_str(raw).map_err(|_| "Google AI 模式语义事件格式无效。")?;
     if value.get("schema").and_then(Value::as_str) == Some("yilong.ai.ui.v1") {
-        if value.get("providerId").and_then(Value::as_str) != Some("google-ai-mode") {
+        if value.get("providerId").and_then(Value::as_str) != Some("google_web") {
             return Err("Google AI 模式语义事件厂商标识无效。".to_string());
+        }
+        if value.get("adapterVersion").and_then(Value::as_u64)
+            != Some(u64::from(ADAPTER_VERSION))
+        {
+            return Err("Google AI 模式语义适配器版本无效。".to_string());
         }
         let event = value
             .get("event")
@@ -273,7 +270,8 @@ mod tests {
     fn snapshot_keeps_visible_text_and_public_citations_only() {
         let raw = serde_json::to_string(&json!({
             "schema": "yilong.ai.ui.v1",
-            "providerId": "google-ai-mode",
+            "adapterVersion": ADAPTER_VERSION,
+            "providerId": "google_web",
             "event": {
                 "type": "message_snapshot",
                 "url": "https://www.google.com/search?udm=50&q=private",
@@ -310,5 +308,14 @@ mod tests {
             r#"{"schema":"yilong.ai.ui.v1","providerId":"chatgpt","event":{}}"#
         )
         .is_err());
+    }
+
+    #[test]
+    fn desktop_bootstrap_reuses_the_android_google_adapter() {
+        let script = initialization_script();
+        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 1"));
+        assert!(script.contains("window.elonGoogleWebNative"));
+        assert!(script.contains("window.__elonGoogleWebBridge"));
+        assert!(script.contains("providerId: 'google_web'"));
     }
 }

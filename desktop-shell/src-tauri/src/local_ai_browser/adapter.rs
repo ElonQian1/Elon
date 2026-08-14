@@ -1,5 +1,7 @@
 use serde_json::{json, Map, Value};
 
+use super::chatgpt_adapter_bootstrap::ADAPTER_VERSION;
+
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_MESSAGE_CHARS: usize = 40_000;
@@ -12,76 +14,6 @@ pub struct SanitizedAdapterEvent {
     pub payload: Value,
 }
 
-pub fn initialization_script() -> String {
-    let adapters = [
-        include_str!(
-            "../../../../android/app/src/main/assets/chatgpt_web_adapter_project_policy.js"
-        ),
-        include_str!(
-            "../../../../android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js"
-        ),
-        include_str!(
-            "../../../../android/app/src/main/assets/chatgpt_web_adapter_conversations.js"
-        ),
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_messages.js"),
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer.js"),
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter.js"),
-    ]
-    .join("\n");
-
-    format!(
-        r#"
-(function () {{
-  'use strict';
-  if (window.__elonWinChatGptBootstrap) return;
-  window.__elonWinChatGptBootstrap = true;
-
-  function invoke(payload) {{
-    if (location.origin !== 'https://chatgpt.com') return;
-    var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
-    var publicInvoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-    var call = internalInvoke || publicInvoke;
-    if (typeof call === 'function') {{
-      Promise.resolve(call('publish_local_ai_web_event', {{ payload: String(payload || '') }})).catch(function () {{}});
-    }}
-  }}
-
-  window.elonChatGptNative = Object.freeze({{ postMessage: invoke }});
-
-  function diagnostic(kind, detail) {{
-    invoke(JSON.stringify({{
-      type: 'browser_diagnostic',
-      kind: String(kind || '').slice(0, 48),
-      detail: String(detail || '').slice(0, 240),
-      url: location.origin + location.pathname
-    }}));
-  }}
-
-  window.addEventListener('error', function (event) {{
-    diagnostic('page_error', event && event.message ? event.message : 'ChatGPT 页面脚本加载失败。');
-  }});
-  window.addEventListener('unhandledrejection', function () {{
-    diagnostic('promise_rejection', 'ChatGPT 页面尚未完成初始化，可尝试刷新或用系统浏览器继续。');
-  }});
-
-  function start() {{
-    if (location.origin !== 'https://chatgpt.com') return;
-    window.setTimeout(function () {{
-      var text = String(document.body && document.body.innerText || '').trim();
-      if (!text && !document.querySelector('iframe')) {{
-        diagnostic('blank_page', 'ChatGPT 页面保持空白，请刷新；若仍失败，可在系统浏览器完成登录。');
-      }}
-    }}, 9000);
-    {adapters}
-  }}
-
-  if (document.documentElement) start();
-  else document.addEventListener('DOMContentLoaded', start, {{ once: true }});
-}})();
-"#
-    )
-}
-
 pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
     if raw.len() > MAX_EVENT_BYTES {
         return Err("ChatGPT 可见语义事件过大，已拒绝。".to_string());
@@ -90,6 +22,18 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
     if value.get("schema").and_then(Value::as_str) == Some("yilong.ai.ui.v1") {
         if value.get("providerId").and_then(Value::as_str) != Some("chatgpt") {
             return Err("ChatGPT 语义事件厂商标识无效。".to_string());
+        }
+        if value.get("adapterVersion").and_then(Value::as_u64)
+            != Some(u64::from(ADAPTER_VERSION))
+        {
+            return Err("ChatGPT 语义适配器版本无效。".to_string());
+        }
+        if !value
+            .get("documentToken")
+            .and_then(Value::as_str)
+            .is_some_and(valid_document_token)
+        {
+            return Err("ChatGPT 页面文档令牌无效。".to_string());
         }
         let event = value
             .get("event")
@@ -119,6 +63,15 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
         }),
         _ => Err("不支持的 ChatGPT 本地浏览器事件。".to_string()),
     }
+}
+
+fn valid_document_token(value: &str) -> bool {
+    value.len() >= 7
+        && value.len() <= 84
+        && value.starts_with("doc_")
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
 }
 
 fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapterEvent, String> {
@@ -402,6 +355,8 @@ mod tests {
     fn semantic_snapshot_drops_queries_and_unsupported_content() {
         let raw = serde_json::to_string(&json!({
             "schema": "yilong.ai.ui.v1",
+            "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "doc_win_contract",
             "providerId": "chatgpt",
             "event": {
                 "type": "message_snapshot",
@@ -440,6 +395,8 @@ mod tests {
     fn conversation_directory_keeps_safe_projects_and_project_chats() {
         let raw = serde_json::to_string(&json!({
             "schema": "yilong.ai.ui.v1",
+            "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "doc_win_contract",
             "providerId": "chatgpt",
             "event": {
                 "type": "conversation_snapshot",
@@ -470,5 +427,25 @@ mod tests {
             event.payload["conversations"][0]["activityDates"],
             json!(["2026-08-14"])
         );
+    }
+
+    #[test]
+    fn protocol_events_require_current_adapter_metadata_shape() {
+        let event = json!({
+            "schema": "yilong.ai.ui.v1",
+            "providerId": "chatgpt",
+            "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "doc_win_contract",
+            "event": { "type": "adapter_ready", "capabilities": [] }
+        });
+        assert!(sanitize_event(&event.to_string()).is_ok());
+
+        let mut wrong_version = event.clone();
+        wrong_version["adapterVersion"] = json!(ADAPTER_VERSION + 1);
+        assert!(sanitize_event(&wrong_version.to_string()).is_err());
+
+        let mut missing_token = event;
+        missing_token.as_object_mut().unwrap().remove("documentToken");
+        assert!(sanitize_event(&missing_token.to_string()).is_err());
     }
 }
