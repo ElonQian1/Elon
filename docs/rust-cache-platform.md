@@ -119,6 +119,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 ```
 
+### 跨目标验证
+
+Windows 上构建 Linux-musl 等非宿主目标时使用专用入口，不直接设置
+`CARGO_TARGET_DIR`，也不在 `D:\rust\shared` 下创建带功能号、提交号或会话号的
+`target-*`：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-cross.ps1 -- `
+  zigbuild --target x86_64-unknown-linux-musl `
+  --manifest-path server\Cargo.toml --locked --bin elon-server --tests
+```
+
+该入口按 target triple 复用 `agent-validation/shared-cross-<target>`，重型依赖和中间
+产物进入 `rust-cache-v2` 托管 build-dir；最终可执行文件只落入当前工作区
+`.ai-tmp/cargo-cross-target/<target>`，可从 WSL 的 `/mnt/<drive>/...` 运行，并随任务
+统一收尾清理。只想检查路由时使用 `-PlanOnly`，不会创建目录或启动 Cargo。
+
+V260、V261 证据中出现的 `target-v260-linux-musl`、`target-v261-linux-musl` 与 WSL
+`/tmp/elon-v*-target` 是历史执行路径，不是后续模板。现存外部 target 不会被平台
+自动删除；先用 `register-legacy -Retired` 登记，再用 `purge-legacy` 预演和显式回收。
+
 正式验证不再为每个 worktree 永久保留一套完整中间产物。调度器把两个轻任务槽分别绑定到
 `shared-validation-light-0`、`shared-validation-light-1`，重任务绑定到
 `shared-validation-heavy`；资源租约与缓存分区锁共同保证同一共享目录不会并发写入。

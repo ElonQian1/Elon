@@ -2209,6 +2209,119 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "rust-cross-target-cache-routing-v1",
+      "title": "Rust cross-target cache routing V1",
+      "summary": "Route Windows Linux-musl and other Rust cross-target validation through stable rust-cache-v2 partitions while keeping final artifacts under task-local .ai-tmp.",
+      "status": "released",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/rust-cross-target-cache-routing-v1.md",
+        "content_hash": "0f85c35e75cd404372bacffc5e79d743388a84c6b9f483d2b46817c67ae7e97f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "4a976034d621f2a062f485d50824efdea4ef0b33",
+          "head_blob_oid": "11d92ebafadb6336658fe0c76cf4ce82d4571983",
+          "worktree_blob_oid": "11d92ebafadb6336658fe0c76cf4ce82d4571983",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "developer-infrastructure",
+      "tags": [
+        "rust",
+        "cache",
+        "cross-target",
+        "musl",
+        "workflow"
+      ],
+      "task_paths": [
+        ".github/instructions/git-deploy-workflow.instructions.md",
+        "docs/rust-cache-platform.md",
+        "scripts/cargo-cross.ps1",
+        "scripts/test-cargo-cross.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Same standard target triple resolves to one stable managed shared build partition across tasks.",
+        "Final cross-target artifacts remain under the current worktree .ai-tmp tree.",
+        "Missing conflicting or custom JSON targets fail closed before Cargo starts.",
+        "Cargo arguments remain exact after the wrapper boundary.",
+        "PlanOnly emits a bounded route contract without creating directories or starting Cargo.",
+        "AI workflow documentation forbids task-specific target directories and WSL tmp targets."
+      ],
+      "implementation_evidence": [
+        {
+          "path": ".github/instructions/git-deploy-workflow.instructions.md",
+          "content_hash": "b6aad5cbce35393e6521fbed2dee6194fd20705f6b3120082ac2bbdde150e4d7",
+          "locator": "AI cross-target build-only routing rule",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4a976034d621f2a062f485d50824efdea4ef0b33",
+            "head_blob_oid": "b4b8a940d6abd39fff379c1764a49bbf9ae29a28",
+            "worktree_blob_oid": "b4b8a940d6abd39fff379c1764a49bbf9ae29a28",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/rust-cross-target-cache-routing-v1.md",
+          "content_hash": "0f85c35e75cd404372bacffc5e79d743388a84c6b9f483d2b46817c67ae7e97f",
+          "locator": "scope non-goals and acceptance",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4a976034d621f2a062f485d50824efdea4ef0b33",
+            "head_blob_oid": "11d92ebafadb6336658fe0c76cf4ce82d4571983",
+            "worktree_blob_oid": "11d92ebafadb6336658fe0c76cf4ce82d4571983",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/rust-cache-platform.md",
+          "content_hash": "0549466a9f753e0494057f7afb4fa83ee8c0c93f96c36da27fbbbaac15da90a5",
+          "locator": "cross-target validation route",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4a976034d621f2a062f485d50824efdea4ef0b33",
+            "head_blob_oid": "217547aaed271827d8fe37327f660da4fb79bcac",
+            "worktree_blob_oid": "217547aaed271827d8fe37327f660da4fb79bcac",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/cargo-cross.ps1",
+          "content_hash": "045e7a1b59eeee44b32ce252a94ff53c48fa1c336e50bbf95b5907d3946c9702",
+          "locator": "stable target route and managed cache invocation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4a976034d621f2a062f485d50824efdea4ef0b33",
+            "head_blob_oid": "bfe1a3168e402b33127a2c78ad5655a4196fe1ac",
+            "worktree_blob_oid": "bfe1a3168e402b33127a2c78ad5655a4196fe1ac",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-cargo-cross.ps1",
+          "content_hash": "240b3b0225a55f2c694569bba487d112e923f389dd9c898d898eac94134ad666",
+          "locator": "26 plan failure and fake Cargo integration assertions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4a976034d621f2a062f485d50824efdea4ef0b33",
+            "head_blob_oid": "6b3209cd1bab425710c16b3233ad649d717f9322",
+            "worktree_blob_oid": "6b3209cd1bab425710c16b3233ad649d717f9322",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786711594167,
+      "updated_at_ms": 1786711596449
+    },
+    {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "title": "Win Google AI 语义桥启动恢复 V1",
       "summary": "修复 WebView2 会话已连接但 Google AI 语义桥因缺少消息提取器、文档令牌及 DOM 就绪门禁而无法发送或接收回复的问题。",
@@ -2682,76 +2795,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_faad467b3172467b8be970d45a9914db",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "重新绑定修正路径后的实现与测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786625050548
-    },
-    {
-      "id": "feature_event_0750476a89364ec884b2a916beed89d5",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786625068932
-    },
-    {
-      "id": "feature_event_ef798628fc294413a0c173673a73e9b3",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "修正路径后的当前源码与五项测试证据已重新绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786625085461
-    },
-    {
-      "id": "feature_event_50c4797005b54175804ed2bf16caa5f3",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "路径修正后重新核对五项 Rust/SQLite 验收全部通过；外部 Gateway/Adapter 与生产升级边界保持未声明。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786625098662
-    },
-    {
-      "id": "feature_event_61c7705980344978b47a3e5aebe382df",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "实现、五项 Rust/SQLite 验收、文档状态和主线推送均已完成。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786625457423
-    },
-    {
-      "id": "feature_event_67a1aed14e2d477098ed51164b680437",
-      "feature_id": "project-feature-registry-normalized-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "规范化哈希修复、Windows 采用测试、CI 门禁和主线推送均已完成。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786625470065
-    },
-    {
-      "id": "feature_event_df9fb05acea84feabe8bad4e8116be40",
-      "feature_id": "open-commerce-consumer-order-closure-v1",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "纵向链路已有分散证据，但消费者端缺少同一订单的连续只读闭环视图。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1786626114513
-    },
     {
       "id": "feature_event_e18bd2454d334bf79831bdd4a0b23b1e",
       "feature_id": "open-commerce-consumer-order-closure-v1",
@@ -4681,6 +4724,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786710654944
+    },
+    {
+      "id": "feature_event_fdd12a859dd1401e89068459a70de0bc",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "registered",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "Re-register after preserving concurrent remote feature registry state during rebase.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786711594167
+    },
+    {
+      "id": "feature_event_9cec6a7e79f542bc9c2a3b067b167443",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "claimed",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786711594262
+    },
+    {
+      "id": "feature_event_1865f9bd68f74ab589c4f9869e679be8",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "Rebind verified implementation after rebase.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786711594352
+    },
+    {
+      "id": "feature_event_386ef017e5e741f3a7a22fbd34b9629c",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786711596172
+    },
+    {
+      "id": "feature_event_1ab0535ff08f44f5b9ab50d43cb7d8db",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "Current implementation and evidence restored after rebase.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786711596265
+    },
+    {
+      "id": "feature_event_fedc17ffd9f44f019904af128d2652ff",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "Focused integration, workflow, prompt, and modularity gates passed before rebase; upstream only changed feature metadata.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786711596357
+    },
+    {
+      "id": "feature_event_76c7d31871c44b2c826d7a8bcce2bf8b",
+      "feature_id": "rust-cross-target-cache-routing-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-cache-rebase",
+      "reason": "No runtime deployment is required.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786711596449
     }
   ]
 }

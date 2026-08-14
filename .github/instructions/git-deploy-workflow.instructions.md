@@ -42,14 +42,9 @@ git push origin HEAD:main
 
 ## push 输出管理
 
-Rust 收据门禁默认关闭：两个 push 入口输出 `RUST_PUSH_RECEIPT_GATE=disabled`，不运行 `prepare-push`/`cargo check`；仅 `ELON_ENABLE_RUST_PUSH_RECEIPT=1` 启用。日志写入 `.ai-tmp/push.log`：
-
-```powershell
-git push origin HEAD:main *> .ai-tmp/push.log
-if ($LASTEXITCODE -ne 0) { Get-Content .ai-tmp/push.log -Tail 40 }
-```
-
-Bash: `git push origin HEAD:main > .ai-tmp/push.log 2>&1 || tail -n 40 .ai-tmp/push.log`
+Rust 收据门禁默认关闭：push 输出 `RUST_PUSH_RECEIPT_GATE=disabled`；仅
+`ELON_ENABLE_RUST_PUSH_RECEIPT=1` 启用。日志写入 `.ai-tmp/push.log`，失败只回传末尾
+40 行。
 
 ## 验证入口
 
@@ -68,6 +63,9 @@ bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --locked
 ```
 
 验证走 `scripts/validate-rust.ps1`；细节见 `docs/rust-cache-platform.md`。
+
+Windows 跨目标 build-only 验证只走 `scripts/cargo-cross.ps1`；禁止任务专属 target 和
+WSL `/tmp` target。发布仍只走对应 `publish-*` 脚本。
 
 ### Rust 格式化
 
