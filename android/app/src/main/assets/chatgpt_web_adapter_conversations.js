@@ -92,16 +92,6 @@
     }).filter(Boolean).slice(0, MAX_PROJECTS);
   }
 
-  function mergeObservedProjects(target, values) {
-    (Array.isArray(values) ? values : []).forEach((project) => {
-      if (!project || !project.id || !project.path) return;
-      const previous = target.get(project.id);
-      target.set(project.id, Object.assign({}, previous || {}, project, {
-        active: !!(previous && previous.active) || !!project.active
-      }));
-    });
-  }
-
   function projectLabel(node) {
     return cleanText(
       node.getAttribute('data-project-title') ||
@@ -221,13 +211,9 @@
 
   function collectConversationHistory(initial, onDone) {
     const history = window.__elonChatGptConversationHistory;
-    const observedProjects = new Map();
-    const observeProjects = () => mergeObservedProjects(observedProjects, readProjects());
-    observeProjects();
     if (!history || typeof history.collect !== 'function') {
       return onDone({
         conversations: initial,
-        projects: Array.from(observedProjects.values()),
         collection: {
           scrollerFound: false,
           scrolled: false,
@@ -242,21 +228,29 @@
     }
     history.collect({
       initial,
-      read: () => {
-        observeProjects();
-        return readConversations();
-      },
+      read: readConversations,
       findScroller: findConversationScroller,
       maximum: MAX_CONVERSATIONS,
       timeoutMs: 10000,
       delayMs: 180,
       maxSteps: 40,
       stablePasses: 3
-    }, (snapshot) => {
-      observeProjects();
-      snapshot.projects = Array.from(observedProjects.values()).slice(0, MAX_PROJECTS);
-      onDone(snapshot);
-    });
+    }, onDone);
+  }
+
+  function collectProjectHistory(initial, onDone) {
+    const history = window.__elonChatGptConversationHistory;
+    if (!history || typeof history.collect !== 'function') return onDone(initial);
+    history.collect({
+      initial,
+      read: readProjects,
+      findScroller: findConversationScroller,
+      maximum: MAX_PROJECTS,
+      timeoutMs: 10000,
+      delayMs: 180,
+      maxSteps: 40,
+      stablePasses: 2
+    }, (snapshot) => onDone(snapshot.conversations));
   }
 
   function findSidebarButton(open) {
@@ -389,18 +383,20 @@
   }
 
   function emitConversationSnapshot(snapshot, emitEvent, result, closeAfter) {
-    collectProjects(snapshot.projects || readProjects(), (projects) => {
-      emitEvent({
-        type: 'conversation_snapshot',
-        conversations: enrichProjectConversations(snapshot.conversations, projects),
-        projects,
-        collection: snapshot.collection
+    collectProjectHistory(readProjects(), (observedProjects) => {
+      collectProjects(observedProjects, (projects) => {
+        emitEvent({
+          type: 'conversation_snapshot',
+          conversations: enrichProjectConversations(snapshot.conversations, projects),
+          projects,
+          collection: snapshot.collection
+        });
+        result('list_conversations', true, '');
+        if (closeAfter) {
+          const close = findSidebarButton(false);
+          if (close) close.click();
+        }
       });
-      result('list_conversations', true, '');
-      if (closeAfter) {
-        const close = findSidebarButton(false);
-        if (close) close.click();
-      }
     });
   }
 
