@@ -3,20 +3,29 @@ title: 外部矿池 Adapter Linux entrypoint capsule 验收边界
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-verification_status: source_review_only
+verification_status: verified_wsl2_linux_kernel_subset
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 验收边界
 
 ## 本批状态
 
-V257 的 Linux-only exact entrypoint capsule preparation、Store-private V250/V252/V253 同时点聚合和 source-contract test 源码已随完整 `elon-server` Windows 测试目标编译通过。本批没有执行 V257 专项、migration、服务或 Linux syscall fixture，不读取真实 mount/secret，不创建进程或网络连接；动态证据仍固定为 `passed=0`。
+V257 已在 WSL2 Ubuntu、Linux `6.18.33.2-microsoft-standard-WSL2`、x86-64、Rust/Cargo `1.97.0` 环境完成完整 `elon-server` 测试目标编译。4 项 Linux kernel fixture 与 7 项 source-contract 全部通过，合计 `11 passed / 0 failed`。本批只 materialize 生成的非生产 static ELF 到匿名 memfd，不执行 capsule，不读取真实 mount/secret，不创建 child process、IPC/session 或网络连接。
 
 数据库 schema 保持 V255；没有 `migration_v257`、receipt、current view、HTTP/MCP/PC route。Windows 与其他平台固定 unavailable。Provider 保持 `registering`，`probe_observed=false`、`runtime_launch_ready=false`、`activation_ready=false`；V254 18 个 temporary absolute deny 原样保留。
 
-## source-contract 待执行断言
+## 动态内核验收
 
-静态测试源码必须锁定：
+4 项 fixture 直接经过生产 `with_external_pool_adapter_entrypoint_capsule` 路径并证明：
+
+- 合规 source 经真实 `memfd_create` 形成 zero-link capsule，mode exact `0500`，带 `FD_CLOEXEC` 和 `F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL`；
+- source、capsule 与权威输入的 size/SHA-256 exact，sealed capsule 的写入、grow、shrink 和增加新 seal 均由 Linux kernel 以 `EPERM` 拒绝；
+- source mode 非 `0600`、出现额外 hard link、digest/size 错误或 ELF 变为 `ET_DYN` 时，consumer callback 不会执行；
+- callback 返回后 capsule 被 Drop，先前观测的 descriptor 经 `F_GETFD` 返回 `EBADF`。
+
+## 已执行 source-contract
+
+7 项静态合同全部通过并继续锁定：
 
 - capsule source 只能来自 fresh V249 Prepared 所持 exact entrypoint handle，caller/path/HTTP/DB 不能提供或重建 executable authority；
 - Linux 使用匿名内存文件，copy 后设置 exact mode 与 complete write/grow/shrink seals；无命名临时文件、path reopen、Command/process、argv/env、IPC 或 network；
@@ -32,27 +41,21 @@ V257 的 Linux-only exact entrypoint capsule preparation、Store-private V250/V2
 - fixed effects 只有 `materialized_ephemeral`，并固定 `probe_observed=false`、`runtime_launch_ready=false`、`activation_ready=false`；
 - V254 18 个 market fence 名称/body 数量和规范化 SHA-256 `7d2971d0987e2c2939e0b212d4aedfa15a4b7cd3205e433eb7030f1371840de6` 不变。
 
-这些断言即使未来执行通过，也只证明源码结构和选定 fixture；不证明生产 Linux kernel、memfd/seals、安装树、bundle mount、ACL、secret generation 或 runtime readiness。
+这些合同与 fixture 只证明当前源码和选定 WSL2 kernel 行为，不证明生产安装树、bundle mount、ACL、secret generation 或 runtime readiness。
 
-## 待运行正向矩阵
+## 命令与证据
 
-- Linux fresh V249 Prepared entrypoint：retained handle exact、copy size/hash exact、capsule identity稳定、permission/seals complete；
-- server-fixed companion policy root exact，合规 static ELF64 `ET_EXEC` 的 header/table/segments/entry point 全部有界且 W^X；
-- 同一 Store-owned transaction/same near-now `checked_at` 下，current V255 + Store-selected V250/V252/V253 + V256 bundle + V249 entrypoint 全部 exact；
-- V250/V252/V253 expiry 边界前 current，V252 exact predecessor/root 组合正确；
-- authority 短借用完成后 Drop 释放 capsule handle 与 V256 locked bytes，崩溃/重启不能恢复旧 authority。
+执行命令：
 
-## 待运行失败关闭矩阵
+```text
+wsl.exe -d Ubuntu --cd /mnt/d/wt/24584-b68911b5/server -- env CARGO_TARGET_DIR=/tmp/elon-v257-cargo-target /home/siwmm/.cargo/bin/cargo test --locked --bin elon-server linux_kernel_ -- --nocapture
+wsl.exe -d Ubuntu --cd /mnt/d/wt/24584-b68911b5/server -- env CARGO_TARGET_DIR=/tmp/elon-v257-cargo-target /home/siwmm/.cargo/bin/cargo test --locked --bin elon-server external_pool_adapter_entrypoint_capsule_source_contract_tests -- --nocapture
+```
 
-- Windows/unsupported OS、匿名文件或任一 seal 不可用、source fd 不可 seek/read、短读/超读、size/hash/identity/metadata 漂移；
-- ELF magic/class/data/machine/type/header/table/range 漂移，`PT_INTERP`、`PT_DYNAMIC`、`ET_DYN`、entry point 不在 executable load segment，或任一 W+X segment；
-- source path reopen、命名临时文件、extra link、权限/属主不安全，或把 executable/secret 复制到普通 heap/String/log/DB；
-- V249/V255/V256 任一 root 不 current，V250/V252/V253 head 缺失、被取代、撤销、过期或绑定错误，V252 predecessor 不是同次 current V250；
-- caller 伪造 checked_at/head/receipt，SQLite transaction 回滚，filesystem 与 DB 观察窗口漂移，或 operator mount/locked-memory custody失败；
-- 任一失败都不得留下 DB row、命名 capsule、进程、route、Provider version、市场或经济副作用。
+结果分别为 `4 passed / 0 failed / 1934 filtered out` 与 `7 passed / 0 failed / 1931 filtered out`。首次 source-contract 执行有 1 个单行字面量假失败；修正为锁定同一调用的稳定片段后 7 项通过，生产实现未改。最终验证指纹为 `2ac6c80f0d9c83f193090535c454851f3055fd835e3217dd3ca43bda79a35ebd`，由环境、两组结果及 facade、Linux production、kernel tests、source-contract、requirement 五个文件 SHA-256 的 canonical material 生成。
 
 ## 仍未验收
 
-未验收 V257 unit/source-contract tests、Linux 编译和 syscall/seal/permission/Drop 行为、生产文件系统与 kernel 配置、SQLite upgrade/reopen/concurrency/crash、Windows运行、真实 secret、secret delivery、Sidecar/IPC、process isolation、authenticated no-work probe、runtime identity、ACK/event、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification 或 settlement。
+未验收生产 Linux kernel/文件系统配置、真实 V249 安装树与 operator mount、V256 真实 secret/zeroization、Store 同事务全根动态 fixture、短读/超读并发漂移、SQLite upgrade/reopen/concurrency/crash、真实进程执行、supervisor、namespace/seccomp/cgroup/Landlock/AppArmor、secret delivery、Sidecar/IPC/session、authenticated no-work probe、runtime identity、ACK/event、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification或settlement。
 
-因此本批只能记录：`implementation_compiled_unrun / source_review_only / passed=0`。V257 不是 runtime、probe 或 activation；后续不得因编译通过、一次 capsule preparation 或三条签名 evidence current 而删除 V254 absolute deny 或宣称 production readiness。
+因此当前只能记录 `implementation_partially_verified / verified_wsl2_linux_kernel_subset`。V257 不是 runtime、probe 或 activation；不得因真实 memfd fixture 通过而删除 V254 absolute deny 或宣称 production readiness。

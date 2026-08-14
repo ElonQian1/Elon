@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Linux entrypoint capsule 权威
 status: current
 reviewed_at: 2026-08-14
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled_unrun
+implementation_status: implementation_partially_verified
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 权威
@@ -78,4 +78,6 @@ Provider 必须继续 exact `registering`。V254 覆盖 direct SQL 与 versions 
 
 ## 7. 实现现实
 
-V257 源码已随完整 `elon-server` 测试目标在 Windows 编译通过，但没有执行 V257 unit/source-contract test、Linux syscall fixture、migration、服务、真实 mount、secret、process 或 network，仍为 `implementation_compiled_unrun / source_review_only / passed=0`。文档中的 `must` 是 fail-closed 合同，不是动态证据；不能把编译通过表述为 Linux capsule 已验证、runtime 可启动或 production ready。
+V257 已在 WSL2 Ubuntu、Linux `6.18.33.2-microsoft-standard-WSL2`、x86-64 与 Rust `1.97.0` 环境中完成完整 `elon-server` 测试目标编译，并通过 4 项真实内核 fixture 与 7 项源码边界合同，合计 `11 passed / 0 failed`。动态 fixture 实际调用生产 `memfd_create` materialization，验证 zero-link、exact `0500`、`FD_CLOEXEC`、四项 exact seals、size/SHA-256、写入/扩缩/增 seal 失败、无效 mode/hard-link/digest/size/ELF 失败关闭及 callback 后 descriptor 为 `EBADF`。验证指纹为 `2ac6c80f0d9c83f193090535c454851f3055fd835e3217dd3ca43bda79a35ebd`，详情见对应 acceptance。
+
+首次执行既有源码合同暴露的唯一失败是 rustfmt 将 `source.retained_entrypoint()` 拆行后，测试仍要求单行字面量；断言已改为分别锁定 source 赋值与 `.retained_entrypoint()` 调用，生产 materialization 未放宽。该证据只把 V257 提升为 `implementation_partially_verified`：fixture 使用生成的非生产 static ELF 和临时本地源文件，没有执行 capsule，没有读取 operator mount/真实 secret，也没有验收生产 kernel 配置、procfs/debugger/root、locked-memory zeroization、Store 同事务全根聚合、并发/崩溃恢复、supervisor/namespace/seccomp/cgroup/Landlock/AppArmor、IPC/session、DNS/TLS/network、probe、route 或 activation。Provider 与 V254 fences 保持不变。

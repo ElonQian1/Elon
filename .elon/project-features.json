@@ -433,6 +433,188 @@
       "updated_at_ms": 1786659172557
     },
     {
+      "id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "title": "V257 entrypoint capsule Linux 内核动态验收",
+      "summary": "在 WSL2 Ubuntu x86-64 上执行 V257 私有 capsule materialization，验证真实 memfd、权限、seals、内容一致性、失败关闭与 Drop 释放；不执行 capsule、IPC、密钥、网络、激活、资金或部署。",
+      "status": "released",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/v257-entrypoint-capsule-linux-kernel-verification.md",
+        "content_hash": "578c428a45a27d80de6495f6e11292995d296d4630a14a4086af5b6cbe85b0de",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ddf1d99812e5646bc2f964af74c8201a031dc7c7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security-ai-economy",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "v257",
+        "linux",
+        "verification"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/external-pool-adapter-entrypoint-capsule-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-entrypoint-capsule-authority.md",
+        "docs/requirements/v257-entrypoint-capsule-linux-kernel-verification.md",
+        "server/src/compute_federation/external_pool_adapter_entrypoint_capsule.rs",
+        "server/src/compute_federation/external_pool_adapter_entrypoint_capsule/linux_tests.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The full elon-server test target compiles under WSL2 Ubuntu x86-64.",
+        "A positive fixture proves real anonymous memfd mode, FD_CLOEXEC, exact bytes and exact immutable seals.",
+        "Kernel write, grow, shrink and seal mutation attempts fail after materialization.",
+        "Invalid mode, hard link, digest, size and ELF inputs fail closed.",
+        "The borrowed capsule descriptor is closed after the callback returns.",
+        "No execution, process, IPC, secret, network, probe, route, activation, market, usage, settlement or deployment occurs."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "1528add7cc4991f9d92e6fdd6de72dc5e196bef1eddab01e41478f4eca7c7b8e",
+          "locator": "V257 verified Linux subset and residual boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "453e7ed301d99a1fbdee22dd68c55565d07e86e1",
+            "worktree_blob_oid": "fbbbeffb012940e96e26d68d8a219c9295708d72",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/README.md",
+          "content_hash": "5d3143ea70f97b1a929f16e3d8149843aa86d042439e433048c209c232778acd",
+          "locator": "V257 catalog and layered status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "e555ea67224261e035ac2f5518ae0caa576efec5",
+            "worktree_blob_oid": "8d32b89babf94084aade5a2a62e673e84a826873",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/current-implementation-status.md",
+          "content_hash": "1baf0a0936e9bc1749a840208c8dab57a5595e05c72ba7905f9fe421a8dce5d8",
+          "locator": "V257 dynamic Linux status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "3edd7e2e351891cd3f4118bcce20cccbba259dc1",
+            "worktree_blob_oid": "d0a6776a26658a9974626b1e55d02e3a8983c744",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-entrypoint-capsule-acceptance.md",
+          "content_hash": "68855d4ae574a2ae2b92ff475806575e29e90ae087fac6d438afda5ea737e80b",
+          "locator": "11 passed WSL2 acceptance and fingerprint",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "0d274bdcf76358b6406fd1b4b5ab09337ae7af48",
+            "worktree_blob_oid": "b783b76de94ca5a2b694a9afdecc69597ed2c3a5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-entrypoint-capsule-authority.md",
+          "content_hash": "74ed2adf84af5da9a99fbc1610c82246e41e4f2fc429f1383d0f8ea26835b76c",
+          "locator": "implementation reality and residual gaps",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "7a0b45052f8fa10448360567dd31f4fec2d1f718",
+            "worktree_blob_oid": "f4adf744cb53589b012c037df7f9abdf17073d24",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/v257-entrypoint-capsule-linux-kernel-verification.md",
+          "content_hash": "578c428a45a27d80de6495f6e11292995d296d4630a14a4086af5b6cbe85b0de",
+          "locator": "goal acceptance and non-goals",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ddf1d99812e5646bc2f964af74c8201a031dc7c7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_entrypoint_capsule.rs",
+          "content_hash": "ad57b3265a4c824aab8a195105d859bcbf4b1dd1a7f2aaf4ca33ec4a24c8e57a",
+          "locator": "Linux-only test module boundary",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "6651b258a77a2272dffd8a55052c243c94312bdd",
+            "worktree_blob_oid": "0da5bc1514a2b4d8b2eeafd0fae1811c153f5221",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_entrypoint_capsule/linux.rs",
+          "content_hash": "41b5e3b41957c13b5c5ce6f915b307f0f6425d3286bd68a0e89bf717e976de9e",
+          "locator": "production memfd materialization under test",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "0868c8ece99c6b03a595d2b8c38b280cdd920698",
+            "worktree_blob_oid": "0868c8ece99c6b03a595d2b8c38b280cdd920698",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_entrypoint_capsule/linux_tests.rs",
+          "content_hash": "5f9a310bc76bcf4ab455a13628b1ecd40dfc456d0e66fffd01cbf6ee64de4567",
+          "locator": "four real Linux kernel fixtures",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "89dd69b3e288185d450bad130aabb1456081fb0e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_entrypoint_capsule_source_contract_tests.rs",
+          "content_hash": "1d1942f9f4a67b5ca1be184c22df065db5fe8e2fb3bfd86ede8194afa2d61e42",
+          "locator": "seven source boundary contracts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44702ddaafa86ead9128e2ed634a83098a7ae8d1",
+            "head_blob_oid": "5d99f6c0fbffce54fd16c47e5210b96070ba1519",
+            "worktree_blob_oid": "a6fae8f385abe20bd386c9f4adb24fcb54d4dfb6",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786690410709,
+      "updated_at_ms": 1786692121767
+    },
+    {
       "id": "compute-v258-upstream-transport-target-verification",
       "title": "V258 惰性上游传输目标动态验收",
       "summary": "编译并执行现有 V258 migration、Store、owner/admin HTTP 与零副作用合同，修复真实集成缺口；不执行 DNS/TLS、真实密钥、进程、Provider 激活、市场、资金或部署。",
@@ -3384,6 +3566,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786689620063
+    },
+    {
+      "id": "feature_event_bdab7077e1834da6a565052b5ab7c3c6",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "registered",
+      "actor": "codex-goal-7x24",
+      "reason": "V257 current authority records Linux syscall verification as passed=0 while this host provides WSL2 Ubuntu and Rust.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786690410709
+    },
+    {
+      "id": "feature_event_c70b66a83e7249c08fe7efcc221dd940",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "claimed",
+      "actor": "codex-task-20260814-145135-24584",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786690426167
+    },
+    {
+      "id": "feature_event_d571995169164c829da5445d9f5447dc",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "transitioned",
+      "actor": "codex-task-20260814-145135-24584",
+      "reason": "Begin bounded Linux kernel verification without runtime execution.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786690437738
+    },
+    {
+      "id": "feature_event_ec127866cd164cdab648bc2cdb6d2b6a",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-task-20260814-145135-24584",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786691806592
+    },
+    {
+      "id": "feature_event_1655ee1eba434cfa8a1ca979fba545e7",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "transitioned",
+      "actor": "codex-task-20260814-145135-24584",
+      "reason": "Linux x86-64 production memfd path is covered by four real-kernel tests and seven source boundary contracts.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786692121536
+    },
+    {
+      "id": "feature_event_87d96c27cf794fc8a9f35253e7661837",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "transitioned",
+      "actor": "codex-task-20260814-145135-24584",
+      "reason": "WSL2 Ubuntu full test target compiled; 11 focused checks passed with zero failures and no prohibited side effects.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786692121685
+    },
+    {
+      "id": "feature_event_36946e65d5394df2ad3c4f9a174c2f96",
+      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
+      "action": "transitioned",
+      "actor": "codex-task-20260814-145135-24584",
+      "reason": "Verification-only batch is committed to the project evidence set; no runtime deployment or activation is claimed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786692121767
     }
   ]
 }

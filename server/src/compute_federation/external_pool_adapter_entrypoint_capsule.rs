@@ -13,6 +13,9 @@ mod elf;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[path = "external_pool_adapter_entrypoint_capsule/linux.rs"]
 mod linux;
+#[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
+#[path = "external_pool_adapter_entrypoint_capsule/linux_tests.rs"]
+mod linux_tests;
 #[path = "external_pool_adapter_entrypoint_capsule/policy.rs"]
 mod policy;
 #[path = "external_pool_adapter_entrypoint_capsule/types.rs"]

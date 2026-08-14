@@ -96,7 +96,8 @@ fn capsule_is_store_private_linux_x86_64_and_handle_sourced() {
     }
     assert!(INSTALLATION_AUDIT.contains("let entrypoint_index = binding"));
     assert!(INSTALLATION_AUDIT.contains("entrypoint_index,"));
-    assert!(CAPSULE_LINUX.contains("source.retained_entrypoint()"));
+    assert!(CAPSULE_LINUX.contains("let (source_file, expected_sha256, expected_size) = source"));
+    assert!(CAPSULE_LINUX.contains(".retained_entrypoint()"));
     assert!(!CAPSULE_LINUX.contains("File::open"));
     assert!(!CAPSULE_LINUX.contains("OpenOptions"));
     assert!(!CAPSULE_LINUX.contains("tempfile"));
