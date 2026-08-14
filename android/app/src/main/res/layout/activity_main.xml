@@ -464,7 +464,7 @@
         <ImageButton
             android:id="@+id/chatSideMenuHandleButton"
             android:layout_width="48dp"
-            android:layout_height="64dp"
+            android:layout_height="80dp"
             android:layout_gravity="start|bottom"
             android:layout_marginBottom="124dp"
             android:background="@android:color/transparent"
@@ -473,7 +473,7 @@
             android:foreground="?attr/selectableItemBackgroundBorderless"
             android:paddingStart="0dp"
             android:paddingTop="7dp"
-            android:paddingEnd="14dp"
+            android:paddingEnd="33dp"
             android:paddingBottom="7dp"
             android:scaleType="fitXY"
             android:src="@drawable/ic_chat_side_menu_handle"
