@@ -9,6 +9,8 @@ const MAX_DRAFT_CHARS: usize = 20_000;
 const ADAPTER_VERSION: u32 = 1;
 
 pub fn initialization_script() -> String {
+    let message_extractor =
+        include_str!("../../../../android/app/src/main/assets/google_web_message_extractor.js");
     let adapter = include_str!("../../../../android/app/src/main/assets/google_web_adapter.js");
     r#"
 (function () {
@@ -49,11 +51,61 @@ pub fn initialization_script() -> String {
     });
   }
 
-  window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
-  __ADAPTER_SOURCE__
+  function documentToken() {
+    var words = new Uint32Array(4);
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      window.crypto.getRandomValues(words);
+    } else {
+      for (var index = 0; index < words.length; index += 1) {
+        words[index] = Math.floor(Math.random() * 0xffffffff) >>> 0;
+      }
+    }
+    return 'doc_win_' + Array.from(words, function (word) {
+      return word.toString(16).padStart(8, '0');
+    }).join('');
+  }
+
+  if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonGoogleWebDocumentToken || ''))) {
+    window.__elonGoogleWebDocumentToken = documentToken();
+  }
+
+  function installAdapter() {
+    try {
+      window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
+      __MESSAGE_EXTRACTOR_SOURCE__
+      __ADAPTER_SOURCE__
+      if (!window.__elonGoogleWebBridge ||
+          typeof window.__elonGoogleWebBridge.command !== 'function') {
+        throw new Error('bridge_missing');
+      }
+    } catch (error) {
+      var errorName = String(error && error.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
+      invoke(JSON.stringify({
+        type: 'browser_diagnostic',
+        kind: 'adapter_bootstrap_failed',
+        detail: 'Google AI 语义桥初始化失败（' + (errorName || 'Error') + '）。',
+        url: location.origin + location.pathname
+      }));
+    }
+  }
+
+  function installWhenReady() {
+    if (!(document.documentElement instanceof Node)) {
+      window.setTimeout(installWhenReady, 0);
+      return;
+    }
+    installAdapter();
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', installWhenReady, { once: true });
+  } else {
+    installWhenReady();
+  }
 })();
 "#
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__MESSAGE_EXTRACTOR_SOURCE__", message_extractor)
     .replace("__ADAPTER_SOURCE__", adapter)
 }
 
@@ -66,9 +118,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
         if value.get("providerId").and_then(Value::as_str) != Some("google_web") {
             return Err("Google AI 模式语义事件厂商标识无效。".to_string());
         }
-        if value.get("adapterVersion").and_then(Value::as_u64)
-            != Some(u64::from(ADAPTER_VERSION))
-        {
+        if value.get("adapterVersion").and_then(Value::as_u64) != Some(u64::from(ADAPTER_VERSION)) {
             return Err("Google AI 模式语义适配器版本无效。".to_string());
         }
         let event = value
@@ -314,8 +364,15 @@ mod tests {
     fn desktop_bootstrap_reuses_the_android_google_adapter() {
         let script = initialization_script();
         assert!(script.contains("window.__elonGoogleWebAdapterVersion = 1"));
+        assert!(script.contains("window.__elonGoogleWebDocumentToken"));
+        assert!(script.contains("window.__elonGoogleWebMessageExtractor"));
         assert!(script.contains("window.elonGoogleWebNative"));
         assert!(script.contains("window.__elonGoogleWebBridge"));
         assert!(script.contains("providerId: 'google_web'"));
+        assert!(script.contains("function installAdapter()"));
+        assert!(script.contains("function installWhenReady()"));
+        assert!(script.contains("document.documentElement instanceof Node"));
+        assert!(script.contains("DOMContentLoaded"));
+        assert!(script.contains("adapter_bootstrap_failed"));
     }
 }

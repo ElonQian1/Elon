@@ -185,9 +185,13 @@ confirmation，再调用商户模块运行时：
 - Google AI 模式提供商固定指向官方 `google.com/aimode`，以独立 Profile 打开；Win 代码已
   接通问题、回答、引用、草稿、发送、停止和新对话的可见语义路径。账号登录仍定向到系统
   浏览器；地区、语言、设备或账号灰度未开放时保留完整 Google 官方窗口。
-- ChatGPT Win 桥已补齐 APK 使用的完整语义模块、版本 106 与文档令牌绑定；Google Win 桥已改为
-  与 APK 共用版本 1 的 `google_web` 适配器。旧的 Windows Google 重复脚本已经删除，新增厂商时
-  必须通过 `ProviderAdapter` 显式登记初始化、动作白名单、事件清洗和页面命令绑定。
+- ChatGPT Win 桥已补齐 APK 使用的完整语义模块、版本 106 与文档令牌绑定；Google Win 桥复用
+  APK 版本 1 的消息提取器和 `google_web` 适配器，并在每页生成独立文档令牌。WebView2 的
+  initialization script 只先安装本机消息出口，等待 DOM 根节点和 `DOMContentLoaded` 后再安装
+  Google 语义桥；因此“窗口/Profile 已连接”不会再早于适配器首份快照被误当成可发送。重复重连
+  保持幂等，桥缺失只产生不含正文、Cookie、令牌或 URL query 的脱敏诊断。旧的 Windows Google
+  重复脚本已经删除，新增厂商时必须通过 `ProviderAdapter` 显式登记初始化、动作白名单、事件清洗
+  和页面命令绑定。
 - PC TypeScript/Vite 生产构建、ESLint 和本地浏览器安全契约测试通过。
 - Win 已实现按 owner/provider 隔离的前端热缓存、Rust 进程缓存和 DPAPI 持久快照；定向测试覆盖
   LRU 淘汰、账号/厂商隔离、缓存状态转换、草稿/流式过滤、当前 Windows 用户加密回读与清除。

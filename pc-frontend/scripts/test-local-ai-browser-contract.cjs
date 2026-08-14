@@ -24,6 +24,7 @@ const chatGptBootstrap = read('desktop-shell/src-tauri/src/local_ai_browser/chat
 const chatGptAdapter = read('android/app/src/main/assets/chatgpt_web_adapter.js')
 const googleAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs')
 const sharedGoogleAdapterScript = read('android/app/src/main/assets/google_web_adapter.js')
+const sharedGoogleMessageExtractorScript = read('android/app/src/main/assets/google_web_message_extractor.js')
 const api = read('pc-frontend/src/features/user-browser/localAiBrowserApi.ts')
 const hotCache = read('pc-frontend/src/features/user-browser/localAiSnapshotCache.ts')
 const protocol = read('pc-frontend/src/features/user-browser/unifiedAiProtocol.ts')
@@ -111,10 +112,18 @@ assert.match(chatGptAdapter, /function optional\(fallback, read\)/)
 assert.match(chatGptAdapter, /Array\.isArray\(messageWindow\.messages\)/)
 assert.match(adapterCommand, /__elonChatGptDocumentToken/)
 assert.match(googleAdapter, /android\/app\/src\/main\/assets\/google_web_adapter\.js/)
+assert.match(googleAdapter, /android\/app\/src\/main\/assets\/google_web_message_extractor\.js/)
 assert.match(googleAdapter, /__elonGoogleWebAdapterVersion/)
+assert.match(googleAdapter, /__elonGoogleWebDocumentToken/)
 assert.match(googleAdapter, /window\.elonGoogleWebNative/)
+assert.match(googleAdapter, /function installAdapter\(\)/)
+assert.match(googleAdapter, /function installWhenReady\(\)/)
+assert.match(googleAdapter, /document\.documentElement instanceof Node/)
+assert.match(googleAdapter, /DOMContentLoaded/)
+assert.match(googleAdapter, /adapter_bootstrap_failed/)
 assert.match(googleAdapter, /Some\("google_web"\)/)
 assert.match(sharedGoogleAdapterScript, /window\.__elonGoogleWebBridge/)
+assert.match(sharedGoogleMessageExtractorScript, /window\.__elonGoogleWebMessageExtractor/)
 assert.equal(fs.existsSync(path.join(root, 'desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode_adapter.js')), false)
 assert.doesNotMatch(rust, /\.cookies\(\)|set_cookie|delete_cookie/)
 assert.match(main, /local_ai_browser::open_local_ai_web_session/)
@@ -199,9 +208,12 @@ assert.match(sharedGoogleAdapterScript, /'\[role="textbox"\]'/)
 assert.match(sharedGoogleAdapterScript, /'\[contenteditable="plaintext-only"\]'/)
 assert.match(sharedGoogleAdapterScript, /href\.includes\('accounts\.google\.com'\)/)
 assert.doesNotMatch(sharedGoogleAdapterScript, /\[data-ogsr-up\]/)
-assert.match(sharedGoogleAdapterScript, /type: 'citation'/)
+assert.match(
+  `${sharedGoogleAdapterScript}\n${sharedGoogleMessageExtractorScript}`,
+  /type: 'citation'/,
+)
 assert.doesNotMatch(
-  `${googleAdapter}\n${sharedGoogleAdapterScript}`,
+  `${googleAdapter}\n${sharedGoogleAdapterScript}\n${sharedGoogleMessageExtractorScript}`,
   /document\.cookie|authorization|access_token|xmlhttprequest|\bfetch\s*\(/i,
 )
 
