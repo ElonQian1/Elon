@@ -89,6 +89,14 @@ internal class ChatGptWebMcpActions(
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
                 val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
                     ?: return error(action, "stale_control_id")
+                ChatGptWebControlInvocationPolicy.rejection(
+                    control = control,
+                    userConfirmed = args.optBoolean("user_confirmed", false),
+                )?.let { rejection ->
+                    return error(action, rejection)
+                        .put("required_argument", "user_confirmed")
+                        .put("control_semantic", control.semantic)
+                }
                 if (control.role == "slider" && !control.supportsSliderValue) {
                     return error(action, "control_requires_official_fallback")
                 }
@@ -602,74 +610,82 @@ internal class ChatGptWebMcpActions(
     private fun controlJson(
         control: ChatGptWebUiControl,
         presentation: ChatGptNativeControlPresentation.Coverage?,
-    ): JSONObject = JSONObject()
-        .put("control_id", control.id)
-        .put("semantic", control.semantic)
-        .put("label", control.label)
-        .put("region", control.region)
-        .put("role", control.role)
-        .put("enabled", control.enabled)
-        .put("selected", control.selected)
-        .put("input_kind", control.inputKind ?: JSONObject.NULL)
-        .put("writable", control.writable)
-        .put("state_settable", control.supportsSelectedState)
-        .put("expanded", control.expanded ?: JSONObject.NULL)
-        .put("expandable", control.supportsExpandedState)
-        .put("choice_labels", JSONArray(control.choiceLabels))
-        .put("selected_choice_index", control.selectedChoiceIndex ?: JSONObject.NULL)
-        .put(
-            "slider",
-            control.slider?.let { slider ->
-                JSONObject()
-                    .put("min", slider.min)
-                    .put("max", slider.max)
-                    .put("step", slider.step)
-                    .put("value", slider.value)
-                    .put("native_input_content_description", ChatGptNativeSliderControlDialog.sliderSelector(control.id))
-                    .put("native_value_content_description", ChatGptNativeSliderControlDialog.valueSelector(control.id))
-                    .put("native_commit_content_description", ChatGptNativeSliderControlDialog.commitSelector(control.id))
-            } ?: JSONObject.NULL,
-        )
-        .put("context_id", control.contextId ?: JSONObject.NULL)
-        .put("in_viewport", control.inViewport)
-        .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
-        .put("web_y_ratio", control.webYRatio ?: JSONObject.NULL)
-        .put("adb_content_description", control.accessibilityLabel)
-        .put("native_presentation", presentation?.kind?.wireName ?: "official_fallback")
-        .put(
-            "native_adb_content_description",
-            presentation?.nativeSelector ?: JSONObject.NULL,
-        )
-        .put(
-            "native_trigger_content_description",
-            presentation?.nativeTriggerSelector ?: JSONObject.NULL,
-        )
-        .put(
-            "native_value_input_content_description",
-            if (control.supportsTextEntry) {
-                ChatGptNativeFormControlDialog.inputSelector(control.id)
-            } else {
-                JSONObject.NULL
-            },
-        )
-        .put(
-            "native_value_commit_content_description",
-            if (control.supportsTextEntry) {
-                ChatGptNativeFormControlDialog.commitSelector(control.id)
-            } else {
-                JSONObject.NULL
-            },
-        )
-        .put(
-            "native_choice_content_descriptions",
-            JSONArray().apply {
-                if (control.supportsChoiceSelection) {
-                    control.choiceLabels.indices.forEach { index ->
-                        put(ChatGptNativeChoiceControlDialog.choiceSelector(control.id, index))
+    ): JSONObject {
+        val invocationRisk = ChatGptWebControlInvocationPolicy.risk(control)
+        return JSONObject()
+            .put("control_id", control.id)
+            .put("semantic", control.semantic)
+            .put("label", control.label)
+            .put("region", control.region)
+            .put("role", control.role)
+            .put("enabled", control.enabled)
+            .put("invocation_risk", invocationRisk.wireName)
+            .put(
+                "requires_user_confirmation",
+                invocationRisk == ChatGptWebControlInvocationPolicy.Risk.USER_CONFIRMATION,
+            )
+            .put("selected", control.selected)
+            .put("input_kind", control.inputKind ?: JSONObject.NULL)
+            .put("writable", control.writable)
+            .put("state_settable", control.supportsSelectedState)
+            .put("expanded", control.expanded ?: JSONObject.NULL)
+            .put("expandable", control.supportsExpandedState)
+            .put("choice_labels", JSONArray(control.choiceLabels))
+            .put("selected_choice_index", control.selectedChoiceIndex ?: JSONObject.NULL)
+            .put(
+                "slider",
+                control.slider?.let { slider ->
+                    JSONObject()
+                        .put("min", slider.min)
+                        .put("max", slider.max)
+                        .put("step", slider.step)
+                        .put("value", slider.value)
+                        .put("native_input_content_description", ChatGptNativeSliderControlDialog.sliderSelector(control.id))
+                        .put("native_value_content_description", ChatGptNativeSliderControlDialog.valueSelector(control.id))
+                        .put("native_commit_content_description", ChatGptNativeSliderControlDialog.commitSelector(control.id))
+                } ?: JSONObject.NULL,
+            )
+            .put("context_id", control.contextId ?: JSONObject.NULL)
+            .put("in_viewport", control.inViewport)
+            .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
+            .put("web_y_ratio", control.webYRatio ?: JSONObject.NULL)
+            .put("adb_content_description", control.accessibilityLabel)
+            .put("native_presentation", presentation?.kind?.wireName ?: "official_fallback")
+            .put(
+                "native_adb_content_description",
+                presentation?.nativeSelector ?: JSONObject.NULL,
+            )
+            .put(
+                "native_trigger_content_description",
+                presentation?.nativeTriggerSelector ?: JSONObject.NULL,
+            )
+            .put(
+                "native_value_input_content_description",
+                if (control.supportsTextEntry) {
+                    ChatGptNativeFormControlDialog.inputSelector(control.id)
+                } else {
+                    JSONObject.NULL
+                },
+            )
+            .put(
+                "native_value_commit_content_description",
+                if (control.supportsTextEntry) {
+                    ChatGptNativeFormControlDialog.commitSelector(control.id)
+                } else {
+                    JSONObject.NULL
+                },
+            )
+            .put(
+                "native_choice_content_descriptions",
+                JSONArray().apply {
+                    if (control.supportsChoiceSelection) {
+                        control.choiceLabels.indices.forEach { index ->
+                            put(ChatGptNativeChoiceControlDialog.choiceSelector(control.id, index))
+                        }
                     }
-                }
-            },
-        )
+                },
+            )
+    }
 
     private fun page(
         args: JSONObject,

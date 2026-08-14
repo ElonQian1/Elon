@@ -144,10 +144,31 @@ internal object ChatGptWebCapabilityMatrix {
             .put("control_coverage", JSONArray().apply {
                 manifest?.controls.orEmpty().forEach { control ->
                     val coverage = controlCoverage.getValue(control.id)
+                    val invocationRisk = ChatGptWebControlInvocationPolicy.risk(control)
                     put(JSONObject()
                         .put("control_id", control.id)
                         .put("semantic", control.semantic)
                         .put("region", control.region)
+                        .put(
+                            "invocation_risk",
+                            invocationRisk.wireName,
+                        )
+                        .put(
+                            "requires_user_confirmation",
+                            invocationRisk ==
+                                ChatGptWebControlInvocationPolicy.Risk.USER_CONFIRMATION,
+                        )
+                        .put(
+                            "confirmation_argument",
+                            if (
+                                invocationRisk ==
+                                ChatGptWebControlInvocationPolicy.Risk.USER_CONFIRMATION
+                            ) {
+                                "user_confirmed"
+                            } else {
+                                JSONObject.NULL
+                            },
+                        )
                         .put("presentation", coverage.kind.wireName)
                         .put(
                             "official_fallback_policy",

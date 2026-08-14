@@ -2,6 +2,7 @@ package com.elon.app.chatgptweb
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,11 +67,21 @@ class ChatGptWebMcpSaveToProjectTest {
             "chatgpt-message-actions:$CONTEXT_ID",
             exported.getString("native_trigger_content_description"),
         )
+        assertEquals("user_confirmation", exported.getString("invocation_risk"))
+        assertTrue(exported.getBoolean("requires_user_confirmation"))
 
-        val result = actions.control(JSONObject()
+        val rejected = actions.control(JSONObject()
             .put("action", "chatgpt_invoke_control")
             .put("control_id", CONTROL_ID))
+        val result = actions.control(JSONObject()
+            .put("action", "chatgpt_invoke_control")
+            .put("control_id", CONTROL_ID)
+            .put("user_confirmed", true))
 
+        assertFalse(rejected.getBoolean("control_ok"))
+        assertEquals("user_confirmation_required", rejected.getString("error"))
+        assertEquals("user_confirmed", rejected.getString("required_argument"))
+        assertEquals("save_to_project", rejected.getString("control_semantic"))
         assertTrue(result.getBoolean("control_ok"))
         assertEquals(CONTROL_ID, invoked)
     }

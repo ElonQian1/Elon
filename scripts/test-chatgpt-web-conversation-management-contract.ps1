@@ -23,6 +23,7 @@ foreach ($required in @(
     "Open-ConversationManagementMenu",
     "Wait-ConversationManagementMenuClosed",
     "Invoke-ConversationPinToggle",
+    'user_confirmed = $true',
     "Restore-ConversationPinState",
     'throw "Conversation pin state recovery could not be verified."',
     "Restore-OriginalViewMode",

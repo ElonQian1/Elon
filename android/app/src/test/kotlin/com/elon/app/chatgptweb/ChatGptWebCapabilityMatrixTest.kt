@@ -66,6 +66,24 @@ class ChatGptWebCapabilityMatrixTest {
         val control = matrix.getJSONArray("control_coverage").getJSONObject(0)
         assertEquals("chatgpt_invoke_control", control.getString("mcp_action"))
         assertEquals("control_demo", control.getJSONObject("mcp_arguments").getString("control_id"))
+        assertEquals("user_confirmation", control.getString("invocation_risk"))
+        assertTrue(control.getBoolean("requires_user_confirmation"))
+        assertEquals("user_confirmed", control.getString("confirmation_argument"))
+    }
+
+    @Test
+    fun ordinaryControlsDoNotAdvertiseAnUnnecessaryConfirmationArgument() {
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = manifest("healthy", "suggestion"),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        val control = matrix.getJSONArray("control_coverage").getJSONObject(0)
+        assertEquals("standard", control.getString("invocation_risk"))
+        assertFalse(control.getBoolean("requires_user_confirmation"))
+        assertTrue(control.isNull("confirmation_argument"))
     }
 
     @Test

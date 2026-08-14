@@ -162,7 +162,10 @@ function Invoke-ConversationPinToggle {
 
     $receipt = Invoke-ChatGptWebSmokeReceiptAction -Runtime $runtime `
         -Action "chatgpt_invoke_control" -ExpectedAction "invoke_ui_control" `
-        -Arguments @{ control_id = [string]$PinControl.control_id } `
+        -Arguments @{
+            control_id = [string]$PinControl.control_id
+            user_confirmed = $true
+        } `
         -TimeoutSec $TimeoutSec
     if ($receipt.receipt.result.ok -ne $true) {
         throw "Conversation pin command did not succeed."
