@@ -54,7 +54,12 @@
       'form textarea',
       'form [role="searchbox"]',
       'form [contenteditable="true"]',
-      'textarea[placeholder]'
+      'textarea[placeholder]',
+      'textarea[aria-label]',
+      'input[type="text"][aria-label]',
+      '[role="textbox"]',
+      '[contenteditable="true"]',
+      '[contenteditable="plaintext-only"]'
     ];
     for (const selector of selectors) {
       const matches = Array.from(document.querySelectorAll(selector)).filter(isVisible);
@@ -63,7 +68,7 @@
           node.getAttribute('aria-label'),
           node.getAttribute('placeholder')
         ].filter(Boolean).join(' ')).toLowerCase();
-        return /ask|search|anything|follow.?up|提问|搜索|追问|输入/.test(label);
+        return /ask|search|anything|follow.?up|chat|prompt|提问|尽情|搜索|追问|输入/.test(label);
       });
       if (preferred || matches[0]) return preferred || matches[0];
     }

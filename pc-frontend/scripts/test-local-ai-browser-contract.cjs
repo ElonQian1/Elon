@@ -151,6 +151,9 @@ assert.match(googleAdapter, /sanitize_page_kind/)
 assert.match(googleAdapter, /"loginRequired"/)
 assert.match(googleAdapterScript, /providerId: 'google-ai-mode'/)
 assert.match(googleAdapterScript, /isAiModePage/)
+assert.match(googleAdapterScript, /'textarea\[aria-label\]'/)
+assert.match(googleAdapterScript, /'\[role="textbox"\]'/)
+assert.match(googleAdapterScript, /'\[contenteditable="plaintext-only"\]'/)
 assert.match(googleAdapterScript, /type: 'citation'/)
 assert.doesNotMatch(
   `${googleAdapter}\n${googleAdapterScript}`,
