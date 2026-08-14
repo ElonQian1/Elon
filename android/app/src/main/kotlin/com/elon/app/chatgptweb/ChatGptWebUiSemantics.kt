@@ -52,6 +52,7 @@ internal object ChatGptWebUiSemantics {
         "apps",
         "tasks",
         "project",
+        "save_to_project",
         "gpts",
         "settings",
         "health",

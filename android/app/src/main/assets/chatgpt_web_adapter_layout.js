@@ -190,9 +190,7 @@
         section: navigationSection(node),
         isLink: node.matches('a[href]')
       });
-    if (pageSemantic === 'temporary_chat' || pageSemantic === 'conversation_options') {
-      return pageSemantic;
-    }
+    if (['temporary_chat', 'conversation_options', 'save_to_project'].includes(pageSemantic)) return pageSemantic;
     const composerToolSemantic = composerToolStatePolicy &&
       typeof composerToolStatePolicy.semantic === 'function'
       ? composerToolStatePolicy.semantic({
@@ -312,6 +310,7 @@
       apps: '应用',
       tasks: '任务',
       project: '项目',
+      save_to_project: '保存到项目',
       gpts: 'GPT',
       settings: '设置',
       health: '健康',

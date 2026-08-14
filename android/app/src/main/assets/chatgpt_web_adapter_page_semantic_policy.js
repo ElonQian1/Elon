@@ -118,6 +118,9 @@
     if (/^\/c\/[a-z0-9_-]{1,160}$/.test(path) && !(input && input.isLink)) {
       return 'conversation_options';
     }
+    if (/project-save-turn-action-button|save.*project|保存.*项目|存入.*项目/.test(combined)) {
+      return 'save_to_project';
+    }
     if (/^\/g\/g-p-[a-z0-9_-]+(?:\/project)?$/.test(path) || /project|项目/.test(context)) {
       return 'project';
     }

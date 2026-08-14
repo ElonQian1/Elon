@@ -132,6 +132,18 @@ expectEqual(policy.classify({
   isLink: true
 }), 'project', 'project navigation row');
 
+expectEqual(policy.classify({
+  pathname: '/c/conversation_123',
+  region: 'content',
+  signal: 'project-save-turn-action-button'
+}), 'save_to_project', 'save response to project test id');
+
+expectEqual(policy.classify({
+  pathname: '/c/conversation_123',
+  region: 'content',
+  signal: 'Save to project'
+}), 'save_to_project', 'save response to project label');
+
 expectEqual(policy.classify({ pathname: '/', path: '/', signal: '主页', isLink: true }), 'home', 'home');
 expectEqual(policy.classify({ pathname: '/', signal: '插件' }), 'apps', 'apps');
 expectEqual(policy.classify({ pathname: '/', signal: '已置顶' }), 'pinned', 'pinned');
