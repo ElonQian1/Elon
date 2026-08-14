@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -7,6 +8,8 @@ use std::{
 use serde::Serialize;
 use serde_json::Value;
 use tauri::Url;
+
+use super::snapshot_cache;
 
 #[derive(Clone, Default)]
 pub struct LocalAiBrowserRuntime {
@@ -28,6 +31,10 @@ struct SessionRecord {
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
     command_result: Option<Value>,
+    semantic_live: bool,
+    navigation_live: bool,
+    cache_path: Option<PathBuf>,
+    cache_updated_at_ms: u64,
     updated_at_ms: u64,
 }
 
@@ -47,15 +54,53 @@ pub struct LocalAiWebSessionState {
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
     pub command_result: Option<Value>,
+    pub cache_status: String,
+    pub semantic_cache_status: String,
+    pub navigation_cache_status: String,
+    pub cache_updated_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
 impl LocalAiBrowserRuntime {
     pub fn ensure_session(&self, label: &str, provider_id: &str, renderer_status: &str) {
+        self.ensure_session_record(label, provider_id, renderer_status, None);
+    }
+
+    pub fn ensure_session_with_cache(
+        &self,
+        label: &str,
+        provider_id: &str,
+        renderer_status: &str,
+        cache_path: PathBuf,
+    ) {
+        self.ensure_session_record(label, provider_id, renderer_status, Some(cache_path));
+    }
+
+    fn ensure_session_record(
+        &self,
+        label: &str,
+        provider_id: &str,
+        renderer_status: &str,
+        cache_path: Option<PathBuf>,
+    ) {
+        if self.sessions().contains_key(label) {
+            return;
+        }
+        let cached = cache_path
+            .as_deref()
+            .and_then(|path| snapshot_cache::load(path, provider_id).ok().flatten());
         let mut sessions = self.sessions();
-        sessions
-            .entry(label.to_string())
-            .or_insert_with(|| SessionRecord {
+        sessions.entry(label.to_string()).or_insert_with(|| {
+            let (semantic_event, navigation_event, cache_updated_at_ms) = cached
+                .map(|snapshot| {
+                    (
+                        snapshot.semantic_event,
+                        snapshot.navigation_event,
+                        snapshot.updated_at_ms,
+                    )
+                })
+                .unwrap_or_default();
+            SessionRecord {
                 provider_id: provider_id.to_string(),
                 window_label: label.to_string(),
                 window_status: "opening".to_string(),
@@ -66,11 +111,16 @@ impl LocalAiBrowserRuntime {
                 renderer_status: renderer_status.to_string(),
                 last_error: None,
                 last_error_code: None,
-                semantic_event: None,
-                navigation_event: None,
+                semantic_event,
+                navigation_event,
                 command_result: None,
+                semantic_live: false,
+                navigation_live: false,
+                cache_path,
+                cache_updated_at_ms,
                 updated_at_ms: now_ms(),
-            });
+            }
+        });
     }
 
     pub fn mark_opening(&self, label: &str, window_visible: bool) {
@@ -81,9 +131,8 @@ impl LocalAiBrowserRuntime {
             record.renderer_status = "connecting".to_string();
             record.last_error = None;
             record.last_error_code = None;
-            record.semantic_event = None;
-            record.navigation_event = None;
             record.command_result = None;
+            record.mark_snapshot_cached();
         });
     }
 
@@ -105,9 +154,8 @@ impl LocalAiBrowserRuntime {
                 record.renderer_status = "connecting".to_string();
                 record.last_error = None;
                 record.last_error_code = None;
-                record.semantic_event = None;
-                record.navigation_event = None;
                 record.command_result = None;
+                record.mark_snapshot_cached();
             } else {
                 record.window_status = "blocked".to_string();
                 record.loading = false;
@@ -138,6 +186,7 @@ impl LocalAiBrowserRuntime {
             if matches!(status, "closed" | "error") {
                 record.loading = false;
                 record.window_visible = false;
+                record.mark_snapshot_cached();
             }
         });
     }
@@ -174,12 +223,16 @@ impl LocalAiBrowserRuntime {
             "message_snapshot" => {
                 record.renderer_status = "active".to_string();
                 record.semantic_event = Some(payload);
+                record.semantic_live = true;
+                record.cache_updated_at_ms = now_ms();
                 record.last_error = None;
                 record.last_error_code = None;
             }
             "conversation_snapshot" => {
                 record.renderer_status = "active".to_string();
                 record.navigation_event = Some(payload);
+                record.navigation_live = true;
+                record.cache_updated_at_ms = now_ms();
                 record.last_error = None;
                 record.last_error_code = None;
             }
@@ -198,6 +251,29 @@ impl LocalAiBrowserRuntime {
             }
             _ => {}
         });
+        if matches!(kind, "message_snapshot" | "conversation_snapshot") {
+            self.persist_snapshot(label);
+        }
+    }
+
+    pub fn clear_snapshots(&self, label: &str) {
+        let cache_path = {
+            let mut sessions = self.sessions();
+            let Some(record) = sessions.get_mut(label) else {
+                return;
+            };
+            record.semantic_event = None;
+            record.navigation_event = None;
+            record.command_result = None;
+            record.semantic_live = false;
+            record.navigation_live = false;
+            record.cache_updated_at_ms = 0;
+            record.updated_at_ms = now_ms();
+            record.cache_path.clone()
+        };
+        if let Some(path) = cache_path {
+            snapshot_cache::clear(&path);
+        }
     }
 
     pub fn snapshot(&self, label: &str) -> Option<LocalAiWebSessionState> {
@@ -217,8 +293,9 @@ impl LocalAiBrowserRuntime {
             "loading": record.loading,
             "adapter_connected": record.renderer_status == "active",
             "semantic_snapshot_ready": snapshot.is_some_and(|event| event.get("type").and_then(Value::as_str) == Some("message_snapshot")),
-            "composer_ready": snapshot.and_then(|event| event.get("composerReady")).and_then(Value::as_bool).unwrap_or(false),
+            "composer_ready": record.semantic_live && snapshot.and_then(|event| event.get("composerReady")).and_then(Value::as_bool).unwrap_or(false),
             "page_kind": snapshot.and_then(|event| event.get("pageKind")).and_then(Value::as_str).unwrap_or("unknown"),
+            "cache_status": record.cache_status(),
             "last_error_code": record.last_error_code,
             "updated_at_ms": record.updated_at_ms,
         }))
@@ -233,6 +310,34 @@ impl LocalAiBrowserRuntime {
         record.updated_at_ms = now_ms();
     }
 
+    fn persist_snapshot(&self, label: &str) {
+        let snapshot = {
+            let sessions = self.sessions();
+            sessions.get(label).and_then(|record| {
+                record.cache_path.clone().map(|path| {
+                    (
+                        path,
+                        record.provider_id.clone(),
+                        record.semantic_event.clone(),
+                        record.navigation_event.clone(),
+                        record.cache_updated_at_ms,
+                    )
+                })
+            })
+        };
+        let Some((path, provider_id, semantic_event, navigation_event, updated_at_ms)) = snapshot
+        else {
+            return;
+        };
+        let _ = snapshot_cache::store(
+            &path,
+            &provider_id,
+            semantic_event.as_ref(),
+            navigation_event.as_ref(),
+            updated_at_ms,
+        );
+    }
+
     fn sessions(&self) -> MutexGuard<'_, HashMap<String, SessionRecord>> {
         self.sessions
             .lock()
@@ -242,6 +347,13 @@ impl LocalAiBrowserRuntime {
 
 impl From<SessionRecord> for LocalAiWebSessionState {
     fn from(record: SessionRecord) -> Self {
+        let cache_status = record.cache_status().to_string();
+        let semantic_cache_status = record
+            .event_cache_status(record.semantic_event.is_some(), record.semantic_live)
+            .to_string();
+        let navigation_cache_status = record
+            .event_cache_status(record.navigation_event.is_some(), record.navigation_live)
+            .to_string();
         Self {
             provider_id: record.provider_id,
             window_label: record.window_label,
@@ -256,7 +368,45 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             semantic_event: record.semantic_event,
             navigation_event: record.navigation_event,
             command_result: record.command_result,
+            cache_status,
+            semantic_cache_status,
+            navigation_cache_status,
+            cache_updated_at_ms: record.cache_updated_at_ms,
             updated_at_ms: record.updated_at_ms,
+        }
+    }
+}
+
+impl SessionRecord {
+    fn mark_snapshot_cached(&mut self) {
+        if self.semantic_event.is_some() {
+            self.semantic_live = false;
+        }
+        if self.navigation_event.is_some() {
+            self.navigation_live = false;
+        }
+    }
+
+    fn cache_status(&self) -> &'static str {
+        let has_semantic = self.semantic_event.is_some();
+        let has_navigation = self.navigation_event.is_some();
+        if !has_semantic && !has_navigation {
+            return "empty";
+        }
+        if (!has_semantic || self.semantic_live) && (!has_navigation || self.navigation_live) {
+            "live"
+        } else {
+            "cached"
+        }
+    }
+
+    fn event_cache_status(&self, present: bool, live: bool) -> &'static str {
+        if !present {
+            "empty"
+        } else if live {
+            "live"
+        } else {
+            "cached"
         }
     }
 }
@@ -362,5 +512,32 @@ mod tests {
         assert!(!encoded.contains("private prompt"));
         assert!(!encoded.contains("private answer"));
         assert!(!encoded.contains("private exception detail"));
+    }
+
+    #[test]
+    fn navigation_keeps_the_snapshot_visible_but_marks_it_cached() {
+        let runtime = LocalAiBrowserRuntime::default();
+        runtime.ensure_session("session", "chatgpt", "reserved");
+        runtime.record_adapter_event(
+            "session",
+            "message_snapshot",
+            json!({"type": "message_snapshot", "messages": []}),
+        );
+        assert_eq!(runtime.snapshot("session").unwrap().cache_status, "live");
+
+        runtime.mark_navigation(
+            "session",
+            &Url::parse("https://chatgpt.com/c/example").unwrap(),
+            true,
+            None,
+        );
+        let cached = runtime.snapshot("session").unwrap();
+        assert_eq!(cached.cache_status, "cached");
+        assert!(cached.semantic_event.is_some());
+
+        runtime.clear_snapshots("session");
+        let cleared = runtime.snapshot("session").unwrap();
+        assert_eq!(cleared.cache_status, "empty");
+        assert!(cleared.semantic_event.is_none());
     }
 }

@@ -51,13 +51,28 @@ app-local-data/
 └── ai-web-profiles/
     └── <owner-fingerprint>/
         ├── chatgpt/
+        │   └── yilong-semantic-snapshot.v1.dpapi
         └── google-ai-mode/
+            └── yilong-semantic-snapshot.v1.dpapi
 ```
 
 WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。应用不枚举、不导出、
 不上传这些数据；“清除会话”只调用 WebView2 的整 Profile 浏览数据清理。OpenAI 官方
 文档也明确区分浏览器中的 ChatGPT 网页会话与 Codex 客户端的浏览器回调登录：
 [OpenAI authentication](https://learn.chatgpt.com/docs/auth)。
+
+一龙原生 UI 另使用三层 stale-while-revalidate 快照，避免厂商切换时先清空再等待官网：
+
+1. React 进程内有界热缓存按当前 owner 与 provider 隔离，切换厂商的首帧直接回显；
+2. Rust 宿主进程内快照跨 `/pc` 页面刷新保留，并继续由 1.5 秒有界状态轮询更新；
+3. Windows 客户端重启时，从同一 owner 指纹与 provider 目录读取 Windows 当前用户 DPAPI
+   加密的最后完整快照，随后后台 WebView2 与官方页面重新同步。
+
+缓存状态明确区分 `empty`、`cached` 与 `live`。缓存只负责显示消息、公开引用、会话和项目目录；
+发送、停止、新建会话和历史同步仍必须等待当前官方页面的实时 `composerReady` 与适配器能力。
+持久快照不保存输入草稿、流式半成品、命令结果、Cookie、token、请求头或原始响应；损坏、未知版本、
+解密失败或体积超限时静默忽略并回退官方页。“清除会话”同时清除 WebView2 浏览数据、内存快照和
+对应 DPAPI 文件。
 
 后台访客会话不会主动弹出官方窗口；官网没有提供输入框、首次登录、Cloudflare 或厂商真人验证期间，
 用户可主动显示官方 WebView2，并由本人操作。会话就绪后用户可将官方页收起到本机后台，在一龙 Chat UI 中继续发送、停止、新建会话和
@@ -132,6 +147,10 @@ Google 登录入口”等按钮只会在宿主允许且页面当前确实具备�
 清单时，前端只使用与当前内置适配器一致的兼容清单，不把 Google AI 模式误当成支持 ChatGPT
 历史、项目或登录动作。
 
+ChatGPT 侧栏对缓存采用“先显示、后刷新”：已有项目与会话目录不会阻止原生 UI 首帧回显，
+但每次重新激活 ChatGPT 厂商仍会在实时页面就绪后后台执行一次 `list_conversations`，以官网
+当前目录原子替换旧快照。Google AI 目前只缓存当前 AI 搜索会话，不伪造官网未提供的项目列表。
+
 原生界面必须把技术状态归一化为用户可理解的阶段：客户端检查或需更新、官方窗口未打开或加载中、
 导航拦截或错误、适配器等待、ChatGPT 需要登录、Google 地区/语言/账号不可用的只读降级、
 Google 访客可用、ChatGPT 已登录以及回答生成中。状态卡同时显示当前已激活的原生能力；不能发送
@@ -170,6 +189,9 @@ confirmation，再调用商户模块运行时：
   与 APK 共用版本 1 的 `google_web` 适配器。旧的 Windows Google 重复脚本已经删除，新增厂商时
   必须通过 `ProviderAdapter` 显式登记初始化、动作白名单、事件清洗和页面命令绑定。
 - PC TypeScript/Vite 生产构建、ESLint 和本地浏览器安全契约测试通过。
+- Win 已实现按 owner/provider 隔离的前端热缓存、Rust 进程缓存和 DPAPI 持久快照；定向测试覆盖
+  LRU 淘汰、账号/厂商隔离、缓存状态转换、草稿/流式过滤、当前 Windows 用户加密回读与清除。
+  缓存快照只读，官方页面重新加载完成前不会解锁发送或历史动作。
 - 没有可验证的一龙云端 owner 或已登录本机节点 owner 时不能创建本地 Profile；两者同时存在
   但不一致时同样失败关闭。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。
@@ -180,6 +202,8 @@ confirmation，再调用商户模块运行时：
 - Google AI 模式真实页面 DOM、账号开放状态、流式回答与引用选择器仍需在已开放账号环境验收；
   ChatGPT 与 Google 从一龙原生输入框真实发送、接收完整回答、停止生成和跨跳转恢复也尚未在用户
   账号环境完成本轮验收。真实账号登录、Cloudflare、下载、音视频和各账号兼容仍需用户本人完成官方验证。
+- 真实账号下 ChatGPT/Google AI 厂商切换首帧时延、重启后 DPAPI 快照回显和官网目录替换仍需
+  安装版现场验收；代码、加密与离线合同通过不能替代真实网页性能验收。
 - DOM 变化会让语义适配器降级；降级时保留完整官方窗口、刷新、主页和系统浏览器入口。
 - 一龙原生子窗口把创建、导航、页面完成、React 根节点健康、焦点、关闭请求和销毁事件写入本机有界脱敏
   快照；节点 Codex 控制诊断与项目绑定 MCP 可直接读取。快照不记录页面正文、Cookie、

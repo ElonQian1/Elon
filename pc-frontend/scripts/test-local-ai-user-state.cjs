@@ -36,6 +36,10 @@ const readySession = {
   currentHost: 'chatgpt.com',
   loading: false,
   rendererStatus: 'active',
+  cacheStatus: 'live',
+  semanticCacheStatus: 'live',
+  navigationCacheStatus: 'empty',
+  cacheUpdatedAtMs: 1,
   updatedAtMs: 1,
 }
 
@@ -85,6 +89,19 @@ assert.equal(authenticated.phase, 'ready_authenticated')
 assert.equal(authenticated.canSend, true)
 assert.equal(authenticated.canConversationHistory, true)
 assert.equal(authenticated.canStartGoogleLogin, false)
+
+const cached = deriveLocalAiUserState('ready', chatgpt, {
+  ...readySession,
+  cacheStatus: 'cached',
+  semanticCacheStatus: 'cached',
+}, snapshot({
+  authenticated: true,
+  composerReady: true,
+  pageKind: 'conversation',
+  capabilities: ['new_conversation', 'conversation_history'],
+}))
+assert.equal(cached.canSend, false, 'cached semantic state must never unlock live writes')
+assert.equal(cached.canConversationHistory, false)
 
 const chatgptGuest = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
   composerReady: true,

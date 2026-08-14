@@ -23,9 +23,12 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const autoSyncKey = useRef('')
 
   useEffect(() => {
+    autoSyncKey.current = ''
+  }, [web.provider?.id])
+
+  useEffect(() => {
     if (!web.userState.canConversationHistory
       || !web.controller.sessionOpen
-      || directory
       || busy) return
     const key = web.controller.sessionState?.windowLabel || web.provider.id
     if (autoSyncKey.current === key) return
@@ -33,8 +36,8 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     void web.controller.run('list_conversations')
   }, [
     busy,
-    directory,
     web.controller,
+    web.provider.id,
     web.userState.canConversationHistory,
   ])
 
@@ -131,7 +134,11 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
         )}
         <div className={styles.status} data-error={Boolean(web.controller.sessionState?.lastError)}>
           <strong>{web.userState.title}</strong>
-          <span>{web.message || web.userState.detail}</span>
+          <span>
+            {web.controller.sessionState?.navigationCacheStatus === 'cached'
+              ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
+              : web.message || web.userState.detail}
+          </span>
         </div>
         <p className={styles.privacy}><ShieldCheck size={14} />Cookie 仅保存在这台电脑的 WebView2 Profile</p>
       </div>

@@ -63,8 +63,15 @@ export function deriveLocalAiUserState(
   const liveCapabilities = new Set(snapshot?.capabilities ?? [])
   const accountReady = authenticated || guestMode
   const adapterConnected = Boolean(snapshot && session?.rendererStatus === 'active')
+  const livePageReady = Boolean(
+    officialOpen
+      && !session?.loading
+      && !['opening', 'loading', 'blocked', 'error'].includes(session?.windowStatus || '')
+      && session?.semanticCacheStatus !== 'cached',
+  )
   const canSend = Boolean(
     adapterConnected
+      && livePageReady
       && snapshot?.composerReady
       && accountReady
       && supportedActions.has('send_prompt'),
@@ -75,7 +82,8 @@ export function deriveLocalAiUserState(
       && liveCapabilities.has('new_conversation'),
   )
   const canConversationHistory = Boolean(
-    authenticated
+    livePageReady
+      && authenticated
       && supportedActions.has('list_conversations')
       && (liveCapabilities.has('conversation_history') || liveCapabilities.has('conversation_list')),
   )

@@ -2100,39 +2100,63 @@
       ],
       "created_at_ms": 1786699261278,
       "updated_at_ms": 1786700258667
+    },
+    {
+      "id": "win-web-ai-snapshot-cache-v1",
+      "title": "Win 网页 AI 快照缓存 V1",
+      "summary": "ChatGPT 与 Google AI 厂商切换、PC 页面刷新或客户端重启时，按一龙账号和厂商隔离地即时回显最近语义快照，再后台重验证官方页面；缓存不解锁实时动作。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-snapshot-cache-v1.md",
+        "content_hash": "74dee8c816c5ddda5c6176c5408ceb35db6df6a3e6c2a4d3ab3e380b52a9ea1c",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "2e7470cb8457c2714f18b276daccb54fd1216f72",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "c633380b7c0575490e02c9ad90fc1645c64b47b5",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-web-ai",
+      "tags": [
+        "windows",
+        "webview2",
+        "chatgpt",
+        "google-ai",
+        "cache"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/Cargo.toml",
+        "desktop-shell/src-tauri/src/local_ai_browser",
+        "desktop-shell/src-tauri/src/local_ai_browser.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/src/features/user-browser"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "厂商切换首帧命中按 owner/provider 隔离的前端热缓存，不先清空消息和目录。",
+        "Windows DPAPI 持久化最后一份完整语义快照，忽略流式半成品和草稿。",
+        "状态合同区分 empty/cached/live，缓存不冒充实时发送能力。",
+        "ChatGPT 缓存目录立即显示且每次重新激活仍后台同步官网目录。",
+        "清除本地网页会话同时清除内存快照和加密磁盘快照。",
+        "PC 构建、ESLint、合同测试和 Tauri Rust 定向测试通过。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_10fdf727dd7c4b75964e58ac6de811e2",
+        "agent_id": "codex/root",
+        "claimed_at_ms": 1786702023084,
+        "expires_at_ms": 1786716423084
+      },
+      "created_at_ms": 1786702015741,
+      "updated_at_ms": 1786702030449
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_1b11c56aa58446e9b0ad43feb2c27367",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "功能注册表启用、自动门禁与证据已验证并推送至 origin/main。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786620439206
-    },
-    {
-      "id": "feature_event_a1fe6314b3ff4198b1a9958f39853548",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "registered",
-      "actor": "codex-goal",
-      "reason": "当前源码已写但权威状态仍为 implementation_uncompiled/implementation_unrun，且该门卫直接保护审核与结算事实链。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786620865523
-    },
-    {
-      "id": "feature_event_70a8fc0c8414425bb035a29ef2f6d452",
-      "feature_id": "compute-attempt-final-usage-fence-verification-v1",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "目标、动态范围、禁线和完成边界明确。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786620891776
-    },
     {
       "id": "feature_event_43c2820d5d2a49e0a9fcd224f9b88642",
       "feature_id": "compute-attempt-final-usage-fence-verification-v1",
@@ -4102,6 +4126,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786700258667
+    },
+    {
+      "id": "feature_event_69fb1573e9c647cfa8b87ef2347c9bf8",
+      "feature_id": "win-web-ai-snapshot-cache-v1",
+      "action": "registered",
+      "actor": "codex/root",
+      "reason": "用户明确要求优化 ChatGPT/Google AI 切换时会话列表和聊天记录的即时回显体验。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786702015741
+    },
+    {
+      "id": "feature_event_296a2b500e804283a0784b1b16959151",
+      "feature_id": "win-web-ai-snapshot-cache-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786702023085
+    },
+    {
+      "id": "feature_event_34cc7702b4dc4e55b3503a9957e628b6",
+      "feature_id": "win-web-ai-snapshot-cache-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "开始建立失败基线并实现分层快照缓存。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786702030449
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { getDesktopInvoke } from '../shell/desktopShell'
+import { localAiSnapshotCache } from './localAiSnapshotCache'
 import { UNIFIED_AI_PROTOCOL } from './unifiedAiProtocol'
 
 export interface LocalAiWebProvider {
@@ -126,6 +127,10 @@ export interface LocalAiWebSessionState {
   semanticEvent?: LocalAiMessageSnapshot | Record<string, unknown> | null
   navigationEvent?: LocalAiConversationSnapshot | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
+  cacheStatus: 'empty' | 'cached' | 'live'
+  semanticCacheStatus: 'empty' | 'cached' | 'live'
+  navigationCacheStatus: 'empty' | 'cached' | 'live'
+  cacheUpdatedAtMs: number
   updatedAtMs: number
 }
 
@@ -239,10 +244,20 @@ export async function clearLocalAiWebSession(
   ownerKey: string,
 ): Promise<ClearedLocalAiWebSession> {
   assertIdentity(providerId, ownerKey)
-  return invokeDesktop<ClearedLocalAiWebSession>('clear_local_ai_web_session', {
+  const cleared = await invokeDesktop<ClearedLocalAiWebSession>('clear_local_ai_web_session', {
     providerId,
     ownerKey,
   }, LOCAL_AI_INVOKE_TIMEOUTS.clear)
+  localAiSnapshotCache.forget(providerId, ownerKey)
+  return cleared
+}
+
+export function getCachedLocalAiWebSessionState(
+  providerId: string,
+  ownerKey: string,
+): LocalAiWebSessionState | null {
+  if (!providerId.trim() || !ownerKey.trim()) return null
+  return localAiSnapshotCache.read(providerId, ownerKey)
 }
 
 export async function getLocalAiWebSessionState(
@@ -250,10 +265,11 @@ export async function getLocalAiWebSessionState(
   ownerKey: string,
 ): Promise<LocalAiWebSessionState> {
   assertIdentity(providerId, ownerKey)
-  return invokeDesktop<LocalAiWebSessionState>('get_local_ai_web_session_state', {
+  const state = await invokeDesktop<LocalAiWebSessionState>('get_local_ai_web_session_state', {
     providerId,
     ownerKey,
   }, LOCAL_AI_INVOKE_TIMEOUTS.state, `state:${providerId}:${ownerKey}`)
+  return rememberSessionState(providerId, ownerKey, state)
 }
 
 export async function controlLocalAiWebSession(
@@ -262,11 +278,12 @@ export async function controlLocalAiWebSession(
   action: LocalAiBrowserControlAction,
 ): Promise<LocalAiWebSessionState> {
   assertIdentity(providerId, ownerKey)
-  return invokeDesktop<LocalAiWebSessionState>('control_local_ai_web_session', {
+  const state = await invokeDesktop<LocalAiWebSessionState>('control_local_ai_web_session', {
     providerId,
     ownerKey,
     action,
   }, LOCAL_AI_INVOKE_TIMEOUTS.action)
+  return rememberSessionState(providerId, ownerKey, state)
 }
 
 export async function runLocalAiWebAdapterCommand(
@@ -389,6 +406,32 @@ function normalizeDesktopInvokeError(error: unknown): LocalAiBrowserError {
 function assertIdentity(providerId: string, ownerKey: string): void {
   if (!providerId.trim()) throw new Error('缺少 AI 网页厂商标识。')
   if (!ownerKey.trim()) throw new Error('请先登录一龙账号。')
+}
+
+function rememberSessionState(
+  providerId: string,
+  ownerKey: string,
+  state: LocalAiWebSessionState,
+): LocalAiWebSessionState {
+  if (state.providerId !== providerId) {
+    throw new Error('桌面壳返回了错误厂商的本地会话状态。')
+  }
+  const cacheStatus = normalizeCacheStatus(state.cacheStatus)
+  state.cacheStatus = cacheStatus
+  state.semanticCacheStatus = normalizeCacheStatus(state.semanticCacheStatus, cacheStatus)
+  state.navigationCacheStatus = normalizeCacheStatus(state.navigationCacheStatus, cacheStatus)
+  state.cacheUpdatedAtMs = Number.isFinite(state.cacheUpdatedAtMs)
+    ? Math.max(0, state.cacheUpdatedAtMs)
+    : 0
+  localAiSnapshotCache.remember(providerId, ownerKey, state)
+  return state
+}
+
+function normalizeCacheStatus(
+  value: LocalAiWebSessionState['cacheStatus'] | undefined,
+  fallback: LocalAiWebSessionState['cacheStatus'] = 'live',
+): LocalAiWebSessionState['cacheStatus'] {
+  return value === 'empty' || value === 'cached' || value === 'live' ? value : fallback
 }
 
 function normalizeProvider(provider: LocalAiWebProvider): void {

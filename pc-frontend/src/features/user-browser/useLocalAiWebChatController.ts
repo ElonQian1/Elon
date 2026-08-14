@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   controlLocalAiWebSession,
+  getCachedLocalAiWebSessionState,
   getLocalAiWebSessionState,
   isLocalAiConversationSnapshot,
   isLocalAiMessageSnapshot,
@@ -20,36 +21,47 @@ export default function useLocalAiWebChatController(
   ownerKey: string,
   clientState: LocalAiClientState = 'ready',
 ) {
-  const [sessionState, setSessionState] = useState<LocalAiWebSessionState | null>(null)
+  const [sessionState, setSessionState] = useState<LocalAiWebSessionState | null>(() => (
+    provider && ownerKey ? getCachedLocalAiWebSessionState(provider.id, ownerKey) : null
+  ))
   const [draft, setDraft] = useState('')
   const [draftTouched, setDraftTouched] = useState(false)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const autoStartKey = useRef('')
+  const visibleSessionState = provider && ownerKey
+    ? sessionState?.providerId === provider.id
+      ? sessionState
+      : getCachedLocalAiWebSessionState(provider.id, ownerKey)
+    : null
   const snapshot = useMemo(
-    () => isLocalAiMessageSnapshot(sessionState?.semanticEvent) ? sessionState.semanticEvent : null,
-    [sessionState?.semanticEvent],
+    () => isLocalAiMessageSnapshot(visibleSessionState?.semanticEvent)
+      ? visibleSessionState.semanticEvent
+      : null,
+    [visibleSessionState?.semanticEvent],
   )
   const navigationSnapshot = useMemo(
-    () => isLocalAiConversationSnapshot(sessionState?.navigationEvent)
-      ? sessionState.navigationEvent
+    () => isLocalAiConversationSnapshot(visibleSessionState?.navigationEvent)
+      ? visibleSessionState.navigationEvent
       : null,
-    [sessionState?.navigationEvent],
+    [visibleSessionState?.navigationEvent],
   )
-  const sessionOpen = Boolean(sessionState && sessionState.windowStatus !== 'closed')
+  const sessionOpen = Boolean(visibleSessionState && visibleSessionState.windowStatus !== 'closed')
   const userState = useMemo(
-    () => deriveLocalAiUserState(clientState, provider, sessionState, snapshot),
-    [clientState, provider, sessionState, snapshot],
+    () => deriveLocalAiUserState(clientState, provider, visibleSessionState, snapshot),
+    [clientState, provider, snapshot, visibleSessionState],
   )
 
   useEffect(() => {
-    setSessionState(null)
+    setSessionState(provider && ownerKey
+      ? getCachedLocalAiWebSessionState(provider.id, ownerKey)
+      : null)
     setDraft('')
     setDraftTouched(false)
     setBusyAction('')
     setMessage('')
     autoStartKey.current = ''
-  }, [provider?.id, ownerKey])
+  }, [ownerKey, provider])
 
   useEffect(() => {
     if (!provider || !ownerKey) return
@@ -170,7 +182,7 @@ export default function useLocalAiWebChatController(
   }
 
   return {
-    sessionState,
+    sessionState: visibleSessionState,
     snapshot,
     navigationSnapshot,
     userState,

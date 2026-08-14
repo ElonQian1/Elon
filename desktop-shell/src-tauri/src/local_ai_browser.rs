@@ -1,7 +1,7 @@
 //! 本地 AI 网页会话宿主。
 //!
 //! WebView2 自己持有 Cookie、DOM storage 与缓存；本模块只按一龙账号和厂商
-//! 隔离 Profile、限制导航，并把官方网页中用户可见的语义转换为受限内存事件。
+//! 隔离 Profile、限制导航，并把官方网页中用户可见的语义转换为受限本机事件。
 //! Cookie、Token、请求头、原始响应与任意 URL 始终不进入 IPC。
 
 #[path = "local_ai_browser/adapter.rs"]
@@ -18,6 +18,8 @@ mod native_window;
 pub(crate) mod native_window_state;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
+#[path = "local_ai_browser/snapshot_cache.rs"]
+mod snapshot_cache;
 #[path = "local_ai_browser/state.rs"]
 mod state;
 #[cfg(test)]
@@ -33,12 +35,13 @@ use tauri::{
 };
 
 pub use native_window_state::{LocalAiNativeWindowRuntime, LocalAiNativeWindowState};
+use provider_adapter::ProviderAdapter;
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
-use provider_adapter::ProviderAdapter;
 
 const RENDERER_PROTOCOL: &str = "yilong.ai.ui.v1";
 const PROFILE_ROOT: &str = "ai-web-profiles";
+const SNAPSHOT_CACHE_FILE: &str = "yilong-semantic-snapshot.v1.dpapi";
 const MAIN_WEBVIEW_LABEL: &str = "main";
 const LOCAL_AI_WINDOW_PREFIX: &str = "local-ai-";
 const LOCAL_AI_NATIVE_WINDOW_PREFIX: &str = "local-ai-native-";
@@ -177,11 +180,13 @@ pub async fn open_local_ai_web_session(
     let show_window = show_window.unwrap_or(true);
     ensure_session_webview(&webview, provider, &owner_fingerprint)?;
     let window_label = window_label(provider, &owner_fingerprint);
-    runtime.ensure_session(
+    ensure_runtime_session(
+        &app,
+        runtime.inner(),
+        provider,
+        &owner_fingerprint,
         &window_label,
-        provider.id,
-        initial_renderer_status(provider),
-    );
+    )?;
 
     if let Some(window) = app.get_webview_window(&window_label) {
         if show_window {
@@ -323,7 +328,7 @@ pub async fn get_local_ai_web_session_state(
     let fingerprint = owner_fingerprint(&owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
-    runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
+    ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
     // 高频状态轮询只能读取宿主内存，不能向 Windows UI 线程发送同步 getter。
     // WebView2 加载或聚焦期间，url()/is_minimized() 会等待同一条消息循环，曾导致
     // 官方页和原生聊天窗一起不响应。URL 与关闭状态均由窗口事件回调持续维护。
@@ -348,7 +353,7 @@ pub async fn control_local_ai_web_session(
     let fingerprint = owner_fingerprint(&owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
-    runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
+    ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
     if action == "external" {
         open_fixed_external_url(provider.start_url)?;
         return runtime
@@ -406,6 +411,7 @@ pub async fn run_local_ai_web_adapter_command(
     let fingerprint = owner_fingerprint(&owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
+    ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
     let window = app
         .get_webview_window(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
@@ -454,6 +460,7 @@ pub async fn clear_local_ai_web_session(
         .get_webview_window(&label)
         .ok_or_else(|| "请先打开本地网页会话，再清除它的本地数据。".to_string())?;
     window.clear_all_browsing_data().map_err(display_error)?;
+    runtime.clear_snapshots(&label);
     window
         .navigate(parse_start_url(provider)?)
         .map_err(display_error)?;
@@ -476,9 +483,10 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         profile_scope: "local_owner_provider",
         renderer_protocol: RENDERER_PROTOCOL,
         renderer_status: provider.renderer_status,
-        adapter_actions: provider
-            .adapter
-            .map_or(&[] as &'static [&'static str], ProviderAdapter::supported_actions),
+        adapter_actions: provider.adapter.map_or(
+            &[] as &'static [&'static str],
+            ProviderAdapter::supported_actions,
+        ),
     }
 }
 
@@ -563,6 +571,30 @@ fn profile_directory(
         .app_local_data_dir()
         .map(|root| root.join(PROFILE_ROOT).join(fingerprint).join(provider.id))
         .map_err(display_error)
+}
+
+fn snapshot_cache_path(
+    app: &AppHandle,
+    provider: &ProviderDefinition,
+    fingerprint: &str,
+) -> Result<PathBuf, String> {
+    profile_directory(app, provider, fingerprint).map(|profile| profile.join(SNAPSHOT_CACHE_FILE))
+}
+
+fn ensure_runtime_session(
+    app: &AppHandle,
+    runtime: &LocalAiBrowserRuntime,
+    provider: &ProviderDefinition,
+    fingerprint: &str,
+    label: &str,
+) -> Result<(), String> {
+    runtime.ensure_session_with_cache(
+        label,
+        provider.id,
+        initial_renderer_status(provider),
+        snapshot_cache_path(app, provider, fingerprint)?,
+    );
+    Ok(())
 }
 
 fn session_response(
