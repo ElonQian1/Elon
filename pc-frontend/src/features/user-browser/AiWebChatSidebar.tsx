@@ -46,14 +46,14 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           className={styles.newChat}
           type="button"
           onClick={() => void web.controller.run('new_conversation')}
-          disabled={!web.ready || !web.controller.sessionOpen || busy}
+          disabled={!web.ready || !web.canCompose || busy}
         >
           <SquarePen size={17} />
           <span><strong>新聊天</strong><small>在 {web.provider?.displayName || '网页 AI'} 新建会话</small></span>
         </button>
         <button type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || busy}>
           <MonitorUp size={16} />
-          <span><strong>{web.controller.sessionOpen ? '显示官方登录页' : '登录 / 打开官方页'}</strong><small>仅登录、验证或故障回退时显示</small></span>
+          <span><strong>显示官方页（登录可选）</strong><small>仅检查限制、登录、验证或故障回退时显示</small></span>
         </button>
         <button
           type="button"
@@ -100,7 +100,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               icon={<Pin size={13} />}
               title="置顶"
               items={pinned}
-              empty={directory ? '官网暂无可见置顶聊天' : '登录后同步官网置顶聊天'}
+              empty={directory ? '官网暂无可见置顶聊天' : '登录后可同步官网置顶聊天'}
               action="open_conversation"
               web={web}
             />
@@ -108,7 +108,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               icon={<FolderClosed size={13} />}
               title="项目"
               items={projects}
-              empty={directory ? '官网暂无可见项目' : '登录后同步官网项目'}
+              empty={directory ? '官网暂无可见项目' : '登录后可同步官网项目'}
               action="open_project"
               web={web}
             />
@@ -116,7 +116,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               icon={<MessageSquare size={13} />}
               title="聊天"
               items={recent}
-              empty={directory ? '官网暂无可见聊天' : '打开官网登录后自动同步'}
+              empty={directory ? '官网暂无可见聊天' : '访客可直接聊天；登录后自动同步历史'}
               action="open_conversation"
               web={web}
             />

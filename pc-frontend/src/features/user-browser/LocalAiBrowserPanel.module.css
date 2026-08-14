@@ -154,31 +154,6 @@
 
 .steps strong { font-size: 12px; font-weight: 650; }
 
-.confirmation {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
-  gap: 12px;
-  cursor: pointer;
-}
-
-.confirmation input {
-  width: 17px;
-  height: 17px;
-  margin: 2px 0 0;
-  accent-color: #54c7a1;
-}
-
-.confirmation strong,
-.confirmation small { display: block; }
-.confirmation strong { color: var(--text-primary); font-size: 13px; }
-.confirmation small {
-  margin-top: 5px;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 .providerList {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   controlLocalAiWebSession,
   getLocalAiWebSessionState,
@@ -23,6 +23,7 @@ export default function useLocalAiWebChatController(
   const [draftTouched, setDraftTouched] = useState(false)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
+  const autoStartKey = useRef('')
   const snapshot = useMemo(
     () => isLocalAiMessageSnapshot(sessionState?.semanticEvent) ? sessionState.semanticEvent : null,
     [sessionState?.semanticEvent],
@@ -41,7 +42,35 @@ export default function useLocalAiWebChatController(
     setDraftTouched(false)
     setBusyAction('')
     setMessage('')
+    autoStartKey.current = ''
   }, [provider?.id, ownerKey])
+
+  useEffect(() => {
+    if (!provider || !ownerKey) return
+    const key = `${provider.id}:${ownerKey}`
+    if (autoStartKey.current === key) return
+    autoStartKey.current = key
+    let active = true
+    setBusyAction('prepare_guest_session')
+    setMessage(`正在后台连接 ${provider.displayName}；官网允许时可直接使用访客模式。`)
+    void openLocalAiWebSession(provider.id, ownerKey, { showWindow: false })
+      .then(async () => {
+        try {
+          const next = await getLocalAiWebSessionState(provider.id, ownerKey)
+          if (active) setSessionState(next)
+        } catch {
+          // 后续有界轮询会恢复状态，不重复创建窗口。
+        }
+        if (active) setMessage(`${provider.displayName} 已在本机后台连接；登录是历史与增强能力的可选项。`)
+      })
+      .catch((error) => {
+        if (active) setMessage(localAiBrowserErrorMessage(error))
+      })
+      .finally(() => {
+        if (active) setBusyAction('')
+      })
+    return () => { active = false }
+  }, [ownerKey, provider])
 
   useEffect(() => {
     if (!provider || !ownerKey) return
@@ -79,7 +108,7 @@ export default function useLocalAiWebChatController(
       } catch {
         // The bounded poll recovers a state refresh without reopening the window.
       }
-      setMessage(`已显示 ${provider.displayName} 官方窗口，请在那里完成登录或真人验证。`)
+      setMessage(`已显示 ${provider.displayName} 官方窗口；可检查访客能力，也可按官网要求登录或完成人机验证。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
     } finally {

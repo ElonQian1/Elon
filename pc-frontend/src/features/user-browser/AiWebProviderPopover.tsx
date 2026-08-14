@@ -56,7 +56,7 @@ export default function AiWebProviderPopover({
         )}
       </div>
       <div className={styles.actions}>
-        <button type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || busy}><MonitorUp size={14} />登录 / 显示官方页</button>
+        <button type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || busy}><MonitorUp size={14} />显示官方页（登录可选）</button>
         <button type="button" onClick={() => void web.controller.control('background')} disabled={!web.ready || !web.controller.sessionState?.windowVisible || busy}><EyeOff size={14} />收起后台</button>
         <button type="button" onClick={() => void web.controller.control('reload')} disabled={!web.ready || !web.controller.sessionOpen || busy}><RefreshCw size={14} />刷新官方页</button>
         <button type="button" onClick={() => void web.controller.control('external')} disabled={busy}><ExternalLink size={14} />系统浏览器</button>
@@ -64,7 +64,7 @@ export default function AiWebProviderPopover({
           <button type="button" onClick={() => void web.controller.run('start_google_login')} disabled={busy}>使用 Google 登录 ChatGPT</button>
         )}
       </div>
-      <footer>官方 Cookie 只在本机 WebView2 Profile 中使用，不上传一龙云端。</footer>
+      <footer>访客模式无需厂商账号；登录后的 Cookie 也只在本机 WebView2 Profile 中使用，不上传一龙云端。</footer>
     </section>
   </>, document.body)
 }

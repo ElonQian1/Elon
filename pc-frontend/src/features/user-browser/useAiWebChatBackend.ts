@@ -49,11 +49,9 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     }) ?? []
   ), [controller.snapshot?.messages, provider?.id])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
-  const guestMode = provider?.loginMode === 'guest_web_system_login'
   const canCompose = Boolean(
     ready
-    && controller.snapshot?.composerReady
-    && (controller.snapshot.authenticated || guestMode),
+    && controller.snapshot?.composerReady,
   )
   const streamingMessageId = [...(controller.snapshot?.messages ?? [])]
     .reverse()
@@ -75,7 +73,10 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     canCompose,
     title: controller.snapshot?.title || '新对话',
     streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
-    status: chatStatus(capability.state, controller.sessionState),
+    accessMode: canCompose
+      ? controller.snapshot?.authenticated ? 'account' as const : 'guest' as const
+      : 'unavailable' as const,
+    status: chatStatus(capability.state, controller.sessionState, controller.snapshot),
     message: controller.sessionState?.lastError || controller.message || capability.message,
     modelButtonCopy: {
       source: '网页 AI',
@@ -90,11 +91,17 @@ export type AiWebChatBackend = ReturnType<typeof useAiWebChatBackend>
 function chatStatus(
   capability: ReturnType<typeof useLocalAiBrowserCapability>['state'],
   state: ReturnType<typeof useLocalAiWebChatController>['sessionState'],
+  snapshot: ReturnType<typeof useLocalAiWebChatController>['snapshot'],
 ) {
   if (capability !== 'ready') return '本地 WebView2 未连接'
-  if (!state || state.windowStatus === 'closed') return '官方会话未打开'
-  if (state.windowVisible) return '官方页可见，可完成登录验证'
-  if (state.rendererStatus === 'active') return '官方页在后台，一龙 UI 已连接'
+  if (!state || state.windowStatus === 'closed') return '正在启动本机访客会话'
+  if (snapshot?.composerReady) {
+    return snapshot.authenticated
+      ? `账号会话已连接${state.windowVisible ? ' · 官方页可见' : ''}`
+      : `访客模式可用${state.windowVisible ? ' · 登录可选' : ' · 官方页在后台'}`
+  }
+  if (state.windowVisible) return '官方页可见，可检查地区限制、登录或真人验证'
+  if (state.rendererStatus === 'active') return '官方页在后台，正在等待可用输入框'
   return state.loading ? '正在同步官方页面' : '等待官方页面就绪'
 }
 

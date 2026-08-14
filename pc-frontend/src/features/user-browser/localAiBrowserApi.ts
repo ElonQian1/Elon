@@ -14,7 +14,7 @@ export interface LocalAiWebProvider {
 export interface LocalAiWebSession {
   providerId: string
   windowLabel: string
-  status: 'created' | 'focused'
+  status: 'created' | 'focused' | 'background'
   profileScope: 'local_owner_provider'
   cookieAccess: 'webview_only'
   rendererProtocol: typeof UNIFIED_AI_PROTOCOL
@@ -176,11 +176,13 @@ export async function listLocalAiWebProviders(): Promise<LocalAiWebProvider[]> {
 export async function openLocalAiWebSession(
   providerId: string,
   ownerKey: string,
+  options: { showWindow?: boolean } = {},
 ): Promise<LocalAiWebSession> {
   assertIdentity(providerId, ownerKey)
   const session = await invokeDesktop<LocalAiWebSession>('open_local_ai_web_session', {
     providerId,
     ownerKey,
+    showWindow: options.showWindow,
   }, LOCAL_AI_INVOKE_TIMEOUTS.window)
   if (session.providerId !== providerId
     || session.profileScope !== 'local_owner_provider'

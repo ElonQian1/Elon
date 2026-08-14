@@ -29,8 +29,7 @@ export default function NativeAiWebChat({
   standalone = false,
   emptyTitle,
 }: NativeAiWebChatProps) {
-  const guestMode = provider.loginMode === 'guest_web_system_login'
-  const canCompose = Boolean(snapshot?.composerReady && (snapshot.authenticated || guestMode))
+  const canCompose = Boolean(snapshot?.composerReady)
   const providerName = provider.displayName
 
   return (
@@ -45,11 +44,9 @@ export default function NativeAiWebChat({
           <small>
             {snapshot?.authenticated
               ? `${snapshot.currentModel || '官方网页模型'} · 本机同步`
-              : guestMode && snapshot?.composerReady
+              : snapshot?.composerReady
                 ? '官方访客模式 · 本机同步'
-                : guestMode
-                  ? '请在官方窗口确认 AI 模式可用'
-                  : '请先在官方窗口登录'}
+                : '正在检测访客能力 · 登录可选'}
           </small>
         </div>
         <button
@@ -85,9 +82,7 @@ export default function NativeAiWebChat({
             <MonitorUp size={24} />
             <strong>{emptyTitle || (sessionOpen ? `等待 ${providerName} 官方页面` : `尚未打开 ${providerName}`)}</strong>
             <p>
-              {guestMode
-                ? 'AI 模式可用后，可见问题、回答和来源会同步到这里；地区或账号未开放时请使用官方窗口。'
-                : '完成官方登录后，可见对话会自动同步到这里；遇到真人验证请在官方窗口本人点击。'}
+              官网提供访客输入框时会直接启用；需要历史、项目或官网要求验证时，再显示官方窗口登录。
             </p>
             {provider.id === 'chatgpt' && sessionOpen && !snapshot?.authenticated && (
               <button type="button" onClick={() => onRun('start_google_login')} disabled={busy}>

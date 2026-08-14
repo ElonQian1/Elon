@@ -37,7 +37,6 @@ interface LocalAiBrowserPanelProps {
 
 export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource, capability }: LocalAiBrowserPanelProps) {
   const { state, providers, message: capabilityMessage, refresh } = capability
-  const [ownerConfirmed, setOwnerConfirmed] = useState(false)
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
   const [sessionState, setSessionState] = useState<LocalAiWebSessionState | null>(null)
   const [message, setMessage] = useState('')
@@ -46,7 +45,6 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
 
   useEffect(() => {
     setSessionState(null)
-    setOwnerConfirmed(false)
     setMessage('')
   }, [provider?.id])
 
@@ -72,7 +70,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
   }, [ownerKey, provider, state])
 
   async function open(item: LocalAiWebProvider) {
-    if (!ownerKey || !ownerConfirmed || busyProvider) return
+    if (!ownerKey || busyProvider) return
     setBusyProvider(item.id)
     setMessage('')
     try {
@@ -89,9 +87,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
         // 官方窗口已成功恢复时，状态刷新失败不能把整个组合动作判为失败。
       }
       const successMessage = session.status === 'created'
-        ? item.loginMode === 'guest_web_system_login'
-          ? `已打开 ${item.displayName} 官方页面和独立一龙聊天窗。若 Google 要求登录，请使用“系统浏览器”。`
-          : `已打开 ${item.displayName} 官方页面和独立一龙聊天窗，请本人完成登录。`
+        ? `已打开 ${item.displayName} 官方页面和独立一龙聊天窗。访客模式优先，登录用于历史与增强能力。`
         : `已恢复 ${item.displayName} 官方页面和一龙聊天窗。`
       setMessage(nativeError
         ? `${item.displayName} 官方页面已恢复；一龙聊天窗未能恢复：${nativeError}`
@@ -104,7 +100,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
   }
 
   async function openNativeChat(item: LocalAiWebProvider) {
-    if (!ownerKey || !ownerConfirmed || busyProvider) return
+    if (!ownerKey || busyProvider) return
     setBusyProvider(item.id)
     setMessage('')
     try {
@@ -145,7 +141,6 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
     try {
       await clearLocalAiWebSession(item.id, ownerKey)
       setSessionState(null)
-      setOwnerConfirmed(false)
       setMessage(`${item.displayName} 本地网页会话已经清除。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
@@ -167,17 +162,10 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
             <h2 id="local-ai-browser-title">{provider?.displayName || '官方 AI 网页'}</h2>
           </div>
         </div>
-        {provider?.loginMode === 'guest_web_system_login' ? (
-          <p>
-            一龙直接打开 Google 官方 AI 模式。访客能力留在本机 WebView2；Google 账号登录
-            按官方要求交给系统浏览器，一龙不接收登录 Cookie 或访问令牌。
-          </p>
-        ) : (
-          <p>
-            一龙打开 ChatGPT 官方页面，由本人输入账号并完成人机验证。Cookie 和网页数据
-            只留在本机 WebView2 Profile；原生聊天区只同步屏幕上可见的消息语义。
-          </p>
-        )}
+        <p>
+          一龙先尝试厂商官方网页的访客能力；官网输入框可用就直接进入原生聊天。
+          登录只用于历史、项目、个性化或厂商要求的验证，Cookie 仍只留在本机 WebView2 Profile。
+        </p>
         <dl>
           <div><dt>一龙账号</dt><dd>{ownerLabel}</dd></div>
           <div><dt>身份来源</dt><dd>{ownerSourceLabel(ownerSource)}</dd></div>
@@ -216,19 +204,9 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
         ) : (
           <>
             <ol className={styles.steps} aria-label={`${provider?.displayName || '官方 AI 网页'}使用步骤`}>
-              {provider?.loginMode === 'guest_web_system_login' ? (
-                <>
-                  <li><span>1</span><strong>选择 Google AI 模式</strong></li>
-                  <li><span>2</span><strong>打开官方页确认 AI 模式可用</strong></li>
-                  <li><span>3</span><strong>回到这里使用一龙聊天界面</strong></li>
-                </>
-              ) : (
-                <>
-                  <li><span>1</span><strong>确认只登录本人账号</strong></li>
-                  <li><span>2</span><strong>打开官方页面并完成登录</strong></li>
-                  <li><span>3</span><strong>回到本页使用一龙聊天界面</strong></li>
-                </>
-              )}
+              <li><span>1</span><strong>选择 ChatGPT 或 Google AI</strong></li>
+              <li><span>2</span><strong>直接使用官网访客模式</strong></li>
+              <li><span>3</span><strong>需要历史或增强能力时再登录</strong></li>
             </ol>
 
             <div className={styles.providerList} role="list" aria-label="官方 AI 网页提供商">
@@ -249,34 +227,13 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
               ))}
             </div>
 
-            <label className={styles.confirmation}>
-              <input
-                type="checkbox"
-                checked={ownerConfirmed}
-                onChange={(event) => setOwnerConfirmed(event.target.checked)}
-                disabled={!ownerKey}
-              />
-              <span>
-                <strong>
-                  {provider?.loginMode === 'guest_web_system_login'
-                    ? '我了解 Google 登录使用系统浏览器'
-                    : '只登录本人账号'}
-                </strong>
-                <small>
-                  {provider?.loginMode === 'guest_web_system_login'
-                    ? '本地窗口适合访客模式；账号状态不会从系统浏览器复制回来。'
-                    : '真人验证由本人完成；一龙不读取密码、Cookie 或访问令牌。'}
-                </small>
-              </span>
-            </label>
-
             {provider && (
               <div className={styles.actions}>
                 <button
                   className={styles.openButton}
                   type="button"
                   onClick={() => void open(provider)}
-                  disabled={!ownerKey || !ownerConfirmed || busy}
+                  disabled={!ownerKey || busy}
                 >
                   {busy ? <LoaderCircle className={styles.spin} size={16} /> : <ShieldCheck size={16} />}
                   {openButtonLabel(provider, sessionOpen)}
@@ -285,7 +242,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
                   className={styles.nativeWindowButton}
                   type="button"
                   onClick={() => void openNativeChat(provider)}
-                  disabled={!ownerKey || !ownerConfirmed || busy}
+                  disabled={!ownerKey || busy}
                 >
                   <MonitorUp size={16} />
                   单独打开一龙聊天窗
@@ -333,7 +290,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
                 provider={provider}
                 ownerKey={ownerKey || ''}
                 busy={busy}
-                onRecover={ownerConfirmed ? () => void openNativeChat(provider) : undefined}
+                onRecover={() => void openNativeChat(provider)}
               />
             ) : (
               <section className={styles.officialWebOnly} aria-label={`${provider?.displayName || '官方 AI'}接入说明`}>
@@ -386,7 +343,7 @@ function sessionStatusLabel(state: LocalAiWebSessionState | null): string {
 
 function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): string {
   if (sessionOpen) return '恢复官方页和聊天窗'
-  return provider.id === 'chatgpt' ? '登录 ChatGPT 并打开聊天窗' : `打开 ${provider.displayName} 和聊天窗`
+  return `打开 ${provider.displayName}（访客可用）和聊天窗`
 }
 
 function ownerSourceLabel(source: LocalAiOwnerSource): string {

@@ -70,10 +70,10 @@ impl LocalAiBrowserRuntime {
             });
     }
 
-    pub fn mark_opening(&self, label: &str) {
+    pub fn mark_opening(&self, label: &str, window_visible: bool) {
         self.update(label, |record| {
             record.window_status = "opening".to_string();
-            record.window_visible = true;
+            record.window_visible = window_visible;
             record.loading = true;
             record.last_error = None;
         });
@@ -269,5 +269,19 @@ mod tests {
             snapshot.navigation_event.unwrap()["type"],
             "conversation_snapshot"
         );
+    }
+
+    #[test]
+    fn background_opening_never_reports_a_visible_official_window() {
+        let runtime = LocalAiBrowserRuntime::default();
+        runtime.ensure_session("session", "chatgpt", "connecting");
+        runtime.mark_opening("session", false);
+
+        let background = runtime.snapshot("session").unwrap();
+        assert_eq!(background.window_status, "opening");
+        assert!(!background.window_visible);
+
+        runtime.mark_opening("session", true);
+        assert!(runtime.snapshot("session").unwrap().window_visible);
     }
 }

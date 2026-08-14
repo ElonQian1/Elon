@@ -662,7 +662,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
         return
       }
       if (!web.canCompose) {
-        setError('请先打开官方页面并完成登录或验证，再回到当前聊天界面。')
+        setError('正在连接官网访客会话；若官网未提供输入框，请显示官方页检查地区限制、登录或真人验证。')
         return
       }
       if (text && !web.controller.busyAction) {
@@ -945,7 +945,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               <p>{!user?.id
                 ? '登录账号后即可开始和我对话。'
                 : chatMode
-                  ? `${web.provider?.displayName || '官方网页 AI'} 是当前消息来源；登录和真人验证在官方窗口完成，聊天仍留在这里。`
+                  ? `${web.provider?.displayName || '官方网页 AI'} 是当前消息来源；访客可用时直接聊天，登录只用于历史、项目和增强能力。`
                 : onlineNodeId
                   ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。`
                   : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
@@ -964,9 +964,9 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               {user?.id && chatMode && !web.canCompose && (
                 <div className={styles.loginPrompt}>
                   <button className={styles.startBtn} type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || visibleSending}>
-                    登录 / 打开官方页
+                    显示官方页检查
                   </button>
-                  <span>{web.status}</span>
+                  <span>{web.status}；登录不是基础聊天的前置条件。</span>
                 </div>
               )}
             </div>

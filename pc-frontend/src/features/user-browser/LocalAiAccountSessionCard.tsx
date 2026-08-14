@@ -84,15 +84,15 @@ export default function LocalAiAccountSessionCard({
         <Layer
           icon={<MonitorUp size={19} />}
           title="ChatGPT / Google AI 官方网页"
-          status="每个厂商独立登录"
+          status="访客优先 · 登录可选"
           tone="local"
-          detail="官方 Cookie 留在各自的本机 WebView2 Profile；登录、真人验证和地区开放状态都由厂商官方页面决定。"
+          detail="基础聊天先检测官网访客输入框；历史、项目、个性化或厂商要求验证时再登录，Cookie 仍只留在各自的本机 WebView2 Profile。"
         />
       </div>
 
       {cloudAccountAvailable && !loading && !googleIdentity && googleProvider?.configured && (
         <div className={styles.bind}>
-          <div><strong>把 Google 设为一龙登录方式</strong><small>绑定完成后仍需在官方 AI 网页按厂商要求登录。</small></div>
+          <div><strong>把 Google 设为一龙登录方式</strong><small>这只用于登录一龙；官方 AI 访客模式不依赖该绑定。</small></div>
           <GoogleIdentityButton mode="bind" onComplete={load} />
         </div>
       )}
