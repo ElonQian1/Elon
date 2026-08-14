@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   clearLocalAiWebSession,
   controlLocalAiWebSession,
   getLocalAiWebSessionState,
+  isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
   openLocalAiNativeChatWindow,
   openLocalAiWebSession,
@@ -26,6 +27,8 @@ import {
 import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
 import type { LocalAiOwnerSource } from './useLocalAiOwnerIdentity'
 import NativeWindowStatusCard from './NativeWindowStatusCard'
+import AiProviderSessionStatus from './AiProviderSessionStatus'
+import { deriveLocalAiUserState } from './localAiUserState'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface LocalAiBrowserPanelProps {
@@ -42,6 +45,14 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
   const [message, setMessage] = useState('')
   const [selectedProviderId, setSelectedProviderId] = useState('google-ai-mode')
   const provider = providers.find((item) => item.id === selectedProviderId) || providers[0]
+  const semanticSnapshot = useMemo(
+    () => isLocalAiMessageSnapshot(sessionState?.semanticEvent) ? sessionState.semanticEvent : null,
+    [sessionState?.semanticEvent],
+  )
+  const userState = useMemo(
+    () => deriveLocalAiUserState(state, provider, sessionState, semanticSnapshot),
+    [provider, semanticSnapshot, sessionState, state],
+  )
 
   useEffect(() => {
     setSessionState(null)
@@ -170,7 +181,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
           <div><dt>一龙账号</dt><dd>{ownerLabel}</dd></div>
           <div><dt>身份来源</dt><dd>{ownerSourceLabel(ownerSource)}</dd></div>
           <div><dt>网页登录</dt><dd>仅当前电脑</dd></div>
-          <div><dt>窗口状态</dt><dd>{sessionStatusLabel(sessionState)}</dd></div>
+          <div><dt>使用状态</dt><dd>{userState.badge}</dd></div>
           <div><dt>当前站点</dt><dd>{sessionState?.currentHost || '尚未打开'}</dd></div>
         </dl>
       </div>
@@ -227,6 +238,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
               ))}
             </div>
 
+            <AiProviderSessionStatus state={userState} />
             {provider && (
               <div className={styles.actions}>
                 <button
@@ -325,20 +337,6 @@ function Notice({ title, message, children }: { title: string; message: string; 
       </div>
     </div>
   )
-}
-
-function sessionStatusLabel(state: LocalAiWebSessionState | null): string {
-  if (!state) return '尚未打开'
-  const labels: Record<string, string> = {
-    opening: '正在打开',
-    loading: '正在加载',
-    ready: '已打开',
-    minimized: '已最小化',
-    blocked: '导航已拦截',
-    error: '加载异常',
-    closed: '已关闭',
-  }
-  return labels[state.windowStatus] || state.windowStatus
 }
 
 function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): string {

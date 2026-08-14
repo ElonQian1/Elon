@@ -101,6 +101,7 @@ pub struct LocalAiWebProvider {
     profile_scope: &'static str,
     renderer_protocol: &'static str,
     renderer_status: &'static str,
+    adapter_actions: &'static [&'static str],
 }
 
 #[derive(Serialize)]
@@ -477,6 +478,7 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         profile_scope: "local_owner_provider",
         renderer_protocol: RENDERER_PROTOCOL,
         renderer_status: provider.renderer_status,
+        adapter_actions: adapter_command::supported_actions(provider.id, GOOGLE_AI_MODE.id),
     }
 }
 

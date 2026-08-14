@@ -1,6 +1,6 @@
 use serde_json::{Map, Value};
 
-const CHATGPT_ACTIONS: &[&str] = &[
+pub(super) const CHATGPT_ACTIONS: &[&str] = &[
     "snapshot",
     "send_prompt",
     "stop_generation",
@@ -18,12 +18,23 @@ const CHATGPT_ACTIONS: &[&str] = &[
     "select_composer_tool",
 ];
 
-const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
+pub(super) const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
     "snapshot",
     "send_prompt",
     "stop_generation",
     "new_conversation",
 ];
+
+pub(super) fn supported_actions(
+    provider_id: &str,
+    google_ai_mode_id: &str,
+) -> &'static [&'static str] {
+    if provider_id == google_ai_mode_id {
+        GOOGLE_AI_MODE_ACTIONS
+    } else {
+        CHATGPT_ACTIONS
+    }
+}
 
 pub fn build(
     provider_id: &str,
@@ -33,11 +44,7 @@ pub fn build(
     value: Option<String>,
     expected_draft: Option<String>,
 ) -> Result<Value, String> {
-    let actions = if provider_id == google_ai_mode_id {
-        GOOGLE_AI_MODE_ACTIONS
-    } else {
-        CHATGPT_ACTIONS
-    };
+    let actions = supported_actions(provider_id, google_ai_mode_id);
     if !actions.contains(&action) {
         return Err(format!("不支持的 {provider_name} 原生界面动作。"));
     }
@@ -141,5 +148,15 @@ mod tests {
             None
         )
         .is_err());
+    }
+
+    #[test]
+    fn provider_action_matrix_is_explicit_and_provider_scoped() {
+        let chatgpt = supported_actions("chatgpt", "google-ai-mode");
+        let google = supported_actions("google-ai-mode", "google-ai-mode");
+        assert!(chatgpt.contains(&"list_conversations"));
+        assert!(chatgpt.contains(&"start_google_login"));
+        assert!(!google.contains(&"list_conversations"));
+        assert_eq!(google, GOOGLE_AI_MODE_ACTIONS);
     }
 }

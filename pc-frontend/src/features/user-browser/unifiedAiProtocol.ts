@@ -51,6 +51,19 @@ export type UnifiedAiCapability =
   | 'tools'
   | 'voice'
   | 'conversation_history'
+  | 'new_conversation'
+  | 'draft_sync'
+  | 'google_login_entry'
+  | 'conversation_list'
+  | 'conversation_search'
+  | 'message_copy'
+  | 'rich_text'
+  | 'message_regenerate'
+  | 'complex_output'
+  | 'model_selector'
+  | 'composer_tools'
+  | 'dictation'
+  | 'feature_navigation'
 
 export type UnifiedAiEvent =
   | {
@@ -65,6 +78,12 @@ export type UnifiedAiEvent =
   | {
       type: 'message_snapshot'
       messages: UnifiedAiMessage[]
+      authenticated?: boolean
+      pageKind?: 'auth' | 'conversation' | 'home' | 'feature' | 'ai_mode' | 'unsupported' | 'unknown'
+      loginRequired?: boolean
+      composerReady?: boolean
+      streaming?: boolean
+      capabilities?: UnifiedAiCapability[]
     }
   | {
       type: 'message_delta'

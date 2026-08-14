@@ -662,7 +662,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
         return
       }
       if (!web.canCompose) {
-        setError('正在连接官网访客会话；若官网未提供输入框，请显示官方页检查地区限制、登录或真人验证。')
+        setError(web.userState.detail)
         return
       }
       if (text && !web.controller.busyAction) {
@@ -854,7 +854,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
           <span>一龙 AI</span>
-          <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.canCompose)}>+</button>
+          <button className={styles.newBtn} onClick={() => chatMode ? void web.controller.run('new_conversation') : newConversation()} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.userState.canNewConversation)}>+</button>
         </div>
         {chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
           sending={sending}
@@ -964,9 +964,9 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               {user?.id && chatMode && !web.canCompose && (
                 <div className={styles.loginPrompt}>
                   <button className={styles.startBtn} type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || visibleSending}>
-                    显示官方页检查
+                    {web.userState.phase === 'login_required' ? '登录 / 打开官方页' : '显示官方页处理'}
                   </button>
-                  <span>{web.status}；登录不是基础聊天的前置条件。</span>
+                  <span>{web.userState.detail}</span>
                 </div>
               )}
             </div>

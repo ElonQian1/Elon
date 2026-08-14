@@ -22,6 +22,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   const controller = useLocalAiWebChatController(
     mode === 'chat' && capability.state === 'ready' ? provider : undefined,
     mode === 'chat' ? ownerKey : '',
+    capability.state,
   )
 
   useEffect(() => {
@@ -49,10 +50,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     }) ?? []
   ), [controller.snapshot?.messages, provider?.id])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
-  const canCompose = Boolean(
-    ready
-    && controller.snapshot?.composerReady,
-  )
+  const canCompose = ready && controller.userState.canSend
   const streamingMessageId = [...(controller.snapshot?.messages ?? [])]
     .reverse()
     .find((item) => item.state === 'streaming')?.id
@@ -68,6 +66,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     provider,
     selectProvider,
     controller,
+    userState: controller.userState,
     messages,
     ready,
     canCompose,
@@ -76,8 +75,11 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     accessMode: canCompose
       ? controller.snapshot?.authenticated ? 'account' as const : 'guest' as const
       : 'unavailable' as const,
-    status: chatStatus(capability.state, controller.sessionState, controller.snapshot),
-    message: controller.sessionState?.lastError || controller.message || capability.message,
+    status: controller.userState.title,
+    message: controller.sessionState?.lastError
+      || controller.message
+      || capability.message
+      || (controller.userState.degraded ? controller.userState.detail : ''),
     modelButtonCopy: {
       source: '网页 AI',
       detail: provider?.displayName || '选择厂商',
@@ -87,23 +89,6 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
 }
 
 export type AiWebChatBackend = ReturnType<typeof useAiWebChatBackend>
-
-function chatStatus(
-  capability: ReturnType<typeof useLocalAiBrowserCapability>['state'],
-  state: ReturnType<typeof useLocalAiWebChatController>['sessionState'],
-  snapshot: ReturnType<typeof useLocalAiWebChatController>['snapshot'],
-) {
-  if (capability !== 'ready') return '本地 WebView2 未连接'
-  if (!state || state.windowStatus === 'closed') return '正在启动本机访客会话'
-  if (snapshot?.composerReady) {
-    return snapshot.authenticated
-      ? `账号会话已连接${state.windowVisible ? ' · 官方页可见' : ''}`
-      : `访客模式可用${state.windowVisible ? ' · 登录可选' : ' · 官方页在后台'}`
-  }
-  if (state.windowVisible) return '官方页可见，可检查地区限制、登录或真人验证'
-  if (state.rendererStatus === 'active') return '官方页在后台，正在等待可用输入框'
-  return state.loading ? '正在同步官方页面' : '等待官方页面就绪'
-}
 
 function readProviderPreference() {
   try {

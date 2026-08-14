@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { ExternalLink, EyeOff, LoaderCircle, MonitorUp, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import NativeAiWebChat from './NativeAiWebChat'
-import { listLocalAiWebProviders, localAiBrowserErrorMessage, type LocalAiWebProvider, type LocalAiWebSessionState } from './localAiBrowserApi'
+import { listLocalAiWebProviders, localAiBrowserErrorMessage, type LocalAiWebProvider } from './localAiBrowserApi'
 import { LOCAL_AI_PROVIDER_FALLBACKS } from './localAiWebProviders'
 import useLocalAiWebChatController from './useLocalAiWebChatController'
 import useLocalAiOwnerIdentity from './useLocalAiOwnerIdentity'
 import NativeWindowStatusCard from './NativeWindowStatusCard'
+import AiProviderSessionStatus from './AiProviderSessionStatus'
 import styles from './NativeAiWebChatWindow.module.css'
 
 export default function NativeAiWebChatWindow() {
@@ -41,7 +42,7 @@ export default function NativeAiWebChatWindow() {
         <div className={styles.identity}>
           <span>YILONG NATIVE AI</span>
           <strong>{provider.displayName}</strong>
-          <small>{statusLabel(controller.sessionState)} · Cookie 仅在官方 WebView2 内</small>
+          <small>{controller.userState.title} · Cookie 仅在官方 WebView2 内</small>
         </div>
         <div className={styles.actions}>
           <button type="button" onClick={() => void controller.openOfficial()} disabled={Boolean(controller.busyAction)}>
@@ -66,13 +67,14 @@ export default function NativeAiWebChatWindow() {
 
       {(loadError || controller.message) && <p className={styles.message}>{loadError || controller.message}</p>}
       {controller.sessionState?.lastError && <p className={styles.error}>{controller.sessionState.lastError}</p>}
+      <AiProviderSessionStatus state={controller.userState} />
       <NativeWindowStatusCard provider={provider} ownerKey={ownerKey} compact />
 
       <div className={styles.chatFrame}>
         <NativeAiWebChat
           provider={provider}
+          userState={controller.userState}
           snapshot={controller.snapshot}
-          sessionOpen={controller.sessionOpen}
           busy={Boolean(controller.busyAction)}
           draft={controller.draft}
           onDraftChange={controller.setDraft}
@@ -100,12 +102,4 @@ function WindowNotice({
       <p>{detail}</p>
     </main>
   )
-}
-
-function statusLabel(state: LocalAiWebSessionState | null): string {
-  if (!state || state.windowStatus === 'closed') return '官方窗口未打开'
-  if (state.windowVisible) return '官方页可见'
-  if (state.rendererStatus === 'active') return '官方页在后台 · 一龙界面已连接'
-  if (state.loading) return '正在同步官方页面'
-  return '等待官方页面'
 }

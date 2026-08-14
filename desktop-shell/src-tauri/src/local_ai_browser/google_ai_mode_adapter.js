@@ -238,6 +238,8 @@
       draft: composerValue(composer).slice(0, 20000),
       messages: visibleMessages(streaming),
       authenticated: isAuthenticated(),
+      pageKind: isAiModePage() ? 'ai_mode' : 'unsupported',
+      loginRequired: false,
       composerReady: !!composer,
       streaming,
       currentModel: 'Google AI 模式',

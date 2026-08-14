@@ -13,10 +13,12 @@ import {
   type LocalAiWebProvider,
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
+import { deriveLocalAiUserState, type LocalAiClientState } from './localAiUserState'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
+  clientState: LocalAiClientState = 'ready',
 ) {
   const [sessionState, setSessionState] = useState<LocalAiWebSessionState | null>(null)
   const [draft, setDraft] = useState('')
@@ -35,6 +37,10 @@ export default function useLocalAiWebChatController(
     [sessionState?.navigationEvent],
   )
   const sessionOpen = Boolean(sessionState && sessionState.windowStatus !== 'closed')
+  const userState = useMemo(
+    () => deriveLocalAiUserState(clientState, provider, sessionState, snapshot),
+    [clientState, provider, sessionState, snapshot],
+  )
 
   useEffect(() => {
     setSessionState(null)
@@ -136,6 +142,10 @@ export default function useLocalAiWebChatController(
 
   async function run(action: LocalAiAdapterAction, value?: string, expectedDraft?: string) {
     if (!provider || !ownerKey || busyAction) return
+    if (!provider.adapterActions.includes(action)) {
+      setMessage(`${provider.displayName} 当前不支持这个原生动作；可以显示官方窗口继续使用。`)
+      return
+    }
     setBusyAction(action)
     setMessage('')
     try {
@@ -163,6 +173,7 @@ export default function useLocalAiWebChatController(
     sessionState,
     snapshot,
     navigationSnapshot,
+    userState,
     sessionOpen,
     draft,
     setDraft: (value: string) => {

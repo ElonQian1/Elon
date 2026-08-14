@@ -4,12 +4,13 @@ import type {
   LocalAiMessageSnapshot,
   LocalAiWebProvider,
 } from './localAiBrowserApi'
+import type { LocalAiUserState } from './localAiUserState'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface NativeAiWebChatProps {
   provider: LocalAiWebProvider
+  userState: LocalAiUserState
   snapshot: LocalAiMessageSnapshot | null
-  sessionOpen: boolean
   busy: boolean
   draft: string
   onDraftChange: (value: string) => void
@@ -20,8 +21,8 @@ interface NativeAiWebChatProps {
 
 export default function NativeAiWebChat({
   provider,
+  userState,
   snapshot,
-  sessionOpen,
   busy,
   draft,
   onDraftChange,
@@ -29,7 +30,7 @@ export default function NativeAiWebChat({
   standalone = false,
   emptyTitle,
 }: NativeAiWebChatProps) {
-  const canCompose = Boolean(snapshot?.composerReady)
+  const canCompose = userState.canSend
   const providerName = provider.displayName
 
   return (
@@ -42,18 +43,16 @@ export default function NativeAiWebChat({
         <div>
           <strong>{snapshot?.title || `${providerName} · 一龙界面`}</strong>
           <small>
-            {snapshot?.authenticated
-              ? `${snapshot.currentModel || '官方网页模型'} · 本机同步`
-              : snapshot?.composerReady
-                ? '官方访客模式 · 本机同步'
-                : '正在检测访客能力 · 登录可选'}
+            {snapshot?.currentModel && userState.canSend
+              ? `${snapshot.currentModel} · 本机同步`
+              : userState.title}
           </small>
         </div>
         <button
           type="button"
           title="新建对话"
           onClick={() => onRun('new_conversation')}
-          disabled={!canCompose || busy}
+          disabled={!userState.canNewConversation || busy}
         >
           <MessageSquarePlus size={17} />
         </button>
@@ -80,11 +79,9 @@ export default function NativeAiWebChat({
         )) : (
           <div className={styles.emptyChat}>
             <MonitorUp size={24} />
-            <strong>{emptyTitle || (sessionOpen ? `等待 ${providerName} 官方页面` : `尚未打开 ${providerName}`)}</strong>
-            <p>
-              官网提供访客输入框时会直接启用；需要历史、项目或官网要求验证时，再显示官方窗口登录。
-            </p>
-            {provider.id === 'chatgpt' && sessionOpen && !snapshot?.authenticated && (
+            <strong>{emptyTitle || userState.title}</strong>
+            <p>{userState.detail}</p>
+            {provider.id === 'chatgpt' && userState.canStartGoogleLogin && (
               <button type="button" onClick={() => onRun('start_google_login')} disabled={busy}>
                 尝试打开官方 Google 登录
               </button>
@@ -104,12 +101,12 @@ export default function NativeAiWebChat({
               onRun('send_prompt', draft, snapshot?.draft ?? '')
             }
           }}
-          placeholder={canCompose ? `向 ${providerName} 发送消息…` : '官方页面就绪后即可使用原生输入框'}
+          placeholder={canCompose ? `向 ${providerName} 发送消息…` : userState.detail}
           disabled={!canCompose || busy}
           maxLength={20_000}
         />
         {snapshot?.streaming ? (
-          <button type="button" title="停止生成" onClick={() => onRun('stop_generation')} disabled={busy}>
+          <button type="button" title="停止生成" onClick={() => onRun('stop_generation')} disabled={!userState.canStop || busy}>
             <Square size={16} />
           </button>
         ) : (

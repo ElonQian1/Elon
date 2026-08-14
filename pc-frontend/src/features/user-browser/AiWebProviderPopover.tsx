@@ -2,6 +2,7 @@ import { useEffect, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { ExternalLink, EyeOff, MonitorUp, RefreshCw } from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
+import AiProviderSessionStatus from './AiProviderSessionStatus'
 import styles from './AiWebProviderPopover.module.css'
 
 export default function AiWebProviderPopover({
@@ -49,7 +50,7 @@ export default function AiWebProviderPopover({
         ))}
       </div>
       <div className={styles.session}>
-        <strong>{web.status}</strong>
+        <AiProviderSessionStatus state={web.userState} compact />
         {web.message && <p>{web.message}</p>}
         {web.capability.state !== 'ready' && (
           <button type="button" onClick={() => void web.capability.refresh()} disabled={web.capability.state === 'checking'}>重新检查本地能力</button>
@@ -60,7 +61,7 @@ export default function AiWebProviderPopover({
         <button type="button" onClick={() => void web.controller.control('background')} disabled={!web.ready || !web.controller.sessionState?.windowVisible || busy}><EyeOff size={14} />收起后台</button>
         <button type="button" onClick={() => void web.controller.control('reload')} disabled={!web.ready || !web.controller.sessionOpen || busy}><RefreshCw size={14} />刷新官方页</button>
         <button type="button" onClick={() => void web.controller.control('external')} disabled={busy}><ExternalLink size={14} />系统浏览器</button>
-        {web.provider?.id === 'chatgpt' && web.controller.sessionOpen && (
+        {web.provider?.id === 'chatgpt' && web.userState.canStartGoogleLogin && (
           <button type="button" onClick={() => void web.controller.run('start_google_login')} disabled={busy}>使用 Google 登录 ChatGPT</button>
         )}
       </div>

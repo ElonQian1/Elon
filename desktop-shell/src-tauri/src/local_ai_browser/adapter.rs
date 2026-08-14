@@ -138,6 +138,8 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "draft": clean_string(event.get("draft"), MAX_DRAFT_CHARS),
             "messages": sanitize_messages(event.get("messages")),
             "authenticated": event.get("authenticated").and_then(Value::as_bool).unwrap_or(false),
+            "pageKind": sanitize_page_kind(event.get("pageKind")),
+            "loginRequired": event.get("loginRequired").and_then(Value::as_bool).unwrap_or(false),
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
             "currentModel": clean_string(event.get("currentModel"), 80),
@@ -357,6 +359,16 @@ fn clean_identifier(value: Option<&Value>, max: usize) -> String {
         .collect()
 }
 
+fn sanitize_page_kind(value: Option<&Value>) -> &'static str {
+    match value.and_then(Value::as_str) {
+        Some("auth") => "auth",
+        Some("conversation") => "conversation",
+        Some("home") => "home",
+        Some("feature") => "feature",
+        _ => "unknown",
+    }
+}
+
 fn clean_string(value: Option<&Value>, max: usize) -> String {
     value
         .and_then(Value::as_str)
@@ -394,6 +406,8 @@ mod tests {
             "event": {
                 "type": "message_snapshot",
                 "url": "https://chatgpt.com/c/test?token=secret",
+                "pageKind": "auth",
+                "loginRequired": true,
                 "draft": "hello",
                 "messages": [{
                     "id": "m1",
@@ -410,6 +424,8 @@ mod tests {
         let event = sanitize_event(&raw).unwrap();
         assert_eq!(event.kind, "message_snapshot");
         assert_eq!(event.payload["url"], "https://chatgpt.com/c/test");
+        assert_eq!(event.payload["pageKind"], "auth");
+        assert_eq!(event.payload["loginRequired"], true);
         assert!(!event.payload.to_string().contains("secret"));
         assert!(event.payload.to_string().contains("visible"));
     }

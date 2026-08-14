@@ -9,6 +9,7 @@ export interface LocalAiWebProvider {
   profileScope: 'local_owner_provider'
   rendererProtocol: typeof UNIFIED_AI_PROTOCOL
   rendererStatus: 'reserved' | 'active'
+  adapterActions: LocalAiAdapterAction[]
 }
 
 export interface LocalAiWebSession {
@@ -72,6 +73,8 @@ export interface LocalAiMessageSnapshot {
   draft: string
   messages: LocalAiVisibleMessage[]
   authenticated: boolean
+  pageKind?: 'auth' | 'conversation' | 'home' | 'feature' | 'ai_mode' | 'unsupported' | 'unknown'
+  loginRequired?: boolean
   composerReady: boolean
   streaming: boolean
   currentModel: string
@@ -138,6 +141,12 @@ export type LocalAiAdapterAction =
   | 'open_conversation'
   | 'open_project'
   | 'start_google_login'
+  | 'list_model_options'
+  | 'list_composer_tools'
+  | 'collect_model_options'
+  | 'collect_composer_tools'
+  | 'select_model_option'
+  | 'select_composer_tool'
 
 type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed' | 'invoke_timeout'
 
@@ -169,7 +178,7 @@ export async function listLocalAiWebProviders(): Promise<LocalAiWebProvider[]> {
     LOCAL_AI_INVOKE_TIMEOUTS.capability,
   )
   if (!Array.isArray(providers)) throw new Error('桌面壳返回了无效的 AI 网页厂商列表。')
-  for (const provider of providers) assertProvider(provider)
+  for (const provider of providers) normalizeProvider(provider)
   return providers
 }
 
@@ -382,7 +391,7 @@ function assertIdentity(providerId: string, ownerKey: string): void {
   if (!ownerKey.trim()) throw new Error('请先登录一龙账号。')
 }
 
-function assertProvider(provider: LocalAiWebProvider): void {
+function normalizeProvider(provider: LocalAiWebProvider): void {
   if (!provider?.id
     || !provider.displayName
     || !['manual_web', 'guest_web_system_login'].includes(provider.loginMode)
@@ -390,4 +399,47 @@ function assertProvider(provider: LocalAiWebProvider): void {
     || provider.rendererProtocol !== UNIFIED_AI_PROTOCOL) {
     throw new Error('桌面壳返回了不受支持的 AI 网页厂商协议。')
   }
+  const rawActions = Array.isArray(provider.adapterActions) ? provider.adapterActions : []
+  const actions = rawActions.filter((action): action is LocalAiAdapterAction => (
+    typeof action === 'string' && LOCAL_AI_ADAPTER_ACTIONS.has(action as LocalAiAdapterAction)
+  ))
+  provider.adapterActions = actions.length ? [...new Set(actions)] : defaultAdapterActions(provider.id)
+}
+
+const LOCAL_AI_ADAPTER_ACTIONS = new Set<LocalAiAdapterAction>([
+  'snapshot',
+  'send_prompt',
+  'stop_generation',
+  'regenerate_response',
+  'new_conversation',
+  'list_conversations',
+  'open_conversation',
+  'open_project',
+  'start_google_login',
+  'list_model_options',
+  'list_composer_tools',
+  'collect_model_options',
+  'collect_composer_tools',
+  'select_model_option',
+  'select_composer_tool',
+])
+
+function defaultAdapterActions(providerId: string): LocalAiAdapterAction[] {
+  const shared: LocalAiAdapterAction[] = ['snapshot', 'send_prompt', 'stop_generation', 'new_conversation']
+  return providerId === 'chatgpt'
+    ? [
+        ...shared,
+        'regenerate_response',
+        'list_conversations',
+        'open_conversation',
+        'open_project',
+        'start_google_login',
+        'list_model_options',
+        'list_composer_tools',
+        'collect_model_options',
+        'collect_composer_tools',
+        'select_model_option',
+        'select_composer_tool',
+      ]
+    : shared
 }

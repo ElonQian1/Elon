@@ -9,6 +9,7 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
     profileScope: 'local_owner_provider',
     rendererProtocol: 'yilong.ai.ui.v1',
     rendererStatus: 'active',
+    adapterActions: ['snapshot', 'send_prompt', 'stop_generation', 'new_conversation'],
   },
   chatgpt: {
     id: 'chatgpt',
@@ -18,6 +19,23 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
     profileScope: 'local_owner_provider',
     rendererProtocol: 'yilong.ai.ui.v1',
     rendererStatus: 'active',
+    adapterActions: [
+      'snapshot',
+      'send_prompt',
+      'stop_generation',
+      'regenerate_response',
+      'new_conversation',
+      'list_conversations',
+      'open_conversation',
+      'open_project',
+      'start_google_login',
+      'list_model_options',
+      'list_composer_tools',
+      'collect_model_options',
+      'collect_composer_tools',
+      'select_model_option',
+      'select_composer_tool',
+    ],
   },
 }
 

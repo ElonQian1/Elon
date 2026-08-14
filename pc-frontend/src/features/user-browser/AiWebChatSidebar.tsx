@@ -23,8 +23,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const autoSyncKey = useRef('')
 
   useEffect(() => {
-    if (web.provider?.id !== 'chatgpt'
-      || !web.controller.snapshot?.authenticated
+    if (!web.userState.canConversationHistory
       || !web.controller.sessionOpen
       || directory
       || busy) return
@@ -36,7 +35,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     busy,
     directory,
     web.controller,
-    web.provider?.id,
+    web.userState.canConversationHistory,
   ])
 
   return (
@@ -46,7 +45,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           className={styles.newChat}
           type="button"
           onClick={() => void web.controller.run('new_conversation')}
-          disabled={!web.ready || !web.canCompose || busy}
+          disabled={!web.userState.canNewConversation || busy}
         >
           <SquarePen size={17} />
           <span><strong>新聊天</strong><small>在 {web.provider?.displayName || '网页 AI'} 新建会话</small></span>
@@ -91,7 +90,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
                 title="同步官网侧栏"
                 aria-label="同步 ChatGPT 官网侧栏"
                 onClick={() => void web.controller.run('list_conversations')}
-                disabled={!web.controller.sessionOpen || busy}
+                disabled={!web.userState.canConversationHistory || busy}
               >
                 <RefreshCw size={13} className={web.controller.busyAction === 'list_conversations' ? styles.spinning : ''} />
               </button>
@@ -131,8 +130,8 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           </section>
         )}
         <div className={styles.status} data-error={Boolean(web.controller.sessionState?.lastError)}>
-          <strong>{web.status}</strong>
-          {web.message && <span>{web.message}</span>}
+          <strong>{web.userState.title}</strong>
+          <span>{web.message || web.userState.detail}</span>
         </div>
         <p className={styles.privacy}><ShieldCheck size={14} />Cookie 仅保存在这台电脑的 WebView2 Profile</p>
       </div>
