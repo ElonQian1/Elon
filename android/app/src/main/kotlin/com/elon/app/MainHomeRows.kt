@@ -117,7 +117,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = friend.lastMessage ?: "\u6682\u65e0\u6d88\u606f"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            textSize = 14f
+            textSize = 13f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
         row.addView(middle)
 
@@ -171,7 +171,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = group.lastMessage ?: "${group.memberCount} 位成员"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            textSize = 14f
+            textSize = 13f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
         row.addView(middle)
 
@@ -209,7 +209,7 @@ internal class MainHomeRows(
                     includeFontPadding = false
                     text = formatHomeListTime(value)
                     setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-                    textSize = 12f
+                    textSize = 12f; typeface = Typeface.create("sans-serif", Typeface.NORMAL); fontFeatureSettings = "tnum"
                 })
             }
 
@@ -276,7 +276,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = title
             setTextColor(Color.parseColor("#F8F7F4"))
-            textSize = 17f
+            textSize = 16f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
     }
 
@@ -611,14 +611,14 @@ internal class MainHomeRows(
         showProjectMarker: Boolean = false,
         projectCompletionCount: Int = 0
     ): View {
-        val size = dp(44)
+        val size = dp(48)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false
             clipToPadding = false
             elevation = dp(4).toFloat()
             translationZ = dp(4).toFloat()
-            val avatar = createAvatarView(friend.name, 44, 17f, friend.avatarDataUrl).apply {
+            val avatar = createAvatarView(friend.name, 48, 18f, friend.avatarDataUrl).apply {
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
             addView(avatar)
@@ -639,7 +639,7 @@ internal class MainHomeRows(
         showProjectMarker: Boolean = false,
         projectCompletionCount: Int = 0
     ): View {
-        val size = dp(44)
+        val size = dp(48)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false

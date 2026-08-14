@@ -43,7 +43,8 @@ internal class HomeChromeController(
         binding.homeMenuButton.visibility = android.view.View.GONE
         binding.topTitleText.apply {
             text = "消息"
-            textSize = 22f
+            textSize = 20f
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = (layoutParams as FrameLayout.LayoutParams).apply {
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
