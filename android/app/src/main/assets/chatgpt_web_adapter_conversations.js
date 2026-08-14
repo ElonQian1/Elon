@@ -231,7 +231,7 @@
       read: readConversations,
       findScroller: findConversationScroller,
       maximum: MAX_CONVERSATIONS,
-      timeoutMs: 5000,
+      timeoutMs: 10000,
       delayMs: 180,
       maxSteps: 40,
       stablePasses: 3

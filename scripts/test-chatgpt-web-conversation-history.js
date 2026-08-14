@@ -74,6 +74,44 @@ async function capsResultsAndReportsTruncation() {
   assert.strictEqual(scroller.scrollTop, 0);
 }
 
+async function allowsSlowVirtualizedHistoryToReachTheEnd() {
+  let now = 0;
+  let page = 0;
+  const scroller = {
+    scrollTop: 0,
+    clientHeight: 400,
+    scrollHeight: 3600,
+    dispatchEvent() {}
+  };
+  const result = await runCollection({
+    initial: [conversation('zero')],
+    read() {
+      page += 1;
+      if (page >= 7) {
+        scroller.scrollHeight = scroller.clientHeight + scroller.scrollTop;
+      }
+      return Array.from({ length: Math.min(page + 1, 8) }, (_, index) =>
+        conversation(String(index))
+      );
+    },
+    findScroller: () => scroller,
+    schedule(callback) {
+      now += 600;
+      callback();
+    },
+    now: () => now,
+    timeoutMs: 10000,
+    delayMs: 180,
+    stablePasses: 3,
+    maxSteps: 40
+  });
+
+  assert.strictEqual(result.collection.reachedEnd, true);
+  assert.strictEqual(result.collection.timedOut, false);
+  assert.strictEqual(result.collection.scrollRestored, true);
+  assert.ok(result.conversations.length >= 8);
+}
+
 async function reportsAConservativeSnapshotWhenNoScrollerExists() {
   const result = await runCollection({
     initial: [conversation('one')],
@@ -121,6 +159,7 @@ async function collapsesRecentAndProjectRoutesForTheSameConversation() {
 Promise.resolve()
   .then(collectsVirtualizedPagesAndRestoresTheOriginalScrollPosition)
   .then(capsResultsAndReportsTruncation)
+  .then(allowsSlowVirtualizedHistoryToReachTheEnd)
   .then(reportsAConservativeSnapshotWhenNoScrollerExists)
   .then(mergesActivityDatesWhenVirtualizedRowsAreObservedAgain)
   .then(collapsesRecentAndProjectRoutesForTheSameConversation)
