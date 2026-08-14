@@ -135,25 +135,19 @@
 
   function answerCandidate(composer, query) {
     const explicitSelectors = [
-      'main [data-container-id]',
-      'main [data-snhf]',
-      'main [data-attrid*="ai" i]',
-      'main article',
-      'main [role="article"]',
-      'main [role="region"]',
-      '[role="main"] article',
-      '[role="main"] [role="article"]',
-      '[role="main"] [role="region"]'
+      '[data-container-id]',
+      '[data-snhf]',
+      '[data-attrid*="ai" i]',
+      'article',
+      '[role="article"]',
+      '[role="region"]'
     ];
     const semanticSelectors = [
-      'main section',
-      'main [aria-live="polite"]',
-      'main [aria-live="assertive"]',
-      '[role="main"] section',
-      '[role="main"] [aria-live="polite"]',
-      '[role="main"] [aria-live="assertive"]'
+      'body section',
+      'body [aria-live="polite"]',
+      'body [aria-live="assertive"]'
     ];
-    const genericSelectors = ['main div', '[role="main"] div'];
+    const genericSelectors = ['body div'];
     const explicit = uniqueNodes(explicitSelectors)
       .map((node) => candidateFrom(node, composer, query, true))
       .filter(Boolean);
@@ -201,12 +195,12 @@
   function diagnostics(composer, extraction) {
     const mainCount = document.querySelectorAll('main, [role="main"]').length;
     const explicitCount = document.querySelectorAll(
-      'main [data-container-id], main [data-snhf], main article, main [role="article"], main [role="region"]'
+      '[data-container-id], [data-snhf], article, [role="article"], [role="region"]'
     ).length;
     const semanticCount = document.querySelectorAll(
-      'main section, main [aria-live="polite"], main [aria-live="assertive"]'
+      'body section, body [aria-live="polite"], body [aria-live="assertive"]'
     ).length;
-    const divCount = Math.min(document.querySelectorAll('main div, [role="main"] div').length, 9999);
+    const divCount = Math.min(document.querySelectorAll('body div').length, 9999);
     return [
       'v=' + extractorVersion,
       'main=' + mainCount,
