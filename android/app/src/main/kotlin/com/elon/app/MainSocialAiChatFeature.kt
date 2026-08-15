@@ -79,6 +79,18 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
+    private val productionFeatureNavigationDelegate = lazy {
+        WebChatProductionFeatureNavigationCoordinator(
+            activity = activity,
+            host = binding.root,
+            mcpPort = ::chatGptMcpPort,
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            openOfficialFallback = ::openOfficialFallback,
+        )
+    }
+    private val productionFeatureNavigation by productionFeatureNavigationDelegate
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -199,7 +211,8 @@ internal class MainSocialAiChatFeature(
             newConversation = { startNewWebChatConversation() },
             openConversation = ::openWebChatConversation,
             openProject = ::openWebChatProject,
-            openOfficialFallback = ::openOfficialFallback,
+            openFeatureNavigation = ::openProductionFeatureNavigation,
+            providerId = { providerId().wireValue },
             providerName = ::providerName,
             active = { isChatModeActive() && webChatNavigationAvailable() },
         )
@@ -225,6 +238,10 @@ internal class MainSocialAiChatFeature(
 
     fun discardWebChatAcceptanceAttachmentSend(): Boolean =
         activeController().discardAcceptanceAttachmentSend()
+
+    private fun openProductionFeatureNavigation() {
+        productionFeatureNavigation.show(WebChatProviderRegistry.get(providerId()))
+    }
 
     fun selectInteractionMode(value: String): Boolean {
         val mode = SocialAiInteractionMode.parse(value) ?: return false
@@ -258,6 +275,9 @@ internal class MainSocialAiChatFeature(
 
     private fun deactivateChatProvider() {
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
+        if (productionFeatureNavigationDelegate.isInitialized()) {
+            productionFeatureNavigation.cancelPending()
+        }
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         binding.modelButton.tag = null
@@ -279,6 +299,10 @@ internal class MainSocialAiChatFeature(
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
+        if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
+        if (productionFeatureNavigationDelegate.isInitialized()) {
+            productionFeatureNavigation.cancelPending()
+        }
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()

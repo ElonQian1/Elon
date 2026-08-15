@@ -27,7 +27,8 @@ internal class ChatGptWebSideMenuView(
     private val newConversation: () -> Unit,
     private val openConversation: (String) -> Unit,
     private val openProject: (String) -> Unit,
-    private val openOfficialFallback: () -> Unit,
+    private val openFeatureNavigation: () -> Unit,
+    private val providerId: () -> String,
     private val providerName: () -> String,
     private val openSettings: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
@@ -349,18 +350,30 @@ internal class ChatGptWebSideMenuView(
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54))
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
-        addView(footerAction(activity.getString(R.string.web_chat_open_official)) {
+        addView(footerAction(
+            activity.getString(R.string.web_chat_open_official),
+            "web-chat-feature-navigation:${providerId()}",
+        ) {
             requestClose(true)
-            postDelayed(openOfficialFallback, CLOSE_DELAY_MS)
+            postDelayed(openFeatureNavigation, CLOSE_DELAY_MS)
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
-        addView(footerAction(activity.getString(R.string.chatgpt_side_menu_settings), openSettings),
+        addView(footerAction(
+            activity.getString(R.string.chatgpt_side_menu_settings),
+            "web-chat-settings:${providerId()}",
+            openSettings,
+        ),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
     }
 
-    private fun footerAction(title: String, onClick: () -> Unit) = TextView(activity).apply {
+    private fun footerAction(
+        title: String,
+        description: String,
+        onClick: () -> Unit,
+    ) = TextView(activity).apply {
         gravity = Gravity.CENTER_VERTICAL or Gravity.START
         includeFontPadding = false
         text = title
+        contentDescription = description
         textSize = 14f
         setTextColor(Color.parseColor("#B3DDDBD5"))
         isClickable = true
