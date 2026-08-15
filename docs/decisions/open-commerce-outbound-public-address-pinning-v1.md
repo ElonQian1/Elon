@@ -1,9 +1,10 @@
 ---
 title: 开放商业 HTTPS 出站公网地址固定 V1
-status: accepted
+status: superseded
 owner: backend
 reviewed_at: 2026-08-03
 implementation_status: implementation_uncompiled
+superseded_by: open-commerce-outbound-public-address-pinning-v2
 ---
 
 # 开放商业 HTTPS 出站公网地址固定 V1

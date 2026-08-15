@@ -1,14 +1,19 @@
 //! DNS resolution and per-request public-address pinning for open-commerce HTTPS calls.
 
+#[path = "outbound_public_address_policy.rs"]
+pub(crate) mod address_policy;
+
 use anyhow::{anyhow, bail, Result};
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    time::Duration,
-};
+use std::{future::Future, net::SocketAddr, time::Duration};
+
+const DNS_TIMEOUT: Duration = Duration::from_secs(3);
+const MAX_DNS_ANSWERS: usize = 32;
 
 pub(crate) struct PinnedHttpsTarget {
     pub client: reqwest::Client,
     pub url: String,
+    #[cfg(test)]
+    pub pinned_addresses: Vec<SocketAddr>,
 }
 
 pub(crate) async fn pinned_public_https_target(
@@ -16,6 +21,35 @@ pub(crate) async fn pinned_public_https_target(
     connect_timeout: Duration,
     request_timeout: Duration,
 ) -> Result<PinnedHttpsTarget> {
+    let (url, host) = parse_standard_https_url(value)?;
+    let addresses = collect_dns_answers_with_timeout(
+        tokio::net::lookup_host((host.as_str(), 443)),
+        DNS_TIMEOUT,
+        MAX_DNS_ANSWERS,
+    )
+    .await?;
+    build_pinned_target(url, host, addresses, connect_timeout, request_timeout)
+}
+
+async fn collect_dns_answers_with_timeout<F, I>(
+    lookup: F,
+    timeout: Duration,
+    max_answers: usize,
+) -> Result<Vec<SocketAddr>>
+where
+    F: Future<Output = std::io::Result<I>>,
+    I: Iterator<Item = SocketAddr>,
+{
+    let lookup = tokio::time::timeout(timeout, lookup)
+        .await
+        .map_err(|_| anyhow!("HTTPS 出站主机解析超时"))?
+        .map_err(|error| anyhow!("HTTPS 出站主机解析失败: {error}"))?;
+    Ok(lookup
+        .take(max_answers.saturating_add(1))
+        .collect::<Vec<_>>())
+}
+
+fn parse_standard_https_url(value: &str) -> Result<(reqwest::Url, String)> {
     let url = reqwest::Url::parse(value).map_err(|_| anyhow!("HTTPS 出站地址无效"))?;
     if url.scheme() != "https"
         || url.host_str().is_none()
@@ -29,28 +63,41 @@ pub(crate) async fn pinned_public_https_target(
         .host_str()
         .ok_or_else(|| anyhow!("HTTPS 出站地址缺少主机"))?
         .to_ascii_lowercase();
-    let addresses = tokio::net::lookup_host((host.as_str(), 443))
-        .await
-        .map_err(|error| anyhow!("HTTPS 出站主机解析失败: {error}"))?
-        .collect::<Vec<_>>();
-    if addresses.is_empty() {
-        bail!("HTTPS 出站主机没有可用地址");
-    }
-    if addresses.iter().any(|address| !is_public_ip(address.ip())) {
-        bail!("HTTPS 出站主机解析到私网或特殊用途地址");
-    }
-    let selected = preferred_address(&addresses);
-    let client = reqwest::Client::builder()
+    Ok((url, host))
+}
+
+fn build_pinned_target(
+    url: reqwest::Url,
+    host: String,
+    addresses: Vec<SocketAddr>,
+    connect_timeout: Duration,
+    request_timeout: Duration,
+) -> Result<PinnedHttpsTarget> {
+    let addresses =
+        address_policy::validate_and_order_public_addresses(addresses, 443, MAX_DNS_ANSWERS)
+            .map_err(|_| anyhow!("HTTPS 出站主机解析结果不符合公网地址策略"))?;
+    let client = build_pinned_client(&host, &addresses, connect_timeout, request_timeout)?;
+    Ok(PinnedHttpsTarget {
+        client,
+        url: url.to_string(),
+        #[cfg(test)]
+        pinned_addresses: addresses,
+    })
+}
+
+fn build_pinned_client(
+    host: &str,
+    addresses: &[SocketAddr],
+    connect_timeout: Duration,
+    request_timeout: Duration,
+) -> Result<reqwest::Client> {
+    Ok(reqwest::Client::builder()
         .no_proxy()
         .connect_timeout(connect_timeout)
         .timeout(request_timeout)
         .redirect(reqwest::redirect::Policy::none())
-        .resolve(&host, selected)
-        .build()?;
-    Ok(PinnedHttpsTarget {
-        client,
-        url: url.to_string(),
-    })
+        .resolve_to_addrs(host, addresses)
+        .build()?)
 }
 
 #[cfg(test)]
@@ -73,64 +120,109 @@ pub(crate) async fn pinned_public_https_target_or_local_test(
         return Ok(PinnedHttpsTarget {
             client,
             url: url.to_string(),
+            pinned_addresses: Vec::new(),
         });
     }
     pinned_public_https_target(value, connect_timeout, request_timeout).await
 }
 
-fn preferred_address(addresses: &[SocketAddr]) -> SocketAddr {
-    addresses
-        .iter()
-        .copied()
-        .find(|address| address.is_ipv4())
-        .unwrap_or(addresses[0])
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
 
-fn is_public_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(ip) => is_public_ipv4(ip),
-        IpAddr::V6(ip) => is_public_ipv6(ip),
-    }
-}
+    const TEST_TIMEOUT: Duration = Duration::from_secs(1);
 
-fn is_public_ipv4(ip: Ipv4Addr) -> bool {
-    let [a, b, c, _] = ip.octets();
-    !(a == 0
-        || a == 10
-        || a == 127
-        || (a == 100 && (64..=127).contains(&b))
-        || (a == 169 && b == 254)
-        || (a == 172 && (16..=31).contains(&b))
-        || (a == 192 && b == 0 && c == 0)
-        || (a == 192 && b == 0 && c == 2)
-        || (a == 192 && b == 168)
-        || (a == 198 && (b == 18 || b == 19))
-        || (a == 198 && b == 51 && c == 100)
-        || (a == 203 && b == 0 && c == 113)
-        || a >= 224)
-}
+    #[test]
+    fn public_answers_are_all_pinned_in_deterministic_order() {
+        let (url, host) = parse_standard_https_url("https://merchant.example/callback").unwrap();
+        let public_v4 = SocketAddr::from(([8, 8, 8, 8], 443));
+        let public_v6 = SocketAddr::new("2606:4700:4700::1111".parse::<IpAddr>().unwrap(), 443);
+        let target = build_pinned_target(
+            url,
+            host,
+            vec![public_v6, public_v4, public_v4],
+            TEST_TIMEOUT,
+            TEST_TIMEOUT,
+        )
+        .unwrap();
+        assert_eq!(target.url, "https://merchant.example/callback");
+        assert_eq!(target.pinned_addresses, vec![public_v4, public_v6]);
+    }
 
-fn is_public_ipv6(ip: Ipv6Addr) -> bool {
-    if ip.is_unspecified() || ip.is_loopback() || ip.is_multicast() {
-        return false;
+    #[test]
+    fn unsafe_mixed_empty_excessive_and_wrong_port_answers_fail_closed() {
+        let public = SocketAddr::from(([8, 8, 8, 8], 443));
+        let private = SocketAddr::from(([127, 0, 0, 1], 443));
+        for answers in [vec![public, private], Vec::new()] {
+            assert!(target_for_answers(answers).is_err());
+        }
+        assert!(target_for_answers(vec![SocketAddr::from(([8, 8, 8, 8], 8443))]).is_err());
+        assert!(target_for_answers(vec![public; MAX_DNS_ANSWERS + 1]).is_err());
     }
-    let segments = ip.segments();
-    if (segments[0] & 0xfe00) == 0xfc00
-        || (segments[0] & 0xffc0) == 0xfe80
-        || (segments[0] & 0xffc0) == 0xfec0
-        || (segments[0] == 0x2001 && segments[1] == 0x0db8)
-        || segments[0] == 0x2002
-        || (segments[0] == 0x0064 && segments[1] == 0xff9b)
-    {
-        return false;
+
+    #[test]
+    fn endpoint_requires_standard_https_without_credentials() {
+        assert!(parse_standard_https_url("http://merchant.example/callback").is_err());
+        assert!(parse_standard_https_url("https://merchant.example:8443/callback").is_err());
+        assert!(parse_standard_https_url("https://user:pass@merchant.example/callback").is_err());
+        assert!(parse_standard_https_url("https://merchant.example/callback?nonce=1").is_ok());
     }
-    if segments[..5] == [0, 0, 0, 0, 0] && segments[5] == 0xffff {
-        return is_public_ipv4(Ipv4Addr::new(
-            (segments[6] >> 8) as u8,
-            segments[6] as u8,
-            (segments[7] >> 8) as u8,
-            segments[7] as u8,
-        ));
+
+    #[tokio::test]
+    async fn dns_lookup_timeout_fails_closed() {
+        let lookup = std::future::pending::<std::io::Result<std::vec::IntoIter<SocketAddr>>>();
+        let error =
+            collect_dns_answers_with_timeout(lookup, Duration::from_millis(1), MAX_DNS_ANSWERS)
+                .await
+                .unwrap_err();
+        assert!(error.to_string().contains("解析超时"));
     }
-    segments[..6] != [0, 0, 0, 0, 0, 0]
+
+    #[test]
+    fn all_open_commerce_outbound_callers_use_the_shared_entrypoint() {
+        for source in [
+            include_str!("open_commerce_developer_domain_service.rs"),
+            include_str!("open_commerce_webhook_verification.rs"),
+            include_str!("open_commerce_webhook_worker.rs"),
+            include_str!("open_commerce_runtime_client.rs"),
+        ] {
+            assert!(source.contains("open_commerce_outbound_security::pinned_public_https_target"));
+        }
+    }
+
+    #[tokio::test]
+    async fn pinned_client_uses_override_and_does_not_follow_redirects() -> Result<()> {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let address = listener.local_addr()?;
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await?;
+            let mut request = [0_u8; 1024];
+            let read = stream.read(&mut request).await?;
+            let request = String::from_utf8_lossy(&request[..read]);
+            assert!(request
+                .lines()
+                .any(|line| line.eq_ignore_ascii_case("host: pinned.invalid")));
+            stream
+                .write_all(
+                    b"HTTP/1.1 302 Found\r\nLocation: http://redirect.invalid/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .await?;
+            Ok::<(), anyhow::Error>(())
+        });
+        let client = build_pinned_client("pinned.invalid", &[address], TEST_TIMEOUT, TEST_TIMEOUT)?;
+        let response = client.get("http://pinned.invalid/").send().await?;
+        assert_eq!(response.status(), reqwest::StatusCode::FOUND);
+        server.await??;
+        Ok(())
+    }
+
+    fn target_for_answers(addresses: Vec<SocketAddr>) -> Result<PinnedHttpsTarget> {
+        let (url, host) = parse_standard_https_url("https://merchant.example/callback")?;
+        build_pinned_target(url, host, addresses, TEST_TIMEOUT, TEST_TIMEOUT)
+    }
 }

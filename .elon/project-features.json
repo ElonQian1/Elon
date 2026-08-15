@@ -3512,6 +3512,159 @@
       "updated_at_ms": 1786766985323
     },
     {
+      "id": "open-commerce-outbound-public-address-policy-v2",
+      "title": "开放商业出站公网地址策略 V2",
+      "summary": "统一开放商业与算力代理的公网单播地址分类，为 DNS 增加超时和答案上限，并把全部已验证公网地址固定给禁代理、禁重定向的 HTTPS 客户端。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/open-commerce-outbound-public-address-policy-v2.md",
+        "content_hash": "0dff32b15b4d22839f64a851f7dd2797c7f35e1964a56e06fc593f2869a212b9",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "40ef80fbe8e905c5361b62d3a94be3d3eb072f64",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-security",
+      "tags": [
+        "open-commerce",
+        "security",
+        "ssrf",
+        "dns",
+        "webhook"
+      ],
+      "task_paths": [
+        "docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md",
+        "server/src/compute_federation/external_pool_adapter_broker_tls",
+        "server/src/open_commerce_outbound_security.rs",
+        "server/src/outbound_public_address_policy.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "共享策略拒绝 ADR 所列 IPv4、IPv6 和 IPv4-mapped IPv6 特殊地址并接受代表性公网地址",
+        "混合公网与私网答案整体失败关闭",
+        "多公网答案去重稳定排序并全部固定给 reqwest，IPv4 优先",
+        "DNS 三秒超时、最多 32 个答案且端口漂移失败关闭",
+        "客户端禁用环境代理和重定向并保留原始 HTTPS 主机身份",
+        "开放商业调用方与算力 broker 共用策略且定向 Rust 测试通过",
+        "源码体积、文档模块化和 Git diff 门禁通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/decisions/open-commerce-outbound-public-address-pinning-v2.md",
+          "content_hash": "d6deeba21d6c5ca97aed5a7b77b9563efbe50e5abad065f14b060e2139cac11c",
+          "locator": "决定",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f1858d92fa3eb86ac826081fa715d08e26de9110",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md",
+          "content_hash": "2b1762412516a0cd2aeec1ae21639e4fca9a0d6273cf37bceb504d28acfb34a2",
+          "locator": "已取得证据",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "01d9918c44457e55396e1af536288919b656b6ed",
+            "worktree_blob_oid": "3d9994ec977f9b0c7a6b2a1b4826088e7777d6f1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/address_policy.rs",
+          "content_hash": "c6c6f81f15cf958a08e7a5962ae430ae857dc9f32cc33294fd229f771a32db50",
+          "locator": "validate_and_order_dns_answers",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "656ab3fc46b58ad1b6ccff3cf1ad6910ff7ef6be",
+            "worktree_blob_oid": "03b5b3337dd4f9260b318065ce4e7afb086dba3e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/tests.rs",
+          "content_hash": "583f3f45426096348705a6710932236101cd44bd0da0725127c178b587ab3d08",
+          "locator": "public_address_policy_rejects_non_public_and_special_ranges",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "9837692e9c3126c524892cc80b4f1d237075fd9a",
+            "worktree_blob_oid": "9837692e9c3126c524892cc80b4f1d237075fd9a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_outbound_security.rs",
+          "content_hash": "f6ae94225d91a413481cf82f09c56879290e6c480122d4c774949fc581971735",
+          "locator": "dns_lookup_timeout_fails_closed",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "10fcff89a70c19e044f1868623766fd4c1e37c99",
+            "worktree_blob_oid": "d9efb3b89293aa312429ef3e05be1ff55bd16fc4",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_outbound_security.rs",
+          "content_hash": "f6ae94225d91a413481cf82f09c56879290e6c480122d4c774949fc581971735",
+          "locator": "pinned_public_https_target",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "10fcff89a70c19e044f1868623766fd4c1e37c99",
+            "worktree_blob_oid": "d9efb3b89293aa312429ef3e05be1ff55bd16fc4",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/outbound_public_address_policy.rs",
+          "content_hash": "65488691c0304c508f5c4a217c58bf102cacf1634eef6993c57b0e70964dc293",
+          "locator": "public_unicast_policy_rejects_special_ranges",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "280dd13d87412680f3269a673cb8b73a63ec9ec7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/outbound_public_address_policy.rs",
+          "content_hash": "65488691c0304c508f5c4a217c58bf102cacf1634eef6993c57b0e70964dc293",
+          "locator": "validate_and_order_public_addresses",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9312f24e382c05339235f081b193c13b1370cd05",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "280dd13d87412680f3269a673cb8b73a63ec9ec7",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1786767952681,
+      "updated_at_ms": 1786772464958
+    },
+    {
       "id": "open-commerce-verified-erp-handoff-handler-v1",
       "title": "开放商业 ERP 写入与回读验证处理器 V1",
       "summary": "复用现有接入器租约工作器，把终态业务证据以稳定幂等来源信封交给商户 ERP 插件，并且只有外部回读完整匹配项目、商户、Invocation、接入和结果摘要后才允许提交 applied。",
@@ -4599,126 +4752,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_1454a9fb9b9d45218e461284def8ce3c",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Refresh evidence after conflict-resolved status documents.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786653759727
-    },
-    {
-      "id": "feature_event_cc5c34bd5141431fa41bbe62ad4f6f45",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786653762992
-    },
-    {
-      "id": "feature_event_bd91003f49304dc7b4b08697f0ada712",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Merged V255 evidence is current; implementation commit fdd92efdf is on origin/main.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786653763008
-    },
-    {
-      "id": "feature_event_f023a9c5129049019bb8b4f2509172f9",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Merged V255 evidence is current; implementation commit fdd92efdf is on origin/main.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786653763026
-    },
-    {
-      "id": "feature_event_e0dbe2e427304a01a0a1c0c95d48c4f7",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Merged V255 evidence is current; implementation commit fdd92efdf is on origin/main.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786653763041
-    },
-    {
-      "id": "feature_event_480db6f3f7e2453580bcfd831b93b14d",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "registered",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786654355853
-    },
-    {
-      "id": "feature_event_26521a6d94eb4055bc1df8d8f8eb8eae",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "claimed",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786654365360
-    },
-    {
-      "id": "feature_event_7b2d36fa0ae24038b65a917a61974aed",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Begin compile and executable contract verification for the existing V256 source.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786654374291
-    },
-    {
-      "id": "feature_event_0bd745a011a14e3ea93355ade979a9f6",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "claim_released",
-      "actor": "codex-goal",
-      "reason": "Authority requirement was intentionally updated with dynamic verification evidence; release the stale claim before rebinding.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786657723154
-    },
-    {
-      "id": "feature_event_6d96d933c38b4a3994a367d5d0a6d54b",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal",
-      "reason": "Accept the intentional authority status update produced by this verification batch.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786657731498
-    },
-    {
-      "id": "feature_event_9d998feea3aa4745b14b9d31fe5f66c5",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Reviewed updated authority against the implemented scope and preserved fail-closed non-goals.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786657744114
-    },
-    {
-      "id": "feature_event_db722bdc2c5443de8ec3f866fb61952d",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Accepted scope is dependency-complete and ready for the verified implementation batch.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786657752674
-    },
     {
       "id": "feature_event_6f983198b66a4554adf1edef3cbfc67f",
       "feature_id": "compute-v256-runtime-bundle-resolver-verification",
@@ -6598,6 +6631,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786766985323
+    },
+    {
+      "id": "feature_event_2fafaa8b1df743b495809ab17892a682",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "registered",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Accepted V1 ADR has an uncompiled and divergent implementation; this scoped V2 closes the independently verifiable SSRF and DNS rebinding boundary.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786767952681
+    },
+    {
+      "id": "feature_event_a5eefd63fb0545559ed661ef708f3536",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "claimed",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786767962422
+    },
+    {
+      "id": "feature_event_81e5b6ff28734675b4ecf4f77ee2d253",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Implementation started after confirming divergent address policies and uncompiled open-commerce coverage.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786767974273
+    },
+    {
+      "id": "feature_event_45be158d8df948ffad6275eff29afa62",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "claim_released",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Requirement wording was intentionally finalized during implementation; release the active claim before explicit rebind and review.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786772344775
+    },
+    {
+      "id": "feature_event_9211a1c2dd49446f8ec22561f7c850ed",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "requirement_rebound",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Bind the intentionally finalized V2 requirement before evidence and lifecycle review.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786772358478
+    },
+    {
+      "id": "feature_event_5ed2fb5bf25d44fdae646ccfb3040a33",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Reviewed finalized V2 scope, non-goals, acceptance criteria and implementation paths against the current source boundary.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786772371392
+    },
+    {
+      "id": "feature_event_79e9b81a4358422a87bdf3faaecff7f5",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Accepted V2 requirement has no unresolved dependency blockers and is ready for evidence-bound delivery.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786772383955
+    },
+    {
+      "id": "feature_event_8ac001749af44583a4aae19d709c65c3",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "claimed",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786772395989
+    },
+    {
+      "id": "feature_event_8717d3e5ab744042808d2b9717095787",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Resume evidence-bound delivery under the re-reviewed requirement.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786772408183
+    },
+    {
+      "id": "feature_event_740da8372bcf47918815322f64222a5c",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "evidence_recorded",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786772435680
+    },
+    {
+      "id": "feature_event_0fb103f9b01a4787a1a4e3f5e7d246ed",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Shared policy, bounded DNS resolution and all-address reqwest pinning are implemented with current source evidence.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786772451867
+    },
+    {
+      "id": "feature_event_bed70161de2148a0973e03c59af398ba",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex:task-20260815-122407-18652-e47884c7",
+      "reason": "Eight outbound policy tests, ten broker compatibility tests and all source/document gates passed with current evidence.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786772464958
     }
   ]
 }

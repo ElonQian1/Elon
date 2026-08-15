@@ -103,6 +103,7 @@
 93. `docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md`：查看出站公网地址固定代码及统一回归待验证范围。
 94. `docs/decisions/open-commerce-merchant-runtime-egress-pinning-v1.md`：查看商户运行时调用阶段白名单复核和地址固定边界。
 95. `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`：查看运行时出站安全代码及统一回归待验证范围。
+96. `docs/decisions/open-commerce-outbound-public-address-pinning-v2.md`：查看共享公网地址策略、有界 DNS 和多公网地址固定边界。
 96. `docs/decisions/open-commerce-developer-app-admission-v1.md`：查看主体声明、人工风险层级和可撤销准入边界。
 97. `docs/open-commerce-developer-app-admission-v1-acceptance.md`：查看 App 准入审查代码及统一回归待验证范围。
 98. `docs/decisions/open-commerce-developer-production-credentials-v1.md`：查看默认关闭、一次性显示、能力限权和紧急撤销的生产凭据边界。
