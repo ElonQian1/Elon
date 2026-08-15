@@ -41,7 +41,10 @@ internal data class WebChatProviderIdentity(
     fun supports(capability: WebChatProviderCapability): Boolean = capability in capabilities
 
     val selectable: Boolean
-        get() = available && REQUIRED_NATIVE_NAVIGATION.all(capabilities::contains)
+        get() =
+            available &&
+                REQUIRED_NATIVE_NAVIGATION.all(capabilities::contains) &&
+                WebChatProductionCapabilityContract.isComplete(id, capabilities)
 
     companion object {
         val REQUIRED_NATIVE_NAVIGATION = setOf(

@@ -176,6 +176,9 @@ internal class MainSocialAiChatFeature(
 
     fun providerName(): String = WebChatProviderRegistry.get(providerId()).displayName
 
+    fun webChatProductionCapabilities(): org.json.JSONObject =
+        WebChatProductionCapabilityContract.describe(WebChatProviderRegistry.get(providerId()))
+
     fun isChatModeActive(): Boolean = modeController.isChatModeActive()
 
     fun webChatState(): String = activeController().stateWireValue()

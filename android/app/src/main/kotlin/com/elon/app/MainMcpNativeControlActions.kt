@@ -517,6 +517,11 @@ internal class MainMcpNativeControlActions(
             .put("interaction_mode", if (friend.isSocialAi()) feature?.interactionMode()?.wireValue ?: JSONObject.NULL else JSONObject.NULL)
             .put("web_chat_provider_id", if (friend.isSocialAi()) feature?.providerId()?.wireValue ?: JSONObject.NULL else JSONObject.NULL)
             .put("web_chat_provider_name", if (friend.isSocialAi()) feature?.providerName() ?: JSONObject.NULL else JSONObject.NULL)
+            .put(
+                "web_chat_production_capabilities",
+                if (friend.isSocialAi()) feature?.webChatProductionCapabilities() ?: JSONObject.NULL
+                else JSONObject.NULL,
+            )
             .put("web_chat_state", if (friend.isSocialAi()) feature?.webChatState() ?: JSONObject.NULL else JSONObject.NULL)
             .put(
                 "web_chat_model",
