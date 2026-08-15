@@ -26,6 +26,7 @@ mod compute_external_pool_adapter_provider_runtime_readiness;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_route_source_projection;
 mod compute_external_pool_adapter_runtime_compatibility_verification;
 mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
@@ -347,6 +348,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (267, "外部矿池 Adapter exec 后身份与会话传输加固策略", compute_external_pool_adapter_supervisor_session_policy_v2::migration_v267),
     (268, "外部矿池 Adapter Provider-neutral 运行时兼容性签名证明", compute_external_pool_adapter_runtime_compatibility_verification::migration_v268),
     (270, "外部矿池 Adapter Provider-specific cleanup 后短时运行就绪证明", compute_external_pool_adapter_provider_runtime_readiness::migration_v270),
+    (271, "外部矿池 Adapter route source logical-to-projection 映射门卫", compute_external_pool_adapter_route_source_projection::migration_v271),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
