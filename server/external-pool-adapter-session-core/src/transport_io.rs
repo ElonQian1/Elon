@@ -112,3 +112,99 @@ fn wait_ready(fd: RawFd, events: libc::c_short, deadline: Instant) -> Result<()>
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{mem::size_of, os::fd::AsRawFd, time::Duration};
+
+    use super::*;
+
+    const TEST_TIMEOUT: Duration = Duration::from_secs(1);
+
+    #[test]
+    fn receive_accepts_plain_seqpacket_within_fixed_limit() {
+        let (sender, receiver) = create_seqpacket_pair().expect("create seqpacket pair");
+        send_packet(sender.as_raw_fd(), b"plain", TEST_TIMEOUT).expect("send plain packet");
+
+        let packet =
+            receive_packet(receiver.as_raw_fd(), 5, TEST_TIMEOUT).expect("receive plain packet");
+
+        assert_eq!(&*packet, b"plain");
+    }
+
+    #[test]
+    fn receive_rejects_seqpacket_larger_than_server_fixed_limit() {
+        let (sender, receiver) = create_seqpacket_pair().expect("create seqpacket pair");
+        send_packet(sender.as_raw_fd(), b"oversize", TEST_TIMEOUT).expect("send oversized packet");
+
+        let error = receive_packet(receiver.as_raw_fd(), 4, TEST_TIMEOUT)
+            .expect_err("oversized packet must fail closed");
+
+        assert!(error.to_string().contains("truncated"));
+    }
+
+    #[test]
+    fn receive_rejects_scm_rights_control_data() {
+        let (sender, receiver) = create_seqpacket_pair().expect("create seqpacket pair");
+        let passed_fd = unsafe { libc::dup(sender.as_raw_fd()) };
+        assert!(passed_fd >= 0, "duplicate descriptor for SCM_RIGHTS");
+        let passed_fd = unsafe { OwnedFd::from_raw_fd(passed_fd) };
+
+        send_fd_control_packet(sender.as_raw_fd(), passed_fd.as_raw_fd());
+        let error = receive_packet(receiver.as_raw_fd(), 1, TEST_TIMEOUT)
+            .expect_err("SCM_RIGHTS packet must fail closed");
+
+        assert!(error.to_string().contains("truncated"));
+    }
+
+    #[test]
+    fn receive_rejects_kernel_generated_credentials() {
+        let (sender, receiver) = create_seqpacket_pair().expect("create seqpacket pair");
+        let enabled: libc::c_int = 1;
+        let result = unsafe {
+            libc::setsockopt(
+                receiver.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_PASSCRED,
+                (&enabled as *const libc::c_int).cast(),
+                size_of::<libc::c_int>() as libc::socklen_t,
+            )
+        };
+        assert_eq!(result, 0, "enable SO_PASSCRED on receiver");
+        send_packet(sender.as_raw_fd(), b"c", TEST_TIMEOUT)
+            .expect("send credential-bearing packet");
+
+        let error = receive_packet(receiver.as_raw_fd(), 1, TEST_TIMEOUT)
+            .expect_err("SCM_CREDENTIALS packet must fail closed");
+
+        assert!(error.to_string().contains("truncated"));
+    }
+
+    fn send_fd_control_packet(socket: RawFd, passed_fd: RawFd) {
+        let mut payload_byte = [b'f'];
+        let mut payload = libc::iovec {
+            iov_base: payload_byte.as_mut_ptr().cast(),
+            iov_len: payload_byte.len(),
+        };
+        let control_bytes = unsafe { libc::CMSG_SPACE(size_of::<RawFd>() as u32) } as usize;
+        let word_bytes = size_of::<usize>();
+        let mut control = vec![0_usize; control_bytes.div_ceil(word_bytes)];
+        let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
+        message.msg_iov = &mut payload;
+        message.msg_iovlen = 1;
+        message.msg_control = control.as_mut_ptr().cast();
+        message.msg_controllen = control_bytes;
+
+        let header = unsafe { libc::CMSG_FIRSTHDR(&message) };
+        assert!(!header.is_null(), "SCM_RIGHTS header must fit");
+        unsafe {
+            (*header).cmsg_level = libc::SOL_SOCKET;
+            (*header).cmsg_type = libc::SCM_RIGHTS;
+            (*header).cmsg_len = libc::CMSG_LEN(size_of::<RawFd>() as u32) as usize;
+            std::ptr::write_unaligned(libc::CMSG_DATA(header).cast::<RawFd>(), passed_fd);
+        }
+
+        let written = unsafe { libc::sendmsg(socket, &message, libc::MSG_NOSIGNAL) };
+        assert_eq!(written, 1, "send SCM_RIGHTS packet");
+    }
+}

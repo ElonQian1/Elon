@@ -58,7 +58,7 @@ pub(super) struct SupervisorScratchRoot {
 pub(crate) fn launch_external_pool_adapter_supervisor_child(
     cgroup_parent: &ExternalPoolAdapterSupervisorCgroupParent,
     child_bootstrap: ExternalPoolAdapterChildBootstrap,
-    capsule: &impl ExternalPoolAdapterSupervisorCapsule,
+    capsule: &(impl ExternalPoolAdapterSupervisorCapsule + ?Sized),
 ) -> Result<ExternalPoolAdapterSupervisorChild> {
     let policy = SupervisorPolicy::load()?;
     require_exec_transition_ptrace_guard(&policy)?;

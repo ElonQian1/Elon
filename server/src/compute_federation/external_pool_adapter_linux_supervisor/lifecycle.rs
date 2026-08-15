@@ -126,14 +126,7 @@ impl ExternalPoolAdapterSupervisorChild {
     }
 
     fn cleanup_after_reap(&mut self) -> Result<()> {
-        let cgroup_failed = self.cgroup.remove().is_err();
-        let scratch_failed = self.scratch.remove().is_err();
-        match (cgroup_failed, scratch_failed) {
-            (false, false) => Ok(()),
-            (true, false) => bail!("supervisor cgroup cleanup failed after reap"),
-            (false, true) => bail!("supervisor scratch cleanup failed after reap"),
-            (true, true) => bail!("supervisor cgroup and scratch cleanup failed after reap"),
-        }
+        cleanup_resources(|| self.cgroup.remove(), || self.scratch.remove())
     }
 
     #[cfg(test)]
@@ -151,6 +144,24 @@ impl ExternalPoolAdapterSupervisorChild {
         self.scratch.path_for_test()
     }
 }
+
+fn cleanup_resources(
+    remove_cgroup: impl FnOnce() -> Result<()>,
+    remove_scratch: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    let cgroup_failed = remove_cgroup().is_err();
+    let scratch_failed = remove_scratch().is_err();
+    match (cgroup_failed, scratch_failed) {
+        (false, false) => Ok(()),
+        (true, false) => bail!("supervisor cgroup cleanup failed after reap"),
+        (false, true) => bail!("supervisor scratch cleanup failed after reap"),
+        (true, true) => bail!("supervisor cgroup and scratch cleanup failed after reap"),
+    }
+}
+
+#[cfg(test)]
+#[path = "lifecycle_tests.rs"]
+mod tests;
 
 impl Drop for ExternalPoolAdapterSupervisorChild {
     fn drop(&mut self) {

@@ -15,6 +15,8 @@ mod probe_preparation;
 mod runtime;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod secret_delivery;
+#[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
+mod test_materialization;
 mod types;
 
 pub(in crate::store) use current::current_external_pool_adapter_runtime_bundle_authority_on;
@@ -27,6 +29,9 @@ pub(crate) use runtime::{
     ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     ExternalPoolAdapterProviderRuntimeReadinessUnavailable,
 };
+#[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
+pub(crate) use test_materialization::with_materialized_external_pool_adapter_test_capsule;
+
 pub(in crate::store) use types::{
     CurrentExternalPoolAdapterProbePreparationAuthority,
     CurrentExternalPoolAdapterRuntimeBundleAuthority, ExternalPoolAdapterRuntimeBundleRoot,

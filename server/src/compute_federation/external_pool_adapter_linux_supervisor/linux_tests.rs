@@ -1,30 +1,25 @@
 use std::{
     collections::BTreeSet,
-    ffi::CString,
     fs::{self, File},
-    os::{
-        fd::{AsRawFd, FromRawFd},
-        unix::{fs::FileExt, fs::PermissionsExt},
-    },
+    os::{fd::AsRawFd, unix::fs::PermissionsExt},
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use super::{
-    launch_external_pool_adapter_supervisor_child, ExternalPoolAdapterSupervisorCapsule,
-    ExternalPoolAdapterSupervisorCgroupParent,
+    launch_external_pool_adapter_supervisor_child, ExternalPoolAdapterSupervisorCgroupParent,
+    ExternalPoolAdapterSupervisorChild,
 };
 use crate::compute_federation::external_pool_adapter_supervisor_session::{
     external_pool_adapter_session_roots, prepare_external_pool_adapter_supervisor_session,
-    ExternalPoolAdapterSessionRoots,
+    ExternalPoolAdapterChildBootstrap, ExternalPoolAdapterSessionRoots,
 };
+use crate::store::compute_external_pool_adapter_runtime_bundle::with_materialized_external_pool_adapter_test_capsule;
 
 #[path = "linux_test_capsule_fixture.rs"]
 mod capsule_fixture;
 use capsule_fixture::minimal_capsule;
 
-const REQUIRED_CAPSULE_SEALS: libc::c_int =
-    libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
 const TMPFS_MAGIC: libc::c_long = 0x0102_1994;
 const MARKER: &[u8; 8] = b"V261_OK\n";
 
@@ -32,8 +27,6 @@ const MARKER: &[u8; 8] = b"V261_OK\n";
 type RlimitResource = libc::__rlimit_resource_t;
 #[cfg(not(target_env = "gnu"))]
 type RlimitResource = libc::c_int;
-
-struct TestCapsule(File);
 
 enum TestCapsuleBehavior {
     BlockingMarker,
@@ -44,12 +37,6 @@ enum TestCapsuleBehavior {
     DisallowedPrctlOption,
     DisallowedPrctlArgument,
     DisallowedExecveatPathPointer,
-}
-
-impl ExternalPoolAdapterSupervisorCapsule for TestCapsule {
-    fn retained_sealed_image(&self) -> &File {
-        &self.0
-    }
 }
 
 #[test]
@@ -68,13 +55,14 @@ fn rejects_non_cgroup_parent_before_clone() {
 fn linux_kernel_enforces_clone3_cgroup_namespaces_root_fd_and_limits() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::BlockingMarker));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V260 descriptors for V261 launch");
     let (host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch isolated supervisor child");
+    let mut child = launch_materialized_fixture(
+        &parent,
+        child_bootstrap,
+        TestCapsuleBehavior::BlockingMarker,
+    );
     let pid = child.pid_for_test();
     let cgroup_name = child
         .cgroup_for_test()
@@ -123,13 +111,11 @@ fn linux_kernel_enforces_clone3_cgroup_namespaces_root_fd_and_limits() {
 fn linux_kernel_seccomp_kills_network_syscall() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::NetworkProbe));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V260 descriptors for seccomp fixture");
     let (_host, child_bootstrap) = prepared.split();
     let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch seccomp fixture");
+        launch_materialized_fixture(&parent, child_bootstrap, TestCapsuleBehavior::NetworkProbe);
     let exit = child
         .wait(Duration::from_secs(2))
         .expect("wait for seccomp termination")
@@ -142,13 +128,14 @@ fn linux_kernel_seccomp_kills_network_syscall() {
 #[ignore = "requires an explicitly delegated cgroup v2 parent and root execution"]
 fn linux_kernel_seccomp_rejects_unapproved_poll_shape() {
     let parent = delegated_cgroup_parent(&delegated_cgroup_parent_path());
-    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::DisallowedPollShape));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare disallowed poll fixture");
     let (_host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch disallowed poll fixture");
+    let mut child = launch_materialized_fixture(
+        &parent,
+        child_bootstrap,
+        TestCapsuleBehavior::DisallowedPollShape,
+    );
     let exit = child
         .wait(Duration::from_secs(2))
         .expect("wait for disallowed poll termination")
@@ -161,13 +148,14 @@ fn linux_kernel_seccomp_rejects_unapproved_poll_shape() {
 #[ignore = "requires an explicitly delegated cgroup v2 parent and root execution"]
 fn linux_kernel_seccomp_rejects_fcntl_descriptor_duplication() {
     let parent = delegated_cgroup_parent(&delegated_cgroup_parent_path());
-    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::DisallowedFcntlDup));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare disallowed fcntl fixture");
     let (_host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch disallowed fcntl fixture");
+    let mut child = launch_materialized_fixture(
+        &parent,
+        child_bootstrap,
+        TestCapsuleBehavior::DisallowedFcntlDup,
+    );
     let exit = child
         .wait(Duration::from_secs(2))
         .expect("wait for disallowed fcntl termination")
@@ -180,13 +168,14 @@ fn linux_kernel_seccomp_rejects_fcntl_descriptor_duplication() {
 #[ignore = "requires an explicitly delegated cgroup v2 parent and root execution"]
 fn linux_kernel_seccomp_allows_exact_dumpable_prctl_shapes() {
     let parent = delegated_cgroup_parent(&delegated_cgroup_parent_path());
-    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::AllowedDumpablePrctl));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare exact dumpable prctl fixture");
     let (_host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch exact dumpable prctl fixture");
+    let mut child = launch_materialized_fixture(
+        &parent,
+        child_bootstrap,
+        TestCapsuleBehavior::AllowedDumpablePrctl,
+    );
     let exit = child
         .wait(Duration::from_secs(2))
         .expect("wait for exact dumpable prctl fixture")
@@ -213,13 +202,10 @@ fn linux_kernel_seccomp_rejects_execveat_pointer_and_other_prctl_shapes() {
         ),
     ] {
         let parent = delegated_cgroup_parent(&delegated_cgroup_parent_path());
-        let capsule = sealed_capsule(minimal_capsule(behavior));
         let prepared = prepare_external_pool_adapter_supervisor_session(roots())
             .expect("prepare rejected exact-seccomp fixture");
         let (_host, child_bootstrap) = prepared.split();
-        let mut child =
-            launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-                .expect("launch rejected exact-seccomp fixture");
+        let mut child = launch_materialized_fixture(&parent, child_bootstrap, behavior);
         let exit = child
             .wait(Duration::from_secs(2))
             .expect("wait for rejected exact-seccomp fixture")
@@ -234,13 +220,14 @@ fn linux_kernel_seccomp_rejects_execveat_pointer_and_other_prctl_shapes() {
 fn linux_kernel_pidfd_termination_reaps_and_cleans() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_capsule(minimal_capsule(TestCapsuleBehavior::BlockingMarker));
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V260 descriptors for termination fixture");
     let (host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch termination fixture");
+    let mut child = launch_materialized_fixture(
+        &parent,
+        child_bootstrap,
+        TestCapsuleBehavior::BlockingMarker,
+    );
     let cgroup_path = parent_path.join(
         child
             .cgroup_for_test()
@@ -274,19 +261,16 @@ fn delegated_cgroup_parent(path: &Path) -> ExternalPoolAdapterSupervisorCgroupPa
     .expect("validate delegated cgroup parent")
 }
 
-fn sealed_capsule(bytes: Vec<u8>) -> TestCapsule {
-    let name = CString::new("elon-v261-test-capsule").expect("static memfd name");
-    let fd =
-        unsafe { libc::memfd_create(name.as_ptr(), libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING) };
-    assert!(fd >= 0);
-    let file = unsafe { File::from_raw_fd(fd) };
-    file.write_all_at(&bytes, 0).expect("write test capsule");
-    assert_eq!(unsafe { libc::fchmod(fd, 0o500) }, 0);
-    assert_eq!(
-        unsafe { libc::fcntl(fd, libc::F_ADD_SEALS, REQUIRED_CAPSULE_SEALS) },
-        0
-    );
-    TestCapsule(file)
+fn launch_materialized_fixture(
+    parent: &ExternalPoolAdapterSupervisorCgroupParent,
+    child_bootstrap: ExternalPoolAdapterChildBootstrap,
+    behavior: TestCapsuleBehavior,
+) -> ExternalPoolAdapterSupervisorChild {
+    let source = minimal_capsule(behavior);
+    with_materialized_external_pool_adapter_test_capsule(&source, |capsule| {
+        launch_external_pool_adapter_supervisor_child(parent, child_bootstrap, capsule)
+    })
+    .expect("production materializer should derive and launch the fixture capsule")
 }
 
 fn roots() -> ExternalPoolAdapterSessionRoots {

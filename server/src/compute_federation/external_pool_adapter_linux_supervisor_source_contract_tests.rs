@@ -4,6 +4,8 @@ const CGROUP: &str = include_str!("external_pool_adapter_linux_supervisor/cgroup
 const CHILD: &str = include_str!("external_pool_adapter_linux_supervisor/child.rs");
 const LAUNCH: &str = include_str!("external_pool_adapter_linux_supervisor/launch.rs");
 const LIFECYCLE: &str = include_str!("external_pool_adapter_linux_supervisor/lifecycle.rs");
+const LIFECYCLE_TESTS: &str =
+    include_str!("external_pool_adapter_linux_supervisor/lifecycle_tests.rs");
 const SECCOMP: &str = include_str!("external_pool_adapter_linux_supervisor/seccomp.rs");
 const SESSION_BOOTSTRAP: &str =
     include_str!("../../external-pool-adapter-session-core/src/bootstrap.rs");
@@ -335,16 +337,22 @@ fn v267_drop_never_blocks_in_waitid_after_pidfd_poll_timeout() {
 
 #[test]
 fn v267_post_reap_cleanup_attempts_cgroup_and_scratch_and_aggregates_failures() {
-    let cleanup = LIFECYCLE
+    let cleanup_after_reap = LIFECYCLE
         .split_once("fn cleanup_after_reap")
         .expect("post-reap cleanup")
         .1
         .split_once("#[cfg(test)]")
         .expect("bounded post-reap cleanup")
         .0;
+    assert!(cleanup_after_reap
+        .contains("cleanup_resources(|| self.cgroup.remove(), || self.scratch.remove())"));
+    let cleanup = LIFECYCLE
+        .split_once("fn cleanup_resources")
+        .expect("injectable cleanup helper")
+        .1;
     for required in [
-        "let cgroup_failed = self.cgroup.remove().is_err()",
-        "let scratch_failed = self.scratch.remove().is_err()",
+        "let cgroup_failed = remove_cgroup().is_err()",
+        "let scratch_failed = remove_scratch().is_err()",
         "match (cgroup_failed, scratch_failed)",
         "supervisor cgroup cleanup failed after reap",
         "supervisor scratch cleanup failed after reap",
@@ -357,12 +365,24 @@ fn v267_post_reap_cleanup_attempts_cgroup_and_scratch_and_aggregates_failures() 
     }
     assert!(
         cleanup
-            .find("self.cgroup.remove()")
+            .find("remove_cgroup()")
             .expect("cgroup cleanup attempt")
             < cleanup
-                .find("self.scratch.remove()")
+                .find("remove_scratch()")
                 .expect("scratch cleanup attempt")
     );
+    for required in [
+        "cleanup_attempts_both_resources_when_cgroup_removal_fails",
+        "cleanup_attempts_both_resources_when_scratch_removal_fails",
+        "cleanup_reports_combined_failure_after_attempting_both_resources",
+        "cleanup_succeeds_only_after_attempting_both_resources",
+        "&[\"cgroup\", \"scratch\"]",
+    ] {
+        assert!(
+            LIFECYCLE_TESTS.contains(required),
+            "missing cleanup fault-injection evidence {required}"
+        );
+    }
     assert!(LIFECYCLE.contains("terminate supervisor after stderr overflow"));
     assert!(CGROUP.contains("duplicate failed and dedicated cgroup rollback failed"));
     assert!(LAUNCH.contains("set supervisor scratch permissions and rollback mountpoint failed"));

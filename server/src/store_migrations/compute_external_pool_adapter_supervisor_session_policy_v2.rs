@@ -73,6 +73,10 @@ mod tests {
 
     #[test]
     fn v267_does_not_change_receipt_tables_or_execution_effects() {
+        let implementation = MIGRATION
+            .split("#[cfg(test)]")
+            .next()
+            .expect("migration implementation precedes tests");
         for forbidden in [
             "CREATE TABLE",
             "ALTER TABLE",
@@ -86,7 +90,7 @@ mod tests {
             "activation_ready=1",
         ] {
             assert!(
-                !MIGRATION.contains(forbidden),
+                !implementation.contains(forbidden),
                 "V267 crossed no-effect fence {forbidden}"
             );
         }
@@ -125,3 +129,7 @@ mod tests {
         "v254_external_pool_offer_version_market_fence",
     ];
 }
+
+#[cfg(test)]
+#[path = "compute_external_pool_adapter_supervisor_session_policy_v2/dynamic_tests.rs"]
+mod dynamic_tests;

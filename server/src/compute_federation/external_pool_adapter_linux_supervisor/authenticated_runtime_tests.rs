@@ -1,30 +1,24 @@
 use std::{
     collections::BTreeSet,
-    ffi::CString,
     fs::{self, File},
-    os::{
-        fd::{AsRawFd, FromRawFd},
-        unix::fs::FileExt,
-    },
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use super::{
-    launch_external_pool_adapter_supervisor_child, ExternalPoolAdapterSupervisorCapsule,
-    ExternalPoolAdapterSupervisorCgroupParent,
+    launch_external_pool_adapter_supervisor_child, ExternalPoolAdapterSupervisorCgroupParent,
+    ExternalPoolAdapterSupervisorChild,
 };
 use crate::compute_federation::external_pool_adapter_supervisor_session::{
     external_pool_adapter_session_roots, prepare_external_pool_adapter_supervisor_session,
-    ExternalPoolAdapterSessionFrameKind,
+    ExternalPoolAdapterChildBootstrap, ExternalPoolAdapterSessionFrameKind,
 };
+use crate::store::compute_external_pool_adapter_runtime_bundle::with_materialized_external_pool_adapter_test_capsule;
 use elon_external_pool_adapter_session_core::{
     prepare_external_pool_adapter_ephemeral_bundle_delivery,
     receive_external_pool_adapter_no_work_probe_request,
 };
 
-const REQUIRED_CAPSULE_SEALS: libc::c_int =
-    libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
 const HOST_READY: &[u8] = b"v262.host.authenticated";
 const CHILD_READY: &[u8] = b"v262.child.authenticated";
 const SHUTDOWN: &[u8] = b"v262.shutdown";
@@ -35,26 +29,15 @@ const V265_REQUEST: &[u8] = b"ELON-TEST-NO-WORK\n";
 const V265_RESPONSE: &[u8] = b"ELON-TEST-NO-TASK\n";
 const V265_PROBE_TIMEOUT: Duration = Duration::from_millis(15_000);
 
-struct TestCapsule(File);
-
-impl ExternalPoolAdapterSupervisorCapsule for TestCapsule {
-    fn retained_sealed_image(&self) -> &File {
-        &self.0
-    }
-}
-
 #[test]
 #[ignore = "requires delegated cgroup v2 root execution and the static V262 fixture"]
 fn linux_kernel_exec_child_completes_mutual_authentication_and_frames() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_fixture_capsule();
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V262 authenticated runtime");
     let (host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch V262 authenticated runtime");
+    let mut child = launch_materialized_fixture(&parent, child_bootstrap);
     let pid = child.pid_for_test();
     let cgroup_path = child_cgroup_path(&parent_path, &child);
     let scratch_path = child.scratch_path_for_test().to_path_buf();
@@ -95,14 +78,11 @@ fn linux_kernel_exec_child_completes_mutual_authentication_and_frames() {
 fn linux_kernel_exec_root_drift_fails_closed_and_cleans_runtime() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_fixture_capsule();
     let prepared = prepare_external_pool_adapter_supervisor_session(roots())
         .expect("prepare V262 drift fixture");
     let (host, mut child_bootstrap) = prepared.split();
     child_bootstrap.replace_root_argument_for_test(1, digest(0xaa));
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch V262 drift fixture");
+    let mut child = launch_materialized_fixture(&parent, child_bootstrap);
     let cgroup_path = child_cgroup_path(&parent_path, &child);
     let scratch_path = child.scratch_path_for_test().to_path_buf();
 
@@ -122,7 +102,6 @@ fn linux_kernel_exec_root_drift_fails_closed_and_cleans_runtime() {
 fn linux_kernel_exec_child_receives_exact_ephemeral_bundle_and_zeroizes_on_shutdown() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_fixture_capsule();
     let delivery =
         prepare_external_pool_adapter_ephemeral_bundle_delivery(263, V263_CONFIG, V263_CREDENTIAL)
             .expect("prepare V263 delivery");
@@ -131,9 +110,7 @@ fn linux_kernel_exec_child_receives_exact_ephemeral_bundle_and_zeroizes_on_shutd
         prepare_external_pool_adapter_supervisor_session(roots_with_bundle(&bundle_root))
             .expect("prepare V263 authenticated runtime");
     let (host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch V263 authenticated runtime");
+    let mut child = launch_materialized_fixture(&parent, child_bootstrap);
     let pid = child.pid_for_test();
     let cgroup_path = child_cgroup_path(&parent_path, &child);
     let scratch_path = child.scratch_path_for_test().to_path_buf();
@@ -168,7 +145,6 @@ fn linux_kernel_exec_child_receives_exact_ephemeral_bundle_and_zeroizes_on_shutd
 fn linux_kernel_ephemeral_bundle_root_drift_fails_closed_and_cleans_runtime() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_fixture_capsule();
     let delivery =
         prepare_external_pool_adapter_ephemeral_bundle_delivery(264, V263_CONFIG, V263_CREDENTIAL)
             .expect("prepare V263 drift delivery");
@@ -177,9 +153,7 @@ fn linux_kernel_ephemeral_bundle_root_drift_fails_closed_and_cleans_runtime() {
         prepare_external_pool_adapter_supervisor_session(roots_with_bundle(&digest(0xaa)))
             .expect("prepare V263 drift runtime");
     let (host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch V263 drift runtime");
+    let mut child = launch_materialized_fixture(&parent, child_bootstrap);
     let cgroup_path = child_cgroup_path(&parent_path, &child);
     let scratch_path = child.scratch_path_for_test().to_path_buf();
 
@@ -203,7 +177,6 @@ fn linux_kernel_ephemeral_bundle_root_drift_fails_closed_and_cleans_runtime() {
 fn linux_kernel_exec_child_completes_authenticated_no_work_probe_and_reaps() {
     let parent_path = delegated_cgroup_parent_path();
     let parent = delegated_cgroup_parent(&parent_path);
-    let capsule = sealed_fixture_capsule();
     let delivery =
         prepare_external_pool_adapter_ephemeral_bundle_delivery(265, V265_CONFIG, V263_CREDENTIAL)
             .expect("prepare V265 delivery");
@@ -212,9 +185,7 @@ fn linux_kernel_exec_child_completes_authenticated_no_work_probe_and_reaps() {
         prepare_external_pool_adapter_supervisor_session(roots_with_bundle(&bundle_root))
             .expect("prepare V265 authenticated runtime");
     let (host, child_bootstrap) = prepared.split();
-    let mut child =
-        launch_external_pool_adapter_supervisor_child(&parent, child_bootstrap, &capsule)
-            .expect("launch V265 authenticated runtime");
+    let mut child = launch_materialized_fixture(&parent, child_bootstrap);
     let pid = child.pid_for_test();
     let cgroup_path = child_cgroup_path(&parent_path, &child);
     let scratch_path = child.scratch_path_for_test().to_path_buf();
@@ -283,24 +254,19 @@ fn delegated_cgroup_parent(path: &Path) -> ExternalPoolAdapterSupervisorCgroupPa
     .expect("validate delegated V262 cgroup parent")
 }
 
-fn sealed_fixture_capsule() -> TestCapsule {
+fn launch_materialized_fixture(
+    parent: &ExternalPoolAdapterSupervisorCgroupParent,
+    child_bootstrap: ExternalPoolAdapterChildBootstrap,
+) -> ExternalPoolAdapterSupervisorChild {
     let path = PathBuf::from(
         std::env::var_os("ELON_V262_SESSION_FIXTURE")
             .expect("ELON_V262_SESSION_FIXTURE must identify the static fixture binary"),
     );
     let bytes = fs::read(path).expect("read V262 fixture binary");
-    let name = CString::new("elon-v262-session-fixture").expect("static memfd name");
-    let fd =
-        unsafe { libc::memfd_create(name.as_ptr(), libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING) };
-    assert!(fd >= 0);
-    let file = unsafe { File::from_raw_fd(fd) };
-    file.write_all_at(&bytes, 0).expect("write V262 capsule");
-    assert_eq!(unsafe { libc::fchmod(fd, 0o500) }, 0);
-    assert_eq!(
-        unsafe { libc::fcntl(fd, libc::F_ADD_SEALS, REQUIRED_CAPSULE_SEALS) },
-        0
-    );
-    TestCapsule(file)
+    with_materialized_external_pool_adapter_test_capsule(&bytes, |capsule| {
+        launch_external_pool_adapter_supervisor_child(parent, child_bootstrap, capsule)
+    })
+    .expect("production materializer should derive and launch the V262 fixture capsule")
 }
 
 fn child_cgroup_path(parent: &Path, child: &super::ExternalPoolAdapterSupervisorChild) -> PathBuf {
