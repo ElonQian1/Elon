@@ -8,6 +8,7 @@ function Get-DefaultRustCachePolicy {
         critical_free_percent = 8
         partition_ttl_days = 14
         old_epoch_ttl_days = 7
+        orphan_task_grace_hours = 24
         sccache_max_size = "20G"
         auto_gc_on_run = $true
         legacy_caches = @()
@@ -48,6 +49,12 @@ function Get-RustCachePolicy {
         if ($null -eq $policy.$field) {
             throw "Rust cache policy is missing '$field': $policyPath"
         }
+    }
+    if ($null -eq $policy.PSObject.Properties["orphan_task_grace_hours"]) {
+        $policy | Add-Member -NotePropertyName orphan_task_grace_hours -NotePropertyValue 24
+    }
+    if ([double]$policy.orphan_task_grace_hours -le 0) {
+        throw "orphan_task_grace_hours must be greater than zero."
     }
     if ($policy.critical_free_percent -ge $policy.warning_free_percent) {
         throw "critical_free_percent must be lower than warning_free_percent."

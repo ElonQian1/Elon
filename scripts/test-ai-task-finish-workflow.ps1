@@ -12,6 +12,7 @@ $externalArtifactScript = Join-Path $repoRoot "scripts\ai-task-external-artifact
 $gitPathResolutionScript = Join-Path $repoRoot "scripts\git-path-resolution.ps1"
 $terminalFinalizationScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization.ps1"
 $terminalFinalizationReceiptScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization-receipt.ps1"
+$rustCacheScriptsRoot = Join-Path $repoRoot "scripts\rust-cache"
 $policyFile = Join-Path $repoRoot ".ai\workspace-policy.txt"
 
 $finishSource = Get-Content -Raw -LiteralPath $finishScript
@@ -168,6 +169,8 @@ New-Item -ItemType Directory -Path $testRoot | Out-Null
 $previousExternalScratchRoot = $env:ELON_AI_TASK_RUST_SCRATCH_ROOT
 $externalScratchRoot = Join-Path $testRoot 'external-rust-scratch'
 $env:ELON_AI_TASK_RUST_SCRATCH_ROOT = $externalScratchRoot
+$previousRustCacheRoot = $env:ELON_RUST_CACHE_ROOT
+$env:ELON_RUST_CACHE_ROOT = Join-Path $testRoot 'managed-rust-cache'
 
 try {
     $originPath = Join-Path $testRoot "origin.git"
@@ -196,6 +199,7 @@ try {
     Copy-Item -LiteralPath $gitPathResolutionScript -Destination (Join-Path $mainRepo "scripts\git-path-resolution.ps1")
     Copy-Item -LiteralPath $terminalFinalizationScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization.ps1")
     Copy-Item -LiteralPath $terminalFinalizationReceiptScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization-receipt.ps1")
+    Copy-Item -LiteralPath $rustCacheScriptsRoot -Destination (Join-Path $mainRepo "scripts") -Recurse
     Copy-Item -LiteralPath $policyFile -Destination (Join-Path $mainRepo ".ai\workspace-policy.txt")
     Set-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "finish workflow fixture`n" -Encoding UTF8
 
@@ -536,9 +540,21 @@ try {
     Assert-Contains $failureOutput "FINALIZABLE=false" "Dirty task worktree must block final reporting."
 
     Remove-Item -LiteralPath $unresolvedPath -Force
+    $taskCachePartition = Join-Path $env:ELON_RUST_CACHE_ROOT "build\rustc-test\finish-fixture\agent-validation\1111111111111111"
+    New-Item -ItemType Directory -Force -Path $taskCachePartition | Out-Null
+    @{ workspace_root = $taskWorktree; cache_scope = 'workspace'; cache_partition = '1111111111111111'; last_used_utc = [DateTime]::UtcNow.ToString('o') } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskCachePartition '.last-used.json') -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $taskCachePartition 'artifact.bin') -Value 'task-owned' -Encoding UTF8
+    $sharedTaskCachePartition = Join-Path $env:ELON_RUST_CACHE_ROOT "build\rustc-test\finish-fixture\agent-validation\shared-finish-fixture"
+    New-Item -ItemType Directory -Force -Path $sharedTaskCachePartition | Out-Null
+    @{ workspace_root = $taskWorktree; cache_scope = 'shared'; cache_partition = 'shared-finish-fixture'; last_used_utc = [DateTime]::UtcNow.ToString('o') } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $sharedTaskCachePartition '.last-used.json') -Encoding UTF8
     $cleanupOutput = Invoke-Finish -WorktreePath $taskWorktree -PerformCleanup -ContractId $taskContractId
+    Assert-Contains $cleanupOutput "RUST_CACHE_TASK_PARTITION_CLEANUP=removed:1;locked:0" "Unified finish must remove only the task-owned workspace cache partition."
     Assert-Contains $cleanupOutput "TASK_WORKTREE_STATUS=cleaned" "Unified finish must remove its merged Codex task worktree."
     Assert-Contains $cleanupOutput "FINALIZABLE=true" "Cleaned task worktree must be finalizable."
+    if (Test-Path -LiteralPath $taskCachePartition) { throw "Unified finish left the task-owned Rust cache partition behind." }
+    if (-not (Test-Path -LiteralPath $sharedTaskCachePartition)) { throw "Unified finish deleted a shared Rust cache partition." }
     $registered = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if ($registered.Contains($taskWorktree)) { throw "Task worktree is still registered after unified finish cleanup." }
     if (-not $registered.Contains("branch refs/heads/codex/peer-fixture")) { throw "Unified finish removed another agent's merged worktree." }
@@ -573,6 +589,11 @@ try {
         Remove-Item Env:ELON_AI_TASK_RUST_SCRATCH_ROOT -ErrorAction SilentlyContinue
     } else {
         $env:ELON_AI_TASK_RUST_SCRATCH_ROOT = $previousExternalScratchRoot
+    }
+    if ($null -eq $previousRustCacheRoot) {
+        Remove-Item Env:ELON_RUST_CACHE_ROOT -ErrorAction SilentlyContinue
+    } else {
+        $env:ELON_RUST_CACHE_ROOT = $previousRustCacheRoot
     }
     if (-not [string]::IsNullOrWhiteSpace([string]$platformReceiptPath) -and
         (Test-Path -LiteralPath $platformReceiptPath -PathType Leaf)) {

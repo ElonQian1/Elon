@@ -157,6 +157,162 @@
       "updated_at_ms": 1786756056943
     },
     {
+      "id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "title": "AI 任务托管 Rust 构建缓存生命周期",
+      "summary": "在受管 Codex 任务收尾时仅清理当前任务拥有的 workspace Cargo 构建分区，并让常规 Rust 缓存 GC 在宽限期后识别已消失 D:\\wt 短期 worktree 的遗留分区；共享、锁定、近期、未知和无效分区保持不动。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/ai-task-managed-rust-cache-lifecycle-v1.md",
+        "content_hash": "2961834ad7c231ae14ca18451825c3008dce671589a09f65418da4f8d5bb98bd",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "5b1e53024d5bcc4a1ba04de71141e72303aada19",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform",
+      "tags": [
+        "rust-cache",
+        "ai-task",
+        "worktree",
+        "gc"
+      ],
+      "task_paths": [
+        "docs/rust-cache-on-demand-adoption.md",
+        "docs/rust-cache-platform.md",
+        "scripts/finish-ai-task.ps1",
+        "scripts/rust-cache/RustCache.Inventory.psm1",
+        "scripts/rust-cache/RustCache.Policy.psm1",
+        "scripts/rust-cache/RustCache.TaskLifecycle.psm1",
+        "scripts/test-ai-task-finish-workflow.ps1",
+        "scripts/test-rust-cache-platform.ps1"
+      ],
+      "dependencies": [
+        "ai-task-external-rust-scratch-lifecycle-v1"
+      ],
+      "acceptance_criteria": [
+        "任务收尾只删除当前 TaskWorktree 标记拥有的非共享 16 位十六进制 workspace 构建分区。",
+        "普通 GC 即使未触发低磁盘水位，也能在宽限期后把已消失 D:\\wt 短期任务分区标记为 orphaned-task-worktree。",
+        "dry-run 与 apply 行为可区分，锁定、近期、shared、unknown、无效标记及非受管路径均保留。",
+        "旧策略文件缺少新字段时安全回退到 24 小时宽限期。",
+        "缓存平台与任务收尾测试、尺寸门禁和文档门禁通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/ai-task-managed-rust-cache-lifecycle-v1.md",
+          "content_hash": "2961834ad7c231ae14ca18451825c3008dce671589a09f65418da4f8d5bb98bd",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5b1e53024d5bcc4a1ba04de71141e72303aada19",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/rust-cache-platform.md",
+          "content_hash": "480c3318e66f902e5b3117866f30c09fd94c61e7b1d52cc66e9f1df5e5102e06",
+          "locator": "磁盘治理",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "036e75ba19633fcabe8d4fb670d42bc3e126ee96",
+            "worktree_blob_oid": "e0ed6e563b1f6d0828569a9ebafd55589b036e35",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/finish-ai-task.ps1",
+          "content_hash": "e3601a68a388d1d7d2c5cb9ef061e1dd3385636f0a39d93dbe6a97f200f29a8e",
+          "locator": "Clear-TaskRustCachePartitions",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "d4a218a622864c726efac57d826667fdd2e03aaa",
+            "worktree_blob_oid": "672037a4d4b4d321b6e1baba29dd4fd76521a59b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Inventory.psm1",
+          "content_hash": "6d306e30a6303dec94b30de081aa04add72c07ee6b4ee8630081f68631f15ca2",
+          "locator": "Clear-RustCacheTaskPartitions",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "4f81047e8f10f5e3584031eebaa5a3dd1a8f2fc8",
+            "worktree_blob_oid": "20c51c7a73fad539664a1f002bc6c25972bb1b56",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Inventory.psm1",
+          "content_hash": "6d306e30a6303dec94b30de081aa04add72c07ee6b4ee8630081f68631f15ca2",
+          "locator": "Invoke-RustCacheGc",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "4f81047e8f10f5e3584031eebaa5a3dd1a8f2fc8",
+            "worktree_blob_oid": "20c51c7a73fad539664a1f002bc6c25972bb1b56",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.TaskLifecycle.psm1",
+          "content_hash": "fd77a4bd885f7b874209d68859d9117d8e918cf08bd37983353bc1c3afbdfe9a",
+          "locator": "Read-RustCachePartitionMarker",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "cc45f1613597184982d65b71e0ebadf6f133c5c0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-ai-task-finish-workflow.ps1",
+          "content_hash": "aad0d638fe38f17ee7a78b38bb2c97015498c2a66e74ebd5c5c855e04abca4e9",
+          "locator": "RUST_CACHE_TASK_PARTITION_CLEANUP",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "b51b883e5d87b7a055e43caa4372ac7f27dd6e31",
+            "worktree_blob_oid": "241372ae2417eb2180dfd310baf1d10f850d77d9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-platform.ps1",
+          "content_hash": "17fb5a475f011a71b26e2794b8cd9afea84f7a82bf6a1417baf37b9397a9e598",
+          "locator": "orphaned-task-worktree regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7cca8f94bb058386b6bb3ed95664a3af0b4b812b",
+            "head_blob_oid": "7b02e3d1e78e362f52d23f7c36ce33ceada1a53f",
+            "worktree_blob_oid": "f4b6cba8aceae8d13461406700eda517911a6190",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786761137731,
+      "updated_at_ms": 1786762559973
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -4216,66 +4372,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_81a620de16c7479da7de9ca96417136b",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V234 migration、共享时间合同与验收文档已形成，7 项真实定向测试通过",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786645066553
-    },
-    {
-      "id": "feature_event_072328c7373e424b8ccc18da703e064e",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "reservation_expiry 3 项和 delivery_allocation_expiry 4 项均实际运行通过",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786645066566
-    },
-    {
-      "id": "feature_event_3dfafad8cc744b49913e9c5b6bbc2454",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "7 项定向验收与 rebase 后受影响回归均通过，实现已推送 origin/main@f3aa96e16",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786647275788
-    },
-    {
-      "id": "feature_event_2ff888c3498c484a8b26cd39dcf88707",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "registered",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786647694990
-    },
-    {
-      "id": "feature_event_012ef42f4ef34d468642fdff74906b52",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "claimed",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786647708306
-    },
-    {
-      "id": "feature_event_2fc8d19438a444cea455674f8b5208bf",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "开始执行 V255 局部验收矩阵",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786647708350
-    },
-    {
       "id": "feature_event_4b9e806c4b294df78b64837763fcc3bc",
       "feature_id": "compute-v255-runtime-launch-profile-verification",
       "action": "claim_released",
@@ -6214,6 +6310,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786758085963
+    },
+    {
+      "id": "feature_event_61673a722c544681bc3dd69a2771318b",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "审计发现大量已删除短期 worktree 遗留 workspace build 分区长期占用共享 D 盘，需要把创建与销毁闭环纳入任务生命周期。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786761137731
+    },
+    {
+      "id": "feature_event_032bc6ae554d4f83a479345d75206f8f",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "claimed",
+      "actor": "codex-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786761148663
+    },
+    {
+      "id": "feature_event_2f7cf66d02fe4bde8540ced215758ff3",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始实现定向任务清理、孤儿分区识别及验证。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786761162685
+    },
+    {
+      "id": "feature_event_62564d08f4ad409bb0e5c3c60589f161",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786762533147
+    },
+    {
+      "id": "feature_event_3ae4cdcb72a042018bca8ae273cbec3c",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "任务定向清理、孤儿任务分区识别、兼容策略默认值及审计报告均已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786762547479
+    },
+    {
+      "id": "feature_event_b006361e88de4972be5253a07653656b",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "缓存平台、统一收尾、预检工作流、Prompt 审计、源码尺寸和文档模块化验证均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786762559973
     }
   ]
 }

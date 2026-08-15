@@ -2,6 +2,7 @@ Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.TaskLifecycle.psm1" -Force -DisableNameChecking
 
 function Get-RustCacheDirectorySize {
     param([Parameter(Mandatory)][string]$Path)
@@ -132,6 +133,7 @@ function Get-RustCachePartitions {
             foreach ($project in Get-ChildItem -LiteralPath $epoch.FullName -Directory -Force -ErrorAction SilentlyContinue) {
                 foreach ($domain in Get-ChildItem -LiteralPath $project.FullName -Directory -Force -ErrorAction SilentlyContinue) {
                     foreach ($workspace in Get-ChildItem -LiteralPath $domain.FullName -Directory -Force -ErrorAction SilentlyContinue) {
+                        $marker = Read-RustCachePartitionMarker -PartitionPath $workspace.FullName
                         $items.Add([pscustomobject]@{
                             kind = "registered"
                             toolchain_epoch = $epoch.Name
@@ -141,6 +143,10 @@ function Get-RustCachePartitions {
                             path = $workspace.FullName
                             last_used_utc = Get-RustCachePartitionLastUsed -Directory $workspace
                             locked = Test-Path -LiteralPath (Join-Path $workspace.FullName ".rust-cache.lockdir")
+                            marker_valid = [bool]$marker.valid
+                            marker_workspace_root = $marker.workspace_root
+                            cache_scope = $marker.cache_scope
+                            marker_error = $marker.error
                         })
                     }
                 }
@@ -163,11 +169,79 @@ function Get-RustCachePartitions {
                     path = $workspace.FullName
                     last_used_utc = Get-RustCachePartitionLastUsed -Directory $workspace
                     locked = Test-Path -LiteralPath (Join-Path $workspace.FullName ".rust-cache.lockdir")
+                    marker_valid = $false
+                    marker_workspace_root = $null
+                    cache_scope = "quarantine"
+                    marker_error = "quarantine-partition"
                 })
             }
         }
     }
     return @($items | ForEach-Object { $_ })
+}
+
+function Clear-RustCacheTaskPartitions {
+    param(
+        [string]$CacheRoot,
+        [Parameter(Mandatory)][string]$TaskWorktree,
+        [switch]$Apply
+    )
+
+    if (-not (Test-RustCacheAbsolutePath $TaskWorktree)) {
+        throw "Task worktree must be absolute: $TaskWorktree"
+    }
+    $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $TaskWorktree
+    $actions = New-Object System.Collections.Generic.List[object]
+    $owned = @(Get-RustCachePartitions -CacheRoot $root | Where-Object {
+        Test-RustCacheTaskOwnedPartition -Partition $_ -TaskWorktree $TaskWorktree
+    })
+
+    foreach ($partition in $owned) {
+        $action = [ordered]@{
+            path = $partition.path
+            workspace_root = $partition.marker_workspace_root
+            size_bytes = Get-RustCacheDirectorySize -Path $partition.path
+            action = if ($Apply) { "delete" } else { "would-delete" }
+            reason = "task-worktree-finished"
+        }
+        if ($partition.locked) {
+            $action.action = "preserve"
+            $action.reason = "lock-present"
+        } elseif ($Apply) {
+            Assert-RustCacheManagedPath -CacheRoot $root -CandidatePath $partition.path
+            try {
+                Remove-RustCachePartitionSafely -CacheRoot $root -Path $partition.path -WorkspaceRoot $TaskWorktree
+            } catch {
+                if ($_.Exception.Message -like "Timed out waiting for Rust cache lock:*") {
+                    $action.action = "preserve"
+                    $action.reason = "lock-appeared"
+                } else {
+                    throw
+                }
+            }
+        }
+        $actions.Add([pscustomobject]$action)
+    }
+
+    $actionItems = @($actions | ForEach-Object { $_ })
+    $report = [pscustomobject]@{
+        schema_version = 1
+        generated_utc = [DateTime]::UtcNow.ToString("o")
+        mode = if ($Apply) { "apply" } else { "dry-run" }
+        cache_root = $root
+        task_worktree = [System.IO.Path]::GetFullPath($TaskWorktree)
+        matched_count = $owned.Count
+        removed_count = @($actionItems | Where-Object { $_.action -eq "delete" }).Count
+        would_delete_count = @($actionItems | Where-Object { $_.action -eq "would-delete" }).Count
+        preserved_locked_count = @($actionItems | Where-Object { $_.reason -in @("lock-present", "lock-appeared") }).Count
+        actions = $actionItems
+    }
+    $reportRoot = Join-Path $root "reports"
+    New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
+    $reportPath = Join-Path $reportRoot ("task-cleanup-{0}-{1}.json" -f [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss"), [Guid]::NewGuid().ToString("N").Substring(0, 8))
+    $report | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+    $report | Add-Member -NotePropertyName report_path -NotePropertyValue $reportPath
+    return $report
 }
 
 function Get-RustCacheStatus {
@@ -256,6 +330,7 @@ function Invoke-RustCacheGc {
         $oldEpoch = $partition.kind -eq "registered" -and $partition.toolchain_epoch -ne $currentEpoch
         $expired = $ageDays -ge [double]$policy.partition_ttl_days
         $oldEpochExpired = $oldEpoch -and $ageDays -ge [double]$policy.old_epoch_ttl_days
+        $orphanedTaskWorktree = Test-RustCacheOrphanedTaskPartition -Partition $partition -GraceHours ([double]$policy.orphan_task_grace_hours) -NowUtc $now
         $retiredDomain = $allowedDomains.Count -gt 0 -and
             $partition.kind -eq "registered" -and
             $partition.project_id -eq $projectManifest.project_id -and
@@ -263,13 +338,16 @@ function Invoke-RustCacheGc {
         $partition | Add-Member -NotePropertyName age_days -NotePropertyValue ([math]::Round($ageDays, 2))
         $partition | Add-Member -NotePropertyName old_epoch -NotePropertyValue $oldEpoch
         $partition | Add-Member -NotePropertyName retired_domain -NotePropertyValue $retiredDomain
-        $partition | Add-Member -NotePropertyName selected -NotePropertyValue ($retiredDomain -or $oldEpochExpired -or (($lowDisk -or $ForceAged) -and $expired))
+        $partition | Add-Member -NotePropertyName orphaned_task_worktree -NotePropertyValue $orphanedTaskWorktree
+        $partition | Add-Member -NotePropertyName selected -NotePropertyValue ($orphanedTaskWorktree -or $retiredDomain -or $oldEpochExpired -or (($lowDisk -or $ForceAged) -and $expired))
         $partition | Add-Member -NotePropertyName size_bytes -NotePropertyValue ([int64]0)
         $partition | Add-Member -NotePropertyName action -NotePropertyValue "preserve"
         $partition | Add-Member -NotePropertyName reason -NotePropertyValue "active-or-recent"
         if ($partition.locked) {
             $partition.selected = $false
             $partition.reason = "lock-present"
+        } elseif ($orphanedTaskWorktree) {
+            $partition.reason = "orphaned-task-worktree"
         } elseif ($retiredDomain) {
             $partition.reason = "retired-domain"
         } elseif ($oldEpochExpired) {
@@ -297,7 +375,7 @@ function Invoke-RustCacheGc {
         }
     }
 
-    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.retired_domain) { 0 } elseif ($_.old_epoch) { 1 } elseif ($_.kind -eq "quarantine") { 2 } else { 3 } } }, last_used_utc)
+    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.orphaned_task_worktree) { 0 } elseif ($_.retired_domain) { 1 } elseif ($_.old_epoch) { 2 } elseif ($_.kind -eq "quarantine") { 3 } else { 4 } } }, last_used_utc)
     foreach ($partition in $selected) {
         $partition.size_bytes = Get-RustCacheDirectorySize -Path $partition.path
     }
@@ -381,4 +459,4 @@ function Invoke-RustCachePreflightGc {
     return $report
 }
 
-Export-ModuleMember -Function Get-RustCacheDirectorySize, Get-RustCacheVolumeState, Get-RustCachePartitions, Get-RustCacheStatus, Test-RustCacheBuildProcesses, Invoke-RustCacheGc, Invoke-RustCachePreflightGc
+Export-ModuleMember -Function Get-RustCacheDirectorySize, Get-RustCacheVolumeState, Get-RustCachePartitions, Clear-RustCacheTaskPartitions, Get-RustCacheStatus, Test-RustCacheBuildProcesses, Invoke-RustCacheGc, Invoke-RustCachePreflightGc

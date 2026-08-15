@@ -11,6 +11,8 @@ Import-Module "$ModulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
+Import-Module "$ModulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
+Import-Module "$ModulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 
 $script:Assertions = 0
 function Assert-True {
@@ -32,6 +34,8 @@ $ProjectRoot = Join-Path $TempRoot "registered-project"
 $UnknownRoot = Join-Path $TempRoot "unknown-project"
 $CacheRoot = Join-Path $TempRoot "cache"
 New-Item -ItemType Directory -Force -Path $ProjectRoot, $UnknownRoot, $CacheRoot | Out-Null
+$previousTaskWorktreeBase = $env:ELON_AI_TASK_WORKTREE_BASE
+$env:ELON_AI_TASK_WORKTREE_BASE = Join-Path $TempRoot "wt"
 
 try {
     @'
@@ -112,6 +116,15 @@ try {
     $migrationAdvice = Get-RustCacheMigrationAdvice -CacheRoot $CacheRoot -LowWatermarkPercent 101 -ManagedAlternativeRoot (Join-Path $TempRoot "managed-alternative")
     Assert-True $migrationAdvice.migration_recommended "low-watermark advice should be structured"
     Assert-True (-not $migrationAdvice.destructive_actions_taken) "migration advice must not move or delete caches"
+    $legacyPolicyRoot = Join-Path $TempRoot "legacy-policy-cache"
+    New-Item -ItemType Directory -Force -Path (Join-Path $legacyPolicyRoot "config") | Out-Null
+    $legacyPolicy = Get-DefaultRustCachePolicy
+    $legacyPolicy.PSObject.Properties.Remove("orphan_task_grace_hours")
+    $legacyPolicy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $legacyPolicyRoot "config\policy.json") -Encoding UTF8
+    $upgradedPolicy = Get-RustCachePolicy -CacheRoot $legacyPolicyRoot
+    Assert-Equal 24 ([int]$upgradedPolicy.orphan_task_grace_hours) "old policy files should receive an in-memory orphan grace default"
+    $persistedLegacyPolicy = Get-Content -Raw -LiteralPath (Join-Path $legacyPolicyRoot "config\policy.json") | ConvertFrom-Json
+    Assert-True ($null -eq $persistedLegacyPolicy.PSObject.Properties["orphan_task_grace_hours"]) "reading an old policy should not rewrite it implicitly"
     $oldRustRoot = $env:ELON_RUST_CACHE_ROOT; $oldNodeRoot = $env:ELON_NODE_DATA_ROOT
     $oldSharedRoot = $env:RUST_SHARED_BUILD_ROOT; $oldAppData = $env:APPDATA
     try {
@@ -220,6 +233,77 @@ exit /b 0
     $retiredDomainAction = $domainGc.actions | Where-Object { $_.path -eq $retiredDomainPartition } | Select-Object -First 1
     Assert-Equal "would-delete" $retiredDomainAction.action "GC should retire a current-epoch domain outside the project allowlist"
     Assert-Equal "retired-domain" $retiredDomainAction.reason "retired domains should have an explicit reason"
+
+    $currentEpoch = Get-RustCacheToolchainEpoch
+    $missingTaskRoot = Join-Path $env:ELON_AI_TASK_WORKTREE_BASE "12345-deadbeef"
+    $orphanWorkspace = Join-Path $missingTaskRoot "server"
+    $oldMarkerTime = [DateTime]::UtcNow.AddHours(-48).ToString("o")
+    $orphanPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\1111111111111111"
+    New-Item -ItemType Directory -Force -Path $orphanPartition | Out-Null
+    @{ workspace_root = $orphanWorkspace; cache_scope = "workspace"; cache_partition = "1111111111111111"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $orphanPartition ".last-used.json") -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $orphanPartition "artifact.bin") -Value "orphan"
+
+    $recentOrphanPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\2222222222222222"
+    New-Item -ItemType Directory -Force -Path $recentOrphanPartition | Out-Null
+    @{ workspace_root = $orphanWorkspace; cache_scope = "workspace"; cache_partition = "2222222222222222"; last_used_utc = [DateTime]::UtcNow.ToString("o") } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $recentOrphanPartition ".last-used.json") -Encoding UTF8
+
+    $sharedTaskPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\shared-finish"
+    New-Item -ItemType Directory -Force -Path $sharedTaskPartition | Out-Null
+    @{ workspace_root = $orphanWorkspace; cache_scope = "shared"; cache_partition = "shared-finish"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $sharedTaskPartition ".last-used.json") -Encoding UTF8
+
+    $unmanagedMissingPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\3333333333333333"
+    New-Item -ItemType Directory -Force -Path $unmanagedMissingPartition | Out-Null
+    @{ workspace_root = (Join-Path $TempRoot "ordinary-missing\server"); cache_scope = "workspace"; cache_partition = "3333333333333333"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $unmanagedMissingPartition ".last-used.json") -Encoding UTF8
+
+    $invalidMarkerPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\4444444444444444"
+    New-Item -ItemType Directory -Force -Path $invalidMarkerPartition | Out-Null
+    '{invalid' | Set-Content -LiteralPath (Join-Path $invalidMarkerPartition ".last-used.json") -Encoding UTF8
+
+    $lockedOrphanPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\5555555555555555"
+    New-Item -ItemType Directory -Force -Path (Join-Path $lockedOrphanPartition ".rust-cache.lockdir") | Out-Null
+    @{ workspace_root = $orphanWorkspace; cache_scope = "workspace"; cache_partition = "5555555555555555"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $lockedOrphanPartition ".last-used.json") -Encoding UTF8
+
+    $nonLowDiskPolicyPath = Get-RustCachePolicyPath -CacheRoot $CacheRoot
+    $nonLowDiskPolicy = Get-Content -Raw -LiteralPath $nonLowDiskPolicyPath | ConvertFrom-Json
+    $nonLowDiskPolicy.warning_free_percent = 1
+    $nonLowDiskPolicy.recovery_free_percent = 2
+    $nonLowDiskPolicy.critical_free_percent = 0
+    $nonLowDiskPolicy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $nonLowDiskPolicyPath -Encoding UTF8
+    $orphanDryRun = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot
+    Assert-True (-not $orphanDryRun.low_disk) "orphan regression must prove selection independently of the disk watermark"
+    $orphanAction = $orphanDryRun.actions | Where-Object { $_.path -eq $orphanPartition } | Select-Object -First 1
+    Assert-Equal "would-delete" $orphanAction.action "ordinary GC should select an orphaned task partition without ForceAged"
+    Assert-Equal "orphaned-task-worktree" $orphanAction.reason "orphaned task partitions should have a stable reason"
+    Assert-True (Test-Path -LiteralPath $orphanPartition) "orphan dry-run must preserve files"
+    Assert-True (-not ($orphanDryRun.actions | Where-Object { $_.path -in @($recentOrphanPartition, $sharedTaskPartition, $unmanagedMissingPartition, $invalidMarkerPartition) -and $_.orphaned_task_worktree })) "recent, shared, unrelated, and invalid partitions must not enter orphan cleanup"
+    $lockedAction = $orphanDryRun.actions | Where-Object { $_.path -eq $lockedOrphanPartition } | Select-Object -First 1
+    Assert-Equal "lock-present" $lockedAction.reason "locked orphaned task partitions must be preserved"
+    $orphanApply = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Apply
+    Assert-True (-not (Test-Path -LiteralPath $orphanPartition)) "orphan apply should delete the eligible task partition"
+    Assert-True (Test-Path -LiteralPath $lockedOrphanPartition) "orphan apply must preserve a locked partition"
+    $preservedOrphanFixtures = @($recentOrphanPartition, $sharedTaskPartition, $unmanagedMissingPartition, $invalidMarkerPartition)
+    Assert-True (@($preservedOrphanFixtures | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 4) "orphan apply must preserve recent, shared, unrelated, and invalid partitions"
+
+    $ownedTaskRoot = Join-Path $TempRoot "explicit-finish-task"
+    $ownedWorkspace = Join-Path $ownedTaskRoot "server"
+    New-Item -ItemType Directory -Force -Path $ownedWorkspace | Out-Null
+    $ownedPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\6666666666666666"
+    New-Item -ItemType Directory -Force -Path $ownedPartition | Out-Null
+    @{ workspace_root = $ownedWorkspace; cache_scope = "workspace"; cache_partition = "6666666666666666"; last_used_utc = [DateTime]::UtcNow.ToString("o") } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ownedPartition ".last-used.json") -Encoding UTF8
+    $ownedSharedPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\shared-owned"
+    New-Item -ItemType Directory -Force -Path $ownedSharedPartition | Out-Null
+    @{ workspace_root = $ownedWorkspace; cache_scope = "shared"; cache_partition = "shared-owned"; last_used_utc = [DateTime]::UtcNow.ToString("o") } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ownedSharedPartition ".last-used.json") -Encoding UTF8
+    $taskCleanup = Clear-RustCacheTaskPartitions -CacheRoot $CacheRoot -TaskWorktree $ownedTaskRoot -Apply
+    Assert-Equal 1 $taskCleanup.removed_count "task cleanup should remove only its workspace-scoped partition"
+    Assert-True (-not (Test-Path -LiteralPath $ownedPartition)) "task cleanup should remove the owned workspace partition"
+    Assert-True (Test-Path -LiteralPath $ownedSharedPartition) "task cleanup must preserve a shared partition for the same workspace"
     Assert-Equal 0 (Get-RustCacheDirectorySize -Path (Join-Path $CacheRoot "missing-partition")) "a concurrently removed partition should have advisory size zero"
     $deletionPartition = Join-Path $CacheRoot "build\rustc-old\test-project\delete-host\bbbbbbbbbbbbbbbb"
     $longSegment = "incremental-" + ("x" * 120)
@@ -366,5 +450,10 @@ retry = 3
     Write-Host "PASS: Rust cache platform tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {
     Remove-Item Env:RUST_CACHE_TEST_ENV -ErrorAction SilentlyContinue
+    if ($null -eq $previousTaskWorktreeBase) {
+        Remove-Item Env:ELON_AI_TASK_WORKTREE_BASE -ErrorAction SilentlyContinue
+    } else {
+        $env:ELON_AI_TASK_WORKTREE_BASE = $previousTaskWorktreeBase
+    }
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

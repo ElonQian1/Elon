@@ -89,6 +89,22 @@ function Normalize-PathText {
     return $fullPath.Replace('\', '/')
 }
 
+function Clear-TaskRustCachePartitions {
+    param([Parameter(Mandatory = $true)][string]$TaskRoot)
+
+    if ($SkipArtifactCleanup) {
+        Write-Host "RUST_CACHE_TASK_PARTITION_CLEANUP=skipped"
+        return
+    }
+    $inventoryModule = Join-Path $PSScriptRoot 'rust-cache\RustCache.Inventory.psm1'
+    if (-not (Test-Path -LiteralPath $inventoryModule -PathType Leaf)) {
+        throw "Rust cache lifecycle module is missing: $inventoryModule"
+    }
+    Import-Module $inventoryModule -Force -DisableNameChecking
+    $report = Clear-RustCacheTaskPartitions -TaskWorktree $TaskRoot -Apply
+    Write-Host "RUST_CACHE_TASK_PARTITION_CLEANUP=removed:$($report.removed_count);locked:$($report.preserved_locked_count)"
+}
+
 function Get-GitWorktreeEntries {
     param([string]$RepoPath)
 
@@ -417,6 +433,7 @@ try {
             throw "Unable to unlock completed task worktree: $($unlock.Text)"
         }
         $taskWorktreeLeaseStatus = if ($unlock.ExitCode -eq 0) { "released" } else { "already_released" }
+        Clear-TaskRustCachePartitions -TaskRoot $taskRoot
         $remove = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "remove", $taskRoot)
 
         $remaining = @(Get-GitWorktreeEntries -RepoPath $mainPath | Where-Object {

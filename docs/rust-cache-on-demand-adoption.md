@@ -43,6 +43,7 @@ implementation_refs:
 | 共享分区能力难以由其他项目使用 | `SharedBuildPartition` 原先只在运行时模块和少量内部脚本中存在，机器级入口没有公开参数 | 项目适配器只能继续创建 workspace 分区，或自行复制平台逻辑 | 机器入口统一公开 `-SharedBuildPartition` |
 | 共享写入容易绕过锁 | 只设置 `CARGO_BUILD_BUILD_DIR` 不能覆盖 Cargo 进程完整生命周期 | 两个 worktree 可能同时写同一 build-dir，导致争用或损坏 | 共享分区禁止与 `-NoLock` 同用，只允许锁覆盖完整 Cargo 调用的入口 |
 | 旧安装版 GC 会被任意 Cargo/rustc 阻塞 | 已安装的 Inventory 仍使用机器级全局进程守卫 | 一个长期运行的开发服务会阻止其他已锁托管分区回收 | 平台源码已改为分区锁；安装升级应单独排期，不在业务项目提交中静默替换 |
+| 短期 worktree 删除后 workspace 分区仍保留 | Git worktree 生命周期与 `rust-cache-v2\build` 生命周期原先彼此独立 | 长会话和多代理任务会留下大量无法再命中的绝对路径哈希分区 | 统一收尾定向回收当前任务分区，GC 在 24 小时宽限后识别严格命名的失效任务根 |
 | 最终产物与可重建缓存容易混为一谈 | 历史上把通用 `target` 同时当缓存池和发布产物目录 | 清理风险大，发布脚本之间互相污染 | build-dir 归平台治理；target-dir 继续由 workspace 或发布脚本明确拥有 |
 | Node 依赖在每个 worktree 重复 | npm 的 `node_modules` 是按 checkout 实体化的安装树 | 多前端项目和 worktree 重复占盘 | 不由 Rust 缓存脚本处理，后续采用共享内容仓库的包管理方案 |
 
@@ -120,7 +121,7 @@ RUST_CACHE_PARTITION=shared-dev-windows
 | 1. 平台能力 | 公开命名共享参数、拒绝无锁共享、输出 scope/partition、补回归测试 | 已实现，待安装版按维护窗口升级 |
 | 2. 项目薄适配 | 项目的直接 Cargo 包装器转发可选共享分区，默认关闭 | BB64A 首批接入 |
 | 3. 选择性启用 | 先启用受控验证或开发入口；发布入口逐个确认 target 与并发模型 | 待逐项目执行 |
-| 4. 收敛旧分区 | 确认新分区稳定后，用 GC dry-run 识别冷 workspace 分区；审查后再 `-Apply` | 待观察数据 |
+| 4. 收敛旧分区 | 任务收尾定向删除自身 workspace 分区；GC dry-run 识别超过宽限期的失效任务分区，审查后再 `-Apply` | 平台能力已实现，机器安装版需同步验证 |
 | 5. Node 依赖 | 评估 pnpm 共享内容仓库和按项目虚拟安装树，不直接共享可写 `node_modules` | 未开始 |
 
 平台安装与项目启用是两件事：先提交并验证平台源码，再安排没有 Cargo/rustc 写入者的维护窗口更新机器安装版，最后由项目显式选择共享分区。不得因为平台支持该参数就批量修改所有项目默认值。
@@ -134,6 +135,8 @@ RUST_CACHE_PARTITION=shared-dev-windows
 3. 不同 domain、不同 rustc 代际和不同项目仍落入不同路径。
 4. `CARGO_TARGET_DIR` 没有被改成共享 build-dir。
 5. `gc` 默认 dry-run；有锁分区和 quarantine 风险区保持不动。
+6. 受管任务收尾只移除 marker 指向当前任务根的 workspace 分区，不移除同一项目的命名共享分区。
+7. 已消失的严格任务根在宽限期后显示为 `orphaned-task-worktree`；近期、任意普通缺失路径、无效 marker 和未知作用域不被该规则选中。
 
 回滚只需移除项目入口的 `-SharedBuildPartition`，下一次调用会恢复 workspace 分区。旧共享分区仍是可重建缓存，由平台 TTL/LRU 治理；不要用 `cargo clean` 指向共享根，也不要手动递归删除平台根。
 
