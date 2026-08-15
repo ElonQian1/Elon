@@ -66,7 +66,7 @@ fn runtime_compatibility_session_source_freezes_dedicated_eleven_root_abi() {
         .split_once("pub fn new_runtime_compatibility(")
         .unwrap()
         .1
-        .split_once("pub fn launch_arguments")
+        .split_once("pub fn new_task_protocol_conformance(")
         .unwrap()
         .0;
     assert_eq!(
@@ -78,10 +78,21 @@ fn runtime_compatibility_session_source_freezes_dedicated_eleven_root_abi() {
             .count(),
         11
     );
+    let runtime_root_set = SESSION_ROOTS
+        .split_once("RuntimeCompatibility {")
+        .unwrap()
+        .1
+        .split_once("TaskProtocolConformance")
+        .unwrap()
+        .0;
     for root in EXACT_RUNTIME_COMPATIBILITY_ROOTS {
         assert!(
             constructor.contains(root),
             "missing V268 session root {root}"
+        );
+        assert!(
+            runtime_root_set.contains(&format!("{root}: [u8; 32]")),
+            "V268 root lost its fixed 32-byte representation: {root}"
         );
         assert!(
             SESSION_ROOTS.contains(&format!("b\"{root}\\0\"")),
@@ -94,7 +105,6 @@ fn runtime_compatibility_session_source_freezes_dedicated_eleven_root_abi() {
             "production slot leaked into V268 constructor: {forbidden}"
         );
     }
-    assert!(SESSION_ROOTS.contains("RuntimeCompatibility([String; 11])"));
     assert!(SESSION_ROOTS.contains(
         "elon.external_pool_adapter.runtime_compatibility_verification.session.roots.v1\\0"
     ));
@@ -135,7 +145,13 @@ fn runtime_compatibility_session_source_preserves_legacy_six_root_abi() {
     for required in [
         "elon.external_pool_adapter.supervisor_session.roots.v1\\0",
         "elon.external_pool_adapter.supervisor_session.kdf_salt.v1\\0",
-        "Production([String; 6])",
+        "Production {",
+        "policy_digest: [u8; 32]",
+        "profile_digest: [u8; 32]",
+        "target_digest: [u8; 32]",
+        "companion_digest: [u8; 32]",
+        "capsule_digest: [u8; 32]",
+        "bundle_digest: [u8; 32]",
         "--elon-session-policy=",
         "--elon-session-profile=",
         "--elon-session-target=",

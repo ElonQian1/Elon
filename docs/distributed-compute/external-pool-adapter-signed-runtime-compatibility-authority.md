@@ -1,10 +1,10 @@
 ---
 title: 外部矿池 Adapter 签名运行时兼容性验证权威
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_source_contracts_and_migration_verified
 ---
 
 # 外部矿池 Adapter 签名运行时兼容性验证权威
@@ -176,9 +176,14 @@ SQL edge 逐项安装等价 replacement guard，并通过 fresh/reopen/concurren
 
 ## 6. 当前验证现实
 
-V268 已随完整 Windows product check 与 WSL2 `elon-server` test target 编译；尚未执行其专属
-migration、单元/HTTP/signature/SQLite lineage 或 Linux runner fixture，也未读取真实 Secret 或
-连接生产网络。当前状态为 `source_review_only / implementation_compiled / implementation_unrun`，
-专属动态计数仍为 `passed=0`、`failed=0`。V269 默认关闭的 admin courier caller 已随完整目标编译，
-但 unattended signer transport、私钥托管和自动签名闭环仍未接线，端到端 signed workflow 仍不可达；
-源码存在和编译通过不能证明 runner、signature、SQLite guard 或 kernel confinement 已动态验收。
+V268 统一定向 Rust 验收 24/24 通过，其中 22 项源码合同与 2 项动态迁移覆盖 fresh/repeat/reopen、精确四表一
+诊断 view、V268 唯一 migration 行、零 durable row、重复安装 schema 不漂移、四个完整性 UDF 拒绝畸形信封、
+V273 恢复持续 `eligible_rows=0` 及 18 个 V254 fence 不变；验证指纹为
+`9924f3425a1b5e0449fb291634a38fd0d0d334fd0f9fcde9ccb0467e0c0a8430`。legacy 六根与 V268 十一根源码合同
+已改为验证固定命名根、参数和 argv ABI，不再依赖内部枚举采用元组还是结构体表示。
+
+当前状态为 `implementation_partially_verified / targeted_local_source_contracts_and_migration_verified`。本批未运行
+owner/admin HTTP、direct-SQL 负向矩阵、正向 RSA signer、Linux runner fixture、SQLite 正向 lineage/concurrency，
+也未读取真实 Secret 或连接生产网络。V269 默认关闭的 admin courier caller 已随完整目标编译，但 unattended
+signer transport、私钥托管和自动签名闭环仍未接线，端到端 signed workflow 仍不可达；本地合同与迁移通过不能
+证明 runner、signature、kernel confinement 或生产 authority 已动态验收。

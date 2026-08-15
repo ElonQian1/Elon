@@ -1,10 +1,10 @@
 ---
 title: 外部矿池 Adapter 签名运行时兼容性验证验收
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_source_contracts_and_migration_verified
 ---
 
 # 外部矿池 Adapter 签名运行时兼容性验证验收
@@ -82,16 +82,18 @@ migration static test 必须比对 DDL/INSERT exact ordered columns和 placehold
 root、错误 JCS/digest、重复消费、分叉、revoked/expired head 与任意 readiness/effect升级均 fail closed。
 这些均为源码合同，不计为动态 passed。
 
-## 4. 后续动态矩阵（尚未运行）
+## 4. 动态矩阵与剩余缺口
 
-- Cargo compile/test、migration apply/reopen、owner/admin HTTP及 direct-SQL negative matrix；
+- 已运行：统一定向 Cargo test 24/24，其中 22 项源码合同和 2 项 migration apply/repeat/reopen 动态测试；动态还覆盖
+  精确四表一 view、零 durable row、四个 UDF 畸形输入失败关闭、V273 恢复零 eligible row 与 18 fence 不变。
+- 尚未运行：owner/admin HTTP 及 direct-SQL negative matrix；
 - Linux x86-64 real derived-launch fixture、Yama 2/3、ancillary injection、timeout与cleanup fault injection；
 - real V237 independent signer、wrong-key/revoked-key/replay/concurrent lineage；
 - Profile V2 checked-in machine JSON/digest reproducibility与 current catalog drift；
 - V260-V267 regression、V270 current readiness authority，以及未来 atomic activation 组合；历史
   `V268 + fresh V265` 计划不得绕过 V270 的 cleanup、短 TTL 与同进程 custody reproof。
 
-完整 Windows product check 与 WSL2 `elon-server` test target 已包含 V268 源码并编译通过，但没有
-运行本节专属动态矩阵，因此计数仍为 `passed=0`、`failed=0`。不得把 implementation 标为 verified，
-不得改变 Provider/route/activation/market authority。V269 的默认关闭 admin courier caller 已随目标编译，
+成功验证指纹为 `9924f3425a1b5e0449fb291634a38fd0d0d334fd0f9fcde9ccb0467e0c0a8430`，状态为
+`implementation_partially_verified / targeted_local_source_contracts_and_migration_verified`。不得把该状态解释为完整
+verified，也不得改变 Provider/route/activation/market authority。V269 的默认关闭 admin courier caller 已随目标编译，
 但没有 unattended signer transport、私钥托管或自动签名闭环；不得据此宣称端到端 signed workflow 已闭合。
