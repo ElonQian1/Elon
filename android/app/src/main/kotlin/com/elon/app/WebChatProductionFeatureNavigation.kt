@@ -12,8 +12,16 @@ internal data class WebChatProductionFeature(
     val kind: String,
     val selected: Boolean,
     val requiresUserConfirmation: Boolean,
+    val officialCompletion: Boolean,
     val nativeSelector: String,
-)
+) {
+    fun navigationLabel(): String = when {
+        selected && officialCompletion -> "$label（当前·官网）"
+        selected -> "$label（当前）"
+        officialCompletion -> "$label（官网）"
+        else -> label
+    }
+}
 
 internal object WebChatProductionFeatureParser {
     fun parse(navigation: JSONObject): List<WebChatProductionFeature> {
@@ -30,6 +38,8 @@ internal object WebChatProductionFeatureParser {
                 kind = feature.optString("kind").trim(),
                 selected = feature.optBoolean("selected"),
                 requiresUserConfirmation = feature.optBoolean("requires_user_confirmation"),
+                officialCompletion = WebChatProductionFeatureCompletionPolicy
+                    .requiresOfficialCompletion(feature.optString("kind")),
                 nativeSelector = feature.optString("native_adb_content_description")
                     .trim()
                     .ifBlank { "web-chat-feature:$id" },
@@ -112,13 +122,11 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
         if (features.isEmpty()) return showUnavailable()
-        val labels = features.map { feature ->
-            if (feature.selected) "${feature.label}（当前）" else feature.label
-        }
+        val labels = features.map(WebChatProductionFeature::navigationLabel)
         val dialog = AlertDialog.Builder(activity)
             .setTitle("${provider.displayName}功能")
             .setItems(labels.toTypedArray()) { _, index ->
-                features.getOrNull(index)?.let { selectFeature(port, it) }
+                features.getOrNull(index)?.let { selectFeature(provider, port, it) }
             }
             .setNeutralButton("打开官方页") { _, _ -> openOfficialFallback() }
             .setNegativeButton("取消", null)
@@ -138,17 +146,24 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         showTracked(dialog)
     }
 
-    private fun selectFeature(port: WebChatSocialMcpPort, feature: WebChatProductionFeature) {
-        if (feature.selected) return
+    private fun selectFeature(
+        provider: WebChatProviderIdentity,
+        port: WebChatSocialMcpPort,
+        feature: WebChatProductionFeature,
+    ) {
+        if (feature.selected) {
+            if (feature.officialCompletion) openOfficialFallback()
+            return
+        }
         if (!feature.requiresUserConfirmation) {
-            dispatchFeature(port, feature, userConfirmed = false)
+            dispatchFeature(provider, port, feature, userConfirmed = false)
             return
         }
         val dialog = AlertDialog.Builder(activity)
             .setTitle(feature.label)
             .setMessage("此功能可能包含健康或财务等敏感信息，是否继续打开？")
             .setPositiveButton("继续") { _, _ ->
-                dispatchFeature(port, feature, userConfirmed = true)
+                dispatchFeature(provider, port, feature, userConfirmed = true)
             }
             .setNegativeButton("取消", null)
             .create()
@@ -156,6 +171,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     }
 
     private fun dispatchFeature(
+        provider: WebChatProviderIdentity,
         port: WebChatSocialMcpPort,
         feature: WebChatProductionFeature,
         userConfirmed: Boolean,
@@ -174,7 +190,56 @@ internal class WebChatProductionFeatureNavigationCoordinator(
             Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(activity, "正在打开${feature.label}", Toast.LENGTH_SHORT).show()
+        if (!feature.officialCompletion) {
+            Toast.makeText(activity, "正在打开${feature.label}", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val requestId = WebChatProductionFeatureCompletionPolicy.requestId(result)
+        if (requestId == null) {
+            Toast.makeText(activity, "官网没有返回可确认的打开状态，请重试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val epoch = requestEpoch
+        Toast.makeText(activity, "正在打开${feature.label}官网页面...", Toast.LENGTH_SHORT).show()
+        pollOfficialCompletion(provider, port, feature, requestId, epoch, attempt = 0)
+    }
+
+    private fun pollOfficialCompletion(
+        provider: WebChatProviderIdentity,
+        port: WebChatSocialMcpPort,
+        feature: WebChatProductionFeature,
+        requestId: String,
+        epoch: Int,
+        attempt: Int,
+    ) {
+        if (epoch != requestEpoch || activeProvider() != provider.id) return
+        when (WebChatProductionFeatureCompletionPolicy.evaluate(feature, requestId, port.uiState())) {
+            WebChatProductionFeatureCompletionDecision.OPEN_OFFICIAL -> {
+                Toast.makeText(activity, "已打开${feature.label}", Toast.LENGTH_SHORT).show()
+                openOfficialFallback()
+            }
+            WebChatProductionFeatureCompletionDecision.FAILED ->
+                Toast.makeText(activity, "官网未能打开${feature.label}，请重试", Toast.LENGTH_SHORT).show()
+            WebChatProductionFeatureCompletionDecision.WAITING -> {
+                if (attempt >= MAX_FEATURE_SETTLE_ATTEMPTS) {
+                    showFeatureSettleTimeout(feature)
+                    return
+                }
+                host.postDelayed({
+                    pollOfficialCompletion(provider, port, feature, requestId, epoch, attempt + 1)
+                }, POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun showFeatureSettleTimeout(feature: WebChatProductionFeature) {
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle(feature.label)
+            .setMessage("官网页面仍在加载。可以打开官方页继续，或稍后重新选择此功能。")
+            .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
+            .setNegativeButton("取消", null)
+            .create()
+        showTracked(dialog)
     }
 
     private fun showUnavailable() {
@@ -199,6 +264,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 
     private companion object {
         const val MAX_POLL_ATTEMPTS = 8
+        const val MAX_FEATURE_SETTLE_ATTEMPTS = 32
         const val POLL_INTERVAL_MS = 250L
     }
 }

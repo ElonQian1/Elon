@@ -19,6 +19,9 @@ class WebChatProductionFeatureNavigationTest {
         assertEquals(listOf("projects", "health"), result.map { it.id })
         assertTrue(result.first().selected)
         assertTrue(result.last().requiresUserConfirmation)
+        assertTrue(result.all(WebChatProductionFeature::officialCompletion))
+        assertEquals("项目（当前·官网）", result.first().navigationLabel())
+        assertEquals("健康（官网）", result.last().navigationLabel())
         assertEquals("chatgpt-feature:projects", result.first().nativeSelector)
     }
 
