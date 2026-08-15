@@ -59,7 +59,7 @@ impl Store {
             let mut conn = self.conn().map_err(StoreError::storage)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|error| StoreError::storage(error.into()))?;
+                .map_err(|error| StoreError::storage(error))?;
             if let Some(stored) =
                 run_by_idempotency_on(&tx, &input.idempotency_scope, &input.idempotency_key)
                     .map_err(StoreError::storage)?
@@ -73,8 +73,7 @@ impl Store {
                 let output = replay_output(&stored);
                 let receipt_id = stored.receipt.run_receipt_id.clone();
                 let integrity = stored.receipt_integrity_digest.clone();
-                tx.commit()
-                    .map_err(|error| StoreError::storage(error.into()))?;
+                tx.commit().map_err(|error| StoreError::storage(error))?;
                 promote_exact_pending_replay(runtime, &receipt_id, &integrity)?;
                 return Ok(output);
             }
@@ -86,8 +85,7 @@ impl Store {
             ensure_predecessor(&input, head.as_ref()).map_err(StoreError::conflict)?;
             let execution_input =
                 into_execution_input(roots).map_err(StoreError::classify_write)?;
-            tx.commit()
-                .map_err(|error| StoreError::storage(error.into()))?;
+            tx.commit().map_err(|error| StoreError::storage(error))?;
             execution_input
         };
 
@@ -102,7 +100,7 @@ impl Store {
             let mut conn = self.conn().map_err(StoreError::storage)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|error| StoreError::storage(error.into()))?;
+                .map_err(|error| StoreError::storage(error))?;
             if let Some(stored) =
                 run_by_idempotency_on(&tx, &input.idempotency_scope, &input.idempotency_key)
                     .map_err(StoreError::storage)?
@@ -115,8 +113,7 @@ impl Store {
                 let output = replay_output(&stored);
                 let receipt_id = stored.receipt.run_receipt_id.clone();
                 let integrity = stored.receipt_integrity_digest.clone();
-                tx.commit()
-                    .map_err(|error| StoreError::storage(error.into()))?;
+                tx.commit().map_err(|error| StoreError::storage(error))?;
                 promote_exact_pending_replay(runtime, &receipt_id, &integrity)?;
                 return Ok(output);
             }
@@ -243,8 +240,7 @@ impl Store {
                 run_receipt_id: receipt.run_receipt_id,
                 receipt_integrity_digest,
             };
-            tx.commit()
-                .map_err(|error| StoreError::storage(error.into()))?;
+            tx.commit().map_err(|error| StoreError::storage(error))?;
             fresh
         };
 

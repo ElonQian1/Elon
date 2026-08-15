@@ -261,7 +261,7 @@ pub(super) fn capability_observations(
     profile_digest: &str,
     fixture_catalog_digest: &str,
 ) -> Result<Vec<TaskProtocolConformanceCapabilityObservation>> {
-    let ordinal_sets = [
+    let ordinal_sets: [Vec<u64>; 6] = [
         vec![1, 2, 3, 4, 5, 6, 7, 8],
         vec![5],
         vec![7, 8],
@@ -275,6 +275,7 @@ pub(super) fn capability_observations(
         .map(|(capability_id, exchange_ordinals)| {
             let selected: Vec<_> = exchange_ordinals
                 .iter()
+                .copied()
                 .map(|ordinal| {
                     let index = ordinal
                         .checked_sub(1)

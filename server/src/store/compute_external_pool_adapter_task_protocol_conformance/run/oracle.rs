@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 
 mod uncertainty;
 
+#[cfg(test)]
+mod tests;
+
 use crate::compute_federation::external_pool_adapter_task_protocol_conformance::TaskProtocolConformanceExchangeObservation;
 use elon_external_pool_adapter_session_core::{
     prepare_external_pool_adapter_task_request, ExternalPoolAdapterTaskProtocolHost,
