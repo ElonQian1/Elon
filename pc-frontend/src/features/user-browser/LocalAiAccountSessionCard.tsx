@@ -63,9 +63,13 @@ export default function LocalAiAccountSessionCard({
       <div className={styles.layers}>
         <Layer
           icon={<Cloud size={19} />}
-          title="一龙账号"
-          status={identityOk ? identity.ownerLabel : identity.checking ? '检查中' : '未登录'}
-          tone={identity.source === 'conflict' ? 'danger' : identityOk ? 'ready' : 'muted'}
+          title="一龙账号 / 本机访客"
+          status={identityOk ? identity.ownerLabel : identity.checking ? '检查中' : '不可用'}
+          tone={identity.source === 'conflict'
+            ? 'danger'
+            : identity.source === 'anonymous_device'
+              ? 'local'
+              : identityOk ? 'ready' : 'muted'}
           detail={identity.detail}
         />
         <Layer

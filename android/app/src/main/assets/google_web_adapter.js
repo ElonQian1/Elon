@@ -313,11 +313,23 @@
     type: 'adapter_ready',
     capabilities: ['streaming', 'citations', 'new_conversation', 'conversation_history']
   });
-  new MutationObserver(scheduleSnapshot).observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
+  const observer = new MutationObserver(scheduleSnapshot);
+  const observeDocument = () => {
+    const root = document.documentElement;
+    if (!(root instanceof Node)) return false;
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    return true;
+  };
+  if (!observeDocument()) {
+    window.addEventListener('DOMContentLoaded', () => {
+      observeDocument();
+      scheduleSnapshot();
+    }, { once: true });
+  }
   window.addEventListener('popstate', scheduleSnapshot);
   snapshot();
 })();

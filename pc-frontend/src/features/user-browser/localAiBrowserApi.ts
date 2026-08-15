@@ -158,7 +158,15 @@ export interface LocalAiWebSessionState {
   cacheStatus: 'empty' | 'cached' | 'live'
   semanticCacheStatus: 'empty' | 'cached' | 'live'
   navigationCacheStatus: 'empty' | 'cached' | 'live'
+  localConversations?: LocalAiCachedConversation[]
   cacheUpdatedAtMs: number
+  updatedAtMs: number
+}
+
+export interface LocalAiCachedConversation {
+  id: string
+  title: string
+  active: boolean
   updatedAtMs: number
 }
 
@@ -324,6 +332,21 @@ export async function controlLocalAiWebSession(
     providerId,
     ownerKey,
     action,
+  }, LOCAL_AI_INVOKE_TIMEOUTS.action)
+  return rememberSessionState(providerId, ownerKey, state)
+}
+
+export async function openLocalAiCachedConversation(
+  providerId: string,
+  ownerKey: string,
+  conversationId: string,
+): Promise<LocalAiWebSessionState> {
+  assertIdentity(providerId, ownerKey)
+  if (!/^[a-f0-9]{16}$/i.test(conversationId)) throw new Error('本机会话缓存标识无效。')
+  const state = await invokeDesktop<LocalAiWebSessionState>('open_local_ai_cached_conversation', {
+    providerId,
+    ownerKey,
+    conversationId,
   }, LOCAL_AI_INVOKE_TIMEOUTS.action)
   return rememberSessionState(providerId, ownerKey, state)
 }

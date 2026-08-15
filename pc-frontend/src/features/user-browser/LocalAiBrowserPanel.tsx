@@ -347,6 +347,7 @@ function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): st
 function ownerSourceLabel(source: LocalAiOwnerSource): string {
   if (source === 'cloud_account') return '一龙云端账号'
   if (source === 'local_node') return '本机节点恢复'
+  if (source === 'anonymous_device') return '本机访客隔离身份'
   if (source === 'conflict') return '账号不一致 · 已暂停'
   return '尚未识别'
 }

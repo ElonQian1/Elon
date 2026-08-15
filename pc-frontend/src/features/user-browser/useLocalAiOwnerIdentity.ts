@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/auth'
 import { probeLocalNode } from '../node/localNodeApi'
 import { safeNodeAdminUrl } from '../../lib/utils'
 
-export type LocalAiOwnerSource = 'cloud_account' | 'local_node' | 'conflict' | 'none'
+export type LocalAiOwnerSource = 'cloud_account' | 'local_node' | 'anonymous_device' | 'conflict' | 'none'
 
 export interface LocalAiOwnerIdentity {
   ownerKey: string
@@ -24,6 +24,7 @@ interface LocalOwnerStatus {
 export default function useLocalAiOwnerIdentity(): LocalAiOwnerIdentity {
   const user = useAuthStore((state) => state.user)
   const [localOwnerKey, setLocalOwnerKey] = useState('')
+  const [anonymousOwnerKey] = useState(readAnonymousOwnerKey)
   const [checking, setChecking] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -79,6 +80,16 @@ export default function useLocalAiOwnerIdentity(): LocalAiOwnerIdentity {
         refresh,
       }
     }
+    if (!checking) {
+      return {
+        ownerKey: anonymousOwnerKey,
+        ownerLabel: '本机访客',
+        source: 'anonymous_device',
+        checking: false,
+        detail: '无需登录一龙账号即可使用官网允许的访客聊天；厂商 Cookie 和缓存按这台电脑的访客身份隔离。登录一龙账号后会切换到独立账号空间。',
+        refresh,
+      }
+    }
     return {
       ownerKey: '',
       ownerLabel: '未识别',
@@ -86,10 +97,23 @@ export default function useLocalAiOwnerIdentity(): LocalAiOwnerIdentity {
       checking,
       detail: checking
         ? '正在读取一龙账号与本机节点身份…'
-        : '请先登录一龙账号并绑定本机节点，再创建隔离的厂商网页会话。',
+        : '暂时无法建立本机访客身份。',
       refresh,
     }
-  }, [checking, localOwnerKey, refresh, user?.account, user?.id, user?.nickname])
+  }, [anonymousOwnerKey, checking, localOwnerKey, refresh, user?.account, user?.id, user?.nickname])
+}
+
+function readAnonymousOwnerKey(): string {
+  const storageKey = 'elon_auth_client_instance_id'
+  try {
+    const existing = window.localStorage.getItem(storageKey)?.trim()
+    if (existing) return `anonymous-device:${existing}`
+    const created = `pc:${window.crypto.randomUUID()}`
+    window.localStorage.setItem(storageKey, created)
+    return `anonymous-device:${created}`
+  } catch {
+    return `anonymous-session:${window.crypto.randomUUID()}`
+  }
 }
 
 function clean(value: unknown): string {

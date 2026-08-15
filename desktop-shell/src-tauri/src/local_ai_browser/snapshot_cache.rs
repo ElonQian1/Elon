@@ -8,14 +8,26 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v1";
+const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v2";
+const LEGACY_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v1";
 const DPAPI_ENTROPY: &[u8] = b"elon.local-ai-web-snapshot.v1";
 const MAX_CACHE_BYTES: usize = 2 * 1024 * 1024;
+const CACHE_TTL_MS: u64 = 7 * 24 * 60 * 60 * 1_000;
 
 #[derive(Clone)]
 pub(super) struct LoadedSnapshot {
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
+    pub conversation_snapshots: Vec<StoredConversationSnapshot>,
+    pub updated_at_ms: u64,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub(super) struct StoredConversationSnapshot {
+    pub id: String,
+    pub title: String,
+    pub restorable_url: String,
+    pub semantic_event: Value,
     pub updated_at_ms: u64,
 }
 
@@ -25,6 +37,8 @@ struct SnapshotEnvelope {
     provider_id: String,
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
+    #[serde(default)]
+    conversation_snapshots: Vec<StoredConversationSnapshot>,
     updated_at_ms: u64,
 }
 
@@ -42,12 +56,23 @@ pub(super) fn load(path: &Path, provider_id: &str) -> Result<Option<LoadedSnapsh
     }
     let envelope: SnapshotEnvelope =
         serde_json::from_slice(&plaintext).context("decode local AI snapshot cache")?;
-    if envelope.schema != CACHE_SCHEMA || envelope.provider_id != provider_id {
+    if !matches!(envelope.schema.as_str(), CACHE_SCHEMA | LEGACY_CACHE_SCHEMA)
+        || envelope.provider_id != provider_id
+    {
         bail!("local AI snapshot cache identity is invalid");
+    }
+    if envelope.updated_at_ms == 0 || now_ms().saturating_sub(envelope.updated_at_ms) > CACHE_TTL_MS
+    {
+        clear(path);
+        return Ok(None);
     }
     Ok(Some(LoadedSnapshot {
         semantic_event: envelope.semantic_event,
         navigation_event: envelope.navigation_event,
+        conversation_snapshots: sanitize_stored_conversations(
+            provider_id,
+            envelope.conversation_snapshots,
+        ),
         updated_at_ms: envelope.updated_at_ms,
     }))
 }
@@ -57,17 +82,22 @@ pub(super) fn store(
     provider_id: &str,
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
+    conversation_snapshots: &[StoredConversationSnapshot],
     updated_at_ms: u64,
 ) -> Result<bool> {
     if !cfg!(windows) {
         return Ok(false);
     }
-    let Some(envelope) =
-        cacheable_envelope(provider_id, semantic_event, navigation_event, updated_at_ms)
-    else {
+    let Some(envelope) = cacheable_envelope(
+        provider_id,
+        semantic_event,
+        navigation_event,
+        conversation_snapshots,
+        updated_at_ms,
+    ) else {
         return Ok(false);
     };
-    let plaintext = serde_json::to_vec(&envelope).context("encode local AI snapshot cache")?;
+    let plaintext = encode_with_bounded_history(envelope)?;
     if plaintext.len() > MAX_CACHE_BYTES {
         bail!("local AI snapshot cache exceeds the local size limit");
     }
@@ -92,6 +122,7 @@ fn cacheable_envelope(
     provider_id: &str,
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
+    conversation_snapshots: &[StoredConversationSnapshot],
     updated_at_ms: u64,
 ) -> Option<SnapshotEnvelope> {
     if semantic_event.is_some_and(is_streaming_snapshot) {
@@ -111,8 +142,89 @@ fn cacheable_envelope(
         provider_id: provider_id.to_string(),
         semantic_event,
         navigation_event,
+        conversation_snapshots: sanitize_stored_conversations(
+            provider_id,
+            conversation_snapshots.to_vec(),
+        ),
         updated_at_ms,
     })
+}
+
+fn encode_with_bounded_history(mut envelope: SnapshotEnvelope) -> Result<Vec<u8>> {
+    loop {
+        let plaintext = serde_json::to_vec(&envelope).context("encode local AI snapshot cache")?;
+        if plaintext.len() <= MAX_CACHE_BYTES || envelope.conversation_snapshots.is_empty() {
+            return Ok(plaintext);
+        }
+        envelope.conversation_snapshots.pop();
+    }
+}
+
+fn sanitize_stored_conversations(
+    provider_id: &str,
+    values: Vec<StoredConversationSnapshot>,
+) -> Vec<StoredConversationSnapshot> {
+    let now = now_ms();
+    let mut values = values
+        .into_iter()
+        .filter(|entry| {
+            valid_cache_id(&entry.id)
+                && !entry.title.trim().is_empty()
+                && entry.title.chars().count() <= 160
+                && entry.updated_at_ms > 0
+                && now.saturating_sub(entry.updated_at_ms) <= CACHE_TTL_MS
+                && valid_restorable_url(provider_id, &entry.restorable_url)
+                && entry.semantic_event.get("type").and_then(Value::as_str)
+                    == Some("message_snapshot")
+        })
+        .collect::<Vec<_>>();
+    values.sort_by_key(|entry| std::cmp::Reverse(entry.updated_at_ms));
+    values.truncate(48);
+    values
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+fn valid_cache_id(value: &str) -> bool {
+    value.len() == 16 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn valid_restorable_url(provider_id: &str, value: &str) -> bool {
+    if value.len() > 4_096 {
+        return false;
+    }
+    let Ok(url) = value.parse::<tauri::Url>() else {
+        return false;
+    };
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some_and(|port| port != 443)
+        || url.fragment().is_some()
+    {
+        return false;
+    }
+    match provider_id {
+        "chatgpt" => {
+            url.host_str() == Some("chatgpt.com")
+                && url.query().is_none()
+                && (url.path().starts_with("/c/") || url.path().starts_with("/g/"))
+        }
+        "google-ai-mode" => {
+            matches!(url.host_str(), Some("google.com" | "www.google.com"))
+                && matches!(url.path(), "/aimode" | "/search")
+        }
+        _ => false,
+    }
+}
+
+pub(super) fn normalize_restorable_url(provider_id: &str, value: &str) -> Option<String> {
+    valid_restorable_url(provider_id, value).then(|| value.to_string())
 }
 
 fn is_streaming_snapshot(value: &Value) -> bool {
@@ -315,6 +427,7 @@ mod tests {
                 "messages": [{"state": "completed", "content": [{"type": "text", "text": "answer"}]}]
             })),
             None,
+            &[],
             42,
         )
         .unwrap();
@@ -326,7 +439,7 @@ mod tests {
             "streaming": true,
             "messages": [{"state": "streaming"}]
         });
-        assert!(cacheable_envelope("chatgpt", Some(&streaming), None, 43).is_none());
+        assert!(cacheable_envelope("chatgpt", Some(&streaming), None, &[], 43).is_none());
     }
 
     #[cfg(windows)]
@@ -358,9 +471,10 @@ mod tests {
             "streaming": false,
             "messages": [{"state": "completed"}]
         });
-        assert!(store(&path, "chatgpt", Some(&semantic), None, 99).unwrap());
+        let stored_at = now_ms();
+        assert!(store(&path, "chatgpt", Some(&semantic), None, &[], stored_at,).unwrap());
         let loaded = load(&path, "chatgpt").unwrap().unwrap();
-        assert_eq!(loaded.updated_at_ms, 99);
+        assert_eq!(loaded.updated_at_ms, stored_at);
         assert_eq!(loaded.semantic_event.unwrap()["draft"], "");
 
         fs::write(&path, b"corrupt cache").unwrap();

@@ -8,8 +8,9 @@ const MAX_DRAFT_CHARS: usize = 20_000;
 const ADAPTER_VERSION: u32 = 7;
 
 pub fn initialization_script() -> String {
-    let answer_candidate_policy =
-        include_str!("../../../../android/app/src/main/assets/google_web_answer_candidate_policy.js");
+    let answer_candidate_policy = include_str!(
+        "../../../../android/app/src/main/assets/google_web_answer_candidate_policy.js"
+    );
     let message_extractor =
         include_str!("../../../../android/app/src/main/assets/google_web_message_extractor.js");
     let composer_bridge =

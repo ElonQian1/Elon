@@ -78,13 +78,12 @@ fn insert_token(
     }
 }
 
-fn insert_count(
-    target: &mut Map<String, Value>,
-    source: &Map<String, Value>,
-    key: &str,
-    max: u64,
-) {
-    if let Some(value) = source.get(key).and_then(Value::as_u64).filter(|value| *value > 0 && *value <= max) {
+fn insert_count(target: &mut Map<String, Value>, source: &Map<String, Value>, key: &str, max: u64) {
+    if let Some(value) = source
+        .get(key)
+        .and_then(Value::as_u64)
+        .filter(|value| *value > 0 && *value <= max)
+    {
         target.insert(key.to_string(), Value::Number(value.into()));
     }
 }
@@ -105,9 +104,9 @@ fn valid_language(value: &str) -> bool {
 
 fn valid_media_type(value: &str) -> bool {
     value.split_once('/').is_some()
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'+' | b'-' | b'/')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'+' | b'-' | b'/'))
 }
 
 fn valid_host(value: &str) -> bool {

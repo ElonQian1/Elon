@@ -31,8 +31,10 @@ import AiWebChatSidebar from '../user-browser/AiWebChatSidebar'
 import AiWebProviderPopover from '../user-browser/AiWebProviderPopover'
 import AiWebComposerControls from '../user-browser/AiWebComposerControls'
 import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
+import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
+import AiChatWelcome from './AiChatWelcome'
 import type { AiHomeMode } from './AiHomeModeSwitch'
 import AiPinnedTools from './AiPinnedTools'
 import AiUserProfilePopover, { type AiChatFriend } from './AiUserProfilePopover'
@@ -118,7 +120,8 @@ function shouldRetryRemoteNodeExec(result: { output?: string; error?: string; ex
 export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; onModeChange: (mode: AiHomeMode) => void }) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const web = useAiWebChatBackend(mode, user?.id || '')
+  const localAiOwner = useLocalAiOwnerIdentity()
+  const web = useAiWebChatBackend(mode, localAiOwner.ownerKey)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
   const modelOptions = useModelStore((s) => s.options)
@@ -186,6 +189,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
     [runtimeRoute, modelLabel, modelOptions, selectedAgent, remoteNodeNameValue],
   )
   const chatMode = mode === 'chat'
+  const visibleIdentityReady = chatMode ? Boolean(localAiOwner.ownerKey) : Boolean(user?.id)
   const visibleMessages = chatMode ? web.messages : messages
   const lastVisibleAssistantId = [...visibleMessages].reverse().find((message) => message.role === 'assistant')?.id
   const visibleInput = chatMode ? web.controller.draft : input
@@ -603,9 +607,9 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
     e.preventDefault()
     if (chatMode) {
       const text = web.controller.draft.trim()
-      if (!user?.id) {
-        setError('请先登录一龙账号后开始对话。')
-        setLoginDialogOpen(true)
+      if (!localAiOwner.ownerKey) {
+        setError(localAiOwner.detail)
+        if (localAiOwner.source === 'none') setLoginDialogOpen(true)
         return
       }
       if (web.controller.snapshot?.streaming) {
@@ -800,7 +804,11 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   }
 
   return (
-    <div className={styles.layout} data-user-panel-collapsed={userPanelCollapsed ? 'true' : undefined}>
+    <div
+      className={styles.layout}
+      data-ai-surface="production-home"
+      data-user-panel-collapsed={userPanelCollapsed ? 'true' : undefined}
+    >
       {/* 会话列表（左栏）*/}
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
@@ -891,36 +899,15 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
             <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
           )}
           {visibleMessages.length === 0 && !visibleMessageLoading && (
-            <div className={styles.welcome}>
-              <h2>你好，我是一龙 AI</h2>
-              <p>{!user?.id
-                ? '登录账号后即可开始和我对话。'
-                : chatMode
-                  ? `${web.provider?.displayName || '官方网页 AI'} 是当前消息来源；访客可用时直接聊天，登录只用于历史、项目和增强能力。`
-                : onlineNodeId
-                  ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。`
-                  : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
-              {!user?.id && (
-                <div className={styles.loginPrompt}>
-                  <button
-                    className={styles.startBtn}
-                    type="button"
-                    onClick={() => setLoginDialogOpen(true)}
-                  >
-                    登录账号
-                  </button>
-                  <span>登录后可以开始对话，并同步你的项目、好友和电脑节点。</span>
-                </div>
-              )}
-              {user?.id && chatMode && !web.canCompose && (
-                <div className={styles.loginPrompt}>
-                  <button className={styles.startBtn} type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || visibleSending}>
-                    {web.userState.phase === 'login_required' ? '登录 / 打开官方页' : '显示官方页处理'}
-                  </button>
-                  <span>{web.userState.detail}</span>
-                </div>
-              )}
-            </div>
+            <AiChatWelcome
+              chatMode={chatMode}
+              identityReady={visibleIdentityReady}
+              onlineNodeId={onlineNodeId || ''}
+              onlineNodeName={onlineNodeName}
+              sending={visibleSending}
+              web={web}
+              onLogin={() => setLoginDialogOpen(true)}
+            />
           )}
           {visibleMessageLoading && <p className={styles.hint}>{chatMode ? '正在连接本地网页 AI…' : '读取消息…'}</p>}
           {visibleMessages.filter((m) => m.role !== 'system').map((m, i) => (
@@ -935,7 +922,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               onConversationForked={chatMode ? undefined : openForkedConversation}
               onProjectHandoff={chatMode ? undefined : handleProjectHandoff}
               onRegenerate={chatMode && m.id === lastVisibleAssistantId && web.provider?.adapterActions.includes('regenerate_response')
-                ? () => web.controller.run('regenerate_response')
+                ? async () => { await web.controller.run('regenerate_response') }
                 : undefined}
             />
           ))}

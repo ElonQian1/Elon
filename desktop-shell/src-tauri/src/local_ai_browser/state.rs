@@ -11,6 +11,9 @@ use tauri::Url;
 
 use super::snapshot_cache;
 
+#[path = "state/cache.rs"]
+mod cache;
+
 #[derive(Clone, Default)]
 pub struct LocalAiBrowserRuntime {
     sessions: Arc<Mutex<HashMap<String, SessionRecord>>>,
@@ -43,6 +46,8 @@ struct SessionRecord {
     streaming: bool,
     semantic_live: bool,
     navigation_live: bool,
+    conversation_snapshots: Vec<snapshot_cache::StoredConversationSnapshot>,
+    active_restorable_url: Option<String>,
     cache_path: Option<PathBuf>,
     cache_updated_at_ms: u64,
     updated_at_ms: u64,
@@ -71,11 +76,53 @@ pub struct LocalAiWebSessionState {
     pub cache_status: String,
     pub semantic_cache_status: String,
     pub navigation_cache_status: String,
+    pub local_conversations: Vec<LocalAiCachedConversation>,
     pub cache_updated_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalAiCachedConversation {
+    pub id: String,
+    pub title: String,
+    pub active: bool,
+    pub updated_at_ms: u64,
+}
+
 impl LocalAiBrowserRuntime {
+    pub fn cached_restorable_url(&self, label: &str) -> Option<String> {
+        self.sessions().get(label).and_then(|record| {
+            record.active_restorable_url.clone().or_else(|| {
+                record
+                    .semantic_event
+                    .as_ref()
+                    .and_then(|event| event.get("url"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToOwned::to_owned)
+            })
+        })
+    }
+
+    pub fn activate_cached_conversation(&self, label: &str, id: &str) -> Option<String> {
+        let mut sessions = self.sessions();
+        let record = sessions.get_mut(label)?;
+        let cached = record
+            .conversation_snapshots
+            .iter()
+            .find(|entry| entry.id == id)
+            .cloned()?;
+        record.semantic_event = Some(cached.semantic_event);
+        record.active_restorable_url = Some(cached.restorable_url.clone());
+        record.semantic_live = false;
+        record.streaming = false;
+        record.last_event_kind = "cached_conversation_activated".to_string();
+        record.updated_at_ms = now_ms();
+        Some(cached.restorable_url)
+    }
+
     pub fn ensure_session(&self, label: &str, provider_id: &str, renderer_status: &str) {
         self.ensure_session_record(label, provider_id, renderer_status, None);
     }
@@ -105,15 +152,20 @@ impl LocalAiBrowserRuntime {
             .and_then(|path| snapshot_cache::load(path, provider_id).ok().flatten());
         let mut sessions = self.sessions();
         sessions.entry(label.to_string()).or_insert_with(|| {
-            let (semantic_event, navigation_event, cache_updated_at_ms) = cached
-                .map(|snapshot| {
-                    (
-                        snapshot.semantic_event,
-                        snapshot.navigation_event,
-                        snapshot.updated_at_ms,
-                    )
-                })
-                .unwrap_or_default();
+            let (semantic_event, navigation_event, conversation_snapshots, cache_updated_at_ms) =
+                cached
+                    .map(|snapshot| {
+                        (
+                            snapshot.semantic_event,
+                            snapshot.navigation_event,
+                            snapshot.conversation_snapshots,
+                            snapshot.updated_at_ms,
+                        )
+                    })
+                    .unwrap_or_default();
+            let active_restorable_url = conversation_snapshots
+                .first()
+                .map(|entry| entry.restorable_url.clone());
             SessionRecord {
                 provider_id: provider_id.to_string(),
                 window_label: label.to_string(),
@@ -140,6 +192,8 @@ impl LocalAiBrowserRuntime {
                 streaming: false,
                 semantic_live: false,
                 navigation_live: false,
+                conversation_snapshots,
+                active_restorable_url,
                 cache_path,
                 cache_updated_at_ms,
                 updated_at_ms: now_ms(),
@@ -168,11 +222,14 @@ impl LocalAiBrowserRuntime {
         blocked_message: Option<&str>,
     ) {
         let safe_url = safe_visible_url(url);
+        let raw_url = url.as_str().to_string();
         let host = url.host_str().unwrap_or_default().to_string();
         self.update(label, |record| {
             record.current_url = safe_url;
             record.current_host = host;
             if allowed {
+                record.active_restorable_url =
+                    snapshot_cache::normalize_restorable_url(&record.provider_id, &raw_url);
                 record.window_status = "loading".to_string();
                 record.loading = true;
                 record.renderer_status = "connecting".to_string();
@@ -236,7 +293,8 @@ impl LocalAiBrowserRuntime {
             record.command_result = None;
             record.last_event_kind = "command_pending".to_string();
             record.last_command_action = truncate(action.to_string(), 48);
-            record.last_command_request_id = request_id.map(|value| truncate(value.to_string(), 36));
+            record.last_command_request_id =
+                request_id.map(|value| truncate(value.to_string(), 36));
             record.last_command_ok = None;
         });
     }
@@ -245,71 +303,78 @@ impl LocalAiBrowserRuntime {
         self.update(label, |record| {
             record.last_event_kind = truncate(kind.to_string(), 48);
             match kind {
-            "adapter_ready" => {
-                record.renderer_status = "active".to_string();
-                record.last_error = None;
-                record.last_error_code = None;
+                "adapter_ready" => {
+                    record.renderer_status = "active".to_string();
+                    record.last_error = None;
+                    record.last_error_code = None;
+                }
+                "message_snapshot" => {
+                    record.renderer_status = "active".to_string();
+                    record.semantic_event = Some(payload);
+                    let snapshot = record.semantic_event.as_ref();
+                    record.message_count = snapshot
+                        .and_then(|event| event.get("messages"))
+                        .and_then(Value::as_array)
+                        .map_or(0, Vec::len);
+                    record.assistant_message_count = snapshot
+                        .and_then(|event| event.get("messages"))
+                        .and_then(Value::as_array)
+                        .map_or(0, |messages| {
+                            messages
+                                .iter()
+                                .filter(|message| {
+                                    message.get("role").and_then(Value::as_str) == Some("assistant")
+                                })
+                                .count()
+                        });
+                    record.streaming = snapshot
+                        .and_then(|event| event.get("streaming"))
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    record.semantic_live = true;
+                    record.cache_updated_at_ms = now_ms();
+                    record.last_error = None;
+                    record.last_error_code = None;
+                    record.remember_current_conversation();
+                }
+                "conversation_snapshot" => {
+                    record.renderer_status = "active".to_string();
+                    record.navigation_event = Some(payload);
+                    record.navigation_live = true;
+                    record.cache_updated_at_ms = now_ms();
+                    record.last_error = None;
+                    record.last_error_code = None;
+                }
+                "composer_controls_snapshot" => record.composer_event = Some(payload),
+                "navigation_snapshot" => record.feature_event = Some(payload),
+                "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
+                "command_result" => {
+                    record.last_command_action = payload
+                        .get("action")
+                        .and_then(Value::as_str)
+                        .map_or_else(String::new, |value| truncate(value.to_string(), 48));
+                    record.last_command_request_id = payload
+                        .get("requestId")
+                        .and_then(Value::as_str)
+                        .map(|value| truncate(value.to_string(), 36));
+                    record.last_command_ok = payload.get("ok").and_then(Value::as_bool);
+                    record.command_result = Some(payload);
+                }
+                "browser_diagnostic" => {
+                    let detail = payload
+                        .get("detail")
+                        .and_then(Value::as_str)
+                        .unwrap_or("ChatGPT 页面暂未完成加载。")
+                        .to_string();
+                    record.last_error = Some(truncate(detail, 240));
+                    record.last_error_code = payload
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .map(|kind| truncate(kind.to_string(), 48));
+                }
+                _ => {}
             }
-            "message_snapshot" => {
-                record.renderer_status = "active".to_string();
-                record.semantic_event = Some(payload);
-                let snapshot = record.semantic_event.as_ref();
-                record.message_count = snapshot
-                    .and_then(|event| event.get("messages"))
-                    .and_then(Value::as_array)
-                    .map_or(0, Vec::len);
-                record.assistant_message_count = snapshot
-                    .and_then(|event| event.get("messages"))
-                    .and_then(Value::as_array)
-                    .map_or(0, |messages| messages.iter().filter(|message| {
-                        message.get("role").and_then(Value::as_str) == Some("assistant")
-                    }).count());
-                record.streaming = snapshot
-                    .and_then(|event| event.get("streaming"))
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false);
-                record.semantic_live = true;
-                record.cache_updated_at_ms = now_ms();
-                record.last_error = None;
-                record.last_error_code = None;
-            }
-            "conversation_snapshot" => {
-                record.renderer_status = "active".to_string();
-                record.navigation_event = Some(payload);
-                record.navigation_live = true;
-                record.cache_updated_at_ms = now_ms();
-                record.last_error = None;
-                record.last_error_code = None;
-            }
-            "composer_controls_snapshot" => record.composer_event = Some(payload),
-            "navigation_snapshot" => record.feature_event = Some(payload),
-            "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
-            "command_result" => {
-                record.last_command_action = payload
-                    .get("action")
-                    .and_then(Value::as_str)
-                    .map_or_else(String::new, |value| truncate(value.to_string(), 48));
-                record.last_command_request_id = payload
-                    .get("requestId")
-                    .and_then(Value::as_str)
-                    .map(|value| truncate(value.to_string(), 36));
-                record.last_command_ok = payload.get("ok").and_then(Value::as_bool);
-                record.command_result = Some(payload);
-            }
-            "browser_diagnostic" => {
-                let detail = payload
-                    .get("detail")
-                    .and_then(Value::as_str)
-                    .unwrap_or("ChatGPT 页面暂未完成加载。")
-                    .to_string();
-                record.last_error = Some(truncate(detail, 240));
-                record.last_error_code = payload
-                    .get("kind")
-                    .and_then(Value::as_str)
-                    .map(|kind| truncate(kind.to_string(), 48));
-            }
-            _ => {}
-        }});
+        });
         if matches!(kind, "message_snapshot" | "conversation_snapshot") {
             self.persist_snapshot(label);
         }
@@ -336,6 +401,8 @@ impl LocalAiBrowserRuntime {
             record.streaming = false;
             record.semantic_live = false;
             record.navigation_live = false;
+            record.conversation_snapshots.clear();
+            record.active_restorable_url = None;
             record.cache_updated_at_ms = 0;
             record.updated_at_ms = now_ms();
             record.cache_path.clone()
@@ -396,12 +463,20 @@ impl LocalAiBrowserRuntime {
                         record.provider_id.clone(),
                         record.semantic_event.clone(),
                         record.navigation_event.clone(),
+                        record.conversation_snapshots.clone(),
                         record.cache_updated_at_ms,
                     )
                 })
             })
         };
-        let Some((path, provider_id, semantic_event, navigation_event, updated_at_ms)) = snapshot
+        let Some((
+            path,
+            provider_id,
+            semantic_event,
+            navigation_event,
+            conversation_snapshots,
+            updated_at_ms,
+        )) = snapshot
         else {
             return;
         };
@@ -410,6 +485,7 @@ impl LocalAiBrowserRuntime {
             &provider_id,
             semantic_event.as_ref(),
             navigation_event.as_ref(),
+            &conversation_snapshots,
             updated_at_ms,
         );
     }
@@ -431,6 +507,17 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             .event_cache_status(record.navigation_event.is_some(), record.navigation_live)
             .to_string();
         let diagnostics = diagnostic_summary(&record);
+        let local_conversations = record
+            .conversation_snapshots
+            .iter()
+            .map(|entry| LocalAiCachedConversation {
+                id: entry.id.clone(),
+                title: entry.title.clone(),
+                active: record.active_restorable_url.as_deref()
+                    == Some(entry.restorable_url.as_str()),
+                updated_at_ms: entry.updated_at_ms,
+            })
+            .collect();
         Self {
             provider_id: record.provider_id,
             window_label: record.window_label,
@@ -452,6 +539,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             cache_status,
             semantic_cache_status,
             navigation_cache_status,
+            local_conversations,
             cache_updated_at_ms: record.cache_updated_at_ms,
             updated_at_ms: record.updated_at_ms,
         }
@@ -469,40 +557,6 @@ fn diagnostic_summary(record: &SessionRecord) -> Value {
         "streaming": record.streaming,
         "updatedAtMs": record.updated_at_ms,
     })
-}
-
-impl SessionRecord {
-    fn mark_snapshot_cached(&mut self) {
-        if self.semantic_event.is_some() {
-            self.semantic_live = false;
-        }
-        if self.navigation_event.is_some() {
-            self.navigation_live = false;
-        }
-    }
-
-    fn cache_status(&self) -> &'static str {
-        let has_semantic = self.semantic_event.is_some();
-        let has_navigation = self.navigation_event.is_some();
-        if !has_semantic && !has_navigation {
-            return "empty";
-        }
-        if (!has_semantic || self.semantic_live) && (!has_navigation || self.navigation_live) {
-            "live"
-        } else {
-            "cached"
-        }
-    }
-
-    fn event_cache_status(&self, present: bool, live: bool) -> &'static str {
-        if !present {
-            "empty"
-        } else if live {
-            "live"
-        } else {
-            "cached"
-        }
-    }
 }
 
 fn safe_visible_url(url: &Url) -> String {
@@ -581,8 +635,14 @@ mod tests {
 
         let snapshot = runtime.snapshot("session").unwrap();
         assert_eq!(snapshot.composer_event.unwrap()["section"], "model");
-        assert_eq!(snapshot.feature_event.unwrap()["type"], "navigation_snapshot");
-        assert_eq!(snapshot.command_result.unwrap()["requestId"], "mcp_receipt1");
+        assert_eq!(
+            snapshot.feature_event.unwrap()["type"],
+            "navigation_snapshot"
+        );
+        assert_eq!(
+            snapshot.command_result.unwrap()["requestId"],
+            "mcp_receipt1"
+        );
         assert_eq!(snapshot.diagnostics["lastCommandRequestId"], "mcp_receipt1");
     }
 
@@ -634,6 +694,42 @@ mod tests {
         assert!(!encoded.contains("private prompt"));
         assert!(!encoded.contains("private answer"));
         assert!(!encoded.contains("private exception detail"));
+    }
+
+    #[test]
+    fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages() {
+        let runtime = LocalAiBrowserRuntime::default();
+        runtime.ensure_session("session", "google-ai-mode", "active");
+        runtime.mark_navigation(
+            "session",
+            &Url::parse("https://www.google.com/search?q=private+prompt&udm=50").unwrap(),
+            true,
+            None,
+        );
+        runtime.record_adapter_event(
+            "session",
+            "message_snapshot",
+            json!({
+                "type": "message_snapshot",
+                "title": "Cached search",
+                "streaming": false,
+                "messages": [{"role": "assistant", "content": [{"type": "text", "text": "answer"}]}],
+            }),
+        );
+
+        let snapshot = runtime.snapshot("session").unwrap();
+        assert_eq!(snapshot.local_conversations.len(), 1);
+        assert!(snapshot.local_conversations[0].active);
+        let encoded = serde_json::to_string(&snapshot).unwrap();
+        assert!(!encoded.contains("private+prompt"));
+
+        let id = snapshot.local_conversations[0].id.clone();
+        assert!(runtime
+            .activate_cached_conversation("session", &id)
+            .is_some());
+        let restored = runtime.snapshot("session").unwrap();
+        assert_eq!(restored.semantic_cache_status, "cached");
+        assert_eq!(restored.semantic_event.unwrap()["title"], "Cached search");
     }
 
     #[test]

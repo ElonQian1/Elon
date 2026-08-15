@@ -6,6 +6,7 @@ import {
   isLocalAiConversationSnapshot,
   isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
+  openLocalAiCachedConversation,
   openLocalAiWebSession,
   runLocalAiWebAdapterCommand,
   waitForLocalAiAdapterResult,
@@ -176,11 +177,25 @@ export default function useLocalAiWebChatController(
     }
   }
 
-  async function run(action: LocalAiAdapterAction, value?: string, expectedDraft?: string) {
+  async function openCachedConversation(conversationId: string) {
     if (!provider || !ownerKey || busyAction) return
+    setBusyAction('open_cached_conversation')
+    setMessage('正在从本机缓存恢复会话，并在后台连接官方上下文…')
+    try {
+      setSessionState(await openLocalAiCachedConversation(provider.id, ownerKey, conversationId))
+      setMessage('已立即恢复本机会话缓存；官方页面正在后台同步最新内容。')
+    } catch (error) {
+      setMessage(localAiBrowserErrorMessage(error))
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function run(action: LocalAiAdapterAction, value?: string, expectedDraft?: string) {
+    if (!provider || !ownerKey || busyAction) return null
     if (!provider.adapterActions.includes(action)) {
       setMessage(`${provider.displayName} 当前不支持这个原生动作；可以显示官方窗口继续使用。`)
-      return
+      return null
     }
     setBusyAction(action)
     setMessage('')
@@ -189,7 +204,7 @@ export default function useLocalAiWebChatController(
       const next = await waitForLocalAiAdapterResult(provider.id, ownerKey, action, requestId)
       if (!next) {
         setMessage('没有收到当前命令的匹配回执；为避免误判，一龙没有把这次操作标记为成功。请显示官方页检查后重试。')
-        return
+        return null
       }
       if (next) setSessionState(next)
       const result = next?.commandResult
@@ -202,8 +217,10 @@ export default function useLocalAiWebChatController(
       } else if (result?.detail) {
         setMessage(result.detail)
       }
+      return next
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
+      return null
     } finally {
       setBusyAction('')
     }
@@ -272,6 +289,7 @@ export default function useLocalAiWebChatController(
     message,
     openOfficial,
     control,
+    openCachedConversation,
     run,
     refreshComposerControls,
     refreshFeatureNavigation,

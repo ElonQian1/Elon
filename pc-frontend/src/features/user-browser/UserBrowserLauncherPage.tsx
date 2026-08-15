@@ -82,14 +82,14 @@ export default function UserBrowserLauncherPage() {
   const ready = availability === 'ready' && Boolean(match)
 
   return (
-    <section className={styles.page}>
+    <section className={styles.page} data-ai-surface="diagnostics-and-login">
       <header className={styles.header}>
         <div className={styles.identityMark} aria-hidden="true">
           <Fingerprint size={30} strokeWidth={1.8} />
         </div>
         <div>
-          <span className={styles.eyebrow}>官方 AI 网页</span>
-          <h1>ChatGPT 与 Google AI 模式</h1>
+          <span className={styles.eyebrow}>诊断与登录工具 · 非聊天首页</span>
+          <h1>官方 AI 会话检查</h1>
           <p>本地隔离会话 · Cookie 和网页数据仅保存在这台电脑</p>
         </div>
         <Status availability={availability} localBrowserState={localBrowser.state} />

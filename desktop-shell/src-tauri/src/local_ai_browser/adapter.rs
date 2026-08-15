@@ -22,9 +22,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
         if value.get("providerId").and_then(Value::as_str) != Some("chatgpt") {
             return Err("ChatGPT 语义事件厂商标识无效。".to_string());
         }
-        if value.get("adapterVersion").and_then(Value::as_u64)
-            != Some(u64::from(ADAPTER_VERSION))
-        {
+        if value.get("adapterVersion").and_then(Value::as_u64) != Some(u64::from(ADAPTER_VERSION)) {
             return Err("ChatGPT 语义适配器版本无效。".to_string());
         }
         if !value
@@ -232,7 +230,10 @@ fn sanitize_ui_controls(value: Option<&Value>) -> Vec<Value> {
             let region = clean_identifier(item.get("region"), 24);
             if !id.starts_with("control_")
                 || label.is_empty()
-                || !matches!(region.as_str(), "header" | "suggestions" | "composer" | "overlay" | "message" | "content")
+                || !matches!(
+                    region.as_str(),
+                    "header" | "suggestions" | "composer" | "overlay" | "message" | "content"
+                )
             {
                 return None;
             }
@@ -559,7 +560,10 @@ mod tests {
         assert!(sanitize_event(&wrong_version.to_string()).is_err());
 
         let mut missing_token = event;
-        missing_token.as_object_mut().unwrap().remove("documentToken");
+        missing_token
+            .as_object_mut()
+            .unwrap()
+            .remove("documentToken");
         assert!(sanitize_event(&missing_token.to_string()).is_err());
     }
 }

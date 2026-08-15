@@ -496,14 +496,23 @@
     maxDelayMs: 1000
   }));
   observer = new MutationObserver(scheduleSnapshot);
-  if (document.documentElement) {
-    observer.observe(document.documentElement, {
+  const observeDocument = () => {
+    const root = document.documentElement;
+    if (!(root instanceof Node)) return false;
+    observer.observe(root, {
       attributes: true,
       attributeFilter: ['aria-selected', 'aria-checked', 'aria-disabled', 'disabled', 'data-state', 'hidden'],
       childList: true,
       subtree: true,
       characterData: true
     });
+    return true;
+  };
+  if (!observeDocument()) {
+    window.addEventListener('DOMContentLoaded', () => {
+      observeDocument();
+      scheduleSnapshot();
+    }, { once: true });
   }
   window.addEventListener('popstate', scheduleSnapshot);
   snapshot();

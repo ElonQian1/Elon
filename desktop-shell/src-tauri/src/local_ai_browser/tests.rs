@@ -89,6 +89,37 @@ fn owner_fingerprint_is_stable_separate_and_path_safe() {
 }
 
 #[test]
+fn cached_chatgpt_conversation_is_restored_without_restoring_auth_or_queries() {
+    assert_eq!(
+        restorable_start_url(&CHATGPT, Some("https://chatgpt.com/c/conversation_123"))
+            .unwrap()
+            .as_str(),
+        "https://chatgpt.com/c/conversation_123"
+    );
+    assert_eq!(
+        restorable_start_url(&CHATGPT, Some("https://auth.openai.com/login"))
+            .unwrap()
+            .as_str(),
+        CHATGPT.start_url
+    );
+    assert_eq!(
+        restorable_start_url(&CHATGPT, Some("https://chatgpt.com/c/one?token=private"))
+            .unwrap()
+            .as_str(),
+        CHATGPT.start_url
+    );
+    assert_eq!(
+        restorable_start_url(
+            &GOOGLE_AI_MODE,
+            Some("https://www.google.com/search?q=private&udm=50"),
+        )
+        .unwrap()
+        .as_str(),
+        GOOGLE_AI_MODE.start_url
+    );
+}
+
+#[test]
 fn adapter_command_does_not_accept_arbitrary_javascript() {
     assert!(adapter_command::build(
         CHATGPT.display_name,

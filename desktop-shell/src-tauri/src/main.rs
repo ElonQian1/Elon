@@ -144,6 +144,7 @@ fn main() {
             local_ai_browser::get_local_ai_web_session_state,
             local_ai_browser::control_local_ai_web_session,
             local_ai_browser::run_local_ai_web_adapter_command,
+            local_ai_browser::open_local_ai_cached_conversation,
             local_ai_browser::publish_local_ai_web_event,
             local_ai_browser::clear_local_ai_web_session,
             local_ai_browser::open_local_ai_native_chat_window,

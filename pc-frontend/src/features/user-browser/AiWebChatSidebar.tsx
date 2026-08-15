@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   EyeOff,
   FolderClosed,
@@ -26,11 +26,51 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const pinned = filtered.filter((item) => /pinned|置顶/i.test(item.groupLabel))
   const recent = filtered.filter((item) => !/pinned|置顶/i.test(item.groupLabel))
   const projects = directory?.projects ?? []
+  const cachedConversations = web.controller.sessionState?.localConversations ?? []
   const autoSyncKey = useRef('')
+  const syncRetryAttempt = useRef(0)
+  const syncRetryTimer = useRef(0)
+  const webRef = useRef(web)
+  const syncDirectoryRef = useRef<(manual?: boolean) => void>(() => {})
+  webRef.current = web
+
+  const cancelSyncRetry = useCallback(() => {
+    window.clearTimeout(syncRetryTimer.current)
+    syncRetryTimer.current = 0
+  }, [])
+
+  const syncDirectory = useCallback((manual = false) => {
+    const current = webRef.current
+    if (!current.userState.canConversationHistory
+      || !current.controller.sessionOpen
+      || current.controller.busyAction) return
+    if (manual) {
+      syncRetryAttempt.current = 0
+      cancelSyncRetry()
+    }
+    void current.controller.run('list_conversations').then((next) => {
+      const result = next?.commandResult
+      if (result?.action === 'list_conversations' && result.ok) {
+        syncRetryAttempt.current = 0
+        cancelSyncRetry()
+        return
+      }
+      const delay = DIRECTORY_RETRY_DELAYS_MS[syncRetryAttempt.current]
+      if (delay === undefined) return
+      syncRetryAttempt.current += 1
+      cancelSyncRetry()
+      syncRetryTimer.current = window.setTimeout(() => syncDirectoryRef.current(), delay)
+    })
+  }, [cancelSyncRetry])
+  syncDirectoryRef.current = syncDirectory
 
   useEffect(() => {
+    cancelSyncRetry()
     autoSyncKey.current = ''
-  }, [web.provider?.id])
+    syncRetryAttempt.current = 0
+  }, [cancelSyncRetry, web.provider?.id])
+
+  useEffect(() => () => cancelSyncRetry(), [cancelSyncRetry])
 
   useEffect(() => {
     if (!web.userState.canConversationHistory
@@ -39,10 +79,12 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     const key = web.controller.sessionState?.windowLabel || web.provider.id
     if (autoSyncKey.current === key) return
     autoSyncKey.current = key
-    void web.controller.run('list_conversations')
+    syncDirectory()
   }, [
     busy,
-    web.controller,
+    syncDirectory,
+    web.controller.sessionOpen,
+    web.controller.sessionState?.windowLabel,
     web.provider.id,
     web.userState.canConversationHistory,
   ])
@@ -98,7 +140,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
                 type="button"
                 title="同步官网侧栏"
                 aria-label="同步 ChatGPT 官网侧栏"
-                onClick={() => void web.controller.run('list_conversations')}
+                onClick={() => syncDirectory(true)}
                 disabled={!web.userState.canConversationHistory || busy}
               >
                 <RefreshCw size={13} className={web.controller.busyAction === 'list_conversations' ? styles.spinning : ''} />
@@ -133,6 +175,9 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               action="open_conversation"
               web={web}
             />
+            {!conversations.length && cachedConversations.length > 0 && (
+              <CachedConversationSection items={cachedConversations} web={web} />
+            )}
           </nav>
         ) : (
           <section className={styles.googleSession} aria-label="Google AI 搜索会话">
@@ -141,6 +186,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               <strong>{web.controller.snapshot?.title || '新 AI 搜索'}</strong>
               <small>Google AI 模式当前网页会话</small>
             </button>
+            <CachedConversationSection items={cachedConversations} web={web} />
           </section>
         )}
         <div className={styles.status} data-error={Boolean(web.controller.sessionState?.lastError)}>
@@ -156,6 +202,36 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     </>
   )
 }
+
+function CachedConversationSection({
+  items,
+  web,
+}: {
+  items: Array<{ id: string; title: string; active: boolean; updatedAtMs: number }>
+  web: AiWebChatBackend
+}) {
+  if (!items.length) return <p className={styles.empty}>还没有可恢复的本机会话缓存</p>
+  return (
+    <section className={styles.directorySection} aria-label="本机加密会话缓存">
+      <div className={styles.sectionHeading}><MessageSquare size={13} /><span>本机最近会话</span><em>{items.length}</em></div>
+      {items.map((item) => (
+        <button
+          className={styles.directoryItem}
+          type="button"
+          key={item.id}
+          data-active={item.active}
+          title={`${item.title} · 本机加密缓存`}
+          onClick={() => void web.controller.openCachedConversation(item.id)}
+          disabled={Boolean(web.controller.busyAction)}
+        >
+          <span>{item.title}</span>
+        </button>
+      ))}
+    </section>
+  )
+}
+
+const DIRECTORY_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000] as const
 
 function DirectorySection({
   icon,

@@ -6,10 +6,10 @@
 
 #[path = "local_ai_browser/adapter.rs"]
 mod adapter;
-#[path = "local_ai_browser/adapter_content.rs"]
-mod adapter_content;
 #[path = "local_ai_browser/adapter_command.rs"]
 mod adapter_command;
+#[path = "local_ai_browser/adapter_content.rs"]
+mod adapter_content;
 #[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]
 mod chatgpt_adapter_bootstrap;
 #[path = "local_ai_browser/google_ai_mode.rs"]
@@ -204,8 +204,9 @@ pub async fn open_local_ai_web_session(
         ));
     }
 
+    let cached_url = runtime.cached_restorable_url(&window_label);
     runtime.mark_opening(&window_label, show_window);
-    let start_url = parse_start_url(provider)?;
+    let start_url = restorable_start_url(provider, cached_url.as_deref())?;
     let bootstrap_url = "about:blank"
         .parse()
         .map_err(|error| format!("WebView2 启动页无效：{error}"))?;
@@ -434,6 +435,42 @@ pub async fn run_local_ai_web_adapter_command(
 }
 
 #[tauri::command]
+pub async fn open_local_ai_cached_conversation(
+    app: AppHandle,
+    webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    provider_id: String,
+    owner_key: String,
+    conversation_id: String,
+) -> Result<LocalAiWebSessionState, String> {
+    let provider = provider(&provider_id)?;
+    let fingerprint = owner_fingerprint(&owner_key)?;
+    ensure_session_webview(&webview, provider, &fingerprint)?;
+    if conversation_id.len() != 16 || !conversation_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("本机会话缓存标识无效。".to_string());
+    }
+    let label = window_label(provider, &fingerprint);
+    ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
+    let window = app
+        .get_webview_window(&label)
+        .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
+    let restorable_url = runtime
+        .activate_cached_conversation(&label, &conversation_id)
+        .ok_or_else(|| "本机会话缓存已失效，请刷新会话列表。".to_string())?;
+    let url = restorable_url
+        .parse::<Url>()
+        .map_err(|error| format!("本机会话缓存地址无效：{error}"))?;
+    if !allows_navigation(provider, &url) {
+        return Err("本机会话缓存不再属于当前 AI 厂商。".to_string());
+    }
+    window.navigate(url).map_err(display_error)?;
+    runtime
+        .snapshot(&label)
+        .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))
+}
+
+#[tauri::command]
 pub fn publish_local_ai_web_event(
     webview: WebviewWindow,
     runtime: State<'_, LocalAiBrowserRuntime>,
@@ -543,6 +580,33 @@ fn parse_start_url(provider: &ProviderDefinition) -> Result<Url, String> {
         .start_url
         .parse()
         .map_err(|error| format!("{} 入口地址无效：{error}", provider.display_name))
+}
+
+fn restorable_start_url(
+    provider: &ProviderDefinition,
+    cached_url: Option<&str>,
+) -> Result<Url, String> {
+    let fallback = parse_start_url(provider)?;
+    let Some(cached) = cached_url.and_then(|value| value.parse::<Url>().ok()) else {
+        return Ok(fallback);
+    };
+    if !allows_navigation(provider, &cached)
+        || cached.query().is_some()
+        || cached.fragment().is_some()
+    {
+        return Ok(fallback);
+    }
+    let host = cached.host_str().unwrap_or_default();
+    let path = cached.path();
+    let restorable = match provider.id {
+        "chatgpt" => {
+            host == "chatgpt.com"
+                && (path == "/" || path.starts_with("/c/") || path.starts_with("/g/"))
+        }
+        "google-ai-mode" => matches!(host, "google.com" | "www.google.com") && path == "/aimode",
+        _ => false,
+    };
+    Ok(if restorable { cached } else { fallback })
 }
 
 fn owner_fingerprint(owner_key: &str) -> Result<String, String> {
