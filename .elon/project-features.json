@@ -3287,7 +3287,7 @@
       "id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
       "title": "消费者多来源偏好合并 V1 验证闭环",
       "summary": "验证并在必要时修复现有多来源偏好冲突预演、人工逐字段采用、事务回滚、权限、V141升级、PC合同和单包兼容。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/open-commerce-consumer-portability-multi-source-merge-v1-verification.md",
@@ -3509,7 +3509,7 @@
         }
       ],
       "created_at_ms": 1786764390292,
-      "updated_at_ms": 1786766909820
+      "updated_at_ms": 1786766985323
     },
     {
       "id": "open-commerce-verified-erp-handoff-handler-v1",
@@ -4599,16 +4599,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_c36573402d5145bfb85dfc6a98ee082f",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "claimed",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786653759713
-    },
     {
       "id": "feature_event_1454a9fb9b9d45218e461284def8ce3c",
       "feature_id": "compute-v255-runtime-launch-profile-verification",
@@ -6598,6 +6588,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786766909820
+    },
+    {
+      "id": "feature_event_1a49010f4a3a4fa7aa15cb1bd7d5aa80",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "验证闭环已随提交 f56e2846e 推送到 origin/main。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786766985323
     }
   ]
 }
