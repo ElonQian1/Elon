@@ -347,7 +347,7 @@
   function addRegionControls(target, root, region, used, filter, contextId) {
     const activeComposer = region === 'composer' ? composerNode() : null;
     actionableNodes(root).forEach((node, index) => {
-      if (filter && !filter(node)) return;
+      if ((used.nodes && used.nodes.has(node)) || (filter && !filter(node))) return;
       if (composerAdapter && composerAdapter.ownsOptionNode(node)) return;
       if (
         controlOwnershipPolicy && controlOwnershipPolicy.isPrimaryComposerTextControl(
@@ -357,7 +357,7 @@
           formAdapter && formAdapter.describe
         )
       ) return;
-      const semantic = semanticFor(node, region, index);
+      used.nodes && used.nodes.add(node); const semantic = semanticFor(node, region, index);
       const label = labelOf(node, defaultLabel(semantic));
       const path = relatedSameOriginPath(node);
       const resolvedContextId = contextId || (
@@ -506,7 +506,7 @@
     controlsById = new Map();
     controlMetadataById = new Map();
     const controls = [];
-    const used = new Set();
+    const used = new Set(); used.nodes = new WeakSet();
     const header = headerRoot();
     const composer = composerRoot();
     addRegionControls(controls, header, 'header', used);

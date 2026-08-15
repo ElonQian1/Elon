@@ -26,6 +26,16 @@ assert.match(
   /addRegionControls\(\s*controls, overlay, 'overlay', used, null, overlayOwnership/,
   'layout exports inherited context on overlay controls'
 );
+assert.match(
+  layoutSource,
+  /used\.nodes = new WeakSet\(\)/,
+  'layout tracks DOM identity across nested visible overlay roots'
+);
+assert.match(
+  layoutSource,
+  /used\.nodes\.has\(node\)/,
+  'layout exports a nested overlay control only once'
+);
 
 function control(role = 'textbox') {
   const descendants = new Set();
