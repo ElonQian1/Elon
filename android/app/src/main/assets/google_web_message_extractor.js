@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 7;
+  const extractorVersion = 8;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -215,6 +215,7 @@
       .map((node) => candidateFrom(node, composer, query, queryAnchor, false))
       .filter(Boolean)
       .filter((candidate) => {
+        if (candidate.text.length < 8) return true;
         const child = Array.from(candidate.node.children)
           .map((node) => candidateFrom(node, composer, query, queryAnchor, false))
           .filter(Boolean)
