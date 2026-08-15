@@ -1,0 +1,22 @@
+{
+  "name": "@yilong/merchant-erp-kernel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./open-commerce": {
+      "types": "./src/open-commerce.d.ts",
+      "default": "./src/open-commerce.js"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
