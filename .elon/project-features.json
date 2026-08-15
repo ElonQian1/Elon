@@ -3131,7 +3131,7 @@
       "id": "open-commerce-verified-erp-handoff-handler-v1",
       "title": "开放商业 ERP 写入与回读验证处理器 V1",
       "summary": "复用现有接入器租约工作器，把终态业务证据以稳定幂等来源信封交给商户 ERP 插件，并且只有外部回读完整匹配项目、商户、Invocation、接入和结果摘要后才允许提交 applied。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/open-commerce-verified-erp-handoff-handler-v1.md",
@@ -3253,7 +3253,7 @@
         }
       ],
       "created_at_ms": 1786756720906,
-      "updated_at_ms": 1786757991761
+      "updated_at_ms": 1786758085963
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -4215,16 +4215,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_17d19ef1737644d496229676270af2be",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786645066472
-    },
     {
       "id": "feature_event_81a620de16c7479da7de9ca96417136b",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
@@ -6214,6 +6204,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786757991761
+    },
+    {
+      "id": "feature_event_834c953e950c44dc987d337d2cc452a0",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-erp-readback",
+      "reason": "Implementation, tests, documents, and verified registry commit were pushed to origin/main at 6b913f058889dad3a5b0698dc251278718527ebc.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786758085963
     }
   ]
 }
