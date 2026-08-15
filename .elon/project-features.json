@@ -3128,6 +3128,61 @@
       "updated_at_ms": 1786629063314
     },
     {
+      "id": "open-commerce-verified-erp-handoff-handler-v1",
+      "title": "开放商业 ERP 写入与回读验证处理器 V1",
+      "summary": "复用现有接入器租约工作器，把终态业务证据以稳定幂等来源信封交给商户 ERP 插件，并且只有外部回读完整匹配项目、商户、Invocation、接入和结果摘要后才允许提交 applied。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/open-commerce-verified-erp-handoff-handler-v1.md",
+        "content_hash": "56bbd6bf3b3886eb6a85ca83466e8dc47370546c923d08267b92f96af6e28376",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "50074db928ddebee21e693c7713c54362ecb944d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "965c0d0a94517068c3a0cd5bb129983f2358e7f7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "open-commerce-sdk",
+      "tags": [
+        "open-commerce",
+        "erp",
+        "sdk",
+        "idempotency",
+        "readback"
+      ],
+      "task_paths": [
+        "docs/open-commerce/connector-sdk.md",
+        "sdk/open-commerce-connector/src/index.d.ts",
+        "sdk/open-commerce-connector/src/index.js",
+        "sdk/open-commerce-connector/src/verified-erp-handoff-handler.js",
+        "sdk/open-commerce-connector/test/verified-erp-handoff-handler.test.mjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "SDK 导出可与 createAdapterHandoffWorker 直接组合的 ERP 处理器工厂，现有自定义 handler 保持兼容。",
+        "成功路径先执行幂等写入再执行独立回读，完整匹配后才返回 applied 和目标记录号。",
+        "同一 Invocation 重试获得相同幂等键和来源摘要，不依赖 Claim ID、尝试次数或租约密钥。",
+        "回读项目、商户、Invocation、数据接入、凭据版本、结果摘要、来源摘要或目标记录号任一不一致均阻止 applied 并释放租约。",
+        "无有效标准业务回执、结果摘要或 Claim 绑定错误时不调用 ERP 写入。",
+        "显式业务拒绝沿用永久拒绝回执；普通写入、回读、取消和网络异常保持可重试。",
+        "Node 全量测试、源码体积和文档模块化门禁通过，文档不宣称生产 ERP、支付或外部平台已实现。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_2302585a22cb4bb5ae509778b867b656",
+        "agent_id": "codex-goal-erp-readback",
+        "claimed_at_ms": 1786756732527,
+        "expires_at_ms": 1786771132527
+      },
+      "created_at_ms": 1786756720906,
+      "updated_at_ms": 1786756745793
+    },
+    {
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
@@ -4087,36 +4142,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_608632df18d943279a6f327f27b97803",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-019f3b86",
-      "reason": "绑定 2026-08-14 最终 7 项验收与明确未验收边界后的权威文档",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786645024839
-    },
-    {
-      "id": "feature_event_47a33d9a3b714befad2bd40cd472be74",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "metadata_updated",
-      "actor": "codex-goal-019f3b86",
-      "reason": "真实回归暴露并修复 Job 终态在 deadline 后无法按事实落账的共享合同缺口",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1786645024996
-    },
-    {
-      "id": "feature_event_2131d2cb80cd43a1a8d9ac804718feb4",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "最终范围仅补齐 V234 本地验收与两处共享时间合同，经济及生产边界不扩大",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786645042844
-    },
     {
       "id": "feature_event_d3964b2c4ae04f158c0adeadb1ee9f92",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
@@ -6086,6 +6111,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786756056943
+    },
+    {
+      "id": "feature_event_11f2203cda014bacaf64161358c9036a",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "registered",
+      "actor": "codex-goal-erp-readback",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786756720906
+    },
+    {
+      "id": "feature_event_feafc80ad96547febc772fb9af81eedc",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "claimed",
+      "actor": "codex-goal-erp-readback",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786756732528
+    },
+    {
+      "id": "feature_event_b14c7057d79a4a3dbc166f03f72e7f24",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-erp-readback",
+      "reason": "开始实现 SDK ERP 写入与独立回读验证纵向切片。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786756745793
     }
   ]
 }
