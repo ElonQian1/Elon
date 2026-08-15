@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v260_verified_v267_transport_source_review_only
+verification_status: historical_v260_and_v267_transport_verified
 ---
 
 # 外部矿池 Adapter authenticated child session core 验收边界
@@ -18,11 +18,9 @@ Linux kernel fixture 使用交叉构建出的 static musl `elon-server` test bin
 ## V267 状态更正
 
 V267 当前 session transport 新增 `MSG_CTRUNC`、`MSG_TRUNC` 与 ancillary control-data 拒绝。
-下文命令、5 项 kernel fixture 和组合指纹发生在该变更之前，仍是 V260 旧源码 provenance，
-不能证明当前 transport 已编译或运行。V267 对本页的新增验收为
-`source_review_only / implementation_uncompiled / implementation_unrun`，
-`passed=0 / failed=0`；至少须注入 `SCM_RIGHTS`、credentials、未知/截断 control data 并重跑
-既有 frame/terminal 矩阵。
+下文 V260 的 5 项历史 fixture 仍只作 provenance；当前 WSL2 session-core 已运行 plain
+seqpacket、oversize、`SCM_RIGHTS` 与 kernel credentials，`4 passed / 0 failed`。未知 ancillary、
+显式 control truncation 与完整 frame/terminal 组合仍需补跑。
 
 ## 已执行验证
 

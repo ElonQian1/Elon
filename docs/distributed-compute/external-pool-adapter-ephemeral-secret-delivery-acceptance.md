@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v263_fixture_superseded_v267_rerun_required
+verification_status: historical_v263_and_v267_controlled_secret_fixture_verified
 ---
 
 # 外部矿池 Adapter 易失配置与凭据交付验收边界
@@ -21,10 +21,9 @@ V263 历史批只交付仓库固定的非生产测试字节。它不连接 V258 
 session capsule root 仍为 source digest，也没有 Yama、policy V2、ancillary 与当前 cleanup 门。
 因此它不能证明当前 config/credential delivery 的隔离或收尾。
 
-V267 当前为 `source_review_only / implementation_uncompiled / implementation_unrun`，
-`passed=0 / failed=0`。必须用派生 launch image、current V2 与 Store source/launch 双 binding
-重跑正向交付、全部 root/material drift、协议失败、shutdown/reap 和资源故障注入。现有
-ignored fixture 仍直接 seal 原测试 ELF，须先接 production materializer；原样重跑不能验收 V267。
+V267 已编译，ignored fixture 已接 production materializer，并用派生 launch image、current V2
+与 Store source/launch 双 binding 在 WSL2/Yama 2 下重跑正向交付、root drift、shutdown
+zeroization 和 reap/cleanup。全部 material drift、协议故障、Yama 3 与生产 Secret 仍须补齐。
 
 V270 源码已通过默认关闭的 admin trigger 间接到达这条 Store 私有 delivery seam，并把顺序改为
 authenticated no-work response 后先完成 shutdown、pidfd reap 与 cgroup/scratch cleanup，再进入
@@ -92,7 +91,6 @@ linux_kernel_output=5d0e1c53fecae6b4d018df430d4999e878de470eb59ed4c02ab88a2b2b46
 - 历史 V263 fixture 未创建 route/service actor、Provider activation/readiness、market admission、usage、settlement 或链上 effect；
 - 历史 V263 没有 HTTP/MCP/PC/APK 入口；V270 只新增默认关闭的 admin readiness trigger，仍未发布服务器或安装包，也未形成 activation/market authority。
 
-因此只能声明 V263 direct-seal 测试 capsule 的旧构建曾完成 source、cross-build 与 Linux
-kernel fixture；current V267 Secret delivery 为 `source_review_only / passed=0`，必须先接
-production derived launch materializer 再重验。不能声明生产外部矿池 Adapter、真实算力派发
-或结算已完成。
+因此 V263 direct-seal 旧构建只保留历史 provenance；current V267 production-materialized
+Secret fixture 已有 WSL2/Yama 2 kernel subset 证据。不能声明生产外部矿池 Adapter、真实
+Secret、算力派发或结算已完成。

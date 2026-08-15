@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v259_v1_verified_v267_v2_source_review_only
+verification_status: historical_v259_v1_and_v267_v2_verified
 ---
 
 # 外部矿池 Adapter supervisor/session policy companion 权威
@@ -81,6 +81,6 @@ companion/revocation 可按创建时材料回读，但不能被 current V2 view 
 
 `migration_v267` 只重装 current policy JSON projection trigger/view，不创建或改写 receipt table，
 也不触碰 V257 capsule-policy V1 roots。fresh companion 必须绑定 V2；V259 的历史
-`13 passed / 0 failed` 只证明 V1 版本，本批 V2 migration/catalog 为
-`source_review_only / implementation_uncompiled / implementation_unrun / passed=0`。V266
-机器 Profile V1 显式使用冻结的 session V1 catalog；面向 V2 的 Profile/verifier 尚未形成。
+`13 passed / 0 failed` 只证明 V1 版本；当前 V267 WSL2 `v267_` 12 项已覆盖 fresh/repeat V2
+migration、historical V1 readback 与 current V2 projection。V266 机器 Profile V1 显式使用冻结
+session V1 catalog；V268 是唯一的 V2 Profile/verifier authority，但其专属动态矩阵尚未运行。

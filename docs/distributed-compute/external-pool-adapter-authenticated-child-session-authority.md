@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v260_verified_v267_transport_source_review_only
+verification_status: historical_v260_and_v267_transport_verified
 ---
 
 # 外部矿池 Adapter authenticated child session core 权威
@@ -65,6 +65,6 @@ V260 也没有验证真实 spawn/exec、fd3/fd4/fd5 remap、seed post-exec custo
 
 V267 在相同固定 allocation 的 `recvmsg(..., MSG_TRUNC)` 后新增 fail-closed envelope gate：
 `MSG_TRUNC`、`MSG_CTRUNC` 或 nonzero `msg_controllen` 必须在 ELSP 解析前拒绝，session 不接收
-`SCM_RIGHTS`、credentials 或其他 ancillary data。V260 的历史 `5 passed` 没有覆盖该源码，
-当前 transport 变更为 `source_review_only / passed=0`；必须补跑 control truncation 与 ancillary
-注入矩阵后，才能把 current session core 标为动态已验收。
+`SCM_RIGHTS`、credentials 或其他 ancillary data。V260 的历史 `5 passed` 没有覆盖该源码。
+当前 session-core 已在 WSL2 动态验证 plain seqpacket、oversize、`SCM_RIGHTS` 与 kernel
+credentials，`4 passed / 0 failed`；显式 `MSG_CTRUNC`、未知 ancillary 与完整 terminal 组合仍需补跑。

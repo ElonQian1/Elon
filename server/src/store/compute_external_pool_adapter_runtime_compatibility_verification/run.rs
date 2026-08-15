@@ -243,7 +243,7 @@ pub(super) fn require_fresh_current_authority(
     checked_at: &str,
 ) -> Result<()> {
     let selected = &challenge.challenge;
-    if checked_at >= selected.expires_at {
+    if checked_at >= selected.expires_at.as_str() {
         bail!("V268 challenge is expired");
     }
     current_external_pool_adapter_registry_release_authority_on(

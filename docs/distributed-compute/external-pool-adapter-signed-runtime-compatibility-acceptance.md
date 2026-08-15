@@ -3,7 +3,7 @@ title: 外部矿池 Adapter 签名运行时兼容性验证验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -82,7 +82,7 @@ migration static test 必须比对 DDL/INSERT exact ordered columns和 placehold
 root、错误 JCS/digest、重复消费、分叉、revoked/expired head 与任意 readiness/effect升级均 fail closed。
 这些均为源码合同，不计为动态 passed。
 
-## 4. 后续动态矩阵（本批不得运行）
+## 4. 后续动态矩阵（尚未运行）
 
 - Cargo compile/test、migration apply/reopen、owner/admin HTTP及 direct-SQL negative matrix；
 - Linux x86-64 real derived-launch fixture、Yama 2/3、ancillary injection、timeout与cleanup fault injection；
@@ -91,7 +91,7 @@ root、错误 JCS/digest、重复消费、分叉、revoked/expired head 与任�
 - V260-V267 regression、V270 current readiness authority，以及未来 atomic activation 组合；历史
   `V268 + fresh V265` 计划不得绕过 V270 的 cleanup、短 TTL 与同进程 custody reproof。
 
-本批动态计数固定为 `passed=0`、`failed=0`。没有上述运行证据时，不得把 implementation 标为 verified，
-不得改变 Provider/route/activation/market authority。V269 已落默认关闭的 admin courier caller 源码，
-但尚未编译或运行，也没有 unattended signer transport、私钥托管或自动签名闭环；不得据此宣称端到端
-signed workflow 已动态闭合。
+完整 Windows product check 与 WSL2 `elon-server` test target 已包含 V268 源码并编译通过，但没有
+运行本节专属动态矩阵，因此计数仍为 `passed=0`、`failed=0`。不得把 implementation 标为 verified，
+不得改变 Provider/route/activation/market authority。V269 的默认关闭 admin courier caller 已随目标编译，
+但没有 unattended signer transport、私钥托管或自动签名闭环；不得据此宣称端到端 signed workflow 已闭合。

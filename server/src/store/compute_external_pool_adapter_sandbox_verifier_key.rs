@@ -7,6 +7,7 @@ mod write;
 pub(in crate::store) use read::{
     current_sandbox_verifier_key_authority_on, sandbox_verifier_key_record_authority_on,
 };
+pub(in crate::store) use types::CurrentExternalPoolAdapterSandboxVerifierKeyAuthority;
 pub(crate) use types::{
     ActivateExternalPoolAdapterSandboxVerifierKey,
     ExternalPoolAdapterSandboxVerifierKeyCurrentnessReceipt,

@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v262_fixture_superseded_v267_rerun_required
+verification_status: historical_v262_and_v267_wsl2_kernel_verified
 ---
 
 # 外部矿池 Adapter exec 后 authenticated runtime 权威
@@ -66,6 +66,7 @@ post-exec dumpable stub、Yama 2/3 gate、current policy V2、派生 launch root
 或当前 cleanup 行为。普通 exec 重置 dumpable 的缺口意味着旧正向 bootstrap/control frame
 不能作为当前 Secret 前置安全证明；旧 seccomp execveat flags 高位规则同样需要重新验证。
 
-V267 已写入上述修正，但尚未编译或运行，`passed=0`。下文 `12 passed` 与组合指纹只属于
-V262 旧构建 provenance；current V2/launch root 下的正向、root drift、seccomp negative、
-terminal cleanup 与 full kernel matrix 必须全部重跑。
+V267 已写入并编译上述修正，production materializer 也已接入 fixture。当前 WSL2/Yama 2
+内核矩阵 `12 passed / 0 failed`，覆盖正向 bootstrap、root drift、seccomp negative、terminal
+cleanup 与 kernel isolation。下文 V262 旧 `12 passed` 仍只作 provenance；Yama 3、第三方 ELF、
+长期/并发 child 和生产故障矩阵仍须补跑。

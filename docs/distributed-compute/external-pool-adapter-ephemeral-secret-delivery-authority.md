@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v263_fixture_superseded_v267_rerun_required
+verification_status: historical_v263_and_v267_controlled_secret_fixture_verified
 ---
 
 # 外部矿池 Adapter 易失配置与凭据交付权威
@@ -113,6 +113,6 @@ V263 的历史 Secret delivery fixture 发生在 exec 后 dumpable 未重新置�
 stub 在原 entry 前 SET/GET dumpable；Store 私有 binding 同时记录 source/launch digest 与
 launch size。current policy V2 另要求 Yama 2/3、受限 prctl 与修正后的 execveat 参数过滤。
 
-这些当前源码仅 `source_review_only`，未编译、未交付任何测试 Secret，`passed=0`。V263 旧
-`18 passed` 保留历史 provenance，但整个 Store→launch→bootstrap→delivery→shutdown/reap
-矩阵必须在 V267 上重跑，才能恢复当前 Secret delivery 的动态验收结论。
+当前源码已编译，production materializer fixture 已在 WSL2/Yama 2 下重跑测试 Secret 的正向
+交付、root drift、shutdown zeroization 与 reap/cleanup。V263 旧 `18 passed` 仍只作历史
+provenance；生产 Secret resolver、真实凭据、Yama 3 与长期/并发取证仍未验收。

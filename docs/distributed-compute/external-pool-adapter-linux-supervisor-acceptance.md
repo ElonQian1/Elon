@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v261_fixture_superseded_v267_rerun_required
+verification_status: historical_v261_and_v267_wsl2_kernel_verified
 ---
 
 # 外部矿池 Adapter Linux supervisor enforcement core 验收边界
@@ -21,10 +21,10 @@ Linux fixture 使用交叉构建出的 static musl `elon-server` test binary，�
 dumpable，且使用旧 execveat 高位参数分支和旧 cleanup/Drop 路径；所以它不能证明当前
 post-exec Secret 边界、Yama gate、policy V2 或清理可观察性。
 
-V267 当前为 `source_review_only / implementation_uncompiled / implementation_unrun`，
-`passed=0 / failed=0`。必须重跑 valid/invalid exec flags、post-exec SET/GET dumpable、Yama
-0/1/2/3、prctl negative、wait/timeout/stderr overflow 及 cgroup/scratch 故障注入后，才能恢复
-current supervisor 的 kernel-verified 声明。
+V267 当前已编译，并在 Yama 2 的 WSL2 内核矩阵中重跑 valid/invalid exec shape、post-exec
+SET/GET dumpable、prctl negative、wait/reap 及 cgroup/scratch cleanup，`12 passed / 0 failed`；
+四项双资源 cleanup fault case 也通过。Yama 0/1/3、timeout/stderr overflow、完整 launch rollback
+和生产日志矩阵仍须补跑，因此仅恢复受控 kernel-subset 声明。
 
 ## 已执行验证
 

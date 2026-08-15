@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v259_v1_verified_v267_v2_source_review_only
+verification_status: historical_v259_v1_and_v267_v2_verified
 ---
 
 # 外部矿池 Adapter supervisor/session policy companion 验收边界
@@ -19,10 +19,9 @@ V259 durable inert Domain、migration、Store、owner/admin Service/API 与源�
 
 V267 保留 historical V1 exact validator，并把 current catalog 升为 policy V2；migration 只重装
 current policy projection，不覆盖历史行或 V257 V1 roots。下文 V259 `13 passed` 是 V1 历史
-证据，没有执行 current V2 catalog、V267 migration、Yama/dumpable/launch root 或 current-view
-换代。V267 当前严格为 `source_review_only / implementation_uncompiled /
-implementation_unrun`，`passed=0 / failed=0`；fresh/repeat migration、V1 history readback、
-V2 fresh companion/currentness 与 V254 18 deny parity 均须补跑。
+证据，没有覆盖后来 V267。当前 WSL2 `v267_` 12 项已执行 current V2 catalog、fresh/repeat
+migration、V1 history readback 与 current-view 换代；Yama 2/dumpable/launch root 另由当前
+12 项内核矩阵覆盖。V254 未新增 effect，18 deny 继续原样保留；生产升级/并发/崩溃仍须补跑。
 
 ## 已运行本地矩阵
 

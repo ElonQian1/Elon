@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -166,7 +166,8 @@ settlement 或 Sui authority。Provider 保持 `registering`，V254 18 个 tempo
 九项 effect 和七项 readiness 不得因 handoff 可达而升级。V269 也不等于 production private-key custody、
 unattended signer worker、Provider-specific readiness、atomic activation 或 market admission。
 
-本批仍处于架构阶段：不编译 Rust、不执行 migration、不运行 HTTP/SQLite/Linux fixture、不启动 child、
-不连接 signer 或生产网络。状态固定为 `source_review_only / implementation_uncompiled /
-implementation_unrun`，`passed=0`、`failed=0`。源码与文档只表达一条可达的人工交接合同，不证明
+V269 已随完整 Windows product check 与 WSL2 `elon-server` test target 编译；尚未运行其 startup、
+HTTP/SQLite/Linux child 或 signer 专属矩阵，也未连接 signer 或生产网络。状态为
+`source_review_only / implementation_compiled / implementation_unrun`，专属动态计数仍为
+`passed=0`、`failed=0`。源码与文档只表达一条可达的人工交接合同，不证明
 startup custody、live-FS audit、V267 runtime、V237 signer 或断连恢复已经动态验收。

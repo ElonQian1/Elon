@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_source_capsule_verified_v267_launch_source_review_only
+verification_status: historical_source_and_v267_launch_wsl2_verified
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 权威
@@ -92,9 +92,9 @@ post-exec dumpable SET/GET stub，再跳回 source 原 entry。V255/profile/inst
 source SHA-256；V267 session capsule root 改绑 launch SHA-256，Store 私有 binding 同时保留
 source/launch digest 与 launch size。
 
-派生 launch image、program-header/range 重写、stub 与双 digest binding 当前仅完成
-`source_review_only`，未编译、未运行真实 `execveat` 或 Linux loader fixture，`passed=0`。
-因此历史 V257 结果不能证明 launch image 可执行或 V267 post-exec 边界成立；具体权威和补跑
+派生 launch image、stub 与双 digest binding 已编译，并由 production materializer 进入当前
+WSL2/Yama 2 内核 fixture，真实 `execveat`、post-exec stub 和 source/launch root 组合已通过。
+program-header/range 的完整负值与第三方 ELF 矩阵仍缺；具体权威和补跑
 矩阵见
 [`external-pool-adapter-post-exec-supervisor-hardening-authority.md`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)
 与对应 acceptance。

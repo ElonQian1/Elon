@@ -3,7 +3,7 @@ title: 外部矿池 Adapter 签名运行时兼容性验证权威
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -176,9 +176,9 @@ SQL edge 逐项安装等价 replacement guard，并通过 fresh/reopen/concurren
 
 ## 6. 当前验证现实
 
-本批遵守架构阶段禁令：不编译 Rust、不执行 migration、不运行单元/HTTP/Linux fixture、不启动 child、
-不读取真实 Secret、不连接网络。当前状态严格为 `source_review_only / implementation_uncompiled /
-implementation_unrun`，`passed=0`、`failed=0`。V269 已接默认关闭的 admin courier caller，可同步取得
-server-derived signer payload，但该路径同样未编译或运行，且没有 unattended signer transport、私钥托管
-或自动签名闭环；源码存在只证明合同已表达，不能声称 runner、signature、SQLite guard 或 kernel
-confinement 已动态验收。
+V268 已随完整 Windows product check 与 WSL2 `elon-server` test target 编译；尚未执行其专属
+migration、单元/HTTP/signature/SQLite lineage 或 Linux runner fixture，也未读取真实 Secret 或
+连接生产网络。当前状态为 `source_review_only / implementation_compiled / implementation_unrun`，
+专属动态计数仍为 `passed=0`、`failed=0`。V269 默认关闭的 admin courier caller 已随完整目标编译，
+但 unattended signer transport、私钥托管和自动签名闭环仍未接线，端到端 signed workflow 仍不可达；
+源码存在和编译通过不能证明 runner、signature、SQLite guard 或 kernel confinement 已动态验收。

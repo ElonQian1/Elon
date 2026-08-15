@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -95,7 +95,8 @@ CapacityPool、Offer、Job、Reservation、Attempt、Start、usage、verificatio
 - V254 18 deny parity、V260-V268 regression、V270 current readiness authority，以及未来 atomic
   activation；历史 `current V268 + fresh V265` 计划不得绕过 V270 的 cleanup 与同进程 reproof。
 
-本批不运行上述命令，动态计数固定为 `passed=0`、`failed=0`。静态 diff、format、source-size 或文档
-modularity 只能作为源码卫生证据，不能升级为编译、HTTP、SQLite、Linux runtime、signer 或生产验收。
+完整 Windows product check 与 WSL2 `elon-server` test target 已包含 V269 源码并编译通过；上述专属
+命令仍未运行，因此动态计数为 `passed=0`、`failed=0`。静态 diff、format、source-size 或文档
+modularity 只能作为源码卫生证据；编译通过也不能升级为 HTTP、SQLite、Linux runtime、signer 或生产验收。
 在真实 signer transport/私钥托管另行设计前，不得把管理员 courier 描述为 unattended signer；在独立
 atomic activation/admission 完成前，Provider 必须保持 `registering`。

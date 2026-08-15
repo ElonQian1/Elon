@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v262_fixture_superseded_v267_rerun_required
+verification_status: historical_v262_and_v267_wsl2_kernel_verified
 ---
 
 # 外部矿池 Adapter exec 后 authenticated runtime 验收边界
@@ -21,10 +21,9 @@ V267 修复了下文历史 fixture 未覆盖的 exec 后 dumpable、Yama host ga
 launch digest、seqpacket ancillary 与 cleanup 边界。旧 `12 passed` 运行的是 V1/source capsule
 链，不能累计为当前 V267 验收。
 
-当前结果严格为 `source_review_only / implementation_uncompiled / implementation_unrun`、
-`passed=0 / failed=0`。V260/V261/V262 的全部正负向 kernel matrix 必须在 V2/derived launch
-image 上重跑；现有 ignored runtime fixture 仍直接 seal 原测试 ELF，必须先改为经过 production
-materializer，原样重跑不算 V267 evidence。在此之前本页历史验证标签只作 provenance。
+当前 V267 已编译，ignored runtime fixture 已改为经过 production materializer，并在
+V2/derived launch image、Yama 2 下完成 `12 passed / 0 failed` 内核矩阵。V260/V261/V262 的
+旧结果仍只作 provenance；Yama 3、全部 host-gate 负值、第三方 ELF 和生产故障矩阵未覆盖。
 
 ## 已执行验证
 
@@ -91,6 +90,6 @@ linux_kernel_output=9ac239f1a6b7ce69d473cd6c39923b6353bd8706fa3d5bbbc338bb10b7ef
 - 未创建 route/service actor、Provider activation/readiness、market admission、usage、settlement 或链上 effect；
 - 未开放 HTTP/MCP/PC/APK 入口，未发布服务器或安装包。
 
-因此只能声明 V262 direct-seal 测试 capsule 的旧构建曾完成 source、cross-build 与 Linux
-kernel fixture；current V267 runtime 为 `source_review_only / passed=0`，必须先接 production
-derived launch materializer 再重验。不能声明生产外部矿池 Adapter、真实算力派发或结算已完成。
+因此可以声明 V262 direct-seal 旧结果保留为历史，且 current V267 production-materialized
+fixture 已通过 WSL2/Yama 2 kernel subset。不能声明生产外部矿池 Adapter、第三方兼容、真实
+算力派发或结算已完成。

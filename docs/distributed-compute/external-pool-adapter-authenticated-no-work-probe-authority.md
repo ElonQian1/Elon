@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v265_fixture_superseded_v267_rerun_required
+verification_status: historical_v265_and_v267_controlled_fixture_verified
 ---
 
 # 外部矿池 Adapter authenticated no-work probe 权威
@@ -102,6 +102,6 @@ dumpable、Yama 2/3、派生 launch root、policy V2、ancillary fail-close 或�
 loopback TLS 与 ELNW protocol 的历史证据可以保留，但不能据此宣称 current child→broker→
 response→reap 组合已经验收。
 
-V267 当前只完成源码加固，未编译、未运行 loopback TLS/kernel/full Store fixture，
-`passed=0 / failed=0`。必须在 current V2 与 launch digest 下重跑 V260-V265 全链和 fault
-matrix；Provider 仍为 `registering`，V254 18 deny 不因旧 no-work receipt 被放宽。
+V267 已编译，并在 current V2、launch digest、production materializer 与 Yama 2 下通过
+authenticated no-work、shutdown/reap 和 cleanup 内核 fixture。完整 loopback TLS/Store orchestration、
+生产 upstream/Secret 与 fault matrix 仍未重跑；Provider 仍为 `registering`，V254 18 deny 不放宽。

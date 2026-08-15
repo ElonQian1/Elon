@@ -3,8 +3,8 @@ title: 外部矿池 Adapter post-exec supervisor hardening 权威
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_compiled
+verification_status: local_windows_and_wsl2_kernel_verified
 ---
 
 # 外部矿池 Adapter post-exec supervisor hardening 权威
@@ -98,18 +98,34 @@ table，不覆盖历史 V1 companion/revocation，也不重装 V257 exact-root t
 
 V266 checked-in runtime compatibility Profile V1 继续显式使用冻结的 supervisor/session V1
 catalog，因此其 JSON、digest 与 `6 passed / 0 failed` 历史验证不因 V267 被重写。它也不能
-证明 V267 V2、派生 launch image、Yama gate 或加固后的 transport/lifecycle 已兼容。面向 V2
-的机器 Profile、challenge/verifier 与真实 runner evidence 必须由后续独立版本形成，不能把
-V266 V1 报告换名复用。
+证明 V267 V2、派生 launch image、Yama gate 或加固后的 transport/lifecycle 已兼容。
 
-## 7. 当前实现现实
+后续 V268 已独立拥有 Profile V2、challenge、Store-private runner observation、V237 signed
+receipt 与 revocation/currentness 链。V267 不再定义第二套 V2 Profile，也不复用 V266 V1
+digest；本页的 V267 Linux 动态证据只验收 hardening runtime，不自动验收 V268/V269 的
+签名兼容性、HTTP、SQLite lineage 或 signer handoff。
 
-V267 当前状态严格为 `source_review_only / implementation_uncompiled / implementation_unrun`：
-Rust compile、migration execution、单元测试、Linux kernel fixture、真实 exec、Yama 矩阵、
-ancillary 注入、cleanup fault injection 与 V260-V265 端到端回归均未运行，`passed=0`、
-`failed=0`。本批源码存在不等于已证明可编译、可运行或关闭了生产威胁。
+## 7. 当前实现与动态证据
 
-V257、V260、V261、V262、V263 与 V265 文档中的旧命令和指纹继续作为对应旧提交的历史
-provenance，但不能作为当前 V267 源码的动态验收。特别是 V261-V265 链的旧 fixture 运行在
-exec 后 dumpable 未重新置零、旧 execveat 参数过滤与旧 cleanup/transport 边界上；必须按
-对应 acceptance 重跑后，才能恢复当前 runtime 的 kernel/组合验证声明。
+V267 当前为 `implementation_compiled / local_windows_and_wsl2_kernel_verified`，但不是
+production ready：
+
+- Windows 受管 `cargo check` 已通过，证据指纹为
+  `b37abea53faab919fa04ba40985b5ecbb41c1594ab09fc4af838500d54ed5c5c`；受管
+  `cargo test ... v267_` 已通过，证据指纹为
+  `6578adda332eb0404e25b8839a1ea4519e251506d0158a525f5a836f3859f62f`；
+- 当前重放后源码在 WSL2/Linux 重新编译并运行 `v267_`，`12 passed / 0 failed`，覆盖
+  fresh/repeat migration、历史 V1 回读、current V2 projection 与源码合同；
+- V262/V263/V265 fixture 已改为调用 production source→derived-launch materializer。以
+  Yama `ptrace_scope=2` 和 delegated cgroup v2 父组运行 `linux_kernel_`，`12 passed / 0 failed`，
+  覆盖 mutual authentication、root drift、测试 Secret 交付/归零、authenticated no-work、
+  clone3/cgroup/namespaces、post-exec stub、seccomp negative shape、pidfd reap 与资源清理；
+- session-core 的 plain seqpacket、oversize、`SCM_RIGHTS` 与 kernel credentials 四项测试为
+  `4 passed / 0 failed`；lifecycle 筛选中四项双资源清理故障测试均通过；
+- 内核矩阵退出后恢复 `Yama=1`，根 `cgroup.subtree_control` 恢复为空，遗留
+  `elon-v267-*` cgroup 数量为 0。
+
+本轮没有验证 Yama `3` 及缺失/symlink/空值/`0`/`1` 的完整 host gate 矩阵，也没有覆盖真实
+第三方 Adapter、生产 Secret/upstream、长期或并发 child、OOM/CPU 故障、宿主重启、生产监控、
+route、atomic activation、market admission、可信用量或结算。Provider 继续保持
+`registering`，V254 的 18 项 temporary absolute deny 原样保留。

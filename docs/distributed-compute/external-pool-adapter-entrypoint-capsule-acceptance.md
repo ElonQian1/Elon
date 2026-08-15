@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Linux entrypoint capsule 验收边界
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-verification_status: historical_source_capsule_verified_v267_launch_source_review_only
+verification_status: historical_source_and_v267_launch_wsl2_verified
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 验收边界
@@ -21,9 +21,10 @@ image，并让 session root 使用 launch SHA-256。下文 4 项 kernel fixture 
 发生在该派生实现之前，只能继续证明 source capsule 的历史行为；它们没有编译或执行当前
 launch image、post-exec stub、双 digest binding 或 Linux loader。
 
-V267 对本页新增边界严格为 `source_review_only / implementation_uncompiled /
-implementation_unrun`，`passed=0 / failed=0`。后续必须重新覆盖 program-header/range 重写、
-launch size/hash/seals、原 entry 跳转和真实 `execveat`；不得把下文历史 `11 passed` 计入 V267。
+V267 新增边界已编译，并通过 production source→derived-launch materializer 进入当前 WSL2
+内核 fixture；原 entry 跳转、真实 `execveat`、stub 与 source/launch binding 已受控验证。
+program-header/range、size/hash/seals 的完整负值与第三方 ELF 矩阵仍须补齐；下文历史
+`11 passed` 不与本轮 V267 结果相加。
 
 ## 动态内核验收
 
@@ -69,7 +70,7 @@ wsl.exe -d Ubuntu --cd /mnt/d/wt/24584-b68911b5/server -- env CARGO_TARGET_DIR=/
 
 未验收生产 Linux kernel/文件系统配置、真实 V249 安装树与 operator mount、V256 真实 secret/zeroization、Store 同事务全根动态 fixture、短读/超读并发漂移、SQLite upgrade/reopen/concurrency/crash、真实进程执行、supervisor、namespace/seccomp/cgroup/Landlock/AppArmor、secret delivery、Sidecar/IPC/session、authenticated no-work probe、runtime identity、ACK/event、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification或settlement。
 
-因此只能把 `implementation_partially_verified / verified_wsl2_linux_kernel_subset` 作为 V257
-source capsule 的历史记录；V267 launch derivation 当前仍是 `source_review_only / passed=0`。
-二者都不是 runtime、probe 或 activation；不得因真实 memfd fixture 通过而删除 V254 absolute
+因此 V257 source capsule 保留 `implementation_partially_verified / verified_wsl2_linux_kernel_subset`
+历史记录，V267 launch derivation 另有当前 WSL2/Yama 2 kernel subset 证据。二者都不是生产
+runtime、probe 或 activation；不得因真实 memfd fixture 通过而删除 V254 absolute
 deny 或宣称 production readiness。

@@ -32,7 +32,7 @@ impl Store {
         let mut conn = self.conn().map_err(StoreError::storage)?;
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Deferred)
-            .map_err(|error| StoreError::storage(error.into()))?;
+            .map_err(StoreError::storage)?;
         let result = (|| -> Result<_> {
             let Some(head) = verification_head_by_release_on(&tx, registry_release_id)? else {
                 return Ok(None);
@@ -98,8 +98,7 @@ impl Store {
             Ok(Some(summary))
         })()
         .map_err(StoreError::storage)?;
-        tx.commit()
-            .map_err(|error| StoreError::storage(error.into()))?;
+        tx.commit().map_err(StoreError::storage)?;
         Ok(result)
     }
 }

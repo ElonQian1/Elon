@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: historical_v261_fixture_superseded_v267_rerun_required
+verification_status: historical_v261_and_v267_wsl2_kernel_verified
 ---
 
 # 外部矿池 Adapter Linux supervisor enforcement core 权威
@@ -91,6 +91,6 @@ V261 的历史实现只在 exec 前设置 `PR_SET_DUMPABLE=0`；普通 Linux exe
 
 V267 改为派生 launch image 的首条 stub 在 exec 后 SET/GET dumpable，并在 clone 前要求 exact
 Yama `ptrace_scope=2|3`；current policy V2 只允许该 `prctl` 形状，修正 execveat 高位检查，
-并收紧 pidfd/cleanup 可观察性。上述当前源码未编译、未运行 kernel fixture，状态为
-`source_review_only / passed=0`。本页下方 V261 历史命令与指纹继续保留 provenance，但不能
-证明 V267 supervisor 已动态验收。
+并收紧 pidfd/cleanup 可观察性。当前源码已编译，production-materialized fixture 在 Yama 2
+的 WSL2 内核矩阵中 `12 passed / 0 failed`，四项双资源 cleanup fault case 也通过。本页下方
+V261 历史命令与指纹继续保留 provenance；Yama 3、完整负值和生产故障矩阵仍未验收。
