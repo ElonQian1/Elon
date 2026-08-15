@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221-v266 保留历史证据。V267 已通过 Windows/WSL2 与内核矩阵；V270 本地合同/迁移 17/17、custody 3/3；V271 migration/source bridge 6/6。V272 只冻结默认关闭的 ELTP v1 14-root/8-exchange、2 表 1 view、短 TTL HMAC 与 3 条 admin route，已随 Windows `elon-server` test target 编译，专属动态仍为 0/0。Provider=`registering`、V254 18 deny 不变；生产 upstream/Secret、六能力 worker、stable executor、active refresh 与 atomic activation 仍缺。见 [`V270 权威`](external-pool-adapter-provider-runtime-readiness-authority.md)、[`V271 权威`](external-pool-route-source-projection-bridge-authority.md)、[`V272 权威`](external-pool-adapter-task-protocol-conformance-authority.md) 与 [`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | v221-v266 保留历史证据。V267 已通过 Windows/WSL2 与内核矩阵；V270 本地合同/迁移 17/17、custody 3/3；V271 migration/source bridge 6/6；V272 Windows migration/schema/fence/UDF 2/2。V272 Linux ELTP、startup、HTTP、并发与故障矩阵仍未运行。Provider=`registering`、V254 18 deny 不变；生产 upstream/Secret、六能力 worker、stable executor、active refresh 与 atomic activation 仍缺。见 [`V270 权威`](external-pool-adapter-provider-runtime-readiness-authority.md)、[`V271 权威`](external-pool-route-source-projection-bridge-authority.md)、[`V272 权威`](external-pool-adapter-task-protocol-conformance-authority.md) 与 [`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -183,7 +183,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-V227-v266 只保留历史结果。V267 已完成 Windows/WSL2、Yama 2 内核、ancillary 与 cleanup 故障验证；V270 本地合同/迁移 17/17、custody 3/3，V271 migration/source bridge 6/6，但均不是 production activation。V272 已随 Windows 完整测试目标编译，专属 migration/ELTP/HTTP/SQLite/Linux 动态仍为 0/0，不能打开 fence。Atomic activation 仍须按 V273 worker+authenticated ingress、V274 active refresh、V275 stable executor+activation 闭合；真实 Secret/upstream 与 V254 replacement 也未完成，18 deny 在此前保留。见 [`V272 conformance`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V270 readiness`](external-pool-adapter-provider-runtime-readiness-authority.md) 与 [`当前状态`](current-implementation-status.md)。
+V227-v266 只保留历史结果。V267 已完成 Windows/WSL2、Yama 2 内核、ancillary 与 cleanup 故障验证；V270 本地合同/迁移 17/17、custody 3/3，V271 migration/source bridge 6/6，V272 Windows migration/schema/fence/UDF 2/2，但均不是 production activation。V272 Linux ELTP、startup、HTTP、并发与故障矩阵仍未运行，不能打开 fence。Atomic activation 仍须按 V273 worker+authenticated ingress、V274 active refresh、V275 stable executor+activation 闭合；真实 Secret/upstream 与 V254 replacement 也未完成，18 deny 在此前保留。见 [`V272 conformance`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V270 readiness`](external-pool-adapter-provider-runtime-readiness-authority.md) 与 [`当前状态`](current-implementation-status.md)。
 
 ### F4：容量期货市场
 

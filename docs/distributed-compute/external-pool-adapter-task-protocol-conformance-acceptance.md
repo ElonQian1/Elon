@@ -3,19 +3,19 @@ title: 外部矿池 Adapter task-protocol conformance 验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_migration_verified
 ---
 
 # 外部矿池 Adapter task-protocol conformance 验收
 
 ## 1. 当前证据强度
 
-V272 当前只接受权威合同、源码复核与完整 Windows `elon-server` test target 编译证据。修复 SQLite UDF 借用
-生命周期和错误转换推断后，编译指纹为
-`702357846db905001886551903686f32f5a1d49461498b4802e366011d129eb9`；本批没有执行专属 migration、
-单元/HTTP/SQLite/Linux fixture、启动 child 或连接 upstream。正式动态计数为 `passed=0 / failed=0`，状态为
-`source_review_only / implementation_compiled / implementation_unrun`。
+V272 当前接受权威合同、源码复核、完整 Windows `elon-server` test target 编译，以及 `v272_`
+`2 passed / 0 failed` 的局部动态证据。该专项覆盖 fresh/repeat/reopen、exact 2-table/1-view、18 个 V254 fence
+不变、畸形 receipt 失败关闭和 exact process-integrity UDF，指纹为
+`96a9621ebfdf248edf263ff50ea32595798fb4d10e4b196fbbf2674edb9f306e`。startup、ELTP、HTTP、Linux、
+并发和故障矩阵仍未运行；状态为 `implementation_partially_verified / targeted_local_migration_verified`。
 
 本页只定义验收门，不重新定义 semantics；唯一语义来源是
 [`external-pool-adapter-task-protocol-conformance-authority.md`](external-pool-adapter-task-protocol-conformance-authority.md)。
@@ -80,7 +80,7 @@ receipt 必须保存每步 digest/size、状态、sequence、tombstone 与 oracl
 
 | 验收面 | 当前结果与未来门槛 |
 |---|---|
-| fresh/repeat/reopen migration | 未运行；必须证明 exact 2-table/1-view、全部 immutable/projection/lineage/integrity guard 与 18 个 V254 fence原样在位。 |
+| fresh/repeat/reopen migration | Windows `v272_` 已通过：exact 2-table/1-view、schema 重装/重开一致、空业务行、完整性 UDF 与 18 个 V254 fence 原样在位；有效 receipt lineage/immutability 仍待 Linux execution fixture。 |
 | startup matrix | 未运行；覆盖 disabled/path-present、enabled/path-missing/no-follow/controller/platform、与 V269/V270 enabled全部交叉组合。 |
 | lineage/concurrency/crash | 未运行；证明唯一 genesis/successor、actor-bound replay、physical run非 exactly-once；commit前无row，rollback pending不授权，commit/promote gap仅同进程exact pending replay可promote，restart不可。 |
 | process HMAC | 未运行；覆盖 canonical/observation/expiry/epoch任一 bit drift、DB伪造、错误 process registry、zeroize与 restart historical。 |
@@ -105,7 +105,7 @@ synthetic lane内运行，不创建 v213 或 market row。
 
 ## 6. 正式结论
 
-V272 当前只能声明“Provider-neutral task-protocol conformance 的 server-run/process-HMAC 合同已冻结、实现已
-编译但专属动态未运行”。它可作为未来同进程 Store-private consumer 的 release conformance 输入，但不是
+V272 当前只能声明“Provider-neutral task-protocol conformance 合同已冻结，Windows migration/schema/UDF 已
+局部动态验证，Linux server-run/process-HMAC 尚未运行”。它可作为未来同进程 Store-private consumer 的输入，但不是
 production executor、route 或 activation authority。只有第 3、4 节全部动态矩阵通过并形成可复算指纹后，
 才能提升实现状态；即使提升，Provider 仍为 `registering`、18 deny保持，atomic activation继续 NO-GO。
