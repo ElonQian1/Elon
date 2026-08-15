@@ -388,7 +388,9 @@ internal class ChatGptBackgroundSession(
                         pageAdapter?.markReady()
                         updateState(State.READY)
                         if (
-                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST)
+                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
+                            conversationCollection.officialLoadState !=
+                                ChatGptWebConversationCollection.LOAD_READY
                         ) {
                             conversationRefresh.requestIfIdle()
                         }

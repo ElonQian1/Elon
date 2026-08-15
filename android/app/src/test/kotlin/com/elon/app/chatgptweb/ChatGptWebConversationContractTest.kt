@@ -132,6 +132,8 @@ class ChatGptWebConversationContractTest {
         assertTrue(backgroundSession.contains("ChatGptConversationRefreshCoordinator("))
         assertTrue(backgroundSession.contains("conversationRefresh.onFailed()"))
         assertTrue(backgroundSession.contains("conversationRefresh.onSucceeded()"))
+        assertTrue(backgroundSession.contains("conversationCollection.officialLoadState !="))
+        assertTrue(backgroundSession.contains("ChatGptWebConversationCollection.LOAD_READY"))
         assertFalse(backgroundSession.contains("conversationListRequested"))
     }
 

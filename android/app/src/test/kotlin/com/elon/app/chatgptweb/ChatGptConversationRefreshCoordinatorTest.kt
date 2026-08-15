@@ -64,6 +64,22 @@ class ChatGptConversationRefreshCoordinatorTest {
     }
 
     @Test
+    fun explicitRefreshJoinsAnInflightRequestWithoutDispatchingTwice() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            true
+        }
+
+        assertTrue(coordinator.requestNow())
+        assertTrue(coordinator.requestNow())
+
+        assertEquals(1, dispatches)
+        assertTrue(coordinator.isBusy)
+    }
+
+    @Test
     fun resetCancelsPendingWorkForANewDocument() {
         val scheduled = mutableListOf<Scheduled>()
         val coordinator = coordinator(scheduled) { true }

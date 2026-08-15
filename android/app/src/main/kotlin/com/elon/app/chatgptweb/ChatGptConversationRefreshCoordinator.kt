@@ -14,6 +14,7 @@ internal class ChatGptConversationRefreshCoordinator(
         get() = inFlight || scheduledRetry != null
 
     fun requestNow(): Boolean {
+        if (inFlight) return true
         cancelScheduledRetry()
         retryIndex = 0
         return dispatchIfIdle()
