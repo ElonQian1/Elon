@@ -4,17 +4,22 @@ status: current
 reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_source_contracts_and_migration_verified
 ---
 
 # 外部矿池 Adapter Provider active successor 验收
 
 ## 1. 当前证据强度
 
-V274 当前只接受 authority合同的静态复核。本批没有编译 Rust、执行 migration、运行 SQLite/HTTP/startup/
-filesystem/Linux child/network/HMAC/crash/concurrency/restart/V275 transaction，也没有动态指纹。正式计数为
-`passed=0 / failed=0`，状态为 `source_review_only / implementation_uncompiled / implementation_unrun`。
+V274 已通过统一定向 Rust 验收 7/7：5 项源码合同和 2 项动态迁移。动态证据覆盖 fresh/repeat/reopen、精确两张
+空表和一个空诊断 view、V274 migration 唯一登记、重复安装 schema 不漂移、18 个 V254 fence 不变、canonical
+UDF 拒绝畸形 JSON、private-integrity exact tuple 及未登记 process seal 失败关闭。验证指纹为
+`9c363ccc6271005b6154d6ae230a34ed2da97b8335c130e9d67998d7632c9ffe`，状态为
+`implementation_partially_verified / targeted_local_source_contracts_and_migration_verified`。
+
+这些证据没有运行 HTTP/startup/filesystem/Linux child/network、正向 process HMAC custody、crash、concurrency、
+V275 transaction 或 production runtime；生产计数仍为 `passed=0 / failed=0`。
 
 本页只定义验收门；唯一语义来源是
 [`external-pool-adapter-provider-active-successor-authority.md`](external-pool-adapter-provider-active-successor-authority.md)。
@@ -104,7 +109,8 @@ V274 passed。
 
 ## 8. 正式结论
 
-V274 当前只能声明“两张 immutable表、一个非权威诊断view、stable activation root、renewable active evidence与
-V275原子消费边界的合同已冻结”。它不能声明 row已产生、Provider active、route/executor存在、fence已打开或任务可
-派发。正式状态保持 `source_review_only / implementation_uncompiled / implementation_unrun`、
-`passed=0 / failed=0`、Provider=`registering`、`eligible_rows=0`、18 fences unchanged。
+V274 当前可声明“两张 immutable 表、一个非权威诊断 view、stable activation root、renewable active evidence 与
+V275 原子消费边界已经源码和本地 SQLite 迁移验收”。它不能声明 successor row 已产生、Provider active、
+route/executor 存在、fence 已打开或任务可派发。正式状态为
+`implementation_partially_verified / targeted_local_source_contracts_and_migration_verified`，统一合同/迁移 7/7；
+生产运行仍为 `passed=0 / failed=0`、Provider=`registering`、`eligible_rows=0`、18 fences unchanged。

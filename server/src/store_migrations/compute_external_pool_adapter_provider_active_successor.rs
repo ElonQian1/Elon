@@ -7,6 +7,9 @@ mod tables;
 mod v253_registering_bridge;
 mod view;
 
+#[cfg(test)]
+mod dynamic_tests;
+
 pub(super) fn register_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     receipt_integrity::register(conn)
 }

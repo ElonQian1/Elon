@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_source_contracts_and_migration_verified
 ---
 
 # 外部矿池 Adapter Provider active successor 权威
@@ -236,7 +236,10 @@ V274 不创建/修改 Provider、Adapter、route、Pool、Offer、Job、Reservat
 settlement；不读取生产 Secret，不启动 child/network，不改变 V273 `eligible_rows=0`。Provider保持
 `registering`；V254 exact 18 temporary absolute deny逐字不变，打开 fence=`0`。
 
-当前状态严格为 `design_frozen / source_review_only / implementation_uncompiled / implementation_unrun`，专属
-`passed=0 / failed=0`。本批没有编译、测试、migration、SQLite、HTTP、startup、filesystem、Linux child、network、
-HMAC、crash、concurrency、restart或 V275 transaction运行证据。唯一正式结论是 V274 Store-private active-successor
-authority合同已冻结；production activation与dispatch继续 NO-GO。
+当前状态为
+`design_frozen / implementation_partially_verified / targeted_local_source_contracts_and_migration_verified`。统一定向
+验收 7/7 通过：5 项源码合同与 2 项动态迁移覆盖 fresh/repeat/reopen、精确两表一诊断 view、V275 前零行、18 个
+V254 fence 不变、完整性 UDF 对畸形输入和未登记 process seal 失败关闭；验证指纹为
+`9c363ccc6271005b6154d6ae230a34ed2da97b8335c130e9d67998d7632c9ffe`。这不是正向 successor producer 或运行态
+证据；HTTP、startup、filesystem、Linux child、network、HMAC 正向 custody、crash、concurrency、V275 transaction
+和 production activation/dispatch 均未运行，生产计数仍为 `passed=0 / failed=0`，继续 NO-GO。
