@@ -513,6 +513,8 @@ retry = 3
     $installedCommand = Get-Command -Name $install.entry_path -ErrorAction Stop
     Assert-True ($installedCommand.Parameters.ContainsKey("SharedBuildPartition")) "installed machine entry should expose named shared partitions"
     Assert-True ($installedCommand.Parameters.ContainsKey("SharedAliasesOnly")) "installed machine entry should expose exact shared-alias GC"
+    Assert-True ($installedCommand.Parameters.ContainsKey("NodeId")) "installed machine entry should expose fleet node identity"
+    Assert-True ($installedCommand.Parameters.ContainsKey("OutputPath")) "installed machine entry should expose fleet report output"
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
     Assert-True (Test-Path -LiteralPath $install.sccache_config_path) "installer should generate managed sccache config"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path

@@ -18,7 +18,7 @@
 | 长聊天/讨论分叉/脑图 | `.github/instructions/discussion-knowledge.instructions.md` |
 | Git/worktree/提交/push/部署/发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
 | Rust/Cargo | Git/发布手册；`scripts/validate-rust.ps1` |
-| Rust 构建缓存、磁盘回收、跨电脑接入 | `.agents/skills/manage-shared-build-cache/SKILL.md`、`docs/rust-cache-platform.md`、`scripts/rust-cache.ps1` |
+| Rust 构建缓存、磁盘回收、跨电脑接入 | `.agents/skills/manage-shared-build-cache/SKILL.md`、`docs/rust-cache-platform.md`、`docs/rust-cache-fleet-operations.md`、`scripts/rust-cache.ps1` |
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和相关源码 |

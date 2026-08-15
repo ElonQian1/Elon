@@ -14,6 +14,7 @@ Use the repository cache tool as the source of truth. Do not reproduce cache rou
 3. If the launcher is absent but `ELON_RUST_CACHE_ROOT` is set, use `$env:ELON_RUST_CACHE_ROOT/platform/rust-cache.ps1` and repair the launcher with a current installer.
 4. If none exists, obtain a current trusted checkout of the platform repository and run its installer.
 5. Invoke the script directly from the current PowerShell session. Do not open nested visible `powershell.exe` or `pwsh.exe` windows.
+6. Run `& <entry> help` when command availability or parameter intent is unclear.
 
 ## Diagnose First
 
@@ -57,6 +58,14 @@ The installer serializes upgrades on each PC. Wait for the current installer ins
 - Run `doctor` on each PC before accepting a long build. A healthy PC must report matching source/install fingerprints and a healthy user launcher.
 - Central dashboards may collect read-only doctor/status reports. GC `-Apply`, Cargo parent-config activation, legacy purge, and cache migration remain machine-local reviewed operations.
 
+Generate the standard sanitized fleet artifact on each node:
+
+```powershell
+& <entry> fleet-report -ProjectRoot <root> -NodeId <platform-node-id> -IncludeSizes
+```
+
+Use the platform node ID supplied by the owning system; do not invent identity from a host name or user profile. The report intentionally omits absolute paths and user/host names. A central service may aggregate it and request a dry-run, but deletion must be re-evaluated and executed on the target PC under the local partition locks.
+
 ## Run Builds
 
 - Prefer the project's `cargo-dev.ps1`, `cargo-cross.ps1`, validation, and release scripts.
@@ -88,3 +97,4 @@ Report:
 - anything preserved or not verified.
 
 For policy and architecture details, read `docs/rust-cache-platform.md` and `docs/rust-cache-on-demand-adoption.md` from the platform repository. Do not duplicate those documents into child projects.
+For multi-PC rollout, report aggregation, and the GC approval state machine, read `docs/rust-cache-fleet-operations.md`.

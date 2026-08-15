@@ -16,7 +16,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet("status", "doctor", "run", "gc", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
+    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "run", "gc", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
     [string]$ProjectRoot,
     [string]$Domain,
     [string]$TargetDir,
@@ -32,6 +32,8 @@ param(
     [string[]]$SharedPartitionDomain = @(),
     [string]$CodexSkillsRoot,
     [string]$UserLauncherPath,
+    [string]$NodeId,
+    [string]$OutputPath,
     [switch]$Retired,
     [switch]$Apply,
     [switch]$ForceAged,
@@ -59,11 +61,21 @@ Import-Module "$modulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Help.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
-# Nested module imports are scoped to their owning module. Re-import the two
-# management surfaces last so status/run and register-legacy all stay callable.
+# Nested module imports are scoped to their owning module. Re-import public
+# management surfaces after Fleet has loaded its own dependencies.
+Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
+
+if ($Command -eq "help") {
+    Show-RustCacheCommandHelp
+    return
+}
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $gitRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
@@ -103,6 +115,16 @@ switch ($Command) {
         $doctor.checks | Format-Table status, id, message, remediation -Wrap -AutoSize
         $doctor
         if (-not $doctor.healthy) { exit 2 }
+    }
+    "fleet-report" {
+        $sourceSkillRoot = Join-Path (Split-Path $scriptsRoot -Parent) ".agents\skills\manage-shared-build-cache"
+        $report = New-RustCacheFleetReport -ProjectRoot $ProjectRoot -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot -UserLauncherPath $UserLauncherPath -NodeId $NodeId -IncludeSizes:$IncludeSizes
+        $resolvedRoot = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $ProjectRoot
+        $export = Export-RustCacheFleetReport -Report $report -CacheRoot $resolvedRoot -OutputPath $OutputPath
+        Write-Host "Fleet report: $($export.report_path)" -ForegroundColor Green
+        Write-Host "Report SHA-256: $($export.content_sha256)"
+        Write-Host "Health: $($report.platform.health); active writers: $($report.activity.active_writer_count); managed partitions: $($report.cache.partition_count)"
+        $export
     }
     "run" {
         if ($RemainingArgs.Count -eq 0) {

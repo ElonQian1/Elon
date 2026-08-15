@@ -7,7 +7,10 @@ Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Help.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to the owner. Re-import public test surfaces last.
+Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
@@ -71,6 +74,11 @@ try {
     Assert-Equal $userLauncherPath $userLauncher.path "portable launcher path"
     Assert-True (Test-Path -LiteralPath $userLauncher.path) "portable launcher should be installed"
     Assert-Equal "healthy" (Test-RustCacheUserLauncher -CacheRoot $cacheRoot -UserLauncherPath $userLauncherPath).status "portable launcher integrity"
+    $launcherContent = Get-Content -Raw -LiteralPath $userLauncher.path -Encoding UTF8
+    Assert-True ($launcherContent -notmatch 'Start-Process|powershell\.exe|pwsh\.exe') "portable launcher must not open a nested visible shell"
+    $launcherHelp = & $userLauncher.path help | Select-Object -Last 1
+    Assert-Equal "elon.rust_cache.command_help.v1" $launcherHelp.schema "portable launcher help schema"
+    Assert-True (@($launcherHelp.commands.name) -contains "fleet-report") "portable launcher help should advertise fleet reports"
     $launcherResult = & $userLauncher.path init-project -ProjectRoot $projectRoot -ProjectId "portable-test" -AllowedDomain @("dev-windows-msvc", "agent-validation") -SharedPartitionDomain @("validation-light=agent-validation") -Apply
     Assert-Equal "unchanged" $launcherResult.action "portable launcher should invoke the installed platform"
 
@@ -94,6 +102,29 @@ try {
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "platform-version").status "doctor platform version check"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "codex-skill").status "doctor skill version check"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "user-launcher").status "doctor portable launcher check"
+    $fleetPath = Join-Path $tempRoot "exports\fleet.json"
+    $fleetReport = New-RustCacheFleetReport -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot -UserLauncherPath $userLauncherPath -NodeId "portable-node-1" -IncludeSizes
+    Assert-Equal "elon.rust_cache.fleet_report.v1" $fleetReport.schema "fleet report schema"
+    Assert-Equal "portable-node-1" $fleetReport.node.node_id "fleet report explicit node identity"
+    Assert-Equal "portable-test" $fleetReport.project.project_id "fleet report project identity"
+    Assert-True (-not $fleetReport.destructive_actions_taken) "fleet report must not run destructive actions"
+    $fleetExport = Export-RustCacheFleetReport -Report $fleetReport -CacheRoot $cacheRoot -OutputPath $fleetPath
+    Assert-True (Test-Path -LiteralPath $fleetExport.report_path -PathType Leaf) "fleet report export path"
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$fleetExport.content_sha256)) "fleet report export hash"
+    $fleetJson = Get-Content -Raw -LiteralPath $fleetPath -Encoding UTF8
+    Assert-True ($fleetJson -notmatch [regex]::Escape($projectRoot)) "fleet report must omit the project absolute path"
+    Assert-True ($fleetJson -notmatch [regex]::Escape($cacheRoot)) "fleet report must omit the cache absolute path"
+    Assert-True ($fleetJson -notmatch 'project_root|cache_root|user_launcher_path') "fleet report must omit path-bearing fields"
+    $invalidNodeRejected = $false
+    try { New-RustCacheFleetReport -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -NodeId "invalid node id" | Out-Null } catch { $invalidNodeRejected = $_.Exception.Message -match "NodeId" }
+    Assert-True $invalidNodeRejected "fleet report should reject unstable node identifiers"
+    $relativeOutputRejected = $false
+    try { Export-RustCacheFleetReport -Report $fleetReport -CacheRoot $cacheRoot -OutputPath "fleet.json" | Out-Null } catch { $relativeOutputRejected = $_.Exception.Message -match "absolute" }
+    Assert-True $relativeOutputRejected "fleet report export should reject relative output paths"
+    $launcherFleetPath = Join-Path $tempRoot "exports\launcher-fleet.json"
+    $launcherFleet = & $userLauncherPath fleet-report -ProjectRoot $projectRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath -NodeId "portable-node-2" -OutputPath $launcherFleetPath | Select-Object -Last 1
+    Assert-Equal "elon.rust_cache.fleet_export.v1" $launcherFleet.schema "installed launcher fleet export schema"
+    Assert-True (Test-Path -LiteralPath $launcherFleetPath -PathType Leaf) "installed launcher should write fleet report"
     $installedDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $platformRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath
     Assert-Equal "installed" $installedDoctor.source_mode "installed entry doctor mode"
     Assert-Equal "warn" ($installedDoctor.checks | Where-Object id -eq "platform-version").status "installed entry should defer source freshness"
