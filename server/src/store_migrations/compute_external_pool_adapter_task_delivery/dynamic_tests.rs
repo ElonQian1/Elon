@@ -4,6 +4,7 @@ use rusqlite::Connection;
 use uuid::Uuid;
 
 use super::migration_v273;
+use crate::compute_federation::external_pool_adapter_task_protocol_production::test_fixtures::exact_envelope_fixtures;
 use crate::store::Store;
 
 const TABLES: [&str; 6] = [
@@ -86,6 +87,30 @@ fn v273_task_protocol_production_integrity_functions_reject_malformed_envelopes(
             assert_eq!(accepted, 0, "{function} accepted {malformed}");
         }
     }
+}
+
+#[test]
+fn v273_task_protocol_production_integrity_functions_accept_only_exact_canonical_envelopes() {
+    let connection = Connection::open_in_memory().expect("in-memory database should open");
+    super::register_receipt_integrity_functions(&connection)
+        .expect("V273 integrity functions should register");
+
+    for fixture in exact_envelope_fixtures().expect("exact V273 fixtures should build") {
+        assert_integrity_result(&connection, fixture.function, &fixture.canonical_json, 1);
+
+        let mut tampered: serde_json::Value =
+            serde_json::from_str(&fixture.canonical_json).expect("exact V273 fixture should parse");
+        tampered[fixture.id_field] = serde_json::Value::String("tampered-id".into());
+        let tampered = serde_json::to_string(&tampered).expect("tampered fixture should serialize");
+        assert_integrity_result(&connection, fixture.function, &tampered, 0);
+    }
+}
+
+fn assert_integrity_result(connection: &Connection, function: &str, json: &str, expected: i64) {
+    let actual: i64 = connection
+        .query_row(&format!("SELECT {function}(?1)"), [json], |row| row.get(0))
+        .unwrap_or_else(|error| panic!("invoke {function}: {error:#}"));
+    assert_eq!(actual, expected, "unexpected {function} result for {json}");
 }
 
 fn assert_migration_and_empty_effects(connection: &Connection) {

@@ -244,10 +244,10 @@ V270/V272 current Store-private reproof。
 
 V273 当前严格为 `design_frozen / implementation_partially_verified /
 targeted_local_source_contracts_and_migration_verified / production_runtime_unrun`。生命周期 UDF 借用与内部
-映射/校验可见性编译阻断已修复，完整 WSL2 GNU `elon-server` 测试目标已编译；统一过滤器 `20 passed / 0 failed`
-包含 18 项源码合同和 2 项动态迁移，规范化指纹为
-`77f262e8d2553a39465324f199e7c6b58a214633c0ddfd08db855b5ba8d7cce4`。动态证据覆盖 fresh/repeat/reopen、
-exact 六张空表、零 view、schema 稳定、六个完整性 UDF 对畸形 envelope 失败关闭、恢复入口持续
+映射/校验可见性编译阻断已修复，完整 WSL2 GNU `elon-server` 测试目标已编译；统一过滤器 `21 passed / 0 failed`
+包含 18 项源码合同和 3 项动态迁移，规范化指纹为
+`8f4bd0e305416b13ffba92bbd3e576bb20c56c7ff4465215b32a6318db7d58cc`。动态证据覆盖 fresh/repeat/reopen、
+exact 六张空表、零 view、schema 稳定、六个完整性 UDF 接受 exact canonical envelope 并拒绝畸形或摘要未重算的 envelope、恢复入口持续
 `eligible_rows=0`，以及 V254 18 deny SQL 不变。production runtime 仍为 `passed=0/failed=0`，没有 startup、
 Linux child、ELTP、network、crash、concurrency、正向 ledger row 或 ingress 运行证据。唯一正式结论是 dormant
 production transport/ingress 合同已冻结、可编译且 migration 边界已局部动态验证；

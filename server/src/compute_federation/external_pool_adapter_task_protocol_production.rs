@@ -9,6 +9,9 @@ mod session;
 mod types;
 mod validation;
 
+#[cfg(test)]
+pub(crate) mod test_fixtures;
+
 pub(crate) use canonical::*;
 pub(crate) use lane::*;
 pub(crate) use session::*;

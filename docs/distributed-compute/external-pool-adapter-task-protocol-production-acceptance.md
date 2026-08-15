@@ -13,10 +13,11 @@ verification_status: targeted_local_source_contracts_and_migration_verified
 
 V273 当前接受 authority 合同的静态复核、完整 WSL2 GNU `elon-server` 测试目标编译及局部动态 migration 验证；
 生命周期 UDF 借用与内部映射/校验可见性阻断已修复。统一 `task_protocol_production` 过滤器
-`20 passed / 0 failed`，包含 18 项源码合同和 2 项 fresh/repeat/reopen + UDF 动态迁移，规范化指纹为
-`77f262e8d2553a39465324f199e7c6b58a214633c0ddfd08db855b5ba8d7cce4`。该指纹按顺序连接 20 条稳定的
+`21 passed / 0 failed`，包含 18 项源码合同和 3 项 fresh/repeat/reopen + UDF 动态迁移，规范化指纹为
+`8f4bd0e305416b13ffba92bbd3e576bb20c56c7ff4465215b32a6318db7d58cc`。该指纹按名称排序并连接 21 条稳定的
 `test ... ok` 行及移除 filtered/time 字段后的结果行再计算 SHA-256。动态证据覆盖 exact 六张空表、零 view、
-schema 稳定、六个完整性 UDF 畸形输入失败关闭、恢复入口持续 `eligible_rows=0` 和 V254 18 deny SQL 不变。
+schema 稳定、六个完整性 UDF 接受 exact canonical envelope 且拒绝畸形或摘要未重算的 envelope、恢复入口持续
+`eligible_rows=0` 和 V254 18 deny SQL 不变。
 production runtime 仍未运行，计数为 `passed=0/failed=0`；状态为 `implementation_partially_verified /
 targeted_local_source_contracts_and_migration_verified / production_runtime_unrun`。
 
