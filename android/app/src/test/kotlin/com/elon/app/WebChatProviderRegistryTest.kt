@@ -41,7 +41,7 @@ class WebChatProviderRegistryTest {
         assertFalse(google.supports(WebChatProviderCapability.MESSAGE_REGENERATE))
         assertFalse(google.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS))
         assertFalse(google.supports(WebChatProviderCapability.COMPOSER_TOOLS))
-        assertFalse(google.supports(WebChatProviderCapability.STOP_GENERATION))
+        assertTrue(google.supports(WebChatProviderCapability.STOP_GENERATION))
         assertFalse(google.supports(WebChatProviderCapability.DICTATION))
         assertFalse(google.supports(WebChatProviderCapability.REALTIME_VOICE))
         assertTrue(google.supports(WebChatProviderCapability.RICH_TEXT))

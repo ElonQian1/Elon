@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="30"
+    android:viewportHeight="30">
+    <path
+        android:fillColor="@color/elon_text_secondary"
+        android:pathData="M15,2.5a12.5,12.5 0,1 0,0.1 0" />
+    <path
+        android:fillColor="@color/elon_surface_card"
+        android:pathData="M10.5,10.5 L19.5,10.5 L19.5,19.5 L10.5,19.5 Z" />
+</vector>

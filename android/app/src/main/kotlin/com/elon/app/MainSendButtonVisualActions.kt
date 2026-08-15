@@ -19,6 +19,7 @@ internal class MainSendButtonVisualActions(
     private val isVoiceMode: () -> Boolean,
     private val hasPendingAttachments: () -> Boolean,
     private val inputCanSend: () -> Boolean,
+    private val isWebChatStreaming: () -> Boolean,
     private val activeConversation: () -> AppConversation,
     private val isFriendChatActive: () -> Boolean
 ) {
@@ -26,14 +27,29 @@ internal class MainSendButtonVisualActions(
         val hasText = binding.inputEdit.text.toString().trim().isNotEmpty()
         val hasAttachments = hasPendingAttachments()
         val composerExpanded = inputComposerMotion()?.isExpanded == true
-        val sendMode = (hasText || hasAttachments) && !isVoiceMode() && (composerExpanded || hasAttachments)
+        val streaming = isWebChatStreaming()
+        val visualMode = WebChatProductionComposerVisualModeResolver.resolve(
+            streaming = streaming,
+            hasText = hasText,
+            hasAttachments = hasAttachments,
+            voiceMode = isVoiceMode(),
+            composerExpanded = composerExpanded,
+        )
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
-        if (sendMode) {
+        if (visualMode != WebChatProductionComposerVisualMode.INPUT_MODE) {
             params?.width = dp(38)
-            activity.getDrawable(R.drawable.ic_input_send_new)?.let {
+            val icon = if (visualMode == WebChatProductionComposerVisualMode.STOP) {
+                R.drawable.ic_input_stop_new
+            } else {
+                R.drawable.ic_input_send_new
+            }
+            activity.getDrawable(icon)?.let {
                 binding.sendButton.background = InsetDrawable(it, dp(3))
             }
             binding.sendButton.text = ""
+            binding.sendButton.contentDescription = if (
+                visualMode == WebChatProductionComposerVisualMode.STOP
+            ) "web-chat-stop-generation" else "发送消息"
             binding.sendButton.visibility = View.VISIBLE
             inputModeButton()?.visibility = View.GONE
         } else {
@@ -54,12 +70,14 @@ internal class MainSendButtonVisualActions(
         }
 
         val conversationEnded = !isFriendChatActive() && activeConversation().ended
-        val sendEnabled = !conversationEnded && (!sendMode || inputCanSend())
+        val sendEnabled = !conversationEnded && (
+            visualMode == WebChatProductionComposerVisualMode.STOP || inputCanSend()
+        )
         binding.sendButton.isEnabled = sendEnabled
         binding.sendButton.alpha = if (sendEnabled) 1f else 0.55f
         attachmentButton()?.let { button ->
-            button.isEnabled = !conversationEnded
-            button.alpha = if (conversationEnded) 0.55f else 1f
+            button.isEnabled = !conversationEnded && !streaming
+            button.alpha = if (button.isEnabled) 1f else 0.55f
         }
         inputModeButton()?.let { button ->
             button.isEnabled = !conversationEnded

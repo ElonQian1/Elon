@@ -78,6 +78,7 @@ internal object WebChatProviderRegistry {
             available = true,
             capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION + setOf(
                 WebChatProviderCapability.MESSAGE_COPY,
+                WebChatProviderCapability.STOP_GENERATION,
                 WebChatProviderCapability.RICH_TEXT,
             ),
         ),

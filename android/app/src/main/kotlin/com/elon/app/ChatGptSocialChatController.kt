@@ -24,6 +24,7 @@ internal class ChatGptSocialChatController(
     private val collapseInputComposer: () -> Unit,
     private val openOfficialFallback: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
+    private val onComposerStateChanged: () -> Unit,
     audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.CHATGPT_WEB
@@ -98,6 +99,8 @@ internal class ChatGptSocialChatController(
     override fun authenticated(): Boolean = session.currentSnapshot()?.authenticated == true
 
     override fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
+
+    override fun streaming(): Boolean = session.currentSnapshot()?.streaming == true
 
     override fun attachmentSupported(): Boolean = session.currentSnapshot()?.capabilities
         ?.supports(com.elon.app.chatgptweb.ChatGptWebCapabilityId.ATTACHMENTS) == true
@@ -267,6 +270,7 @@ internal class ChatGptSocialChatController(
         adapter.notifyDataSetChanged()
         if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel(snapshot.currentModel)
+        onComposerStateChanged()
     }
 
     private fun renderState(state: ChatGptBackgroundSession.State, detail: String?) {

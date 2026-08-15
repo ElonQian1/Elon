@@ -68,6 +68,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val productionSources = listOf(
             "android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt",
             "android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt",
+            "android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt",
             "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
             "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
             "android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt",
@@ -75,6 +76,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionRichContent.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerCommands.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerVisualMode.kt",
         )
     }
 }

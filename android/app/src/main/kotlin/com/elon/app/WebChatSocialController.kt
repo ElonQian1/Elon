@@ -14,6 +14,7 @@ internal interface WebChatSocialController {
     fun adapterVersion(): Int
     fun authenticated(): Boolean
     fun composerReady(): Boolean
+    fun streaming(): Boolean
     fun attachmentSupported(): Boolean
     fun attachmentSendPhase(): String
     fun pendingAttachmentCount(): Int

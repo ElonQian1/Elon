@@ -21,6 +21,7 @@ internal class GoogleWebSocialChatController(
     private val collapseInputComposer: () -> Unit,
     private val openOfficialFallback: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
+    private val onComposerStateChanged: () -> Unit,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.GOOGLE_WEB
     private val messages = mutableListOf<ChatMessage>()
@@ -77,6 +78,8 @@ internal class GoogleWebSocialChatController(
     override fun authenticated(): Boolean = session.currentSnapshot()?.authenticated == true
 
     override fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
+
+    override fun streaming(): Boolean = session.currentSnapshot()?.streaming == true
 
     override fun attachmentSupported(): Boolean = false
 
@@ -192,6 +195,7 @@ internal class GoogleWebSocialChatController(
         adapter.notifyDataSetChanged()
         if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel()
+        onComposerStateChanged()
     }
 
     private fun renderState(state: GoogleWebBackgroundSession.State, detail: String?) {

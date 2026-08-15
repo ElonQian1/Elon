@@ -47,5 +47,12 @@ class WebChatProductionComposerCommandsTest {
         val google = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
 
         assertTrue(WebChatProductionComposerCommandCatalog.resolve(google, JSONObject()).isEmpty())
+        assertEquals(
+            listOf("chatgpt_stop_generation"),
+            WebChatProductionComposerCommandCatalog.resolve(
+                google,
+                JSONObject().put("streaming", true),
+            ).map { it.action },
+        )
     }
 }

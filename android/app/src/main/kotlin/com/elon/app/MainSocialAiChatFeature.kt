@@ -22,6 +22,7 @@ internal class MainSocialAiChatFeature(
     private val inputComposerViews: () -> MainInputComposerViews?,
     private val showWorkModelSelector: () -> Unit,
     private val updateWorkModel: () -> Unit,
+    private val refreshInputComposerVisual: () -> Unit,
     private val chatGptWebLifecycle: MainChatGptWebLifecycle,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
@@ -35,6 +36,7 @@ internal class MainSocialAiChatFeature(
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = { onWebChatNavigationChanged() },
+            onComposerStateChanged = refreshInputComposerVisual,
             audioPermissionController = chatGptWebLifecycle.audioPermissionController,
         )
     }
@@ -49,6 +51,7 @@ internal class MainSocialAiChatFeature(
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = { onWebChatNavigationChanged() },
+            onComposerStateChanged = refreshInputComposerVisual,
         )
     }
     private val googleController by googleControllerDelegate
@@ -161,6 +164,14 @@ internal class MainSocialAiChatFeature(
 
     fun webChatComposerReady(): Boolean = activeController().composerReady()
 
+    fun webChatStreaming(): Boolean = isChatModeActive() && activeController().streaming()
+
+    fun stopWebChatGeneration(): Boolean {
+        if (!webChatStreaming()) return false
+        activeController().stopGeneration()
+        return true
+    }
+
     fun webChatAttachmentSupported(): Boolean = activeController().attachmentSupported()
 
     fun webChatAttachmentPhase(): String = activeController().attachmentSendPhase()
@@ -263,6 +274,7 @@ internal class MainSocialAiChatFeature(
             binding.modelButton.setOnClickListener { showWorkModelSelector() }
         }
         updateWorkModel()
+        refreshInputComposerVisual()
     }
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
@@ -293,6 +305,7 @@ internal class MainSocialAiChatFeature(
             binding.modelButton.setOnClickListener { providerPicker.show() }
         }
         binding.root.post { controller.refreshComposerModel() }
+        refreshInputComposerVisual()
     }
 
     private fun activeController(): WebChatSocialController = controllerFor(providerId())

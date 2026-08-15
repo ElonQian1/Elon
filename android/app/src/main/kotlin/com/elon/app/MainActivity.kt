@@ -214,7 +214,7 @@ class MainActivity : AppCompatActivity() {
             },
             isSocialAiChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive()
-            },
+            }, isWebChatStreaming = { socialAiChatFeature.webChatStreaming() }, stopWebChatGeneration = { socialAiChatFeature.stopWebChatGeneration() },
             trySendFriendMessage = { text, attachments ->
                 socialAiChatFeature.trySendMessage(text, attachments) ||
                     projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
@@ -1039,7 +1039,7 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             inputComposerViews = inputActions::inputComposerViewsOrNull,
             showWorkModelSelector = modelActions::showModelPopupOrLoad,
-            updateWorkModel = modelActions::updateModelButton, chatGptWebLifecycle = chatGptWebLifecycle,
+            updateWorkModel = modelActions::updateModelButton, refreshInputComposerVisual = inputActions.sendButtonVisualActions::updateSendButtonVisual, chatGptWebLifecycle = chatGptWebLifecycle,
         )
     }
 

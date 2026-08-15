@@ -33,6 +33,8 @@ internal class MainInputActions(
     private val isFriendChatActive: () -> Boolean,
     private val isDirectSocialAiChatActive: () -> Boolean,
     private val isSocialAiChatActive: () -> Boolean,
+    private val isWebChatStreaming: () -> Boolean,
+    private val stopWebChatGeneration: () -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
     private val forkForRunningInput: (String, String) -> ForkedConversation,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean
@@ -94,7 +96,9 @@ internal class MainInputActions(
             onVoiceTouchMove = { rawX, rawY -> speechInputActions().onVoiceTouchMove(rawX, rawY) },
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
             togglePlanMode = { planModeActions.togglePlanMode() },
-            sendMessage = { sendMessageActions.sendMessage() },
+            sendMessage = {
+                if (!stopWebChatGeneration()) sendMessageActions.sendMessage()
+            },
             toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
             toggleEmojiPanel = { emojiActions.toggleEmojiPanel() },
             buildAttachmentPanel = { attachmentPanelActions.buildAttachmentPanel() },
@@ -539,6 +543,7 @@ internal class MainInputActions(
             isVoiceMode = { voiceMode },
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
+            isWebChatStreaming = isWebChatStreaming,
             activeConversation = projectStateActions()::activeConversation,
             isFriendChatActive = isFriendChatActive
         )
