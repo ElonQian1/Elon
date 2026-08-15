@@ -101,6 +101,10 @@ async fn rollback_merge(
     })
 }
 
+#[cfg(test)]
+#[path = "open_commerce_portability_merge_api_tests.rs"]
+mod tests;
+
 fn with_caller<T: serde::Serialize>(
     state: &AppState,
     headers: &HeaderMap,

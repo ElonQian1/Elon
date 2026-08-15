@@ -369,3 +369,7 @@ fn ensure_consumer_project_actor(actor: &OpenCommerceActor<'_>) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "open_commerce_portability_merge_service_tests.rs"]
+mod tests;

@@ -27,3 +27,7 @@ pub(crate) fn migration_v161(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "open_commerce_portability_merge_migration_tests.rs"]
+mod tests;

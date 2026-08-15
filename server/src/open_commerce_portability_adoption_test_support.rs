@@ -176,6 +176,60 @@ pub(super) fn fixture(with_current_profile: bool) -> Fixture {
     }
 }
 
+pub(super) fn add_import(
+    fixture: &Fixture,
+    preferences: Option<ConsumerPreferences>,
+    label: &str,
+) -> String {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let source_project = fixture
+        .state
+        .store
+        .create_project(
+            &fixture.owner_id,
+            &format!("Portability source {label} {suffix}"),
+            None,
+            None,
+        )
+        .unwrap()
+        .project;
+    let source_actor = OpenCommerceActor {
+        user_id: &fixture.owner_id,
+        app_id: "pc-web",
+        project_role: Some("owner"),
+    };
+    if let Some(preferences) = preferences {
+        open_commerce_consumer_preference_service::upsert_profile(
+            &fixture.state.store,
+            &source_project.id,
+            &source_actor,
+            UpsertConsumerPreferenceProfileRequest { preferences },
+        )
+        .unwrap();
+    }
+    let package = open_commerce_portability_service::create_export(
+        &fixture.state.store,
+        &source_project.id,
+        &source_actor,
+        CreateConsumerPortabilityExportRequest {
+            idempotency_key: format!("merge-source-{label}-{suffix}"),
+        },
+    )
+    .unwrap();
+    open_commerce_portability_import_service::create_import(
+        &fixture.state.store,
+        &fixture.target_project_id,
+        &fixture.owner_actor(),
+        CreateConsumerPortabilityImportRequest {
+            source_operator: format!("fixture-{label}"),
+            package,
+            signature: None,
+        },
+    )
+    .unwrap()
+    .id
+}
+
 pub(super) async fn send_json(
     router: &Router,
     method: Method,

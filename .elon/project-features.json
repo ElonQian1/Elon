@@ -3284,6 +3284,234 @@
       "updated_at_ms": 1786629063314
     },
     {
+      "id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "title": "消费者多来源偏好合并 V1 验证闭环",
+      "summary": "验证并在必要时修复现有多来源偏好冲突预演、人工逐字段采用、事务回滚、权限、V141升级、PC合同和单包兼容。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/open-commerce-consumer-portability-multi-source-merge-v1-verification.md",
+        "content_hash": "3223dc647a7885e3034d7a7ffe72d57465fe07f91bf06bcba1493b0325571e91",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+          "head_blob_oid": "c74862e43913304c96c2a21d075d74bd13fc27fb",
+          "worktree_blob_oid": "c74862e43913304c96c2a21d075d74bd13fc27fb",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [
+        "open-commerce",
+        "portability",
+        "verification"
+      ],
+      "task_paths": [
+        "pc-frontend/src/features/open-commerce/ConsumerPortabilityMergePanel.tsx",
+        "server/src/open_commerce_portability_merge_api.rs",
+        "server/src/open_commerce_portability_merge_migration.rs",
+        "server/src/open_commerce_portability_merge_service.rs",
+        "server/src/store/open_commerce_consumer_portability_merges.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "2至10个本人隔离包、重复越权删除和无偏好来源失败关闭",
+        "逐字段人工选择、过期修订和未参与来源失败关闭",
+        "采用与回滚保存快照和来源摘要且审计不含偏好明文",
+        "V141磁盘升级、HTTP权限和既有单包采用兼容通过",
+        "PC静态交互合同、TypeScript生产构建和Rust回归通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/open-commerce-consumer-portability-multi-source-merge-v1-acceptance.md",
+          "content_hash": "fb40071ba08c2c67fd0d7b87b99955c5f8daa9f84601b7bc5fea9627333a42b1",
+          "locator": "verification evidence",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "bc4d57d243932594b5388a3be1be62ec9d5e98a7",
+            "worktree_blob_oid": "bc4d57d243932594b5388a3be1be62ec9d5e98a7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/open-commerce-consumer-portability-multi-source-merge-v1-verification.md",
+          "content_hash": "3223dc647a7885e3034d7a7ffe72d57465fe07f91bf06bcba1493b0325571e91",
+          "locator": "acceptance criteria",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "c74862e43913304c96c2a21d075d74bd13fc27fb",
+            "worktree_blob_oid": "c74862e43913304c96c2a21d075d74bd13fc27fb",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/package.json",
+          "content_hash": "bbe799b7e54b4dbf9ab46a4b72ac643ce6a999eb4d2f7459ac12cca9a6b2e9ba",
+          "locator": "test:open-commerce",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "0c6fbbf93a687dfaa3f8dbb4699ee2aa131edfdc",
+            "worktree_blob_oid": "0c6fbbf93a687dfaa3f8dbb4699ee2aa131edfdc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/open-commerce/ConsumerPortabilityMergePanel.tsx",
+          "content_hash": "23616dc597b3f6054fb02b4d24f6eea8372f2da4bdc527e78b262526b20688c4",
+          "locator": "multi-source workbench",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "c646d517de37cd87e2aa854c8ecb8d92bd505efc",
+            "worktree_blob_oid": "c646d517de37cd87e2aa854c8ecb8d92bd505efc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/open-commerce/openCommerceClientApi.ts",
+          "content_hash": "864e9241c778e7d77209dd44e43c5078322b4fac78f7ce77bd0c394dd83a4d4f",
+          "locator": "merge HTTP client",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "a322d3640fb2fd03040b548e7b18a0876b0ed63b",
+            "worktree_blob_oid": "a322d3640fb2fd03040b548e7b18a0876b0ed63b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/open-commerce/openCommerceClientTypes.ts",
+          "content_hash": "b2fb8080897964bbc048c2691a4a27d7e83b9c6cf5878d64bbd6f21f56fd803f",
+          "locator": "merge v1 contracts",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "4fccbe322bf15664377bb61170289d4ec8772c5e",
+            "worktree_blob_oid": "4fccbe322bf15664377bb61170289d4ec8772c5e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-open-commerce-portability-merge-pc.js",
+          "content_hash": "c0d74360b631ffdb9ca58b6eab78f5127b0c55d90584f1b559414a59b9005823",
+          "locator": "PC static contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "b7dc4bf907caf62c08e9c7606ae1ab33db6d41fb",
+            "worktree_blob_oid": "b7dc4bf907caf62c08e9c7606ae1ab33db6d41fb",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_portability_merge_api.rs",
+          "content_hash": "d077b230047b3baadd8cd9c8ce43dcae8c4049039a6e1c8b07b5ae7bb766048d",
+          "locator": "routes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "ba31369277935a1b2bba98c0f243f706e84c85e9",
+            "worktree_blob_oid": "ba31369277935a1b2bba98c0f243f706e84c85e9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_portability_merge_api_tests.rs",
+          "content_hash": "f014e82e833f1450fcec9c58f42f9f90f523af90c63671753fef45f4edb518ff",
+          "locator": "Axum route tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "b6f21ca133bbb85971c2b1cebc1f0313de424210",
+            "worktree_blob_oid": "b6f21ca133bbb85971c2b1cebc1f0313de424210",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_portability_merge_migration.rs",
+          "content_hash": "51659e5d2a707fb576aa7f63f924133ff5cede14d532fca1b10fceb3ec3c1294",
+          "locator": "migration_v161",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "80beed161ddb542a0b87a368428d9e7e245bf732",
+            "worktree_blob_oid": "80beed161ddb542a0b87a368428d9e7e245bf732",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_portability_merge_migration_tests.rs",
+          "content_hash": "14df5af5885016d798d525c1f3681d058a8fa47621035b20e43cd2198c8d38a8",
+          "locator": "V141 disk upgrade",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "36cc9b6a35e1623cb4948ed077574e6242368668",
+            "worktree_blob_oid": "36cc9b6a35e1623cb4948ed077574e6242368668",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_portability_merge_service.rs",
+          "content_hash": "1a1e5d1ba1399ebe063518016200ea102cde2546833a9ea67d159e91cd20e6db",
+          "locator": "merge_plan/apply_merge/rollback_merge",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "3ca403c4120064a20054a977658c04a77f5e8486",
+            "worktree_blob_oid": "3ca403c4120064a20054a977658c04a77f5e8486",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/open_commerce_portability_merge_service_tests.rs",
+          "content_hash": "76bd449b72efeff4dfb4a1feb47dbf796da84443cae334b2337fec5cc3fcb13b",
+          "locator": "service boundary tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "1cc31f064cb30584fa6ad8fce6a159fbc6c29c88",
+            "worktree_blob_oid": "1cc31f064cb30584fa6ad8fce6a159fbc6c29c88",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/open_commerce_consumer_portability_merges.rs",
+          "content_hash": "8a8e519543122b55c6a80e49cd7cbd1b27ac48417d7bc3bda2401d3b9f8e2873",
+          "locator": "transactional persistence",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8f485d2a74745f1e7cbe878227898c38cdd94996",
+            "head_blob_oid": "2aa35c4dc8dd1b805a2d95dc59a52917e94d1694",
+            "worktree_blob_oid": "2aa35c4dc8dd1b805a2d95dc59a52917e94d1694",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786764390292,
+      "updated_at_ms": 1786766909820
+    },
+    {
       "id": "open-commerce-verified-erp-handoff-handler-v1",
       "title": "开放商业 ERP 写入与回读验证处理器 V1",
       "summary": "复用现有接入器租约工作器，把终态业务证据以稳定幂等来源信封交给商户 ERP 插件，并且只有外部回读完整匹配项目、商户、Invocation、接入和结果摘要后才允许提交 applied。",
@@ -4371,166 +4599,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_f0b3767492364cce985b84e8d71b81fd",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Bind the authority document to the successful 12-test local verification result and exact production boundaries.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786652711931
-    },
-    {
-      "id": "feature_event_9862c56672624ec4a6606182c206c58e",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Reviewed V255 scope remains inert and matches the targeted local verification evidence.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786652711944
-    },
-    {
-      "id": "feature_event_73e4827ec6ce41f4a429e4acd80b9ebb",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Reviewed V255 scope remains inert and matches the targeted local verification evidence.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786652711955
-    },
-    {
-      "id": "feature_event_a593d3727dff468d8ecc6cfa217a88ea",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "claimed",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786652711966
-    },
-    {
-      "id": "feature_event_5921f0d1bb384235a75891577d83db9d",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Record implementation and test evidence after successful targeted validation.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786652711979
-    },
-    {
-      "id": "feature_event_ee77efdc0d9e4e85b86a6c4eb2f2b263",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786652715098
-    },
-    {
-      "id": "feature_event_57860230746748f2b5c9e662fc884c7d",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "V255 targeted Rust/SQLite/Axum verification passed 12 tests with no forbidden runtime or market effect.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786652715123
-    },
-    {
-      "id": "feature_event_305b4fbdd8e94b4bb77bd197cf837abf",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "V255 targeted Rust/SQLite/Axum verification passed 12 tests with no forbidden runtime or market effect.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786652715138
-    },
-    {
-      "id": "feature_event_16d43d8788774319a1fcccf97b723eb5",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "registered",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786653173582
-    },
-    {
-      "id": "feature_event_d279eac92691447bab07c383cffdaf68",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "claimed",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786653173595
-    },
-    {
-      "id": "feature_event_cbc30d020e584bee97ed91361701472f",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Align the stale adoption threshold with the current bounded registry contract.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786653173609
-    },
-    {
-      "id": "feature_event_122be033a33c49adabeb11c5145bea64",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786653174355
-    },
-    {
-      "id": "feature_event_282fd35f9f5e4c40b90dcd254ecb997d",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Adoption, preflight workflow, Rust format guard, and AI prompt asset audit passed.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786653174367
-    },
-    {
-      "id": "feature_event_3d0bcf873b964aca8b8caf5466ea20cd",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Adoption, preflight workflow, Rust format guard, and AI prompt asset audit passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786653174384
-    },
-    {
-      "id": "feature_event_1e422ce6afba4f4c9f246365236aa774",
-      "feature_id": "project-feature-registry-growth-contract-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Implementation and verification commit fdd92efdf was pushed to origin/main.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786653716050
-    },
-    {
-      "id": "feature_event_3d09d7d702c04ce4a719cb1a47b37c27",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Reopen after rebase so merged V256/V257 status documents can be rebound as current evidence.",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1786653759360
-    },
     {
       "id": "feature_event_c36573402d5145bfb85dfc6a98ee082f",
       "feature_id": "compute-v255-runtime-launch-profile-verification",
@@ -6370,6 +6438,166 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786762799336
+    },
+    {
+      "id": "feature_event_af5dfe1e15314da7af5f181c67ce2417",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "registered",
+      "actor": "codex-agent",
+      "reason": "AI_CURRENT 与现有验收文档均表明代码存在但统一验证未完成。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786764390292
+    },
+    {
+      "id": "feature_event_4891102563294cddbc7fc8bde44927c9",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "claimed",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786764390320
+    },
+    {
+      "id": "feature_event_0eced78014234583a8bf7daf39699c8e",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-agent",
+      "reason": "开始补齐领域、HTTP、迁移、PC合同和兼容回归。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786764405409
+    },
+    {
+      "id": "feature_event_04daf56bd8ea418c853f1e94bc89683f",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786766545522
+    },
+    {
+      "id": "feature_event_945bc24e1b344d16a9778a73d94a10db",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "服务、HTTP、SQLite 迁移和 PC 验证代码已经形成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786766545545
+    },
+    {
+      "id": "feature_event_e121ecdc628945738d800f667617b6f8",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "Rust 8 项定向回归、完整开放商业 PC 契约和 TypeScript/Vite 生产构建全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786766545567
+    },
+    {
+      "id": "feature_event_91b6ccc3e6574c589f2feaaf2b4914d1",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "提交前格式门禁删除了需求文档末尾空白行，显式重开并重绑当前需求哈希。",
+      "from_status": "verified",
+      "to_status": "retired",
+      "at_ms": 1786766904443
+    },
+    {
+      "id": "feature_event_3ea3ef8b123640c9b86045f7d263ade9",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "重新评审格式修正后的同范围需求。",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1786766904462
+    },
+    {
+      "id": "feature_event_1fc6b9fdff2444a2966910acc2551f3c",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "绑定已提交且通过差异检查的当前需求文档。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1786766904822
+    },
+    {
+      "id": "feature_event_c6e52e4ea62943b2b87aebd4d5b8c5cb",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "需求仅修正末尾空白，目标与验收范围不变。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786766904840
+    },
+    {
+      "id": "feature_event_8e70344f5392451985706557c896e121",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "依赖为空，现有验证证据可重新绑定。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786766904858
+    },
+    {
+      "id": "feature_event_9d4ee7c635f74784b634a4730d6fcbcb",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "claimed",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786766904876
+    },
+    {
+      "id": "feature_event_bf93628d639d463bab3208895eaa8079",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "重新绑定当前实现与测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786766904896
+    },
+    {
+      "id": "feature_event_9254881fabf543ba9c97ba09ab4e114f",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786766909776
+    },
+    {
+      "id": "feature_event_11af531a1f034a30a43178bd97817a22",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "当前实现与验证文件重新绑定完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786766909798
+    },
+    {
+      "id": "feature_event_12d9d1a187c2464081d74b024f762da4",
+      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
+      "action": "transitioned",
+      "actor": "codex-task-40204-890e17df",
+      "reason": "Rust 8 项定向回归、完整开放商业 PC 契约和 TypeScript/Vite 生产构建已通过；远端新增 Android 改动不影响本范围。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786766909820
     }
   ]
 }
