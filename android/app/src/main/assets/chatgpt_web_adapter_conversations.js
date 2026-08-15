@@ -9,6 +9,7 @@
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/(g-p-[A-Za-z0-9_-]{1,160})\/c\/[A-Za-z0-9_-]{1,160})$/;
   const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
   const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早)$/i;
+  let sidebarOpenedByAdapter = false;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -307,7 +308,7 @@
         stableSince = Date.now();
       }
       if (conversations.length && Date.now() - stableSince >= 500) return onReady(best);
-      if (Date.now() - started >= 3000) {
+      if (Date.now() - started >= 10000) {
         return best.length ? onReady(best) : onTimeout();
       }
       window.setTimeout(poll, 100);
@@ -400,6 +401,7 @@
         if (closeAfter) {
           const close = findSidebarButton(false);
           if (close) close.click();
+          sidebarOpenedByAdapter = false;
         }
       });
     });
@@ -408,7 +410,20 @@
   function requestList(emitEvent, result) {
     const open = findSidebarButton(true);
     if (open) {
+      sidebarOpenedByAdapter = true;
       open.click();
+      return waitForConversations(
+        (conversations) => {
+          collectConversationHistory(conversations, (snapshot) => {
+            emitConversationSnapshot(snapshot, emitEvent, result, sidebarOpenedByAdapter);
+          });
+        },
+        () => result('list_conversations', false, '官网会话列表尚未加载完成。')
+      );
+    }
+
+    const existing = readConversations();
+    if (!existing.length && sidebarOpenedByAdapter && findSidebarButton(false)) {
       return waitForConversations(
         (conversations) => {
           collectConversationHistory(conversations, (snapshot) => {
@@ -418,8 +433,6 @@
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
       );
     }
-
-    const existing = readConversations();
     if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
     collectConversationHistory(existing, (snapshot) => {
       emitConversationSnapshot(snapshot, emitEvent, result, false);

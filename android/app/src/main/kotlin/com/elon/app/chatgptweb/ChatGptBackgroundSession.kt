@@ -48,6 +48,12 @@ internal class ChatGptBackgroundSession(
     private val observedMcpState = ChatGptWebObservedState(restoredConversationHistory)
     private val verificationEvidenceStore = ChatGptWebVerificationEvidenceStore(activity.applicationContext)
     private val attachmentHandler = Handler(Looper.getMainLooper())
+    private val conversationRefreshHandler = Handler(Looper.getMainLooper())
+    private val conversationRefresh = ChatGptConversationRefreshCoordinator(
+        dispatch = ::dispatchConversationIndexRequest,
+        schedule = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
+        cancel = conversationRefreshHandler::removeCallbacks,
+    )
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
@@ -63,7 +69,6 @@ internal class ChatGptBackgroundSession(
     private var conversationCollection = restoredConversationHistory?.let {
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
-    private var conversationListRequested = false
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
@@ -94,6 +99,10 @@ internal class ChatGptBackgroundSession(
     )
 
     fun requestConversationIndex(): Boolean {
+        return conversationRefresh.requestNow()
+    }
+
+    private fun dispatchConversationIndexRequest(): Boolean {
         val adapter = pageAdapter ?: return false
         if (state != State.READY) return false
         conversationCollection = conversationCollection.copy(
@@ -101,7 +110,6 @@ internal class ChatGptBackgroundSession(
             officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
         )
         onConversationIndexChanged(conversationIndex())
-        conversationListRequested = true
         adapter.listConversations()
         return true
     }
@@ -236,6 +244,8 @@ internal class ChatGptBackgroundSession(
     fun destroy() {
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)
+        conversationRefresh.reset()
+        conversationRefreshHandler.removeCallbacksAndMessages(null)
         pageAdapter = null
         touchDispatcher = null
         webView?.apply {
@@ -308,7 +318,7 @@ internal class ChatGptBackgroundSession(
         )
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
-                conversationListRequested = false
+                conversationRefresh.reset()
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
             },
@@ -378,10 +388,9 @@ internal class ChatGptBackgroundSession(
                         pageAdapter?.markReady()
                         updateState(State.READY)
                         if (
-                            !conversationListRequested &&
                             snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST)
                         ) {
-                            requestConversationIndex()
+                            conversationRefresh.requestIfIdle()
                         }
                     }
                     else -> updateState(State.LOADING)
@@ -404,11 +413,13 @@ internal class ChatGptBackgroundSession(
                             officialLoadState = ChatGptWebConversationCollection.LOAD_FAILED,
                         )
                         onConversationIndexChanged(conversationIndex())
+                        conversationRefresh.onFailed()
                     }
                     onStateChanged(state, event.detail.ifBlank { "官网操作失败" })
                 }
             }
             is ChatGptWebEvent.ConversationList -> {
+                conversationRefresh.onSucceeded()
                 conversations = ChatGptWebConversationIndex.mergeOfficialHistory(
                     conversations,
                     event.conversations,

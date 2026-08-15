@@ -98,6 +98,28 @@ class ChatGptWebConversationContractTest {
         assertTrue(conversations.contains("enrichProjectConversations(snapshot.conversations, projects)"))
     }
 
+    @Test
+    fun slowMobileSidebarCanFinishAfterTheFirstAttemptTimesOut() {
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val backgroundSession = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+
+        assertTrue(conversations.contains("Date.now() - started >= 10000"))
+        assertTrue(conversations.contains("let sidebarOpenedByAdapter = false"))
+        assertTrue(
+            conversations.contains(
+                "!existing.length && sidebarOpenedByAdapter && findSidebarButton(false)",
+            ),
+        )
+        assertTrue(backgroundSession.contains("ChatGptConversationRefreshCoordinator("))
+        assertTrue(backgroundSession.contains("conversationRefresh.onFailed()"))
+        assertTrue(backgroundSession.contains("conversationRefresh.onSucceeded()"))
+        assertFalse(backgroundSession.contains("conversationListRequested"))
+    }
+
     private fun readRepositoryFile(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 
