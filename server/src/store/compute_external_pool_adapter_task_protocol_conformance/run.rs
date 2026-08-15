@@ -4,6 +4,9 @@ mod execution;
 mod oracle;
 mod support;
 
+#[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
+mod session_tests;
+
 use anyhow::Result;
 
 use crate::compute_federation::{

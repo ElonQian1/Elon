@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: targeted_local_contract_migration_http_and_wsl2_oracle_verified
+verification_status: targeted_local_contract_migration_http_wsl2_oracle_and_session_wire_verified
 ---
 
 # 外部矿池 Adapter task-protocol conformance 验收
@@ -16,10 +16,13 @@ SQLite 和 1 项真实 Axum 门卫。它覆盖 fresh/repeat/reopen、exact 2-tab
 UDF，以及 401/403/422 先于 unavailable 503，指纹为
 `d08956fe46177ab11ea9038ce3306eff9e30e7fb09d5c07673e4dd12412ad45b`。WSL2 GNU server target 另有
 direct stateful-oracle `3 passed / 0 failed`，覆盖 exact 八步状态、乱序/重复拒绝和 receipt 后置状态门，
-规范化证据指纹为 `9f00ae268b6a4f52511884ec8943c1ffaab4630d808981e7b8a89020dba73019`。它没有启动 child，也没有
-经过真实 session/wire authenticated ACK 或 process HMAC。startup、Linux child/session ELTP、成功 HTTP
+指纹为 `9f00ae268b6a4f52511884ec8943c1ffaab4630d808981e7b8a89020dba73019`；authenticated in-process
+session/wire `1 passed / 0 failed` 覆盖真实 seqpacket 会话启动、双向认证、临时 bundle 交付、8 次 ELTP
+request/response/receipt、独立 child fixture oracle 与认证关闭，指纹为
+`f011891d0198687f9b289b40983f9e3142259557a77be225dab8cd897f07cecb`。该专项使用同进程线程，不等于
+独立 child process，也未经过 process HMAC。startup、独立 Linux child process 及内核隔离/清理、成功 HTTP
 写链、并发和故障矩阵仍未运行；状态为 `implementation_partially_verified /
-targeted_local_contract_migration_http_and_wsl2_oracle_verified`。
+targeted_local_contract_migration_http_wsl2_oracle_and_session_wire_verified`。
 
 本页只定义验收门，不重新定义 semantics；唯一语义来源是
 [`external-pool-adapter-task-protocol-conformance-authority.md`](external-pool-adapter-task-protocol-conformance-authority.md)。
@@ -64,19 +67,20 @@ targeted_local_contract_migration_http_and_wsl2_oracle_verified`。
 
 ## 3. 六能力动态判定矩阵
 
-当前在 WSL2 GNU server target 上完成 direct stateful oracle 3/3；它直接调用 oracle transition，不等价于
-启动 child、建立 ELTP session 或取得 wire authenticated receipt。完整动态矩阵仍须逐项闭合：
+当前在 WSL2 GNU server target 上完成 direct stateful oracle 3/3，并完成 authenticated in-process
+session/wire 1/1。后者已建立真实 ELTP 会话并取得八次 wire receipt，但使用线程化 child fixture，不等价于
+独立 child process 或内核隔离/清理验收。完整动态矩阵仍须逐项闭合：
 
 | 验收面 | 当前结果与完整门槛 |
 |---|---|
-| ordinals 1/6 prepare | direct oracle 已确认 A/B 进入 prepared，且乱序、重复 transition 拒绝；refA/seq1/refB 通过真实 ELTP observation 的完整绑定仍未运行。 |
-| ordinals 2/3 commit | direct oracle 已确认 committed、`start_count=1`、replay 不增 start count 并生成 pending marker；same-idempotency wire replay 与 authenticated receipt 全绑定仍未运行。 |
-| ordinal 4 reconcile | direct oracle 已确认 receipt 后置状态应用前拒绝 reconcile，应用后转为 running/resolved；真实 receipt、marker wire 绑定与矛盾漂移矩阵仍未运行。 |
-| ordinal 5 events | direct oracle 已确认 terminal、2 events、exact replay equality 与 duplicate classification；cursor/root chain 和 gap/fork/conflict wire 矩阵仍未运行。 |
-| ordinals 7/8 cancel | direct oracle 已确认 7 无 tombstone，8 才 terminal_no_start + tombstone，且 B start/event 为 0；ACK wire 绑定仍未运行。 |
-| authenticated ACK | 未运行真实 ACK；direct oracle 只证明生产代码在 post-receipt 状态应用前拒绝 reconcile，不能替代 session receipt 验证。 |
-| wire limits | 未运行；仍须覆盖 exact-length v1、big-endian、reserved=0、ordinal/timeout/size 上限及 delimiter/EOF/chunked/stream、generic TLS stream、未知 kind/op 拒绝。 |
-| failure/cleanup | 未运行；仍须覆盖 timeout、stderr policy、协议失败、shutdown/reap/cgroup/scratch 任一失败零 receipt，以及响应取消后的 terminal cleanup。 |
+| ordinals 1/6 prepare | direct oracle 与真实 session/wire 已确认 A/B 进入 prepared，8 次 exchange 的 request/response/receipt 均按 ordinal 完成；乱序、重复 transition 由 direct oracle 拒绝。更多字段漂移负值仍未运行。 |
+| ordinals 2/3 commit | 真实 session/wire 已确认 committed、`start_count=1`、same-idempotency replay 不增 start count并生成 pending marker；矛盾 idempotency/wire 漂移仍未运行。 |
+| ordinal 4 reconcile | 真实 session/wire 已确认 authenticated receipt 后应用 pending uncertainty，再转为 running/resolved；marker 矛盾漂移矩阵仍未运行。 |
+| ordinal 5 events | 真实 session/wire 已确认 terminal、2 events、exact replay equality 与 duplicate classification；gap/fork/conflict wire 负值矩阵仍未运行。 |
+| ordinals 7/8 cancel | 真实 session/wire 已确认 7 无 tombstone，8 才 terminal_no_start + tombstone，且 B start/event 为 0；取消字段漂移负值仍未运行。 |
+| authenticated receipt | 8 次 request/response/receipt 已通过双方认证的真实 seqpacket session，host 对 request/response/exchange root 和 observation 做了验证；尚未覆盖独立进程、篡改和超时负值矩阵。 |
+| wire limits | 正向 exact-length v1、big-endian、reserved=0 路径已运行；ordinal/timeout/size 上限及 delimiter/EOF/chunked/stream、generic TLS stream、未知 kind/op 拒绝仍须补齐。 |
+| failure/cleanup | 已验证认证 shutdown 和线程退出；仍须覆盖独立进程 timeout、stderr policy、协议失败、reap/cgroup/scratch 任一失败零 receipt，以及响应取消后的 terminal cleanup。 |
 
 receipt 必须保存每步 digest/size、状态、sequence、tombstone 与 oracle counters 的完整 host-derived observation；
 只保存六项 `true` 或复用 caller transcript 应判验收失败。
@@ -111,7 +115,7 @@ synthetic lane内运行，不创建 v213 或 market row。
 ## 6. 正式结论
 
 V272 当前只能声明“Provider-neutral task-protocol conformance 合同已冻结，Windows contract/migration/HTTP
-门卫及 WSL2 direct stateful oracle 已局部动态验证，Linux child/session server-run、wire authenticated ACK 与
-process HMAC 尚未运行”。它可作为未来同进程 Store-private consumer 的输入，但不是 production executor、
-route 或 activation authority。只有第 3、4 节全部动态矩阵通过并形成可复算指纹后，
+门卫、WSL2 direct stateful oracle 及 authenticated in-process session/wire 已局部动态验证；独立 Linux child
+process、内核隔离/清理、process HMAC 与成功 HTTP 写链尚未运行”。它可作为未来同进程 Store-private
+consumer 的输入，但不是 production executor、route 或 activation authority。只有第 3、4 节全部动态矩阵通过并形成可复算指纹后，
 才能提升实现状态；即使提升，Provider 仍为 `registering`、18 deny保持，atomic activation继续 NO-GO。
