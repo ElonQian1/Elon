@@ -186,6 +186,64 @@ function Get-RustCachePartitions {
     return @($items | ForEach-Object { $_ })
 }
 
+function Add-RustCacheSharedPartitionGovernance {
+    param(
+        [Parameter(Mandatory)][object[]]$Partitions,
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [AllowNull()]$ProjectManifest
+    )
+
+    $mapping = if ($ProjectManifest -and $ProjectManifest.registered) {
+        $ProjectManifest.shared_partition_domains
+    } else {
+        @{}
+    }
+    foreach ($partition in $Partitions) {
+        $sharedPartition = if ([string]$partition.workspace_hash -like "shared-*") {
+            ([string]$partition.workspace_hash).Substring("shared-".Length)
+        } else {
+            $null
+        }
+        $canonicalDomain = if (
+            $ProjectManifest -and
+            $ProjectManifest.registered -and
+            $partition.kind -eq "registered" -and
+            $partition.project_id -eq $ProjectManifest.project_id -and
+            $partition.marker_valid -and
+            $partition.cache_scope -eq "shared" -and
+            -not [string]::IsNullOrWhiteSpace($sharedPartition) -and
+            $null -ne $mapping -and
+            $mapping.ContainsKey($sharedPartition)
+        ) {
+            [string]$mapping[$sharedPartition]
+        } else {
+            $null
+        }
+        $canonicalPath = if (-not [string]::IsNullOrWhiteSpace($canonicalDomain)) {
+            Join-Path $CacheRoot "build\$($partition.toolchain_epoch)\$($partition.project_id)\$canonicalDomain\$($partition.workspace_hash)"
+        } else {
+            $null
+        }
+        $canonicalPartition = if ($canonicalPath) {
+            $Partitions | Where-Object { [string]$_.path -ieq $canonicalPath } | Select-Object -First 1
+        } else {
+            $null
+        }
+        $canonicalReady = $null -ne $canonicalPartition -and
+            $canonicalPartition.marker_valid -and
+            $canonicalPartition.cache_scope -eq "shared"
+        $retiredAlias = -not [string]::IsNullOrWhiteSpace($canonicalDomain) -and
+            $partition.domain -ne $canonicalDomain
+        $partition | Add-Member -NotePropertyName shared_partition -NotePropertyValue $sharedPartition -Force
+        $partition | Add-Member -NotePropertyName retired_shared_alias -NotePropertyValue $retiredAlias -Force
+        $partition | Add-Member -NotePropertyName canonical_shared_domain -NotePropertyValue $canonicalDomain -Force
+        $partition | Add-Member -NotePropertyName canonical_shared_path -NotePropertyValue $canonicalPath -Force
+        $partition | Add-Member -NotePropertyName canonical_shared_exists -NotePropertyValue ($null -ne $canonicalPartition) -Force
+        $partition | Add-Member -NotePropertyName canonical_shared_ready -NotePropertyValue $canonicalReady -Force
+    }
+    return $Partitions
+}
+
 function Clear-RustCacheTaskPartitions {
     param(
         [string]$CacheRoot,
@@ -261,6 +319,8 @@ function Get-RustCacheStatus {
     $policy = Get-RustCachePolicy -CacheRoot $root
     $volume = Get-RustCacheVolumeState -CacheRoot $root
     $partitions = @(Get-RustCachePartitions -CacheRoot $root)
+    $projectManifest = if ($RepoRoot) { Get-RustCacheProjectManifest -ProjectRoot $RepoRoot } else { $null }
+    $partitions = @(Add-RustCacheSharedPartitionGovernance -Partitions $partitions -CacheRoot $root -ProjectManifest $projectManifest)
     if ($IncludeSizes) {
         foreach ($partition in $partitions) {
             $partition | Add-Member -NotePropertyName size_bytes -NotePropertyValue (Get-RustCacheDirectorySize -Path $partition.path)
@@ -287,6 +347,7 @@ function Get-RustCacheStatus {
         volume = $volume
         toolchain_epoch = Get-RustCacheToolchainEpoch
         partition_count = $partitions.Count
+        retired_shared_alias_count = @($partitions | Where-Object { $_.retired_shared_alias }).Count
         partitions = $partitions
         registered_workspaces = @($registry.workspaces)
         legacy_caches = $legacy
@@ -319,8 +380,13 @@ function Invoke-RustCacheGc {
         [switch]$Apply,
         [switch]$ForceAged,
         [switch]$WorkspaceOnly,
-        [switch]$RecoverMissingWorkspaces
+        [switch]$RecoverMissingWorkspaces,
+        [switch]$SharedAliasesOnly
     )
+
+    if ($SharedAliasesOnly -and ($WorkspaceOnly -or $RecoverMissingWorkspaces)) {
+        throw "SharedAliasesOnly cannot be combined with WorkspaceOnly or RecoverMissingWorkspaces."
+    }
 
     $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $RepoRoot
     $policy = Get-RustCachePolicy -CacheRoot $root
@@ -331,6 +397,7 @@ function Invoke-RustCacheGc {
     $criticalDisk = $volumeBefore.free_percent -lt [double]$policy.critical_free_percent
     $partitions = @(Get-RustCachePartitions -CacheRoot $root)
     $projectManifest = if ($RepoRoot) { Get-RustCacheProjectManifest -ProjectRoot $RepoRoot } else { $null }
+    $partitions = @(Add-RustCacheSharedPartitionGovernance -Partitions $partitions -CacheRoot $root -ProjectManifest $projectManifest)
     $allowedDomains = if ($projectManifest -and $projectManifest.registered) { @($projectManifest.allowed_domains) } else { @() }
 
     foreach ($partition in $partitions) {
@@ -345,12 +412,14 @@ function Invoke-RustCacheGc {
             $partition.kind -eq "registered" -and
             $partition.project_id -eq $projectManifest.project_id -and
             $partition.domain -notin $allowedDomains
+        $retiredSharedAlias = [bool]$partition.retired_shared_alias
+        $canonicalSharedReady = [bool]$partition.canonical_shared_ready
         $partition | Add-Member -NotePropertyName age_days -NotePropertyValue ([math]::Round($ageDays, 2))
         $partition | Add-Member -NotePropertyName old_epoch -NotePropertyValue $oldEpoch
         $partition | Add-Member -NotePropertyName retired_domain -NotePropertyValue $retiredDomain
         $partition | Add-Member -NotePropertyName orphaned_task_worktree -NotePropertyValue $orphanedTaskWorktree
         $partition | Add-Member -NotePropertyName recoverable_missing_workspace -NotePropertyValue $recoverableMissingWorkspace
-        $partition | Add-Member -NotePropertyName selected -NotePropertyValue ($recoverableMissingWorkspace -or $orphanedTaskWorktree -or $retiredDomain -or $oldEpochExpired -or (($lowDisk -or $ForceAged) -and $expired))
+        $partition | Add-Member -NotePropertyName selected -NotePropertyValue ($recoverableMissingWorkspace -or $orphanedTaskWorktree -or $retiredDomain -or ($retiredSharedAlias -and $canonicalSharedReady) -or $oldEpochExpired -or (($lowDisk -or $ForceAged) -and $expired))
         $partition | Add-Member -NotePropertyName size_bytes -NotePropertyValue ([int64]0)
         $partition | Add-Member -NotePropertyName action -NotePropertyValue "preserve"
         $partition | Add-Member -NotePropertyName reason -NotePropertyValue "active-or-recent"
@@ -363,6 +432,10 @@ function Invoke-RustCacheGc {
             $partition.reason = "orphaned-task-worktree"
         } elseif ($retiredDomain) {
             $partition.reason = "retired-domain"
+        } elseif ($retiredSharedAlias -and $canonicalSharedReady) {
+            $partition.reason = "retired-shared-alias"
+        } elseif ($retiredSharedAlias) {
+            $partition.reason = "retired-shared-alias-canonical-missing"
         } elseif ($oldEpochExpired) {
             $partition.reason = "old-toolchain-epoch"
         } elseif ($partition.selected) {
@@ -376,6 +449,20 @@ function Invoke-RustCacheGc {
             if ($partition.reason -eq "active-or-recent") {
                 $partition.reason = "disk-watermark-lru"
             }
+        }
+    }
+
+    foreach ($partition in $partitions | Where-Object { $_.retired_shared_alias -and -not $_.canonical_shared_ready }) {
+        $partition.selected = $false
+        $partition.action = "preserve"
+        $partition.reason = "retired-shared-alias-canonical-missing"
+    }
+
+    if ($SharedAliasesOnly) {
+        foreach ($partition in $partitions | Where-Object { $_.selected -and -not ($_.retired_shared_alias -and $_.canonical_shared_ready) }) {
+            $partition.selected = $false
+            $partition.action = "preserve"
+            $partition.reason = "shared-alias-filter"
         }
     }
 
@@ -404,7 +491,7 @@ function Invoke-RustCacheGc {
         }
     }
 
-    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.recoverable_missing_workspace) { 0 } elseif ($_.orphaned_task_worktree) { 1 } elseif ($_.retired_domain) { 2 } elseif ($_.old_epoch) { 3 } elseif ($_.kind -eq "quarantine") { 4 } else { 5 } } }, last_used_utc)
+    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.recoverable_missing_workspace) { 0 } elseif ($_.orphaned_task_worktree) { 1 } elseif ($_.retired_domain) { 2 } elseif ($_.retired_shared_alias) { 3 } elseif ($_.old_epoch) { 4 } elseif ($_.kind -eq "quarantine") { 5 } else { 6 } } }, last_used_utc)
     foreach ($partition in $selected) {
         $partition.size_bytes = Get-RustCacheDirectorySize -Path $partition.path
     }
@@ -443,6 +530,7 @@ function Invoke-RustCacheGc {
         force_aged = [bool]$ForceAged
         workspace_only = [bool]$WorkspaceOnly
         recover_missing_workspaces = [bool]$RecoverMissingWorkspaces
+        shared_aliases_only = [bool]$SharedAliasesOnly
         low_disk = $lowDisk
         critical_disk = $criticalDisk
         volume_before = $volumeBefore
@@ -490,4 +578,4 @@ function Invoke-RustCachePreflightGc {
     return $report
 }
 
-Export-ModuleMember -Function Get-RustCacheDirectorySize, Get-RustCacheVolumeState, Get-RustCachePartitions, Clear-RustCacheTaskPartitions, Get-RustCacheStatus, Test-RustCacheBuildProcesses, Invoke-RustCacheGc, Invoke-RustCachePreflightGc
+Export-ModuleMember -Function Get-RustCacheDirectorySize, Get-RustCacheVolumeState, Get-RustCachePartitions, Add-RustCacheSharedPartitionGovernance, Clear-RustCacheTaskPartitions, Get-RustCacheStatus, Test-RustCacheBuildProcesses, Invoke-RustCacheGc, Invoke-RustCachePreflightGc

@@ -74,6 +74,8 @@ implementation_refs:
 5. 不传 `-NoLock`；平台会对命名共享分区串行写入。
 6. 最终 `target-dir` 仍保持 workspace 本地，或使用发布流程专属的绝对路径。
 7. 首次启用先选一个低风险入口，观察命中率、等待时间和磁盘增长，再扩大范围。
+8. 会被多个入口调用的稳定分区必须登记到 `shared_partition_domains`，由平台把分区
+   名称绑定到唯一 allowlist domain；不能只靠包装器约定 domain。
 
 默认入口保持 workspace 隔离：
 
@@ -97,6 +99,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
 ```text
 RUST_CACHE_SCOPE=shared
 RUST_CACHE_PARTITION=shared-dev-windows
+RUST_CACHE_SHARED_DOMAIN_CANONICALIZED=False
 ```
 
 未传参数时应输出 `RUST_CACHE_SCOPE=workspace`，以便确认默认隔离没有被隐式改变。未注册项目传共享分区会失败，不会进入托管共享池。
@@ -121,7 +124,7 @@ RUST_CACHE_PARTITION=shared-dev-windows
 | 1. 平台能力 | 公开命名共享参数、拒绝无锁共享、输出 scope/partition、补回归测试 | 已实现，待安装版按维护窗口升级 |
 | 2. 项目薄适配 | 项目的直接 Cargo 包装器转发可选共享分区，默认关闭 | BB64A 首批接入 |
 | 3. 选择性启用 | 先启用受控验证或开发入口；发布入口逐个确认 target 与并发模型 | 待逐项目执行 |
-| 4. 收敛旧分区 | 任务收尾定向删除自身 workspace 分区；GC dry-run 识别超过宽限期的失效任务分区，审查后再 `-Apply` | 平台能力已实现，机器安装版需同步验证 |
+| 4. 收敛旧分区 | 任务收尾处理自身 workspace 分区；GC 识别失效任务分区和已被 canonical domain 取代的共享别名，审查后再 `-Apply` | 平台能力已实现，机器安装版需同步验证 |
 | 5. Node 依赖 | 评估 pnpm 共享内容仓库和按项目虚拟安装树，不直接共享可写 `node_modules` | 未开始 |
 
 平台安装与项目启用是两件事：先提交并验证平台源码，再安排没有 Cargo/rustc 写入者的维护窗口更新机器安装版，最后由项目显式选择共享分区。不得因为平台支持该参数就批量修改所有项目默认值。
@@ -137,6 +140,10 @@ RUST_CACHE_PARTITION=shared-dev-windows
 5. `gc` 默认 dry-run；有锁分区和 quarantine 风险区保持不动。
 6. 受管任务收尾只移除 marker 指向当前任务根的 workspace 分区，不移除同一项目的命名共享分区。
 7. 已消失的严格任务根在宽限期后显示为 `orphaned-task-worktree`；近期、任意普通缺失路径、无效 marker 和未知作用域不被该规则选中。
+8. 同一登记分区从不同 allowlist domain 发起时解析到同一 build-dir；旧 domain 副本
+   只在 canonical shared marker 有效后显示为 `retired-shared-alias`。
+9. `gc -SharedAliasesOnly` 只选择 canonical 分区已经就绪的历史共享别名，不同时选择
+   workspace、quarantine、普通超龄分区或缺失工作区恢复候选。
 
 回滚只需移除项目入口的 `-SharedBuildPartition`，下一次调用会恢复 workspace 分区。旧共享分区仍是可重建缓存，由平台 TTL/LRU 治理；不要用 `cargo clean` 指向共享根，也不要手动递归删除平台根。
 

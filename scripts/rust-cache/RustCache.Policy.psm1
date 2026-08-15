@@ -79,6 +79,7 @@ function Get-RustCacheProjectManifest {
             default_domain = "unregistered"
             allowed_domains = @()
             unknown_domain_fallback = "unregistered"
+            shared_partition_domains = @{}
             registered = $false
             manifest_path = $null
         }
@@ -116,12 +117,36 @@ function Get-RustCacheProjectManifest {
             throw "rust-cache.project.json unknown_domain_fallback must be listed in allowed_domains: $manifestPath"
         }
     }
+    $sharedPartitionDomains = @{}
+    if ($null -ne $manifest.PSObject.Properties["shared_partition_domains"]) {
+        $mapping = $manifest.shared_partition_domains
+        if ($null -eq $mapping -or $mapping -isnot [pscustomobject]) {
+            throw "rust-cache.project.json shared_partition_domains must be a JSON object: $manifestPath"
+        }
+        foreach ($property in $mapping.PSObject.Properties) {
+            $partitionName = [string]$property.Name
+            $partitionSlug = ConvertTo-RustCacheSlug $partitionName
+            if ($partitionSlug -eq "unknown" -or $partitionSlug -cne $partitionName) {
+                throw "rust-cache.project.json shared partition names must be lowercase stable slugs: $partitionName"
+            }
+            $mappedDomainValue = [string]$property.Value
+            $mappedDomain = ConvertTo-RustCacheSlug $mappedDomainValue
+            if ($mappedDomain -eq "unknown" -or $mappedDomain -cne $mappedDomainValue) {
+                throw "rust-cache.project.json shared partition domain must be a lowercase stable slug: $mappedDomainValue"
+            }
+            if ($mappedDomain -notin $allowedDomains) {
+                throw "rust-cache.project.json shared partition domain must be listed in allowed_domains: $mappedDomain"
+            }
+            $sharedPartitionDomains[$partitionSlug] = $mappedDomain
+        }
+    }
     return [pscustomobject]@{
         schema_version = 1
         project_id = $projectId
         default_domain = $domain
         allowed_domains = $allowedDomains
         unknown_domain_fallback = $fallbackDomain
+        shared_partition_domains = $sharedPartitionDomains
         registered = $true
         manifest_path = $manifestPath
     }
@@ -149,6 +174,23 @@ function Resolve-RustCacheDomain {
         return $requested
     }
     return [string]$projectManifest.unknown_domain_fallback
+}
+
+function Resolve-RustCacheSharedPartitionDomain {
+    param(
+        [Parameter(Mandatory)]$Manifest,
+        [string]$SharedPartition,
+        [Parameter(Mandatory)][string]$ResolvedDomain
+    )
+
+    if ([string]::IsNullOrWhiteSpace($SharedPartition) -or -not $Manifest.registered) {
+        return $ResolvedDomain
+    }
+    $mapping = $Manifest.shared_partition_domains
+    if ($null -ne $mapping -and $mapping.ContainsKey($SharedPartition)) {
+        return [string]$mapping[$SharedPartition]
+    }
+    return $ResolvedDomain
 }
 
 function Add-RustCacheLegacyRecord {
@@ -184,4 +226,4 @@ function Add-RustCacheLegacyRecord {
     return $policyPath
 }
 
-Export-ModuleMember -Function Get-DefaultRustCachePolicy, Get-RustCachePolicyPath, Initialize-RustCachePolicy, Get-RustCachePolicy, Get-RustCacheProjectManifest, Resolve-RustCacheDomain, Add-RustCacheLegacyRecord
+Export-ModuleMember -Function Get-DefaultRustCachePolicy, Get-RustCachePolicyPath, Initialize-RustCachePolicy, Get-RustCachePolicy, Get-RustCacheProjectManifest, Resolve-RustCacheDomain, Resolve-RustCacheSharedPartitionDomain, Add-RustCacheLegacyRecord

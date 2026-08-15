@@ -108,11 +108,11 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     Assert-True $lightBlocked "light must exclude an active heavy task"; Exit-ValidationResource $heavy
     $capture = Invoke-ValidationCapturedProcess -FilePath "cmd.exe" -ArgumentList @("/d","/c","echo failure-marker 1>&2 & exit /b 23") -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot "capture")
     Assert-Equal 23 $capture.exit_code "captured exit code"; Assert-True (Test-Path $capture.stderr_path) "stderr must be durable on first run"
-    $timeoutCapture = Invoke-ValidationCapturedProcess -FilePath "powershell.exe" -ArgumentList @('-NoProfile','-Command','Write-Output before-timeout; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30') -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot 'timeout-capture') -TimeoutSeconds 1
+    $timeoutCapture = Invoke-ValidationCapturedProcess -FilePath "powershell.exe" -ArgumentList @('-NoProfile','-Command','Write-Output before-timeout; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30'' -WindowStyle Hidden; Start-Sleep 30') -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot 'timeout-capture') -TimeoutSeconds 1
     Assert-Equal 124 $timeoutCapture.exit_code "timeout exit code"; Assert-True $timeoutCapture.timed_out "timeout flag"
     Assert-True ((Get-Content -Raw $timeoutCapture.stdout_path) -match 'before-timeout') "timeout must finish capturing stdout"
     $fallbackIds=Join-Path $TempRoot 'fallback-process-ids.txt'
-    $fallback = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command',"`$child=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -PassThru; @(`$PID,`$child.Id)|Set-Content -LiteralPath '$fallbackIds'; Start-Sleep 30") -PassThru
+    $fallback = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command',"`$child=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -WindowStyle Hidden -PassThru; @(`$PID,`$child.Id)|Set-Content -LiteralPath '$fallbackIds'; Start-Sleep 30") -WindowStyle Hidden -PassThru
     $fallbackDeadline=[DateTime]::UtcNow.AddSeconds(5); while(-not (Test-Path $fallbackIds) -and [DateTime]::UtcNow -lt $fallbackDeadline){Start-Sleep -Milliseconds 20}
     $fallbackProcessIds=@(Get-Content $fallbackIds | ForEach-Object {[int]$_})
     Stop-ValidationCapturedProcess -Process $fallback -TaskkillFilePath (Join-Path $TempRoot 'missing-taskkill.exe') | Out-Null
@@ -121,7 +121,7 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     $fallback.Dispose()
     $nonzeroTaskkill=Join-Path $TempRoot 'nonzero-taskkill.cmd'; '@exit /b 7'|Set-Content -LiteralPath $nonzeroTaskkill -Encoding ASCII
     $nonzeroIds=Join-Path $TempRoot 'nonzero-process-ids.txt'
-    $nonzero = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command',"`$child=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -PassThru; @(`$PID,`$child.Id)|Set-Content -LiteralPath '$nonzeroIds'; Start-Sleep 30") -PassThru
+    $nonzero = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command',"`$child=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -WindowStyle Hidden -PassThru; @(`$PID,`$child.Id)|Set-Content -LiteralPath '$nonzeroIds'; Start-Sleep 30") -WindowStyle Hidden -PassThru
     $nonzeroDeadline=[DateTime]::UtcNow.AddSeconds(5); while(-not (Test-Path $nonzeroIds) -and [DateTime]::UtcNow -lt $nonzeroDeadline){Start-Sleep -Milliseconds 20}
     $nonzeroProcessIds=@(Get-Content $nonzeroIds | ForEach-Object {[int]$_})
     Stop-ValidationCapturedProcess -Process $nonzero -TaskkillFilePath $nonzeroTaskkill | Out-Null
@@ -133,7 +133,7 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-argument-cargo.ps1" %*
 exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot 'cargo.cmd') -Encoding ASCII
     'if($args -ccontains ''-V''){Write-Output ''cargo 1.88.0-test'';exit 0}
-if($env:ELON_TEST_FAKE_TIMEOUT){ Write-Output fake-timeout-started; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30 }
+if($env:ELON_TEST_FAKE_TIMEOUT){ Write-Output fake-timeout-started; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30'' -WindowStyle Hidden; Start-Sleep 30 }
 $args | Set-Content -LiteralPath $env:ELON_TEST_ARGUMENT_LOG -Encoding UTF8
 exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-argument-cargo.ps1') -Encoding UTF8
     $env:PATH="$BinRoot;$originalPath"
@@ -166,11 +166,11 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     $quotedValidator = '"{0}"' -f $validator
     $quotedCacheRoot = '"{0}"' -f $CacheRoot
     $common = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$quotedValidator,"-CacheRoot",$quotedCacheRoot,"-SkipCheapGates","-DisableSccache","check","--manifest-path","server\Cargo.toml")
-    $p1 = Start-Process powershell -ArgumentList $common -PassThru -NoNewWindow -RedirectStandardOutput $stdout1 -RedirectStandardError $stderr1
+    $p1 = Start-Process powershell -ArgumentList $common -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout1 -RedirectStandardError $stderr1
     $children += $p1; $null = $p1.Handle
     if(-not $ready.WaitOne([TimeSpan]::FromSeconds(30))){ throw "first validation did not reach cargo: exited=$($p1.HasExited) stdout=$((Get-Content -Raw $stdout1 -ErrorAction SilentlyContinue)) stderr=$((Get-Content -Raw $stderr1 -ErrorAction SilentlyContinue))" }
     Assert-True $true "first validation reached explicit cargo synchronization point"
-    $p2 = Start-Process powershell -ArgumentList $common -PassThru -NoNewWindow -RedirectStandardOutput $stdout2 -RedirectStandardError $stderr2
+    $p2 = Start-Process powershell -ArgumentList $common -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout2 -RedirectStandardError $stderr2
     $children += $p2; $null = $p2.Handle
     $waiterPattern=Join-Path $CacheRoot 'validation-v1\evidence\*\.run.lock.waiters\*.json'
     $waiterDeadline=[DateTime]::UtcNow.AddSeconds(15)
@@ -207,7 +207,7 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     $failureOut=Join-Path $TempRoot 'failure.out'; $failureErr=Join-Path $TempRoot 'failure.err'
     $systemPowerShell=Join-Path $PSHOME 'powershell.exe'
     $env:ELON_TEST_VALIDATION_CAPTURE_EXCEPTION='1'
-    $failureProcess=Start-Process $systemPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$quotedValidator,'-CacheRoot',$quotedCacheRoot,'-SkipCheapGates','-DisableSccache','-Force','check','--manifest-path','server\Cargo.toml','--features','capture-exception') -PassThru -NoNewWindow -RedirectStandardOutput $failureOut -RedirectStandardError $failureErr
+    $failureProcess=Start-Process $systemPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$quotedValidator,'-CacheRoot',$quotedCacheRoot,'-SkipCheapGates','-DisableSccache','-Force','check','--manifest-path','server\Cargo.toml','--features','capture-exception') -PassThru -WindowStyle Hidden -RedirectStandardOutput $failureOut -RedirectStandardError $failureErr
     Wait-TestProcess $failureProcess 20 'capture exception validation'; Assert-True ($failureProcess.ExitCode -ne 0) "capture exception validation must fail"
     $failureEvidence=[regex]::Match((Get-Content -Raw $failureOut),'VALIDATION_EVIDENCE=(.+)').Groups[1].Value.Trim()
     Assert-True (Test-Path -LiteralPath $failureEvidence) "capture exception must publish its summary path"

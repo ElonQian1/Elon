@@ -65,11 +65,13 @@ function Resolve-RustCacheInvocation {
     $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $project
     $manifest = Get-RustCacheProjectManifest -ProjectRoot $project
     $requestedDomain = if ([string]::IsNullOrWhiteSpace($Domain)) { $manifest.default_domain } else { ConvertTo-RustCacheSlug $Domain }
-    $resolvedDomain = Resolve-RustCacheDomain -ProjectRoot $project -Domain $Domain -Manifest $manifest
     $workspace = Resolve-RustCacheWorkspaceRoot -ProjectRoot $project -CargoArgs $CargoArgs
     $workspaceHash = Get-RustCacheWorkspaceHash -WorkspaceRoot $workspace
     $epoch = if ([string]::IsNullOrWhiteSpace($ToolchainEpoch)) { Get-RustCacheToolchainEpoch } else { ConvertTo-RustCacheSlug $ToolchainEpoch }
     $scope = Resolve-RustCacheBuildScope -Registered $manifest.registered -WorkspaceHash $workspaceHash -SharedBuildPartition $SharedBuildPartition
+    $allowedDomain = Resolve-RustCacheDomain -ProjectRoot $project -Domain $Domain -Manifest $manifest
+    $resolvedDomain = Resolve-RustCacheSharedPartitionDomain -Manifest $manifest -SharedPartition $scope.shared_partition -ResolvedDomain $allowedDomain
+    $sharedPartitionDomainCanonicalized = $scope.cache_scope -eq "shared" -and $allowedDomain -ne $resolvedDomain
     if ($manifest.registered) {
         $buildDir = Join-Path $root "build\$epoch\$($manifest.project_id)\$resolvedDomain\$($scope.partition_name)"
     } else {
@@ -95,6 +97,9 @@ function Resolve-RustCacheInvocation {
         requested_domain = $requestedDomain
         domain = $resolvedDomain
         domain_fallback = $requestedDomain -ne $resolvedDomain
+        domain_fallback_from_allowlist = $requestedDomain -ne $allowedDomain
+        domain_canonicalized_by_shared_partition = $sharedPartitionDomainCanonicalized
+        shared_partition_canonical_domain = if ($scope.cache_scope -eq "shared") { $resolvedDomain } else { $null }
         toolchain_epoch = $epoch
         build_dir = $buildDir
         target_dir = $resolvedTarget
@@ -362,6 +367,7 @@ function Invoke-RustCacheCargo {
         Write-Host "RUST_CACHE_DOMAIN_REQUESTED=$($context.requested_domain)"
         Write-Host "RUST_CACHE_DOMAIN=$($context.domain)"
         Write-Host "RUST_CACHE_DOMAIN_FALLBACK=$($context.domain_fallback)"
+        Write-Host "RUST_CACHE_SHARED_DOMAIN_CANONICALIZED=$($context.domain_canonicalized_by_shared_partition)"
         Write-Host "RUST_CACHE_SCOPE=$($context.cache_scope)"
         Write-Host "RUST_CACHE_PARTITION=$($context.cache_partition)"
         Write-Host "CARGO_BUILD_BUILD_DIR=$($context.build_dir)"
