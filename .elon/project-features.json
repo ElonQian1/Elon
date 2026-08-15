@@ -988,6 +988,179 @@
       "updated_at_ms": 1786734638141
     },
     {
+      "id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "title": "外部矿池 Adapter 运行时兼容性 Profile V1",
+      "summary": "复用 V255/V258/V259/V265 真源，发布 Linux x86_64 ELSP/ELNW 机器可读兼容性 Profile，并校验有界 challenge 与无权威候选报告；不执行第三方 Adapter、不连接上游、不激活 Provider。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/compute-external-pool-adapter-runtime-compatibility-profile-v1.md",
+        "content_hash": "4998453f69d4715f073872fcf75a2f754cd1d1e5896ab0f3e4ad7e809dd9369e",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "63c8c98ccda9fc8186459aeb9761e8b0a2462fc3",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "compute-federation",
+      "tags": [
+        "distributed-compute",
+        "external-pool",
+        "adapter",
+        "compatibility",
+        "v266"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/external-pool-adapter-runtime-compatibility-profile-acceptance.md",
+        "docs/distributed-compute/external-pool-adapter-runtime-compatibility-profile-authority.md",
+        "docs/distributed-compute/external-pool-adapter-runtime-compatibility-profile-v1.json",
+        "server/src/compute_federation/external_pool_adapter_runtime_compatibility.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_compatibility/canonical.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_compatibility/profile.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_compatibility/tests.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_compatibility/types.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_compatibility/validation.rs",
+        "server/src/compute_federation/external_pool_adapter_runtime_launch_profile/policy.rs"
+      ],
+      "dependencies": [
+        "compute-external-pool-adapter-authenticated-no-work-probe-v1"
+      ],
+      "acceptance_criteria": [
+        "代码生成的 Profile 绑定六项 revision 1 release capability、V255 Linux runtime policy、V258 transport policy、V259 session policy 及 ELSP/ELNW 边界。",
+        "checked-in JSON 与代码生成 Profile 完全一致，上游 policy 或协议字段漂移由测试阻断。",
+        "challenge 精确绑定 Adapter/release/implementation/capability/runtime image/Profile/nonce 与最多十分钟有效期。",
+        "候选报告固定八项观察并校验时序、边界、零 policy violation 与 ELNW root。",
+        "源码合同证明无 Store、SQLite、network、process、secret、activation、market、usage、settlement、Sui、HTTP 或 MCP。",
+        "Rust check、定向测试、源码及文档模块化门禁通过，并记录独立 acceptance 证据。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-runtime-compatibility-profile-acceptance.md",
+          "content_hash": "d884819225d55277a009230f6dc8f19fa9509e0f9c10a97356775cbd7e036181",
+          "locator": "validation receipts and exclusions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "31e90f4defe66d2c0ffd25f73d134d74480884e9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-runtime-compatibility-profile-authority.md",
+          "content_hash": "59a843016914bfd48c4e31bb65c134a2f1b388791386a5391b9394ee1a5dd547",
+          "locator": "authority boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "71b9b1503af7c39ed72ce9c637d002959df776fb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/external-pool-adapter-runtime-compatibility-profile-v1.json",
+          "content_hash": "f37af5f65fc8fddb378fd98b4c7cbf2611e3c696d3c2b13944e41b122c5a32e6",
+          "locator": "checked-in profile",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3f30bb4c584177f76e14c757c706db02dd1d08a8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_compatibility.rs",
+          "content_hash": "305d09c926a0732968f3f0599291845c179cffe1b4a44892eb46b6299a746e48",
+          "locator": "module facade and authority boundary",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8be77dafe9c1c933abfd1bba990bd07257cde97b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_compatibility/canonical.rs",
+          "content_hash": "e8bfcba728ea69714a5067d678aa9687ecafff2f173ab17f7a051ec1bf60c31e",
+          "locator": "RFC 8785 and domain digests",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d4338afd88644d63206a069b847c0a22cc7bb2a3",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_compatibility/profile.rs",
+          "content_hash": "6bb36f78a6e11c3ab1de7794b10863158f29445804235bea500cd68c3bcc0833",
+          "locator": "server policy catalog projection",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "cc1fbc700e2a213009f20c9f04a9dfc7d0aa093d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_compatibility/tests.rs",
+          "content_hash": "02fa27abd5f1fd623819aec160fef230142aff84a8672ff69d27bc73f007f0ec",
+          "locator": "v266_ focused tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "299d33c740f2c0716a03052164552a542b92514d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_compatibility/types.rs",
+          "content_hash": "95059fa98fa50664f652b6d570d51608cd59032b5ced41842745406b6977dd44",
+          "locator": "profile challenge and report contracts",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f37ca2e26e7b03aa85573be33cd9f8f755447940",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_runtime_compatibility/validation.rs",
+          "content_hash": "f41889da99f66b260db98010f7f47faaac920135a95f9bbd1d4979229b4ee1a6",
+          "locator": "fail-closed validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b9ac1c8f7e58f4900dae2b0b60384c085f70350c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dfe2d41f50d69ba0ca697441502afca4bd0dbe27",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1786750215286,
+      "updated_at_ms": 1786753510706
+    },
+    {
       "id": "compute-v255-runtime-launch-profile-verification",
       "title": "V255 惰性 runtime launch profile 验收闭环",
       "summary": "编译并执行已落地的 V255 Domain、migration、Store、Service 与 HTTP 测试，修复真实缺口并把 passed=0 更新为可复核的局部验收证据；不扩张到 Sidecar、真实凭据、Provider activation、市场或结算。",
@@ -3760,76 +3933,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d2e41a96b78847f5845b18a4354083ea",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "fresh/repeat migration/源码合同 8 项与进程内 Axum HTTP 2 项全部通过；生产 activation 与 market/runtime 仍保持 NO-GO。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786637323929
-    },
-    {
-      "id": "feature_event_c6ed3af6455e4226ade27cc861816010",
-      "feature_id": "external-pool-provider-activation-candidate-v254-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "V254 验证代码与权威文档已推送 origin/main；10 项本地验收通过，生产 activation/market/runtime 继续 NO-GO。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786638099721
-    },
-    {
-      "id": "feature_event_af144d2f171348a3b257062fab4aa99b",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Goal 持续批次：收敛已有 v234 source_written/passed=0 候选。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786638401675
-    },
-    {
-      "id": "feature_event_67a2a4f65d744e10ac480febfe62d801",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "已复核 v234 权威与现有测试，范围只做本地运行验收。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786638416707
-    },
-    {
-      "id": "feature_event_57b00e3675144b268b19a19686b64648",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "无需外部依赖，测试入口与 NO-GO 边界明确。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786638416738
-    },
-    {
-      "id": "feature_event_a0eed1d35b584ecb83e3fc4d2cd3eae7",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786638416751
-    },
-    {
-      "id": "feature_event_4072a067cd5a4590bead1dfd5df4a13c",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "开始真实编译并运行 v234 expiry worker 定向测试。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786638416777
-    },
-    {
       "id": "feature_event_97ab09fedd2c4054bce47a6ebc2137a7",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
       "action": "claim_released",
@@ -5758,6 +5861,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786748712051
+    },
+    {
+      "id": "feature_event_6966631d7be042b29cffa44f8b483547",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "registered",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1786750215286
+    },
+    {
+      "id": "feature_event_b6d30c4e53ef487b809e8238778cb492",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Accepted V266 requirement is frozen and V265 dependency is released.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786750225024
+    },
+    {
+      "id": "feature_event_c2c6801db0e8470985a4763359fe7fa0",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "claimed",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786750236320
+    },
+    {
+      "id": "feature_event_57720299acff4fb28ad89708a2020b5c",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Implementation started in isolated V266 worktree.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786750246261
+    },
+    {
+      "id": "feature_event_da9633fa40db4d278cd534c9750c0cf0",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786753477963
+    },
+    {
+      "id": "feature_event_adc6e5fd31104345802f279c3519beed",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "V266 profile, challenge, candidate validator, machine JSON, tests, authority and acceptance evidence are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786753498089
+    },
+    {
+      "id": "feature_event_e39260604e42487da1c5f6b05b9bf1ab",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Production Rust check, six focused V266 tests, exact profile snapshot, source-size and document modularity gates passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786753510706
     }
   ]
 }

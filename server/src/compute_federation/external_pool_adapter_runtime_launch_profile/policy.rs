@@ -9,7 +9,19 @@ use super::{
 
 pub(crate) fn server_runtime_launch_policy_catalog(
 ) -> Result<(ExternalPoolAdapterRuntimeLaunchPolicy, String)> {
-    let policy = runtime_launch_policy_for_host(std::env::consts::OS, std::env::consts::ARCH)?;
+    runtime_launch_policy_catalog_for_host(std::env::consts::OS, std::env::consts::ARCH)
+}
+
+pub(crate) fn server_linux_runtime_launch_policy_catalog(
+) -> Result<(ExternalPoolAdapterRuntimeLaunchPolicy, String)> {
+    runtime_launch_policy_catalog_for_host("linux", "x86_64")
+}
+
+fn runtime_launch_policy_catalog_for_host(
+    requested_os: &str,
+    requested_arch: &str,
+) -> Result<(ExternalPoolAdapterRuntimeLaunchPolicy, String)> {
+    let policy = runtime_launch_policy_for_host(requested_os, requested_arch)?;
     validate_runtime_launch_policy(&policy)?;
     let digest = runtime_launch_policy_digest(&policy)?;
     Ok((policy, digest))

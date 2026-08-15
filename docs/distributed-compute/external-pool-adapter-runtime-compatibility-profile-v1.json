@@ -1,0 +1,159 @@
+{
+  "schema": "compute_federation.external_pool_adapter_runtime_compatibility_profile_envelope.v1",
+  "canonicalization": "rfc8785_jcs",
+  "digest_algorithm": "sha256",
+  "profile_digest": "a63d30b6f2f75c78c156ddb9ea609312f8b9b6726f403fedb960ed8a754fa047",
+  "profile": {
+    "schema": "compute_federation.external_pool_adapter_runtime_compatibility_profile.v1",
+    "profile_id": "external_pool_adapter_linux_runtime_compatibility_v1",
+    "profile_revision": 1,
+    "host_os": "linux",
+    "host_arch": "x86_64",
+    "release_capabilities": [
+      {
+        "capability_id": "authenticated_ack",
+        "capability_revision": 1
+      },
+      {
+        "capability_id": "authenticated_events",
+        "capability_revision": 1
+      },
+      {
+        "capability_id": "cancel_no_start",
+        "capability_revision": 1
+      },
+      {
+        "capability_id": "idempotent_commit",
+        "capability_revision": 1
+      },
+      {
+        "capability_id": "prepare",
+        "capability_revision": 1
+      },
+      {
+        "capability_id": "reconcile",
+        "capability_revision": 1
+      }
+    ],
+    "runtime_launch_policy": {
+      "policy_id": "external_pool_adapter_runtime_launch_policy_v1",
+      "policy_revision": 1,
+      "policy_digest": "619fc15969e55b7555ec5a28c2a6b41378104175d82d4f42a9f25f1025c96216"
+    },
+    "upstream_transport_policy": {
+      "policy_id": "external_pool_adapter_upstream_transport_target_policy_v1",
+      "policy_revision": 1,
+      "policy_digest": "32027fbbdfe681d0362535dee83d008b36887e0da13c93aa6f94e6319b3f857a"
+    },
+    "supervisor_session_policy": {
+      "policy_id": "external_pool_adapter_supervisor_session_policy_v1",
+      "policy_revision": 1,
+      "policy_digest": "a2d40964c952b20a63e29de3c366f21c7a878e7397f30b994fb8f09c5fc74a53"
+    },
+    "elsp": {
+      "protocol_id": "elon.external_pool_adapter.sidecar.v1",
+      "protocol_revision": 1,
+      "transport": "anonymous_child_socketpair_seqpacket_v1",
+      "framing": "elon_external_pool_sidecar_dual_frame_v1",
+      "frame_magic_ascii": "ELSP",
+      "frame_header_bytes": 20,
+      "frame_mac_bytes": 32,
+      "frame_kind_control": 1,
+      "frame_kind_config": 2,
+      "frame_kind_credential": 3,
+      "control_encoding": "strict_utf8_rfc8785_jcs_v1",
+      "binary_encoding": "raw_exact_bytes_v1",
+      "sequence_policy": "independent_directional_u64_from_1_exact_increment_no_replay_v1",
+      "mac": "hmac_sha256_32_v1",
+      "config_delivery_kind": "authenticated_sensitive_frame_v1",
+      "credential_delivery_kind": "authenticated_sensitive_frame_v1"
+    },
+    "elnw": {
+      "frame_kind": "elsp_control_payload_v1",
+      "magic_ascii": "ELNW",
+      "version": 1,
+      "flags": 0,
+      "begin_kind": 1,
+      "request_kind": 2,
+      "response_kind": 3,
+      "receipt_kind": 4,
+      "request_header_bytes": 48,
+      "response_header_bytes": 44,
+      "receipt_bytes": 136,
+      "max_request_bytes": 16384,
+      "max_response_bytes": 65536,
+      "max_probe_timeout_ms": 15000,
+      "root_domain": "elon.external_pool_adapter.no_work_probe.root.v1\u0000",
+      "integer_encoding": "unsigned_big_endian_v1",
+      "completion_policy": "one_shot_child_semantic_validation_then_authenticated_receipt_v1"
+    },
+    "broker": {
+      "transport_owner": "server_broker_v1",
+      "transport_kind": "brokered_tls_tcp_v1",
+      "tls_version_policy": "tls_1_3_only_v1",
+      "tls_server_name_policy": "exact_dns_hostname_v1",
+      "tls_leaf_identity_policy": "expected_leaf_spki_sha256_pin_and_future_webpki_observation_v1",
+      "proxy_policy": "disabled_v1",
+      "redirect_policy": "disabled_v1",
+      "zero_rtt_policy": "disabled_v1",
+      "client_certificate_policy": "disabled_v1",
+      "adapter_network_policy": "sidecar_no_network_server_broker_only_v1",
+      "application_exchange_policy": "single_bounded_write_exact_length_read_v1"
+    },
+    "required_observations": [
+      {
+        "observation_id": "authenticated_bootstrap",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "config_delivery",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "credential_delivery",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "adapter_request_generation",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "broker_exact_exchange",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "adapter_response_validation",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "authenticated_shutdown",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      },
+      {
+        "observation_id": "bounded_reap",
+        "observation_revision": 1,
+        "required_outcome": "passed"
+      }
+    ],
+    "candidate_evidence_scope": "caller_asserted_public_fixture_observations_not_signature_or_execution_proof_v1",
+    "effects": {
+      "conformance_effect": "none",
+      "credential_effect": "none",
+      "adapter_effect": "none",
+      "provider_effect": "none",
+      "route_effect": "none",
+      "activation_effect": "none",
+      "execution_effect": "none",
+      "usage_effect": "none",
+      "market_effect": "none",
+      "settlement_effect": "none"
+    }
+  }
+}
