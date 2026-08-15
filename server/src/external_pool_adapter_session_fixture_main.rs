@@ -32,6 +32,19 @@ const ROOT_ARGUMENT_PREFIXES: [&str; 6] = [
     "--elon-session-capsule=",
     "--elon-session-bundle=",
 ];
+const RUNTIME_COMPATIBILITY_ROOT_ARGUMENT_PREFIXES: [&str; 11] = [
+    "--elon-runtime-compatibility-session-policy=",
+    "--elon-runtime-compatibility-profile=",
+    "--elon-runtime-compatibility-challenge=",
+    "--elon-runtime-compatibility-runner-policy=",
+    "--elon-runtime-compatibility-fixture-catalog=",
+    "--elon-runtime-compatibility-sandbox-verifier-key-record=",
+    "--elon-runtime-compatibility-registry-release=",
+    "--elon-runtime-compatibility-installation-content=",
+    "--elon-runtime-compatibility-source-capsule=",
+    "--elon-runtime-compatibility-launch-image=",
+    "--elon-runtime-compatibility-public-delivery=",
+];
 
 fn main() {
     if let Err(error) = run() {
@@ -42,12 +55,14 @@ fn main() {
 
 fn run() -> Result<()> {
     let arguments: Vec<String> = std::env::args().collect();
-    if arguments.len() != ROOT_ARGUMENT_PREFIXES.len() + 1
-        || arguments[0] != "elon-external-pool-adapter"
-    {
+    if arguments.first().map(String::as_str) != Some("elon-external-pool-adapter") {
         bail!("fixed supervisor argv contract rejected");
     }
-    let (roots, bundle_root) = parse_roots(&arguments[1..])?;
+    let (roots, bundle_root) = match arguments.len() - 1 {
+        6 => parse_roots(&arguments[1..])?,
+        11 => parse_runtime_compatibility_roots(&arguments[1..])?,
+        _ => bail!("fixed supervisor argv contract rejected"),
+    };
     let child = unsafe { ExternalPoolAdapterChildBootstrap::adopt_supervisor_descriptors() };
     let mut session = child
         .authenticate(roots)
@@ -114,6 +129,30 @@ fn parse_roots(arguments: &[String]) -> Result<(ExternalPoolAdapterSessionRoots,
             values[0], values[1], values[2], values[3], values[4], values[5],
         )?,
         values[5].to_string(),
+    ))
+}
+
+fn parse_runtime_compatibility_roots(
+    arguments: &[String],
+) -> Result<(ExternalPoolAdapterSessionRoots, String)> {
+    if arguments.len() != RUNTIME_COMPATIBILITY_ROOT_ARGUMENT_PREFIXES.len() {
+        bail!("fixed runtime compatibility root argument count rejected");
+    }
+    let values: Vec<&str> = arguments
+        .iter()
+        .zip(RUNTIME_COMPATIBILITY_ROOT_ARGUMENT_PREFIXES)
+        .map(|(argument, prefix)| {
+            argument.strip_prefix(prefix).ok_or_else(|| {
+                anyhow::anyhow!("fixed runtime compatibility root argument prefix rejected")
+            })
+        })
+        .collect::<Result<_>>()?;
+    Ok((
+        ExternalPoolAdapterSessionRoots::new_runtime_compatibility(
+            values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
+            values[8], values[9], values[10],
+        )?,
+        values[10].to_string(),
     ))
 }
 

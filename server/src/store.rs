@@ -1,8 +1,6 @@
 use crate::store_schema::apply_migrations;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
-use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
 mod account_identities;
 #[cfg(test)]
 mod account_identities_tests;
@@ -107,6 +105,7 @@ mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
 mod compute_external_pool_adapter_runtime_bundle;
+mod compute_external_pool_adapter_runtime_compatibility_verification;
 mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -564,6 +563,7 @@ pub(crate) use compute_external_pool_adapter_release_lifecycle::{
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_SUPERSESSION_CONFIRMATION,
     EXTERNAL_POOL_ADAPTER_RELEASE_ADMISSION_WITHDRAWAL_CONFIRMATION,
 };
+pub(crate) use compute_external_pool_adapter_runtime_compatibility_verification::api::*;
 pub(crate) use compute_external_pool_adapter_runtime_launch_profile::api::*;
 pub(crate) use compute_external_pool_adapter_sandbox_reattestation::{
     CreateExternalPoolAdapterSandboxReattestation,
@@ -735,11 +735,11 @@ pub use user_memories::{
 };
 pub use user_progression::UserProgressionLedger;
 pub struct Store {
-    conn: Mutex<Connection>,
+    conn: std::sync::Mutex<Connection>,
 }
 const MAX_TASK_EVENTS_PER_TASK: i64 = 1000;
 impl Store {
-    pub fn open(path: &Path) -> Result<Self> {
+    pub fn open(path: &std::path::Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -749,7 +749,7 @@ impl Store {
         conn.pragma_update(None, "busy_timeout", 5000)?;
         apply_migrations(&conn)?;
         Ok(Self {
-            conn: Mutex::new(conn),
+            conn: std::sync::Mutex::new(conn),
         })
     }
     pub fn ensure_device_user(&self, user_id: &str) -> Result<PublicUser> {
@@ -788,7 +788,7 @@ impl Store {
         drop(conn);
         Ok(user)
     }
-    pub(crate) fn conn(&self) -> Result<MutexGuard<'_, Connection>> {
+    pub(crate) fn conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
 }

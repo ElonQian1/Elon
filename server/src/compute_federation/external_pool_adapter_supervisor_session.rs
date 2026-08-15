@@ -48,5 +48,40 @@ pub(crate) fn external_pool_adapter_session_roots(
     )
 }
 
+/// Dedicated V268 public-fixture binding. None of these values occupies a production target,
+/// companion, or secret-delivery slot; the shared core applies separate transcript/KDF domains.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn external_pool_adapter_runtime_compatibility_session_roots(
+    supervisor_session_policy_digest: &str,
+    runtime_compatibility_profile_digest: &str,
+    challenge_digest: &str,
+    runner_policy_digest: &str,
+    fixture_catalog_digest: &str,
+    sandbox_verifier_key_record_digest: &str,
+    registry_release_digest: &str,
+    installation_content_digest: &str,
+    source_capsule_sha256: &str,
+    launch_image_sha256: &str,
+    public_fixture_delivery_root: &str,
+) -> Result<ExternalPoolAdapterSessionRoots> {
+    let (_, current_policy_digest) = server_supervisor_session_policy_catalog()?;
+    if current_policy_digest != supervisor_session_policy_digest {
+        bail!("V268 runtime compatibility session policy is not current and exact");
+    }
+    ExternalPoolAdapterSessionRoots::new_runtime_compatibility(
+        supervisor_session_policy_digest,
+        runtime_compatibility_profile_digest,
+        challenge_digest,
+        runner_policy_digest,
+        fixture_catalog_digest,
+        sandbox_verifier_key_record_digest,
+        registry_release_digest,
+        installation_content_digest,
+        source_capsule_sha256,
+        launch_image_sha256,
+        public_fixture_delivery_root,
+    )
+}
+
 #[cfg(test)]
 mod linux_tests;

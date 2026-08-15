@@ -25,6 +25,7 @@ mod compute_external_pool_adapter_installation_terminal;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_runtime_compatibility_verification;
 mod compute_external_pool_adapter_runtime_launch_profile;
 mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
@@ -53,6 +54,10 @@ pub(crate) fn register_v259_receipt_integrity_functions(conn: &Connection) -> Re
     compute_external_pool_adapter_supervisor_session_policy_companion::register_receipt_integrity_functions(
         conn,
     )
+}
+
+pub(crate) fn register_v268_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_runtime_compatibility_verification::register_receipt_integrity_functions(conn)
 }
 
 #[rustfmt::skip]
@@ -333,6 +338,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (258, "外部矿池 Adapter 惰性 brokered upstream transport target", compute_external_pool_adapter_upstream_transport_target::migration_v258),
     (259, "外部矿池 Adapter 惰性 supervisor/session policy companion", compute_external_pool_adapter_supervisor_session_policy_companion::migration_v259),
     (267, "外部矿池 Adapter exec 后身份与会话传输加固策略", compute_external_pool_adapter_supervisor_session_policy_v2::migration_v267),
+    (268, "外部矿池 Adapter Provider-neutral 运行时兼容性签名证明", compute_external_pool_adapter_runtime_compatibility_verification::migration_v268),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

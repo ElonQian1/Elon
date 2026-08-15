@@ -82,6 +82,11 @@ pub(crate) mod external_pool_adapter_release_service;
 #[cfg(test)]
 mod external_pool_adapter_runtime_bundle_source_contract_tests;
 pub(crate) mod external_pool_adapter_runtime_compatibility;
+pub(crate) mod external_pool_adapter_runtime_compatibility_verification;
+pub(crate) mod external_pool_adapter_runtime_compatibility_verification_api;
+pub(crate) mod external_pool_adapter_runtime_compatibility_verification_service;
+mod external_pool_adapter_runtime_compatibility_verification_service_redaction;
+mod external_pool_adapter_runtime_compatibility_verification_service_validation;
 pub(crate) mod external_pool_adapter_runtime_launch_profile;
 pub(crate) mod external_pool_adapter_runtime_launch_profile_api;
 pub(crate) mod external_pool_adapter_runtime_launch_profile_service;

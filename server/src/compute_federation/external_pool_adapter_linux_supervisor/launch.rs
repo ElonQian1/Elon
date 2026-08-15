@@ -31,6 +31,19 @@ const CAPSULE_MODE: u32 = 0o500;
 const CHILD_SOURCE_FD_MINIMUM: i32 = 10;
 const CLONE_INTO_CGROUP: u64 = 1 << 33;
 const YAMA_PTRACE_SCOPE: &str = "/proc/sys/kernel/yama/ptrace_scope";
+const RUNTIME_COMPATIBILITY_ROOT_ARGUMENT_PREFIXES: [&str; 11] = [
+    "--elon-runtime-compatibility-session-policy=",
+    "--elon-runtime-compatibility-profile=",
+    "--elon-runtime-compatibility-challenge=",
+    "--elon-runtime-compatibility-runner-policy=",
+    "--elon-runtime-compatibility-fixture-catalog=",
+    "--elon-runtime-compatibility-sandbox-verifier-key-record=",
+    "--elon-runtime-compatibility-registry-release=",
+    "--elon-runtime-compatibility-installation-content=",
+    "--elon-runtime-compatibility-source-capsule=",
+    "--elon-runtime-compatibility-launch-image=",
+    "--elon-runtime-compatibility-public-delivery=",
+];
 
 pub(crate) trait ExternalPoolAdapterSupervisorCapsule {
     fn retained_sealed_image(&self) -> &File;
@@ -301,20 +314,37 @@ fn set_blocking(fd: i32) -> Result<()> {
     Ok(())
 }
 
-fn child_launch_argv(roots: &ExternalPoolAdapterSessionRootArguments) -> Result<[CString; 7]> {
-    let [policy, profile, target, companion, capsule, bundle] = roots.values();
-    Ok([
-        CString::new("elon-external-pool-adapter")?,
-        digest_argument("policy", policy)?,
-        digest_argument("profile", profile)?,
-        digest_argument("target", target)?,
-        digest_argument("companion", companion)?,
-        digest_argument("capsule", capsule)?,
-        digest_argument("bundle", bundle)?,
-    ])
+fn child_launch_argv(roots: &ExternalPoolAdapterSessionRootArguments) -> Result<Vec<CString>> {
+    let mut arguments = Vec::with_capacity(12);
+    arguments.push(CString::new("elon-external-pool-adapter")?);
+    if let Some(values) = roots.runtime_compatibility_values() {
+        for (prefix, value) in RUNTIME_COMPATIBILITY_ROOT_ARGUMENT_PREFIXES
+            .into_iter()
+            .zip(values)
+        {
+            arguments.push(prefixed_digest_argument(prefix, value)?);
+        }
+    } else {
+        let [policy, profile, target, companion, capsule, bundle] = roots.values() else {
+            bail!("production supervisor root argument count is invalid");
+        };
+        arguments.extend([
+            digest_argument("policy", policy)?,
+            digest_argument("profile", profile)?,
+            digest_argument("target", target)?,
+            digest_argument("companion", companion)?,
+            digest_argument("capsule", capsule)?,
+            digest_argument("bundle", bundle)?,
+        ]);
+    }
+    Ok(arguments)
 }
 
 fn digest_argument(label: &str, digest: &str) -> Result<CString> {
+    prefixed_digest_argument(&format!("--elon-session-{label}="), digest)
+}
+
+fn prefixed_digest_argument(prefix: &str, digest: &str) -> Result<CString> {
     if digest.len() != 64
         || !digest
             .bytes()
@@ -322,7 +352,7 @@ fn digest_argument(label: &str, digest: &str) -> Result<CString> {
     {
         bail!("supervisor launch root digest is invalid");
     }
-    CString::new(format!("--elon-session-{label}={digest}"))
+    CString::new(format!("{prefix}{digest}"))
         .context("supervisor launch root argument contains NUL")
 }
 
