@@ -149,21 +149,11 @@ try {
             $report.assistant_completed = $true
         } finally {
             if ($originPath) {
-                try {
-                    Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-                        -Action "open_web_chat_conversation" `
-                        -Arguments @{ conversation_path = $originPath } | Out-Null
-                    $restored = Wait-ChatGptWebSmokeState -Runtime $runtime `
-                        -TimeoutSec $TimeoutSec `
-                        -Description "original ChatGPT Web AI conversation" -Predicate {
-                            param($state)
-                            [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
-                                [string]$state.social_chat.web_chat_conversation_path -eq $originPath
-                        }.GetNewClosure()
-                    $report.original_conversation_restored = $null -ne $restored
-                } catch {
-                    $report.original_conversation_restored = $false
-                    throw
+                $report.original_conversation_restored = Restore-WebChatNativeConversation `
+                    -Runtime $runtime -ProviderId "chatgpt_web" `
+                    -ConversationPath $originPath -TimeoutSec ([Math]::Min($TimeoutSec, 120))
+                if (-not $report.original_conversation_restored) {
+                    throw "Unable to restore the original ChatGPT Web AI conversation."
                 }
             } else {
                 Invoke-ChatGptWebSmokeAction -Runtime $runtime `

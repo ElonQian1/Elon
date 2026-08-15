@@ -27,7 +27,7 @@ foreach ($required in @(
     '-Action "send_input"',
     'Wait-GoogleWebProbeReply',
     '-ExpectedReply $probeExpectedReply',
-    'open_web_chat_conversation',
+    'Restore-WebChatNativeConversation',
     'cleared_cookies = $false',
     'cleared_app_data = $false',
     'private_content_emitted = $false',

@@ -544,6 +544,42 @@ function Open-ChatGptWebNativeChatSurface {
         -ProviderId "chatgpt_web" -TimeoutSec $TimeoutSec
 }
 
+function Restore-WebChatNativeConversation {
+    param(
+        [Parameter(Mandatory = $true)]$Runtime,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("chatgpt_web", "google_web")]
+        [string]$ProviderId,
+        [Parameter(Mandatory = $true)][string]$ConversationPath,
+        [ValidateRange(5, 120)][int]$TimeoutSec = 45
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ConversationPath)) { return $false }
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $dispatched = $false
+    do {
+        try {
+            $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+            if (
+                [string]$state.social_chat.web_chat_provider_id -eq $ProviderId -and
+                [string]$state.social_chat.web_chat_conversation_path -eq $ConversationPath
+            ) {
+                return $true
+            }
+            if (-not $dispatched) {
+                Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+                    -Action "open_web_chat_conversation" `
+                    -Arguments @{ conversation_path = $ConversationPath } | Out-Null
+                $dispatched = $true
+            }
+        } catch {
+            $Runtime.mcp_bootstrapped = $false
+        }
+        Start-Sleep -Seconds $Runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $false
+}
+
 function Get-ChatGptWebNativeChatState {
     param([Parameter(Mandatory = $true)]$Runtime)
 
