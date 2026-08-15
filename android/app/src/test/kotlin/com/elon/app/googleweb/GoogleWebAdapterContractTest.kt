@@ -65,6 +65,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(extractor.contains("hasCurrentQuery"))
         assertTrue(extractor.contains("findQueryAnchor"))
         assertTrue(extractor.contains("afterQuery: followsQuery"))
+        assertTrue(extractor.contains("trustedAnswerContainer: node.matches"))
         assertTrue(extractor.contains("interactive: !!node.closest"))
         assertTrue(extractor.contains("if (candidate.text.length < 8) return true"))
         assertTrue(queryPolicy.contains("rememberedQuery"))

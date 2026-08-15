@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 12;
+  const extractorVersion = 13;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -162,6 +162,7 @@
       liveRegion,
       controls,
       afterQuery: followsQuery(node, queryAnchor),
+      trustedAnswerContainer: node.matches('[id^="aim-chrome-initial-inline-async-container"]'),
       interactive: !!node.closest(
         'a[href], button, input, textarea, select, [role="button"], [role="link"], ' +
         '[role="menuitem"], [role="tab"]'

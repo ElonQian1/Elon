@@ -47,6 +47,22 @@ assert.equal(policy.accepts({
   textLength: 1,
   citations: 0,
   semanticBlocks: 0,
+  controls: 5,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: false,
+  trustedAnswerContainer: true,
+  interactive: false,
+  explicit: true,
+}), true)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '5',
+  textLength: 1,
+  citations: 0,
+  semanticBlocks: 0,
   controls: 1,
   links: 0,
   tabControls: 0,
