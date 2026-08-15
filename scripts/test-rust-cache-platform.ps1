@@ -563,11 +563,16 @@ retry = 3
     Set-Content -LiteralPath (Join-Path $activeGcQuarantine "artifact.bin") -Value "unmanaged-old"
     $fakeCargoPath = Join-Path $TempRoot "cargo.exe"
     Copy-Item -LiteralPath (Join-Path $PSHOME "powershell.exe") -Destination $fakeCargoPath
-    $fakeCargo = Start-Process -FilePath $fakeCargoPath -ArgumentList @('-NoProfile','-Command','Start-Sleep 60') -PassThru
+    $fakeCargo = Start-Process -FilePath $fakeCargoPath -ArgumentList @('-NoProfile','-Command','Start-Sleep 60') -WindowStyle Hidden -PassThru
     try {
         $activeDeadline = [DateTime]::UtcNow.AddSeconds(5)
         while (-not (Get-Process -Name cargo -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $activeDeadline) { Start-Sleep -Milliseconds 20 }
         Assert-True ($null -ne (Get-Process -Name cargo -ErrorAction SilentlyContinue)) "active-build GC regression needs a visible Cargo process"
+        if (Get-Command sccache -ErrorAction SilentlyContinue) {
+            $deferredSccache = Restart-RustCacheSccacheServer -CacheRoot $CacheRoot -MaxCacheSize "20G"
+            Assert-Equal "deferred" $deferredSccache.status "platform installation should defer SCCache reload while Cargo is active"
+            Assert-True $deferredSccache.restart_pending "deferred SCCache activation should remain durably pending"
+        }
         $activeGc = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -ForceAged -Apply
         Assert-True (-not (Test-Path -LiteralPath $activeGcPartition)) "GC should reclaim an unlocked managed partition while unrelated Cargo is active"
         Assert-True (Test-Path -LiteralPath $activeGcQuarantine) "GC must preserve quarantine while unmanaged Cargo may be writing"
