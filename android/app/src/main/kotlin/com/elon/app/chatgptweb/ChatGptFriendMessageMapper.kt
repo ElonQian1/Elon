@@ -2,6 +2,10 @@ package com.elon.app.chatgptweb
 
 import com.elon.app.ChatMessage
 import com.elon.app.ChatAttachment
+import com.elon.app.WebChatMessageAction
+import com.elon.app.WebChatProductionContentPart
+import com.elon.app.WebChatProductionMessage
+import com.elon.app.WebChatProviderCapability
 import com.elon.app.WebChatProviderIdentity
 
 internal object ChatGptFriendMessageMapper {
@@ -21,28 +25,35 @@ internal object ChatGptFriendMessageMapper {
             val messageAttachments = attachmentsForMessage(message.id).ifEmpty {
                 message.parts.mapNotNull(::attachmentFromPart)
             }
+            val contentParts = if (provider.supports(WebChatProviderCapability.RICH_PARTS)) {
+                message.parts.mapNotNull(::contentPartFromPart)
+            } else {
+                emptyList()
+            }
+            val renderMarkdown = message.role == "assistant" &&
+                provider.supports(WebChatProviderCapability.RICH_TEXT)
             val actions = buildSet {
                 if (
                     message.content.isNotBlank() &&
-                    provider.supports(com.elon.app.WebChatProviderCapability.MESSAGE_COPY)
+                    provider.supports(WebChatProviderCapability.MESSAGE_COPY)
                 ) {
-                    add(com.elon.app.WebChatMessageAction.COPY)
+                    add(WebChatMessageAction.COPY)
                 }
                 if (
                     index == latestAssistantIndex &&
                     message.role == "assistant" &&
                     message.state == "completed" &&
                     !snapshot.streaming &&
-                    provider.supports(com.elon.app.WebChatProviderCapability.MESSAGE_REGENERATE) &&
+                    provider.supports(WebChatProviderCapability.MESSAGE_REGENERATE) &&
                     snapshot.capabilities.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE)
                 ) {
-                    add(com.elon.app.WebChatMessageAction.REGENERATE)
+                    add(WebChatMessageAction.REGENERATE)
                 }
                 if (
-                    provider.supports(com.elon.app.WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS) &&
+                    provider.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS) &&
                     ChatGptNativeControlPresentation.stableContextId(message.id) in messageActionContextIds
                 ) {
-                    add(com.elon.app.WebChatMessageAction.MORE)
+                    add(WebChatMessageAction.MORE)
                 }
             }
             ChatMessage(
@@ -54,11 +65,13 @@ internal object ChatGptFriendMessageMapper {
                 createdAtMs = timestampFor(id),
                 modelUsed = snapshot.currentModel.takeIf { message.role == "assistant" && it.isNotBlank() },
                 attachments = messageAttachments.takeIf(List<ChatAttachment>::isNotEmpty),
-                webChatMessage = com.elon.app.WebChatProductionMessage(
+                webChatMessage = WebChatProductionMessage(
                     providerWireValue = provider.id.wireValue,
                     sourceMessageId = message.id,
                     actions = actions,
-                ).takeIf { actions.isNotEmpty() },
+                    renderMarkdown = renderMarkdown,
+                    contentParts = contentParts,
+                ).takeIf { actions.isNotEmpty() || renderMarkdown || contentParts.isNotEmpty() },
             )
         }.toMutableList()
 
@@ -104,5 +117,19 @@ internal object ChatGptFriendMessageMapper {
             mimeType = part.metadata?.mediaType,
         )
         else -> null
+    }
+
+    private fun contentPartFromPart(part: ChatGptWebMessagePart): WebChatProductionContentPart? {
+        if (part.type in setOf("image", "file")) return null
+        return WebChatProductionContentPart(
+            type = part.type,
+            label = part.label,
+            language = part.metadata?.language,
+            mediaType = part.metadata?.mediaType,
+            targetHost = part.metadata?.targetHost,
+            lineCount = part.metadata?.lineCount,
+            rowCount = part.metadata?.rowCount,
+            columnCount = part.metadata?.columnCount,
+        )
     }
 }

@@ -31,6 +31,7 @@ internal class ChatGptSocialChatController(
     private val timestamps = linkedMapOf<String, Long>()
     private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions).apply {
         onWebChatMessageAction = ::handleWebChatMessageAction
+        onWebChatContentOpen = { _, _ -> openOfficialFallback() }
     }
     private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(

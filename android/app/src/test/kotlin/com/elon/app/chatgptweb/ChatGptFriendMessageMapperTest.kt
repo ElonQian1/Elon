@@ -31,6 +31,8 @@ class ChatGptFriendMessageMapperTest {
         assertTrue(result.last().senderAvatarResId != null)
         assertEquals("GPT-5", result.last().modelUsed)
         assertNull(result.first().senderAvatarResId)
+        assertEquals(false, result.first().webChatMessage?.renderMarkdown)
+        assertEquals(true, result.last().webChatMessage?.renderMarkdown)
         assertEquals(setOf(WebChatMessageAction.COPY), result.first().webChatMessage?.actions)
         assertEquals(setOf(WebChatMessageAction.COPY), result.last().webChatMessage?.actions)
     }
@@ -121,6 +123,41 @@ class ChatGptFriendMessageMapperTest {
 
         assertEquals("fixture.pdf", result.single().attachments?.single()?.displayName)
         assertEquals("application/pdf", result.single().attachments?.single()?.mimeType)
+    }
+
+    @Test
+    fun mapsComplexOfficialPartsIntoTheProductionFriendBubbleModel() {
+        val message = ChatGptWebMessage(
+            id = "a-rich",
+            role = "assistant",
+            content = "## 结论\n支持表格。",
+            state = "completed",
+            parts = listOf(
+                ChatGptWebMessagePart(
+                    type = "citation",
+                    label = "官方文档",
+                    metadata = ChatGptWebMessagePartMetadata(targetHost = "example.com"),
+                ),
+                ChatGptWebMessagePart(
+                    type = "code",
+                    label = "示例代码",
+                    metadata = ChatGptWebMessagePartMetadata(language = "kotlin", lineCount = 12),
+                ),
+            ),
+        )
+
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot(messages = listOf(message)),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = null,
+            timestampFor = { 42L },
+        ).single()
+
+        assertEquals(true, result.webChatMessage?.renderMarkdown)
+        assertEquals(listOf("citation", "code"), result.webChatMessage?.contentParts?.map { it.type })
+        assertEquals("example.com", result.webChatMessage?.contentParts?.first()?.targetHost)
+        assertEquals("kotlin", result.webChatMessage?.contentParts?.last()?.language)
+        assertEquals(12, result.webChatMessage?.contentParts?.last()?.lineCount)
     }
 
     private fun snapshot(

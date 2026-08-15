@@ -11,18 +11,6 @@ import com.elon.app.chatgptweb.ChatGptNativeControlPresentation
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class WebChatMessageAction(val wireValue: String) {
-    COPY("copy"),
-    REGENERATE("regenerate"),
-    MORE("more"),
-}
-
-data class WebChatProductionMessage(
-    val providerWireValue: String,
-    val sourceMessageId: String,
-    val actions: Set<WebChatMessageAction>,
-)
-
 internal object WebChatProductionMessageActionBinder {
     fun bind(
         itemView: View,

@@ -27,6 +27,7 @@ internal class GoogleWebSocialChatController(
     private val timestamps = linkedMapOf<String, Long>()
     private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions).apply {
         onWebChatMessageAction = ::handleWebChatMessageAction
+        onWebChatContentOpen = { _, _ -> openOfficialFallback() }
     }
     private val session = GoogleWebBackgroundSession(
         activity = activity,

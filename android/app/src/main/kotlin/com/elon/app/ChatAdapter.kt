@@ -73,6 +73,7 @@ class ChatAdapter(
     /** 语音附件长按回调（转文字 / 其他操作），由 Activity 通过 setAdapterAndWireApkActions 注入。 */
     var onVoiceAttachmentLongPress: ((message: ChatMessage, attachment: ChatAttachment) -> Unit)? = null
     var onWebChatMessageAction: ((ChatMessage, WebChatMessageAction) -> Unit)? = null
+    var onWebChatContentOpen: ((ChatMessage, WebChatProductionContentPart) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
     private var cachedUserBitmap: Bitmap? = null
     private var selectionMode = false
@@ -87,6 +88,7 @@ class ChatAdapter(
         val text: TextView = view.findViewById(R.id.messageText)
         val status: TextView? = view.findViewById(R.id.messageStatus)
         val attachmentList: LinearLayout? = view.findViewById(R.id.messageAttachmentList)
+        val webChatPartList: LinearLayout? = view.findViewById(R.id.webChatMessagePartList)
         val bubble: LinearLayout? = view.findViewById(R.id.messageBubble)
         val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
@@ -182,12 +184,18 @@ class ChatAdapter(
             )
         }
         val projectCardBound = postCardBound || projectShareBound
+        val webChatTextBound = !projectCardBound && !recalled &&
+            WebChatProductionRichContentBinder.bindMessageText(holder.text, message)
         applyChatProjectBubbleStyle(holder.bubble, message.role, projectCardBound)
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
-            holder.text.text = if (recalled) message.recallNoticeText() else message.content
-            holder.text.visibility = if (!recalled && message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
+            if (!webChatTextBound) {
+                holder.text.text = if (recalled) message.recallNoticeText() else message.content
+            }
+            val hasSupplementalContent = !message.attachments.isNullOrEmpty() ||
+                message.webChatMessage?.contentParts?.isNotEmpty() == true
+            holder.text.visibility = if (!recalled && message.content.isBlank() && hasSupplementalContent) {
                 View.GONE
             } else {
                 View.VISIBLE
@@ -195,11 +203,14 @@ class ChatAdapter(
             holder.text.setTextColor(if (recalled) Color.parseColor("#8A8A8A") else messageTextColor(message.role))
             if (recalled) {
                 holder.text.movementMethod = null
+            } else if (webChatTextBound) {
+                holder.text.movementMethod = LinkMovementMethod.getInstance()
             } else {
                 Linkify.addLinks(holder.text, Linkify.WEB_URLS)
                 holder.text.movementMethod = LinkMovementMethod.getInstance()
             }
         }
+        WebChatProductionRichContentBinder.bindParts(holder.webChatPartList, message, onWebChatContentOpen)
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
         bindSenderAvatar(holder.friendAvatar, message)

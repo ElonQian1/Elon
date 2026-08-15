@@ -28,12 +28,16 @@ class WebChatProviderRegistryTest {
         assertTrue(chatGpt.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS))
         assertTrue(chatGpt.supports(WebChatProviderCapability.MODEL_SELECTOR))
         assertTrue(chatGpt.supports(WebChatProviderCapability.ATTACHMENT_UPLOAD))
+        assertTrue(chatGpt.supports(WebChatProviderCapability.RICH_TEXT))
+        assertTrue(chatGpt.supports(WebChatProviderCapability.RICH_PARTS))
         assertEquals("Google 搜索网页 AI", google.displayName)
         assertTrue(google.available)
         assertTrue(google.selectable)
         assertTrue(google.supports(WebChatProviderCapability.MESSAGE_COPY))
         assertFalse(google.supports(WebChatProviderCapability.MESSAGE_REGENERATE))
         assertFalse(google.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS))
+        assertTrue(google.supports(WebChatProviderCapability.RICH_TEXT))
+        assertFalse(google.supports(WebChatProviderCapability.RICH_PARTS))
         assertEquals(
             listOf(WebChatProviderId.CHATGPT_WEB, WebChatProviderId.GOOGLE_WEB),
             WebChatProviderRegistry.available().map { it.id },

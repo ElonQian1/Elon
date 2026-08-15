@@ -21,6 +21,8 @@ internal enum class WebChatProviderCapability {
     MESSAGE_CONTEXT_ACTIONS,
     MODEL_SELECTOR,
     ATTACHMENT_UPLOAD,
+    RICH_TEXT,
+    RICH_PARTS,
 }
 
 internal data class WebChatProviderIdentity(
@@ -57,6 +59,8 @@ internal object WebChatProviderRegistry {
                 WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS,
                 WebChatProviderCapability.MODEL_SELECTOR,
                 WebChatProviderCapability.ATTACHMENT_UPLOAD,
+                WebChatProviderCapability.RICH_TEXT,
+                WebChatProviderCapability.RICH_PARTS,
             ),
         ),
         WebChatProviderIdentity(
@@ -66,6 +70,7 @@ internal object WebChatProviderRegistry {
             available = true,
             capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION + setOf(
                 WebChatProviderCapability.MESSAGE_COPY,
+                WebChatProviderCapability.RICH_TEXT,
             ),
         ),
     )
