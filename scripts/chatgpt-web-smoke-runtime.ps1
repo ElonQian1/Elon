@@ -307,6 +307,16 @@ function Test-ChatGptWebSmokeActivityForeground {
         '(?m)^\s*topResumedActivity=.*com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
 }
 
+function Test-WebChatNativeChatSurfaceForeground {
+    param([Parameter(Mandatory = $true)]$Runtime)
+
+    $activities = Invoke-ChatGptWebSmokeAdb -Runtime $Runtime `
+        -Arguments @("shell", "dumpsys", "activity", "activities") `
+        -TimeoutSec 8 -Label "read native web chat foreground activity"
+    return $activities -match
+        '(?m)^\s*topResumedActivity=.*com\.elon\.app/\.MainActivity\b'
+}
+
 function ConvertTo-ChatGptWebSmokeSafeDiagnostic {
     param(
         [AllowNull()]$Value,

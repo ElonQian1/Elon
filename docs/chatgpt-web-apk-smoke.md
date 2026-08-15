@@ -46,6 +46,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-chatgpt-web-ap
 
 如果不带 `-SendProbe` 却传入 `-ProbeMarker`，脚本会立即失败，防止默认只读模式意外发送消息。
 
+## 生产好友聊天收发
+
+全屏官网 smoke 用于验证完整网页兜底；普通用户实际使用的好友聊天入口单独使用
+`smoke-chatgpt-web-native-chat.ps1` 验收。默认模式只读取生产提供方、适配器、输入框、
+会话数量和项目数量，不输出标题或消息正文：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\smoke-chatgpt-web-native-chat.ps1 `
+  -DeviceSerial "192.168.31.171:5555" `
+  -ExpectedHardwareSerial "<physical-device-serial>"
+```
+
+获得测试消息发送授权后增加 `-SendProbe`。脚本会在生产好友聊天里新建隔离会话，
+发送固定 ASCII 标记，等待原生消息列表收到停止流式的精确回复，然后恢复原会话。
+如果用户切换到其它应用，验收会立即失败，不会把前台中断误报成模型失败。
+
+Google 对称链路使用 `scripts\smoke-google-web-native-chat.ps1`，具备相同的只读、
+`-SendProbe`、前台保护、原会话恢复和隐私输出约束。
+
 ## 原生聊天附件验收
 
 正式附件能力从好友聊天中的「ChatGPT 网页 AI」原生界面验收。脚本只生成固定 ASCII 文本夹具，不打开系统文件选择器，不扫描相册或下载目录，也不读取用户文件。流程拆成三个可恢复阶段；前两阶段只在本地添加和移除夹具，不上传、不发送。
