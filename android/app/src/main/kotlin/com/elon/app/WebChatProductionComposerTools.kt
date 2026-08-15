@@ -62,7 +62,7 @@ internal class WebChatProductionComposerToolsCoordinator(
             .put("action", "chatgpt_list_composer_options")
             .put("section", TOOLS_SECTION))
         if (!requested.optBoolean("control_ok")) {
-            showUnavailable()
+            showToolDialog(provider, port, emptyList())
             return
         }
         Toast.makeText(activity, "正在读取网页工具...", Toast.LENGTH_SHORT).show()
@@ -86,7 +86,7 @@ internal class WebChatProductionComposerToolsCoordinator(
             return
         }
         if (attempt >= MAX_POLL_ATTEMPTS) {
-            showUnavailable()
+            showToolDialog(provider, port, emptyList())
             return
         }
         host.postDelayed(
@@ -109,12 +109,23 @@ internal class WebChatProductionComposerToolsCoordinator(
         tools: List<WebChatProductionComposerTool>,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
-        val labels = tools.map { tool ->
+        val commands = WebChatProductionComposerCommandCatalog.resolve(provider, port.uiState())
+        if (commands.isEmpty() && tools.isEmpty()) {
+            showUnavailable()
+            return
+        }
+        val labels = commands.map(WebChatProductionComposerCommand::label) + tools.map { tool ->
             if (tool.selected) "${tool.label}（已选）" else tool.label
-        }.toTypedArray()
+        }
         val dialog = AlertDialog.Builder(activity)
-            .setTitle("网页工具")
-            .setItems(labels) { _, index -> selectTool(port, tools[index]) }
+            .setTitle("网页功能")
+            .setItems(labels.toTypedArray()) { _, index ->
+                if (index < commands.size) {
+                    executeCommand(port, commands[index])
+                } else {
+                    selectTool(port, tools[index - commands.size])
+                }
+            }
             .setNegativeButton("取消", null)
             .create()
         dialog.setOnShowListener {
@@ -123,14 +134,25 @@ internal class WebChatProductionComposerToolsCoordinator(
                 post {
                     for (childIndex in 0 until childCount) {
                         val optionIndex = firstVisiblePosition + childIndex
-                        if (optionIndex in tools.indices) {
-                            getChildAt(childIndex)?.contentDescription = tools[optionIndex].nativeSelector
+                        val selector = if (optionIndex < commands.size) {
+                            commands.getOrNull(optionIndex)?.nativeSelector
+                        } else {
+                            tools.getOrNull(optionIndex - commands.size)?.nativeSelector
                         }
+                        getChildAt(childIndex)?.contentDescription = selector
                     }
                 }
             }
         }
         dialog.show()
+    }
+
+    private fun executeCommand(
+        port: WebChatSocialMcpPort,
+        command: WebChatProductionComposerCommand,
+    ) {
+        val result = port.control(JSONObject().put("action", command.action))
+        if (!result.optBoolean("control_ok")) showCommandError(result.optString("error"))
     }
 
     private fun selectTool(port: WebChatSocialMcpPort, tool: WebChatProductionComposerTool) {
@@ -151,6 +173,16 @@ internal class WebChatProductionComposerToolsCoordinator(
             .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showCommandError(error: String) {
+        val message = when (error) {
+            "dictation_unavailable" -> "当前网页暂不支持听写"
+            "realtime_voice_unavailable" -> "当前网页暂不支持实时语音"
+            "bridge_not_ready", "adapter_not_current" -> "网页正在恢复，请稍后重试"
+            else -> "网页功能状态已变化，请重试"
+        }
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
     }
 
     private companion object {
