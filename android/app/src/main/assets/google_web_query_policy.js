@@ -16,10 +16,12 @@
 
   function select(observation) {
     if (!observation) return '';
+    const remembered = clean(observation.rememberedQuery);
+    if (observation.rememberedOwned === true && remembered) return remembered;
     return clean(observation.explicitQuery) ||
-      clean(observation.rememberedQuery) ||
-      clean(observation.urlQuery);
+      clean(observation.urlQuery) ||
+      remembered;
   }
 
-  return Object.freeze({ version: 1, select });
+  return Object.freeze({ version: 2, select });
 });

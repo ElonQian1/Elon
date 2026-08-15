@@ -48,13 +48,15 @@ class GoogleWebPendingSendStateTest {
     }
 
     @Test
-    fun observedUserMessageCompletesPendingSubmission() {
+    fun observedUserMessageWaitsForItsAssistantBeforeCompleting() {
         val state = GoogleWebPendingSendState()
         val generation = state.begin("hello")
         state.confirmSubmission()
 
-        assertFalse(state.observeUserPrompt("different"))
-        assertTrue(state.observeUserPrompt(" hello "))
+        assertFalse(state.observeCompletedTurn("different", assistantObserved = true))
+        assertFalse(state.observeCompletedTurn(" hello ", assistantObserved = false))
+        assertEquals("hello", state.prompt())
+        assertTrue(state.observeCompletedTurn(" hello ", assistantObserved = true))
         assertNull(state.prompt())
         assertFalse(state.requiresOfficialConfirmation())
         assertEquals(

@@ -234,4 +234,13 @@ assert.equal(policy.accepts({
 }), false)
 
 assert.ok(policy.penalty({ links: 3, tabControls: 2 }) > policy.penalty({ links: 0, tabControls: 0 }))
+
+assert.equal(policy.select([
+  { id: 'older-long', trustedAnswerContainer: true, domOrder: 2, score: 9000, textLength: 900 },
+  { id: 'latest-short', trustedAnswerContainer: true, domOrder: 5, score: 20, textLength: 2 },
+]).id, 'latest-short')
+assert.equal(policy.select([
+  { id: 'later-unrelated', domOrder: 9, score: 9000, textLength: 900 },
+  { id: 'current-answer', afterQuery: true, domOrder: 4, score: 20, textLength: 2 },
+]).id, 'current-answer')
 console.log('google web answer candidate policy passed')

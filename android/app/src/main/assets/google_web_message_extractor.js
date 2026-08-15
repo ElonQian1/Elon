@@ -1,14 +1,24 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 14;
+  const extractorVersion = 15;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
   const allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   const candidatePolicy = window.__elonGoogleWebAnswerCandidatePolicy;
   const queryPolicy = window.__elonGoogleWebQueryPolicy;
+  const TRUSTED_ANSWER_SELECTORS = [
+    '[id^="aim-chrome-initial-inline-async-container"]',
+    '[data-container-id]',
+    '[data-snhf]',
+    '[data-attrid*="ai" i]',
+    'article',
+    '[role="article"]'
+  ];
+  const TRUSTED_ANSWER_SELECTOR = TRUSTED_ANSWER_SELECTORS.join(',');
   let rememberedQueryValue = '';
+  let rememberedQueryOwned = false;
 
   function cleanText(value) {
     return String(value || '')
@@ -40,10 +50,12 @@
     const query = cleanText(value).slice(0, 40000);
     if (!query) return;
     rememberedQueryValue = query;
+    rememberedQueryOwned = true;
   }
 
   function clearRememberedQuery() {
     rememberedQueryValue = '';
+    rememberedQueryOwned = false;
   }
 
   function rememberedQuery() {
@@ -64,9 +76,17 @@
       .filter((text) => text.length > 1 && text.length <= 40000);
     const explicitQuery = headings[headings.length - 1] || '';
     const selected = queryPolicy && typeof queryPolicy.select === 'function'
-      ? queryPolicy.select({ explicitQuery, rememberedQuery: rememberedQuery(), urlQuery })
+      ? queryPolicy.select({
+          explicitQuery,
+          rememberedQuery: rememberedQuery(),
+          rememberedOwned: rememberedQueryOwned,
+          urlQuery
+        })
       : explicitQuery || rememberedQuery() || urlQuery;
-    if (selected) rememberQuery(selected);
+    if (selected && selected !== rememberedQueryValue) {
+      rememberedQueryValue = selected;
+      rememberedQueryOwned = false;
+    }
     return selected;
   }
 
@@ -162,7 +182,7 @@
       liveRegion,
       controls,
       afterQuery: followsQuery(node, queryAnchor),
-      trustedAnswerContainer: node.matches('[id^="aim-chrome-initial-inline-async-container"]'),
+      trustedAnswerContainer: node.matches(TRUSTED_ANSWER_SELECTOR),
       interactive: !!node.closest(
         'a[href], button, input, textarea, select, [role="button"], [role="link"], ' +
         '[role="menuitem"], [role="tab"]'
@@ -175,7 +195,15 @@
       Math.min(semanticBlocks, 20) * 90 + (explicit ? 1400 : 0) + depth * 30 -
       Math.min(controls, 20) * 120 -
       (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);
-    return { node, text, citations, score, explicit };
+    return {
+      node,
+      text,
+      citations,
+      score,
+      explicit,
+      afterQuery: metrics.afterQuery,
+      trustedAnswerContainer: metrics.trustedAnswerContainer
+    };
   }
 
   function uniqueNodes(selectors) {
@@ -192,15 +220,7 @@
 
   function answerCandidate(composer, query) {
     const queryAnchor = findQueryAnchor(query);
-    const explicitSelectors = [
-      '[id^="aim-chrome-initial-inline-async-container"]',
-      '[data-container-id]',
-      '[data-snhf]',
-      '[data-attrid*="ai" i]',
-      'article',
-      '[role="article"]',
-      '[role="region"]'
-    ];
+    const explicitSelectors = TRUSTED_ANSWER_SELECTORS.concat('[role="region"]');
     const semanticSelectors = [
       'body section',
       'body [aria-live="polite"]',
@@ -224,8 +244,29 @@
           .sort((left, right) => right.text.length - left.text.length)[0];
         return !child || child.text.length < candidate.text.length * 0.92;
       });
-    return explicit.concat(semantic, generic)
-      .sort((left, right) => right.score - left.score || left.text.length - right.text.length)[0] || null;
+    const candidatesByNode = new Map();
+    explicit.concat(semantic, generic).forEach((candidate) => {
+      const current = candidatesByNode.get(candidate.node);
+      if (!current || candidate.score > current.score) candidatesByNode.set(candidate.node, candidate);
+    });
+    const candidates = Array.from(candidatesByNode.values()).sort((left, right) => {
+      if (left.node !== right.node && typeof left.node.compareDocumentPosition === 'function') {
+        const position = left.node.compareDocumentPosition(right.node);
+        if (position & 4) return -1;
+        if (position & 2) return 1;
+      }
+      return 0;
+    }).map((candidate, index) => ({
+      ...candidate,
+      domOrder: index,
+      textLength: candidate.text.length
+    }));
+    if (candidatePolicy && typeof candidatePolicy.select === 'function') {
+      return candidatePolicy.select(candidates);
+    }
+    return candidates.sort((left, right) =>
+      right.domOrder - left.domOrder || right.score - left.score
+    )[0] || null;
   }
 
   function extract(composer, streaming) {
@@ -259,15 +300,19 @@
     const semanticCount = document.querySelectorAll(
       'body section, body [aria-live="polite"], body [aria-live="assertive"]'
     ).length;
+    const trustedCount = Array.from(document.querySelectorAll(TRUSTED_ANSWER_SELECTOR))
+      .filter(isVisible).length;
     const divCount = Math.min(document.querySelectorAll('body div').length, 9999);
     return [
       'v=' + extractorVersion,
       'main=' + mainCount,
       'explicit=' + explicitCount,
       'semantic=' + semanticCount,
+      'trusted=' + trustedCount,
       'div=' + divCount,
       'composer=' + (composer ? 1 : 0),
       'query=' + (extraction.queryFound ? 1 : 0),
+      'owned=' + (rememberedQueryOwned ? 1 : 0),
       'answer=' + (extraction.answerFound ? 1 : 0)
     ].join('|').slice(0, 160);
   }

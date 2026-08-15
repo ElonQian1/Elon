@@ -9,9 +9,15 @@ assert.equal(policy.select({
 assert.equal(policy.select({
   rememberedQuery: 'native follow-up',
   urlQuery: 'initial query',
+}), 'initial query')
+assert.equal(policy.select({
+  explicitQuery: 'stale visible query',
+  rememberedQuery: 'native follow-up',
+  rememberedOwned: true,
+  urlQuery: 'stale url query',
 }), 'native follow-up')
 assert.equal(policy.select({ urlQuery: 'initial query' }), 'initial query')
 assert.equal(policy.select(null), '')
-assert.equal(policy.version, 1)
+assert.equal(policy.version, 2)
 
 console.log('google web query policy passed')

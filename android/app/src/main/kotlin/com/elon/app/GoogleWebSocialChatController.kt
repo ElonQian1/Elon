@@ -156,7 +156,15 @@ internal class GoogleWebSocialChatController(
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
-        if (pendingSend.observeUserPrompt(snapshot.messages.lastOrNull { it.role == "user" }?.content)) {
+        val lastUserIndex = snapshot.messages.indexOfLast { it.role == "user" }
+        val assistantObserved = lastUserIndex >= 0 && snapshot.messages
+            .drop(lastUserIndex + 1)
+            .any { it.role == "assistant" }
+        if (pendingSend.observeCompletedTurn(
+                snapshot.messages.getOrNull(lastUserIndex)?.content,
+                assistantObserved,
+            )
+        ) {
             cancelPendingSendWatchdog()
         }
         val mapped = ChatGptFriendMessageMapper.map(

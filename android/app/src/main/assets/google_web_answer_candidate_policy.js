@@ -115,10 +115,23 @@
     return Math.min(links, 20) * 180 + Math.min(tabControls, 10) * 600;
   }
 
+  function select(candidates) {
+    const values = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+    const afterQuery = values.filter((candidate) => candidate.afterQuery === true);
+    const trusted = values.filter((candidate) => candidate.trustedAnswerContainer === true);
+    const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : values);
+    return pool.sort((left, right) =>
+      nonNegative(right.domOrder) - nonNegative(left.domOrder) ||
+      Number(right.score || 0) - Number(left.score || 0) ||
+      nonNegative(left.textLength) - nonNegative(right.textLength)
+    )[0] || null;
+  }
+
   return Object.freeze({
-    version: 8,
+    version: 9,
     accepts,
     penalty,
+    select,
     navigationOnlyText,
     transientStatusText,
     shareSurfaceText,

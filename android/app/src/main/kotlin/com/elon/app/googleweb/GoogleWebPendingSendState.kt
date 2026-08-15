@@ -47,9 +47,10 @@ internal class GoogleWebPendingSendState {
         return prompt
     }
 
-    fun observeUserPrompt(content: String?): Boolean {
+    fun observeCompletedTurn(content: String?, assistantObserved: Boolean): Boolean {
         val current = pending ?: return false
         if (content?.trim() != current.prompt.trim()) return false
+        if (!assistantObserved) return false
         invalidate()
         return true
     }
