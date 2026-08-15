@@ -510,6 +510,7 @@ fn release(version: &str, previous: Option<&str>, require_marketing: bool) -> Er
         capabilities: vec!["catalog.query".into()],
         extension_points: vec!["order.enrichment".into()],
         migrations: vec![],
+        runtime: None,
         compatibility: ErpReleaseCompatibility {
             minimum_instance_version: "1.0.0".into(),
             required_plugins: vec![],

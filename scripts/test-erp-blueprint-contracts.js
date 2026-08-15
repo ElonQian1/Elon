@@ -5,7 +5,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..')
 const examples = path.join(root, 'examples/erp-blueprints')
 const blueprint = json('official-blueprint.json')
-const release = json('release-1.1.0.json')
+const release = json('release-1.2.0.json')
 const coffee = json('cofficethinking-instance.json')
 const retail = json('minimal-retail-instance.json')
 const signal = json('feature-signal.json')
@@ -15,6 +15,13 @@ const commerceReadiness = json('open-commerce-readiness.json')
 
 assert.equal(blueprint.schema, 'yilong.erp.blueprint.v1')
 assert.equal(release.schema, 'yilong.erp.release.v1')
+assert.deepEqual(release.runtime, {
+  kind: 'node_package',
+  contract: 'yilong.erp.kernel.v1',
+  package_name: '@yilong/merchant-erp-kernel',
+  package_version: '0.1.0',
+})
+assert.ok(release.capabilities.includes('procurement.record'))
 assert.equal(coffee.blueprint_key, blueprint.blueprint_key)
 assert.equal(retail.blueprint_key, blueprint.blueprint_key)
 assert.equal(coffee.pinned_version, retail.pinned_version)
@@ -75,6 +82,13 @@ const strictVersion = new RegExp(releaseSchema.$defs.version.pattern)
 assert.equal(strictVersion.test('1.2.3'), true)
 assert.equal(strictVersion.test('1.2.3-beta'), false)
 assert.equal(strictVersion.test('01.2.3'), false)
+const runtimePackage = new RegExp(releaseSchema.properties.runtime.properties.package_name.pattern)
+assert.equal(runtimePackage.test('@yilong/merchant-erp-kernel'), true)
+assert.equal(runtimePackage.test('merchant-erp-kernel'), true)
+assert.equal(runtimePackage.test('../unsafe'), false)
+assert.equal(runtimePackage.test('/absolute'), false)
+assert.equal(runtimePackage.test('scope/package'), false)
+assert.equal(runtimePackage.test('@scope/'), false)
 
 console.log('ERP blueprint machine contracts passed')
 

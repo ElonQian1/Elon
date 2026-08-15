@@ -214,6 +214,7 @@ mod tests {
                 capabilities: vec![],
                 extension_points: vec![],
                 migrations: vec![],
+                runtime: None,
                 compatibility: ErpReleaseCompatibility {
                     minimum_instance_version: "1.0.0".into(),
                     required_plugins: vec![],

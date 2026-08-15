@@ -26,6 +26,17 @@
         }
       }
     },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "contract", "package_name", "package_version"],
+      "properties": {
+        "kind": { "const": "node_package" },
+        "contract": { "const": "yilong.erp.kernel.v1" },
+        "package_name": { "type": "string", "minLength": 3, "maxLength": 120, "pattern": "^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$" },
+        "package_version": { "$ref": "#/$defs/version" }
+      }
+    },
     "compatibility": {
       "type": "object",
       "additionalProperties": false,

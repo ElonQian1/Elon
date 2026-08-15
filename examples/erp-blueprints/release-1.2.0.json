@@ -1,0 +1,27 @@
+{
+  "schema": "yilong.erp.release.v1",
+  "blueprint_key": "official.erp",
+  "version": "1.2.0",
+  "previous_version": "1.1.0",
+  "source_git_commit": "4a635fb4b",
+  "modules": [
+    { "module_key": "catalog", "version": "1.2.0", "required": true },
+    { "module_key": "order", "version": "1.2.0", "required": true },
+    { "module_key": "inventory", "version": "1.2.0", "required": true },
+    { "module_key": "customer", "version": "1.1.0", "required": false },
+    { "module_key": "finance", "version": "1.2.0", "required": false },
+    { "module_key": "procurement", "version": "1.0.0", "required": false },
+    { "module_key": "marketing", "version": "1.1.0", "required": false }
+  ],
+  "capabilities": ["catalog.search", "order.create", "order.status", "inventory.query", "procurement.record", "marketing.campaign"],
+  "extension_points": ["catalog.enrichment", "order.enrichment", "marketing.campaign", "dashboard.widget", "integration.connector"],
+  "migrations": [],
+  "runtime": {
+    "kind": "node_package",
+    "contract": "yilong.erp.kernel.v1",
+    "package_name": "@yilong/merchant-erp-kernel",
+    "package_version": "0.1.0"
+  },
+  "compatibility": { "minimum_instance_version": "1.0.0", "required_plugins": [] },
+  "rollback": { "supported": true, "instructions": "固定回上一已验收版本；保留商户存储适配器、主题和私有扩展，不自动回写经营数据。" }
+}

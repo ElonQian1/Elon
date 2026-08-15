@@ -47,6 +47,8 @@ AI 工具故意不提供蓝图演进、提案接受、Matter 创建、公共版�
 
 创建实例时默认使用 `project_name` 新建项目；传入 `target_project_id` 时忽略空的 `project_name`，并要求操作者对目标项目具有 `owner`、`admin` 或 `editor` 角色。响应中的 `onboarding_mode` 以及物化合同中的 `target_onboarding_mode` 用于区分 `new_project` 与 `existing_project`。该接口只登记治理关系，不导入本机目录、不复制 Git 仓库，也不启动开发任务。
 
+版本清单可以通过 `runtime` 固定 `yilong.erp.kernel.v1` 的 Node 包名称和严格语义版本。物化合同只把这项不可变绑定传递给后续 Matter/Assignment，不能自行下载依赖、修改目标项目或宣称部署成功。当前官方 `1.2.0` 示例绑定 `@yilong/merchant-erp-kernel@0.1.0`；生产数据库适配、商户项目迁移和包分发仍需独立任务与验收。
+
 开放商业就绪度是从各领域真源即时生成的只读投影，不新增第二套执行状态机。ERP 实例可以把同项目中的一个商户节点登记为稳定商业身份，该字段属于现有实例配置并复用 `configuration_revision`：绑定变化后旧物化证据自然不再匹配。已绑定实例不能被查询参数临时覆盖；未绑定且只有一个商户节点时可安全预览，多节点时必须先传 `merchant_id` 预览，再由有编辑权的人确认绑定。`consumer_invocation_ready` 要求商户启用、运行时已验证且至少存在一项非 `owner_only` 的有效 `merchant_runtime` 能力；其中 `public` 能力可按现有公开规则调用，`authorized` 能力仍必须由具体消费者 App 取得有效 grant，本投影不会代替授权。`consumer_discovery_ready` 还要求商户已发布到开放目录；`erp_onboarding_ready` 只由物化证据是否达到 `accepted_verified` 决定。这三个结果不得互相替代。
 
 ## 机器合同

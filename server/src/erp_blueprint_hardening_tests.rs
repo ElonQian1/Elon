@@ -189,6 +189,13 @@ fn editable_existing_project_can_be_adopted_without_recreation() {
     assert_eq!(instance.onboarding_mode, "existing_project");
     let contract = materialization::build_contract(&blueprint, &version, &instance);
     assert_eq!(contract.target_onboarding_mode, "existing_project");
+    let runtime = contract
+        .source
+        .runtime
+        .expect("published runtime binding should reach materialization");
+    assert_eq!(runtime.contract, "yilong.erp.kernel.v1");
+    assert_eq!(runtime.package_name, "@yilong/merchant-erp-kernel");
+    assert_eq!(runtime.package_version, "0.1.0");
     assert!(contract
         .boundaries
         .contains(&"does_not_overwrite_existing_project"));
@@ -348,6 +355,32 @@ fn release_must_only_publish_declared_and_reversible_contracts() {
             .to_string()
             .contains("所有迁移步骤都必须可逆")
     );
+
+    unknown_capability.migrations.clear();
+    unknown_capability.runtime = Some(ErpRuntimeBinding {
+        kind: "node_package".into(),
+        contract: "yilong.erp.kernel.v1".into(),
+        package_name: "@yilong/merchant-erp-kernel".into(),
+        package_version: "0.1.0".into(),
+    });
+    validation::validate_release(&definition, &unknown_capability).unwrap();
+    for unsafe_name in [
+        "../unsafe",
+        "/absolute",
+        "scope/package",
+        "@scope/",
+        "Uppercase",
+    ] {
+        unknown_capability.runtime.as_mut().unwrap().package_name = unsafe_name.into();
+        assert!(validation::validate_release(&definition, &unknown_capability).is_err());
+    }
+
+    let mut legacy_manifest = release(vec!["catalog"], vec!["catalog.search"]);
+    legacy_manifest.runtime = None;
+    let legacy_json = serde_json::to_value(&legacy_manifest).unwrap();
+    assert!(legacy_json.get("runtime").is_none());
+    let decoded: ErpReleaseManifest = serde_json::from_value(legacy_json).unwrap();
+    assert!(decoded.runtime.is_none());
 }
 
 #[test]
@@ -410,6 +443,12 @@ fn release(modules: Vec<&str>, capabilities: Vec<&str>) -> ErpReleaseManifest {
         capabilities: capabilities.into_iter().map(str::to_string).collect(),
         extension_points: vec!["catalog.enrichment".into()],
         migrations: vec![],
+        runtime: Some(ErpRuntimeBinding {
+            kind: "node_package".into(),
+            contract: "yilong.erp.kernel.v1".into(),
+            package_name: "@yilong/merchant-erp-kernel".into(),
+            package_version: "0.1.0".into(),
+        }),
         compatibility: ErpReleaseCompatibility {
             minimum_instance_version: "1.0.0".into(),
             required_plugins: vec![],

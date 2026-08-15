@@ -474,6 +474,7 @@ fn release() -> ErpReleaseManifest {
         capabilities: vec!["catalog.query".into()],
         extension_points: vec![],
         migrations: vec![],
+        runtime: None,
         compatibility: ErpReleaseCompatibility {
             minimum_instance_version: "1.0.0".into(),
             required_plugins: vec![],

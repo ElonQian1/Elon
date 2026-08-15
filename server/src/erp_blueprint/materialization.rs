@@ -58,6 +58,7 @@ pub(crate) fn build_contract(
             git_commit: version.manifest.source_git_commit.clone(),
             blueprint_key: blueprint.definition.blueprint_key.clone(),
             version: version.manifest.version.clone(),
+            runtime: version.manifest.runtime.clone(),
         },
         configuration: ErpMaterializationConfiguration {
             revision: instance.configuration_revision,

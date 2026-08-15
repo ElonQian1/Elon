@@ -106,6 +106,14 @@ pub(crate) struct ErpRollbackPlan {
     pub instructions: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ErpRuntimeBinding {
+    pub kind: String,
+    pub contract: String,
+    pub package_name: String,
+    pub package_version: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ErpReleaseManifest {
     pub schema: String,
@@ -121,6 +129,8 @@ pub(crate) struct ErpReleaseManifest {
     pub extension_points: Vec<String>,
     #[serde(default)]
     pub migrations: Vec<ErpMigrationStep>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<ErpRuntimeBinding>,
     pub compatibility: ErpReleaseCompatibility,
     pub rollback: ErpRollbackPlan,
 }
@@ -197,6 +207,7 @@ pub(crate) struct ErpMaterializationSource {
     pub git_commit: String,
     pub blueprint_key: String,
     pub version: String,
+    pub runtime: Option<ErpRuntimeBinding>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

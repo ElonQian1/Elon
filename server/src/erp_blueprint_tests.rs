@@ -402,6 +402,7 @@ fn release(version: &str, previous: Option<&str>) -> ErpReleaseManifest {
         capabilities: vec!["inventory.query".into()],
         extension_points: vec!["catalog.enrichment".into(), "order.enrichment".into()],
         migrations: vec![],
+        runtime: None,
         compatibility: ErpReleaseCompatibility {
             minimum_instance_version: "1.0.0".into(),
             required_plugins: vec![],

@@ -210,6 +210,17 @@ pub(crate) fn validate_release(
     for migration in &manifest.migrations {
         require_normalized_key(&migration.migration_key, "migration_key")?;
     }
+    if let Some(runtime) = manifest.runtime.as_ref() {
+        if runtime.kind != "node_package" || runtime.contract != "yilong.erp.kernel.v1" {
+            bail!("ERP runtime 必须使用 node_package 和 yilong.erp.kernel.v1 合同");
+        }
+        if !(3..=120).contains(&runtime.package_name.len())
+            || !valid_runtime_package_name(&runtime.package_name)
+        {
+            bail!("ERP runtime package_name 不是安全的包标识");
+        }
+        validate_version(&runtime.package_version)?;
+    }
     if manifest.rollback.instructions.trim().is_empty() {
         bail!("发布清单必须提供回滚说明");
     }
@@ -217,6 +228,31 @@ pub(crate) fn validate_release(
         bail!("发布清单声明支持回滚时，所有迁移步骤都必须可逆");
     }
     Ok(())
+}
+
+fn valid_runtime_package_name(value: &str) -> bool {
+    fn valid_segment(segment: &str) -> bool {
+        segment
+            .chars()
+            .next()
+            .is_some_and(|value| value.is_ascii_lowercase() || value.is_ascii_digit())
+            && segment.chars().all(|value| {
+                value.is_ascii_lowercase()
+                    || value.is_ascii_digit()
+                    || matches!(value, '-' | '_' | '.')
+            })
+    }
+
+    if value.contains("..") {
+        return false;
+    }
+    if let Some(scoped) = value.strip_prefix('@') {
+        let Some((scope, package)) = scoped.split_once('/') else {
+            return false;
+        };
+        return !package.contains('/') && valid_segment(scope) && valid_segment(package);
+    }
+    !value.contains('/') && valid_segment(value)
 }
 
 pub(crate) fn validate_extensions(
