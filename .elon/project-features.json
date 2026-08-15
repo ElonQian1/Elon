@@ -160,7 +160,7 @@
       "id": "ai-task-managed-rust-cache-lifecycle-v1",
       "title": "AI 任务托管 Rust 构建缓存生命周期",
       "summary": "在受管 Codex 任务收尾时仅清理当前任务拥有的 workspace Cargo 构建分区，并让常规 Rust 缓存 GC 在宽限期后识别已消失 D:\\wt 短期 worktree 的遗留分区；共享、锁定、近期、未知和无效分区保持不动。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/ai-task-managed-rust-cache-lifecycle-v1.md",
@@ -310,7 +310,7 @@
         }
       ],
       "created_at_ms": 1786761137731,
-      "updated_at_ms": 1786762559973
+      "updated_at_ms": 1786762799336
     },
     {
       "id": "compute-attempt-final-usage-fence-verification-v1",
@@ -4372,16 +4372,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_4b9e806c4b294df78b64837763fcc3bc",
-      "feature_id": "compute-v255-runtime-launch-profile-verification",
-      "action": "claim_released",
-      "actor": "codex-goal-v255-20260814",
-      "reason": "Requirement evidence was intentionally updated after successful V255 validation; release before rebind.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786652711543
-    },
-    {
       "id": "feature_event_f0b3767492364cce985b84e8d71b81fd",
       "feature_id": "compute-v255-runtime-launch-profile-verification",
       "action": "requirement_rebound",
@@ -6370,6 +6360,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786762559973
+    },
+    {
+      "id": "feature_event_1afac90992df456aa30dc077346a5a6d",
+      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现与验证证据已通过 pre-push 门禁并推送 origin/main@a2a59aada。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786762799336
     }
   ]
 }
