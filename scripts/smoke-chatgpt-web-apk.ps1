@@ -705,9 +705,12 @@ Add-Check "conversation_list" ($listState.last_command.ok -eq $true) ([string]$l
 $conversationPage = Invoke-UiAction -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 }
 Add-Check "conversation_query" ($conversationPage.control_ok -eq $true) "returned=$(@($conversationPage.conversations).Count)"
 $conversationCollection = $conversationPage.collection
+$conversationCoverage = Get-ChatGptConversationCollectionCoverage `
+    -Collection $conversationCollection `
+    -SourceCount ([int]$conversationPage.source_count)
 Add-Check "conversation_collection_count" (
-    [int]$conversationCollection.observed_count -ge [int]$conversationPage.source_count
-) "observed=$($conversationCollection.observed_count),source=$($conversationPage.source_count)"
+    $conversationCoverage.passed -eq $true
+) "observed=$($conversationCoverage.observed_count),required=$($conversationCoverage.required_count),source=$($conversationCoverage.source_count),truncated=$($conversationCoverage.truncated)"
 Add-Check "conversation_scroll_restored" (
     $conversationCollection.scroll_restored -eq $true
 ) "scrolled=$($conversationCollection.scrolled),steps=$($conversationCollection.steps)"

@@ -233,6 +233,7 @@
       findScroller: findConversationScroller,
       maximum: MAX_CONVERSATIONS,
       timeoutMs: 10000,
+      absoluteTimeoutMs: 30000,
       delayMs: 180,
       maxSteps: 40,
       stablePasses: 3

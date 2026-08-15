@@ -112,6 +112,7 @@ Assert-Contains 'Invoke-Adb shell input keyevent 4'
 Assert-Contains 'Get-ChatGptContextPagingEvidence'
 Assert-Contains 'Add-Check "context_cursor_roundtrip"'
 Assert-Contains 'Add-Check "context_cursor_next"'
+Assert-Contains 'Get-ChatGptConversationCollectionCoverage'
 Assert-Contains 'Add-Check "official_fullscreen_mode"'
 Assert-Contains 'official_fullscreen_chrome_$chromeId'
 Assert-Contains '$sendRequestId = [string]$sendDispatch.command_receipt.request_id'
@@ -138,6 +139,31 @@ if (-not $evidenceSource.Contains('message_cursor = [string]$first.message_curso
 }
 if (-not $evidenceSource.Contains('message_cursor = [string]$first.next_message_cursor')) {
     throw "Context paging evidence must follow the next MCP cursor."
+}
+
+$completeCollection = Get-ChatGptConversationCollectionCoverage `
+    -Collection ([pscustomobject]@{ observed_count = 94; reached_end = $true; truncated = $false; timed_out = $false }) `
+    -SourceCount 94
+if ($completeCollection.passed -ne $true -or $completeCollection.required_count -ne 94) {
+    throw "Complete conversation history was not accepted."
+}
+$boundedCollection = Get-ChatGptConversationCollectionCoverage `
+    -Collection ([pscustomobject]@{ observed_count = 100; reached_end = $false; truncated = $true; timed_out = $false }) `
+    -SourceCount 110
+if ($boundedCollection.passed -ne $true -or $boundedCollection.required_count -ne 100) {
+    throw "Bounded conversation history was not accepted."
+}
+$timedOutCollection = Get-ChatGptConversationCollectionCoverage `
+    -Collection ([pscustomobject]@{ observed_count = 84; reached_end = $false; truncated = $false; timed_out = $true }) `
+    -SourceCount 94
+if ($timedOutCollection.passed -eq $true) {
+    throw "Timed-out conversation history was accepted."
+}
+$nonTerminalCollection = Get-ChatGptConversationCollectionCoverage `
+    -Collection ([pscustomobject]@{ observed_count = 94; reached_end = $false; truncated = $false; timed_out = $false }) `
+    -SourceCount 94
+if ($nonTerminalCollection.passed -eq $true) {
+    throw "Non-terminal conversation history was accepted."
 }
 
 $uiXml = '<node resource-id="com.elon.app:id/chatGptWebView" content-desc="chatgpt-native:send:ready" />'

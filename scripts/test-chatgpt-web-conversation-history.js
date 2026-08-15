@@ -112,6 +112,73 @@ async function allowsSlowVirtualizedHistoryToReachTheEnd() {
   assert.ok(result.conversations.length >= 8);
 }
 
+async function renewsTheStallBudgetWhileHistoryKeepsGrowing() {
+  let now = 0;
+  let page = 0;
+  const scroller = {
+    scrollTop: 0,
+    clientHeight: 400,
+    scrollHeight: 4800,
+    dispatchEvent() {}
+  };
+  const result = await runCollection({
+    initial: [conversation('zero')],
+    read() {
+      page += 1;
+      if (page >= 7) {
+        scroller.scrollHeight = scroller.clientHeight + scroller.scrollTop;
+      }
+      return Array.from({ length: Math.min(page + 1, 8) }, (_, index) =>
+        conversation(String(index))
+      );
+    },
+    findScroller: () => scroller,
+    schedule(callback) {
+      now += 2500;
+      callback();
+    },
+    now: () => now,
+    timeoutMs: 10000,
+    absoluteTimeoutMs: 30000,
+    delayMs: 180,
+    stablePasses: 2,
+    maxSteps: 40
+  });
+
+  assert.ok(now > 10000);
+  assert.strictEqual(result.collection.reachedEnd, true);
+  assert.strictEqual(result.collection.timedOut, false);
+}
+
+async function timesOutWhenHistoryStopsMakingProgress() {
+  let now = 0;
+  const scroller = {
+    scrollTop: 0,
+    clientHeight: 400,
+    scrollHeight: 4800,
+    dispatchEvent() {}
+  };
+  const result = await runCollection({
+    initial: [conversation('zero')],
+    read: () => [conversation('zero')],
+    findScroller: () => scroller,
+    schedule(callback) {
+      now += 2500;
+      callback();
+    },
+    now: () => now,
+    timeoutMs: 10000,
+    absoluteTimeoutMs: 30000,
+    delayMs: 180,
+    stablePasses: 2,
+    maxSteps: 40
+  });
+
+  assert.strictEqual(result.collection.reachedEnd, false);
+  assert.strictEqual(result.collection.timedOut, true);
+  assert.ok(now < 30000);
+}
+
 async function reportsAConservativeSnapshotWhenNoScrollerExists() {
   const result = await runCollection({
     initial: [conversation('one')],
@@ -160,6 +227,8 @@ Promise.resolve()
   .then(collectsVirtualizedPagesAndRestoresTheOriginalScrollPosition)
   .then(capsResultsAndReportsTruncation)
   .then(allowsSlowVirtualizedHistoryToReachTheEnd)
+  .then(renewsTheStallBudgetWhileHistoryKeepsGrowing)
+  .then(timesOutWhenHistoryStopsMakingProgress)
   .then(reportsAConservativeSnapshotWhenNoScrollerExists)
   .then(mergesActivityDatesWhenVirtualizedRowsAreObservedAgain)
   .then(collapsesRecentAndProjectRoutesForTheSameConversation)

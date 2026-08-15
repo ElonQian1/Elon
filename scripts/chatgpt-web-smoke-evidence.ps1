@@ -20,6 +20,35 @@ function Test-ChatGptResourceVisible {
     return $UiXml.Contains("resource-id=`"${PackageName}:id/${ResourceId}`"")
 }
 
+function Get-ChatGptConversationCollectionCoverage {
+    param(
+        [Parameter(Mandatory = $true)]$Collection,
+        [Parameter(Mandatory = $true)][int]$SourceCount,
+        [ValidateRange(1, 1000)][int]$MaximumObservedCount = 100
+    )
+
+    $safeSourceCount = [Math]::Max(0, $SourceCount)
+    $observedCount = [Math]::Max(0, [int]$Collection.observed_count)
+    $requiredCount = [Math]::Min($safeSourceCount, $MaximumObservedCount)
+    $terminal =
+        $Collection.reached_end -eq $true -or
+        $Collection.truncated -eq $true -or
+        $safeSourceCount -eq 0
+    $passed =
+        $Collection.timed_out -ne $true -and
+        $terminal -and
+        $observedCount -ge $requiredCount
+
+    return [pscustomobject]@{
+        passed = $passed
+        observed_count = $observedCount
+        source_count = $safeSourceCount
+        required_count = $requiredCount
+        terminal = $terminal
+        truncated = $Collection.truncated -eq $true
+    }
+}
+
 function Get-ChatGptContextPagingEvidence {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$InvokeUiAction,

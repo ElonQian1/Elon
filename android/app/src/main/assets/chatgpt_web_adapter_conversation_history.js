@@ -71,7 +71,13 @@
       : (callback, delayMs) => setTimeout(callback, delayMs);
     const now = typeof options.now === 'function' ? options.now : Date.now;
     const maximum = boundedInteger(options.maximum, 100, 1, 100);
-    const timeoutMs = boundedInteger(options.timeoutMs, 5000, 500, 10000);
+    const stallTimeoutMs = boundedInteger(options.timeoutMs, 5000, 500, 30000);
+    const absoluteTimeoutMs = boundedInteger(
+      options.absoluteTimeoutMs,
+      30000,
+      stallTimeoutMs,
+      60000
+    );
     const delayMs = boundedInteger(options.delayMs, 180, 20, 1000);
     const maxSteps = boundedInteger(options.maxSteps, 40, 1, 80);
     const stablePassesRequired = boundedInteger(options.stablePasses, 3, 1, 8);
@@ -81,6 +87,7 @@
       ? Number(scroller.scrollTop)
       : 0;
     const startedAt = now();
+    let lastProgressAt = startedAt;
     let steps = 0;
     let stablePasses = 0;
     let previousCount = 0;
@@ -131,13 +138,18 @@
       const maxTop = Math.max(0, scrollHeight - clientHeight);
       const grew = collected.size > previousCount || maxTop > previousMaxTop + 1;
       const atEnd = maxTop <= 1 || scrollTop >= maxTop - 2;
+      const observedAt = now();
 
       stablePasses = atEnd && !grew ? stablePasses + 1 : 0;
+      if (grew) lastProgressAt = observedAt;
       previousCount = collected.size;
       previousMaxTop = maxTop;
 
       if (atEnd && stablePasses >= stablePassesRequired) return finish(true, false);
-      if (now() - startedAt >= timeoutMs) return finish(false, true);
+      if (
+        observedAt - lastProgressAt >= stallTimeoutMs ||
+        observedAt - startedAt >= absoluteTimeoutMs
+      ) return finish(false, true);
       if (steps >= maxSteps) return finish(false, false);
 
       if (!atEnd) {
