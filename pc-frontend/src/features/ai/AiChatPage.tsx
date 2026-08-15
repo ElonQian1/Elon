@@ -29,6 +29,7 @@ import { safeNodeAdminUrl } from '../../lib/utils'
 import { DEFAULT_POPOVER_ANCHOR, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import AiWebChatSidebar from '../user-browser/AiWebChatSidebar'
 import AiWebProviderPopover from '../user-browser/AiWebProviderPopover'
+import AiWebComposerControls from '../user-browser/AiWebComposerControls'
 import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
@@ -186,6 +187,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   )
   const chatMode = mode === 'chat'
   const visibleMessages = chatMode ? web.messages : messages
+  const lastVisibleAssistantId = [...visibleMessages].reverse().find((message) => message.role === 'assistant')?.id
   const visibleInput = chatMode ? web.controller.draft : input
   const visibleSending = chatMode ? Boolean(web.controller.busyAction) : sending
   const visibleMessageLoading = chatMode ? web.capability.state === 'checking' : messagesLoading
@@ -932,10 +934,14 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               streamingStatus={chatMode ? `${web.provider?.displayName || '网页 AI'} 正在回答…` : streamStatus || '正在处理…'}
               onConversationForked={chatMode ? undefined : openForkedConversation}
               onProjectHandoff={chatMode ? undefined : handleProjectHandoff}
+              onRegenerate={chatMode && m.id === lastVisibleAssistantId && web.provider?.adapterActions.includes('regenerate_response')
+                ? () => web.controller.run('regenerate_response')
+                : undefined}
             />
           ))}
         </div>
 
+        {chatMode && <AiWebComposerControls web={web} />}
         <form className={styles.composer} onSubmit={handleSend}>
             <button
               ref={modelBtnRef}

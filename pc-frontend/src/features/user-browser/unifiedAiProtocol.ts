@@ -6,8 +6,20 @@ export type UnifiedAiRole = 'user' | 'assistant' | 'system' | 'tool'
 export type UnifiedAiMessageState = 'pending' | 'streaming' | 'completed' | 'failed'
 
 export interface UnifiedAiTextPart {
-  type: 'text'
+  type: 'text' | 'markdown'
   text: string
+}
+
+export interface UnifiedAiStructuredPart {
+  type: 'code' | 'table' | 'artifact' | 'audio' | 'video' | 'math' | 'chart' | 'map' | 'interactive'
+  text: string
+  kind?: string
+  language?: string
+  mediaType?: string
+  targetHost?: string
+  lineCount?: number
+  rowCount?: number
+  columnCount?: number
 }
 
 export interface UnifiedAiImagePart {
@@ -35,6 +47,7 @@ export type UnifiedAiContentPart =
   | UnifiedAiImagePart
   | UnifiedAiFilePart
   | UnifiedAiCitationPart
+  | UnifiedAiStructuredPart
 
 export interface UnifiedAiMessage {
   id: string

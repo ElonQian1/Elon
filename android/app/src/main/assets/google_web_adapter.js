@@ -48,15 +48,17 @@
     }));
   }
 
-  function emitResult(action, ok, detail) {
-    nativeBridge.postMessage(JSON.stringify({
+  function emitResult(action, ok, detail, requestId) {
+    const event = {
       adapterVersion,
       documentToken,
       type: 'command_result',
       action: String(action || '').slice(0, 40),
       ok: !!ok,
       detail: cleanText(detail).slice(0, 160)
-    }));
+    };
+    if (/^mcp_[a-z0-9]{1,32}$/.test(String(requestId || ''))) event.requestId = requestId;
+    nativeBridge.postMessage(JSON.stringify(event));
   }
 
   function isVisible(node) {
@@ -187,9 +189,9 @@
     return url.href;
   }
 
-  function sendPrompt(value, expectedDraft, ownedComposer) {
+  function sendPrompt(value, expectedDraft, ownedComposer, requestId) {
     const composer = findComposer();
-    if (!composer) return emitResult('send_prompt', false, 'Google AI 输入框尚未就绪。');
+    if (!composer) return emitResult('send_prompt', false, 'Google AI 输入框尚未就绪。', requestId);
     const prompt = cleanText(value);
     const draft = cleanText(composerValue(composer));
     const reconciliation = sendPolicy.reconcile(
@@ -200,10 +202,10 @@
     );
     if (!reconciliation.allowed) {
       scheduleSnapshot();
-      return emitResult('send_prompt', false, '官方网页草稿已经变化，请确认后重试。');
+      return emitResult('send_prompt', false, '官方网页草稿已经变化，请确认后重试。', requestId);
     }
     if (reconciliation.write && !setComposerValue(composer, value)) {
-      return emitResult('send_prompt', false, 'Google 官方输入框未接受文本。');
+      return emitResult('send_prompt', false, 'Google 官方输入框未接受文本。', requestId);
     }
     const beforeHref = location.href;
     const submitStartedAt = Date.now();
@@ -220,12 +222,12 @@
         prompt
       })) {
         messageExtractor.rememberQuery(prompt);
-        emitResult('send_prompt', true, '');
+        emitResult('send_prompt', true, '', requestId);
         return scheduleSnapshot();
       }
       if (Date.now() - startedAt >= 8000) {
         scheduleSnapshot();
-        return emitResult('send_prompt', false, 'Google 官方页未确认发送，请重试。');
+        return emitResult('send_prompt', false, 'Google 官方页未确认发送，请重试。', requestId);
       }
       window.setTimeout(() => confirmSubmission(startedAt), 160);
     }
@@ -264,7 +266,7 @@
         location.assign(firstPromptNavigationUrl(prompt));
         return;
       }
-      if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。');
+      if (!submitted) return emitResult('send_prompt', false, 'Google AI 发送入口尚未就绪。', requestId);
       confirmSubmission(Date.now());
     }
 
@@ -276,26 +278,30 @@
     try { command = JSON.parse(String(raw || '{}')); }
     catch (_) { return emitResult('unknown', false, '命令格式无效。'); }
     const action = String(command.action || '');
+    const requestId = /^mcp_[a-z0-9]{1,32}$/.test(String(command.requestId || ''))
+      ? String(command.requestId)
+      : '';
     if (action === 'snapshot') return snapshot();
     if (action === 'send_prompt') return sendPrompt(
       String(command.value || '').slice(0, 20000),
       String(command.expectedDraft || '').slice(0, 20000),
-      command.ownedComposer === true
+      command.ownedComposer === true,
+      requestId
     );
     if (action === 'stop_generation') {
       const stop = findButton(['stop response', 'stop generating', '停止回答', '停止生成', '停止']);
-      if (!stop) return emitResult(action, false, '当前没有可停止的回答。');
+      if (!stop) return emitResult(action, false, '当前没有可停止的回答。', requestId);
       stop.click();
-      emitResult(action, true, '');
+      emitResult(action, true, '', requestId);
       return scheduleSnapshot();
     }
     if (action === 'new_conversation') {
       messageExtractor.clearRememberedQuery();
-      emitResult(action, true, '');
+      emitResult(action, true, '', requestId);
       location.assign('https://www.google.com/aimode');
       return;
     }
-    emitResult(action || 'unknown', false, 'Google AI 不支持这个本地动作。');
+    emitResult(action || 'unknown', false, 'Google AI 不支持这个本地动作。', requestId);
   }
 
   window.__elonGoogleWebBridge = Object.freeze({

@@ -1,0 +1,36 @@
+$ErrorActionPreference = 'Stop'
+
+$TaskRepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$FrontendDirectory = Join-Path $TaskRepoRoot 'pc-frontend'
+$RustManifest = Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\Cargo.toml'
+
+function Invoke-Checked {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][scriptblock]$Action
+    )
+    Write-Host "VALIDATION_STEP=$Label"
+    & $Action
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Label failed with exit code $LASTEXITCODE"
+    }
+}
+
+Invoke-Checked 'adapter_js_syntax' {
+    $AdapterAssets = @(Get-ChildItem (Join-Path $TaskRepoRoot 'android\app\src\main\assets\*') `
+        -Include 'chatgpt_web_adapter*.js','google_web_adapter*.js' -File)
+    if (-not $AdapterAssets.Count) { throw 'No shared Web AI adapter assets were found.' }
+    foreach ($Asset in $AdapterAssets) {
+        & node --check $Asset.FullName
+        if ($LASTEXITCODE -ne 0) { throw "JavaScript syntax failed: $($Asset.Name)" }
+    }
+}
+Invoke-Checked 'pc_user_browser_contracts' { & npm.cmd --prefix $FrontendDirectory run test:user-browser }
+Invoke-Checked 'pc_typecheck_and_vite_build' { & npm.cmd --prefix $FrontendDirectory run build }
+Invoke-Checked 'pc_eslint' { & npm.cmd --prefix $FrontendDirectory run lint }
+Invoke-Checked 'tauri_local_ai_rust_tests' {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'validate-rust.ps1') `
+        -Domain 'local-ai-browser' -- test --manifest-path $RustManifest --bin elon-desktop local_ai_browser
+}
+
+Write-Host 'WIN_WEB_AI_VALIDATION=passed'

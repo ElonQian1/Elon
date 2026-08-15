@@ -14,6 +14,12 @@ import {
   type LocalAiWebProvider,
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
+import {
+  isLocalAiComposerControlsSnapshot,
+  isLocalAiFeatureNavigationSnapshot,
+  isLocalAiUiManifestSnapshot,
+  type LocalAiComposerControlsSnapshot,
+} from './localAiBrowserProtocol'
 import { deriveLocalAiUserState, type LocalAiClientState } from './localAiUserState'
 
 export default function useLocalAiWebChatController(
@@ -45,6 +51,24 @@ export default function useLocalAiWebChatController(
       ? visibleSessionState.navigationEvent
       : null,
     [visibleSessionState?.navigationEvent],
+  )
+  const composerSnapshot = useMemo(
+    () => isLocalAiComposerControlsSnapshot(visibleSessionState?.composerEvent)
+      ? visibleSessionState.composerEvent
+      : null,
+    [visibleSessionState?.composerEvent],
+  )
+  const featureSnapshot = useMemo(
+    () => isLocalAiFeatureNavigationSnapshot(visibleSessionState?.featureEvent)
+      ? visibleSessionState.featureEvent
+      : null,
+    [visibleSessionState?.featureEvent],
+  )
+  const uiManifest = useMemo(
+    () => isLocalAiUiManifestSnapshot(visibleSessionState?.uiManifestEvent)
+      ? visibleSessionState.uiManifestEvent
+      : null,
+    [visibleSessionState?.uiManifestEvent],
   )
   const sessionOpen = Boolean(visibleSessionState && visibleSessionState.windowStatus !== 'closed')
   const userState = useMemo(
@@ -161,8 +185,12 @@ export default function useLocalAiWebChatController(
     setBusyAction(action)
     setMessage('')
     try {
-      await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
-      const next = await waitForLocalAiAdapterResult(provider.id, ownerKey, action)
+      const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
+      const next = await waitForLocalAiAdapterResult(provider.id, ownerKey, action, requestId)
+      if (!next) {
+        setMessage('没有收到当前命令的匹配回执；为避免误判，一龙没有把这次操作标记为成功。请显示官方页检查后重试。')
+        return
+      }
       if (next) setSessionState(next)
       const result = next?.commandResult
       if (result?.action === action && !result.ok) {
@@ -181,10 +209,58 @@ export default function useLocalAiWebChatController(
     }
   }
 
+  async function refreshComposerControls(section: LocalAiComposerControlsSnapshot['section']) {
+    const listAction = section === 'model' ? 'list_model_options' : 'list_composer_tools'
+    const collectAction = section === 'model' ? 'collect_model_options' : 'collect_composer_tools'
+    return refreshDeferredMenu(listAction, collectAction)
+  }
+
+  async function refreshFeatureNavigation() {
+    return refreshDeferredMenu('list_navigation', 'collect_navigation')
+  }
+
+  async function refreshDeferredMenu(
+    listAction: LocalAiAdapterAction,
+    collectAction: LocalAiAdapterAction,
+  ) {
+    if (!provider || !ownerKey || busyAction) return
+    if (!provider.adapterActions.includes(listAction) || !provider.adapterActions.includes(collectAction)) {
+      setMessage(`${provider.displayName} 当前没有这个官网菜单。`)
+      return
+    }
+    setBusyAction(listAction)
+    setMessage('正在读取官网可见选项…')
+    try {
+      const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, listAction)
+      await new Promise((resolve) => window.setTimeout(resolve, 180))
+      let next = await getLocalAiWebSessionState(provider.id, ownerKey)
+      if (next.commandResult?.requestId !== requestId) {
+        await runLocalAiWebAdapterCommand(provider.id, ownerKey, collectAction)
+        next = await waitForLocalAiAdapterResult(provider.id, ownerKey, listAction, requestId) ?? next
+      }
+      setSessionState(next)
+      const result = next.commandResult
+      if (result?.requestId !== requestId) {
+        setMessage('官网菜单没有返回匹配回执；已保留现有选项，不会把旧菜单当成当前结果。')
+      } else if (!result.ok) {
+        setMessage(result.detail || '官网菜单尚未返回可用选项。')
+      } else {
+        setMessage('已同步官网当前可见选项。')
+      }
+    } catch (error) {
+      setMessage(localAiBrowserErrorMessage(error))
+    } finally {
+      setBusyAction('')
+    }
+  }
+
   return {
     sessionState: visibleSessionState,
     snapshot,
     navigationSnapshot,
+    composerSnapshot,
+    featureSnapshot,
+    uiManifest,
     userState,
     sessionOpen,
     draft,
@@ -197,5 +273,7 @@ export default function useLocalAiWebChatController(
     openOfficial,
     control,
     run,
+    refreshComposerControls,
+    refreshFeatureNavigation,
   }
 }

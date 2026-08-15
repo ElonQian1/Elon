@@ -1,10 +1,9 @@
 use serde_json::{json, Map, Value};
 
-use super::adapter::SanitizedAdapterEvent;
+use super::{adapter::SanitizedAdapterEvent, adapter_content};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 12;
-const MAX_MESSAGE_CHARS: usize = 40_000;
 const MAX_DRAFT_CHARS: usize = 20_000;
 const ADAPTER_VERSION: u32 = 6;
 
@@ -144,6 +143,17 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
     }
 
     match value.get("type").and_then(Value::as_str) {
+        Some("command_result")
+            if value.get("action").and_then(Value::as_str) == Some("dom_diagnostics") =>
+        {
+            Ok(SanitizedAdapterEvent {
+                kind: "adapter_diagnostic".to_string(),
+                payload: json!({
+                    "type": "adapter_diagnostic",
+                    "kind": "dom_diagnostics",
+                }),
+            })
+        }
         Some("command_result") => Ok(SanitizedAdapterEvent {
             kind: "command_result".to_string(),
             payload: json!({
@@ -151,6 +161,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "action": clean_identifier(value.get("action"), 48),
                 "ok": value.get("ok").and_then(Value::as_bool).unwrap_or(false),
                 "detail": clean_string(value.get("detail"), 240),
+                "requestId": sanitize_request_id(value.get("requestId")),
             }),
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
@@ -210,14 +221,7 @@ fn sanitize_messages(value: Option<&Value>) -> Vec<Value> {
             if !matches!(role, "user" | "assistant") {
                 return None;
             }
-            let content = message
-                .get("content")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .take(24)
-                .filter_map(sanitize_content_part)
-                .collect::<Vec<_>>();
+            let content = adapter_content::sanitize_parts(message.get("content"));
             if content.is_empty() {
                 return None;
             }
@@ -232,27 +236,6 @@ fn sanitize_messages(value: Option<&Value>) -> Vec<Value> {
             }))
         })
         .collect()
-}
-
-fn sanitize_content_part(part: &Value) -> Option<Value> {
-    let part = part.as_object()?;
-    match part.get("type")?.as_str()? {
-        "text" => {
-            let text = clean_string(part.get("text"), MAX_MESSAGE_CHARS);
-            (!text.is_empty()).then(|| json!({"type": "text", "text": text}))
-        }
-        "citation" => {
-            let url = sanitize_public_url(part.get("url"));
-            (!url.is_empty()).then(|| {
-                json!({
-                    "type": "citation",
-                    "title": clean_string(part.get("title"), 160),
-                    "url": url,
-                })
-            })
-        }
-        _ => None,
-    }
 }
 
 fn clean_identifiers(value: Option<&Value>, max: usize) -> Vec<String> {
@@ -274,6 +257,18 @@ fn clean_identifier(value: Option<&Value>, max: usize) -> String {
         })
         .take(max)
         .collect()
+}
+
+fn sanitize_request_id(value: Option<&Value>) -> Option<String> {
+    let request_id = clean_string(value, 36);
+    (request_id.len() >= 5
+        && request_id.starts_with("mcp_")
+        && request_id.len() <= 36
+        && request_id
+            .bytes()
+            .skip(4)
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()))
+    .then_some(request_id)
 }
 
 fn sanitize_page_kind(value: Option<&Value>) -> &'static str {
@@ -298,10 +293,6 @@ fn clean_string(value: Option<&Value>, max: usize) -> String {
 
 fn sanitize_google_url(value: Option<&Value>) -> String {
     sanitize_url(value, true)
-}
-
-fn sanitize_public_url(value: Option<&Value>) -> String {
-    sanitize_url(value, false)
 }
 
 fn sanitize_url(value: Option<&Value>, google_only: bool) -> String {

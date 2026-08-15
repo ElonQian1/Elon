@@ -41,6 +41,9 @@
 .provider strong { overflow: hidden; display: block; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .logo { width: 23px; height: 23px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 7px; background: rgba(255,255,255,.06); color: #76d49a; font-size: 11px; font-weight: 800; }
 .directory { display: flex; flex-direction: column; gap: 11px; }
+.search { height: 30px; display: grid; grid-template-columns: 16px minmax(0,1fr) 20px; align-items: center; gap: 4px; padding: 0 7px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: #68717e; background: rgba(0,0,0,.13); }
+.search input { width: 100%; border: 0; outline: 0; color: #cdd2da; background: transparent; font-size: 10px; }
+.search button { width: 20px; height: 20px; border: 0; color: #7f8793; background: transparent; cursor: pointer; }
 .directoryTitle { min-height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px; color: #d8dde5; font-size: 12px; font-weight: 700; }
 .directoryTitle button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: #7f8793; }
 .directoryTitle button:hover:not(:disabled) { color: #d8dde5; background: rgba(255,255,255,.06); }

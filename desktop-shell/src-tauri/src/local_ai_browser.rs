@@ -6,6 +6,8 @@
 
 #[path = "local_ai_browser/adapter.rs"]
 mod adapter;
+#[path = "local_ai_browser/adapter_content.rs"]
+mod adapter_content;
 #[path = "local_ai_browser/adapter_command.rs"]
 mod adapter_command;
 #[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]
@@ -400,6 +402,7 @@ pub async fn run_local_ai_web_adapter_command(
     action: String,
     value: Option<String>,
     expected_draft: Option<String>,
+    request_id: Option<String>,
 ) -> Result<(), String> {
     let provider = provider(&provider_id)?;
     let adapter = provider.adapter.ok_or_else(|| {
@@ -415,13 +418,14 @@ pub async fn run_local_ai_web_adapter_command(
     let window = app
         .get_webview_window(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
-    runtime.mark_command_pending(&label);
+    runtime.mark_command_pending(&label, &action, request_id.as_deref());
     let command = adapter_command::build(
         provider.display_name,
         adapter.supported_actions(),
         &action,
         value,
         expected_draft,
+        request_id,
     )?;
     let raw = serde_json::to_string(&command).map_err(display_error)?;
     window

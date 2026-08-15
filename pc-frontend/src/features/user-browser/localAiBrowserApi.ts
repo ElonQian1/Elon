@@ -1,6 +1,24 @@
 import { getDesktopInvoke } from '../shell/desktopShell'
 import { localAiSnapshotCache } from './localAiSnapshotCache'
 import { UNIFIED_AI_PROTOCOL } from './unifiedAiProtocol'
+import { createLocalAiRequestId, isLocalAiRequestId } from './localAiCommandReceipt'
+import type {
+  LocalAiAttachment,
+  LocalAiComposerControlsSnapshot,
+  LocalAiFeatureNavigationSnapshot,
+  LocalAiSessionDiagnostics,
+  LocalAiStructuredContentPart,
+  LocalAiUiManifestSnapshot,
+} from './localAiBrowserProtocol'
+
+export type {
+  LocalAiAttachment,
+  LocalAiComposerControlsSnapshot,
+  LocalAiFeatureNavigationSnapshot,
+  LocalAiSessionDiagnostics,
+  LocalAiStructuredContentPart,
+  LocalAiUiManifestSnapshot,
+} from './localAiBrowserProtocol'
 
 export interface LocalAiWebProvider {
   id: string
@@ -65,7 +83,8 @@ export interface LocalAiVisibleMessage {
 
 export type LocalAiVisibleContentPart =
   | { type: 'text'; text: string }
-  | { type: 'citation'; title?: string; url: string }
+  | { type: 'markdown'; text: string }
+  | LocalAiStructuredContentPart
 
 export interface LocalAiMessageSnapshot {
   type: 'message_snapshot'
@@ -73,12 +92,16 @@ export interface LocalAiMessageSnapshot {
   url: string
   draft: string
   messages: LocalAiVisibleMessage[]
+  observedMessageCount?: number
+  messageWindowStart?: number
   authenticated: boolean
   pageKind?: 'auth' | 'conversation' | 'home' | 'feature' | 'ai_mode' | 'unsupported' | 'unknown'
   loginRequired?: boolean
   composerReady: boolean
   streaming: boolean
   currentModel: string
+  attachments?: LocalAiAttachment[]
+  dictationActive?: boolean
   capabilities: string[]
 }
 
@@ -112,6 +135,7 @@ export interface LocalAiCommandResult {
   action: string
   ok: boolean
   detail: string
+  requestId?: string | null
 }
 
 export interface LocalAiWebSessionState {
@@ -126,7 +150,11 @@ export interface LocalAiWebSessionState {
   lastError?: string | null
   semanticEvent?: LocalAiMessageSnapshot | Record<string, unknown> | null
   navigationEvent?: LocalAiConversationSnapshot | Record<string, unknown> | null
+  composerEvent?: LocalAiComposerControlsSnapshot | Record<string, unknown> | null
+  featureEvent?: LocalAiFeatureNavigationSnapshot | Record<string, unknown> | null
+  uiManifestEvent?: LocalAiUiManifestSnapshot | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
+  diagnostics?: LocalAiSessionDiagnostics
   cacheStatus: 'empty' | 'cached' | 'live'
   semanticCacheStatus: 'empty' | 'cached' | 'live'
   navigationCacheStatus: 'empty' | 'cached' | 'live'
@@ -152,6 +180,20 @@ export type LocalAiAdapterAction =
   | 'collect_composer_tools'
   | 'select_model_option'
   | 'select_composer_tool'
+  | 'request_attachment_upload'
+  | 'open_model_selector'
+  | 'open_composer_tools'
+  | 'start_dictation'
+  | 'cancel_dictation'
+  | 'submit_dictation'
+  | 'remove_attachment'
+  | 'dismiss_composer_menu'
+  | 'list_navigation'
+  | 'collect_navigation'
+  | 'select_navigation'
+  | 'dismiss_navigation'
+  | 'snapshot_ui_manifest'
+  | 'invoke_ui_control'
 
 type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed' | 'invoke_timeout'
 
@@ -292,15 +334,18 @@ export async function runLocalAiWebAdapterCommand(
   action: LocalAiAdapterAction,
   value?: string,
   expectedDraft?: string,
-): Promise<void> {
+): Promise<string> {
   assertIdentity(providerId, ownerKey)
+  const requestId = createLocalAiRequestId()
   await invokeDesktop<void>('run_local_ai_web_adapter_command', {
     providerId,
     ownerKey,
     action,
     value,
     expectedDraft,
+    requestId,
   }, LOCAL_AI_INVOKE_TIMEOUTS.action)
+  return requestId
 }
 
 export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessageSnapshot {
@@ -324,11 +369,13 @@ export async function waitForLocalAiAdapterResult(
   providerId: string,
   ownerKey: string,
   action: string,
+  requestId: string,
 ): Promise<LocalAiWebSessionState | null> {
+  if (!isLocalAiRequestId(requestId)) throw new Error('本地 AI 命令回执标识无效。')
   for (let attempt = 0; attempt < 12; attempt += 1) {
     await new Promise((resolve) => window.setTimeout(resolve, 200))
     const state = await getLocalAiWebSessionState(providerId, ownerKey)
-    if (state.commandResult?.action === action) return state
+    if (state.commandResult?.action === action && state.commandResult.requestId === requestId) return state
   }
   return null
 }
@@ -465,6 +512,20 @@ const LOCAL_AI_ADAPTER_ACTIONS = new Set<LocalAiAdapterAction>([
   'collect_composer_tools',
   'select_model_option',
   'select_composer_tool',
+  'request_attachment_upload',
+  'open_model_selector',
+  'open_composer_tools',
+  'start_dictation',
+  'cancel_dictation',
+  'submit_dictation',
+  'remove_attachment',
+  'dismiss_composer_menu',
+  'list_navigation',
+  'collect_navigation',
+  'select_navigation',
+  'dismiss_navigation',
+  'snapshot_ui_manifest',
+  'invoke_ui_control',
 ])
 
 function defaultAdapterActions(providerId: string): LocalAiAdapterAction[] {
@@ -483,6 +544,20 @@ function defaultAdapterActions(providerId: string): LocalAiAdapterAction[] {
         'collect_composer_tools',
         'select_model_option',
         'select_composer_tool',
+        'request_attachment_upload',
+        'open_model_selector',
+        'open_composer_tools',
+        'start_dictation',
+        'cancel_dictation',
+        'submit_dictation',
+        'remove_attachment',
+        'dismiss_composer_menu',
+        'list_navigation',
+        'collect_navigation',
+        'select_navigation',
+        'dismiss_navigation',
+        'snapshot_ui_manifest',
+        'invoke_ui_control',
       ]
     : shared
 }

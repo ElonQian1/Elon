@@ -123,7 +123,31 @@ pub(super) fn initialization_script() -> String {
   'use strict';
   if (location.origin !== '__ALLOWED_ORIGIN__') return;
 
+  var touchPurposes = new Set([
+    'list_model_options', 'list_composer_tools', 'select_model_option', 'select_composer_tool',
+    'open_model_submenu', 'open_composer_tools_submenu', 'open_model_selector',
+    'open_composer_tools', 'start_dictation', 'cancel_dictation', 'submit_dictation',
+    'remove_attachment', 'list_navigation', 'select_navigation', 'dismiss_navigation',
+    'invoke_ui_control', 'regenerate_open_menu', 'regenerate_retry'
+  ]);
+
+  function dispatchLocalTouch(payload) {
+    var envelope;
+    try { envelope = JSON.parse(String(payload || '{}')); } catch (_) { return; }
+    var event = envelope && envelope.event;
+    if (!event || event.type !== 'web_touch_request' || !touchPurposes.has(String(event.purpose || ''))) return;
+    var x = Number(event.xRatio); var y = Number(event.yRatio);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) return;
+    window.setTimeout(function () {
+      var node = document.elementFromPoint(x * window.innerWidth, y * window.innerHeight);
+      if (!(node instanceof HTMLElement) || !node.isConnected) return;
+      try { node.focus({ preventScroll: true }); } catch (_) {}
+      node.click();
+    }, 0);
+  }
+
   function invoke(payload) {
+    dispatchLocalTouch(payload);
     var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
     var publicInvoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
     var call = internalInvoke || publicInvoke;
@@ -215,5 +239,7 @@ mod tests {
         assert!(script.contains("window.__elonChatGptBridge"));
         assert!(script.contains("DOMContentLoaded"));
         assert!(script.contains("adapter_bootstrap_failed"));
+        assert!(script.contains("dispatchLocalTouch"));
+        assert!(script.contains("document.elementFromPoint"));
     }
 }

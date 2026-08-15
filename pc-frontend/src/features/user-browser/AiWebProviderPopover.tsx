@@ -52,6 +52,12 @@ export default function AiWebProviderPopover({
       <div className={styles.session}>
         <AiProviderSessionStatus state={web.userState} compact />
         {web.message && <p>{web.message}</p>}
+        {web.controller.sessionState?.diagnostics && (
+          <p title="仅包含计数、状态和命令回执，不记录提示词、回复正文、Cookie 或 Token">
+            诊断：消息 {web.controller.sessionState.diagnostics.messageCount} · 助手回复 {web.controller.sessionState.diagnostics.assistantMessageCount}
+            {web.controller.sessionState.diagnostics.lastCommandAction ? ` · ${web.controller.sessionState.diagnostics.lastCommandAction} ${web.controller.sessionState.diagnostics.lastCommandOk === false ? '失败' : '完成'}` : ''}
+          </p>
+        )}
         {web.capability.state !== 'ready' && (
           <button type="button" onClick={() => void web.capability.refresh()} disabled={web.capability.state === 'checking'}>重新检查本地能力</button>
         )}

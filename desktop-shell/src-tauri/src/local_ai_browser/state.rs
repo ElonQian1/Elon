@@ -30,7 +30,17 @@ struct SessionRecord {
     last_error_code: Option<String>,
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
+    composer_event: Option<Value>,
+    feature_event: Option<Value>,
+    ui_manifest_event: Option<Value>,
     command_result: Option<Value>,
+    last_event_kind: String,
+    last_command_action: String,
+    last_command_request_id: Option<String>,
+    last_command_ok: Option<bool>,
+    message_count: usize,
+    assistant_message_count: usize,
+    streaming: bool,
     semantic_live: bool,
     navigation_live: bool,
     cache_path: Option<PathBuf>,
@@ -53,7 +63,11 @@ pub struct LocalAiWebSessionState {
     pub last_error_code: Option<String>,
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
+    pub composer_event: Option<Value>,
+    pub feature_event: Option<Value>,
+    pub ui_manifest_event: Option<Value>,
     pub command_result: Option<Value>,
+    pub diagnostics: Value,
     pub cache_status: String,
     pub semantic_cache_status: String,
     pub navigation_cache_status: String,
@@ -113,7 +127,17 @@ impl LocalAiBrowserRuntime {
                 last_error_code: None,
                 semantic_event,
                 navigation_event,
+                composer_event: None,
+                feature_event: None,
+                ui_manifest_event: None,
                 command_result: None,
+                last_event_kind: "session_created".to_string(),
+                last_command_action: String::new(),
+                last_command_request_id: None,
+                last_command_ok: None,
+                message_count: 0,
+                assistant_message_count: 0,
+                streaming: false,
                 semantic_live: false,
                 navigation_live: false,
                 cache_path,
@@ -207,14 +231,20 @@ impl LocalAiBrowserRuntime {
         });
     }
 
-    pub fn mark_command_pending(&self, label: &str) {
+    pub fn mark_command_pending(&self, label: &str, action: &str, request_id: Option<&str>) {
         self.update(label, |record| {
             record.command_result = None;
+            record.last_event_kind = "command_pending".to_string();
+            record.last_command_action = truncate(action.to_string(), 48);
+            record.last_command_request_id = request_id.map(|value| truncate(value.to_string(), 36));
+            record.last_command_ok = None;
         });
     }
 
     pub fn record_adapter_event(&self, label: &str, kind: &str, payload: Value) {
-        self.update(label, |record| match kind {
+        self.update(label, |record| {
+            record.last_event_kind = truncate(kind.to_string(), 48);
+            match kind {
             "adapter_ready" => {
                 record.renderer_status = "active".to_string();
                 record.last_error = None;
@@ -223,6 +253,21 @@ impl LocalAiBrowserRuntime {
             "message_snapshot" => {
                 record.renderer_status = "active".to_string();
                 record.semantic_event = Some(payload);
+                let snapshot = record.semantic_event.as_ref();
+                record.message_count = snapshot
+                    .and_then(|event| event.get("messages"))
+                    .and_then(Value::as_array)
+                    .map_or(0, Vec::len);
+                record.assistant_message_count = snapshot
+                    .and_then(|event| event.get("messages"))
+                    .and_then(Value::as_array)
+                    .map_or(0, |messages| messages.iter().filter(|message| {
+                        message.get("role").and_then(Value::as_str) == Some("assistant")
+                    }).count());
+                record.streaming = snapshot
+                    .and_then(|event| event.get("streaming"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
                 record.semantic_live = true;
                 record.cache_updated_at_ms = now_ms();
                 record.last_error = None;
@@ -236,7 +281,21 @@ impl LocalAiBrowserRuntime {
                 record.last_error = None;
                 record.last_error_code = None;
             }
-            "command_result" => record.command_result = Some(payload),
+            "composer_controls_snapshot" => record.composer_event = Some(payload),
+            "navigation_snapshot" => record.feature_event = Some(payload),
+            "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
+            "command_result" => {
+                record.last_command_action = payload
+                    .get("action")
+                    .and_then(Value::as_str)
+                    .map_or_else(String::new, |value| truncate(value.to_string(), 48));
+                record.last_command_request_id = payload
+                    .get("requestId")
+                    .and_then(Value::as_str)
+                    .map(|value| truncate(value.to_string(), 36));
+                record.last_command_ok = payload.get("ok").and_then(Value::as_bool);
+                record.command_result = Some(payload);
+            }
             "browser_diagnostic" => {
                 let detail = payload
                     .get("detail")
@@ -250,7 +309,7 @@ impl LocalAiBrowserRuntime {
                     .map(|kind| truncate(kind.to_string(), 48));
             }
             _ => {}
-        });
+        }});
         if matches!(kind, "message_snapshot" | "conversation_snapshot") {
             self.persist_snapshot(label);
         }
@@ -264,7 +323,17 @@ impl LocalAiBrowserRuntime {
             };
             record.semantic_event = None;
             record.navigation_event = None;
+            record.composer_event = None;
+            record.feature_event = None;
+            record.ui_manifest_event = None;
             record.command_result = None;
+            record.last_event_kind = "session_cleared".to_string();
+            record.last_command_action.clear();
+            record.last_command_request_id = None;
+            record.last_command_ok = None;
+            record.message_count = 0;
+            record.assistant_message_count = 0;
+            record.streaming = false;
             record.semantic_live = false;
             record.navigation_live = false;
             record.cache_updated_at_ms = 0;
@@ -297,6 +366,13 @@ impl LocalAiBrowserRuntime {
             "page_kind": snapshot.and_then(|event| event.get("pageKind")).and_then(Value::as_str).unwrap_or("unknown"),
             "cache_status": record.cache_status(),
             "last_error_code": record.last_error_code,
+            "last_event_kind": record.last_event_kind,
+            "last_command_action": record.last_command_action,
+            "last_command_request_id": record.last_command_request_id,
+            "last_command_ok": record.last_command_ok,
+            "message_count": record.message_count,
+            "assistant_message_count": record.assistant_message_count,
+            "streaming": record.streaming,
             "updated_at_ms": record.updated_at_ms,
         }))
     }
@@ -354,6 +430,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
         let navigation_cache_status = record
             .event_cache_status(record.navigation_event.is_some(), record.navigation_live)
             .to_string();
+        let diagnostics = diagnostic_summary(&record);
         Self {
             provider_id: record.provider_id,
             window_label: record.window_label,
@@ -367,7 +444,11 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             last_error_code: record.last_error_code,
             semantic_event: record.semantic_event,
             navigation_event: record.navigation_event,
+            composer_event: record.composer_event,
+            feature_event: record.feature_event,
+            ui_manifest_event: record.ui_manifest_event,
             command_result: record.command_result,
+            diagnostics,
             cache_status,
             semantic_cache_status,
             navigation_cache_status,
@@ -375,6 +456,19 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             updated_at_ms: record.updated_at_ms,
         }
     }
+}
+
+fn diagnostic_summary(record: &SessionRecord) -> Value {
+    serde_json::json!({
+        "lastEventKind": record.last_event_kind,
+        "lastCommandAction": record.last_command_action,
+        "lastCommandRequestId": record.last_command_request_id,
+        "lastCommandOk": record.last_command_ok,
+        "messageCount": record.message_count,
+        "assistantMessageCount": record.assistant_message_count,
+        "streaming": record.streaming,
+        "updatedAtMs": record.updated_at_ms,
+    })
 }
 
 impl SessionRecord {
@@ -462,6 +556,34 @@ mod tests {
             snapshot.navigation_event.unwrap()["type"],
             "conversation_snapshot"
         );
+    }
+
+    #[test]
+    fn composer_feature_and_command_receipts_remain_independent() {
+        let runtime = LocalAiBrowserRuntime::default();
+        runtime.ensure_session("session", "chatgpt", "reserved");
+        runtime.record_adapter_event(
+            "session",
+            "composer_controls_snapshot",
+            json!({"type":"composer_controls_snapshot","section":"model","options":[]}),
+        );
+        runtime.record_adapter_event(
+            "session",
+            "navigation_snapshot",
+            json!({"type":"navigation_snapshot","features":[]}),
+        );
+        runtime.mark_command_pending("session", "send_prompt", Some("mcp_receipt1"));
+        runtime.record_adapter_event(
+            "session",
+            "command_result",
+            json!({"type":"command_result","action":"send_prompt","requestId":"mcp_receipt1","ok":true}),
+        );
+
+        let snapshot = runtime.snapshot("session").unwrap();
+        assert_eq!(snapshot.composer_event.unwrap()["section"], "model");
+        assert_eq!(snapshot.feature_event.unwrap()["type"], "navigation_snapshot");
+        assert_eq!(snapshot.command_result.unwrap()["requestId"], "mcp_receipt1");
+        assert_eq!(snapshot.diagnostics["lastCommandRequestId"], "mcp_receipt1");
     }
 
     #[test]

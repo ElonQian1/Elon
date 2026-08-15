@@ -16,6 +16,20 @@ pub(super) const CHATGPT_ACTIONS: &[&str] = &[
     "collect_composer_tools",
     "select_model_option",
     "select_composer_tool",
+    "request_attachment_upload",
+    "open_model_selector",
+    "open_composer_tools",
+    "start_dictation",
+    "cancel_dictation",
+    "submit_dictation",
+    "remove_attachment",
+    "dismiss_composer_menu",
+    "list_navigation",
+    "collect_navigation",
+    "select_navigation",
+    "dismiss_navigation",
+    "snapshot_ui_manifest",
+    "invoke_ui_control",
 ];
 
 pub(super) const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
@@ -37,6 +51,7 @@ pub fn build(
     action: &str,
     value: Option<String>,
     expected_draft: Option<String>,
+    request_id: Option<String>,
 ) -> Result<Value, String> {
     if !supported_actions.contains(&action) {
         return Err(format!("不支持的 {provider_name} 原生界面动作。"));
@@ -54,6 +69,12 @@ pub fn build(
     }
     let mut command = Map::new();
     command.insert("action".to_string(), Value::String(action.to_string()));
+    if let Some(request_id) = request_id {
+        if !is_safe_request_id(&request_id) {
+            return Err(format!("{provider_name} 命令回执标识无效。"));
+        }
+        command.insert("requestId".to_string(), Value::String(request_id));
+    }
     if let Some(value) = value {
         if value.chars().count() > 20_000 {
             return Err(format!("{provider_name} 输入内容过长。"));
@@ -67,6 +88,16 @@ pub fn build(
         command.insert("expectedDraft".to_string(), Value::String(expected_draft));
     }
     Ok(Value::Object(command))
+}
+
+fn is_safe_request_id(value: &str) -> bool {
+    value.len() >= 5
+        && value.len() <= 36
+        && value.starts_with("mcp_")
+        && value
+            .bytes()
+            .skip(4)
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
 }
 
 pub(super) fn page_invocation_script(
@@ -148,7 +179,8 @@ mod tests {
             CHATGPT_ACTIONS,
             "open_project",
             Some("/g/g-p-roadmap/project".into()),
-            None
+            None,
+            Some("mcp_roadmap1".into())
         )
         .is_ok());
         assert!(build(
@@ -156,6 +188,7 @@ mod tests {
             CHATGPT_ACTIONS,
             "open_conversation",
             Some("/g/g-p-roadmap/c/chat-1".into()),
+            None,
             None
         )
         .is_ok());
@@ -164,6 +197,7 @@ mod tests {
             CHATGPT_ACTIONS,
             "open_project",
             Some("https://evil.example".into()),
+            None,
             None
         )
         .is_err());
@@ -174,6 +208,31 @@ mod tests {
         assert!(CHATGPT_ACTIONS.contains(&"list_conversations"));
         assert!(CHATGPT_ACTIONS.contains(&"start_google_login"));
         assert!(!GOOGLE_AI_MODE_ACTIONS.contains(&"list_conversations"));
+        assert!(CHATGPT_ACTIONS.contains(&"request_attachment_upload"));
+        assert!(CHATGPT_ACTIONS.contains(&"start_dictation"));
+    }
+
+    #[test]
+    fn command_receipts_require_bounded_lowercase_ids() {
+        let command = build(
+            "ChatGPT",
+            CHATGPT_ACTIONS,
+            "snapshot",
+            None,
+            None,
+            Some("mcp_abc123".into()),
+        )
+        .unwrap();
+        assert_eq!(command["requestId"], "mcp_abc123");
+        assert!(build(
+            "ChatGPT",
+            CHATGPT_ACTIONS,
+            "snapshot",
+            None,
+            None,
+            Some("unsafe-request".into()),
+        )
+        .is_err());
     }
 
     #[test]

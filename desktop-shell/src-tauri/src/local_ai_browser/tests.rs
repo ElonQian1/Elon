@@ -96,6 +96,7 @@ fn adapter_command_does_not_accept_arbitrary_javascript() {
         "eval",
         Some("alert(1)".to_string()),
         None,
+        None,
     )
     .is_err());
     assert!(adapter_command::build(
@@ -104,6 +105,7 @@ fn adapter_command_does_not_accept_arbitrary_javascript() {
         "snapshot",
         None,
         None,
+        Some("mcp_snapshot1".to_string()),
     )
     .is_ok());
     assert!(adapter_command::build(
@@ -112,12 +114,14 @@ fn adapter_command_does_not_accept_arbitrary_javascript() {
         "send_prompt",
         Some("hi".to_string()),
         None,
+        None,
     )
     .is_ok());
     assert!(adapter_command::build(
         GOOGLE_AI_MODE.display_name,
         GOOGLE_AI_MODE.adapter.unwrap().supported_actions(),
         "start_google_login",
+        None,
         None,
         None,
     )

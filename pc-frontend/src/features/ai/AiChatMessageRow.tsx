@@ -6,6 +6,7 @@ import MarkdownContent from '../markdown/MarkdownContent'
 import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import UserAvatar from '../shell/UserAvatar'
 import styles from './AiChatPage.module.css'
+import AiStructuredContent, { type AiStructuredPart } from './AiStructuredContent'
 
 export interface AiMessage {
   id?: string
@@ -21,6 +22,7 @@ export interface AiMessage {
   tool_used?: string | null
   sources?: AiSource[]
   handoff?: AiHandoff | null
+  structured_parts?: AiStructuredPart[]
 }
 
 export interface AiSource {
@@ -49,6 +51,7 @@ interface AiChatMessageRowProps {
   streamingStatus?: string
   onConversationForked?: (conversationId: string) => void | Promise<void>
   onProjectHandoff?: (handoff: AiHandoff, candidate?: AiProjectCandidate) => void | Promise<void>
+  onRegenerate?: () => void | Promise<void>
 }
 
 export default function AiChatMessageRow({
@@ -60,6 +63,7 @@ export default function AiChatMessageRow({
   streamingStatus = '正在生成回答…',
   onConversationForked,
   onProjectHandoff,
+  onRegenerate,
 }: AiChatMessageRowProps) {
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
@@ -105,6 +109,7 @@ export default function AiChatMessageRow({
             ))}
           </div>
         )}
+        {!isUser && <AiStructuredContent parts={message.structured_parts} />}
         {!isUser && message.handoff && (
           <div className={styles.handoffCard}>
             <strong>继续到项目 AI</strong>
@@ -138,6 +143,7 @@ export default function AiChatMessageRow({
             const fork = await forkAiConversation(activeConvId, message.id!, forkTitleFromContent(content))
             await onConversationForked?.(fork.conversation_id)
           } : undefined}
+          onRegenerate={!isUser ? onRegenerate : undefined}
         />
       </div>
     </div>

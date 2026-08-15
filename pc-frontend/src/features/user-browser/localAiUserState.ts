@@ -23,6 +23,7 @@ export type LocalAiUserPhase =
 
 export interface LocalAiUserFeature {
   id: 'native_chat' | 'new_conversation' | 'citations' | 'conversation_history' | 'attachments'
+    | 'model_selector' | 'composer_tools' | 'dictation' | 'feature_navigation'
   label: string
   supported: boolean
   active: boolean
@@ -206,7 +207,11 @@ function featureMatrix(
     { id: 'new_conversation', label: '新建对话', supported: actions.has('new_conversation'), active: active.canNewConversation },
     { id: 'conversation_history', label: '历史与项目', supported: actions.has('list_conversations'), active: active.canConversationHistory },
     { id: 'citations', label: '公开来源', supported: provider?.id === 'google-ai-mode' || live.has('citations'), active: live.has('citations') },
-    { id: 'attachments', label: '附件', supported: actions.has('list_composer_tools'), active: live.has('attachments') },
+    { id: 'attachments', label: '附件', supported: actions.has('request_attachment_upload'), active: live.has('attachments') },
+    { id: 'model_selector', label: '模型选择', supported: actions.has('list_model_options'), active: live.has('model_selector') },
+    { id: 'composer_tools', label: '网页工具', supported: actions.has('list_composer_tools'), active: live.has('composer_tools') },
+    { id: 'dictation', label: '听写', supported: actions.has('start_dictation'), active: live.has('dictation') },
+    { id: 'feature_navigation', label: '功能入口', supported: actions.has('list_navigation'), active: live.has('feature_navigation') },
   ]
   return features.filter((feature) => feature.supported)
 }

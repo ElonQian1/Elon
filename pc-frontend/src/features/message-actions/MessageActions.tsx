@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Copy, GitFork, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { Check, ChevronDown, Copy, GitFork, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { copyRichTextToClipboard, copyTextToClipboard, sanitizedRichHtmlFromElement } from '../../lib/clipboard'
 import styles from './MessageActions.module.css'
 
@@ -14,6 +14,7 @@ interface MessageActionsProps {
   richCopySourceId?: string
   onFeedbackChange?: (value: MessageFeedbackValue) => void
   onFork?: () => void | Promise<void>
+  onRegenerate?: () => void | Promise<void>
 }
 
 const FEEDBACK_PREFIX = 'elon.pc.messageFeedback'
@@ -28,11 +29,13 @@ export default function MessageActions({
   richCopySourceId,
   onFeedbackChange,
   onFork,
+  onRegenerate,
 }: MessageActionsProps) {
   const text = content.trim()
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [copyMenuOpen, setCopyMenuOpen] = useState(false)
   const [forking, setForking] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
   const [feedback, setFeedback] = useState<MessageFeedbackValue>(null)
   const copyMenuRef = useRef<HTMLDivElement>(null)
 
@@ -113,6 +116,16 @@ export default function MessageActions({
     }
   }
 
+  async function handleRegenerate() {
+    if (!onRegenerate || regenerating) return
+    setRegenerating(true)
+    try {
+      await onRegenerate()
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
   const containerClassName = [
     styles.actions,
     align === 'right' ? styles.right : styles.left,
@@ -179,6 +192,19 @@ export default function MessageActions({
           onClick={handleFork}
         >
           <GitFork aria-hidden="true" />
+        </button>
+      )}
+      {onRegenerate && (
+        <button
+          className={styles.button}
+          type="button"
+          title={regenerating ? '正在重新生成…' : '重新生成'}
+          aria-label="重新生成回答"
+          aria-busy={regenerating}
+          disabled={regenerating}
+          onClick={() => void handleRegenerate()}
+        >
+          <RotateCcw aria-hidden="true" />
         </button>
       )}
     </div>

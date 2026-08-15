@@ -1,10 +1,9 @@
 use serde_json::{json, Map, Value};
 
-use super::chatgpt_adapter_bootstrap::ADAPTER_VERSION;
+use super::{adapter_content, chatgpt_adapter_bootstrap::ADAPTER_VERSION};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
-const MAX_MESSAGE_CHARS: usize = 40_000;
 const MAX_DRAFT_CHARS: usize = 20_000;
 const MAX_OPTIONS: usize = 100;
 const MAX_PROJECTS: usize = 40;
@@ -50,6 +49,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "action": clean_string(value.get("action"), 48),
                 "ok": value.get("ok").and_then(Value::as_bool).unwrap_or(false),
                 "detail": clean_string(value.get("detail"), 240),
+                "requestId": sanitize_request_id(value.get("requestId")),
             }),
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
@@ -90,12 +90,16 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "url": sanitize_chatgpt_url(event.get("url")),
             "draft": clean_string(event.get("draft"), MAX_DRAFT_CHARS),
             "messages": sanitize_messages(event.get("messages")),
+            "observedMessageCount": bounded_u64(event.get("observedMessageCount"), 0, 1_000_000),
+            "messageWindowStart": bounded_u64(event.get("messageWindowStart"), 0, 1_000_000),
             "authenticated": event.get("authenticated").and_then(Value::as_bool).unwrap_or(false),
             "pageKind": sanitize_page_kind(event.get("pageKind")),
             "loginRequired": event.get("loginRequired").and_then(Value::as_bool).unwrap_or(false),
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
             "currentModel": clean_string(event.get("currentModel"), 80),
+            "attachments": sanitize_attachments(event.get("attachments")),
+            "dictationActive": event.get("dictationActive").and_then(Value::as_bool).unwrap_or(false),
             "capabilities": clean_identifiers(event.get("capabilities"), 40),
         }),
         "conversation_snapshot" => json!({
@@ -108,6 +112,25 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "section": clean_identifier(event.get("section"), 24),
             "currentModel": clean_string(event.get("currentModel"), 80),
             "options": sanitize_options(event.get("options")),
+        }),
+        "navigation_snapshot" => json!({
+            "type": kind,
+            "features": sanitize_features(event.get("features")),
+        }),
+        "ui_manifest_snapshot" => json!({
+            "type": kind,
+            "version": bounded_u64(event.get("version"), 1, 8),
+            "pageKind": sanitize_page_kind(event.get("pageKind")),
+            "title": clean_string(event.get("title"), 160),
+            "compatibility": sanitize_compatibility(event.get("compatibility")),
+            "controls": sanitize_ui_controls(event.get("controls")),
+            "discoveredControlCount": bounded_u64(event.get("discoveredControlCount"), 0, 10_000),
+            "controlsTruncated": event.get("controlsTruncated").and_then(Value::as_bool).unwrap_or(false),
+        }),
+        "web_touch_request" => json!({
+            "type": kind,
+            "purpose": clean_identifier(event.get("purpose"), 48),
+            "controlId": clean_string(event.get("controlId"), 72),
         }),
         _ => return Err("不支持的 ChatGPT 可见语义事件类型。".to_string()),
     };
@@ -129,22 +152,7 @@ fn sanitize_messages(value: Option<&Value>) -> Vec<Value> {
             if !matches!(role, "user" | "assistant") {
                 return None;
             }
-            let content = message
-                .get("content")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .take(20)
-                .filter_map(|part| {
-                    let part = part.as_object()?;
-                    let kind = part.get("type")?.as_str()?;
-                    if !matches!(kind, "text" | "markdown") {
-                        return None;
-                    }
-                    let text = clean_string(part.get("text"), MAX_MESSAGE_CHARS);
-                    (!text.is_empty()).then(|| json!({"type": "text", "text": text}))
-                })
-                .collect::<Vec<_>>();
+            let content = adapter_content::sanitize_parts(message.get("content"));
             if content.is_empty() {
                 return None;
             }
@@ -159,6 +167,94 @@ fn sanitize_messages(value: Option<&Value>) -> Vec<Value> {
             }))
         })
         .collect()
+}
+
+fn sanitize_attachments(value: Option<&Value>) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(10)
+        .filter_map(|item| {
+            let item = item.as_object()?;
+            let id = clean_string(item.get("id"), 64);
+            let name = clean_string(item.get("name"), 180);
+            if !id.starts_with("attachment_") || name.is_empty() {
+                return None;
+            }
+            Some(json!({
+                "id": id,
+                "name": name,
+                "state": match item.get("state").and_then(Value::as_str) {
+                    Some("uploading") => "uploading",
+                    Some("error") => "error",
+                    _ => "ready",
+                },
+                "removable": item.get("removable").and_then(Value::as_bool).unwrap_or(false),
+            }))
+        })
+        .collect()
+}
+
+fn sanitize_features(value: Option<&Value>) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(60)
+        .filter_map(|item| {
+            let item = item.as_object()?;
+            let id = clean_string(item.get("id"), 64);
+            let label = clean_string(item.get("label"), 120);
+            if !id.starts_with("feature_") || label.is_empty() {
+                return None;
+            }
+            Some(json!({
+                "id": id,
+                "label": label,
+                "kind": clean_identifier(item.get("kind"), 32),
+                "selected": item.get("selected").and_then(Value::as_bool).unwrap_or(false),
+            }))
+        })
+        .collect()
+}
+
+fn sanitize_ui_controls(value: Option<&Value>) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(512)
+        .filter_map(|item| {
+            let item = item.as_object()?;
+            let id = clean_string(item.get("id"), 72);
+            let label = clean_string(item.get("label"), 160);
+            let region = clean_identifier(item.get("region"), 24);
+            if !id.starts_with("control_")
+                || label.is_empty()
+                || !matches!(region.as_str(), "header" | "suggestions" | "composer" | "overlay" | "message" | "content")
+            {
+                return None;
+            }
+            Some(json!({
+                "id": id,
+                "semantic": clean_identifier(item.get("semantic"), 48),
+                "label": label,
+                "region": region,
+                "role": clean_identifier(item.get("role"), 32),
+                "enabled": item.get("enabled").and_then(Value::as_bool).unwrap_or(true),
+                "selected": item.get("selected").and_then(Value::as_bool).unwrap_or(false),
+            }))
+        })
+        .collect()
+}
+
+fn sanitize_compatibility(value: Option<&Value>) -> &'static str {
+    match value.and_then(Value::as_str) {
+        Some("healthy") => "healthy",
+        Some("fallback_required") => "fallback_required",
+        _ => "partial",
+    }
 }
 
 fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
@@ -286,6 +382,8 @@ fn sanitize_options(value: Option<&Value>) -> Vec<Value> {
                 "label": clean_string(item.get("label"), 120),
                 "selected": item.get("selected").and_then(Value::as_bool).unwrap_or(false),
                 "kind": clean_identifier(item.get("kind"), 32),
+                "semantic": clean_identifier(item.get("semantic"), 32),
+                "opensSubmenu": item.get("opensSubmenu").and_then(Value::as_bool).unwrap_or(false),
             }))
         })
         .collect()
@@ -310,6 +408,22 @@ fn clean_identifier(value: Option<&Value>, max: usize) -> String {
         })
         .take(max)
         .collect()
+}
+
+fn sanitize_request_id(value: Option<&Value>) -> Option<String> {
+    let request_id = clean_string(value, 36);
+    (request_id.len() >= 5
+        && request_id.starts_with("mcp_")
+        && request_id.len() <= 36
+        && request_id
+            .bytes()
+            .skip(4)
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()))
+    .then_some(request_id)
+}
+
+fn bounded_u64(value: Option<&Value>, default: u64, max: u64) -> u64 {
+    value.and_then(Value::as_u64).unwrap_or(default).min(max)
 }
 
 fn sanitize_page_kind(value: Option<&Value>) -> &'static str {

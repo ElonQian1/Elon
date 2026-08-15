@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   EyeOff,
   FolderClosed,
@@ -6,6 +6,7 @@ import {
   MonitorUp,
   Pin,
   RefreshCw,
+  Search,
   ShieldCheck,
   SquarePen,
 } from 'lucide-react'
@@ -17,8 +18,13 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const officialVisible = Boolean(web.controller.sessionState?.windowVisible)
   const directory = web.controller.navigationSnapshot
   const conversations = directory?.conversations ?? []
-  const pinned = conversations.filter((item) => /pinned|置顶/i.test(item.groupLabel))
-  const recent = conversations.filter((item) => !/pinned|置顶/i.test(item.groupLabel))
+  const [query, setQuery] = useState('')
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filtered = normalizedQuery
+    ? conversations.filter((item) => item.title.toLocaleLowerCase().includes(normalizedQuery))
+    : conversations
+  const pinned = filtered.filter((item) => /pinned|置顶/i.test(item.groupLabel))
+  const recent = filtered.filter((item) => !/pinned|置顶/i.test(item.groupLabel))
   const projects = directory?.projects ?? []
   const autoSyncKey = useRef('')
 
@@ -98,6 +104,11 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
                 <RefreshCw size={13} className={web.controller.busyAction === 'list_conversations' ? styles.spinning : ''} />
               </button>
             </div>
+            <label className={styles.search}>
+              <Search size={13} aria-hidden="true" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索本机已同步聊天" />
+              {query && <button type="button" onClick={() => setQuery('')} aria-label="清除聊天搜索">×</button>}
+            </label>
             <DirectorySection
               icon={<Pin size={13} />}
               title="置顶"

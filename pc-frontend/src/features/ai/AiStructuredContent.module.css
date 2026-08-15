@@ -1,0 +1,51 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #7ee3b2;
+  background: rgba(80, 190, 130, .12);
+}
+
+.copy {
+  min-width: 0;
+}
+
+.copy strong,
+.copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy strong {
+  color: var(--text, #f5f6f8);
+  font-size: 12px;
+}
+
+.copy small {
+  margin-top: 2px;
+  color: var(--text-muted, #8e939e);
+  font-size: 10px;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AiMessage, AiSource } from '../ai/AiChatMessageRow'
+import type { AiStructuredPart } from '../ai/AiStructuredContent'
 import type { AiHomeMode } from '../ai/AiHomeModeSwitch'
 import {
   DEFAULT_LOCAL_AI_PROVIDER_ID,
@@ -33,10 +34,12 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   const messages = useMemo<AiMessage[]>(() => (
     controller.snapshot?.messages.map((item) => {
       const sources = item.content
-        .filter((part): part is Extract<typeof part, { type: 'citation' }> => part.type === 'citation')
-        .map<AiSource>((part) => ({ title: part.title || publicHost(part.url), url: part.url }))
+        .filter((part): part is Extract<typeof part, { type: 'citation' }> => part.type === 'citation' && Boolean(part.url))
+        .map<AiSource>((part) => ({ title: part.text || publicHost(part.url!), url: part.url! }))
       const content = item.content
-        .filter((part): part is Extract<typeof part, { type: 'text' }> => part.type === 'text')
+        .filter((part): part is Extract<typeof part, { type: 'text' | 'markdown' }> => (
+          part.type === 'text' || part.type === 'markdown'
+        ))
         .map((part) => part.text)
         .filter(Boolean)
         .join('\n\n')
@@ -46,6 +49,19 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         content: content || (sources.length ? '相关来源' : '官方网页暂未返回可见文本。'),
         tool_used: item.role === 'assistant' && provider?.id === 'google-ai-mode' ? 'web_search' : null,
         sources,
+        structured_parts: item.content
+          .filter((part) => !['text', 'markdown', 'citation'].includes(part.type))
+          .map<AiStructuredPart>((part) => ({
+            type: part.type as AiStructuredPart['type'],
+            label: part.text,
+            kind: 'kind' in part ? part.kind : undefined,
+            language: 'language' in part ? part.language : undefined,
+            mediaType: 'mediaType' in part ? part.mediaType : undefined,
+            targetHost: 'targetHost' in part ? part.targetHost : undefined,
+            lineCount: 'lineCount' in part ? part.lineCount : undefined,
+            rowCount: 'rowCount' in part ? part.rowCount : undefined,
+            columnCount: 'columnCount' in part ? part.columnCount : undefined,
+          })),
       }
     }) ?? []
   ), [controller.snapshot?.messages, provider?.id])

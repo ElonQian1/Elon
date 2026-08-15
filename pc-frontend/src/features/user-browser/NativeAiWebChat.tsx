@@ -62,9 +62,9 @@ export default function NativeAiWebChat({
         {snapshot?.messages.length ? snapshot.messages.map((item) => (
           <article className={item.role === 'user' ? styles.userMessage : styles.assistantMessage} key={item.id}>
             <span>{item.role === 'user' ? '你' : providerName}</span>
-            {item.content.map((part, index) => part.type === 'text' ? (
+            {item.content.map((part, index) => part.type === 'text' || part.type === 'markdown' ? (
               <p key={`${item.id}-${index}`}>{part.text}</p>
-            ) : (
+            ) : part.type === 'citation' && part.url ? (
               <a
                 className={styles.citation}
                 href={part.url}
@@ -72,8 +72,12 @@ export default function NativeAiWebChat({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {part.title || new URL(part.url).hostname}
+                {part.text || publicHost(part.url)}
               </a>
+            ) : (
+              <p key={`${item.id}-${index}`}>
+                {`${part.text}${part.language ? ` · ${part.language}` : ''}`}
+              </p>
             ))}
           </article>
         )) : (
@@ -122,4 +126,9 @@ export default function NativeAiWebChat({
       </div>
     </section>
   )
+}
+
+function publicHost(url: string) {
+  try { return new URL(url).hostname }
+  catch { return url }
 }
