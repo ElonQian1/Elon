@@ -110,7 +110,7 @@ internal class ChatGptBackgroundSession(
             officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
         )
         onConversationIndexChanged(conversationIndex())
-        adapter.listConversations()
+        adapter.listConversations(projects)
         return true
     }
 

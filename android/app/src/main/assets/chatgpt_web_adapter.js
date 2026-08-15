@@ -427,7 +427,7 @@
       );
     }
     if (action === 'list_conversations' && conversationAdapter) {
-      return conversationAdapter.requestList(emitEvent, respond);
+      return conversationAdapter.requestList(command, emitEvent, respond);
     }
     if (action === 'open_conversation' && conversationAdapter) {
       if (comparableText(composerValue(findComposer()))) {

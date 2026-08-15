@@ -6,6 +6,7 @@
   const MAX_CONVERSATIONS = 100;
   const MAX_PROJECTS = 40;
   const projectPolicy = window.__elonChatGptProjectPolicy;
+  const projectHints = window.__elonChatGptProjectHints;
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/(g-p-[A-Za-z0-9_-]{1,160})\/c\/[A-Za-z0-9_-]{1,160})$/;
   const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
   const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早)$/i;
@@ -330,9 +331,12 @@
   function collectProjects(initial, onDone) {
     if (!projectPolicy || typeof projectPolicy.unresolved !== 'function') return onDone(initial);
     const originalPath = location.pathname;
-    const titles = projectPolicy.unresolved(document, isVisible, projectLabel)
-      .map((project) => project.title);
     const values = initial.slice();
+    const observedTitles = projectPolicy.unresolved(document, isVisible, projectLabel)
+      .map((project) => project.title);
+    const titles = projectHints && typeof projectHints.missingTitles === 'function'
+      ? projectHints.missingTitles(observedTitles, values)
+      : observedTitles;
     const seen = new Set(values.map((project) => project.id));
     let index = 0;
 
@@ -389,8 +393,12 @@
     visitNext();
   }
 
-  function emitConversationSnapshot(snapshot, emitEvent, result, closeAfter) {
-    collectProjectHistory(readProjects(), (observedProjects) => {
+  function emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter) {
+    const observedProjects = readProjects();
+    const initialProjects = projectHints && typeof projectHints.merge === 'function'
+      ? projectHints.merge(observedProjects, command && command.projectHints)
+      : observedProjects;
+    collectProjectHistory(initialProjects, (observedProjects) => {
       collectProjects(observedProjects, (projects) => {
         emitEvent({
           type: 'conversation_snapshot',
@@ -408,7 +416,7 @@
     });
   }
 
-  function requestList(emitEvent, result) {
+  function requestList(command, emitEvent, result) {
     const open = findSidebarButton(true);
     if (open) {
       sidebarOpenedByAdapter = true;
@@ -416,7 +424,7 @@
       return waitForConversations(
         (conversations) => {
           collectConversationHistory(conversations, (snapshot) => {
-            emitConversationSnapshot(snapshot, emitEvent, result, sidebarOpenedByAdapter);
+            emitConversationSnapshot(snapshot, command, emitEvent, result, sidebarOpenedByAdapter);
           });
         },
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
@@ -428,7 +436,7 @@
       return waitForConversations(
         (conversations) => {
           collectConversationHistory(conversations, (snapshot) => {
-            emitConversationSnapshot(snapshot, emitEvent, result, true);
+            emitConversationSnapshot(snapshot, command, emitEvent, result, true);
           });
         },
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
@@ -436,7 +444,7 @@
     }
     if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
     collectConversationHistory(existing, (snapshot) => {
-      emitConversationSnapshot(snapshot, emitEvent, result, false);
+      emitConversationSnapshot(snapshot, command, emitEvent, result, false);
     });
   }
 

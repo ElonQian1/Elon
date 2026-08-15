@@ -77,12 +77,27 @@ class ChatGptWebConversationContractTest {
         assertTrue(conversations.contains("projectTitle:"))
         assertTrue(conversations.contains("function collectProjectHistory(initial, onDone)"))
         assertTrue(conversations.contains("timeoutMs: 10000"))
-        assertTrue(conversations.contains("collectProjectHistory(readProjects(), (observedProjects) =>"))
+        assertTrue(conversations.contains("projectHints.merge(observedProjects, command && command.projectHints)"))
+        assertTrue(conversations.contains("projectHints.missingTitles(observedTitles, values)"))
         assertTrue(conversations.contains("collectProjects(observedProjects, (projects) =>"))
         assertTrue(conversations.contains("projects,"))
         assertTrue(conversations.contains("function openProject"))
         assertTrue(conversations.contains("path.split('/').filter(Boolean).pop()"))
         assertTrue(history.contains("previous.activityDates"))
+    }
+
+    @Test
+    fun cachedProjectHintsAvoidRepeatedProjectNavigation() {
+        val pageAdapter = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        )
+        val background = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+
+        assertTrue(pageAdapter.contains("projectHints.take(MAX_PROJECT_HINTS)"))
+        assertTrue(pageAdapter.contains("chatgpt_web_adapter_project_hints.js"))
+        assertTrue(background.contains("adapter.listConversations(projects)"))
     }
 
     @Test

@@ -9,6 +9,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.elon.app.WebBridgeDocumentSession
 import java.nio.charset.StandardCharsets
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal class ChatGptWebPageAdapter(
@@ -133,7 +134,10 @@ internal class ChatGptWebPageAdapter(
 
     fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)
 
-    fun listConversations() = runCommand("list_conversations")
+    fun listConversations(projectHints: List<ChatGptWebProject> = emptyList()) = runCommand(
+        action = "list_conversations",
+        projectHints = projectHints,
+    )
 
     fun listConversations(requestId: String) = runCommand("list_conversations", requestId = requestId)
 
@@ -315,6 +319,7 @@ internal class ChatGptWebPageAdapter(
         choiceIndex: Int? = null,
         numericValue: Double? = null,
         expanded: Boolean? = null,
+        projectHints: List<ChatGptWebProject> = emptyList(),
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
@@ -329,6 +334,15 @@ internal class ChatGptWebPageAdapter(
                 if (choiceIndex != null) put("choiceIndex", choiceIndex)
                 if (numericValue != null && numericValue.isFinite()) put("numericValue", numericValue)
                 if (expanded != null) put("expanded", expanded)
+                if (projectHints.isNotEmpty()) put("projectHints", JSONArray().apply {
+                    projectHints.take(MAX_PROJECT_HINTS).forEach { project ->
+                        put(JSONObject()
+                            .put("id", project.id)
+                            .put("title", project.title.take(MAX_PROJECT_TITLE_LENGTH))
+                            .put("path", project.path)
+                            .put("active", project.active))
+                    }
+                })
             }
             .toString()
         val encoded = JSONObject.quote(command)
@@ -342,12 +356,13 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 116
+        internal const val ADAPTER_VERSION = 117
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
             "chatgpt_web_adapter_authentication_policy.js",
             "chatgpt_web_adapter_project_policy.js",
+            "chatgpt_web_adapter_project_hints.js",
             "chatgpt_web_adapter_context_menu_policy.js",
             "chatgpt_web_adapter_conversation_history.js",
             "chatgpt_web_adapter_conversations.js",
@@ -378,6 +393,8 @@ internal class ChatGptWebPageAdapter(
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
         private const val MAX_PROMPT_LENGTH = 20_000
         private const val MAX_CONVERSATION_PATH_LENGTH = 256
+        private const val MAX_PROJECT_HINTS = 40
+        private const val MAX_PROJECT_TITLE_LENGTH = 160
         private const val MAX_OPTION_ID_LENGTH = 64
         private const val MAX_UI_CONTROL_ID_LENGTH = 72
         private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
