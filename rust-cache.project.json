@@ -8,5 +8,15 @@
     "node-agent-release",
     "node-agent-local-first-v1"
   ],
-  "unknown_domain_fallback": "agent-validation"
+  "unknown_domain_fallback": "agent-validation",
+  "shared_partition_domains": {
+    "validation-heavy": "agent-validation",
+    "validation-light-0": "agent-validation",
+    "validation-light-1": "agent-validation",
+    "cross-x86_64-unknown-linux-musl": "agent-validation",
+    "node-agent-windows": "node-agent-release",
+    "node-agent-linux": "node-agent-release",
+    "node-agent-desktop": "node-agent-release",
+    "local-server": "dev-windows-msvc"
+  }
 }

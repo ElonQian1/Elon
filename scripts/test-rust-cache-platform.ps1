@@ -44,7 +44,13 @@ try {
   "project_id": "test-project",
   "default_domain": "dev-host",
   "allowed_domains": ["dev-host", "agent-validation", "node-agent-release", "release-host"],
-  "unknown_domain_fallback": "agent-validation"
+  "unknown_domain_fallback": "agent-validation",
+  "shared_partition_domains": {
+    "validation-heavy": "agent-validation",
+    "validation-light-0": "agent-validation",
+    "validation-light-1": "agent-validation",
+    "node-agent-windows": "node-agent-release"
+  }
 }
 '@ | Set-Content -LiteralPath (Join-Path $ProjectRoot "rust-cache.project.json") -Encoding UTF8
     "[package]`nname='test-project'`nversion='0.1.0'`nedition='2021'`n" | Set-Content -LiteralPath (Join-Path $ProjectRoot "Cargo.toml") -Encoding UTF8
@@ -59,6 +65,29 @@ try {
     $unknownDomain = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "one-off-task-name" -CargoArgs @("check") -ToolchainEpoch "rustc-test"
     Assert-Equal "agent-validation" $unknownDomain.domain "managed build paths should use the canonical fallback domain"
     Assert-True $unknownDomain.domain_fallback "domain fallback should be observable"
+    $validationFromDev = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "dev-host" -SharedBuildPartition "validation-heavy" -CargoArgs @("check") -ToolchainEpoch "rustc-test"
+    $validationFromAgent = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "agent-validation" -SharedBuildPartition "validation-heavy" -CargoArgs @("check") -ToolchainEpoch "rustc-test"
+    Assert-Equal "agent-validation" $validationFromDev.domain "reserved shared partitions should override an otherwise allowed caller domain"
+    Assert-True $validationFromDev.domain_canonicalized_by_shared_partition "shared partition domain canonicalization should be observable"
+    Assert-Equal $validationFromAgent.build_dir $validationFromDev.build_dir "same reserved shared partition must converge across caller domains"
+    $unreservedShared = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "dev-host" -SharedBuildPartition "generic-shared" -CargoArgs @("check") -ToolchainEpoch "rustc-test"
+    Assert-Equal "dev-host" $unreservedShared.domain "unreserved shared partitions should retain an allowed caller domain"
+    Assert-True (-not $unreservedShared.domain_canonicalized_by_shared_partition) "unreserved shared partitions should not report canonicalization"
+
+    $InvalidMappingRoot = Join-Path $TempRoot "invalid-shared-mapping-project"
+    New-Item -ItemType Directory -Force -Path $InvalidMappingRoot | Out-Null
+    @'
+{
+  "schema_version": 1,
+  "project_id": "invalid-shared-mapping",
+  "default_domain": "dev-host",
+  "allowed_domains": ["dev-host"],
+  "shared_partition_domains": {"validation-heavy": "unlisted-domain"}
+}
+'@ | Set-Content -LiteralPath (Join-Path $InvalidMappingRoot "rust-cache.project.json") -Encoding UTF8
+    $invalidMappingRejected = $false
+    try { Get-RustCacheProjectManifest -ProjectRoot $InvalidMappingRoot | Out-Null } catch { $invalidMappingRejected = $_.Exception.Message -match "must be listed in allowed_domains" }
+    Assert-True $invalidMappingRejected "shared partition mappings must fail closed when their domain is not allowlisted"
 
     $unknown = Resolve-RustCacheInvocation -ProjectRoot $UnknownRoot -CacheRoot $CacheRoot -CargoArgs @("check") -ToolchainEpoch "rustc-test"
     Assert-True (-not $unknown.registered) "unknown project should not enter the registered pool"
@@ -208,6 +237,39 @@ exit /b 0
     $agentCaptured = Get-Content -Raw -LiteralPath $EnvironmentCapture
     Assert-True ($agentCaptured -match 'CARGO_BUILD_BUILD_DIR=.*agent-validation\\shared-validation-light-0') "scheduled validation should receive its stable shared build partition"
     Assert-True ($agentCaptured -match 'CARGO_INCREMENTAL=0') "agent validation should disable incremental"
+
+    $canonicalSharedPartition = Join-Path $CacheRoot "build\rustc-test\test-project\agent-validation\shared-validation-heavy"
+    $retiredSharedAlias = Join-Path $CacheRoot "build\rustc-test\test-project\dev-host\shared-validation-heavy"
+    $unmigratedSharedAlias = Join-Path $CacheRoot "build\rustc-test\test-project\dev-host\shared-validation-light-1"
+    New-Item -ItemType Directory -Force -Path $canonicalSharedPartition, $retiredSharedAlias, $unmigratedSharedAlias | Out-Null
+    @{ workspace_root = $ProjectRoot; cache_scope = "shared"; cache_partition = "shared-validation-heavy"; domain = "agent-validation"; last_used_utc = [DateTime]::UtcNow.ToString("o") } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $canonicalSharedPartition ".last-used.json") -Encoding UTF8
+    @{ workspace_root = $ProjectRoot; cache_scope = "shared"; cache_partition = "shared-validation-heavy"; domain = "dev-host"; last_used_utc = [DateTime]::UtcNow.ToString("o") } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $retiredSharedAlias ".last-used.json") -Encoding UTF8
+    @{ workspace_root = $ProjectRoot; cache_scope = "shared"; cache_partition = "shared-validation-light-1"; domain = "dev-host"; last_used_utc = [DateTime]::UtcNow.ToString("o") } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $unmigratedSharedAlias ".last-used.json") -Encoding UTF8
+    $sharedAliasPolicyPath = Get-RustCachePolicyPath -CacheRoot $CacheRoot
+    $sharedAliasPolicy = Get-Content -Raw -LiteralPath $sharedAliasPolicyPath | ConvertFrom-Json
+    $sharedAliasPolicy.warning_free_percent = 1
+    $sharedAliasPolicy.recovery_free_percent = 2
+    $sharedAliasPolicy.critical_free_percent = 0
+    $sharedAliasPolicy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $sharedAliasPolicyPath -Encoding UTF8
+    $sharedAliasStatus = Get-RustCacheStatus -CacheRoot $CacheRoot -RepoRoot $ProjectRoot
+    Assert-Equal 2 $sharedAliasStatus.retired_shared_alias_count "status should proactively expose duplicate shared aliases"
+    $sharedAliasGc = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -SharedAliasesOnly
+    $retiredSharedAction = $sharedAliasGc.actions | Where-Object { $_.path -eq $retiredSharedAlias } | Select-Object -First 1
+    Assert-Equal "would-delete" $retiredSharedAction.action "GC should select a duplicate shared alias when the canonical partition is ready"
+    Assert-Equal "retired-shared-alias" $retiredSharedAction.reason "duplicate shared aliases should have an explicit reason"
+    $unmigratedSharedAction = $sharedAliasGc.actions | Where-Object { $_.path -eq $unmigratedSharedAlias } | Select-Object -First 1
+    Assert-Equal "preserve" $unmigratedSharedAction.action "GC should preserve an alias until its canonical partition is ready"
+    Assert-Equal "retired-shared-alias-canonical-missing" $unmigratedSharedAction.reason "missing canonical partitions should have a stable preservation reason"
+    $sharedAliasApply = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -SharedAliasesOnly -Apply
+    Assert-True (-not (Test-Path -LiteralPath $retiredSharedAlias)) "managed GC should remove the reviewed duplicate alias"
+    Assert-True (Test-Path -LiteralPath $canonicalSharedPartition) "managed GC must preserve the canonical shared partition"
+    Assert-True (Test-Path -LiteralPath $unmigratedSharedAlias) "managed GC must preserve an alias whose canonical partition is not ready"
+    $conflictingSharedAliasFiltersRejected = $false
+    try { Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -SharedAliasesOnly -WorkspaceOnly | Out-Null } catch { $conflictingSharedAliasFiltersRejected = $_.Exception.Message -match "cannot be combined" }
+    Assert-True $conflictingSharedAliasFiltersRejected "shared alias cleanup must reject broader workspace recovery filters"
 
     $staleBuildDir = Join-Path $CacheRoot "build\rustc-test\test-project\stale\0123456789abcdef"
     $staleLock = Join-Path $staleBuildDir ".rust-cache.lockdir"
@@ -437,6 +499,7 @@ retry = 3
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
     $installedCommand = Get-Command -Name $install.entry_path -ErrorAction Stop
     Assert-True ($installedCommand.Parameters.ContainsKey("SharedBuildPartition")) "installed machine entry should expose named shared partitions"
+    Assert-True ($installedCommand.Parameters.ContainsKey("SharedAliasesOnly")) "installed machine entry should expose exact shared-alias GC"
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
     Assert-True (Test-Path -LiteralPath $install.sccache_config_path) "installer should generate managed sccache config"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path

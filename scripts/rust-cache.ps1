@@ -24,6 +24,7 @@ param(
     [switch]$ForceAged,
     [switch]$WorkspaceOnly,
     [switch]$RecoverMissingWorkspaces,
+    [switch]$SharedAliasesOnly,
     [switch]$IncludeSizes,
     [switch]$NoLock,
     [switch]$DisableSccache,
@@ -67,12 +68,15 @@ switch ($Command) {
         Write-Host "Disk free: $([math]::Round($status.volume.free_bytes / 1GB, 2)) GiB ($($status.volume.free_percent)%)"
         Write-Host "Managed partitions: $($status.partition_count)"
         Write-Host "Registered workspaces: $(@($status.registered_workspaces).Count)"
+        if ($status.retired_shared_alias_count -gt 0) {
+            Write-Host "Retired shared aliases: $($status.retired_shared_alias_count) (run gc dry-run to review)" -ForegroundColor Yellow
+        }
         if (@($status.legacy_caches).Count -gt 0) {
             Write-Host "External legacy caches:" -ForegroundColor Yellow
             $status.legacy_caches | Format-Table label, retired, exists, path -AutoSize
         }
         if ($IncludeSizes -and $status.partition_count -gt 0) {
-            $status.partitions | Select-Object project_id, domain, @{n="GiB";e={[math]::Round($_.size_bytes / 1GB, 2)}}, last_used_utc, path | Format-Table -AutoSize
+            $status.partitions | Select-Object project_id, domain, cache_scope, retired_shared_alias, canonical_shared_domain, @{n="GiB";e={[math]::Round($_.size_bytes / 1GB, 2)}}, last_used_utc, path | Format-Table -AutoSize
         }
         $status
     }
@@ -85,9 +89,9 @@ switch ($Command) {
         exit $LASTEXITCODE
     }
     "gc" {
-        $report = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Apply:$Apply -ForceAged:$ForceAged -WorkspaceOnly:$WorkspaceOnly -RecoverMissingWorkspaces:$RecoverMissingWorkspaces
+        $report = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Apply:$Apply -ForceAged:$ForceAged -WorkspaceOnly:$WorkspaceOnly -RecoverMissingWorkspaces:$RecoverMissingWorkspaces -SharedAliasesOnly:$SharedAliasesOnly
         Write-Host "GC mode: $($report.mode)"
-        Write-Host "Workspace only: $($report.workspace_only); recover missing workspaces: $($report.recover_missing_workspaces)"
+        Write-Host "Workspace only: $($report.workspace_only); recover missing workspaces: $($report.recover_missing_workspaces); shared aliases only: $($report.shared_aliases_only)"
         Write-Host "Low disk: $($report.low_disk); critical: $($report.critical_disk)"
         Write-Host "Report: $($report.report_path)"
         $report.actions | Format-Table action, reason, project_id, domain, age_days, @{n="GiB";e={[math]::Round($_.size_bytes / 1GB, 2)}}, path -AutoSize

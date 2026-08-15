@@ -61,7 +61,12 @@ rust-cache-v2\
 {
   "schema_version": 1,
   "project_id": "my-project",
-  "default_domain": "dev-windows-msvc"
+  "default_domain": "dev-windows-msvc",
+  "allowed_domains": ["dev-windows-msvc", "agent-validation"],
+  "unknown_domain_fallback": "agent-validation",
+  "shared_partition_domains": {
+    "validation-heavy": "agent-validation"
+  }
 }
 ```
 
@@ -85,6 +90,19 @@ domain 应描述构建用途和兼容性，例如：
 带锁分区和正在运行的 Cargo/rustc 仍受原有安全保护。实际删除前，GC 会取得与 Cargo
 相同的分区锁并将目录原子移入受管 `trash`；若锁在扫描后出现则保留该分区，因此新
 构建无法在并发窗口中被误删。
+
+`shared_partition_domains` 进一步把稳定共享分区绑定到唯一 domain。调用方即使把
+`validation-heavy` 错传为 `dev-windows-msvc`，运行时也会强制路由到
+`agent-validation/shared-validation-heavy`，并输出
+`RUST_CACHE_SHARED_DOMAIN_CANONICALIZED=True`。这条规则位于缓存平台，不依赖每个
+包装脚本都正确传参，因此同一逻辑分区不会再因入口不同复制一套中间产物。未登记的
+共享分区仍保留调用方的 allowlist domain，便于项目逐项审查后接入。
+
+状态清单会主动标记历史错误副本为 `retired_shared_alias`。GC 只在相同项目、相同
+rustc 代际的 canonical 分区已有有效 shared marker 时，才以
+`retired-shared-alias` 选中旧副本；canonical 分区尚未准备好时显示
+`retired-shared-alias-canonical-missing` 并保留。所有删除仍先 dry-run、再获取分区锁、
+原子移入 `trash`，不会手工合并两个可写 Cargo build-dir。
 
 ## 使用入口
 
@@ -111,7 +129,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
   check --manifest-path server\Cargo.toml --locked
 ```
 
-命名共享分区必须持有平台锁，不能和 `-NoLock` 同用。运行时会输出 `RUST_CACHE_SCOPE` 与 `RUST_CACHE_PARTITION` 供日志审计。
+命名共享分区必须持有平台锁，不能和 `-NoLock` 同用。运行时会输出
+`RUST_CACHE_SCOPE`、`RUST_CACHE_PARTITION` 与共享 domain 规范化状态供日志审计。
 
 一龙仓库日常验证继续使用稳定入口，它已委托给平台：
 
@@ -212,6 +231,21 @@ GC 默认 dry-run：
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc
 ```
+
+`status -IncludeSizes` 会显示 `retired_shared_alias` 和 `canonical_shared_domain`；发现
+旧副本后使用 `gc -SharedAliasesOnly` 做精确预演。共享别名治理不需要 `-ForceAged`，也不依赖磁盘进入
+低水位，但 canonical 分区未就绪或任一目标存在活动锁时不会删除。
+
+```powershell
+# 只列出 canonical 分区已就绪的历史共享别名
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -SharedAliasesOnly
+
+# 审查报告后，只回收同一批共享别名
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -SharedAliasesOnly -Apply
+```
+
+`-SharedAliasesOnly` 与 `-WorkspaceOnly`、`-RecoverMissingWorkspaces` 互斥，防止一次维护
+混合两种所有权和证据完全不同的回收任务。
 
 实际执行只会删除 `rust-cache-v2` 根内、无活动锁的托管分区：
 
