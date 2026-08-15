@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: local_migration_and_source_bridge_verified
 ---
 
 # 外部矿池 Route source logical-to-projection bridge 权威
@@ -104,5 +104,7 @@ authority、建立完整 route/runtime closure、写 Provider adjacent active ve
 - `server/src/store_migrations.rs`：只登记 migration 271 及 module。
 
 不得修改 `server/src/store.rs`、route/domain ABI、API/router 或 V254 fence 文件。当前源码已表达该合同并随
-完整 Windows 产品目标与 WSL2 test target 编译，但 V271 专属 migration/source-contract 矩阵仍未运行；证据强度见
+完整 Windows 产品目标与 WSL2 test target 编译；Windows 受管 `v271_` 6/6 已覆盖 fresh/repeat/reopen、
+missing-fence/existing-route 失败关闭、唯一 projection 正向和 8 类跨根漂移拒绝。完整 current fence 写入、
+legacy branch 动态、并发、崩溃和旧库升级矩阵仍未运行；证据强度见
 [`external-pool-route-source-projection-bridge-acceptance.md`](external-pool-route-source-projection-bridge-acceptance.md)。

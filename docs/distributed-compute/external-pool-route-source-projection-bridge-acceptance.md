@@ -3,18 +3,21 @@ title: 外部矿池 Route source logical-to-projection bridge 验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: local_migration_and_source_bridge_verified
 ---
 
 # 外部矿池 Route source logical-to-projection bridge 验收
 
 ## 1. 当前证据强度
 
-V271 当前完成权威合同与 migration/source-contract 源码静态复核，并已随完整 Windows `elon-server` 产品
-目标和 WSL2 `elon-server` test target 编译；没有执行 V271 migration，也没有运行其 source-contract、SQLite、
-并发、重开或 runtime 专属验证。正式动态计数为 `passed=0 / failed=0`，状态为
-`source_review_only / implementation_compiled / implementation_unrun`。
+V271 已随完整 Windows `elon-server` 产品目标和 WSL2 `elon-server` test target 编译。Windows 受管
+`v271_` 矩阵 6/6 通过，指纹为
+`f630a40bb79ace2e4a2740ce8dda7da1a557bf0d02e55e135c1b3e74b6e6a697`：其中 1 项冻结源码合同，5 项
+真实执行 fresh/repeat/reopen migration、缺失 fence 与历史 route 失败关闭、唯一 projection 正向桥接和
+8 类跨根漂移拒绝。source bridge 夹具从完整 V271 文件库读取实际 trigger 后派生，不复制另一份 trigger，
+并在内存库以直接 SQL 行使。当前状态为
+`implementation_partially_verified / local_migration_and_source_bridge_verified`。
 
 本页定义 V271 migration 的验收门；源码存在不等于 migration 已执行或 trigger 已安装。语义唯一来源是
 [`external-pool-route-source-projection-bridge-authority.md`](external-pool-route-source-projection-bridge-authority.md)。
@@ -35,6 +38,10 @@ V271 当前完成权威合同与 migration/source-contract 源码静态复核，
 positive bridge 必须使用完整应用 V271 后派生的 disposable trigger-only fixture，因为完整 current schema 上 V254
 fence 正确地让 route projection 不可写。测试只能在隔离测试连接中移除相关 inert fence 后单独行使 source
 trigger；不得为了得到“成功插入”而在生产 migration 中删除、disable 或缩窄 fence。
+
+当前已通过 fresh/repeat/reopen、exact positive、logical-ID rejection 与 8 类 route-side cross-root negative。
+legacy branch 仍只有静态 source contract；完整 current schema 的 projection/credential/authorization/
+capability/seal 写入矩阵、并发、崩溃恢复与停在 V270 的磁盘升级仍未运行。
 
 ## 3. 静态边界检查
 
@@ -60,6 +67,6 @@ trigger；不得为了得到“成功插入”而在生产 migration 中删除�
 
 ## 5. 正式结论
 
-当前 V271 只能声明“logical-to-projection source bridge 已写入并随完整目标编译，静态合同已复核”。在通过
-第 2 节全部动态矩阵前，不得声明 migration 已验收；即使全部通过，也只能消除一个来源映射 P0。Atomic
+当前 V271 只能声明“fresh/repeat/reopen migration 与派生 trigger source bridge 子集已本地验证”。在通过
+第 2 节剩余动态矩阵前，不得声明 V271 完整验收；即使全部通过，也只能消除一个来源映射 P0。Atomic
 activation 继续 NO-GO，Provider、route 与所有经济效果继续为零。

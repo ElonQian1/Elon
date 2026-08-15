@@ -3,7 +3,7 @@ title: 外部矿池 Adapter task-protocol conformance 验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -11,10 +11,11 @@ verification_status: source_review_only
 
 ## 1. 当前证据强度
 
-V272 当前只接受权威合同与计划源码的静态复核。遵守架构阶段禁令，本批没有编译 Rust、执行 migration、
-运行单元/HTTP/SQLite/Linux fixture、启动 child、连接 upstream 或生成动态指纹。正式计数为
-`passed=0 / failed=0`，状态为
-`source_review_only / implementation_uncompiled / implementation_unrun`。
+V272 当前只接受权威合同、源码复核与完整 Windows `elon-server` test target 编译证据。修复 SQLite UDF 借用
+生命周期和错误转换推断后，编译指纹为
+`702357846db905001886551903686f32f5a1d49461498b4802e366011d129eb9`；本批没有执行专属 migration、
+单元/HTTP/SQLite/Linux fixture、启动 child 或连接 upstream。正式动态计数为 `passed=0 / failed=0`，状态为
+`source_review_only / implementation_compiled / implementation_unrun`。
 
 本页只定义验收门，不重新定义 semantics；唯一语义来源是
 [`external-pool-adapter-task-protocol-conformance-authority.md`](external-pool-adapter-task-protocol-conformance-authority.md)。
@@ -104,7 +105,7 @@ synthetic lane内运行，不创建 v213 或 market row。
 
 ## 6. 正式结论
 
-V272 当前只能声明“Provider-neutral task-protocol conformance 的 server-run/process-HMAC 合同已冻结并进入
-未编译、未运行实现阶段”。它可作为未来同进程 Store-private consumer 的 release conformance 输入，但不是
+V272 当前只能声明“Provider-neutral task-protocol conformance 的 server-run/process-HMAC 合同已冻结、实现已
+编译但专属动态未运行”。它可作为未来同进程 Store-private consumer 的 release conformance 输入，但不是
 production executor、route 或 activation authority。只有第 3、4 节全部动态矩阵通过并形成可复算指纹后，
 才能提升实现状态；即使提升，Provider 仍为 `registering`、18 deny保持，atomic activation继续 NO-GO。

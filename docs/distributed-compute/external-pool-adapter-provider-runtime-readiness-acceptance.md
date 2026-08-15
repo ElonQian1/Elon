@@ -3,8 +3,8 @@ title: 外部矿池 Adapter Provider runtime readiness 验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_verified
 ---
 
 # 外部矿池 Adapter Provider runtime readiness 验收
@@ -12,10 +12,13 @@ verification_status: source_review_only
 ## 1. 本批验收强度
 
 V270 已随完整 Windows `elon-server` 产品目标和 WSL2 `elon-server` test target 编译；编译闭合了 SQLite
-scalar helper 生命周期、Store error conversion 与 Linux-only installation filesystem error import。尚未执行
-V270 专属 migration、单元/HTTP/SQLite/Linux fixture，也未启动 child、读取真实 Secret、打开 production
-bundle 或连接 upstream。专属动态计数仍为 `passed=0 / failed=0`，状态为
-`source_review_only / implementation_compiled / implementation_unrun`。
+scalar helper 生命周期、Store error conversion 与 Linux-only installation filesystem error import。当前 Windows
+受管 `provider_runtime_readiness` 矩阵 17/17 通过，其中包含 15 项源码合同与 2 项真实 SQLite
+migration/integrity 用例；独立 process custody 矩阵 3/3 通过。对应指纹分别为
+`00371751088b9a58da143145f21e8c7ad02045eb6c224c70ed675a690b9b3512` 与
+`d63a8d249322129fc6a2d662ad231482c52dc480f8287621f342297011abc9ab`。当前状态提升为
+`implementation_partially_verified / targeted_local_verified`，但尚未运行 HTTP、Linux production fixture、
+真实 child/Secret/upstream 或完整并发故障矩阵。
 
 本页只记录证据强度，不重新定义 V270 semantics；authority 唯一来源是
 [`external-pool-adapter-provider-runtime-readiness-authority.md`](external-pool-adapter-provider-runtime-readiness-authority.md)。
@@ -47,16 +50,18 @@ bundle 或连接 upstream。专属动态计数仍为 `passed=0 / failed=0`，状
 - Provider 保持 `registering`，V254 18 个 absolute deny、v213 constructor fence、route/activation/market/
   execution/usage/settlement 边界逐字保留。
 
-## 3. 明确未运行的动态矩阵
+## 3. 当前动态证据与剩余矩阵
 
-当前没有以下证据：
+当前证据边界如下：
 
 | 验收面 | 当前结果 |
 |---|---|
-| fresh/repeat V270 migration、旧库升级、文件重开 | 未运行 |
+| fresh/repeat V270 migration、全新文件库重开 | 2 项通过；显式重装保持 schema exact，非法 canonical receipt 被 UDF 拒绝 |
+| process custody seal、提交晋升、身份漂移、重启 epoch、最长 15 秒窗口 | 3 项通过 |
+| 停在 V269 的旧库升级 | 未运行 |
 | receipt/revocation projection、direct SQL、并发 CAS、崩溃恢复 | 未运行 |
 | startup enabled/disabled/path/controller/平台矩阵 | 未运行 |
-| locked-memory/HMAC zeroize、重启 epoch 失效、commitment 重算 | 未运行 |
+| locked-memory/HMAC zeroize、commitment 重算 | 未运行；仅 process epoch 隔离与 seal exactness 已通过 |
 | V267 current V2 child、V256 Secret、V264 TLS、V265 ELNW 与 cleanup fault matrix | 未运行 |
 | 五条进程内 HTTP、真实 TCP、生产 upstream/Secret | 未运行 |
 | Provider activation、18 项 replacement guard、market admission | 不属于 V270 |
@@ -68,5 +73,6 @@ bundle 或连接 upstream。专属动态计数仍为 `passed=0 / failed=0`，状
 
 V270 仅冻结“一个 exact Provider-specific probe 在 cleanup 后形成可撤销、最长 15 秒、重启即失效的
 durable readiness history”的源码合同。它不是 production deployment、SLA、Provider activation 或开放市场
-验收。当前只能声明实现已编译；只有后续动态矩阵全部通过并产生可复算指纹后，才能提升 verification
-状态。即使提升，`activation_ready=false` 与 V254 fences 也必须保持到独立 atomic activation/admission 批次。
+验收。当前只能声明目标化的本地 migration、integrity 与 process custody 子集已验证，不能声明 production
+runtime readiness 已验收。后续必须补齐第 3 节剩余矩阵；即使全部通过，`activation_ready=false` 与
+V254 fences 也必须保持到独立 atomic activation/admission 批次。

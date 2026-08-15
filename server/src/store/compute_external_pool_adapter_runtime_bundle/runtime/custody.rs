@@ -398,3 +398,6 @@ fn validate_readiness_seal_material(
     }
     Ok(expires_at_utc)
 }
+#[cfg(test)]
+#[path = "custody_tests.rs"]
+mod tests;

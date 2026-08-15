@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -251,10 +251,12 @@ server custody产生；当前硬安全边界是 same-process HMAC anti-forgery�
 
 ## 10. 当前实现与验证现实
 
-当前只冻结 authority 与计划源码切面：V272 migration 的 2 tables/1 view、task protocol profile/catalog 与
-runner/oracle、Store current authority、Service/redaction、三条 API 及 source contracts。架构阶段不编译 Rust、
-不执行 migration、不运行 HTTP/SQLite/Linux fixture、不启动 child 或连接 upstream。正式状态为
-`source_review_only / implementation_uncompiled / implementation_unrun`，`passed=0 / failed=0`。
+当前已冻结 authority 与实现源码切面：V272 migration 的 2 tables/1 view、task protocol profile/catalog 与
+runner/oracle、Store current authority、Service/redaction、三条 API 及 source contracts。修复 SQLite UDF 借用
+生命周期和错误转换推断后，完整 Windows `elon-server` test target 已编译，指纹为
+`702357846db905001886551903686f32f5a1d49461498b4802e366011d129eb9`；尚未执行专属
+migration/ELTP/HTTP/SQLite/Linux fixture、启动 child 或连接 upstream。正式状态为
+`source_review_only / implementation_compiled / implementation_unrun`，`passed=0 / failed=0`。
 
 源码或文档存在不能证明六能力实际运行、process HMAC、TTL race、revocation、重启失效、carrier 隔离或 18
 fences 已动态验收。验收门见

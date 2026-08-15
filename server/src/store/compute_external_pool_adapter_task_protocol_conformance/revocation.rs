@@ -30,7 +30,7 @@ impl Store {
         let mut conn = self.conn().map_err(StoreError::storage)?;
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|error| StoreError::storage(error.into()))?;
+            .map_err(StoreError::storage)?;
         let output = (|| -> Result<_> {
             if let Some(stored) =
                 revocation_by_idempotency_on(&tx, &input.idempotency_scope, &input.idempotency_key)?
@@ -96,8 +96,7 @@ impl Store {
             )
         })()
         .map_err(StoreError::classify_write)?;
-        tx.commit()
-            .map_err(|error| StoreError::storage(error.into()))?;
+        tx.commit().map_err(StoreError::storage)?;
         Ok(output)
     }
 }

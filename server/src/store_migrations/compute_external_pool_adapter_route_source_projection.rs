@@ -300,3 +300,7 @@ fn replace_exact_source_trigger(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "compute_external_pool_adapter_route_source_projection/dynamic_tests.rs"]
+mod dynamic_tests;

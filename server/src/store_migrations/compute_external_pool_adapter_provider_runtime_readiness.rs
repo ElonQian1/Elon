@@ -19,3 +19,7 @@ pub(crate) fn migration_v270(conn: &Connection) -> Result<()> {
     transaction.commit()?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "compute_external_pool_adapter_provider_runtime_readiness/dynamic_tests.rs"]
+mod dynamic_tests;
