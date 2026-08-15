@@ -15,6 +15,8 @@ foreach ($token in @(
     'set_input_text',
     'send_input',
     'Wait-ChatGptWebNativeProbeReply',
+    'Register-ChatGptWebVerificationCases',
+    '-CaseIds @("reversible/send_probe")',
     'open_web_chat_conversation',
     'private_content_emitted = $false',
     'cleared_cookies = $false',
