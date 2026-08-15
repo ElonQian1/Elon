@@ -8,7 +8,9 @@ param(
     [ValidateRange(10, 300)][int]$TimeoutSec = 120,
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$SendProbe,
-    [string]$ProbeMarker = ""
+    [string]$ProbeMarker = "",
+    [string]$Prompt = "",
+    [string]$ExpectedReply = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,7 +32,8 @@ function Resolve-GoogleWebAdapterVersion {
 function Wait-GoogleWebProbeReply {
     param(
         [Parameter(Mandatory = $true)]$Runtime,
-        [Parameter(Mandatory = $true)][string]$Marker,
+        [Parameter(Mandatory = $true)][string]$Prompt,
+        [Parameter(Mandatory = $true)][string]$ExpectedReply,
         [ValidateRange(10, 300)][int]$WaitTimeoutSec
     )
 
@@ -45,8 +48,8 @@ function Wait-GoogleWebProbeReply {
         if (
             [string]$state.social_chat.web_chat_provider_id -eq "google_web" -and
             [string]$state.social_chat.web_chat_state -eq "ready" -and
-            [string]$user.content -like "*$Marker*" -and
-            [string]$assistant.content -like "*$Marker*"
+            [string]$user.content -eq $Prompt -and
+            [string]$assistant.content -eq $ExpectedReply
         ) {
             return $state
         }
@@ -55,15 +58,26 @@ function Wait-GoogleWebProbeReply {
     throw "Timed out waiting for the Google Web AI probe reply."
 }
 
-if (-not $SendProbe -and $ProbeMarker) {
-    throw "ProbeMarker requires -SendProbe because the default Google smoke is read-only."
+if (-not $SendProbe -and ($ProbeMarker -or $Prompt -or $ExpectedReply)) {
+    throw "Probe arguments require -SendProbe because the default Google smoke is read-only."
 }
-if ($SendProbe -and -not $ProbeMarker) {
-    $ProbeMarker = "ELON-GOOGLE-WEB-AI-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+if ($ProbeMarker -and ($Prompt -or $ExpectedReply)) {
+    throw "ProbeMarker cannot be combined with Prompt or ExpectedReply."
 }
 if ($ProbeMarker -and $ProbeMarker -notmatch '^[A-Za-z0-9_-]{8,120}$') {
     throw "ProbeMarker must be 8-120 ASCII letters, digits, underscores, or hyphens."
 }
+if ($SendProbe -and -not $ProbeMarker -and -not $Prompt -and -not $ExpectedReply) {
+    $ProbeMarker = "ELON-GOOGLE-WEB-AI-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+}
+if ($SendProbe -and ($Prompt -or $ExpectedReply) -and (-not $Prompt -or -not $ExpectedReply)) {
+    throw "Prompt and ExpectedReply must be provided together."
+}
+if ($Prompt.Length -gt 400 -or $ExpectedReply.Length -gt 400) {
+    throw "Prompt and ExpectedReply must each stay within 400 characters."
+}
+$probePrompt = if ($Prompt) { $Prompt } else { "Reply exactly with: $ProbeMarker" }
+$probeExpectedReply = if ($ExpectedReply) { $ExpectedReply } else { $ProbeMarker }
 
 $ExpectedAdapterVersion = Resolve-GoogleWebAdapterVersion $ExpectedAdapterVersion
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
@@ -89,6 +103,7 @@ try {
         composer_ready = $true
         sent_messages = 0
         assistant_completed = $false
+        probe_kind = if ($Prompt) { "custom_exact" } else { "marker_exact" }
         original_conversation_restored = $true
         cleared_cookies = $false
         cleared_app_data = $false
@@ -108,9 +123,10 @@ try {
                         [int]$state.social_chat.message_count -eq 0
                 } | Out-Null
             Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
-                -Arguments @{ text = "Reply exactly with: $ProbeMarker" } | Out-Null
+                -Arguments @{ text = $probePrompt } | Out-Null
             Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
-            Wait-GoogleWebProbeReply -Runtime $runtime -Marker $ProbeMarker `
+            Wait-GoogleWebProbeReply -Runtime $runtime -Prompt $probePrompt `
+                -ExpectedReply $probeExpectedReply `
                 -WaitTimeoutSec $TimeoutSec | Out-Null
             $report.sent_messages = 1
             $report.assistant_completed = $true

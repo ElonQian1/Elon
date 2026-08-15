@@ -15,7 +15,9 @@ if (@($parseErrors).Count -gt 0) {
 
 foreach ($required in @(
     '[switch]$SendProbe',
-    'ProbeMarker requires -SendProbe',
+    'Probe arguments require -SendProbe',
+    'Prompt and ExpectedReply must be provided together',
+    'probe_kind = if ($Prompt) { "custom_exact" } else { "marker_exact" }',
     'Open-WebChatNativeChatSurface',
     '-ProviderId "google_web"',
     'web_chat_adapter_version',
@@ -24,6 +26,7 @@ foreach ($required in @(
     '-Action "set_input_text"',
     '-Action "send_input"',
     'Wait-GoogleWebProbeReply',
+    '-ExpectedReply $probeExpectedReply',
     'open_web_chat_conversation',
     'cleared_cookies = $false',
     'cleared_app_data = $false',
