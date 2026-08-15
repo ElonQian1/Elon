@@ -1,7 +1,9 @@
 use anyhow::{bail, Result};
 use chrono::Duration;
 
-use super::{super::*, support};
+use super::{
+    super::*, support, validate_active_provider_evidence, validate_registering_provider_evidence,
+};
 
 pub(crate) fn validate_external_pool_adapter_provider_active_successor_receipt(
     value: &ExternalPoolAdapterProviderActiveSuccessorReceipt,

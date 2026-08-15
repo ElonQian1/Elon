@@ -50,9 +50,7 @@ fn receipt_on<P: rusqlite::Params>(
     let stored = conn
         .query_row(&sql, values, |row| {
             let receipt_json: String = row.get(0)?;
-            let receipt = bounded_decode(&receipt_json).map_err(|error| {
-                rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
-            })?;
+            let receipt = bounded_decode(&receipt_json).map_err(sqlite_decode_error)?;
             Ok(StoredExternalPoolAdapterProviderActiveSuccessor {
                 receipt,
                 receipt_json,
@@ -81,9 +79,7 @@ pub(super) fn revocation_by_target_on(
             params![target_receipt_id],
             |row| {
                 let revocation_json: String = row.get(0)?;
-                let receipt = bounded_decode(&revocation_json).map_err(|error| {
-                    rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
-                })?;
+                let receipt = bounded_decode(&revocation_json).map_err(sqlite_decode_error)?;
                 Ok(StoredExternalPoolAdapterProviderActiveSuccessorRevocation {
                     receipt,
                     revocation_json,
@@ -107,4 +103,9 @@ fn bounded_decode<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
         bail!("provider active-successor durable JSON exceeds its fixed bound");
     }
     Ok(serde_json::from_str(json)?)
+}
+
+fn sqlite_decode_error(error: anyhow::Error) -> rusqlite::Error {
+    let source = std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string());
+    rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(source))
 }
