@@ -4070,7 +4070,7 @@
       "id": "rust-cache-recovery-exclusive-filter-v2-1",
       "title": "Rust cache missing-workspace exclusive recovery filter V2.1",
       "summary": "Keep explicit missing-workspace recovery exclusive under low disk so valid workspace partitions cannot be selected by the general LRU watermark path.",
-      "status": "implemented",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/rust-cache-recovery-exclusive-filter-v2-1.md",
@@ -4151,7 +4151,7 @@
         }
       ],
       "created_at_ms": 1786781564000,
-      "updated_at_ms": 1786781603308
+      "updated_at_ms": 1786781999142
     },
     {
       "id": "rust-cache-recovery-governance-v2",
@@ -5011,16 +5011,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_010eba7d9e134fce80d9c2d2f43abd14",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Rebased full elon-server target passed 14 focused tests with fingerprint fd22ac143bc522669a3b224a4375fdc40e748d26d69bbb3330d1b408f3860618.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786659172228
-    },
     {
       "id": "feature_event_5b1c283fd7a145389554c821bfe27c92",
       "feature_id": "compute-v256-runtime-bundle-resolver-verification",
@@ -7010,6 +7000,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1786781603308
+    },
+    {
+      "id": "feature_event_804965cd646e4de2867315db9d058dff",
+      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "action": "transitioned",
+      "actor": "codex-cache-repair",
+      "reason": "Passed 138 cache-platform assertions. Live low-disk dry-runs selected only missing workspace partitions with Unsafe=0; C apply removed 5 partitions (11.28 GiB), shared deletions 0, postchecks selected 0.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786781999142
     }
   ]
 }
