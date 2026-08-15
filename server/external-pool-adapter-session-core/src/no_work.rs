@@ -38,6 +38,7 @@ pub struct ExternalPoolAdapterNoWorkProbeHostRequest {
 
 /// Host proof that the same authenticated child semantically accepted the exact response.
 pub struct ExternalPoolAdapterNoWorkProbeHostReceipt {
+    probe_nonce_digest: [u8; 32],
     probe_root: [u8; 32],
     request_sha256: [u8; 32],
     response_sha256: [u8; 32],
@@ -109,6 +110,7 @@ impl ExternalPoolAdapterNoWorkProbeHostRequest {
             bail!("no-work probe child receipt rejected");
         }
         let output = ExternalPoolAdapterNoWorkProbeHostReceipt {
+            probe_nonce_digest: Sha256::digest(&self.nonce[..]).into(),
             probe_root,
             request_sha256: self.request_sha256,
             response_sha256,
@@ -129,8 +131,20 @@ impl Drop for ExternalPoolAdapterNoWorkProbeHostRequest {
 }
 
 impl ExternalPoolAdapterNoWorkProbeHostReceipt {
+    pub fn probe_nonce_digest_hex(&self) -> String {
+        hex::encode(self.probe_nonce_digest)
+    }
+
     pub fn probe_root_hex(&self) -> String {
         hex::encode(self.probe_root)
+    }
+
+    pub fn request_sha256_hex(&self) -> String {
+        hex::encode(self.request_sha256)
+    }
+
+    pub fn response_sha256_hex(&self) -> String {
+        hex::encode(self.response_sha256)
     }
 
     pub fn request_bytes(&self) -> u32 {
@@ -144,6 +158,7 @@ impl ExternalPoolAdapterNoWorkProbeHostReceipt {
 
 impl Drop for ExternalPoolAdapterNoWorkProbeHostReceipt {
     fn drop(&mut self) {
+        self.probe_nonce_digest.zeroize();
         self.probe_root.zeroize();
         self.request_sha256.zeroize();
         self.response_sha256.zeroize();

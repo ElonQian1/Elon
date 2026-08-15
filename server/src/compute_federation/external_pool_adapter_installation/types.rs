@@ -1,11 +1,13 @@
-use std::{fs::File, path::PathBuf};
+use std::{collections::BTreeSet, fs::File, io, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::compute_federation::{
     external_pool_adapter_adoption::ExternalPoolAdapterAdoptionReceipt,
     external_pool_adapter_artifact_package::{
         ExternalPoolAdapterArtifactPackageReceipt, ARTIFACT_PACKAGE_ENTRYPOINT_ROLE,
+        ARTIFACT_PACKAGE_RESOURCE_ROLE,
     },
 };
 
@@ -200,4 +202,101 @@ impl PreparedExternalPoolAdapterInstallation {
             self.binding.entrypoint_size_bytes,
         ))
     }
+
+    /// Borrows one exact public resource retained by the installation audit.
+    ///
+    /// Every call revalidates the full ordered inventory and every retained handle by path, role,
+    /// SHA-256, and size. No local path or raw descriptor crosses this seam.
+    pub(crate) fn retained_resource(&self, path: &str) -> anyhow::Result<(&File, &str, u64)> {
+        if self._reopened_files.len() != self.binding.installed_files.len()
+            || path.trim() != path
+            || path.is_empty()
+        {
+            anyhow::bail!("retained resource inventory is no longer exact");
+        }
+        let mut paths = BTreeSet::new();
+        let mut selected = None;
+        for (index, (expected, retained)) in self
+            .binding
+            .installed_files
+            .iter()
+            .zip(&self._reopened_files)
+            .enumerate()
+        {
+            if !valid_retained_inventory_path(&expected.path)
+                || !paths.insert(expected.path.as_str())
+                || !matches!(
+                    expected.role.as_str(),
+                    ARTIFACT_PACKAGE_ENTRYPOINT_ROLE | ARTIFACT_PACKAGE_RESOURCE_ROLE
+                )
+                || (index == self.entrypoint_index)
+                    != (expected.role == ARTIFACT_PACKAGE_ENTRYPOINT_ROLE)
+                || expected.size_bytes == 0
+                || (expected.role == ARTIFACT_PACKAGE_ENTRYPOINT_ROLE
+                    && (index != self.entrypoint_index
+                        || expected.path != self.binding.entrypoint_path
+                        || expected.sha256 != self.binding.entrypoint_sha256
+                        || expected.size_bytes != self.binding.entrypoint_size_bytes))
+                || retained.metadata()?.len() != expected.size_bytes
+                || retained_file_sha256(retained, expected.size_bytes)? != expected.sha256
+            {
+                anyhow::bail!("retained resource authority is no longer exact");
+            }
+            if expected.path == path {
+                if selected.is_some() || expected.role != ARTIFACT_PACKAGE_RESOURCE_ROLE {
+                    anyhow::bail!("retained resource selection is not exact");
+                }
+                selected = Some((retained, expected.sha256.as_str(), expected.size_bytes));
+            }
+        }
+        selected.ok_or_else(|| anyhow::anyhow!("retained resource is unavailable"))
+    }
+}
+
+fn valid_retained_inventory_path(path: &str) -> bool {
+    path.trim() == path
+        && !path.is_empty()
+        && !path.starts_with('/')
+        && !path.contains('\\')
+        && !path.chars().any(char::is_control)
+        && path
+            .split('/')
+            .all(|component| !matches!(component, "" | "." | ".."))
+}
+
+fn retained_file_sha256(file: &File, expected_size: u64) -> anyhow::Result<String> {
+    let before = file.metadata()?;
+    if !before.is_file() || before.len() != expected_size {
+        anyhow::bail!("retained resource size changed");
+    }
+    let mut digest = Sha256::new();
+    let mut offset = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    while offset < expected_size {
+        let wanted = usize::try_from((expected_size - offset).min(buffer.len() as u64))?;
+        let read = read_retained_at(file, &mut buffer[..wanted], offset)?;
+        if read == 0 {
+            anyhow::bail!("retained resource ended early");
+        }
+        digest.update(&buffer[..read]);
+        offset = offset
+            .checked_add(read as u64)
+            .ok_or_else(|| anyhow::anyhow!("retained resource size overflow"))?;
+    }
+    if read_retained_at(file, &mut buffer[..1], expected_size)? != 0
+        || file.metadata()?.len() != before.len()
+    {
+        anyhow::bail!("retained resource changed during rehash");
+    }
+    Ok(hex::encode(digest.finalize()))
+}
+
+#[cfg(unix)]
+fn read_retained_at(file: &File, buffer: &mut [u8], offset: u64) -> io::Result<usize> {
+    std::os::unix::fs::FileExt::read_at(file, buffer, offset)
+}
+
+#[cfg(windows)]
+fn read_retained_at(file: &File, buffer: &mut [u8], offset: u64) -> io::Result<usize> {
+    std::os::windows::fs::FileExt::seek_read(file, buffer, offset)
 }

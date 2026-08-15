@@ -66,6 +66,14 @@ mod lifecycle_http_test;
 mod lifecycle_support;
 #[path = "external_pool_adapter_release_api_tests/management.rs"]
 mod management;
+#[path = "external_pool_adapter_release_api_tests/runtime_compatibility_verification_api_source_contract_test.rs"]
+mod runtime_compatibility_verification_api_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_compatibility_verification_domain_source_contract_test.rs"]
+mod runtime_compatibility_verification_domain_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_compatibility_verification_session_source_contract_test.rs"]
+mod runtime_compatibility_verification_session_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_compatibility_verification_store_source_contract_test.rs"]
+mod runtime_compatibility_verification_store_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/runtime_launch_profile_admin_http_test.rs"]
 mod runtime_launch_profile_admin_http_test;
 #[path = "external_pool_adapter_release_api_tests/runtime_launch_profile_owner_http_test.rs"]

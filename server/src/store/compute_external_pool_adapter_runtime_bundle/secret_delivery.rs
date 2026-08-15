@@ -215,7 +215,7 @@ pub(super) fn delivery_binding(
     preparation: &CurrentExternalPoolAdapterProbePreparationAuthority<'_, '_, '_>,
     companion: &CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
     delivery_root: &str,
-    session_root_arguments: &[String; 6],
+    session_root_arguments: &[String],
 ) -> Result<ExternalPoolAdapterEphemeralSecretDeliveryBinding> {
     use sha2::{Digest, Sha256};
 
@@ -226,7 +226,8 @@ pub(super) fn delivery_binding(
     let profile = &bundle.launch_profile().profile().profile;
     let capsule = preparation.capsule();
     let probe_timeout_ms = profile.launch_policy.probe_timeout_ms;
-    if profile.launch_policy.probe_contract != "authenticated_no_work_readiness_v1"
+    if session_root_arguments.len() != 6
+        || profile.launch_policy.probe_contract != "authenticated_no_work_readiness_v1"
         || probe_timeout_ms == 0
         || probe_timeout_ms != material.supervisor_session_policy.state.probe_timeout_ms
         || session_root_arguments[0] != material.supervisor_session_policy_digest

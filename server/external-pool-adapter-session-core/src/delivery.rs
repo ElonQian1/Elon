@@ -163,6 +163,10 @@ impl Drop for PreparedExternalPoolAdapterEphemeralBundleDelivery {
 }
 
 impl ExternalPoolAdapterEphemeralBundleDeliveryHostReceipt {
+    pub fn bundle_root_hex(&self) -> String {
+        hex::encode(self.bundle_root)
+    }
+
     pub fn shutdown(mut self, session: &mut AuthenticatedExternalPoolAdapterSession) -> Result<()> {
         session.send(
             ExternalPoolAdapterSessionFrameKind::Control,

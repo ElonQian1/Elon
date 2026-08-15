@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221-v266 保留各层证据，但 V261-V265 runtime fixture 现在只作历史 provenance。V267 已针对 exec 后 dumpable、execveat、ancillary 与 cleanup 缺口写入 launch stub、Yama 2/3、policy V2 及 transport/lifecycle 加固，但仍为 `source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0`；旧 fixture 不能验收 current runtime。V266 `6 passed` 只属于冻结 V1 Profile，V2 Profile/verifier 尚缺。没有第三方 binary、生产 upstream/Secret、durable readiness 或 route/activation；Provider 仍 `registering`，V254 18 deny 不变。见 [`V267 权威`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)、[`验收`](external-pool-adapter-post-exec-supervisor-hardening-acceptance.md) 与 [`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | v221-v266 保留各层证据，但 V261-V265 runtime fixture 现在只作历史 provenance。V267 写入 launch stub、Yama 2/3、policy V2 及 transport/lifecycle 加固；V268 写入独立 Profile V2、固定 catalog 路径/约束下的 release-declared public fixture、Store-private run observation、exact V237 key signed receipt/revocation/currentness与五条 admin route。production orchestrator/independent-signer handoff 未接线，端到端 signed workflow 仍不可达。V267/V268 仍为 `source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0`；V266 `6 passed` 只属于冻结 V1 Profile。V268 是 Provider-neutral release evidence，不是 production readiness；没有第三方 binary、生产 upstream/Secret、route/activation/market admission，Provider 仍 `registering`，V254 18 deny 不变。见 [`V268 权威`](external-pool-adapter-signed-runtime-compatibility-authority.md)、[`验收`](external-pool-adapter-signed-runtime-compatibility-acceptance.md) 与 [`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -124,6 +124,7 @@ owners: backend, node, ai-economy
 37. `docs/distributed-compute/settlement-release-batch-api.md`：到期候选、逐笔 v198 释放、部分失败报告与非后台自动化边界。
 38. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 39. `docs/distributed-compute/external-pool-adapter-post-exec-supervisor-hardening-authority.md` 与对应 acceptance：V267 source/launch capsule、post-exec dumpable、Yama、policy V2、ancillary、cleanup 和历史 evidence 失效边界。
+40. `docs/distributed-compute/external-pool-adapter-signed-runtime-compatibility-authority.md` 与对应 acceptance：V268 Profile V2、固定 catalog 约束下的 release-declared public fixture、private runner observation、V237 signed release evidence、五条 admin route 与 atomic activation 后置边界。
 
 ## 分阶段落地
 
@@ -178,7 +179,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-Provider Adapter v227-v266 的证据只在各自历史版本内有效。V267 已写入 launch image、post-exec dumpable、Yama 2/3、policy V2、execveat/ancillary/cleanup 加固，但未编译或运行，`passed=0`；V260-V265 全链与 V2 machine Profile 必须重验。V264 独立 Broker TLS 和 V266 冻结 V1 Profile 不等于 V2 runtime。之后才可推进 signed verifier execution 与同批 atomic activation/admission gate；V254 18 deny 逐字保留。见 [`V267 hardening`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)、[`V266 V1 Profile`](external-pool-adapter-runtime-compatibility-profile-authority.md) 与 [`当前状态`](current-implementation-status.md)。
+Provider Adapter v227-v266 的证据只在各自历史版本内有效。V267 已写入 launch image、post-exec dumpable、Yama 2/3、policy V2、execveat/ancillary/cleanup 加固；V268 又写入 Profile V2 与 Provider-neutral signed compatibility source，但两批都未编译或运行，`passed=0`，且 V268 production orchestrator/independent-signer handoff 未接线。V260-V265 current 全链仍须重验。V268 不能与 atomic activation/admission 同批闭合：后续事务必须组合 current V268 durable release root 与 fresh V265 Provider-specific no-work/target/Secret availability，且必须先成功 shutdown/reap；V254 18 deny 在完整替代 gate 动态验收前逐字保留。见 [`V268 signed compatibility`](external-pool-adapter-signed-runtime-compatibility-authority.md)、[`V267 hardening`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)、[`V266 V1 Profile`](external-pool-adapter-runtime-compatibility-profile-authority.md) 与 [`当前状态`](current-implementation-status.md)。
 
 ### F4：容量期货市场
 

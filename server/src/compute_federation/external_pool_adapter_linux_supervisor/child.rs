@@ -52,7 +52,7 @@ pub(super) struct ChildLaunchPlan {
     pub(super) child_ipc_fd: i32,
     pub(super) capsule_fd: i32,
     pub(super) seed_fd: i32,
-    pub(super) argv: [CString; 7],
+    pub(super) argv: Vec<CString>,
     pub(super) scratch_root: CString,
     pub(super) policy: SupervisorPolicy,
     pub(super) seccomp_program: Vec<libc::sock_filter>,
@@ -74,16 +74,13 @@ impl ChildLaunchPlan {
             libc::_exit(127);
         }
 
-        let argv = [
-            self.argv[0].as_ptr(),
-            self.argv[1].as_ptr(),
-            self.argv[2].as_ptr(),
-            self.argv[3].as_ptr(),
-            self.argv[4].as_ptr(),
-            self.argv[5].as_ptr(),
-            self.argv[6].as_ptr(),
-            std::ptr::null(),
-        ];
+        if !(2..=12).contains(&self.argv.len()) {
+            libc::_exit(127);
+        }
+        let mut argv = [std::ptr::null::<libc::c_char>(); 13];
+        for (slot, value) in argv.iter_mut().zip(self.argv.iter()) {
+            *slot = value.as_ptr();
+        }
         let environment = [std::ptr::null::<libc::c_char>()];
         libc::syscall(
             libc::SYS_execveat,
