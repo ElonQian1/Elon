@@ -16,6 +16,7 @@ internal class SocialAiChatModeController(
     private val activateWorkMode: () -> Unit,
     private val activateChatProvider: (WebChatProviderIdentity) -> Unit,
     private val deactivateChatProvider: () -> Unit,
+    private val officialFallbackUrl: () -> String?,
 ) {
     private val modeStore = SocialAiModeStore(activity)
     private val modeControl = SocialAiModeSegmentedControl(
@@ -55,7 +56,10 @@ internal class SocialAiChatModeController(
     fun openOfficialFallback() {
         val intent = when (providerId) {
             WebChatProviderId.CHATGPT_WEB -> ChatGptWebTestActivity.createProductIntent(activity)
-            WebChatProviderId.GOOGLE_WEB -> GoogleWebOfficialActivity.createIntent(activity)
+            WebChatProviderId.GOOGLE_WEB -> GoogleWebOfficialActivity.createIntent(
+                activity,
+                officialFallbackUrl(),
+            )
         }
         activity.startActivity(intent)
     }

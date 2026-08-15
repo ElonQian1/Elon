@@ -92,6 +92,10 @@ internal class GoogleWebBackgroundSession(
 
     fun currentConversationPath(): String? = activePath
 
+    fun currentOfficialUrl(): String? = activePath
+        ?.let(conversationStore::restorableUrl)
+        ?: GoogleWebNavigationPolicy.sanitizeRestorableUrl(latestSnapshot?.url)
+
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationStore.index(activePath)
 
     fun requestConversationIndex(): Boolean {

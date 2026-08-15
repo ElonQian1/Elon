@@ -21,6 +21,12 @@ class GoogleWebAdapterContractTest {
         val session = read(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
         )
+        val officialActivity = read(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebOfficialActivity.kt",
+        )
+        val modeController = read(
+            "android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt",
+        )
         val pendingSendState = read(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPendingSendState.kt",
         )
@@ -87,7 +93,13 @@ class GoogleWebAdapterContractTest {
         assertTrue(session.contains("ChatGptWebProxyController"))
         assertTrue(session.contains("snapshot.composerReady && !snapshot.streaming"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))
+        assertTrue(session.contains("fun currentOfficialUrl(): String?"))
+        assertTrue(session.contains("conversationStore::restorableUrl"))
+        assertTrue(officialActivity.contains("intent.getStringExtra(EXTRA_START_URL)"))
+        assertTrue(officialActivity.contains("sanitizeRestorableUrl(requestedUrl)"))
+        assertTrue(modeController.contains("officialFallbackUrl()"))
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
+        assertTrue(controller.contains("session.currentOfficialUrl()"))
         assertTrue(controller.contains("pendingSend.confirmSubmission()"))
         assertTrue(controller.contains("restorePrompt(failedPrompt)"))
         assertTrue(controller.contains("pendingSend.onConfirmationTimeout(generation)"))

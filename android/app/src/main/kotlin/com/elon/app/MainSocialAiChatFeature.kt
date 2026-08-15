@@ -74,6 +74,7 @@ internal class MainSocialAiChatFeature(
             activateWorkMode = ::activateWorkMode,
             activateChatProvider = ::activateChatProvider,
             deactivateChatProvider = ::deactivateChatProvider,
+            officialFallbackUrl = { activeController().officialFallbackUrl() },
         )
     }
     private val webChatNavigationSessions: WebChatNavigationSessionRegistry by lazy {

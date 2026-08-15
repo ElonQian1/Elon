@@ -23,6 +23,7 @@ internal interface WebChatSocialController {
     fun stopGeneration()
     fun startNewConversation()
     fun currentConversationPath(): String?
+    fun officialFallbackUrl(): String? = null
     fun conversationIndex(): ChatGptWebConversationIndexState
     fun requestConversationIndex(): Boolean
     fun openConversation(path: String): Boolean
