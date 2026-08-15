@@ -189,7 +189,12 @@ assert.equal(
 );
 tracker.observeNoOverlay('/');
 
-const reusedOverlay = { isConnected: true, menu: '' };
+const nestedMenu = { isConnected: true };
+const reusedOverlay = {
+  isConnected: true,
+  menu: '',
+  contains(candidate) { return candidate === nestedMenu; }
+};
 tracker.rememberContextTrigger(
   conversationTrigger,
   source,
@@ -202,6 +207,26 @@ assert.equal(
   tracker.resolveOverlayContext(reusedOverlay, '/', reusedOverlay.menu),
   'conversation_123',
   'management actions mounted into an existing overlay inherit the triggering conversation context'
+);
+assert.equal(
+  tracker.resolveOverlayContext(nestedMenu, '/', reusedOverlay.menu),
+  'conversation_123',
+  'the nested structural menu root inherits ownership from its changed outer overlay'
+);
+assert.equal(
+  tracker.resolveOverlayContext(reusedOverlay, '/', reusedOverlay.menu),
+  'conversation_123',
+  'probing the outer wrapper does not displace the more specific nested menu root'
+);
+assert.equal(
+  tracker.resolveOverlayContext({ isConnected: true }, '/', reusedOverlay.menu),
+  '',
+  'an unrelated overlay still cannot steal nested menu ownership'
+);
+assert.equal(
+  tracker.resolveOverlayContext(nestedMenu, '/', reusedOverlay.menu),
+  'conversation_123',
+  'the nested menu keeps ownership after unrelated overlay probes'
 );
 tracker.observeNoOverlay('/');
 
