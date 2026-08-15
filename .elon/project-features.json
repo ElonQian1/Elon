@@ -4067,6 +4067,178 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "rust-cache-recovery-governance-v2",
+      "title": "Rust cache safe recovery governance V2",
+      "summary": "Provide explicit missing-workspace recovery, workspace-only GC filtering, stale lock classification, and cache-aware independent worktree cleanup while preserving shared caches and active work.",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/rust-cache-recovery-governance-v2.md",
+        "content_hash": "08ba735bc70e887ad2ebc233a207105f50922d1d030933555479a015d00f929c",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "7f68b45ef0a475b6cc243261c30c8b829f9b8d3a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "developer-platform",
+      "tags": [
+        "rust-cache",
+        "gc",
+        "worktree",
+        "lock",
+        "recovery"
+      ],
+      "task_paths": [
+        "docs/rust-cache-on-demand-adoption.md",
+        "docs/rust-cache-platform.md",
+        "scripts/cleanup-task-worktrees.ps1",
+        "scripts/rust-cache.ps1",
+        "scripts/rust-cache/RustCache.Inventory.psm1",
+        "scripts/rust-cache/RustCache.Runtime.psm1",
+        "scripts/rust-cache/RustCache.TaskLifecycle.psm1",
+        "scripts/test-ai-task-finish-workflow.ps1",
+        "scripts/test-rust-cache-platform.ps1"
+      ],
+      "dependencies": [
+        "ai-task-managed-rust-cache-lifecycle-v1"
+      ],
+      "acceptance_criteria": [
+        "Distinguish active, stale, invalid, and absent cache locks without allowing stale locks to block GC forever.",
+        "Explicit missing-workspace recovery selects only valid aged workspace hash partitions whose workspace path is absent.",
+        "Workspace-only mode preserves shared, quarantine, invalid, current, recent, and actively locked partitions under every GC trigger.",
+        "Independent worktree cleanup reclaims owned workspace partitions before removal and preserves worktrees with active cache locks.",
+        "Managed deletion continues through partition locks, atomic trash, bounded reports, and live machine dry-run before apply.",
+        "Installed machine entry matches the pushed source before real cleanup; shared caches, current worktrees, dirty or unmerged worktrees, and long-running Cargo processes remain."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/rust-cache-recovery-governance-v2.md",
+          "content_hash": "08ba735bc70e887ad2ebc233a207105f50922d1d030933555479a015d00f929c",
+          "locator": "acceptance criteria",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7f68b45ef0a475b6cc243261c30c8b829f9b8d3a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/rust-cache-platform.md",
+          "content_hash": "5f3a1d476839555b5604e44591311ee8728fa3aa166a5e8979df7a7884368869",
+          "locator": "missing workspace recovery commands",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "e0ed6e563b1f6d0828569a9ebafd55589b036e35",
+            "worktree_blob_oid": "6e5e0059622cb5aef55f78963de9da800db18392",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/cleanup-task-worktrees.ps1",
+          "content_hash": "4f1a325292861554e385f71878092b46f89aabd7999f0711062a72d35421a759",
+          "locator": "Clear-WorktreeRustCachePartitions",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "a389cf212a26ac89bc948f1013147e7b7a581a19",
+            "worktree_blob_oid": "58466aa39f1d89210b3de31a538c03e569c0de12",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache.ps1",
+          "content_hash": "ec55c7535d21270efd6794d2fe6be84dd63792b2be60f437f9aa7aa24a0b9a1f",
+          "locator": "RecoverMissingWorkspaces",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "86fa8a546c8cec88138e26baf64e39a7e9300d45",
+            "worktree_blob_oid": "6da04470ec8220846eb21c819d9468f99db42097",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Inventory.psm1",
+          "content_hash": "d2d94b6e651957003a85c2ce6dd72e81899c0b74b4d0e7a4bc64a513dbc4803f",
+          "locator": "Invoke-RustCacheGc",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "20c51c7a73fad539664a1f002bc6c25972bb1b56",
+            "worktree_blob_oid": "067260ecc624a13ba271ff40cc495f851c47cc70",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Runtime.psm1",
+          "content_hash": "b82ca1113f7f5116902040043c17fae2c1e5a61bf3345c01af8a54b694597e60",
+          "locator": "Get-RustCacheLockState",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "c456c158481e40bb6fc23bef372f25d5fee95a28",
+            "worktree_blob_oid": "1b0bfd664e9048de602d8a374a5f020d4916073d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.TaskLifecycle.psm1",
+          "content_hash": "026b8616e47b013dc5bcac10d37c87aa7ef98aa70a8665a15c54f34982baba29",
+          "locator": "Test-RustCacheRecoverableMissingWorkspacePartition",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "cc45f1613597184982d65b71e0ebadf6f133c5c0",
+            "worktree_blob_oid": "d74541b66703d17339db018be99c5e5ccc0e40ed",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-ai-task-finish-workflow.ps1",
+          "content_hash": "b71a525dc5f9e407ec450d7ac46df80c2dafdd4bf4dae637128b50f20a4921c5",
+          "locator": "independent cleanup cache regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "241372ae2417eb2180dfd310baf1d10f850d77d9",
+            "worktree_blob_oid": "958b9227a69129db18d490c5075aac76eee338dc",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-platform.ps1",
+          "content_hash": "b9ba0595f6feb3aedd6724028c8f6180929d647530b66aa907bfb2c9a291d16b",
+          "locator": "missing workspace recovery regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e71ac7cfa39a21c218590b2b8ded543633336e61",
+            "head_blob_oid": "f4b6cba8aceae8d13461406700eda517911a6190",
+            "worktree_blob_oid": "8a36d7acad72628315a57526cf3ef98a829d66ca",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786779464857,
+      "updated_at_ms": 1786780384585
+    },
+    {
       "id": "rust-cross-target-cache-routing-v1",
       "title": "Rust cross-target cache routing V1",
       "summary": "Route Windows Linux-musl and other Rust cross-target validation through stable rust-cache-v2 partitions while keeping final artifacts under task-local .ai-tmp.",
@@ -4752,66 +4924,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_0529c43a46f547cfbd6c90db68181635",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Bind the completed implementation and dynamic evidence under the refreshed requirement.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786657770803
-    },
-    {
-      "id": "feature_event_fbe90639fff149a885a853f60c7d13df",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786657786329
-    },
-    {
-      "id": "feature_event_3d37411393664de994d6bdf41285fc6c",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Implementation, modular tests and current authority documentation are complete; verification evidence is recorded.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786657795077
-    },
-    {
-      "id": "feature_event_3e3b660861ce43579556ae4a13a0ba4e",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Final rebased evidence changed the authority hash; block before explicit requirement rebind.",
-      "from_status": "implemented",
-      "to_status": "blocked",
-      "at_ms": 1786659124031
-    },
-    {
-      "id": "feature_event_a34c3726e5844df9becde812d303e941",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal",
-      "reason": "Bind the final rebased validation fingerprint and committed authority document.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786659133225
-    },
-    {
-      "id": "feature_event_2cfec4080334426b8e145d7542843539",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Reviewed the final rebased authority and retained all fail-closed non-goals.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786659165764
-    },
     {
       "id": "feature_event_45c31cd7264e421f877f27f368d613b0",
       "feature_id": "compute-v256-runtime-bundle-resolver-verification",
@@ -6751,6 +6863,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786772758494
+    },
+    {
+      "id": "feature_event_728df1e278124380925ac79c9a578124",
+      "feature_id": "rust-cache-recovery-governance-v2",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "Live machine audit found over 100 GiB of missing-workspace partitions plus a stale lock that current GC cannot safely reclaim.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786779464857
+    },
+    {
+      "id": "feature_event_48a36d200c744efd8eb52b6e026c9233",
+      "feature_id": "rust-cache-recovery-governance-v2",
+      "action": "claimed",
+      "actor": "codex-cache-recovery-20260815",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786779480037
+    },
+    {
+      "id": "feature_event_96a46ab9d6aa45fe8dce77151963786d",
+      "feature_id": "rust-cache-recovery-governance-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Implementation started after live inventory reproduced missing-workspace accumulation and stale lock blockage.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786779494263
+    },
+    {
+      "id": "feature_event_e5a03f64ce3a40afa573dda5ed83c4ec",
+      "feature_id": "rust-cache-recovery-governance-v2",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786780355392
+    },
+    {
+      "id": "feature_event_baa82b31c82b4864b4990a03fef673bf",
+      "feature_id": "rust-cache-recovery-governance-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Source, docs, and focused regression evidence are recorded.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786780372727
+    },
+    {
+      "id": "feature_event_25e653c6c5404bcdbc8aebbe54b5a2d8",
+      "feature_id": "rust-cache-recovery-governance-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Focused cache, worktree finish, preflight workflow, prompt audit, source size, and document modularity gates passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786780384585
     }
   ]
 }

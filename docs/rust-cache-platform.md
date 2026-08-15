@@ -219,9 +219,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -Apply
 ```
 
-托管项目的每个构建分区都有独立写锁；GC 只会取得目标分区锁后再原子移入回收区，因此其他分区正在构建时仍可回收冷分区。裸 Cargo 没有平台分区锁，所以只要检测到任意 Cargo/rustc 进程，quarantine 分区就全部保留。每次计划或执行都写入 `reports\gc-*.json`，并记录检测到的构建进程。
+历史 worktree 已被旧流程移除，但 marker 中的精确 workspace 路径已经不存在时，使用
+显式恢复模式。该模式仍默认 dry-run，并用 `-WorkspaceOnly` 把本轮候选限制在有效的
+16 位 workspace 哈希分区：
 
-共享缓存根不等于共享 Cargo build-dir。默认 workspace 分区仍按绝对工作区路径生成 16 位哈希，因此短期 worktree 若只删除 Git 目录、不处理对应分区，缓存会持续累积。统一任务收尾会在移除受管 `codex/*` worktree 前，定向读取 `.last-used.json`，只删除标记工作区位于当前任务根内、名称为 16 位十六进制且作用域为 `workspace` 的分区。`shared`、`quarantine`、未知作用域、无效标记和带锁分区一律保留。
+```powershell
+# 先审查报告中的路径、作用域、锁状态和预计释放量
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -RecoverMissingWorkspaces -WorkspaceOnly
+
+# 只有报告与工作区清单核对一致后才执行
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -RecoverMissingWorkspaces -WorkspaceOnly -Apply
+```
+
+`-RecoverMissingWorkspaces` 不属于自动预检 GC。它只选择 marker 有效、
+`cache_scope=workspace`、workspace 路径不存在且超过 `orphan_task_grace_hours` 的分区；
+当前或近期 workspace、共享分区、quarantine、无效 marker 和活动锁保持不动。
+`-WorkspaceOnly` 也可与 `-ForceAged` 组合，避免维护者只想处理 workspace 时把超龄
+共享分区带入计划。
+
+托管项目的每个构建分区都有独立写锁；GC 只会取得目标分区锁后再原子移入回收区，因此其他分区正在构建时仍可回收冷分区。Inventory 区分 `absent`、`initializing`、`active`、`stale` 和 `invalid` 锁状态；初始化和活动锁失败关闭，PID 已退出或进程代际不匹配的 stale 锁不会永久阻塞，但删除时仍须由同一锁入口原子接管。裸 Cargo 没有平台分区锁，所以只要检测到任意 Cargo/rustc 进程，quarantine 分区就全部保留。每次计划或执行都写入 `reports\gc-*.json`，并记录检测到的构建进程。
+
+共享缓存根不等于共享 Cargo build-dir。默认 workspace 分区仍按绝对工作区路径生成 16 位哈希，因此短期 worktree 若只删除 Git 目录、不处理对应分区，缓存会持续累积。统一任务收尾和独立 `cleanup-task-worktrees.ps1 -Apply` 都会在移除 worktree 前，定向读取 `.last-used.json`，只删除标记工作区位于目标根内、名称为 16 位十六进制且作用域为 `workspace` 的分区。活动缓存锁会阻止该 worktree 被独立清理；`shared`、`quarantine`、未知作用域和无效 marker 一律保留。
 
 如果任务目录已经先被其他流程移除，普通 GC 仍会识别超过宽限期的遗留任务分区，并在报告中使用 `orphaned-task-worktree` 原因。该判断只接受受管任务根命名、合法 marker 和 workspace 作用域，不把任意缺失工作区当作可删除证据；因此不依赖低磁盘水位，也不会扩大为全盘路径扫描。
 

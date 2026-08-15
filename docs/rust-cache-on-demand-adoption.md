@@ -140,15 +140,20 @@ RUST_CACHE_PARTITION=shared-dev-windows
 
 回滚只需移除项目入口的 `-SharedBuildPartition`，下一次调用会恢复 workspace 分区。旧共享分区仍是可重建缓存，由平台 TTL/LRU 治理；不要用 `cargo clean` 指向共享根，也不要手动递归删除平台根。
 
-确认命名共享分区稳定后，才执行：
+确认命名共享分区稳定后，如需按普通 TTL 处理旧 workspace，必须显式限制作用域：
 
 ```powershell
 # 先查看计划
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -ForceAged
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -ForceAged -WorkspaceOnly
 
 # 审查报告后才应用
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -ForceAged -Apply
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -ForceAged -WorkspaceOnly -Apply
 ```
+
+如果旧流程已经移除了 workspace，优先使用更精确的
+`gc -RecoverMissingWorkspaces -WorkspaceOnly`；它不等待普通 14 天 TTL，但仍要求 marker
+有效、路径不存在、超过孤儿宽限期且没有活动锁。独立 worktree 清理入口也会在移除
+clean、已合并 worktree 前定向回收其 workspace 分区，不再制造新的遗留哈希目录。
 
 如果安装版仍使用全局 Cargo/rustc 守卫，GC 被活动进程拒绝是安全降级，不应通过强杀无关开发服务来绕过；先升级并验证平台安装版。
 

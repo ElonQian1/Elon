@@ -22,6 +22,8 @@ param(
     [switch]$Retired,
     [switch]$Apply,
     [switch]$ForceAged,
+    [switch]$WorkspaceOnly,
+    [switch]$RecoverMissingWorkspaces,
     [switch]$IncludeSizes,
     [switch]$NoLock,
     [switch]$DisableSccache,
@@ -83,8 +85,9 @@ switch ($Command) {
         exit $LASTEXITCODE
     }
     "gc" {
-        $report = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Apply:$Apply -ForceAged:$ForceAged
+        $report = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Apply:$Apply -ForceAged:$ForceAged -WorkspaceOnly:$WorkspaceOnly -RecoverMissingWorkspaces:$RecoverMissingWorkspaces
         Write-Host "GC mode: $($report.mode)"
+        Write-Host "Workspace only: $($report.workspace_only); recover missing workspaces: $($report.recover_missing_workspaces)"
         Write-Host "Low disk: $($report.low_disk); critical: $($report.critical_disk)"
         Write-Host "Report: $($report.report_path)"
         $report.actions | Format-Table action, reason, project_id, domain, age_days, @{n="GiB";e={[math]::Round($_.size_bytes / 1GB, 2)}}, path -AutoSize

@@ -124,7 +124,52 @@ function Test-RustCacheOwnerProcessAlive {
         return $false
     }
     $process = Get-Process -Id ([int]$Owner.pid) -ErrorAction SilentlyContinue
-    return $null -ne $process
+    if ($null -eq $process) {
+        return $false
+    }
+    try {
+        $actualStart = $process.StartTime.ToUniversalTime()
+        $processStartProperty = $Owner.PSObject.Properties["process_started_utc"]
+        if ($processStartProperty -and -not [string]::IsNullOrWhiteSpace([string]$processStartProperty.Value)) {
+            $recordedStart = [DateTime]::Parse([string]$processStartProperty.Value).ToUniversalTime()
+            return [math]::Abs(($actualStart - $recordedStart).TotalSeconds) -le 2
+        }
+        $lockStartProperty = $Owner.PSObject.Properties["started_utc"]
+        if ($lockStartProperty -and -not [string]::IsNullOrWhiteSpace([string]$lockStartProperty.Value)) {
+            $lockStart = [DateTime]::Parse([string]$lockStartProperty.Value).ToUniversalTime()
+            if ($actualStart -gt $lockStart.AddSeconds(2)) {
+                return $false
+            }
+        }
+    } catch {
+        # Process start time may be inaccessible. A visible owner PID remains
+        # the fail-closed result when its generation cannot be proven stale.
+    }
+    return $true
+}
+
+function Get-RustCacheLockState {
+    param(
+        [Parameter(Mandatory)][string]$LockPath,
+        [int]$InitializationGraceSeconds = 30
+    )
+
+    if (-not (Test-Path -LiteralPath $LockPath -PathType Container)) {
+        return [pscustomobject]@{ state = "absent"; active = $false; owner = $null; reason = "lock-absent" }
+    }
+    $owner = Get-RustCacheLockOwner -LockPath $LockPath
+    if ($owner) {
+        if (Test-RustCacheOwnerProcessAlive -Owner $owner) {
+            return [pscustomobject]@{ state = "active"; active = $true; owner = $owner; reason = "owner-process-active" }
+        }
+        return [pscustomobject]@{ state = "stale"; active = $false; owner = $owner; reason = "owner-process-missing-or-reused" }
+    }
+    $lockDirectory = Get-Item -LiteralPath $LockPath -Force -ErrorAction SilentlyContinue
+    $ageSeconds = if ($lockDirectory) { ([DateTime]::UtcNow - $lockDirectory.LastWriteTimeUtc).TotalSeconds } else { 0 }
+    if ($ageSeconds -lt [math]::Max(1, $InitializationGraceSeconds)) {
+        return [pscustomobject]@{ state = "initializing"; active = $true; owner = $null; reason = "owner-record-grace" }
+    }
+    return [pscustomobject]@{ state = "invalid"; active = $false; owner = $null; reason = "owner-record-invalid" }
 }
 
 function Enter-RustCacheLock {
@@ -145,17 +190,19 @@ function Enter-RustCacheLock {
             $owner = [ordered]@{
                 pid = $PID
                 started_utc = [DateTime]::UtcNow.ToString("o")
+                process_started_utc = (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString("o")
                 workspace_root = $WorkspaceRoot
             }
             $owner | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $lockPath "owner.json") -Encoding UTF8
             return $lockPath
         } catch {
-            $existingOwner = Get-RustCacheLockOwner -LockPath $lockPath
-            if (-not (Test-RustCacheOwnerProcessAlive -Owner $existingOwner)) {
+            $lockState = Get-RustCacheLockState -LockPath $lockPath
+            if (-not $lockState.active) {
                 Remove-Item -LiteralPath $lockPath -Recurse -Force -ErrorAction SilentlyContinue
                 continue
             }
             if ([DateTime]::UtcNow -ge $deadline) {
+                $existingOwner = $lockState.owner
                 $ownerText = if ($existingOwner) { $existingOwner | ConvertTo-Json -Compress } else { "unknown" }
                 throw "Timed out waiting for Rust cache lock: $lockPath owner=$ownerText"
             }
@@ -347,4 +394,4 @@ function Invoke-RustCacheCargo {
     }
 }
 
-Export-ModuleMember -Function Resolve-RustCacheWorkspaceRoot, Test-RustCacheReleaseInvocation, Resolve-RustCacheInvocation, Get-RustCacheLockOwner, Test-RustCacheOwnerProcessAlive, Enter-RustCacheLock, Exit-RustCacheLock, Get-RustCacheSccacheBaseDirs, Get-RustCacheSccacheReadiness, Set-RustCacheBuildEnvironment, Invoke-RustCacheCargo
+Export-ModuleMember -Function Resolve-RustCacheWorkspaceRoot, Test-RustCacheReleaseInvocation, Resolve-RustCacheInvocation, Get-RustCacheLockOwner, Test-RustCacheOwnerProcessAlive, Get-RustCacheLockState, Enter-RustCacheLock, Exit-RustCacheLock, Get-RustCacheSccacheBaseDirs, Get-RustCacheSccacheReadiness, Set-RustCacheBuildEnvironment, Invoke-RustCacheCargo

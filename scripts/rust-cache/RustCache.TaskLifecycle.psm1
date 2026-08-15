@@ -162,6 +162,23 @@ function Test-RustCacheOrphanedTaskPartition {
     return $lastUsed -le $NowUtc.ToUniversalTime().AddHours(-$GraceHours)
 }
 
+function Test-RustCacheRecoverableMissingWorkspacePartition {
+    param(
+        [Parameter(Mandatory)]$Partition,
+        [Parameter(Mandatory)][double]$GraceHours,
+        [DateTime]$NowUtc = [DateTime]::UtcNow
+    )
+
+    if ($GraceHours -le 0 -or -not (Test-RustCacheTaskOwnedPartitionShape -Partition $Partition)) {
+        return $false
+    }
+    if (Test-Path -LiteralPath ([string]$Partition.marker_workspace_root)) {
+        return $false
+    }
+    $lastUsed = [DateTime]$Partition.last_used_utc
+    return $lastUsed -le $NowUtc.ToUniversalTime().AddHours(-$GraceHours)
+}
+
 function Test-RustCacheTaskOwnedPartitionShape {
     param([Parameter(Mandatory)]$Partition)
 
@@ -172,4 +189,4 @@ function Test-RustCacheTaskOwnedPartitionShape {
         -not [string]::IsNullOrWhiteSpace([string]$Partition.marker_workspace_root)
 }
 
-Export-ModuleMember -Function ConvertTo-RustCacheComparablePath, Test-RustCachePathWithin, Read-RustCachePartitionMarker, Resolve-RustCacheTaskWorktreeBase, Get-RustCacheDisposableTaskRoot, Test-RustCacheTaskOwnedPartition, Test-RustCacheOrphanedTaskPartition
+Export-ModuleMember -Function ConvertTo-RustCacheComparablePath, Test-RustCachePathWithin, Read-RustCachePartitionMarker, Resolve-RustCacheTaskWorktreeBase, Get-RustCacheDisposableTaskRoot, Test-RustCacheTaskOwnedPartition, Test-RustCacheOrphanedTaskPartition, Test-RustCacheRecoverableMissingWorkspacePartition

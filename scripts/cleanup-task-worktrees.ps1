@@ -140,6 +140,21 @@ function Remove-ResidualWorktreeDirectory {
     Write-Host "  residual directory removed: $fullPath"
 }
 
+function Clear-WorktreeRustCachePartitions {
+    param([Parameter(Mandatory)][string]$WorktreePath)
+
+    $inventoryModule = Join-Path $PSScriptRoot "rust-cache\RustCache.Inventory.psm1"
+    if (-not (Test-Path -LiteralPath $inventoryModule -PathType Leaf)) {
+        throw "Rust cache lifecycle module is missing: $inventoryModule"
+    }
+    Import-Module $inventoryModule -Force -DisableNameChecking
+    $report = Clear-RustCacheTaskPartitions -TaskWorktree ([System.IO.Path]::GetFullPath($WorktreePath)) -Apply
+    Write-Host "  RUST_CACHE_WORKTREE_PARTITION_CLEANUP=removed:$($report.removed_count);locked:$($report.preserved_locked_count)"
+    if ($report.preserved_locked_count -gt 0) {
+        throw "active Rust cache partition locks still belong to this worktree"
+    }
+}
+
 $repoRoot = GitOutput @("rev-parse", "--show-toplevel")
 Set-Location -LiteralPath $repoRoot
 
@@ -293,6 +308,7 @@ $removed = 0; $failed = 0
 foreach ($wt in $toRemove) {
     try {
         Write-Host "removing $($wt.Path)" -ForegroundColor Yellow
+        Clear-WorktreeRustCachePartitions -WorktreePath $wt.Path
         & git worktree remove --force $wt.Path 2>&1 | ForEach-Object { Write-Host "  $_" }
         if ($LASTEXITCODE -ne 0) {
             if (Test-WorktreeRegistered -Path $wt.Path) {

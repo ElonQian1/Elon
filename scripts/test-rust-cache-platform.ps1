@@ -213,10 +213,27 @@ exit /b 0
     $staleLock = Join-Path $staleBuildDir ".rust-cache.lockdir"
     New-Item -ItemType Directory -Force -Path $staleLock | Out-Null
     '{"pid":2147483000,"started_utc":"2000-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $staleLock "owner.json") -Encoding UTF8
+    $staleState = Get-RustCacheLockState -LockPath $staleLock
+    Assert-Equal "stale" $staleState.state "a lock owned by a missing PID should be classified as stale"
+    Assert-True (-not $staleState.active) "a stale lock must not remain an active GC blocker"
     $acquired = Enter-RustCacheLock -CacheRoot $CacheRoot -BuildDir $staleBuildDir -WorkspaceRoot $ProjectRoot -TimeoutSeconds 2
     $owner = Get-RustCacheLockOwner -LockPath $acquired
     Assert-Equal $PID ([int]$owner.pid) "stale lock should be replaced by the current owner"
+    $activeState = Get-RustCacheLockState -LockPath $acquired
+    Assert-Equal "active" $activeState.state "a current process lock should be classified as active"
+    Assert-True $activeState.active "a current process lock must block GC"
     Exit-RustCacheLock -LockPath $acquired
+    $absentState = Get-RustCacheLockState -LockPath $acquired
+    Assert-Equal "absent" $absentState.state "a released lock should be classified as absent"
+
+    $invalidLock = Join-Path $staleBuildDir ".rust-cache.lockdir"
+    New-Item -ItemType Directory -Force -Path $invalidLock | Out-Null
+    Set-Content -LiteralPath (Join-Path $invalidLock "owner.json") -Value "{invalid" -Encoding UTF8
+    (Get-Item -LiteralPath $invalidLock -Force).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(-5)
+    $invalidState = Get-RustCacheLockState -LockPath $invalidLock
+    Assert-Equal "invalid" $invalidState.state "an old malformed lock should be classified explicitly"
+    Assert-True (-not $invalidState.active) "an old malformed lock may be atomically replaced"
+    Remove-Item -LiteralPath $invalidLock -Recurse -Force
 
     $oldPartition = Join-Path $CacheRoot "build\rustc-old\test-project\dev-host\aaaaaaaaaaaaaaaa"
     New-Item -ItemType Directory -Force -Path $oldPartition | Out-Null
@@ -268,6 +285,14 @@ exit /b 0
     @{ workspace_root = $orphanWorkspace; cache_scope = "workspace"; cache_partition = "5555555555555555"; last_used_utc = $oldMarkerTime } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $lockedOrphanPartition ".last-used.json") -Encoding UTF8
 
+    $staleMissingPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\7777777777777777"
+    $staleMissingLock = Join-Path $staleMissingPartition ".rust-cache.lockdir"
+    New-Item -ItemType Directory -Force -Path $staleMissingLock | Out-Null
+    @{ pid = 2147483000; started_utc = "2000-01-01T00:00:00Z" } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $staleMissingLock "owner.json") -Encoding UTF8
+    @{ workspace_root = (Join-Path $TempRoot "recoverable-missing\server"); cache_scope = "workspace"; cache_partition = "7777777777777777"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $staleMissingPartition ".last-used.json") -Encoding UTF8
+
     $nonLowDiskPolicyPath = Get-RustCachePolicyPath -CacheRoot $CacheRoot
     $nonLowDiskPolicy = Get-Content -Raw -LiteralPath $nonLowDiskPolicyPath | ConvertFrom-Json
     $nonLowDiskPolicy.warning_free_percent = 1
@@ -288,6 +313,29 @@ exit /b 0
     Assert-True (Test-Path -LiteralPath $lockedOrphanPartition) "orphan apply must preserve a locked partition"
     $preservedOrphanFixtures = @($recentOrphanPartition, $sharedTaskPartition, $unmanagedMissingPartition, $invalidMarkerPartition)
     Assert-True (@($preservedOrphanFixtures | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 4) "orphan apply must preserve recent, shared, unrelated, and invalid partitions"
+
+    $missingRecovery = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -RecoverMissingWorkspaces -WorkspaceOnly
+    $missingAction = $missingRecovery.actions | Where-Object { $_.path -eq $unmanagedMissingPartition } | Select-Object -First 1
+    Assert-Equal "would-delete" $missingAction.action "explicit recovery should select an aged valid workspace whose path is missing"
+    Assert-Equal "missing-workspace-recovery" $missingAction.reason "missing workspace recovery should have a stable reason"
+    $staleMissingAction = $missingRecovery.actions | Where-Object { $_.path -eq $staleMissingPartition } | Select-Object -First 1
+    Assert-Equal "stale" $staleMissingAction.lock_state "a stale lock should be audited without blocking recovery"
+    Assert-Equal "would-delete" $staleMissingAction.action "a stale lock should be replaced only by the managed deletion lock"
+    $sharedFiltered = $missingRecovery.actions | Where-Object { $_.path -eq $sharedTaskPartition } | Select-Object -First 1
+    Assert-Equal "workspace-scope-filter" $sharedFiltered.reason "workspace-only recovery must report shared partition preservation"
+    Assert-True (-not ($missingRecovery.actions | Where-Object { $_.path -eq $recentOrphanPartition -and $_.action -eq "would-delete" })) "recent missing workspaces must remain protected"
+    Assert-True (-not ($missingRecovery.actions | Where-Object { $_.path -eq $invalidMarkerPartition -and $_.action -eq "would-delete" })) "invalid markers must remain protected"
+
+    $workspaceOnlyAged = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -ForceAged -WorkspaceOnly
+    $sharedAgedAction = $workspaceOnlyAged.actions | Where-Object { $_.path -eq $sharedTaskPartition } | Select-Object -First 1
+    Assert-Equal "workspace-scope-filter" $sharedAgedAction.reason "workspace-only must override force-aged selection for shared partitions"
+    Assert-True (-not $sharedAgedAction.selected) "shared partitions must remain unselected under workspace-only force-aged GC"
+
+    $missingRecoveryApply = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -RecoverMissingWorkspaces -WorkspaceOnly -Apply
+    Assert-True (-not (Test-Path -LiteralPath $unmanagedMissingPartition)) "missing workspace apply should delete the reviewed workspace partition"
+    Assert-True (-not (Test-Path -LiteralPath $staleMissingPartition)) "managed deletion should atomically replace and remove a stale lock"
+    Assert-True (Test-Path -LiteralPath $sharedTaskPartition) "missing workspace apply must preserve shared partitions"
+    Assert-True (Test-Path -LiteralPath $recentOrphanPartition) "missing workspace apply must preserve recent partitions"
 
     $ownedTaskRoot = Join-Path $TempRoot "explicit-finish-task"
     $ownedWorkspace = Join-Path $ownedTaskRoot "server"

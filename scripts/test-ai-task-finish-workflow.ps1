@@ -559,6 +559,16 @@ try {
     if ($registered.Contains($taskWorktree)) { throw "Task worktree is still registered after unified finish cleanup." }
     if (-not $registered.Contains("branch refs/heads/codex/peer-fixture")) { throw "Unified finish removed another agent's merged worktree." }
 
+    $platformCachePartition = Join-Path $env:ELON_RUST_CACHE_ROOT "build\rustc-test\finish-fixture\agent-validation\2222222222222222"
+    New-Item -ItemType Directory -Force -Path $platformCachePartition | Out-Null
+    @{ workspace_root = $platformSessionWorktree; cache_scope = 'workspace'; cache_partition = '2222222222222222'; last_used_utc = [DateTime]::UtcNow.ToString('o') } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $platformCachePartition '.last-used.json') -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $platformCachePartition 'artifact.bin') -Value 'platform-owned' -Encoding UTF8
+    $platformSharedCachePartition = Join-Path $env:ELON_RUST_CACHE_ROOT "build\rustc-test\finish-fixture\agent-validation\shared-platform-fixture"
+    New-Item -ItemType Directory -Force -Path $platformSharedCachePartition | Out-Null
+    @{ workspace_root = $platformSessionWorktree; cache_scope = 'shared'; cache_partition = 'shared-platform-fixture'; last_used_utc = [DateTime]::UtcNow.ToString('o') } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $platformSharedCachePartition '.last-used.json') -Encoding UTF8
+
     Push-Location -LiteralPath $mainRepo
     try {
         $oldPreference = $ErrorActionPreference
@@ -575,7 +585,10 @@ try {
     $platformCleanupText = (($platformCleanupOutput | ForEach-Object { [string]$_ }) -join "`n").Trim()
     if ($platformCleanupExitCode -ne 0) { throw "Platform-session cleanup fixture failed.`n$platformCleanupText" }
     Assert-Contains $platformCleanupText "ai/session/elon-self/cleanup-session" "Cleanup must include merged clean platform session worktrees."
+    Assert-Contains $platformCleanupText "RUST_CACHE_WORKTREE_PARTITION_CLEANUP=removed:1;locked:0" "Independent cleanup must reclaim the removed worktree's workspace cache partition."
     Assert-Contains $platformCleanupText "active workflow fixture" "Cleanup must preserve locked active task worktrees."
+    if (Test-Path -LiteralPath $platformCachePartition) { throw "Independent cleanup left the platform worktree cache partition behind." }
+    if (-not (Test-Path -LiteralPath $platformSharedCachePartition)) { throw "Independent cleanup deleted a shared platform cache partition." }
     $registeredAfterPlatformCleanup = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if ($registeredAfterPlatformCleanup.Contains("branch refs/heads/ai/session/elon-self/cleanup-session")) { throw "Platform session worktree is still registered after cleanup.`n$platformCleanupText" }
     if ($registeredAfterPlatformCleanup.Contains($platformSessionWorktree)) { throw "Platform session path is still registered after cleanup.`n$platformCleanupText" }
