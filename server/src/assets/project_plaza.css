@@ -818,3 +818,155 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
     transform: none;
   }
 }
+
+/* 图 1：项目广场极简复原。这里有意覆盖旧观测舱装饰，保留原交互结构。 */
+.project-plaza-inline-root {
+  --plaza-bg: #050609;
+  --plaza-card: #1b1e24;
+  --plaza-search: #1b1e24;
+  --plaza-text: rgba(244, 244, 245, 0.88);
+  --plaza-text-secondary: rgba(244, 244, 245, 0.42);
+  --plaza-text-tertiary: rgba(244, 244, 245, 0.30);
+  --plaza-action: #dedede;
+  background: var(--plaza-bg);
+}
+
+.project-plaza-inline-root::before,
+.project-plaza-inline-root::after { display: none; }
+
+.project-plaza-search-bar {
+  height: 52px;
+  margin: 22px 40px 22px;
+  padding: 0 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--plaza-search);
+  gap: 18px;
+}
+
+.project-plaza-search-icon,
+.project-plaza-search-icon img { width: 23px; height: 23px; }
+
+.project-plaza-search-input {
+  text-align: center;
+  font-size: 16px;
+  color: var(--plaza-text);
+}
+
+.project-plaza-search-chevron {
+  flex: none;
+  color: rgba(244, 244, 245, 0.86);
+  font-size: 28px;
+  line-height: 1;
+  transform: translateY(-3px);
+}
+
+.project-plaza-filter-row { display: none; }
+.project-plaza-results { margin-top: 0; }
+
+.project-plaza-featured-label {
+  height: 46px;
+  margin: 0 22px 8px;
+}
+
+.project-plaza-featured-label strong {
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.project-plaza-featured-track {
+  gap: 22px;
+  padding: 0 116px 0 22px;
+}
+
+.project-plaza-featured-card {
+  width: 66vw;
+  max-width: 306px;
+  aspect-ratio: 0.88;
+  border: 0;
+  border-radius: 24px;
+  clip-path: none;
+  background: var(--plaza-card);
+  box-shadow: none;
+  transform: none;
+}
+
+.project-plaza-featured-card::before,
+.project-plaza-featured-card::after,
+.project-plaza-featured-head { display: none; }
+
+.project-plaza-featured-body { padding: 28px 24px 96px; }
+.project-plaza-featured-identity { display: block; }
+
+.project-plaza-featured-cover {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #d8d8d8;
+  color: #353535;
+}
+
+.project-plaza-featured-copy { padding-top: 16px; }
+.project-plaza-featured-copy h3 { font-size: 22px; font-weight: 400; }
+.project-plaza-featured-copy p {
+  margin-top: 48px;
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-line-clamp: 3;
+  color: var(--plaza-text-secondary);
+}
+
+.project-plaza-featured-facts { display: none; }
+.project-plaza-featured-actions {
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  justify-content: space-between;
+}
+
+.project-plaza-reactions { order: 0; gap: 2px; }
+.project-plaza-featured-primary {
+  order: 1;
+  flex: none;
+  width: 48px;
+  min-width: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #dedede;
+  color: #393b3f;
+  box-shadow: none;
+  font-size: 36px;
+  font-weight: 300;
+  line-height: 44px;
+}
+
+.project-plaza-section-heading {
+  margin: 22px 22px 0;
+  min-height: 48px;
+}
+
+.project-plaza-section-heading h2 { font-size: 21px; }
+.project-plaza-section-heading span { display: none; }
+.project-plaza-list { margin: 0 30px; }
+
+.project-plaza-card {
+  min-height: 82px;
+  padding: 12px 0;
+  border: 0;
+}
+
+.project-plaza-card + .project-plaza-card { margin-top: 10px; }
+.project-plaza-list-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #dedede;
+  color: #353535;
+}
+
+.project-plaza-title-block { margin-left: 18px; }
+.project-plaza-name { font-size: 16px; }
+.project-plaza-desc { margin-top: 5px; font-size: 14px; }
+.project-plaza-list-meta { display: none; }
+.project-plaza-open img { width: 14px; height: 14px; }

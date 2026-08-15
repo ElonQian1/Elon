@@ -153,10 +153,7 @@ internal class MainMarketplaceActions(
             )
         }
         shell.addView(buildSearchBar())
-        shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(48)
-        ).apply { topMargin = dp(8) })
+        shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(0, 0))
         val results = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, 0)
@@ -212,6 +209,14 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1f
             ))
+            addView(TextView(activity).apply {
+                text = "⌄"
+                includeFontPadding = false
+                gravity = Gravity.CENTER
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+                contentDescription = null
+            }, LinearLayout.LayoutParams(dp(32), LinearLayout.LayoutParams.MATCH_PARENT))
         }
     }
 
@@ -219,13 +224,13 @@ internal class MainMarketplaceActions(
         return EditText(activity).apply {
             searchField = this
             background = null
-            hint = "搜索项目、作者"
+            hint = "搜索项目"
             setText(searchQuery)
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             includeFontPadding = false
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
             setPadding(0, 0, 0, 0)
             setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setHintTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
@@ -380,14 +385,6 @@ internal class MainMarketplaceActions(
             setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
-        addView(TextView(activity).apply {
-            val installableCount = projects.count { !it.latestApkUrl.isNullOrBlank() }
-            text = "${projects.size} 个项目 · $installableCount 个可安装"
-            includeFontPadding = false
-            gravity = Gravity.CENTER_VERTICAL
-            setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)))
     }
 
     private fun buildProjectListRow(project: StoreProject) = LinearLayout(activity).apply {
@@ -416,10 +413,6 @@ internal class MainMarketplaceActions(
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END; includeFontPadding = false
                 setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
-            addView(buildProjectListMeta(project), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(7) })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(16) })
         addView(FrameLayout(activity).apply {
             contentDescription = "进入${project.displayTitle()}"

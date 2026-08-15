@@ -50,58 +50,19 @@ internal class ProjectPlazaMetalPanelDrawable(context: Context) : Drawable() {
         val top = bounds.top.toFloat()
         val right = bounds.right.toFloat()
         val bottom = bounds.bottom.toFloat()
-        val cut = 18f * density
-        val smallCut = 11f * density
         panelRect.set(left, top, right, bottom)
-        buildPanelPath(panelPath, left, top, right, bottom, cut, smallCut)
-
-        val inset = 3f * density
-        buildPanelPath(
-            innerPath,
-            left + inset,
-            top + inset,
-            right - inset,
-            bottom - inset,
-            cut - inset,
-            smallCut - inset,
-        )
-        topHighlightPath.reset()
-        topHighlightPath.moveTo(left + cut, top + 1.5f * density)
-        topHighlightPath.lineTo(right - cut - 1.5f * density, top + 1.5f * density)
-        topHighlightPath.lineTo(right - 1.5f * density, top + cut)
-
-        fillPaint.shader = LinearGradient(
-            left,
-            top,
-            right,
-            bottom,
-            intArrayOf(highColor, midColor, lowColor, Color.rgb(10, 13, 17)),
-            floatArrayOf(0f, 0.28f, 0.72f, 1f),
-            Shader.TileMode.CLAMP,
-        )
+        panelPath.reset()
+        panelPath.addRoundRect(panelRect, 24f * density, 24f * density, Path.Direction.CW)
+        fillPaint.shader = null
+        fillPaint.color = midColor
     }
 
     override fun draw(canvas: Canvas) {
         canvas.drawPath(panelPath, fillPaint)
-        canvas.drawPath(panelPath, edgePaint)
-        canvas.drawPath(innerPath, highlightPaint)
-        canvas.drawPath(topHighlightPath, highlightPaint)
-
-        val right = panelRect.right - 7f * density
-        val startY = panelRect.top + 83f * density
-        repeat(5) { index ->
-            val y = startY + index * 9f * density
-            val length = if (index == 2) 12f * density else 7f * density
-            canvas.drawLine(right - length, y, right, y, calibrationPaint)
-        }
-        val left = panelRect.left + 7f * density
-        val bottom = panelRect.bottom - 11f * density
-        canvas.drawLine(left, bottom, left + 16f * density, bottom, calibrationPaint)
     }
 
     override fun getOutline(outline: Outline) {
-        @Suppress("DEPRECATION")
-        outline.setConvexPath(panelPath)
+        outline.setRoundRect(bounds, 24f * density)
     }
 
     override fun setAlpha(alpha: Int) {

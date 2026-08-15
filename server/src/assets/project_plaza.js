@@ -371,7 +371,8 @@
         <span class="project-plaza-search-icon" aria-hidden="true">
           <img src="${escapeHtml(searchArtwork)}" alt="" />
         </span>
-        <input class="project-plaza-search-input" type="search" placeholder="搜索项目、作者" value="${escapeHtml(state.query)}" data-plaza-action="search" aria-label="搜索项目或作者" />
+        <input class="project-plaza-search-input" type="search" placeholder="搜索项目" value="${escapeHtml(state.query)}" data-plaza-action="search" aria-label="搜索项目" />
+        <span class="project-plaza-search-chevron" aria-hidden="true">⌄</span>
       </div>
       <div class="project-plaza-filter-row">
         ${filters.map(renderFilter).join('')}
@@ -413,8 +414,7 @@
     return `
       ${state.cacheNotice ? renderCacheNotice(state.cacheNotice) : ''}
       <div class="project-plaza-featured-label">
-        <strong>精选项目</strong>
-        <span data-plaza-featured-position>01 / ${escapeHtml(String(featuredProjects.length).padStart(2, '0'))}</span>
+        <strong>推荐</strong>
       </div>
       <div class="project-plaza-featured-scroller" aria-label="精选项目">
         <div class="project-plaza-featured-track">
@@ -491,7 +491,6 @@
     return `
       <div class="project-plaza-section-heading">
         <h2>全部</h2>
-        <span>${escapeHtml(state.projects.length)} 个项目 · ${escapeHtml(installableCount)} 个可安装</span>
       </div>
     `;
   }
@@ -555,10 +554,6 @@
     const members = Math.max(0, Number(project.member_count || 0));
     return `
       <article class="project-plaza-featured-card ${index === 0 ? 'is-active' : ''}" data-id="${escapeHtml(project.id)}">
-        <header class="project-plaza-featured-head">
-          <div class="project-plaza-featured-rank"><strong>精选节点</strong><span>NODE ${escapeHtml(String(index + 1).padStart(2, '0'))}</span></div>
-          <div class="project-plaza-featured-status is-${escapeHtml(status.tone)}"><i aria-hidden="true"></i><span>${escapeHtml(status.label)}</span></div>
-        </header>
         <div class="project-plaza-featured-body">
           <div class="project-plaza-featured-identity">
             <span class="project-plaza-featured-cover" aria-hidden="true">
@@ -570,18 +565,13 @@
               <p>${escapeHtml(description)}</p>
             </div>
           </div>
-          <div class="project-plaza-featured-facts">
-            <span class="project-plaza-featured-fact"><small>创建者</small><b>${escapeHtml(owner)}</b></span>
-            <span class="project-plaza-featured-fact"><small>成员</small><b>${escapeHtml(members)} 人</b></span>
-            <span class="project-plaza-featured-fact"><small>最近构建</small><b class="is-${escapeHtml(build.tone)}">${escapeHtml(build.label)}</b></span>
-          </div>
         </div>
         <div class="project-plaza-featured-actions">
-          <button class="project-plaza-featured-primary" type="button" data-plaza-action="${escapeHtml(action.action)}" data-id="${escapeHtml(project.id)}" aria-label="${escapeHtml(action.label)}${escapeHtml(identity.title)}" aria-disabled="${action.disabled ? 'true' : 'false'}" ${action.disabled ? 'disabled' : ''}>${escapeHtml(action.label)}</button>
           <div class="project-plaza-reactions" aria-label="项目偏好">
             <button class="project-plaza-reaction is-star ${reactionSelected(project, 'favorite') ? 'is-selected' : ''}" type="button" data-plaza-action="favorite" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'favorite') ? '取消收藏' : '收藏'}${escapeHtml(identity.title)}"></button>
             <button class="project-plaza-reaction is-heart ${reactionSelected(project, 'liked') ? 'is-selected' : ''}" type="button" data-plaza-action="liked" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'liked') ? '取消点赞' : '点赞'}${escapeHtml(identity.title)}"></button>
           </div>
+          <button class="project-plaza-featured-primary" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}">›</button>
         </div>
       </article>
     `;
@@ -603,7 +593,6 @@
         <div class="project-plaza-title-block">
           <h3 class="project-plaza-name">${escapeHtml(identity.title)}</h3>
           <p class="project-plaza-desc">${escapeHtml(description)}</p>
-          <div class="project-plaza-list-meta"><span>${escapeHtml(owner)} · ${escapeHtml(members)} 人</span><b class="is-${escapeHtml(build.tone)}"><i aria-hidden="true"></i>${escapeHtml(build.label)}</b></div>
         </div>
         <button class="project-plaza-open" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}"><img src="/assets/project_view_chevron.png" alt="" /></button>
       </article>

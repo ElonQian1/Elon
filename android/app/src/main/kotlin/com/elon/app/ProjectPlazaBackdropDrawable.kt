@@ -44,37 +44,7 @@ internal class ProjectPlazaBackdropDrawable(context: Context) : Drawable() {
     )
 
     override fun draw(canvas: Canvas) {
-        val area = bounds
-        canvas.drawRect(area, voidPaint)
-        val width = area.width().toFloat()
-        val height = area.height().toFloat()
-        if (width <= 0f || height <= 0f) return
-
-        gridX.forEach { fraction ->
-            val x = area.left + width * fraction
-            canvas.drawLine(x, area.top.toFloat(), x, area.bottom.toFloat(), gridPaint)
-        }
-        gridY.forEach { fraction ->
-            val y = area.top + height * fraction
-            canvas.drawLine(area.left.toFloat(), y, area.right.toFloat(), y, gridPaint)
-        }
-
-        stars.forEachIndexed { index, point ->
-            val radius = if (index % 6 == 0) 1.45f else 0.85f
-            canvas.drawCircle(area.left + width * point.first, area.top + height * point.second, radius, starPaint)
-        }
-        orbit.set(
-            area.left - width * 0.48f,
-            area.top + height * 0.05f,
-            area.left + width * 1.22f,
-            area.top + height * 0.56f
-        )
-        canvas.drawArc(orbit, 198f, 116f, false, constellationPaint)
-        orbit.offset(width * 0.22f, height * 0.33f)
-        canvas.drawArc(orbit, 18f, 64f, false, constellationPaint)
-
-        drawReticle(canvas, area.left + width * 0.84f, area.top + height * 0.52f, 13f)
-        drawReticle(canvas, area.left + width * 0.13f, area.top + height * 0.82f, 8f)
+        canvas.drawRect(bounds, voidPaint)
     }
 
     override fun setAlpha(alpha: Int) {

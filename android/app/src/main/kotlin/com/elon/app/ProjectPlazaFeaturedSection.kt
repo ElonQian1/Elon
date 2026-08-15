@@ -46,7 +46,7 @@ internal class ProjectPlazaFeaturedSection(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_SIDE_MARGIN_DP), 0)
         addView(TextView(activity).apply {
-            text = "精选项目"
+            text = "推荐"
             includeFontPadding = false
             setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
@@ -62,10 +62,7 @@ internal class ProjectPlazaFeaturedSection(
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER_VERTICAL
             contentDescription = "精选项目位置"
-        }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.MATCH_PARENT
-        ))
+        }, LinearLayout.LayoutParams(0, 0))
     }
 
     private fun buildCarousel(projects: List<StoreProject>) = ProjectPlazaCarousel(activity).apply {
@@ -96,18 +93,11 @@ internal class ProjectPlazaFeaturedSection(
         foreground = selectableForeground()
         contentDescription = "查看${project.displayTitle()}"
         setOnClickListener { openProjectSpace(project) }
-        addView(buildCardHeader(project, index), FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            dp(CARD_HEADER_HEIGHT_DP),
-            Gravity.TOP
-        ))
         addView(buildCardBody(project), FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP
-        ).apply {
-            topMargin = dp(CARD_HEADER_HEIGHT_DP)
-        })
+        ))
         addView(buildActions(project), FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             dp(ACTION_HEIGHT_DP),
@@ -181,25 +171,10 @@ internal class ProjectPlazaFeaturedSection(
             0
         )
         addView(buildIdentity(project))
-        addView(View(activity).apply {
-            background = rect(activity.elonColor(R.color.elon_plaza_divider))
-            contentDescription = null
-        }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(1)
-        ).apply {
-            topMargin = dp(18)
-        })
-        addView(buildFacts(project), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            topMargin = dp(12)
-        })
     }
 
     private fun buildIdentity(project: StoreProject) = LinearLayout(activity).apply {
-        orientation = LinearLayout.HORIZONTAL
+        orientation = LinearLayout.VERTICAL
         gravity = Gravity.TOP
         addView(projectPlazaProjectCover(
             activity = activity,
@@ -219,7 +194,7 @@ internal class ProjectPlazaFeaturedSection(
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
                 setLineSpacing(0f, 1.02f)
                 breakStrategy = Layout.BREAK_STRATEGY_BALANCED
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = Typeface.DEFAULT
             })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
@@ -235,9 +210,8 @@ internal class ProjectPlazaFeaturedSection(
             ).apply {
                 topMargin = dp(8)
             })
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginStart = dp(16)
-            topMargin = dp(2)
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(16)
         })
     }
 
