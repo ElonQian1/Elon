@@ -294,6 +294,7 @@ internal class MainSocialAiChatFeature(
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         binding.modelButton.tag = null
+        binding.inputEdit.contentDescription = null
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = null
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
@@ -303,6 +304,7 @@ internal class MainSocialAiChatFeature(
             views.webToolsButton.visibility = View.GONE
             views.webToolsButton.setOnClickListener(null)
             views.attachmentButton.visibility = View.VISIBLE
+            views.attachmentButton.contentDescription = WebChatProductionSelectors.WORK_ATTACHMENT
             views.modelButtonShell.setOnClickListener { showWorkModelSelector() }
             binding.modelButton.setOnClickListener { showWorkModelSelector() }
         }
@@ -322,10 +324,11 @@ internal class MainSocialAiChatFeature(
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         val controller = controllerFor(provider.id)
         controller.activate(provider)
+        binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
             visibility = View.VISIBLE
             setImageResource(R.drawable.ic_more_horizontal)
-            contentDescription = "web-chat-page-actions:${provider.id.wireValue}"
+            contentDescription = WebChatProductionSelectors.pageActions(provider.id)
             setOnClickListener { productionPageActions.show(provider) }
         }
         inputComposerViews()?.let { views ->
@@ -337,14 +340,14 @@ internal class MainSocialAiChatFeature(
             views.webToolsButton.visibility = if (
                 provider.supports(WebChatProviderCapability.COMPOSER_TOOLS)
             ) View.VISIBLE else View.GONE
-            views.webToolsButton.contentDescription =
-                "web-chat-composer-tools:${provider.id.wireValue}"
+            views.webToolsButton.contentDescription = WebChatProductionSelectors.composerTools(provider.id)
             views.webToolsButton.setOnClickListener {
                 productionComposerTools.show(provider)
             }
             views.attachmentButton.visibility = if (
                 provider.supports(WebChatProviderCapability.ATTACHMENT_UPLOAD)
             ) View.VISIBLE else View.GONE
+            views.attachmentButton.contentDescription = WebChatProductionSelectors.attachment(provider.id)
             views.modelButtonShell.setOnClickListener { providerPicker.show() }
             binding.modelButton.setOnClickListener { providerPicker.show() }
         }

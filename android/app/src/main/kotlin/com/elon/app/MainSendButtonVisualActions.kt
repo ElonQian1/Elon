@@ -47,9 +47,16 @@ internal class MainSendButtonVisualActions(
                 binding.sendButton.background = InsetDrawable(it, dp(3))
             }
             binding.sendButton.text = ""
-            binding.sendButton.contentDescription = if (
-                visualMode == WebChatProductionComposerVisualMode.STOP
-            ) "web-chat-stop-generation" else "发送消息"
+            val webChatComposer = binding.modelButton.tag == WEB_CHAT_MODEL_BUTTON_OWNER
+            binding.sendButton.contentDescription = if (webChatComposer) {
+                WebChatProductionSelectors.composerAction(
+                    streaming = visualMode == WebChatProductionComposerVisualMode.STOP,
+                )
+            } else if (visualMode == WebChatProductionComposerVisualMode.STOP) {
+                WebChatProductionSelectors.STOP_GENERATION
+            } else {
+                "发送消息"
+            }
             binding.sendButton.visibility = View.VISIBLE
             inputModeButton()?.visibility = View.GONE
         } else {

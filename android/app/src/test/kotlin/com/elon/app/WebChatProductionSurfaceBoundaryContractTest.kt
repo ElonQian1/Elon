@@ -31,6 +31,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
     fun productionFeaturesAreWiredThroughTheFriendChatSurface() {
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
         val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
+        val sendVisual = read("android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt")
 
         assertTrue(feature.contains("ChatGptSocialChatController"))
         assertTrue(feature.contains("GoogleWebSocialChatController"))
@@ -38,11 +39,14 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionFeatureNavigationCoordinator"))
         assertTrue(feature.contains("WebChatProductionPageActionsCoordinator"))
         assertTrue(feature.contains("openFeatureNavigation = ::openProductionFeatureNavigation"))
-        assertTrue(feature.contains("contentDescription = \"web-chat-page-actions:\${provider.id.wireValue}\""))
+        assertTrue(feature.contains("WebChatProductionSelectors.pageActions"))
         assertTrue(feature.contains("views.attachmentButton.visibility"))
         assertTrue(feature.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
+        assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
+        assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
         assertTrue(composer.contains("webToolsButton"))
         assertTrue(composer.contains("web-chat-composer-tools:unavailable"))
+        assertTrue(sendVisual.contains("WebChatProductionSelectors.composerAction"))
     }
 
     @Test
@@ -84,6 +88,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionAdaptiveControls.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionSelectors.kt",
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuCoordinator.kt",
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
         )
