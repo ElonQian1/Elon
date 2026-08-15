@@ -10,6 +10,7 @@
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
   const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
+  const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
   if (!/^doc_[a-z0-9_]{3,80}$/.test(documentToken)) return;
@@ -78,24 +79,36 @@
     return String(composer.innerText || composer.textContent || '');
   }
 
-  function hasVisibleLoginEntry() {
-    const loginLabels = new Set(['log in', 'login', 'sign in', '登录', '登入']);
+  function hasLoginEntry() {
     return Array.from(document.querySelectorAll('a, button, [role="button"]')).some((node) => {
-      if (!isVisible(node)) return false;
+      if (node.isConnected === false) return false;
       const label = cleanText(node.getAttribute('aria-label') || node.textContent).toLowerCase();
       const href = String(node.getAttribute('href') || '').toLowerCase();
-      return loginLabels.has(label) || href.includes('/auth/login');
+      return authenticationPolicy && authenticationPolicy.isLoginEntry({ label, href });
     });
   }
 
-  function isAuthenticated(dictationActive, loginRequired) {
-    if (loginRequired) return false;
+  function hasProfileEntry() {
     const profile = document.querySelector(
-      '[data-testid="profile-button"], [data-testid="accounts-profile-button"], button[aria-label*="profile" i]'
+      '[data-testid="profile-button"], [data-testid="accounts-profile-button"], ' +
+      'button[aria-label*="profile" i], button[aria-label*="account" i], ' +
+      'button[aria-label*="个人资料" i], button[aria-label*="账号" i]'
     );
-    if (isVisible(profile)) return true;
-    if (dictationActive) return true;
-    return !!findComposer() && !hasVisibleLoginEntry();
+    return !!profile && profile.isConnected !== false;
+  }
+
+  function isAuthenticated(loginRequired, composerReady) {
+    const signals = {
+      loginRequired,
+      hasLoginEntry: hasLoginEntry(),
+      hasProfileEntry: hasProfileEntry(),
+      composerReady
+    };
+    if (authenticationPolicy && typeof authenticationPolicy.isAuthenticated === 'function') {
+      return authenticationPolicy.isAuthenticated(signals);
+    }
+    return !signals.loginRequired && !signals.hasLoginEntry &&
+      (signals.hasProfileEntry || signals.composerReady);
   }
 
   function findButton(testId, labels) {
@@ -164,7 +177,7 @@
       messages,
       observedMessageCount: Math.max(messages.length, Number(messageWindow.observedCount) || 0),
       messageWindowStart: Math.max(0, Number(messageWindow.startIndex) || 0),
-      authenticated: isAuthenticated(dictationActive, loginRequired),
+      authenticated: isAuthenticated(loginRequired, !!composer),
       pageKind,
       loginRequired,
       composerReady: !!composer,

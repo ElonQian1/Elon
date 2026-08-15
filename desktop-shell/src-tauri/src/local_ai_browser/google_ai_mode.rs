@@ -5,7 +5,7 @@ use super::{adapter::SanitizedAdapterEvent, adapter_content};
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 12;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 6;
+const ADAPTER_VERSION: u32 = 7;
 
 pub fn initialization_script() -> String {
     let answer_candidate_policy =
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn desktop_bootstrap_reuses_the_android_google_adapter() {
         let script = initialization_script();
-        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 6"));
+        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 7"));
         assert!(script.contains("window.__elonGoogleWebDocumentToken"));
         assert!(script.contains("window.__elonGoogleWebAnswerCandidatePolicy"));
         assert!(script.contains("window.__elonGoogleWebMessageExtractor"));

@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
+assert.equal(policy.version, 10)
+
 assert.equal(policy.accepts({
   hasQuery: true,
   textLength: 42,
@@ -170,6 +172,25 @@ assert.equal(policy.shareSurfaceText(
   '分享公开链接 此公开链接用于分享消息串。复制链接 Facebook Gmail X Reddit WhatsApp',
 ), true)
 assert.equal(policy.shareSurfaceText('下面是关于公开链接安全性的完整回答。'), false)
+assert.equal(policy.disclosureOnlyText('收起全部显示'), true)
+assert.equal(policy.disclosureOnlyText('全部显示'), true)
+assert.equal(policy.disclosureOnlyText('Show all'), true)
+assert.equal(policy.disclosureOnlyText('下面给出完整回答，并说明如何展开全部内容。'), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '收起全部显示',
+  textLength: 6,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
+  explicit: true,
+}), false)
 
 assert.equal(policy.accepts({
   hasQuery: true,

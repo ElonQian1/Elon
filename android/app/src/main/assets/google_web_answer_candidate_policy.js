@@ -78,6 +78,19 @@
     return shareHeading && shareActions;
   }
 
+  function disclosureOnlyText(value) {
+    const text = String(value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!text || text.length > 40) return false;
+    if (/^(?:show|view|expand|collapse)\s+(?:all|more|less)$/.test(text) ||
+        /^(?:expand|collapse)$/.test(text)) return true;
+    const compact = text.replace(/[\s,，、;；:：|｜·•/]+/g, '');
+    return /^(?:(?:收起|展开)(?:全部)?|(?:全部)?显示|显示全部|隐藏全部){1,3}$/.test(compact);
+  }
+
   function shortAnswerAllowed(metrics) {
     const trustedAnswerContainer = metrics && metrics.trustedAnswerContainer === true;
     if (!metrics || (metrics.afterQuery !== true && !trustedAnswerContainer) ||
@@ -101,6 +114,7 @@
     if (navigationOnlyText(metrics && metrics.text)) return false;
     if (transientStatusText(metrics && metrics.text)) return false;
     if (shareSurfaceText(metrics && metrics.text)) return false;
+    if (disclosureOnlyText(metrics && metrics.text)) return false;
     if (textLength < 8) return shortAnswerAllowed(metrics);
     if (liveRegion && semanticBlocks === 0 && citations === 0) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
@@ -128,13 +142,14 @@
   }
 
   return Object.freeze({
-    version: 9,
+    version: 10,
     accepts,
     penalty,
     select,
     navigationOnlyText,
     transientStatusText,
     shareSurfaceText,
+    disclosureOnlyText,
     shortAnswerAllowed
   });
 });
