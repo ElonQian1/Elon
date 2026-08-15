@@ -287,6 +287,9 @@ async fn credential_reattestation_http_is_registering_only_before_v275() {
     assert_eq!(status, StatusCode::CONFLICT, "{rejected}");
     assert!(error(&rejected).contains("exact registering observation"));
 
+    let provider_binding_id = roots.registry["binding"]["provider_binding_id"]
+        .as_str()
+        .unwrap();
     let connection = fixture.state.store.conn().unwrap();
     let (receipt_count, current_status): (i64, String) = connection
         .query_row(
@@ -297,7 +300,7 @@ async fn credential_reattestation_http_is_registering_only_before_v275() {
                current_status
                FROM compute_external_pool_adapter_credential_reattestation_current
               WHERE provider_binding_id=?1",
-            [&roots.provider_binding_id],
+            [provider_binding_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .unwrap();
