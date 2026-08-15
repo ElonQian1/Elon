@@ -35,6 +35,16 @@ class GoogleWebSnapshotMergerTest {
     }
 
     @Test
+    fun keepsTheCurrentAnswerWhenAReflowSnapshotOnlyContainsTheQuestion() {
+        val answered = snapshot("What is 2 plus 3?", "5")
+        val reflowed = snapshot("What is 2 plus 3?")
+
+        val merged = GoogleWebSnapshotMerger.merge(answered, reflowed, sameConversation = true)
+
+        assertEquals(listOf("What is 2 plus 3?", "5"), merged.messages.map { it.content })
+    }
+
+    @Test
     fun switchingConversationDoesNotLeakPreviousMessages() {
         val merged = GoogleWebSnapshotMerger.merge(
             snapshot("private old", "old answer"),

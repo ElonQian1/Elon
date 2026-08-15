@@ -25,10 +25,17 @@ internal object GoogleWebSnapshotMerger {
             previous.messages
         }
         val currentAssistant = incoming.messages.lastOrNull { it.role == "assistant" }
+        val previousAssistant = if (sameTurn) {
+            previous.messages
+                .drop(previousUserIndex + 1)
+                .lastOrNull { it.role == "assistant" }
+        } else {
+            null
+        }
         val merged = buildList {
             addAll(prefix)
             add(currentUser)
-            currentAssistant?.let(::add)
+            (currentAssistant ?: previousAssistant)?.let(::add)
         }
         return incoming.withBoundedMessages(merged, previous.messageWindowStart)
     }
