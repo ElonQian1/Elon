@@ -43,8 +43,11 @@ fn v264_broker_owns_dns_direct_tcp_tls13_webpki_and_exact_spki_pin() {
 #[test]
 fn v264_store_reproves_v258_and_full_installation_after_network_await() {
     for required in [
-        "preflight_prepared: PreparedExternalPoolAdapterInstallation",
-        "postflight_prepared: PreparedExternalPoolAdapterInstallation",
+        "ExternalPoolAdapterInstallationReopener<'a>",
+        "> + Send",
+        "reopen_prepared: &mut ExternalPoolAdapterInstallationReopener<'_>",
+        "let preflight_prepared = reopen_prepared()",
+        "let postflight_prepared = reopen_prepared()",
         "current_external_pool_adapter_upstream_transport_target_authority_on",
         "current_installation_binding(&authority).clone()",
         "connect_external_pool_adapter_broker_tls(broker_target).await",
@@ -63,9 +66,10 @@ fn v264_store_reproves_v258_and_full_installation_after_network_await() {
     let network = BROKER_STORE
         .find("connect_external_pool_adapter_broker_tls(broker_target).await")
         .unwrap();
-    let postflight = BROKER_STORE
-        .find("transaction_with_behavior(TransactionBehavior::Immediate)")
-        .unwrap();
+    let postflight = network
+        + BROKER_STORE[network..]
+            .find("transaction_with_behavior(TransactionBehavior::Immediate)")
+            .unwrap();
     assert!(preflight < network && network < postflight);
 }
 

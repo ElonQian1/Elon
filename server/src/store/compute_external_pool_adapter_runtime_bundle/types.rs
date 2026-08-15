@@ -7,10 +7,11 @@ use crate::store::{
 use anyhow::Result;
 use rusqlite::Transaction;
 use sha2::{Digest, Sha256};
-use std::{
-    marker::PhantomData,
-    path::{Path, PathBuf},
-};
+#[cfg(target_os = "linux")]
+use std::fs::File;
+#[cfg(windows)]
+use std::path::Path;
+use std::{marker::PhantomData, path::PathBuf};
 use zeroize::Zeroize;
 
 use super::entrypoint_capsule::{
@@ -46,7 +47,19 @@ pub(super) struct ExpectedExternalPoolAdapterRuntimeBundle {
     pub(super) credential_report_expires_at: String,
 }
 
-pub(in crate::store) struct ExternalPoolAdapterRuntimeBundleRoot(PathBuf);
+/// Startup-retained operator custody root.
+///
+/// Linux keeps the no-follow directory handle, so a later rename or path replacement cannot
+/// redirect a bundle resolution. Windows retains the path until its protected-DACL implementation
+/// becomes available. The type deliberately exposes neither representation.
+pub(in crate::store) struct ExternalPoolAdapterRuntimeBundleRoot {
+    #[cfg(target_os = "linux")]
+    retained_directory: File,
+    #[cfg(windows)]
+    path: PathBuf,
+    #[cfg(not(any(target_os = "linux", windows)))]
+    unavailable: (),
+}
 
 impl ExternalPoolAdapterRuntimeBundleRoot {
     pub(in crate::store) fn new(
@@ -55,11 +68,34 @@ impl ExternalPoolAdapterRuntimeBundleRoot {
         if !path.is_absolute() {
             return Err(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody);
         }
-        Ok(Self(path))
+
+        #[cfg(target_os = "linux")]
+        {
+            let retained_directory =
+                super::filesystem::open_external_pool_adapter_runtime_bundle_root(&path)?;
+            return Ok(Self { retained_directory });
+        }
+
+        #[cfg(windows)]
+        {
+            return Ok(Self { path });
+        }
+
+        #[cfg(not(any(target_os = "linux", windows)))]
+        {
+            let _ = path;
+            Err(ExternalPoolAdapterRuntimeBundleError::Unavailable)
+        }
     }
 
+    #[cfg(target_os = "linux")]
+    pub(super) fn retained_directory(&self) -> &File {
+        &self.retained_directory
+    }
+
+    #[cfg(windows)]
     pub(super) fn as_path(&self) -> &Path {
-        &self.0
+        &self.path
     }
 }
 
@@ -229,6 +265,12 @@ impl<'tx, 'conn> CurrentExternalPoolAdapterRuntimeBundleAuthority<'tx, 'conn> {
     pub(in crate::store) fn checked_at(&self) -> &str {
         &self.checked_at
     }
+
+    /// Removes every database/installation authority while retaining only the already-resolved
+    /// locked V256 material and its filesystem handles.
+    pub(super) fn into_prepared_bundle(self) -> PreparedExternalPoolAdapterRuntimeBundle {
+        self.bundle
+    }
 }
 
 /// Store-only borrowed view over one exact pre-probe preparation.
@@ -304,5 +346,17 @@ impl<'a, 'tx, 'conn> CurrentExternalPoolAdapterProbePreparationAuthority<'a, 'tx
 
     pub(super) fn bundle(&self) -> &CurrentExternalPoolAdapterRuntimeBundleAuthority<'tx, 'conn> {
         self.bundle
+    }
+
+    pub(in crate::store) fn vulnerability(
+        &self,
+    ) -> &CurrentExternalPoolAdapterVulnerabilityReattestationAuthority {
+        self.vulnerability
+    }
+
+    pub(in crate::store) fn sandbox(
+        &self,
+    ) -> &CurrentExternalPoolAdapterSandboxReattestationAuthority {
+        self.sandbox
     }
 }

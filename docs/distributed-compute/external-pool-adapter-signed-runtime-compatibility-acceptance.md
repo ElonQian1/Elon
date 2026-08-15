@@ -88,8 +88,10 @@ root、错误 JCS/digest、重复消费、分叉、revoked/expired head 与任�
 - Linux x86-64 real derived-launch fixture、Yama 2/3、ancillary injection、timeout与cleanup fault injection；
 - real V237 independent signer、wrong-key/revoked-key/replay/concurrent lineage；
 - Profile V2 checked-in machine JSON/digest reproducibility与 current catalog drift；
-- V260-V267 regression，以及未来 V268 + fresh V265 + atomic activation组合。
+- V260-V267 regression、V270 current readiness authority，以及未来 atomic activation 组合；历史
+  `V268 + fresh V265` 计划不得绕过 V270 的 cleanup、短 TTL 与同进程 custody reproof。
 
 本批动态计数固定为 `passed=0`、`failed=0`。没有上述运行证据时，不得把 implementation 标为 verified，
-不得改变 Provider/route/activation/market authority；在 production orchestrator 与 independent-signer
-handoff caller 落地并验收前，也不得宣称端到端 signed workflow 已闭合。
+不得改变 Provider/route/activation/market authority。V269 已落默认关闭的 admin courier caller 源码，
+但尚未编译或运行，也没有 unattended signer transport、私钥托管或自动签名闭环；不得据此宣称端到端
+signed workflow 已动态闭合。

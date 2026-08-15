@@ -71,6 +71,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .merge(super::external_pool_adapter_runtime_compatibility_verification_api::routes())
         .merge(super::external_pool_adapter_upstream_transport_target_api::routes())
         .merge(super::external_pool_adapter_supervisor_session_policy_companion_api::routes())
+        .merge(super::external_pool_adapter_provider_runtime_readiness_api::routes())
         .merge(super::external_pool_adapter_release_lifecycle_api::routes())
 }
 

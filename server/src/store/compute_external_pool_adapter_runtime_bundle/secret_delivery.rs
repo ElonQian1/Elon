@@ -4,28 +4,36 @@ use anyhow::{bail, Result};
 use chrono::{SecondsFormat, Utc};
 use rusqlite::TransactionBehavior;
 
+mod binding;
+
+pub(super) use binding::{
+    audit_delivery_roots, delivery_binding, ExternalPoolAdapterEphemeralSecretDeliveryBinding,
+};
+
 use super::{
     current::current_external_pool_adapter_runtime_bundle_authority_on,
-    probe_preparation::{materialize_probe_preparation, select_current_probe_preparation_roots_on},
+    entrypoint_capsule::PreparedExternalPoolAdapterEntrypointCapsule,
+    probe_preparation::{
+        prepare_owned_probe_capsule, select_current_probe_preparation_roots_on,
+        with_owned_probe_preparation,
+    },
+    runtime::ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
     types::{
-        CurrentExternalPoolAdapterProbePreparationAuthority,
-        CurrentExternalPoolAdapterRuntimeBundleAuthority, ExternalPoolAdapterRuntimeBundleRoot,
+        CurrentExternalPoolAdapterProbePreparationAuthority, ExternalPoolAdapterRuntimeBundleRoot,
+        PreparedExternalPoolAdapterRuntimeBundle,
     },
 };
 use crate::{
     compute_federation::{
-        external_pool_adapter_installation::{
-            ExternalPoolAdapterInstallationBinding, PreparedExternalPoolAdapterInstallation,
-        },
+        external_pool_adapter_installation::PreparedExternalPoolAdapterInstallation,
         external_pool_adapter_linux_supervisor::{
             launch_external_pool_adapter_supervisor_child,
             ExternalPoolAdapterSupervisorCgroupParent, ExternalPoolAdapterSupervisorChild,
         },
         external_pool_adapter_supervisor_session::{
             external_pool_adapter_session_roots, prepare_external_pool_adapter_supervisor_session,
-            AuthenticatedExternalPoolAdapterSession,
+            AuthenticatedExternalPoolAdapterSession, ExternalPoolAdapterSessionRoots,
         },
-        external_pool_adapter_upstream_transport_target::ExternalPoolAdapterUpstreamTransportTargetReceipt,
     },
     store::{
         compute_external_pool_adapter_supervisor_session_policy_companion::{
@@ -40,6 +48,7 @@ use elon_external_pool_adapter_session_core::{
     receive_external_pool_adapter_no_work_probe_request,
     ExternalPoolAdapterEphemeralBundleDeliveryHostReceipt,
     ExternalPoolAdapterNoWorkProbeHostReceipt, ExternalPoolAdapterNoWorkProbeHostRequest,
+    PreparedExternalPoolAdapterEphemeralBundleDelivery,
 };
 
 const CHILD_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -56,21 +65,26 @@ pub(in crate::store) struct CurrentExternalPoolAdapterEphemeralSecretDeliveryAut
     checked_at: String,
 }
 
-/// Stable non-secret roots retained across transaction-free network waits.
-/// It is intentionally neither Clone, Debug, nor serializable.
-pub(super) struct ExternalPoolAdapterEphemeralSecretDeliveryBinding {
-    policy_digest: String,
-    profile_digest: String,
-    target_digest: String,
-    companion_digest: String,
-    source_capsule_digest: String,
-    launch_capsule_digest: String,
-    launch_capsule_size_bytes: u64,
-    delivery_root: String,
-    bundle_material_digest: [u8; 32],
-    installation: ExternalPoolAdapterInstallationBinding,
-    upstream_target: ExternalPoolAdapterUpstreamTransportTargetReceipt,
-    probe_timeout_ms: u64,
+/// Unforgeable terminal authority. Construction requires authenticated shutdown, pidfd reap, and
+/// successful cgroup plus scratch cleanup.
+pub(super) struct CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority {
+    binding: ExternalPoolAdapterEphemeralSecretDeliveryBinding,
+    delivery_checked_at: String,
+}
+
+struct PreparedExternalPoolAdapterEphemeralSecretDeliveryLaunch {
+    bundle: PreparedExternalPoolAdapterRuntimeBundle,
+    capsule: PreparedExternalPoolAdapterEntrypointCapsule,
+    delivery: PreparedExternalPoolAdapterEphemeralBundleDelivery,
+    session_roots: ExternalPoolAdapterSessionRoots,
+    binding: ExternalPoolAdapterEphemeralSecretDeliveryBinding,
+    checked_at: String,
+}
+
+struct PreparedExternalPoolAdapterEphemeralSecretDeliveryRoots {
+    delivery: PreparedExternalPoolAdapterEphemeralBundleDelivery,
+    session_roots: ExternalPoolAdapterSessionRoots,
+    binding: ExternalPoolAdapterEphemeralSecretDeliveryBinding,
 }
 
 impl Store {
@@ -84,9 +98,10 @@ impl Store {
         session_prepared: PreparedExternalPoolAdapterInstallation,
         bundle_root: &ExternalPoolAdapterRuntimeBundleRoot,
         cgroup_parent: &ExternalPoolAdapterSupervisorCgroupParent,
+        process_custody: &ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
         consume: impl FnOnce(&CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority) -> Result<()>,
     ) -> Result<bool> {
-        let Some(mut authority) = self
+        let Some(authority) = self
             .prepare_current_external_pool_adapter_ephemeral_secret_delivery(
                 profile_id,
                 companion_id,
@@ -95,12 +110,13 @@ impl Store {
                 session_prepared,
                 bundle_root,
                 cgroup_parent,
+                process_custody,
             )?
         else {
             return Ok(false);
         };
         consume(&authority)?;
-        authority.shutdown_and_reap()?;
+        let _cleaned = authority.shutdown_and_reap()?;
         Ok(true)
     }
 
@@ -114,6 +130,7 @@ impl Store {
         session_prepared: PreparedExternalPoolAdapterInstallation,
         bundle_root: &ExternalPoolAdapterRuntimeBundleRoot,
         cgroup_parent: &ExternalPoolAdapterSupervisorCgroupParent,
+        process_custody: &ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
     ) -> Result<Option<CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority>> {
         let mut connection = self.conn()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -140,34 +157,49 @@ impl Store {
         audit_delivery_roots(&bundle, &companion, &checked_at)?;
         let selected =
             select_current_probe_preparation_roots_on(&transaction, &bundle, &checked_at)?;
-        let mut delivered = None;
-        materialize_probe_preparation(&bundle, &selected, |preparation| {
-            delivered = Some(deliver_to_authenticated_child(
+        let capsule = prepare_owned_probe_capsule(&bundle, &selected)?;
+        let mut roots = None;
+        with_owned_probe_preparation(&bundle, &selected, &capsule, |preparation| {
+            roots = Some(prepare_transaction_free_delivery_roots(
                 preparation,
                 &companion,
-                cgroup_parent,
+                process_custody,
             )?);
             Ok(())
         })?;
+        let roots = roots.ok_or_else(|| {
+            anyhow::anyhow!("ephemeral secret delivery did not produce exact launch roots")
+        })?;
+        let prepared = PreparedExternalPoolAdapterEphemeralSecretDeliveryLaunch {
+            bundle: bundle.into_prepared_bundle(),
+            capsule,
+            delivery: roots.delivery,
+            session_roots: roots.session_roots,
+            binding: roots.binding,
+            checked_at,
+        };
         drop(selected);
         drop(companion);
-        drop(bundle);
         transaction.commit()?;
-        Ok(Some(delivered.ok_or_else(|| {
-            anyhow::anyhow!("ephemeral secret delivery did not produce an authority")
-        })?))
+        drop(connection);
+        Ok(Some(deliver_to_authenticated_child(
+            prepared,
+            cgroup_parent,
+        )?))
     }
 }
 
-fn deliver_to_authenticated_child(
+fn prepare_transaction_free_delivery_roots(
     preparation: &CurrentExternalPoolAdapterProbePreparationAuthority<'_, '_, '_>,
     companion: &CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
-    cgroup_parent: &ExternalPoolAdapterSupervisorCgroupParent,
-) -> Result<CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority> {
+    process_custody: &ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
+) -> Result<PreparedExternalPoolAdapterEphemeralSecretDeliveryRoots> {
     let bundle = preparation.bundle();
     bundle.revalidate()?;
     let binary_roots = bundle.roots();
-    let mut delivered = None;
+    let runtime_bundle_identity_commitment =
+        process_custody.runtime_bundle_identity_commitment(bundle)?;
+    let mut prepared = None;
     bundle.with_sensitive_bytes(|config, credential| {
         let delivery = prepare_external_pool_adapter_ephemeral_bundle_delivery(
             binary_roots.bundle_generation(),
@@ -191,119 +223,59 @@ fn deliver_to_authenticated_child(
             companion,
             &delivery_root,
             session_root_arguments.values(),
+            runtime_bundle_identity_commitment,
         )?;
-        let prepared_session = prepare_external_pool_adapter_supervisor_session(session_roots)?;
-        let (host, child_bootstrap) = prepared_session.split();
-        let child =
-            launch_external_pool_adapter_supervisor_child(cgroup_parent, child_bootstrap, capsule)?;
-        let mut session = host.authenticate()?;
-        let receipt = delivery.deliver(&mut session, &delivery_root, config, credential)?;
-        delivered = Some(CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority {
-            session,
-            child,
-            receipt: Some(receipt),
+        prepared = Some(PreparedExternalPoolAdapterEphemeralSecretDeliveryRoots {
+            delivery,
+            session_roots,
             binding,
-            checked_at: bundle.checked_at().to_string(),
         });
         Ok(())
     })?;
     bundle.revalidate()?;
-    delivered.ok_or_else(|| anyhow::anyhow!("authenticated child delivery was not retained"))
+    prepared.ok_or_else(|| anyhow::anyhow!("authenticated child delivery roots were not retained"))
 }
 
-pub(super) fn delivery_binding(
-    preparation: &CurrentExternalPoolAdapterProbePreparationAuthority<'_, '_, '_>,
-    companion: &CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
-    delivery_root: &str,
-    session_root_arguments: &[String],
-) -> Result<ExternalPoolAdapterEphemeralSecretDeliveryBinding> {
-    use sha2::{Digest, Sha256};
-
-    let bundle = preparation.bundle();
-    let roots = bundle.roots();
-    let companion_receipt = companion.companion();
-    let material = &companion_receipt.companion;
-    let profile = &bundle.launch_profile().profile().profile;
-    let capsule = preparation.capsule();
-    let probe_timeout_ms = profile.launch_policy.probe_timeout_ms;
-    if session_root_arguments.len() != 6
-        || profile.launch_policy.probe_contract != "authenticated_no_work_readiness_v1"
-        || probe_timeout_ms == 0
-        || probe_timeout_ms != material.supervisor_session_policy.state.probe_timeout_ms
-        || session_root_arguments[0] != material.supervisor_session_policy_digest
-        || session_root_arguments[1] != material.profile_digest
-        || session_root_arguments[2] != material.target_digest
-        || session_root_arguments[3] != companion_receipt.companion_digest
-        || capsule.launch_size_bytes() == 0
-        || capsule.launch_sha256() == capsule.entrypoint_sha256()
-        || session_root_arguments[4] != capsule.launch_sha256()
-        || session_root_arguments[5] != delivery_root
-    {
-        bail!("ephemeral secret delivery no-work roots rejected");
-    }
-    let mut digest = Sha256::new();
-    digest.update(b"elon.external_pool_adapter.bundle_material.v1\0");
-    digest.update(roots.bundle_generation().to_be_bytes());
-    digest.update(roots.config_size_bytes().to_be_bytes());
-    digest.update(roots.config_sha256());
-    digest.update(roots.credential_size_bytes().to_be_bytes());
-    digest.update(roots.credential_sha256());
-    Ok(ExternalPoolAdapterEphemeralSecretDeliveryBinding {
-        policy_digest: session_root_arguments[0].clone(),
-        profile_digest: session_root_arguments[1].clone(),
-        target_digest: session_root_arguments[2].clone(),
-        companion_digest: session_root_arguments[3].clone(),
-        source_capsule_digest: capsule.entrypoint_sha256().to_string(),
-        launch_capsule_digest: session_root_arguments[4].clone(),
-        launch_capsule_size_bytes: capsule.launch_size_bytes(),
-        delivery_root: session_root_arguments[5].clone(),
-        bundle_material_digest: digest.finalize().into(),
-        installation: bundle
-            .launch_profile()
-            .candidate()
-            .registry()
-            .prepared()
-            .binding()
-            .clone(),
-        upstream_target: companion.target().target().clone(),
-        probe_timeout_ms,
+fn deliver_to_authenticated_child(
+    prepared: PreparedExternalPoolAdapterEphemeralSecretDeliveryLaunch,
+    cgroup_parent: &ExternalPoolAdapterSupervisorCgroupParent,
+) -> Result<CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority> {
+    let PreparedExternalPoolAdapterEphemeralSecretDeliveryLaunch {
+        bundle,
+        capsule,
+        delivery,
+        session_roots,
+        binding,
+        checked_at,
+    } = prepared;
+    bundle.revalidate()?;
+    let delivery_root = delivery.bundle_root_hex();
+    let prepared_session = prepare_external_pool_adapter_supervisor_session(session_roots)?;
+    let (host, child_bootstrap) = prepared_session.split();
+    let mut child =
+        launch_external_pool_adapter_supervisor_child(cgroup_parent, child_bootstrap, &capsule)?;
+    let mut session = host.authenticate()?;
+    let mut delivery = Some(delivery);
+    let mut receipt = None;
+    bundle.with_sensitive_bytes(|config, credential| {
+        let selected = delivery
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("ephemeral delivery was already consumed"))?;
+        receipt = Some(selected.deliver(&mut session, &delivery_root, config, credential)?);
+        Ok(())
+    })?;
+    bundle.revalidate()?;
+    drop(bundle);
+    drop(capsule);
+    Ok(CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority {
+        session,
+        child,
+        receipt: Some(
+            receipt.ok_or_else(|| anyhow::anyhow!("authenticated delivery receipt was absent"))?,
+        ),
+        binding,
+        checked_at,
     })
-}
-
-pub(super) fn audit_delivery_roots(
-    bundle: &CurrentExternalPoolAdapterRuntimeBundleAuthority<'_, '_>,
-    companion: &CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
-    checked_at: &str,
-) -> Result<()> {
-    let bundle_profile = bundle.launch_profile().profile();
-    let companion_receipt = companion.companion();
-    let companion_material = &companion_receipt.companion;
-    let target = companion.target();
-    let target_profile = target.profile().profile();
-    let bundle_installation = bundle
-        .launch_profile()
-        .candidate()
-        .registry()
-        .prepared()
-        .binding();
-    let session_installation = target.profile().candidate().registry().prepared().binding();
-    if bundle.checked_at() != checked_at
-        || companion.checked_at() != checked_at
-        || target.checked_at() != checked_at
-        || companion_material.profile_id != bundle_profile.profile_id
-        || companion_material.profile_digest != bundle_profile.profile_digest
-        || target_profile.profile_id != bundle_profile.profile_id
-        || target_profile.profile_digest != bundle_profile.profile_digest
-        || companion_material.target_id != target.target().target_id
-        || companion_material.target_digest != target.target().target_digest
-        || companion_material.provider_binding_id != bundle_profile.profile.provider_binding_id
-        || companion_material.provider_binding_digest
-            != bundle_profile.profile.provider_binding_digest
-        || bundle_installation != session_installation
-    {
-        bail!("ephemeral secret delivery roots drifted");
-    }
-    Ok(())
 }
 
 impl CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority {
@@ -340,7 +312,9 @@ impl CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority {
         request.complete(&mut self.session, response)
     }
 
-    pub(super) fn shutdown_and_reap(&mut self) -> Result<()> {
+    pub(super) fn shutdown_and_reap(
+        mut self,
+    ) -> Result<CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority> {
         let receipt = self
             .receipt
             .take()
@@ -353,50 +327,35 @@ impl CurrentExternalPoolAdapterEphemeralSecretDeliveryAuthority {
         if exit.exit_code != Some(0) || exit.signal.is_some() {
             bail!("ephemeral secret delivery child failed no-work shutdown");
         }
-        Ok(())
+        Ok(CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority {
+            binding: self.binding,
+            delivery_checked_at: self.checked_at,
+        })
     }
 }
 
-impl PartialEq for ExternalPoolAdapterEphemeralSecretDeliveryBinding {
-    fn eq(&self, other: &Self) -> bool {
-        self.policy_digest == other.policy_digest
-            && self.profile_digest == other.profile_digest
-            && self.target_digest == other.target_digest
-            && self.companion_digest == other.companion_digest
-            && self.source_capsule_digest == other.source_capsule_digest
-            && self.launch_capsule_digest == other.launch_capsule_digest
-            && self.launch_capsule_size_bytes == other.launch_capsule_size_bytes
-            && self.delivery_root == other.delivery_root
-            && self.bundle_material_digest == other.bundle_material_digest
-            && self.installation == other.installation
-            && self.upstream_target == other.upstream_target
-            && self.probe_timeout_ms == other.probe_timeout_ms
-    }
-}
-
-impl Eq for ExternalPoolAdapterEphemeralSecretDeliveryBinding {}
-
-impl ExternalPoolAdapterEphemeralSecretDeliveryBinding {
-    pub(super) fn upstream_target(&self) -> &ExternalPoolAdapterUpstreamTransportTargetReceipt {
-        &self.upstream_target
+impl CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority {
+    pub(super) fn binding(&self) -> &ExternalPoolAdapterEphemeralSecretDeliveryBinding {
+        &self.binding
     }
 
-    pub(super) fn delivery_root(&self) -> &str {
-        &self.delivery_root
+    pub(super) fn delivery_checked_at(&self) -> &str {
+        &self.delivery_checked_at
     }
 
-    pub(super) fn session_root_arguments(&self) -> [String; 6] {
-        [
-            self.policy_digest.clone(),
-            self.profile_digest.clone(),
-            self.target_digest.clone(),
-            self.companion_digest.clone(),
-            self.launch_capsule_digest.clone(),
-            self.delivery_root.clone(),
-        ]
+    pub(super) fn authenticated_shutdown_completed(&self) -> bool {
+        true
     }
 
-    pub(super) fn probe_timeout(&self) -> Duration {
-        Duration::from_millis(self.probe_timeout_ms)
+    pub(super) fn pidfd_reaped(&self) -> bool {
+        true
+    }
+
+    pub(super) fn cgroup_cleaned(&self) -> bool {
+        true
+    }
+
+    pub(super) fn scratch_cleaned(&self) -> bool {
+        true
     }
 }

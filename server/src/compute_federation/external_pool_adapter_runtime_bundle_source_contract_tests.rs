@@ -1,5 +1,7 @@
 use sha2::{Digest, Sha256};
 
+mod provider_readiness;
+
 const COMPUTE_FEDERATION_MOD: &str = include_str!("mod.rs");
 const FILESYSTEM: &str = include_str!("external_pool_adapter_runtime_bundle/filesystem.rs");
 const LINUX: &str = include_str!("external_pool_adapter_runtime_bundle/filesystem/linux.rs");
@@ -11,8 +13,18 @@ const STORE_CURRENT: &str =
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/current.rs");
 const STORE_TYPES: &str =
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/types.rs");
-const STORE_SECRET_DELIVERY: &str =
-    include_str!("../store/compute_external_pool_adapter_runtime_bundle/secret_delivery.rs");
+const STORE_RUNTIME: &str =
+    include_str!("../store/compute_external_pool_adapter_runtime_bundle/runtime.rs");
+const STORE_RUNTIME_CUSTODY: &str =
+    include_str!("../store/compute_external_pool_adapter_runtime_bundle/runtime/custody.rs");
+const PROVIDER_READINESS_TYPES: &str =
+    include_str!("external_pool_adapter_provider_runtime_readiness/types.rs");
+const STORE_SECRET_DELIVERY: &str = concat!(
+    include_str!("../store/compute_external_pool_adapter_runtime_bundle/secret_delivery.rs"),
+    include_str!(
+        "../store/compute_external_pool_adapter_runtime_bundle/secret_delivery/binding.rs"
+    )
+);
 const V253_CURRENT: &str =
     include_str!("../store/compute_external_pool_adapter_credential_reattestation/current.rs");
 const V254_FENCES: &str = include_str!(
@@ -142,6 +154,8 @@ fn runtime_bundle_path_and_filesystem_custody_are_fail_closed() {
     assert!(FILESYSTEM.contains("not(any(target_os = \"linux\", windows))"));
     assert!(FILESYSTEM.contains("Err(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody)"));
     assert!(!FILESYSTEM.contains("pub(crate) fn resolve_external_pool_adapter_runtime_bundle"));
+    assert!(!LINUX.contains(".expect("));
+    assert!(!LINUX.contains(".unwrap("));
 }
 
 #[test]
@@ -310,7 +324,8 @@ fn v263_store_composition_is_private_current_rooted_and_has_no_external_effect()
         "current_external_pool_adapter_runtime_bundle_authority_on",
         "current_external_pool_adapter_supervisor_session_policy_companion_authority_on",
         "select_current_probe_preparation_roots_on",
-        "materialize_probe_preparation",
+        "prepare_owned_probe_capsule",
+        "with_owned_probe_preparation",
         "bundle.with_sensitive_bytes(|config, credential|",
         "prepare_external_pool_adapter_ephemeral_bundle_delivery",
         "external_pool_adapter_session_roots",
@@ -324,7 +339,7 @@ fn v263_store_composition_is_private_current_rooted_and_has_no_external_effect()
         "capsule.launch_sha256() == capsule.entrypoint_sha256()",
         "session_root_arguments[4] != capsule.launch_sha256()",
         "host.authenticate()?",
-        "delivery.deliver(&mut session, &delivery_root, config, credential)?",
+        "selected.deliver(",
         "bundle_installation != session_installation",
         "receipt.shutdown(&mut self.session)?",
         ".wait(CHILD_EXIT_TIMEOUT)?",

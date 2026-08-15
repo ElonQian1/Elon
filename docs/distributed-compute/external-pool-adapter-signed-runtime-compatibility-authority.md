@@ -19,10 +19,11 @@ catalog path、role、size bound 与验证规则，不是 fixture bytes 的作�
 
 这条链是 release 级兼容性证据，不是某个 Provider 的生产 readiness。它不得读取或持久化
 V256 production config/credential、credential commitment、V258 hostname/SPKI/address、V259
-Provider companion/session delivery root，或任何由生产 Secret 派生的摘要。未来 atomic activation
-必须另取 fresh Provider-specific V255/V258/V259/V265 authority，并与 current V268 receipt 的
-release、installation content、source/launch image 和 policy roots 做 exact equality；V268 自身不能
-替代该事务。
+Provider companion/session delivery root，或任何由生产 Secret 派生的摘要。V268 交付时规划由未来
+atomic activation 另取 fresh Provider-specific V255/V258/V259/V265 authority；V270 已把这组瞬时
+证明收敛为 cleanup 后、同进程短时有效的 Store-private current readiness authority，并 exact 绑定
+current V268 receipt 的 release、installation content、source/launch image 和 policy roots。未来
+activation 必须在独立原子事务消费该 V270 authority；V268 自身不能替代该事务。
 
 ## 2. Profile V2、server-fixed runner/catalog constraint 与 release-declared fixture
 
@@ -158,13 +159,15 @@ runtime-launch/activation readiness 全部为 false。Provider 保持 `registeri
 route，不创建 service actor，不触发任务、算力、用量、市场、结算或 Sui 动作；V254 的 18 项 temporary
 absolute deny 必须逐字保留。
 
-atomic Provider activation 和 market admission 明确后置。后续必须先成功 shutdown/reap，再在独立
-原子事务中组合 current V268 durable receipt 与 fresh V265 Provider-specific observation；不能在 V265
-callback 内先提交 activation、再尝试 cleanup，也不能让 SQLite transaction 跨 upstream network await。
+atomic Provider activation 和 market admission 明确后置。V268 批次最初要求先成功 shutdown/reap，
+再组合 current V268 durable receipt 与 fresh V265 Provider-specific observation；V270 已把该要求实现为
+cleanup 后才可形成、最多 15 秒且需同进程 HMAC custody reproof 的 Store-private current readiness
+authority。后续 activation 必须消费该 V270 authority，不能回退为直接信任 V268/V265，也不能让
+SQLite transaction 跨 upstream network await。
 
-V254 的 temporary deny 不能因 V268 source 存在而删除。未来替代至少要求：事务外先完成并成功清理
-fresh Provider-specific V265 probe；事务内同一 connection/`checked_at` 重新消费 current V249 release、
-V254 candidate、V255 profile、V258 target、V259 companion/session、V237 key 与 V268 head，并 exact 比对
+V254 的 temporary deny 不能因 V268 或 V270 source 存在而删除。未来替代至少要求：事务外形成已成功
+清理的 V270 receipt；事务内同一 connection/`checked_at` 消费其 Store-private current authority，并由该
+authority 重验 current V249/V254/V255/V258/V259/V250/V252/V253/V268 与 exact
 installation/source/launch/profile/runner/fixture lineage；只有随后同事务写入的 Provider/route authority 才能
 获得 activation effect。CapacityPool/Offer/market admission 仍须自己的 current capacity/price/admission roots
 与原子写集合，不能由 activation receipt 顺带授予。后续 migration 必须为 18 个 insert/update/version/direct-
@@ -175,6 +178,7 @@ SQL edge 逐项安装等价 replacement guard，并通过 fresh/reopen/concurren
 
 本批遵守架构阶段禁令：不编译 Rust、不执行 migration、不运行单元/HTTP/Linux fixture、不启动 child、
 不读取真实 Secret、不连接网络。当前状态严格为 `source_review_only / implementation_uncompiled /
-implementation_unrun`，`passed=0`、`failed=0`。production orchestrator/independent-signer handoff 未接线，
-端到端 signed workflow 仍不可达；源码存在只证明合同已表达，不能声称 runner、signature、SQLite guard
-或 kernel confinement 已动态验收。
+implementation_unrun`，`passed=0`、`failed=0`。V269 已接默认关闭的 admin courier caller，可同步取得
+server-derived signer payload，但该路径同样未编译或运行，且没有 unattended signer transport、私钥托管
+或自动签名闭环；源码存在只证明合同已表达，不能声称 runner、signature、SQLite guard 或 kernel
+confinement 已动态验收。

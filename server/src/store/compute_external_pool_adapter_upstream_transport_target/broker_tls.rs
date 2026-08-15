@@ -10,7 +10,8 @@ use crate::compute_federation::{
         ExternalPoolAdapterBrokerTlsChannel, ExternalPoolAdapterBrokerTlsTarget,
     },
     external_pool_adapter_installation::{
-        ExternalPoolAdapterInstallationBinding, PreparedExternalPoolAdapterInstallation,
+        ExternalPoolAdapterInstallationBinding, ExternalPoolAdapterInstallationFsError,
+        PreparedExternalPoolAdapterInstallation,
     },
 };
 use zeroize::Zeroizing;
@@ -20,6 +21,13 @@ use super::{
     CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
 };
 use crate::store::Store;
+
+pub(in crate::store) type ExternalPoolAdapterInstallationReopener<'a> =
+    dyn FnMut() -> std::result::Result<
+            PreparedExternalPoolAdapterInstallation,
+            ExternalPoolAdapterInstallationFsError,
+        > + Send
+        + 'a;
 
 /// Store-private, short-lived authority retaining both the exact V258 roots and TLS channel.
 /// It is intentionally non-Clone/non-Debug/non-Serde and exposes no network I/O.
@@ -86,13 +94,14 @@ impl Store {
         &self,
         target_id: &str,
         expected_target_digest: &str,
-        preflight_prepared: PreparedExternalPoolAdapterInstallation,
-        postflight_prepared: PreparedExternalPoolAdapterInstallation,
-        consume: impl FnOnce(&CurrentExternalPoolAdapterBrokerTlsAuthority) -> Result<()>,
+        reopen_prepared: &mut ExternalPoolAdapterInstallationReopener<'_>,
+        consume: impl FnOnce(&CurrentExternalPoolAdapterBrokerTlsAuthority) -> Result<()> + Send,
     ) -> Result<bool> {
+        let preflight_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
         let (preflight_target, preflight_binding, broker_target) = {
             let mut connection = self.conn()?;
-            let transaction = connection.transaction()?;
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let checked_at = canonical_now();
             let Some(authority) =
                 current_external_pool_adapter_upstream_transport_target_authority_on(
@@ -116,6 +125,7 @@ impl Store {
         // No database connection, transaction, or Prepared handle crosses this network await.
         let channel = connect_external_pool_adapter_broker_tls(broker_target).await?;
 
+        let postflight_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
         let mut connection = self.conn()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let checked_at = canonical_now();
@@ -162,12 +172,19 @@ impl Store {
         &self,
         target_id: &str,
         expected_target_digest: &str,
-        preflight_prepared: PreparedExternalPoolAdapterInstallation,
-        postflight_prepared: PreparedExternalPoolAdapterInstallation,
+        reopen_prepared: &mut ExternalPoolAdapterInstallationReopener<'_>,
+        preflight_consume: impl FnOnce(
+                &rusqlite::Transaction<'_>,
+                &CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
+                &str,
+            ) -> Result<()>
+            + Send,
     ) -> Result<Option<PreparedExternalPoolAdapterBrokerTlsChannel>> {
+        let preflight_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
         let (preflight_target, preflight_binding, broker_target) = {
             let mut connection = self.conn()?;
-            let transaction = connection.transaction()?;
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let checked_at = canonical_now();
             let Some(authority) =
                 current_external_pool_adapter_upstream_transport_target_authority_on(
@@ -180,6 +197,7 @@ impl Store {
             else {
                 return Ok(None);
             };
+            preflight_consume(&transaction, &authority, &checked_at)?;
             let broker_target =
                 ExternalPoolAdapterBrokerTlsTarget::from_receipt(authority.target())?;
             let target = authority.target().clone();
@@ -191,6 +209,7 @@ impl Store {
         // No database connection, transaction, or Prepared handle crosses this network await.
         let channel = connect_external_pool_adapter_broker_tls(broker_target).await?;
 
+        let postflight_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
         let mut connection = self.conn()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let checked_at = canonical_now();

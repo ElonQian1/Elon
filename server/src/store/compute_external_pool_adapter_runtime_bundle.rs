@@ -12,10 +12,21 @@ mod manifest;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod no_work_probe;
 mod probe_preparation;
+mod runtime;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod secret_delivery;
 mod types;
 
+pub(in crate::store) use current::current_external_pool_adapter_runtime_bundle_authority_on;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in crate::store) use no_work_probe::CurrentExternalPoolAdapterNoWorkProbeObservationAuthority;
+pub(in crate::store) use runtime::ExternalPoolAdapterProviderRuntimeReadinessProcessCustody;
+pub(crate) use runtime::{
+    external_pool_adapter_provider_runtime_readiness_runtime,
+    initialize_external_pool_adapter_provider_runtime_readiness_runtime,
+    ExternalPoolAdapterProviderRuntimeReadinessRuntime,
+    ExternalPoolAdapterProviderRuntimeReadinessUnavailable,
+};
 pub(in crate::store) use types::{
     CurrentExternalPoolAdapterProbePreparationAuthority,
     CurrentExternalPoolAdapterRuntimeBundleAuthority, ExternalPoolAdapterRuntimeBundleRoot,

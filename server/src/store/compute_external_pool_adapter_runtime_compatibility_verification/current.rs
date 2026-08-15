@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Transaction, TransactionBehavior};
 
 use crate::{
     compute_federation::external_pool_adapter_runtime_compatibility_verification::*,
@@ -104,47 +104,53 @@ impl Store {
     }
 }
 
-pub(in crate::store) fn current_external_pool_adapter_runtime_compatibility_verification_authority_on(
-    conn: &Connection,
+pub(in crate::store) fn current_external_pool_adapter_runtime_compatibility_verification_authority_on<
+    'tx,
+    'conn,
+>(
+    transaction: &'tx Transaction<'conn>,
     verification_receipt_id: &str,
     expected_verification_receipt_digest: &str,
     checked_at: &str,
-) -> Result<Option<CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority>> {
+) -> Result<Option<CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'tx, 'conn>>>
+{
     validate_checked_at(checked_at)?;
-    let Some(stored) = verification_by_id_on(conn, verification_receipt_id)? else {
+    let Some(stored) = verification_by_id_on(transaction, verification_receipt_id)? else {
         return Ok(None);
     };
     if stored.receipt.verification_receipt_digest != expected_verification_receipt_digest {
         bail!("V268 expected verification receipt is not exact");
     }
     let v = &stored.receipt.verification;
-    let head = verification_head_by_release_on(conn, &v.registry_release.registry_release_id)?
-        .ok_or_else(|| anyhow::anyhow!("V268 verification lineage head disappeared"))?;
+    let head =
+        verification_head_by_release_on(transaction, &v.registry_release.registry_release_id)?
+            .ok_or_else(|| anyhow::anyhow!("V268 verification lineage head disappeared"))?;
     if head.receipt.verification_receipt_id != stored.receipt.verification_receipt_id
-        || revocation_by_verification_on(conn, verification_receipt_id)?.is_some()
+        || revocation_by_verification_on(transaction, verification_receipt_id)?.is_some()
         || canonical_time(&v.expires_at)? <= canonical_time(checked_at)?
         || !current_policy_roots(v)?
     {
         bail!("V268 verification is historical, revoked, expired, or policy-stale");
     }
     let release = current_external_pool_adapter_registry_release_authority_on(
-        conn,
+        transaction,
         &v.registry_release.registry_release_id,
         &v.registry_release.registry_release_digest,
         checked_at,
     )?
     .ok_or_else(|| anyhow::anyhow!("V268 verification lost current V249 release"))?;
     let key = current_sandbox_verifier_key_authority_on(
-        conn,
+        transaction,
         &v.sandbox_verifier_key_record_id,
         &v.sandbox_verifier_key_record_digest,
         &v.sandbox_verifier_key_id,
     )?
     .ok_or_else(|| anyhow::anyhow!("V268 verification lost current V237 key"))?;
-    let observation = run_observation_by_id_on(conn, &v.run_observation_id)?
+    let observation = run_observation_by_id_on(transaction, &v.run_observation_id)?
         .ok_or_else(|| anyhow::anyhow!("V268 verification lost its observation"))?;
     Ok(Some(
         CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority::new(
+            transaction,
             stored.receipt,
             observation.receipt,
             release.release().clone(),

@@ -9,7 +9,7 @@ use rusqlite::{params, Connection};
 
 use crate::store_migrations::{
     register_v259_receipt_integrity_functions, register_v268_receipt_integrity_functions,
-    MIGRATIONS,
+    register_v270_receipt_integrity_functions, MIGRATIONS,
 };
 
 /// 将所有尚未应用的 schema 迁移顺序执行到数据库。
@@ -18,6 +18,7 @@ use crate::store_migrations::{
 pub(crate) fn apply_migrations(conn: &Connection) -> Result<()> {
     register_v259_receipt_integrity_functions(conn)?;
     register_v268_receipt_integrity_functions(conn)?;
+    register_v270_receipt_integrity_functions(conn)?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
            version    INTEGER PRIMARY KEY,

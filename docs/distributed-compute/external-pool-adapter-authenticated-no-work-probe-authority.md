@@ -16,7 +16,7 @@ server-owned authenticated TLS channel 组合起来，完成一次 child-generat
 上游 request/response，并由同一个 child 验证响应的无任务语义。
 
 成功只形成 Store-private、进程内、短时的 observation，证明本次 exact
-V256/V258/V259/installation roots 下的 child 接受了一个响应。它不证明上游具备任务、算力、
+V250/V252/V253/V256/V258/V259/V268/installation roots 下的 child 接受了一个响应。它不证明上游具备任务、算力、
 计量或结算能力，也不使 Provider ready 或 active。
 
 ## 2. ELNW 子协议与一次性状态机
@@ -47,28 +47,34 @@ loopback TLS fixture，不连接生产 upstream。exact-length read 保证不足
 
 完整顺序固定为：
 
-1. 使用两份 Prepared installation handle 完成 V264 TLS preflight、事务外 connect 和 postflight；
+1. 通过 late-bound reopener 分别取得第 1/2 份 Prepared installation，完成 V264 TLS preflight、
+   事务外 connect 和 postflight；
 2. 提交 SQLite transaction 后返回不携带 Prepared 或数据库 authority 的 one-shot channel；
-3. 在独立 `Immediate` transaction 内组合 current bundle、companion、capsule、target 与完整
-   installation binding，启动 V263 child 并交付 Secret；
+3. connect 完成后才取得第 3/4 份 Prepared，在独立 `Immediate` transaction 内组合 current
+   bundle、companion、capsule、target 与完整 installation binding；提交并丢弃两份 Prepared 后，
+   才从已派生 sealed launch image 与 locked bundle 启动 V263 child 并交付 Secret；
 4. 比较 broker target 与 child delivery target，接收 child request，再在事务外执行 TLS exchange；
 5. 把 exact response 送回同一 ELSP session，由 child 返回 root-bound receipt；
-6. 丢弃 response 和 network channel，再用独立 Prepared handles 在 `Immediate` transaction
-   中复验 bundle、companion、target、capsule 与完整 installation binding；
-7. transaction commit 后，才向 Store-private callback 借用短时 observation；随后 shutdown、
-   pidfd wait、scratch/cgroup cleanup。
+6. 丢弃 response 和 network channel，先完成 authenticated shutdown、pidfd wait 与 scratch/cgroup
+   cleanup；任何收尾失败都不可到达 observation callback；
+7. cleanup 成功后才 late-bound 取得第 5/6 份 Prepared，在新的 `Immediate` transaction 中复验
+   bundle、companion、target、capsule、完整 installation binding 与 exact current V268 root；
+   Store-private callback 位于该 final transaction 内，callback 成功后才 commit。
 
 任何 SQLite transaction、connection 或 Prepared filesystem handle 都不跨 network await。
 currentness 漂移返回 `false` 或失败关闭，不降级为旧 root 或部分 root。
 
 ## 5. Observation 权限
 
-`CurrentExternalPoolAdapterNoWorkProbeObservationAuthority` 不可 Clone、Debug、序列化或持久化，
-只在 `crate::store` 内可见。callback 只能读取 no-work 布尔结论、request/response 字节数、
-checked-at 和 expires-at；不能取得 Secret、socket、PID、fd、原始 application bytes、probe root
-或内部 root 明细。callback 调用前会检查时效，最迟在 V255/V259 固定 probe timeout 后失效。
+`CurrentExternalPoolAdapterNoWorkProbeObservationAuthority` 不可 Clone、Debug、序列化或直接持久化，
+只在 `crate::store` 内、final transaction callback 期间可见。它可向 V270 Store consumer 借用
+no-work 结论、request/response 字节数、cleanup 状态、exact 非秘密 authority roots 与进程私有 keyed
+commitment；仍不能取得 Secret、socket、PID、fd、原始 application bytes、未加键 probe root 或
+selected address。callback 调用前后都会检查时效，最迟在 V255/V259 固定 probe timeout 后失效。
 
-当前没有公共调用者、HTTP/MCP/PC/APK 路由或数据库 observation 表。这是有意边界，不是遗漏。
+V265 本身仍没有直接 HTTP/MCP/PC/APK surface 或 observation 表。V270 的 admin-only trigger 是唯一
+production caller；它只能在 cleanup 后把该短时 authority消费为最多 15 秒、重启即 historical 的
+readiness receipt，不能把 V265 observation 本身公开或延长。
 
 ## 6. 模块边界与下一硬门
 
@@ -84,8 +90,9 @@ Provider 继续 `registering`，V254 的 18 项 temporary absolute deny 逐字�
 route/service actor，不领取 share/job/attempt，不生成 verified usage、settlement 或 Sui effect，
 不发布 Server、PC 或 APK。
 
-下一硬门是为生产 Adapter 定义独立兼容性与受控 upstream 验收，再设计与 atomic activation
-同批提交的完整 admission gate。单个 no-work observation 不能单独移除 V254 deny。动态证据见
+V268/V270 已在源码中补上独立 signed compatibility 与 post-cleanup readiness；下一硬门是按 current
+V2 动态重验它们，再设计与 atomic activation 同批提交的完整 admission gate。单个 no-work
+observation 或 readiness receipt 都不能单独移除 V254 deny。动态证据见
 [`external-pool-adapter-authenticated-no-work-probe-acceptance.md`](external-pool-adapter-authenticated-no-work-probe-acceptance.md)。
 
 ## 7. V267 状态更正

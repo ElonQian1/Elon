@@ -69,9 +69,11 @@ Store-owned callback 中借用，callback 外无法取得 slice、hash、nonce�
 本机路径。
 
 child 返回 final ready 后，Store 才向同一私有 callback 暴露不可 Clone、不可 Debug、不可
-序列化的 delivery authority。当前 callback 只能证明 `secret_delivery_ready=true`；随后立刻
-执行 no-work shutdown 和有界 reap。V263 没有公共调用者，也没有写入 Provider、route、
-market、usage、settlement 或 Sui 状态。
+序列化的 delivery authority。历史 V263 callback 只能证明 `secret_delivery_ready=true`，其后继
+V265/V270 现已把该 authority 保持为 Store 私有，并在 authenticated no-work response 后先完成
+shutdown、pidfd reap 与 cgroup/scratch cleanup，再进入 post-cleanup reproof。V263 本身没有直接
+公共入口；V270 的 admin trigger 只是经 Store 私有链间接调用它，并且仍不把 delivery authority、
+Secret 或派生 root 暴露到 HTTP。整条链都不写入 route、market、usage、settlement 或 Sui 状态。
 
 ## 5. 模块边界
 
@@ -96,7 +98,10 @@ V254 的 18 项 temporary absolute deny 继续逐字保留，Provider 继续 `re
 V263 已完成 Store 私有组合、cross-build 与真实 Linux kernel fixture。后继 V264/V265 已在
 不向 child 扩大网络 authority 的前提下，使用 V258 exact target 完成 Broker TLS seam，并在
 固定本地 fixture 上完成 authenticated upstream no-work probe。probe 形成独立、可过期、
-可复验的进程内 observation；它仍不能单独移除 V254 deny 或激活 Provider。V263 详细动态
+可复验的进程内 observation。V270 又为该私有链增加默认关闭的 admin trigger，并只在成功
+shutdown/reap/cleanup 后形成最多 15 秒的 Provider-specific durable readiness receipt；当前实现仍为
+`source_review_only / passed=0`，且 `activation_ready=false`。这些能力都不能单独移除 V254 deny 或
+激活 Provider。V263 详细动态
 证据与尚未验收项见
 [`external-pool-adapter-ephemeral-secret-delivery-acceptance.md`](external-pool-adapter-ephemeral-secret-delivery-acceptance.md)。
 

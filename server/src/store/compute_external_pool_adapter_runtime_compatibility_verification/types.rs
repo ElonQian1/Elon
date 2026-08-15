@@ -1,4 +1,7 @@
 use serde::Serialize;
+use std::marker::PhantomData;
+
+use rusqlite::Transaction;
 
 use crate::compute_federation::{
     external_pool_adapter_registry::ExternalPoolAdapterRegistryReleaseReceipt,
@@ -58,16 +61,21 @@ pub(super) struct StoredRuntimeCompatibilityRevocation {
 }
 
 /// Same-connection current authority. It is intentionally non-Clone/non-Debug/non-Serde.
-pub(in crate::store) struct CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority {
+pub(in crate::store) struct CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<
+    'tx,
+    'conn,
+> {
     verification: ExternalPoolAdapterRuntimeCompatibilityVerificationReceipt,
     run_observation: ExternalPoolAdapterRuntimeCompatibilityRunObservationReceipt,
     release: ExternalPoolAdapterRegistryReleaseReceipt,
     verifier_key: CurrentExternalPoolAdapterSandboxVerifierKeyAuthority,
     checked_at: String,
+    transaction: PhantomData<&'tx Transaction<'conn>>,
 }
 
-impl CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority {
+impl<'tx, 'conn> CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'tx, 'conn> {
     pub(super) fn new(
+        _transaction: &'tx Transaction<'conn>,
         verification: ExternalPoolAdapterRuntimeCompatibilityVerificationReceipt,
         run_observation: ExternalPoolAdapterRuntimeCompatibilityRunObservationReceipt,
         release: ExternalPoolAdapterRegistryReleaseReceipt,
@@ -80,6 +88,7 @@ impl CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority {
             release,
             verifier_key,
             checked_at,
+            transaction: PhantomData,
         }
     }
 

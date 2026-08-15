@@ -39,11 +39,14 @@ struct FileIdentity {
 
 impl LinuxOpenedRuntimeBundle {
     pub(super) fn open(
-        root: &Path,
+        root: &File,
         digest: &str,
     ) -> Result<Self, ExternalPoolAdapterRuntimeBundleError> {
-        let mut directories = open_absolute_root(root)?;
-        let custody_root_index = directories.len().saturating_sub(1);
+        let retained_root = duplicate_cloexec(root)?;
+        validate_directory(&retained_root)?;
+        require_local_filesystem(&retained_root)?;
+        let mut directories = vec![retained_root];
+        let custody_root_index = 0;
         let root_fd = directories
             .last()
             .ok_or(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody)?;
@@ -71,6 +74,15 @@ impl LinuxOpenedRuntimeBundle {
             identities,
         })
     }
+}
+
+pub(super) fn open_custody_root(
+    path: &Path,
+) -> Result<File, ExternalPoolAdapterRuntimeBundleError> {
+    let mut directories = open_absolute_root(path)?;
+    directories
+        .pop()
+        .ok_or(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody)
 }
 
 impl OpenedRuntimeBundle for LinuxOpenedRuntimeBundle {
@@ -141,7 +153,8 @@ fn open_absolute_root(path: &Path) -> Result<Vec<File>, ExternalPoolAdapterRunti
     if !path.is_absolute() || path.as_os_str().as_bytes().contains(&0) {
         return Err(ExternalPoolAdapterRuntimeBundleError::UnsafeCustody);
     }
-    let slash = CString::new("/").expect("static root has no NUL");
+    let slash =
+        CString::new("/").map_err(|_| ExternalPoolAdapterRuntimeBundleError::UnsafeCustody)?;
     let root = file_from_fd(unsafe {
         libc::open(
             slash.as_ptr(),
@@ -224,6 +237,11 @@ fn file_from_fd(fd: i32) -> Result<File, ExternalPoolAdapterRuntimeBundleError> 
     } else {
         Ok(unsafe { File::from_raw_fd(fd) })
     }
+}
+
+fn duplicate_cloexec(file: &File) -> Result<File, ExternalPoolAdapterRuntimeBundleError> {
+    let duplicate = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 0) };
+    file_from_fd(duplicate)
 }
 
 fn validate_directory(file: &File) -> Result<(), ExternalPoolAdapterRuntimeBundleError> {
@@ -316,7 +334,7 @@ fn require_exact_entries(
     directory: &File,
     expected: &[&str],
 ) -> Result<(), ExternalPoolAdapterRuntimeBundleError> {
-    let duplicate = unsafe { libc::dup(directory.as_raw_fd()) };
+    let duplicate = unsafe { libc::fcntl(directory.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 0) };
     if duplicate < 0 {
         return Err(ExternalPoolAdapterRuntimeBundleError::Unavailable);
     }

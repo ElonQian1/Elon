@@ -80,16 +80,19 @@ evidence 不属于产品状态或发布工件。
 
 ## 未验收与禁止声明
 
-- 未用完整 SQLite fixture 动态调用 Store 顶层 no-work orchestration；该层当前是生产编译与
-  source-contract 证据；
+- 未用完整 SQLite fixture 动态调用 Store 顶层 no-work orchestration；历史 V265 层曾有 production
+  compile/source-contract 证据，但 current V267-V270 已实质改为六次晚绑定与 cleanup-before-callback，
+  当前组合只有 source-contract 证据且尚未编译；
 - 未连接生产 DNS、公网 upstream、真实 CA/SPKI、真实 Adapter binary、账号或 Secret；
 - 未验证响应协议在不同第三方矿池中的 framing、no-task 语义、重连、错误映射和运维兼容性；
 - 未做生产 Linux host、network namespace、代理污染、IPv4/IPv6 故障转移、长时稳定性或
   高并发压力验收；
-- 未生成 durable observation、readiness、route/service actor、Provider activation、任务、
-  usage、settlement 或 Sui effect；
-- 未开放 HTTP/MCP/PC/APK，未发布服务器或安装包。
+- 历史 V265 fixture 未生成 durable observation 或 readiness；V270 现有 cleanup 后短时 readiness
+  receipt 与 admin/owner HTTP 源码仍未编译、运行或动态验收，也没有 route/service actor、Provider
+  activation、任务、usage、settlement 或 Sui effect；
+- V265 本身未开放直接 HTTP/MCP/PC/APK；V270 间接 trigger 当前仅为未运行源码，未发布服务器或安装包。
 
 因此只能声明 V265 direct-seal 旧 runtime 的 bounded no-work seam 曾在固定本地 fixture 中
-部分验收；current V267 组合为 `source_review_only / passed=0`，必须先接 production derived
-launch materializer 再重验。不能声明外部矿池生产接入、算力供应或交易结算链路完成。
+部分验收；current V267-V270 组合为 `source_review_only / passed=0`，必须以 production derived
+launch materializer、六次 late-bound audit 与 cleanup-before-callback 顺序重验。不能声明外部矿池
+生产接入、算力供应或交易结算链路完成。

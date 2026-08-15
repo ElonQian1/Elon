@@ -309,7 +309,7 @@ fn runtime_compatibility_store_source_freezes_http_and_atomic_consumer_seams() {
         )
         .unwrap()
         .1
-        .split_once("impl CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority")
+        .split_once("impl<'tx, 'conn>")
         .unwrap()
         .0;
     for root in [
@@ -330,11 +330,11 @@ fn runtime_compatibility_store_source_freezes_http_and_atomic_consumer_seams() {
         "pub(in crate::store) fn current_external_pool_adapter_runtime_compatibility_verification_authority_on"
     ));
     for required in [
-        "verification_head_by_release_on(conn",
-        "revocation_by_verification_on(conn",
+        "verification_head_by_release_on(transaction",
+        "revocation_by_verification_on(transaction",
         "current_external_pool_adapter_registry_release_authority_on(",
         "current_sandbox_verifier_key_authority_on(",
-        "run_observation_by_id_on(conn",
+        "run_observation_by_id_on(transaction",
     ] {
         assert!(
             STORE_CURRENT.contains(required),

@@ -13,7 +13,7 @@ verification_status: historical_v263_fixture_superseded_v267_rerun_required
 
 V263 已把 V256 Store-owned 短时 config/credential 与 V262 exec 后 authenticated runtime 组合。最终验证覆盖两组 Windows source-contract、Linux-musl `elon-server` 与静态 fixture 链接，以及 WSL2 Ubuntu root 下 18 项真实 kernel test；session 与 supervisor 各 `9 passed / 0 failed`，并确认 `V263_WSL_CGROUP_CLEAN=true`。
 
-V263 只交付仓库固定的非生产测试字节。它不连接 V258 upstream，不激活 Provider，不写 route、market、usage、settlement 或链上状态，也没有发布或部署。
+V263 历史批只交付仓库固定的非生产测试字节。它不连接 V258 upstream，不激活 Provider，不写 route、market、usage、settlement 或链上状态，也没有发布或部署。
 
 ## V267 状态更正
 
@@ -25,6 +25,12 @@ V267 当前为 `source_review_only / implementation_uncompiled / implementation_
 `passed=0 / failed=0`。必须用派生 launch image、current V2 与 Store source/launch 双 binding
 重跑正向交付、全部 root/material drift、协议失败、shutdown/reap 和资源故障注入。现有
 ignored fixture 仍直接 seal 原测试 ELF，须先接 production materializer；原样重跑不能验收 V267。
+
+V270 源码已通过默认关闭的 admin trigger 间接到达这条 Store 私有 delivery seam，并把顺序改为
+authenticated no-work response 后先完成 shutdown、pidfd reap 与 cgroup/scratch cleanup，再进入
+post-cleanup reproof 和短时 readiness receipt 写入。该源码仍未编译、运行或接触生产 Secret/upstream，
+`passed=0 / failed=0`；它没有把 delivery authority 或敏感根开放为 HTTP DTO，也不能替代当前
+V267/V263 动态回归矩阵。
 
 ## 已执行验证
 
@@ -83,8 +89,8 @@ linux_kernel_output=5d0e1c53fecae6b4d018df430d4999e878de470eb59ed4c02ab88a2b2b46
 - 未使用生产 config/credential、真实矿池账号或第三方 Adapter；
 - 未连接 V258 hostname/port/SPKI，没有 DNS、TLS、TCP 或 authenticated no-work probe；
 - 未验证生产 mount、生产 cgroup delegation、长时运行、并发多 child、OOM/CPU failure 或主机重启；
-- 未创建 route/service actor、Provider activation/readiness、market admission、usage、settlement 或链上 effect；
-- 未开放 HTTP/MCP/PC/APK 入口，未发布服务器或安装包。
+- 历史 V263 fixture 未创建 route/service actor、Provider activation/readiness、market admission、usage、settlement 或链上 effect；
+- 历史 V263 没有 HTTP/MCP/PC/APK 入口；V270 只新增默认关闭的 admin readiness trigger，仍未发布服务器或安装包，也未形成 activation/market authority。
 
 因此只能声明 V263 direct-seal 测试 capsule 的旧构建曾完成 source、cross-build 与 Linux
 kernel fixture；current V267 Secret delivery 为 `source_review_only / passed=0`，必须先接

@@ -29,3 +29,10 @@ pub(crate) use types::{
     ExternalPoolAdapterRegistryAuditTarget, ExternalPoolAdapterRegistryProviderBindingCurrentness,
     ExternalPoolAdapterRegistryWriteReceipt, RegisterExternalPoolAdapterInstalledInstance,
 };
+
+pub(crate) mod api {
+    pub(crate) use super::types::{
+        ExternalPoolAdapterRegistryProviderBindingCurrentness,
+        ExternalPoolAdapterRegistryWriteReceipt, RegisterExternalPoolAdapterInstalledInstance,
+    };
+}

@@ -21,6 +21,13 @@ const MANIFEST_FILE: &str = "manifest.jcs";
 const CONFIG_FILE: &str = "config.bin";
 const CREDENTIAL_FILE: &str = "credential.bin";
 
+#[cfg(target_os = "linux")]
+pub(super) fn open_external_pool_adapter_runtime_bundle_root(
+    path: &std::path::Path,
+) -> Result<std::fs::File, ExternalPoolAdapterRuntimeBundleError> {
+    linux::open_custody_root(path)
+}
+
 pub(super) fn resolve_external_pool_adapter_runtime_bundle(
     root: &ExternalPoolAdapterRuntimeBundleRoot,
     expected: &ExpectedExternalPoolAdapterRuntimeBundle,
@@ -97,7 +104,7 @@ fn platform_open_bundle(
     root: &ExternalPoolAdapterRuntimeBundleRoot,
     digest: &str,
 ) -> Result<impl OpenedRuntimeBundle, ExternalPoolAdapterRuntimeBundleError> {
-    linux::LinuxOpenedRuntimeBundle::open(root.as_path(), digest)
+    linux::LinuxOpenedRuntimeBundle::open(root.retained_directory(), digest)
 }
 
 #[cfg(windows)]

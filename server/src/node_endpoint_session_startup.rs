@@ -4,12 +4,13 @@ use anyhow::Result;
 
 use crate::{
     compute_federation::external_pool_adapter_runtime_compatibility_signing_handoff_runtime::initialize_external_pool_adapter_runtime_compatibility_signing_handoff_runtime,
-    types::AppState,
+    store::initialize_external_pool_adapter_provider_runtime_readiness_runtime, types::AppState,
 };
 
 /// Reconcile durable heads before any listener or background producer can observe this process.
 pub(crate) fn prepare(state: Arc<AppState>) -> Result<Arc<AppState>> {
     initialize_external_pool_adapter_runtime_compatibility_signing_handoff_runtime()?;
+    initialize_external_pool_adapter_provider_runtime_readiness_runtime()?;
     let restarted = state.store.restart_node_endpoint_sessions()?;
     if restarted > 0 {
         tracing::info!(

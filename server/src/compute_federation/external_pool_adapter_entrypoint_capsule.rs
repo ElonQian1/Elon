@@ -62,9 +62,19 @@ pub(super) fn with_external_pool_adapter_entrypoint_capsule(
     source: &impl ExternalPoolAdapterEntrypointSource,
     consume: impl FnOnce(&PreparedExternalPoolAdapterEntrypointCapsule) -> Result<()>,
 ) -> Result<()> {
-    let capsule = platform_materialize(source)
-        .map_err(|_| anyhow::anyhow!("external-pool Adapter entrypoint capsule is unavailable"))?;
+    let capsule = prepare_external_pool_adapter_entrypoint_capsule(source)?;
     consume(&capsule)
+}
+
+/// Materializes an owned sealed capsule without retaining the installation source handle.
+///
+/// The Store uses this seam to finish its filesystem-current transaction, drop the source
+/// `PreparedExternalPoolAdapterInstallation`, and only then launch a child from the sealed image.
+pub(super) fn prepare_external_pool_adapter_entrypoint_capsule(
+    source: &impl ExternalPoolAdapterEntrypointSource,
+) -> Result<PreparedExternalPoolAdapterEntrypointCapsule> {
+    platform_materialize(source)
+        .map_err(|_| anyhow::anyhow!("external-pool Adapter entrypoint capsule is unavailable"))
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

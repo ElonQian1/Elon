@@ -58,7 +58,7 @@ impl Store {
 }
 
 /// Composes current V255/V253 roots with one filesystem snapshot inside the owning transaction.
-pub(super) fn current_external_pool_adapter_runtime_bundle_authority_on<'tx, 'conn>(
+pub(in crate::store) fn current_external_pool_adapter_runtime_bundle_authority_on<'tx, 'conn>(
     transaction: &'tx Transaction<'conn>,
     profile_id: &str,
     prepared: PreparedExternalPoolAdapterInstallation,

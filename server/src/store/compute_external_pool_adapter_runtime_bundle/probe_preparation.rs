@@ -2,6 +2,10 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Connection, TransactionBehavior};
 
+mod owned;
+
+pub(super) use owned::{prepare_owned_probe_capsule, with_owned_probe_preparation};
+
 use super::{
     current::current_external_pool_adapter_runtime_bundle_authority_on,
     entrypoint_capsule::{
@@ -323,7 +327,7 @@ fn audit_static_roots(
     Ok(())
 }
 
-fn audit_vulnerability_roots(
+pub(super) fn audit_vulnerability_roots(
     profile: &ExternalPoolAdapterRuntimeLaunchProfileMaterial,
     release: &crate::compute_federation::external_pool_adapter_registry::ExternalPoolAdapterRegistryReleaseMaterial,
     vulnerability: &crate::compute_federation::external_pool_adapter_vulnerability_reattestation::ExternalPoolAdapterVulnerabilityReattestationBinding,
@@ -342,7 +346,7 @@ fn audit_vulnerability_roots(
     Ok(())
 }
 
-fn audit_sandbox_roots(
+pub(super) fn audit_sandbox_roots(
     profile: &ExternalPoolAdapterRuntimeLaunchProfileMaterial,
     release: &crate::compute_federation::external_pool_adapter_registry::ExternalPoolAdapterRegistryReleaseMaterial,
     vulnerability: &crate::compute_federation::external_pool_adapter_vulnerability_reattestation::ExternalPoolAdapterVulnerabilityReattestationReceipt,
@@ -379,7 +383,7 @@ fn audit_sandbox_roots(
     Ok(())
 }
 
-fn audit_credential_roots(
+pub(super) fn audit_credential_roots(
     profile: &ExternalPoolAdapterRuntimeLaunchProfileMaterial,
     credential: &crate::compute_federation::external_pool_adapter_credential_reattestation::ExternalPoolAdapterCredentialReattestationBinding,
 ) -> Result<()> {

@@ -1,45 +1,105 @@
+use std::marker::PhantomData;
+
 use anyhow::{bail, Result};
-use chrono::{Duration as ChronoDuration, SecondsFormat, Utc};
-use rusqlite::TransactionBehavior;
+use rusqlite::Transaction;
+
+mod reproof;
 
 use super::{
-    current::current_external_pool_adapter_runtime_bundle_authority_on,
-    probe_preparation::{materialize_probe_preparation, select_current_probe_preparation_roots_on},
+    probe_preparation::{audit_credential_roots, audit_sandbox_roots, audit_vulnerability_roots},
+    runtime::ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     secret_delivery::{
-        audit_delivery_roots, delivery_binding, ExternalPoolAdapterEphemeralSecretDeliveryBinding,
+        CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority,
+        ExternalPoolAdapterEphemeralSecretDeliveryBinding,
     },
-    types::ExternalPoolAdapterRuntimeBundleRoot,
 };
 use crate::{
     compute_federation::{
         external_pool_adapter_broker_tls::ExternalPoolAdapterBrokerTlsTarget,
-        external_pool_adapter_installation::PreparedExternalPoolAdapterInstallation,
-        external_pool_adapter_linux_supervisor::ExternalPoolAdapterSupervisorCgroupParent,
+        external_pool_adapter_credential_reattestation::ExternalPoolAdapterCredentialReattestationReceipt,
+        external_pool_adapter_runtime_compatibility_verification::server_runtime_compatibility_v2_profile_catalog,
+        external_pool_adapter_runtime_launch_profile::ExternalPoolAdapterRuntimeLaunchProfileReceipt,
+        external_pool_adapter_sandbox_reattestation::ExternalPoolAdapterSandboxReattestationReceipt,
+        external_pool_adapter_vulnerability_reattestation::ExternalPoolAdapterVulnerabilityReattestationReceipt,
     },
     store::{
-        compute_external_pool_adapter_supervisor_session_policy_companion::current_external_pool_adapter_supervisor_session_policy_companion_authority_on,
+        compute_external_pool_adapter_credential_reattestation::{
+            current_external_pool_adapter_credential_reattestation_head_authority_on,
+            CurrentExternalPoolAdapterCredentialReattestationAuthority,
+        },
+        compute_external_pool_adapter_runtime_compatibility_verification::{
+            current_external_pool_adapter_runtime_compatibility_verification_authority_on,
+            CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority,
+        },
+        compute_external_pool_adapter_sandbox_reattestation::{
+            current_external_pool_adapter_sandbox_reattestation_head_authority_on,
+            CurrentExternalPoolAdapterSandboxReattestationAuthority,
+        },
+        compute_external_pool_adapter_supervisor_session_policy_companion::CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
+        compute_external_pool_adapter_upstream_transport_target::{
+            CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
+            ExternalPoolAdapterInstallationReopener,
+        },
+        compute_external_pool_adapter_vulnerability_reattestation::{
+            current_external_pool_adapter_vulnerability_reattestation_head_authority_on,
+            CurrentExternalPoolAdapterVulnerabilityReattestationAuthority,
+        },
         Store,
     },
 };
 use elon_external_pool_adapter_session_core::ExternalPoolAdapterNoWorkProbeHostReceipt;
 
-/// Process-private proof of one exact no-task response. No raw roots or application bytes escape.
-pub(in crate::store) struct CurrentExternalPoolAdapterNoWorkProbeObservationAuthority {
-    receipt: ExternalPoolAdapterNoWorkProbeHostReceipt,
-    binding: ExternalPoolAdapterEphemeralSecretDeliveryBinding,
+const MAX_PROVIDER_READINESS_PROBE_TIMEOUT_MS: u64 = 15_000;
+
+/// Process-private proof of one exact post-cleanup no-task response.
+///
+/// Every database-backed field is borrowed from the final IMMEDIATE transaction. The authority is
+/// neither Clone, Debug, nor serializable and cannot survive the final callback.
+pub(in crate::store) struct CurrentExternalPoolAdapterNoWorkProbeObservationAuthority<
+    'authority,
+    'tx,
+    'conn,
+> {
+    receipt: &'authority ExternalPoolAdapterNoWorkProbeHostReceipt,
+    binding: &'authority ExternalPoolAdapterEphemeralSecretDeliveryBinding,
     selected_address: std::net::SocketAddr,
+    launch_profile: &'authority ExternalPoolAdapterRuntimeLaunchProfileReceipt,
+    vulnerability: &'authority CurrentExternalPoolAdapterVulnerabilityReattestationAuthority,
+    sandbox: &'authority CurrentExternalPoolAdapterSandboxReattestationAuthority,
+    credential: &'authority CurrentExternalPoolAdapterCredentialReattestationAuthority,
+    companion: &'authority CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
+    runtime_compatibility:
+        &'authority CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'tx, 'conn>,
+    cleaned: &'authority CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority,
+    runtime_bundle_identity_commitment: &'authority str,
+    post_cleanup_observation_commitment: String,
+    custody_epoch_digest: &'authority str,
     checked_at: String,
     expires_at: String,
+    transaction: PhantomData<&'tx Transaction<'conn>>,
 }
 
-impl CurrentExternalPoolAdapterNoWorkProbeObservationAuthority {
+impl<'authority, 'tx, 'conn>
+    CurrentExternalPoolAdapterNoWorkProbeObservationAuthority<'authority, 'tx, 'conn>
+{
     pub(in crate::store) fn no_work_observed(&self) -> bool {
         let _retained_exact_authority = (
-            &self.receipt,
-            &self.binding,
+            self.receipt,
+            self.binding,
             self.selected_address,
+            self.launch_profile,
+            self.vulnerability,
+            self.sandbox,
+            self.credential,
+            self.companion,
+            self.runtime_compatibility,
+            self.cleaned,
+            self.runtime_bundle_identity_commitment,
+            &self.post_cleanup_observation_commitment,
+            self.custody_epoch_digest,
             &self.checked_at,
             &self.expires_at,
+            &self.transaction,
         );
         true
     }
@@ -56,8 +116,84 @@ impl CurrentExternalPoolAdapterNoWorkProbeObservationAuthority {
         &self.checked_at
     }
 
+    /// The child authenticated the no-work exchange at this earlier timestamp. The final
+    /// `checked_at` is intentionally a distinct post-reap/post-cleanup transaction anchor.
+    pub(in crate::store) fn probe_checked_at(&self) -> &str {
+        self.cleaned.delivery_checked_at()
+    }
+
     pub(in crate::store) fn expires_at(&self) -> &str {
         &self.expires_at
+    }
+
+    pub(in crate::store) fn launch_profile(
+        &self,
+    ) -> &ExternalPoolAdapterRuntimeLaunchProfileReceipt {
+        self.launch_profile
+    }
+
+    pub(in crate::store) fn vulnerability(
+        &self,
+    ) -> &ExternalPoolAdapterVulnerabilityReattestationReceipt {
+        self.vulnerability.receipt()
+    }
+
+    pub(in crate::store) fn sandbox(&self) -> &ExternalPoolAdapterSandboxReattestationReceipt {
+        self.sandbox.receipt()
+    }
+
+    pub(in crate::store) fn credential(
+        &self,
+    ) -> &ExternalPoolAdapterCredentialReattestationReceipt {
+        self.credential.receipt()
+    }
+
+    pub(in crate::store) fn companion(
+        &self,
+    ) -> &CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority {
+        self.companion
+    }
+
+    pub(in crate::store) fn runtime_compatibility(
+        &self,
+    ) -> &CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'tx, 'conn> {
+        self.runtime_compatibility
+    }
+
+    pub(in crate::store) fn runtime_bundle_identity_commitment(&self) -> &str {
+        self.runtime_bundle_identity_commitment
+    }
+
+    pub(in crate::store) fn post_cleanup_observation_commitment(&self) -> &str {
+        &self.post_cleanup_observation_commitment
+    }
+
+    pub(in crate::store) fn custody_epoch_digest(&self) -> &str {
+        self.custody_epoch_digest
+    }
+
+    pub(in crate::store) fn source_capsule_digest(&self) -> &str {
+        self.binding.source_capsule_digest()
+    }
+
+    pub(in crate::store) fn launch_capsule_digest(&self) -> &str {
+        self.binding.launch_capsule_digest()
+    }
+
+    pub(in crate::store) fn authenticated_shutdown_completed(&self) -> bool {
+        self.cleaned.authenticated_shutdown_completed()
+    }
+
+    pub(in crate::store) fn pidfd_reaped(&self) -> bool {
+        self.cleaned.pidfd_reaped()
+    }
+
+    pub(in crate::store) fn cgroup_cleaned(&self) -> bool {
+        self.cleaned.cgroup_cleaned()
+    }
+
+    pub(in crate::store) fn scratch_cleaned(&self) -> bool {
+        self.cleaned.scratch_cleaned()
     }
 }
 
@@ -70,28 +206,47 @@ impl Store {
         expected_companion_digest: &str,
         target_id: &str,
         expected_target_digest: &str,
-        broker_preflight_prepared: PreparedExternalPoolAdapterInstallation,
-        broker_postflight_prepared: PreparedExternalPoolAdapterInstallation,
-        delivery_bundle_prepared: PreparedExternalPoolAdapterInstallation,
-        delivery_session_prepared: PreparedExternalPoolAdapterInstallation,
-        reproof_bundle_prepared: PreparedExternalPoolAdapterInstallation,
-        reproof_session_prepared: PreparedExternalPoolAdapterInstallation,
-        bundle_root: &ExternalPoolAdapterRuntimeBundleRoot,
-        cgroup_parent: &ExternalPoolAdapterSupervisorCgroupParent,
-        consume: impl FnOnce(&CurrentExternalPoolAdapterNoWorkProbeObservationAuthority) -> Result<()>,
+        runtime_compatibility_verification_receipt_id: &str,
+        expected_runtime_compatibility_verification_receipt_digest: &str,
+        reopen_prepared: &mut ExternalPoolAdapterInstallationReopener<'_>,
+        runtime: &ExternalPoolAdapterProviderRuntimeReadinessRuntime,
+        preflight_consume: impl FnOnce(
+                &Transaction<'_>,
+                &CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
+                &str,
+            ) -> Result<()>
+            + Send,
+        consume: impl FnOnce(
+                &Transaction<'_>,
+                &CurrentExternalPoolAdapterNoWorkProbeObservationAuthority<'_, '_, '_>,
+            ) -> Result<()>
+            + Send,
     ) -> Result<bool> {
         let Some(mut broker) = self
             .prepare_current_external_pool_adapter_broker_tls_channel(
                 target_id,
                 expected_target_digest,
-                broker_preflight_prepared,
-                broker_postflight_prepared,
+                reopen_prepared,
+                |transaction, target, checked_at| {
+                    require_preflight_dynamic_and_compatibility_roots(
+                        transaction,
+                        target,
+                        runtime_compatibility_verification_receipt_id,
+                        expected_runtime_compatibility_verification_receipt_digest,
+                        checked_at,
+                    )?;
+                    preflight_consume(transaction, target, checked_at)
+                },
             )
             .await?
         else {
             return Ok(false);
         };
 
+        // Successful execution uses exactly six independently reopened installation audits. These
+        // are #3 and #4; neither is opened before the broker network await completes.
+        let delivery_bundle_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
+        let delivery_session_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
         let Some(mut delivery) = self
             .prepare_current_external_pool_adapter_ephemeral_secret_delivery(
                 profile_id,
@@ -99,8 +254,9 @@ impl Store {
                 expected_companion_digest,
                 delivery_bundle_prepared,
                 delivery_session_prepared,
-                bundle_root,
-                cgroup_parent,
+                runtime.bundle_root(),
+                runtime.cgroup_parent(),
+                runtime.process_custody(),
             )?
         else {
             return Ok(false);
@@ -127,94 +283,111 @@ impl Store {
         drop(response);
         drop(broker);
 
-        let Some((binding, checked_at)) = self.reprove_external_pool_adapter_no_work_roots(
+        // No final callback or durable write is reachable until this consuming transition returns.
+        let cleaned = delivery.shutdown_and_reap()?;
+
+        // These are successful-path reopens #5 and #6, deliberately obtained only after cleanup.
+        let reproof_bundle_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
+        let reproof_session_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
+        self.with_reproved_external_pool_adapter_no_work_roots(
             profile_id,
             companion_id,
             expected_companion_digest,
+            runtime_compatibility_verification_receipt_id,
+            expected_runtime_compatibility_verification_receipt_digest,
             reproof_bundle_prepared,
             reproof_session_prepared,
-            bundle_root,
-            delivery.binding(),
-        )?
-        else {
-            return Ok(false);
-        };
-        let checked = chrono::DateTime::parse_from_rfc3339(&checked_at)?.with_timezone(&Utc);
-        let timeout = ChronoDuration::from_std(binding.probe_timeout())?;
-        let expires_at = (checked + timeout).to_rfc3339_opts(SecondsFormat::Nanos, true);
-        let observation = CurrentExternalPoolAdapterNoWorkProbeObservationAuthority {
+            runtime,
             receipt,
-            binding,
             selected_address,
-            checked_at,
-            expires_at,
-        };
-        if !observation.no_work_observed() || Utc::now() >= checked + timeout {
-            bail!("no-work probe observation expired before consumption");
-        }
-        consume(&observation)?;
-        delivery.shutdown_and_reap()?;
-        Ok(true)
+            cleaned,
+            consume,
+        )
     }
+}
 
-    #[allow(clippy::too_many_arguments)]
-    fn reprove_external_pool_adapter_no_work_roots(
-        &self,
-        profile_id: &str,
-        companion_id: &str,
-        expected_companion_digest: &str,
-        bundle_prepared: PreparedExternalPoolAdapterInstallation,
-        session_prepared: PreparedExternalPoolAdapterInstallation,
-        bundle_root: &ExternalPoolAdapterRuntimeBundleRoot,
-        expected: &ExternalPoolAdapterEphemeralSecretDeliveryBinding,
-    ) -> Result<Option<(ExternalPoolAdapterEphemeralSecretDeliveryBinding, String)>> {
-        let mut connection = self.conn()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let checked_at = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
-        let Some(bundle) = current_external_pool_adapter_runtime_bundle_authority_on(
-            &transaction,
-            profile_id,
-            bundle_prepared,
-            bundle_root,
-            &checked_at,
+fn require_preflight_dynamic_and_compatibility_roots(
+    transaction: &Transaction<'_>,
+    target: &CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
+    verification_receipt_id: &str,
+    expected_verification_receipt_digest: &str,
+    checked_at: &str,
+) -> Result<()> {
+    let profile_authority = target.profile();
+    let profile = &profile_authority.profile().profile;
+    let release_receipt = profile_authority.candidate().registry().release();
+    let release = &release_receipt.release;
+    let vulnerability =
+        current_external_pool_adapter_vulnerability_reattestation_head_authority_on(
+            transaction,
+            &profile.registry_release_id,
+            checked_at,
         )?
-        else {
-            return Ok(None);
-        };
-        let Some(companion) =
-            current_external_pool_adapter_supervisor_session_policy_companion_authority_on(
-                &transaction,
-                companion_id,
-                expected_companion_digest,
-                session_prepared,
-                &checked_at,
-            )?
-        else {
-            return Ok(None);
-        };
-        audit_delivery_roots(&bundle, &companion, &checked_at)?;
-        let selected =
-            select_current_probe_preparation_roots_on(&transaction, &bundle, &checked_at)?;
-        let roots = expected.session_root_arguments();
-        let mut observed = None;
-        materialize_probe_preparation(&bundle, &selected, |preparation| {
-            observed = Some(delivery_binding(
-                preparation,
-                &companion,
-                expected.delivery_root(),
-                &roots,
-            )?);
-            Ok(())
-        })?;
-        let observed = observed
-            .ok_or_else(|| anyhow::anyhow!("no-work reproof did not produce exact roots"))?;
-        if &observed != expected {
-            bail!("no-work probe roots changed after application exchange");
-        }
-        drop(selected);
-        drop(companion);
-        drop(bundle);
-        transaction.commit()?;
-        Ok(Some((observed, checked_at)))
+        .ok_or_else(|| anyhow::anyhow!("no-work preflight lacks current V250"))?;
+    let sandbox = current_external_pool_adapter_sandbox_reattestation_head_authority_on(
+        transaction,
+        &profile.registry_release_id,
+        checked_at,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("no-work preflight lacks current V252"))?;
+    let credential = current_external_pool_adapter_credential_reattestation_head_authority_on(
+        transaction,
+        &profile.provider_binding_id,
+        checked_at,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("no-work preflight lacks current V253"))?;
+    audit_vulnerability_roots(
+        profile,
+        release,
+        &vulnerability.receipt().reattestation.binding,
+    )?;
+    audit_sandbox_roots(
+        profile,
+        release,
+        vulnerability.receipt(),
+        &sandbox.receipt().reattestation.binding,
+    )?;
+    audit_credential_roots(profile, &credential.receipt().reattestation.binding)?;
+    let compatibility =
+        current_external_pool_adapter_runtime_compatibility_verification_authority_on(
+            transaction,
+            verification_receipt_id,
+            expected_verification_receipt_digest,
+            checked_at,
+        )?
+        .ok_or_else(|| anyhow::anyhow!("no-work preflight lacks exact current V268"))?;
+    audit_runtime_compatibility_static_roots(target, &compatibility)
+}
+
+fn audit_runtime_compatibility_static_roots(
+    target: &CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
+    compatibility: &CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'_, '_>,
+) -> Result<()> {
+    let profile = &target.profile().profile().profile;
+    let target_receipt = target.target();
+    let target_material = &target_receipt.target;
+    let release = target.profile().candidate().registry().release();
+    let verification = &compatibility.verification().verification;
+    let run = &compatibility.run_observation().observation;
+    let catalog = server_runtime_compatibility_v2_profile_catalog()?;
+    if compatibility.release() != release
+        || &verification.registry_release != release
+        || &run.registry_release != release
+        || verification.profile_id != catalog.profile.profile_id
+        || verification.profile_revision != catalog.profile.profile_revision
+        || verification.profile_digest != catalog.profile_digest
+        || run.profile_id != catalog.profile.profile_id
+        || run.profile_revision != catalog.profile.profile_revision
+        || run.profile_digest != catalog.profile_digest
+        || catalog.profile.runtime_launch_policy.policy_digest != profile.launch_policy_digest
+        || catalog.profile.upstream_transport_policy.policy_digest
+            != target_material.target_policy_digest
+        || profile.installation_content_digest != release.release.installation_content_digest
+        || target_material.installation_content_digest
+            != release.release.installation_content_digest
+        || compatibility.checked_at() != target.checked_at()
+    {
+        bail!("V268 and Provider runtime preflight roots diverged");
     }
+    Ok(())
 }

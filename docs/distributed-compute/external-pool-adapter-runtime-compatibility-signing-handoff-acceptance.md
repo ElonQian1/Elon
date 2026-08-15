@@ -92,7 +92,8 @@ CapacityPool、Offer、Job、Reservation、Attempt、Start、usage、verificatio
 - real V249 installation audit、V267 derived-launch/Yama/session/no-work/shutdown/reap/cleanup；
 - concurrent duplicate handoff、连接取消、response 丢失、observation commit 前后进程故障与 replay；
 - real independent V237 signer、wrong/revoked/expired key、签名提交及 V268 currentness；
-- V254 18 deny parity、V260-V268 regression，以及未来 current V268 + fresh V265 + atomic activation。
+- V254 18 deny parity、V260-V268 regression、V270 current readiness authority，以及未来 atomic
+  activation；历史 `current V268 + fresh V265` 计划不得绕过 V270 的 cleanup 与同进程 reproof。
 
 本批不运行上述命令，动态计数固定为 `passed=0`、`failed=0`。静态 diff、format、source-size 或文档
 modularity 只能作为源码卫生证据，不能升级为编译、HTTP、SQLite、Linux runtime、signer 或生产验收。

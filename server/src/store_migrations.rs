@@ -22,6 +22,7 @@ mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_installation_terminal;
+mod compute_external_pool_adapter_provider_runtime_readiness;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
@@ -58,6 +59,12 @@ pub(crate) fn register_v259_receipt_integrity_functions(conn: &Connection) -> Re
 
 pub(crate) fn register_v268_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_runtime_compatibility_verification::register_receipt_integrity_functions(conn)
+}
+
+pub(crate) fn register_v270_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_provider_runtime_readiness::register_receipt_integrity_functions(
+        conn,
+    )
 }
 
 #[rustfmt::skip]
@@ -339,6 +346,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (259, "外部矿池 Adapter 惰性 supervisor/session policy companion", compute_external_pool_adapter_supervisor_session_policy_companion::migration_v259),
     (267, "外部矿池 Adapter exec 后身份与会话传输加固策略", compute_external_pool_adapter_supervisor_session_policy_v2::migration_v267),
     (268, "外部矿池 Adapter Provider-neutral 运行时兼容性签名证明", compute_external_pool_adapter_runtime_compatibility_verification::migration_v268),
+    (270, "外部矿池 Adapter Provider-specific cleanup 后短时运行就绪证明", compute_external_pool_adapter_provider_runtime_readiness::migration_v270),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

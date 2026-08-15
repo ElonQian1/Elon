@@ -1,5 +1,6 @@
 use std::{fs::File, io::Read, ptr::NonNull, sync::atomic};
 
+use ring::rand::{SecureRandom, SystemRandom};
 use zeroize::Zeroize;
 
 use super::types::ExternalPoolAdapterRuntimeBundleError;
@@ -10,6 +11,19 @@ pub(super) struct LockedSensitiveBytes {
 }
 
 impl LockedSensitiveBytes {
+    /// Generates secret bytes directly in the locked allocation. No ordinary Vec or stack key
+    /// buffer exists between the operating-system CSPRNG and the retained custody.
+    pub(super) fn random(length: usize) -> Result<Self, ExternalPoolAdapterRuntimeBundleError> {
+        if length == 0 {
+            return Err(ExternalPoolAdapterRuntimeBundleError::ContentDrift);
+        }
+        let mut custody = Self::allocate(length)?;
+        SystemRandom::new()
+            .fill(custody.as_mut_slice())
+            .map_err(|_| ExternalPoolAdapterRuntimeBundleError::MemoryCustodyUnavailable)?;
+        Ok(custody)
+    }
+
     pub(super) fn read_exact(
         file: &mut File,
         length: u64,
