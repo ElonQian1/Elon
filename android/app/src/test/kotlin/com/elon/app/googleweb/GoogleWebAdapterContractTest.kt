@@ -65,6 +65,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(extractor.contains("findQueryAnchor"))
         assertTrue(extractor.contains("afterQuery: followsQuery"))
         assertTrue(extractor.contains("interactive: !!node.closest"))
+        assertTrue(extractor.contains("node.querySelector('[aria-live], [role=\"status\"], [role=\"alert\"]')"))
         assertTrue(extractor.contains("if (candidate.text.length < 8) return true"))
         assertTrue(queryPolicy.contains("rememberedQuery"))
         assertTrue(queryPolicy.contains("explicitQuery"))

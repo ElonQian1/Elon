@@ -61,7 +61,8 @@
     if (!text || text.length > 80) return false;
     return /^(?:ai\s*mode\s*)?(?:answer|response)\s+(?:is\s+)?ready[.!。！]?$/.test(text) ||
       /^(?:ai\s*模式)?(?:回答|回复|响应)(?:已经|已)?准备就绪[。！!]?$/.test(text) ||
-      /^(?:正在)?(?:生成|加载|准备)(?:回答|回复|响应)?(?:中)?[.。…]*$/.test(text);
+      /^(?:正在)?(?:生成|加载|准备)(?:回答|回复|响应)?(?:中)?[.。…]*$/.test(text) ||
+      /^(?:正在)?(?:搜索|检索|查询)(?:中)?[.。…]*$/.test(text);
   }
 
   function shareSurfaceText(value) {
@@ -110,7 +111,7 @@
   }
 
   return Object.freeze({
-    version: 4,
+    version: 5,
     accepts,
     penalty,
     navigationOnlyText,

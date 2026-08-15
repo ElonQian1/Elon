@@ -101,6 +101,7 @@ assert.equal(policy.navigationOnlyText(
 assert.equal(policy.transientStatusText('AI 模式回答已准备就绪'), true)
 assert.equal(policy.transientStatusText('AI Mode answer is ready'), true)
 assert.equal(policy.transientStatusText('正在生成回答…'), true)
+assert.equal(policy.transientStatusText('正在搜索'), true)
 assert.equal(policy.transientStatusText('下面是已经准备好的实际回答。'), false)
 assert.equal(policy.shareSurfaceText(
   '分享公开链接 此公开链接用于分享消息串。复制链接 Facebook Gmail X Reddit WhatsApp',
@@ -116,6 +117,21 @@ assert.equal(policy.accepts({
   links: 0,
   tabControls: 0,
   liveRegion: true,
+  explicit: true,
+}), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '正在搜索',
+  textLength: 4,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
   explicit: true,
 }), false)
 
