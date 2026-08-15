@@ -50,6 +50,7 @@ internal class ChatGptWebMcpCommandAdapter(
     }
 
     override fun requestFeatures(requestId: String) = pageAdapter.listFeatures(requestId)
+    override fun dismissFeatures(requestId: String) = pageAdapter.dismissFeatures(requestId)
     override fun selectFeature(featureId: String, requestId: String) =
         pageAdapter.selectFeature(featureId, requestId)
 

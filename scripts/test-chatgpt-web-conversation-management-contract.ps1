@@ -19,6 +19,8 @@ foreach ($required in @(
     '[switch]$ConfirmPinRoundTrip',
     'semantic = "conversation_options"',
     "Wait-ConversationManagementMenu",
+    "Close-FeatureNavigation",
+    'Action "chatgpt_dismiss_features"',
     "Get-ConversationPinState",
     "Open-ConversationManagementMenu",
     "Wait-ConversationManagementMenuClosed",

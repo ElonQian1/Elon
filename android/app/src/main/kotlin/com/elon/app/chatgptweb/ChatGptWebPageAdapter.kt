@@ -215,6 +215,8 @@ internal class ChatGptWebPageAdapter(
 
     fun dismissFeatures() = runCommand("dismiss_navigation")
 
+    fun dismissFeatures(requestId: String) = runCommand("dismiss_navigation", requestId = requestId)
+
     fun requestUiManifest() = runCommand("snapshot_ui_manifest")
 
     fun requestUiManifest(requestId: String) = runCommand(
@@ -340,7 +342,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 114
+        internal const val ADAPTER_VERSION = 115
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

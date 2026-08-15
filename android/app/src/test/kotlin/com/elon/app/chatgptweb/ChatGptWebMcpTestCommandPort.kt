@@ -98,6 +98,8 @@ internal class ChatGptWebMcpTestCommandPort(
         dispatch("list_navigation", requestId)
     }
 
+    override fun dismissFeatures(requestId: String) = dispatch("dismiss_navigation", requestId)
+
     override fun selectFeature(featureId: String, requestId: String) {
         onSelectFeature(featureId)
         dispatch("select_navigation", requestId)

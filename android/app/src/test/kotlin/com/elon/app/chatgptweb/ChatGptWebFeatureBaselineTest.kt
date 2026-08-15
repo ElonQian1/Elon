@@ -666,6 +666,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_list_composer_options",
             "chatgpt_select_composer_option",
             "chatgpt_select_feature",
+            "chatgpt_dismiss_features",
             "chatgpt_get_context",
             "chatgpt_find_controls",
             "chatgpt_get_conversations",

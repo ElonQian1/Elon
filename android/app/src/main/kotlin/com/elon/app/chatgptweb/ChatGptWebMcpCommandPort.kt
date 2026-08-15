@@ -21,6 +21,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun requestComposerOptions(section: String, requestId: String)
     fun selectComposerOption(section: String, optionId: String, requestId: String)
     fun requestFeatures(requestId: String)
+    fun dismissFeatures(requestId: String)
     fun selectFeature(featureId: String, requestId: String)
     fun openConversation(path: String, requestId: String)
 }

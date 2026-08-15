@@ -248,6 +248,7 @@ internal class ChatGptWebMcpActions(
                 }
             }
             "chatgpt_list_features" -> dispatch("list_navigation", commands::requestFeatures)
+            "chatgpt_dismiss_features" -> dispatch("dismiss_navigation", commands::dismissFeatures)
             "chatgpt_select_feature" -> {
                 val featureId = args.optString("feature_id").trim()
                 val feature = observedState().features.firstOrNull { it.id == featureId }
@@ -762,6 +763,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_list_composer_options",
             "chatgpt_select_composer_option",
             "chatgpt_list_features",
+            "chatgpt_dismiss_features",
             "chatgpt_select_feature",
             "chatgpt_get_context",
             "chatgpt_reveal_message",

@@ -532,7 +532,11 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "feature_navigation",
             group = "navigation",
-            mcpActions = listOf("chatgpt_get_navigation", "chatgpt_select_feature"),
+            mcpActions = listOf(
+                "chatgpt_get_navigation",
+                "chatgpt_dismiss_features",
+                "chatgpt_select_feature",
+            ),
             capabilityIds = setOf(ChatGptWebCapabilityId.FEATURE_NAVIGATION),
             semantics = setOf("navigation"),
         ),

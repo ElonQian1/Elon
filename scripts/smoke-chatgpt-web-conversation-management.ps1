@@ -88,6 +88,25 @@ function Wait-ConversationManagementMenu {
     return $lastControls
 }
 
+function Close-FeatureNavigation {
+    Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+        -Action "chatgpt_dismiss_features" -TimeoutSec 15 | Out-Null
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min($TimeoutSec, 20))
+    do {
+        Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_refresh_controls" -TimeoutSec 15 | Out-Null
+        $sidebarOptions = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_find_controls" -Arguments @{
+                semantic = "conversation_options"
+                region = "overlay"
+                limit = 100
+            }
+        if (@($sidebarOptions.controls).Count -eq 0) { return }
+        Start-Sleep -Seconds 1
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Feature navigation did not close before conversation management."
+}
+
 function Get-ConversationPinState {
     param([Parameter(Mandatory = $true)]$Control)
 
@@ -247,6 +266,7 @@ try {
 
     Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
         -Action "chatgpt_list_features" -TimeoutSec $TimeoutSec | Out-Null
+    Close-FeatureNavigation
     $openedMenu = Open-ConversationManagementMenu
     $conversationContextId = [string]$openedMenu.context_id
     $menuControls = @($openedMenu.controls)
