@@ -3,7 +3,7 @@ title: 外部矿池 Route source logical-to-projection bridge 验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -11,9 +11,10 @@ verification_status: source_review_only
 
 ## 1. 当前证据强度
 
-V271 当前完成权威合同与 migration/source-contract 源码静态复核；没有编译 Rust，没有执行 migration，也没有
-运行测试、SQLite、并发、重开或 runtime 验证。正式计数为 `passed=0 / failed=0`，状态为
-`source_review_only / implementation_uncompiled / implementation_unrun`。
+V271 当前完成权威合同与 migration/source-contract 源码静态复核，并已随完整 Windows `elon-server` 产品
+目标和 WSL2 `elon-server` test target 编译；没有执行 V271 migration，也没有运行其 source-contract、SQLite、
+并发、重开或 runtime 专属验证。正式动态计数为 `passed=0 / failed=0`，状态为
+`source_review_only / implementation_compiled / implementation_unrun`。
 
 本页定义 V271 migration 的验收门；源码存在不等于 migration 已执行或 trigger 已安装。语义唯一来源是
 [`external-pool-route-source-projection-bridge-authority.md`](external-pool-route-source-projection-bridge-authority.md)。
@@ -59,6 +60,6 @@ trigger；不得为了得到“成功插入”而在生产 migration 中删除�
 
 ## 5. 正式结论
 
-当前 V271 只能声明“logical-to-projection source bridge 已写入未编译源码并完成静态合同复核”。在通过第 2 节全部
-动态矩阵前，不得声明 migration 已验收；即使全部通过，也只能消除一个来源映射 P0。Atomic activation 继续
-NO-GO，Provider、route 与所有经济效果继续为零。
+当前 V271 只能声明“logical-to-projection source bridge 已写入并随完整目标编译，静态合同已复核”。在通过
+第 2 节全部动态矩阵前，不得声明 migration 已验收；即使全部通过，也只能消除一个来源映射 P0。Atomic
+activation 继续 NO-GO，Provider、route 与所有经济效果继续为零。

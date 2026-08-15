@@ -3033,14 +3033,14 @@
       "priority": "p1",
       "requirement": {
         "path": "docs/distributed-compute/external-pool-adapter-post-exec-supervisor-hardening-authority.md",
-        "content_hash": "e2677cab6b7b30ead1329b2b131d04bdb92adddb41a6b310d2deb508dd3246d5",
+        "content_hash": "cedbdf62fedd5bfa0b532ef4a89a1618c4404d0e95fb425219f3b5632a32e578",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
-          "head_blob_oid": "85a97c5f4dc45c1b281c95c3369e4103b13b8705",
-          "worktree_blob_oid": "7b9974421c467c5dbfbedb18ee58cc633fe8e881",
+          "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
+          "head_blob_oid": "7b9974421c467c5dbfbedb18ee58cc633fe8e881",
+          "worktree_blob_oid": "b62b00e764cf41d67812a650b0a190f54b75d7b0",
           "state": "tracked_modified"
         }
       },
@@ -3073,53 +3073,53 @@
       "implementation_evidence": [
         {
           "path": "AI_CURRENT.md",
-          "content_hash": "4d9db74fdacd4fc5eb30350157e041d6db4543a6687444340d1bd75a8446d357",
+          "content_hash": "7293cd3dee7e52e083991d22540185f43a3d6870c379c1800b80ab66d266084d",
           "locator": "AI routing current truth",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
-            "head_blob_oid": "9e307b37ec4d4ac4f1cd7799352c30bcc221ac97",
-            "worktree_blob_oid": "c873ca7365818eed5461ddfed17231a1ce4e5d77",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
+            "head_blob_oid": "25f00a16f5f50a1b5a9f048982bd1578df81786c",
+            "worktree_blob_oid": "c6564bdd9b43c22cc8c73558d3e035e17a6ecee9",
             "state": "tracked_modified"
           }
         },
         {
           "path": "docs/distributed-compute/current-implementation-status.md",
-          "content_hash": "908e0a40902db57f2c40e3df80ab3947b1c5155e8913cd9c4e072900d66a3110",
+          "content_hash": "1b2e27e86b35302893d3e5f0535caa3cb91e297402a2b2d2cbf0f26e9b5a96b1",
           "locator": "cross-version V257-V269 current status correction",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
-            "head_blob_oid": "f492580fd0f2bb91962b06689f9d77a9ac6028a6",
-            "worktree_blob_oid": "5d8df2c2fac2d1c14ef1e5f1aa578535914aa0b8",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
+            "head_blob_oid": "95ae2287797a1af32dc9b1fb60e1a25b52bea68b",
+            "worktree_blob_oid": "37cde23226df9fc123bcc7b37f2be4885639f863",
             "state": "tracked_modified"
           }
         },
         {
           "path": "docs/distributed-compute/external-pool-adapter-post-exec-supervisor-hardening-acceptance.md",
-          "content_hash": "a9cc7e1f5503ae545737cddb4563b834a729af2910dcbd7044c657af907a88cd",
+          "content_hash": "a22472465446f8e0ad458a7cb7877d23904723e4fb96493e99d6c67a638b0367",
           "locator": "dynamic matrix, evidence counts, and production exclusions",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
-            "head_blob_oid": "7b1a0c3b3f1e48e9c8dfda326eb50c79d84ca919",
-            "worktree_blob_oid": "5ca958138d06a16054129f1a837346367352f5bb",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
+            "head_blob_oid": "5ca958138d06a16054129f1a837346367352f5bb",
+            "worktree_blob_oid": "4e84f2503b18fa7c4db2439491b6ba9bcf0d6102",
             "state": "tracked_modified"
           }
         },
         {
           "path": "docs/distributed-compute/external-pool-adapter-post-exec-supervisor-hardening-authority.md",
-          "content_hash": "e2677cab6b7b30ead1329b2b131d04bdb92adddb41a6b310d2deb508dd3246d5",
+          "content_hash": "cedbdf62fedd5bfa0b532ef4a89a1618c4404d0e95fb425219f3b5632a32e578",
           "locator": "final V267 authority and evidence fingerprints",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
-            "head_blob_oid": "85a97c5f4dc45c1b281c95c3369e4103b13b8705",
-            "worktree_blob_oid": "7b9974421c467c5dbfbedb18ee58cc633fe8e881",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
+            "head_blob_oid": "7b9974421c467c5dbfbedb18ee58cc633fe8e881",
+            "worktree_blob_oid": "b62b00e764cf41d67812a650b0a190f54b75d7b0",
             "state": "tracked_modified"
           }
         },
@@ -3130,7 +3130,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "0786aa63ba9ef0614d58b6bbe16d1bed85e0ab08",
             "worktree_blob_oid": "0786aa63ba9ef0614d58b6bbe16d1bed85e0ab08",
             "state": "tracked_clean"
@@ -3143,7 +3143,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "856b705d4409eb804717bf91aac085b1d4f43587",
             "worktree_blob_oid": "856b705d4409eb804717bf91aac085b1d4f43587",
             "state": "tracked_clean"
@@ -3156,7 +3156,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "096dcfa65548654367fd7d17c25b582957929629",
             "worktree_blob_oid": "096dcfa65548654367fd7d17c25b582957929629",
             "state": "tracked_clean"
@@ -3169,7 +3169,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "6e1b86da79a5563226351e393787f060f108fd22",
             "worktree_blob_oid": "6e1b86da79a5563226351e393787f060f108fd22",
             "state": "tracked_clean"
@@ -3182,7 +3182,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "1f79a7b906d62b5dd1ea8585f2ebbc927ce9cd7d",
             "worktree_blob_oid": "1f79a7b906d62b5dd1ea8585f2ebbc927ce9cd7d",
             "state": "tracked_clean"
@@ -3195,7 +3195,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "7d00d511b9a042880c0b70199b3cdc598f3ef38b",
             "worktree_blob_oid": "7d00d511b9a042880c0b70199b3cdc598f3ef38b",
             "state": "tracked_clean"
@@ -3208,10 +3208,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
-            "head_blob_oid": "9699bce345b443d7080ca843379ca98571a7e742",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
+            "head_blob_oid": "281a904057ff922f688e3f1c8640cce73a28b5a3",
             "worktree_blob_oid": "281a904057ff922f688e3f1c8640cce73a28b5a3",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -3221,7 +3221,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6c13b06998bba935df98df4f0631149a249fbb07",
+            "head_commit": "faba5b3a04349cd0a16bc7a74562684a24212f72",
             "head_blob_oid": "3cdfeab57a9a1cdc0df9d8b6e5d06fe56c82f756",
             "worktree_blob_oid": "3cdfeab57a9a1cdc0df9d8b6e5d06fe56c82f756",
             "state": "tracked_clean"
@@ -3229,7 +3229,7 @@
         }
       ],
       "created_at_ms": 1786788437277,
-      "updated_at_ms": 1786789001941
+      "updated_at_ms": 1786791959414
     },
     {
       "id": "external-pool-provider-activation-candidate-v254-verification",
@@ -5218,166 +5218,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8ed8bef477e34eb7b92758c18a3babc4",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-7x24",
-      "reason": "V259 compiles and all 13 focused migration, source-contract and owner/admin HTTP tests pass after correcting the false source-contract binding.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786688296508
-    },
-    {
-      "id": "feature_event_46204a09c41d4a3f8025696c86971a8a",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-7x24",
-      "reason": "Focused validation completed with CARGO_OK and 13 passed, 0 failed; residual production and Linux boundaries remain explicit.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786688314982
-    },
-    {
-      "id": "feature_event_86bfb5c946ee45ff813babd0362bbdd7",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-7x24",
-      "reason": "Local V259 verification is complete and documented; production and Linux runtime capabilities remain explicitly outside this release.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786688331449
-    },
-    {
-      "id": "feature_event_53146a46f7d448bb8df4dbbd6d73eb5a",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Reopen released V259 after intentional AI_CURRENT modularity compaction invalidated one evidence hash.",
-      "from_status": "released",
-      "to_status": "retired",
-      "at_ms": 1786689555059
-    },
-    {
-      "id": "feature_event_6f6a9b996a874376a7fb649ccd2747dd",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Re-propose unchanged verified scope after evidence document compaction.",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1786689555231
-    },
-    {
-      "id": "feature_event_55f56bac1c38412b9dab6adea9f5c620",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Re-accept unchanged V259 verification scope.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786689556332
-    },
-    {
-      "id": "feature_event_fa509ba4131b4c92806c89dd51806d15",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Scope and dependencies remain current; refresh evidence against compact status document.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786689556400
-    },
-    {
-      "id": "feature_event_ab06cf85858d43e7b3bb150455835335",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "claimed",
-      "actor": "codex-v259-verifier",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786689582747
-    },
-    {
-      "id": "feature_event_c1fabecd7ab74054ac44359e2d7ccd9c",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Refresh exact evidence after intentional status-document compaction.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786689582852
-    },
-    {
-      "id": "feature_event_2711bfaf9a054f03869efaab1891cc17",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-v259-verifier",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786689619698
-    },
-    {
-      "id": "feature_event_e34b0c1a1e4b4394aac4bf5ef25ce981",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Implementation and documentation match the completed focused verification.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786689619874
-    },
-    {
-      "id": "feature_event_3a2fa41d8053490e877a18bf090a6738",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Full target compile and 13 focused tests passed; test evidence is current.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786689619964
-    },
-    {
-      "id": "feature_event_f0fb4297ad3b44f3af7a0042cbc23783",
-      "feature_id": "compute-v259-supervisor-session-policy-companion-verification",
-      "action": "transitioned",
-      "actor": "codex-v259-verifier",
-      "reason": "Release the verification record; no runtime activation or deployment was performed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786689620063
-    },
-    {
-      "id": "feature_event_bdab7077e1834da6a565052b5ab7c3c6",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "registered",
-      "actor": "codex-goal-7x24",
-      "reason": "V257 current authority records Linux syscall verification as passed=0 while this host provides WSL2 Ubuntu and Rust.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786690410709
-    },
-    {
-      "id": "feature_event_c70b66a83e7249c08fe7efcc221dd940",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "claimed",
-      "actor": "codex-task-20260814-145135-24584",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786690426167
-    },
-    {
-      "id": "feature_event_d571995169164c829da5445d9f5447dc",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-145135-24584",
-      "reason": "Begin bounded Linux kernel verification without runtime execution.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786690437738
-    },
-    {
       "id": "feature_event_ec127866cd164cdab648bc2cdb6d2b6a",
       "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
       "action": "evidence_recorded",
@@ -7216,6 +7056,166 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786789001941
+    },
+    {
+      "id": "feature_event_25f3612e74c545cabad20e19e1be3dd2",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-rebase",
+      "reason": "远程 rebase 改变实现证据 Git 身份，回退到 ready 后重新绑定已复核证据",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1786789628954
+    },
+    {
+      "id": "feature_event_8c487df970514f63b420efdfeeabd5fa",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "claimed",
+      "actor": "codex-v267-rebase",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786789629546
+    },
+    {
+      "id": "feature_event_26ed975a0d634358b4f4bc650d27b0ee",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-rebase",
+      "reason": "复核 rebase 后 V267 实现和测试证据",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786789629758
+    },
+    {
+      "id": "feature_event_35a513b3501742d2a032b6a5b5752eef",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-v267-rebase",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786789690236
+    },
+    {
+      "id": "feature_event_365eda6ebd1b40ccb8f3d29fb8fa89b3",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-rebase",
+      "reason": "rebase 后当前实现与文档证据已重新绑定",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786789690466
+    },
+    {
+      "id": "feature_event_e6893f78fed044bbbef4fc906cfbabee",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-rebase",
+      "reason": "保留既有 Windows/WSL2 实测边界并重新完成证据一致性检查",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786789690708
+    },
+    {
+      "id": "feature_event_ddd0ae211f6c4c9db7c25ee6c231b8ec",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "权威需求正文更新，显式关闭旧 verified 绑定后重新打开",
+      "from_status": "verified",
+      "to_status": "retired",
+      "at_ms": 1786791948400
+    },
+    {
+      "id": "feature_event_40273bdbb25348c7a0839a444b36ca81",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "以当前权威文档重新打开 V267 验收功能",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1786791948745
+    },
+    {
+      "id": "feature_event_d582b0bd62144e0daba7963a5e4e82e3",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "requirement_rebound",
+      "actor": "codex-v267-finalize",
+      "reason": "rebase 后补充最终编译指纹与 V270/V271 编译边界",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1786791949916
+    },
+    {
+      "id": "feature_event_60214847d6f046fa8142a134dcea7763",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "重新评审的 V267 权威仅更新验证证据，不扩大生产权限",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786791950230
+    },
+    {
+      "id": "feature_event_65b75a834e7246ffbf6d5cd32bd84b55",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "当前需求与依赖有效",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786791950597
+    },
+    {
+      "id": "feature_event_c63e2b4381b84afb8a1a420ca3bc0768",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "claimed",
+      "actor": "codex-v267-finalize",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786791950909
+    },
+    {
+      "id": "feature_event_540e54b66c9344ad9058c18cffbba7c4",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "复核最终 Windows/WSL2 证据",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786791951287
+    },
+    {
+      "id": "feature_event_fca9fd8900804f4588753b229a1eaade",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "evidence_recorded",
+      "actor": "codex-v267-finalize",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786791958641
+    },
+    {
+      "id": "feature_event_7e6e543e2f544ab29bda6651be55c052",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "最终实现和证据已按当前工作区绑定",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786791959025
+    },
+    {
+      "id": "feature_event_7d9dc9d6882d4811b906761fc3e2aa94",
+      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
+      "action": "transitioned",
+      "actor": "codex-v267-finalize",
+      "reason": "Windows check、WSL2 v267_ 与 Yama 2 kernel matrix 已通过，生产边界保持未声明",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786791959414
     }
   ]
 }

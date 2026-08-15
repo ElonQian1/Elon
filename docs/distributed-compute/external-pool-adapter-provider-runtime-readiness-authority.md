@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -178,9 +178,11 @@ Store-private current authority并原子创建完整 route/runtime closure。Cap
 
 ## 8. 当前实现与验证现实
 
-本批处于架构铺设阶段，只允许源码和文档静态审查：不编译 Rust、不执行 migration、不运行 HTTP/SQLite/
-Linux fixture、不启动 child、不读取真实 Secret、不连接 upstream。当前严格为
-`source_review_only / implementation_uncompiled / implementation_unrun`，`passed=0 / failed=0`。
+V270 已随完整 Windows `elon-server` 产品目标与 WSL2 `elon-server` test target 编译；为闭合当前基线，已修复
+SQLite scalar helper 生命周期、Store error conversion 和 Linux-only installation filesystem error import。
+尚未执行 V270 专属 migration、HTTP/SQLite/Linux fixture，也未启动 child、读取真实 Secret 或连接 upstream。
+当前严格为 `source_review_only / implementation_compiled / implementation_unrun`，专属动态计数仍为
+`passed=0 / failed=0`。
 
 源码存在只能证明 V270 合同已表达，不能证明 startup custody、locked HMAC、六份 late-bound audit、生产
 DNS/TLS、Secret delivery、post-cleanup ordering、SQLite guard、TTL race 或重启失效已经动态验收。验收边界

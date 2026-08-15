@@ -111,7 +111,7 @@ V267 当前为 `implementation_compiled / local_windows_and_wsl2_kernel_verified
 production ready：
 
 - Windows 受管 `cargo check` 已通过，证据指纹为
-  `b37abea53faab919fa04ba40985b5ecbb41c1594ab09fc4af838500d54ed5c5c`；受管
+  `31f20bef1febf422e8fe4abc159c06b3a9985f77e563486b9b841cde2d0ca7ab`；受管
   `cargo test ... v267_` 已通过，证据指纹为
   `6578adda332eb0404e25b8839a1ea4519e251506d0158a525f5a836f3859f62f`；
 - 当前重放后源码在 WSL2/Linux 重新编译并运行 `v267_`，`12 passed / 0 failed`，覆盖

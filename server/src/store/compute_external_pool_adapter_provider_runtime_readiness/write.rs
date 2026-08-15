@@ -5,7 +5,10 @@ use chrono::{DateTime, Utc};
 use rusqlite::Transaction;
 
 use crate::{
-    compute_federation::external_pool_adapter_provider_runtime_readiness::*,
+    compute_federation::{
+        external_pool_adapter_installation::ExternalPoolAdapterInstallationFsError,
+        external_pool_adapter_provider_runtime_readiness::*,
+    },
     store::{
         compute_external_pool_adapter_runtime_bundle::{
             CurrentExternalPoolAdapterNoWorkProbeObservationAuthority,

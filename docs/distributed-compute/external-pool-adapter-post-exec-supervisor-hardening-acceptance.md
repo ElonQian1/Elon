@@ -36,7 +36,7 @@ fixture、Yama 2 和本机 cgroup v2 环境，不等于生产或第三方 Adapte
 - Provider、route、activation、execution、usage、market、settlement 与 Sui effect 没有新增
   authority，Provider 仍为 `registering`，V254 18 deny 保持。
 - Windows 受管 `cargo check` 与 `cargo test ... v267_` 均通过；测试证据指纹分别为
-  `b37abea53faab919fa04ba40985b5ecbb41c1594ab09fc4af838500d54ed5c5c` 和
+  `31f20bef1febf422e8fe4abc159c06b3a9985f77e563486b9b841cde2d0ca7ab` 和
   `6578adda332eb0404e25b8839a1ea4519e251506d0158a525f5a836f3859f62f`；
 - WSL2 当前源码 `v267_` 为 `12 passed / 0 failed`；Yama 2 + delegated cgroup v2 的真实内核
   矩阵为 `12 passed / 0 failed`；

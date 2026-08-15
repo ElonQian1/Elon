@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -103,6 +103,6 @@ authority、建立完整 route/runtime closure、写 Provider adjacent active ve
 - `server/src/compute_federation/external_pool_adapter_release_api_tests.rs`：只登记上述测试模块；
 - `server/src/store_migrations.rs`：只登记 migration 271 及 module。
 
-不得修改 `server/src/store.rs`、route/domain ABI、API/router 或 V254 fence 文件。当前源码已表达该合同，
-但没有编译或运行；证据强度见
+不得修改 `server/src/store.rs`、route/domain ABI、API/router 或 V254 fence 文件。当前源码已表达该合同并随
+完整 Windows 产品目标与 WSL2 test target 编译，但 V271 专属 migration/source-contract 矩阵仍未运行；证据强度见
 [`external-pool-route-source-projection-bridge-acceptance.md`](external-pool-route-source-projection-bridge-acceptance.md)。

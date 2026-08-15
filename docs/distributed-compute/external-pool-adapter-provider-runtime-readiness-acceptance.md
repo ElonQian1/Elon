@@ -3,7 +3,7 @@ title: 外部矿池 Adapter Provider runtime readiness 验收
 status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
+implementation_status: implementation_compiled
 verification_status: source_review_only
 ---
 
@@ -11,10 +11,11 @@ verification_status: source_review_only
 
 ## 1. 本批验收强度
 
-V270 当前只接受源码与权威合同静态复核。遵守架构阶段禁令，本批没有编译 Rust、执行 migration、运行
-单元/HTTP/SQLite/Linux fixture、启动 child、读取真实 Secret、打开 production bundle、连接 upstream 或
-生成动态指纹。正式计数为 `passed=0 / failed=0`，状态为
-`source_review_only / implementation_uncompiled / implementation_unrun`。
+V270 已随完整 Windows `elon-server` 产品目标和 WSL2 `elon-server` test target 编译；编译闭合了 SQLite
+scalar helper 生命周期、Store error conversion 与 Linux-only installation filesystem error import。尚未执行
+V270 专属 migration、单元/HTTP/SQLite/Linux fixture，也未启动 child、读取真实 Secret、打开 production
+bundle 或连接 upstream。专属动态计数仍为 `passed=0 / failed=0`，状态为
+`source_review_only / implementation_compiled / implementation_unrun`。
 
 本页只记录证据强度，不重新定义 V270 semantics；authority 唯一来源是
 [`external-pool-adapter-provider-runtime-readiness-authority.md`](external-pool-adapter-provider-runtime-readiness-authority.md)。
@@ -60,12 +61,12 @@ V270 当前只接受源码与权威合同静态复核。遵守架构阶段禁令
 | 五条进程内 HTTP、真实 TCP、生产 upstream/Secret | 未运行 |
 | Provider activation、18 项 replacement guard、market admission | 不属于 V270 |
 
-历史 V261-V265 fixture、V266 Profile V1 或 V268/V269 source review 不能替代这些结果；current V267-V270
-组合必须在架构阶段结束后按风险重新编译和运行。
+历史 V261-V265 fixture、V266 Profile V1、V267 kernel subset 或 V268/V269 source review 不能替代这些
+结果；current V270 专属矩阵仍须按风险运行。
 
 ## 4. 正式验收结论
 
 V270 仅冻结“一个 exact Provider-specific probe 在 cleanup 后形成可撤销、最长 15 秒、重启即失效的
 durable readiness history”的源码合同。它不是 production deployment、SLA、Provider activation 或开放市场
-验收。只有后续动态矩阵全部通过并产生可复算指纹后，才能把实现状态从 `implementation_uncompiled` 提升；
-即使提升，`activation_ready=false` 与 V254 fences 也必须保持到独立 atomic activation/admission 批次。
+验收。当前只能声明实现已编译；只有后续动态矩阵全部通过并产生可复算指纹后，才能提升 verification
+状态。即使提升，`activation_ready=false` 与 V254 fences 也必须保持到独立 atomic activation/admission 批次。
