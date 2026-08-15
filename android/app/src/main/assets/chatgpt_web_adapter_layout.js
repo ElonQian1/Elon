@@ -519,16 +519,13 @@
     });
     addRegionControls(controls, composer, 'composer', used);
     const overlays = visibleOverlayRoots();
-    const overlay = overlays[overlays.length - 1];
-    let overlayContextId = '';
-    if (overlayOwnership) {
-      if (overlay) {
-        overlayContextId = overlayOwnership.resolveOverlayContext(overlay, ownershipPageKey(), overlayPolicy.managementSignature(overlay, isVisible, actionableNodes));
-      } else {
-        overlayOwnership.observeNoOverlay(ownershipPageKey());
-      }
-    }
-    addRegionControls(controls, overlay, 'overlay', used, null, overlayContextId);
+    if (overlayOwnership && !overlays.length) overlayOwnership.observeNoOverlay(ownershipPageKey());
+    overlays.forEach((overlay) => addRegionControls(
+      controls, overlay, 'overlay', used, null, overlayOwnership
+        ? overlayOwnership.resolveOverlayContext(overlay, ownershipPageKey(),
+            overlayPolicy.contextMenuSignature(overlay, isVisible, actionableNodes))
+        : ''
+    ));
     addMessageControls(controls, used);
     addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
     return {
@@ -651,8 +648,12 @@
   function invoke(id, emitEvent, result) {
     discover();
     const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
-    const contextMenuRetry = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots, undefined, undefined, (root) => overlayPolicy.managementSignature(root, isVisible, actionableNodes));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
+    const contextMenuRetry = contextMenuPolicy && contextMenuPolicy.prepare(
+      control, visibleOverlayRoots, undefined, undefined,
+      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes),
+      undefined, () => String(node.getAttribute('aria-expanded') || '').toLowerCase() === 'true'
+    );
     function dispatch() {
       if (!node.isConnected || !isVisible(node)) {
         return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
@@ -667,7 +668,7 @@
           control,
           node,
           visibleOverlayRoots(),
-          ownershipPageKey(), (root) => overlayPolicy.managementSignature(root, isVisible, actionableNodes)
+          ownershipPageKey(), (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes)
         );
         if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }

@@ -23,7 +23,7 @@ assert.match(
 );
 assert.match(
   layoutSource,
-  /addRegionControls\(controls, overlay, 'overlay', used, null, overlayContextId\)/,
+  /addRegionControls\(\s*controls, overlay, 'overlay', used, null, overlayOwnership/,
   'layout exports inherited context on overlay controls'
 );
 
@@ -144,6 +144,16 @@ assert.equal(
   tracker.resolveOverlayContext(openedOverlay, '/c/example'),
   'conversation-turn-2',
   'the active menu keeps its context across repeated snapshots'
+);
+assert.equal(
+  tracker.resolveOverlayContext({ isConnected: true }, '/c/example'),
+  '',
+  'probing another visible overlay does not claim the active menu context'
+);
+assert.equal(
+  tracker.resolveOverlayContext(openedOverlay, '/c/example'),
+  'conversation-turn-2',
+  'probing another overlay does not clear the active menu ownership'
 );
 tracker.observeNoOverlay('/c/example');
 assert.equal(

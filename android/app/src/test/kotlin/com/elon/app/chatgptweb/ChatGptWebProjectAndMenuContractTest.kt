@@ -47,6 +47,10 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(conversations.contains("enrichProjectConversations"))
         assertTrue(menu.contains("hasNewRoot"))
         assertTrue(menu.contains("retry();"))
+        assertTrue(menu.contains("confirmationDelayMs"))
+        assertTrue(menu.contains("typeof isOpen === 'function' && isOpen()"))
+        assertTrue(layout.contains("overlayPolicy.contextMenuSignature"))
+        assertTrue(layout.contains("overlays.forEach"))
         assertTrue(layout.contains("contextMenuPolicy.prepare"))
     }
 

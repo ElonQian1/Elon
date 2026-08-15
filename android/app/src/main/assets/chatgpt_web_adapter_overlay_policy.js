@@ -43,6 +43,58 @@
       .join('|');
   }
 
+  function menuItemSignal(node) {
+    const role = String(node && node.getAttribute && node.getAttribute('role') || '').toLowerCase();
+    if (!/^menuitem(?:checkbox|radio)?$/.test(role) && !isManagementAction(node)) return '';
+    return [
+      role,
+      node && node.getAttribute && node.getAttribute('data-testid'),
+      node && node.getAttribute && node.getAttribute('aria-label'),
+      node && node.getAttribute && node.getAttribute('title'),
+      node && node.textContent
+    ].filter(Boolean).join(':').replace(/\s+/g, ' ').trim().slice(0, 240);
+  }
+
+  function contextMenuSignature(root, isVisible, actionableNodes) {
+    if (!root || typeof actionableNodes !== 'function') return '';
+    return actionableNodes(root)
+      .filter((node) => typeof isVisible !== 'function' || isVisible(node))
+      .map(menuItemSignal)
+      .filter(Boolean)
+      .sort()
+      .join('|');
+  }
+
+  function explicitMenuRoot(root) {
+    if (!root || typeof root.getAttribute !== 'function') return false;
+    const role = String(root.getAttribute('role') || '').toLowerCase();
+    return role === 'menu' || [
+      'data-radix-menu-content',
+      'data-headlessui-menu-items',
+      'data-slot'
+    ].some((attribute) => root.hasAttribute && root.hasAttribute(attribute));
+  }
+
+  function rankedRoots(roots, isVisible, actionableNodes) {
+    return Array.from(new Set(Array.isArray(roots) ? roots : []))
+      .map((root, index) => {
+        const actions = typeof actionableNodes === 'function' ? actionableNodes(root) : [];
+        const visibleActions = actions.filter(
+          (node) => typeof isVisible !== 'function' || isVisible(node)
+        );
+        const managementCount = visibleActions.filter(isManagementAction).length;
+        const menuItemCount = visibleActions.map(menuItemSignal).filter(Boolean).length;
+        return {
+          root,
+          index,
+          score: managementCount * 1000 + menuItemCount * 100 +
+            (explicitMenuRoot(root) ? 25 : 0) - Math.min(visibleActions.length, 24)
+        };
+      })
+      .sort((left, right) => right.score - left.score || right.index - left.index)
+      .map((candidate) => candidate.root);
+  }
+
   function inferredRoot(node, isVisible, actionableNodes) {
     let current = node && node.parentElement;
     for (let depth = 0; current && depth < 7; depth += 1, current = current.parentElement) {
@@ -61,8 +113,14 @@
       'button, [role="button"], [role="menuitem"], a[href]'
     )).filter(isVisible).filter(isManagementAction)
       .map((node) => inferredRoot(node, isVisible, actionableNodes)).filter(Boolean);
-    return Array.from(new Set(explicit.concat(inferred)));
+    return rankedRoots(explicit.concat(inferred), isVisible, actionableNodes);
   }
 
-  return Object.freeze({ isManagementAction, managementSignature, visibleRoots });
+  return Object.freeze({
+    contextMenuSignature,
+    isManagementAction,
+    managementSignature,
+    rankedRoots,
+    visibleRoots
+  });
 });

@@ -317,7 +317,10 @@ class ChatGptWebLabContractTest {
         assertTrue(overlayPolicy.contains("[data-headlessui-portal]"))
         assertTrue(overlayPolicy.contains("actions.filter(isManagementAction).length >= 2"))
         assertTrue(adapterLayout.contains("overlayPolicy.visibleRoots(document, isVisible, actionableNodes)"))
-        assertTrue(adapterLayout.contains("const overlay = overlays[overlays.length - 1]"))
+        assertTrue(overlayPolicy.contains("function contextMenuSignature"))
+        assertTrue(overlayPolicy.contains("function rankedRoots"))
+        assertTrue(adapterLayout.contains("overlays.forEach((overlay)"))
+        assertFalse(adapterLayout.contains("overlays[overlays.length - 1]"))
         listOf("personalization", "help", "logout", "plan").forEach { semantic ->
             assertTrue(ChatGptWebUiSemantics.KNOWN.contains(semantic))
             assertTrue(pageSemanticPolicy.contains("return '$semantic'"))

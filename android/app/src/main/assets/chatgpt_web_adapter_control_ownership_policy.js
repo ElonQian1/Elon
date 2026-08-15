@@ -110,6 +110,7 @@
         active && active.overlay === overlay &&
         (!active.overlay || active.overlay.isConnected !== false)
       ) return active.contextId;
+      if (active && active.overlay && active.overlay.isConnected !== false) return '';
       active = null;
       if (!pendingIsUsable()) return '';
       if (pending.existingOverlays.has(overlay)) {

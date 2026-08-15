@@ -34,14 +34,29 @@
     });
   }
 
-  function prepare(control, visibleRoots, scheduleTask, delayMs, signatureFor) {
+  function prepare(
+    control,
+    visibleRoots,
+    scheduleTask,
+    delayMs,
+    signatureFor,
+    confirmationDelayMs,
+    isOpen
+  ) {
     if (!shouldArm(control) || typeof visibleRoots !== 'function') return null;
     const before = snapshotRoots(visibleRoots(), signatureFor);
     const schedule = typeof scheduleTask === 'function' ? scheduleTask : setTimeout;
+    const opened = () => (
+      (typeof isOpen === 'function' && isOpen()) ||
+      hasNewOrChangedRoot(before, visibleRoots(), signatureFor)
+    );
     return function arm(retry) {
       if (typeof retry !== 'function') return false;
       schedule(() => {
-        if (!hasNewOrChangedRoot(before, visibleRoots(), signatureFor)) retry();
+        if (opened()) return;
+        schedule(() => {
+          if (!opened()) retry();
+        }, Number.isFinite(confirmationDelayMs) ? confirmationDelayMs : 220);
       }, Number.isFinite(delayMs) ? delayMs : 260);
       return true;
     };
