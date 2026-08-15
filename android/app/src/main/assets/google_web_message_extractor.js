@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 9;
+  const extractorVersion = 10;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -150,8 +150,7 @@
     const links = node.querySelectorAll('a[href]').length;
     const tabControls = node.querySelectorAll('[role="tab"], [role="tablist"], [role="toolbar"]').length +
       (node.matches('[role="tab"], [role="tablist"], [role="toolbar"]') ? 1 : 0);
-    const liveRegion = node.matches('[aria-live], [role="status"], [role="alert"]') ||
-      !!node.querySelector('[aria-live], [role="status"], [role="alert"]');
+    const liveRegion = node.matches('[aria-live], [role="status"], [role="alert"]');
     const metrics = {
       hasQuery: !!query,
       text,
