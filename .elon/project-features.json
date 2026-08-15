@@ -3131,7 +3131,7 @@
       "id": "open-commerce-verified-erp-handoff-handler-v1",
       "title": "开放商业 ERP 写入与回读验证处理器 V1",
       "summary": "复用现有接入器租约工作器，把终态业务证据以稳定幂等来源信封交给商户 ERP 插件，并且只有外部回读完整匹配项目、商户、Invocation、接入和结果摘要后才允许提交 applied。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/open-commerce-verified-erp-handoff-handler-v1.md",
@@ -3172,15 +3172,88 @@
         "显式业务拒绝沿用永久拒绝回执；普通写入、回读、取消和网络异常保持可重试。",
         "Node 全量测试、源码体积和文档模块化门禁通过，文档不宣称生产 ERP、支付或外部平台已实现。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_2302585a22cb4bb5ae509778b867b656",
-        "agent_id": "codex-goal-erp-readback",
-        "claimed_at_ms": 1786756732527,
-        "expires_at_ms": 1786771132527
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/open-commerce-verified-erp-handoff-handler-v1-acceptance.md",
+          "content_hash": "e79d3de15c04fab7512a9ca5789677720c08f717c131df07a2daa6c1f7072486",
+          "locator": "V1 acceptance and residual boundaries",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4528b81f4b46d8e6c53024c0426b6c967595b1b8",
+            "head_blob_oid": "9bc17b514244a430a5fef0886caeeaa5fdeadf9d",
+            "worktree_blob_oid": "9bc17b514244a430a5fef0886caeeaa5fdeadf9d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/connector-sdk.md",
+          "content_hash": "f41e7c12789c78ddfec9e12dce03b9c521c95a30a477190380e9f6f8573c2687",
+          "locator": "verified ERP handoff handler",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4528b81f4b46d8e6c53024c0426b6c967595b1b8",
+            "head_blob_oid": "fb2bb065e527525edb50288b8cd937dde8cf1a34",
+            "worktree_blob_oid": "fb2bb065e527525edb50288b8cd937dde8cf1a34",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/verified-erp-handoff-handler.d.ts",
+          "content_hash": "c99d682c9f96aa6c498b451ba90219add7d26324be2ff988ce5d4520eee48c0e",
+          "locator": "VerifiedErpHandoffHandlerOptions",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4528b81f4b46d8e6c53024c0426b6c967595b1b8",
+            "head_blob_oid": "1bcfb94222b6965fccb62d7ac28cdee11fb61a22",
+            "worktree_blob_oid": "1bcfb94222b6965fccb62d7ac28cdee11fb61a22",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/verified-erp-handoff-handler.js",
+          "content_hash": "532b5051370bbd23686ecd1e31675fc07c73a7bcc2290390a32c81191c0ca111",
+          "locator": "createVerifiedErpHandoffHandler",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4528b81f4b46d8e6c53024c0426b6c967595b1b8",
+            "head_blob_oid": "58344d27a47301d1bc3906bee1cfd76ae93095d0",
+            "worktree_blob_oid": "58344d27a47301d1bc3906bee1cfd76ae93095d0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/test/verified-erp-handoff-handler-types.ts",
+          "content_hash": "d1912328e2fc166e0d540e4ac88100c5efccaba03c972f21739cfa9e2d02dde3",
+          "locator": "TypeScript strict noEmit pass",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4528b81f4b46d8e6c53024c0426b6c967595b1b8",
+            "head_blob_oid": "3577b6caacd7fd088c50cbf0dff735bf915b1769",
+            "worktree_blob_oid": "3577b6caacd7fd088c50cbf0dff735bf915b1769",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/test/verified-erp-handoff-handler.test.mjs",
+          "content_hash": "34265b3364d9e8f33c69ea89acbf129eb0aec31a40dc7e43b064e9c6581f60cb",
+          "locator": "targeted 23 and SDK full 88 passing",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4528b81f4b46d8e6c53024c0426b6c967595b1b8",
+            "head_blob_oid": "c149431e009e90dfa35f247950a3db92b8f28f4a",
+            "worktree_blob_oid": "c149431e009e90dfa35f247950a3db92b8f28f4a",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1786756720906,
-      "updated_at_ms": 1786756745793
+      "updated_at_ms": 1786757991761
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -4142,36 +4215,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_d3964b2c4ae04f158c0adeadb1ee9f92",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "7 项定向验收、迁移与文档边界均有可执行入口",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786645042969
-    },
-    {
-      "id": "feature_event_74229959d8fa4a66b52530189bf37c96",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786645042994
-    },
-    {
-      "id": "feature_event_61768d04feee4c95a7b9b2e079acf4c5",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "登记最终实现和验证证据",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786645043006
-    },
     {
       "id": "feature_event_17d19ef1737644d496229676270af2be",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
@@ -6141,6 +6184,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1786756745793
+    },
+    {
+      "id": "feature_event_22ae3c19d2534431be624939fcd0a4f1",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-erp-readback",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786757976607
+    },
+    {
+      "id": "feature_event_73f1b8e871e6491abd5a8b7e7c678f74",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-erp-readback",
+      "reason": "SDK implementation, strict types, targeted and full Node tests, source size and document modularity gates passed.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786757991721
+    },
+    {
+      "id": "feature_event_861f7fbbc6224cadb2cc0715bf46db1c",
+      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-erp-readback",
+      "reason": "Independent test evidence is hash-bound: targeted 23/23, SDK full 88/88, TypeScript strict noEmit, source and document gates passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786757991761
     }
   ]
 }
