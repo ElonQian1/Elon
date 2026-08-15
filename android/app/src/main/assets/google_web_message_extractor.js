@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 15;
+  const extractorVersion = 16;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -9,6 +9,7 @@
   const candidatePolicy = window.__elonGoogleWebAnswerCandidatePolicy;
   const queryPolicy = window.__elonGoogleWebQueryPolicy;
   const TRUSTED_ANSWER_SELECTORS = [
+    '[data-sfc-cp][data-hveid]',
     '[id^="aim-chrome-initial-inline-async-container"]',
     '[data-container-id]',
     '[data-snhf]',
@@ -302,6 +303,8 @@
     ).length;
     const trustedCount = Array.from(document.querySelectorAll(TRUSTED_ANSWER_SELECTOR))
       .filter(isVisible).length;
+    const responseRootCount = Array.from(document.querySelectorAll('[data-sfc-cp][data-hveid]'))
+      .filter(isVisible).length;
     const divCount = Math.min(document.querySelectorAll('body div').length, 9999);
     return [
       'v=' + extractorVersion,
@@ -309,6 +312,7 @@
       'explicit=' + explicitCount,
       'semantic=' + semanticCount,
       'trusted=' + trustedCount,
+      'roots=' + responseRootCount,
       'div=' + divCount,
       'composer=' + (composer ? 1 : 0),
       'query=' + (extraction.queryFound ? 1 : 0),

@@ -23,6 +23,8 @@ class GoogleWebMessageExtractorContractTest {
         assertTrue(source.contains("candidatePolicy.accepts(metrics)"))
         assertTrue(source.contains("candidatePolicy.select(candidates)"))
         assertTrue(source.contains("TRUSTED_ANSWER_SELECTORS"))
+        assertTrue(source.contains("'[data-sfc-cp][data-hveid]'"))
+        assertTrue(source.contains("'roots=' + responseRootCount"))
         assertTrue(source.contains("rememberedOwned: rememberedQueryOwned"))
         assertTrue(source.contains("const answer = query ? answerCandidate"))
         assertTrue(source.contains("hasQuery: !!query"))
