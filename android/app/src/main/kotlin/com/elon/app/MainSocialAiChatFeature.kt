@@ -91,6 +91,18 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionFeatureNavigation by productionFeatureNavigationDelegate
+    private val productionPageActionsDelegate = lazy {
+        WebChatProductionPageActionsCoordinator(
+            activity = activity,
+            host = binding.root,
+            mcpPort = ::chatGptMcpPort,
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            openOfficialFallback = ::openOfficialFallback,
+        )
+    }
+    private val productionPageActions by productionPageActionsDelegate
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -278,6 +290,7 @@ internal class MainSocialAiChatFeature(
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
         }
+        if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         binding.modelButton.tag = null
@@ -303,11 +316,18 @@ internal class MainSocialAiChatFeature(
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
         }
+        if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         val controller = controllerFor(provider.id)
         controller.activate(provider)
+        binding.moreButton.apply {
+            visibility = View.VISIBLE
+            setImageResource(R.drawable.ic_more_horizontal)
+            contentDescription = "web-chat-page-actions:${provider.id.wireValue}"
+            setOnClickListener { productionPageActions.show(provider) }
+        }
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
