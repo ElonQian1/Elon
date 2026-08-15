@@ -53,6 +53,35 @@ assert.equal(policy.navigationOnlyText(
   '你可以在 AI 模式里查看新闻和地图，下面是详细回答。',
 ), false)
 
+assert.equal(policy.transientStatusText('AI 模式回答已准备就绪'), true)
+assert.equal(policy.transientStatusText('AI Mode answer is ready'), true)
+assert.equal(policy.transientStatusText('正在生成回答…'), true)
+assert.equal(policy.transientStatusText('下面是已经准备好的实际回答。'), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: 'AI 模式回答已准备就绪',
+  textLength: 12,
+  citations: 0,
+  semanticBlocks: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: true,
+  explicit: true,
+}), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: 'The answer is four.',
+  textLength: 19,
+  citations: 0,
+  semanticBlocks: 1,
+  links: 0,
+  tabControls: 0,
+  liveRegion: true,
+  explicit: true,
+}), true)
+
 assert.equal(policy.accepts({
   hasQuery: true,
   text: 'AI 模式 全部 图片 视频 新闻 地图 购物 图书 航班 财经',

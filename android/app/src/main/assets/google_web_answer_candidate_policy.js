@@ -52,6 +52,18 @@
     return matched >= 4 && !remainder.replace(/[\s,，、;；:：-]+/g, '');
   }
 
+  function transientStatusText(value) {
+    const text = String(value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!text || text.length > 80) return false;
+    return /^(?:ai\s*mode\s*)?(?:answer|response)\s+(?:is\s+)?ready[.!。！]?$/.test(text) ||
+      /^(?:ai\s*模式)?(?:回答|回复|响应)(?:已经|已)?准备就绪[。！!]?$/.test(text) ||
+      /^(?:正在)?(?:生成|加载|准备)(?:回答|回复|响应)?(?:中)?[.。…]*$/.test(text);
+  }
+
   function accepts(metrics) {
     const hasQuery = metrics && metrics.hasQuery === true;
     const textLength = nonNegative(metrics && metrics.textLength);
@@ -59,9 +71,12 @@
     const semanticBlocks = nonNegative(metrics && metrics.semanticBlocks);
     const links = nonNegative(metrics && metrics.links);
     const tabControls = nonNegative(metrics && metrics.tabControls);
+    const liveRegion = metrics && metrics.liveRegion === true;
     const explicit = metrics && metrics.explicit === true;
     if (!hasQuery || textLength < 8) return false;
     if (navigationOnlyText(metrics && metrics.text)) return false;
+    if (transientStatusText(metrics && metrics.text)) return false;
+    if (liveRegion && semanticBlocks === 0 && citations === 0) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
     if (links >= 3 && semanticBlocks === 0 && citations === 0) return false;
     if (!explicit && semanticBlocks === 0 && citations === 0 && textLength < 80) return false;
@@ -74,5 +89,11 @@
     return Math.min(links, 20) * 180 + Math.min(tabControls, 10) * 600;
   }
 
-  return Object.freeze({ version: 2, accepts, penalty, navigationOnlyText });
+  return Object.freeze({
+    version: 3,
+    accepts,
+    penalty,
+    navigationOnlyText,
+    transientStatusText
+  });
 });
