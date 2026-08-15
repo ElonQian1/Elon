@@ -155,6 +155,7 @@ internal class MainMcpNativeControlActions(
                 }
                 uiState()
             }
+            "get_web_chat_context" -> webChatContextJson(args)
             "get_web_chat_navigation" -> webChatNavigationJson(args)
             "set_web_chat_sidebar" -> {
                 val tab = ChatGptWebSideMenuTab.parse(args.optString("section"))
@@ -625,6 +626,23 @@ internal class MainMcpNativeControlActions(
             date = date,
             offset = offset,
             limit = limit,
+        )
+    }
+
+    private fun webChatContextJson(args: JSONObject): JSONObject {
+        val feature = socialAiChatFeature()
+            ?: return errorJson("get_web_chat_context", "social_ai_feature_unavailable")
+        if (!feature.isChatModeActive()) {
+            return errorJson("get_web_chat_context", "web_chat_inactive")
+        }
+        return WebChatProductionContextPager.page(
+            providerId = feature.providerId(),
+            conversationPath = feature.webChatConversationPath(),
+            model = feature.webChatModel(),
+            state = feature.webChatState(),
+            streaming = feature.webChatStreaming(),
+            messages = feature.currentMessages(),
+            args = args,
         )
     }
 

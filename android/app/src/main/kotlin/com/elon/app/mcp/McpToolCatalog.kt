@@ -191,9 +191,9 @@ internal fun mcpToolsListResult(): JSONObject {
                 tool(
                     name = "ui_control",
                     title = "Native UI Control",
-                    description = "Control project chat, social AI chat, and the ChatGPT Web mirror through stable native actions and semantic control ids.",
+                    description = "Control project chat and provider-backed social AI chat through stable native actions and semantic control ids.",
                     properties = JSONObject()
-                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, isolated web chat conversation actions, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
+                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, isolated web chat conversation actions, get_web_chat_context, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
                         .put("project_id", stringProperty("Optional project id or project space id."))
                         .put("project_index", intProperty("Optional project index."))
                         .put("conversation_id", stringProperty("Optional local conversation id."))
@@ -217,9 +217,9 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("date", stringProperty("Optional ISO date for the native web chat sidebar or navigation query."))
                         .put("offset", intProperty("Zero-based page offset for web chat conversation queries."))
                         .put("limit", intProperty("Page size for web chat conversation queries."))
-                        .put("message_cursor", stringProperty("Stable cursor returned by chatgpt_get_context for the next context page."))
-                        .put("message_offset", intProperty("Zero-based message offset for chatgpt_get_context."))
-                        .put("message_limit", intProperty("Page size from 1 to 40 for chatgpt_get_context."))
+                        .put("message_cursor", stringProperty("Stable cursor returned by chatgpt_get_context or get_web_chat_context for the next context page."))
+                        .put("message_offset", intProperty("Zero-based message offset for chatgpt_get_context or get_web_chat_context."))
+                        .put("message_limit", intProperty("Page size from 1 to 40 for chatgpt_get_context or get_web_chat_context."))
                         .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false."))
                         .put("wait_for_target_bind_ms", intProperty("How long cross-surface ChatGPT actions wait for the target native or official Activity controller, 0-15000. Defaults to 8000."))
                         .put("mode", stringProperty("Interaction mode for set_social_ai_interaction_mode: work or chat."))

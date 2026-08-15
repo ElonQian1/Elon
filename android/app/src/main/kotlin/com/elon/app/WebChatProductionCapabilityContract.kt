@@ -285,7 +285,7 @@ internal object WebChatProductionCapabilityContract {
             Access.MCP_READ,
             null,
             SelectorMode.NONE,
-            readAction = "state",
+            readAction = "get_web_chat_context",
         ),
         chatGpt(
             WebChatProviderCapability.RICH_PARTS,
