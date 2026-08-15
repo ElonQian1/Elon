@@ -874,7 +874,7 @@ internal class MainNavigationController(
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
         updateFriendVoiceCallButton()
-        binding.moreButton.visibility = View.VISIBLE
+        binding.moreButton.visibility = if (isDirectSocialAiChatActive()) View.GONE else View.VISIBLE
         binding.moreButton.setImageResource(R.drawable.ic_more_horizontal)
         applyDefaultMoreButtonIconInsets()
         binding.moreButton.setOnClickListener { showContactChatSettings() }
