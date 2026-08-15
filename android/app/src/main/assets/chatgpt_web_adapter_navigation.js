@@ -185,9 +185,18 @@
   }
 
   function dismiss(emitEvent, result) {
+    const layout = window.__elonChatGptLayout;
+    if (
+      layout && typeof layout.requestSemanticTouch === 'function' &&
+      layout.requestSemanticTouch('close', 'dismiss_navigation', emitEvent, 'overlay')
+    ) {
+      return result('dismiss_navigation', true, '');
+    }
     const close = sidebarButton(false);
-    if (close) emitTouchRequest('dismiss_navigation', close, emitEvent);
-    result('dismiss_navigation', true, '');
+    if (close && emitTouchRequest('dismiss_navigation', close, emitEvent)) {
+      return result('dismiss_navigation', true, '');
+    }
+    result('dismiss_navigation', false, '官网功能侧栏关闭入口当前不可见。');
   }
 
   function capabilities() {

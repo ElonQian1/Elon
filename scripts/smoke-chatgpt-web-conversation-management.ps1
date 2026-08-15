@@ -101,7 +101,14 @@ function Close-FeatureNavigation {
                 region = "overlay"
                 limit = 100
             }
-        if (@($sidebarOptions.controls).Count -eq 0) { return }
+        if (@($sidebarOptions.controls).Count -eq 0) {
+            # The official drawer disappears from the manifest before its close animation
+            # stops intercepting taps on the conversation header.
+            Start-Sleep -Milliseconds 1000
+            Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+                -Action "chatgpt_refresh_controls" -TimeoutSec 15 | Out-Null
+            return
+        }
         Start-Sleep -Seconds 1
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Feature navigation did not close before conversation management."
