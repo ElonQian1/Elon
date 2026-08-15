@@ -55,7 +55,8 @@ data class ChatMessage(
     var streamId: String? = null,
     var recalledAt: String? = null,
     var recalledBy: String? = null,
-    var projectPostCard: ChatProjectPostCard? = null
+    var projectPostCard: ChatProjectPostCard? = null,
+    var webChatMessage: WebChatProductionMessage? = null,
 )
 
 class ChatAdapter(
@@ -71,6 +72,7 @@ class ChatAdapter(
     var onSuggestionResolve: ((ChatMessage) -> Unit)? = null
     /** 语音附件长按回调（转文字 / 其他操作），由 Activity 通过 setAdapterAndWireApkActions 注入。 */
     var onVoiceAttachmentLongPress: ((message: ChatMessage, attachment: ChatAttachment) -> Unit)? = null
+    var onWebChatMessageAction: ((ChatMessage, WebChatMessageAction) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
     private var cachedUserBitmap: Bitmap? = null
     private var selectionMode = false
@@ -203,6 +205,7 @@ class ChatAdapter(
         bindSenderAvatar(holder.friendAvatar, message)
         bindSelectionVisual(holder, message, projectCardBound, position)
         bindMessageActions(holder, message, projectCardBound)
+        WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction)
         bindFinalReplyLabel(holder, message)
         bindEvidence(holder, message, position)
         bindModelAttribution(holder, message)

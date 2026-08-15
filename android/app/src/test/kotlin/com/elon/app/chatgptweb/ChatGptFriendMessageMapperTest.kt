@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 import com.elon.app.ChatAttachment
 import com.elon.app.WebChatProviderId
 import com.elon.app.WebChatProviderRegistry
+import com.elon.app.WebChatMessageAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -30,6 +31,33 @@ class ChatGptFriendMessageMapperTest {
         assertTrue(result.last().senderAvatarResId != null)
         assertEquals("GPT-5", result.last().modelUsed)
         assertNull(result.first().senderAvatarResId)
+        assertEquals(setOf(WebChatMessageAction.COPY), result.first().webChatMessage?.actions)
+        assertEquals(setOf(WebChatMessageAction.COPY), result.last().webChatMessage?.actions)
+    }
+
+    @Test
+    fun exposesRegenerateAndContextActionsOnlyWhenProductionAndPageCapabilitiesAgree() {
+        val snapshot = snapshot(
+            messages = listOf(
+                ChatGptWebMessage("a-old", "assistant", "旧回答", "completed", emptyList()),
+                ChatGptWebMessage("a-latest", "assistant", "新回答", "completed", emptyList()),
+            ),
+            capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE)),
+        )
+
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot,
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = null,
+            messageActionContextIds = setOf("a-latest"),
+            timestampFor = { 42L },
+        )
+
+        assertEquals(setOf(WebChatMessageAction.COPY), result.first().webChatMessage?.actions)
+        assertEquals(
+            setOf(WebChatMessageAction.COPY, WebChatMessageAction.REGENERATE, WebChatMessageAction.MORE),
+            result.last().webChatMessage?.actions,
+        )
     }
 
     @Test
@@ -95,7 +123,10 @@ class ChatGptFriendMessageMapperTest {
         assertEquals("application/pdf", result.single().attachments?.single()?.mimeType)
     }
 
-    private fun snapshot(messages: List<ChatGptWebMessage>) = ChatGptWebSnapshot(
+    private fun snapshot(
+        messages: List<ChatGptWebMessage>,
+        capabilities: ChatGptWebCapabilities = ChatGptWebCapabilities.EMPTY,
+    ) = ChatGptWebSnapshot(
         title = "",
         url = "https://chatgpt.com/",
         draft = "",
@@ -106,6 +137,6 @@ class ChatGptFriendMessageMapperTest {
         currentModel = "GPT-5",
         attachments = emptyList(),
         dictationActive = false,
-        capabilities = ChatGptWebCapabilities.EMPTY,
+        capabilities = capabilities,
     )
 }

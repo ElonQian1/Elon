@@ -25,7 +25,9 @@ internal class GoogleWebSocialChatController(
     override val providerId = WebChatProviderId.GOOGLE_WEB
     private val messages = mutableListOf<ChatMessage>()
     private val timestamps = linkedMapOf<String, Long>()
-    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions)
+    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions).apply {
+        onWebChatMessageAction = ::handleWebChatMessageAction
+    }
     private val session = GoogleWebBackgroundSession(
         activity = activity,
         host = binding.chatListFrame,
@@ -35,6 +37,13 @@ internal class GoogleWebSocialChatController(
         onConversationIndexChanged = { onConversationIndexChanged() },
     )
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
+    private val productionMessageActions by lazy {
+        WebChatProductionMessageActionCoordinator(
+            activity = activity,
+            mcpPort = { null },
+            openOfficialFallback = openOfficialFallback,
+        )
+    }
     private var active = false
     private val pendingSend = GoogleWebPendingSendState()
     private var pendingSendWatchdog: Runnable? = null
@@ -272,6 +281,10 @@ internal class GoogleWebSocialChatController(
             createdAtMs = timestamps.getOrPut(id) { System.currentTimeMillis() },
         )
         adapter.notifyDataSetChanged()
+    }
+
+    private fun handleWebChatMessageAction(message: ChatMessage, action: WebChatMessageAction) {
+        productionMessageActions.handle(message, action)
     }
 
     private fun updateComposerModel() {

@@ -29,7 +29,9 @@ internal class ChatGptSocialChatController(
     override val providerId = WebChatProviderId.CHATGPT_WEB
     private val messages = mutableListOf<ChatMessage>()
     private val timestamps = linkedMapOf<String, Long>()
-    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions)
+    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions).apply {
+        onWebChatMessageAction = ::handleWebChatMessageAction
+    }
     private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(
         activity = activity,
@@ -57,6 +59,13 @@ internal class ChatGptSocialChatController(
                 if (mode != ChatGptWebModeController.Mode.NATIVE) openOfficialFallback()
             },
             revealMessage = ::revealMessageFromMcp,
+        )
+    }
+    private val productionMessageActions by lazy {
+        WebChatProductionMessageActionCoordinator(
+            activity = activity,
+            mcpPort = { socialMcpPort },
+            openOfficialFallback = openOfficialFallback,
         )
     }
 
@@ -246,6 +255,9 @@ internal class ChatGptSocialChatController(
                 else -> "发送中…"
             },
             attachmentsForMessage = { id -> sentAttachments[id].orEmpty() },
+            messageActionContextIds = WebChatProductionMessageActionJson.messageContextIds(
+                socialMcpPort.uiState(),
+            ),
             timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
         )
         messages.clear()
@@ -322,6 +334,10 @@ internal class ChatGptSocialChatController(
             createdAtMs = timestamps.getOrPut(id) { System.currentTimeMillis() },
         )
         adapter.notifyDataSetChanged()
+    }
+
+    private fun handleWebChatMessageAction(message: ChatMessage, action: WebChatMessageAction) {
+        productionMessageActions.handle(message, action)
     }
 
     private fun showModelOptions(options: List<ChatGptWebComposerOption>) {

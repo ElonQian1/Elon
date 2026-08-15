@@ -12,12 +12,38 @@ internal object ChatGptFriendMessageMapper {
         pendingAttachments: List<ChatAttachment> = emptyList(),
         pendingSendStatus: String = "发送中…",
         attachmentsForMessage: (String) -> List<ChatAttachment> = { emptyList() },
+        messageActionContextIds: Set<String> = emptySet(),
         timestampFor: (String) -> Long,
     ): List<ChatMessage> {
-        val result = snapshot.messages.map { message ->
+        val latestAssistantIndex = snapshot.messages.indexOfLast { it.role == "assistant" }
+        val result = snapshot.messages.mapIndexed { index, message ->
             val id = "${provider.id.wireValue}:${message.id}"
             val messageAttachments = attachmentsForMessage(message.id).ifEmpty {
                 message.parts.mapNotNull(::attachmentFromPart)
+            }
+            val actions = buildSet {
+                if (
+                    message.content.isNotBlank() &&
+                    provider.supports(com.elon.app.WebChatProviderCapability.MESSAGE_COPY)
+                ) {
+                    add(com.elon.app.WebChatMessageAction.COPY)
+                }
+                if (
+                    index == latestAssistantIndex &&
+                    message.role == "assistant" &&
+                    message.state == "completed" &&
+                    !snapshot.streaming &&
+                    provider.supports(com.elon.app.WebChatProviderCapability.MESSAGE_REGENERATE) &&
+                    snapshot.capabilities.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE)
+                ) {
+                    add(com.elon.app.WebChatMessageAction.REGENERATE)
+                }
+                if (
+                    provider.supports(com.elon.app.WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS) &&
+                    ChatGptNativeControlPresentation.stableContextId(message.id) in messageActionContextIds
+                ) {
+                    add(com.elon.app.WebChatMessageAction.MORE)
+                }
             }
             ChatMessage(
                 role = if (message.role == "user") "user" else "friend",
@@ -28,6 +54,11 @@ internal object ChatGptFriendMessageMapper {
                 createdAtMs = timestampFor(id),
                 modelUsed = snapshot.currentModel.takeIf { message.role == "assistant" && it.isNotBlank() },
                 attachments = messageAttachments.takeIf(List<ChatAttachment>::isNotEmpty),
+                webChatMessage = com.elon.app.WebChatProductionMessage(
+                    providerWireValue = provider.id.wireValue,
+                    sourceMessageId = message.id,
+                    actions = actions,
+                ).takeIf { actions.isNotEmpty() },
             )
         }.toMutableList()
 

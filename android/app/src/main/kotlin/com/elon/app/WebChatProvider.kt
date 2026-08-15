@@ -16,6 +16,11 @@ internal enum class WebChatProviderCapability {
     CONVERSATION_LIST,
     PROJECT_LIST,
     NEW_CONVERSATION,
+    MESSAGE_COPY,
+    MESSAGE_REGENERATE,
+    MESSAGE_CONTEXT_ACTIONS,
+    MODEL_SELECTOR,
+    ATTACHMENT_UPLOAD,
 }
 
 internal data class WebChatProviderIdentity(
@@ -25,6 +30,8 @@ internal data class WebChatProviderIdentity(
     val available: Boolean,
     val capabilities: Set<WebChatProviderCapability>,
 ) {
+    fun supports(capability: WebChatProviderCapability): Boolean = capability in capabilities
+
     val selectable: Boolean
         get() = available && REQUIRED_NATIVE_NAVIGATION.all(capabilities::contains)
 
@@ -44,14 +51,22 @@ internal object WebChatProviderRegistry {
             displayName = "ChatGPT 网页 AI",
             avatarResId = R.drawable.ic_web_ai_chatgpt_avatar,
             available = true,
-            capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
+            capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION + setOf(
+                WebChatProviderCapability.MESSAGE_COPY,
+                WebChatProviderCapability.MESSAGE_REGENERATE,
+                WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS,
+                WebChatProviderCapability.MODEL_SELECTOR,
+                WebChatProviderCapability.ATTACHMENT_UPLOAD,
+            ),
         ),
         WebChatProviderIdentity(
             id = WebChatProviderId.GOOGLE_WEB,
             displayName = "Google 搜索网页 AI",
             avatarResId = R.drawable.ic_web_ai_google_placeholder_avatar,
             available = true,
-            capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
+            capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION + setOf(
+                WebChatProviderCapability.MESSAGE_COPY,
+            ),
         ),
     )
 

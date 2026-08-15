@@ -85,6 +85,45 @@
                 android:textColor="@color/elon_text_primary"
                 android:textSize="15sp" />
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/webChatMessageActionBar"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/webChatMessageCopy"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:padding="9dp"
+                android:src="@drawable/ic_msg_copy"
+                android:tooltipText="@string/chatgpt_message_copy" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/webChatMessageRegenerate"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:padding="9dp"
+                android:src="@drawable/ic_side_menu_refresh"
+                android:tooltipText="@string/chatgpt_message_regenerate"
+                android:visibility="gone" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/webChatMessageMore"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:padding="9dp"
+                android:src="@drawable/ic_more_horizontal"
+                android:tooltipText="@string/chatgpt_message_more_actions"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
     </LinearLayout>
 
