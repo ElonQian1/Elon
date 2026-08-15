@@ -276,6 +276,13 @@ exit /b 0
     @{ workspace_root = (Join-Path $TempRoot "ordinary-missing\server"); cache_scope = "workspace"; cache_partition = "3333333333333333"; last_used_utc = $oldMarkerTime } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $unmanagedMissingPartition ".last-used.json") -Encoding UTF8
 
+    $existingWorkspace = Join-Path $TempRoot "existing-workspace\server"
+    New-Item -ItemType Directory -Force -Path $existingWorkspace | Out-Null
+    $existingWorkspacePartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\8888888888888888"
+    New-Item -ItemType Directory -Force -Path $existingWorkspacePartition | Out-Null
+    @{ workspace_root = $existingWorkspace; cache_scope = "workspace"; cache_partition = "8888888888888888"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $existingWorkspacePartition ".last-used.json") -Encoding UTF8
+
     $invalidMarkerPartition = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\4444444444444444"
     New-Item -ItemType Directory -Force -Path $invalidMarkerPartition | Out-Null
     '{invalid' | Set-Content -LiteralPath (Join-Path $invalidMarkerPartition ".last-used.json") -Encoding UTF8
@@ -326,6 +333,19 @@ exit /b 0
     Assert-True (-not ($missingRecovery.actions | Where-Object { $_.path -eq $recentOrphanPartition -and $_.action -eq "would-delete" })) "recent missing workspaces must remain protected"
     Assert-True (-not ($missingRecovery.actions | Where-Object { $_.path -eq $invalidMarkerPartition -and $_.action -eq "would-delete" })) "invalid markers must remain protected"
 
+    $lowDiskPolicy = Get-Content -Raw -LiteralPath $nonLowDiskPolicyPath | ConvertFrom-Json
+    $lowDiskPolicy.warning_free_percent = 99
+    $lowDiskPolicy.recovery_free_percent = 100
+    $lowDiskPolicy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $nonLowDiskPolicyPath -Encoding UTF8
+    $lowDiskRecovery = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -RecoverMissingWorkspaces -WorkspaceOnly
+    Assert-True $lowDiskRecovery.low_disk "recovery regression must exercise the low-disk selection path"
+    $existingWorkspaceAction = $lowDiskRecovery.actions | Where-Object { $_.path -eq $existingWorkspacePartition } | Select-Object -First 1
+    Assert-Equal "preserve" $existingWorkspaceAction.action "missing-workspace recovery must preserve an existing workspace under low disk"
+    Assert-Equal "missing-workspace-filter" $existingWorkspaceAction.reason "exclusive recovery should report why an existing workspace was filtered"
+    Assert-True (-not $existingWorkspaceAction.selected) "existing workspaces must remain unselected under low-disk recovery"
+    Assert-True (@($lowDiskRecovery.actions | Where-Object { $_.path -eq $unmanagedMissingPartition -and $_.action -eq "would-delete" }).Count -eq 1) "low-disk recovery must still select an eligible missing workspace"
+    $nonLowDiskPolicy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $nonLowDiskPolicyPath -Encoding UTF8
+
     $workspaceOnlyAged = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -ForceAged -WorkspaceOnly
     $sharedAgedAction = $workspaceOnlyAged.actions | Where-Object { $_.path -eq $sharedTaskPartition } | Select-Object -First 1
     Assert-Equal "workspace-scope-filter" $sharedAgedAction.reason "workspace-only must override force-aged selection for shared partitions"
@@ -336,6 +356,7 @@ exit /b 0
     Assert-True (-not (Test-Path -LiteralPath $staleMissingPartition)) "managed deletion should atomically replace and remove a stale lock"
     Assert-True (Test-Path -LiteralPath $sharedTaskPartition) "missing workspace apply must preserve shared partitions"
     Assert-True (Test-Path -LiteralPath $recentOrphanPartition) "missing workspace apply must preserve recent partitions"
+    Assert-True (Test-Path -LiteralPath $existingWorkspacePartition) "missing workspace apply must preserve partitions whose workspace still exists"
 
     $ownedTaskRoot = Join-Path $TempRoot "explicit-finish-task"
     $ownedWorkspace = Join-Path $ownedTaskRoot "server"

@@ -379,6 +379,14 @@ function Invoke-RustCacheGc {
         }
     }
 
+    if ($RecoverMissingWorkspaces) {
+        foreach ($partition in $partitions | Where-Object { -not $_.recoverable_missing_workspace -and $_.selected }) {
+            $partition.selected = $false
+            $partition.action = "preserve"
+            $partition.reason = "missing-workspace-filter"
+        }
+    }
+
     if ($WorkspaceOnly) {
         foreach ($partition in $partitions | Where-Object { [string]$_.cache_scope -ne "workspace" }) {
             $partition.selected = $false

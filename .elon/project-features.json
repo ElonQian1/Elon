@@ -4067,6 +4067,93 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "title": "Rust cache missing-workspace exclusive recovery filter V2.1",
+      "summary": "Keep explicit missing-workspace recovery exclusive under low disk so valid workspace partitions cannot be selected by the general LRU watermark path.",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/rust-cache-recovery-exclusive-filter-v2-1.md",
+        "content_hash": "7d794d106b0f876e54068ac2a75e932c5e837f25c4ed4746192d2ba714b54a5d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "44fad241501db0ed308c95d8cce26494abb9892a",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "1e9b4c560cdde1f23fae62b9d9cb12bd100b5ceb",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "developer-platform",
+      "tags": [
+        "rust-cache",
+        "gc",
+        "recovery",
+        "low-disk"
+      ],
+      "task_paths": [
+        "docs/requirements/rust-cache-recovery-exclusive-filter-v2-1.md",
+        "scripts/rust-cache/RustCache.Inventory.psm1",
+        "scripts/test-rust-cache-platform.ps1"
+      ],
+      "dependencies": [
+        "rust-cache-recovery-governance-v2"
+      ],
+      "acceptance_criteria": [
+        "Existing workspace partitions remain preserved below the warning watermark.",
+        "Eligible missing workspace partitions remain selectable under low disk.",
+        "Filtered workspace partitions report missing-workspace-filter.",
+        "Shared, quarantine, unknown, invalid-marker, recent, and active-lock partitions remain preserved.",
+        "Regression suite covers the low-disk path.",
+        "Live dry-run shows no selected partition whose recorded workspace exists before C-drive apply."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/rust-cache-recovery-exclusive-filter-v2-1.md",
+          "content_hash": "7d794d106b0f876e54068ac2a75e932c5e837f25c4ed4746192d2ba714b54a5d",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44fad241501db0ed308c95d8cce26494abb9892a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1e9b4c560cdde1f23fae62b9d9cb12bd100b5ceb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Inventory.psm1",
+          "content_hash": "c07c11dc46b025919b16bac04dd0a038be92378e96b7dcbfeb3a5fea64b78aa1",
+          "locator": "Invoke-RustCacheGc recovery filter",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44fad241501db0ed308c95d8cce26494abb9892a",
+            "head_blob_oid": "067260ecc624a13ba271ff40cc495f851c47cc70",
+            "worktree_blob_oid": "75a63ff124df20aed0d54225beb09795ba9ab1d6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-platform.ps1",
+          "content_hash": "5b68fe26a4a1430ff3cbe5b24585514cf2656269e19e3a65caefa56c4f7714d3",
+          "locator": "low-disk missing-workspace recovery regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "44fad241501db0ed308c95d8cce26494abb9892a",
+            "head_blob_oid": "8a36d7acad72628315a57526cf3ef98a829d66ca",
+            "worktree_blob_oid": "4d76aa36965656dacd41ecdf8196108e7c9fb821",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786781564000,
+      "updated_at_ms": 1786781603308
+    },
+    {
       "id": "rust-cache-recovery-governance-v2",
       "title": "Rust cache safe recovery governance V2",
       "summary": "Provide explicit missing-workspace recovery, workspace-only GC filtering, stale lock classification, and cache-aware independent worktree cleanup while preserving shared caches and active work.",
@@ -4924,56 +5011,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_45c31cd7264e421f877f27f368d613b0",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Final committed requirement and verified dependency are ready for evidence binding.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786659166065
-    },
-    {
-      "id": "feature_event_575e05962e924c74a2ef33a4a1f1993f",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "claimed",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786659166352
-    },
-    {
-      "id": "feature_event_061183e0149242d4bfef60fe661a9615",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Bind final committed implementation and rebased dynamic test evidence.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786659166698
-    },
-    {
-      "id": "feature_event_4fe47fc10585413f8e76b2bd0217bd56",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786659171494
-    },
-    {
-      "id": "feature_event_5ed8a1e2d9bb45d39fed9aebcc20b084",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "transitioned",
-      "actor": "codex-goal",
-      "reason": "Final implementation and committed evidence are bound.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786659171870
-    },
     {
       "id": "feature_event_010eba7d9e134fce80d9c2d2f43abd14",
       "feature_id": "compute-v256-runtime-bundle-resolver-verification",
@@ -6923,6 +6960,56 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786780384585
+    },
+    {
+      "id": "feature_event_2573032547d34f79b5a7e46b8ffbb0c7",
+      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "action": "registered",
+      "actor": "codex-cache-repair",
+      "reason": "Live C-drive dry-run exposed a narrow ordering gap after V2 verification.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786781564000
+    },
+    {
+      "id": "feature_event_66a99eb33f81470ebb3d12846690ee77",
+      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "action": "claimed",
+      "actor": "codex-cache-repair",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786781581813
+    },
+    {
+      "id": "feature_event_41e4082c064a40f39b32122e9b8ce840",
+      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "action": "transitioned",
+      "actor": "codex-cache-repair",
+      "reason": "Implement strict recovery filtering and verify it under forced low-disk conditions.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786781582404
+    },
+    {
+      "id": "feature_event_328b09aaf3554ad88f888640e2d43b57",
+      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "action": "evidence_recorded",
+      "actor": "codex-cache-repair",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786781603021
+    },
+    {
+      "id": "feature_event_cb1c232e0b1a4ace94a3818318a8c5a7",
+      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
+      "action": "transitioned",
+      "actor": "codex-cache-repair",
+      "reason": "Exclusive recovery filter and forced low-disk regression are implemented; live C-drive apply remains gated on dry-run review.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786781603308
     }
   ]
 }
