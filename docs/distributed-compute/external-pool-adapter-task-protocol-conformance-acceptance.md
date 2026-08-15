@@ -4,18 +4,19 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: targeted_local_migration_verified
+verification_status: targeted_local_contract_migration_http_verified
 ---
 
 # 外部矿池 Adapter task-protocol conformance 验收
 
 ## 1. 当前证据强度
 
-V272 当前接受权威合同、源码复核、完整 Windows `elon-server` test target 编译，以及 `v272_`
-`2 passed / 0 failed` 的局部动态证据。该专项覆盖 fresh/repeat/reopen、exact 2-table/1-view、18 个 V254 fence
-不变、畸形 receipt 失败关闭和 exact process-integrity UDF，指纹为
-`96a9621ebfdf248edf263ff50ea32595798fb4d10e4b196fbbf2674edb9f306e`。startup、ELTP、HTTP、Linux、
-并发和故障矩阵仍未运行；状态为 `implementation_partially_verified / targeted_local_migration_verified`。
+V272 当前接受统一 `task_protocol_conformance` 的 `21 passed / 0 failed`：18 项源码合同、2 项 Windows
+SQLite 和 1 项真实 Axum 门卫。它覆盖 fresh/repeat/reopen、exact 2-table/1-view、18 个 V254 fence、完整性
+UDF，以及 401/403/422 先于 unavailable 503，指纹为
+`d08956fe46177ab11ea9038ce3306eff9e30e7fb09d5c07673e4dd12412ad45b`。startup、Linux ELTP、成功
+HTTP 写链、并发和故障矩阵仍未运行；状态为
+`implementation_partially_verified / targeted_local_contract_migration_http_verified`。
 
 本页只定义验收门，不重新定义 semantics；唯一语义来源是
 [`external-pool-adapter-task-protocol-conformance-authority.md`](external-pool-adapter-task-protocol-conformance-authority.md)。
@@ -86,7 +87,7 @@ receipt 必须保存每步 digest/size、状态、sequence、tombstone 与 oracl
 | process HMAC | 未运行；覆盖 canonical/observation/expiry/epoch任一 bit drift、DB伪造、错误 process registry、zeroize与 restart historical。 |
 | root/TTL/revocation | 未运行；覆盖 V249/V250/V252/V268 successor/revoke/expiry、15 秒边界、V239 expiry无影响、historical latest revoke/replay。 |
 | carrier neutrality | 未运行；跨 Provider exact neutral release可运行，carrier/root/source/launch漂移拒绝，durable/public/canonical JSON中无 carrier字段。 |
-| 三条 HTTP | 未运行；覆盖 401/403先于 unavailable 503、strict shape、201/200 replay、404/409、递归脱敏及无 `/api/me`/run-observation route。 |
+| 三条 HTTP | Windows Axum 已验证 401、member/local-owner 403、strict-shape 422 均先于 unavailable 503；201/200 replay、404/409、成功 currentness/revoke 与递归脱敏仍待 Linux runtime fixture。 |
 | Store-private consumer | 未运行；同 connection/checked-at + fresh Prepared成功，缓存 GET、跨进程 receipt、过期/重启/撤销 receipt全部拒绝。 |
 
 动态测试不得通过关闭、删除或缩窄 V254 fence 来制造 production route 成功；V272 positive fixture只在自己的
@@ -105,7 +106,7 @@ synthetic lane内运行，不创建 v213 或 market row。
 
 ## 6. 正式结论
 
-V272 当前只能声明“Provider-neutral task-protocol conformance 合同已冻结，Windows migration/schema/UDF 已
-局部动态验证，Linux server-run/process-HMAC 尚未运行”。它可作为未来同进程 Store-private consumer 的输入，但不是
+V272 当前只能声明“Provider-neutral task-protocol conformance 合同已冻结，Windows contract/migration/HTTP
+门卫已局部动态验证，Linux server-run/process-HMAC 尚未运行”。它可作为未来同进程 Store-private consumer 的输入，但不是
 production executor、route 或 activation authority。只有第 3、4 节全部动态矩阵通过并形成可复算指纹后，
 才能提升实现状态；即使提升，Provider 仍为 `registering`、18 deny保持，atomic activation继续 NO-GO。

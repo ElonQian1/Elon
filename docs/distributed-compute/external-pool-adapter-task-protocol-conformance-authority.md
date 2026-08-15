@@ -5,7 +5,7 @@ reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
 implementation_status: implementation_partially_verified
-verification_status: targeted_local_migration_verified
+verification_status: targeted_local_contract_migration_http_verified
 ---
 
 # 外部矿池 Adapter task-protocol conformance 权威
@@ -252,11 +252,11 @@ server custody产生；当前硬安全边界是 same-process HMAC anti-forgery�
 ## 10. 当前实现与验证现实
 
 当前已冻结 authority 与实现源码切面：V272 migration 的 2 tables/1 view、task protocol profile/catalog 与
-runner/oracle、Store current authority、Service/redaction、三条 API 及 source contracts。Windows `v272_`
-`2 passed / 0 failed` 已验证 fresh/repeat/reopen、schema、18 个 V254 fence 与完整性 UDF，指纹为
-`96a9621ebfdf248edf263ff50ea32595798fb4d10e4b196fbbf2674edb9f306e`。尚未执行 startup、
-ELTP/HTTP/Linux fixture、启动 child 或连接 upstream。正式状态为
-`implementation_partially_verified / targeted_local_migration_verified`。
+runner/oracle、Store current authority、Service/redaction、三条 API 及 source contracts。统一过滤器
+`21 passed / 0 failed` 包含 18 项源码合同、2 项 Windows SQLite 和 1 项真实 Axum 门卫，指纹为
+`d08956fe46177ab11ea9038ce3306eff9e30e7fb09d5c07673e4dd12412ad45b`。尚未执行 startup、Linux
+ELTP、成功 HTTP 写链、启动 child 或连接 upstream。正式状态为
+`implementation_partially_verified / targeted_local_contract_migration_http_verified`。
 
 源码或文档存在不能证明六能力实际运行、process HMAC、TTL race、revocation、重启失效、carrier 隔离或 18
 fences 已动态验收。验收门见

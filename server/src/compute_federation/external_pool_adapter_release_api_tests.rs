@@ -118,6 +118,8 @@ mod task_protocol_conformance_api_runtime_source_contract_test;
 mod task_protocol_conformance_boundary_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_domain_source_contract_test.rs"]
 mod task_protocol_conformance_domain_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_http_test.rs"]
+mod task_protocol_conformance_http_test;
 #[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_session_source_contract_test.rs"]
 mod task_protocol_conformance_session_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_store_source_contract_test.rs"]
