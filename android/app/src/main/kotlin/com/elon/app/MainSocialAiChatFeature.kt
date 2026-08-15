@@ -258,6 +258,7 @@ internal class MainSocialAiChatFeature(
             views.planModeButton.visibility = View.VISIBLE
             views.webToolsButton.visibility = View.GONE
             views.webToolsButton.setOnClickListener(null)
+            views.attachmentButton.visibility = View.VISIBLE
             views.modelButtonShell.setOnClickListener { showWorkModelSelector() }
             binding.modelButton.setOnClickListener { showWorkModelSelector() }
         }
@@ -285,6 +286,9 @@ internal class MainSocialAiChatFeature(
             views.webToolsButton.setOnClickListener {
                 productionComposerTools.show(provider)
             }
+            views.attachmentButton.visibility = if (
+                provider.supports(WebChatProviderCapability.ATTACHMENT_UPLOAD)
+            ) View.VISIBLE else View.GONE
             views.modelButtonShell.setOnClickListener { providerPicker.show() }
             binding.modelButton.setOnClickListener { providerPicker.show() }
         }

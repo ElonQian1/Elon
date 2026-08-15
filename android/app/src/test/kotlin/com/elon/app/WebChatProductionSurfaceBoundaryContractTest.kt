@@ -35,6 +35,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("ChatGptSocialChatController"))
         assertTrue(feature.contains("GoogleWebSocialChatController"))
         assertTrue(feature.contains("WebChatProductionComposerToolsCoordinator"))
+        assertTrue(feature.contains("views.attachmentButton.visibility"))
+        assertTrue(feature.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(composer.contains("webToolsButton"))
         assertTrue(composer.contains("web-chat-composer-tools:unavailable"))
     }
