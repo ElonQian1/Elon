@@ -55,7 +55,10 @@ function Wait-ConversationOptions {
 }
 
 function Wait-ConversationManagementMenu {
-    param([Parameter(Mandatory = $true)][string]$ContextId)
+    param(
+        [Parameter(Mandatory = $true)][string]$ContextId,
+        [ValidateRange(1, 300)][int]$WaitTimeoutSec = $TimeoutSec
+    )
 
     $managementSemantics = @(
         "conversation_files",
@@ -65,7 +68,7 @@ function Wait-ConversationManagementMenu {
         "share",
         "delete"
     )
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($WaitTimeoutSec)
     $lastControls = @()
     do {
         Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
@@ -126,22 +129,35 @@ function Get-ConversationPinState {
 function Open-ConversationManagementMenu {
     param([AllowEmptyString()][string]$ExpectedContextId = "")
 
-    $options = Wait-ConversationOptions -ExpectedContextId $ExpectedContextId
-    if ([string]$options.native_trigger_content_description -notlike "chatgpt-conversation-actions:*") {
-        throw "Conversation options do not expose a stable conversation-scoped native selector."
-    }
-    $receipt = Invoke-ChatGptWebSmokeReceiptAction -Runtime $runtime `
-        -Action "chatgpt_invoke_control" -ExpectedAction "invoke_ui_control" `
-        -Arguments @{ control_id = [string]$options.control_id } `
-        -TimeoutSec $TimeoutSec
-    if ($receipt.receipt.result.ok -ne $true) {
-        throw "Conversation options command did not succeed."
-    }
-    $script:menuOpened = $true
-    $contextId = [string]$options.context_id
-    return [pscustomobject]@{
-        context_id = $contextId
-        controls = @(Wait-ConversationManagementMenu -ContextId $contextId)
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $options = Wait-ConversationOptions -ExpectedContextId $ExpectedContextId
+        if ([string]$options.native_trigger_content_description -notlike "chatgpt-conversation-actions:*") {
+            throw "Conversation options do not expose a stable conversation-scoped native selector."
+        }
+        $receipt = Invoke-ChatGptWebSmokeReceiptAction -Runtime $runtime `
+            -Action "chatgpt_invoke_control" -ExpectedAction "invoke_ui_control" `
+            -Arguments @{ control_id = [string]$options.control_id } `
+            -TimeoutSec $TimeoutSec
+        if ($receipt.receipt.result.ok -ne $true) {
+            throw "Conversation options command did not succeed."
+        }
+        $script:menuOpened = $true
+        $contextId = [string]$options.context_id
+        $menuWaitSec = if ($attempt -eq 1) { [Math]::Min(12, $TimeoutSec) } else { $TimeoutSec }
+        $controls = @(Wait-ConversationManagementMenu `
+            -ContextId $contextId -WaitTimeoutSec $menuWaitSec)
+        if ($controls.Count -gt 0 -or $attempt -eq 2) {
+            return [pscustomobject]@{
+                context_id = $contextId
+                controls = $controls
+            }
+        }
+
+        # The feature drawer can stop exposing controls before its exit animation
+        # stops intercepting the header. Retry the same idempotent menu opener once.
+        Start-Sleep -Milliseconds 1200
+        Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_refresh_controls" -TimeoutSec 15 | Out-Null
     }
 }
 
