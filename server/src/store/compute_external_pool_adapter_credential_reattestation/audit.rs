@@ -15,9 +15,7 @@ use crate::{
         external_pool_adapter_credential_verification::{
             credential_locator_commitment, credential_ref_scheme,
         },
-        provider::{
-            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
-        },
+        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
     },
     store::{
         compute_external_pool_adapter_credential_verification::external_pool_adapter_credential_verification_receipt_authority_on,
@@ -142,9 +140,7 @@ fn audit_lineage(
     let locator = onboarding.non_bearer_credential_ref();
     let observed_allowed = observed.status == PROVIDER_STATUS_REGISTERING
         && observed.policy_revision == pb.provider_policy_revision
-        && b.observed_provider_digest == pb.provider_digest
-        || observed.status == PROVIDER_STATUS_ACTIVE
-            && observed.policy_revision > pb.provider_policy_revision;
+        && b.observed_provider_digest == pb.provider_digest;
     if provider_binding.provider_binding_id != b.provider_binding_id
         || provider_binding.provider_binding_digest != b.provider_binding_digest
         || provider_binding.provider_binding_material_digest != b.provider_binding_material_digest

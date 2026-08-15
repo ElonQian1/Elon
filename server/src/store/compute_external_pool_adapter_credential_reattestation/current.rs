@@ -5,9 +5,7 @@ use rusqlite::Connection;
 use crate::{
     compute_federation::{
         external_pool_adapter_credential_reattestation::CREDENTIAL_REATTESTATION_CURRENTNESS_SCHEMA,
-        provider::{
-            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
-        },
+        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
     },
     store::{
         compute_external_pool_adapter_adoption::external_pool_adapter_adoption_is_revoked_on,
@@ -43,11 +41,7 @@ pub(super) fn currentness_on(
     let verified = DateTime::parse_from_rfc3339(&receipt.reattestation.verified_at)?;
     let expires = DateTime::parse_from_rfc3339(&b.report_expires_at)?;
     let report_current = checked >= verified && checked < expires;
-    let provider_current = subject_exact
-        && matches!(
-            revision_status,
-            "exact_registering" | "adjacent_active" | "exact_active"
-        );
+    let provider_current = subject_exact && revision_status == "exact_registering";
     let verified_current = release_current
         && !upstream_terminal
         && provider_current
@@ -166,17 +160,6 @@ fn provider_statuses(
         && current.provider_digest == b.observed_provider_digest
     {
         "exact_registering"
-    } else if b.observed_provider_status == PROVIDER_STATUS_REGISTERING
-        && provider.status == PROVIDER_STATUS_ACTIVE
-        && b.observed_provider_policy_revision.checked_add(1) == Some(provider.policy_revision)
-    {
-        "adjacent_active"
-    } else if b.observed_provider_status == PROVIDER_STATUS_ACTIVE
-        && provider.status == PROVIDER_STATUS_ACTIVE
-        && provider.policy_revision == b.observed_provider_policy_revision
-        && current.provider_digest == b.observed_provider_digest
-    {
-        "exact_active"
     } else {
         "historical_only"
     };

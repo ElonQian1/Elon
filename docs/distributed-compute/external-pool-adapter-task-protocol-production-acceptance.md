@@ -103,16 +103,18 @@ V275/V276 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制�
 
 - v213 Adapter/version、credential、service actor、route authorization/capability/seal或其 constructor；
 - stable executor binding、Provider active version、Start outbox、真实 eligible row或生产任务执行；
-- V249/V254/V255/V258/V259/V270 activation-rooted active successor；
+- V274 stable activation root、exact projected-active Provider、最长15秒V270-equivalent observation、fresh V272
+  carrier、两张immutable表+一个诊断view，及V275事务内首个successor；
 - V254 18-fence replacement、atomic Provider/route activation；
 - V276 worker/ingress到v213 ACK/observation/accepted closure/Lease/Runner event的production reachability；
 - Pool/Offer admission、usage、market、settlement、部署或跨进程可携带外签 authority。
 
 ## 7. 后继门与正式结论
 
-后继顺序固定为 V274 active successor → V275 stable executor binding + atomic Provider/route activation → V276
-production reachability。V276 必须重新执行本页 startup、root/wire、六表、crash/concurrency与 ingress矩阵；不能把
-V273 source review、V272 conformance passed或V275 migration success当作 transport已验收。
+后继顺序固定为 V274 Store-private contract（V275前零行）→ V275 stable executor + exact projected-active
+Provider/route/18-fence atomic activation并append V274 genesis → V276 production reachability。V276 必须重新执行本页
+startup、root/wire、六表、crash/concurrency与 ingress矩阵；不能把 V273/V274 source review、V272 conformance passed
+或V275 migration success当作 transport已验收。
 
 V273 当前只能声明“default-off dormant production transport/ingress kernel 合同已冻结，迁移边界已局部动态验证”。
 它不能声明 worker已运行、ACK/event已接入、Provider可激活或任务可派发。正式状态保持

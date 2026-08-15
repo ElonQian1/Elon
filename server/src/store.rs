@@ -99,6 +99,7 @@ mod compute_external_pool_adapter_credential_verification;
 mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_installation;
+mod compute_external_pool_adapter_provider_active_successor;
 mod compute_external_pool_adapter_provider_runtime_readiness;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
@@ -729,10 +730,8 @@ pub use token_usage::{
     UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats, UsageTotals,
 };
 pub(crate) use ui_route_learning::{UiLearnedRoute, UiRouteLearningEntry, UiRouteLearningSource};
-pub use user_memories::{
-    UserMemory, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_GLOBAL, MEMORY_SCOPE_PHONE_CONTROL,
-    MEMORY_SCOPE_PROJECT,
-};
+pub use user_memories::{UserMemory, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_GLOBAL};
+pub use user_memories::{MEMORY_SCOPE_PHONE_CONTROL, MEMORY_SCOPE_PROJECT};
 pub use user_progression::UserProgressionLedger;
 pub struct Store {
     conn: std::sync::Mutex<Connection>,

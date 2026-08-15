@@ -5,6 +5,7 @@ mod challenge;
 mod challenge_audit;
 mod current;
 mod persistence;
+mod projected_transition;
 mod read;
 mod receipt_projection_audit;
 mod revocation;
@@ -15,6 +16,10 @@ mod write;
 pub(in crate::store) use current::{
     current_external_pool_adapter_credential_reattestation_authority_on,
     current_external_pool_adapter_credential_reattestation_head_authority_on,
+};
+pub(in crate::store) use projected_transition::{
+    prepare_external_pool_adapter_credential_projected_active_transition_on,
+    PreparedExternalPoolAdapterCredentialProjectedActiveTransition,
 };
 pub(in crate::store) use read::historical_external_pool_adapter_credential_reattestation_authority_on;
 pub(crate) use types::{

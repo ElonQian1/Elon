@@ -27,10 +27,13 @@ pub(in crate::store) use no_work_probe::CurrentExternalPoolAdapterNoWorkProbeObs
 pub(crate) use runtime::{
     external_pool_adapter_provider_runtime_readiness_runtime,
     initialize_external_pool_adapter_provider_runtime_readiness_runtime,
+    verify_pending_external_pool_adapter_provider_active_successor_process_seal,
     ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     ExternalPoolAdapterProviderRuntimeReadinessUnavailable,
 };
 pub(in crate::store) use runtime::{
+    ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
+    ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,
     ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
     ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
 };

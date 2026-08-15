@@ -1,5 +1,6 @@
 //! Locked HMAC custody and epoch-local durable receipt seals.
 
+mod provider_active_successor;
 mod support;
 mod task_protocol_conformance;
 
@@ -33,6 +34,10 @@ use elon_external_pool_adapter_session_core::ExternalPoolAdapterNoWorkProbeHostR
 
 const MAX_READINESS_SEAL_TTL_MS: i64 = 15_000;
 const MAX_LIVE_READINESS_SEALS: usize = 4_096;
+pub(in crate::store) use provider_active_successor::{
+    ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
+    ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,
+};
 pub(in crate::store) use task_protocol_conformance::{
     ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
 };
@@ -42,6 +47,8 @@ pub(in crate::store) struct ExternalPoolAdapterProviderRuntimeReadinessProcessCu
     readiness_seals: Mutex<ProviderRuntimeReadinessSealRegistry>,
     task_protocol_conformance_seals:
         Mutex<task_protocol_conformance::TaskProtocolConformanceSealRegistry>,
+    provider_active_successor_seals:
+        Mutex<provider_active_successor::ProviderActiveSuccessorSealRegistry>,
     custody_epoch_digest: String,
 }
 
@@ -104,6 +111,9 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
             readiness_seals: Mutex::new(ProviderRuntimeReadinessSealRegistry::default()),
             task_protocol_conformance_seals: Mutex::new(
                 task_protocol_conformance::TaskProtocolConformanceSealRegistry::default(),
+            ),
+            provider_active_successor_seals: Mutex::new(
+                provider_active_successor::ProviderActiveSuccessorSealRegistry::default(),
             ),
             custody_epoch_digest,
         })

@@ -18,6 +18,8 @@ use super::types::ExternalPoolAdapterRuntimeBundleRoot;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use custody::ExternalPoolAdapterPostCleanupCommitmentInput;
 pub(in crate::store) use custody::{
+    ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
+    ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,
     ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
     ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
 };
@@ -60,6 +62,37 @@ pub(crate) fn external_pool_adapter_provider_runtime_readiness_runtime() -> std:
         .and_then(Option::as_ref)
         .map(Arc::clone)
         .ok_or(ExternalPoolAdapterProviderRuntimeReadinessUnavailable)
+}
+
+/// SQLite's V274 verifier-only UDF calls this registry lookup. It never opens SQLite, mints a
+/// seal, or turns a pending tuple into committed authority.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn verify_pending_external_pool_adapter_provider_active_successor_process_seal(
+    kind: &str,
+    entity_id: &str,
+    entity_digest: &str,
+    process_custody_epoch_digest: &str,
+    process_custody_nonce_digest: &str,
+    process_custody_seal_digest: &str,
+    receipt_integrity_digest: &str,
+) -> bool {
+    external_pool_adapter_provider_runtime_readiness_runtime()
+        .ok()
+        .and_then(|runtime| {
+            runtime
+                .process_custody()
+                .attests_pending_provider_active_successor_process_seal(
+                    kind,
+                    entity_id,
+                    entity_digest,
+                    process_custody_epoch_digest,
+                    process_custody_nonce_digest,
+                    process_custody_seal_digest,
+                    receipt_integrity_digest,
+                )
+                .ok()
+        })
+        .unwrap_or(false)
 }
 
 impl ExternalPoolAdapterProviderRuntimeReadinessRuntime {

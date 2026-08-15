@@ -22,6 +22,7 @@ mod compute_external_pool_adapter_credential_verifier;
 mod compute_external_pool_adapter_credential_verifier_key;
 mod compute_external_pool_adapter_installation;
 mod compute_external_pool_adapter_installation_terminal;
+mod compute_external_pool_adapter_provider_active_successor;
 mod compute_external_pool_adapter_provider_runtime_readiness;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
@@ -78,6 +79,12 @@ pub(crate) fn register_v272_receipt_integrity_functions(conn: &Connection) -> Re
 
 pub(crate) fn register_v273_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_task_delivery::register_receipt_integrity_functions(conn)
+}
+
+pub(crate) fn register_v274_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_provider_active_successor::register_receipt_integrity_functions(
+        conn,
+    )
 }
 
 #[rustfmt::skip]
@@ -363,6 +370,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (271, "外部矿池 Adapter route source logical-to-projection 映射门卫", compute_external_pool_adapter_route_source_projection::migration_v271),
     (272, "外部矿池 Adapter Provider-neutral task-protocol 六能力实跑证明", compute_external_pool_adapter_task_protocol_conformance::migration_v272),
     (273, "外部矿池 Adapter dormant production task delivery 与 authenticated ingress ledger", compute_external_pool_adapter_task_delivery::migration_v273),
+    (274, "外部矿池 Adapter activation-rooted Provider active successor", compute_external_pool_adapter_provider_active_successor::migration_v274),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

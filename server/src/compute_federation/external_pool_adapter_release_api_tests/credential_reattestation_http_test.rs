@@ -252,7 +252,7 @@ async fn credential_reattestation_http_revokes_head_and_classifies_failures() {
 }
 
 #[tokio::test]
-async fn credential_reattestation_http_bridges_adjacent_active_and_renews_on_later_active() {
+async fn credential_reattestation_http_is_registering_only_before_v275() {
     let fixture = fixture();
     let roots =
         create_credential_reattestation_fixture(&fixture, "credential-active", "52.2.0").await;
@@ -266,7 +266,7 @@ async fn credential_reattestation_http_bridges_adjacent_active_and_renews_on_lat
     );
 
     advance_provider_to_active_revision(&fixture, &roots, 2);
-    let (status, bridged) = call(
+    let (status, historical) = call(
         &fixture.router,
         Method::GET,
         &format!("{}/currentness", collection_path(&roots)),
@@ -274,65 +274,36 @@ async fn credential_reattestation_http_bridges_adjacent_active_and_renews_on_lat
         &Value::Null,
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "{bridged}");
-    assert_eq!(bridged["current_status"], "verified_current");
-    assert_eq!(bridged["provider_revision_status"], "adjacent_active");
+    assert_eq!(status, StatusCode::CONFLICT, "{historical}");
+    assert!(error(&historical).contains("not current"));
+    let (status, rejected) = call(
+        &fixture.router,
+        Method::POST,
+        &format!("{}/challenge", collection_path(&roots)),
+        Some(&fixture.applier_token),
+        &challenge_body(&roots, "credential-active-rejected"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{rejected}");
+    assert!(error(&rejected).contains("exact registering observation"));
 
-    let active_two = issue_challenge(&fixture, &roots, "credential-active-two").await;
-    assert_eq!(
-        active_two["binding"]["observed_provider_policy_revision"],
-        2
-    );
-    assert_eq!(active_two["binding"]["sequence"], 2);
-    let (status, second) =
-        record_challenge(&fixture, &roots, &active_two, "credential-active-record-2").await;
-    assert_eq!(status, StatusCode::CREATED, "{second}");
-    assert_eq!(
-        second["reattestation"]["observed_provider_status"],
-        "active"
-    );
-
-    advance_provider_to_active_revision(&fixture, &roots, 3);
-    assert_eq!(
-        call(
-            &fixture.router,
-            Method::GET,
-            &format!("{}/currentness", collection_path(&roots)),
-            Some(&fixture.applier_token),
-            &Value::Null,
+    let connection = fixture.state.store.conn().unwrap();
+    let (receipt_count, current_status): (i64, String) = connection
+        .query_row(
+            "SELECT
+               (SELECT COUNT(*)
+                  FROM compute_external_pool_adapter_credential_reattestation_receipts
+                 WHERE provider_binding_id=?1),
+               current_status
+               FROM compute_external_pool_adapter_credential_reattestation_current
+              WHERE provider_binding_id=?1",
+            [&roots.provider_binding_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .await
-        .0,
-        StatusCode::CONFLICT
-    );
-    let active_three = issue_challenge(&fixture, &roots, "credential-active-three").await;
-    assert_eq!(
-        active_three["binding"]["observed_provider_policy_revision"],
-        3
-    );
-    assert_eq!(active_three["binding"]["sequence"], 3);
-    let (status, third) = record_challenge(
-        &fixture,
-        &roots,
-        &active_three,
-        "credential-active-record-3",
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "{third}");
-    let (status, current) = call(
-        &fixture.router,
-        Method::GET,
-        &format!("{}/currentness", collection_path(&roots)),
-        Some(&fixture.applier_token),
-        &Value::Null,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{current}");
-    assert_eq!(
-        current["reattestation"]["observed_provider_policy_revision"],
-        3
-    );
-    assert_response_redacted(&current);
+        .unwrap();
+    assert_eq!(receipt_count, 1, "pre-V275 must not mint an active receipt");
+    assert_eq!(current_status, "historical_only");
+    drop(connection);
     assert_no_effects(&fixture, &roots);
     fixture.cleanup();
 }

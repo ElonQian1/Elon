@@ -1,0 +1,11 @@
+CREATE INDEX IF NOT EXISTS idx_v274_active_successor_binding_head
+  ON compute_external_pool_adapter_provider_active_successor_receipts(
+    provider_binding_id,activation_root_digest,successor_sequence DESC,active_successor_receipt_id);
+
+CREATE INDEX IF NOT EXISTS idx_v274_active_successor_provider_expiry
+  ON compute_external_pool_adapter_provider_active_successor_receipts(
+    evidence_provider_id,observation_expires_at DESC,active_successor_receipt_id);
+
+CREATE INDEX IF NOT EXISTS idx_v274_active_successor_revocation_target
+  ON compute_external_pool_adapter_provider_active_successor_revocations(
+    target_active_successor_receipt_id,revoked_at DESC,active_successor_revocation_id);

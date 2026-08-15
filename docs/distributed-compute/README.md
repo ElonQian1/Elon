@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | V267-V272 已有分层的 Windows/WSL2、合同、迁移、HTTP、oracle 与会话证据。V273 已编译并以 20/20 覆盖源码合同和 fresh/repeat/reopen + UDF 迁移，但生产 runtime 仍未运行；Provider=`registering`、18 deny 不变。范围和缺口见 [`V272 权威`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V273 权威`](external-pool-adapter-task-protocol-production-authority.md)、[`V273 验收`](external-pool-adapter-task-protocol-production-acceptance.md) 与 [`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | V267-V272 已有分层验证。V273 已编译，18 项源码合同和 3 项动态迁移统一 21/21 通过，但 production runtime 未运行。V274 已铺 stable root、2 张 immutable 表、1 个诊断 view 与 Store-private purpose-seal ABI；仍未编译/运行、`passed=0/failed=0`，V275 前零行，V253 pre-V275 为 registering-only。Provider=`registering`、`eligible_rows=0`、18 deny 不变；V275/V276 仍缺。见 [`V273`](external-pool-adapter-task-protocol-production-authority.md)、[`V274`](external-pool-adapter-provider-active-successor-authority.md) 与 [`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -130,6 +130,7 @@ owners: backend, node, ai-economy
 43. `docs/distributed-compute/external-pool-route-source-projection-bridge-authority.md` 与对应 acceptance：V271 migration-only V221 logical identity→V249 Provider projection exact source bridge、0 fence 开放与 atomic activation NO-GO 边界。
 44. `docs/distributed-compute/external-pool-adapter-task-protocol-conformance-authority.md` 与对应 acceptance：V272 Provider-neutral ELTP v1 controlled run、独立 process HMAC custody、14-root/8-exchange ABI、2 表 1 诊断 view、最长 15 秒 TTL、三条 admin route与零扩权边界。
 45. `docs/distributed-compute/external-pool-adapter-task-protocol-production-authority.md` 与对应 acceptance：V273 默认关闭 dormant production transport/ingress、8项 production roots、ELTP wire复用、exact 6表、无公开 API与 `eligible_rows=0` 边界。
+46. `docs/distributed-compute/external-pool-adapter-provider-active-successor-authority.md` 与对应 acceptance：V274 stable activation root、exact projected-active Provider、2张immutable表+1个非权威view、renewable active evidence与V275前零行边界。
 
 ## 分阶段落地
 
@@ -184,7 +185,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-V227-V272 的历史和局部动态证据不能外推为 production activation。V272 已覆盖同进程 authenticated session/wire，但独立 child process、内核隔离/清理、process HMAC、成功写链和故障矩阵仍缺。V273 已编译并以 20/20 覆盖源码合同及局部迁移，仍是 default-off、无公开 API、无 v213 constructor、production runtime `passed=0/failed=0` 的 dormant kernel。后继 V274-V276、真实 Secret/upstream 与 V254 replacement 均未完成，Provider=`registering`、18 deny 不变。详见 [`V272 conformance`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V273 authority`](external-pool-adapter-task-protocol-production-authority.md)、[`V273 acceptance`](external-pool-adapter-task-protocol-production-acceptance.md) 与 [`当前状态`](current-implementation-status.md)。
+V227-V272 的历史和局部动态证据不能外推为 production activation。V272 已覆盖同进程 authenticated session/wire，但独立 child、内核清理、process HMAC、成功写链和故障矩阵仍缺。V273 已编译，18 项源码合同和 3 项动态迁移统一 21/21 通过；它仍是 default-off、无公开 API、无 v213 constructor、production runtime `passed=0/failed=0` 的 dormant kernel。V274 已铺 Store-private active-successor 合同，但未编译/运行、V275 前零行；V253 pre-V275 currentness 为 registering-only。后继固定为 V275 atomic activation → V276 reachability；真实 Secret/upstream 与 V254 replacement 仍缺，Provider=`registering`、`eligible_rows=0`、18 deny 不变。见 [`V272 conformance`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V273`](external-pool-adapter-task-protocol-production-authority.md)、[`V274`](external-pool-adapter-provider-active-successor-authority.md) 与 [`当前状态`](current-implementation-status.md)。
 
 ### F4：容量期货市场
 

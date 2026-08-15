@@ -233,12 +233,15 @@ outbox。Provider 必须保持 `registering`，V254 18 个 temporary absolute de
 
 后继顺序固定为：
 
-1. V274 冻结 V249/V254/V255/V258/V259/V270 及 V272/V273 carrier 的 activation-rooted active successor；
-2. V275 签发 stable executor binding，并在一个原子事务内完成 Provider/route activation与18-fence replacement；
+1. V274 冻结 Store-private activation-rooted active successor：exact两张immutable表+一个非权威诊断view，stable
+   root排除Secret/session/executor/route，renewable evidence消费最长15秒V270-equivalent observation与fresh V272
+   carrier；V275前零行、无public producer，Provider仍`registering`；
+2. V275 在同一个原子事务内消费V274 pending overlay，签发stable executor、写exact projected-active Provider/route
+   closure、append首个V274 successor并替换18 fences；
 3. V276 才把本页 dormant worker/ingress handoff接到真实 v213 eligible rows并做 production reachability验收。
 
-V274 receipt、V275 executor/route 或 migration success都不能倒推 V273 transport已动态通过；V276 也不能跳过
-V270/V272 current Store-private reproof。
+V274 docs/DDL、V275 executor/route 或 migration success都不能倒推 V273 transport已动态通过；V276 也不能跳过
+V270-equivalent/V272/V274 current Store-private reproof。
 
 ## 11. 当前实现与验证现实
 

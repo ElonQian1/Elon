@@ -69,6 +69,7 @@ pub(crate) mod external_pool_adapter_linux_supervisor;
 mod external_pool_adapter_linux_supervisor_source_contract_tests;
 #[cfg(test)]
 mod external_pool_adapter_no_work_probe_source_contract_tests;
+pub(crate) mod external_pool_adapter_provider_active_successor;
 pub(crate) mod external_pool_adapter_provider_runtime_readiness;
 pub(crate) mod external_pool_adapter_provider_runtime_readiness_api;
 pub(crate) mod external_pool_adapter_provider_runtime_readiness_service;

@@ -13,9 +13,7 @@ use sha2::{Digest, Sha256};
 use crate::{
     compute_federation::{
         external_pool_adapter_credential_reattestation::*,
-        provider::{
-            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
-        },
+        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
     },
     store::{
         compute_external_pool_adapter_adoption::external_pool_adapter_adoption_is_revoked_on,
@@ -229,7 +227,6 @@ fn ensure_exact_observed_provider(
         || provider.policy_revision != b.observed_provider_policy_revision
         || provider.status != b.observed_provider_status
         || provider.status != PROVIDER_STATUS_REGISTERING
-            && provider.status != PROVIDER_STATUS_ACTIVE
         || provider.provider_kind != PROVIDER_KIND_EXTERNAL_POOL
         || provider.provider_id != b.provider_id
         || provider.owner_account_id != b.provider_owner_account_id

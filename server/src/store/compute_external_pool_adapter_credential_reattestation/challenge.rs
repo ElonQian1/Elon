@@ -12,9 +12,7 @@ use crate::{
             credential_locator_commitment, credential_ref_scheme,
             validate_credential_verification_draft,
         },
-        provider::{
-            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
-        },
+        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
     },
     store::{
         compute_external_pool_adapter_adoption::external_pool_adapter_adoption_is_revoked_on,
@@ -294,8 +292,6 @@ fn ensure_observed_provider(
     let registering_exact = provider.status == PROVIDER_STATUS_REGISTERING
         && provider.policy_revision == binding.provider_policy_revision
         && current.provider_digest == binding.provider_digest;
-    let later_active = provider.status == PROVIDER_STATUS_ACTIVE
-        && provider.policy_revision > binding.provider_policy_revision;
     if provider.provider_kind != PROVIDER_KIND_EXTERNAL_POOL
         || provider.provider_id != historical.provider_id
         || provider.owner_account_id != historical.owner_account_id
@@ -306,9 +302,9 @@ fn ensure_observed_provider(
         || adapter.map(|item| item.config_revision) != Some(binding.adapter_config_revision)
         || adapter.map(|item| item.config_digest.as_str())
             != Some(binding.adapter_config_digest.as_str())
-        || !registering_exact && !later_active
+        || !registering_exact
     {
-        bail!("live Provider is not an allowed exact registering/later active observation");
+        bail!("live Provider is not the exact registering observation");
     }
     Ok(())
 }
