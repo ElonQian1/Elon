@@ -3,6 +3,8 @@ use std::{
     fs::File,
     io::Read,
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
+    os::unix::ffi::OsStrExt,
+    path::{Component, Path},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -26,6 +28,11 @@ pub(super) struct SupervisorCgroupLeaf {
 }
 
 impl ExternalPoolAdapterSupervisorCgroupParent {
+    pub(crate) fn from_operator_delegated_path(path: &Path) -> Result<Self> {
+        let directory = open_operator_delegated_directory(path)?;
+        Self::from_directory(directory)
+    }
+
     pub(crate) fn from_directory(directory: File) -> Result<Self> {
         require_cgroup2(directory.as_raw_fd())?;
         let available = read_control_file(directory.as_raw_fd(), c"cgroup.controllers")?;
@@ -90,6 +97,76 @@ impl ExternalPoolAdapterSupervisorCgroupParent {
         }
         Ok(leaf)
     }
+}
+
+fn open_operator_delegated_directory(path: &Path) -> Result<File> {
+    if !path.is_absolute() {
+        bail!("delegated cgroup parent path must be absolute");
+    }
+    let mut names = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::RootDir => {}
+            Component::Normal(name) => names.push(name),
+            Component::CurDir | Component::ParentDir | Component::Prefix(_) => {
+                bail!("delegated cgroup parent path contains an unsafe component");
+            }
+        }
+    }
+    if names.is_empty() {
+        bail!("delegated cgroup parent cannot be the filesystem root");
+    }
+    let root = unsafe {
+        libc::open(
+            c"/".as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if root < 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("open delegated cgroup absolute-path root");
+    }
+    let mut directory = unsafe { OwnedFd::from_raw_fd(root) };
+    require_trusted_operator_path_component(directory.as_raw_fd(), false)?;
+    for (index, name) in names.iter().enumerate() {
+        let name =
+            CString::new(name.as_bytes()).context("encode delegated cgroup path component")?;
+        directory = open_operator_path_component(directory.as_raw_fd(), &name)?;
+        require_trusted_operator_path_component(directory.as_raw_fd(), index + 1 == names.len())?;
+    }
+    Ok(File::from(directory))
+}
+
+fn open_operator_path_component(parent: i32, name: &CStr) -> Result<OwnedFd> {
+    let fd = unsafe {
+        libc::openat(
+            parent,
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("open delegated cgroup path component");
+    }
+    Ok(unsafe { OwnedFd::from_raw_fd(fd) })
+}
+
+fn require_trusted_operator_path_component(fd: i32, final_component: bool) -> Result<()> {
+    let mut status = std::mem::MaybeUninit::<libc::stat>::uninit();
+    if unsafe { libc::fstat(fd, status.as_mut_ptr()) } != 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("inspect delegated cgroup path component");
+    }
+    let status = unsafe { status.assume_init() };
+    let effective_user_id = unsafe { libc::geteuid() };
+    if (status.st_uid != 0 && status.st_uid != effective_user_id)
+        || status.st_mode & (libc::S_IWGRP | libc::S_IWOTH) != 0
+        || (final_component && status.st_uid != effective_user_id)
+    {
+        bail!("delegated cgroup path ownership or mode is unsafe");
+    }
+    Ok(())
 }
 
 impl SupervisorCgroupLeaf {

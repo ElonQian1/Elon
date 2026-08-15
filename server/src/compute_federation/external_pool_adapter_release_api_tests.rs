@@ -66,6 +66,10 @@ mod lifecycle_http_test;
 mod lifecycle_support;
 #[path = "external_pool_adapter_release_api_tests/management.rs"]
 mod management;
+#[path = "external_pool_adapter_release_api_tests/runtime_compatibility_signing_handoff_runtime_source_contract_test.rs"]
+mod runtime_compatibility_signing_handoff_runtime_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/runtime_compatibility_signing_handoff_source_contract_test.rs"]
+mod runtime_compatibility_signing_handoff_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/runtime_compatibility_verification_api_source_contract_test.rs"]
 mod runtime_compatibility_verification_api_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/runtime_compatibility_verification_domain_source_contract_test.rs"]

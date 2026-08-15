@@ -29,6 +29,8 @@ const STORE_TYPES: &str = include_str!(
 const STORE_ROOT: &str = include_str!("../../store.rs");
 const SERVICE: &str =
     include_str!("../external_pool_adapter_runtime_compatibility_verification_service.rs");
+const SIGNING_HANDOFF_SERVICE: &str =
+    include_str!("../external_pool_adapter_runtime_compatibility_signing_handoff_service.rs");
 
 const EXACT_RUNTIME_COMPATIBILITY_ROOTS: &[&str] = &[
     "supervisor_session_policy_digest",
@@ -252,6 +254,10 @@ fn runtime_compatibility_private_run_commits_only_after_shutdown_reap_and_cleanu
     assert!(
         !SERVICE.contains("run_external_pool_adapter_runtime_compatibility_verification_challenge")
     );
+    assert!(SIGNING_HANDOFF_SERVICE
+        .contains("run_external_pool_adapter_runtime_compatibility_signing_handoff"));
+    assert!(!SIGNING_HANDOFF_SERVICE
+        .contains("run_external_pool_adapter_runtime_compatibility_verification_challenge"));
     let private_receipt = STORE_TYPES
         .split_once(
             "pub(in crate::store) struct ExternalPoolAdapterRuntimeCompatibilityRunObservationWriteReceipt",

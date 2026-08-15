@@ -5,6 +5,8 @@ mod current;
 #[path = "../compute_federation/external_pool_adapter_entrypoint_capsule.rs"]
 mod entrypoint_capsule;
 mod error;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod handoff;
 mod persistence;
 mod read;
 mod record;

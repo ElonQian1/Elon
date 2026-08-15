@@ -10,6 +10,12 @@ pub(crate) enum ExternalPoolAdapterRuntimeCompatibilityVerificationStoreError {
     Storage(#[source] AnyError),
 }
 
+impl From<SqliteError> for ExternalPoolAdapterRuntimeCompatibilityVerificationStoreError {
+    fn from(error: SqliteError) -> Self {
+        Self::classify_write(AnyError::new(error))
+    }
+}
+
 impl ExternalPoolAdapterRuntimeCompatibilityVerificationStoreError {
     pub(super) fn conflict(error: impl Into<AnyError>) -> Self {
         Self::Conflict(error.into())

@@ -15,6 +15,10 @@ use crate::{
     types::AppState,
 };
 
+use super::external_pool_adapter_runtime_compatibility_signing_handoff_service::{
+    self as signing_handoff_service, RuntimeCompatibilitySigningHandoffBody,
+    RuntimeCompatibilitySigningHandoffResponse, RuntimeCompatibilitySigningHandoffServiceError,
+};
 use super::external_pool_adapter_runtime_compatibility_verification_service::{
     self as service, CreateRuntimeCompatibilityChallengeBody,
     RecordRuntimeCompatibilityVerificationBody, RevokeRuntimeCompatibilityVerificationBody,
@@ -27,6 +31,7 @@ const CHALLENGE_PATH: &str = "/api/admin/compute/external-pool-adapter-registry-
 const VERIFICATIONS_PATH: &str = "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications";
 const CURRENTNESS_PATH: &str = "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications/currentness";
 const REVOCATION_PATH: &str = "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications/:verification_receipt_id/revoke";
+const SIGNING_HANDOFF_PATH: &str = "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications/:challenge_id/signing-handoff";
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -35,6 +40,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(VERIFICATIONS_PATH, post(record))
         .route(CURRENTNESS_PATH, get(currentness))
         .route(REVOCATION_PATH, post(revoke))
+        .route(SIGNING_HANDOFF_PATH, post(signing_handoff))
 }
 
 async fn profile_v2(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -125,6 +131,32 @@ async fn revoke(
     ))
 }
 
+async fn signing_handoff(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((registry_release_id, challenge_id)): Path<(String, String)>,
+    payload: Result<Json<RuntimeCompatibilitySigningHandoffBody>, JsonRejection>,
+) -> Response {
+    let actor = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let body = match json_body(payload) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    signing_handoff_response(
+        signing_handoff_service::signing_handoff_for_admin(
+            state,
+            &actor,
+            &registry_release_id,
+            &challenge_id,
+            body,
+        )
+        .await,
+    )
+}
+
 fn write_response(
     result: Result<serde_json::Value, RuntimeCompatibilityVerificationServiceError>,
 ) -> Response {
@@ -154,6 +186,25 @@ fn read_response(
     }
 }
 
+fn signing_handoff_response(
+    result: Result<
+        RuntimeCompatibilitySigningHandoffResponse,
+        RuntimeCompatibilitySigningHandoffServiceError,
+    >,
+) -> Response {
+    match result {
+        Ok(output) => {
+            let status = if output.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            };
+            (status, Json(output)).into_response()
+        }
+        Err(error) => signing_handoff_error_response(error),
+    }
+}
+
 fn json_body<T>(payload: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
     payload
         .map(|Json(value)| value)
@@ -166,6 +217,23 @@ fn error_response(error: RuntimeCompatibilityVerificationServiceError) -> Respon
         RuntimeCompatibilityVerificationServiceError::Invalid(_) => StatusCode::BAD_REQUEST,
         RuntimeCompatibilityVerificationServiceError::Conflict(_) => StatusCode::CONFLICT,
         RuntimeCompatibilityVerificationServiceError::Internal(_) => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    };
+    json_error(status, error)
+}
+
+fn signing_handoff_error_response(
+    error: RuntimeCompatibilitySigningHandoffServiceError,
+) -> Response {
+    let status = match error {
+        RuntimeCompatibilitySigningHandoffServiceError::NotFound => StatusCode::NOT_FOUND,
+        RuntimeCompatibilitySigningHandoffServiceError::Invalid(_) => StatusCode::BAD_REQUEST,
+        RuntimeCompatibilitySigningHandoffServiceError::Conflict(_) => StatusCode::CONFLICT,
+        RuntimeCompatibilitySigningHandoffServiceError::Unavailable(_) => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+        RuntimeCompatibilitySigningHandoffServiceError::Internal(_) => {
             StatusCode::INTERNAL_SERVER_ERROR
         }
     };

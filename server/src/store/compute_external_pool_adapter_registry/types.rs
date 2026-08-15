@@ -221,6 +221,10 @@ impl CurrentExternalPoolAdapterRegistryProviderBindingAuthority {
     pub(in crate::store) fn checked_at(&self) -> &str {
         &self.checked_at
     }
+
+    pub(in crate::store) fn into_prepared(self) -> PreparedExternalPoolAdapterInstallation {
+        self.prepared
+    }
 }
 
 impl StoredRegistryRelease {

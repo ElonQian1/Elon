@@ -17,11 +17,12 @@ const EXACT_ROUTES: &[&str] = &[
     "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications",
     "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications/currentness",
     "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications/:verification_receipt_id/revoke",
+    "/api/admin/compute/external-pool-adapter-registry-releases/:registry_release_id/runtime-compatibility-verifications/:challenge_id/signing-handoff",
 ];
 
 #[test]
 fn runtime_compatibility_api_source_freezes_exact_admin_only_surface() {
-    assert_eq!(API.matches(".route(").count(), 5);
+    assert_eq!(API.matches(".route(").count(), 6);
     for path in EXACT_ROUTES {
         assert!(API.contains(path), "missing exact V268 route {path}");
     }
@@ -31,6 +32,7 @@ fn runtime_compatibility_api_source_freezes_exact_admin_only_surface() {
         ".route(VERIFICATIONS_PATH, post(record))",
         ".route(CURRENTNESS_PATH, get(currentness))",
         ".route(REVOCATION_PATH, post(revoke))",
+        ".route(SIGNING_HANDOFF_PATH, post(signing_handoff))",
     ] {
         assert!(
             API.contains(binding),
@@ -47,6 +49,7 @@ fn runtime_compatibility_api_source_freezes_exact_admin_only_surface() {
         "StatusCode::CONFLICT",
         "StatusCode::UNPROCESSABLE_ENTITY",
         "StatusCode::INTERNAL_SERVER_ERROR",
+        "StatusCode::SERVICE_UNAVAILABLE",
         "JsonRejection",
     ] {
         assert!(API.contains(required), "missing HTTP boundary {required}");

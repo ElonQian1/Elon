@@ -9,6 +9,7 @@
 
 mod canonical;
 mod evidence_validation;
+mod handoff_types;
 mod input_types;
 mod policy;
 mod profile;
@@ -20,6 +21,7 @@ mod validation_support;
 
 pub(crate) use canonical::*;
 pub(crate) use evidence_validation::*;
+pub(crate) use handoff_types::*;
 pub(crate) use input_types::*;
 pub(crate) use policy::*;
 pub(crate) use profile::*;

@@ -82,6 +82,9 @@ pub(crate) mod external_pool_adapter_release_service;
 #[cfg(test)]
 mod external_pool_adapter_runtime_bundle_source_contract_tests;
 pub(crate) mod external_pool_adapter_runtime_compatibility;
+pub(crate) mod external_pool_adapter_runtime_compatibility_signing_handoff_runtime;
+pub(crate) mod external_pool_adapter_runtime_compatibility_signing_handoff_service;
+mod external_pool_adapter_runtime_compatibility_signing_handoff_service_validation;
 pub(crate) mod external_pool_adapter_runtime_compatibility_verification;
 pub(crate) mod external_pool_adapter_runtime_compatibility_verification_api;
 pub(crate) mod external_pool_adapter_runtime_compatibility_verification_service;

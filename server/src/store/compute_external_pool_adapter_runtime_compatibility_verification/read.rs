@@ -257,6 +257,26 @@ fn decode<T: serde::de::DeserializeOwned>(
 }
 
 impl Store {
+    pub(crate) fn external_pool_adapter_runtime_compatibility_verification_challenge_exists(
+        &self,
+        challenge_id: &str,
+        registry_release_id: &str,
+    ) -> std::result::Result<bool, StoreError> {
+        identifier(challenge_id).map_err(StoreError::conflict)?;
+        identifier(registry_release_id).map_err(StoreError::conflict)?;
+        let conn = self.conn().map_err(StoreError::storage)?;
+        Ok(challenge_by_id_on(&conn, challenge_id)
+            .map_err(StoreError::storage)?
+            .is_some_and(|stored| {
+                stored
+                    .receipt
+                    .challenge
+                    .registry_release
+                    .registry_release_id
+                    == registry_release_id
+            }))
+    }
+
     pub(crate) fn external_pool_adapter_runtime_compatibility_verification_run_observation_exists(
         &self,
         run_observation_id: &str,
