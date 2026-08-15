@@ -23,15 +23,18 @@ class WebChatProductionPageActionsTest {
     }
 
     @Test
-    fun keepsComplexMutationsVisibleButRoutesThemToTheOfficialFallback() {
+    fun keepsAdaptiveMutationsNativeAndRoutesExternalFlowsToTheOfficialFallback() {
         val response = JSONObject().put("controls", JSONArray()
             .put(control("rename", "重命名会话", "rename", "overlay", "menu"))
-            .put(control("delete", "删除", "delete", "overlay", "menu", confirmation = true)))
+            .put(control("delete", "删除", "delete", "overlay", "menu", confirmation = true))
+            .put(control("share", "分享", "share", "overlay", "menu")))
 
         val result = WebChatProductionPageActionParser.parse(response)
 
-        assertTrue(result.all(WebChatProductionPageAction::officialFallback))
-        assertTrue(result.last().requiresUserConfirmation)
+        assertFalse(result[0].officialFallback)
+        assertFalse(result[1].officialFallback)
+        assertTrue(result[1].requiresUserConfirmation)
+        assertTrue(result[2].officialFallback)
     }
 
     @Test
@@ -70,6 +73,7 @@ class WebChatProductionPageActionsTest {
         .put("label", label)
         .put("semantic", semantic)
         .put("region", region)
+        .put("role", "button")
         .put("enabled", enabled)
         .put("requires_user_confirmation", confirmation)
         .put("native_presentation", presentation)

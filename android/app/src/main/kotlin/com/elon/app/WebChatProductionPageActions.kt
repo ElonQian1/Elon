@@ -4,47 +4,43 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.chatgptweb.ChatGptWebUiControl
 import org.json.JSONObject
 
 internal data class WebChatProductionPageAction(
-    val controlId: String,
-    val label: String,
-    val semantic: String,
+    val control: ChatGptWebUiControl,
     val requiresUserConfirmation: Boolean,
     val officialFallback: Boolean,
     val nativeSelector: String,
-)
+) {
+    val controlId: String get() = control.id
+    val label: String get() = control.label
+    val semantic: String get() = control.semantic
+}
 
 internal object WebChatProductionPageActionParser {
     fun parse(response: JSONObject): List<WebChatProductionPageAction> {
         val controls = response.optJSONArray("controls") ?: return emptyList()
         val parsed = mutableListOf<WebChatProductionPageAction>()
         for (index in 0 until controls.length()) {
-            val control = controls.optJSONObject(index) ?: continue
-            val controlId = control.optString("control_id").trim()
-            val label = control.optString("label").trim()
-            val semantic = control.optString("semantic").trim().lowercase()
-            val region = control.optString("region").trim().lowercase()
-            val presentation = control.optString("native_presentation").trim().lowercase()
+            val raw = controls.optJSONObject(index) ?: continue
+            val control = WebChatProductionControlJson.parse(raw) ?: continue
+            val presentation = raw.optString("native_presentation").trim().lowercase()
             if (
-                controlId.isBlank() || label.isBlank() ||
-                !control.optBoolean("enabled", false) ||
-                region !in PAGE_REGIONS ||
-                semantic.isBlank() ||
-                semantic in EXCLUDED_SEMANTICS ||
+                !control.enabled ||
+                control.region !in PAGE_REGIONS ||
+                control.semantic in EXCLUDED_SEMANTICS ||
                 presentation !in SUPPORTED_PRESENTATIONS
             ) continue
             parsed += WebChatProductionPageAction(
-                controlId = controlId,
-                label = label,
-                semantic = semantic,
-                requiresUserConfirmation = control.optBoolean("requires_user_confirmation", false),
+                control = control,
+                requiresUserConfirmation = raw.optBoolean("requires_user_confirmation", false),
                 officialFallback = presentation == "official_fallback" ||
-                    semantic in OFFICIAL_COMPLETION_SEMANTICS,
-                nativeSelector = control.optString("native_adb_content_description")
+                    control.semantic in OFFICIAL_COMPLETION_SEMANTICS,
+                nativeSelector = raw.optString("native_adb_content_description")
                     .trim()
-                    .ifBlank { control.optString("adb_content_description").trim() }
-                    .ifBlank { "web-chat-page-action:$semantic:$controlId" },
+                    .ifBlank { raw.optString("adb_content_description").trim() }
+                    .ifBlank { "web-chat-page-action:${control.semantic}:${control.id}" },
             )
         }
         return parsed.distinctBy(WebChatProductionPageAction::controlId)
@@ -55,8 +51,6 @@ internal object WebChatProductionPageActionParser {
     private val EXCLUDED_SEMANTICS = setOf(
         "navigation",
         "title",
-        "close",
-        "confirm",
         "send",
         "stop",
         "copy",
@@ -65,20 +59,13 @@ internal object WebChatProductionPageActionParser {
         "attachment",
         "dictation",
         "voice_mode",
-        "text_input",
-        "selection",
-        "toggle",
-        "slider",
         "search",
         "conversation",
         "timestamp",
     )
     private val OFFICIAL_COMPLETION_SEMANTICS = setOf(
         "conversation_files",
-        "rename",
         "share",
-        "delete",
-        "save_to_project",
         "create_asset",
         "open_media",
         "personalization",
@@ -96,6 +83,7 @@ internal class WebChatProductionPageActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeDialog: AlertDialog? = null
+    private val adaptiveControls = WebChatProductionAdaptiveControlsCoordinator(activity)
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -120,6 +108,7 @@ internal class WebChatProductionPageActionsCoordinator(
         requestEpoch += 1
         activeDialog?.dismiss()
         activeDialog = null
+        adaptiveControls.cancel()
     }
 
     private fun pollActions(
@@ -194,19 +183,52 @@ internal class WebChatProductionPageActionsCoordinator(
             openOfficialFallback()
             return
         }
+        if (adaptiveControls.supports(action)) {
+            val present = {
+                adaptiveControls.present(port, action) {
+                    refreshAfterAdaptiveMutation(provider, port)
+                }
+                Unit
+            }
+            if (action.requiresUserConfirmation) {
+                showConfirmation(action, present)
+            } else {
+                present()
+            }
+            return
+        }
         if (!action.requiresUserConfirmation) {
             invoke(provider, port, action, previousControlIds, userConfirmed = false)
             return
         }
+        showConfirmation(action) {
+            invoke(provider, port, action, previousControlIds, userConfirmed = true)
+        }
+    }
+
+    private fun showConfirmation(
+        action: WebChatProductionPageAction,
+        onConfirmed: () -> Unit,
+    ) {
         val dialog = AlertDialog.Builder(activity)
             .setTitle(action.label)
             .setMessage("确认执行这个网页操作？")
-            .setPositiveButton("继续") { _, _ ->
-                invoke(provider, port, action, previousControlIds, userConfirmed = true)
-            }
+            .setPositiveButton("继续") { _, _ -> onConfirmed() }
             .setNegativeButton("取消", null)
             .create()
         showTracked(dialog)
+    }
+
+    private fun refreshAfterAdaptiveMutation(
+        provider: WebChatProviderIdentity,
+        port: WebChatSocialMcpPort,
+    ) {
+        val epoch = requestEpoch
+        host.postDelayed({
+            if (epoch != requestEpoch || activeProvider() != provider.id) return@postDelayed
+            val actions = readActions(port)
+            if (actions.isNotEmpty()) showActionDialog(provider, port, actions)
+        }, ADAPTIVE_MUTATION_SETTLE_MS)
     }
 
     private fun invoke(
@@ -280,6 +302,14 @@ internal class WebChatProductionPageActionsCoordinator(
         const val MAX_CONTROL_COUNT = 80
         const val MAX_POLL_ATTEMPTS = 8
         const val POLL_INTERVAL_MS = 250L
-        val NESTED_MENU_SEMANTICS = setOf("conversation_options", "profile", "more", "sources")
+        const val ADAPTIVE_MUTATION_SETTLE_MS = 320L
+        val NESTED_MENU_SEMANTICS = setOf(
+            "conversation_options",
+            "profile",
+            "more",
+            "sources",
+            "rename",
+            "save_to_project",
+        )
     }
 }
