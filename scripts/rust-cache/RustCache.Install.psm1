@@ -102,13 +102,29 @@ function Restart-RustCacheSccacheServer {
     if (-not $sccache) { return $null }
     $result = Sync-RustCacheSccacheConfiguration -CacheRoot $CacheRoot -ConfigureProcessEnvironment -ForceRestart
     if ($result.restart_pending) {
-        throw "Refusing to report sccache activation while Cargo/rustc is active. Managed configuration remains pending: $($result.state_path)"
+        return [pscustomobject]@{
+            status = "deferred"
+            reason = "cargo-or-rustc-active"
+            path = $sccache.Source
+            cache_dir = $result.cache_dir
+            max_cache_size = $MaxCacheSize
+            config_path = $result.config_path
+            base_directories = $result.base_directories
+            base_directory_status = $result.base_directory_status
+            configuration_loaded = $false
+            state_path = $result.state_path
+            location = $result.location
+            restarted = $false
+            restart_pending = $true
+        }
     }
     $normalizedLocation = if ($result.location) { ([string]$result.location).Replace("\\", "\") } else { "" }
     if (-not $result.location -or $normalizedLocation -notlike "*$($result.cache_dir)*") {
         throw "sccache server did not bind the managed cache directory. Reported: $($result.location)"
     }
     return [pscustomobject]@{
+        status = "ready"
+        reason = $null
         path = $sccache.Source
         cache_dir = $result.cache_dir
         max_cache_size = $MaxCacheSize
@@ -119,6 +135,7 @@ function Restart-RustCacheSccacheServer {
         state_path = $result.state_path
         location = $result.location
         restarted = $result.restarted
+        restart_pending = $false
     }
 }
 

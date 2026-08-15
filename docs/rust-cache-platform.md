@@ -188,6 +188,11 @@ V260、V261 证据中出现的 `target-v260-linux-musl`、`target-v261-linux-mus
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 install
 ```
 
+安装器始终先更新机器缓存根中的平台脚本。若此时存在 Cargo/rustc 写入者，SCCache
+配置会写入 `state/sccache-sync.json` 并返回 `status=deferred`，安装本身仍然成功；
+后续平台构建在空闲窗口自动重试重载。只有 `install -Apply` 修改 Cargo 父配置时才会
+因活动写入者失败关闭，避免把配置切换和普通平台升级混为一件事。
+
 确认预览后激活父级 Cargo 配置：
 
 ```powershell

@@ -104,6 +104,9 @@ switch ($Command) {
         $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -ActivateCargoConfig:$Apply -ConfigureSccacheServer -ResetCargoSourcePolicy:$ResetCargoSourcePolicy
         Write-Host "Installed Rust cache platform: $($result.entry_path)" -ForegroundColor Green
         Write-Host "Cargo include: $($result.cargo_include_path)"
+        if ($result.sccache_server -and $result.sccache_server.status -eq "deferred") {
+            Write-Warning "SCCache reload is pending until Cargo/rustc becomes idle: $($result.sccache_server.state_path)"
+        }
         if (-not $Apply) {
             Write-Host "Cargo parent config was not changed. Re-run install with -Apply to activate it." -ForegroundColor Yellow
         }
