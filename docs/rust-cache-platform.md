@@ -1,6 +1,6 @@
 # Windows 多项目 Rust 编译缓存平台
 
-最后更新：2026-08-15
+最后更新：2026-08-16
 
 ## 目标
 
@@ -18,6 +18,11 @@
 `manage-shared-build-cache` Skill 只指导 AI 正确调用工具。远程 PC 不共享本机目录；每台电脑维护自己的缓存根，
 通过 Git 中相同的项目清单和平台源码指纹获得一致的路由规则。
 
+安装器还会在 `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1` 写入固定的用户级启动器。
+启动器只转发到该电脑当前安装的 `platform/rust-cache.ps1`，不复制缓存逻辑、不启动新的可见
+PowerShell 窗口，也不要求子项目知道缓存位于 C 盘、D 盘或节点数据根。这样不含平台源码的
+子项目也能使用同一入口；`doctor` 会校验启动器是否缺失、过期或指向错误安装。
+
 新电脑先从权威仓库运行只读诊断，再安装或升级：
 
 ```powershell
@@ -25,6 +30,18 @@
 & .\scripts\rust-cache.ps1 install -ProjectRoot . -Apply -InstallCodexSkill
 & .\scripts\rust-cache.ps1 doctor -ProjectRoot .
 ```
+
+安装后，任意子项目可使用固定入口：
+
+```powershell
+& "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" doctor -ProjectRoot D:\work\sample
+& "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" run -ProjectRoot D:\work\sample -- check --locked
+```
+
+不同 PC 只共享 Git 中的 `rust-cache.project.json`、平台版本和 Skill 版本，不共享物理目录。
+每台 PC 独立安装、独立选择缓存盘并持有本机锁。中央节点可以汇总只读 `doctor/status` 结果，
+但 `gc -Apply`、legacy purge、Cargo 父配置激活与缓存迁移必须在目标机器上按预演报告执行，
+避免远程控制面绕过活动构建和本机所有权证据。
 
 `doctor` 不创建目录、不初始化策略、不删除数据。安装会写入
 `platform/platform-install.json`，记录平台源码和已安装文件指纹；不同电脑可据此识别漏装、版本漂移或本地文件被修改。

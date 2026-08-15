@@ -31,6 +31,7 @@ param(
     [string]$UnknownDomainFallback = "agent-validation",
     [string[]]$SharedPartitionDomain = @(),
     [string]$CodexSkillsRoot,
+    [string]$UserLauncherPath,
     [switch]$Retired,
     [switch]$Apply,
     [switch]$ForceAged,
@@ -55,6 +56,7 @@ Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
@@ -96,7 +98,7 @@ switch ($Command) {
     }
     "doctor" {
         $sourceSkillRoot = Join-Path (Split-Path $scriptsRoot -Parent) ".agents\skills\manage-shared-build-cache"
-        $doctor = Get-RustCacheDoctor -ProjectRoot $ProjectRoot -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot
+        $doctor = Get-RustCacheDoctor -ProjectRoot $ProjectRoot -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot -UserLauncherPath $UserLauncherPath
         Write-Host "Rust cache doctor: $($doctor.status)" -ForegroundColor $(if ($doctor.healthy) { "Green" } else { "Yellow" })
         $doctor.checks | Format-Table status, id, message, remediation -Wrap -AutoSize
         $doctor
@@ -124,8 +126,9 @@ switch ($Command) {
             $CargoConfigPath = Get-RustCacheDefaultCargoConfigPath
         }
         $sourceSkillRoot = Join-Path (Split-Path $scriptsRoot -Parent) ".agents\skills\manage-shared-build-cache"
-        $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot -ActivateCargoConfig:$Apply -InstallCodexSkill:$InstallCodexSkill -ConfigureSccacheServer -ResetCargoSourcePolicy:$ResetCargoSourcePolicy
+        $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot -UserLauncherPath $UserLauncherPath -ActivateCargoConfig:$Apply -InstallCodexSkill:$InstallCodexSkill -ConfigureSccacheServer -ResetCargoSourcePolicy:$ResetCargoSourcePolicy
         Write-Host "Installed Rust cache platform: $($result.entry_path)" -ForegroundColor Green
+        Write-Host "Portable user launcher: $($result.user_launcher.path)"
         Write-Host "Cargo include: $($result.cargo_include_path)"
         Write-Host "Platform manifest: $($result.platform_manifest_path)"
         Write-Host "Source hash: $($result.source_hash)"

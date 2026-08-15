@@ -188,7 +188,7 @@ function Get-RustCachePartitions {
 
 function Add-RustCacheSharedPartitionGovernance {
     param(
-        [Parameter(Mandatory)][object[]]$Partitions,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Partitions,
         [Parameter(Mandatory)][string]$CacheRoot,
         [AllowNull()]$ProjectManifest
     )

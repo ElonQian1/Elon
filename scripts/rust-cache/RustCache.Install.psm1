@@ -2,6 +2,7 @@ Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 
 function ConvertTo-RustCacheTomlPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -259,6 +260,7 @@ function Install-RustCachePlatform {
         [string]$CargoConfigPath,
         [string]$SourceSkillRoot,
         [string]$CodexSkillsRoot,
+        [string]$UserLauncherPath,
         [int]$InstallLockTimeoutSeconds = 120,
         [switch]$ActivateCargoConfig,
         [switch]$InstallCodexSkill,
@@ -291,6 +293,7 @@ function Install-RustCachePlatform {
         Get-ChildItem -LiteralPath $sourceModules -File | ForEach-Object {
             Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $targetModules $_.Name) -Force
         }
+        $userLauncher = Install-RustCacheUserLauncher -CacheRoot $root -UserLauncherPath $UserLauncherPath
 
     $sccache = Get-Command sccache -ErrorAction SilentlyContinue
     $policy = Get-RustCachePolicy -CacheRoot $root
@@ -343,6 +346,7 @@ function Install-RustCachePlatform {
             source_hash = $sourceFingerprint.hash
             installed_hash = $installedFingerprint.hash
             codex_skill = $codexSkill
+            user_launcher = $userLauncher
         }
     } finally {
         Exit-RustCachePlatformInstallLock -Lease $installLease

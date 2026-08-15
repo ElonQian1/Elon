@@ -5,10 +5,12 @@ $ErrorActionPreference = "Stop"
 $modulesRoot = Join-Path $PSScriptRoot "rust-cache"
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to the owner. Re-import public test surfaces last.
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 
 $script:Assertions = 0
 function Assert-True {
@@ -27,6 +29,7 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("rust-cache-portability
 $projectRoot = Join-Path $tempRoot "project"
 $cacheRoot = Join-Path $tempRoot "cache"
 $codexSkillsRoot = Join-Path $tempRoot "codex-skills"
+$userLauncherPath = Join-Path $tempRoot "user-bin\rust-cache.ps1"
 New-Item -ItemType Directory -Force -Path $projectRoot | Out-Null
 
 try {
@@ -64,6 +67,12 @@ try {
     $installManifestPath = Write-RustCachePlatformInstallManifest -CacheRoot $cacheRoot -SourceFingerprint $sourceFingerprint -InstalledFingerprint $installedFingerprint
     Assert-True (Test-Path -LiteralPath $installManifestPath) "platform installation should record a manifest"
     Assert-Equal $sourceFingerprint.hash (Read-RustCachePlatformInstallManifest -CacheRoot $cacheRoot).source_hash "platform source fingerprint"
+    $userLauncher = Install-RustCacheUserLauncher -CacheRoot $cacheRoot -UserLauncherPath $userLauncherPath
+    Assert-Equal $userLauncherPath $userLauncher.path "portable launcher path"
+    Assert-True (Test-Path -LiteralPath $userLauncher.path) "portable launcher should be installed"
+    Assert-Equal "healthy" (Test-RustCacheUserLauncher -CacheRoot $cacheRoot -UserLauncherPath $userLauncherPath).status "portable launcher integrity"
+    $launcherResult = & $userLauncher.path init-project -ProjectRoot $projectRoot -ProjectId "portable-test" -AllowedDomain @("dev-windows-msvc", "agent-validation") -SharedPartitionDomain @("validation-light=agent-validation") -Apply
+    Assert-Equal "unchanged" $launcherResult.action "portable launcher should invoke the installed platform"
 
     $includePath = Join-Path $cacheRoot "config\cargo-cache.toml"
     New-Item -ItemType Directory -Force -Path (Split-Path $includePath -Parent) | Out-Null
@@ -77,22 +86,32 @@ try {
     $skillInstall = Install-RustCacheCodexSkill -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot
     Assert-True (Test-Path -LiteralPath (Join-Path $skillInstall.path "SKILL.md")) "skill installer should copy SKILL.md"
     Assert-True (Test-Path -LiteralPath $skillInstall.marker_path) "skill installer should record provenance"
-    $doctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot
+    $doctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot -UserLauncherPath $userLauncherPath
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "project-manifest").status "doctor project manifest check"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "platform-install").status "doctor platform install check"
     Assert-True (-not $doctor.destructive_actions_taken) "doctor must be read-only"
     Assert-True (-not (Test-Path -LiteralPath $policyPath)) "doctor must not initialize policy state"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "platform-version").status "doctor platform version check"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "codex-skill").status "doctor skill version check"
-    $installedDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $platformRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig
+    Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "user-launcher").status "doctor portable launcher check"
+    $installedDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $platformRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath
     Assert-Equal "installed" $installedDoctor.source_mode "installed entry doctor mode"
     Assert-Equal "warn" ($installedDoctor.checks | Where-Object id -eq "platform-version").status "installed entry should defer source freshness"
     Assert-Equal "pass" ($installedDoctor.checks | Where-Object id -eq "platform-integrity").status "installed entry integrity check"
 
+    Add-Content -LiteralPath $userLauncherPath -Value "# stale"
+    $staleLauncherDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath
+    Assert-Equal "fail" ($staleLauncherDoctor.checks | Where-Object id -eq "user-launcher").status "doctor stale launcher check"
+    Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
+    Install-RustCacheUserLauncher -CacheRoot $cacheRoot -UserLauncherPath $userLauncherPath | Out-Null
+
     Add-Content -LiteralPath (Join-Path $targetModules "RustCache.Portability.psm1") -Value "# tampered"
-    $tampered = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig
+    $tampered = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath
     Assert-True (-not $tampered.healthy) "doctor should reject changed installed files"
     Assert-Equal "fail" ($tampered.checks | Where-Object id -eq "platform-integrity").status "doctor integrity check"
+
+    $launcherStatus = & $userLauncherPath status -ProjectRoot $projectRoot -CacheRoot $cacheRoot
+    Assert-Equal 0 $launcherStatus.partition_count "fresh installs should report an empty managed inventory"
 
     Write-Host "PASS: Rust cache portability tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {

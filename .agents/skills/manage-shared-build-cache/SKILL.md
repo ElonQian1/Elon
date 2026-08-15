@@ -10,9 +10,10 @@ Use the repository cache tool as the source of truth. Do not reproduce cache rou
 ## Locate The Tool
 
 1. Prefer `<project>/scripts/rust-cache.ps1` when it exists.
-2. Otherwise use `$env:ELON_RUST_CACHE_ROOT/platform/rust-cache.ps1`.
-3. If neither exists, obtain a current trusted checkout of the platform repository and run its installer.
-4. Invoke the script directly from the current PowerShell session. Do not open nested visible `powershell.exe` or `pwsh.exe` windows.
+2. Otherwise use `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1`, the stable per-user launcher written by the installer.
+3. If the launcher is absent but `ELON_RUST_CACHE_ROOT` is set, use `$env:ELON_RUST_CACHE_ROOT/platform/rust-cache.ps1` and repair the launcher with a current installer.
+4. If none exists, obtain a current trusted checkout of the platform repository and run its installer.
+5. Invoke the script directly from the current PowerShell session. Do not open nested visible `powershell.exe` or `pwsh.exe` windows.
 
 ## Diagnose First
 
@@ -45,7 +46,16 @@ From a current trusted platform checkout, run:
 ```
 
 The installer writes a source fingerprint. Re-run it when `doctor` reports platform drift. Installing the Codex skill is per user and per PC; project manifests remain portable Git files.
+The installer also writes `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1`. Child repositories call this launcher instead of copying platform modules or hard-coding a machine cache root.
 The installer serializes upgrades on each PC. Wait for the current installer instead of copying platform files manually.
+
+## Use Across A PC Fleet
+
+- Install or upgrade the platform and Skill independently on every PC from the same trusted Git revision.
+- Commit only `rust-cache.project.json` and thin project wrappers. Do not commit cache roots, launcher targets, user profiles, or node data paths.
+- Let Git distribute project identity and domain policy; let each PC choose its own physical cache volume.
+- Run `doctor` on each PC before accepting a long build. A healthy PC must report matching source/install fingerprints and a healthy user launcher.
+- Central dashboards may collect read-only doctor/status reports. GC `-Apply`, Cargo parent-config activation, legacy purge, and cache migration remain machine-local reviewed operations.
 
 ## Run Builds
 

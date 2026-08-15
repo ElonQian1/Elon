@@ -504,8 +504,10 @@ retry = 3
     Assert-True $concurrentInstallRejected "concurrent platform installation must fail closed on the same PC"
     Exit-RustCachePlatformInstallLock -Lease $installLock
 
-    $install = Install-RustCachePlatform -SourceScriptsRoot $PSScriptRoot -CacheRoot (Join-Path $TempRoot "installed") -RepoRoot $ProjectRoot
+    $install = Install-RustCachePlatform -SourceScriptsRoot $PSScriptRoot -CacheRoot (Join-Path $TempRoot "installed") -RepoRoot $ProjectRoot -UserLauncherPath (Join-Path $TempRoot "user-bin\rust-cache.ps1")
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
+    Assert-True (Test-Path -LiteralPath $install.user_launcher.path) "installer should write the stable per-user launcher"
+    Assert-Equal $install.entry_path $install.user_launcher.entry_path "user launcher should target the installed platform entry"
     Assert-True (Test-Path -LiteralPath $install.platform_manifest_path) "installer should record a portable platform manifest"
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$install.source_hash)) "installer should report its source fingerprint"
     $installedCommand = Get-Command -Name $install.entry_path -ErrorAction Stop

@@ -80,6 +80,8 @@ implementation_refs:
 推荐用统一入口完成项目登记，而不是手写 JSON：先运行 `rust-cache.ps1 init-project` 预览，
 确认项目 ID、允许域和命名共享分区后再追加 `-Apply`。接入前后均运行 `doctor`；
 若它报告安装指纹漂移，先从当前权威仓库重新 `install`，不要让各项目复制缓存实现。
+没有平台源码的子项目使用 `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1`；该固定启动器由安装器
+维护并由 `doctor` 校验，项目不得提交指向某台电脑缓存根的替代脚本。
 
 默认入口保持 workspace 隔离：
 

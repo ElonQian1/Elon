@@ -1,5 +1,6 @@
 Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 
 function Get-RustCacheTextHash {
     param([Parameter(Mandatory)][string]$Text)
@@ -123,7 +124,7 @@ function New-RustCacheProjectManifest {
 
     $mappingValues = @{}
     foreach ($item in @($SharedPartitionDomains)) {
-        $parts = ([string]$item).Split(@('='), 2)
+        $parts = @(([string]$item) -split '=', 2)
         if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
             throw "SharedPartitionDomain must use partition=domain syntax: $item"
         }
@@ -258,7 +259,8 @@ function Get-RustCacheDoctor {
         [string]$CacheRoot,
         [string]$CargoConfigPath,
         [string]$SourceSkillRoot,
-        [string]$CodexSkillsRoot
+        [string]$CodexSkillsRoot,
+        [string]$UserLauncherPath
     )
 
     $project = [System.IO.Path]::GetFullPath($ProjectRoot)
@@ -340,6 +342,13 @@ function Get-RustCacheDoctor {
         $checks.Add((New-RustCacheDoctorCheck "cargo-activation" "warn" "User Cargo config does not exist: $cargoConfig" "Run install with -Apply to create and activate it."))
     }
 
+    $launcher = Test-RustCacheUserLauncher -CacheRoot $root -UserLauncherPath $UserLauncherPath
+    if ($launcher.healthy) {
+        $checks.Add((New-RustCacheDoctorCheck "user-launcher" "pass" "Portable user launcher points to this installed cache platform." $null))
+    } else {
+        $checks.Add((New-RustCacheDoctorCheck "user-launcher" "fail" "Portable user launcher is $($launcher.status): $($launcher.path)" "Re-run install from a trusted current checkout."))
+    }
+
     $drive = New-Object System.IO.DriveInfo ([System.IO.Path]::GetPathRoot($root))
     $freePercent = if ($drive.TotalSize -gt 0) { [math]::Round(100 * $drive.AvailableFreeSpace / $drive.TotalSize, 2) } else { 0 }
     $policyPath = Get-RustCachePolicyPath -CacheRoot $root
@@ -387,6 +396,7 @@ function Get-RustCacheDoctor {
         cargo_config_path = $cargoConfig
         source_hash = $sourceFingerprint.hash
         source_mode = if ($sourceIsInstalledEntry) { "installed" } else { "repository" }
+        user_launcher_path = $launcher.path
         checks = @($checks | ForEach-Object { $_ })
         active_writers = $writers
         destructive_actions_taken = $false
