@@ -136,6 +136,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-cross.ps1 -- `
 `.ai-tmp/cargo-cross-target/<target>`，可从 WSL 的 `/mnt/<drive>/...` 运行，并随任务
 统一收尾清理。只想检查路由时使用 `-PlanOnly`，不会创建目录或启动 Cargo。
 
+极少数隔离测试确实不能使用 D 盘受管共享缓存时，不得再手工创建 `%TEMP%` 下的
+Cargo home、cache 或 target。先使用预检输出的不可变 `TaskContract` 分配任务资产：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\new-ai-task-rust-scratch.ps1 `
+  -TaskWorktree $env:EDIT_ROOT -TaskContract <preflight-contract> -Purpose isolated-check
+```
+
+入口只在 `%TEMP%\elon-ai-task-rust-v1` 下创建带本机所有权标记的独立 `cache` 和
+`target`。`finish-ai-task.ps1` 验证同一合同后精确回收；其他合同、历史目录、未知成员、
+标记漂移和重解析点均不会被删除。`-SkipArtifactCleanup` 会明确保留这些目录。该路径是
+任务级逃生舱，不替代 `rust-cache.ps1`、`cargo-dev.ps1` 和稳定共享分区。
+
 V260、V261 证据中出现的 `target-v260-linux-musl`、`target-v261-linux-musl` 与 WSL
 `/tmp/elon-v*-target` 是历史执行路径，不是后续模板。现存外部 target 不会被平台
 自动删除；先用 `register-legacy -Retired` 登记，再用 `purge-legacy` 预演和显式回收。

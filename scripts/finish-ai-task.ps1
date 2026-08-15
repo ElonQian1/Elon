@@ -39,6 +39,7 @@ $taskWorktreeStatus = "not_checked"
 $taskWorktreeLeaseStatus = "not_checked"
 
 . (Join-Path $PSScriptRoot 'ai-task-finish-contract.ps1')
+. (Join-Path $PSScriptRoot 'ai-task-external-artifacts.ps1')
 . (Join-Path $PSScriptRoot 'ai-task-terminal-finalization.ps1')
 
 function Invoke-NativeCapture {
@@ -315,6 +316,13 @@ try {
     }
 
     Clear-DeclaredTemporaryRoots -RepoPath $taskRoot -Policy $policy -Label "task"
+    if ($null -ne $validatedContract) {
+        $null = Clear-AiTaskRustScratch `
+            -RepoPath $taskRoot `
+            -ContractId $TaskContract `
+            -ValidatedContract $validatedContract `
+            -Skip:$SkipArtifactCleanup
+    }
     $taskStatus = @(Get-StatusLines -RepoPath $taskRoot)
     if ($taskStatus.Count -gt 0) {
         Write-Host "TASK_WORKTREE_STATUS=dirty"

@@ -8,6 +8,7 @@ $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $appUiTaskPushScopeScript = Join-Path $repoRoot "scripts\app-ui-task-push-scope.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
+$externalArtifactScript = Join-Path $repoRoot "scripts\ai-task-external-artifacts.ps1"
 $gitPathResolutionScript = Join-Path $repoRoot "scripts\git-path-resolution.ps1"
 $terminalFinalizationScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization.ps1"
 $terminalFinalizationReceiptScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization-receipt.ps1"
@@ -164,6 +165,9 @@ function Invoke-Finish {
 $tempBase = [System.IO.Path]::GetTempPath()
 $testRoot = Join-Path $tempBase ("elon-finish-workflow-test-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
+$previousExternalScratchRoot = $env:ELON_AI_TASK_RUST_SCRATCH_ROOT
+$externalScratchRoot = Join-Path $testRoot 'external-rust-scratch'
+$env:ELON_AI_TASK_RUST_SCRATCH_ROOT = $externalScratchRoot
 
 try {
     $originPath = Join-Path $testRoot "origin.git"
@@ -188,6 +192,7 @@ try {
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $mainRepo "scripts\direct-network.ps1")
     Copy-Item -LiteralPath $appUiTaskPushScopeScript -Destination (Join-Path $mainRepo "scripts\app-ui-task-push-scope.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $mainRepo "scripts\ai-task-finish-contract.ps1")
+    Copy-Item -LiteralPath $externalArtifactScript -Destination (Join-Path $mainRepo "scripts\ai-task-external-artifacts.ps1")
     Copy-Item -LiteralPath $gitPathResolutionScript -Destination (Join-Path $mainRepo "scripts\git-path-resolution.ps1")
     Copy-Item -LiteralPath $terminalFinalizationScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization.ps1")
     Copy-Item -LiteralPath $terminalFinalizationReceiptScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization-receipt.ps1")
@@ -244,14 +249,30 @@ try {
     if ($beforeMain -eq $originMain) { throw "Fixture main must start behind origin/main." }
 
     . (Join-Path $taskWorktree 'scripts\ai-task-finish-contract.ps1')
+    . (Join-Path $taskWorktree 'scripts\ai-task-external-artifacts.ps1')
     $taskContractId = New-AiTaskFinishContract -RepoPath $taskWorktree
+    $taskRustScratch = New-AiTaskRustScratch -RepoPath $taskWorktree `
+        -ContractId $taskContractId -Purpose 'finish-fixture'
+    $unknownScratch = Join-Path $externalScratchRoot 'historical-unknown'
+    New-Item -ItemType Directory -Path $unknownScratch -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $unknownScratch 'owner-required.txt') -Value 'preserve' -Encoding UTF8
+    if (-not (Test-Path -LiteralPath $taskRustScratch.scratch_path -PathType Container)) {
+        throw 'Finish fixture failed to allocate task-owned Rust scratch.'
+    }
     $missingContractOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure -NoLegacy
     Assert-Contains $missingContractOutput 'requires the immutable TaskContract' 'Managed task finish must fail closed without its preflight contract.'
     $successOutput = Invoke-Finish -WorktreePath $taskWorktree -ContractId $taskContractId
     Assert-Contains $successOutput "FINISH_CONTRACT_STATUS=validated:$taskContractId" "Finish must validate the exact preflight contract."
+    Assert-Contains $successOutput "EXTERNAL_RUST_SCRATCH_CLEANUP=removed:1" "Finish must clean only its task-owned Rust scratch."
     Assert-Contains $successOutput "LOCAL_MAIN_STATUS=current:" "Finish must report a current main baseline."
     Assert-Contains $successOutput "MAIN_UNTRACKED_STATUS_PATH=legacy-test.rs|candidate_track" "Finish must classify source-looking untracked files without mutating them."
     Assert-Contains $successOutput "FINALIZABLE=true" "Finish must allow final reporting after main is safely synchronized."
+    if (Test-Path -LiteralPath $taskRustScratch.scratch_path) {
+        throw 'Unified finish left task-owned Rust scratch behind.'
+    }
+    if (-not (Test-Path -LiteralPath $unknownScratch -PathType Container)) {
+        throw 'Unified finish removed unknown adjacent Rust scratch.'
+    }
 
     $afterMain = Invoke-Git $mainRepo @("rev-parse", "HEAD")
     $originMain = Invoke-Git $mainRepo @("rev-parse", "origin/main")
@@ -548,6 +569,11 @@ try {
 
     Write-Host "PASS ai-task-finish workflow guard"
 } finally {
+    if ($null -eq $previousExternalScratchRoot) {
+        Remove-Item Env:ELON_AI_TASK_RUST_SCRATCH_ROOT -ErrorAction SilentlyContinue
+    } else {
+        $env:ELON_AI_TASK_RUST_SCRATCH_ROOT = $previousExternalScratchRoot
+    }
     if (-not [string]::IsNullOrWhiteSpace([string]$platformReceiptPath) -and
         (Test-Path -LiteralPath $platformReceiptPath -PathType Leaf)) {
         Remove-Item -LiteralPath $platformReceiptPath -Force

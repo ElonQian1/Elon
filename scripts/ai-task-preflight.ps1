@@ -157,6 +157,7 @@ function Write-AiWorkflowGuard {
     Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
     Write-Host "RULE_OUTPUT=long build/test/publish commands must use scripts\invoke-ai-logged-command.ps1 with -RequireOutput and a bounded -StallTimeoutSeconds; never accept empty successful logs or stream full successful output into AI context."
     Write-Host "RULE_RESUME=after an interrupted logged command, run scripts\get-ai-command-status.ps1 -LogName <name>; never launch a duplicate while status is running."
+    Write-Host "RULE_EXTERNAL_RUST_SCRATCH=ordinary Rust builds must use the managed D-drive cache entry points; if isolated temp cache/target is unavoidable, allocate it with scripts\new-ai-task-rust-scratch.ps1 and the emitted TaskContract, never hand-create a %TEMP% Rust cache."
     Write-Host "RULE_BEFORE_COMMIT=run scripts\check-source-size.ps1 and scripts\check-document-modularity.ps1 before git commit; pre-commit/pre-push repeat the document guard."
     Write-Host "RULE_PUSH=after commit run powershell -NoProfile -ExecutionPolicy Bypass -File scripts\direct-network.ps1 push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
     $contractId = ''

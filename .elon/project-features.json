@@ -2,6 +2,161 @@
   "version": 1,
   "features": [
     {
+      "id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "title": "AI 任务外部 Rust scratch 生命周期 V1",
+      "summary": "把确需隔离的 Windows Rust cache/target 精确绑定不可变 TaskContract，并由统一收尾只回收本任务标记目录；未知和历史缓存保持不动。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/ai-task-external-rust-scratch-lifecycle-v1.md",
+        "content_hash": "215223f1b85f224c0c08aec3de43c50324f8980789ebd515e73bd49299ffcc37",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f7c6b14a9dc35ba281cdf0d1d4592c32639bea15",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "developer-platform",
+      "tags": [
+        "workflow",
+        "rust-cache",
+        "operations",
+        "windows",
+        "p1"
+      ],
+      "task_paths": [
+        "docs/rust-cache-platform.md",
+        "scripts/ai-task-external-artifacts.ps1",
+        "scripts/ai-task-preflight.ps1",
+        "scripts/finish-ai-task.ps1",
+        "scripts/new-ai-task-rust-scratch.ps1",
+        "scripts/test-ai-task-external-artifacts.ps1",
+        "scripts/test-ai-task-finish-workflow.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "有效 TaskContract 分配唯一 cache/target scratch，错误合同、工作树、purpose 和路径失败关闭。",
+        "统一收尾只删除本合同标记 scratch，保留其他合同和未知目录。",
+        "标记漂移、重解析点、越界和未知顶层成员阻止自动删除。",
+        "SkipArtifactCleanup 显式保留，普通成功收尾在 FINALIZABLE=true 前完成回收。",
+        "预检输出禁止手工任务专属 Temp Rust target，并路由到统一分配入口。",
+        "专项、统一收尾、Prompt 审计、体积和文档门禁通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/rust-cache-platform.md",
+          "content_hash": "ba533c7fb3aed3012c0345759cca7acd5df4edf69bce17309513be4b72e82f47",
+          "locator": "极少数隔离测试",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "08d0fce2ee56ac1c7b9a5b1b37fdc554f2a0562b",
+            "worktree_blob_oid": "036e75ba19633fcabe8d4fb670d42bc3e126ee96",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/ai-task-external-artifacts.ps1",
+          "content_hash": "4a2bb97806bb9c31ec6608b966c34edfc146814a7613e9ca7a3503ad01dbdef0",
+          "locator": "New-AiTaskRustScratch; Clear-AiTaskRustScratch",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6f5dcfed54b667f8613ffd76574bec7b531b7b55",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/ai-task-preflight.ps1",
+          "content_hash": "e2395f05dc5777f73bd97695a347a68b954a6a62b5812d60e14e7ecfa9b3bd9d",
+          "locator": "RULE_EXTERNAL_RUST_SCRATCH",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "1dca7dae7d073559e823414a7407dc06541a0786",
+            "worktree_blob_oid": "74e9c45dcbc60fe5577a8c4d503fa2438604dcb3",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/finish-ai-task.ps1",
+          "content_hash": "a897125d9f315438efe70cc24e3154627873b537cc36d72e1064bd3d334ea086",
+          "locator": "Clear-AiTaskRustScratch",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "e29785fc36f27ef954a448e67ef89c7366b45817",
+            "worktree_blob_oid": "d4a218a622864c726efac57d826667fdd2e03aaa",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/new-ai-task-rust-scratch.ps1",
+          "content_hash": "3a5da59b1565eb68357835275dff3bd0ffd6474c7ce58f0a75d9776e6d2ddea0",
+          "locator": "AI_TASK_RUST_SCRATCH; ELON_RUST_CACHE_ROOT; CARGO_TARGET_DIR",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d24b83c60a4b60f729647c532b9f58bbbd6b6f91",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-ai-task-external-artifacts.ps1",
+          "content_hash": "164a2fd1d91f2a35b0b2ce6868c24faf403bad4ddf837d87161bc5b79546e84f",
+          "locator": "PASS ai-task external Rust scratch lifecycle",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2884854ae1088706640ac8e56e4b55bd4f1976ff",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-ai-task-finish-workflow.ps1",
+          "content_hash": "9738d00eb4aec6b0453746648baf56b54f5957f54b67c86fbe9ee5c5b63063f8",
+          "locator": "EXTERNAL_RUST_SCRATCH_CLEANUP=removed:1",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "e5df31ce1de47662df443f93c55b44a7c32c897f",
+            "worktree_blob_oid": "b51b883e5d87b7a055e43caa4372ac7f27dd6e31",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-ai-task-preflight-workflow.ps1",
+          "content_hash": "bc36531a01bde3c04c367567495c24b2834f832439d2301edbe6c894c888430d",
+          "locator": "AI task external artifact lifecycle guard",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dac716a8e30d474c260a8bc294853dffb73f9fec",
+            "head_blob_oid": "cff5e60afe14477c80e3be34eeb94305864bd2d7",
+            "worktree_blob_oid": "fcd9fb055d20b2c4a6629586ebe45c15eae65b46",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1786754525015,
+      "updated_at_ms": 1786755938481
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -3933,126 +4088,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_80624aa3f3244b22a823c6963b04a339",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "metadata_updated",
-      "actor": "codex-goal-019f3b86",
-      "reason": "纳入仍引用 v234 passed=0 的市场边界文档，统一消除状态矛盾",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1786640151210
-    },
-    {
-      "id": "feature_event_7a23fc5c466a49cd96ec586bfa050c12",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "新增市场边界文档仅用于同步同一验收事实，功能边界与验收标准不变",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786640164949
-    },
-    {
-      "id": "feature_event_df7aaa7021c24bafb72af688c7daf517",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "更新后的文档范围已评审可执行",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786640165026
-    },
-    {
-      "id": "feature_event_fd9d5e5ff347487b8da915d1144ea294",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786640165037
-    },
-    {
-      "id": "feature_event_e603a1df97b7411bab06e1375d6fc24e",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "范围更新后继续同步验证事实",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786640178710
-    },
-    {
-      "id": "feature_event_66944e89a0be4384b4e4502fec0ac8e4",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claim_released",
-      "actor": "codex-goal-019f3b86",
-      "reason": "真实过滤器暴露共享测试夹具时间精度漂移，扩展受控修复路径",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786641171536
-    },
-    {
-      "id": "feature_event_b6e1e6db0100459d8c645bc243e53311",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-019f3b86",
-      "reason": "绑定本次本地验收结果与未验收边界更新后的权威文档",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786641202289
-    },
-    {
-      "id": "feature_event_9c83b35187b044e896f9c32c3ad9bbf6",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "metadata_updated",
-      "actor": "codex-goal-019f3b86",
-      "reason": "纳入共享测试夹具，修复 V238 canonical UTC nanoseconds 合同漂移后复验 V234",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1786641218106
-    },
-    {
-      "id": "feature_event_7ad036f72f484aa7b1e074112a3f8097",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "metadata_updated",
-      "actor": "codex-goal-019f3b86",
-      "reason": "真实回归定位到交付窗口首次落库规范化与 V238 固定纳秒合同不一致，纳入最早权威边界修复",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1786641372928
-    },
-    {
-      "id": "feature_event_efa5651512874b91afe20ebf7e0baa33",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "评审确认修复位于交付窗口首次落库权威边界，保持原验收和经济边界",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786641401891
-    },
-    {
-      "id": "feature_event_3c055bf44be2465ab89c9ebefd96daf8",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "更新后的跨版本时间合同可执行",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786641401966
-    },
-    {
-      "id": "feature_event_76c379ff2955409bac2614ae9990aa97",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786641401978
-    },
-    {
       "id": "feature_event_5ad80a5a02d1449f8ee4309832c3286a",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
       "action": "transitioned",
@@ -5931,6 +5966,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786753990538
+    },
+    {
+      "id": "feature_event_04e504e9a46344b6a68fba13e42a1c3c",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "当前系统盘存在多份历史任务专属 Rust cache；现有共享缓存和仓库内临时根不能安全认领这些外部目录。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1786754525015
+    },
+    {
+      "id": "feature_event_26a3c9e4bce54323ad021530dcf1039a",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "需求、边界、验收与非目标已冻结，可在独立 workflow 模块内实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786754535609
+    },
+    {
+      "id": "feature_event_bcd0ff91d4124c7885d62174e4f715ae",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019feb34",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786754549409
+    },
+    {
+      "id": "feature_event_0ad1b7800403493fbe8ce8121e5f6135",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "开始实现合同绑定分配器、统一收尾回收与安全测试。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786754563090
+    },
+    {
+      "id": "feature_event_0083d9181e2b45c1a12c796686b72498",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "claim_released",
+      "actor": "codex-goal-019feb34",
+      "reason": "Requirement clarification changed the bound hash; release the claim before explicit rebind and review.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786755811441
+    },
+    {
+      "id": "feature_event_bad1a6303050494fad2f2cae99370d69",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-019feb34",
+      "reason": "Bind the reviewed wording that keeps absolute allocator assignments terminal-local and finish logs path-bounded.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786755825986
+    },
+    {
+      "id": "feature_event_289d36803a5d4984bcbc30dca9eb3adf",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "Reviewed requirement wording and confirmed the frozen ownership and cleanup boundaries.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786755852650
+    },
+    {
+      "id": "feature_event_f61cccf555484a5e918e673a40189f77",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "Dependencies are empty and task paths plus acceptance criteria are implementation-ready.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786755852722
+    },
+    {
+      "id": "feature_event_f44aae83f8b24dbca9b392986c8dc3ce",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019feb34",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786755852814
+    },
+    {
+      "id": "feature_event_552497877a0c40d4adec67d7e8b3568f",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "Implementation, targeted tests, workflow gates, and documentation are now being evidence-bound.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786755852889
+    },
+    {
+      "id": "feature_event_9261a73cdc9b42588fd604297659505a",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019feb34",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786755911068
+    },
+    {
+      "id": "feature_event_d7ec565d568545eea5ff1930b5a3be38",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "Task-owned allocator, two-phase fail-closed cleanup, unified finish integration, isolated tests, workflow gates, and operator documentation are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786755938481
     }
   ]
 }

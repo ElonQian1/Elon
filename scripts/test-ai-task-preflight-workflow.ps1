@@ -60,6 +60,7 @@ Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight
 Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
 Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
 Assert-Contains $preflightContent "RULE_OUTPUT=" "PowerShell preflight must expose the bounded AI output rule."
+Assert-Contains $preflightContent "RULE_EXTERNAL_RUST_SCRATCH=" "PowerShell preflight must expose the task-owned external Rust scratch rule."
 Assert-Contains $preflightContent "-RequireOutput" "PowerShell preflight must reject silent long-command success."
 Assert-Contains $preflightContent "-StallTimeoutSeconds" "PowerShell preflight must require a bounded no-progress timeout."
 Assert-Contains $preflightContent "get-ai-command-status.ps1" "PowerShell preflight must require interrupted-command recovery inspection."
@@ -443,6 +444,20 @@ try {
             Write-Warning "Skip cleanup for unexpected test path: $resolvedPath"
         }
     }
+}
+
+$externalArtifactTest = Join-Path $repoRoot "scripts\test-ai-task-external-artifacts.ps1"
+$oldPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $externalArtifactOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $externalArtifactTest 2>&1
+    $externalArtifactExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $oldPreference
+}
+$externalArtifactOutput | ForEach-Object { Write-Host ([string]$_) }
+if ($externalArtifactExitCode -ne 0) {
+    throw "AI task external artifact lifecycle guard failed."
 }
 
 $finishWorkflowTest = Join-Path $repoRoot "scripts\test-ai-task-finish-workflow.ps1"
