@@ -13,6 +13,51 @@ assert.equal(policy.accepts({
 
 assert.equal(policy.accepts({
   hasQuery: true,
+  text: '5',
+  textLength: 1,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
+  explicit: false,
+}), true)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '5',
+  textLength: 1,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: false,
+  interactive: false,
+  explicit: true,
+}), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '复制',
+  textLength: 2,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: true,
+  explicit: true,
+}), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
   textLength: 18,
   citations: 0,
   semanticBlocks: 0,

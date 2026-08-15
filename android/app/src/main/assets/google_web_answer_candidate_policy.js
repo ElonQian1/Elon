@@ -76,6 +76,12 @@
     return shareHeading && shareActions;
   }
 
+  function shortAnswerAllowed(metrics) {
+    return metrics && metrics.afterQuery === true && metrics.interactive !== true &&
+      metrics.liveRegion !== true && nonNegative(metrics.controls) === 0 &&
+      nonNegative(metrics.links) === 0 && nonNegative(metrics.tabControls) === 0;
+  }
+
   function accepts(metrics) {
     const hasQuery = metrics && metrics.hasQuery === true;
     const textLength = nonNegative(metrics && metrics.textLength);
@@ -85,10 +91,11 @@
     const tabControls = nonNegative(metrics && metrics.tabControls);
     const liveRegion = metrics && metrics.liveRegion === true;
     const explicit = metrics && metrics.explicit === true;
-    if (!hasQuery || textLength < 8) return false;
+    if (!hasQuery || textLength < 1) return false;
     if (navigationOnlyText(metrics && metrics.text)) return false;
     if (transientStatusText(metrics && metrics.text)) return false;
     if (shareSurfaceText(metrics && metrics.text)) return false;
+    if (textLength < 8) return shortAnswerAllowed(metrics);
     if (liveRegion && semanticBlocks === 0 && citations === 0) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
     if (links >= 3 && semanticBlocks === 0 && citations === 0) return false;
@@ -103,11 +110,12 @@
   }
 
   return Object.freeze({
-    version: 3,
+    version: 4,
     accepts,
     penalty,
     navigationOnlyText,
     transientStatusText,
-    shareSurfaceText
+    shareSurfaceText,
+    shortAnswerAllowed
   });
 });

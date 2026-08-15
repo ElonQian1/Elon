@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 6;
+  const extractorVersion = 7;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -118,11 +118,32 @@
     return false;
   }
 
-  function candidateFrom(node, composer, query, explicit) {
+  function followsQuery(node, queryAnchor) {
+    if (!queryAnchor || node === queryAnchor || typeof Node === 'undefined') return false;
+    return !!(queryAnchor.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  function findQueryAnchor(query) {
+    if (!query) return null;
+    const nodes = uniqueNodes([
+      'main [data-user-query]',
+      'main [data-query]',
+      'main [aria-label*="your question" i]',
+      'main [aria-label*="您的问题" i]',
+      'body div',
+      'body span',
+      'body p'
+    ]).slice(0, 2400).filter((node) =>
+      isVisible(node) && cleanText(node.innerText || node.textContent) === query
+    );
+    return nodes[nodes.length - 1] || null;
+  }
+
+  function candidateFrom(node, composer, query, queryAnchor, explicit) {
     if (excludedContainer(node, composer)) return null;
     let text = cleanText(node.innerText || node.textContent).slice(0, 40000);
     if (query && text.startsWith(query)) text = cleanText(text.slice(query.length));
-    if (text.length < 8 || text === query) return null;
+    if (!text || text === query) return null;
     const citations = citationParts(node);
     const semanticBlocks = node.querySelectorAll('p, li, blockquote, pre, table, h2, h3').length;
     const controls = node.querySelectorAll('button, [role="button"], input, textarea').length;
@@ -139,6 +160,12 @@
       links,
       tabControls,
       liveRegion,
+      controls,
+      afterQuery: followsQuery(node, queryAnchor),
+      interactive: !!node.closest(
+        'a[href], button, input, textarea, select, [role="button"], [role="link"], ' +
+        '[role="menuitem"], [role="tab"]'
+      ),
       explicit
     };
     if (candidatePolicy && !candidatePolicy.accepts(metrics)) return null;
@@ -163,6 +190,7 @@
   }
 
   function answerCandidate(composer, query) {
+    const queryAnchor = findQueryAnchor(query);
     const explicitSelectors = [
       '[data-container-id]',
       '[data-snhf]',
@@ -178,17 +206,17 @@
     ];
     const genericSelectors = ['body div'];
     const explicit = uniqueNodes(explicitSelectors)
-      .map((node) => candidateFrom(node, composer, query, true))
+      .map((node) => candidateFrom(node, composer, query, queryAnchor, true))
       .filter(Boolean);
     const semantic = uniqueNodes(semanticSelectors)
-      .map((node) => candidateFrom(node, composer, query, true))
+      .map((node) => candidateFrom(node, composer, query, queryAnchor, true))
       .filter(Boolean);
     const generic = uniqueNodes(genericSelectors).slice(0, 1200)
-      .map((node) => candidateFrom(node, composer, query, false))
+      .map((node) => candidateFrom(node, composer, query, queryAnchor, false))
       .filter(Boolean)
       .filter((candidate) => {
         const child = Array.from(candidate.node.children)
-          .map((node) => candidateFrom(node, composer, query, false))
+          .map((node) => candidateFrom(node, composer, query, queryAnchor, false))
           .filter(Boolean)
           .sort((left, right) => right.text.length - left.text.length)[0];
         return !child || child.text.length < candidate.text.length * 0.92;
