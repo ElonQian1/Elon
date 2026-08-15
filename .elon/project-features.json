@@ -991,7 +991,7 @@
       "id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
       "title": "外部矿池 Adapter 运行时兼容性 Profile V1",
       "summary": "复用 V255/V258/V259/V265 真源，发布 Linux x86_64 ELSP/ELNW 机器可读兼容性 Profile，并校验有界 challenge 与无权威候选报告；不执行第三方 Adapter、不连接上游、不激活 Provider。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/compute-external-pool-adapter-runtime-compatibility-profile-v1.md",
@@ -1158,7 +1158,7 @@
         }
       ],
       "created_at_ms": 1786750215286,
-      "updated_at_ms": 1786753510706
+      "updated_at_ms": 1786753990538
     },
     {
       "id": "compute-v255-runtime-launch-profile-verification",
@@ -3933,16 +3933,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_97ab09fedd2c4054bce47a6ebc2137a7",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claim_released",
-      "actor": "codex-goal-019f3b86",
-      "reason": "将仍含 v234 未编译旧结论的市场权威页纳入受控文档范围后重新评审",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1786640136192
-    },
-    {
       "id": "feature_event_80624aa3f3244b22a823c6963b04a339",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
       "action": "metadata_updated",
@@ -5931,6 +5921,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786753510706
+    },
+    {
+      "id": "feature_event_ef783c79689e46caa3a28f5cd747d2d1",
+      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "V266 implementation, focused tests, production check, evidence drift check, pre-push gates and origin/main publication completed at b6d315072.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786753990538
     }
   ]
 }
