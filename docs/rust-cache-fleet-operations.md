@@ -43,7 +43,7 @@ SCCache 负责兼容编译对象的跨项目复用。命名 Cargo build-dir 只�
 & .\scripts\rust-cache.ps1 doctor -ProjectRoot .
 ```
 
-安装器会写入源码与安装指纹、固定用户启动器和 Codex Skill。`doctor` 报告 `platform-version` 或 `platform-integrity` 失败时，必须从当前可信提交重新安装，不能手工复制单个模块。
+安装器会分别写入规范化源码指纹与安装文件原始字节指纹，并安装固定用户启动器和 Codex Skill。源码指纹会统一 UTF-8 BOM 与 LF/CRLF，使同一 Git 内容在不同 Windows 配置和 worktree 中保持同一版本身份；安装指纹不做规范化，安装后的任何字节变化仍会被 `doctor` 识别。`doctor` 报告 `platform-version`、`platform-integrity` 或 Skill 完整性异常时，必须从当前可信提交重新安装，不能手工复制单个模块。
 
 调用入口必须在当前 PowerShell 会话内使用 `&`。缓存工具、用户启动器和 Skill 均不得通过 `Start-Process powershell.exe` 或 `Start-Process pwsh.exe` 打开可见窗口。节点后台服务若必须创建独立进程，应由节点宿主使用隐藏窗口和受控日志，而不是由项目包装器自行弹窗。
 
@@ -130,7 +130,7 @@ fleet-report/status 发现风险
 
 推广到新项目或新 PC 前必须确认：
 
-1. `doctor` 能识别项目清单、平台指纹、启动器、SCCache、磁盘和活动写入者。
+1. `doctor` 能识别项目清单、规范化源码身份、平台与 Skill 的原始字节完整性、启动器、SCCache、磁盘和活动写入者。
 2. 用户启动器不包含 `Start-Process`、`powershell.exe` 或 `pwsh.exe` 嵌套启动。
 3. `fleet-report` 通过同一 schema 输出，JSON 中不含本机绝对路径。
 4. 两个 worktree 只有在相同项目与兼容域内才命中同一命名分区，并由同一锁串行化。

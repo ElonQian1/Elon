@@ -46,7 +46,7 @@ From a current trusted platform checkout, run:
 & .\scripts\rust-cache.ps1 doctor -ProjectRoot .
 ```
 
-The installer writes a source fingerprint. Re-run it when `doctor` reports platform drift. Installing the Codex skill is per user and per PC; project manifests remain portable Git files.
+The installer writes a canonical source fingerprint and an exact installed-byte fingerprint. Equivalent LF/CRLF or UTF-8 BOM checkout forms identify the same reviewed source, while any post-install file change still fails integrity checks. Re-run the installer when `doctor` reports genuine platform drift or installed-file tampering. Installing the Codex skill is per user and per PC; project manifests remain portable Git files.
 The installer also writes `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1`. Child repositories call this launcher instead of copying platform modules or hard-coding a machine cache root.
 The installer serializes upgrades on each PC. Wait for the current installer instead of copying platform files manually.
 
@@ -55,7 +55,7 @@ The installer serializes upgrades on each PC. Wait for the current installer ins
 - Install or upgrade the platform and Skill independently on every PC from the same trusted Git revision.
 - Commit only `rust-cache.project.json` and thin project wrappers. Do not commit cache roots, launcher targets, user profiles, or node data paths.
 - Let Git distribute project identity and domain policy; let each PC choose its own physical cache volume.
-- Run `doctor` on each PC before accepting a long build. A healthy PC must report matching source/install fingerprints and a healthy user launcher.
+- Run `doctor` on each PC before accepting a long build. A healthy PC must report matching canonical source identity, exact installed-byte integrity, Codex Skill integrity, and a healthy user launcher.
 - Central dashboards may collect read-only doctor/status reports. GC `-Apply`, Cargo parent-config activation, legacy purge, and cache migration remain machine-local reviewed operations.
 
 Generate the standard sanitized fleet artifact on each node:

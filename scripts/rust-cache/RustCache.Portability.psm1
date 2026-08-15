@@ -2,15 +2,46 @@ Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 
-function Get-RustCacheTextHash {
-    param([Parameter(Mandatory)][string]$Text)
+function Get-RustCacheBytesHash {
+    param([Parameter(Mandatory)][AllowEmptyCollection()][byte[]]$Bytes)
 
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
-        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+        return ([BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace("-", "").ToLowerInvariant()
     } finally {
         $sha.Dispose()
+    }
+}
+
+function Get-RustCacheTextHash {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    Get-RustCacheBytesHash -Bytes ([System.Text.Encoding]::UTF8.GetBytes($Text))
+}
+
+function Get-RustCacheFileFingerprint {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [switch]$CanonicalText
+    )
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($CanonicalText) {
+        $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
+        try {
+            $text = $strictUtf8.GetString($bytes)
+        } catch {
+            throw "Rust cache platform text file is not valid UTF-8: $Path"
+        }
+        if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) {
+            $text = $text.Substring(1)
+        }
+        $text = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($text)
+    }
+    [pscustomobject]@{
+        hash = Get-RustCacheBytesHash -Bytes $bytes
+        length = $bytes.Length
     }
 }
 
@@ -33,8 +64,8 @@ function Get-RustCachePlatformFingerprint {
     })
     $records = @($files | ForEach-Object {
         $relative = $_.FullName.Substring($root.Length).TrimStart('\', '/').Replace('\', '/')
-        $fileHash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        "{0}:{1}:{2}" -f $relative, $_.Length, $fileHash
+        $file = Get-RustCacheFileFingerprint -Path $_.FullName -CanonicalText:(-not $Installed)
+        "{0}:{1}:{2}" -f $relative, $file.length, $file.hash
     } | Sort-Object)
     [pscustomobject]@{
         hash = Get-RustCacheTextHash -Text ($records -join "`n")
@@ -82,6 +113,8 @@ function Write-RustCachePlatformInstallManifest {
         source_file_count = [int]$SourceFingerprint.file_count
         installed_hash = [string]$InstalledFingerprint.hash
         installed_file_count = [int]$InstalledFingerprint.file_count
+        source_fingerprint_mode = "canonical-utf8-text-v1"
+        installed_fingerprint_mode = "raw-bytes-v1"
         entry_relative_path = "platform/rust-cache.ps1"
     }
     $temporary = "$path.$PID.tmp"
@@ -205,7 +238,10 @@ function Get-RustCacheCodexSkillsRoot {
 }
 
 function Get-RustCacheCodexSkillFingerprint {
-    param([Parameter(Mandatory)][string]$SkillRoot)
+    param(
+        [Parameter(Mandatory)][string]$SkillRoot,
+        [switch]$Installed
+    )
 
     $root = [System.IO.Path]::GetFullPath($SkillRoot)
     $skillPath = Join-Path $root "SKILL.md"
@@ -213,7 +249,14 @@ function Get-RustCacheCodexSkillFingerprint {
     if (-not (Test-Path -LiteralPath $skillPath -PathType Leaf) -or -not (Test-Path -LiteralPath $agentPath -PathType Leaf)) {
         throw "Cache management skill is incomplete: $root"
     }
-    return Get-RustCacheTextHash -Text ((Get-FileHash $skillPath -Algorithm SHA256).Hash + ":" + (Get-FileHash $agentPath -Algorithm SHA256).Hash)
+    $records = @(
+        @{ relative = "SKILL.md"; path = $skillPath },
+        @{ relative = "agents/openai.yaml"; path = $agentPath }
+    ) | ForEach-Object {
+        $file = Get-RustCacheFileFingerprint -Path $_.path -CanonicalText:(-not $Installed)
+        "{0}:{1}:{2}" -f $_.relative, $file.length, $file.hash
+    }
+    return Get-RustCacheTextHash -Text ($records -join "`n")
 }
 
 function Install-RustCacheCodexSkill {
@@ -233,13 +276,17 @@ function Install-RustCacheCodexSkill {
     Copy-Item -LiteralPath $sourceSkill -Destination (Join-Path $destination "SKILL.md") -Force
     Copy-Item -LiteralPath $sourceAgent -Destination (Join-Path $destination "agents\openai.yaml") -Force
     $fingerprint = Get-RustCacheCodexSkillFingerprint -SkillRoot $source
+    $installedFingerprint = Get-RustCacheCodexSkillFingerprint -SkillRoot $destination -Installed
     $marker = Join-Path $destination ".elon-install.json"
     [ordered]@{
         schema = "elon.rust_cache.codex_skill_install.v1"
         installed_at_utc = [DateTime]::UtcNow.ToString("o")
         source_hash = $fingerprint
+        installed_hash = $installedFingerprint
+        source_fingerprint_mode = "canonical-utf8-text-v1"
+        installed_fingerprint_mode = "raw-bytes-v1"
     } | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding UTF8
-    [pscustomobject]@{ path = $destination; marker_path = $marker; source_hash = $fingerprint }
+    [pscustomobject]@{ path = $destination; marker_path = $marker; source_hash = $fingerprint; installed_hash = $installedFingerprint }
 }
 
 function New-RustCacheDoctorCheck {
@@ -368,16 +415,24 @@ function Get-RustCacheDoctor {
             $checks.Add((New-RustCacheDoctorCheck "codex-skill" "warn" "Codex cache management skill is not installed for this user." "Re-run install with -InstallCodexSkill."))
         } else {
             $expectedSkillHash = Get-RustCacheCodexSkillFingerprint -SkillRoot $SourceSkillRoot
-            $installedSkillHash = $null
+            $installedSkillSourceHash = $null
+            $recordedInstalledSkillHash = $null
             if (Test-Path -LiteralPath $skillMarkerPath -PathType Leaf) {
                 try {
                     $skillMarker = Get-Content -Raw -LiteralPath $skillMarkerPath -Encoding UTF8 | ConvertFrom-Json
                     if ($skillMarker.schema -eq "elon.rust_cache.codex_skill_install.v1") {
-                        $installedSkillHash = [string]$skillMarker.source_hash
+                        $installedSkillSourceHash = [string]$skillMarker.source_hash
+                        $recordedInstalledSkillHash = [string]$skillMarker.installed_hash
                     }
-                } catch { $installedSkillHash = $null }
+                } catch { $installedSkillSourceHash = $null }
             }
-            if ($expectedSkillHash -eq $installedSkillHash) {
+            $actualInstalledSkillHash = $null
+            try {
+                $actualInstalledSkillHash = Get-RustCacheCodexSkillFingerprint -SkillRoot $installedSkillRoot -Installed
+            } catch { $actualInstalledSkillHash = $null }
+            if ($expectedSkillHash -eq $installedSkillSourceHash -and
+                -not [string]::IsNullOrWhiteSpace($recordedInstalledSkillHash) -and
+                $recordedInstalledSkillHash -eq $actualInstalledSkillHash) {
                 $checks.Add((New-RustCacheDoctorCheck "codex-skill" "pass" "Codex cache management skill matches this checkout." $null))
             } else {
                 $checks.Add((New-RustCacheDoctorCheck "codex-skill" "warn" "Codex cache management skill is unverified or stale." "Re-run install with -InstallCodexSkill."))

@@ -28,6 +28,18 @@ function Assert-Equal {
     if ($Expected -ne $Actual) { throw "Assertion failed: $Message. Expected='$Expected' Actual='$Actual'" }
 }
 
+function Set-TestTreeLineEnding {
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][ValidateSet("lf", "crlf")][string]$LineEnding)
+
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object { $_.Extension -in @(".ps1", ".psm1", ".rs", ".md", ".yaml") } | ForEach-Object {
+        $text = [System.IO.File]::ReadAllText($_.FullName)
+        $text = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+        if ($LineEnding -eq "crlf") { $text = $text.Replace("`n", "`r`n") }
+        [System.IO.File]::WriteAllText($_.FullName, $text, $utf8)
+    }
+}
+
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("rust-cache-portability-" + [Guid]::NewGuid().ToString("N"))
 $projectRoot = Join-Path $tempRoot "project"
 $cacheRoot = Join-Path $tempRoot "cache"
@@ -59,6 +71,19 @@ try {
 
     $sourceFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $PSScriptRoot
     Assert-True ($sourceFingerprint.file_count -gt 5) "source fingerprint should cover the platform files"
+    $lineEndingSourceRoot = Join-Path $tempRoot "line-ending-source"
+    New-Item -ItemType Directory -Force -Path $lineEndingSourceRoot | Out-Null
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "rust-cache.ps1") -Destination (Join-Path $lineEndingSourceRoot "rust-cache.ps1")
+    Copy-Item -LiteralPath $modulesRoot -Destination (Join-Path $lineEndingSourceRoot "rust-cache") -Recurse
+    Set-TestTreeLineEnding -Root $lineEndingSourceRoot -LineEnding lf
+    $lfSourceFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $lineEndingSourceRoot
+    $lfInstalledFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $lineEndingSourceRoot -Installed
+    Set-TestTreeLineEnding -Root $lineEndingSourceRoot -LineEnding crlf
+    $crlfSourceFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $lineEndingSourceRoot
+    $crlfInstalledFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $lineEndingSourceRoot -Installed
+    Assert-Equal $sourceFingerprint.hash $lfSourceFingerprint.hash "source fingerprint should ignore checkout line endings"
+    Assert-Equal $lfSourceFingerprint.hash $crlfSourceFingerprint.hash "source fingerprint should be stable across LF and CRLF"
+    Assert-True ($lfInstalledFingerprint.hash -ne $crlfInstalledFingerprint.hash) "installed integrity fingerprint must retain exact bytes"
     $platformRoot = Join-Path $cacheRoot "platform"
     $targetModules = Join-Path $platformRoot "rust-cache"
     New-Item -ItemType Directory -Force -Path $targetModules | Out-Null
@@ -91,6 +116,14 @@ try {
     $policyPath = Get-RustCachePolicyPath -CacheRoot $cacheRoot
     Assert-True (-not (Test-Path -LiteralPath $policyPath)) "doctor fixture should begin without a policy"
     $skillRoot = Join-Path (Split-Path $PSScriptRoot -Parent) ".agents\skills\manage-shared-build-cache"
+    $skillVariantRoot = Join-Path $tempRoot "skill-line-ending-source"
+    Copy-Item -LiteralPath $skillRoot -Destination $skillVariantRoot -Recurse
+    Set-TestTreeLineEnding -Root $skillVariantRoot -LineEnding lf
+    $lfSkillFingerprint = Get-RustCacheCodexSkillFingerprint -SkillRoot $skillVariantRoot
+    Set-TestTreeLineEnding -Root $skillVariantRoot -LineEnding crlf
+    $crlfSkillFingerprint = Get-RustCacheCodexSkillFingerprint -SkillRoot $skillVariantRoot
+    Assert-Equal (Get-RustCacheCodexSkillFingerprint -SkillRoot $skillRoot) $lfSkillFingerprint "skill source fingerprint should ignore checkout line endings"
+    Assert-Equal $lfSkillFingerprint $crlfSkillFingerprint "skill source fingerprint should be stable across LF and CRLF"
     $skillInstall = Install-RustCacheCodexSkill -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot
     Assert-True (Test-Path -LiteralPath (Join-Path $skillInstall.path "SKILL.md")) "skill installer should copy SKILL.md"
     Assert-True (Test-Path -LiteralPath $skillInstall.marker_path) "skill installer should record provenance"
@@ -102,6 +135,9 @@ try {
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "platform-version").status "doctor platform version check"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "codex-skill").status "doctor skill version check"
     Assert-Equal "pass" ($doctor.checks | Where-Object id -eq "user-launcher").status "doctor portable launcher check"
+    $lineEndingDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $lineEndingSourceRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -SourceSkillRoot $skillVariantRoot -CodexSkillsRoot $codexSkillsRoot -UserLauncherPath $userLauncherPath
+    Assert-Equal "pass" ($lineEndingDoctor.checks | Where-Object id -eq "platform-version").status "doctor should accept an equivalent CRLF checkout"
+    Assert-Equal "pass" ($lineEndingDoctor.checks | Where-Object id -eq "codex-skill").status "doctor should accept an equivalent CRLF skill source"
     $fleetPath = Join-Path $tempRoot "exports\fleet.json"
     $fleetReport = New-RustCacheFleetReport -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot -UserLauncherPath $userLauncherPath -NodeId "portable-node-1" -IncludeSizes
     Assert-Equal "elon.rust_cache.fleet_report.v1" $fleetReport.schema "fleet report schema"
@@ -135,6 +171,11 @@ try {
     Assert-Equal "fail" ($staleLauncherDoctor.checks | Where-Object id -eq "user-launcher").status "doctor stale launcher check"
     Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
     Install-RustCacheUserLauncher -CacheRoot $cacheRoot -UserLauncherPath $userLauncherPath | Out-Null
+
+    Add-Content -LiteralPath (Join-Path $skillInstall.path "SKILL.md") -Value "# tampered"
+    $tamperedSkillDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot -UserLauncherPath $userLauncherPath
+    Assert-Equal "warn" ($tamperedSkillDoctor.checks | Where-Object id -eq "codex-skill").status "doctor should detect installed skill tampering"
+    Install-RustCacheCodexSkill -SourceSkillRoot $skillRoot -CodexSkillsRoot $codexSkillsRoot | Out-Null
 
     Add-Content -LiteralPath (Join-Path $targetModules "RustCache.Portability.psm1") -Value "# tampered"
     $tampered = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath
