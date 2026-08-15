@@ -21,6 +21,7 @@ internal enum class WebChatProviderCapability {
     MESSAGE_CONTEXT_ACTIONS,
     MODEL_SELECTOR,
     ATTACHMENT_UPLOAD,
+    COMPOSER_TOOLS,
     RICH_TEXT,
     RICH_PARTS,
 }
@@ -59,6 +60,7 @@ internal object WebChatProviderRegistry {
                 WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS,
                 WebChatProviderCapability.MODEL_SELECTOR,
                 WebChatProviderCapability.ATTACHMENT_UPLOAD,
+                WebChatProviderCapability.COMPOSER_TOOLS,
                 WebChatProviderCapability.RICH_TEXT,
                 WebChatProviderCapability.RICH_PARTS,
             ),

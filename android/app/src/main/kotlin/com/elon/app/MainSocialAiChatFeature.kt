@@ -62,6 +62,20 @@ internal class MainSocialAiChatFeature(
             openOfficialFallback = ::openOfficialFallback,
         )
     }
+    private val productionComposerToolsDelegate = lazy {
+        WebChatProductionComposerToolsCoordinator(
+            activity = activity,
+            host = binding.root,
+            mcpPort = {
+                if (isChatModeActive()) activeController().mcpPort() else null
+            },
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            openOfficialFallback = ::openOfficialFallback,
+        )
+    }
+    private val productionComposerTools by productionComposerToolsDelegate
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -232,6 +246,7 @@ internal class MainSocialAiChatFeature(
     }
 
     private fun deactivateChatProvider() {
+        if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         binding.modelButton.tag = null
@@ -241,6 +256,8 @@ internal class MainSocialAiChatFeature(
                 width = dp(MODEL_BUTTON_WORK_WIDTH_DP)
             }
             views.planModeButton.visibility = View.VISIBLE
+            views.webToolsButton.visibility = View.GONE
+            views.webToolsButton.setOnClickListener(null)
             views.modelButtonShell.setOnClickListener { showWorkModelSelector() }
             binding.modelButton.setOnClickListener { showWorkModelSelector() }
         }
@@ -260,6 +277,14 @@ internal class MainSocialAiChatFeature(
                 width = dp(MODEL_BUTTON_CHAT_WIDTH_DP)
             }
             views.planModeButton.visibility = View.GONE
+            views.webToolsButton.visibility = if (
+                provider.supports(WebChatProviderCapability.COMPOSER_TOOLS)
+            ) View.VISIBLE else View.GONE
+            views.webToolsButton.contentDescription =
+                "web-chat-composer-tools:${provider.id.wireValue}"
+            views.webToolsButton.setOnClickListener {
+                productionComposerTools.show(provider)
+            }
             views.modelButtonShell.setOnClickListener { providerPicker.show() }
             binding.modelButton.setOnClickListener { providerPicker.show() }
         }

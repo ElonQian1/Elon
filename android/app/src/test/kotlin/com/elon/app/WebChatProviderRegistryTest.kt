@@ -28,6 +28,7 @@ class WebChatProviderRegistryTest {
         assertTrue(chatGpt.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS))
         assertTrue(chatGpt.supports(WebChatProviderCapability.MODEL_SELECTOR))
         assertTrue(chatGpt.supports(WebChatProviderCapability.ATTACHMENT_UPLOAD))
+        assertTrue(chatGpt.supports(WebChatProviderCapability.COMPOSER_TOOLS))
         assertTrue(chatGpt.supports(WebChatProviderCapability.RICH_TEXT))
         assertTrue(chatGpt.supports(WebChatProviderCapability.RICH_PARTS))
         assertEquals("Google 搜索网页 AI", google.displayName)
@@ -36,6 +37,7 @@ class WebChatProviderRegistryTest {
         assertTrue(google.supports(WebChatProviderCapability.MESSAGE_COPY))
         assertFalse(google.supports(WebChatProviderCapability.MESSAGE_REGENERATE))
         assertFalse(google.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS))
+        assertFalse(google.supports(WebChatProviderCapability.COMPOSER_TOOLS))
         assertTrue(google.supports(WebChatProviderCapability.RICH_TEXT))
         assertFalse(google.supports(WebChatProviderCapability.RICH_PARTS))
         assertEquals(

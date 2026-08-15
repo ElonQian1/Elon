@@ -32,6 +32,7 @@ internal data class MainInputComposerViews(
     val modelButtonShell: FrameLayout,
     val modelChevron: ImageView,
     val planModeButton: TextView,
+    val webToolsButton: TextView,
     val modeButtonRow: LinearLayout,
     val pendingAttachmentHost: LinearLayout,
     val inputRightControls: FrameLayout,
@@ -355,6 +356,24 @@ internal class MainInputComposerSetup(
             setOnClickListener { togglePlanMode() }
         }
 
+        val webToolsButton = TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(72), dp(36)).apply {
+                marginEnd = dp(8)
+            }
+            background = activity.getDrawable(R.drawable.bg_bottom_mode_selector)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            text = "工具"
+            textSize = 14f
+            setTextColor(Color.parseColor("#F8F7F4"))
+            visibility = View.GONE
+            isClickable = true
+            isFocusable = true
+            contentDescription = "web-chat-composer-tools:unavailable"
+        }
+
         val emojiButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
                 marginEnd = dp(8)
@@ -424,6 +443,7 @@ internal class MainInputComposerSetup(
 
         modeButtonRow.addView(modelButtonShell)
         modeButtonRow.addView(planModeButton)
+        modeButtonRow.addView(webToolsButton)
 
         inputBarContainer.addView(attachmentButton)
         inputBarContainer.addView(emojiButton)
@@ -503,6 +523,7 @@ internal class MainInputComposerSetup(
             modelButtonShell = modelButtonShell,
             modelChevron = modelChevron,
             planModeButton = planModeButton,
+            webToolsButton = webToolsButton,
             modeButtonRow = modeButtonRow,
             pendingAttachmentHost = pendingAttachmentHost,
             inputRightControls = inputRightControls,
