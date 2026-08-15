@@ -112,6 +112,16 @@ mod supervisor_session_policy_companion_owner_http_test;
 mod supervisor_session_policy_companion_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/supervisor_session_policy_companion_test_support.rs"]
 mod supervisor_session_policy_companion_test_support;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_api_runtime_source_contract_test.rs"]
+mod task_protocol_conformance_api_runtime_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_boundary_source_contract_test.rs"]
+mod task_protocol_conformance_boundary_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_domain_source_contract_test.rs"]
+mod task_protocol_conformance_domain_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_session_source_contract_test.rs"]
+mod task_protocol_conformance_session_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_store_source_contract_test.rs"]
+mod task_protocol_conformance_store_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_admin_http_test.rs"]
 mod upstream_transport_target_admin_http_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_owner_http_test.rs"]

@@ -1,4 +1,3 @@
-use crate::store_schema::apply_migrations;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 mod account_identities;
@@ -112,6 +111,7 @@ mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_adapter_supervisor_session_policy_companion;
+mod compute_external_pool_adapter_task_protocol_conformance;
 mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_onboarding;
@@ -588,6 +588,7 @@ pub(crate) use compute_external_pool_adapter_scanner_key::{
     RevokeExternalPoolAdapterScannerKey,
 };
 pub(crate) use compute_external_pool_adapter_supervisor_session_policy_companion::*;
+pub(crate) use compute_external_pool_adapter_task_protocol_conformance::api::*;
 pub(crate) use compute_external_pool_adapter_upstream_transport_target::api::*;
 pub(crate) use compute_external_pool_adapter_vulnerability_reattestation::{
     CreateExternalPoolAdapterVulnerabilityReattestation,
@@ -746,7 +747,7 @@ impl Store {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", 5000)?;
-        apply_migrations(&conn)?;
+        crate::store_schema::apply_migrations(&conn)?;
         Ok(Self {
             conn: std::sync::Mutex::new(conn),
         })

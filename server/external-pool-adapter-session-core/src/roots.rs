@@ -1,6 +1,10 @@
 use anyhow::{anyhow, bail, Context, Result};
 use sha2::{Digest, Sha256};
 
+mod task_conformance;
+
+use task_conformance::ExternalPoolAdapterTaskProtocolConformanceRoots;
+
 const ROOT_TRANSCRIPT_DOMAIN: &[u8] = b"elon.external_pool_adapter.supervisor_session.roots.v1\0";
 const KDF_SALT_DOMAIN: &[u8] = b"elon.external_pool_adapter.supervisor_session.kdf_salt.v1\0";
 const RUNTIME_COMPATIBILITY_ROOT_TRANSCRIPT_DOMAIN: &[u8] =
@@ -36,6 +40,7 @@ enum ExternalPoolAdapterSessionRootSet {
         launch_image_sha256: [u8; 32],
         public_fixture_delivery_root: [u8; 32],
     },
+    TaskProtocolConformance(ExternalPoolAdapterTaskProtocolConformanceRoots),
 }
 
 impl ExternalPoolAdapterSessionRoots {
@@ -123,6 +128,45 @@ impl ExternalPoolAdapterSessionRoots {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_task_protocol_conformance(
+        supervisor_session_policy_digest: &str,
+        task_protocol_profile_digest: &str,
+        run_nonce_digest: &str,
+        fixture_catalog_digest: &str,
+        registry_release_digest: &str,
+        installation_content_digest: &str,
+        capability_set_digest: &str,
+        sandbox_reattestation_receipt_digest: &str,
+        runtime_compatibility_verification_receipt_digest: &str,
+        source_capsule_sha256: &str,
+        launch_image_sha256: &str,
+        public_fixture_delivery_root: &str,
+        synthetic_fixture_lane_digest: &str,
+        synthetic_fixture_executor_digest: &str,
+    ) -> Result<Self> {
+        Ok(Self {
+            roots: ExternalPoolAdapterSessionRootSet::TaskProtocolConformance(
+                ExternalPoolAdapterTaskProtocolConformanceRoots::new(
+                    supervisor_session_policy_digest,
+                    task_protocol_profile_digest,
+                    run_nonce_digest,
+                    fixture_catalog_digest,
+                    registry_release_digest,
+                    installation_content_digest,
+                    capability_set_digest,
+                    sandbox_reattestation_receipt_digest,
+                    runtime_compatibility_verification_receipt_digest,
+                    source_capsule_sha256,
+                    launch_image_sha256,
+                    public_fixture_delivery_root,
+                    synthetic_fixture_lane_digest,
+                    synthetic_fixture_executor_digest,
+                )?,
+            ),
+        })
+    }
+
     pub fn launch_arguments(&self) -> ExternalPoolAdapterSessionRootArguments {
         let values = match &self.roots {
             ExternalPoolAdapterSessionRootSet::Production {
@@ -165,6 +209,11 @@ impl ExternalPoolAdapterSessionRoots {
                 hex::encode(launch_image_sha256),
                 hex::encode(public_fixture_delivery_root),
             ]),
+            ExternalPoolAdapterSessionRootSet::TaskProtocolConformance(roots) => {
+                ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(
+                    roots.launch_values(),
+                )
+            }
         };
         ExternalPoolAdapterSessionRootArguments { values }
     }
@@ -196,6 +245,9 @@ impl ExternalPoolAdapterSessionRoots {
                     None,
                 )
             }
+            ExternalPoolAdapterSessionRootSet::TaskProtocolConformance(roots) => {
+                roots.transcript_digest()
+            }
         }
     }
 
@@ -223,6 +275,9 @@ impl ExternalPoolAdapterSessionRoots {
                     Some((host_nonce, child_nonce)),
                 )
             }
+            ExternalPoolAdapterSessionRootSet::TaskProtocolConformance(roots) => {
+                roots.kdf_salt(host_nonce, child_nonce)
+            }
         }
     }
 }
@@ -236,6 +291,7 @@ pub struct ExternalPoolAdapterSessionRootArguments {
 enum ExternalPoolAdapterSessionRootArgumentValues {
     Production([String; 6]),
     RuntimeCompatibility([String; 11]),
+    TaskProtocolConformance([String; 14]),
 }
 
 impl ExternalPoolAdapterSessionRootArguments {
@@ -243,6 +299,7 @@ impl ExternalPoolAdapterSessionRootArguments {
         match &self.values {
             ExternalPoolAdapterSessionRootArgumentValues::Production(values) => values,
             ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(values) => values,
+            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(values) => values,
         }
     }
 
@@ -252,6 +309,17 @@ impl ExternalPoolAdapterSessionRootArguments {
             ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(values) => {
                 Some(values)
             }
+            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(_) => None,
+        }
+    }
+
+    pub fn task_protocol_conformance_values(&self) -> Option<&[String; 14]> {
+        match &self.values {
+            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(values) => {
+                Some(values)
+            }
+            ExternalPoolAdapterSessionRootArgumentValues::Production(_)
+            | ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(_) => None,
         }
     }
 
@@ -262,6 +330,9 @@ impl ExternalPoolAdapterSessionRootArguments {
                 values[index] = value;
             }
             ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(values) => {
+                values[index] = value;
+            }
+            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(values) => {
                 values[index] = value;
             }
         }

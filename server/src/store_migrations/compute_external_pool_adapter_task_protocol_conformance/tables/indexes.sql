@@ -1,0 +1,7 @@
+CREATE INDEX IF NOT EXISTS idx_task_protocol_conformance_release_sequence
+  ON compute_external_pool_adapter_task_protocol_conformance_run_receipts(registry_release_id,sequence DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_protocol_conformance_single_genesis
+  ON compute_external_pool_adapter_task_protocol_conformance_run_receipts(registry_release_id)
+  WHERE predecessor_run_receipt_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_task_protocol_conformance_expiry
+  ON compute_external_pool_adapter_task_protocol_conformance_run_receipts(expires_at,registry_release_id);

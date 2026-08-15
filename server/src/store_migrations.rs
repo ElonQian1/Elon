@@ -34,6 +34,7 @@ mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_adapter_supervisor_session_policy_companion;
 mod compute_external_pool_adapter_supervisor_session_policy_v2;
+mod compute_external_pool_adapter_task_protocol_conformance;
 mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_provider_activation_candidate;
@@ -64,6 +65,12 @@ pub(crate) fn register_v268_receipt_integrity_functions(conn: &Connection) -> Re
 
 pub(crate) fn register_v270_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_provider_runtime_readiness::register_receipt_integrity_functions(
+        conn,
+    )
+}
+
+pub(crate) fn register_v272_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_task_protocol_conformance::register_receipt_integrity_functions(
         conn,
     )
 }
@@ -349,6 +356,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (268, "外部矿池 Adapter Provider-neutral 运行时兼容性签名证明", compute_external_pool_adapter_runtime_compatibility_verification::migration_v268),
     (270, "外部矿池 Adapter Provider-specific cleanup 后短时运行就绪证明", compute_external_pool_adapter_provider_runtime_readiness::migration_v270),
     (271, "外部矿池 Adapter route source logical-to-projection 映射门卫", compute_external_pool_adapter_route_source_projection::migration_v271),
+    (272, "外部矿池 Adapter Provider-neutral task-protocol 六能力实跑证明", compute_external_pool_adapter_task_protocol_conformance::migration_v272),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

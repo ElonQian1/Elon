@@ -22,16 +22,18 @@ mod types;
 pub(in crate::store) use current::current_external_pool_adapter_runtime_bundle_authority_on;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use no_work_probe::CurrentExternalPoolAdapterNoWorkProbeObservationAuthority;
-pub(in crate::store) use runtime::ExternalPoolAdapterProviderRuntimeReadinessProcessCustody;
 pub(crate) use runtime::{
     external_pool_adapter_provider_runtime_readiness_runtime,
     initialize_external_pool_adapter_provider_runtime_readiness_runtime,
     ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     ExternalPoolAdapterProviderRuntimeReadinessUnavailable,
 };
+pub(in crate::store) use runtime::{
+    ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
+    ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
+};
 #[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
 pub(crate) use test_materialization::with_materialized_external_pool_adapter_test_capsule;
-
 pub(in crate::store) use types::{
     CurrentExternalPoolAdapterProbePreparationAuthority,
     CurrentExternalPoolAdapterRuntimeBundleAuthority, ExternalPoolAdapterRuntimeBundleRoot,

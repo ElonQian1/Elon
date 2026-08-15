@@ -11,6 +11,7 @@ mod crypto;
 mod delivery;
 mod no_work;
 mod roots;
+mod task_protocol;
 mod transport;
 mod transport_io;
 
@@ -33,6 +34,12 @@ pub use no_work::{
     ExternalPoolAdapterNoWorkProbeHostRequest,
 };
 pub use roots::{ExternalPoolAdapterSessionRootArguments, ExternalPoolAdapterSessionRoots};
+pub use task_protocol::{
+    prepare_external_pool_adapter_task_request, ExternalPoolAdapterTaskOperationKind,
+    ExternalPoolAdapterTaskProtocolChild, ExternalPoolAdapterTaskProtocolChildExchange,
+    ExternalPoolAdapterTaskProtocolHost, ExternalPoolAdapterTaskProtocolHostExchange,
+    ExternalPoolAdapterTaskProtocolHostReceipt, PreparedExternalPoolAdapterTaskRequest,
+};
 pub use transport::{
     AuthenticatedExternalPoolAdapterSession, AuthenticatedExternalPoolAdapterSessionFrame,
     ExternalPoolAdapterSessionFrameKind,

@@ -148,6 +148,10 @@ impl AuthenticatedExternalPoolAdapterSession {
         }
     }
 
+    pub(crate) fn binding_transcript_digest(&self) -> [u8; 32] {
+        self.transcript_digest
+    }
+
     fn send_inner(
         &mut self,
         kind: ExternalPoolAdapterSessionFrameKind,

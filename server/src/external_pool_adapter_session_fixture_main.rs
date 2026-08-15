@@ -15,6 +15,9 @@ use elon_external_pool_adapter_session_core::{
     ExternalPoolAdapterSessionFrameKind, ExternalPoolAdapterSessionRoots,
 };
 
+#[path = "external_pool_adapter_session_fixture/task_protocol_conformance.rs"]
+mod task_protocol_conformance;
+
 const HOST_READY: &[u8] = b"v262.host.authenticated";
 const CHILD_READY: &[u8] = b"v262.child.authenticated";
 const SHUTDOWN: &[u8] = b"v262.shutdown";
@@ -58,9 +61,19 @@ fn run() -> Result<()> {
     if arguments.first().map(String::as_str) != Some("elon-external-pool-adapter") {
         bail!("fixed supervisor argv contract rejected");
     }
-    let (roots, bundle_root) = match arguments.len() - 1 {
-        6 => parse_roots(&arguments[1..])?,
-        11 => parse_runtime_compatibility_roots(&arguments[1..])?,
+    let (roots, bundle_root, task_protocol_conformance) = match arguments.len() - 1 {
+        6 => {
+            let (roots, bundle_root) = parse_roots(&arguments[1..])?;
+            (roots, bundle_root, false)
+        }
+        11 => {
+            let (roots, bundle_root) = parse_runtime_compatibility_roots(&arguments[1..])?;
+            (roots, bundle_root, false)
+        }
+        14 => {
+            let (roots, bundle_root) = task_protocol_conformance::parse_roots(&arguments[1..])?;
+            (roots, bundle_root, true)
+        }
         _ => bail!("fixed supervisor argv contract rejected"),
     };
     let child = unsafe { ExternalPoolAdapterChildBootstrap::adopt_supervisor_descriptors() };
@@ -85,6 +98,15 @@ fn run() -> Result<()> {
         first,
     )
     .context("receive V263 ephemeral bundle")?;
+    if task_protocol_conformance {
+        return task_protocol_conformance::execute(
+            &mut session,
+            delivered,
+            V265_CONFIG,
+            V263_CREDENTIAL,
+        )
+        .context("execute V272 task protocol conformance fixture");
+    }
     if (delivered.config() != V263_CONFIG && delivered.config() != V265_CONFIG)
         || delivered.credential() != V263_CREDENTIAL
     {

@@ -17,7 +17,10 @@ use super::types::ExternalPoolAdapterRuntimeBundleRoot;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use custody::ExternalPoolAdapterPostCleanupCommitmentInput;
-pub(in crate::store) use custody::ExternalPoolAdapterProviderRuntimeReadinessProcessCustody;
+pub(in crate::store) use custody::{
+    ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
+    ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
+};
 
 const ENABLED_ENV: &str = "ELON_EXTERNAL_POOL_ADAPTER_PROVIDER_RUNTIME_READINESS_ENABLED";
 const CGROUP_PARENT_PATH_ENV: &str =

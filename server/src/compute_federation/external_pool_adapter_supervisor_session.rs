@@ -83,5 +83,46 @@ pub(crate) fn external_pool_adapter_runtime_compatibility_session_roots(
     )
 }
 
+/// Dedicated V272 controlled task-protocol binding. The synthetic lane/executor roots are
+/// explicitly non-production and none of these values occupies a Provider target or Secret slot.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn external_pool_adapter_task_protocol_conformance_session_roots(
+    supervisor_session_policy_digest: &str,
+    task_protocol_profile_digest: &str,
+    run_nonce_digest: &str,
+    fixture_catalog_digest: &str,
+    registry_release_digest: &str,
+    installation_content_digest: &str,
+    capability_set_digest: &str,
+    sandbox_reattestation_receipt_digest: &str,
+    runtime_compatibility_verification_receipt_digest: &str,
+    source_capsule_sha256: &str,
+    launch_image_sha256: &str,
+    public_fixture_delivery_root: &str,
+    synthetic_fixture_lane_digest: &str,
+    synthetic_fixture_executor_digest: &str,
+) -> Result<ExternalPoolAdapterSessionRoots> {
+    let (_, current_policy_digest) = server_supervisor_session_policy_catalog()?;
+    if current_policy_digest != supervisor_session_policy_digest {
+        bail!("V272 task-protocol conformance session policy is not current and exact");
+    }
+    ExternalPoolAdapterSessionRoots::new_task_protocol_conformance(
+        supervisor_session_policy_digest,
+        task_protocol_profile_digest,
+        run_nonce_digest,
+        fixture_catalog_digest,
+        registry_release_digest,
+        installation_content_digest,
+        capability_set_digest,
+        sandbox_reattestation_receipt_digest,
+        runtime_compatibility_verification_receipt_digest,
+        source_capsule_sha256,
+        launch_image_sha256,
+        public_fixture_delivery_root,
+        synthetic_fixture_lane_digest,
+        synthetic_fixture_executor_digest,
+    )
+}
+
 #[cfg(test)]
 mod linux_tests;

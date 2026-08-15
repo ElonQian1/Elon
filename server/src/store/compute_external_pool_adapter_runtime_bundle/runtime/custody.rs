@@ -1,12 +1,17 @@
 //! Locked HMAC custody and epoch-local durable receipt seals.
 
+mod support;
+mod task_protocol_conformance;
+
 use std::{collections::HashMap, net::SocketAddr, sync::Mutex};
 
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Duration as ChronoDuration, SecondsFormat, Utc};
-use hmac::{Hmac, Mac};
-use ring::constant_time::verify_slices_are_equal;
-use sha2::Sha256;
+
+use support::{
+    constant_time_equal, is_lower_hex_sha256, keyed_commitment, update_field,
+    update_socket_address, update_u64, HmacSha256,
+};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use super::super::secret_delivery::{
@@ -28,11 +33,15 @@ use elon_external_pool_adapter_session_core::ExternalPoolAdapterNoWorkProbeHostR
 
 const MAX_READINESS_SEAL_TTL_MS: i64 = 15_000;
 const MAX_LIVE_READINESS_SEALS: usize = 4_096;
-type HmacSha256 = Hmac<Sha256>;
+pub(in crate::store) use task_protocol_conformance::{
+    ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
+};
 /// Locked process secrets plus the only permitted purpose-specific commitment operations.
 pub(in crate::store) struct ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
     secrets: Mutex<LockedProviderRuntimeReadinessSecrets>,
     readiness_seals: Mutex<ProviderRuntimeReadinessSealRegistry>,
+    task_protocol_conformance_seals:
+        Mutex<task_protocol_conformance::TaskProtocolConformanceSealRegistry>,
     custody_epoch_digest: String,
 }
 
@@ -68,15 +77,22 @@ pub(in crate::store) struct ExternalPoolAdapterPostCleanupCommitmentInput<'a> {
 }
 
 impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
-    pub(super) fn generate() -> Result<Self> {
+    pub(in crate::store) fn generate() -> Result<Self> {
+        Self::generate_for_epoch_domain(
+            PROVIDER_RUNTIME_READINESS_CUSTODY_EPOCH_DIGEST_DOMAIN,
+            "Provider readiness",
+        )
+    }
+
+    fn generate_for_epoch_domain(epoch_domain: &[u8], authority: &str) -> Result<Self> {
         let hmac_key = LockedSensitiveBytes::random(PROVIDER_RUNTIME_READINESS_HMAC_KEY_BYTES)
-            .map_err(|_| anyhow!("locked Provider readiness HMAC key is unavailable"))?;
+            .map_err(|_| anyhow!("locked {authority} HMAC key is unavailable"))?;
         let custody_epoch =
             LockedSensitiveBytes::random(PROVIDER_RUNTIME_READINESS_CUSTODY_EPOCH_BYTES)
-                .map_err(|_| anyhow!("locked Provider readiness custody epoch is unavailable"))?;
+                .map_err(|_| anyhow!("locked {authority} custody epoch is unavailable"))?;
         let custody_epoch_digest = keyed_commitment(
             hmac_key.as_slice(),
-            PROVIDER_RUNTIME_READINESS_CUSTODY_EPOCH_DIGEST_DOMAIN,
+            epoch_domain,
             custody_epoch.as_slice(),
             |_| {},
         )?;
@@ -86,6 +102,9 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
                 custody_epoch,
             }),
             readiness_seals: Mutex::new(ProviderRuntimeReadinessSealRegistry::default()),
+            task_protocol_conformance_seals: Mutex::new(
+                task_protocol_conformance::TaskProtocolConformanceSealRegistry::default(),
+            ),
             custody_epoch_digest,
         })
     }
@@ -378,52 +397,4 @@ fn validate_readiness_seal_material(
         bail!("Provider readiness process seal expiry is outside its fixed live window");
     }
     Ok(expires_at_utc)
-}
-
-fn is_lower_hex_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
-}
-
-fn constant_time_equal(left: &str, right: &str) -> bool {
-    verify_slices_are_equal(left.as_bytes(), right.as_bytes()).is_ok()
-}
-
-fn keyed_commitment(
-    key: &[u8],
-    domain: &[u8],
-    epoch: &[u8],
-    update: impl FnOnce(&mut HmacSha256),
-) -> Result<String> {
-    let mut mac = <HmacSha256 as Mac>::new_from_slice(key)
-        .map_err(|_| anyhow!("Provider readiness HMAC key length was rejected"))?;
-    update_field(&mut mac, domain);
-    update_field(&mut mac, epoch);
-    update(&mut mac);
-    Ok(hex::encode(mac.finalize().into_bytes()))
-}
-
-fn update_field(mac: &mut HmacSha256, value: &[u8]) {
-    mac.update(&(value.len() as u64).to_be_bytes());
-    mac.update(value);
-}
-
-fn update_u64(mac: &mut HmacSha256, value: u64) {
-    mac.update(&value.to_be_bytes());
-}
-
-fn update_socket_address(mac: &mut HmacSha256, address: SocketAddr) {
-    match address.ip() {
-        std::net::IpAddr::V4(ip) => {
-            mac.update(&[4]);
-            mac.update(&ip.octets());
-        }
-        std::net::IpAddr::V6(ip) => {
-            mac.update(&[6]);
-            mac.update(&ip.octets());
-        }
-    }
-    mac.update(&address.port().to_be_bytes());
 }
