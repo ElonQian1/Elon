@@ -5,7 +5,7 @@
       "id": "ai-task-external-rust-scratch-lifecycle-v1",
       "title": "AI 任务外部 Rust scratch 生命周期 V1",
       "summary": "把确需隔离的 Windows Rust cache/target 精确绑定不可变 TaskContract，并由统一收尾只回收本任务标记目录；未知和历史缓存保持不动。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/ai-task-external-rust-scratch-lifecycle-v1.md",
@@ -154,7 +154,7 @@
         }
       ],
       "created_at_ms": 1786754525015,
-      "updated_at_ms": 1786755938481
+      "updated_at_ms": 1786756056943
     },
     {
       "id": "compute-attempt-final-usage-fence-verification-v1",
@@ -4088,26 +4088,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5ad80a5a02d1449f8ee4309832c3286a",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "修复规范化并复验真实测试过滤器",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786641402003
-    },
-    {
-      "id": "feature_event_5583fd77aae74b75ad8ed991ff354735",
-      "feature_id": "delivery-allocation-expiry-worker-v234-verification",
-      "action": "claim_released",
-      "actor": "codex-goal-019f3b86",
-      "reason": "最终 7 项证据与共享 Job 终态时间合同已形成，重新绑定更新后的权威文档与受控路径",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786645020745
-    },
-    {
       "id": "feature_event_608632df18d943279a6f327f27b97803",
       "feature_id": "delivery-allocation-expiry-worker-v234-verification",
       "action": "requirement_rebound",
@@ -6086,6 +6066,26 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1786755938481
+    },
+    {
+      "id": "feature_event_e22a6a0235b14c728c986bcdba0f5517",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "Dedicated PowerShell 5 lifecycle test, unified finish fixture, complete preflight workflow, source-size, document-modularity, prompt audit, and registry adoption gates passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786756056855
+    },
+    {
+      "id": "feature_event_bf9095379dbc432db0653b8cdfa5153e",
+      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019feb34",
+      "reason": "Implementation commit dbca464da5e4d4e4b331099cbb1e5a52372d4a79 is present on origin/main and all bound evidence remains current.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786756056943
     }
   ]
 }
