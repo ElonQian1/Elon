@@ -55,8 +55,7 @@ internal class HomeConversationHeaderView(
                 HomeListFilterMode.All to ("全部" to counts.all),
                 HomeListFilterMode.Friends to ("好友" to counts.friends),
                 HomeListFilterMode.Projects to ("项目" to counts.projects),
-                HomeListFilterMode.Conversations to ("对话" to counts.conversations),
-                HomeListFilterMode.Unread to ("未读" to counts.unread)
+                HomeListFilterMode.Conversations to ("对话" to counts.conversations)
             )
             items.forEachIndexed { index, (mode, label) ->
                 addView(createFilterPill(label.first, label.second, mode == selected) { onSelect(mode) },
@@ -172,10 +171,6 @@ internal class HomeConversationHeaderView(
         setPadding(dp(16), dp(5), dp(16), 0)
         addView(TextView(activity).apply {
             includeFontPadding = false; text = "最近"; textSize = 14f; typeface = regular
-            setTextColor(Color.parseColor("#B3DDDBD5"))
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        addView(TextView(activity).apply {
-            includeFontPadding = false; text = "全部已读  ✓"; textSize = 13f; typeface = regular
             setTextColor(Color.parseColor("#B3DDDBD5"))
         })
     }

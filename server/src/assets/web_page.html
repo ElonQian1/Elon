@@ -7455,6 +7455,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
 
   function renderConversationList() {
+    // Keep the home mirror free of standalone unread-filter and mark-all-read controls.
     if (currentTab === 'chatPage' && !isAnyChatActive()) {
       topTitle.textContent = contactFilterTitle();
     }
