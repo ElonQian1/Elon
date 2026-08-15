@@ -57,6 +57,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(!adapter.contains("Authorization"))
         assertTrue(!adapter.contains("fetch("))
         assertTrue(extractor.contains("answerCandidate"))
+        assertTrue(extractor.contains("[id^=\"aim-chrome-initial-inline-async-container\"]"))
         assertTrue(extractor.contains("const answer = query ? answerCandidate"))
         assertTrue(extractor.contains("rememberQuery"))
         assertTrue(extractor.contains("queryPolicy.select"))

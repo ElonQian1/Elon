@@ -9,6 +9,7 @@ const source = fs.readFileSync(
 )
 
 assert.match(source, /const genericSelectors = \['body div'\]/)
+assert.match(source, /'\[id\^="aim-chrome-initial-inline-async-container"\]'/)
 assert.match(source, /'\[role="article"\]'/)
 assert.match(source, /'body \[aria-live="polite"\]'/)
 assert.match(source, /node\.closest\(/)

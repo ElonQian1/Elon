@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 10;
+  const extractorVersion = 11;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -192,6 +192,7 @@
   function answerCandidate(composer, query) {
     const queryAnchor = findQueryAnchor(query);
     const explicitSelectors = [
+      '[id^="aim-chrome-initial-inline-async-container"]',
       '[data-container-id]',
       '[data-snhf]',
       '[data-attrid*="ai" i]',
