@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_configuration_and_source_contracts_verified
 ---
 
 # 外部矿池 Adapter 运行时兼容性签名交接验收边界
@@ -85,9 +85,17 @@ V268 record route ABI 不漂移。
 CapacityPool、Offer、Job、Reservation、Attempt、Start、usage、verification/settlement/Sui 均无写入，V254
 18 个 trigger name 与 source SHA-256 不变。九项 effect 仍为 `none`，七项 readiness 仍为 false。
 
-## 5. 后续动态矩阵（本批不得运行）
+## 5. 已执行的定向矩阵与后续边界
 
-- Rust compile、startup env 正负矩阵、Linux cgroup2 no-follow/controller/FD lifetime 与 disabled `503`；
+本地定向 Rust 测试已执行 `23 passed / 0 failed`，验证指纹为
+`f245567d18e5ef2c6f521d3f13a486a6b255aebac9c1039794d3294386b82675`。其中动态调用的范围仅为纯
+startup 配置规划和请求 Body 校验：覆盖默认关闭、exact `true|false`、启用/禁用与 path 组合、绝对
+path 接受、exact 六字段、显式确认、标识符边界、lowercase SHA-256 digest、未知字段和错误 JSON 类型。
+绝对 path 用例只验证规划结果，不打开目录，也不建立 cgroup custody。
+
+以下矩阵仍未运行：
+
+- 真实进程 env/OnceLock startup、Linux cgroup2 no-follow/controller/FD lifetime 与 disabled HTTP `503`；
 - fresh/repeat V268 migration、route 401/403/400/404/409/422/500/503、response JSON exact allowlist；
 - real V249 installation audit、V267 derived-launch/Yama/session/no-work/shutdown/reap/cleanup；
 - concurrent duplicate handoff、连接取消、response 丢失、observation commit 前后进程故障与 replay；
@@ -95,8 +103,8 @@ CapacityPool、Offer、Job、Reservation、Attempt、Start、usage、verificatio
 - V254 18 deny parity、V260-V268 regression、V270 current readiness authority，以及未来 atomic
   activation；历史 `current V268 + fresh V265` 计划不得绕过 V270 的 cleanup 与同进程 reproof。
 
-完整 Windows product check 与 WSL2 `elon-server` test target 已包含 V269 源码并编译通过；上述专属
-命令仍未运行，因此动态计数为 `passed=0`、`failed=0`。静态 diff、format、source-size 或文档
-modularity 只能作为源码卫生证据；编译通过也不能升级为 HTTP、SQLite、Linux runtime、signer 或生产验收。
+完整 Windows product check 与 WSL2 `elon-server` test target 已包含 V269 源码并编译通过；本批的
+`23/23` 不能升级为 HTTP、SQLite、Linux runtime、signer 或生产验收，这些未运行矩阵继续单独记为
+`passed=0`、`failed=0`。静态 diff、format、source-size 或文档 modularity 只能作为源码卫生证据。
 在真实 signer transport/私钥托管另行设计前，不得把管理员 courier 描述为 unattended signer；在独立
 atomic activation/admission 完成前，Provider 必须保持 `registering`。

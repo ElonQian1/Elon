@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_compiled
-verification_status: source_review_only
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_configuration_and_source_contracts_verified
 ---
 
 # 外部矿池 Adapter 运行时兼容性签名交接权威
@@ -166,8 +166,14 @@ settlement 或 Sui authority。Provider 保持 `registering`，V254 18 个 tempo
 九项 effect 和七项 readiness 不得因 handoff 可达而升级。V269 也不等于 production private-key custody、
 unattended signer worker、Provider-specific readiness、atomic activation 或 market admission。
 
-V269 已随完整 Windows product check 与 WSL2 `elon-server` test target 编译；尚未运行其 startup、
-HTTP/SQLite/Linux child 或 signer 专属矩阵，也未连接 signer 或生产网络。状态为
-`source_review_only / implementation_compiled / implementation_unrun`，专属动态计数仍为
-`passed=0`、`failed=0`。源码与文档只表达一条可达的人工交接合同，不证明
-startup custody、live-FS audit、V267 runtime、V237 signer 或断连恢复已经动态验收。
+V269 已随完整 Windows product check 与 WSL2 `elon-server` test target 编译。本地定向测试进一步覆盖
+默认关闭、exact `true|false`、启用/禁用与 path 组合、绝对 path 解析、exact 六字段 Body、显式确认、
+标识符边界、lowercase SHA-256 digest 以及未知字段和错误 JSON 类型拒绝；连同既有源码合同共
+`23 passed / 0 failed`，验证指纹为
+`f245567d18e5ef2c6f521d3f13a486a6b255aebac9c1039794d3294386b82675`。状态为
+`implementation_partially_verified / targeted_local_configuration_and_source_contracts_verified`。
+
+上述测试只调用纯配置规划和请求校验，不设置真实进程环境，不初始化全局 runtime，也不打开 cgroup
+目录。startup custody、disabled HTTP `503`、SQLite、live-FS audit、Linux cgroup/FD/child、V267
+runtime、V237 signer、并发与断连恢复仍为 `passed=0`、`failed=0`、`unrun`，且未连接 signer 或生产网络。
+源码、文档和局部测试只证明人工交接入口的静态合同与输入门卫，不证明运行时或生产可用。

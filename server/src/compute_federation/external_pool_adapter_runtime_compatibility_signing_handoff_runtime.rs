@@ -1,6 +1,6 @@
 //! Startup-owned delegated cgroup custody for the V269 administrator signing handoff.
 
-use std::{path::PathBuf, sync::Arc, sync::OnceLock};
+use std::{ffi::OsString, path::PathBuf, sync::Arc, sync::OnceLock};
 
 use anyhow::{anyhow, bail, Result};
 use thiserror::Error;
@@ -54,30 +54,13 @@ pub(crate) fn external_pool_adapter_runtime_compatibility_signing_handoff_runtim
 
 fn configured_runtime(
 ) -> Result<Option<Arc<ExternalPoolAdapterRuntimeCompatibilitySigningHandoffRuntime>>> {
-    let enabled = match std::env::var_os(ENABLED_ENV) {
-        None => false,
-        Some(value) => match value.to_str() {
-            Some("true") => true,
-            Some("false") => false,
-            _ => bail!("runtime compatibility signing handoff enabled value is invalid"),
-        },
-    };
-    let path = std::env::var_os(CGROUP_PARENT_PATH_ENV);
-    if !enabled {
-        if path.is_some() {
-            bail!("disabled runtime compatibility signing handoff has a cgroup path");
-        }
+    let path = signing_handoff_runtime_path(
+        std::env::var_os(ENABLED_ENV),
+        std::env::var_os(CGROUP_PARENT_PATH_ENV),
+    )?;
+    let Some(path) = path else {
         return Ok(None);
-    }
-    let path = path
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .ok_or_else(|| {
-            anyhow!("enabled runtime compatibility signing handoff lacks a cgroup path")
-        })?;
-    if !path.is_absolute() {
-        bail!("runtime compatibility signing handoff cgroup path is not absolute");
-    }
+    };
 
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
@@ -93,4 +76,34 @@ fn configured_runtime(
         let _ = path;
         bail!("runtime compatibility signing handoff requires Linux x86-64");
     }
+}
+
+pub(super) fn signing_handoff_runtime_path(
+    enabled: Option<OsString>,
+    path: Option<OsString>,
+) -> Result<Option<PathBuf>> {
+    let enabled = match enabled {
+        None => false,
+        Some(value) => match value.to_str() {
+            Some("true") => true,
+            Some("false") => false,
+            _ => bail!("runtime compatibility signing handoff enabled value is invalid"),
+        },
+    };
+    if !enabled {
+        if path.is_some() {
+            bail!("disabled runtime compatibility signing handoff has a cgroup path");
+        }
+        return Ok(None);
+    }
+    let path = path
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            anyhow!("enabled runtime compatibility signing handoff lacks a cgroup path")
+        })?;
+    if !path.is_absolute() {
+        bail!("runtime compatibility signing handoff cgroup path is not absolute");
+    }
+    Ok(Some(path))
 }
