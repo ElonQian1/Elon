@@ -181,6 +181,30 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("\"chatgpt_web_mcp\""))
     }
 
+    @Test
+    fun ordinaryFriendChatOwnsARealMicrophonePermissionChain() {
+        val main = read("android/app/src/main/kotlin/com/elon/app/MainActivity.kt")
+        val lifecycle = read("android/app/src/main/kotlin/com/elon/app/MainChatGptWebLifecycle.kt")
+        val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val controller = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
+        val session = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt")
+
+        assertTrue(main.contains("private val chatGptWebLifecycle = MainChatGptWebLifecycle(this)"))
+        assertTrue(
+            main.indexOf("private val chatGptWebLifecycle =") <
+                main.indexOf("override fun onCreate("),
+        )
+        assertTrue(lifecycle.contains("ChatGptWebAudioPermissionController(activity)"))
+        assertTrue(feature.contains("audioPermissionController = chatGptWebLifecycle.audioPermissionController"))
+        assertTrue(feature.contains("chatGptWebLifecycle.dispose()"))
+        assertTrue(controller.contains("audioPermissionController = audioPermissionController"))
+        assertTrue(session.contains("override fun onPermissionRequest(request: PermissionRequest)"))
+        assertTrue(session.contains("audioPermissionController.handle(request)"))
+        assertTrue(session.contains("audioPermissionController.cancel(request)"))
+        assertTrue(session.contains("audioPermissionState = audioPermissionController::snapshot"))
+        assertTrue(session.contains("microphone_permission_denied"))
+    }
+
     private fun read(relative: String): String =
         String(Files.readAllBytes(root().resolve(relative)), StandardCharsets.UTF_8)
 

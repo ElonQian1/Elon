@@ -24,7 +24,7 @@ private sealed class SuspendedSocialChat {
 }
 
 class MainActivity : AppCompatActivity() {
-
+    private val chatGptWebLifecycle = MainChatGptWebLifecycle(this)
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var agentPageController: AgentPageController
@@ -58,7 +58,6 @@ class MainActivity : AppCompatActivity() {
             groupActions.loadGroups()
         }
     }
-
     /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
         adapter.onApkAction = { action, url -> handleApkChatAction(action, url) }
@@ -1040,7 +1039,7 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             inputComposerViews = inputActions::inputComposerViewsOrNull,
             showWorkModelSelector = modelActions::showModelPopupOrLoad,
-            updateWorkModel = modelActions::updateModelButton,
+            updateWorkModel = modelActions::updateModelButton, chatGptWebLifecycle = chatGptWebLifecycle,
         )
     }
 

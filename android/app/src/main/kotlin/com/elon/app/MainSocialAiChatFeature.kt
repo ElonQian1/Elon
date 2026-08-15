@@ -22,6 +22,7 @@ internal class MainSocialAiChatFeature(
     private val inputComposerViews: () -> MainInputComposerViews?,
     private val showWorkModelSelector: () -> Unit,
     private val updateWorkModel: () -> Unit,
+    private val chatGptWebLifecycle: MainChatGptWebLifecycle,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
     private val chatGptControllerDelegate = lazy {
@@ -34,6 +35,7 @@ internal class MainSocialAiChatFeature(
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = { onWebChatNavigationChanged() },
+            audioPermissionController = chatGptWebLifecycle.audioPermissionController,
         )
     }
     private val chatGptController by chatGptControllerDelegate
@@ -220,6 +222,7 @@ internal class MainSocialAiChatFeature(
     fun destroy() {
         if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
         if (googleControllerDelegate.isInitialized()) googleController.destroy()
+        chatGptWebLifecycle.dispose()
     }
 
     private fun activateWorkMode() {

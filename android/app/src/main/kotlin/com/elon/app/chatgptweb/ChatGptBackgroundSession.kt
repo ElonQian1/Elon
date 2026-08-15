@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -26,6 +27,7 @@ internal class ChatGptBackgroundSession(
     private val onCommandResult: (ChatGptWebEvent.CommandResult) -> Unit,
     private val onAttachmentSendChanged: (ChatGptWebAttachmentSendUpdate) -> Unit,
     private val onConversationIndexChanged: (ChatGptWebConversationIndexState) -> Unit,
+    private val audioPermissionController: ChatGptWebAudioPermissionController,
 ) {
     enum class State(val wireValue: String) {
         IDLE("idle"),
@@ -193,7 +195,18 @@ internal class ChatGptBackgroundSession(
                 )
             },
             invokeControlAction = adapter::invokeUiControl,
-            startDictationAction = adapter::startDictation,
+            startDictationAction = { requestId ->
+                audioPermissionController.runWithMicrophone(
+                    action = { adapter.startDictation(requestId) },
+                    onPermissionDenied = {
+                        observedMcpState.failCommand(
+                            requestId,
+                            "start_dictation",
+                            "microphone_permission_denied",
+                        )
+                    },
+                )
+            },
             requestComposerOptionsAction = { section, requestId ->
                 observedMcpState.beginComposerRequest(section)
                 if (section == "model") adapter.listModelOptions(requestId)
@@ -208,6 +221,7 @@ internal class ChatGptBackgroundSession(
             bridgeState = { latestBridgeState },
             mode = { ChatGptWebModeController.Mode.NATIVE },
             inputText = inputText,
+            audioPermissionState = audioPermissionController::snapshot,
             verificationEvidence = verificationEvidenceStore::snapshot,
             recordVerificationCases = verificationEvidenceStore::record,
             setInputText = setInputText,
@@ -272,6 +286,14 @@ internal class ChatGptBackgroundSession(
                     filePathCallback.onReceiveValue(values.takeIf { it.isNotEmpty() }?.toTypedArray())
                     if (values.isEmpty()) failAttachmentSend("附件请求已失效，请重新选择。")
                     return true
+                }
+
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    activity.runOnUiThread { audioPermissionController.handle(request) }
+                }
+
+                override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                    activity.runOnUiThread { audioPermissionController.cancel(request) }
                 }
             }
         }

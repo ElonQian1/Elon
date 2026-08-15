@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptBackgroundSession
 import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
 import com.elon.app.chatgptweb.ChatGptMessageClipboard
+import com.elon.app.chatgptweb.ChatGptWebAudioPermissionController
 import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
@@ -23,6 +24,7 @@ internal class ChatGptSocialChatController(
     private val collapseInputComposer: () -> Unit,
     private val openOfficialFallback: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
+    audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.CHATGPT_WEB
     private val messages = mutableListOf<ChatMessage>()
@@ -38,6 +40,7 @@ internal class ChatGptSocialChatController(
         onCommandResult = ::handleCommandResult,
         onAttachmentSendChanged = ::handleAttachmentSendUpdate,
         onConversationIndexChanged = { onConversationIndexChanged() },
+        audioPermissionController = audioPermissionController,
     )
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
