@@ -36,7 +36,8 @@ internal class WebChatNavigationSessionRegistry(
         val provider = identity(providerId)
         if (!provider.selectable) return null
         return sessionsByProvider[providerId]?.takeIf { session ->
-            provider.capabilities.all(session.capabilities::contains)
+            WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION.all(session.capabilities::contains) &&
+                session.capabilities.all(provider.capabilities::contains)
         }
     }
 }

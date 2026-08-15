@@ -34,6 +34,18 @@ class WebChatNavigationSessionRegistryTest {
     }
 
     @Test
+    fun routesProductionProvidersWithCapabilitiesBeyondNavigation() {
+        WebChatProviderId.entries.forEach { providerId ->
+            val registry = WebChatNavigationSessionRegistry(
+                sessions = listOf(navigationSession(providerId)),
+                identity = WebChatProviderRegistry::get,
+            )
+
+            requireNotNull(registry.session(providerId))
+        }
+    }
+
+    @Test
     fun rejectsAProviderWhoseRuntimeAdapterLacksAnyRequiredNavigationCapability() {
         val incomplete = navigationSession(
             providerId = WebChatProviderId.GOOGLE_WEB,
@@ -55,6 +67,22 @@ class WebChatNavigationSessionRegistryTest {
             identity = { id ->
                 completeIdentity(id).copy(available = false)
             },
+        )
+
+        assertNull(registry.session(WebChatProviderId.GOOGLE_WEB))
+    }
+
+    @Test
+    fun rejectsASessionCapabilityThatTheProviderDoesNotDeclare() {
+        val registry = WebChatNavigationSessionRegistry(
+            sessions = listOf(
+                navigationSession(
+                    providerId = WebChatProviderId.GOOGLE_WEB,
+                    capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION +
+                        WebChatProviderCapability.REALTIME_VOICE,
+                ),
+            ),
+            identity = { completeIdentity(it) },
         )
 
         assertNull(registry.session(WebChatProviderId.GOOGLE_WEB))
