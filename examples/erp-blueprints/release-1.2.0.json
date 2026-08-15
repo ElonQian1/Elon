@@ -3,7 +3,7 @@
   "blueprint_key": "official.erp",
   "version": "1.2.0",
   "previous_version": "1.1.0",
-  "source_git_commit": "4a635fb4b",
+  "source_git_commit": "a3776e8a2",
   "modules": [
     { "module_key": "catalog", "version": "1.2.0", "required": true },
     { "module_key": "order", "version": "1.2.0", "required": true },
