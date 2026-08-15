@@ -25,7 +25,7 @@ V253 的 2026-08-13 historical 领域合同、migration、Store、管理员 Serv
 - 同一 binding sequence/predecessor 连续，旧 head historical；过期/撤销 head 可作为历史 predecessor 恢复；
 - pre-V275 只有 registering receipt 在 exact 原 revision/digest/status current，且 live Adapter ID 必须等于 `logical_adapter_id`；
 - 旧 registering→logical-active 窄桥、active challenge 与 later logical-active successor 的通过结果仅为 historical/superseded evidence，不再列为当前正向验收；
-- future V275 genesis 应由单独的 non-authorizing transition proof 消费 current registering V253 与 planned adjacent projected-active target；future ordinary projected-active challenge/current 还必须消费 durable V275 activation witness 与 exact historical activation root；这些路径本批未运行、未验收；
+- V275 genesis应由单独的non-authorizing transition proof消费current registering V253与planned adjacent projected-active target，不要求预存/current V274；ordinary projected-active challenge/current直接消费durable V275 activation witness、exact historical activation root与live projected-active Provider，不先要求current V274；这些路径仍未实现、未运行、未验收；
 - future active live Adapter ID 必须等于 `route_adapter_projection_id`，而 release/credential lineage继续使用 `logical_adapter_id`；验收不得断言二者相等；
 - V243 历史 receipt、V249 locator commitment 与 onboarding 私有 locator 重算一致；结构化 DTO 不单列 locator/commitment，而授权签名方收到的 domain-separated 完整签名消息会承诺 commitment，但永不包含 raw locator；
 - V250 漏洞情报与 V252 六能力沙箱 currentness 保持正交，V253 不把它们的缺失或成功投影为 credential 结果；
@@ -41,7 +41,7 @@ V253 的 2026-08-13 historical 领域合同、migration、Store、管理员 Serv
 - onboarding 原始 locator 的 scheme/commitment 与 V249 companion 不一致；
 - report 非 `passed`、运行超过 10 分钟、生成延迟超过 5 分钟、有效期超过 60 分钟、已过期或未来时间；
 - pre-V275 任意 active Provider、registering revision/digest 漂移或 registering live Adapter 不等于 logical Adapter 均失败关闭；
-- future registering→projected-active 跳号、缺失 V275 witness/historical activation root、active live Adapter 不等于 route projection、把 logical ID 与 projection ID 强等、owner/release/config/live credential subject 漂移均失败关闭；settlement 不得被当作 credential stable subject 或 activation compatibility 字段；
+- registering→projected-active跳号、缺失V275 witness/historical activation root、错误依赖current V274、active live Adapter不等于route projection、把logical ID与projection ID强等、owner/release/config/live credential subject漂移均失败关闭；settlement不得被当作credential stable subject或activation compatibility字段；
 - future active receipt 遇到任意 revision/digest/status 变化时须经 witness/root 门控 successor 重取证据；`draining`、`quarantined`、`disabled` 均不能签发或保持 current；
 - receipt/head 显式撤销、到期、successor、SQL update/delete/replace、canonical JSON 或物化列漂移；
 - response 出现 locator/commitment、nonce/message/signature及 digest、PEM、actor、幂等、confirmation、evidence 原文、receipt JSON、bearer/token/secret 或本机路径。
@@ -50,4 +50,4 @@ V253 的 2026-08-13 historical 领域合同、migration、Store、管理员 Serv
 
 当前 HTTP 测试已确认 route adapter/credential/capability、service actor、attempt start outbox、Offer 和 Job 七类表未被 V253 写入，并确认 receipt/revocation 的 Adapter/Provider/route/execution/usage/settlement 效果为 `none`。完整运行验收仍须比较写前写后 Provider current version、v213 seal、Capacity/Reservation/Attempt/Lease/ACK/event、usage/Receipt/settlement/付款表；当前局部检查不能替代完整零效果证明。
 
-尚未验收 SQLite V252→V253 文件库升级、两次重开、并发 sibling challenge、崩溃恢复、真实 TCP HTTP、真实 secret custody、外部认证、生产数据库/部署/MCP/PC、Provider activation、projected-active challenge/current、Sidecar/worker/ACK、派发、计量与结算。旧 `8 passed` 维持 historical local evidence；本批 registering-only narrowing、HTTP fail-close expectation 与 projected transition seam严格为 `source_review_only / implementation_uncompiled / implementation_unrun / passed=0 / failed=0`。V253 总体仍是 `implementation_partially_verified`，不能把历史验证状态升级为 latest narrowing或生产可用。
+尚未验收 SQLite V252→V253 文件库升级、两次重开、并发 sibling challenge、崩溃恢复、真实 TCP HTTP、真实 secret custody、外部认证、生产数据库/部署/MCP/PC、Provider activation、V275 projected-active challenge/current与restart、Sidecar/worker/ACK、派发、计量与结算。旧 `8 passed` 维持 historical local evidence；本批 registering-only narrowing与V275 projected transition/active seam严格为 `source_review_only / implementation_uncompiled / implementation_unrun / passed=0 / failed=0`。V253 总体仍是 `implementation_partially_verified`，不能把历史验证状态升级为latest narrowing、V275实现或生产可用。

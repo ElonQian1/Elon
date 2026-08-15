@@ -50,31 +50,35 @@ V275 transaction 或 production runtime；生产计数仍为 `passed=0 / failed=
 | structural drift | release/binding/candidate/profile/target/companion/policy/image/task profile/lane/carrier任一变化产生不同 root并阻止旧 route复用。 |
 | forbidden input | V250/V252/V253/V268/V270/V272 renewable receipt、process seal/TTL、Secret/session、executor/route/capability/fence/attempt/lease任一进入 stable root即失败。 |
 
-Provider target还必须验证 `policy_revision=source+1`、status=`active`、`updated_at=checked_at`，除 adapter
+Provider target还必须验证 `policy_revision=source+1`、status=`active`、
+`updated_at=activation_target_updated_at`，除 adapter
 projection与这三个transition字段外其它 typed Provider字段 exact保持。wrong owner/release/config/settlement、跳
-revision或 logical-active
-一律失败关闭。
+revision或 logical-active 一律失败关闭。双时间必须满足
+`source.updated_at <= activation_target_updated_at <= observation_started_at <= observation_completed_at <= evidence_checked_at < observation_expires_at`；preflight冻结target/root，final才生成`evidence_checked_at`并重验，不得折叠为单一
+`checked_at`或用final时间改写target。
 
 ## 4. Renewable evidence 与 circularity 矩阵
 
 | Case | 必须结果 |
 |---|---|
 | V275 genesis prepare | registering source、planned adjacent active target、fresh V253 registering transition proof、pending V270-equivalent genesis observation与fresh V272 genesis carrier形成仅进程内non-authorizing overlay；数据库仍零V274 row。 |
-| V275 commit | 同一 `BEGIN IMMEDIATE` 原子闭合 exact active Provider/route/executor、V274 genesis与18-fence replacement；不承诺行级先后，一次commit后purpose seal才pending→committed。 |
+| V275 commit | 同一 `BEGIN IMMEDIATE` 原子闭合 exact active Provider/route/executor、V275 receipt、V274 genesis与`9 pending-plan permits / 9 absolute denies`；commit后same-connection readback才promote purpose seal。 |
 | genesis pair distinction | credential-observed registering Provider pair与runtime/task evidence planned-active pair不强等；transition由activation root+V275 transaction证明。 |
-| future active refresh | 只在future V275/V276 transaction-bound path中，live Provider必须active且adapter=projection；fresh V253 active receipt、fresh V270-equivalent observation、fresh V272 carrier与stable root同checked-at重验；V274无独立producer。 |
+| active refresh | V275实现transaction-bound active V253与fresh V274 successor/restart；live Provider必须active且adapter=projection，fresh V253、V270-equivalent observation、V272 carrier与stable root在`evidence_checked_at`重验；V276只负责route renewal/reachability。 |
 | runtime freshness | observation完成后最长15秒，且不晚于任何输入到期；历史V270 registering receipt不能冒充active observation。 |
-| V272 neutrality | public/canonical V272 receipt保持Provider-neutral；genesis private carrier绑定planned target，restart/refresh carrier直接消费durable V275 witness+historical root再由V274 wrapping，绝不能依赖current V274形成递归。 |
+| V272 neutrality | public/canonical V272 receipt保持Provider-neutral；private digest用`ELON-EXTERNAL-POOL-ADAPTER-TASK-PROTOCOL-ACTIVE-CARRIER-V1` exact十字段material，genesis/refresh走不同typed constructors；refresh直接消费V275 witness+root，绝不依赖current V274。 |
+| one-way witness | V275 canonical/DDL不含V274 receipt identity或反向FK；V275自身receipt/root三元组为UNIQUE parent，V274 witness/root三元组以immediate FK引用它，先写V275、后写V274。 |
 
 任何 SQLite transaction、connection、Prepared/Store authority跨 filesystem/network/child/await，或在外部观察后不做
-final same-connection reproof，均失败。
+final same-connection `evidence_checked_at` reproof，均失败；raw-result wrapping不能替代typed current authority。
 
 ## 5. Purpose seal、restart 与 lineage 矩阵
 
 | Case | 必须结果 |
 |---|---|
 | rollback | 零durable successor且pending永不授权；允许TTL prune/best-effort cleanup，不能promote，安全性不依赖显式删除。 |
-| commit/promote gap | 仅同进程同exact pending entry可exact readback后promote；不得造第二行。 |
+| pending order | observation完成仍无plan/seal；final writer lock+`evidence_checked_at`+fresh typed reproof后才注册V275 plan并mint/remember V274 pending seal。 |
+| commit/promote gap | 17 mutations/same-tx readback/commit后，仅same connection postcommit exact readback可promote并discard plan；不得造第二行。 |
 | restart | 旧seal/epoch立即historical，即使TTL未过；fresh Prepared、active observation、V272与新successor全部必需。 |
 | exact replay | 同actor/idempotency与全部bytes exact只readback；任何差异冲突。 |
 | refresh | sequence单调、predecessor exact head；Provider任意active `policy_revision`变化都使旧receipt historical。 |
@@ -100,10 +104,12 @@ projected-active branch（含旧logical-active形状）、active carrier、refre
 
 V275正向验收必须证明 stable executor、route projection Adapter/version与v213 route credential、V253
 projected-active transition proof、service actor、route authorization、六 capability、seal、紧邻 active Provider、
-V274 genesis及18-fence replacement同一
-`BEGIN IMMEDIATE`/同commit，任一 fault全部 rollback。V274本批不得用 mock row提前证明该事务。
+V275 receipt、V274 genesis及18-fence exact九项pending permit/九项absolute deny同一
+`BEGIN IMMEDIATE`/同commit，任一 fault全部 rollback。#2 active Provider INSERT与#3-#4/#13-#18不得放行。
+V274本批不得用 mock row提前证明该事务。
 
-V276才验收 V273 worker/ingress到真实v213 eligible rows、ELTP ACK/event与downstream closure；V274/V275成功都不能
+V275另须实现active V253与restart后从durable witness/root/live Provider出发的fresh V274 successor；旧V274 current
+不得成为前置。V276才验收route renewal、V273 worker/ingress到真实v213 eligible rows、ELTP ACK/event与downstream closure；V274/V275成功都不能
 倒推 transport动态通过。Pool/Offer admission、usage、market、settlement、部署与跨进程可携带外签 authority也不属于
 V274 passed。
 

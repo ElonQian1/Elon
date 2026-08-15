@@ -117,19 +117,17 @@ external pool 只能使用 `server_adapter + adapter_execution`，不能伪装�
 
 v221 源码已让 `external_pool_onboarding` 精确引用专用 application，而不是借用 endpoint-only activation application；它已编译迁移，onboarding Store 状态机通过 2 项专项，但没有生产入口，因此生产环境不会触发 route source。申请、管理员批准、Provider adapter ref 与 non-bearer lookup ref 都不等于 credential proof；v213 rows 仍须等待独立 verifier、TTL/revocation、六能力 currentness 与 sealed producer。完整边界见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)。
 
-V273 已实现但尚未编译或运行默认关闭的 dormant production transport/ingress kernel：唯一新 env 是
-`ELON_EXTERNAL_POOL_ADAPTER_ATTEMPT_DELIVERY_ENABLED`；`true` startup只要求Linux x86_64与V270/V272
-runtime/custody available，current authority由每个candidate/attempt同connection/checked-at重取。它按固定八项
-production roots/argv复用ELTP v1，并只持久化四张完全immutable
-attempt/receipt/batch/event表与两张immutable-intent/narrow-CAS reconcile/event poll表；没有HTTP/MCP/WebSocket
-或通用ingress API。首个v213 send-attempt与V273 exchange-attempt必须同一BEGIN IMMEDIATE/同commit后才出网。
+V273 default-off dormant production transport/ingress已通过完整WSL2 GNU目标编译与21/21源码/迁移合同，但production
+runtime仍`passed=0/failed=0`。它只消费已耐久化的v213 outbox/route/executor/fence，不提供v213 constructor；首个
+v213 send-attempt与V273 exchange-attempt仍须同一transaction/commit后才可出网。
 
-该 kernel 只消费未来已经耐久化的 v213 outbox/route/executor/fence，并通过既有 v213 Store gate把首个
-send-attempt与V273 exchange-attempt原子成对记录，不提供任何新v213 constructor。当前 Provider=`registering`、
-stable executor与route均不存在，所以固定 `eligible_rows=0`，不允许网络发送或把
-non-authoritative lane subject冒充 executor。V254 18 deny逐字保留；V274 active successor、V275 executor+atomic
-activation之后，仍须由V276单独接通并验收 production reachability。权威边界见
-[`external-pool-adapter-task-protocol-production-authority.md`](external-pool-adapter-task-protocol-production-authority.md)。
+V275 docs-first冻结stable executor与Provider/route原子激活：exact `16 INSERT + 1 CAS UPDATE`同时闭合active
+Provider、v213 route、V275 historical receipt及V274 genesis；V275 receipt永不单独current，V254矩阵只把#1/#5-#12
+九项改为pending-plan permit，#2-#4/#13-#18九项继续absolute deny。该设计尚未实现/编译/运行，当前Provider仍
+`registering`、route/executor不存在、`eligible_rows=0`。即使V275成功，仍不允许网络发送；V276才负责route renewal、
+per-attempt current reproof与production reachability。见
+[`V273 authority`](external-pool-adapter-task-protocol-production-authority.md)与
+[`V275 authority`](external-pool-adapter-stable-executor-atomic-activation-authority.md)。
 
 ## 11. 仍未实现
 

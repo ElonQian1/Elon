@@ -69,7 +69,8 @@ command/outbox/send-attempt/Attempt/Lease，以及任何 network observation。�
 
 Store 只接受当前 source `ComputeProvider` typed value，不接受 caller JSON。`initial_active_provider_json` 的唯一
 生成算法是：复制 exact registering Provider；保持 provider/owner/kind/release/config/settlement 与其它稳定字段；
-把 `policy_revision` 设为紧邻 revision，把 status 设为 `active`，把 `updated_at` 设为同一 `checked_at`，并把
+把 `policy_revision` 设为紧邻 revision，把 status 设为 `active`，把 `updated_at` 设为 preflight 冻结的
+`activation_target_updated_at`，并把
 `provider.adapter.adapter_id` 从 V249 logical adapter ID 改为 exact `route_adapter_projection_id`；然后调用
 `serde_json::to_string(&ComputeProvider)`。digest 继续使用现有 Provider SHA-256 ABI。
 
@@ -113,7 +114,18 @@ compute_external_pool_adapter_provider_active_successor_current
   `process_custody_seal_digest`；
 - activation closure：每个durable row required的 `activation_witness_id`、`activation_witness_digest`；pending
   overlay不写表，因此不存在nullable prepare row；
-- receipt：`checked_at`、`receipt_json`、`receipt_digest`、`created_at`。
+- receipt：`activation_target_updated_at`、final `evidence_checked_at`、`receipt_json`、`receipt_digest`、
+  `created_at=evidence_checked_at`。
+
+V274 的 dual-time 顺序 exact 为
+`source.updated_at <= activation_target_updated_at <= observation_started_at <= observation_completed_at <= evidence_checked_at < observation_expires_at`。
+preflight 用第一时间冻结 target/root，外部证据完成后的 final transaction 用第二时间重验 currentness；不得把二者
+折叠回单一 `checked_at`，也不得用 final 时间改写 Provider target bytes。
+
+V275实现前V274两张base table保证零row，因此V275 migration可失败关闭地rebuild V274 receipt shape：把旧
+`checked_at`语义正式重命名为`activation_target_updated_at`，新增`evidence_checked_at`，并固定
+`created_at=evidence_checked_at`；V275 parent table/UNIQUE先建立，再给V274 witness/root三元组安装指向V275
+receipt/root三元组的immediate FK。不得保留歧义alias、反向FK或迁移任何非零历史row。
 
 Genesis 的 credential-observed Provider pair 可以是 source registering pair，而 runtime/task-protocol evidence
 pair 必须绑定 planned adjacent active target；两组 pair 不得被错误强等。V275 transaction 证明 transition 后才能
@@ -131,24 +143,27 @@ activation、route、dispatch 或 admission authority，也不得命名为 `read
 它不得依赖V249/V253/V270/V272 registering-only current view；只可从V274两张base table与direct historical/
 Provider facts计算关系诊断，避免currentness递归。
 
-当前 implemented Store-private ABI 只暴露
+当前 source-reviewed Store-private ABI 只暴露
 `prepare_external_pool_adapter_provider_active_successor_target_on`：它接收调用者已有的 `&Transaction` 与同一
-`checked_at`，只生成 registering source、planned adjacent projected-active target和 stable activation root。返回的
+`activation_target_updated_at`，只生成 registering source、planned adjacent projected-active target和 stable activation root。返回的
 Prepared target是non-authorizing、transaction-bound、non-Clone、non-Debug、non-Serde，不能从Store root公开
 re-export；当前源码另有 dormant private read/audit 与 process-custody seam，但没有 Store facade、row producer、
-current authority、active observation minter或 V272 active carrier。
+current authority、active observation minter或 V272 active carrier。V275 implementation须让final producer另收服务端
+生成的`evidence_checked_at`。任何Transaction/Connection/
+Prepared authority都不得跨外部I/O，只可携带owned non-authorizing plan，并在final重建同一target/root。
 
 `append_external_pool_adapter_provider_active_successor_genesis_on`、
 `append_external_pool_adapter_provider_active_successor_refresh_on`、
 `require_current_external_pool_adapter_provider_active_successor_on` 与
-`append_external_pool_adapter_provider_active_successor_revocation_on` 仅是 future V275/V276 reserved ABI names；
-V274 本批对这些名字有零定义、零调用。V275 必须先提供 opaque durable atomic activation witness，才可在同一
-`BEGIN IMMEDIATE` transaction内加入 genesis producer；V276 才能接 reachability/current consumer。不得把当前
+`append_external_pool_adapter_provider_active_successor_revocation_on` 是 V275 active/restart 与后继消费所需的
+reserved ABI names；V274 本批对这些名字有零定义、零调用。V275 必须先提供 opaque durable atomic activation
+witness，才可在同一 `BEGIN IMMEDIATE` transaction内加入 genesis producer，并实现 fresh successor/restart；V276
+才接 route renewal与reachability consumer。不得把当前
 structural target helper改述为 pending row、genesis receipt或 active authority。
 
 ## 5. Renewable active-successor evidence
 
-每个 current receipt 都必须在同一 `checked_at` 重新证明 stable root 未漂移，并消费：
+每个 current receipt 都必须在 final `evidence_checked_at` 重新证明 stable root 未漂移，并消费：
 
 1. exact immutable V249/V254/V255/V258/V259 historical roots、unique structural head/unrevoked facts与V274
    active-historical reproof；不得调用其registering-only current wrappers；
@@ -166,6 +181,9 @@ filesystem、runtime/target/supervisor、config/credential、authenticated no-wo
 V272 canonical receipt继续 Provider-neutral。只有 Store-private carrier增加 activation-root-gated active subject；
 Provider/activation/carrier字段不得写入 V272 public JSON、receipt digest 或 process HMAC。Genesis carrier绑定 planned
 adjacent active target并保持 pending；V275 commit exact active Provider与durable activation witness后才可成为 current。
+carrier digest使用V275冻结的`ELON-EXTERNAL-POOL-ADAPTER-TASK-PROTOCOL-ACTIVE-CARRIER-V1`与exact十字段material；
+不含kind/time、V274 identity、process seal/session/Secret。genesis与active-refresh由不同typed constructors/current
+reproof隔离，不得互换。
 重启及后续 active carrier必须直接消费durable V275 activation witness、historical activation root与live
 projected-active Provider，再由V274 wrapping；它永远不得先要求current V274 receipt，否则会形成V272↔V274递归。
 V272 registering carrier与active carrier不能互换。
@@ -175,13 +193,15 @@ V272 registering carrier与active carrier不能互换。
 Active runtime observation 使用独立于 V270/V272 的 purpose-separated process HMAC。外部 filesystem/network/child
 观察先在 SQLite 事务外完成；final `BEGIN IMMEDIATE` 前形成 non-Clone、non-Debug、non-Serde Prepared overlay。
 
-同一进程 registry 在 final transaction 写入前登记 exact seal 为 `pending`；transaction 在同一 `checked_at` 重验
-Provider、stable root、V253、V270-equivalent observation、V272 carrier与所有结构根，append并 exact readback，
-commit 后才把 seal提升为 `committed`。rollback后的 pending永不授权，可由TTL prune或best-effort cleanup移除；
-显式删除不是安全性的前提。commit/promote gap 只允许同一进程、同一 exact pending entry 的幂等 readback完成
-promote；进程重启后不得根据 durable receipt 重建 seal。
+external observation完成时只有non-authorizing evidence。final`BEGIN IMMEDIATE`取得writer lock、生成
+`evidence_checked_at`并fresh typed重验Provider、stable root、V253、V270-equivalent observation、V272 carrier与全部
+结构根后，才可注册one-shot V275 plan并把exact V274 seal mint/remember为`pending`；writer lock/该时间前不得存在
+pending plan或seal。17项mutation与same-tx readback后commit；same connection postcommit exact readback成功才把seal
+提升为`committed`并discard plan。rollback、commit不确定或postcommit readback失败均不得promote；pending永不授权，
+显式删除不是安全性的前提。进程重启后不得根据durable receipt重建seal。
 
-任何 SQLite transaction、connection、Prepared/Store authority都不得跨 filesystem、network、child 或 async await。
+任何 SQLite transaction、connection、Prepared/Store authority都不得跨 filesystem、network、child 或 async await；
+final reproof消费typed current authority，不接受raw-result wrapping。
 
 ## 7. Narrow currentness bridges；禁止 broad reinterpretation
 
@@ -205,8 +225,8 @@ V274 只允许 activation-root-gated 窄分支，不重写 V249-V270 历史语�
 每个 `provider_binding_id + activation_root_digest` 只有一条全局线性 lineage：genesis sequence=1且 predecessor
 为空；successor必须引用 exact unrevoked head；相同 actor-bound idempotency只允许 exact replay。live Provider 的
 任何 active `policy_revision`变化，包括 settlement-only变化，都会令旧 successor historical；恢复 current 必须 fresh V253、
-fresh active runtime observation、fresh V272与新 successor。该 refresh 只是 future V275/V276 transaction-bound
-消费路径，V274 自身没有独立可运行 producer。`draining|quarantined|disabled` 一律失败关闭。
+fresh active runtime observation、fresh V272与新 successor。V275负责实现该active successor/restart path；V276只负责
+route renewal/reachability。V274 自身没有独立可运行 producer。`draining|quarantined|disabled` 一律失败关闭。
 
 Revocation只终止 future prepare/commit/refresh消费，不修改 Provider、route、market、settlement或历史 task facts。
 revoked/expired head可以作为 fully re-proven successor的结构 predecessor，但本身永远不 current；cleanup horizon内
@@ -218,16 +238,21 @@ seal、fresh V272 run/current receipt，并 append新 successor。诊断 view、
 
 ## 9. V275 genesis transaction 与 V276 reachability
 
-首个 durable successor只能由 V275 在一个 `BEGIN IMMEDIATE` 中产生。该 transaction 使用同一 `checked_at`重验
+首个 durable successor只能由 V275 在一个 `BEGIN IMMEDIATE` 中产生。该 transaction 在
+`evidence_checked_at`重验
 V274 Prepared overlay，并在同一原子闭包内完成 stable executor binding、exact route projection Adapter/version、
 v213 route credential、V253 projected-active transition proof、service actor、route authorization、六 capability、
-seal、紧邻 active Provider、durable V275 activation witness、V274 genesis与V254 18 deny replacement；全部 exact
-readback 后一次 commit。这里列举
+seal、紧邻 active Provider、durable V275 activation witness、V274 genesis与V254 exact
+`9 pending-plan permits / 9 absolute denies` replacement；全部 exact readback 后一次 commit。这里列举
 的是同一事务必须闭合的集合，不承诺错误的行级先后。任一失败全部 rollback，不能先 commit Provider、successor、
-executor或route中的任意子集，也不能在 transaction 内出网。
+executor或route中的任意子集，也不能在 transaction 内出网。V275 canonical/DDL不得保存V274 receipt identity或
+反向FK；V275自身`(activation_receipt_id, activation_receipt_digest, activation_root_digest)`为UNIQUE parent，V274
+`(activation_witness_id, activation_witness_digest, activation_root_digest)`以immediate FK引用它，所以同事务先写
+V275、后写V274即可闭合，不形成摘要环。只有Adapter/credential内部既有cycle保留deferred FK。
 
-V274 不提供上述 V275 constructors。V275 也不连接 V273 dormant worker。只有 V276 可在每个 candidate/attempt
-同 connection/checked-at重验 current V274/V275 authority后，让 V273消费真实 v213 eligible rows并执行 production
+V274 不提供上述 V275 constructors。V275 也不连接 V273 dormant worker。V275实现active V253与fresh V274
+successor/restart，但不续签route；只有 V276 可在每个 candidate/attempt
+同connection按其独立currentness time重验current V274/V275 authority后，让 V273消费真实v213 eligible rows并执行production
 reachability验收。
 
 ## 10. Zero effect 与当前证据

@@ -36,7 +36,7 @@ V221 application；V249 binding 只是 SQL 内部的 exact bridge，不替代 so
 | V221 -> review/request | 保留 V221 已有 exact review/request join、`approved`、`applied`、owner/reviewer separation 及摘要检查 |
 | V221 -> V249 binding | application ID/digest、Provider ID/owner、target Provider policy revision/digest、logical Adapter ID、release、config revision/digest 全部一致 |
 | V249 binding -> V254 candidate | binding/release/installation/projection/Provider/logical Adapter/release/config 六组组成根逐项 exact；只接受 structural latest、未撤销 candidate/delegation 与未终止 installation/adoption |
-| candidate -> route | `candidate.route_adapter_projection_id=NEW.adapter_id`、service actor exact，且 `candidate.logical_adapter_binding_digest=NEW.route_binding_digest=NEW.adapter_binding_digest` |
+| candidate -> route（V271 historical pre-V275） | `candidate.route_adapter_projection_id=NEW.adapter_id`、service actor exact；当时 dormant shape 还要求`candidate.logical_adapter_binding_digest=NEW.route_binding_digest=NEW.adapter_binding_digest` |
 | V249 binding -> projection | `binding.route_adapter_projection_id=NEW.adapter_id` 且不等于 source logical Adapter ID；不得跨 Provider 借用 projection |
 | V249 binding -> neutral release | registry release ID/digest、logical Adapter ID、release version 与 implementation exact，且 release 必须 current |
 
@@ -49,6 +49,14 @@ projected Adapter 的 `supported_capabilities_json` 必须与 V249 release 原�
 六能力 producer/worker 或 runtime proof。V249 capability-set digest 与 v213 route digest 属于不同 domain，
 V271 不把二者直接比较。`logical_projection_compatibility_digest` 也不由 SQLite UDF 重算；trigger 只审计
 candidate canonical JSON 投影，并逐项锁定生成该 digest 的 binding/release/logical-binding/projection 组成根。
+
+V275 supersedes上表最后一个digest等式，但不改写V271历史证据：`logical_adapter_binding_digest`只保留V221/V249/
+V254 release/credential/source lineage，V275 active route的`NEW.route_binding_digest/NEW.adapter_binding_digest`必须等于
+复用`ELON-COMPUTE-ATTEMPT-ADAPTER-BINDING-V1`计算的projection-shaped v211 digest。该v211 canonical shape仍只有
+provider ID/kind、route kind、endpoint、Adapter ID/version与config revision/digest，V275只把Adapter ID映射为
+`route_adapter_projection_id`；不得虚构Provider revision/digest/status或executor字段。planned active Provider pair与
+stable executor由V275 activation-route binding/receipt另行绑定。source仍是`external_pool_onboarding`和exact V221
+application，不得改成V275 receipt。
 
 ## 3. Migration 与历史语义
 
@@ -83,15 +91,16 @@ V271 只消除一个 schema-level P0，不足以创建 v213 route 或推进 Prov
 
 - 六项 v213 capability 的真实 production producer/worker 与 authenticated ACK/event、prepare、idempotent
   commit、cancel-no-start、reconcile 协议仍不存在；V249/V268 的六能力声明不是运行实现；
-- `external_pool` 的稳定 `executor_id`/executor authority root 尚未冻结，不能用 projection ID、service actor
-  或短时 process identity 临时代替；
-- 除 V253 credential 外，V249/V254/V255/V258/V259/V270 都没有完整 activation 后 active refresh/successor
-  currentness；registering evidence 不能被长期复用；
-- V254 18 fences 只能在 fresh/repeat/reopen、并发、crash、revocation、expiry、direct-SQL 与完整失败原子性
-  动态 replacement matrix 通过后逐项替换，不能由 V271 删除或旁路。
+- V275文档已冻结稳定`executor_id`/binding与projected v211 digest，但Rust/DDL/Store尚未实现；projection ID、service
+  actor或短时process identity仍不能临时代替；
+- V275文档已冻结active V253与fresh V274 successor/restart路径，但尚未实现/编译/运行；registering evidence仍不能
+  被长期复用；
+- V254 18 fences只能由V275 exact pending-plan UDF把#1/#5-#12九项改为permit；#2-#4/#13-#18九项保持absolute deny。
+  在fresh/repeat/reopen、并发、crash、revocation、expiry、direct-SQL与完整失败原子性通过前不能由V271删除或旁路。
 
-因此 atomic activation 仍为 NO-GO。未来事务设计必须另外消费同 connection/checked_at 的 V270 Store-private
-authority、建立完整 route/runtime closure、写 Provider adjacent active version，并在任何失败时整体回滚。
+因此实现与production atomic activation仍为NO-GO。V275 final transaction必须在`evidence_checked_at`消费fresh
+V270-equivalent/V272 Store-private authority、建立完整route/runtime closure、UPDATE既有Provider到adjacent active并
+写version；#2 active Provider INSERT永久deny，任何失败整体回滚。V276才负责route renewal/reachability。
 
 ## 6. 计划实现边界
 
