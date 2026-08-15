@@ -128,13 +128,18 @@ internal class ChatGptSocialChatController(
         val prompt = rawText.trim()
         if (prompt.isBlank()) return true
         if (!session.canSend()) {
-            val message = if (session.state() == ChatGptBackgroundSession.State.LOGIN_REQUIRED) {
-                R.string.web_chat_login_required
-            } else {
-                R.string.web_chat_not_ready
+            when (WebChatSendFallbackPolicy.decide(
+                loginRequired = session.state() == ChatGptBackgroundSession.State.LOGIN_REQUIRED,
+            )) {
+                WebChatSendFallbackPolicy.Action.OPEN_OFFICIAL_AUTHENTICATION -> {
+                    Toast.makeText(activity, R.string.web_chat_login_required, Toast.LENGTH_LONG).show()
+                    openOfficialFallback()
+                }
+                WebChatSendFallbackPolicy.Action.RETRY_IN_PLACE -> {
+                    session.onHostResumed()
+                    Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_LONG).show()
+                }
             }
-            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
-            openOfficialFallback()
             return true
         }
         pendingPrompt = prompt

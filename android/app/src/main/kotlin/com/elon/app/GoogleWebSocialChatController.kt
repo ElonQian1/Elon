@@ -92,8 +92,13 @@ internal class GoogleWebSocialChatController(
             return true
         }
         if (!session.canSend()) {
-            Toast.makeText(activity, "Google 网页 AI 尚未就绪，请打开官方页确认", Toast.LENGTH_LONG).show()
-            openOfficialFallback()
+            when (WebChatSendFallbackPolicy.decide(loginRequired = false)) {
+                WebChatSendFallbackPolicy.Action.RETRY_IN_PLACE -> {
+                    session.onHostResumed()
+                    Toast.makeText(activity, "Google 网页 AI 正在连接，请稍后重试", Toast.LENGTH_LONG).show()
+                }
+                WebChatSendFallbackPolicy.Action.OPEN_OFFICIAL_AUTHENTICATION -> openOfficialFallback()
+            }
             return true
         }
         val sendGeneration = pendingSend.begin(prompt)

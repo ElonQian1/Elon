@@ -77,7 +77,12 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(fixtureActions.contains("remove_chatgpt_web_acceptance_attachment"))
         assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
         assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
+        assertTrue(activity.contains("modeController.select(ChatGptWebModeController.Mode.WEB)"))
         assertTrue(activity.contains("ChatGptWebAccessPolicy.canChat(snapshot)"))
+        assertTrue(chatController.contains("WebChatSendFallbackPolicy.decide"))
+        assertTrue(chatController.contains("session.onHostResumed()"))
+        assertTrue(googleController.contains("WebChatSendFallbackPolicy.decide(loginRequired = false)"))
+        assertTrue(googleController.contains("session.onHostResumed()"))
     }
 
     @Test

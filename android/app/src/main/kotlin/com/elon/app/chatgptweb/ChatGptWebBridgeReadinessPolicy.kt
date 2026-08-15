@@ -23,7 +23,6 @@ internal object ChatGptWebBridgeReadinessPolicy {
     fun canRestoreFromManifest(
         snapshot: ChatGptWebSnapshot?,
         manifest: ChatGptWebUiManifest,
-    ): Boolean = snapshot?.authenticated == true &&
-        snapshot.loginRequired.not() &&
+    ): Boolean = snapshot?.let(ChatGptWebAccessPolicy::canChat) == true &&
         manifest.pageKind != "auth"
 }

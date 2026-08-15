@@ -60,17 +60,21 @@ class ChatGptWebBridgeReadinessPolicyTest {
     }
 
     @Test
-    fun authenticatedDocumentCanRecoverFromAnOverlayManifest() {
+    fun chatReadyDocumentCanRecoverFromAnOverlayManifestWithOrWithoutAnAccount() {
         assertTrue(ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
             snapshot(authenticated = true),
+            manifest(pageKind = "home"),
+        ))
+        assertTrue(ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
+            snapshot(authenticated = false),
             manifest(pageKind = "home"),
         ))
     }
 
     @Test
-    fun loginAndUnauthenticatedStatesCannotRecoverFromManifestAlone() {
+    fun loginAndNonComposerStatesCannotRecoverFromManifestAlone() {
         assertFalse(ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
-            snapshot(authenticated = false),
+            snapshot(authenticated = false, composerReady = false),
             manifest(pageKind = "home"),
         ))
         assertFalse(ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(
@@ -90,13 +94,14 @@ class ChatGptWebBridgeReadinessPolicyTest {
     private fun snapshot(
         authenticated: Boolean,
         loginRequired: Boolean = false,
+        composerReady: Boolean = true,
     ) = ChatGptWebSnapshot(
         title = "ChatGPT",
         url = "https://chatgpt.com/",
         draft = "",
         messages = emptyList(),
         authenticated = authenticated,
-        composerReady = true,
+        composerReady = composerReady,
         streaming = false,
         currentModel = "",
         attachments = emptyList(),

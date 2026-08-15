@@ -535,7 +535,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 } else if (ChatGptWebAccessPolicy.canChat(snapshot)) {
                     pageAdapter.markReady()
                     sessionRestorer.restorePreferredMode(binding.chatGptModeNative.isEnabled, modeController)
-                } else {
+                } else if (ChatGptWebAccessPolicy.requiresLogin(snapshot)) {
                     pageAdapter.markLoginRequired()
                 }
                 if (snapshot.title.isNotBlank()) binding.chatGptWebHost.text = snapshot.title
@@ -784,6 +784,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         binding.chatGptWebToolbar.visibility = View.GONE
         binding.chatGptWebStatus.visibility = View.GONE
         binding.chatGptModeToggle.visibility = View.GONE
+        modeController.select(ChatGptWebModeController.Mode.WEB)
     }
 
     companion object {
