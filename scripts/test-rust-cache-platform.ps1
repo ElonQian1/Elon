@@ -495,8 +495,19 @@ retry = 3
     Assert-Equal 'ustc' $resetProposal.removed_source_replacements[0] "source reset should report the removed replacement"
     Assert-True ($resetProposal.content -match '\[source\.ustc\]') "source reset should preserve inactive source definitions and unrelated user data"
 
+    $installLockRoot = Join-Path $TempRoot "install-lock"
+    $installLock = Enter-RustCachePlatformInstallLock -CacheRoot $installLockRoot -TimeoutSeconds 1
+    $concurrentInstallRejected = $false
+    try {
+        Enter-RustCachePlatformInstallLock -CacheRoot $installLockRoot -TimeoutSeconds 0 | Out-Null
+    } catch { $concurrentInstallRejected = $_.Exception.Message -match "platform install lock" }
+    Assert-True $concurrentInstallRejected "concurrent platform installation must fail closed on the same PC"
+    Exit-RustCachePlatformInstallLock -Lease $installLock
+
     $install = Install-RustCachePlatform -SourceScriptsRoot $PSScriptRoot -CacheRoot (Join-Path $TempRoot "installed") -RepoRoot $ProjectRoot
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
+    Assert-True (Test-Path -LiteralPath $install.platform_manifest_path) "installer should record a portable platform manifest"
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$install.source_hash)) "installer should report its source fingerprint"
     $installedCommand = Get-Command -Name $install.entry_path -ErrorAction Stop
     Assert-True ($installedCommand.Parameters.ContainsKey("SharedBuildPartition")) "installed machine entry should expose named shared partitions"
     Assert-True ($installedCommand.Parameters.ContainsKey("SharedAliasesOnly")) "installed machine entry should expose exact shared-alias GC"
@@ -562,7 +573,8 @@ retry = 3
     '{"last_used_utc":"2000-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $activeGcQuarantine ".last-used.json") -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $activeGcQuarantine "artifact.bin") -Value "unmanaged-old"
     $fakeCargoPath = Join-Path $TempRoot "cargo.exe"
-    Copy-Item -LiteralPath (Join-Path $PSHOME "powershell.exe") -Destination $fakeCargoPath
+    $currentPowerShellPath = (Get-Process -Id $PID).Path
+    Copy-Item -LiteralPath $currentPowerShellPath -Destination $fakeCargoPath
     $fakeCargo = Start-Process -FilePath $fakeCargoPath -ArgumentList @('-NoProfile','-Command','Start-Sleep 60') -WindowStyle Hidden -PassThru
     try {
         $activeDeadline = [DateTime]::UtcNow.AddSeconds(5)

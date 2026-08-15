@@ -77,6 +77,10 @@ implementation_refs:
 8. 会被多个入口调用的稳定分区必须登记到 `shared_partition_domains`，由平台把分区
    名称绑定到唯一 allowlist domain；不能只靠包装器约定 domain。
 
+推荐用统一入口完成项目登记，而不是手写 JSON：先运行 `rust-cache.ps1 init-project` 预览，
+确认项目 ID、允许域和命名共享分区后再追加 `-Apply`。接入前后均运行 `doctor`；
+若它报告安装指纹漂移，先从当前权威仓库重新 `install`，不要让各项目复制缓存实现。
+
 默认入口保持 workspace 隔离：
 
 ```powershell

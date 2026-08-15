@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Shared Build Cache"
+  short_description: "Safely operate portable Rust build caches"
+  default_prompt: "Use $manage-shared-build-cache to diagnose and safely operate this project's shared Rust build cache."

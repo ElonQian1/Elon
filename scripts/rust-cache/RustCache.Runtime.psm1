@@ -122,6 +122,22 @@ function Get-RustCacheLockOwner {
     }
 }
 
+function ConvertTo-RustCacheOwnerUtcDateTime {
+    param([Parameter(Mandatory)]$Value)
+
+    if ($Value -is [DateTime]) {
+        return $Value.ToUniversalTime()
+    }
+    if ($Value -is [DateTimeOffset]) {
+        return $Value.UtcDateTime
+    }
+    return [DateTime]::Parse(
+        [string]$Value,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::RoundtripKind
+    ).ToUniversalTime()
+}
+
 function Test-RustCacheOwnerProcessAlive {
     param([AllowNull()]$Owner)
 
@@ -136,12 +152,12 @@ function Test-RustCacheOwnerProcessAlive {
         $actualStart = $process.StartTime.ToUniversalTime()
         $processStartProperty = $Owner.PSObject.Properties["process_started_utc"]
         if ($processStartProperty -and -not [string]::IsNullOrWhiteSpace([string]$processStartProperty.Value)) {
-            $recordedStart = [DateTime]::Parse([string]$processStartProperty.Value).ToUniversalTime()
+            $recordedStart = ConvertTo-RustCacheOwnerUtcDateTime -Value $processStartProperty.Value
             return [math]::Abs(($actualStart - $recordedStart).TotalSeconds) -le 2
         }
         $lockStartProperty = $Owner.PSObject.Properties["started_utc"]
         if ($lockStartProperty -and -not [string]::IsNullOrWhiteSpace([string]$lockStartProperty.Value)) {
-            $lockStart = [DateTime]::Parse([string]$lockStartProperty.Value).ToUniversalTime()
+            $lockStart = ConvertTo-RustCacheOwnerUtcDateTime -Value $lockStartProperty.Value
             if ($actualStart -gt $lockStart.AddSeconds(2)) {
                 return $false
             }

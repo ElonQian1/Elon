@@ -1,6 +1,7 @@
 Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 
 function ConvertTo-RustCacheTomlPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -206,13 +207,61 @@ function Set-RustCacheUserEnvironment {
     [pscustomobject]@{ applied = [bool]$Apply; values = [pscustomobject]$values; cleared_legacy_target = [bool]$Apply }
 }
 
+function Enter-RustCachePlatformInstallLock {
+    param(
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [int]$TimeoutSeconds = 120
+    )
+
+    $stateRoot = Join-Path ([System.IO.Path]::GetFullPath($CacheRoot)) "state"
+    New-Item -ItemType Directory -Force -Path $stateRoot | Out-Null
+    $lockPath = Join-Path $stateRoot "platform-install.lock"
+    $deadline = [DateTime]::UtcNow.AddSeconds([math]::Max(0, $TimeoutSeconds))
+    while ($true) {
+        try {
+            $stream = [System.IO.File]::Open(
+                $lockPath,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None
+            )
+            $owner = [ordered]@{
+                schema = "elon.rust_cache.platform_install_lock.v1"
+                pid = $PID
+                acquired_at_utc = [DateTime]::UtcNow.ToString("o")
+            } | ConvertTo-Json -Compress
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($owner)
+            $stream.SetLength(0)
+            $stream.Write($bytes, 0, $bytes.Length)
+            $stream.Flush($true)
+            return $stream
+        } catch [System.IO.IOException] {
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Timed out waiting for Rust cache platform install lock: $lockPath"
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Exit-RustCachePlatformInstallLock {
+    param([AllowNull()]$Lease)
+    if ($null -ne $Lease) {
+        $Lease.Dispose()
+    }
+}
+
 function Install-RustCachePlatform {
     param(
         [Parameter(Mandatory)][string]$SourceScriptsRoot,
         [string]$CacheRoot,
         [string]$RepoRoot,
         [string]$CargoConfigPath,
+        [string]$SourceSkillRoot,
+        [string]$CodexSkillsRoot,
+        [int]$InstallLockTimeoutSeconds = 120,
         [switch]$ActivateCargoConfig,
+        [switch]$InstallCodexSkill,
         [switch]$ConfigureSccacheServer,
         [switch]$ResetCargoSourcePolicy
     )
@@ -223,6 +272,7 @@ function Install-RustCachePlatform {
     if (-not (Test-Path -LiteralPath $sourceEntry) -or -not (Test-Path -LiteralPath $sourceModules)) {
         throw "Rust cache source files are incomplete under $sourceRoot"
     }
+    $sourceFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $sourceRoot
     if ($ActivateCargoConfig) {
         $writers = @(Get-Process -Name cargo,rustc -ErrorAction SilentlyContinue)
         if ($writers.Count -gt 0) {
@@ -231,14 +281,16 @@ function Install-RustCachePlatform {
         }
     }
     $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $RepoRoot
-    Initialize-RustCachePolicy -CacheRoot $root | Out-Null
-    $platformRoot = Join-Path $root "platform"
-    $targetModules = Join-Path $platformRoot "rust-cache"
-    New-Item -ItemType Directory -Force -Path $targetModules | Out-Null
-    Copy-Item -LiteralPath $sourceEntry -Destination (Join-Path $platformRoot "rust-cache.ps1") -Force
-    Get-ChildItem -LiteralPath $sourceModules -File | ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $targetModules $_.Name) -Force
-    }
+    $installLease = Enter-RustCachePlatformInstallLock -CacheRoot $root -TimeoutSeconds $InstallLockTimeoutSeconds
+    try {
+        Initialize-RustCachePolicy -CacheRoot $root | Out-Null
+        $platformRoot = Join-Path $root "platform"
+        $targetModules = Join-Path $platformRoot "rust-cache"
+        New-Item -ItemType Directory -Force -Path $targetModules | Out-Null
+        Copy-Item -LiteralPath $sourceEntry -Destination (Join-Path $platformRoot "rust-cache.ps1") -Force
+        Get-ChildItem -LiteralPath $sourceModules -File | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $targetModules $_.Name) -Force
+        }
 
     $sccache = Get-Command sccache -ErrorAction SilentlyContinue
     $policy = Get-RustCachePolicy -CacheRoot $root
@@ -267,18 +319,34 @@ function Install-RustCachePlatform {
         }
         $activation = Set-RustCacheParentCargoConfig -CargoConfigPath $CargoConfigPath -IncludeConfigPath $includePath -Apply -ResetSourceReplacement:$ResetCargoSourcePolicy
     }
-    [pscustomobject]@{
-        cache_root = $root
-        platform_root = $platformRoot
-        entry_path = Join-Path $platformRoot "rust-cache.ps1"
-        cargo_include_path = $includePath
-        sccache_path = if ($sccache) { $sccache.Source } else { $null }
-        sccache_wrapper_path = $sccacheWrapperPath
-        sccache_config_path = $sccacheConfig.config_path
-        sccache_server = $sccacheServer
-        user_environment = $userEnvironment
-        cargo_activation = $activation
+    $codexSkill = $null
+    if ($InstallCodexSkill) {
+        if ([string]::IsNullOrWhiteSpace($SourceSkillRoot)) {
+            throw "-SourceSkillRoot is required with -InstallCodexSkill."
+        }
+        $codexSkill = Install-RustCacheCodexSkill -SourceSkillRoot $SourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot
+    }
+    $installedFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $platformRoot -Installed
+    $platformManifestPath = Write-RustCachePlatformInstallManifest -CacheRoot $root -SourceFingerprint $sourceFingerprint -InstalledFingerprint $installedFingerprint
+        [pscustomobject]@{
+            cache_root = $root
+            platform_root = $platformRoot
+            entry_path = Join-Path $platformRoot "rust-cache.ps1"
+            cargo_include_path = $includePath
+            sccache_path = if ($sccache) { $sccache.Source } else { $null }
+            sccache_wrapper_path = $sccacheWrapperPath
+            sccache_config_path = $sccacheConfig.config_path
+            sccache_server = $sccacheServer
+            user_environment = $userEnvironment
+            cargo_activation = $activation
+            platform_manifest_path = $platformManifestPath
+            source_hash = $sourceFingerprint.hash
+            installed_hash = $installedFingerprint.hash
+            codex_skill = $codexSkill
+        }
+    } finally {
+        Exit-RustCachePlatformInstallLock -Lease $installLease
     }
 }
 
-Export-ModuleMember -Function ConvertTo-RustCacheTomlPath, Get-RustCacheCargoIncludeContent, Install-RustCacheSccacheWrapper, Set-RustCacheParentCargoConfig, Restart-RustCacheSccacheServer, Set-RustCacheUserEnvironment, Install-RustCachePlatform
+Export-ModuleMember -Function ConvertTo-RustCacheTomlPath, Get-RustCacheCargoIncludeContent, Install-RustCacheSccacheWrapper, Set-RustCacheParentCargoConfig, Restart-RustCacheSccacheServer, Set-RustCacheUserEnvironment, Enter-RustCachePlatformInstallLock, Exit-RustCachePlatformInstallLock, Install-RustCachePlatform

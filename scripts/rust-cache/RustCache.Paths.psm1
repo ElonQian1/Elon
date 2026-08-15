@@ -58,7 +58,8 @@ function Get-RustCachePersistedNodeDataRoot {
 function Resolve-RustCacheRoot {
     param(
         [string]$ExplicitRoot,
-        [string]$RepoRoot
+        [string]$RepoRoot,
+        [switch]$NoCreate
     )
 
     if (-not [string]::IsNullOrWhiteSpace($ExplicitRoot)) {
@@ -98,8 +99,28 @@ function Resolve-RustCacheRoot {
     if ($driveRoot -and -not (Test-Path -LiteralPath $driveRoot)) {
         throw "Rust cache drive/root does not exist: $fullPath"
     }
-    New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+    if (-not $NoCreate) {
+        New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+    }
     return $fullPath
+}
+
+function Get-RustCacheDefaultCargoConfigPath {
+    if (-not [string]::IsNullOrWhiteSpace($env:CARGO_HOME)) {
+        return Join-Path $env:CARGO_HOME "config.toml"
+    }
+
+    $homeRoot = if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        $env:USERPROFILE
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:HOME)) {
+        $env:HOME
+    } else {
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+    }
+    if ([string]::IsNullOrWhiteSpace($homeRoot)) {
+        throw "Cannot resolve the user Cargo config path. Set CARGO_HOME explicitly."
+    }
+    return Join-Path $homeRoot ".cargo\config.toml"
 }
 
 function Get-RustCacheMigrationAdvice {
@@ -189,4 +210,4 @@ function Assert-RustCacheManagedPath {
     }
 }
 
-Export-ModuleMember -Function Test-RustCacheAbsolutePath, Resolve-RustCacheRoot, Get-RustCacheMigrationAdvice, ConvertTo-RustCacheSlug, Get-RustCacheWorkspaceHash, Get-RustCacheToolchainEpoch, Assert-RustCacheManagedPath
+Export-ModuleMember -Function Test-RustCacheAbsolutePath, Resolve-RustCacheRoot, Get-RustCacheDefaultCargoConfigPath, Get-RustCacheMigrationAdvice, ConvertTo-RustCacheSlug, Get-RustCacheWorkspaceHash, Get-RustCacheToolchainEpoch, Assert-RustCacheManagedPath

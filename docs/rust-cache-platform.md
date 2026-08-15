@@ -1,6 +1,6 @@
 # Windows 多项目 Rust 编译缓存平台
 
-最后更新：2026-08-10
+最后更新：2026-08-15
 
 ## 目标
 
@@ -11,6 +11,38 @@
 3. 旧缓存失去写入者后没有登记、退役和安全清理流程。
 
 `bb64a` 和 `elon cli` 是首批参考接入项目，不是平台边界。任何项目都可通过根目录的 `rust-cache.project.json` 注册。
+
+## 跨电脑标准入口
+
+平台采用两层交付：`scripts/rust-cache.ps1` 及其模块是唯一执行事实源，
+`manage-shared-build-cache` Skill 只指导 AI 正确调用工具。远程 PC 不共享本机目录；每台电脑维护自己的缓存根，
+通过 Git 中相同的项目清单和平台源码指纹获得一致的路由规则。
+
+新电脑先从权威仓库运行只读诊断，再安装或升级：
+
+```powershell
+& .\scripts\rust-cache.ps1 doctor -ProjectRoot .
+& .\scripts\rust-cache.ps1 install -ProjectRoot . -Apply -InstallCodexSkill
+& .\scripts\rust-cache.ps1 doctor -ProjectRoot .
+```
+
+`doctor` 不创建目录、不初始化策略、不删除数据。安装会写入
+`platform/platform-install.json`，记录平台源码和已安装文件指纹；不同电脑可据此识别漏装、版本漂移或本地文件被修改。
+`-InstallCodexSkill` 将同一份 Skill 安装到当前用户的 Codex 技能目录，供该电脑上的其他项目使用。
+仓库入口可比较当前源码与安装版本；子项目调用已安装入口时只校验安装完整性，并提示回到最新权威仓库检查升级，
+不会把“缺少仓库源码”误判为安装损坏。
+同一台电脑上的安装和升级由 `state/platform-install.lock` 独占串行化；进程异常退出后由操作系统释放句柄，
+其他代理无需删除锁文件，也不得手工覆盖 `platform` 目录。
+
+新项目采用前必须先预览，再提交不含机器路径的清单：
+
+```powershell
+& $env:ELON_RUST_CACHE_ROOT\platform\rust-cache.ps1 init-project `
+  -ProjectRoot D:\work\sample -ProjectId sample -AllowedDomain dev-windows-msvc,agent-validation
+# 审查输出后追加 -Apply，并提交 sample/rust-cache.project.json
+```
+
+项目清单负责稳定身份和域策略；缓存盘符、用户目录、节点数据根和 Codex Skill 安装位置均属于机器状态，不得写入清单。
 
 新增项目、处理大量 worktree 重复缓存或逐步启用命名共享分区时，按需读取 `docs/rust-cache-on-demand-adoption.md`。该文档是跨项目接入、风险、启用顺序与回滚的唯一事实源；项目仓库只维护本地状态和入口。
 
@@ -185,7 +217,7 @@ V260、V261 证据中出现的 `target-v260-linux-musl`、`target-v261-linux-mus
 安装到机器缓存根，但不修改 Cargo 父级配置：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 install
+& .\scripts\rust-cache.ps1 install
 ```
 
 安装器始终先更新机器缓存根中的平台脚本。若此时存在 Cargo/rustc 写入者，SCCache
@@ -196,16 +228,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 insta
 确认预览后激活父级 Cargo 配置：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 install -Apply `
-  -CargoConfigPath D:\rust\.cargo\config.toml
+& .\scripts\rust-cache.ps1 install -Apply -InstallCodexSkill
 ```
 
 若父级配置还永久设置了 `source.crates-io.replace-with`，只在已审查并确认无
 Cargo/rustc 写入者时显式迁移：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 install -Apply `
-  -CargoConfigPath $env:USERPROFILE\.cargo\config.toml -ResetCargoSourcePolicy
+& .\scripts\rust-cache.ps1 install -Apply -ResetCargoSourcePolicy
 ```
 
 安装器先拒绝活动写入者、备份原文件，再原子替换；只移除 crates.io 的

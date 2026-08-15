@@ -6,11 +6,17 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 status -IncludeSizes
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run -ProjectRoot . -Domain dev-windows-msvc check --manifest-path server\Cargo.toml
+    & .\scripts\rust-cache.ps1 run -ProjectRoot . -Domain dev-windows-msvc check --manifest-path server\Cargo.toml
+
+.EXAMPLE
+    & .\scripts\rust-cache.ps1 doctor -ProjectRoot .
+
+.EXAMPLE
+    & .\scripts\rust-cache.ps1 init-project -ProjectRoot D:\work\sample -ProjectId sample
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet("status", "run", "gc", "install", "register-legacy", "purge-legacy")][string]$Command = "status",
+    [Parameter(Position = 0)][ValidateSet("status", "doctor", "run", "gc", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
     [string]$ProjectRoot,
     [string]$Domain,
     [string]$TargetDir,
@@ -19,6 +25,12 @@ param(
     [string]$CargoConfigPath,
     [string]$LegacyPath,
     [string]$Label,
+    [string]$ProjectId,
+    [string]$DefaultDomain = "dev-windows-msvc",
+    [string[]]$AllowedDomain = @(),
+    [string]$UnknownDomainFallback = "agent-validation",
+    [string[]]$SharedPartitionDomain = @(),
+    [string]$CodexSkillsRoot,
     [switch]$Retired,
     [switch]$Apply,
     [switch]$ForceAged,
@@ -29,6 +41,7 @@ param(
     [switch]$NoLock,
     [switch]$DisableSccache,
     [switch]$ResetCargoSourcePolicy,
+    [switch]$InstallCodexSkill,
     [switch]$SkipCacheGc,
     [int]$LockTimeoutSeconds = 3600,
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$RemainingArgs = @()
@@ -43,6 +56,7 @@ Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameCheckin
 Import-Module "$modulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to their owning module. Re-import the two
 # management surfaces last so status/run and register-legacy all stay callable.
@@ -80,6 +94,14 @@ switch ($Command) {
         }
         $status
     }
+    "doctor" {
+        $sourceSkillRoot = Join-Path (Split-Path $scriptsRoot -Parent) ".agents\skills\manage-shared-build-cache"
+        $doctor = Get-RustCacheDoctor -ProjectRoot $ProjectRoot -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot
+        Write-Host "Rust cache doctor: $($doctor.status)" -ForegroundColor $(if ($doctor.healthy) { "Green" } else { "Yellow" })
+        $doctor.checks | Format-Table status, id, message, remediation -Wrap -AutoSize
+        $doctor
+        if (-not $doctor.healthy) { exit 2 }
+    }
     "run" {
         if ($RemainingArgs.Count -eq 0) {
             throw "run requires Cargo arguments."
@@ -99,16 +121,34 @@ switch ($Command) {
     }
     "install" {
         if ([string]::IsNullOrWhiteSpace($CargoConfigPath)) {
-            $CargoConfigPath = "D:\rust\.cargo\config.toml"
+            $CargoConfigPath = Get-RustCacheDefaultCargoConfigPath
         }
-        $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -ActivateCargoConfig:$Apply -ConfigureSccacheServer -ResetCargoSourcePolicy:$ResetCargoSourcePolicy
+        $sourceSkillRoot = Join-Path (Split-Path $scriptsRoot -Parent) ".agents\skills\manage-shared-build-cache"
+        $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot -ActivateCargoConfig:$Apply -InstallCodexSkill:$InstallCodexSkill -ConfigureSccacheServer -ResetCargoSourcePolicy:$ResetCargoSourcePolicy
         Write-Host "Installed Rust cache platform: $($result.entry_path)" -ForegroundColor Green
         Write-Host "Cargo include: $($result.cargo_include_path)"
+        Write-Host "Platform manifest: $($result.platform_manifest_path)"
+        Write-Host "Source hash: $($result.source_hash)"
+        if ($result.codex_skill) {
+            Write-Host "Codex skill: $($result.codex_skill.path)" -ForegroundColor Green
+        }
         if ($result.sccache_server -and $result.sccache_server.status -eq "deferred") {
             Write-Warning "SCCache reload is pending until Cargo/rustc becomes idle: $($result.sccache_server.state_path)"
         }
         if (-not $Apply) {
             Write-Host "Cargo parent config was not changed. Re-run install with -Apply to activate it." -ForegroundColor Yellow
+        }
+        $result
+    }
+    "init-project" {
+        if ([string]::IsNullOrWhiteSpace($ProjectId)) {
+            throw "init-project requires -ProjectId."
+        }
+        $result = New-RustCacheProjectManifest -ProjectRoot $ProjectRoot -ProjectId $ProjectId -DefaultDomain $DefaultDomain -AllowedDomains $AllowedDomain -UnknownDomainFallback $UnknownDomainFallback -SharedPartitionDomains $SharedPartitionDomain -Apply:$Apply
+        Write-Host "Project cache manifest: $($result.action) $($result.path)" -ForegroundColor $(if ($result.applied -or $result.action -eq "unchanged") { "Green" } else { "Yellow" })
+        if (-not $Apply -and $result.action -eq "would-create") {
+            Write-Host "Review the preview, then repeat with -Apply." -ForegroundColor Yellow
+            Write-Host $result.content
         }
         $result
     }
