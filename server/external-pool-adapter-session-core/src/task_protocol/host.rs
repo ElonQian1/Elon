@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Result};
 use ring::constant_time::verify_slices_are_equal;
@@ -29,7 +29,7 @@ pub struct ExternalPoolAdapterTaskProtocolHostExchange<'exchange> {
     binding: BeginBinding,
     request: UpstreamRequest,
     session_transcript_digest: [u8; 32],
-    timeout: Duration,
+    deadline: Instant,
     active: bool,
 }
 
@@ -54,6 +54,10 @@ impl<'session> ExternalPoolAdapterTaskProtocolHost<'session> {
         if !valid_timeout(timeout) || self.next_ordinal > wire::MAX_EXCHANGE_ORDINAL {
             return terminal_error(self.session);
         }
+        let deadline = match Instant::now().checked_add(timeout) {
+            Some(deadline) => deadline,
+            None => return terminal_error(self.session),
+        };
         let delivery_attempt_digest =
             match wire::decode_digest("ELTP delivery attempt", delivery_attempt_digest) {
                 Ok(value) => value,
@@ -66,8 +70,15 @@ impl<'session> ExternalPoolAdapterTaskProtocolHost<'session> {
         };
         let ordinal = self.next_ordinal;
         let begin = wire::encode_begin(ordinal, &nonce, &delivery_attempt_digest, &prepared);
-        self.session
-            .send(ExternalPoolAdapterSessionFrameKind::Control, &begin)?;
+        let send_timeout = match remaining_before(deadline) {
+            Ok(timeout) => timeout,
+            Err(error) => return terminal(self.session, error),
+        };
+        self.session.send_with_timeout(
+            ExternalPoolAdapterSessionFrameKind::Control,
+            &begin,
+            send_timeout,
+        )?;
         let binding = BeginBinding {
             ordinal,
             operation: prepared.operation,
@@ -81,7 +92,11 @@ impl<'session> ExternalPoolAdapterTaskProtocolHost<'session> {
             fence_digest: prepared.fence_digest,
             body: zeroize::Zeroizing::new(prepared.body.to_vec()),
         };
-        let frame = self.session.receive_with_timeout(timeout)?;
+        let receive_timeout = match remaining_before(deadline) {
+            Ok(timeout) => timeout,
+            Err(error) => return terminal(self.session, error),
+        };
+        let frame = self.session.receive_with_timeout(receive_timeout)?;
         let request = match wire::parse_request(frame, &binding) {
             Ok(request) => request,
             Err(error) => return terminal(self.session, error),
@@ -96,7 +111,7 @@ impl<'session> ExternalPoolAdapterTaskProtocolHost<'session> {
             binding,
             request,
             session_transcript_digest,
-            timeout,
+            deadline,
             active: true,
         })
     }
@@ -111,7 +126,14 @@ impl ExternalPoolAdapterTaskProtocolHostExchange<'_> {
         self.request.expected_response_bytes as usize
     }
 
+    /// Returns only the remaining bounded exchange time; no session or raw transport escapes.
+    pub fn remaining_timeout(&self) -> Result<Duration> {
+        remaining_before(self.deadline)
+    }
+
     /// Completes exactly once after validating the child-produced semantic observation.
+    /// `validate_observation` must be pure and bounded. It executes synchronously and is not
+    /// preempted; deadline checks around it make an overrun terminal without returning a receipt.
     pub fn complete<T>(
         mut self,
         response: &[u8],
@@ -123,11 +145,21 @@ impl ExternalPoolAdapterTaskProtocolHostExchange<'_> {
         {
             return terminal_error(self.session);
         }
-        self.session.send(
+        let encoded_response = wire::encode_response(&self.binding, response);
+        let send_timeout = match remaining_before(self.deadline) {
+            Ok(timeout) => timeout,
+            Err(error) => return terminal(self.session, error),
+        };
+        self.session.send_with_timeout(
             ExternalPoolAdapterSessionFrameKind::Control,
-            &wire::encode_response(&self.binding, response),
+            &encoded_response,
+            send_timeout,
         )?;
-        let frame = self.session.receive_with_timeout(self.timeout)?;
+        let receive_timeout = match remaining_before(self.deadline) {
+            Ok(timeout) => timeout,
+            Err(error) => return terminal(self.session, error),
+        };
+        let frame = self.session.receive_with_timeout(receive_timeout)?;
         let received = match wire::parse_receipt(frame, &self.binding) {
             Ok(receipt) => receipt,
             Err(error) => return terminal(self.session, error),
@@ -148,10 +180,12 @@ impl ExternalPoolAdapterTaskProtocolHostExchange<'_> {
         {
             return terminal_error(self.session);
         }
+        require_before_deadline(self.session, self.deadline)?;
         let observation = match validate_observation(&received.observation) {
             Ok(observation) => observation,
             Err(error) => return terminal(self.session, error),
         };
+        require_before_deadline(self.session, self.deadline)?;
         let receipt = ExternalPoolAdapterTaskProtocolHostReceipt {
             ordinal: self.binding.ordinal,
             operation: self.binding.operation,
@@ -172,6 +206,7 @@ impl ExternalPoolAdapterTaskProtocolHostExchange<'_> {
             session_transcript_digest: self.session_transcript_digest,
             exchange_root,
         };
+        require_before_deadline(self.session, self.deadline)?;
         self.active = false;
         Ok((receipt, observation))
     }
@@ -187,6 +222,23 @@ impl Drop for ExternalPoolAdapterTaskProtocolHostExchange<'_> {
 
 fn valid_timeout(timeout: Duration) -> bool {
     !timeout.is_zero() && timeout <= MAX_EXCHANGE_TIMEOUT
+}
+
+fn remaining_before(deadline: Instant) -> Result<Duration> {
+    deadline
+        .checked_duration_since(Instant::now())
+        .filter(|remaining| !remaining.is_zero())
+        .ok_or_else(|| anyhow::anyhow!("ELTP host exchange timed out"))
+}
+
+fn require_before_deadline(
+    session: &mut AuthenticatedExternalPoolAdapterSession,
+    deadline: Instant,
+) -> Result<()> {
+    match remaining_before(deadline) {
+        Ok(_) => Ok(()),
+        Err(error) => terminal(session, error),
+    }
 }
 
 fn terminal<T>(

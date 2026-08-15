@@ -48,6 +48,31 @@ pub(crate) fn external_pool_adapter_session_roots(
     )
 }
 
+/// Dedicated production ELTP session binding. This only binds exact transport roots; it grants no
+/// Provider, route, executor, fence, send, ACK, event, or activation authority.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn external_pool_adapter_task_protocol_production_session_roots(
+    runtime_launch_profile_digest: &str,
+    task_protocol_profile_digest: &str,
+    upstream_transport_target_digest: &str,
+    supervisor_session_policy_companion_digest: &str,
+    launch_image_sha256: &str,
+    ephemeral_task_secret_delivery_root: &str,
+    task_protocol_conformance_run_receipt_digest: &str,
+) -> Result<ExternalPoolAdapterSessionRoots> {
+    let (_, supervisor_session_policy_digest) = server_supervisor_session_policy_catalog()?;
+    ExternalPoolAdapterSessionRoots::new_task_protocol_production(
+        &supervisor_session_policy_digest,
+        runtime_launch_profile_digest,
+        task_protocol_profile_digest,
+        upstream_transport_target_digest,
+        supervisor_session_policy_companion_digest,
+        launch_image_sha256,
+        ephemeral_task_secret_delivery_root,
+        task_protocol_conformance_run_receipt_digest,
+    )
+}
+
 /// Dedicated V268 public-fixture binding. None of these values occupies a production target,
 /// companion, or secret-delivery slot; the shared core applies separate transcript/KDF domains.
 #[allow(clippy::too_many_arguments)]

@@ -1,9 +1,14 @@
 use anyhow::{anyhow, bail, Context, Result};
 use sha2::{Digest, Sha256};
 
+mod root_arguments;
 mod task_conformance;
+mod task_production;
 
+use root_arguments::ExternalPoolAdapterSessionRootArgumentValues;
+pub use root_arguments::ExternalPoolAdapterSessionRootArguments;
 use task_conformance::ExternalPoolAdapterTaskProtocolConformanceRoots;
+use task_production::ExternalPoolAdapterTaskProtocolProductionRoots;
 
 const ROOT_TRANSCRIPT_DOMAIN: &[u8] = b"elon.external_pool_adapter.supervisor_session.roots.v1\0";
 const KDF_SALT_DOMAIN: &[u8] = b"elon.external_pool_adapter.supervisor_session.kdf_salt.v1\0";
@@ -41,6 +46,7 @@ enum ExternalPoolAdapterSessionRootSet {
         public_fixture_delivery_root: [u8; 32],
     },
     TaskProtocolConformance(ExternalPoolAdapterTaskProtocolConformanceRoots),
+    TaskProtocolProduction(ExternalPoolAdapterTaskProtocolProductionRoots),
 }
 
 impl ExternalPoolAdapterSessionRoots {
@@ -167,6 +173,33 @@ impl ExternalPoolAdapterSessionRoots {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_task_protocol_production(
+        supervisor_session_policy_digest: &str,
+        runtime_launch_profile_digest: &str,
+        task_protocol_profile_digest: &str,
+        upstream_transport_target_digest: &str,
+        supervisor_session_policy_companion_digest: &str,
+        launch_image_sha256: &str,
+        ephemeral_task_secret_delivery_root: &str,
+        task_protocol_conformance_run_receipt_digest: &str,
+    ) -> Result<Self> {
+        Ok(Self {
+            roots: ExternalPoolAdapterSessionRootSet::TaskProtocolProduction(
+                ExternalPoolAdapterTaskProtocolProductionRoots::new(
+                    supervisor_session_policy_digest,
+                    runtime_launch_profile_digest,
+                    task_protocol_profile_digest,
+                    upstream_transport_target_digest,
+                    supervisor_session_policy_companion_digest,
+                    launch_image_sha256,
+                    ephemeral_task_secret_delivery_root,
+                    task_protocol_conformance_run_receipt_digest,
+                )?,
+            ),
+        })
+    }
+
     pub fn launch_arguments(&self) -> ExternalPoolAdapterSessionRootArguments {
         let values = match &self.roots {
             ExternalPoolAdapterSessionRootSet::Production {
@@ -214,6 +247,11 @@ impl ExternalPoolAdapterSessionRoots {
                     roots.launch_values(),
                 )
             }
+            ExternalPoolAdapterSessionRootSet::TaskProtocolProduction(roots) => {
+                ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolProduction(
+                    roots.launch_values(),
+                )
+            }
         };
         ExternalPoolAdapterSessionRootArguments { values }
     }
@@ -248,6 +286,9 @@ impl ExternalPoolAdapterSessionRoots {
             ExternalPoolAdapterSessionRootSet::TaskProtocolConformance(roots) => {
                 roots.transcript_digest()
             }
+            ExternalPoolAdapterSessionRootSet::TaskProtocolProduction(roots) => {
+                roots.transcript_digest()
+            }
         }
     }
 
@@ -278,62 +319,8 @@ impl ExternalPoolAdapterSessionRoots {
             ExternalPoolAdapterSessionRootSet::TaskProtocolConformance(roots) => {
                 roots.kdf_salt(host_nonce, child_nonce)
             }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ExternalPoolAdapterSessionRootArguments {
-    values: ExternalPoolAdapterSessionRootArgumentValues,
-}
-
-#[derive(Clone)]
-enum ExternalPoolAdapterSessionRootArgumentValues {
-    Production([String; 6]),
-    RuntimeCompatibility([String; 11]),
-    TaskProtocolConformance([String; 14]),
-}
-
-impl ExternalPoolAdapterSessionRootArguments {
-    pub fn values(&self) -> &[String] {
-        match &self.values {
-            ExternalPoolAdapterSessionRootArgumentValues::Production(values) => values,
-            ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(values) => values,
-            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(values) => values,
-        }
-    }
-
-    pub fn runtime_compatibility_values(&self) -> Option<&[String; 11]> {
-        match &self.values {
-            ExternalPoolAdapterSessionRootArgumentValues::Production(_) => None,
-            ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(values) => {
-                Some(values)
-            }
-            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(_) => None,
-        }
-    }
-
-    pub fn task_protocol_conformance_values(&self) -> Option<&[String; 14]> {
-        match &self.values {
-            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(values) => {
-                Some(values)
-            }
-            ExternalPoolAdapterSessionRootArgumentValues::Production(_)
-            | ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(_) => None,
-        }
-    }
-
-    #[cfg(feature = "test-support")]
-    pub fn replace_for_test(&mut self, index: usize, value: String) {
-        match &mut self.values {
-            ExternalPoolAdapterSessionRootArgumentValues::Production(values) => {
-                values[index] = value;
-            }
-            ExternalPoolAdapterSessionRootArgumentValues::RuntimeCompatibility(values) => {
-                values[index] = value;
-            }
-            ExternalPoolAdapterSessionRootArgumentValues::TaskProtocolConformance(values) => {
-                values[index] = value;
+            ExternalPoolAdapterSessionRootSet::TaskProtocolProduction(roots) => {
+                roots.kdf_salt(host_nonce, child_nonce)
             }
         }
     }

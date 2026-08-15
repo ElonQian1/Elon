@@ -6,10 +6,14 @@
 mod address_policy;
 mod no_work;
 mod target;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod task_protocol;
 mod transport;
 
 pub(crate) use no_work::exchange_external_pool_adapter_broker_no_work;
 pub(crate) use target::ExternalPoolAdapterBrokerTlsTarget;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(crate) use task_protocol::exchange_external_pool_adapter_broker_task;
 pub(crate) use transport::{
     connect_external_pool_adapter_broker_tls, ExternalPoolAdapterBrokerTlsChannel,
 };

@@ -1,0 +1,12 @@
+CREATE INDEX IF NOT EXISTS idx_v273_task_exchange_attempt_source
+  ON compute_external_pool_adapter_task_exchange_attempts(source_kind,source_id,started_at);
+CREATE INDEX IF NOT EXISTS idx_v273_task_exchange_attempt_unclosed
+  ON compute_external_pool_adapter_task_exchange_attempts(started_at,exchange_attempt_id);
+CREATE INDEX IF NOT EXISTS idx_v273_task_reconcile_claim
+  ON compute_external_pool_adapter_task_reconcile_polls(claim_status,not_before,not_after,reconcile_poll_id);
+CREATE INDEX IF NOT EXISTS idx_v273_task_event_poll_claim
+  ON compute_external_pool_adapter_task_event_polls(claim_status,not_before,not_after,event_poll_id);
+CREATE INDEX IF NOT EXISTS idx_v273_task_event_batch_remote_cursor
+  ON compute_external_pool_adapter_task_event_batches(remote_identity_digest,cursor_after_remote_sequence,event_batch_id);
+CREATE INDEX IF NOT EXISTS idx_v273_task_event_remote_sequence
+  ON compute_external_pool_adapter_task_events(remote_sequence,event_id);

@@ -15,6 +15,8 @@ mod probe_preparation;
 mod runtime;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod secret_delivery;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod task_delivery;
 #[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
 mod test_materialization;
 mod types;

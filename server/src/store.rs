@@ -9,8 +9,7 @@ mod account_security_events;
 mod account_security_support;
 #[cfg(test)]
 mod account_security_tests;
-pub(crate) use account_security::*;
-pub(crate) use account_security_events::*;
+pub(crate) use {account_security::*, account_security_events::*};
 mod admin_stats;
 mod admin_stats_quotas;
 #[cfg(test)]
@@ -111,6 +110,7 @@ mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_adapter_supervisor_session_policy_companion;
+mod compute_external_pool_adapter_task_delivery;
 mod compute_external_pool_adapter_task_protocol_conformance;
 mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;

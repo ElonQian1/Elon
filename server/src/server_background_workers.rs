@@ -11,6 +11,7 @@ use crate::{
 pub(crate) fn spawn(state: Arc<AppState>) {
     codex_health::spawn_codex_network_monitor(state.clone());
     billing_lifecycle::spawn_reservation_janitor(state.clone());
+    compute_federation::external_pool_adapter_task_worker::spawn(state.clone());
     compute_federation::delivery_allocation_expiry_worker::spawn(state.clone());
     billing_monitor::spawn_reconciliation_monitor(state.clone());
     project_workspace_health_monitor::spawn_project_workspace_health_monitor(state.clone());

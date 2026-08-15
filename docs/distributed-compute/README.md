@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221-v266 保留历史证据。V267 已通过 Windows/WSL2 与内核矩阵；V270 本地合同/迁移 17/17、custody 3/3；V271 migration/source bridge 6/6；V272 源码合同、Windows migration/UDF 与真实 Axum 门卫共 21/21，并在 WSL2 通过 direct stateful oracle 3/3。V272 startup、Linux child/session ELTP、wire authenticated ACK、process HMAC、成功 HTTP 写链、并发与故障矩阵仍未运行。Provider=`registering`、V254 18 deny 不变；生产 upstream/Secret、六能力 worker、stable executor、active refresh 与 atomic activation 仍缺。见 [`V270 权威`](external-pool-adapter-provider-runtime-readiness-authority.md)、[`V271 权威`](external-pool-route-source-projection-bridge-authority.md)、[`V272 权威`](external-pool-adapter-task-protocol-conformance-authority.md) 与 [`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | v221-v266 保留历史证据。V267 已通过 Windows/WSL2 与内核矩阵；V270 本地合同/迁移17/17、custody3/3，V271 bridge6/6，V272 源码合同、Windows migration/UDF与Axum共21/21，并在WSL2通过direct oracle3/3。V273只冻结默认关闭env、Linux x86_64+V270/V272 custody、8 roots/argv、ELTP、exact六表及无公开API，仍为`source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0`、`eligible_rows=0`。Provider=`registering`、18 deny不变；V272 Linux child/session ELTP、成功写链、V274/V275/V276仍缺。见[`V273权威`](external-pool-adapter-task-protocol-production-authority.md)、[`验收`](external-pool-adapter-task-protocol-production-acceptance.md)与[`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -129,6 +129,7 @@ owners: backend, node, ai-economy
 42. `docs/distributed-compute/external-pool-adapter-provider-runtime-readiness-authority.md` 与对应 acceptance：V270 production custody、post-cleanup Provider-specific readiness、最长 15 秒 TTL、五条 owner/admin route 与 activation 后置边界。
 43. `docs/distributed-compute/external-pool-route-source-projection-bridge-authority.md` 与对应 acceptance：V271 migration-only V221 logical identity→V249 Provider projection exact source bridge、0 fence 开放与 atomic activation NO-GO 边界。
 44. `docs/distributed-compute/external-pool-adapter-task-protocol-conformance-authority.md` 与对应 acceptance：V272 Provider-neutral ELTP v1 controlled run、独立 process HMAC custody、14-root/8-exchange ABI、2 表 1 诊断 view、最长 15 秒 TTL、三条 admin route与零扩权边界。
+45. `docs/distributed-compute/external-pool-adapter-task-protocol-production-authority.md` 与对应 acceptance：V273 默认关闭 dormant production transport/ingress、8项 production roots、ELTP wire复用、exact 6表、无公开 API与 `eligible_rows=0` 边界。
 
 ## 分阶段落地
 
@@ -183,7 +184,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-V227-v266 只保留历史结果。V267 已完成 Windows/WSL2、Yama 2 内核、ancillary 与 cleanup 故障验证；V270 本地合同/迁移 17/17、custody 3/3，V271 migration/source bridge 6/6，V272 统一 21/21 及 WSL2 direct oracle 3/3，但均不是 production activation。V272 startup、Linux child/session ELTP、wire authenticated ACK、process HMAC、成功 HTTP 写链、并发与故障矩阵仍未运行，不能打开 fence。Atomic activation 仍须按 V273 worker+authenticated ingress、V274 active refresh、V275 stable executor+activation 闭合；真实 Secret/upstream 与 V254 replacement 也未完成，18 deny 在此前保留。见 [`V272 conformance`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V270 readiness`](external-pool-adapter-provider-runtime-readiness-authority.md) 与 [`当前状态`](current-implementation-status.md)。
+V227-v266 只保留历史结果。V267 已完成 Windows/WSL2、Yama 2 内核、ancillary 与 cleanup 故障验证；V270本地合同/迁移17/17、custody3/3，V271 bridge6/6，V272统一21/21及WSL2 direct oracle3/3，但均不是production activation。V273无公开API、无v213 constructor且`eligible_rows=0`，严格为`source_review_only/implementation_uncompiled/implementation_unrun`。后继固定为V274 active successor → V275 stable executor+atomic activation → V276 reachability；真实Secret/upstream、V272 Linux child/session ELTP与V254 replacement未完成，V275前18 deny不变。见[`V273 authority`](external-pool-adapter-task-protocol-production-authority.md)、[`acceptance`](external-pool-adapter-task-protocol-production-acceptance.md)与[`当前状态`](current-implementation-status.md)。
 
 ### F4：容量期货市场
 

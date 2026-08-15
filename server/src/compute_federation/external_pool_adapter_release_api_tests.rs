@@ -124,6 +124,16 @@ mod task_protocol_conformance_http_test;
 mod task_protocol_conformance_session_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/task_protocol_conformance_store_source_contract_test.rs"]
 mod task_protocol_conformance_store_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_production_boundary_source_contract_test.rs"]
+mod task_protocol_production_boundary_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_production_domain_migration_source_contract_test.rs"]
+mod task_protocol_production_domain_migration_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_production_session_source_contract_test.rs"]
+mod task_protocol_production_session_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_production_store_source_contract_test.rs"]
+mod task_protocol_production_store_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_protocol_production_worker_source_contract_test.rs"]
+mod task_protocol_production_worker_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_admin_http_test.rs"]
 mod upstream_transport_target_admin_http_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_owner_http_test.rs"]

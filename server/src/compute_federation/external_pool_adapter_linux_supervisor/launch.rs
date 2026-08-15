@@ -26,6 +26,7 @@ use super::{
 };
 
 mod task_protocol_conformance_arguments;
+mod task_protocol_production_arguments;
 
 const REQUIRED_CAPSULE_SEALS: libc::c_int =
     libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
@@ -319,7 +320,9 @@ fn set_blocking(fd: i32) -> Result<()> {
 fn child_launch_argv(roots: &ExternalPoolAdapterSessionRootArguments) -> Result<Vec<CString>> {
     let mut arguments = Vec::with_capacity(15);
     arguments.push(CString::new("elon-external-pool-adapter")?);
-    if let Some(values) = roots.task_protocol_conformance_values() {
+    if let Some(values) = roots.task_protocol_production_values() {
+        task_protocol_production_arguments::append(&mut arguments, values)?;
+    } else if let Some(values) = roots.task_protocol_conformance_values() {
         task_protocol_conformance_arguments::append(&mut arguments, values)?;
     } else if let Some(values) = roots.runtime_compatibility_values() {
         for (prefix, value) in RUNTIME_COMPATIBILITY_ROOT_ARGUMENT_PREFIXES

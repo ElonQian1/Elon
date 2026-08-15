@@ -123,7 +123,19 @@ impl AuthenticatedExternalPoolAdapterSession {
         kind: ExternalPoolAdapterSessionFrameKind,
         payload: &[u8],
     ) -> Result<()> {
-        let result = self.send_inner(kind, payload);
+        self.send_with_timeout(kind, payload, FRAME_IO_TIMEOUT)
+    }
+
+    pub(crate) fn send_with_timeout(
+        &mut self,
+        kind: ExternalPoolAdapterSessionFrameKind,
+        payload: &[u8],
+        timeout: Duration,
+    ) -> Result<()> {
+        if timeout.is_zero() || timeout > MAX_FRAME_IO_TIMEOUT {
+            return self.fail(anyhow!("authenticated session timeout rejected"));
+        }
+        let result = self.send_inner(kind, payload, timeout);
         if let Err(error) = result {
             return self.fail(error);
         }
@@ -156,6 +168,7 @@ impl AuthenticatedExternalPoolAdapterSession {
         &mut self,
         kind: ExternalPoolAdapterSessionFrameKind,
         payload: &[u8],
+        timeout: Duration,
     ) -> Result<()> {
         self.ensure_active()?;
         if payload.len() > kind.maximum_payload_bytes() {
@@ -172,7 +185,7 @@ impl AuthenticatedExternalPoolAdapterSession {
             self.next_send_sequence,
             payload,
         )?;
-        send_packet(self.socket.as_raw_fd(), &packet, FRAME_IO_TIMEOUT)?;
+        send_packet(self.socket.as_raw_fd(), &packet, timeout)?;
         self.next_send_sequence = self
             .next_send_sequence
             .checked_add(1)

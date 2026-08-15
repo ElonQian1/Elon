@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Delivery Outbox V1
 status: current
-reviewed_at: 2026-08-10
+reviewed_at: 2026-08-15
 owners: backend, node, ai-economy
 implementation_status: implementation_unwired
 ---
@@ -117,10 +117,24 @@ external pool 只能使用 `server_adapter + adapter_execution`，不能伪装�
 
 v221 源码已让 `external_pool_onboarding` 精确引用专用 application，而不是借用 endpoint-only activation application；它已编译迁移，onboarding Store 状态机通过 2 项专项，但没有生产入口，因此生产环境不会触发 route source。申请、管理员批准、Provider adapter ref 与 non-bearer lookup ref 都不等于 credential proof；v213 rows 仍须等待独立 verifier、TTL/revocation、六能力 currentness 与 sealed producer。完整边界见 [`external-pool-adapter-authority.md`](external-pool-adapter-authority.md)。
 
+V273 已实现但尚未编译或运行默认关闭的 dormant production transport/ingress kernel：唯一新 env 是
+`ELON_EXTERNAL_POOL_ADAPTER_ATTEMPT_DELIVERY_ENABLED`；`true` startup只要求Linux x86_64与V270/V272
+runtime/custody available，current authority由每个candidate/attempt同connection/checked-at重取。它按固定八项
+production roots/argv复用ELTP v1，并只持久化四张完全immutable
+attempt/receipt/batch/event表与两张immutable-intent/narrow-CAS reconcile/event poll表；没有HTTP/MCP/WebSocket
+或通用ingress API。首个v213 send-attempt与V273 exchange-attempt必须同一BEGIN IMMEDIATE/同commit后才出网。
+
+该 kernel 只消费未来已经耐久化的 v213 outbox/route/executor/fence，并通过既有 v213 Store gate把首个
+send-attempt与V273 exchange-attempt原子成对记录，不提供任何新v213 constructor。当前 Provider=`registering`、
+stable executor与route均不存在，所以固定 `eligible_rows=0`，不允许网络发送或把
+non-authoritative lane subject冒充 executor。V254 18 deny逐字保留；V274 active successor、V275 executor+atomic
+activation之后，仍须由V276单独接通并验收 production reachability。权威边界见
+[`external-pool-adapter-task-protocol-production-authority.md`](external-pool-adapter-task-protocol-production-authority.md)。
+
 ## 11. 仍未实现
 
 - Adapter resolver、真实 credential verifier/KMS 与 bearer 解析；
-- user-node、managed-cluster、external-pool transport 和 worker；
+- user-node、managed-cluster transport/worker，以及 external-pool V273 dormant kernel 的动态验证与 V276 production reachability；
 - authenticated ACK/event 公网入口、reconcile/cancel 网络协议与 crash injection；
 - accepted closure 的可信生产入口、commit transport 与 Lease authority 带外交付；
 - Lease authority 带外交付、Runner event、Renew 与可信零用量补偿；

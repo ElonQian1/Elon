@@ -122,6 +122,8 @@ pub(crate) mod external_pool_adapter_task_protocol_conformance_api;
 pub(crate) mod external_pool_adapter_task_protocol_conformance_service;
 mod external_pool_adapter_task_protocol_conformance_service_redaction;
 mod external_pool_adapter_task_protocol_conformance_service_validation;
+pub(crate) mod external_pool_adapter_task_protocol_production;
+pub(crate) mod external_pool_adapter_task_worker;
 pub(crate) mod external_pool_adapter_upstream_transport_target;
 pub(crate) mod external_pool_adapter_upstream_transport_target_api;
 pub(crate) mod external_pool_adapter_upstream_transport_target_service;
