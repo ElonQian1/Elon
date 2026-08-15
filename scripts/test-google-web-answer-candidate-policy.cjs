@@ -50,6 +50,22 @@ assert.equal(policy.accepts({
   controls: 5,
   links: 0,
   tabControls: 0,
+  liveRegion: true,
+  afterQuery: false,
+  trustedAnswerContainer: true,
+  interactive: false,
+  explicit: true,
+}), true)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '5',
+  textLength: 1,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 5,
+  links: 0,
+  tabControls: 0,
   liveRegion: false,
   afterQuery: false,
   trustedAnswerContainer: true,
@@ -146,6 +162,7 @@ assert.equal(policy.navigationOnlyText(
 
 assert.equal(policy.transientStatusText('AI 模式回答已准备就绪'), true)
 assert.equal(policy.transientStatusText('AI Mode answer is ready'), true)
+assert.equal(policy.transientStatusText('Searching...'), true)
 assert.equal(policy.transientStatusText('正在生成回答…'), true)
 assert.equal(policy.transientStatusText('正在搜索'), true)
 assert.equal(policy.transientStatusText('下面是已经准备好的实际回答。'), false)

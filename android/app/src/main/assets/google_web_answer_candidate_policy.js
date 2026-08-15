@@ -60,6 +60,7 @@
       .toLowerCase();
     if (!text || text.length > 80) return false;
     return /^(?:ai\s*mode\s*)?(?:answer|response)\s+(?:is\s+)?ready[.!。！]?$/.test(text) ||
+      /^(?:searching|loading|generating|preparing)(?:\s+(?:answer|response|results?))?[.!…]*$/.test(text) ||
       /^(?:ai\s*模式)?(?:回答|回复|响应)(?:已经|已)?准备就绪[。！!]?$/.test(text) ||
       /^(?:正在)?(?:生成|加载|准备)(?:回答|回复|响应)?(?:中)?[.。…]*$/.test(text) ||
       /^(?:正在)?(?:搜索|检索|查询)(?:中)?[.。…]*$/.test(text);
@@ -80,7 +81,8 @@
   function shortAnswerAllowed(metrics) {
     const trustedAnswerContainer = metrics && metrics.trustedAnswerContainer === true;
     if (!metrics || (metrics.afterQuery !== true && !trustedAnswerContainer) ||
-        metrics.interactive === true || metrics.liveRegion === true || nonNegative(metrics.links) !== 0 ||
+        metrics.interactive === true || (metrics.liveRegion === true && !trustedAnswerContainer) ||
+        nonNegative(metrics.links) !== 0 ||
         nonNegative(metrics.tabControls) !== 0) return false;
     const controls = nonNegative(metrics.controls);
     return controls === 0 || (metrics.explicit === true && controls <= 8);
@@ -114,7 +116,7 @@
   }
 
   return Object.freeze({
-    version: 7,
+    version: 8,
     accepts,
     penalty,
     navigationOnlyText,
