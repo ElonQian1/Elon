@@ -78,9 +78,11 @@
   }
 
   function shortAnswerAllowed(metrics) {
-    return metrics && metrics.afterQuery === true && metrics.interactive !== true &&
-      metrics.liveRegion !== true && nonNegative(metrics.controls) === 0 &&
-      nonNegative(metrics.links) === 0 && nonNegative(metrics.tabControls) === 0;
+    if (!metrics || metrics.afterQuery !== true || metrics.interactive === true ||
+        metrics.liveRegion === true || nonNegative(metrics.links) !== 0 ||
+        nonNegative(metrics.tabControls) !== 0) return false;
+    const controls = nonNegative(metrics.controls);
+    return controls === 0 || (metrics.explicit === true && controls <= 8);
   }
 
   function accepts(metrics) {
@@ -111,7 +113,7 @@
   }
 
   return Object.freeze({
-    version: 5,
+    version: 6,
     accepts,
     penalty,
     navigationOnlyText,
