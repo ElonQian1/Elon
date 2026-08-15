@@ -1,19 +1,21 @@
 ---
 title: 外部矿池 Adapter task-protocol production transport 验收
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_compiled
+verification_status: targeted_local_source_contracts_verified
 ---
 
 # 外部矿池 Adapter task-protocol production transport 验收
 
 ## 1. 当前证据强度
 
-V273 当前只接受 authority 合同的静态复核。本批没有编译 Rust、执行 migration、运行 SQLite/startup/Linux/
-ELTP/network/crash/concurrency/reopen fixture，也没有生成动态指纹。正式计数为 `passed=0 / failed=0`，状态为
-`source_review_only / implementation_uncompiled / implementation_unrun`。
+V273 当前接受 authority 合同的静态复核与完整 WSL2 GNU `elon-server` 测试目标编译；生命周期 UDF 借用与
+内部映射/校验可见性阻断已修复。`task_protocol_production_` 源码合同 `18 passed / 0 failed`，规范化指纹为
+`d9c13b9ea8638c172709e740d540b5fe8f72477189c99f5c9646d417991df105`。尚未执行 V273 migration，或运行
+SQLite/startup/Linux child/ELTP/network/crash/concurrency/reopen fixture；运行态计数为 `passed=0/failed=0`，
+状态为 `implementation_compiled / targeted_local_source_contracts_verified / implementation_unrun`。
 
 本页只定义验收门；唯一语义来源是
 [`external-pool-adapter-task-protocol-production-authority.md`](external-pool-adapter-task-protocol-production-authority.md)。
@@ -110,5 +112,6 @@ V273 source review、V272 conformance passed或V275 migration success当作 tran
 
 V273 当前只能声明“default-off dormant production transport/ingress kernel 合同已冻结”。它不能声明 worker已运行、
 ACK/event已接入、Provider可激活或任务可派发。正式状态保持
-`source_review_only / implementation_uncompiled / implementation_unrun`、`passed=0 / failed=0`、
+`implementation_compiled / targeted_local_source_contracts_verified / implementation_unrun`、运行态
+`passed=0/failed=0`、
 `eligible_rows=0`、Provider=`registering`、18 fences unchanged。

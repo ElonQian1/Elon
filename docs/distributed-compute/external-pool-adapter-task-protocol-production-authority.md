@@ -1,11 +1,11 @@
 ---
 title: 外部矿池 Adapter task-protocol production transport 权威
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_uncompiled
-verification_status: source_review_only
+implementation_status: implementation_compiled
+verification_status: targeted_local_source_contracts_verified
 ---
 
 # 外部矿池 Adapter task-protocol production transport 权威
@@ -242,7 +242,11 @@ V270/V272 current Store-private reproof。
 
 ## 11. 当前实现与验证现实
 
-V273 当前严格为 `design_frozen / source_review_only / implementation_uncompiled / implementation_unrun`，专属
-`passed=0 / failed=0`。本批没有编译、测试、migration、SQLite、startup、Linux child、ELTP、network、crash、
-concurrency、reopen或 ingress运行证据。唯一正式结论是 dormant production transport/ingress 合同已冻结；
+V273 当前严格为 `design_frozen / implementation_compiled / targeted_local_source_contracts_verified /
+implementation_unrun`。生命周期 UDF 借用与内部映射/校验可见性编译阻断已修复，完整 WSL2 GNU
+`elon-server` 测试目标已编译；`task_protocol_production_` 源码合同 `18 passed / 0 failed`，覆盖 default-off、
+双 custody、8 roots/argv、ELTP、六表/恢复、零公开 API、零 v213 constructor 与 18 deny，规范化指纹为
+`d9c13b9ea8638c172709e740d540b5fe8f72477189c99f5c9646d417991df105`。V273 运行态仍为 `passed=0/failed=0`，
+没有 migration、SQLite、startup、Linux child、ELTP、network、crash、concurrency、reopen 或 ingress 运行证据。
+唯一正式结论是 dormant production transport/ingress 合同已冻结、可编译且源码合同已验证；
 `eligible_rows=0`、Provider=`registering`、18 deny unchanged，production dispatch 与 atomic activation继续 NO-GO。

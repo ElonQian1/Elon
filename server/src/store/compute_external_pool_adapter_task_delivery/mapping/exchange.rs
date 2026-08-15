@@ -10,7 +10,7 @@ use crate::compute_federation::external_pool_adapter_task_protocol_production::{
 
 use super::{canonical_value, integer, text};
 
-pub(super) fn exchange_attempt_values(
+pub(in crate::store::compute_external_pool_adapter_task_delivery) fn exchange_attempt_values(
     envelope: &ExternalPoolAdapterTaskExchangeAttemptEnvelope,
 ) -> Result<Vec<Value>> {
     let canonical = canonical_task_production_exchange_attempt_json_and_digest(envelope)?.0;
@@ -37,7 +37,7 @@ pub(super) fn exchange_attempt_values(
     Ok(values)
 }
 
-pub(super) fn exchange_receipt_values(
+pub(in crate::store::compute_external_pool_adapter_task_delivery) fn exchange_receipt_values(
     envelope: &ExternalPoolAdapterTaskExchangeReceiptEnvelope,
 ) -> Result<Vec<Value>> {
     let canonical = canonical_task_production_exchange_receipt_json_and_digest(envelope)?.0;

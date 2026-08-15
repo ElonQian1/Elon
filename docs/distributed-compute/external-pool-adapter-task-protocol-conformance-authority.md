@@ -259,7 +259,7 @@ direct stateful-oracle `3 passed / 0 failed`，覆盖 exact 八步状态、乱�
 指纹为 `9f00ae268b6a4f52511884ec8943c1ffaab4630d808981e7b8a89020dba73019`；authenticated in-process
 session/wire `1 passed / 0 failed` 覆盖真实 seqpacket 会话启动、双向认证、临时 bundle 交付、8 次 ELTP
 request/response/receipt、独立 child fixture oracle 与认证关闭，指纹为
-`f011891d0198687f9b289b40983f9e3142259557a77be225dab8cd897f07cecb`。该测试使用同进程线程，不等于
+`fb4d9f5c115070d1149c55dc37324eb2e46742ed0223ead5477c28605850c5cf`。该测试使用同进程线程，不等于
 独立 child process。尚未执行 startup、独立 Linux child process 启动及 cgroup/pidfd/seccomp/scratch 清理、
 process HMAC、成功 HTTP 写链或生产 upstream。正式状态为 `implementation_partially_verified /
 targeted_local_contract_migration_http_wsl2_oracle_and_session_wire_verified`。

@@ -9,7 +9,7 @@ use crate::compute_federation::external_pool_adapter_task_protocol_production::{
 
 use super::{canonical_value, integer, optional_text, text};
 
-pub(super) fn event_batch_values(
+pub(in crate::store::compute_external_pool_adapter_task_delivery) fn event_batch_values(
     envelope: &ExternalPoolAdapterTaskEventBatchEnvelope,
 ) -> Result<Vec<Value>> {
     let canonical = canonical_task_production_event_batch_json_and_digest(envelope)?.0;
@@ -58,7 +58,9 @@ pub(super) fn event_batch_values(
     Ok(values)
 }
 
-pub(super) fn event_values(envelope: &ExternalPoolAdapterTaskEventEnvelope) -> Result<Vec<Value>> {
+pub(in crate::store::compute_external_pool_adapter_task_delivery) fn event_values(
+    envelope: &ExternalPoolAdapterTaskEventEnvelope,
+) -> Result<Vec<Value>> {
     let canonical = canonical_task_production_event_json_and_digest(envelope)?.0;
     let event = &envelope.event;
     let values = vec![

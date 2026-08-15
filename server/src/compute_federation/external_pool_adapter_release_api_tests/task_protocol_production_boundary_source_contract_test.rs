@@ -169,10 +169,10 @@ fn task_protocol_production_boundary_persists_only_redacted_evidence() {
 }
 
 #[test]
-fn task_protocol_production_boundary_reports_only_dormant_source_review() {
+fn task_protocol_production_boundary_reports_only_dormant_compiled_source_contracts() {
     for marker in [
-        "source_review_only",
-        "implementation_uncompiled",
+        "targeted_local_source_contracts_verified",
+        "implementation_compiled",
         "implementation_unrun",
         "passed=0",
         "failed=0",

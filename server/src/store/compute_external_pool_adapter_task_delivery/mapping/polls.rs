@@ -11,7 +11,7 @@ use crate::compute_federation::external_pool_adapter_task_protocol_production::{
 use super::{canonical_value, integer, optional_text, text};
 use crate::store::compute_external_pool_adapter_task_delivery::types::PollClaimProjection;
 
-pub(super) fn reconcile_poll_values(
+pub(in crate::store::compute_external_pool_adapter_task_delivery) fn reconcile_poll_values(
     envelope: &ExternalPoolAdapterTaskReconcilePollEnvelope,
     claim: &PollClaimProjection,
 ) -> Result<Vec<Value>> {
@@ -53,7 +53,7 @@ pub(super) fn reconcile_poll_values(
     Ok(values)
 }
 
-pub(super) fn event_poll_values(
+pub(in crate::store::compute_external_pool_adapter_task_delivery) fn event_poll_values(
     envelope: &ExternalPoolAdapterTaskEventPollEnvelope,
     claim: &PollClaimProjection,
 ) -> Result<Vec<Value>> {

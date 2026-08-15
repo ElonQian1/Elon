@@ -69,7 +69,7 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn text(context: &rusqlite::functions::Context<'_>, index: usize) -> Option<&str> {
+fn text<'a>(context: &'a rusqlite::functions::Context<'a>, index: usize) -> Option<&'a str> {
     context.get_raw(index).as_str().ok()
 }
 

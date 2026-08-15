@@ -22,7 +22,9 @@ pub(super) fn metadata(
     Ok(())
 }
 
-pub(super) fn identifier(value: &str) -> Result<()> {
+pub(in crate::compute_federation::external_pool_adapter_task_protocol_production) fn identifier(
+    value: &str,
+) -> Result<()> {
     text(value, 1, 240)
 }
 
@@ -37,7 +39,9 @@ pub(super) fn text(value: &str, minimum: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn digest(value: &str) -> Result<()> {
+pub(in crate::compute_federation::external_pool_adapter_task_protocol_production) fn digest(
+    value: &str,
+) -> Result<()> {
     if value.len() != 64
         || !value
             .bytes()
