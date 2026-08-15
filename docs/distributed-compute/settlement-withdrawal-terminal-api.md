@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Provider 提款唯一终态
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-16
 owners: ai-economy, backend
 implementation_status: implementation_partially_verified
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前实现
 
-v201 的追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已写入并随服务端组合编译/迁移；操作级接口专项仍未运行。PC `/my-compute-settlement` 与 `/compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
+v201 的追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已写入并随服务端组合编译/迁移。本地 Store/Service 专项 3/3 通过，覆盖取消返还只执行一次、精确重放不重复入账、数据库重开后回执与余额保持一致，以及管理员外部已付款声明不改变内部余额、不执行也不验证外部付款。验证指纹为 `588ba2509b7d80bfc9a72d1f68af4e1aff5d78c164bbeb0ea238f1dba0ccf6d8`。PC `/my-compute-settlement` 与 `/compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态仍为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 每份 v200 Withdrawal Request 最多绑定一份不可变 Terminal Receipt。终态只能是：
 
@@ -83,7 +83,7 @@ v201 的追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已�
 
 ## 7. 尚未实现
 
-- Cargo 编译、v201 迁移执行、HTTP 真实调用、并发与故障注入验证；
+- HTTP 真实调用、并发竞态与故障注入验证，以及生产数据库迁移验收；
 - 银行、支付机构、钱包或 Sui 网络的真实付款适配器；
 - 外部回执自动拉取、签名核验、链上确认数和对账文件验证；
 - 部分付款、手续费、税务、KYC、风控、多币种和批量提款；

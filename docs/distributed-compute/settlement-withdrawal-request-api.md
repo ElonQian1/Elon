@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Provider 提现申请与内部冻结
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-16
 owners: ai-economy, backend
 implementation_status: implementation_partially_verified
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_partially_verified
 
 ## 1. 当前实现
 
-v200 的追加式 Store、独立 Service 与 Provider 本人 HTTP 路由已写入并随服务端组合编译/迁移；操作级接口专项仍未运行。PC `/my-compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
+v200 的追加式 Store、独立 Service 与 Provider 本人 HTTP 路由已写入并随服务端组合编译/迁移。本地 Store/Service 专项 3/3 通过，其中申请用例验证了确认门卫、available 到 withdrawn 的原子转移、精确幂等重放、所有者隔离、冲突幂等键和余额不足失败不留部分记录。验证指纹为 `588ba2509b7d80bfc9a72d1f68af4e1aff5d78c164bbeb0ea238f1dba0ccf6d8`。PC `/my-compute-settlement` 已通过跨层合同、严格类型、lint 和生产构建，状态仍为 `implementation_partially_verified`；真实 TCP、浏览器和生产库仍未验收，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 Provider 所有者可把本人结算账户中的一笔 CNY `available` 余额原子转入 `withdrawn` 保留区，并取得不可变 Withdrawal Request Receipt、Posting 和两条账本腿。该动作只创建提款申请和内部资金冻结，不执行银行付款、数字钱包转账、Sui 交易或任何外部清算。
 
@@ -74,7 +74,7 @@ v201 使用独立追加式记录表达取消、拒绝或“管理员登记外部
 
 ## 7. 尚未实现
 
-- Cargo 编译、v200 迁移执行、HTTP 真实调用、并发与故障注入验证；
+- HTTP 真实调用、并发竞态与故障注入验证，以及生产数据库迁移验收；
 - 自动银行打款、支付机构清算、钱包签名或 Sui 链上提交；
 - 外部付款证据自动拉取、签名验证或链上确认；
 - 提现风控、KYC、多币种、手续费、税务、生产密钥和对账文件。

@@ -146,3 +146,7 @@ fn owned_withdrawal(
     }
     Ok(withdrawal)
 }
+
+#[cfg(test)]
+#[path = "compute_federation_settlement_withdrawal_service_tests.rs"]
+mod tests;
