@@ -18,6 +18,13 @@ export {
 } from './adapter-handoff-worker.js'
 
 export {
+  VERIFIED_ERP_HANDOFF_READBACK_SCHEMA,
+  VERIFIED_ERP_HANDOFF_SOURCE_SCHEMA,
+  VerifiedErpHandoffError,
+  createVerifiedErpHandoffHandler,
+} from './verified-erp-handoff-handler.js'
+
+export {
   SUI_ADAPTER_HANDOFF_SCHEMA,
   SUI_PREFLIGHT_MAX_RESPONSE_BYTES,
   SUI_PREFLIGHT_REPORT_SCHEMA,

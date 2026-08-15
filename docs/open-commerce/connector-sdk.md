@@ -51,6 +51,58 @@
 
 客户端不会只检查 HTTP 成功：领取证据必须与活动租约的商户和 Invocation 一致，续租与释放响应必须仍绑定原任务，完成回执必须保留原项目、商户、调用、接入器凭据版本和租约 ID，并明确标记机器权威、非人工确认和未移动资金。工作器把续租失败或硬截止视为临时失败并尽力释放，不会在处理器忽略中止信号时继续提交完成。SDK 测试只证明这些本地协议边界，不证明外部 ERP 已幂等写入。
 
+## ERP 写入与回读验证处理器
+
+`createVerifiedErpHandoffHandler` 可直接作为 `createAdapterHandoffWorker` 的 `handler`。它先复核
+Claim、终态证据、标准业务回执和未移动资金边界，再构造不可变 `source` 信封。商户插件必须
+把该信封与 ERP 业务记录一起持久化，并以 `source.idempotencyKey` 防止同一 Invocation 的租约
+重试创建重复订单。写入返回目标记录号后，处理器必定调用独立 `readBack`；只有 ERP 回读的
+目标记录号和完整来源信封都匹配，才返回 `applied`。
+
+```js
+import {
+  VERIFIED_ERP_HANDOFF_READBACK_SCHEMA,
+  createAdapterHandoffWorker,
+  createVerifiedErpHandoffHandler,
+} from '@elon/open-commerce-connector'
+
+const handler = createVerifiedErpHandoffHandler({
+  async apply({ source, result }, { signal }) {
+    return merchantErp.upsertOrder({
+      idempotencyKey: source.idempotencyKey,
+      source,
+      order: result.order,
+      signal,
+    })
+  },
+  async readBack({ targetReference }, { signal }) {
+    const record = await merchantErp.getOrder(targetReference, { signal })
+    return {
+      schema: VERIFIED_ERP_HANDOFF_READBACK_SCHEMA,
+      targetReference: record.id,
+      source: record.openCommerceSource,
+    }
+  },
+})
+
+const worker = createAdapterHandoffWorker({
+  baseUrl: process.env.YILONG_BASE_URL,
+  token: process.env.YILONG_ADAPTER_TOKEN,
+  targetDomain: 'erp',
+  handler,
+})
+```
+
+`sourceDigest` 只绑定稳定业务身份，不包含 Claim ID、尝试次数、租约密钥或机器 Token；凭据轮换
+后同一 Invocation 仍得到相同摘要。完整来源信封同时保留本次机器凭据 ID 和版本，ERP 插件在
+幂等重放时应更新并回读当前来源元数据。写入成功但回读暂不可见、字段不一致或查询失败时，
+错误继续向 worker 传播并释放租约；插件只有在明确不可恢复的业务拒绝时才应抛出
+`AdapterHandoffRejectError`。
+
+回读函数必须查询 ERP 的持久化事实，不能把 `apply` 返回的内存对象直接回显。SDK 能证明的是
+“插件执行了写入入口，并返回了与 Claim 完整匹配的回读证明”；没有第三方签名或目标环境验收
+时，它仍不能独立证明生产 ERP、支付、库存、履约或外部平台已经真实完成操作。
+
 ## 商户可携带身份
 
 `createMerchantIdentityProof` 使用商户本地 RSA 私钥，生成绑定项目 ID、商户 ID 和 SPKI SHA-256 指纹的持有证明。`verifyMerchantIdentityProof` 可在上传前本地复核。SDK 不生成、保存或上传私钥；密钥生命周期始终属于商户。

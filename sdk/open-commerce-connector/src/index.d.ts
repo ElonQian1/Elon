@@ -1,3 +1,5 @@
+export * from './verified-erp-handoff-handler.js'
+
 export const CONNECTOR_SCHEMA: 'open_commerce.connector.v1'
 export const CONNECTOR_CONTRACT_VERSION: '1.0'
 export const MAX_SYNC_PAGE_RECORDS: 500
