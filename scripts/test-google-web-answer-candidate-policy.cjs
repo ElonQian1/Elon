@@ -57,6 +57,10 @@ assert.equal(policy.transientStatusText('AI 模式回答已准备就绪'), true)
 assert.equal(policy.transientStatusText('AI Mode answer is ready'), true)
 assert.equal(policy.transientStatusText('正在生成回答…'), true)
 assert.equal(policy.transientStatusText('下面是已经准备好的实际回答。'), false)
+assert.equal(policy.shareSurfaceText(
+  '分享公开链接 此公开链接用于分享消息串。复制链接 Facebook Gmail X Reddit WhatsApp',
+), true)
+assert.equal(policy.shareSurfaceText('下面是关于公开链接安全性的完整回答。'), false)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -81,6 +85,18 @@ assert.equal(policy.accepts({
   liveRegion: true,
   explicit: true,
 }), true)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: 'Share a public link. Copy link Facebook Gmail Reddit WhatsApp',
+  textLength: 61,
+  citations: 5,
+  semanticBlocks: 2,
+  links: 5,
+  tabControls: 0,
+  liveRegion: false,
+  explicit: true,
+}), false)
 
 assert.equal(policy.accepts({
   hasQuery: true,

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 5;
+  const extractorVersion = 6;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -21,9 +21,19 @@
   function isVisible(node) {
     if (!(node instanceof Element)) return false;
     const rect = node.getBoundingClientRect();
-    const style = window.getComputedStyle(node);
-    return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
-      style.visibility !== 'hidden';
+    if (rect.width <= 0 || rect.height <= 0 || node.getClientRects().length === 0) return false;
+    if (typeof node.checkVisibility === 'function' && !node.checkVisibility({
+      checkOpacity: true,
+      checkVisibilityCSS: true
+    })) return false;
+    for (let current = node; current && current instanceof Element; current = current.parentElement) {
+      if (current.hidden || current.hasAttribute('inert') ||
+          current.getAttribute('aria-hidden') === 'true') return false;
+      const style = window.getComputedStyle(current);
+      if (style.display === 'none' || style.visibility === 'hidden' ||
+          style.visibility === 'collapse' || Number(style.opacity) === 0) return false;
+    }
+    return true;
   }
 
   function rememberQuery(value) {

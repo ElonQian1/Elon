@@ -64,6 +64,18 @@
       /^(?:正在)?(?:生成|加载|准备)(?:回答|回复|响应)?(?:中)?[.。…]*$/.test(text);
   }
 
+  function shareSurfaceText(value) {
+    const text = String(value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!text || text.length > 800) return false;
+    const shareHeading = /share (?:a )?public link|分享公开链接|公开链接用于分享/.test(text);
+    const shareActions = /copy link|复制链接|facebook|reddit|whatsapp/.test(text);
+    return shareHeading && shareActions;
+  }
+
   function accepts(metrics) {
     const hasQuery = metrics && metrics.hasQuery === true;
     const textLength = nonNegative(metrics && metrics.textLength);
@@ -76,6 +88,7 @@
     if (!hasQuery || textLength < 8) return false;
     if (navigationOnlyText(metrics && metrics.text)) return false;
     if (transientStatusText(metrics && metrics.text)) return false;
+    if (shareSurfaceText(metrics && metrics.text)) return false;
     if (liveRegion && semanticBlocks === 0 && citations === 0) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
     if (links >= 3 && semanticBlocks === 0 && citations === 0) return false;
@@ -94,6 +107,7 @@
     accepts,
     penalty,
     navigationOnlyText,
-    transientStatusText
+    transientStatusText,
+    shareSurfaceText
   });
 });
