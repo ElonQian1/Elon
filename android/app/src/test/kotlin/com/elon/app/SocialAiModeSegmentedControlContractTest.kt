@@ -16,6 +16,8 @@ class SocialAiModeSegmentedControlContractTest {
         val layout = read("android/app/src/main/res/layout/activity_main.xml")
 
         assertTrue(layout.contains("@+id/socialAiModeControlHost"))
+        assertTrue(layout.contains("android:layout_width=\"160dp\""))
+        assertTrue(layout.contains("android:layout_height=\"40dp\""))
         assertTrue(controller.contains("SocialAiModeSegmentedControl"))
         assertTrue(control.contains("onSelected(mode)"))
         assertTrue(control.contains("social_ai_mode_\${mode.wireValue}"))
@@ -34,6 +36,20 @@ class SocialAiModeSegmentedControlContractTest {
         assertTrue(composer.contains("LinearLayout.LayoutParams(dp(76), dp(34))"))
         assertTrue(selector.contains("android:radius=\"12dp\""))
         assertTrue(web.contains("border-radius: 12px"))
+    }
+
+    @Test
+    fun socialAiComposerHasNoTranslucentBackdropBehindItsPills() {
+        val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
+        val layout = read("android/app/src/main/res/layout/activity_main.xml")
+        val web = read("server/src/assets/web_page.html")
+
+        assertTrue(composer.contains("root.setBackgroundColor(Color.TRANSPARENT)"))
+        assertFalse(composer.contains("root.setBackgroundColor(Color.argb(77, 0, 0, 0))"))
+        assertTrue(layout.contains("android:id=\"@+id/inputLayout\""))
+        assertTrue(layout.contains("android:background=\"@android:color/transparent\""))
+        assertTrue(web.contains(".input-bar {"))
+        assertFalse(web.contains("background: rgba(0, 0, 0, 0.70);"))
     }
 
     private fun read(relative: String): String =

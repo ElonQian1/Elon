@@ -29,8 +29,8 @@ internal class SocialAiModeSegmentedControl(
             LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
-                setPadding(dp(3), dp(3), dp(3), dp(3))
-                background = roundedBackground(OUTER_COLOR, 24)
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+                background = roundedBackground(OUTER_COLOR, 20)
                 addView(chatButton, segmentLayoutParams())
                 addView(workButton, segmentLayoutParams())
             },
@@ -63,9 +63,9 @@ internal class SocialAiModeSegmentedControl(
         val selected = buttonMode == selectedMode
         button.isSelected = selected
         button.isActivated = selected
-        button.background = if (selected) roundedBackground(SELECTED_COLOR, 21) else null
+        button.background = if (selected) roundedBackground(SELECTED_COLOR, 16) else null
         button.setTextColor(Color.parseColor(if (selected) SELECTED_TEXT_COLOR else TEXT_COLOR))
-        button.setTypeface(button.typeface, if (selected) Typeface.BOLD else Typeface.NORMAL)
+        button.setTypeface(button.typeface, Typeface.NORMAL)
         button.contentDescription = activity.getString(
             R.string.social_ai_mode_tab_description,
             button.text,
@@ -77,7 +77,7 @@ internal class SocialAiModeSegmentedControl(
         gravity = Gravity.CENTER
         includeFontPadding = false
         text = title
-        textSize = 16f
+        textSize = 15f
         isClickable = true
         isFocusable = true
         tag = "social_ai_mode_${mode.wireValue}"

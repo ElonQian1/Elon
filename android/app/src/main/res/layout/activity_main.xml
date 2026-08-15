@@ -68,8 +68,8 @@
 
             <FrameLayout
                 android:id="@+id/socialAiModeControlHost"
-                android:layout_width="188dp"
-                android:layout_height="48dp"
+                android:layout_width="160dp"
+                android:layout_height="40dp"
                 android:layout_gravity="center"
                 android:visibility="gone" />
 
@@ -1213,7 +1213,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:background="@color/elon_input_panel_bg_70"
+            android:background="@android:color/transparent"
             android:gravity="bottom"
             android:orientation="horizontal"
             android:paddingStart="10dp"

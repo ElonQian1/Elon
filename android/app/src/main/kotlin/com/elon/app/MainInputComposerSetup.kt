@@ -92,7 +92,7 @@ internal class MainInputComposerSetup(
         root.clipChildren = false
         root.clipToPadding = false
         root.setPadding(0, dp(12), 0, bottomEdgeGap)
-        root.setBackgroundColor(Color.argb(77, 0, 0, 0))
+        root.setBackgroundColor(Color.TRANSPARENT)
 
         val modeButtonRow = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
