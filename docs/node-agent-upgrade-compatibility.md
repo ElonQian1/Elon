@@ -1,6 +1,6 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-08-10
+最后更新：2026-08-16
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
@@ -20,7 +20,7 @@
 - 发布包与安装更新只分发 signer、公钥和 nonce 账本路径等非秘密配置；不得复制 Desktop 私钥或 Desktop `StateRoot`。
 - 凭据 `Commit` 默认写入 v3 公钥集合、`ELON_DESKTOP_REVIEW_NONCE_LEDGER` 与 `ELON_DESKTOP_REVIEW_ALLOW_V2=0`。轮换窗口同时保留新旧公钥；确认 Desktop helper 全部升级后移除旧公钥。
 - v2 兼容必须由运维显式设置 `ELON_DESKTOP_REVIEW_ALLOW_V2=1`，且不会重新启用共享 secret v1。v3 公钥存在时任何 v1 ticket 都拒绝。
-- 更新保留已有 `node-agent.env` 和 nonce 账本，不创建生产凭据、不替换 Desktop 身份，也不自动重启 Desktop。
+- 更新保留已有 `node-agent.env` 和 nonce 账本，不创建生产凭据、不替换 Desktop 身份。普通后台更新不自动重启 Desktop；只有 Codex MCP 明确提交精确发布身份的 `update_and_restart` 语义动作，才可进入下述受限的桌面退出与自动重开流程。
 
 ## 用户能听懂的一句话
 
@@ -59,6 +59,7 @@
 21. 项目记忆生命周期与 Memory CI 必须向后兼容：旧 manifest/建议/SQLite 候选缺少 `owner`、`scope`、`review` 或 `expires_at` 时使用 serde 默认值继续读取，规范化时空 scope 降级为 repository；不得因为升级而批量改写旧 manifest。缺失治理字段只由 advisory health 标记，`fail_on_drift` 只对证据漂移和过期给出失败建议，只有调用方显式选择 `strict` 才把复核逾期、治理缺口或共享事实冲突纳入失败。旧 health 响应缺少 v2 计数、repair plan、capabilities 或 policy outcome 时 PC 按零值/隐藏处理，候选审核仍可用。
 22. 本机发布激活器只能把由正式安装路径 `LocalAppData\ElonNode\一龙开发平台.exe` 持有的 loopback Admin listener 作为安装节点；读取 `/api/status` 后必须再次确认同端口仍由同一 PID 和安装路径持有。调试节点、隔离候选、release fixture 或其它端口即使回报目标 `release_identity`，也不得把正式发布状态推进为 `activated`，不得跳过 repair、精确 health check 或 rollback。正式 listener 缺失、所有权变化或路径无法读取时保持 `status_unavailable` 并失败关闭。
 23. 后台多端 UI 验证不得把本机资源缺失升级成代码 capability gap。普通 Android 验证找不到 emulator、AVD 或空闲 Renderer 时必须返回脱敏有界 `VERIFICATION_DEFERRED`、明确 phase/error code/recovery action，并保持 `capabilityGapRequired=false`、`REAL_DEVICE_STATUS=NOT_REQUIRED`；只有显式真机请求才允许进入真机路径。Tauri 项目没有全局 `cargo-tauri` 时可回退仓库内 `src-tauri/Cargo.toml` 的 `cargo run --manifest-path`，但仍只能使用目标发现产生的受限命令。PWA 配置扫描上限只统计相关设计候选，不能让大量无关文件隐藏实际 PWA 目标。
+24. AI 发起的 Windows 自更新只允许 Codex MCP 的固定动作 `update_and_restart`，并要求目标为精确 `version+40–64 位 Git SHA`。节点更新器必须把远端签名清单的版本和完整 SHA 与请求逐字匹配，禁止 latest、分支、短 SHA、任意下载地址或任意脚本。Tauri 只能从正式安装布局启动仓库内嵌守护器；先形成动作回执，再由桌面壳主动退出，不能把 PID 交给代理任意结束。守护器复用现有签名验证、任务终态等待、激活锁和回滚状态，更新完成或失败后都等待锁空闲并只重开正式 `一龙开发平台.exe`；Codex 必须在重连后回读精确 `release_identity` 才能确认成功。
 
 2026-08-05 正式发布复验已覆盖本条合同：7800 候选节点在线且回报目标身份时，激活帮助程序仍选中 7799 正式安装 listener；关闭桌面壳后发布从 `0.3.69+067ec391…` 激活到 `0.3.69+e30818e6…`，状态为 `activated`、`rollback_state=not_required`。重开桌面壳后只有一个安装目录 `elon-desktop.exe`，7799 仍由安装目录 `一龙开发平台.exe` 持有并保持目标 `build_git_sha`、`release_identity` 和云连接。
 

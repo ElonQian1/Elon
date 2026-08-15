@@ -39,7 +39,7 @@ struct ActionInput {
     #[serde(default)]
     provider_id: Option<String>,
     #[serde(default)]
-    requested_by: Option<String>,
+    target_release_identity: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -126,12 +126,13 @@ async fn action_handler(
     State(runtime): State<Arc<NodeRuntime>>,
     Json(input): Json<ActionInput>,
 ) -> Response {
-    match runtime.win_codex_control.enqueue_action(
+    match runtime.win_codex_control.enqueue_action_with_target(
         &input.trace_id,
         &input.kind,
         input.route.as_deref(),
         input.provider_id.as_deref(),
-        input.requested_by.as_deref().unwrap_or("pc_ui"),
+        input.target_release_identity.as_deref(),
+        "pc_ui",
     ) {
         Ok(action) => Json(json!({"ok": true, "action": action})).into_response(),
         Err(error) => bad_request(error),

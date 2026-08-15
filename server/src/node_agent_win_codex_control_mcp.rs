@@ -25,6 +25,8 @@ struct ActionArguments {
     #[serde(default)]
     provider_id: Option<String>,
     #[serde(default)]
+    target_release_identity: Option<String>,
+    #[serde(default)]
     trace_id: Option<String>,
 }
 
@@ -76,13 +78,14 @@ fn definitions() -> Vec<Value> {
         }),
         json!({
             "name":"win_control_action",
-            "description":"排队白名单 Win 语义动作。queued 不等于成功，随后必须读 timeline/状态确认 Tauri 回执。",
+            "description":"排队白名单 Win 语义动作。queued 不等于成功；update_and_restart 还必须提供精确发布身份，并在 Win 重连后重新读取 status 核对版本。",
             "inputSchema":{
                 "type":"object","required":["kind"],"additionalProperties":false,
                 "properties":{
-                    "kind":{"type":"string","enum":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window"]},
+                    "kind":{"type":"string","enum":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"]},
                     "route":{"type":"string","maxLength":180,"description":"仅 navigate 使用的已登记相对路径，不含 URL/query/hash。"},
                     "provider_id":{"type":"string","enum":["chatgpt","google-ai-mode"],"description":"仅 AI 子窗口定向动作使用。"},
+                    "target_release_identity":{"type":"string","maxLength":113,"description":"仅 update_and_restart 使用，格式为 version+40至64位git_sha。"},
                     "trace_id":{"type":"string","maxLength":160}
                 }
             }
@@ -138,18 +141,19 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
             let input: ActionArguments = serde_json::from_value(arguments)?;
             let action = runtime
                 .win_codex_control
-                .enqueue_action(
+                .enqueue_action_with_target(
                     input.trace_id.as_deref().unwrap_or("codex_mcp"),
                     &input.kind,
                     input.route.as_deref(),
                     input.provider_id.as_deref(),
+                    input.target_release_identity.as_deref(),
                     "codex_mcp",
                 )
                 .map_err(anyhow::Error::msg)?;
             json!({
                 "schema":"elon.win_codex_action.v1",
                 "action":action,
-                "completion_rule":"queued is not success; wait for a succeeded Tauri receipt",
+                "completion_rule":"queued is not success; wait for a succeeded Tauri scheduling receipt, then after reconnect verify capabilities.release_identity equals the requested target",
             })
         }
         "win_control_action_status" => {

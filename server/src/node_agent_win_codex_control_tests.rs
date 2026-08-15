@@ -42,6 +42,66 @@ fn action_contract_rejects_arbitrary_urls_scripts_and_routes() {
 }
 
 #[test]
+fn update_restart_requires_codex_and_an_exact_release_identity() {
+    let hub = WinCodexControlHub::default();
+    let target = format!("0.3.69+{}", "A".repeat(40));
+    let normalized_target = format!("0.3.69+{}", "a".repeat(40));
+    let action = hub
+        .enqueue_action_with_target(
+            "trace",
+            "update_and_restart",
+            None,
+            None,
+            Some(&target),
+            "codex_mcp",
+        )
+        .unwrap();
+    assert_eq!(
+        action.target_release_identity.as_deref(),
+        Some(normalized_target.as_str())
+    );
+    assert_eq!(action.requested_by, "codex_mcp");
+    assert!(hub
+        .enqueue_action_with_target(
+            "trace",
+            "update_and_restart",
+            None,
+            None,
+            Some(&target),
+            "pc_ui",
+        )
+        .is_err());
+    assert!(hub
+        .enqueue_action_with_target(
+            "trace",
+            "update_and_restart",
+            None,
+            None,
+            Some("latest"),
+            "codex_mcp",
+        )
+        .is_err());
+    assert!(hub
+        .enqueue_action_with_target("trace", "focus_window", None, None, Some(&target), "test",)
+        .is_err());
+}
+
+#[test]
+fn capabilities_expose_the_current_release_and_pinned_restart_policy() {
+    let capabilities = WinCodexControlHub::default().capabilities();
+    assert!(capabilities["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|action| action.as_str() == Some("update_and_restart")));
+    assert_eq!(
+        capabilities["security"]["update_restart_requires_exact_release"],
+        true
+    );
+    assert!(capabilities["release_identity"].as_str().is_some());
+}
+
+#[test]
 fn event_fields_and_sensitive_summaries_are_redacted() {
     let hub = WinCodexControlHub::default();
     let event = hub.record(

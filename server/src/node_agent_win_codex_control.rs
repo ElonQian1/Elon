@@ -39,6 +39,7 @@ pub(crate) struct WinControlAction {
     pub kind: String,
     pub route: Option<String>,
     pub provider_id: Option<String>,
+    pub target_release_identity: Option<String>,
     pub requested_by: String,
     pub requested_at_ms: u128,
     pub expires_at_ms: u128,
@@ -118,9 +119,23 @@ impl WinCodexControlHub {
         provider_id: Option<&str>,
         requested_by: &str,
     ) -> Result<WinControlAction, String> {
+        self.enqueue_action_with_target(trace_id, kind, route, provider_id, None, requested_by)
+    }
+
+    pub(crate) fn enqueue_action_with_target(
+        &self,
+        trace_id: &str,
+        kind: &str,
+        route: Option<&str>,
+        provider_id: Option<&str>,
+        target_release_identity: Option<&str>,
+        requested_by: &str,
+    ) -> Result<WinControlAction, String> {
         let kind = validate_action_kind(kind)?;
         let route = validate_action_route(kind, route)?;
         let provider_id = validate_action_provider(kind, provider_id)?;
+        let target_release_identity =
+            validate_action_target(kind, target_release_identity, requested_by)?;
         let now = now_ms();
         let action = WinControlAction {
             action_id: format!("win_act_{}", uuid::Uuid::new_v4().simple()),
@@ -128,6 +143,7 @@ impl WinCodexControlHub {
             kind: kind.to_string(),
             route,
             provider_id,
+            target_release_identity,
             requested_by: clean_identifier(requested_by, "local_admin"),
             requested_at_ms: now,
             expires_at_ms: now.saturating_add(ACTION_TTL_MS),
@@ -147,7 +163,7 @@ impl WinCodexControlHub {
             "info",
             "action.queued",
             &format!("已排队 Win 语义动作 {}", action.kind),
-            json!({"action_id": action.action_id, "kind": action.kind, "route": action.route, "provider_id": action.provider_id}),
+            json!({"action_id": action.action_id, "kind": action.kind, "route": action.route, "provider_id": action.provider_id, "target_release_identity": action.target_release_identity}),
         );
         Ok(action)
     }
@@ -300,6 +316,7 @@ impl WinCodexControlHub {
         let state = lock(&self.inner);
         json!({
             "schema": "elon.win_codex_control.v1",
+            "release_identity": crate::node_agent_release_identity::current(),
             "actions": allowed_actions(),
             "ai_window_providers": ["chatgpt", "google-ai-mode"],
             "routes": allowed_route_roots(),
@@ -311,6 +328,8 @@ impl WinCodexControlHub {
                 "cookies_exported": false,
                 "request_bodies_logged": false,
                 "prompt_bodies_logged": false,
+                "arbitrary_update_target": false,
+                "update_restart_requires_exact_release": true,
             },
             "frontend_available": heartbeat_live(state.last_frontend_heartbeat_ms, now),
             "tauri_available": heartbeat_live(state.last_tauri_heartbeat_ms, now),
@@ -427,6 +446,46 @@ fn validate_action_provider(
         return Err("只有 AI 子窗口定向动作允许 provider_id。".to_string());
     }
     Ok(None)
+}
+
+fn validate_action_target(
+    kind: &str,
+    target_release_identity: Option<&str>,
+    requested_by: &str,
+) -> Result<Option<String>, String> {
+    let target = target_release_identity
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if kind == "update_and_restart" {
+        if requested_by.trim() != "codex_mcp" {
+            return Err("更新重启动作只允许项目绑定的 Codex MCP 发起。".to_string());
+        }
+        return target
+            .ok_or_else(|| "update_and_restart 必须提供精确 target_release_identity。".to_string())
+            .and_then(validate_release_identity)
+            .map(Some);
+    }
+    if target.is_some() {
+        return Err("只有 update_and_restart 允许 target_release_identity。".to_string());
+    }
+    Ok(None)
+}
+
+fn validate_release_identity(value: &str) -> Result<String, String> {
+    let (version, git_sha) = value
+        .rsplit_once('+')
+        .ok_or_else(|| "target_release_identity 必须是 version+git_sha。".to_string())?;
+    let version_ok = !version.is_empty()
+        && version.len() <= 48
+        && version
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'));
+    let git_sha_ok =
+        (40..=64).contains(&git_sha.len()) && git_sha.bytes().all(|byte| byte.is_ascii_hexdigit());
+    if !version_ok || !git_sha_ok {
+        return Err("target_release_identity 不是合法的精确 Win 发布身份。".to_string());
+    }
+    Ok(format!("{}+{}", version, git_sha.to_ascii_lowercase()))
 }
 
 fn validate_route(route: &str) -> Result<String, String> {
@@ -612,6 +671,7 @@ fn allowed_actions() -> &'static [&'static str] {
         "list_ai_windows",
         "capture_ai_window_state",
         "focus_ai_window",
+        "update_and_restart",
     ]
 }
 

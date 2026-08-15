@@ -5,6 +5,8 @@ use std::path::Path;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct VersionInfo {
+    #[serde(default)]
+    pub(crate) version: String,
     #[serde(default, rename = "gitSha")]
     pub(crate) git_sha: String,
     #[serde(default, rename = "downloadUrl")]

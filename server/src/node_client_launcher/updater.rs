@@ -75,6 +75,9 @@ mod checkpoint_gate;
 #[path = "updater_runtime_gate.rs"]
 mod runtime_gate;
 
+#[path = "updater_target.rs"]
+mod target_identity;
+
 #[path = "updater_singleflight.rs"]
 mod singleflight;
 pub(crate) use self::singleflight::{

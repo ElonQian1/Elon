@@ -21,6 +21,7 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     let remote_text = remote_text.trim_start_matches('\u{feff}').to_string();
     let remote: VersionInfo =
         serde_json::from_str(&remote_text).context("远程版本内容不是合法 JSON")?;
+    target_identity::verify_expected_from_env(&remote)?;
     if remote.git_sha.trim().is_empty() {
         return Ok(false);
     }

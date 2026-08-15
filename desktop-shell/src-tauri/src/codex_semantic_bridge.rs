@@ -13,6 +13,8 @@ use tauri::{AppHandle, Manager, State, WebviewWindow};
 
 #[path = "codex_semantic_bridge/ai_window_control.rs"]
 mod ai_window_control;
+#[path = "codex_semantic_bridge/update_restart.rs"]
+mod update_restart;
 
 use crate::local_ai_browser::{LocalAiBrowserRuntime, LocalAiNativeWindowRuntime};
 
@@ -31,6 +33,10 @@ pub(crate) struct SemanticAction {
     pub route: Option<String>,
     #[serde(default)]
     pub provider_id: Option<String>,
+    #[serde(default)]
+    pub target_release_identity: Option<String>,
+    #[serde(default)]
+    pub requested_by: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -211,7 +217,7 @@ pub(crate) fn codex_win_capabilities(
         "schema":"elon.tauri_codex_bridge.v1",
         "available":true,
         "window_label":window.label(),
-        "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window"],
+        "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"],
         "ai_window_providers":["chatgpt","google-ai-mode"],
         "devtools_supported":cfg!(debug_assertions),
         "arbitrary_javascript":false,
@@ -245,7 +251,7 @@ pub(crate) fn codex_execute_semantic_action(
         level,
         "action.executed",
         &format!("{}: {}", action.kind, status),
-        json!({"action_id": action.action_id, "kind": action.kind, "status": status, "route": action.route, "window_state": captured_state.clone()}),
+        json!({"action_id": action.action_id, "kind": action.kind, "status": status, "route": action.route, "target_release_identity": action.target_release_identity, "window_state": captured_state.clone()}),
     );
     result.map(|result| {
         json!({
@@ -362,6 +368,16 @@ fn execute(
             )?;
             outcome("一龙 AI 子窗口已聚焦", Some(state))
         }
+        "update_and_restart" => update_restart::schedule(
+            window,
+            &action.action_id,
+            &action.requested_by,
+            action
+                .target_release_identity
+                .as_deref()
+                .ok_or("更新重启动作缺少精确目标发布身份")?,
+        )
+        .and_then(|message| outcome(message, None)),
         _ => Err("不支持的 Tauri 语义动作".to_string()),
     }
 }
@@ -444,6 +460,7 @@ fn validate_action(action: &SemanticAction) -> Result<(), String> {
             | "list_ai_windows"
             | "capture_ai_window_state"
             | "focus_ai_window"
+            | "update_and_restart"
     ) {
         return Err("动作不在 Tauri 白名单".to_string());
     }
@@ -468,6 +485,23 @@ fn validate_action(action: &SemanticAction) -> Result<(), String> {
         .is_some_and(|provider_id| !provider_id.trim().is_empty())
     {
         return Err("只有 AI 子窗口定向动作允许 provider_id".to_string());
+    }
+    if action.kind == "update_and_restart" {
+        if action.requested_by != "codex_mcp" {
+            return Err("更新重启动作只允许项目绑定的 Codex MCP 发起".to_string());
+        }
+        update_restart::schedule_target_is_valid(
+            action
+                .target_release_identity
+                .as_deref()
+                .ok_or("更新重启动作缺少精确目标发布身份")?,
+        )?;
+    } else if action
+        .target_release_identity
+        .as_deref()
+        .is_some_and(|target| !target.trim().is_empty())
+    {
+        return Err("只有 update_and_restart 允许目标发布身份".to_string());
     }
     Ok(())
 }
@@ -606,7 +640,29 @@ mod tests {
             kind: "eval_javascript".to_string(),
             route: None,
             provider_id: None,
+            target_release_identity: None,
+            requested_by: "codex_mcp".to_string(),
         };
+        assert!(validate_action(&action).is_err());
+    }
+
+    #[test]
+    fn update_restart_bridge_requires_codex_and_exact_target() {
+        let target = format!("0.3.69+{}", "a".repeat(40));
+        let mut action = SemanticAction {
+            action_id: "a".to_string(),
+            trace_id: "t".to_string(),
+            kind: "update_and_restart".to_string(),
+            route: None,
+            provider_id: None,
+            target_release_identity: Some(target),
+            requested_by: "codex_mcp".to_string(),
+        };
+        assert!(validate_action(&action).is_ok());
+        action.requested_by = "pc_ui".to_string();
+        assert!(validate_action(&action).is_err());
+        action.requested_by = "codex_mcp".to_string();
+        action.target_release_identity = Some("latest".to_string());
         assert!(validate_action(&action).is_err());
     }
 
