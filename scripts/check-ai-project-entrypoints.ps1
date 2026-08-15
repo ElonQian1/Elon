@@ -27,8 +27,13 @@ Set-Location $repoRoot
 
 $requiredFiles = @(
     "AI_CURRENT.md",
+    "AI_ARCHITECTURE.md",
     "docs/decisions/reject-demo-oracle-role.md",
     "docs/decisions/reject-ai-to-ai-skill-route.md",
+    "docs/distributed-compute/current-implementation-status.md",
+    "docs/distributed-compute/README.md",
+    "docs/distributed-compute/settlement-withdrawal-request-api.md",
+    "docs/distributed-compute/settlement-withdrawal-terminal-api.md",
     "default-project-docs/files/AI_CURRENT.md"
 )
 foreach ($path in $requiredFiles) {
@@ -42,12 +47,46 @@ $copilot = [System.IO.File]::ReadAllText(".github/copilot-instructions.md")
 $contextCompiler = [System.IO.File]::ReadAllText("server/src/context_compiler/agent_rag_project_docs.rs")
 $defaultSeeder = [System.IO.File]::ReadAllText("server/src/project_default_docs.rs")
 $current = [System.IO.File]::ReadAllText("AI_CURRENT.md")
+$architecture = [System.IO.File]::ReadAllText("AI_ARCHITECTURE.md")
+$computeStatus = [System.IO.File]::ReadAllText("docs/distributed-compute/current-implementation-status.md")
+$computeReadme = [System.IO.File]::ReadAllText("docs/distributed-compute/README.md")
 Assert-Contains $agents "AI_CURRENT.md" "AGENTS.md"
 Assert-Contains $copilot "AI_CURRENT.md" ".github/copilot-instructions.md"
 Assert-Contains $contextCompiler 'path: "AI_CURRENT.md"' "agent project docs context"
 Assert-Contains $defaultSeeder 'path: "AI_CURRENT.md"' "default project document seeder"
 Assert-Contains $current "reject-demo-oracle-role.md" "AI_CURRENT.md"
 Assert-Contains $current "reject-ai-to-ai-skill-route.md" "AI_CURRENT.md"
+
+$computeSectionStartMarker = "<!-- distributed-compute-architecture:start -->"
+$computeSectionEndMarker = "<!-- distributed-compute-architecture:end -->"
+$computeSectionStart = $architecture.IndexOf($computeSectionStartMarker, [System.StringComparison]::Ordinal)
+$computeSectionEnd = if ($computeSectionStart -ge 0) {
+    $architecture.IndexOf(
+        $computeSectionEndMarker,
+        $computeSectionStart + $computeSectionStartMarker.Length,
+        [System.StringComparison]::Ordinal
+    )
+} else {
+    -1
+}
+if ($computeSectionStart -lt 0 -or $computeSectionEnd -le $computeSectionStart) {
+    throw "AI_ARCHITECTURE.md must retain the distributed-compute architecture section before current gaps."
+}
+$computeArchitecture = $architecture.Substring(
+    $computeSectionStart,
+    ($computeSectionEnd + $computeSectionEndMarker.Length) - $computeSectionStart
+)
+Assert-Contains $computeArchitecture "docs/distributed-compute/current-implementation-status.md" "distributed-compute architecture section"
+if ($computeArchitecture -match '\bimplementation_(?:uncompiled|unrun|unwired|partially_verified|verified)\b') {
+    throw "Distributed-compute maturity labels belong in current-implementation-status.md, not AI_ARCHITECTURE.md."
+}
+foreach ($withdrawalDoc in @(
+    "settlement-withdrawal-request-api.md",
+    "settlement-withdrawal-terminal-api.md"
+)) {
+    Assert-Contains $computeStatus $withdrawalDoc "distributed-compute current status"
+    Assert-Contains $computeReadme $withdrawalDoc "distributed-compute README"
+}
 
 $manifest = Read-Json ".elon/document-sections.json"
 $currentGovernance = $manifest.governance_facets."AI_CURRENT.md"

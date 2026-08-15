@@ -1,7 +1,7 @@
 ---
 title: 一龙任务级分布式算力联邦
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-16
 owners: backend, node, ai-economy
 ---
 
@@ -63,8 +63,8 @@ owners: backend, node, ai-economy
 | Attempt 待结算原子释放 | v198、追加式 Store、Release Posting/账本腿与消费者/管理员 HTTP 已写；满 72 小时且挑战允许时，管理员可把内部 pending 原子转入 available。PC `/compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。open/accepted 阻断，available 不等于提现或外部付款 |
 | 到期结算释放队列与管理员批处理 | 管理员 HTTP 可按不透明 keyset 游标读取到期候选，再逐笔复用 v198；v202 保存批次意图和完成回执，PC 展示分页、当前页处理和批次历史。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。批次不是整批原子事务或后台定时器，不提现、不外部付款 |
 | Attempt accepted 挑战纠正 | v199、追加式 Store、accepted 待纠正队列、Correction Posting/账本腿、角色 HTTP 与 PC `/compute-corrections` 已写；管理员以整数 fen/micros、守恒预览和双重确认提交平台内向下纠正。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器、生产库和发布仍未验证。纠正不等于外部退款到账 |
-| Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
-| Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
+| Provider 提款申请与内部冻结 | v200 把 Provider 本人 CNY available 原子转入 withdrawn；与 v201 共用 Store/Service 专项 `3 passed / 0 failed`，PC 静态构建通过。只冻结内部余额，不执行外部付款；真实 TCP、浏览器和生产库未验证。见 [`当前状态`](current-implementation-status.md) 与 [`v200 合同`](settlement-withdrawal-request-api.md) |
+| Provider 提款唯一终态 | v201 允许取消、拒绝或登记外部已付款声明；同组专项覆盖返还幂等、重开和声明零资金移动，PC 静态构建通过。它不发起或验证外部付款。见 [`当前状态`](current-implementation-status.md) 与 [`v201 合同`](settlement-withdrawal-terminal-api.md) |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
 | 外部算力池适配器与统一报价 | V267-V272 已有分层验证。V273 已编译，18 项源码合同和 3 项动态迁移统一 21/21 通过，但 production runtime 未运行。V274 已铺 stable root、2 张 immutable 表、1 个诊断 view 与 Store-private purpose-seal ABI；仍未编译/运行、`passed=0/failed=0`，V275 前零行，V253 pre-V275 为 registering-only。Provider=`registering`、`eligible_rows=0`、18 deny 不变；V275/V276 仍缺。见 [`V273`](external-pool-adapter-task-protocol-production-authority.md)、[`V274`](external-pool-adapter-provider-active-successor-authority.md) 与 [`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
@@ -175,7 +175,7 @@ v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt �
 v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。管理员现可读取有界到期候选并逐笔复用 v198；这是人工触发的部分成功批处理，不是后台定时清算。v200 再允许 Provider 所有者把本人 available 原子转入 withdrawn 提款保留区；v201 为申请增加取消、拒绝或外部已付款声明的唯一终态。取消/拒绝返还内部余额，付款声明只保存证据，不调用或验证外部资金网络。
 Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。平台 reference fallback 现由管理员 HTTP/MCP 完成 exact batch 提交、独立复核、preflight 和原子 application；v223/v224 直接登记 entry 对应的唯一 v171 Snapshot，并通过临时文件迁移与重开专项。它仍固定为 `fallback_curve/sample_count=0`，不代表 index/mark/trade；平台曲线 PC、真实 TCP 与生产部署未验证。候选不返回节点路由、凭据或适配器配置，任何报价发布和锁价都不自动移动资金或容量。
 
-Provider、Pool、Bucket、Supply、激活、Offer、平台参考价格和 Broker 各自的控制面与证据由本页“阅读顺序”中的专题文档维护。PC `/compute-supply`、`/compute-activation`、`/compute-offers`、`/compute-reference-curves`、`/compute-market` 与 12 个 Attempt/结算角色路由已完成静态生产构建；Attempt 后端操作级专项仍未运行。静态构建不代表接口联调、浏览器验收、生产迁移或发布，参考价格、Broker 与 Attempt PC 证据分别见 `platform-reference-price-curve-api-acceptance.md`、`broker-control-plane-acceptance.md` 与 `pc-compute-attempt-workbenches-acceptance.md`。
+各控制面的证据由本页“阅读顺序”中的专题文档维护。PC 算力管理和 12 个 Attempt/结算角色路由已完成静态生产构建；v200/v201 另已完成本地 Store/Service 专项。其余成熟度统一见 [`current-implementation-status.md`](current-implementation-status.md)。静态构建不代表接口联调、浏览器验收、生产迁移或发布。
 
 v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 从 `submitted` 创建并只从当前合格候选进入 `quoted`；消费者幂等键、revision/digest CAS、历史依赖审计及临时磁盘重开已随 Broker 组合链通过定向测试。该结论不代表真实 TCP、生产数据库升级、异常断电恢复、自动撮合或任务派发已经验证。
 
