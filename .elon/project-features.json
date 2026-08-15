@@ -3515,7 +3515,7 @@
       "id": "open-commerce-outbound-public-address-policy-v2",
       "title": "开放商业出站公网地址策略 V2",
       "summary": "统一开放商业与算力代理的公网单播地址分类，为 DNS 增加超时和答案上限，并把全部已验证公网地址固定给禁代理、禁重定向的 HTTPS 客户端。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/open-commerce-outbound-public-address-policy-v2.md",
@@ -3662,7 +3662,7 @@
         }
       ],
       "created_at_ms": 1786767952681,
-      "updated_at_ms": 1786772464958
+      "updated_at_ms": 1786772758494
     },
     {
       "id": "open-commerce-verified-erp-handoff-handler-v1",
@@ -4752,16 +4752,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_6f983198b66a4554adf1edef3cbfc67f",
-      "feature_id": "compute-v256-runtime-bundle-resolver-verification",
-      "action": "claimed",
-      "actor": "codex-goal",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786657760928
-    },
     {
       "id": "feature_event_0529c43a46f547cfbd6c90db68181635",
       "feature_id": "compute-v256-runtime-bundle-resolver-verification",
@@ -6751,6 +6741,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786772464958
+    },
+    {
+      "id": "feature_event_8342a6b1e18d4de59e73984bcd9432ad",
+      "feature_id": "open-commerce-outbound-public-address-policy-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Verified implementation and evidence were pushed to origin/main at b890be82a8c6a0fc306131bece42de2e84f9359b.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786772758494
     }
   ]
 }
