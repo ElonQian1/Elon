@@ -3,19 +3,22 @@ title: 外部矿池 Adapter task-protocol production transport 验收
 status: current
 reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
-implementation_status: implementation_compiled
-verification_status: targeted_local_source_contracts_verified
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_source_contracts_and_migration_verified
 ---
 
 # 外部矿池 Adapter task-protocol production transport 验收
 
 ## 1. 当前证据强度
 
-V273 当前接受 authority 合同的静态复核与完整 WSL2 GNU `elon-server` 测试目标编译；生命周期 UDF 借用与
-内部映射/校验可见性阻断已修复。`task_protocol_production_` 源码合同 `18 passed / 0 failed`，规范化指纹为
-`d9c13b9ea8638c172709e740d540b5fe8f72477189c99f5c9646d417991df105`。尚未执行 V273 migration，或运行
-SQLite/startup/Linux child/ELTP/network/crash/concurrency/reopen fixture；运行态计数为 `passed=0/failed=0`，
-状态为 `implementation_compiled / targeted_local_source_contracts_verified / implementation_unrun`。
+V273 当前接受 authority 合同的静态复核、完整 WSL2 GNU `elon-server` 测试目标编译及局部动态 migration 验证；
+生命周期 UDF 借用与内部映射/校验可见性阻断已修复。统一 `task_protocol_production` 过滤器
+`20 passed / 0 failed`，包含 18 项源码合同和 2 项 fresh/repeat/reopen + UDF 动态迁移，规范化指纹为
+`77f262e8d2553a39465324f199e7c6b58a214633c0ddfd08db855b5ba8d7cce4`。该指纹按顺序连接 20 条稳定的
+`test ... ok` 行及移除 filtered/time 字段后的结果行再计算 SHA-256。动态证据覆盖 exact 六张空表、零 view、
+schema 稳定、六个完整性 UDF 畸形输入失败关闭、恢复入口持续 `eligible_rows=0` 和 V254 18 deny SQL 不变。
+production runtime 仍未运行，计数为 `passed=0/failed=0`；状态为 `implementation_partially_verified /
+targeted_local_source_contracts_and_migration_verified / production_runtime_unrun`。
 
 本页只定义验收门；唯一语义来源是
 [`external-pool-adapter-task-protocol-production-authority.md`](external-pool-adapter-task-protocol-production-authority.md)。
@@ -53,7 +56,7 @@ SQLite/startup/Linux child/ELTP/network/crash/concurrency/reopen fixture；运�
 
 ## 3. Startup 与 dormant reachability 动态矩阵
 
-当前全部未运行。未来最低矩阵为：
+当前 startup/worker/session 动态项全部未运行。未来最低矩阵为：
 
 | 验收面 | 必须证明 |
 |---|---|
@@ -81,7 +84,7 @@ SQLite/startup/Linux child/ELTP/network/crash/concurrency/reopen fixture；运�
 
 | 验收面 | 必须证明 |
 |---|---|
-| fresh/repeat/reopen migration | exact六表、PK/FK/UNIQUE、projection/integrity/no-delete/no-replace；四表no-update、两poll intent no-update且只有列举claim projection可CAS；V254 18 trigger SQL与语义不变。 |
+| fresh/repeat/reopen migration | **局部通过**：exact六张空表、零view、schema稳定、六个UDF畸形输入失败关闭、恢复入口 `eligible_rows=0`、V254 18 trigger SQL不变。PK/FK/UNIQUE正向行、projection/no-delete/no-replace、四表no-update、两poll narrow CAS与trigger语义仍待动态验证。 |
 | attempt-before-network | 首个v213 send-attempt与V273 exchange-attempt同一BEGIN IMMEDIATE、同commit；任一失败两者rollback，commit后才允许socket，无receipt一律remote-unknown。 |
 | receipt replay | exact replay返回同row；同attempt不同digest、第二receipt、不同session/nonce/ordinal拒绝。 |
 | reconcile | unknown prepare/commit只能reconcile，不盲重发；cancel ACK无tombstone时不形成no-start。 |
@@ -110,8 +113,9 @@ V275/V276 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制�
 production reachability。V276 必须重新执行本页 startup、root/wire、六表、crash/concurrency与 ingress矩阵；不能把
 V273 source review、V272 conformance passed或V275 migration success当作 transport已验收。
 
-V273 当前只能声明“default-off dormant production transport/ingress kernel 合同已冻结”。它不能声明 worker已运行、
-ACK/event已接入、Provider可激活或任务可派发。正式状态保持
-`implementation_compiled / targeted_local_source_contracts_verified / implementation_unrun`、运行态
+V273 当前只能声明“default-off dormant production transport/ingress kernel 合同已冻结，迁移边界已局部动态验证”。
+它不能声明 worker已运行、ACK/event已接入、Provider可激活或任务可派发。正式状态保持
+`implementation_partially_verified / targeted_local_source_contracts_and_migration_verified /
+production_runtime_unrun`、运行态
 `passed=0/failed=0`、
 `eligible_rows=0`、Provider=`registering`、18 fences unchanged。

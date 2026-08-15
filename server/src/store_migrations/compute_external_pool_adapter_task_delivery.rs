@@ -5,6 +5,9 @@ mod guards;
 mod receipt_integrity;
 mod tables;
 
+#[cfg(test)]
+mod dynamic_tests;
+
 pub(super) fn register_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     receipt_integrity::register(conn)
 }

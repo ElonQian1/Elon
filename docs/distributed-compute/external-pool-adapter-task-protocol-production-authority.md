@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-16
 owners: backend, security, ai-economy
 design_status: design_frozen
-implementation_status: implementation_compiled
-verification_status: targeted_local_source_contracts_verified
+implementation_status: implementation_partially_verified
+verification_status: targeted_local_source_contracts_and_migration_verified
 ---
 
 # 外部矿池 Adapter task-protocol production transport 权威
@@ -242,11 +242,13 @@ V270/V272 current Store-private reproof。
 
 ## 11. 当前实现与验证现实
 
-V273 当前严格为 `design_frozen / implementation_compiled / targeted_local_source_contracts_verified /
-implementation_unrun`。生命周期 UDF 借用与内部映射/校验可见性编译阻断已修复，完整 WSL2 GNU
-`elon-server` 测试目标已编译；`task_protocol_production_` 源码合同 `18 passed / 0 failed`，覆盖 default-off、
-双 custody、8 roots/argv、ELTP、六表/恢复、零公开 API、零 v213 constructor 与 18 deny，规范化指纹为
-`d9c13b9ea8638c172709e740d540b5fe8f72477189c99f5c9646d417991df105`。V273 运行态仍为 `passed=0/failed=0`，
-没有 migration、SQLite、startup、Linux child、ELTP、network、crash、concurrency、reopen 或 ingress 运行证据。
-唯一正式结论是 dormant production transport/ingress 合同已冻结、可编译且源码合同已验证；
+V273 当前严格为 `design_frozen / implementation_partially_verified /
+targeted_local_source_contracts_and_migration_verified / production_runtime_unrun`。生命周期 UDF 借用与内部
+映射/校验可见性编译阻断已修复，完整 WSL2 GNU `elon-server` 测试目标已编译；统一过滤器 `20 passed / 0 failed`
+包含 18 项源码合同和 2 项动态迁移，规范化指纹为
+`77f262e8d2553a39465324f199e7c6b58a214633c0ddfd08db855b5ba8d7cce4`。动态证据覆盖 fresh/repeat/reopen、
+exact 六张空表、零 view、schema 稳定、六个完整性 UDF 对畸形 envelope 失败关闭、恢复入口持续
+`eligible_rows=0`，以及 V254 18 deny SQL 不变。production runtime 仍为 `passed=0/failed=0`，没有 startup、
+Linux child、ELTP、network、crash、concurrency、正向 ledger row 或 ingress 运行证据。唯一正式结论是 dormant
+production transport/ingress 合同已冻结、可编译且 migration 边界已局部动态验证；
 `eligible_rows=0`、Provider=`registering`、18 deny unchanged，production dispatch 与 atomic activation继续 NO-GO。

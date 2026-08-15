@@ -171,9 +171,9 @@ fn task_protocol_production_boundary_persists_only_redacted_evidence() {
 #[test]
 fn task_protocol_production_boundary_reports_only_dormant_compiled_source_contracts() {
     for marker in [
-        "targeted_local_source_contracts_verified",
-        "implementation_compiled",
-        "implementation_unrun",
+        "targeted_local_source_contracts_and_migration_verified",
+        "implementation_partially_verified",
+        "production_runtime_unrun",
         "passed=0",
         "failed=0",
         "eligible_rows=0",
