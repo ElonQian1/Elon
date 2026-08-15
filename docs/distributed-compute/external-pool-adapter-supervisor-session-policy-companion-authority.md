@@ -4,6 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
+verification_status: historical_v259_v1_verified_v267_v2_source_review_only
 ---
 
 # 外部矿池 Adapter supervisor/session policy companion 权威
@@ -69,3 +70,17 @@ V254 的 18 个 temporary absolute deny trigger必须名称及SQL body逐字保�
 2026-08-15，V262 在真实 static Rust capsule 中观察到 stdio 启动与认证 transport 需要 `F_GETFD` 和受限 `poll`。当前 server-fixed catalog 只增加 `fcntl(F_GETFD)` 的 fd3/fd5 形状，以及 `poll(nfds=3, timeout=0)` 或 `poll(nfds=1, timeout=1..5000)`；descriptor duplication、其他 poll 形状与未知 syscall 仍 `KILL_PROCESS`，真实 negative fixture 已验证。
 
 该 catalog 修正改变 supervisor/session policy digest。历史 companion/profile 继续绑定创建时的 exact digest，currentness 视图不会把它们静默升级到新策略；采用 V262 runtime 必须通过线性后继 companion 或明确重新验证形成新绑定。撤销、前驱和审计记录保持 append-only，不覆盖旧 digest，也不因为 policy id/revision 文字相同而放宽匹配。
+
+## 8. V267 current V2 与历史 V1
+
+V267 把 current catalog 升级为 `external_pool_adapter_supervisor_session_policy_v2` revision 2。
+V2 保留 V1 framing、crypto、resource 与 no-effect/readiness 边界，同时增加
+`yama_ptrace_scope_2_or_stricter_v2`、受参数约束的 dumpable `prctl`，并把唯一 exec 规则改为
+派生 launch capsule fd4/`AT_EMPTY_PATH`。历史 V1 builder/JCS/digest 继续 exact 冻结；历史
+companion/revocation 可按创建时材料回读，但不能被 current V2 view 静默视为新策略。
+
+`migration_v267` 只重装 current policy JSON projection trigger/view，不创建或改写 receipt table，
+也不触碰 V257 capsule-policy V1 roots。fresh companion 必须绑定 V2；V259 的历史
+`13 passed / 0 failed` 只证明 V1 版本，本批 V2 migration/catalog 为
+`source_review_only / implementation_uncompiled / implementation_unrun / passed=0`。V266
+机器 Profile V1 显式使用冻结的 session V1 catalog；面向 V2 的 Profile/verifier 尚未形成。

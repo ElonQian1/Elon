@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: static_profile_and_unsigned_candidate_validation
+verification_status: frozen_v1_static_profile_and_unsigned_candidate_validation
 ---
 
 # 外部矿池 Adapter 运行时兼容性 Profile 验收边界
@@ -19,6 +19,14 @@ release capability、V255 runtime、V258 transport、V259 session 与 V265 ELNW 
 本批没有运行第三方 Adapter、读取 package 或 Secret、启动 sandbox、连接 upstream、访问 Store、
 签发独立 verifier receipt，或改变 Provider、route、activation、usage、market、settlement 和 Sui
 状态。
+
+## V267 版本边界
+
+下文 `6 passed / 0 failed`、checked-in JSON 和 digest 继续对应冻结 supervisor/session V1
+Profile。V267 current catalog 为 V2，但不会在 Profile revision 1 下静默改写该机器合同。
+V267 尚无新的 V2 Profile、challenge/verifier 或 runner evidence，相关结果严格为
+`source_review_only / passed=0`；本批把 V1 builder 改接 historical catalog 的源码也未重新
+编译或执行 JSON parity test。V1 通过数不能累计到 V2。
 
 ## 验收矩阵
 
@@ -65,5 +73,6 @@ Profile dump helper只用于有意提升 Profile revision 时生成候选 JSON�
 - 未实现完整 admission gate、atomic Provider activation、任务派发、可信计量或跨主体结算；
 - 未开放 HTTP/MCP/PC/APK，未发布服务器、安装包或链上交易。
 
-因此只能声明 V266 的机器可读合同与 unsigned candidate validation 已通过静态/单元边界验收，
-不能声明第三方 Adapter 已兼容、Provider 已 ready，或生产算力交易链路完成。
+因此只能声明冻结 V1 的 V266 机器合同与 unsigned candidate validation 曾通过静态/单元边界
+验收；本批 historical-catalog 接线和 V2 Profile 都是 `source_review_only / passed=0`。不能
+声明第三方 Adapter 已兼容、Provider 已 ready，或生产算力交易链路完成。

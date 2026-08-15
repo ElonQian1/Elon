@@ -5,6 +5,9 @@ use super::*;
 pub(super) const SUPERVISOR_SESSION_POLICY_V1_ID: &str =
     "external_pool_adapter_supervisor_session_policy_v1";
 pub(super) const SUPERVISOR_SESSION_POLICY_V1_REVISION: u64 = 1;
+pub(super) const SUPERVISOR_SESSION_POLICY_V2_ID: &str =
+    "external_pool_adapter_supervisor_session_policy_v2";
+pub(super) const SUPERVISOR_SESSION_POLICY_V2_REVISION: u64 = 2;
 
 pub(crate) fn server_supervisor_session_policy_catalog(
 ) -> Result<(ExternalPoolAdapterSupervisorSessionPolicy, String)> {
@@ -14,8 +17,17 @@ pub(crate) fn server_supervisor_session_policy_catalog(
     Ok((policy, digest))
 }
 
+/// Frozen V259 catalog used only to validate and reproduce historical V1 evidence.
+pub(crate) fn historical_supervisor_session_policy_v1_catalog(
+) -> Result<(ExternalPoolAdapterSupervisorSessionPolicy, String)> {
+    let policy = policy_v1_for_validation();
+    validate_embedded_supervisor_session_policy_shape(&policy)?;
+    let digest = supervisor_session_policy_digest(&policy)?;
+    Ok((policy, digest))
+}
+
 pub(super) fn policy_for_validation() -> ExternalPoolAdapterSupervisorSessionPolicy {
-    policy_v1_for_validation()
+    policy_v2_for_validation()
 }
 
 pub(super) fn policy_v1_for_validation() -> ExternalPoolAdapterSupervisorSessionPolicy {
@@ -27,8 +39,37 @@ pub(super) fn policy_v1_for_validation() -> ExternalPoolAdapterSupervisorSession
         wire: wire_policy(),
         crypto: crypto_policy(),
         state: state_policy(),
-        linux_confinement: linux_confinement_policy(),
+        linux_confinement: linux_confinement_policy_v1(),
     }
+}
+
+pub(super) fn policy_v2_for_validation() -> ExternalPoolAdapterSupervisorSessionPolicy {
+    let mut policy = policy_v1_for_validation();
+    policy.policy_id = SUPERVISOR_SESSION_POLICY_V2_ID.into();
+    policy.policy_revision = SUPERVISOR_SESSION_POLICY_V2_REVISION;
+    policy.compatibility = "v255_intent_preserved_v267_post_exec_dumpable_launch_capsule_v2".into();
+    let identity = &mut policy.linux_confinement.identity;
+    identity.exec_transition_ptrace_guard = Some("yama_ptrace_scope_2_or_stricter_v2".into());
+    let seccomp = &mut policy.linux_confinement.seccomp;
+    insert_before(
+        &mut seccomp.bootstrap_allowed_syscalls,
+        "prlimit64",
+        "prctl",
+    );
+    insert_before(&mut seccomp.runtime_allowed_syscalls, "prlimit64", "prctl");
+    seccomp
+        .argument_rules
+        .push("prctl_dumpable_set_zero_or_get_only".into());
+    seccomp.exec_rule = "single_execveat_derived_launch_capsule_fd_4_at_empty_path_v2".into();
+    policy
+}
+
+fn insert_before(values: &mut Vec<String>, before: &str, value: &str) {
+    let index = values
+        .iter()
+        .position(|entry| entry == before)
+        .unwrap_or(values.len());
+    values.insert(index, value.into());
 }
 
 fn wire_policy() -> ExternalPoolAdapterSupervisorSessionWirePolicy {
@@ -121,7 +162,7 @@ fn state_policy() -> ExternalPoolAdapterSupervisorSessionStatePolicy {
     }
 }
 
-fn linux_confinement_policy() -> ExternalPoolAdapterSupervisorLinuxConfinementPolicy {
+fn linux_confinement_policy_v1() -> ExternalPoolAdapterSupervisorLinuxConfinementPolicy {
     ExternalPoolAdapterSupervisorLinuxConfinementPolicy {
         host_os: "linux".into(),
         host_arch: "x86_64".into(),
@@ -143,6 +184,7 @@ fn linux_confinement_policy() -> ExternalPoolAdapterSupervisorLinuxConfinementPo
             clear_all_capability_sets: true,
             no_new_privileges: true,
             dumpable: false,
+            exec_transition_ptrace_guard: None,
             umask: 0o077,
             create_session: true,
         },

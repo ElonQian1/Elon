@@ -22,7 +22,7 @@ owners: backend, node, ai-economy
 
 > v218 合同修正：历史“v11 Planning Snapshot V2”现以协议阈值 12 解释；work-admission `None` 允许新晋升槽首次重授权，`Some` 才承诺 current head。当前 A1 只有未编译的同事务 projector；A2 总合同已冻结，未编译、未运行的 A2b2 静态源码已覆盖 route→WAL-main、map/lock、barrier、完整 unmap、联合 close、route/registration typed custody/count inventory，但逐 case Windows 动态证据仍缺。无 producer，v14 永久 blocked-only，Runtime/Ready/派发不可达。
 
-| 能力 | 2026-08-13 状态 |
+| 能力 | 2026-08-15 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | 旧节点 LLM 联邦兼容观察 | 真实 `NodeComputeRun` 与认证 `/api/me/node-usage` 已接入附加只读投影；只认 `server_node_llm/node_llm`，固定 `partial/provider_reported_unverified`，原始数组不变。PC 账本源码只按逐字 `source_run_id=run.id` 在原始行内显示兼容观察、未验证计量和旧结算边界；未知或畸形投影整侧不贴标签。源码未编译、未运行、未做浏览器或读屏验证（`passed=0`），不生成 Job、Reservation、Attempt、Lease、Receipt、可信计量或结算 |
@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；把 CNY available 原子转入 withdrawn 保留区。PC `/my-compute-settlement` 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它只冻结内部余额，不执行或证明外部付款 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。它不发起或验证外部付款 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | v221-v266 前置门为 `implementation_partially_verified`。V265 在固定 child 与 loopback TLS fixture 中完成一次 authenticated no-work；V266 再把六项 release capability、V255/V258/V259 policy 与 V265 ELSP/ELNW 冻结为 Linux x86_64 机器 Profile，并验证有界 challenge/unsigned candidate report。当前仍没有第三方 binary 执行、生产 upstream/Secret、signed verifier、durable readiness 或 route/activation；V254 18 deny 不变。见 [`V266 Profile 权威`](external-pool-adapter-runtime-compatibility-profile-authority.md)、[`V266 验收`](external-pool-adapter-runtime-compatibility-profile-acceptance.md)、[`V265 no-work`](external-pool-adapter-authenticated-no-work-probe-authority.md) 与 [`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | v221-v266 保留各层证据，但 V261-V265 runtime fixture 现在只作历史 provenance。V267 已针对 exec 后 dumpable、execveat、ancillary 与 cleanup 缺口写入 launch stub、Yama 2/3、policy V2 及 transport/lifecycle 加固，但仍为 `source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0`；旧 fixture 不能验收 current runtime。V266 `6 passed` 只属于冻结 V1 Profile，V2 Profile/verifier 尚缺。没有第三方 binary、生产 upstream/Secret、durable readiness 或 route/activation；Provider 仍 `registering`，V254 18 deny 不变。见 [`V267 权威`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)、[`验收`](external-pool-adapter-post-exec-supervisor-hardening-acceptance.md) 与 [`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -123,6 +123,7 @@ owners: backend, node, ai-economy
 36. `docs/distributed-compute/settlement-account-view-api.md`：Provider 结算账户账本重建与管理员提款队列边界。
 37. `docs/distributed-compute/settlement-release-batch-api.md`：到期候选、逐笔 v198 释放、部分失败报告与非后台自动化边界。
 38. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
+39. `docs/distributed-compute/external-pool-adapter-post-exec-supervisor-hardening-authority.md` 与对应 acceptance：V267 source/launch capsule、post-exec dumpable、Yama、policy V2、ancillary、cleanup 和历史 evidence 失效边界。
 
 ## 分阶段落地
 
@@ -177,7 +178,7 @@ v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Jo
 
 ### F3：外部矿池与企业集群
 
-Provider Adapter 的 v227-v266 前置门已形成分层权威。V260 已验证 authenticated session，V261 验证 Linux supervisor，V262 组合真实 exec 后 runtime，V263 向同一受限 child 交付 V256 短时 config/credential，V264 由 server broker 认证 V258 exact TLS target，V265 在固定本地 fixture 中完成 bounded no-work。V266 发布机器可读兼容性 Profile 与 unsigned candidate validator，但没有执行第三方 binary，不能形成生产兼容证明。下一硬门是把 exact release package、runtime image、受控 upstream 和 server-owned sandbox runner 绑定到一次 signed verifier execution，再与 atomic activation 同批设计完整 admission gate；V254 18 deny 逐字保留。见 [`V266 Profile`](external-pool-adapter-runtime-compatibility-profile-authority.md)、[`V265 no-work`](external-pool-adapter-authenticated-no-work-probe-authority.md)、[`V264 Broker TLS`](external-pool-adapter-broker-tls-transport-authority.md) 与 [`current-implementation-status.md`](current-implementation-status.md)。
+Provider Adapter v227-v266 的证据只在各自历史版本内有效。V267 已写入 launch image、post-exec dumpable、Yama 2/3、policy V2、execveat/ancillary/cleanup 加固，但未编译或运行，`passed=0`；V260-V265 全链与 V2 machine Profile 必须重验。V264 独立 Broker TLS 和 V266 冻结 V1 Profile 不等于 V2 runtime。之后才可推进 signed verifier execution 与同批 atomic activation/admission gate；V254 18 deny 逐字保留。见 [`V267 hardening`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)、[`V266 V1 Profile`](external-pool-adapter-runtime-compatibility-profile-authority.md) 与 [`当前状态`](current-implementation-status.md)。
 
 ### F4：容量期货市场
 

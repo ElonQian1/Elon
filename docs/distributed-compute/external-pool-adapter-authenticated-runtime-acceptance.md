@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v262_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter exec 后 authenticated runtime 验收边界
@@ -14,6 +14,17 @@ verification_status: verified_source_cross_build_and_linux_kernel
 V262 已把 V260 mutual authenticated session 放入 V261 真实 Linux child lifecycle。最终验证覆盖 Windows source-contract、Linux-musl product/fixture/test binary 完整链接，以及 WSL2 Ubuntu root 下 12 项真实 kernel test；结果为 V260 `5 passed`、V261 `5 passed`、V262 `2 passed`，无失败，并确认 `V262_WSL_CGROUP_CLEAN=true`。
 
 V262 只验证仓库测试 capsule。它不读取真实 Secret、不连接 upstream、不启用 Provider、不写市场/计量/结算/链上状态，也没有发布或部署。
+
+## V267 状态更正
+
+V267 修复了下文历史 fixture 未覆盖的 exec 后 dumpable、Yama host gate、execveat 高位参数、
+launch digest、seqpacket ancillary 与 cleanup 边界。旧 `12 passed` 运行的是 V1/source capsule
+链，不能累计为当前 V267 验收。
+
+当前结果严格为 `source_review_only / implementation_uncompiled / implementation_unrun`、
+`passed=0 / failed=0`。V260/V261/V262 的全部正负向 kernel matrix 必须在 V2/derived launch
+image 上重跑；现有 ignored runtime fixture 仍直接 seal 原测试 ELF，必须先改为经过 production
+materializer，原样重跑不算 V267 evidence。在此之前本页历史验证标签只作 provenance。
 
 ## 已执行验证
 
@@ -80,4 +91,6 @@ linux_kernel_output=9ac239f1a6b7ce69d473cd6c39923b6353bd8706fa3d5bbbc338bb10b7ef
 - 未创建 route/service actor、Provider activation/readiness、market admission、usage、settlement 或链上 effect；
 - 未开放 HTTP/MCP/PC/APK 入口，未发布服务器或安装包。
 
-因此只能声明 V262 的测试 capsule 已完成 exec 后 authenticated runtime 的 source、cross-build 与真实 Linux kernel 验收，不能声明生产外部矿池 Adapter、真实算力派发或结算已完成。
+因此只能声明 V262 direct-seal 测试 capsule 的旧构建曾完成 source、cross-build 与 Linux
+kernel fixture；current V267 runtime 为 `source_review_only / passed=0`，必须先接 production
+derived launch materializer 再重验。不能声明生产外部矿池 Adapter、真实算力派发或结算已完成。

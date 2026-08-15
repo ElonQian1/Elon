@@ -19,6 +19,14 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn reinstall_current_policy(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "DROP TRIGGER IF EXISTS external_pool_adapter_supervisor_session_policy_companion_policy_json_projection;",
+    )?;
+    policy_projection::install(conn)?;
+    Ok(())
+}
+
 #[cfg(test)]
 pub(super) fn receipt_projection_counts() -> (usize, usize) {
     receipt_projection::counts()

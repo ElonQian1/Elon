@@ -13,6 +13,7 @@ use zeroize::Zeroize;
 
 use super::{
     elf::validate_static_elf64_x86_64,
+    launch_image::derive as derive_launch_image,
     policy::entrypoint_capsule_policy,
     types::{
         ExternalPoolAdapterEntrypointCapsuleError, PreparedExternalPoolAdapterEntrypointCapsule,
@@ -60,20 +61,20 @@ pub(super) fn materialize(
 
     let source_before = source_identity(source_file, expected_size)?;
     validate_static_elf64_x86_64(source_file, expected_size)?;
-    let capsule = create_memfd()?;
-    let mut copied_digest = copy_exact(source_file, &capsule, expected_size)?;
+    let source_capsule = create_memfd()?;
+    let mut copied_digest = copy_exact(source_file, &source_capsule, expected_size)?;
     if copied_digest != expected_digest {
         copied_digest.zeroize();
         expected_digest.zeroize();
         return Err(ExternalPoolAdapterEntrypointCapsuleError::ContentDrift);
     }
-    set_capsule_mode_and_seals(&capsule)?;
-    let capsule_before = capsule_identity(&capsule, expected_size)?;
-    validate_static_elf64_x86_64(&capsule, expected_size)?;
-    let mut capsule_digest = hash_exact(&capsule, expected_size)?;
+    set_capsule_mode_and_seals(&source_capsule)?;
+    let capsule_before = capsule_identity(&source_capsule, expected_size)?;
+    validate_static_elf64_x86_64(&source_capsule, expected_size)?;
+    let mut capsule_digest = hash_exact(&source_capsule, expected_size)?;
     let mut source_after_digest = hash_exact(source_file, expected_size)?;
     let source_after = source_identity(source_file, expected_size)?;
-    let capsule_after = capsule_identity(&capsule, expected_size)?;
+    let capsule_after = capsule_identity(&source_capsule, expected_size)?;
     let exact = copied_digest == expected_digest
         && capsule_digest == expected_digest
         && source_after_digest == expected_digest
@@ -86,12 +87,16 @@ pub(super) fn materialize(
     if !exact {
         return Err(ExternalPoolAdapterEntrypointCapsuleError::ContentDrift);
     }
-    require_exact_seals(&capsule)?;
+    require_exact_seals(&source_capsule)?;
+    let launch = derive_launch_image(&source_capsule)?;
     let policy = entrypoint_capsule_policy()?;
     Ok(PreparedExternalPoolAdapterEntrypointCapsule {
-        sealed_image: capsule,
+        sealed_image: source_capsule,
+        launch_image: launch.file,
         entrypoint_sha256: expected_sha256.to_string(),
         entrypoint_size_bytes: expected_size,
+        launch_sha256: launch.sha256,
+        launch_size_bytes: launch.size_bytes,
         policy_digest: policy.policy_digest,
     })
 }

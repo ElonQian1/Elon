@@ -76,6 +76,9 @@ fn v259_registration_receipts_and_policy_catalog_are_exact() {
         "argument_rules",
         "unknown_syscall_action",
         "audit_arch_policy",
+        "policy_v2_for_validation",
+        "yama_ptrace_scope_2_or_stricter_v2",
+        "prctl_dumpable_set_zero_or_get_only",
     ] {
         assert!(
             DOMAIN_POLICY.contains(required),
@@ -121,6 +124,9 @@ fn v259_receipt_jcs_and_domain_digests_are_connection_enforced() {
         "SUPERVISOR_SESSION_POLICY_V1_ID",
         "SUPERVISOR_SESSION_POLICY_V1_REVISION",
         "policy_v1_for_validation",
+        "SUPERVISOR_SESSION_POLICY_V2_ID",
+        "SUPERVISOR_SESSION_POLICY_V2_REVISION",
+        "policy_v2_for_validation",
         "supervisor_session_policy_digest(&c.supervisor_session_policy)",
         "supervisor_session_companion_material_digest(c)",
         "canonical_supervisor_session_companion_json_and_digest(receipt)?.1",

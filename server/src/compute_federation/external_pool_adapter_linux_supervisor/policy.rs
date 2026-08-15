@@ -61,6 +61,8 @@ fn validate_confinement(
         || !identity.clear_all_capability_sets
         || !identity.no_new_privileges
         || identity.dumpable
+        || identity.exec_transition_ptrace_guard.as_deref()
+            != Some("yama_ptrace_scope_2_or_stricter_v2")
         || identity.umask != 0o077
         || !identity.create_session
     {
@@ -112,7 +114,7 @@ fn validate_confinement(
     if seccomp.architecture != "x86_64"
         || seccomp.unknown_syscall_action != "kill_process"
         || seccomp.audit_arch_policy != "x86_64_only_kill_other_arch"
-        || seccomp.exec_rule != "single_execveat_capsule_fd_4_at_empty_path_v1"
+        || seccomp.exec_rule != "single_execveat_derived_launch_capsule_fd_4_at_empty_path_v2"
         || !seccomp.deny_new_executable_mappings_after_exec
         || !seccomp.deny_process_creation
         || !seccomp.deny_network_syscalls
@@ -125,6 +127,7 @@ fn validate_confinement(
                 "fcntl_getfd_fd3_fd5_only",
                 "ioctl_denied",
                 "poll_nfds3_timeout0_or_nfds1_timeout1_5000_only",
+                "prctl_dumpable_set_zero_or_get_only",
             ]
     {
         bail!("supervisor seccomp policy drifted");

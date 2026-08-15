@@ -5,8 +5,10 @@ const SESSION_ROOTS: &str = include_str!("../../external-pool-adapter-session-co
 const SESSION_CRYPTO: &str = include_str!("../../external-pool-adapter-session-core/src/crypto.rs");
 const SESSION_BOOTSTRAP: &str =
     include_str!("../../external-pool-adapter-session-core/src/bootstrap.rs");
-const SESSION_TRANSPORT: &str =
-    include_str!("../../external-pool-adapter-session-core/src/transport.rs");
+const SESSION_TRANSPORT: &str = concat!(
+    include_str!("../../external-pool-adapter-session-core/src/transport.rs"),
+    include_str!("../../external-pool-adapter-session-core/src/transport_io.rs")
+);
 const SESSION_DELIVERY: &str =
     include_str!("../../external-pool-adapter-session-core/src/delivery.rs");
 const SESSION_FIXTURE: &str = include_str!("../external_pool_adapter_session_fixture_main.rs");
@@ -143,7 +145,10 @@ fn v260_elsp_frames_are_bounded_ordered_directional_and_fail_closed() {
         "libc::socketpair(libc::AF_UNIX",
         "libc::sendmsg(fd, &message, libc::MSG_NOSIGNAL)",
         "libc::recvmsg(fd, &mut message, libc::MSG_TRUNC)",
-        "libc::MSG_TRUNC",
+        "message.msg_flags & (libc::MSG_TRUNC | libc::MSG_CTRUNC) != 0",
+        "authenticated seqpacket was truncated",
+        "message.msg_controllen != 0",
+        "authenticated seqpacket carried unexpected control data",
         "vec![0_u8; maximum_bytes]",
         "received > maximum_bytes",
         "sequence != self.next_receive_sequence",

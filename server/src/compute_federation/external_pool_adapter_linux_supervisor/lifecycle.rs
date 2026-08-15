@@ -102,7 +102,8 @@ impl ExternalPoolAdapterSupervisorChild {
                 let read = read as usize;
                 if output.len().saturating_add(read) > STDERR_LIMIT_BYTES {
                     if !self.reaped {
-                        let _ = self.terminate();
+                        self.terminate()
+                            .context("terminate supervisor after stderr overflow")?;
                     }
                     bail!("supervisor stderr exceeded server-fixed bound");
                 }
@@ -125,9 +126,14 @@ impl ExternalPoolAdapterSupervisorChild {
     }
 
     fn cleanup_after_reap(&mut self) -> Result<()> {
-        self.cgroup.remove()?;
-        self.scratch.remove()?;
-        Ok(())
+        let cgroup_failed = self.cgroup.remove().is_err();
+        let scratch_failed = self.scratch.remove().is_err();
+        match (cgroup_failed, scratch_failed) {
+            (false, false) => Ok(()),
+            (true, false) => bail!("supervisor cgroup cleanup failed after reap"),
+            (false, true) => bail!("supervisor scratch cleanup failed after reap"),
+            (true, true) => bail!("supervisor cgroup and scratch cleanup failed after reap"),
+        }
     }
 
     #[cfg(test)]
@@ -148,16 +154,36 @@ impl ExternalPoolAdapterSupervisorChild {
 
 impl Drop for ExternalPoolAdapterSupervisorChild {
     fn drop(&mut self) {
-        if !self.reaped {
-            let _ = pidfd_send_signal(self.pidfd.as_raw_fd(), libc::SIGKILL);
-            let _ = poll_pidfd(
-                self.pidfd.as_raw_fd(),
-                Duration::from_millis(SHUTDOWN_GRACE_MS),
-            );
-            if waitid_pidfd(self.pidfd.as_raw_fd()).is_ok() {
-                self.reaped = true;
-                let _ = self.cleanup_after_reap();
+        if self.reaped {
+            return;
+        }
+        if pidfd_send_signal(self.pidfd.as_raw_fd(), libc::SIGKILL).is_err() {
+            tracing::error!(target: "security", "supervisor child Drop pidfd signal failed");
+        }
+        match poll_pidfd(
+            self.pidfd.as_raw_fd(),
+            Duration::from_millis(SHUTDOWN_GRACE_MS),
+        ) {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::error!(target: "security", "supervisor child Drop pidfd poll timed out");
+                return;
             }
+            Err(_) => {
+                tracing::error!(target: "security", "supervisor child Drop pidfd poll failed");
+                return;
+            }
+        }
+        if waitid_pidfd(self.pidfd.as_raw_fd()).is_err() {
+            tracing::error!(target: "security", "supervisor child Drop pidfd reap failed");
+            return;
+        }
+        self.reaped = true;
+        if self.cleanup_after_reap().is_err() {
+            tracing::error!(
+                target: "security",
+                "supervisor child Drop post-reap cleanup failed"
+            );
         }
     }
 }

@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v261_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter Linux supervisor enforcement core 权威
@@ -74,10 +74,23 @@ stderr 生命周期上限为 1 MiB，超过上限会终止 child；公开错误�
 - `lifecycle.rs`：pidfd wait/terminate、stderr bound 与 cleanup；
 - `linux_tests.rs`：sealed minimal ELF 和真实 kernel fixture。
 
-最大生产模块为 `launch.rs` 274 行，测试文件 498 行；没有把实现堆入 `compute_federation/mod.rs` 或 V260 模块。
+V267 后各生产模块与 kernel test 文件均低于 500 行；没有把实现堆入 `compute_federation/mod.rs` 或 V260 模块。
 
 ## 7. 已验证边界与下一硬门
 
 Windows source-contract、Linux-musl product/test 完整链接和 WSL2 Ubuntu 真实 kernel fixture 均已通过。动态矩阵覆盖 clone3/cgroup/namespaces/private root、exact fd、rlimit/capability/no-new-privileges/seccomp、pidfd terminate/wait，以及 cgroup/scratch cleanup。详细命令和组合证据见对应 acceptance。
 
 V261 当时的下一硬门“把 V260 mutual authenticated session 运行在 child lifecycle 内”已由 V262 完成，并在真实 static Rust capsule 中补充参数受限的 `F_GETFD`/`poll` seccomp 形状；V261 本批历史验收结论不因此被重写。当前下一硬门是在不扩大权限的前提下接入 V256 ephemeral Secret delivery；之后才可使用 V258 target 实现 broker TLS 和 upstream no-work probe。完成这些门之前，不得声明 production Adapter、真实外部矿池连接或 Provider 可用。
+
+## 8. V267 安全状态更正
+
+V261 的历史实现只在 exec 前设置 `PR_SET_DUMPABLE=0`；普通 Linux exec 会重新设置 dumpable，
+因此旧 fixture 不能证明原 entry、fd5 或后续 Secret 处理期间维持 non-dumpable。旧
+`execveat` seccomp 对 flags 高 32 位的分支方向也不满足 exact-zero 规则，部分 lifecycle/Drop
+路径不能稳定暴露终止、reap 与资源清理失败。
+
+V267 改为派生 launch image 的首条 stub 在 exec 后 SET/GET dumpable，并在 clone 前要求 exact
+Yama `ptrace_scope=2|3`；current policy V2 只允许该 `prctl` 形状，修正 execveat 高位检查，
+并收紧 pidfd/cleanup 可观察性。上述当前源码未编译、未运行 kernel fixture，状态为
+`source_review_only / passed=0`。本页下方 V261 历史命令与指纹继续保留 provenance，但不能
+证明 V267 supervisor 已动态验收。

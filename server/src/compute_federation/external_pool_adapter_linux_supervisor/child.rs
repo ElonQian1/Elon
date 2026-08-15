@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use super::{
     policy::{SupervisorPolicy, CAPSULE_FD, CHILD_IPC_FD, FIRST_CLOSED_FD, SEED_FD},
-    seccomp::install_seccomp_program,
+    seccomp::{install_seccomp_program, EMPTY_EXEC_PATH},
 };
 
 const CLOSE_RANGE_UNSHARE: u32 = 1 << 1;
@@ -74,7 +74,6 @@ impl ChildLaunchPlan {
             libc::_exit(127);
         }
 
-        let empty_path = c"";
         let argv = [
             self.argv[0].as_ptr(),
             self.argv[1].as_ptr(),
@@ -89,7 +88,7 @@ impl ChildLaunchPlan {
         libc::syscall(
             libc::SYS_execveat,
             CAPSULE_FD,
-            empty_path.as_ptr(),
+            EMPTY_EXEC_PATH.as_ptr(),
             argv.as_ptr(),
             environment.as_ptr(),
             libc::AT_EMPTY_PATH,

@@ -1,10 +1,10 @@
 ---
 title: 外部矿池 Adapter authenticated child session core 验收边界
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v260_verified_v267_transport_source_review_only
 ---
 
 # 外部矿池 Adapter authenticated child session core 验收边界
@@ -14,6 +14,15 @@ verification_status: verified_source_cross_build_and_linux_kernel
 V260 已完成独立 Linux x86-64 authenticated child-only session core，并通过 6 项 Windows source-contract、Linux-musl product/test 完整交叉构建和 5 项 WSL2 真实 kernel fixture。kernel 结果为 `5 passed / 0 failed / 1944 filtered out`，source-contract 验证指纹为 `da501d3c524f0b6c09d8d8e9ba44da4aebd36cf8bea5ae6eeb50a5bfe8db26fc`，receipt 为 `D:\rust\shared\rust-cache-v2\validation-v1\receipts\ce4f5e16731ddaea539b623bcb5990af706f95992839c9dd2ef4aef1399e3728.json`。
 
 Linux kernel fixture 使用交叉构建出的 static musl `elon-server` test binary 在 WSL2 Ubuntu 内直接运行，不使用 Docker。测试执行时使用真实 `socketpair`、pipe、fcntl/fstat、poll、send/recv 和 shutdown syscalls；不是 mock 或源码模拟。
+
+## V267 状态更正
+
+V267 当前 session transport 新增 `MSG_CTRUNC`、`MSG_TRUNC` 与 ancillary control-data 拒绝。
+下文命令、5 项 kernel fixture 和组合指纹发生在该变更之前，仍是 V260 旧源码 provenance，
+不能证明当前 transport 已编译或运行。V267 对本页的新增验收为
+`source_review_only / implementation_uncompiled / implementation_unrun`，
+`passed=0 / failed=0`；至少须注入 `SCM_RIGHTS`、credentials、未知/截断 control data 并重跑
+既有 frame/terminal 矩阵。
 
 ## 已执行验证
 
@@ -62,4 +71,6 @@ linux_kernel_output=4f303c0d08427f62983407d4089c80db9bac887fc8897e1fd4cd7878312b
 - 未创建 DNS/TLS/network/upstream probe、route/service actor、Provider activation/readiness、market、usage、settlement 或 chain effect；
 - 未验证生产数据库、真实 Store-private root composition、真实 TCP、生产部署或长期压力。
 
-因此只能声明 `verified_source_cross_build_and_linux_kernel` 的独立 session core，不能声明 production supervisor、secret delivery、runtime launch、broker transport、no-work probe 或 production Adapter 已完成。
+因此下文 `verified_source_cross_build_and_linux_kernel` 只能标记 V260 旧 transport；V267
+ancillary gate 当前为 `source_review_only / passed=0`。两者都不能证明 production supervisor、
+secret delivery、runtime launch、broker transport、no-work probe 或 production Adapter 已完成。

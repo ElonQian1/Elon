@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v263_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter 易失配置与凭据交付验收边界
@@ -14,6 +14,17 @@ verification_status: verified_source_cross_build_and_linux_kernel
 V263 已把 V256 Store-owned 短时 config/credential 与 V262 exec 后 authenticated runtime 组合。最终验证覆盖两组 Windows source-contract、Linux-musl `elon-server` 与静态 fixture 链接，以及 WSL2 Ubuntu root 下 18 项真实 kernel test；session 与 supervisor 各 `9 passed / 0 failed`，并确认 `V263_WSL_CGROUP_CLEAN=true`。
 
 V263 只交付仓库固定的非生产测试字节。它不连接 V258 upstream，不激活 Provider，不写 route、market、usage、settlement 或链上状态，也没有发布或部署。
+
+## V267 状态更正
+
+下文 `18 passed` 与组合指纹运行在 V267 之前：旧 child exec 后 dumpable 可能被 Linux 重置，
+session capsule root 仍为 source digest，也没有 Yama、policy V2、ancillary 与当前 cleanup 门。
+因此它不能证明当前 config/credential delivery 的隔离或收尾。
+
+V267 当前为 `source_review_only / implementation_uncompiled / implementation_unrun`，
+`passed=0 / failed=0`。必须用派生 launch image、current V2 与 Store source/launch 双 binding
+重跑正向交付、全部 root/material drift、协议失败、shutdown/reap 和资源故障注入。现有
+ignored fixture 仍直接 seal 原测试 ELF，须先接 production materializer；原样重跑不能验收 V267。
 
 ## 已执行验证
 
@@ -75,4 +86,7 @@ linux_kernel_output=5d0e1c53fecae6b4d018df430d4999e878de470eb59ed4c02ab88a2b2b46
 - 未创建 route/service actor、Provider activation/readiness、market admission、usage、settlement 或链上 effect；
 - 未开放 HTTP/MCP/PC/APK 入口，未发布服务器或安装包。
 
-因此只能声明 V263 的测试 capsule 已完成易失配置与凭据交付的 source、cross-build 与真实 Linux kernel 验收，不能声明生产外部矿池 Adapter、真实算力派发或结算已完成。
+因此只能声明 V263 direct-seal 测试 capsule 的旧构建曾完成 source、cross-build 与 Linux
+kernel fixture；current V267 Secret delivery 为 `source_review_only / passed=0`，必须先接
+production derived launch materializer 再重验。不能声明生产外部矿池 Adapter、真实算力派发
+或结算已完成。

@@ -14,7 +14,7 @@ const SESSION_NO_WORK: &str =
 const BROKER_NO_WORK: &str = include_str!("../external_pool_adapter_broker_tls/no_work.rs");
 
 #[test]
-fn v266_checked_in_profile_matches_current_policy_catalogs() {
+fn v266_checked_in_profile_remains_the_frozen_v1_evidence_catalog() {
     let expected = server_runtime_compatibility_profile_catalog().unwrap();
     let canonical = runtime_compatibility_profile_json(&expected).unwrap();
     assert_eq!(
@@ -139,7 +139,7 @@ fn v266_profile_tracks_v265_wire_constants_and_has_no_runtime_capabilities() {
     for required in [
         "server_linux_runtime_launch_policy_catalog",
         "server_upstream_transport_target_policy_catalog",
-        "server_supervisor_session_policy_catalog",
+        "historical_supervisor_session_policy_v1_catalog",
         "single_bounded_write_exact_length_read_v1",
     ] {
         assert!(

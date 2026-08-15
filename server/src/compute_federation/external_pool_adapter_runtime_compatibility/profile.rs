@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::compute_federation::{
     external_pool_adapter_release::ComputeExternalPoolAdapterReleaseCapability,
     external_pool_adapter_runtime_launch_profile::server_linux_runtime_launch_policy_catalog,
-    external_pool_adapter_supervisor_session_policy_companion::server_supervisor_session_policy_catalog,
+    external_pool_adapter_supervisor_session_policy_companion::historical_supervisor_session_policy_v1_catalog,
     external_pool_adapter_upstream_transport_target::server_upstream_transport_target_policy_catalog,
 };
 
@@ -40,7 +40,7 @@ pub(crate) fn build_runtime_compatibility_challenge(
 pub(super) fn profile_for_validation() -> Result<ExternalPoolAdapterRuntimeCompatibilityProfile> {
     let (runtime, runtime_digest) = server_linux_runtime_launch_policy_catalog()?;
     let (transport, transport_digest) = server_upstream_transport_target_policy_catalog()?;
-    let (session, session_digest) = server_supervisor_session_policy_catalog()?;
+    let (session, session_digest) = historical_supervisor_session_policy_v1_catalog()?;
     let no_effects = no_effects();
 
     Ok(ExternalPoolAdapterRuntimeCompatibilityProfile {

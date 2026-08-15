@@ -78,18 +78,25 @@ fn linux_kernel_materializes_exact_immutable_memfd_and_drops_descriptor() {
     let observed_fd = Cell::new(-1);
 
     with_external_pool_adapter_entrypoint_capsule(&fixture, |capsule| {
-        let image = &capsule.sealed_image;
+        let source_image = &capsule.sealed_image;
+        let image = &capsule.launch_image;
         let fd = image.as_raw_fd();
         observed_fd.set(fd);
         let metadata = image.metadata()?;
 
         assert!(metadata.is_file());
         assert_eq!(metadata.permissions().mode() & 0o777, CAPSULE_MODE);
-        assert_eq!(metadata.len(), bytes.len() as u64);
+        assert!(metadata.len() > bytes.len() as u64);
         assert_eq!(metadata_nlink(image), 0);
         assert_eq!(capsule.entrypoint_size_bytes(), bytes.len() as u64);
         assert_eq!(capsule.entrypoint_sha256(), fixture.sha256);
-        assert_eq!(hash_file(image, bytes.len()), fixture.sha256);
+        assert_eq!(capsule.launch_size_bytes(), metadata.len());
+        assert_eq!(hash_file(source_image, bytes.len()), fixture.sha256);
+        assert_eq!(
+            hash_file(image, metadata.len() as usize),
+            capsule.launch_sha256()
+        );
+        assert_ne!(capsule.launch_sha256(), fixture.sha256);
         assert!(!capsule.policy_digest().is_empty());
 
         let descriptor_flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };

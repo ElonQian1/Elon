@@ -1,10 +1,10 @@
 ---
 title: 外部矿池 Adapter supervisor/session policy companion 验收边界
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_rust_sqlite_axum
+verification_status: historical_v259_v1_verified_v267_v2_source_review_only
 ---
 
 # 外部矿池 Adapter supervisor/session policy companion 验收边界
@@ -14,6 +14,15 @@ verification_status: verified_rust_sqlite_axum
 V259 durable inert Domain、migration、Store、owner/admin Service/API 与源码合同已随完整 `elon-server` 测试目标编译，并执行 13 项 Windows 本地定向验收：6 项 migration/Store 合同、5 项源码边界合同和 2 项 owner/admin 进程内 Axum HTTP，结果为 `13 passed / 0 failed`。验证指纹为 `af27aff6c90e44409ee3da8d7fbc5a32dd2910766a962c2cbc1cc08ab5eda17f`，receipt 为 `D:\rust\shared\rust-cache-v2\validation-v1\receipts\b581810545819c43bbb9a1c74b0ee01d95b9f7a3b56d713d98b033dbedbd799c.json`。
 
 首次动态执行发现源码合同错误地要求 Service 文件包含 API 层的完整 admin actor 构造字符串；合同已改为分别验证 Service 枚举/分支和 API 身份映射，运行时授权没有放宽。上述测试没有执行 process/syscall、capsule exec、namespace/cgroup/seccomp/rlimit/pidfd、IPC/socketpair/session、secret 读取或交付、DNS/TLS/network、probe/ACK/runtime identity、route/service actor、Provider activation、market、usage或 settlement。
+
+## V267 状态更正
+
+V267 保留 historical V1 exact validator，并把 current catalog 升为 policy V2；migration 只重装
+current policy projection，不覆盖历史行或 V257 V1 roots。下文 V259 `13 passed` 是 V1 历史
+证据，没有执行 current V2 catalog、V267 migration、Yama/dumpable/launch root 或 current-view
+换代。V267 当前严格为 `source_review_only / implementation_uncompiled /
+implementation_unrun`，`passed=0 / failed=0`；fresh/repeat migration、V1 history readback、
+V2 fresh companion/currentness 与 V254 18 deny parity 均须补跑。
 
 ## 已运行本地矩阵
 
@@ -35,4 +44,8 @@ Service/API consumer源码扫描必须拒绝 `std::process::Command`、`tokio::p
 
 future Store-private seam须证明同一Immediate事务与checked_at组合 current V259/V258/V255、V257 capsule、V256 locked bundle及V250/V252/V253 TTL roots，且authority不可Clone/Debug/Serde、raw endpoint与secret不越界。本批不实现或调用该 consumer。
 
-因此本批只能记录 `verified_rust_sqlite_axum / 13 passed / 0 failed`；未运行 confinement fixture，ordered syscall catalog 尚未证明足以启动真实 static ELF。不得宣称 supervisor、authenticated session、secret-safe delivery、Linux isolation、broker transport、probe、runtime readiness或 production Adapter 已验收。
+因此 `verified_rust_sqlite_axum / 13 passed / 0 failed` 只属于 historical V1 companion；V267
+current V2/migration 为 `source_review_only / passed=0`。ordered syscall catalog 尚未在 V2
+derived launch fixture 中证明；不得宣称 supervisor、authenticated session、secret-safe
+delivery、Linux isolation、broker transport、probe、runtime readiness 或 production Adapter
+已验收。

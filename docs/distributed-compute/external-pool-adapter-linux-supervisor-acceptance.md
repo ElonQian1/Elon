@@ -1,10 +1,10 @@
 ---
 title: 外部矿池 Adapter Linux supervisor enforcement core 验收边界
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v261_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter Linux supervisor enforcement core 验收边界
@@ -14,6 +14,17 @@ verification_status: verified_source_cross_build_and_linux_kernel
 V261 已完成独立 Linux x86-64 supervisor enforcement core，并通过 Windows source-contract、Linux-musl product/test 完整交叉构建和 3 项 WSL2 真实 kernel fixture。kernel 结果为 `3 passed / 0 failed / 1957 filtered out`，组合证据指纹为 `b13a0c11d6cfa57b0d246109c5255110aa67edfeb0a4af3e687e632af092bee1`。
 
 Linux fixture 使用交叉构建出的 static musl `elon-server` test binary，在 WSL2 Ubuntu root 下通过明确创建的 delegated cgroup parent 执行；测试结束后确认 parent 无 process、无 child leaf，再移除固定 fixture cgroup。不使用 Docker、mock supervisor 或源码模拟。
+
+## V267 状态更正
+
+下文 V261 的 3 项 kernel fixture 与组合指纹发生在 V267 之前。该运行对象只在 exec 前设置
+dumpable，且使用旧 execveat 高位参数分支和旧 cleanup/Drop 路径；所以它不能证明当前
+post-exec Secret 边界、Yama gate、policy V2 或清理可观察性。
+
+V267 当前为 `source_review_only / implementation_uncompiled / implementation_unrun`，
+`passed=0 / failed=0`。必须重跑 valid/invalid exec flags、post-exec SET/GET dumpable、Yama
+0/1/2/3、prctl negative、wait/timeout/stderr overflow 及 cgroup/scratch 故障注入后，才能恢复
+current supervisor 的 kernel-verified 声明。
 
 ## 已执行验证
 
@@ -66,4 +77,6 @@ linux_kernel_output=bf3d606b84cac9b9e1becf2a8669611f73e7f60845578ea9c6ebea22fed8
 - 未验证动态链接程序、通用第三方 Adapter、长时运行、并发多 child、OOM/CPU hard-failure、生产 cgroup delegation 或公网部署；
 - 未改变 V254 18 项 absolute deny，Provider 仍为 `registering`。
 
-因此只能声明 V261 独立 supervisor enforcement core 已通过 source、cross-build 和真实 Linux kernel 验收；不能声明生产外部矿池 Adapter、真实算力派发或结算已完成。
+因此只能声明 V261 旧构建曾通过 source、cross-build 和 Linux kernel fixture；current V267
+supervisor 为 `source_review_only / passed=0`，必须先升级 production-derived fixture 再重验。
+任何版本都不能据此声明生产外部矿池 Adapter、真实算力派发或结算已完成。

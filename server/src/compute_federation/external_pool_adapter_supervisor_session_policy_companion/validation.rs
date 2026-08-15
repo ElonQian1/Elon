@@ -23,10 +23,14 @@ pub(crate) fn validate_embedded_supervisor_session_policy_shape(
             super::policy::SUPERVISOR_SESSION_POLICY_V1_ID,
             super::policy::SUPERVISOR_SESSION_POLICY_V1_REVISION,
         ) => super::policy::policy_v1_for_validation(),
+        (
+            super::policy::SUPERVISOR_SESSION_POLICY_V2_ID,
+            super::policy::SUPERVISOR_SESSION_POLICY_V2_REVISION,
+        ) => super::policy::policy_v2_for_validation(),
         _ => bail!("embedded supervisor session policy version is unsupported"),
     };
     if policy != &expected {
-        bail!("embedded supervisor session policy is not the frozen v1 catalog entry");
+        bail!("embedded supervisor session policy is not an exact frozen catalog entry");
     }
     Ok(())
 }

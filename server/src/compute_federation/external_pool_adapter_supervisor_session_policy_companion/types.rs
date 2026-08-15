@@ -13,8 +13,8 @@ pub(crate) const SUPERVISOR_SESSION_COMPANION_CONFIRMATION: &str =
 pub(crate) const SUPERVISOR_SESSION_COMPANION_REVOCATION_CONFIRMATION: &str =
     "confirm_external_pool_adapter_supervisor_session_policy_companion_revocation";
 pub(crate) const SUPERVISOR_SESSION_POLICY_ID: &str =
-    "external_pool_adapter_supervisor_session_policy_v1";
-pub(crate) const SUPERVISOR_SESSION_POLICY_REVISION: u64 = 1;
+    "external_pool_adapter_supervisor_session_policy_v2";
+pub(crate) const SUPERVISOR_SESSION_POLICY_REVISION: u64 = 2;
 pub(crate) const SUPERVISOR_SESSION_COMPANION_STATUS: &str =
     "supervisor_session_policy_companion_current_inert";
 pub(crate) const SUPERVISOR_SESSION_COMPANION_EFFECT: &str =
@@ -107,6 +107,8 @@ pub(crate) struct ExternalPoolAdapterSupervisorLinuxIdentityPolicy {
     pub clear_all_capability_sets: bool,
     pub no_new_privileges: bool,
     pub dumpable: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exec_transition_ptrace_guard: Option<String>,
     pub umask: u64,
     pub create_session: bool,
 }

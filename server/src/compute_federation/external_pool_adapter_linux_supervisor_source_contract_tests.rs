@@ -9,8 +9,10 @@ const SESSION_BOOTSTRAP: &str =
     include_str!("../../external-pool-adapter-session-core/src/bootstrap.rs");
 const AUTHENTICATED_RUNTIME_TESTS: &str =
     include_str!("external_pool_adapter_linux_supervisor/authenticated_runtime_tests.rs");
-const LINUX_KERNEL_TESTS: &str =
-    include_str!("external_pool_adapter_linux_supervisor/linux_tests.rs");
+const LINUX_KERNEL_TESTS: &str = concat!(
+    include_str!("external_pool_adapter_linux_supervisor/linux_tests.rs"),
+    include_str!("external_pool_adapter_linux_supervisor/linux_test_capsule_fixture.rs")
+);
 const SESSION_FIXTURE: &str = include_str!("../external_pool_adapter_session_fixture_main.rs");
 const CAPSULE_FACADE: &str = include_str!("external_pool_adapter_entrypoint_capsule.rs");
 const COMPUTE_MOD: &str = include_str!("mod.rs");
@@ -167,6 +169,113 @@ fn v261_seccomp_kills_unknown_arch_syscalls_and_restricts_exec_memory() {
 }
 
 #[test]
+fn v267_execveat_binds_the_shared_empty_path_pointer_and_exact_flags() {
+    for required in [
+        "pub(super) static EMPTY_EXEC_PATH: [libc::c_char; 1] = [0]",
+        "EMPTY_EXEC_PATH.as_ptr() as usize as u64",
+        "empty_path_pointer_low",
+        "empty_path_pointer_high",
+        "argument_low_offset(1)",
+        "argument_high_offset(1)",
+        "argument_low_offset(4)",
+        "argument_high_offset(4)",
+    ] {
+        assert!(
+            SECCOMP.contains(required),
+            "missing exact execveat rule {required}"
+        );
+    }
+    assert!(CHILD.contains("seccomp::{install_seccomp_program, EMPTY_EXEC_PATH}"));
+    assert!(CHILD.contains("EMPTY_EXEC_PATH.as_ptr()"));
+    assert!(!CHILD.contains("let empty_path = c\"\";"));
+
+    let execveat_rule = SECCOMP
+        .split_once("fn append_execveat_rule")
+        .expect("execveat seccomp rule")
+        .1
+        .split_once("fn append_dumpable_prctl_rule")
+        .expect("bounded execveat seccomp rule")
+        .0;
+    let flags_high_tail = execveat_rule
+        .split_once("argument_high_offset(4)")
+        .expect("execveat flags high word")
+        .1;
+    assert!(flags_high_tail.contains("jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0)"));
+    assert!(LINUX_KERNEL_TESTS
+        .contains("linux_kernel_seccomp_rejects_execveat_pointer_and_other_prctl_shapes"));
+    assert!(LINUX_KERNEL_TESTS.contains("TestCapsuleBehavior::DisallowedExecveatPathPointer"));
+    assert!(LINUX_KERNEL_TESTS.contains("emit_mov_r8d(&mut code, libc::AT_EMPTY_PATH as u32)"));
+}
+
+#[test]
+fn v267_requires_the_fixed_yama_exec_transition_guard_before_launch() {
+    for required in [
+        "const YAMA_PTRACE_SCOPE: &str = \"/proc/sys/kernel/yama/ptrace_scope\"",
+        "require_exec_transition_ptrace_guard(&policy)?",
+        "yama_ptrace_scope_2_or_stricter_v2",
+        "libc::O_CLOEXEC | libc::O_NOFOLLOW",
+        "let mut observed = [0_u8; 4]",
+        "length == 2",
+        "observed[1] == b'\\n'",
+        "matches!(observed[0], b'2' | b'3')",
+        "supervisor requires Yama ptrace scope 2 or stricter",
+    ] {
+        assert!(LAUNCH.contains(required), "missing Yama guard {required}");
+    }
+    assert!(
+        LAUNCH
+            .find("require_exec_transition_ptrace_guard(&policy)?")
+            .expect("Yama guard")
+            < LAUNCH.find("libc::SYS_clone3").expect("clone3 launch")
+    );
+}
+
+#[test]
+fn v267_prctl_allows_only_exact_zero_argument_dumpable_shapes() {
+    let prctl_rule = SECCOMP
+        .split_once("fn append_dumpable_prctl_rule")
+        .expect("dumpable prctl seccomp rule")
+        .1
+        .split_once("fn append_getfd_rule")
+        .expect("bounded dumpable prctl seccomp rule")
+        .0;
+    for required in [
+        "libc::PR_SET_DUMPABLE as u32",
+        "libc::PR_GET_DUMPABLE as u32",
+        "argument_low_offset(1)",
+        "argument_high_offset(1)",
+        "argument_low_offset(2)",
+        "argument_high_offset(2)",
+        "argument_low_offset(3)",
+        "argument_high_offset(3)",
+        "argument_low_offset(4)",
+        "argument_high_offset(4)",
+        "SECCOMP_RET_KILL_PROCESS",
+        "SECCOMP_RET_ALLOW",
+    ] {
+        assert!(
+            prctl_rule.contains(required),
+            "missing exact prctl rule {required}"
+        );
+    }
+    for required in [
+        "linux_kernel_seccomp_allows_exact_dumpable_prctl_shapes",
+        "libc::PR_GET_DUMPABLE as u32, 0",
+        "libc::PR_SET_DUMPABLE as u32, 0",
+        "TestCapsuleBehavior::DisallowedPrctlOption",
+        "TestCapsuleBehavior::DisallowedPrctlArgument",
+        "libc::PR_SET_NAME as u32",
+        "libc::PR_GET_DUMPABLE as u32, 1",
+        "emit_zero_r10d",
+    ] {
+        assert!(
+            LINUX_KERNEL_TESTS.contains(required),
+            "missing exact prctl fixture {required}"
+        );
+    }
+}
+
+#[test]
 fn v261_uses_pidfd_only_bounded_stderr_and_existing_v257_v260_seams() {
     for required in [
         "libc::SYS_pidfd_send_signal",
@@ -184,6 +293,80 @@ fn v261_uses_pidfd_only_bounded_stderr_and_existing_v257_v260_seams() {
     assert!(CAPSULE_FACADE.contains("retained_sealed_image"));
     assert!(LAUNCH.contains("REQUIRED_CAPSULE_SEALS"));
     assert!(LAUNCH.contains("FD_CLOEXEC"));
+}
+
+#[test]
+fn v267_drop_never_blocks_in_waitid_after_pidfd_poll_timeout() {
+    let drop_impl = LIFECYCLE
+        .split_once("impl Drop for ExternalPoolAdapterSupervisorChild")
+        .expect("supervisor child Drop")
+        .1
+        .split_once("pub(super) fn terminate_pidfd_and_reap")
+        .expect("bounded supervisor child Drop")
+        .0;
+    for required in [
+        "pidfd_send_signal(self.pidfd.as_raw_fd(), libc::SIGKILL).is_err()",
+        "poll_pidfd(",
+        "Ok(true) => {}",
+        "Ok(false) =>",
+        "Err(_) =>",
+        "waitid_pidfd(self.pidfd.as_raw_fd()).is_err()",
+        "supervisor child Drop pidfd signal failed",
+        "supervisor child Drop pidfd poll timed out",
+        "supervisor child Drop pidfd poll failed",
+        "supervisor child Drop pidfd reap failed",
+        "supervisor child Drop post-reap cleanup failed",
+    ] {
+        assert!(
+            drop_impl.contains(required),
+            "missing bounded Drop rule {required}"
+        );
+    }
+    assert!(
+        drop_impl.find("poll_pidfd(").expect("Drop pidfd poll")
+            < drop_impl.find("waitid_pidfd(").expect("Drop pidfd waitid")
+    );
+    assert!(!drop_impl.contains("let _ = poll_pidfd"));
+    assert!(!drop_impl.contains("%error"));
+    assert!(!drop_impl.contains("{error}"));
+    assert!(LIFECYCLE.contains("supervisor child did not terminate after pidfd SIGKILL"));
+    assert!(LIFECYCLE.contains("failed launch child did not terminate after pidfd SIGKILL"));
+}
+
+#[test]
+fn v267_post_reap_cleanup_attempts_cgroup_and_scratch_and_aggregates_failures() {
+    let cleanup = LIFECYCLE
+        .split_once("fn cleanup_after_reap")
+        .expect("post-reap cleanup")
+        .1
+        .split_once("#[cfg(test)]")
+        .expect("bounded post-reap cleanup")
+        .0;
+    for required in [
+        "let cgroup_failed = self.cgroup.remove().is_err()",
+        "let scratch_failed = self.scratch.remove().is_err()",
+        "match (cgroup_failed, scratch_failed)",
+        "supervisor cgroup cleanup failed after reap",
+        "supervisor scratch cleanup failed after reap",
+        "supervisor cgroup and scratch cleanup failed after reap",
+    ] {
+        assert!(
+            cleanup.contains(required),
+            "missing aggregate cleanup rule {required}"
+        );
+    }
+    assert!(
+        cleanup
+            .find("self.cgroup.remove()")
+            .expect("cgroup cleanup attempt")
+            < cleanup
+                .find("self.scratch.remove()")
+                .expect("scratch cleanup attempt")
+    );
+    assert!(LIFECYCLE.contains("terminate supervisor after stderr overflow"));
+    assert!(CGROUP.contains("duplicate failed and dedicated cgroup rollback failed"));
+    assert!(LAUNCH.contains("set supervisor scratch permissions and rollback mountpoint failed"));
+    assert!(LAUNCH.contains("encode supervisor scratch path and rollback mountpoint failed"));
 }
 
 #[test]

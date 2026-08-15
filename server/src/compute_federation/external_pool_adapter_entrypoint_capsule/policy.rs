@@ -34,25 +34,18 @@ pub(super) fn entrypoint_capsule_policy(
         materialization: "sealed-memfd-v1",
         policy_digest: hex::encode(Sha256::digest(ENTRYPOINT_CAPSULE_POLICY_DOMAIN)),
     };
-    policy.validate()?;
-    Ok(policy)
-}
-
-impl ExternalPoolAdapterEntrypointCapsulePolicy {
-    fn validate(&self) -> Result<(), ExternalPoolAdapterEntrypointCapsuleError> {
-        if self.policy_id != ENTRYPOINT_CAPSULE_POLICY_ID
-            || self.policy_revision != ENTRYPOINT_CAPSULE_POLICY_REVISION
-            || self.host_os != "linux"
-            || self.host_arch != "x86_64"
-            || self.binary_format != "elf64-le"
-            || self.executable_type != "et_exec"
-            || self.linking_policy != "static-no-interp-no-dynamic"
-            || self.segment_policy != "no-wx"
-            || self.materialization != "sealed-memfd-v1"
-            || self.policy_digest != hex::encode(Sha256::digest(ENTRYPOINT_CAPSULE_POLICY_DOMAIN))
-        {
-            return Err(ExternalPoolAdapterEntrypointCapsuleError::InvalidAuthority);
-        }
-        Ok(())
+    if policy.policy_id != ENTRYPOINT_CAPSULE_POLICY_ID
+        || policy.policy_revision != ENTRYPOINT_CAPSULE_POLICY_REVISION
+        || policy.host_os != "linux"
+        || policy.host_arch != "x86_64"
+        || policy.binary_format != "elf64-le"
+        || policy.executable_type != "et_exec"
+        || policy.linking_policy != "static-no-interp-no-dynamic"
+        || policy.segment_policy != "no-wx"
+        || policy.materialization != "sealed-memfd-v1"
+        || policy.policy_digest != hex::encode(Sha256::digest(ENTRYPOINT_CAPSULE_POLICY_DOMAIN))
+    {
+        return Err(ExternalPoolAdapterEntrypointCapsuleError::InvalidAuthority);
     }
+    Ok(policy)
 }

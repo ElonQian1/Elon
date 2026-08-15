@@ -17,8 +17,11 @@ pub(super) enum ExternalPoolAdapterEntrypointCapsuleError {
 /// An ephemeral, sealed image. It is intentionally neither Clone, Debug, nor serializable.
 pub(in super::super) struct PreparedExternalPoolAdapterEntrypointCapsule {
     pub(super) sealed_image: File,
+    pub(super) launch_image: File,
     pub(super) entrypoint_sha256: String,
     pub(super) entrypoint_size_bytes: u64,
+    pub(super) launch_sha256: String,
+    pub(super) launch_size_bytes: u64,
     pub(super) policy_digest: String,
 }
 
@@ -29,6 +32,14 @@ impl PreparedExternalPoolAdapterEntrypointCapsule {
 
     pub(in super::super) fn entrypoint_size_bytes(&self) -> u64 {
         self.entrypoint_size_bytes
+    }
+
+    pub(in super::super) fn launch_sha256(&self) -> &str {
+        &self.launch_sha256
+    }
+
+    pub(in super::super) fn launch_size_bytes(&self) -> u64 {
+        self.launch_size_bytes
     }
 
     pub(in super::super) fn policy_digest(&self) -> &str {

@@ -63,7 +63,9 @@ pub(super) struct ExternalPoolAdapterEphemeralSecretDeliveryBinding {
     profile_digest: String,
     target_digest: String,
     companion_digest: String,
-    capsule_digest: String,
+    source_capsule_digest: String,
+    launch_capsule_digest: String,
+    launch_capsule_size_bytes: u64,
     delivery_root: String,
     bundle_material_digest: [u8; 32],
     installation: ExternalPoolAdapterInstallationBinding,
@@ -180,7 +182,7 @@ fn deliver_to_authenticated_child(
             &companion_material.profile_digest,
             &companion_material.target_digest,
             &companion_receipt.companion_digest,
-            capsule.entrypoint_sha256(),
+            capsule.launch_sha256(),
             &delivery_root,
         )?;
         let session_root_arguments = session_roots.launch_arguments();
@@ -222,6 +224,7 @@ pub(super) fn delivery_binding(
     let companion_receipt = companion.companion();
     let material = &companion_receipt.companion;
     let profile = &bundle.launch_profile().profile().profile;
+    let capsule = preparation.capsule();
     let probe_timeout_ms = profile.launch_policy.probe_timeout_ms;
     if profile.launch_policy.probe_contract != "authenticated_no_work_readiness_v1"
         || probe_timeout_ms == 0
@@ -230,7 +233,9 @@ pub(super) fn delivery_binding(
         || session_root_arguments[1] != material.profile_digest
         || session_root_arguments[2] != material.target_digest
         || session_root_arguments[3] != companion_receipt.companion_digest
-        || session_root_arguments[4] != preparation.capsule().entrypoint_sha256()
+        || capsule.launch_size_bytes() == 0
+        || capsule.launch_sha256() == capsule.entrypoint_sha256()
+        || session_root_arguments[4] != capsule.launch_sha256()
         || session_root_arguments[5] != delivery_root
     {
         bail!("ephemeral secret delivery no-work roots rejected");
@@ -247,7 +252,9 @@ pub(super) fn delivery_binding(
         profile_digest: session_root_arguments[1].clone(),
         target_digest: session_root_arguments[2].clone(),
         companion_digest: session_root_arguments[3].clone(),
-        capsule_digest: session_root_arguments[4].clone(),
+        source_capsule_digest: capsule.entrypoint_sha256().to_string(),
+        launch_capsule_digest: session_root_arguments[4].clone(),
+        launch_capsule_size_bytes: capsule.launch_size_bytes(),
         delivery_root: session_root_arguments[5].clone(),
         bundle_material_digest: digest.finalize().into(),
         installation: bundle
@@ -355,7 +362,9 @@ impl PartialEq for ExternalPoolAdapterEphemeralSecretDeliveryBinding {
             && self.profile_digest == other.profile_digest
             && self.target_digest == other.target_digest
             && self.companion_digest == other.companion_digest
-            && self.capsule_digest == other.capsule_digest
+            && self.source_capsule_digest == other.source_capsule_digest
+            && self.launch_capsule_digest == other.launch_capsule_digest
+            && self.launch_capsule_size_bytes == other.launch_capsule_size_bytes
             && self.delivery_root == other.delivery_root
             && self.bundle_material_digest == other.bundle_material_digest
             && self.installation == other.installation
@@ -381,7 +390,7 @@ impl ExternalPoolAdapterEphemeralSecretDeliveryBinding {
             self.profile_digest.clone(),
             self.target_digest.clone(),
             self.companion_digest.clone(),
-            self.capsule_digest.clone(),
+            self.launch_capsule_digest.clone(),
             self.delivery_root.clone(),
         ]
     }

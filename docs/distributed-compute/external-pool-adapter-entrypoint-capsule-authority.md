@@ -1,9 +1,10 @@
 ---
 title: 外部矿池 Adapter Linux entrypoint capsule 权威
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
+verification_status: historical_source_capsule_verified_v267_launch_source_review_only
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 权威
@@ -81,3 +82,19 @@ Provider 必须继续 exact `registering`。V254 覆盖 direct SQL 与 versions 
 V257 已在 WSL2 Ubuntu、Linux `6.18.33.2-microsoft-standard-WSL2`、x86-64 与 Rust `1.97.0` 环境中完成完整 `elon-server` 测试目标编译，并通过 4 项真实内核 fixture 与 7 项源码边界合同，合计 `11 passed / 0 failed`。动态 fixture 实际调用生产 `memfd_create` materialization，验证 zero-link、exact `0500`、`FD_CLOEXEC`、四项 exact seals、size/SHA-256、写入/扩缩/增 seal 失败、无效 mode/hard-link/digest/size/ELF 失败关闭及 callback 后 descriptor 为 `EBADF`。验证指纹为 `2ac6c80f0d9c83f193090535c454851f3055fd835e3217dd3ca43bda79a35ebd`，详情见对应 acceptance。
 
 首次执行既有源码合同暴露的唯一失败是 rustfmt 将 `source.retained_entrypoint()` 拆行后，测试仍要求单行字面量；断言已改为分别锁定 source 赋值与 `.retained_entrypoint()` 调用，生产 materialization 未放宽。该证据只把 V257 提升为 `implementation_partially_verified`：fixture 使用生成的非生产 static ELF 和临时本地源文件，没有执行 capsule，没有读取 operator mount/真实 secret，也没有验收生产 kernel 配置、procfs/debugger/root、locked-memory zeroization、Store 同事务全根聚合、并发/崩溃恢复、supervisor/namespace/seccomp/cgroup/Landlock/AppArmor、IPC/session、DNS/TLS/network、probe、route 或 activation。Provider 与 V254 fences 保持不变。
+
+## 8. V267 source/launch 双 capsule 状态更正
+
+V257 的上述 `11 passed / 0 failed` 只验证逐字 source capsule。V267 保持
+`external_pool_adapter_entrypoint_capsule_policy_v1` revision 1 和固定 digest 不变，并在已
+封存 source capsule 旁派生第二个 sealed launch image：launch ELF 的 entry point 先进入
+post-exec dumpable SET/GET stub，再跳回 source 原 entry。V255/profile/installation 继续绑定
+source SHA-256；V267 session capsule root 改绑 launch SHA-256，Store 私有 binding 同时保留
+source/launch digest 与 launch size。
+
+派生 launch image、program-header/range 重写、stub 与双 digest binding 当前仅完成
+`source_review_only`，未编译、未运行真实 `execveat` 或 Linux loader fixture，`passed=0`。
+因此历史 V257 结果不能证明 launch image 可执行或 V267 post-exec 边界成立；具体权威和补跑
+矩阵见
+[`external-pool-adapter-post-exec-supervisor-hardening-authority.md`](external-pool-adapter-post-exec-supervisor-hardening-authority.md)
+与对应 acceptance。

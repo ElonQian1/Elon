@@ -141,7 +141,7 @@ fn supervisor_session_source_freezes_inert_projection_and_recursive_redaction() 
 }
 
 #[test]
-fn supervisor_session_policy_source_freezes_fd_and_seccomp_catalog_exactly() {
+fn supervisor_session_policy_source_freezes_v1_and_current_v2_exactly() {
     for required in [
         "child_ipc_fd: 3",
         "capsule_fd: 4",
@@ -164,6 +164,17 @@ fn supervisor_session_policy_source_freezes_fd_and_seccomp_catalog_exactly() {
         "mprotect_prot_exec_denied",
         "fcntl_getfd_fd3_fd5_only",
         "ioctl_denied",
+        "SUPERVISOR_SESSION_POLICY_V1_ID",
+        "SUPERVISOR_SESSION_POLICY_V2_ID",
+        "policy_v1_for_validation",
+        "policy_v2_for_validation",
+        "historical_supervisor_session_policy_v1_catalog",
+        "v255_intent_preserved_v267_post_exec_dumpable_launch_capsule_v2",
+        "yama_ptrace_scope_2_or_stricter_v2",
+        "&mut seccomp.bootstrap_allowed_syscalls",
+        "insert_before(&mut seccomp.runtime_allowed_syscalls, \"prlimit64\", \"prctl\")",
+        "prctl_dumpable_set_zero_or_get_only",
+        "single_execveat_derived_launch_capsule_fd_4_at_empty_path_v2",
     ] {
         assert!(
             DOMAIN_POLICY.contains(required),
@@ -228,6 +239,8 @@ fn supervisor_session_policy_source_freezes_fd_and_seccomp_catalog_exactly() {
             "poll_nfds3_timeout0_or_nfds1_timeout1_5000_only",
         ]
     );
+    assert!(DOMAIN_TYPES.contains("#[serde(default, skip_serializing_if = \"Option::is_none\")]"));
+    assert!(DOMAIN_TYPES.contains("exec_transition_ptrace_guard: Option<String>"));
 }
 
 #[test]

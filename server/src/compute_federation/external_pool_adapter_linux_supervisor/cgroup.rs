@@ -43,16 +43,35 @@ impl ExternalPoolAdapterSupervisorCgroupParent {
         if unsafe { libc::mkdirat(self.directory.as_raw_fd(), name.as_ptr(), 0o700) } != 0 {
             return Err(std::io::Error::last_os_error()).context("create dedicated cgroup leaf");
         }
-        let parent = duplicate_fd(self.directory.as_raw_fd())?;
-        let directory = match open_directory_at(self.directory.as_raw_fd(), &name) {
-            Ok(directory) => directory,
+        let parent = match duplicate_fd(self.directory.as_raw_fd()) {
+            Ok(parent) => parent,
             Err(error) => {
-                unsafe {
+                let removed = unsafe {
                     libc::unlinkat(
                         self.directory.as_raw_fd(),
                         name.as_ptr(),
                         libc::AT_REMOVEDIR,
-                    );
+                    )
+                };
+                if removed != 0 {
+                    return Err(error)
+                        .context("duplicate failed and dedicated cgroup rollback failed");
+                }
+                return Err(error);
+            }
+        };
+        let directory = match open_directory_at(self.directory.as_raw_fd(), &name) {
+            Ok(directory) => directory,
+            Err(error) => {
+                let removed = unsafe {
+                    libc::unlinkat(
+                        self.directory.as_raw_fd(),
+                        name.as_ptr(),
+                        libc::AT_REMOVEDIR,
+                    )
+                };
+                if removed != 0 {
+                    return Err(error).context("open failed and dedicated cgroup rollback failed");
                 }
                 return Err(error);
             }
@@ -64,7 +83,9 @@ impl ExternalPoolAdapterSupervisorCgroupParent {
             removed: false,
         };
         if let Err(error) = leaf.configure(policy) {
-            let _ = leaf.remove();
+            if leaf.remove().is_err() {
+                return Err(error).context("configure failed and dedicated cgroup rollback failed");
+            }
             return Err(error);
         }
         Ok(leaf)
@@ -132,7 +153,12 @@ impl SupervisorCgroupLeaf {
 
 impl Drop for SupervisorCgroupLeaf {
     fn drop(&mut self) {
-        let _ = self.remove();
+        if self.remove().is_err() {
+            tracing::error!(
+                target: "security",
+                "supervisor cgroup fallback cleanup failed"
+            );
+        }
     }
 }
 

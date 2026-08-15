@@ -1,9 +1,10 @@
 ---
 title: 外部矿池 Adapter authenticated child session core 权威
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
+verification_status: historical_v260_verified_v267_transport_source_review_only
 ---
 
 # 外部矿池 Adapter authenticated child session core 权威
@@ -34,12 +35,13 @@ receive 先使用 server-fixed 1,048,628-byte buffer 和 `MSG_TRUNC` 取得一�
 
 - `roots.rs`：V259 policy 与五项 runtime root 的 strict decode/transcript；
 - `crypto.rs`：OS CSPRNG、HKDF-SHA256、HMAC-SHA256 与 zeroizing keys；
-- `transport.rs`：anonymous seqpacket、ELSP frame、固定 buffer、sequence 与 terminal state；
+- `transport.rs`：ELSP frame、固定 buffer、sequence 与 terminal state；
+- `transport_io.rs`：anonymous seqpacket send/receive、deadline 与 truncation/ancillary gate；
 - `bootstrap.rs`：seed pipe、fixed mutual proof 和 authenticated endpoint construction；
 - `linux_tests.rs`：真实 Linux kernel socket/pipe 与 adversarial protocol fixture；
 - `external_pool_adapter_supervisor_session_source_contract_tests.rs`：跨平台 no-effect 与 exact-source contract。
 
-最大实现文件为 `transport.rs` 401 行；没有把 session 继续堆入 `compute_federation/mod.rs` 或既有 V259 巨型模块。模块没有 HTTP/MCP/router/main consumer，也没有 Store/migration/schema。
+I/O 已从 frame/state 拆入独立 `transport_io.rs`，生产模块均低于 500 行；没有把 session 继续堆入 `compute_federation/mod.rs` 或既有 V259 巨型模块。模块没有 HTTP/MCP/router/main consumer，也没有 Store/migration/schema。
 
 ## 5. 已验证边界
 
@@ -58,3 +60,11 @@ Windows 项目统一验证执行 6 项 source-contract；Linux-musl 完整交叉
 V260 不证明 1 MiB control/config 在所有 Linux 默认 Unix socket buffer 上都可作为单个 seqpacket 成功发送；当前数值是拒绝超限的 protocol ceiling，不是 transport availability SLA。实现未调大 kernel buffer，也没有 fragmentation。后续 supervisor/transport 设计必须先通过 1 MiB boundary fixture，或以新的 server-fixed version 明确降低/分片，不能静默重解释 V259。
 
 V260 也没有验证真实 spawn/exec、fd3/fd4/fd5 remap、seed post-exec custody、namespace/cgroup/seccomp/rlimit/pidfd/shutdown/reap、sealed capsule execution、production secret delivery、DNS/TLS/broker/upstream probe、Store-private same-transaction root composition、Provider readiness、route、market、usage、settlement、Sui 或部署。Provider 继续 `registering`，V254 18 项 absolute deny 原样保留。下一硬门是 supervisor 级 Linux enforcement 与受控 child lifecycle；完成前不得把本 session core 接到 production Adapter。
+
+## 7. V267 transport 状态更正
+
+V267 在相同固定 allocation 的 `recvmsg(..., MSG_TRUNC)` 后新增 fail-closed envelope gate：
+`MSG_TRUNC`、`MSG_CTRUNC` 或 nonzero `msg_controllen` 必须在 ELSP 解析前拒绝，session 不接收
+`SCM_RIGHTS`、credentials 或其他 ancillary data。V260 的历史 `5 passed` 没有覆盖该源码，
+当前 transport 变更为 `source_review_only / passed=0`；必须补跑 control truncation 与 ancillary
+注入矩阵后，才能把 current session core 标为动态已验收。

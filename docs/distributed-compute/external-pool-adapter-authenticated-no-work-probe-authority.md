@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_windows_local_tls_and_linux_kernel_fixture
+verification_status: historical_v265_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter authenticated no-work probe 权威
@@ -87,3 +87,14 @@ route/service actor，不领取 share/job/attempt，不生成 verified usage、s
 下一硬门是为生产 Adapter 定义独立兼容性与受控 upstream 验收，再设计与 atomic activation
 同批提交的完整 admission gate。单个 no-work observation 不能单独移除 V254 deny。动态证据见
 [`external-pool-adapter-authenticated-no-work-probe-acceptance.md`](external-pool-adapter-authenticated-no-work-probe-acceptance.md)。
+
+## 7. V267 状态更正
+
+V265 的历史 bounded no-work fixture 继承 V263/V262/V261 旧 runtime，因此没有证明 exec 后
+dumpable、Yama 2/3、派生 launch root、policy V2、ancillary fail-close 或当前 cleanup 行为。
+loopback TLS 与 ELNW protocol 的历史证据可以保留，但不能据此宣称 current child→broker→
+response→reap 组合已经验收。
+
+V267 当前只完成源码加固，未编译、未运行 loopback TLS/kernel/full Store fixture，
+`passed=0 / failed=0`。必须在 current V2 与 launch digest 下重跑 V260-V265 全链和 fault
+matrix；Provider 仍为 `registering`，V254 18 deny 不因旧 no-work receipt 被放宽。

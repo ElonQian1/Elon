@@ -6,6 +6,9 @@ const CAPSULE_TYPES: &str = include_str!("external_pool_adapter_entrypoint_capsu
 const CAPSULE_POLICY: &str = include_str!("external_pool_adapter_entrypoint_capsule/policy.rs");
 const CAPSULE_ELF: &str = include_str!("external_pool_adapter_entrypoint_capsule/elf.rs");
 const CAPSULE_LINUX: &str = include_str!("external_pool_adapter_entrypoint_capsule/linux.rs");
+const LAUNCH_IMAGE: &str = include_str!("external_pool_adapter_entrypoint_capsule/launch_image.rs");
+const LAUNCH_IMAGE_IO: &str =
+    include_str!("external_pool_adapter_entrypoint_capsule/launch_image_io.rs");
 const INSTALLATION_TYPES: &str = include_str!("external_pool_adapter_installation/types.rs");
 const INSTALLATION_AUDIT: &str =
     include_str!("external_pool_adapter_installation/filesystem/audit.rs");
@@ -117,6 +120,8 @@ fn elf_and_memfd_gate_are_fail_closed_and_byte_exact() {
         "const X86_64_PAGE_BYTES: u64 = 4096",
         "matches!(kind, PT_INTERP | PT_DYNAMIC)",
         "flags & PF_X != 0 && flags & PF_W != 0",
+        "kind == PT_GNU_STACK && flags & PF_X != 0",
+        "segment_alignment > 1 && !segment_alignment.is_power_of_two()",
         "memory_size == 0",
         "file_size == 0",
         "memory_size < file_size",
@@ -124,6 +129,8 @@ fn elf_and_memfd_gate_are_fail_closed_and_byte_exact() {
         "!alignment.is_power_of_two()",
         "file_offset < end && start < file_end",
         "let mapped_start = virtual_address & !(X86_64_PAGE_BYTES - 1)",
+        "if virtual_address <= previous",
+        "previous_load_virtual_address = Some(virtual_address)",
         "let mapped_end = memory_end",
         "mapped_end <= mapped_start",
         "mapped_start < end && start < mapped_end",
@@ -167,6 +174,56 @@ fn elf_and_memfd_gate_are_fail_closed_and_byte_exact() {
     assert!(!CAPSULE_LINUX.contains("Vec<"));
     assert!(!CAPSULE_LINUX.contains("std::process"));
     assert!(!CAPSULE_LINUX.contains("Command::"));
+}
+
+#[test]
+fn v267_derives_a_second_sealed_launch_image_without_rewriting_v257_policy() {
+    for required in [
+        "mod launch_image;",
+        "mod launch_image_io;",
+        "let launch = derive_launch_image(&source_capsule)?;",
+        "sealed_image: source_capsule",
+        "launch_image: launch.file",
+        "launch_sha256: launch.sha256",
+        "launch_size_bytes: launch.size_bytes",
+        "&self.launch_image",
+    ] {
+        assert!(
+            format!("{CAPSULE_FACADE}\n{CAPSULE_LINUX}\n{CAPSULE_TYPES}").contains(required),
+            "missing V267 launch custody rule {required}"
+        );
+    }
+    for required in [
+        "parse_static_elf64_x86_64",
+        ".checked_add(1)",
+        "stub_header(stub_vaddr, stub_file_size, stub_memory_size)",
+        "rewrite_elf_header(&mut elf, stub_entry, headers.len())",
+        "rewrite_phdr_header(&mut headers, stub_vaddr)",
+        "copy_relocated_ranges",
+        "let delta = if target_residue >= cursor_residue",
+        ".checked_add(delta)",
+        "libc::PR_SET_DUMPABLE",
+        "libc::PR_GET_DUMPABLE",
+        "0xe7, 0x00, 0x00, 0x00",
+        "0x0f, 0x05, 0x0f, 0x0b",
+        "require_source_custody",
+        "require_launch_custody",
+        "F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL",
+    ] {
+        assert!(
+            format!("{LAUNCH_IMAGE}\n{LAUNCH_IMAGE_IO}").contains(required),
+            "missing V267 launch image rule {required}"
+        );
+    }
+    assert!(CAPSULE_POLICY.contains("ENTRYPOINT_CAPSULE_POLICY_REVISION: u64 = 1"));
+    assert!(!CAPSULE_POLICY.contains("entrypoint_capsule_policy_v2"));
+    assert!(CAPSULE_TYPES.contains("pub(super) sealed_image: File"));
+    assert!(CAPSULE_TYPES.contains("pub(super) launch_image: File"));
+    assert!(CAPSULE_TYPES.contains("fn launch_sha256(&self) -> &str"));
+    assert!(CAPSULE_TYPES.contains("fn launch_size_bytes(&self) -> u64"));
+    assert!(!LAUNCH_IMAGE.contains("std::process"));
+    assert!(!LAUNCH_IMAGE.contains("TcpStream"));
+    assert!(!LAUNCH_IMAGE.contains("execve"));
 }
 
 #[test]
@@ -289,6 +346,8 @@ fn v257_has_no_process_persistence_route_or_activation_effect() {
         CAPSULE_POLICY,
         CAPSULE_ELF,
         CAPSULE_LINUX,
+        LAUNCH_IMAGE,
+        LAUNCH_IMAGE_IO,
         STORE_FACADE,
         STORE_PROBE,
         STORE_TYPES,

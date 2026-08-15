@@ -1,7 +1,9 @@
 const SESSION_NO_WORK: &str =
     include_str!("../../external-pool-adapter-session-core/src/no_work.rs");
-const SESSION_TRANSPORT: &str =
-    include_str!("../../external-pool-adapter-session-core/src/transport.rs");
+const SESSION_TRANSPORT: &str = concat!(
+    include_str!("../../external-pool-adapter-session-core/src/transport.rs"),
+    include_str!("../../external-pool-adapter-session-core/src/transport_io.rs")
+);
 const BROKER_NO_WORK: &str = include_str!("external_pool_adapter_broker_tls/no_work.rs");
 const BROKER_TRANSPORT: &str = include_str!("external_pool_adapter_broker_tls/transport.rs");
 const BROKER_STORE: &str =
@@ -123,6 +125,10 @@ fn v265_store_commits_before_network_and_reproves_exact_roots_after_exchange() {
         "ExternalPoolAdapterEphemeralSecretDeliveryBinding",
         "bundle_material_digest",
         "probe_timeout_ms",
+        "source_capsule_digest",
+        "launch_capsule_digest",
+        "launch_capsule_size_bytes",
+        "self.launch_capsule_digest.clone()",
     ] {
         assert!(
             DELIVERY_STORE.contains(required),

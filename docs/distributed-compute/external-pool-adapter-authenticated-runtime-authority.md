@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v262_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter exec 后 authenticated runtime 权威
@@ -58,3 +58,14 @@ fixture binary 只有显式 Cargo feature `external-pool-adapter-session-fixture
 Windows source-contract、Linux-musl product/fixture/test 完整链接和 WSL2 Ubuntu 真实 kernel fixture 均已通过。动态执行同时保持 V260 5 项协议测试、扩展后的 V261 5 项 confinement 测试和 V262 2 项组合测试，合计 `12 passed / 0 failed`；cgroup fixture 最终为空并成功清理。详细命令、工件 SHA-256 和组合证据指纹见对应 acceptance。
 
 下一硬门是把 V256 的短时 config/credential authority 以 ephemeral、不可日志化、不可持久化的方式交付给已认证 child，并保持失败关闭；完成后才可由 server broker 使用 V258 target 做 DNS/TLS 与 upstream no-work probe。V262 不证明任一真实 Adapter 二进制兼容、Secret 已交付、外部矿池可连接、Provider 可激活或经济结算可执行。
+
+## 7. V267 状态更正
+
+V262 的历史 exec 后 fixture 使用 source capsule digest 和 supervisor/session V1，并没有
+post-exec dumpable stub、Yama 2/3 gate、current policy V2、派生 launch root、ancillary rejection
+或当前 cleanup 行为。普通 exec 重置 dumpable 的缺口意味着旧正向 bootstrap/control frame
+不能作为当前 Secret 前置安全证明；旧 seccomp execveat flags 高位规则同样需要重新验证。
+
+V267 已写入上述修正，但尚未编译或运行，`passed=0`。下文 `12 passed` 与组合指纹只属于
+V262 旧构建 provenance；current V2/launch root 下的正向、root drift、seccomp negative、
+terminal cleanup 与 full kernel matrix 必须全部重跑。

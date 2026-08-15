@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_windows_local_tls_and_linux_kernel_fixture
+verification_status: historical_v265_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter authenticated no-work probe 验收边界
@@ -18,6 +18,18 @@ child semantic validation、root-bound receipt、post-exchange Store reproof 和
 
 所有 application bytes 都是仓库固定测试值，网络仅使用 loopback TLS fixture。没有真实矿池、
 生产 Secret、Provider activation、任务、用量、资金、链上状态或部署。
+
+## V267 状态更正
+
+下文 Windows/Linux/WSL2 结果来自 V267 之前的 V1/source-capsule runtime。它们保留 ELNW 与
+loopback TLS 的历史 provenance，但没有覆盖 current post-exec dumpable、Yama、launch root、
+policy V2、ancillary rejection 和 lifecycle cleanup，因此不能计作 V267 passed。
+
+V267 当前为 `source_review_only / implementation_uncompiled / implementation_unrun`，
+`passed=0 / failed=0`。至少须重跑完整 Store orchestration、Secret delivery、ELNW exchange、
+response semantic validation、postflight currentness、shutdown/reap 与 cgroup/scratch cleanup。
+现有 ignored runtime fixture 仍直接 seal 原测试 ELF；必须先经 production materializer 生成
+derived launch image，原样重跑不能形成 V267 acceptance evidence。
 
 ## 动态与源码合同矩阵
 
@@ -78,5 +90,6 @@ evidence 不属于产品状态或发布工件。
   usage、settlement 或 Sui effect；
 - 未开放 HTTP/MCP/PC/APK，未发布服务器或安装包。
 
-因此只能声明 V265 的 bounded authenticated no-work seam 已在固定本地 fixture 中部分验收，
-不能声明外部矿池生产接入、算力供应或交易结算链路完成。
+因此只能声明 V265 direct-seal 旧 runtime 的 bounded no-work seam 曾在固定本地 fixture 中
+部分验收；current V267 组合为 `source_review_only / passed=0`，必须先接 production derived
+launch materializer 再重验。不能声明外部矿池生产接入、算力供应或交易结算链路完成。

@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: verified_source_cross_build_and_linux_kernel
+verification_status: historical_v263_fixture_superseded_v267_rerun_required
 ---
 
 # 外部矿池 Adapter 易失配置与凭据交付权威
@@ -99,3 +99,15 @@ V263 已完成 Store 私有组合、cross-build 与真实 Linux kernel fixture�
 可复验的进程内 observation；它仍不能单独移除 V254 deny 或激活 Provider。V263 详细动态
 证据与尚未验收项见
 [`external-pool-adapter-ephemeral-secret-delivery-acceptance.md`](external-pool-adapter-ephemeral-secret-delivery-acceptance.md)。
+
+## 7. V267 状态更正
+
+V263 的历史 Secret delivery fixture 发生在 exec 后 dumpable 未重新置零的旧 runtime 上，因此
+不能证明同 UID ptrace 暴露面在 config/credential 交付前已关闭。V267 保持 profile/installation
+绑定 source capsule SHA-256，但把 session capsule root 改为派生 launch SHA-256，并让 launch
+stub 在原 entry 前 SET/GET dumpable；Store 私有 binding 同时记录 source/launch digest 与
+launch size。current policy V2 另要求 Yama 2/3、受限 prctl 与修正后的 execveat 参数过滤。
+
+这些当前源码仅 `source_review_only`，未编译、未交付任何测试 Secret，`passed=0`。V263 旧
+`18 passed` 保留历史 provenance，但整个 Store→launch→bootstrap→delivery→shutdown/reap
+矩阵必须在 V267 上重跑，才能恢复当前 Secret delivery 的动态验收结论。

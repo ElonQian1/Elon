@@ -22,6 +22,8 @@ const BPF_JSET: u16 = 0x40;
 const BPF_K: u16 = 0x00;
 const BPF_RET: u16 = 0x06;
 
+pub(super) static EMPTY_EXEC_PATH: [libc::c_char; 1] = [0];
+
 pub(super) fn build_seccomp_program(policy: &SupervisorPolicy) -> Result<Vec<libc::sock_filter>> {
     let names = &policy.confinement.seccomp.bootstrap_allowed_syscalls;
     if names.is_empty() || names.len() > 128 {
@@ -40,6 +42,7 @@ pub(super) fn build_seccomp_program(policy: &SupervisorPolicy) -> Result<Vec<lib
         || !seen.contains("mprotect")
         || !seen.contains("fcntl")
         || !seen.contains("poll")
+        || !seen.contains("prctl")
     {
         bail!("supervisor seccomp allowlist is incomplete");
     }
@@ -58,6 +61,7 @@ pub(super) fn build_seccomp_program(policy: &SupervisorPolicy) -> Result<Vec<lib
             "execveat" => append_execveat_rule(&mut program, number),
             "fcntl" => append_getfd_rule(&mut program, number),
             "poll" => append_bounded_poll_rule(&mut program, number),
+            "prctl" => append_dumpable_prctl_rule(&mut program, number),
             _ => append_plain_allow(&mut program, number),
         }
     }
@@ -103,11 +107,29 @@ fn append_no_exec_memory_rule(program: &mut Vec<libc::sock_filter>, syscall: i64
 }
 
 fn append_execveat_rule(program: &mut Vec<libc::sock_filter>, syscall: i64) {
-    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, syscall as u32, 0, 10));
+    let empty_path_pointer = EMPTY_EXEC_PATH.as_ptr() as usize as u64;
+    let empty_path_pointer_low = empty_path_pointer as u32;
+    let empty_path_pointer_high = (empty_path_pointer >> 32) as u32;
+
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, syscall as u32, 0, 14));
     program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(0)));
-    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, CAPSULE_FD as u32, 0, 6));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, CAPSULE_FD as u32, 0, 10));
     program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(0)));
-    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 4));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 8));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(1)));
+    program.push(jump(
+        BPF_JMP | BPF_JEQ | BPF_K,
+        empty_path_pointer_low,
+        0,
+        6,
+    ));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(1)));
+    program.push(jump(
+        BPF_JMP | BPF_JEQ | BPF_K,
+        empty_path_pointer_high,
+        0,
+        4,
+    ));
     program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(4)));
     program.push(jump(
         BPF_JMP | BPF_JEQ | BPF_K,
@@ -115,6 +137,44 @@ fn append_execveat_rule(program: &mut Vec<libc::sock_filter>, syscall: i64) {
         0,
         2,
     ));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(4)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_NR_OFFSET));
+}
+
+fn append_dumpable_prctl_rule(program: &mut Vec<libc::sock_filter>, syscall: i64) {
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, syscall as u32, 0, 23));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(0)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 19));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(0)));
+    program.push(jump(
+        BPF_JMP | BPF_JEQ | BPF_K,
+        libc::PR_SET_DUMPABLE as u32,
+        1,
+        0,
+    ));
+    program.push(jump(
+        BPF_JMP | BPF_JEQ | BPF_K,
+        libc::PR_GET_DUMPABLE as u32,
+        0,
+        16,
+    ));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(1)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 14));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(1)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 12));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(2)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 10));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(2)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 8));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(3)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 6));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(3)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 4));
+    program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_low_offset(4)));
+    program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 2));
     program.push(statement(BPF_LD | BPF_W | BPF_ABS, argument_high_offset(4)));
     program.push(jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0));
     program.push(statement(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
@@ -216,6 +276,7 @@ fn syscall_number(name: &str) -> Result<i64> {
         "getpid" => libc::SYS_getpid,
         "gettid" => libc::SYS_gettid,
         "prlimit64" => libc::SYS_prlimit64,
+        "prctl" => libc::SYS_prctl,
         "execveat" => libc::SYS_execveat,
         _ => bail!("unsupported supervisor syscall policy entry"),
     };

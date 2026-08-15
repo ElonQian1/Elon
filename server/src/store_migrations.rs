@@ -30,6 +30,7 @@ mod compute_external_pool_adapter_sandbox_reattestation;
 mod compute_external_pool_adapter_sandbox_verifier_key;
 mod compute_external_pool_adapter_scanner_key;
 mod compute_external_pool_adapter_supervisor_session_policy_companion;
+mod compute_external_pool_adapter_supervisor_session_policy_v2;
 mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_provider_activation_candidate;
@@ -331,6 +332,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (255, "外部矿池 Adapter Provider-specific 惰性 runtime launch profile", compute_external_pool_adapter_runtime_launch_profile::migration_v255),
     (258, "外部矿池 Adapter 惰性 brokered upstream transport target", compute_external_pool_adapter_upstream_transport_target::migration_v258),
     (259, "外部矿池 Adapter 惰性 supervisor/session policy companion", compute_external_pool_adapter_supervisor_session_policy_companion::migration_v259),
+    (267, "外部矿池 Adapter exec 后身份与会话传输加固策略", compute_external_pool_adapter_supervisor_session_policy_v2::migration_v267),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

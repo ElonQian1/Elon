@@ -20,6 +20,12 @@ pub(crate) fn migration_v259(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn reinstall_current_policy(conn: &Connection) -> Result<()> {
+    guards::reinstall_current_policy(conn)?;
+    view::install(conn)?;
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "compute_external_pool_adapter_supervisor_session_policy_companion/tests.rs"]
 mod tests;

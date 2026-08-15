@@ -12,6 +12,7 @@ mod delivery;
 mod no_work;
 mod roots;
 mod transport;
+mod transport_io;
 
 pub use bootstrap::{
     prepare_external_pool_adapter_supervisor_session, ExternalPoolAdapterChildBootstrap,

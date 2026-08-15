@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
-verification_status: static_profile_and_unsigned_candidate_validation
+verification_status: frozen_v1_static_profile_and_unsigned_candidate_validation
 ---
 
 # 外部矿池 Adapter 运行时兼容性 Profile 权威
@@ -18,15 +18,16 @@ challenge 与候选报告，而不需要复制服务端源码中的常量。
 
 机器真源是
 [`external-pool-adapter-runtime-compatibility-profile-v1.json`](external-pool-adapter-runtime-compatibility-profile-v1.json)。
-代码每次从现有 policy catalog 重建 Profile，并使用 RFC 8785/I-JSON 规范化和 domain-separated
-SHA-256 计算摘要；checked-in JSON 与代码结果逐字段不一致时测试失败。
+代码从 V255/V258 current catalog 与显式冻结的 supervisor/session V1 catalog 重建 Profile，
+并使用 RFC 8785/I-JSON 规范化和 domain-separated SHA-256 计算摘要；checked-in JSON 与该
+V1 合同逐字段不一致时测试失败。后续 current catalog 升级不能静默改写 Profile V1。
 
 ## 2. Profile 的 exact 绑定
 
 Profile 固定 Linux x86_64，绑定六项 revision 1 release capability、V255 runtime launch
-policy、V258 upstream transport policy、V259 supervisor/session policy，以及 ELSP/ELNW 与
-Broker exact exchange 的固定协议参数。三个 policy digest 直接来自现有 catalog；V266 不另建
-第二套运行时、网络、凭据或沙箱政策。
+policy、V258 upstream transport policy、冻结的 V259 supervisor/session policy V1，以及
+ELSP/ELNW 与 Broker exact exchange 的固定协议参数。三个 policy digest 来自对应版本化
+catalog；V266 不另建第二套运行时、网络、凭据或沙箱政策。
 
 ELNW request 为 1..16 KiB，response 为 1..64 KiB，单项 probe 最多 15 秒。root 使用 V265
 相同 domain、32-byte nonce、big-endian 长度和 request/response SHA-256 重算。Profile 中所有
@@ -68,3 +69,14 @@ installation、credential、target、readiness 和 admission roots 在同一原�
 
 动态证据和明确未验收项见
 [`external-pool-adapter-runtime-compatibility-profile-acceptance.md`](external-pool-adapter-runtime-compatibility-profile-acceptance.md)。
+
+## 6. V267 版本边界
+
+V267 把 fresh V259 companion 使用的 current supervisor/session catalog 升到 V2，但 V266
+Profile V1 继续绑定冻结 V1 catalog、原 JSON/digest 和历史 `6 passed / 0 failed`。这避免在
+Profile revision 不变时静默改变机器合同；同时也意味着 V266 不能作为 V267 派生 launch
+image、post-exec dumpable、Yama、ancillary 或 cleanup 的兼容性证据。
+
+面向 current V2 的 Profile、challenge、candidate report 与 verifier/runner evidence 尚未形成，
+当前为 `passed=0`。后续必须发布独立版本并重跑，不得复用 V1 digest 或把历史 unsigned report
+改标签升级。

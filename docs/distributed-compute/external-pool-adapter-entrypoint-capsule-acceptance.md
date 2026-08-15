@@ -1,9 +1,9 @@
 ---
 title: 外部矿池 Adapter Linux entrypoint capsule 验收边界
 status: current
-reviewed_at: 2026-08-14
+reviewed_at: 2026-08-15
 owners: backend, security, ai-economy
-verification_status: verified_wsl2_linux_kernel_subset
+verification_status: historical_source_capsule_verified_v267_launch_source_review_only
 ---
 
 # 外部矿池 Adapter Linux entrypoint capsule 验收边界
@@ -13,6 +13,17 @@ verification_status: verified_wsl2_linux_kernel_subset
 V257 已在 WSL2 Ubuntu、Linux `6.18.33.2-microsoft-standard-WSL2`、x86-64、Rust/Cargo `1.97.0` 环境完成完整 `elon-server` 测试目标编译。4 项 Linux kernel fixture 与 7 项 source-contract 全部通过，合计 `11 passed / 0 failed`。本批只 materialize 生成的非生产 static ELF 到匿名 memfd，不执行 capsule，不读取真实 mount/secret，不创建 child process、IPC/session 或网络连接。
 
 数据库 schema 保持 V255；没有 `migration_v257`、receipt、current view、HTTP/MCP/PC route。Windows 与其他平台固定 unavailable。Provider 保持 `registering`，`probe_observed=false`、`runtime_launch_ready=false`、`activation_ready=false`；V254 18 个 temporary absolute deny 原样保留。
+
+## V267 状态更正
+
+V267 没有改写 V257 source policy/root，而是在已验证的 source capsule 旁新增派生 sealed launch
+image，并让 session root 使用 launch SHA-256。下文 4 项 kernel fixture 和 7 项 source-contract
+发生在该派生实现之前，只能继续证明 source capsule 的历史行为；它们没有编译或执行当前
+launch image、post-exec stub、双 digest binding 或 Linux loader。
+
+V267 对本页新增边界严格为 `source_review_only / implementation_uncompiled /
+implementation_unrun`，`passed=0 / failed=0`。后续必须重新覆盖 program-header/range 重写、
+launch size/hash/seals、原 entry 跳转和真实 `execveat`；不得把下文历史 `11 passed` 计入 V267。
 
 ## 动态内核验收
 
@@ -58,4 +69,7 @@ wsl.exe -d Ubuntu --cd /mnt/d/wt/24584-b68911b5/server -- env CARGO_TARGET_DIR=/
 
 未验收生产 Linux kernel/文件系统配置、真实 V249 安装树与 operator mount、V256 真实 secret/zeroization、Store 同事务全根动态 fixture、短读/超读并发漂移、SQLite upgrade/reopen/concurrency/crash、真实进程执行、supervisor、namespace/seccomp/cgroup/Landlock/AppArmor、secret delivery、Sidecar/IPC/session、authenticated no-work probe、runtime identity、ACK/event、Provider activation、actor/route、Pool/Offer/Job/Attempt/Start、usage、verification或settlement。
 
-因此当前只能记录 `implementation_partially_verified / verified_wsl2_linux_kernel_subset`。V257 不是 runtime、probe 或 activation；不得因真实 memfd fixture 通过而删除 V254 absolute deny 或宣称 production readiness。
+因此只能把 `implementation_partially_verified / verified_wsl2_linux_kernel_subset` 作为 V257
+source capsule 的历史记录；V267 launch derivation 当前仍是 `source_review_only / passed=0`。
+二者都不是 runtime、probe 或 activation；不得因真实 memfd fixture 通过而删除 V254 absolute
+deny 或宣称 production readiness。

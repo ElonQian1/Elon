@@ -11,6 +11,12 @@ use std::fs::File;
 #[path = "external_pool_adapter_entrypoint_capsule/elf.rs"]
 mod elf;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[path = "external_pool_adapter_entrypoint_capsule/launch_image.rs"]
+mod launch_image;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[path = "external_pool_adapter_entrypoint_capsule/launch_image_io.rs"]
+mod launch_image_io;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[path = "external_pool_adapter_entrypoint_capsule/linux.rs"]
 mod linux;
 #[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
@@ -66,7 +72,7 @@ impl crate::compute_federation::external_pool_adapter_linux_supervisor::External
     for PreparedExternalPoolAdapterEntrypointCapsule
 {
     fn retained_sealed_image(&self) -> &File {
-        &self.sealed_image
+        &self.launch_image
     }
 }
 

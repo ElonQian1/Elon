@@ -1,7 +1,7 @@
 use std::{
     ffi::CString,
     fs::{self, File, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     mem::size_of,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
@@ -30,6 +30,7 @@ const REQUIRED_CAPSULE_SEALS: libc::c_int =
 const CAPSULE_MODE: u32 = 0o500;
 const CHILD_SOURCE_FD_MINIMUM: i32 = 10;
 const CLONE_INTO_CGROUP: u64 = 1 << 33;
+const YAMA_PTRACE_SCOPE: &str = "/proc/sys/kernel/yama/ptrace_scope";
 
 pub(crate) trait ExternalPoolAdapterSupervisorCapsule {
     fn retained_sealed_image(&self) -> &File;
@@ -47,9 +48,10 @@ pub(crate) fn launch_external_pool_adapter_supervisor_child(
     capsule: &impl ExternalPoolAdapterSupervisorCapsule,
 ) -> Result<ExternalPoolAdapterSupervisorChild> {
     let policy = SupervisorPolicy::load()?;
+    require_exec_transition_ptrace_guard(&policy)?;
     require_sealed_capsule(capsule.retained_sealed_image())?;
     let mut cgroup = cgroup_parent.create_leaf(&policy)?;
-    let scratch = SupervisorScratchRoot::create()?;
+    let mut scratch = SupervisorScratchRoot::create()?;
     let seccomp_program = build_seccomp_program(&policy)?;
     let (child_ipc, seed_reader, root_arguments) =
         child_bootstrap.into_supervisor_descriptors()?.into_parts();
@@ -127,8 +129,12 @@ pub(crate) fn launch_external_pool_adapter_supervisor_child(
     });
     drop(mapping_writer);
     if let Err(error) = mapping_result {
-        terminate_pidfd_and_reap(pidfd.as_raw_fd())?;
-        let _ = cgroup.remove();
+        let termination_failed = terminate_pidfd_and_reap(pidfd.as_raw_fd()).is_err();
+        let cgroup_cleanup_failed = cgroup.remove().is_err();
+        let scratch_cleanup_failed = scratch.remove().is_err();
+        if termination_failed || cgroup_cleanup_failed || scratch_cleanup_failed {
+            return Err(error).context("mapped supervisor child rollback failed");
+        }
         return Err(error);
     }
 
@@ -139,6 +145,38 @@ pub(crate) fn launch_external_pool_adapter_supervisor_child(
         scratch,
         stderr_reader,
     ))
+}
+
+fn require_exec_transition_ptrace_guard(policy: &SupervisorPolicy) -> Result<()> {
+    if policy
+        .confinement
+        .identity
+        .exec_transition_ptrace_guard
+        .as_deref()
+        != Some("yama_ptrace_scope_2_or_stricter_v2")
+    {
+        bail!("supervisor exec-transition ptrace guard policy drifted");
+    }
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(YAMA_PTRACE_SCOPE)
+        .context("open fixed Yama ptrace scope")?;
+    let mut observed = [0_u8; 4];
+    let mut length = 0;
+    while length < observed.len() {
+        match file.read(&mut observed[length..]) {
+            Ok(0) => break,
+            Ok(read) => length += read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error).context("read fixed Yama ptrace scope"),
+        }
+    }
+    let accepted = length == 2 && observed[1] == b'\n' && matches!(observed[0], b'2' | b'3');
+    if !accepted {
+        bail!("supervisor requires Yama ptrace scope 2 or stricter");
+    }
+    Ok(())
 }
 
 impl SupervisorScratchRoot {
@@ -153,9 +191,23 @@ impl SupervisorScratchRoot {
             hex::encode(nonce)
         ));
         fs::create_dir(&path).context("create supervisor scratch mountpoint")?;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
-            .context("set supervisor scratch permissions")?;
-        let path_cstring = path_to_cstring(&path)?;
+        if let Err(error) = fs::set_permissions(&path, fs::Permissions::from_mode(0o700)) {
+            if fs::remove_dir(&path).is_err() {
+                return Err(error)
+                    .context("set supervisor scratch permissions and rollback mountpoint failed");
+            }
+            return Err(error).context("set supervisor scratch permissions");
+        }
+        let path_cstring = match path_to_cstring(&path) {
+            Ok(path_cstring) => path_cstring,
+            Err(error) => {
+                if fs::remove_dir(&path).is_err() {
+                    return Err(error)
+                        .context("encode supervisor scratch path and rollback mountpoint failed");
+                }
+                return Err(error);
+            }
+        };
         Ok(Self {
             path,
             path_cstring,
@@ -180,7 +232,12 @@ impl SupervisorScratchRoot {
 
 impl Drop for SupervisorScratchRoot {
     fn drop(&mut self) {
-        let _ = self.remove();
+        if self.remove().is_err() {
+            tracing::error!(
+                target: "security",
+                "supervisor scratch fallback cleanup failed"
+            );
+        }
     }
 }
 
