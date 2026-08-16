@@ -86,7 +86,7 @@ internal class MainSocialAiChatFeature(
             activity = activity,
             onRetry = {
                 if (isChatModeActive()) {
-                    if (webChatState() != "login_required" || !activeController().retryGuestAccess()) activeController().onHostResumed()
+                    retryConsumerSession()
                     refreshConsumerComposerUi()
                 }
             },
@@ -463,6 +463,16 @@ internal class MainSocialAiChatFeature(
     }
 
     private fun activeController(): WebChatSocialController = controllerFor(providerId())
+
+    private fun retryConsumerSession() {
+        val controller = activeController()
+        val retried = if (controller.stateWireValue() == "login_required") {
+            controller.retryGuestAccess()
+        } else {
+            controller.retryConnection()
+        }
+        if (!retried) controller.onHostResumed()
+    }
 
     private fun selectChatProvider(id: WebChatProviderId): Boolean {
         if (providerId() == id && isChatModeActive()) return true

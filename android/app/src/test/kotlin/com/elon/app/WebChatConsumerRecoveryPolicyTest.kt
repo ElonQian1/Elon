@@ -40,7 +40,7 @@ class WebChatConsumerRecoveryPolicyTest {
 
         assertTrue(session.contains("view.loadUrl(ChatGptWebNavigationPolicy.START_URL)"))
         assertTrue(controller.contains("override fun retryGuestAccess(): Boolean"))
-        assertTrue(feature.contains("webChatState() != \"login_required\""))
+        assertTrue(feature.contains("controller.stateWireValue() == \"login_required\""))
         assertTrue(feature.contains("binding.moreButton.visibility = View.GONE"))
     }
 

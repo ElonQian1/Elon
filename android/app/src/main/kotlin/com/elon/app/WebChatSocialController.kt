@@ -43,6 +43,7 @@ internal interface WebChatSocialController {
     fun lastCommandStatus(): WebChatCommandStatus? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false
     fun retryGuestAccess(): Boolean = false
+    fun retryConnection(): Boolean = false
     fun onHostResumed()
     fun onHostPaused()
     fun destroy()

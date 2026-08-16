@@ -67,6 +67,14 @@ internal class GoogleWebBackgroundSession(
         pageAdapter?.onHostResumed(webView?.url)
     }
 
+    fun retryConnection(): Boolean {
+        val view = webView ?: return false
+        view.stopLoading()
+        updateState(State.LOADING)
+        view.reload()
+        return true
+    }
+
     fun onHostPaused() {
         cookieManager.flush()
         webView?.onPause()

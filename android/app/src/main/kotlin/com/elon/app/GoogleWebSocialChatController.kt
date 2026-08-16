@@ -169,6 +169,8 @@ internal class GoogleWebSocialChatController(
 
     override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
 
+    override fun retryConnection(): Boolean = session.retryConnection()
+
     override fun onHostResumed() = session.onHostResumed()
 
     override fun onHostPaused() = session.onHostPaused()
