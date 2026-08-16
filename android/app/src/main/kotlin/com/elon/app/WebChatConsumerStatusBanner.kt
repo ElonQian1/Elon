@@ -21,10 +21,22 @@ internal object WebChatConsumerRecoveryPolicy {
     fun resolve(
         provider: WebChatProviderIdentity,
         state: String,
+        detail: String? = null,
+        hasConversationContent: Boolean = false,
     ): WebChatConsumerRecoveryState = when (state) {
+        "loading" -> if (hasConversationContent) {
+            WebChatConsumerRecoveryState(
+                visible = true,
+                message = "正在重新连接${provider.displayName}，当前对话已保留",
+                retryVisible = false,
+                officialVisible = false,
+            )
+        } else {
+            hidden()
+        }
         "error" -> WebChatConsumerRecoveryState(
             visible = true,
-            message = "${provider.displayName}连接异常",
+            message = errorMessage(provider, detail),
             retryVisible = true,
             officialVisible = true,
         )
@@ -36,14 +48,40 @@ internal object WebChatConsumerRecoveryPolicy {
             retryLabel = "访客",
             officialLabel = "登录",
         )
-        else -> WebChatConsumerRecoveryState(
-            visible = false,
-            message = "",
-            retryVisible = false,
-            officialVisible = false,
-        )
+        else -> hidden()
     }
+
+    private fun errorMessage(provider: WebChatProviderIdentity, detail: String?): String {
+        val normalized = detail.orEmpty().lowercase()
+        return when {
+            "err_name_not_resolved" in normalized || "err_internet_disconnected" in normalized ->
+                "网络不可用，请检查加速网络后重试"
+            "err_timed_out" in normalized || "timeout" in normalized || "超时" in normalized ->
+                "${provider.displayName}连接超时，请重试"
+            "webview" in normalized && ("不支持" in normalized || "unsupported" in normalized) ->
+                "系统 WebView 版本不支持网页聊天，请更新后重试"
+            "导航被拦截" in normalized || "blocked" in normalized ->
+                "官网跳转未完成，请打开官网继续"
+            else -> "${provider.displayName}连接异常"
+        }
+    }
+
+    private fun hidden() = WebChatConsumerRecoveryState(
+        visible = false,
+        message = "",
+        retryVisible = false,
+        officialVisible = false,
+    )
 }
+
+internal fun WebChatSocialController.consumerRecoveryState(
+    provider: WebChatProviderIdentity,
+): WebChatConsumerRecoveryState = WebChatConsumerRecoveryPolicy.resolve(
+    provider = provider,
+    state = stateWireValue(),
+    detail = stateDetail(),
+    hasConversationContent = currentMessages().any { it.webChatMessage != null },
+)
 
 internal class WebChatConsumerStatusBanner(
     activity: AppCompatActivity,

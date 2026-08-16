@@ -461,7 +461,7 @@ internal class MainSocialAiChatFeature(
                 attachmentSupported = controller.attachmentSupported(),
             )
             binding.inputEdit.hint = state.inputHint
-            val recovery = WebChatConsumerRecoveryPolicy.resolve(provider, controller.stateWireValue())
+            val recovery = controller.consumerRecoveryState(provider)
             consumerStatusBanner.render(
                 if (recovery.visible) recovery else WebChatConsumerComposerOperationPolicy.resolve(
                     provider = provider,

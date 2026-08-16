@@ -55,6 +55,7 @@ internal class ChatGptSocialChatController(
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
     private var latestCommandStatus: WebChatCommandStatus? = null
+    private var latestStateDetail: String? = null
     private var followLatestOnNextSnapshot = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
@@ -95,6 +96,8 @@ internal class ChatGptSocialChatController(
     override fun currentMessages(): List<ChatMessage> = messages.toList()
 
     override fun stateWireValue(): String = session.state().wireValue
+
+    override fun stateDetail(): String? = latestStateDetail
 
     override fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 
@@ -351,6 +354,8 @@ internal class ChatGptSocialChatController(
     }
 
     private fun renderState(state: ChatGptBackgroundSession.State, detail: String?) {
+        latestStateDetail = detail?.takeIf(String::isNotBlank)
+            ?.takeIf { state == ChatGptBackgroundSession.State.ERROR }
         if (!active) return
         if (messages.isEmpty()) when (state) {
             ChatGptBackgroundSession.State.LOADING -> renderStatusMessage("正在连接 ChatGPT 网页 AI…")

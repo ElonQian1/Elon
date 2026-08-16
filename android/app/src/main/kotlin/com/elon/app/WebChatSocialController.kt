@@ -17,6 +17,7 @@ internal interface WebChatSocialController {
     fun isActive(): Boolean
     fun currentMessages(): List<ChatMessage>
     fun stateWireValue(): String
+    fun stateDetail(): String? = null
     fun currentModel(): String
     fun adapterVersion(): Int
     fun authenticated(): Boolean

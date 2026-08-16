@@ -29,6 +29,46 @@ class WebChatConsumerStatusBannerTest {
     }
 
     @Test
+    fun reconnectingKeepsCachedConversationVisibleWithoutOfferingPrematureActions() {
+        val state = WebChatConsumerRecoveryPolicy.resolve(
+            provider = chatGpt,
+            state = "loading",
+            hasConversationContent = true,
+        )
+
+        assertTrue(state.visible)
+        assertTrue(state.message.contains("当前对话已保留"))
+        assertFalse(state.retryVisible)
+        assertFalse(state.officialVisible)
+    }
+
+    @Test
+    fun firstConnectionDoesNotDuplicateTheEmptyConversationStatus() {
+        assertFalse(WebChatConsumerRecoveryPolicy.resolve(
+            provider = chatGpt,
+            state = "loading",
+            hasConversationContent = false,
+        ).visible)
+    }
+
+    @Test
+    fun commonNetworkFailuresUseConsumerFriendlyRecoveryText() {
+        val offline = WebChatConsumerRecoveryPolicy.resolve(
+            provider = google,
+            state = "error",
+            detail = "net::ERR_INTERNET_DISCONNECTED",
+        )
+        val timeout = WebChatConsumerRecoveryPolicy.resolve(
+            provider = chatGpt,
+            state = "error",
+            detail = "net::ERR_TIMED_OUT",
+        )
+
+        assertEquals("网络不可用，请检查加速网络后重试", offline.message)
+        assertEquals("${chatGpt.displayName}连接超时，请重试", timeout.message)
+    }
+
+    @Test
     fun explicitLoginRequirementOffersGuestRetryAndOptionalOfficialLogin() {
         val state = WebChatConsumerRecoveryPolicy.resolve(chatGpt, "login_required")
 

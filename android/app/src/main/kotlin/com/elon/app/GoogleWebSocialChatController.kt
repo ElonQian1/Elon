@@ -52,6 +52,7 @@ internal class GoogleWebSocialChatController(
     private val pendingSend = GoogleWebPendingSendState()
     private var pendingSendWatchdog: Runnable? = null
     private var latestCommandStatus: WebChatCommandStatus? = null
+    private var latestStateDetail: String? = null
     private var followLatestOnNextSnapshot = false
 
     override fun activate(identity: WebChatProviderIdentity) {
@@ -74,6 +75,8 @@ internal class GoogleWebSocialChatController(
     override fun currentMessages(): List<ChatMessage> = messages.toList()
 
     override fun stateWireValue(): String = session.state().wireValue
+
+    override fun stateDetail(): String? = latestStateDetail
 
     override fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 
@@ -226,6 +229,8 @@ internal class GoogleWebSocialChatController(
     }
 
     private fun renderState(state: GoogleWebBackgroundSession.State, detail: String?) {
+        latestStateDetail = detail?.takeIf(String::isNotBlank)
+            ?.takeIf { state == GoogleWebBackgroundSession.State.ERROR }
         if (!active) return
         if (messages.isEmpty()) when (state) {
             GoogleWebBackgroundSession.State.LOADING -> renderStatus("正在连接 Google 搜索网页 AI…")
