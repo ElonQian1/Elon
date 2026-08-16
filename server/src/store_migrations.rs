@@ -48,6 +48,7 @@ mod migrations_v1_v16;
 mod migrations_v35_v53;
 mod migrations_v54_v70;
 mod migrations_v71_v82;
+mod rust_cache_fleet;
 
 use migrations_v17_v34::*;
 use migrations_v1_v16::*;
@@ -371,6 +372,11 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (272, "外部矿池 Adapter Provider-neutral task-protocol 六能力实跑证明", compute_external_pool_adapter_task_protocol_conformance::migration_v272),
     (273, "外部矿池 Adapter dormant production task delivery 与 authenticated ingress ledger", compute_external_pool_adapter_task_delivery::migration_v273),
     (274, "外部矿池 Adapter activation-rooted Provider active successor", compute_external_pool_adapter_provider_active_successor::migration_v274),
+    (
+        275,
+        "Rust 缓存 Fleet 脱敏报告有界历史",
+        rust_cache_fleet::migration_v275,
+    ),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

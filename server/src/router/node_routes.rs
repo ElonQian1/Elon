@@ -35,6 +35,14 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/api/me/nodes", get(node_api::my_nodes))
         .route("/api/me/nodes/register", post(node_api::register_node))
         .route(
+            "/api/me/nodes/:node_id/cache-reports",
+            post(node_api::rust_cache_fleet::upload_report),
+        )
+        .route(
+            "/api/me/nodes/:node_id/cache-reports/latest",
+            get(node_api::rust_cache_fleet::latest_report),
+        )
+        .route(
             "/api/me/nodes/:node_id/sharing",
             axum::routing::patch(node_api::update_my_node_sharing),
         )

@@ -14,6 +14,9 @@ implementation_refs:
   - file:scripts/rust-cache/RustCache.FleetQueue.psm1
   - file:scripts/rust-cache/RustCache.Install.psm1
   - file:scripts/rust-cache/RustCache.Launcher.psm1
+  - file:server/src/node_api/rust_cache_fleet/mod.rs
+  - file:server/src/node_api/rust_cache_fleet/contract.rs
+  - file:server/src/store/rust_cache_fleet_reports.rs
   - file:.agents/skills/manage-shared-build-cache/SKILL.md
   - file:scripts/test-rust-cache-portability.ps1
 ---
@@ -83,7 +86,7 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
 - 磁盘总量、剩余量及是否建议审查 GC；
 - 按 scope/domain 聚合的数量和可选字节数。
 
-报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出；节点上传接口、中央看板和远程审批队列仍是后续集成，不能宣称已经上线。
+报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出和所有者鉴权的服务端接收接口；节点自动上传器、中央看板和远程审批队列仍是后续集成，不能宣称已经上线。
 
 网络不稳定或需要节点服务稍后上传时，使用 outbox 信封：
 
@@ -92,7 +95,16 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
   -ProjectRoot D:\work\shop-app -NodeId <platform-node-id> -IncludeSizes
 ```
 
-默认信封写入缓存根的 `reports\fleet\outbox`，包含紧凑脱敏报告、报告字节长度、SHA-256、稳定节点 ID，以及“接收端必须认证节点、不得据此执行破坏操作”的机器可读约束。信封生成后保持不可变；上传尝试、失败原因和服务端 ACK 应写独立回执，避免重试修改原始证据。节点上传接口、服务端 ACK 和中央看板仍未接通，当前 `fleet-stage` 只完成可靠本地排队。
+默认信封写入缓存根的 `reports\fleet\outbox`，包含紧凑脱敏报告、报告字节长度、SHA-256、稳定节点 ID，以及“接收端必须校验节点归属、不得据此执行破坏操作”的机器可读约束。信封生成后保持不可变；上传尝试、失败原因和服务端 ACK 应写独立回执，避免重试修改原始证据。
+
+服务端现已提供：
+
+- `POST /api/me/nodes/{node_id}/cache-reports`：由已登录节点所有者提交完整信封；
+- `GET /api/me/nodes/{node_id}/cache-reports/latest`：由节点所有者读取最新已接受报告；
+- ACK schema `elon.rust_cache.fleet_ack.v1`：返回信封 ID、报告哈希、接收时间和幂等状态；
+- 每节点最多保存 100 条历史，同一 `node_id + report_sha256` 重试不会重复写入。
+
+接收端严格校验路由、信封和内嵌报告中的节点 ID，重新计算 UTF-8 JSON 字节长度与 SHA-256，拒绝未知字段、绝对路径、本机身份、破坏性执行记录或破坏性授权。响应始终声明 `destructive_actions_authorized: false`。当前节点运行时尚未自动消费 outbox，也尚未写上传尝试与 ACK 本地回执，因此 `fleet-stage` 仍是可靠本地排队入口，不能宣称自动上报已经上线。
 
 ## GC 业务流
 
@@ -132,9 +144,9 @@ fleet-report/status 发现风险
 - 长构建前运行 `doctor` 或轻量 preflight GC；
 - 任务 worktree 成功收尾时精确回收该任务拥有的 workspace 分区；
 - 低磁盘时自动生成 GC 预演报告；
-- 节点空闲时生成并上传脱敏 fleet report。
+- 节点空闲时生成并排队脱敏 fleet report；自动上传须等节点 uploader 接通后启用。
 
-节点服务应优先消费 `fleet-stage` outbox，而不是自行拼接另一种缓存报告。服务端必须以已认证会话中的节点身份为准，并校验它与信封 `node_id`、报告内 `node_id` 及报告 SHA-256 一致；信封自报身份不能单独构成授权。
+节点服务后续应优先消费 `fleet-stage` outbox，而不是自行拼接另一种缓存报告。现有 HTTP 接口以已认证所有者和数据库中的节点归属为授权根，并校验路由 `node_id`、信封 `node_id`、报告内 `node_id` 及报告 SHA-256 一致；信封自报身份不能单独构成授权。节点 uploader 接入时还应使用节点凭证或受约束上传凭证，不能把长期用户会话写入普通项目目录。
 
 通用 GC `-Apply`、legacy purge、Cargo 父配置激活和平台迁移不能因一次 Git 提交而在所有 PC 自动执行。它们必须在目标 PC 上有明确审批、重新扫描和回执。
 
@@ -146,9 +158,10 @@ fleet-report/status 发现风险
 2. 用户启动器不包含 `Start-Process`、`powershell.exe` 或 `pwsh.exe` 嵌套启动。
 3. `fleet-report` 通过同一 schema 输出，JSON 中不含本机绝对路径。
 4. `fleet-stage` 生成不可变信封，篡改内嵌报告后校验失败，且信封不携带删除授权。
-5. 两个 worktree 只有在相同项目与兼容域内才命中同一命名分区，并由同一锁串行化。
-6. 未登记项目进入 quarantine，不污染正式项目分区。
-7. GC dry-run 不删除；apply 重新取锁并只处理受管路径。
-8. 项目回滚只需取消命名共享分区，不需要手工清空缓存根。
+5. 服务端接收接口拒绝节点身份不一致、哈希篡改、未知隐私字段和破坏性授权，重复信封返回幂等 ACK。
+6. 两个 worktree 只有在相同项目与兼容域内才命中同一命名分区，并由同一锁串行化。
+7. 未登记项目进入 quarantine，不污染正式项目分区。
+8. GC dry-run 不删除；apply 重新取锁并只处理受管路径。
+9. 项目回滚只需取消命名共享分区，不需要手工清空缓存根。
 
 底层路径、域、锁和 GC 细节见 `docs/rust-cache-platform.md`；渐进共享策略见 `docs/rust-cache-on-demand-adoption.md`。

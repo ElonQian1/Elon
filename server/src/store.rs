@@ -232,6 +232,7 @@ mod open_commerce_portability_reauthorization;
 mod open_commerce_production_webhooks;
 mod open_commerce_rate_limits;
 mod open_commerce_runtime_bindings;
+pub(crate) mod rust_cache_fleet_reports;
 pub(crate) use open_commerce_action_confirmations::CreateOpenCommerceActionConfirmation;
 pub(crate) use open_commerce_business_handoffs::{
     AdapterClaimReceiptProof, RecordOpenCommerceBusinessHandoffReceipt,

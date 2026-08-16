@@ -33,6 +33,7 @@ mod public_dev;
 mod public_dev_smoke;
 mod responses;
 mod runtime_response;
+pub(crate) mod rust_cache_fleet;
 mod usage;
 pub use compute_sharing::{get_my_node_compute_sharing, update_my_node_compute_sharing};
 pub use my_nodes::my_nodes;
