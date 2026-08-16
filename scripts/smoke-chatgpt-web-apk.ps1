@@ -108,6 +108,7 @@ function Wait-ChatGptState {
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     $last = $null
+    $nextOpenAttemptAt = [DateTimeOffset]::UtcNow.AddSeconds(3)
     do {
         $last = Invoke-ApkMcp -Tool "ui_state"
         if (& $Predicate $last) { return $last }
@@ -228,6 +229,10 @@ function Wait-NavigationReady {
                 command_state = $last
                 navigation = $navigation
             }
+        }
+        if (-not $overlayOpen -and [DateTimeOffset]::UtcNow -ge $nextOpenAttemptAt) {
+            Invoke-UiAction -Action "chatgpt_list_features" | Out-Null
+            $nextOpenAttemptAt = [DateTimeOffset]::UtcNow.AddSeconds(3)
         }
         Start-Sleep -Seconds $PollIntervalSec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)

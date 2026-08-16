@@ -21,6 +21,8 @@ Assert-Contains 'Start-ChatGptWebSmokeAwakeLease'
 Assert-Contains 'Stop-ChatGptWebSmokeAwakeLease'
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
 Assert-Contains 'function Wait-NavigationReady'
+Assert-Contains '$nextOpenAttemptAt = [DateTimeOffset]::UtcNow.AddSeconds(3)'
+Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features" | Out-Null'
 Assert-Contains 'function Wait-VisibleNativeSelectors'
 Assert-Contains 'foreach ($attempt in 1..3)'
 Assert-Contains 'UIAutomator dump failed after 3 attempts.'
@@ -256,7 +258,11 @@ if ($source -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMain
     throw "ChatGPT Web smoke must relaunch MainActivity only for an explicit initial bootstrap."
 }
 
-$featuresIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_list_features"')
+$featuresFlowIndex = $source.IndexOf('$beforeFeaturesState = Invoke-ApkMcp -Tool "ui_state"')
+$featuresIndex = $source.IndexOf(
+    'Invoke-UiAction -Action "chatgpt_list_features"',
+    $featuresFlowIndex
+)
 $openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_official_fallback"')
 $officialIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }')
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
