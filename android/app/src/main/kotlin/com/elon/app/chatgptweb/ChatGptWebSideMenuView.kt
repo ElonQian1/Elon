@@ -187,7 +187,7 @@ internal class ChatGptWebSideMenuView(
 
     private fun iconButton(resource: Int, description: String, onClick: () -> Unit) =
         ImageView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(48))
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
             setImageResource(resource)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(11), dp(11), dp(11), dp(11))

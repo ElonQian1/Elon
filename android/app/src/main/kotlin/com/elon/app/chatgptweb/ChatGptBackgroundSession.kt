@@ -191,6 +191,9 @@ internal class ChatGptBackgroundSession(
 
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
 
+    fun currentOfficialUrl(): String? = latestSnapshot?.url
+        ?.takeIf(ChatGptWebNavigationPolicy::allows)
+
     fun openConversation(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
         if (state != State.READY) return false

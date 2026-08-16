@@ -30,6 +30,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
     @Test
     fun productionFeaturesAreWiredThroughTheFriendChatSurface() {
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val modeController = read("android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt")
         val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
         val sendVisual = read("android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt")
         val consumerComposer = read(
@@ -40,6 +41,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         )
 
         assertTrue(feature.contains("ChatGptSocialChatController"))
+        assertFalse(modeController.contains("ChatGptWebTestActivity"))
+        assertTrue(modeController.contains("ChatGptWebOfficialFallbackIntent"))
         assertTrue(feature.contains("GoogleWebSocialChatController"))
         assertTrue(feature.contains("WebChatProductionComposerToolsCoordinator"))
         assertTrue(feature.contains("WebChatProductionFeatureNavigationCoordinator"))
@@ -95,6 +98,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
     private companion object {
         val productionSources = listOf(
             "android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt",
+            "android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt",
             "android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt",
             "android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt",
             "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",

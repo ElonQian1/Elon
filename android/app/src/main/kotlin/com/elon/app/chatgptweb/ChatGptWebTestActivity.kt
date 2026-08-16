@@ -135,7 +135,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             proxyStatus = status
             status.error?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
             if (savedInstanceState == null || binding.chatGptWebView.restoreState(savedInstanceState) == null) {
-                binding.chatGptWebView.loadUrl(sessionRestorer.restoreUrl())
+                binding.chatGptWebView.loadUrl(ChatGptWebOfficialFallbackIntent.startUrl(intent) ?: sessionRestorer.restoreUrl())
             }
         }
     }
@@ -780,7 +780,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun applyProductEntryPresentation() {
-        if (!intent.getBooleanExtra(EXTRA_PRODUCT_ENTRY, false)) return
+        if (!ChatGptWebOfficialFallbackIntent.isProductEntry(intent)) return
         binding.chatGptWebToolbar.visibility = View.GONE
         binding.chatGptWebStatus.visibility = View.GONE
         binding.chatGptModeToggle.visibility = View.GONE
@@ -788,12 +788,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val EXTRA_PRODUCT_ENTRY = "chatgpt_product_entry"
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
         val DICTATION_START_ACTIONS = setOf("start_dictation", "invoke_ui_control")
 
         fun createProductIntent(context: Context): Intent =
-            Intent(context, ChatGptWebTestActivity::class.java).putExtra(EXTRA_PRODUCT_ENTRY, true)
+            ChatGptWebOfficialFallbackIntent.create(context, currentUrl = null)
     }
 }

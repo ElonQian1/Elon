@@ -1,7 +1,7 @@
 package com.elon.app
 
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.chatgptweb.ChatGptWebTestActivity
+import com.elon.app.chatgptweb.ChatGptWebOfficialFallbackIntent
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.googleweb.GoogleWebOfficialActivity
 
@@ -55,7 +55,10 @@ internal class SocialAiChatModeController(
 
     fun openOfficialFallback() {
         val intent = when (providerId) {
-            WebChatProviderId.CHATGPT_WEB -> ChatGptWebTestActivity.createProductIntent(activity)
+            WebChatProviderId.CHATGPT_WEB -> ChatGptWebOfficialFallbackIntent.create(
+                activity,
+                officialFallbackUrl(),
+            )
             WebChatProviderId.GOOGLE_WEB -> GoogleWebOfficialActivity.createIntent(
                 activity,
                 officialFallbackUrl(),

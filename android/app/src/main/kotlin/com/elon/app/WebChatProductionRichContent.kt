@@ -61,7 +61,7 @@ internal object WebChatProductionRichContentBinder {
         gravity = Gravity.CENTER_VERTICAL
         maxLines = 2
         ellipsize = TextUtils.TruncateAt.END
-        minHeight = dp(container, 44)
+        minHeight = dp(container, 48)
         setPadding(dp(container, 10), dp(container, 6), dp(container, 8), dp(container, 6))
         setTextColor(ContextCompat.getColor(context, R.color.elon_text_primary))
         textSize = 13f

@@ -185,6 +185,8 @@ internal class ChatGptSocialChatController(
 
     override fun currentConversationPath(): String? = session.currentConversationPath()
 
+    override fun officialFallbackUrl(): String? = session.currentOfficialUrl()
+
     override fun conversationIndex() = session.conversationIndex()
 
     override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
