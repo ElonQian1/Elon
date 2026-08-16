@@ -32,6 +32,7 @@ function Invoke-Guard {
         [switch]$AutomationHandoff
     )
     $arguments = @(
+        "-WindowStyle", "Hidden",
         "-NoProfile", "-ExecutionPolicy", "Bypass",
         "-File", $guardPath,
         "-BaseRef", $Base
@@ -144,11 +145,18 @@ try {
     $preCommit = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\pre-commit"))
     $postCommit = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\post-commit"))
     $prePush = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\pre-push"))
+    $powerShellRunner = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\powershell-runner.sh"))
     Assert-True ($preCommit.Contains("check-document-modularity.ps1")) "pre-commit hook does not run the document guard"
     Assert-True ($preCommit.Contains("-AutomationHandoff")) "pre-commit hook does not enable automatic handoff"
     Assert-True ($postCommit.Contains("dispatch-document-organization.ps1")) "post-commit hook does not dispatch the persisted signal"
     Assert-True ($prePush.Contains("check-document-modularity.ps1")) "pre-push hook does not repeat the document guard"
     Assert-True (-not $prePush.Contains("-AutomationHandoff")) "pre-push must keep the strict document gate"
+    foreach ($hook in @($preCommit, $postCommit, $prePush)) {
+        Assert-True ($hook.Contains('source "$HOOK_DIR/powershell-runner.sh"')) "Git hook bypasses the shared PowerShell runner"
+        Assert-True ($hook.Contains("elon_run_hook_powershell")) "Git hook does not use the shared PowerShell runner"
+    }
+    Assert-True ($powerShellRunner.Contains('-WindowStyle Hidden')) "Windows Git-hook PowerShell runner may create visible consoles"
+    Assert-True ($powerShellRunner.Contains('Windows_NT')) "Git-hook PowerShell runner does not detect native Windows"
 
     Write-Host "DOCUMENT_MODULARITY_GUARD_TEST=passed"
 } finally {

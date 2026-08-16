@@ -98,8 +98,8 @@ Linux/macOS 使用 `bash scripts/format-rust.sh --apply --files ...`。脚本按
 修改预检、收尾、worktree 清理、共享契约或本文件后，必须运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\audit-ai-prompt-assets.ps1
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\audit-ai-prompt-assets.ps1
 ```
 
 ## 最终汇报

@@ -11,26 +11,21 @@ cd "$REPO_ROOT"
 git_local_env_vars="$(git rev-parse --local-env-vars)"
 if [ -n "$git_local_env_vars" ]; then unset $git_local_env_vars; fi
 
-PS_CMD=""
-if command -v powershell >/dev/null 2>&1; then
-  PS_CMD="powershell"
-elif command -v pwsh >/dev/null 2>&1; then
-  PS_CMD="pwsh"
-fi
-if [ -z "$PS_CMD" ]; then
+source "$HOOK_DIR/powershell-runner.sh"
+if ! elon_resolve_hook_powershell; then
   echo -e "${RED}pre-commit rejected: powershell/pwsh unavailable${NC}" >&2
   exit 1
 fi
 
 git diff --cached --check
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass \
+elon_run_hook_powershell \
   -File scripts/check-document-modularity.ps1 \
   -BaseRef HEAD \
   -Staged \
   -AutomationHandoff
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass \
+elon_run_hook_powershell \
   -File scripts/check-ai-project-entrypoints.ps1
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass \
+elon_run_hook_powershell \
   -File scripts/check-source-ownership.ps1 \
   -Staged \
   -EnforceLegacy

@@ -17,9 +17,8 @@ if [ -n "$UNTRACKED_RS" ]; then
   exit 1
 fi
 
-PS_CMD=""
-if command -v powershell >/dev/null 2>&1; then PS_CMD="powershell"; elif command -v pwsh >/dev/null 2>&1; then PS_CMD="pwsh"; fi
-if [ -z "$PS_CMD" ]; then
+source "$HOOK_DIR/powershell-runner.sh"
+if ! elon_resolve_hook_powershell; then
   echo -e "${RED}pre-push rejected: powershell/pwsh unavailable${NC}" >&2
   exit 1
 fi
@@ -27,10 +26,10 @@ fi
 git diff --check
 git diff --cached --check
 bash scripts/format-rust.sh
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-size.ps1
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-ownership.ps1 -EnforceLegacy
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-document-modularity.ps1
-"$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-ai-project-entrypoints.ps1
+elon_run_hook_powershell -File scripts/check-source-size.ps1
+elon_run_hook_powershell -File scripts/check-source-ownership.ps1 -EnforceLegacy
+elon_run_hook_powershell -File scripts/check-document-modularity.ps1
+elon_run_hook_powershell -File scripts/check-ai-project-entrypoints.ps1
 
 # Rust receipt validation is opt-in because it can run cargo check. Keep the
 # existing fail-closed gate available for callers that explicitly request it.
@@ -38,7 +37,7 @@ if [ "${ELON_ENABLE_RUST_PUSH_RECEIPT:-}" = "1" ]; then
   echo -e "${YELLOW}RUST_PUSH_RECEIPT_GATE=enabled${NC}"
   if [ -f "server/Cargo.toml" ]; then
     echo -e "${YELLOW}pre-push: checking managed Rust receipt...${NC}"
-    if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-push.ps1 -SkipCheapGates 2>&1; then
+    if ! elon_run_hook_powershell -File scripts/prepare-push.ps1 -SkipCheapGates 2>&1; then
       echo -e "${RED}pre-push rejected: Rust receipt preparation failed${NC}" >&2
       exit 1
     fi

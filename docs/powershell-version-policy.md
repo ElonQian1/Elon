@@ -12,6 +12,7 @@
 3. 没有 PowerShell 7 的设备，只能运行没有 `#requires -Version 7.0` 的脚本，或转到安装了 `pwsh` 的机器、服务器、WSL/Linux 对应脚本执行。
 4. 如果确实需要给 PowerShell 5.1 设备提供入口，只能写很薄的 wrapper：检查 `pwsh` 是否存在，存在则转调原 PS7 脚本，不存在则打印安装指引并失败。不要复制 PS7 脚本业务逻辑。
 5. 真正需要 PS5 原生实现时，必须新建明确命名的脚本，例如 `*-winps.ps1` 或 `*-ps5.ps1`，并补单独测试；不得改坏原 PS7 脚本。
+6. AI、Git Hook、节点和计划任务创建 Windows PowerShell 子进程时必须传 `-WindowStyle Hidden`。当前进程已经是 PowerShell 时优先使用调用运算符 `&` 运行脚本，避免嵌套宿主；只有用户明确要求交互窗口时才允许显示新控制台。
 
 ## 安装 PowerShell 7
 
@@ -38,8 +39,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-pwsh7.ps1
 PowerShell 5.1 可用：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed
 ```
 
 PowerShell 7 必须用：
@@ -58,4 +59,6 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 2. 若存在，原命令改用 `pwsh -NoProfile -ExecutionPolicy Bypass -File ...` 重新运行。
 3. 若不存在，停止该 PS7 脚本任务，说明需要安装 PowerShell 7 或转到有 `pwsh` 的环境。
 4. 不要为了让 PowerShell 5.1 跑通而修改 PS7 脚本。
+
+缓存平台等可移植工具在当前 PowerShell 会话内直接调用，例如 `& .\scripts\rust-cache.ps1 doctor`。后台巡检和上报交给节点运行时；不要通过循环弹出新的 PowerShell 窗口来模拟守护进程。
 

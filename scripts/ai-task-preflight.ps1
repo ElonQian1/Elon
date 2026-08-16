@@ -157,9 +157,10 @@ function Write-AiWorkflowGuard {
     Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
     Write-Host "RULE_OUTPUT=long build/test/publish commands must use scripts\invoke-ai-logged-command.ps1 with -RequireOutput and a bounded -StallTimeoutSeconds; never accept empty successful logs or stream full successful output into AI context."
     Write-Host "RULE_RESUME=after an interrupted logged command, run scripts\get-ai-command-status.ps1 -LogName <name>; never launch a duplicate while status is running."
+    Write-Host "RULE_WINDOWS_BACKGROUND=when automation starts a Windows PowerShell child, include -WindowStyle Hidden; when already in PowerShell, use & <script> instead of nesting another visible host."
     Write-Host "RULE_EXTERNAL_RUST_SCRATCH=ordinary Rust builds must use the managed D-drive cache entry points; if isolated temp cache/target is unavoidable, allocate it with scripts\new-ai-task-rust-scratch.ps1 and the emitted TaskContract, never hand-create a %TEMP% Rust cache."
     Write-Host "RULE_BEFORE_COMMIT=run scripts\check-source-size.ps1 and scripts\check-document-modularity.ps1 before git commit; pre-commit/pre-push repeat the document guard."
-    Write-Host "RULE_PUSH=after commit run powershell -NoProfile -ExecutionPolicy Bypass -File scripts\direct-network.ps1 push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
+    Write-Host "RULE_PUSH=after commit run powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\direct-network.ps1 push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
     $contractId = ''
     if ($State -ne 'blocked_needs_worktree' -and (Test-Path -LiteralPath $EditRoot)) {
         $contractId = New-AiTaskFinishContract -RepoPath $EditRoot
@@ -168,7 +169,7 @@ function Write-AiWorkflowGuard {
         Write-Host "TASK_BASE_SHA=$(Get-AiTaskBaseMarker -RepoPath $EditRoot)"
     }
     Write-Host "RULE_FINISH=after push run the exact FINISH_COMMAND_POWERSHELL; it validates the preflight identity, verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
-    Write-Host "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed -TaskWorktree `"$EditRoot`" -TaskContract $contractId"
+    Write-Host "FINISH_COMMAND_POWERSHELL=powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed -TaskWorktree `"$EditRoot`" -TaskContract $contractId"
     Write-Host "FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed"
     Write-Host "AI_WORKFLOW_GUARD_END"
 }
@@ -306,7 +307,7 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     $createdWorktreePath = $worktreePath
 } elseif ($needsWorktree) {
     Write-Host "WORKTREE_CREATED=false"
-    Write-Host "NEXT=Run powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree before editing."
+    Write-Host "NEXT=Run powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree before editing."
     Write-AiWorkflowGuard -EditRoot "BLOCKED_CREATE_WORKTREE_FIRST" -State "blocked_needs_worktree"
 } elseif ($isPcConversationWorktree) {
     Write-Host "WORKTREE_CREATED=false"
@@ -335,7 +336,7 @@ if (-not $SkipAutoCleanup -and $createdWorktree) {
     $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
     if (Test-Path -LiteralPath $cleanupScript) {
         try {
-            $cleanupArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $cleanupScript, "-Apply")
+            $cleanupArgs = @("-WindowStyle", "Hidden", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $cleanupScript, "-Apply")
             $cleanupOut = & powershell @cleanupArgs 2>&1
             $removedLine = $cleanupOut | Select-String -Pattern "^完成：清理" | Select-Object -Last 1
             if ($removedLine) {

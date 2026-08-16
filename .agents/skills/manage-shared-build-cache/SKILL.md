@@ -15,6 +15,7 @@ Use the repository cache tool as the source of truth. Do not reproduce cache rou
 4. If none exists, obtain a current trusted checkout of the platform repository and run its installer.
 5. Invoke the script directly from the current PowerShell session. Do not open nested visible `powershell.exe` or `pwsh.exe` windows.
 6. Run `& <entry> help` when command availability or parameter intent is unclear.
+7. Route recurring fleet reports and uploads through the installed node runtime. If a separate Windows worker is unavoidable, it must use `CreateNoWindow` or `-WindowStyle Hidden`; never implement monitoring as a visible PowerShell loop.
 
 ## Diagnose First
 

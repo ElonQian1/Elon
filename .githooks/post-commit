@@ -10,18 +10,13 @@ cd "$REPO_ROOT"
 git_local_env_vars="$(git rev-parse --local-env-vars)"
 if [ -n "$git_local_env_vars" ]; then unset $git_local_env_vars; fi
 
-PS_CMD=""
-if command -v powershell >/dev/null 2>&1; then
-  PS_CMD="powershell"
-elif command -v pwsh >/dev/null 2>&1; then
-  PS_CMD="pwsh"
-fi
-if [ -z "$PS_CMD" ]; then
+source "$HOOK_DIR/powershell-runner.sh"
+if ! elon_resolve_hook_powershell; then
   echo -e "${YELLOW}post-commit: powershell/pwsh unavailable; document organization signal remains queued${NC}" >&2
   exit 0
 fi
 
-if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass \
+if ! elon_run_hook_powershell \
   -File scripts/dispatch-document-organization.ps1; then
   echo -e "${YELLOW}post-commit: automatic document organization dispatch failed; signal remains queued${NC}" >&2
 fi

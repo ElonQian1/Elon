@@ -60,11 +60,15 @@ Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight
 Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
 Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
 Assert-Contains $preflightContent "RULE_OUTPUT=" "PowerShell preflight must expose the bounded AI output rule."
+Assert-Contains $preflightContent "RULE_WINDOWS_BACKGROUND=" "PowerShell preflight must require hidden Windows automation shells."
+Assert-Contains $preflightContent "powershell -WindowStyle Hidden -NoProfile" "PowerShell workflow commands must not create visible child consoles."
 Assert-Contains $preflightContent "RULE_EXTERNAL_RUST_SCRATCH=" "PowerShell preflight must expose the task-owned external Rust scratch rule."
 Assert-Contains $preflightContent "-RequireOutput" "PowerShell preflight must reject silent long-command success."
 Assert-Contains $preflightContent "-StallTimeoutSeconds" "PowerShell preflight must require a bounded no-progress timeout."
 Assert-Contains $preflightContent "get-ai-command-status.ps1" "PowerShell preflight must require interrupted-command recovery inspection."
 Assert-Contains $preflightShContent "RULE_OUTPUT=" "Shell preflight must expose the bounded AI output rule."
+Assert-Contains $preflightShContent "RULE_WINDOWS_BACKGROUND=" "Shell preflight must preserve the Windows hidden-shell rule."
+Assert-Contains $preflightShContent "powershell -WindowStyle Hidden -NoProfile" "Shell output must expose a no-popup Windows finish command."
 Assert-Contains $preflightContent "scripts\check-document-modularity.ps1" "PowerShell preflight must require document modularity checks before commit."
 Assert-Contains $preflightShContent "scripts/check-document-modularity.ps1" "Shell preflight must require document modularity checks before commit."
 Assert-Contains $preflightContent "AUTO_CLEANUP=skipped_created_worktree" "PowerShell preflight must not clean up the worktree it just created."
@@ -103,7 +107,7 @@ function Assert-DocumentContains {
     )
 
     $docPath = Join-Path $repoRoot $relativePath
-    $docContent = Get-Content -Raw -LiteralPath $docPath
+    $docContent = [System.IO.File]::ReadAllText($docPath, [System.Text.Encoding]::UTF8)
     Assert-Contains -Text $docContent -Expected $Snippet -Message "Workflow documentation is missing the required preflight/worktree rule in $RelativePath."
 }
 
@@ -127,7 +131,7 @@ function Assert-DocumentTokenBudget {
     )
 
     $docPath = Join-Path $repoRoot $RelativePath
-    $docContent = Get-Content -Raw -LiteralPath $docPath
+    $docContent = [System.IO.File]::ReadAllText($docPath, [System.Text.Encoding]::UTF8)
     $approxTokens = [int][Math]::Ceiling($docContent.Length / 4.0)
     if ($approxTokens -gt $MaxApproxTokens) {
         throw "Mandatory routing document exceeded its token budget: $RelativePath approxTokens=$approxTokens max=$MaxApproxTokens"
@@ -171,6 +175,8 @@ function Invoke-PreflightAndAssertNoNestedWorktree {
 
     New-Item -ItemType Directory -Path $WorktreeParent -Force | Out-Null
     $preflightArgs = @(
+        "-WindowStyle",
+        "Hidden",
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
@@ -341,7 +347,7 @@ try {
         $oldPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         try {
-            $shortOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File `
+            $shortOutput = & powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `
                 (Join-Path $seedRepo "scripts\ai-task-preflight.ps1") -CreateWorktree `
                 -BranchPrefix "codex/short-path-test" -WorktreeParent $shortWorktreeRoot `
                 -SkipAutoCleanup 2>&1
@@ -450,7 +456,7 @@ $externalArtifactTest = Join-Path $repoRoot "scripts\test-ai-task-external-artif
 $oldPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $externalArtifactOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $externalArtifactTest 2>&1
+    $externalArtifactOutput = & powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $externalArtifactTest 2>&1
     $externalArtifactExitCode = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
@@ -464,7 +470,7 @@ $finishWorkflowTest = Join-Path $repoRoot "scripts\test-ai-task-finish-workflow.
 $oldPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $finishTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $finishWorkflowTest 2>&1
+    $finishTestOutput = & powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $finishWorkflowTest 2>&1
     $finishTestExitCode = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
@@ -478,7 +484,7 @@ $formatWorkflowTest = Join-Path $repoRoot "scripts\test-format-rust-workflow.ps1
 $oldPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $formatTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $formatWorkflowTest 2>&1
+    $formatTestOutput = & powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $formatWorkflowTest 2>&1
     $formatTestExitCode = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
@@ -492,7 +498,7 @@ $githubSshNetworkTest = Join-Path $repoRoot "scripts\test-github-ssh-network.ps1
 $oldPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $githubSshTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $githubSshNetworkTest 2>&1
+    $githubSshTestOutput = & powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $githubSshNetworkTest 2>&1
     $githubSshTestExitCode = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
@@ -506,7 +512,7 @@ $commandOutputTest = Join-Path $repoRoot "scripts\test-ai-command-output.ps1"
 $oldPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $commandOutputTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $commandOutputTest 2>&1
+    $commandOutputTestOutput = & powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $commandOutputTest 2>&1
     $commandOutputTestExitCode = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference

@@ -245,7 +245,7 @@ git commit -m "feat(<模块>): <用中文简洁描述本次修改内容>"
 如果本次提交已 push，使用统一收尾完成主基线同步、文件审计和 worktree 回收：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind <Kind>
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind <Kind>
 ```
 
 Linux/macOS 使用 `bash scripts/finish-ai-task.sh --kind <Kind>`。未知主工作区文件不会被自动修改，也不再阻止无路径冲突的已跟踪基线快进。
@@ -362,11 +362,11 @@ Android 可安装端能力变更要先区分**代码同步**和**APK 发布**：
 
 ```powershell
 # 只交付代码时，用统一收尾确认远端主线、同步 main 并清理 worktree
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed
 
 # Android 用户可见改动默认继续发布；明确只同步代码时跳过
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind AndroidFeature
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind AndroidFeature
 ```
 
 - **代码同步完成**：业务代码已 commit 并 push 到 `origin/main`。只有用户明确说“先同步代码”“暂不发布”或并行任务只负责合并时，才以 `CodePushed` 收尾。
