@@ -74,7 +74,7 @@ internal class ChatGptSocialChatController(
     private val productionMessageActions by lazy {
         WebChatProductionMessageActionCoordinator(
             activity = activity,
-            mcpPort = { socialMcpPort },
+            consumerPort = { socialConsumerPort },
             openOfficialFallback = openOfficialFallback,
         )
     }
@@ -344,8 +344,8 @@ internal class ChatGptSocialChatController(
                 else -> "发送中…"
             },
             attachmentsForMessage = { id -> sentAttachments[id].orEmpty() },
-            messageActionContextIds = WebChatProductionMessageActionJson.messageContextIds(
-                socialMcpPort.uiState(),
+            messageActionContextIds = WebChatProductionMessageActionControls.messageContextIds(
+                socialConsumerPort.state().controls,
             ),
             timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
         )

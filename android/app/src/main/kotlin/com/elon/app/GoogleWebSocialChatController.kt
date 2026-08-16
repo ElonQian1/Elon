@@ -44,7 +44,7 @@ internal class GoogleWebSocialChatController(
     private val productionMessageActions by lazy {
         WebChatProductionMessageActionCoordinator(
             activity = activity,
-            mcpPort = { null },
+            consumerPort = { null },
             openOfficialFallback = openOfficialFallback,
         )
     }

@@ -88,6 +88,25 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(diagnostic.contains("binding.chatGptNativeComposer"))
     }
 
+    @Test
+    fun productionMessageActionsUseTheTypedConsumerPortWithoutAJsonRoundTrip() {
+        val actions = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageActions.kt",
+        )
+        val controller = read(
+            "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
+        )
+
+        assertTrue(actions.contains("WebChatConsumerPort"))
+        assertTrue(actions.contains("executeSessionCommand"))
+        assertTrue(actions.contains("invokeControl"))
+        assertFalse(actions.contains("WebChatSocialMcpPort"))
+        assertFalse(actions.contains("JSONObject"))
+        assertFalse(actions.contains("MessageActionJson"))
+        assertTrue(controller.contains("socialConsumerPort.state().controls"))
+        assertFalse(controller.contains("socialMcpPort.uiState()"))
+    }
+
     private fun read(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 

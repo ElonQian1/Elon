@@ -8,8 +8,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptMessageClipboard
 import com.elon.app.chatgptweb.ChatGptNativeControlPresentation
-import org.json.JSONArray
-import org.json.JSONObject
 
 internal object WebChatProductionMessageActionBinder {
     fun bind(
@@ -93,61 +91,54 @@ internal object WebChatProductionMessageActionFeedback {
     fun contextActionAccepted(label: String): String = "已执行：$label"
 }
 
-internal object WebChatProductionMessageActionJson {
-    fun messageContextIds(state: JSONObject): Set<String> {
-        val controls = state.optJSONObject("ui_manifest")?.optJSONArray("controls") ?: return emptySet()
-        return buildSet {
-            controls.forEachObject { control ->
-                if (
-                    control.optString("region") == "message" &&
-                    control.optBoolean("enabled", false) &&
-                    !isPrimaryCopy(control)
-                ) {
-                    control.optString("context_id").takeIf(String::isNotBlank)?.let(::add)
-                }
-            }
+internal object WebChatProductionMessageActionControls {
+    fun messageContextIds(controls: List<WebChatConsumerControlDescriptor>): Set<String> =
+        controls.asSequence()
+            .map(WebChatConsumerControlDescriptor::control)
+            .filter { it.region == "message" && it.enabled && !isPrimaryCopy(it) }
+            .mapNotNull(WebChatConsumerControl::contextId)
+            .map(ChatGptNativeControlPresentation::stableContextId)
+            .toSet()
+
+    fun contextActions(
+        controls: List<WebChatConsumerControlDescriptor>,
+        contextId: String,
+    ): List<WebChatContextAction> = controls.asSequence()
+        .filter { descriptor ->
+            val control = descriptor.control
+            control.region == "message" &&
+                control.enabled &&
+                control.contextId?.let(ChatGptNativeControlPresentation::stableContextId) == contextId &&
+                !isPrimaryCopy(control) &&
+                descriptor.presentation != WebChatConsumerControlPresentation.OFFICIAL_FALLBACK
         }
-    }
+        .map { descriptor ->
+            val control = descriptor.control
+            WebChatContextAction(
+                controlId = control.id,
+                label = control.label.trim(),
+                requiresUserConfirmation = descriptor.requiresUserConfirmation,
+                nativeSelector = descriptor.nativeSelector
+                    ?.trim()
+                    ?.takeIf(String::isNotBlank)
+                    ?: "web-chat-message-context-action:" +
+                    ChatGptNativeControlPresentation.stableContextId(control.id),
+            )
+        }
+        .filter { it.controlId.isNotBlank() && it.label.isNotBlank() }
+        .distinctBy(WebChatContextAction::controlId)
+        .take(MAX_CONTEXT_ACTIONS)
+        .toList()
 
-    fun contextActions(response: JSONObject): List<WebChatContextAction> {
-        val controls = response.optJSONArray("controls") ?: return emptyList()
-        return buildList {
-            controls.forEachObject { control ->
-                val id = control.optString("control_id")
-                val label = control.optString("label").trim()
-                if (
-                    id.isNotBlank() &&
-                    label.isNotBlank() &&
-                    control.optBoolean("enabled", false) &&
-                    !isPrimaryCopy(control) &&
-                    control.optString("native_presentation") != "official_fallback"
-                ) {
-                    add(
-                        WebChatContextAction(
-                            controlId = id,
-                            label = label,
-                            requiresUserConfirmation = control.optBoolean("requires_user_confirmation", false),
-                            nativeSelector = "web-chat-message-context-action:" +
-                                ChatGptNativeControlPresentation.stableContextId(id),
-                        ),
-                    )
-                }
-            }
-        }.distinctBy(WebChatContextAction::controlId)
-    }
+    private fun isPrimaryCopy(control: WebChatConsumerControl): Boolean =
+        control.semantic == "copy" || control.label.trim() in setOf("复制", "Copy")
 
-    private fun isPrimaryCopy(control: JSONObject): Boolean =
-        control.optString("semantic") == "copy" ||
-            control.optString("label").trim() in setOf("复制", "Copy")
-
-    private inline fun JSONArray.forEachObject(block: (JSONObject) -> Unit) {
-        for (index in 0 until length()) optJSONObject(index)?.let(block)
-    }
+    private const val MAX_CONTEXT_ACTIONS = 50
 }
 
 internal class WebChatProductionMessageActionCoordinator(
     private val activity: AppCompatActivity,
-    private val mcpPort: () -> WebChatSocialMcpPort?,
+    private val consumerPort: () -> WebChatConsumerPort?,
     private val openOfficialFallback: () -> Unit,
 ) {
     private val clipboard = ChatGptMessageClipboard(activity)
@@ -162,9 +153,8 @@ internal class WebChatProductionMessageActionCoordinator(
             }
             WebChatMessageAction.REGENERATE -> {
                 val accepted = dispatch(
-                    JSONObject().put("action", "chatgpt_regenerate_response"),
                     failureMessage = "当前回答暂时不能重新生成",
-                )
+                ) { port -> port.executeSessionCommand("chatgpt_regenerate_response") }
                 if (accepted) showFeedback(WebChatProductionMessageActionFeedback.regenerateAccepted())
             }
             WebChatMessageAction.MORE -> showMore(metadata)
@@ -172,16 +162,12 @@ internal class WebChatProductionMessageActionCoordinator(
     }
 
     private fun showMore(message: WebChatProductionMessage) {
-        val port = mcpPort() ?: return openOfficialFallback()
+        val port = consumerPort() ?: return openOfficialFallback()
         val contextId = ChatGptNativeControlPresentation.stableContextId(message.sourceMessageId)
-        val response = port.control(
-            JSONObject()
-                .put("action", "chatgpt_find_controls")
-                .put("region", "message")
-                .put("context_id", contextId)
-                .put("limit", 50),
+        val actions = WebChatProductionMessageActionControls.contextActions(
+            port.state().controls,
+            contextId,
         )
-        val actions = WebChatProductionMessageActionJson.contextActions(response)
         if (actions.isEmpty()) {
             showOfficialFallback(
                 title = "消息操作",
@@ -226,20 +212,19 @@ internal class WebChatProductionMessageActionCoordinator(
 
     private fun invoke(action: WebChatContextAction, userConfirmed: Boolean) {
         val accepted = dispatch(
-            JSONObject()
-                .put("action", "chatgpt_invoke_control")
-                .put("control_id", action.controlId)
-                .put("user_confirmed", userConfirmed),
             failureMessage = "网页操作执行失败",
-        )
+        ) { port -> port.invokeControl(action.controlId, userConfirmed) }
         if (accepted) {
             showFeedback(WebChatProductionMessageActionFeedback.contextActionAccepted(action.label))
         }
     }
 
-    private fun dispatch(args: JSONObject, failureMessage: String): Boolean {
-        val result = mcpPort()?.control(args)
-        if (result?.optBoolean("control_ok", false) == true) return true
+    private fun dispatch(
+        failureMessage: String,
+        action: (WebChatConsumerPort) -> WebChatConsumerCommandResult,
+    ): Boolean {
+        val result = consumerPort()?.let(action)
+        if (result?.accepted == true) return true
         showOfficialFallback(
             title = "消息操作",
             message = "$failureMessage。可以在官方页面继续。",
