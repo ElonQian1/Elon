@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 108;
+pub(super) const ADAPTER_VERSION: u32 = 124;
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -13,6 +13,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_project_policy.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_project_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_project_hints.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_project_hints.js"),
     ),
     (
         "chatgpt_web_adapter_context_menu_policy.js",
@@ -31,6 +35,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_message_action_policy.js"),
     ),
     (
+        "chatgpt_web_adapter_message_portal_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_message_portal_policy.js"),
+    ),
+    (
         "chatgpt_web_adapter_messages.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_messages.js"),
     ),
@@ -41,6 +49,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_composer_option_policy.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer_option_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_composer_submenu.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_composer_submenu.js"),
     ),
     (
         "chatgpt_web_adapter_composer_tool_state_policy.js",
@@ -119,7 +131,12 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
 pub(super) fn initialization_script() -> String {
     let adapters = ADAPTER_ASSETS
         .iter()
-        .map(|(_, source)| *source)
+        .map(|(name, source)| {
+            format!(
+                "window.__elonChatGptBootstrapStage = '{}';\n{}",
+                name, source
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
     r#"
@@ -202,15 +219,20 @@ pub(super) fn initialization_script() -> String {
     try {
       window.__elonChatGptAdapterTargetVersion = __ADAPTER_VERSION__;
       __ADAPTER_ASSETS__
+      window.__elonChatGptBootstrapStage = 'bridge_check';
       if (!window.__elonChatGptBridge || typeof window.__elonChatGptBridge.command !== 'function') {
         throw new Error('bridge_missing');
       }
+      window.__elonChatGptBootstrapStage = 'ready';
     } catch (error) {
       var errorName = String(error && error.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
+      var errorStage = String(window.__elonChatGptBootstrapStage || 'unknown')
+        .replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80);
       invoke(JSON.stringify({
         type: 'browser_diagnostic',
         kind: 'adapter_bootstrap_failed',
-        detail: 'ChatGPT 语义桥初始化失败（' + (errorName || 'Error') + '）。',
+        detail: 'ChatGPT 语义桥初始化失败（' + (errorName || 'Error') +
+          '，阶段：' + (errorStage || 'unknown') + '）。',
         url: location.origin + location.pathname
       }));
     }
@@ -235,8 +257,36 @@ mod tests {
     #[test]
     fn win_bootstrap_tracks_the_complete_android_adapter_bundle() {
         let script = initialization_script();
-        assert_eq!(ADAPTER_ASSETS.len(), 28);
-        assert!(script.contains("__elonChatGptAdapterTargetVersion = 108"));
+        let android_page_adapter = include_str!(
+            "../../../../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
+        );
+        let android_assets = android_page_adapter
+            .split("private val ADAPTER_ASSETS = listOf(")
+            .nth(1)
+            .and_then(|tail| tail.split("\n        )").next())
+            .expect("Android ChatGPT adapter asset list should remain readable")
+            .lines()
+            .filter_map(|line| {
+                let value = line.trim().trim_end_matches(',');
+                value
+                    .strip_prefix('"')
+                    .and_then(|value| value.strip_suffix('"'))
+            })
+            .collect::<Vec<_>>();
+        let android_version = android_page_adapter
+            .split("internal const val ADAPTER_VERSION = ")
+            .nth(1)
+            .and_then(|tail| tail.lines().next())
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .expect("Android ChatGPT adapter version should remain readable");
+        let win_assets = ADAPTER_ASSETS
+            .iter()
+            .map(|(name, _)| *name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(win_assets, android_assets);
+        assert_eq!(ADAPTER_VERSION, android_version);
+        assert!(script.contains("__elonChatGptAdapterTargetVersion = 124"));
         assert!(script.contains("__elonChatGptDocumentToken"));
         assert!(script.contains("__elonChatGptSnapshotScheduler"));
         assert!(script.contains("__elonChatGptLayout"));
@@ -245,5 +295,9 @@ mod tests {
         assert!(script.contains("adapter_bootstrap_failed"));
         assert!(script.contains("dispatchLocalTouch"));
         assert!(script.contains("document.elementFromPoint"));
+        assert!(script.contains("阶段："));
+        assert!(script.contains("chatgpt_web_adapter_composer_submenu.js"));
+        assert!(script.contains("chatgpt_web_adapter_message_portal_policy.js"));
+        assert!(script.contains("chatgpt_web_adapter_project_hints.js"));
     }
 }

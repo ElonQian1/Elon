@@ -128,7 +128,8 @@ Cookie。Gemini 仍不登记，后续应采用系统浏览器 OAuth、官方 API
 协议不定义 Cookie、Authorization、Access Token、原始请求头或网络响应。Win Rust
 宿主和 Android 均已通过来源受限的桥接接入 ChatGPT 可见语义适配器；Win 另接入 Google
 AI 模式的可见 DOM 适配器。Win 不再维护缩水或分叉的厂商脚本：ChatGPT 按与 APK 相同的固定
-27 个语义模块顺序加载，并用适配器版本与每页随机文档令牌约束事件和命令；Google 直接复用 APK 的
+31 个语义模块顺序加载，并用适配器版本与每页随机文档令牌约束事件和命令；Rust 回归会直接对照
+Android 的资产清单和版本，任一端新增、遗漏或乱序都失败关闭；Google 直接复用 APK 的
 `google_web_adapter.js`。页面完成加载后宿主会幂等重注入并请求快照，覆盖首次加载、官方登录跳转和
 SPA 文档切换。主窗口提供刷新、返回主页、恢复窗口、系统浏览器回退以及统一
 消息/文字输入区。每个厂商适配器仍必须独立评审：
@@ -191,7 +192,8 @@ confirmation，再调用商户模块运行时：
 - Google AI 模式提供商固定指向官方 `google.com/aimode`，以独立 Profile 打开；Win 代码已
   接通问题、回答、引用、草稿、发送、停止和新对话的可见语义路径。账号登录仍定向到系统
   浏览器；地区、语言、设备或账号灰度未开放时保留完整 Google 官方窗口。
-- ChatGPT Win 桥已补齐 APK 使用的完整语义模块、版本 107 与文档令牌绑定；Google Win 桥复用
+- ChatGPT Win 桥已补齐 APK 使用的完整 31 模块、版本 124 与文档令牌绑定；启动错误额外记录稳定的
+  模块阶段名，但不记录页面正文、Cookie、Token 或异常消息。Google Win 桥复用
   APK 版本 1 的消息提取器和 `google_web` 适配器，并在每页生成独立文档令牌。WebView2 的
   initialization script 只先安装本机消息出口，等待 DOM 根节点和 `DOMContentLoaded` 后再安装
   Google 语义桥；因此“窗口/Profile 已连接”不会再早于适配器首份快照被误当成可发送。重复重连
