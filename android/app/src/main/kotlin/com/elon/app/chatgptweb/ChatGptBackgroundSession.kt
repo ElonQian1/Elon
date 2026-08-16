@@ -43,6 +43,7 @@ internal class ChatGptBackgroundSession(
     private val proxyController = ChatGptWebProxyController(activity)
     private val uploadStager = ChatGptWebUploadStager(activity)
     private val conversationHistoryStore = ChatGptConversationHistoryStore(activity)
+    private val conversationNavigation = ChatGptConversationNavigationCoordinator(activity)
     private val snapshotStore = WebChatSnapshotStore(activity, "chatgpt")
     private val restoredConversationHistory = conversationHistoryStore.restore()
     private val observedMcpState = ChatGptWebObservedState(restoredConversationHistory)
@@ -165,7 +166,11 @@ internal class ChatGptBackgroundSession(
     }
 
     fun startNewConversation() {
-        pageAdapter?.startNewConversation()
+        val adapter = pageAdapter ?: return
+        latestSnapshot = conversationNavigation.beginNew(latestSnapshot)
+        latestSnapshot?.let(onSnapshot)
+        updateState(State.LOADING)
+        adapter.startNewConversation()
     }
 
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
@@ -173,7 +178,12 @@ internal class ChatGptBackgroundSession(
     fun openConversation(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
         if (state != State.READY) return false
-        pageAdapter?.openConversation(normalized) ?: return false
+        val adapter = pageAdapter ?: return false
+        val previous = latestSnapshot
+        latestSnapshot = conversationNavigation.beginOpen(normalized, previous)
+        latestSnapshot?.let(onSnapshot)
+        updateState(State.LOADING)
+        adapter.openConversation(normalized)
         return true
     }
 
@@ -242,6 +252,7 @@ internal class ChatGptBackgroundSession(
     }
 
     fun destroy() {
+        conversationNavigation.clear()
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)
         conversationRefresh.reset()
@@ -360,6 +371,7 @@ internal class ChatGptBackgroundSession(
         observedMcpState.accept(event)
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
+                if (!conversationNavigation.shouldAccept(event.value)) return
                 val snapshot = sessionContinuity.reconcile(event.value)
                 latestSnapshot = snapshot
                 ChatGptWebConversationPath.fromUrl(snapshot.url)?.let { activePath ->
@@ -384,7 +396,12 @@ internal class ChatGptBackgroundSession(
                         updateState(State.LOGIN_REQUIRED)
                     }
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
-                        if (!snapshot.streaming) snapshotStore.save(snapshot)
+                        if (!snapshot.streaming) {
+                            snapshotStore.save(snapshot)
+                            ChatGptWebConversationPath.fromUrl(snapshot.url)?.let { path ->
+                                conversationNavigation.save(path, snapshot)
+                            }
+                        }
                         pageAdapter?.markReady()
                         updateState(State.READY)
                         if (
@@ -409,6 +426,17 @@ internal class ChatGptBackgroundSession(
                 if (event.ok) {
                     pageAdapter?.requestSnapshot()
                 } else {
+                    if (event.action == "open_conversation" || event.action == "new_conversation") {
+                        conversationNavigation.restoreAfterFailure(event.action)?.let { previous ->
+                            latestSnapshot = previous
+                            onSnapshot(previous)
+                            updateState(when {
+                                ChatGptWebAccessPolicy.requiresLogin(previous) -> State.LOGIN_REQUIRED
+                                ChatGptWebAccessPolicy.canChat(previous) -> State.READY
+                                else -> State.LOADING
+                            })
+                        }
+                    }
                     if (event.action == "list_conversations") {
                         conversationCollection = conversationCollection.copy(
                             stale = conversations.isNotEmpty(),
@@ -454,7 +482,10 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun handleDocumentChanged(document: com.elon.app.WebBridgeDocumentSession.Snapshot) {
-        if (document.pageGeneration > observedMcpState.snapshot().pageGeneration) {
+        if (
+            document.pageGeneration > observedMcpState.snapshot().pageGeneration &&
+            !conversationNavigation.hasPending()
+        ) {
             latestSnapshot = null
             latestUiManifest = null
         }

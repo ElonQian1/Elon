@@ -35,6 +35,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val consumerComposer = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatConsumerComposerState.kt",
         )
+        val chatGptBackground = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
 
         assertTrue(feature.contains("ChatGptSocialChatController"))
         assertTrue(feature.contains("GoogleWebSocialChatController"))
@@ -52,6 +55,10 @@ class WebChatProductionSurfaceBoundaryContractTest {
         )
         assertTrue(sideMenu.contains("WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen"))
         assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS"))
+        assertTrue(chatGptBackground.contains("ChatGptConversationNavigationCoordinator"))
+        assertTrue(chatGptBackground.contains("conversationNavigation.beginOpen"))
+        assertTrue(chatGptBackground.contains("conversationNavigation.beginNew"))
+        assertTrue(chatGptBackground.contains("conversationNavigation.save"))
         assertTrue(consumerComposer.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
