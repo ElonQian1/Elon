@@ -99,7 +99,7 @@ internal class MainInputComposerSetup(
         val modeButtonRow = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(40)
+                dp(48)
             ).apply {
                 marginStart = dp(20)
                 marginEnd = dp(20)
@@ -157,11 +157,11 @@ internal class MainInputComposerSetup(
         }
 
         val inputModeButton = ImageButton(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(38), dp(38), Gravity.END or Gravity.CENTER_VERTICAL)
+            layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL)
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_voice_wave_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "切换语音输入"
             setOnClickListener { toggleVoiceMode() }
         }
@@ -182,11 +182,11 @@ internal class MainInputComposerSetup(
         val inputCenterContainer = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                dp(38),
+                dp(48),
                 1f
             )
             background = ColorDrawable(Color.TRANSPARENT)
-            minimumHeight = dp(38)
+            minimumHeight = dp(48)
             isClickable = true
             isFocusable = false
             setOnClickListener { openCollapsedInputComposer() }
@@ -295,7 +295,7 @@ internal class MainInputComposerSetup(
         }
 
         val modelButtonShell = FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(76), dp(34)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(76), dp(48)).apply {
                 marginEnd = dp(10)
             }
             background = activity.getDrawable(R.drawable.bg_bottom_mode_selector)
@@ -340,7 +340,7 @@ internal class MainInputComposerSetup(
         modelButtonShell.addView(modelChevron)
 
         val planModeButton = TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(72), dp(36)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(72), dp(48)).apply {
                 marginEnd = dp(8)
             }
             gravity = Gravity.CENTER
@@ -358,7 +358,7 @@ internal class MainInputComposerSetup(
         }
 
         val webToolsButton = TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(72), dp(36)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(72), dp(48)).apply {
                 marginEnd = dp(8)
             }
             background = activity.getDrawable(R.drawable.bg_bottom_mode_selector)
@@ -376,13 +376,13 @@ internal class MainInputComposerSetup(
         }
 
         val emojiButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
-                marginEnd = dp(8)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                marginEnd = dp(4)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_emoji_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "打开表情"
             setOnClickListener { toggleEmojiPanel() }
         }
@@ -393,24 +393,24 @@ internal class MainInputComposerSetup(
         expandedInputContainer.addView(expandEditorButton)
 
         val inputRightControls = FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38))
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
         }
 
         val attachmentButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
-                marginEnd = dp(8)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                marginEnd = dp(4)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_add_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "展开更多输入功能"
             setOnClickListener { toggleAttachmentPanel() }
         }
 
         sendButton.apply {
-            layoutParams = FrameLayout.LayoutParams(dp(38), dp(38), Gravity.END or Gravity.CENTER_VERTICAL)
-            activity.getDrawable(R.drawable.ic_input_send_new)?.let { background = InsetDrawable(it, dp(3)) }
+            layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL)
+            activity.getDrawable(R.drawable.ic_input_send_new)?.let { background = InsetDrawable(it, dp(5)) }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = ""
@@ -418,7 +418,7 @@ internal class MainInputComposerSetup(
         }
 
         val ttsSpeakerButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
                 marginEnd = dp(0)
             }
             background = ColorDrawable(Color.TRANSPARENT)
@@ -427,7 +427,7 @@ internal class MainInputComposerSetup(
                 else R.drawable.ic_input_tts_off_circle
             )
             scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(6), dp(6), dp(6), dp(6))
+            setPadding(dp(11), dp(11), dp(11), dp(11))
             contentDescription = "切换AI语音朗读"
             visibility = View.GONE
             setOnClickListener {

@@ -198,7 +198,7 @@ internal class InputComposerMotion(
     }
 
     private fun rightControlsTargetWidth(): Int {
-        val addWidth = rightControls.resources.displayMetrics.density * 38f
+        val addWidth = rightControls.resources.displayMetrics.density * 48f
         return addWidth.toInt()
     }
 

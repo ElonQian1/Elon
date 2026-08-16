@@ -36,7 +36,7 @@ class SocialAiModeSegmentedControlContractTest {
         val web = read("server/src/assets/web_page.html")
 
         assertTrue(composer.contains("R.drawable.bg_bottom_mode_selector"))
-        assertTrue(composer.contains("LinearLayout.LayoutParams(dp(76), dp(34))"))
+        assertTrue(composer.contains("LinearLayout.LayoutParams(dp(76), dp(48))"))
         assertTrue(selector.contains("android:radius=\"999dp\""))
         assertTrue(web.contains("border-radius: 999px"))
     }
