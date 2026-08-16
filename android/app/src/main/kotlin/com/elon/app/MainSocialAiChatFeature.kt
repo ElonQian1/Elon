@@ -210,6 +210,9 @@ internal class MainSocialAiChatFeature(
 
     fun openOfficialFallback() = modeController.openOfficialFallback()
 
+    fun startWebChatRealtimeVoice(): Boolean =
+        productionComposerTools.startRealtimeVoice(WebChatProviderRegistry.get(providerId()))
+
     fun interactionMode(): SocialAiInteractionMode = modeController.interactionMode()
 
     fun providerId(): WebChatProviderId = modeController.providerId()

@@ -70,6 +70,30 @@ internal class WebChatProductionComposerToolsCoordinator(
         pollTools(provider, port, epoch, attempt = 0)
     }
 
+    fun startRealtimeVoice(provider: WebChatProviderIdentity): Boolean {
+        cancelPending()
+        if (activeProvider() != provider.id) return false
+        if (!provider.supports(WebChatProviderCapability.REALTIME_VOICE)) {
+            openOfficialFallback()
+            return true
+        }
+        val port = mcpPort()
+        if (port == null) {
+            showUnavailable()
+            return true
+        }
+        val command = WebChatProductionComposerCommandCatalog.resolve(provider, port.uiState())
+            .firstOrNull { it.action == REALTIME_VOICE_ACTION }
+        if (command == null) {
+            showCommandError("realtime_voice_unavailable")
+            return true
+        }
+        if (executeCommand(port, command)) {
+            Toast.makeText(activity, "正在启动网页实时语音…", Toast.LENGTH_SHORT).show()
+        }
+        return true
+    }
+
     fun cancelPending() {
         requestEpoch += 1
         activeSheet?.dismiss()
@@ -160,9 +184,10 @@ internal class WebChatProductionComposerToolsCoordinator(
     private fun executeCommand(
         port: WebChatSocialMcpPort,
         command: WebChatProductionComposerCommand,
-    ) {
+    ): Boolean {
         val result = port.control(JSONObject().put("action", command.action))
         if (!result.optBoolean("control_ok")) showCommandError(result.optString("error"))
+        return result.optBoolean("control_ok")
     }
 
     private fun selectTool(port: WebChatSocialMcpPort, tool: WebChatProductionComposerTool) {
@@ -197,6 +222,7 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private companion object {
         const val TOOLS_SECTION = "tools"
+        const val REALTIME_VOICE_ACTION = "chatgpt_start_realtime_voice"
         const val MAX_POLL_ATTEMPTS = 8
         const val POLL_INTERVAL_MS = 250L
     }

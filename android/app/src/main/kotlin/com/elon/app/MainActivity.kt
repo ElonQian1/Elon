@@ -639,7 +639,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "实时语音目前只支持一龙AI 私聊", Toast.LENGTH_SHORT).show()
             return
         }
-        startActivity(SocialAiVoiceCallActivity.createIntent(this, serverUrl, userId))
+        if (!socialAiChatFeature.startWebChatRealtimeVoice()) startActivity(SocialAiVoiceCallActivity.createIntent(this, serverUrl, userId))
     }
 
     private fun suspendSocialChatForProjectReturn(): Boolean {
