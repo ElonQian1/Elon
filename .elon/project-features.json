@@ -6167,6 +6167,156 @@
       "updated_at_ms": 1786874485287
     },
     {
+      "id": "win-web-ai-production-session-diagnostics-v1",
+      "title": "Win 网页 AI 生产会话结构诊断 V1",
+      "summary": "让 Win Codex 控制区分测试子窗口与生产首页后台官方会话，并以双重白名单清洗公开上下文、目录、缓存和流式结构状态。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-production-session-diagnostics-v1.md",
+        "content_hash": "d12d17d60bf4bf04ab918ed639653ad67263a3a198b6b64997383715917883a1",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+          "head_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
+          "worktree_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "windows-web-ai",
+      "tags": [],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+        "docs/requirements/win-web-ai-production-session-diagnostics-v1.md",
+        "docs/win-codex-control.md",
+        "server/src/node_agent_win_codex_control.rs",
+        "server/src/node_agent_win_codex_control/ai_session_diagnostic.rs",
+        "server/src/node_agent_win_codex_control_tests.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "生产会话诊断公开适配器、上下文、目录、缓存和流式结构状态。",
+        "目录公开官网观察数、合并可用数、项目/置顶数与完整性。",
+        "本机会话缓存只公开数量和当前会话存在性。",
+        "节点对白名单枚举、动作、错误码和计数二次清洗。",
+        "恶意回执夹带正文、URL、owner、Cookie、token 或异常详情时全部丢弃。",
+        "Rust、合同、生产构建、安装身份和 /pc/ai 只读验收通过；真实消息另经授权。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
+          "content_hash": "a9924828b57855f1fb7e010e020445a7085e7ed10af954d0a9ace9fb13819d1f",
+          "locator": "diagnostic_for_provider",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "7c068edf5b8462be80d106a878f79d7592cb6c30",
+            "worktree_blob_oid": "7c068edf5b8462be80d106a878f79d7592cb6c30",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+          "content_hash": "85ff874e0140558cdf5ff6f3e1e8cb99d6e67abb0ad5c3d18b0904f7107380e6",
+          "locator": "provider_diagnostic_exposes_readiness_without_identity_or_page_content",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "6fbae01f0221ac4fb0554bea19aa3aa9f1502188",
+            "worktree_blob_oid": "6fbae01f0221ac4fb0554bea19aa3aa9f1502188",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/win-web-ai-production-session-diagnostics-v1.md",
+          "content_hash": "d12d17d60bf4bf04ab918ed639653ad67263a3a198b6b64997383715917883a1",
+          "locator": "交付矩阵",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
+            "worktree_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/win-codex-control.md",
+          "content_hash": "c68bb3cc40c0bb3fa2c4d5865d7b653d5d08b50a813ab2f405e47c7bdce123e7",
+          "locator": "official_session",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "1bbd73abf0234624dd219ebe38bc686e0181158f",
+            "worktree_blob_oid": "1bbd73abf0234624dd219ebe38bc686e0181158f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/validate-win-web-ai.ps1",
+          "content_hash": "1abb50cacc614c156d028c8ea18771d7dc6cd429268622831bcc0d35a22caf41",
+          "locator": "WIN_WEB_AI_VALIDATION",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "8cea88da3505dc632d748c5ced0630679fefec11",
+            "worktree_blob_oid": "8cea88da3505dc632d748c5ced0630679fefec11",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control.rs",
+          "content_hash": "498b0fca631960f36b4fd935259b973bab97fa35157e881eeab6aeb9a0f06b8c",
+          "locator": "sanitize_ai_window",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "b75305988dc0e60830f538af7adb253687de25a5",
+            "worktree_blob_oid": "b75305988dc0e60830f538af7adb253687de25a5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control/ai_session_diagnostic.rs",
+          "content_hash": "6517b399f7da003a0030c8de689b8947a82f8348d0476d4daf8c76985c204c2b",
+          "locator": "sanitize",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "2b7ca0daa69ca854df48cb2fb417b21993243d67",
+            "worktree_blob_oid": "2b7ca0daa69ca854df48cb2fb417b21993243d67",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control_tests.rs",
+          "content_hash": "58dfc6a17427f96f57e53550857887ac2cfeba577269540bf95077eae73d55b7",
+          "locator": "list_ai_windows",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_blob_oid": "058f0c9af8d7c7c064ff72603ea61d0e71eb15f8",
+            "worktree_blob_oid": "058f0c9af8d7c7c064ff72603ea61d0e71eb15f8",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786875988368,
+      "updated_at_ms": 1786876016089
+    },
+    {
       "id": "win-web-ai-snapshot-cache-v1",
       "title": "Win 网页 AI 快照缓存 V1",
       "summary": "ChatGPT 与 Google AI 厂商切换、PC 页面刷新或客户端重启时，按一龙账号和厂商隔离地即时回显最近语义快照，再后台重验证官方页面；缓存不解锁实时动作。",
@@ -6373,66 +6523,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_d22c98aa5bfa4fd3bf1a77c48c2e5b4a",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "依赖为空，任务路径和验收标准完整，进入可认领状态。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786727445899
-    },
-    {
-      "id": "feature_event_6e043eaa1d7f403c8438dc3da0155b05",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "claimed",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786727455306
-    },
-    {
-      "id": "feature_event_2cf1e15507604fca898a5dd4878566a7",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "重新绑定后的同范围实现和验收证据已就绪，继续完成状态收口。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786727464750
-    },
-    {
-      "id": "feature_event_15e9d0cc002a4df099334a090a98b3f3",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786727491595
-    },
-    {
-      "id": "feature_event_5fd6dcf7789a42b08b3e59a7f7b8da23",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "共享 session core、V261 组合 launcher、受限 seccomp 形状、测试 capsule 和权威文档均已实现并绑定当前证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786727502719
-    },
-    {
-      "id": "feature_event_1bbeb2741a1149d6897397b3114fc0e4",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "当前 test 证据已绑定；Windows source-contract、Linux-musl 链接和 WSL2 12 项 kernel fixture 均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786727513483
-    },
     {
       "id": "feature_event_f26276a9469f4bc3ae6bb6458594f04e",
       "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
@@ -8372,6 +8462,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786875687630
+    },
+    {
+      "id": "feature_event_fc9444381c6a4fb2b6a66882906928fc",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "registered",
+      "actor": "codex-win-web-ai",
+      "reason": "Re-register verified feature metadata after preserving concurrent upstream registry changes during rebase.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786875988368
+    },
+    {
+      "id": "feature_event_d9eb78cb9ea044258b608bbf2ccf52a8",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "claimed",
+      "actor": "codex-win-web-ai",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786876013546
+    },
+    {
+      "id": "feature_event_63d229348fdd424889f9e333e6e59323",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Rebased implementation is ready for evidence binding.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786876013774
+    },
+    {
+      "id": "feature_event_3f236cf4c0f2473eb294ce2817e1c892",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-win-web-ai",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786876015813
+    },
+    {
+      "id": "feature_event_26398da591bf45dfa42cdba1d020dffb",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Production-session structural projection and double sanitizer are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786876015935
+    },
+    {
+      "id": "feature_event_01cf7e313cba4241badb7eed75b3265f",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Focused Rust and full Win Web AI validation passed before rebase; implementation hashes are unchanged after rebase.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786876016089
     }
   ]
 }
