@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Settings, ShieldCheck } from 'lucide-react'
+import { HardDrive, Settings, ShieldCheck } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from './launchWinClient'
@@ -14,6 +14,7 @@ import NodeMarketPanel from './NodeMarketPanel'
 import NodeShareStatus, { publicDevHandshakeText } from './NodeShareStatus'
 import NodeComputeSharingCard from './NodeComputeSharingCard'
 import NodeCacheHealthCard from './NodeCacheHealthCard'
+import NodeCacheFleetOverview from './NodeCacheFleetOverview'
 import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
@@ -30,6 +31,7 @@ import styles from './NodePage.module.css'
 
 const MARKET_VIEW = '__node_market__'
 const VAULT_VIEW = '__codex_vault__'
+const CACHE_FLEET_VIEW = '__cache_fleet__'
 type LocalNodePanelView = 'overview' | 'codex-vault'
 
 export default function NodePage() {
@@ -75,6 +77,13 @@ export default function NodePage() {
           <span className={styles.sideIcon}>◇</span><span className={styles.sideMeta}><strong>节点市场</strong><small>发现、使用和结算</small></span>
         </button>
         <div className={styles.sideSection}>我的节点</div>
+        <button
+          className={[styles.sideBtn, selectedNodeId === CACHE_FLEET_VIEW ? styles.sideActive : ''].join(' ')}
+          onClick={() => setSelectedNodeId(CACHE_FLEET_VIEW)}
+        >
+          <span className={styles.sideIcon} aria-hidden="true"><HardDrive size={16} strokeWidth={2.2} /></span>
+          <span className={styles.sideMeta}><strong>缓存总览</strong><small>多电脑缓存状态</small></span>
+        </button>
         {nodes.length === 0 && <p className={styles.sideEmpty}>暂无节点</p>}
         {nodes.map((n) => {
           const id = nodeId(n)
@@ -105,6 +114,8 @@ export default function NodePage() {
           ? <NodeMarketPanel myNodes={nodes} onOpenMyNode={setSelectedNodeId} />
           : selectedNodeId === VAULT_VIEW
           ? <LocalNodePanel adminUrl={adminUrl} view="codex-vault" />
+          : selectedNodeId === CACHE_FLEET_VIEW
+          ? <NodeCacheFleetOverview nodes={nodes} onOpenNode={setSelectedNodeId} />
           : !selectedNodeId
           ? <LocalNodePanel adminUrl={adminUrl} view="overview" />
           : selected

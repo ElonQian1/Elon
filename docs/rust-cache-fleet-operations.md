@@ -21,6 +21,8 @@ implementation_refs:
   - file:server/src/node_agent_rust_cache_fleet/storage.rs
   - file:server/src/store/rust_cache_fleet_reports.rs
   - file:pc-frontend/src/features/node/NodeCacheHealthCard.tsx
+  - file:pc-frontend/src/features/node/NodeCacheFleetOverview.tsx
+  - file:pc-frontend/src/features/node/nodeCacheFleet.ts
   - file:.agents/skills/manage-shared-build-cache/SKILL.md
   - file:scripts/test-rust-cache-portability.ps1
 ---
@@ -90,7 +92,7 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
 - 磁盘总量、剩余量及是否建议审查 GC；
 - 按 scope/domain 聚合的数量和可选字节数。
 
-报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出、节点自动上传、服务端有界存储，以及 PC 节点详情中的所有者只读健康卡片；跨节点汇总看板和远程审批队列仍是后续集成，不能宣称已经上线。
+报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出、节点自动上传、服务端有界存储、PC 节点详情健康卡片和本人多节点只读总览；远程审批队列仍是后续集成，不能宣称已经上线。
 
 网络不稳定或需要节点服务稍后上传时，使用 outbox 信封：
 
@@ -114,6 +116,8 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
 PC 节点获得有效凭证后会周期性扫描既有 outbox，每轮最多处理 4 个信封。上传目标只允许 HTTPS 或本机回环 HTTP；只有服务端 ACK 的节点 ID、信封 ID 和报告哈希全部匹配时，节点才先写入不可变 `receipts\<envelope-id>.ack.json`，再把原信封原子移动至 `accepted`。网络或服务端失败只写 `attempts` 状态并保留原信封，后续继续重试。节点不会自动生成报告，也不会因为 ACK 执行 GC、legacy purge、迁移或任意命令；需要上报时仍由受控任务调用 `fleet-stage`。
 
 PC 工作台的“我的节点”详情会读取所有者接口，区分尚未上报、读取失败、健康、报告陈旧、建议检查和报告异常。页面只展示受管字节数、磁盘余量、分区、活动写入者及脱敏检查数量；它再次校验响应 schema、节点 ID 和 `destructive_actions_authorized=false`，不提供远程 GC、删除或清理按钮。
+
+“缓存总览”以最多 4 个并发请求读取当前账号名下的全部节点，单台节点的 404 或读取失败不会阻断其他节点。总览复用单节点响应校验和 24 小时陈旧规则，按读取失败、异常、需关注、未上报、健康的顺序展示，并可进入对应节点详情。它不新增聚合数据库、跨所有者查询或写操作；节点数增长到需要服务端分页聚合时，应新增版本化只读端点，而不能放宽现有节点归属校验。
 
 ## GC 业务流
 
