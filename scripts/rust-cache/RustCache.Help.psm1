@@ -10,6 +10,7 @@ function Get-RustCacheCommandHelp {
         [pscustomobject]@{ name = "gc-plan"; purpose = "Create an immutable local GC plan and sanitized approval summary." }
         [pscustomobject]@{ name = "gc-apply-approved"; purpose = "Re-scan and apply only an exact digest-bound approved GC plan." }
         [pscustomobject]@{ name = "install"; purpose = "Install or upgrade the per-PC platform and launcher." }
+        [pscustomobject]@{ name = "adopt-project"; purpose = "Preview or write a portable child-project manifest and thin launcher." }
         [pscustomobject]@{ name = "init-project"; purpose = "Preview or write the portable project manifest." }
         [pscustomobject]@{ name = "register-legacy"; purpose = "Register an external cache without deleting it." }
         [pscustomobject]@{ name = "purge-legacy"; purpose = "Preview or apply deletion of one retired registered cache." }
@@ -22,6 +23,7 @@ function Get-RustCacheCommandHelp {
             "rust-cache.ps1 doctor -ProjectRoot D:\work\project"
             "rust-cache.ps1 fleet-report -ProjectRoot D:\work\project -NodeId <platform-node-id> -IncludeSizes"
             "rust-cache.ps1 fleet-stage -ProjectRoot D:\work\project -NodeId <platform-node-id> -IncludeSizes"
+            "rust-cache.ps1 adopt-project -ProjectRoot D:\work\project -ProjectId stable-project-id"
             "rust-cache.ps1 init-project -ProjectRoot D:\work\project -ProjectId stable-project-id"
             "rust-cache.ps1 gc -ProjectRoot D:\work\project -IncludeSizes"
             "rust-cache.ps1 gc-plan -RequestId <32-hex-id> -NodeId <platform-node-id>"

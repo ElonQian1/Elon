@@ -12,11 +12,11 @@
     & .\scripts\rust-cache.ps1 doctor -ProjectRoot .
 
 .EXAMPLE
-    & .\scripts\rust-cache.ps1 init-project -ProjectRoot D:\work\sample -ProjectId sample
+    & .\scripts\rust-cache.ps1 adopt-project -ProjectRoot D:\work\sample -ProjectId sample
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "fleet-stage", "run", "gc", "gc-plan", "gc-apply-approved", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
+    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "fleet-stage", "run", "gc", "gc-plan", "gc-apply-approved", "install", "adopt-project", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
     [string]$ProjectRoot,
     [string]$Domain,
     [string]$TargetDir,
@@ -66,6 +66,7 @@ Import-Module "$modulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.ProjectAdoption.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Help.psm1" -Force -DisableNameChecking
@@ -203,6 +204,16 @@ switch ($Command) {
         if (-not $Apply) {
             Write-Host "Cargo parent config was not changed. Re-run install with -Apply to activate it." -ForegroundColor Yellow
         }
+        $result
+    }
+    "adopt-project" {
+        if ([string]::IsNullOrWhiteSpace($ProjectId)) {
+            throw "adopt-project requires -ProjectId."
+        }
+        $result = New-RustCacheProjectAdoption -ProjectRoot $ProjectRoot -ProjectId $ProjectId -DefaultDomain $DefaultDomain -AllowedDomains $AllowedDomain -UnknownDomainFallback $UnknownDomainFallback -SharedPartitionDomains $SharedPartitionDomain -Apply:$Apply
+        Write-Host "Project cache adoption: $($result.mode)" -ForegroundColor $(if ($Apply) { "Green" } else { "Yellow" })
+        $result.files | Format-Table action, relative_path -AutoSize
+        $result.next_steps | ForEach-Object { Write-Host "Next: $_" }
         $result
     }
     "init-project" {

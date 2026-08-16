@@ -4946,7 +4946,7 @@
       "id": "rust-cache-project-adoption-v1",
       "title": "Rust 缓存子项目一键接入 V1",
       "summary": "为 Rust 子项目生成可提交的缓存项目清单和跨 PC 薄启动器，使所有 AI 代理复用已安装平台而不复制缓存逻辑。",
-      "status": "proposed",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/rust-cache-project-adoption-v1.md",
@@ -4987,9 +4987,101 @@
         "便携性回归覆盖接入完整流程。",
         "Skill 以新命令作为首选子项目接入流程。"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": ".agents/skills/manage-shared-build-cache/SKILL.md",
+          "content_hash": "0144a761e6e448a862b1577325d665ead7e1ce26e22ecd6ddf369d1a959ab239",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "afa8197e66aa38d678250da16cf3cbf7674e09f4",
+            "worktree_blob_oid": "4030d00922769c6d42eaabf6bc0b12ebefa10589",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/rust-cache-project-adoption-v1.md",
+          "content_hash": "39fc0b33ff8d8d0c2620b9c79de2e8991dd67b14b9ed746746c0be5870c58300",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "43a4ad01e3e2cd96b596c3ff6537604a9896b164",
+            "worktree_blob_oid": "43a4ad01e3e2cd96b596c3ff6537604a9896b164",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/rust-cache-on-demand-adoption.md",
+          "content_hash": "f41bfbbc13ef2db8dd44c622054e9d8c9af791068de9a87bc379c902468de7f0",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "42750eef07796dc2827e5be2dfefa039a0f8c863",
+            "worktree_blob_oid": "bfd6b31a2e8a80d8a71d6b6af945e9b658dbcb8b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache.ps1",
+          "content_hash": "570c71334ef2a90fbca37c6ae7be20eff598815fd1b19305eece5fc2e242cbd1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "f665aa304923096ef3bf784cb425ea282d7e548c",
+            "worktree_blob_oid": "fd7ff866f94ddcfbb8e3f4456cc0ba0269fd47d7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Help.psm1",
+          "content_hash": "72af9bb7929746b3d79eaafde81deddbb92296452f842ca2d969bf5d65275cef",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "2d09ee3a2aaea2d9b591e739756f4a88ce4a7c05",
+            "worktree_blob_oid": "15b127a6c3dc8bf52f7024fc8b179663837e7265",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.ProjectAdoption.psm1",
+          "content_hash": "9807bb9332b7f5b880bb0d435da565432d9adfdeb7ebc18877b635a0d1b73441",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d9be0771a9efe8ff9829112ea659beb7b7645fe0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-portability.ps1",
+          "content_hash": "7da639537f29671af9535a9d62581fd2457eeb565a3b128928d6bd98c2d871c9",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64dcbdf64fdf0ac4f9228882978bc3f391420b75",
+            "head_blob_oid": "f456123ea736007f8e98d3a5de24863385ecd931",
+            "worktree_blob_oid": "6d0b86b6124eb8c684e717328a73eaa9cc50ab69",
+            "state": "tracked_modified"
+          }
+        }
+      ],
       "created_at_ms": 1786875253989,
-      "updated_at_ms": 1786875253989
+      "updated_at_ms": 1786875687630
     },
     {
       "id": "rust-cache-recovery-exclusive-filter-v2-1",
@@ -6281,76 +6373,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_cad466781753471db2d758f73b23b001",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "V261 authority and current implementation status both define exec-post-authenticated runtime as the next hard gate.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786713126558
-    },
-    {
-      "id": "feature_event_bdd97dad775d4f10a2c53c7d11d35d14",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "Requirement scope, non-goals, Linux evidence ladder, and external-system boundaries are explicit.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786713143198
-    },
-    {
-      "id": "feature_event_20a0623d11454681a98fc6244acee68f",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "claimed",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786713158670
-    },
-    {
-      "id": "feature_event_0a3fb123b7494ee5a61e8a55392e9f2b",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "Implementation begins in the isolated preflight worktree.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786713173524
-    },
-    {
-      "id": "feature_event_674744bff729454b975ac36aa2f67fe9",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "claim_released",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "需求正文补写验收结果导致当前哈希漂移；先按状态机释放认领，再显式重绑并重新认领。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786727414548
-    },
-    {
-      "id": "feature_event_f6646dc27aeb4c87b4534ae1943d8408",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "范围不变；显式绑定补写验收结果后的当前需求哈希。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786727424381
-    },
-    {
-      "id": "feature_event_3526b2efabca4c9f932c465daed1a89b",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "需求目标、非目标和验收标准未改变；补充的实现结果与现有证据一致，接受当前版本。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786727434306
-    },
     {
       "id": "feature_event_d22c98aa5bfa4fd3bf1a77c48c2e5b4a",
       "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
@@ -8280,6 +8302,76 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1786875253989
+    },
+    {
+      "id": "feature_event_b5611771ecf1445280639a7d2be229ea",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "需求已作为当前正式文档提交并确认实现范围。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786875286357
+    },
+    {
+      "id": "feature_event_6164efe1b79042f4b66038e89133efb6",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "需求已作为当前正式文档提交并确认实现范围。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786875286399
+    },
+    {
+      "id": "feature_event_f2c6c2659ab3499588f0f99b98d6f4c0",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786875286430
+    },
+    {
+      "id": "feature_event_c5b6425bde8d4504aca91249919f0e3c",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始实现项目接入命令、薄启动器、Skill 与回归。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786875286493
+    },
+    {
+      "id": "feature_event_b145966434d84cbbb8e9d075084886da",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786875687567
+    },
+    {
+      "id": "feature_event_3e928d2da0e64c52bd6c6f4f36feb637",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "便携性 90 项、平台 173 项、Skill 校验和 Prompt 资产审计均通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786875687603
+    },
+    {
+      "id": "feature_event_caf401db1eba421ba30f8d766bcda663",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "便携性 90 项、平台 173 项、Skill 校验和 Prompt 资产审计均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786875687630
     }
   ]
 }

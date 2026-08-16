@@ -1,7 +1,7 @@
 ---
 title: "跨项目 Rust 缓存按需共享与渐进接入"
 owner: platform
-reviewed_at: 2026-08-10
+reviewed_at: 2026-08-16
 review_interval_days: 60
 role: runbook
 lifecycle: active
@@ -10,6 +10,7 @@ default_retrieval: false
 version_status: current
 implementation_refs:
   - file:scripts/rust-cache.ps1
+  - file:scripts/rust-cache/RustCache.ProjectAdoption.psm1
   - file:scripts/rust-cache/RustCache.Scope.psm1
   - file:scripts/rust-cache/RustCache.Runtime.psm1
   - file:scripts/rust-cache/RustCache.Inventory.psm1
@@ -18,7 +19,7 @@ implementation_refs:
 
 # 跨项目 Rust 缓存按需共享与渐进接入
 
-最后更新：2026-08-10
+最后更新：2026-08-16
 版本：v1（当前）
 
 本文只在新增 Rust 项目、创建大量 worktree、发现重复编译目录、调整缓存作用域或执行缓存迁移时按需读取。它是所有本机项目的共享接入合同；各项目只记录自己的启用状态和入口，不复制本文。
@@ -77,11 +78,20 @@ implementation_refs:
 8. 会被多个入口调用的稳定分区必须登记到 `shared_partition_domains`，由平台把分区
    名称绑定到唯一 allowlist domain；不能只靠包装器约定 domain。
 
-推荐用统一入口完成项目登记，而不是手写 JSON：先运行 `rust-cache.ps1 init-project` 预览，
-确认项目 ID、允许域和命名共享分区后再追加 `-Apply`。接入前后均运行 `doctor`；
-若它报告安装指纹漂移，先从当前权威仓库重新 `install`，不要让各项目复制缓存实现。
-没有平台源码的子项目使用 `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1`；该固定启动器由安装器
-维护并由 `doctor` 校验，项目不得提交指向某台电脑缓存根的替代脚本。
+推荐用统一入口完成子项目接入，而不是手写 JSON 或复制平台模块：
+
+```powershell
+& "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" adopt-project `
+  -ProjectRoot D:\work\sample -ProjectId sample `
+  -AllowedDomain dev-windows-msvc,agent-validation
+# 审查 rust-cache.project.json 与 scripts/rust-cache.ps1 后，再追加 -Apply。
+```
+
+`adopt-project` 默认只预演；应用后生成可提交的项目清单和薄启动器。薄启动器不保存本机
+路径，只在当前 PowerShell 会话中转发到该电脑的用户级启动器，并固定自身仓库根。
+已有文件内容不同会失败关闭。仓库已经拥有自己的缓存入口或只需要清单时，继续使用
+低层 `init-project`。接入前后均运行 `doctor`；若它报告安装指纹漂移，先从当前权威仓库
+重新 `install`，不要让各项目复制缓存实现。
 
 默认入口保持 workspace 隔离：
 

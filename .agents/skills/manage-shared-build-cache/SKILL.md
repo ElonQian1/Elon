@@ -29,14 +29,16 @@ Treat exit code `2` as an actionable health report, not as an unknown tool crash
 
 ## Adopt A Project
 
-Keep machine paths out of Git. Preview the portable manifest first:
+Keep machine paths out of Git. For a child repository, preview the complete portable adoption first:
 
 ```powershell
-& <entry> init-project -ProjectRoot <root> -ProjectId <stable-slug> `
+& <entry> adopt-project -ProjectRoot <root> -ProjectId <stable-slug> `
   -AllowedDomain dev-windows-msvc,agent-validation
 ```
 
-Review the JSON, then repeat with `-Apply`. Commit `rust-cache.project.json` with the project so every PC uses the same project identity and domain policy. Add named shared partitions only for stable, reviewed workflows.
+Review both planned files, then repeat with `-Apply`. Commit `rust-cache.project.json` and `scripts/rust-cache.ps1`. The wrapper contains no machine path; it binds its own repository root and calls the per-PC installed launcher in the current PowerShell session. If either file already exists with different content, stop and review it. Do not overwrite it.
+
+Use `init-project` only when the repository already owns a cache entry script or intentionally needs the manifest without the standard thin wrapper. Add named shared partitions only for stable, reviewed workflows.
 
 ## Install Or Upgrade A PC
 
@@ -55,6 +57,7 @@ The installer serializes upgrades on each PC. Wait for the current installer ins
 
 - Install or upgrade the platform and Skill independently on every PC from the same trusted Git revision.
 - Commit only `rust-cache.project.json` and thin project wrappers. Do not commit cache roots, launcher targets, user profiles, or node data paths.
+- After cloning an adopted child project, run `& .\scripts\rust-cache.ps1 doctor` before its first long build. A missing per-PC launcher is an installation problem, not a reason to copy platform modules into the child project.
 - Let Git distribute project identity and domain policy; let each PC choose its own physical cache volume.
 - Run `doctor` on each PC before accepting a long build. A healthy PC must report matching canonical source identity, exact installed-byte integrity, Codex Skill integrity, and a healthy user launcher.
 - Central dashboards may collect read-only doctor/status reports. GC `-Apply`, Cargo parent-config activation, legacy purge, and cache migration remain machine-local reviewed operations.

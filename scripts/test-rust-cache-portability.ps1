@@ -7,12 +7,15 @@ Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.ProjectAdoption.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Help.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to the owner. Re-import public test surfaces last.
 Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.ProjectAdoption.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
@@ -110,8 +113,53 @@ try {
     Assert-True (@($launcherHelp.commands.name) -contains "fleet-stage") "portable launcher help should advertise fleet staging"
     Assert-True (@($launcherHelp.commands.name) -contains "gc-plan") "portable launcher help should advertise immutable GC plans"
     Assert-True (@($launcherHelp.commands.name) -contains "gc-apply-approved") "portable launcher help should advertise digest-bound approved GC"
+    Assert-True (@($launcherHelp.commands.name) -contains "adopt-project") "portable launcher help should advertise child-project adoption"
     $launcherResult = & $userLauncher.path init-project -ProjectRoot $projectRoot -ProjectId "portable-test" -AllowedDomain @("dev-windows-msvc", "agent-validation") -SharedPartitionDomain @("validation-light=agent-validation") -Apply
     Assert-Equal "unchanged" $launcherResult.action "portable launcher should invoke the installed platform"
+
+    $adoptionRoot = Join-Path $tempRoot "adopted-child"
+    New-Item -ItemType Directory -Force -Path $adoptionRoot | Out-Null
+    $adoptionPreview = New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("dev-windows-msvc", "agent-validation")
+    Assert-Equal "preview" $adoptionPreview.mode "child-project adoption should preview by default"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $adoptionRoot "rust-cache.project.json"))) "adoption preview must not create a manifest"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $adoptionRoot "scripts\rust-cache.ps1"))) "adoption preview must not create a wrapper"
+    Assert-True (@($adoptionPreview.files.action | Where-Object { $_ -eq "would-create" }).Count -eq 2) "adoption preview should plan both portable files"
+
+    $adoption = New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("dev-windows-msvc", "agent-validation") -Apply
+    Assert-Equal "apply" $adoption.mode "child-project adoption apply mode"
+    $projectWrapper = Join-Path $adoptionRoot "scripts\rust-cache.ps1"
+    Assert-True (Test-Path -LiteralPath $projectWrapper -PathType Leaf) "child-project adoption should create the thin wrapper"
+    Assert-Equal "portable-child" (Get-RustCacheProjectManifest -ProjectRoot $adoptionRoot).project_id "child-project adoption manifest"
+    $projectWrapperContent = Get-Content -Raw -LiteralPath $projectWrapper -Encoding UTF8
+    Assert-True ($projectWrapperContent -notmatch [regex]::Escape($tempRoot)) "project wrapper must not contain the generating PC path"
+    Assert-True ($projectWrapperContent -notmatch 'Start-Process|powershell\.exe|pwsh\.exe') "project wrapper must not open a nested visible shell"
+
+    $projectAdoptionAgain = New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("agent-validation", "dev-windows-msvc") -Apply
+    Assert-True (@($projectAdoptionAgain.files.action | Where-Object { $_ -eq "unchanged" }).Count -eq 2) "child-project adoption must be idempotent"
+
+    $fakeLocalAppData = Join-Path $tempRoot "local-app-data"
+    $projectLauncherPath = Join-Path $fakeLocalAppData "Elon\bin\rust-cache.ps1"
+    New-Item -ItemType Directory -Force -Path (Split-Path $projectLauncherPath -Parent) | Out-Null
+    Copy-Item -LiteralPath $userLauncher.path -Destination $projectLauncherPath
+    $oldLocalAppData = $env:LOCALAPPDATA
+    try {
+        $env:LOCALAPPDATA = $fakeLocalAppData
+        $forwarded = & $projectWrapper init-project -ProjectId "portable-child" -AllowedDomain @("dev-windows-msvc", "agent-validation") -Apply | Select-Object -Last 1
+        Assert-Equal "unchanged" $forwarded.action "project wrapper should bind and forward its own project root"
+        $overrideRejected = $false
+        try { & $projectWrapper status -ProjectRoot $projectRoot | Out-Null } catch { $overrideRejected = $_.Exception.Message -match "owns -ProjectRoot" }
+        Assert-True $overrideRejected "project wrapper must reject a caller-supplied project root"
+    } finally {
+        $env:LOCALAPPDATA = $oldLocalAppData
+    }
+
+    Set-Content -LiteralPath $projectWrapper -Value "# user-owned wrapper" -Encoding UTF8
+    $wrapperConflictRejected = $false
+    try {
+        New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("dev-windows-msvc", "agent-validation") -Apply | Out-Null
+    } catch { $wrapperConflictRejected = $_.Exception.Message -match "different content" }
+    Assert-True $wrapperConflictRejected "child-project adoption must not overwrite an existing different wrapper"
+    Assert-True ((Get-Content -Raw -LiteralPath $projectWrapper) -match "user-owned wrapper") "conflicting project wrapper must be preserved"
 
     $includePath = Join-Path $cacheRoot "config\cargo-cache.toml"
     New-Item -ItemType Directory -Force -Path (Split-Path $includePath -Parent) | Out-Null
