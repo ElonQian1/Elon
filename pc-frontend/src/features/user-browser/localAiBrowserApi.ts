@@ -45,25 +45,6 @@ export interface LocalAiWebSession {
   rendererStatus: 'reserved' | 'active'
 }
 
-export interface LocalAiNativeChatWindow {
-  providerId: string
-  windowLabel: string
-  status: 'created' | 'focused'
-}
-
-export interface LocalAiNativeWindowState {
-  providerId: string
-  windowLabel: string
-  phase: 'creating' | 'loading' | 'loaded' | 'ready' | 'error' | 'closed'
-  focused: boolean
-  pageReady: boolean
-  rootExists: boolean
-  rootChildCount: number
-  lastErrorCode?: 'root_empty' | 'page_runtime_error' | 'webview_navigation_error' | 'webview_create_failed' | string | null
-  retryable: boolean
-  updatedAtMs: number
-}
-
 export interface ClearedLocalAiWebSession {
   providerId: string
   status: 'cleared'
@@ -278,38 +259,6 @@ export async function openLocalAiWebSession(
     throw new Error('桌面壳返回了不受支持的本地会话协议。')
   }
   return session
-}
-
-export async function openLocalAiNativeChatWindow(
-  providerId: string,
-  ownerKey: string,
-): Promise<LocalAiNativeChatWindow> {
-  assertIdentity(providerId, ownerKey)
-  const window = await invokeDesktop<LocalAiNativeChatWindow>('open_local_ai_native_chat_window', {
-    providerId,
-    ownerKey,
-  }, LOCAL_AI_INVOKE_TIMEOUTS.window)
-  if (window.providerId !== providerId || !window.windowLabel.startsWith(`local-ai-native-${providerId}-`)) {
-    throw new Error('桌面壳返回了不受支持的一龙聊天窗口。')
-  }
-  return window
-}
-
-export async function getLocalAiNativeWindowState(
-  providerId: string,
-  ownerKey: string,
-): Promise<LocalAiNativeWindowState> {
-  assertIdentity(providerId, ownerKey)
-  const state = await invokeDesktop<LocalAiNativeWindowState>('get_local_ai_native_window_state', {
-    providerId,
-    ownerKey,
-  }, LOCAL_AI_INVOKE_TIMEOUTS.state, `native-state:${providerId}:${ownerKey}`)
-  if (state.providerId !== providerId
-    || !state.windowLabel.startsWith(`local-ai-native-${providerId}-`)
-    || !['creating', 'loading', 'loaded', 'ready', 'error', 'closed'].includes(state.phase)) {
-    throw new Error('桌面壳返回了无效的一龙聊天窗状态。')
-  }
-  return state
 }
 
 export async function clearLocalAiWebSession(

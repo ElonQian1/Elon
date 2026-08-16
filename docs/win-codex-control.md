@@ -24,9 +24,9 @@ implementation_status: tested
 3. `reload_page`：刷新主工作台。
 4. `open_devtools`、`close_devtools`：只由 Tauri 壳执行并写回回执；生产是否允许由壳能力明确报告。
 5. `capture_state`：读取当前路由、标题、可见/聚焦状态和版本等非秘密状态，不截图、不读输入框正文。
-6. `list_ai_windows`：列出 `chatgpt` 与 `google-ai-mode` 两个固定厂商的逻辑窗口状态；每项同时区分原生测试子窗口状态与生产首页后台 `official_session` 结构状态，不返回 Tauri label、owner 指纹、窗口句柄或 URL。
-7. `capture_ai_window_state`：按固定 `provider_id` 读取测试子窗口阶段、是否打开/聚焦、页面根节点健康，以及生产后台会话的适配器、上下文、缓存、目录和流式就绪度；只公开稳定错误码、固定枚举、布尔值与有界计数。
-8. `focus_ai_window`：按固定 `provider_id` 恢复、显示并聚焦已存在的一龙原生 AI 子窗口；找不到窗口时失败关闭，不隐式创建网页会话。
+6. `list_ai_windows`：列出 `chatgpt` 与 `google-ai-mode` 两个固定厂商的生产官方网页窗口状态；每项同时包含同一生产会话的 `official_session` 结构诊断，不返回 Tauri label、owner 指纹、窗口句柄或 URL。
+7. `capture_ai_window_state`：按固定 `provider_id` 读取生产官方窗口阶段、是否打开/聚焦、语义快照健康，以及适配器、上下文、缓存、目录和流式就绪度；只公开稳定错误码、固定枚举、布尔值与有界计数。
+8. `focus_ai_window`：按固定 `provider_id` 恢复、显示并聚焦已存在的生产官方网页窗口；找不到窗口时失败关闭，不隐式创建网页会话。
 9. `update_and_restart`：只接受 Codex MCP 提交的精确 `version+40–64 位 Git SHA` 发布身份。Tauri 仅在正式安装目录中启动外部更新守护器，先写回“已安排”回执，再主动退出桌面壳；守护器复用既有签名、健康检查、任务终态等待和回滚流程，确认更新锁释放后自动重开正式工作台。HTTP/PC UI、模糊版本、任意 URL、任意程序路径和任意进程号均被拒绝。
 
 动作由节点 loopback API 排队，Win 页面先原子领取为 `executing`，再调用 Tauri 白名单 command 并写回成功或失败回执。刷新等会中断页面的动作会延迟到回执发起后执行；领取后页面崩溃时动作只会过期，不会被新页面重复执行。Codex MCP 只调用同一领域服务，不直接操作进程、窗口句柄或 WebView2 profile。
@@ -37,9 +37,9 @@ implementation_status: tested
 schema 清洗并限制为 16 KiB；即使被篡改的 Tauri 页面提交 label、URL、Cookie 或 token，
 节点也不会把这些字段返回给 Codex。
 
-AI 窗口状态中的 `phase` 只描述供开发诊断使用的一龙原生测试子窗口，因此
-`phase=not_created` 不代表生产首页没有建立官方网页会话。生产 `/pc/ai` 实际使用的隐藏
-WebView2 会话由同一 provider 项下的 `official_session` 独立表达。该对象仅返回窗口与加载
+独立测试聊天窗已经退役。AI 窗口状态中的 `phase` 直接投影生产 `/pc/ai` 使用的官方
+WebView2 生命周期；`phase=not_created` 表示该厂商生产会话尚未创建，`closed` 表示曾有运行时
+记录但窗口当前已关闭。同一 provider 项下的 `official_session` 返回更完整的结构诊断，仅包含窗口与加载
 状态、适配器/语义快照/输入框/上下文就绪度、导航与目录完整度、缓存状态、消息/会话/项目/
 置顶有界计数、流式状态、稳定动作名和稳定错误码。Tauri 从运行时生成一次安全投影，节点再按
 固定白名单重建一次；消息正文、标题、草稿、引用、会话 ID、项目名、URL、host、owner、账号、
@@ -65,8 +65,8 @@ Tauri 原生桥还在后台把最近 64 条原生事件写入本机 `desktop-dia
 心跳挤出快照。每次桥事件（包括能力心跳和语义动作回执）都在写入内存环后自动调度同一份
 脱敏快照，不能只留在当前桌面进程内存中。节点读取时
 限制为 512 KiB、校验 schema 并最多返回 32 条；HTTP 响应和 MCP 不返回快照文件路径。
-因此即使子窗口页面尚未加载、无法把日志回传给 PC 前端，Codex 仍可从节点读取创建、
-导航、错误码、根节点健康、焦点和销毁状态。快照遵守同一正文与凭证禁采集边界。
+因此即使主工作台页面暂时无法回传日志，Codex 仍可从节点读取生产官方窗口的创建、
+导航、错误码、语义快照健康、焦点和销毁状态。快照遵守同一正文与凭证禁采集边界。
 
 ## 权限与失败关闭
 
@@ -75,7 +75,7 @@ Tauri 原生桥还在后台把最近 64 条原生事件写入本机 `desktop-dia
 - 页面领取动作后必须核对 `action_id`，重复回执幂等；过期动作不再执行。
 - 事件字段按 key 和内容双重脱敏；Cookie、token、password、secret、authorization、API key 一律替换。
 - AI 窗口控制只接受 `chatgpt`、`google-ai-mode` 两个逻辑 provider；不接受窗口 label、任意厂商字符串、任意 URL 或任意 JavaScript。
-- AI 窗口回执只公开逻辑 provider、测试子窗口阶段、生产 `official_session` 结构状态、焦点、页面健康、稳定错误码和更新时间；生产会话诊断只含布尔值、有界计数、固定枚举和稳定动作/错误码。窗口 label、owner 指纹、账号、会话身份、URL、页面正文、Cookie 与 token 均为明确的 `false` 采集能力。
+- AI 窗口回执只公开逻辑 provider、生产官方窗口阶段、`official_session` 结构状态、焦点、语义快照健康、稳定错误码和更新时间；诊断只含布尔值、有界计数、固定枚举和稳定动作/错误码。窗口 label、owner 指纹、账号、会话身份、URL、页面正文、Cookie 与 token 均为明确的 `false` 采集能力。
 - 更新重启动作只接受 `requested_by=codex_mcp` 与精确发布身份；能力投影明确报告 `arbitrary_update_target=false`、`update_restart_requires_exact_release=true`。调用方不能指定下载地址、脚本、安装目录、PID 或重开程序。
 - 没有 Tauri 宿主时，浏览器/PWA 控制台仍能读取日志，但 Tauri 动作返回明确 `host_unavailable`。
 - 此能力不恢复已暂停的跨项目自动派发、自动验收、自动续跑或后台自进化。

@@ -16,10 +16,6 @@ mod chatgpt_adapter_bootstrap;
 mod conversation_directory;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
-#[path = "local_ai_browser/native_window.rs"]
-mod native_window;
-#[path = "local_ai_browser/native_window_state.rs"]
-pub(crate) mod native_window_state;
 #[path = "local_ai_browser/owner_profile.rs"]
 mod owner_profile;
 #[path = "local_ai_browser/provider_adapter.rs"]
@@ -42,7 +38,6 @@ use tauri::{
     AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
-pub use native_window_state::{LocalAiNativeWindowRuntime, LocalAiNativeWindowState};
 use owner_profile::fingerprint as owner_fingerprint;
 use owner_profile::resolve as resolve_owner_fingerprint;
 use provider_adapter::ProviderAdapter;
@@ -54,7 +49,6 @@ const PROFILE_ROOT: &str = "ai-web-profiles";
 const SNAPSHOT_CACHE_FILE: &str = "yilong-semantic-snapshot.v1.dpapi";
 const MAIN_WEBVIEW_LABEL: &str = "main";
 const LOCAL_AI_WINDOW_PREFIX: &str = "local-ai-";
-const LOCAL_AI_NATIVE_WINDOW_PREFIX: &str = "local-ai-native-";
 
 #[derive(Clone, Copy)]
 struct ProviderDefinition {
@@ -139,33 +133,6 @@ pub struct LocalAiWebSession {
 pub struct ClearLocalAiWebSession {
     provider_id: &'static str,
     status: &'static str,
-}
-
-#[tauri::command]
-pub async fn open_local_ai_native_chat_window(
-    app: AppHandle,
-    webview: WebviewWindow,
-    runtime: State<'_, LocalAiNativeWindowRuntime>,
-    provider_id: String,
-    owner_key: String,
-) -> Result<native_window::LocalAiNativeChatWindow, String> {
-    native_window::open(
-        app,
-        webview,
-        runtime.inner().clone(),
-        provider_id,
-        owner_key,
-    )
-    .await
-}
-
-#[tauri::command]
-pub fn publish_local_ai_native_window_health(
-    webview: WebviewWindow,
-    runtime: State<'_, LocalAiNativeWindowRuntime>,
-    report: native_window::LocalAiNativeWindowHealth,
-) -> Result<(), String> {
-    native_window::publish_health(webview, runtime.inner().clone(), report)
 }
 
 #[tauri::command]
@@ -566,9 +533,7 @@ fn ensure_main_webview(webview: &WebviewWindow) -> Result<(), String> {
 }
 
 fn ensure_provider_list_webview(webview: &WebviewWindow) -> Result<(), String> {
-    if webview.label() == MAIN_WEBVIEW_LABEL
-        || webview.label().starts_with(LOCAL_AI_NATIVE_WINDOW_PREFIX)
-    {
+    if webview.label() == MAIN_WEBVIEW_LABEL {
         Ok(())
     } else {
         Err("AI 网页厂商列表只允许一龙 PC 窗口读取。".to_string())
@@ -577,11 +542,10 @@ fn ensure_provider_list_webview(webview: &WebviewWindow) -> Result<(), String> {
 
 fn ensure_session_webview(
     webview: &WebviewWindow,
-    provider: &ProviderDefinition,
-    fingerprint: &str,
+    _provider: &ProviderDefinition,
+    _fingerprint: &str,
 ) -> Result<(), String> {
-    let expected_native = native_window::native_window_label(provider, fingerprint);
-    if webview.label() == MAIN_WEBVIEW_LABEL || webview.label() == expected_native {
+    if webview.label() == MAIN_WEBVIEW_LABEL {
         Ok(())
     } else {
         Err("当前一龙窗口不能控制这个本地 AI 会话。".to_string())

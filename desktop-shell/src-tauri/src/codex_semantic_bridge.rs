@@ -16,7 +16,7 @@ mod ai_window_control;
 #[path = "codex_semantic_bridge/update_restart.rs"]
 mod update_restart;
 
-use crate::local_ai_browser::{LocalAiBrowserRuntime, LocalAiNativeWindowRuntime};
+use crate::local_ai_browser::LocalAiBrowserRuntime;
 
 const MAX_NATIVE_EVENTS: usize = 600;
 const MAX_PERSISTED_EVENTS: usize = 64;
@@ -230,17 +230,11 @@ pub(crate) fn codex_win_capabilities(
 pub(crate) fn codex_execute_semantic_action(
     window: WebviewWindow,
     bridge: State<'_, CodexSemanticBridge>,
-    ai_windows: State<'_, LocalAiNativeWindowRuntime>,
     ai_web_sessions: State<'_, LocalAiBrowserRuntime>,
     action: SemanticAction,
 ) -> Result<Value, String> {
     validate_action(&action)?;
-    let result = execute(
-        &window,
-        ai_windows.inner(),
-        ai_web_sessions.inner(),
-        &action,
-    );
+    let result = execute(&window, ai_web_sessions.inner(), &action);
     let captured_state = result.as_ref().ok().and_then(|result| result.state.clone());
     let (status, level) = match &result {
         Ok(_) => ("succeeded", "info"),
@@ -302,7 +296,6 @@ fn outcome(
 
 fn execute(
     window: &WebviewWindow,
-    ai_windows: &LocalAiNativeWindowRuntime,
     ai_web_sessions: &LocalAiBrowserRuntime,
     action: &SemanticAction,
 ) -> Result<SemanticActionResult, String> {
@@ -337,10 +330,9 @@ fn execute(
         "close_devtools" => devtools(window, false).and_then(|message| outcome(message, None)),
         "capture_state" => outcome("已捕获非秘密窗口状态", Some(window_state(window))),
         "list_ai_windows" => outcome(
-            "已列出一龙 AI 逻辑子窗口",
+            "已列出生产 AI 官方网页窗口",
             Some(ai_window_control::list(
                 window.app_handle(),
-                ai_windows,
                 ai_web_sessions,
             )),
         ),
@@ -348,10 +340,9 @@ fn execute(
             let provider_id =
                 ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
             outcome(
-                "已捕获一龙 AI 子窗口脱敏状态",
+                "已捕获生产 AI 官方网页窗口脱敏状态",
                 Some(ai_window_control::capture(
                     window.app_handle(),
-                    ai_windows,
                     ai_web_sessions,
                     provider_id,
                 )),
@@ -360,13 +351,9 @@ fn execute(
         "focus_ai_window" => {
             let provider_id =
                 ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
-            let state = ai_window_control::focus(
-                window.app_handle(),
-                ai_windows,
-                ai_web_sessions,
-                provider_id,
-            )?;
-            outcome("一龙 AI 子窗口已聚焦", Some(state))
+            let state =
+                ai_window_control::focus(window.app_handle(), ai_web_sessions, provider_id)?;
+            outcome("生产 AI 官方网页窗口已聚焦", Some(state))
         }
         "update_and_restart" => update_restart::schedule(
             window,
@@ -405,13 +392,9 @@ fn window_state(window: &WebviewWindow) -> Value {
 fn semantic_window_role(label: &str) -> &'static str {
     if label == "main" {
         "main"
-    } else if label.starts_with("local-ai-native-chatgpt-") {
-        "ai:chatgpt"
-    } else if label.starts_with("local-ai-native-google-ai-mode-") {
-        "ai:google-ai-mode"
-    } else if label.starts_with("local-ai-web-chatgpt-") {
+    } else if label.starts_with("local-ai-chatgpt-") {
         "official:chatgpt"
-    } else if label.starts_with("local-ai-web-google-ai-mode-") {
+    } else if label.starts_with("local-ai-google-ai-mode-") {
         "official:google-ai-mode"
     } else {
         "other"
@@ -484,7 +467,7 @@ fn validate_action(action: &SemanticAction) -> Result<(), String> {
         .as_deref()
         .is_some_and(|provider_id| !provider_id.trim().is_empty())
     {
-        return Err("只有 AI 子窗口定向动作允许 provider_id".to_string());
+        return Err("只有 AI 官方窗口定向动作允许 provider_id".to_string());
     }
     if action.kind == "update_and_restart" {
         if action.requested_by != "codex_mcp" {

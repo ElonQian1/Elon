@@ -56,7 +56,8 @@ expect(pwaController.includes("open.textContent = '登录或继续使用 ChatGPT
 expect(pcAccount.includes('<ChatGptAccountCard />'), 'PC account settings must render the ChatGPT entry card');
 expect(pcCard.includes('Cookie 和网页登录数据只保存在这台电脑'), 'PC card must explain local-only session storage');
 expect(pcCard.includes('to="/user-browser"'), 'PC account card must link to the ChatGPT workspace');
-expect(pcBrowser.includes('（访客可用）和聊天窗'), 'Win workspace must expose a guest-first ChatGPT action');
+expect(pcBrowser.includes('打开 ${provider.displayName}（访客可用）'), 'Win workspace must expose a guest-first official-page action');
+expect(!pcBrowser.includes('单独打开一龙聊天窗'), 'Win workspace must not restore the retired standalone chat action');
 expect(pcAccount.includes('<OpenAiChatKitCard />'), 'PC account settings must render the ChatKit entry card');
 expect(pcChatKitCard.includes('不需要再次登录 ChatGPT'), 'PC card must distinguish ChatKit from ChatGPT account login');
 expect(pcChatKitPage.includes("'/api/openai-chatkit/session'"), 'PC ChatKit must use the authenticated session endpoint');

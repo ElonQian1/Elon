@@ -1,9 +1,7 @@
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
-use crate::local_ai_browser::{
-    LocalAiBrowserRuntime, LocalAiNativeWindowRuntime, LocalAiNativeWindowState,
-};
+use crate::local_ai_browser::LocalAiBrowserRuntime;
 
 const PROVIDERS: [&str; 2] = ["chatgpt", "google-ai-mode"];
 
@@ -11,21 +9,17 @@ pub(super) fn validate_provider_id(provider_id: Option<&str>) -> Result<&str, St
     let provider_id = provider_id
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| "AI 子窗口动作必须提供 provider_id。".to_string())?;
+        .ok_or_else(|| "AI 官方窗口动作必须提供 provider_id。".to_string())?;
     PROVIDERS
         .contains(&provider_id)
         .then_some(provider_id)
-        .ok_or_else(|| "provider_id 不在 AI 子窗口白名单。".to_string())
+        .ok_or_else(|| "provider_id 不在 AI 官方窗口白名单。".to_string())
 }
 
-pub(super) fn list(
-    app: &AppHandle,
-    runtime: &LocalAiNativeWindowRuntime,
-    web_runtime: &LocalAiBrowserRuntime,
-) -> Value {
+pub(super) fn list(app: &AppHandle, web_runtime: &LocalAiBrowserRuntime) -> Value {
     let windows = PROVIDERS
         .iter()
-        .map(|provider_id| state(app, runtime, web_runtime, provider_id))
+        .map(|provider_id| state(app, web_runtime, provider_id))
         .collect::<Vec<_>>();
     json!({
         "schema": "elon.tauri_ai_window_list.v1",
@@ -36,94 +30,113 @@ pub(super) fn list(
 
 pub(super) fn capture(
     app: &AppHandle,
-    runtime: &LocalAiNativeWindowRuntime,
     web_runtime: &LocalAiBrowserRuntime,
     provider_id: &str,
 ) -> Value {
     json!({
         "schema": "elon.tauri_ai_window_capture.v1",
-        "window": state(app, runtime, web_runtime, provider_id),
+        "window": state(app, web_runtime, provider_id),
         "privacy": privacy(),
     })
 }
 
 pub(super) fn focus(
     app: &AppHandle,
-    runtime: &LocalAiNativeWindowRuntime,
     web_runtime: &LocalAiBrowserRuntime,
     provider_id: &str,
 ) -> Result<Value, String> {
-    let snapshot = current_snapshot(app, runtime, provider_id)
-        .ok_or_else(|| "目标一龙 AI 子窗口尚未创建。".to_string())?;
-    let window = app
-        .get_webview_window(&snapshot.window_label)
-        .ok_or_else(|| "目标一龙 AI 子窗口当前已关闭。".to_string())?;
+    let window = official_window(app, provider_id)
+        .ok_or_else(|| "目标 AI 官方网页会话尚未创建或已经关闭。".to_string())?;
     window.show().map_err(display_error)?;
     if window.is_minimized().unwrap_or(false) {
         window.unminimize().map_err(display_error)?;
     }
     window.set_focus().map_err(display_error)?;
-    runtime.mark_focus(&snapshot.window_label, true);
-    Ok(capture(app, runtime, web_runtime, provider_id))
+    Ok(capture(app, web_runtime, provider_id))
 }
 
-fn state(
-    app: &AppHandle,
-    runtime: &LocalAiNativeWindowRuntime,
-    web_runtime: &LocalAiBrowserRuntime,
-    provider_id: &str,
-) -> Value {
+fn state(app: &AppHandle, web_runtime: &LocalAiBrowserRuntime, provider_id: &str) -> Value {
     let official_session = web_runtime.diagnostic_for_provider(provider_id);
-    let Some(snapshot) = current_snapshot(app, runtime, provider_id) else {
-        return json!({
-            "provider_id": provider_id,
-            "phase": "not_created",
-            "open": false,
-            "focused": false,
-            "page_ready": false,
-            "root_exists": false,
-            "root_child_count": 0,
-            "last_error_code": null,
-            "retryable": true,
-            "updated_at_ms": 0,
-            "official_session": official_session,
-        });
-    };
-    view(app, snapshot, official_session)
+    let window = official_window(app, provider_id);
+    view(provider_id, window.as_ref(), official_session)
 }
 
-fn current_snapshot(
-    app: &AppHandle,
-    runtime: &LocalAiNativeWindowRuntime,
-    provider_id: &str,
-) -> Option<LocalAiNativeWindowState> {
-    let states = runtime.states_for_provider(provider_id);
-    states
-        .iter()
-        .find(|state| app.get_webview_window(&state.window_label).is_some())
-        .cloned()
-        .or_else(|| states.into_iter().next())
+fn official_window(app: &AppHandle, provider_id: &str) -> Option<WebviewWindow> {
+    let prefix = format!("local-ai-{provider_id}-");
+    app.webview_windows()
+        .into_iter()
+        .find_map(|(label, window)| label.starts_with(&prefix).then_some(window))
 }
 
 fn view(
-    app: &AppHandle,
-    snapshot: LocalAiNativeWindowState,
+    provider_id: &str,
+    window: Option<&WebviewWindow>,
     official_session: Option<Value>,
 ) -> Value {
-    let open = app.get_webview_window(&snapshot.window_label).is_some();
+    let open = window.is_some();
+    let status = official_session
+        .as_ref()
+        .and_then(|session| session.get("window_status"))
+        .and_then(Value::as_str);
+    let loading = official_session
+        .as_ref()
+        .and_then(|session| session.get("loading"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let page_ready = open
+        && official_session
+            .as_ref()
+            .and_then(|session| session.get("semantic_snapshot_ready"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+    let last_error_code = official_session
+        .as_ref()
+        .and_then(|session| session.get("last_error_code"))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let updated_at_ms = official_session
+        .as_ref()
+        .and_then(|session| session.get("updated_at_ms"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
     json!({
-        "provider_id": snapshot.provider_id,
-        "phase": if open { snapshot.phase.as_str() } else { "closed" },
+        "provider_id": provider_id,
+        "phase": official_phase(open, status, loading, page_ready),
         "open": open,
-        "focused": open && snapshot.focused,
-        "page_ready": open && snapshot.page_ready,
-        "root_exists": snapshot.root_exists,
-        "root_child_count": snapshot.root_child_count,
-        "last_error_code": snapshot.last_error_code,
-        "retryable": snapshot.retryable || !open,
-        "updated_at_ms": snapshot.updated_at_ms,
+        "focused": window.and_then(|window| window.is_focused().ok()).unwrap_or(false),
+        "page_ready": page_ready,
+        "root_exists": page_ready,
+        "root_child_count": usize::from(page_ready),
+        "last_error_code": last_error_code,
+        "retryable": !open || matches!(status, Some("blocked" | "error" | "closed")),
+        "updated_at_ms": updated_at_ms,
         "official_session": official_session,
     })
+}
+
+fn official_phase(
+    open: bool,
+    status: Option<&str>,
+    loading: bool,
+    page_ready: bool,
+) -> &'static str {
+    if !open {
+        return if status.is_some() {
+            "closed"
+        } else {
+            "not_created"
+        };
+    }
+    match status {
+        Some("opening") => "creating",
+        Some("loading") => "loading",
+        Some("ready" | "minimized") => "ready",
+        Some("blocked" | "error") => "error",
+        Some("closed") => "closed",
+        _ if loading => "loading",
+        _ if page_ready => "ready",
+        _ => "loading",
+    }
 }
 
 fn privacy() -> Value {
@@ -138,7 +151,7 @@ fn privacy() -> Value {
 }
 
 fn display_error(error: impl std::fmt::Display) -> String {
-    format!("一龙 AI 子窗口控制失败：{error}")
+    format!("AI 官方网页窗口控制失败：{error}")
 }
 
 #[cfg(test)]
@@ -152,7 +165,19 @@ mod tests {
             validate_provider_id(Some("google-ai-mode")).unwrap(),
             "google-ai-mode"
         );
-        assert!(validate_provider_id(Some("local-ai-native-chatgpt-secret")).is_err());
+        assert!(validate_provider_id(Some("arbitrary-window-label-secret")).is_err());
         assert!(validate_provider_id(Some("gemini")).is_err());
+    }
+
+    #[test]
+    fn official_phase_uses_the_production_webview_lifecycle() {
+        assert_eq!(official_phase(false, None, false, false), "not_created");
+        assert_eq!(official_phase(false, Some("ready"), false, true), "closed");
+        assert_eq!(
+            official_phase(true, Some("opening"), true, false),
+            "creating"
+        );
+        assert_eq!(official_phase(true, Some("ready"), false, true), "ready");
+        assert_eq!(official_phase(true, Some("blocked"), false, false), "error");
     }
 }

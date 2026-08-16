@@ -18,7 +18,6 @@ import {
   getLocalAiWebSessionState,
   isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
-  openLocalAiNativeChatWindow,
   openLocalAiWebSession,
   type LocalAiBrowserControlAction,
   type LocalAiWebProvider,
@@ -26,7 +25,6 @@ import {
 } from './localAiBrowserApi'
 import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
 import type { LocalAiOwnerSource } from './useLocalAiOwnerIdentity'
-import NativeWindowStatusCard from './NativeWindowStatusCard'
 import AiProviderSessionStatus from './AiProviderSessionStatus'
 import { deriveLocalAiUserState } from './localAiUserState'
 import styles from './LocalAiBrowserPanel.module.css'
@@ -86,37 +84,14 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
     setMessage('')
     try {
       const session = await openLocalAiWebSession(item.id, ownerKey)
-      let nativeError = ''
-      try {
-        await openLocalAiNativeChatWindow(item.id, ownerKey)
-      } catch (error) {
-        nativeError = localAiBrowserErrorMessage(error)
-      }
       try {
         setSessionState(await getLocalAiWebSessionState(item.id, ownerKey))
       } catch {
-        // 官方窗口已成功恢复时，状态刷新失败不能把整个组合动作判为失败。
+        // 官方窗口已成功恢复时，状态刷新失败不能把打开动作判为失败。
       }
-      const successMessage = session.status === 'created'
-        ? `已打开 ${item.displayName} 官方页面和独立一龙聊天窗。访客模式优先，登录用于历史与增强能力。`
-        : `已恢复 ${item.displayName} 官方页面和一龙聊天窗。`
-      setMessage(nativeError
-        ? `${item.displayName} 官方页面已恢复；一龙聊天窗未能恢复：${nativeError}`
-        : successMessage)
-    } catch (error) {
-      setMessage(localAiBrowserErrorMessage(error))
-    } finally {
-      setBusyProvider(null)
-    }
-  }
-
-  async function openNativeChat(item: LocalAiWebProvider) {
-    if (!ownerKey || busyProvider) return
-    setBusyProvider(item.id)
-    setMessage('')
-    try {
-      await openLocalAiNativeChatWindow(item.id, ownerKey)
-      setMessage(`已打开 ${item.displayName} 的一龙独立聊天窗。`)
+      setMessage(session.status === 'created'
+        ? `已打开 ${item.displayName} 官方页面。访客模式优先，登录用于历史与增强能力。`
+        : `已恢复 ${item.displayName} 官方页面。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
     } finally {
@@ -251,15 +226,6 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
                   {openButtonLabel(provider, sessionOpen)}
                 </button>
                 <button
-                  className={styles.nativeWindowButton}
-                  type="button"
-                  onClick={() => void openNativeChat(provider)}
-                  disabled={!ownerKey || busy}
-                >
-                  <MonitorUp size={16} />
-                  单独打开一龙聊天窗
-                </button>
-                <button
                   className={styles.clearButton}
                   type="button"
                   title="清除当前账号的本地网页会话"
@@ -297,26 +263,17 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
               </div>
             )}
 
-            {provider?.rendererStatus === 'active' ? (
-              <NativeWindowStatusCard
-                provider={provider}
-                ownerKey={ownerKey || ''}
-                busy={busy}
-                onRecover={() => void openNativeChat(provider)}
-              />
-            ) : (
-              <section className={styles.officialWebOnly} aria-label={`${provider?.displayName || '官方 AI'}接入说明`}>
-                <ExternalLink size={24} aria-hidden="true" />
-                <div>
-                  <strong>{provider?.displayName || '官方 AI 网页'}</strong>
-                  <p>
-                    当前厂商暂时只开放官方网页窗口。一龙不会读取网页凭证、请求或私有接口；
-                    厂商功能是否可用仍由其地区、语言、设备和账号策略决定。
-                  </p>
-                  <small>可继续使用上方“显示窗口”或“系统浏览器”。</small>
-                </div>
-              </section>
-            )}
+            <section className={styles.officialWebOnly} aria-label={`${provider?.displayName || '官方 AI'}接入说明`}>
+              <ExternalLink size={24} aria-hidden="true" />
+              <div>
+                <strong>{provider?.displayName || '官方 AI 网页'}</strong>
+                <p>
+                  生产聊天已统一到“一龙 AI”的 Chat 界面；这里仅管理和恢复同一官方网页会话。
+                  一龙不会读取网页凭证、请求或私有接口，厂商能力仍由其地区、语言、设备和账号策略决定。
+                </p>
+                <small>可继续使用上方“显示窗口”或“系统浏览器”。</small>
+              </div>
+            </section>
           </>
         )}
 
@@ -340,8 +297,8 @@ function Notice({ title, message, children }: { title: string; message: string; 
 }
 
 function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): string {
-  if (sessionOpen) return '恢复官方页和聊天窗'
-  return `打开 ${provider.displayName}（访客可用）和聊天窗`
+  if (sessionOpen) return '恢复官方页'
+  return `打开 ${provider.displayName}（访客可用）`
 }
 
 function ownerSourceLabel(source: LocalAiOwnerSource): string {

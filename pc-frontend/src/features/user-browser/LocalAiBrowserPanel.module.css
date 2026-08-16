@@ -291,170 +291,7 @@
 .officialWebOnly p { margin: 8px 0; color: var(--text-secondary); font-size: 11px; line-height: 1.65; }
 .officialWebOnly small { color: var(--text-muted); font-size: 10px; }
 
-.nativeChat {
-  min-height: 360px;
-  display: grid;
-  grid-template-rows: auto minmax(230px, 1fr) auto;
-  overflow: hidden;
-  border: 1px solid rgba(84, 199, 161, .28);
-  border-radius: 7px;
-  background: #0c0f0e;
-}
-
-.nativeChat[data-standalone="true"] { height: 100%; min-height: 0; border: 0; border-radius: 0; }
-.nativeChat[data-standalone="true"] .messageList { min-height: 0; max-height: none; }
-
-.nativeChat > header {
-  min-height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(84, 199, 161, .045);
-}
-
-.nativeChat > header strong,
-.nativeChat > header small { display: block; }
-.nativeChat > header strong { color: var(--text-primary); font-size: 13px; }
-.nativeChat > header small { margin-top: 3px; color: var(--text-muted); font-size: 9px; }
-
-.nativeChat > header button,
-.composer button {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 34px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  color: #84e2c2;
-  background: rgba(84, 199, 161, .07);
-  cursor: pointer;
-}
-
-.nativeChat button:disabled { opacity: .35; cursor: not-allowed; }
-
-.messageList {
-  max-height: 520px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px;
-}
-
-.userMessage,
-.assistantMessage {
-  max-width: 88%;
-  padding: 10px 12px;
-  border-radius: 7px;
-}
-
-.userMessage {
-  align-self: flex-end;
-  color: #e6fff6;
-  background: rgba(84, 199, 161, .17);
-}
-
-.assistantMessage {
-  align-self: flex-start;
-  color: var(--text-primary);
-  background: var(--bg-elevated);
-}
-
-.userMessage > span,
-.assistantMessage > span {
-  display: block;
-  margin-bottom: 6px;
-  color: #84e2c2;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .04em;
-}
-
-.userMessage p,
-.assistantMessage p {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-.citation {
-  display: inline-flex;
-  max-width: 100%;
-  margin: 8px 7px 0 0;
-  padding: 4px 7px;
-  overflow: hidden;
-  border: 1px solid rgba(132, 226, 194, .24);
-  border-radius: 4px;
-  color: #84e2c2;
-  background: rgba(84, 226, 194, .055);
-  font-size: 9px;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.citation:hover { border-color: rgba(132, 226, 194, .5); }
-
-.emptyChat {
-  min-height: 220px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 8px;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.emptyChat strong { color: var(--text-secondary); font-size: 13px; }
-.emptyChat p { max-width: 430px; margin: 0; font-size: 11px; line-height: 1.55; }
-.emptyChat button {
-  min-height: 32px;
-  margin-top: 5px;
-  padding: 0 11px;
-  border: 1px solid rgba(132, 226, 194, .35);
-  border-radius: 5px;
-  color: #84e2c2;
-  background: rgba(84, 199, 161, .07);
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 9px;
-  padding: 11px;
-  border-top: 1px solid var(--border);
-  background: rgba(255, 255, 255, .015);
-}
-
-.composer textarea {
-  min-height: 54px;
-  max-height: 160px;
-  flex: 1;
-  resize: vertical;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  outline: none;
-  color: var(--text-primary);
-  background: #111513;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.composer textarea:focus { border-color: rgba(132, 226, 194, .55); }
-.composer textarea:disabled { opacity: .48; }
-
 .openButton,
-.nativeWindowButton,
 .clearButton {
   min-height: 36px;
   display: inline-flex;
@@ -475,19 +312,6 @@
 
 .openButton:hover:not(:disabled) { background: #9ce6cb; }
 
-.nativeWindowButton {
-  min-width: 150px;
-  padding: 0 13px;
-  border: 1px solid rgba(132, 226, 194, .32);
-  color: #84e2c2;
-  background: rgba(84, 199, 161, .07);
-}
-
-.nativeWindowButton:hover:not(:disabled) {
-  border-color: rgba(132, 226, 194, .6);
-  background: rgba(84, 199, 161, .13);
-}
-
 .clearButton {
   width: 36px;
   border: 1px solid var(--border);
@@ -497,7 +321,6 @@
 
 .clearButton:hover:not(:disabled) { border-color: rgba(224, 112, 112, .55); }
 .openButton:disabled,
-.nativeWindowButton:disabled,
 .clearButton:disabled { opacity: .38; cursor: not-allowed; }
 
 .message {

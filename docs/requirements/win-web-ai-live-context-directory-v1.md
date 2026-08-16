@@ -13,7 +13,7 @@ Windows 生产首页的同一个聊天 UI 在 ChatGPT 与 Google AI 之间切换
 ## 范围
 
 - ChatGPT 与 Google AI 仍使用按一龙 owner 和厂商隔离的本机 WebView2 Profile。
-- 生产首页继续使用 `AiChatPage`、原消息气泡、原输入框和同一侧栏；测试子窗口不是生产验收入口。
+- 生产首页继续使用 `AiChatPage`、原消息气泡、原输入框和同一侧栏；旧测试子窗口已经退役。
 - ChatGPT 会话目录支持快速可见快照、后台完整采集、置顶、项目、普通聊天和本机缓存。
 - ChatGPT 可见消息窗口保留稳定重叠上下文；Google AI 继续保留同一搜索会话的多轮合并。
 - Cookie、token、密码、完整 URL 查询和聊天正文不进入日志、命令回执或功能登记。

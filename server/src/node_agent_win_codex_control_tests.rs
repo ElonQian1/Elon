@@ -32,7 +32,7 @@ fn action_contract_rejects_arbitrary_urls_scripts_and_routes() {
             "trace",
             "capture_ai_window_state",
             None,
-            Some("local-ai-native-chatgpt-owner"),
+            Some("arbitrary-window-label-secret"),
             "test",
         )
         .is_err());
@@ -193,7 +193,7 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
                     "last_error_code":null,
                     "retryable":false,
                     "updated_at_ms":42,
-                    "window_label":"local-ai-native-chatgpt-owner-secret",
+                    "window_label":"local-ai-chatgpt-owner-secret",
                     "url":"https://chatgpt.com/private",
                     "official_session":{
                         "present":true,

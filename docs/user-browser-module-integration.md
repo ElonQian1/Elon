@@ -93,18 +93,16 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 - 其他调用错误使用可重试状态，不能吞掉 Tauri 字符串 rejection 后只显示泛化失败。
 
 Windows 上创建 WebView 的 Tauri command 必须保持为 `async`；同步 command 会在
-WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色窗口。一龙原生聊天窗在 Windows
-作为独立顶层窗口直接加载登记的 `/pc/user-browser/native` 地址；主窗口与原生聊天窗必须
-使用完全相同的 WebView2 browser arguments，否则共享默认用户数据目录的 WebView2 环境会
-拒绝初始化，而 Rust build 返回后用户只看到窗口一闪而过。非 Windows 平台继续使用 parent
-关系。宿主导航失败时不得销毁窗口：保留窗口并显示稳定诊断码，防止用户只看到“一闪而过”。
+WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色窗口。生产聊天统一由 `/pc/ai`
+承载，按厂商和 owner 复用同一官方 WebView2 会话，不再创建或维护 `/pc/user-browser/native`
+独立测试聊天窗。宿主导航失败时保留官方窗口和稳定诊断码，方便用户直接处理登录、验证或地区限制。
 
 ### IPC 与导航边界
 
-- `build.rs` 只登记主窗口会话命令和子窗口语义事件命令。
+- `build.rs` 只登记主窗口会话命令和官方网页语义事件命令。
 - `capabilities/main.json` 只向 `main` 窗口和项目批准的 PC 地址开放该权限。
 - 每个 Rust 命令再次检查调用 WebView 标签必须等于 `main`。
-- ChatGPT 与 Google AI 模式子窗口分别匹配独立 capability，只能上报经过 Rust 白名单
+- ChatGPT 与 Google AI 模式官方 WebView 分别匹配独立 capability，只能上报经过 Rust 白名单
   清洗的可见语义；它们不能调用主窗口的会话控制命令。初始化脚本不读取 Cookie、Token、
   请求头或原始响应，也不发起厂商私有网络请求。
 - ChatGPT 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
@@ -203,9 +201,9 @@ confirmation，再调用商户模块运行时：
 - Tauri crate 定向 Rust 测试、本地宿主安全测试、28 个共享适配器 JavaScript 语法检查、
   PC 用户浏览器契约与 TypeScript/Vite 生产构建通过。
 - Win 实机已验证未登录状态的 ChatGPT 官方页面可完整加载、关闭后状态可恢复并可再次打开。
-- 正式安装版 `0.3.69+8eacc54c5c6b356dbce0c50838e875edfc03cdfb` 已验证一龙原生聊天窗
-  独立创建、取得焦点并完成 React 根节点渲染；本机诊断收到 `created`、`page_started`、
-  `page_finished` 和 `page_health/settled`，窗口未再白屏或闪退。
+- 生产 `/pc/ai` 已覆盖 ChatGPT/Google 的统一消息、输入、停止、新建、重试、模型/工具、历史与
+  官方页回退；原 `/pc/user-browser/native` 只覆盖其中较小子集，现已连同专属路由、组件、状态机、
+  Tauri 命令和权限退役，避免生产与测试两套聊天入口继续漂移。
 - Google AI 模式提供商固定指向官方 `google.com/aimode`，以独立 Profile 打开；Win 代码已
   接通问题、回答、引用、草稿、发送、停止和新对话的可见语义路径。账号登录仍定向到系统
   浏览器；地区、语言、设备或账号灰度未开放时保留完整 Google 官方窗口。
