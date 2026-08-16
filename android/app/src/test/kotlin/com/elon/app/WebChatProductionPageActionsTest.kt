@@ -1,7 +1,6 @@
 package com.elon.app
 
-import org.json.JSONArray
-import org.json.JSONObject
+import com.elon.app.chatgptweb.ChatGptWebUiControl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,12 +9,11 @@ import org.junit.Test
 class WebChatProductionPageActionsTest {
     @Test
     fun parsesSupportedCurrentPageActionsForTheProductionChat() {
-        val response = JSONObject().put("controls", JSONArray()
-            .put(control("temporary", "临时聊天", "temporary_chat", "header", "direct"))
-            .put(control("options", "会话操作", "conversation_options", "header", "direct"))
-            .put(control("copy", "复制", "copy", "message", "dedicated")))
-
-        val result = WebChatProductionPageActionParser.parse(response)
+        val result = WebChatProductionPageActionParser.parse(listOf(
+            control("temporary", "临时聊天", "temporary_chat", "header", WebChatConsumerControlPresentation.DIRECT),
+            control("options", "会话操作", "conversation_options", "header", WebChatConsumerControlPresentation.DIRECT),
+            control("copy", "复制", "copy", "message", WebChatConsumerControlPresentation.DEDICATED),
+        ))
 
         assertEquals(listOf("temporary", "options"), result.map { it.controlId })
         assertFalse(result.first().officialFallback)
@@ -24,12 +22,11 @@ class WebChatProductionPageActionsTest {
 
     @Test
     fun keepsAdaptiveMutationsNativeAndRoutesExternalFlowsToTheOfficialFallback() {
-        val response = JSONObject().put("controls", JSONArray()
-            .put(control("rename", "重命名会话", "rename", "overlay", "menu"))
-            .put(control("delete", "删除", "delete", "overlay", "menu", confirmation = true))
-            .put(control("share", "分享", "share", "overlay", "menu")))
-
-        val result = WebChatProductionPageActionParser.parse(response)
+        val result = WebChatProductionPageActionParser.parse(listOf(
+            control("rename", "重命名会话", "rename", "overlay", WebChatConsumerControlPresentation.MENU),
+            control("delete", "删除", "delete", "overlay", WebChatConsumerControlPresentation.MENU, confirmation = true),
+            control("share", "分享", "share", "overlay", WebChatConsumerControlPresentation.MENU),
+        ))
 
         assertFalse(result[0].officialFallback)
         assertFalse(result[1].officialFallback)
@@ -39,15 +36,14 @@ class WebChatProductionPageActionsTest {
 
     @Test
     fun keepsNewManifestActionsButIgnoresDisabledStructuralAndComposerControls() {
-        val response = JSONObject().put("controls", JSONArray()
-            .put(control("profile", "账户", "profile", "header", "direct"))
-            .put(control("profile", "重复账户", "profile", "header", "direct"))
-            .put(control("future", "新官网功能", "future_action", "content", "direct"))
-            .put(control("navigation", "打开导航", "navigation", "header", "direct"))
-            .put(control("model", "模型", "model", "composer", "dedicated"))
-            .put(control("off", "停用", "more", "header", "direct", enabled = false)))
-
-        val result = WebChatProductionPageActionParser.parse(response)
+        val result = WebChatProductionPageActionParser.parse(listOf(
+            control("profile", "账户", "profile", "header", WebChatConsumerControlPresentation.DIRECT),
+            control("profile", "重复账户", "profile", "header", WebChatConsumerControlPresentation.DIRECT),
+            control("future", "新官网功能", "future_action", "content", WebChatConsumerControlPresentation.DIRECT),
+            control("navigation", "打开导航", "navigation", "header", WebChatConsumerControlPresentation.DIRECT),
+            control("model", "模型", "model", "composer", WebChatConsumerControlPresentation.DEDICATED),
+            control("off", "停用", "more", "header", WebChatConsumerControlPresentation.DIRECT, enabled = false),
+        ))
 
         assertEquals(listOf("profile", "future"), result.map { it.controlId })
     }
@@ -65,17 +61,21 @@ class WebChatProductionPageActionsTest {
         label: String,
         semantic: String,
         region: String,
-        presentation: String,
+        presentation: WebChatConsumerControlPresentation,
         confirmation: Boolean = false,
         enabled: Boolean = true,
-    ): JSONObject = JSONObject()
-        .put("control_id", id)
-        .put("label", label)
-        .put("semantic", semantic)
-        .put("region", region)
-        .put("role", "button")
-        .put("enabled", enabled)
-        .put("requires_user_confirmation", confirmation)
-        .put("native_presentation", presentation)
-        .put("native_adb_content_description", "selector:$id")
+    ) = WebChatConsumerControlDescriptor(
+        control = ChatGptWebUiControl(
+            id = id,
+            label = label,
+            semantic = semantic,
+            region = region,
+            role = "button",
+            enabled = enabled,
+            selected = false,
+        ),
+        requiresUserConfirmation = confirmation,
+        presentation = presentation,
+        nativeSelector = "selector:$id",
+    )
 }

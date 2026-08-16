@@ -4,12 +4,10 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.chatgptweb.ChatGptWebUiControl
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import org.json.JSONObject
 
 internal data class WebChatProductionPageAction(
-    val control: ChatGptWebUiControl,
+    val control: WebChatConsumerControl,
     val requiresUserConfirmation: Boolean,
     val officialFallback: Boolean,
     val nativeSelector: String,
@@ -20,35 +18,37 @@ internal data class WebChatProductionPageAction(
 }
 
 internal object WebChatProductionPageActionParser {
-    fun parse(response: JSONObject): List<WebChatProductionPageAction> {
-        val controls = response.optJSONArray("controls") ?: return emptyList()
-        val parsed = mutableListOf<WebChatProductionPageAction>()
-        for (index in 0 until controls.length()) {
-            val raw = controls.optJSONObject(index) ?: continue
-            val control = WebChatProductionControlJson.parse(raw) ?: continue
-            val presentation = raw.optString("native_presentation").trim().lowercase()
+    fun parse(descriptors: List<WebChatConsumerControlDescriptor>): List<WebChatProductionPageAction> {
+        return descriptors.mapNotNull { descriptor ->
+            val control = descriptor.control
             if (
                 !control.enabled ||
                 control.region !in PAGE_REGIONS ||
                 control.semantic in EXCLUDED_SEMANTICS ||
-                presentation !in SUPPORTED_PRESENTATIONS
-            ) continue
-            parsed += WebChatProductionPageAction(
+                descriptor.presentation !in SUPPORTED_PRESENTATIONS
+            ) return@mapNotNull null
+            WebChatProductionPageAction(
                 control = control,
-                requiresUserConfirmation = raw.optBoolean("requires_user_confirmation", false),
-                officialFallback = presentation == "official_fallback" ||
+                requiresUserConfirmation = descriptor.requiresUserConfirmation,
+                officialFallback = descriptor.presentation ==
+                    WebChatConsumerControlPresentation.OFFICIAL_FALLBACK ||
                     control.semantic in OFFICIAL_COMPLETION_SEMANTICS,
-                nativeSelector = raw.optString("native_adb_content_description")
+                nativeSelector = descriptor.nativeSelector
+                    .orEmpty()
                     .trim()
-                    .ifBlank { raw.optString("adb_content_description").trim() }
                     .ifBlank { "web-chat-page-action:${control.semantic}:${control.id}" },
             )
         }
-        return parsed.distinctBy(WebChatProductionPageAction::controlId)
+            .distinctBy(WebChatProductionPageAction::controlId)
     }
 
     private val PAGE_REGIONS = setOf("header", "content", "suggestions", "overlay")
-    private val SUPPORTED_PRESENTATIONS = setOf("direct", "dedicated", "menu", "official_fallback")
+    private val SUPPORTED_PRESENTATIONS = setOf(
+        WebChatConsumerControlPresentation.DIRECT,
+        WebChatConsumerControlPresentation.DEDICATED,
+        WebChatConsumerControlPresentation.MENU,
+        WebChatConsumerControlPresentation.OFFICIAL_FALLBACK,
+    )
     private val EXCLUDED_SEMANTICS = setOf(
         "navigation",
         "title",
@@ -78,7 +78,7 @@ internal object WebChatProductionPageActionParser {
 internal class WebChatProductionPageActionsCoordinator(
     private val activity: AppCompatActivity,
     private val host: View,
-    private val mcpPort: () -> WebChatSocialMcpPort?,
+    private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
 ) {
@@ -93,15 +93,15 @@ internal class WebChatProductionPageActionsCoordinator(
             openOfficialFallback()
             return
         }
-        val port = mcpPort() ?: return showUnavailable()
+        val port = consumerPort() ?: return showUnavailable()
         val epoch = requestEpoch
         val cached = readActions(port)
         if (cached.isNotEmpty()) {
             showActionDialog(provider, port, cached)
             return
         }
-        val requested = port.control(JSONObject().put("action", "chatgpt_refresh_controls"))
-        if (!requested.optBoolean("control_ok")) return showUnavailable()
+        val requested = port.requestControls()
+        if (!requested.accepted) return showUnavailable()
         Toast.makeText(activity, "正在读取当前网页操作...", Toast.LENGTH_SHORT).show()
         pollActions(provider, port, epoch, attempt = 0)
     }
@@ -117,7 +117,7 @@ internal class WebChatProductionPageActionsCoordinator(
 
     private fun pollActions(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         epoch: Int,
         attempt: Int,
     ) {
@@ -134,17 +134,14 @@ internal class WebChatProductionPageActionsCoordinator(
         )
     }
 
-    private fun readActions(port: WebChatSocialMcpPort): List<WebChatProductionPageAction> {
-        val response = port.control(JSONObject()
-            .put("action", "chatgpt_find_controls")
-            .put("limit", MAX_CONTROL_COUNT))
-        if (!response.optBoolean("control_ok")) return emptyList()
-        return WebChatProductionPageActionParser.parse(response)
-    }
+    private fun readActions(port: WebChatConsumerPort): List<WebChatProductionPageAction> =
+        WebChatProductionPageActionParser.parse(
+            port.state().controls.take(MAX_CONTROL_COUNT),
+        )
 
     private fun showActionDialog(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         actions: List<WebChatProductionPageAction>,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
@@ -183,7 +180,7 @@ internal class WebChatProductionPageActionsCoordinator(
 
     private fun selectAction(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         action: WebChatProductionPageAction,
         previousControlIds: Set<String>,
     ) {
@@ -229,7 +226,7 @@ internal class WebChatProductionPageActionsCoordinator(
 
     private fun refreshAfterAdaptiveMutation(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
     ) {
         val epoch = requestEpoch
         host.postDelayed({
@@ -241,17 +238,14 @@ internal class WebChatProductionPageActionsCoordinator(
 
     private fun invoke(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         action: WebChatProductionPageAction,
         previousControlIds: Set<String>,
         userConfirmed: Boolean,
     ) {
-        val result = port.control(JSONObject()
-            .put("action", "chatgpt_invoke_control")
-            .put("control_id", action.controlId)
-            .put("user_confirmed", userConfirmed))
-        if (!result.optBoolean("control_ok")) {
-            Toast.makeText(activity, errorMessage(result.optString("error")), Toast.LENGTH_SHORT).show()
+        val result = port.invokeControl(action.controlId, userConfirmed)
+        if (!result.accepted) {
+            Toast.makeText(activity, errorMessage(result.error.orEmpty()), Toast.LENGTH_SHORT).show()
             return
         }
         if (action.semantic !in NESTED_MENU_SEMANTICS) return
@@ -262,7 +256,7 @@ internal class WebChatProductionPageActionsCoordinator(
 
     private fun pollNestedActions(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         epoch: Int,
         previousControlIds: Set<String>,
         attempt: Int,

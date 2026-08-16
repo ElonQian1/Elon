@@ -127,13 +127,7 @@ internal class MainSocialAiChatFeature(
         WebChatProductionFeatureNavigationCoordinator(
             activity = activity,
             host = binding.root,
-            consumerPort = {
-                if (isChatModeActive() && providerId() == WebChatProviderId.CHATGPT_WEB) {
-                    activeController().consumerPort()
-                } else {
-                    null
-                }
-            },
+            consumerPort = ::chatGptConsumerPort,
             activeProvider = {
                 if (isChatModeActive()) providerId() else null
             },
@@ -145,7 +139,7 @@ internal class MainSocialAiChatFeature(
         WebChatProductionPageActionsCoordinator(
             activity = activity,
             host = binding.root,
-            mcpPort = ::chatGptMcpPort,
+            consumerPort = ::chatGptConsumerPort,
             activeProvider = {
                 if (isChatModeActive()) providerId() else null
             },
@@ -293,6 +287,15 @@ internal class MainSocialAiChatFeature(
     fun chatGptMcpPort(): WebChatSocialMcpPort? {
         if (!isChatModeActive()) return null
         return if (providerId() == WebChatProviderId.CHATGPT_WEB) chatGptController.mcpPort() else null
+    }
+
+    fun chatGptConsumerPort(): WebChatConsumerPort? {
+        if (!isChatModeActive()) return null
+        return if (providerId() == WebChatProviderId.CHATGPT_WEB) {
+            activeController().consumerPort()
+        } else {
+            null
+        }
     }
 
     fun webChatNavigationAvailable(): Boolean = webChatNavigationSession() != null

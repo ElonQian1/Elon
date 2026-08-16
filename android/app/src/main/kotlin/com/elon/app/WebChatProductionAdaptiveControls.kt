@@ -7,82 +7,6 @@ import com.elon.app.chatgptweb.ChatGptNativeChoiceControlDialog
 import com.elon.app.chatgptweb.ChatGptNativeControlPresentation
 import com.elon.app.chatgptweb.ChatGptNativeFormControlDialog
 import com.elon.app.chatgptweb.ChatGptNativeSliderControlDialog
-import com.elon.app.chatgptweb.ChatGptWebSlider
-import com.elon.app.chatgptweb.ChatGptWebUiControl
-import org.json.JSONArray
-import org.json.JSONObject
-
-internal object WebChatProductionControlJson {
-    fun parse(value: JSONObject): ChatGptWebUiControl? {
-        val id = value.optString("control_id").trim()
-        val semantic = value.optString("semantic").trim().lowercase()
-        val label = value.optString("label").trim()
-        val region = value.optString("region").trim().lowercase()
-        val role = value.optString("role").trim().lowercase()
-        if (id.isBlank() || semantic.isBlank() || label.isBlank() || region.isBlank()) return null
-        val choices = value.optJSONArray("choice_labels").strings()
-        val choiceIndex = (value.opt("selected_choice_index") as? Number)
-            ?.toInt()
-            ?.takeIf { it in choices.indices }
-        return ChatGptWebUiControl(
-            id = id,
-            semantic = semantic,
-            label = label,
-            region = region,
-            role = role,
-            enabled = value.optBoolean("enabled", false),
-            selected = value.optBoolean("selected", false),
-            inputKind = value.optionalString("input_kind"),
-            writable = value.optBoolean("writable", false),
-            stateSettable = value.optBoolean("state_settable", false),
-            choiceLabels = choices,
-            selectedChoiceIndex = choiceIndex,
-            slider = value.optJSONObject("slider")?.let(::parseSlider),
-            expanded = value.opt("expanded") as? Boolean,
-            expandable = value.optBoolean("expandable", false),
-            contextId = value.optionalString("context_id"),
-            inViewport = value.optBoolean("in_viewport", true),
-            webXRatio = value.optionalFiniteDouble("web_x_ratio"),
-            webYRatio = value.optionalFiniteDouble("web_y_ratio"),
-        )
-    }
-
-    private fun parseSlider(value: JSONObject): ChatGptWebSlider? {
-        val min = value.optionalFiniteDouble("min") ?: return null
-        val max = value.optionalFiniteDouble("max") ?: return null
-        val step = value.optionalFiniteDouble("step") ?: return null
-        val current = value.optionalFiniteDouble("value") ?: return null
-        val stepCount = (max - min) / step
-        if (
-            max <= min ||
-            step <= 0.0 ||
-            current !in min..max ||
-            !stepCount.isFinite() ||
-            stepCount > MAX_NATIVE_SLIDER_STEPS
-        ) return null
-        return ChatGptWebSlider(min = min, max = max, step = step, value = current)
-    }
-
-    private fun JSONObject.optionalString(name: String): String? {
-        if (!has(name) || isNull(name)) return null
-        return optString(name).trim().takeIf(String::isNotBlank)
-    }
-
-    private fun JSONObject.optionalFiniteDouble(name: String): Double? =
-        (opt(name) as? Number)?.toDouble()?.takeIf(Double::isFinite)
-
-    private fun JSONArray?.strings(): List<String> {
-        if (this == null) return emptyList()
-        return buildList {
-            for (index in 0 until length()) {
-                if (isNull(index)) continue
-                optString(index).trim().takeIf(String::isNotBlank)?.let(::add)
-            }
-        }
-    }
-
-    private const val MAX_NATIVE_SLIDER_STEPS = 10_000.0
-}
 
 internal object WebChatProductionAdaptiveControlSelectors {
     fun stateList(controlId: String): String =
@@ -115,7 +39,7 @@ internal class WebChatProductionAdaptiveControlsCoordinator(
     }
 
     fun present(
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         action: WebChatProductionPageAction,
         onUpdated: () -> Unit,
     ): Boolean {
@@ -137,47 +61,38 @@ internal class WebChatProductionAdaptiveControlsCoordinator(
     }
 
     private fun showText(
-        port: WebChatSocialMcpPort,
-        control: ChatGptWebUiControl,
+        port: WebChatConsumerPort,
+        control: WebChatConsumerControl,
         onUpdated: () -> Unit,
     ) {
         track(ChatGptNativeFormControlDialog.show(activity, control) { controlId, text ->
-            dispatch(port, JSONObject()
-                .put("action", "chatgpt_set_control_text")
-                .put("control_id", controlId)
-                .put("text", text), onUpdated)
+            dispatch(port, controlId, WebChatConsumerControlMutation.Text(text), onUpdated)
         })
     }
 
     private fun showChoice(
-        port: WebChatSocialMcpPort,
-        control: ChatGptWebUiControl,
+        port: WebChatConsumerPort,
+        control: WebChatConsumerControl,
         onUpdated: () -> Unit,
     ) {
         track(ChatGptNativeChoiceControlDialog.show(activity, control) { controlId, index ->
-            dispatch(port, JSONObject()
-                .put("action", "chatgpt_select_control_choice")
-                .put("control_id", controlId)
-                .put("choice_index", index), onUpdated)
+            dispatch(port, controlId, WebChatConsumerControlMutation.Choice(index), onUpdated)
         })
     }
 
     private fun showSlider(
-        port: WebChatSocialMcpPort,
-        control: ChatGptWebUiControl,
+        port: WebChatConsumerPort,
+        control: WebChatConsumerControl,
         onUpdated: () -> Unit,
     ) {
         track(ChatGptNativeSliderControlDialog.show(activity, control) { controlId, value ->
-            dispatch(port, JSONObject()
-                .put("action", "chatgpt_set_control_slider")
-                .put("control_id", controlId)
-                .put("value", value), onUpdated)
+            dispatch(port, controlId, WebChatConsumerControlMutation.Slider(value), onUpdated)
         })
     }
 
     private fun showSelectedState(
-        port: WebChatSocialMcpPort,
-        control: ChatGptWebUiControl,
+        port: WebChatConsumerPort,
+        control: WebChatConsumerControl,
         onUpdated: () -> Unit,
     ) {
         val values = if (control.role in SINGLE_SELECT_ROLES) listOf(true) else listOf(true, false)
@@ -187,10 +102,12 @@ internal class WebChatProductionAdaptiveControlsCoordinator(
             .setTitle(control.label)
             .setSingleChoiceItems(labels, checked) { opened, index ->
                 val selected = values[index]
-                dispatch(port, JSONObject()
-                    .put("action", "chatgpt_set_control_selected")
-                    .put("control_id", control.id)
-                    .put("selected", selected), onUpdated)
+                dispatch(
+                    port,
+                    control.id,
+                    WebChatConsumerControlMutation.Selected(selected),
+                    onUpdated,
+                )
                 opened.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -212,18 +129,20 @@ internal class WebChatProductionAdaptiveControlsCoordinator(
     }
 
     private fun showExpandedState(
-        port: WebChatSocialMcpPort,
-        control: ChatGptWebUiControl,
+        port: WebChatConsumerPort,
+        control: WebChatConsumerControl,
         onUpdated: () -> Unit,
     ) {
         val values = listOf(true, false)
         val dialog = AlertDialog.Builder(activity)
             .setTitle(control.label)
             .setSingleChoiceItems(arrayOf("展开", "收起"), values.indexOf(control.expanded)) { opened, index ->
-                dispatch(port, JSONObject()
-                    .put("action", "chatgpt_set_control_expanded")
-                    .put("control_id", control.id)
-                    .put("expanded", values[index]), onUpdated)
+                dispatch(
+                    port,
+                    control.id,
+                    WebChatConsumerControlMutation.Expanded(values[index]),
+                    onUpdated,
+                )
                 opened.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -245,16 +164,17 @@ internal class WebChatProductionAdaptiveControlsCoordinator(
     }
 
     private fun dispatch(
-        port: WebChatSocialMcpPort,
-        args: JSONObject,
+        port: WebChatConsumerPort,
+        controlId: String,
+        mutation: WebChatConsumerControlMutation,
         onUpdated: () -> Unit,
     ) {
-        val result = port.control(args)
-        if (result.optBoolean("control_ok")) {
+        val result = port.updateControl(controlId, mutation)
+        if (result.accepted) {
             onUpdated()
             return
         }
-        val message = when (result.optString("error")) {
+        val message = when (result.error) {
             "stale_control_id" -> "官网控件已变化，请重新打开列表"
             "control_not_writable", "control_state_not_settable",
             "control_choices_unavailable", "control_slider_unavailable",
