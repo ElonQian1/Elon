@@ -24,12 +24,14 @@ internal class MainAttachmentPanelActions(
     private val openCameraAttachment: () -> Unit,
     private val openPhotoAttachment: () -> Unit,
     private val openDocumentAttachment: () -> Unit,
+    private val showUiDesignAction: () -> Boolean,
     private val openUiDesignOptions: () -> Unit
 ) {
     var isOpen = false
         private set
 
     private var iconAnimationToken = 0
+    private var uiDesignAction: View? = null
 
     fun buildAttachmentPanel(): LinearLayout {
         return LinearLayout(activity).apply {
@@ -52,9 +54,11 @@ internal class MainAttachmentPanelActions(
             addView(createAttachmentAction("文件", R.drawable.ic_input_file_new, addEndMargin = true) {
                 openDocumentAttachment()
             })
-            addView(createAttachmentAction("UI设计", R.drawable.ic_input_photo_new, addEndMargin = false) {
+            val designAction = createAttachmentAction("UI设计", R.drawable.ic_input_photo_new, addEndMargin = false) {
                 openUiDesignOptions()
-            })
+            }
+            uiDesignAction = designAction
+            addView(designAction)
         }
     }
 
@@ -68,6 +72,7 @@ internal class MainAttachmentPanelActions(
         collapseInputComposer()
         if (isOpen) return
         val panel = attachmentPanel() ?: return
+        uiDesignAction?.visibility = if (showUiDesignAction()) View.VISIBLE else View.GONE
         isOpen = true
         applyAttachmentPanelBackground(expanded = true)
         panel.visibility = View.VISIBLE

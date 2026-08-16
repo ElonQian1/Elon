@@ -462,6 +462,7 @@ internal class MainInputActions(
             openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },
             openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() },
+            showUiDesignAction = { binding.modelButton.tag != WEB_CHAT_MODEL_BUTTON_OWNER },
             openUiDesignOptions = {
                 uiDesignRequestDialog.show(uiDesignRequestSelection) { selection ->
                     uiDesignRequestSelection = selection
