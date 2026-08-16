@@ -45,6 +45,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionSelectors.pageActions"))
         assertTrue(feature.contains("views.attachmentButton.visibility"))
         assertTrue(feature.contains("WebChatConsumerComposerStateResolver.resolve"))
+        assertTrue(feature.contains("WebChatConsumerStatusBanner"))
+        assertTrue(feature.contains("WebChatConsumerRecoveryPolicy.resolve"))
         assertTrue(consumerComposer.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
@@ -94,6 +96,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionAdaptiveControls.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionSelectors.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatConsumerStatusBanner.kt",
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuCoordinator.kt",
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
         )

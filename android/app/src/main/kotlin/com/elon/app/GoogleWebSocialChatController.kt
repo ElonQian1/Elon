@@ -218,6 +218,7 @@ internal class GoogleWebSocialChatController(
             GoogleWebBackgroundSession.State.IDLE,
             GoogleWebBackgroundSession.State.READY -> Unit
         }
+        onComposerStateChanged()
     }
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {

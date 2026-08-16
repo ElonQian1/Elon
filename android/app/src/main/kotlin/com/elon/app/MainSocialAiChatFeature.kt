@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
@@ -69,6 +70,19 @@ internal class MainSocialAiChatFeature(
             openOfficialFallback = ::openOfficialFallback,
         )
     }
+    private val consumerStatusBannerDelegate = lazy {
+        WebChatConsumerStatusBanner(
+            activity = activity,
+            onRetry = {
+                if (isChatModeActive()) {
+                    activeController().onHostResumed()
+                    refreshConsumerComposerUi()
+                }
+            },
+            onOfficialPage = ::openOfficialFallback,
+        )
+    }
+    private val consumerStatusBanner by consumerStatusBannerDelegate
     private val productionComposerToolsDelegate = lazy {
         WebChatProductionComposerToolsCoordinator(
             activity = activity,
@@ -311,6 +325,7 @@ internal class MainSocialAiChatFeature(
         if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
+        if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         binding.modelButton.tag = null
         binding.inputEdit.contentDescription = null
         binding.inputEdit.hint = "输入内容"
@@ -343,6 +358,7 @@ internal class MainSocialAiChatFeature(
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         val controller = controllerFor(provider.id)
         controller.activate(provider)
+        ensureConsumerStatusBannerAttached()
         binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
             visibility = View.VISIBLE
@@ -379,12 +395,22 @@ internal class MainSocialAiChatFeature(
                 attachmentSupported = controller.attachmentSupported(),
             )
             binding.inputEdit.hint = state.inputHint
+            consumerStatusBanner.render(
+                WebChatConsumerRecoveryPolicy.resolve(provider, controller.stateWireValue()),
+            )
             inputComposerViews()?.let { views ->
                 views.attachmentButton.visibility = if (state.attachmentVisible) View.VISIBLE else View.GONE
                 views.webToolsButton.visibility = if (state.toolsVisible) View.VISIBLE else View.GONE
             }
-        }
+        } else if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         refreshInputComposerVisual()
+    }
+
+    private fun ensureConsumerStatusBannerAttached() {
+        val banner = consumerStatusBanner
+        if (banner.parent === binding.inputLayout) return
+        (banner.parent as? ViewGroup)?.removeView(banner)
+        binding.inputLayout.addView(banner, 0)
     }
 
     private fun activeController(): WebChatSocialController = controllerFor(providerId())

@@ -351,6 +351,7 @@ internal class ChatGptSocialChatController(
         if (state == ChatGptBackgroundSession.State.ERROR && !detail.isNullOrBlank()) {
             Toast.makeText(activity, detail, Toast.LENGTH_LONG).show()
         }
+        onComposerStateChanged()
     }
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
