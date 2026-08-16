@@ -81,6 +81,11 @@ if ($viewRestoreBeforeEvidenceIndex -lt 0 -or $registerEvidenceIndex -lt 0 -or
     $viewRestoreBeforeEvidenceIndex -gt $registerEvidenceIndex) {
     throw "Conversation evidence must be registered only after view-mode restoration."
 }
+$sampleIndex = $source.LastIndexOf('Open-ConversationManagementSample')
+$menuIndex = $source.IndexOf('$openedMenu = Open-ConversationManagementMenu', $sampleIndex)
+if ($sampleIndex -lt 0 -or $menuIndex -lt 0 -or $sampleIndex -gt $menuIndex) {
+    throw "Conversation management must open a deterministic history sample before the menu."
+}
 foreach ($forbidden in @("pm clear", "removeAllCookies", "send_input")) {
     if ($source.Contains($forbidden)) {
         throw "Conversation management smoke contains forbidden operation: $forbidden"

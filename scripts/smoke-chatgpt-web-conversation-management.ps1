@@ -333,12 +333,8 @@ try {
         $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
             -TimeoutSec $TimeoutSec -InitialWaitSec 5
     }
-    if (-not $originConversationPath) {
-        Open-ConversationManagementSample
-    }
-
-    Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-        -Action "chatgpt_list_features" -TimeoutSec $TimeoutSec | Out-Null
+    Close-FeatureNavigation
+    Open-ConversationManagementSample
     Close-FeatureNavigation
     $openedMenu = Open-ConversationManagementMenu
     $conversationContextId = [string]$openedMenu.context_id
