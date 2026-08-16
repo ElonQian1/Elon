@@ -18,6 +18,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.R
 import com.elon.app.WebChatLocalProjectActions
+import com.elon.app.WebChatLocalProjectDialogs
 import com.elon.app.createSocialSidebarDateStrip
 import java.time.LocalDate
 
