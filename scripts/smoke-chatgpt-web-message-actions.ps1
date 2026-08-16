@@ -13,6 +13,9 @@ param(
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-supervised-runtime.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-conversation-sample.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
@@ -21,6 +24,8 @@ $script:overlayOpened = $false
 $script:nativeActionDialogOpened = $false
 $script:originalViewMode = ""
 $script:viewModeChanged = $false
+$script:originConversationPath = ""
+$script:conversationSampleOpened = $false
 
 function Wait-CommandReceipt {
     param(
@@ -159,6 +164,18 @@ function Restore-OriginalViewMode {
     return $true
 }
 
+function Restore-MessageActionOrigin {
+    if ($script:conversationSampleOpened) {
+        Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
+            -ConversationPath $script:originConversationPath `
+            -ViewMode $script:originalViewMode -TimeoutSec $ReadyTimeoutSec | Out-Null
+        $script:conversationSampleOpened = $false
+        $script:viewModeChanged = $false
+        return $true
+    }
+    return Restore-OriginalViewMode
+}
+
 function Get-UiAutomatorNodes {
     param(
         [Parameter(Mandatory = $true)][string]$UiXml,
@@ -221,10 +238,16 @@ try {
         -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    if ([int]$origin.conversation.message_count -lt 1) {
-        throw "A conversation with at least one rendered message is required."
-    }
+    $script:originConversationPath = Get-ChatGptWebSmokeConversationPath `
+        -Url ([string]$origin.conversation.url)
     $script:originalViewMode = [string]$origin.view_mode
+    $workingState = $origin
+    if ([int]$origin.conversation.message_count -lt 1) {
+        $script:conversationSampleOpened = $true
+        $sample = Open-ChatGptWebSmokeConversationSample -Runtime $runtime `
+            -TimeoutSec $ReadyTimeoutSec -MinimumMessageCount 1
+        $workingState = $sample.state
+    }
     if ($script:originalViewMode -notin @("native", "web")) {
         throw "ChatGPT returned an unsupported view mode."
     }
@@ -235,7 +258,7 @@ try {
         Wait-ViewMode -ExpectedMode "web" | Out-Null
     }
     Dismiss-VisibleOverlays | Out-Null
-    $originUrl = [string]$origin.conversation.url
+    $workingUrl = [string]$workingState.conversation.url
 
     Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
         -ExpectedAction "snapshot_ui_manifest" | Out-Null
@@ -382,9 +405,9 @@ try {
             param($state)
             $state.bridge_state -eq "ready" -and
                 $state.adapter_current -eq $true -and
-                [string]$state.conversation.url -eq $originUrl
+                [string]$state.conversation.url -eq $workingUrl
         }
-    Restore-OriginalViewMode | Out-Null
+    Restore-MessageActionOrigin | Out-Null
 
     Register-ChatGptWebVerificationCases -Runtime $runtime `
         -CaseIds @("safe/message_actions") `
@@ -434,6 +457,6 @@ try {
                 -Label "recover native ChatGPT message action dialog" | Out-Null
         } catch { }
     }
-    try { Restore-OriginalViewMode | Out-Null } catch { }
+    try { Restore-MessageActionOrigin | Out-Null } catch { }
     Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 }

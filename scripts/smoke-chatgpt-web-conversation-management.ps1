@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-supervised-runtime.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-conversation-sample.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
@@ -125,32 +126,9 @@ function Close-FeatureNavigation {
 }
 
 function Open-ConversationManagementSample {
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
-    do {
-        Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-            -Action "chatgpt_list_conversations" -TimeoutSec 15 | Out-Null
-        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 }
-        $samplePath = @($page.conversations | Where-Object {
-            -not [string]::IsNullOrWhiteSpace([string]$_.path)
-        } | Select-Object -First 1 | ForEach-Object { [string]$_.path })
-        if ($samplePath.Count -gt 0) {
-            $path = $samplePath[0]
-            Invoke-ChatGptWebSmokeReceiptAction -Runtime $runtime `
-                -Action "chatgpt_open_conversation" -ExpectedAction "open_conversation" `
-                -Arguments @{ conversation_path = $path } -TimeoutSec $TimeoutSec | Out-Null
-            $script:conversationSampleOpened = $true
-            Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-                -Description "conversation management sample" -Predicate {
-                    param($state)
-                    [string]$state.conversation.url -like "*$path*" -and
-                        $state.bridge_state -eq "ready"
-                }.GetNewClosure() | Out-Null
-            return
-        }
-        Start-Sleep -Seconds 1
-    } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Conversation management verification is deferred without conversation history."
+    $script:conversationSampleOpened = $true
+    Open-ChatGptWebSmokeConversationSample -Runtime $runtime `
+        -TimeoutSec $TimeoutSec | Out-Null
 }
 
 function Restore-ConversationManagementOrigin {

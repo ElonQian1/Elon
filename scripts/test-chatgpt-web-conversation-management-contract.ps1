@@ -26,8 +26,8 @@ foreach ($required in @(
     "Close-FeatureNavigation",
     'Action "chatgpt_dismiss_features"',
     "Open-ConversationManagementSample",
-    'Action "chatgpt_get_conversations"',
-    'Action "chatgpt_open_conversation"',
+    "chatgpt-web-smoke-conversation-sample.ps1",
+    "Open-ChatGptWebSmokeConversationSample",
     "Restore-ConversationManagementOrigin",
     "Restore-ChatGptWebSmokeOrigin",
     "Get-ConversationPinState",
@@ -81,9 +81,21 @@ if ($viewRestoreBeforeEvidenceIndex -lt 0 -or $registerEvidenceIndex -lt 0 -or
     $viewRestoreBeforeEvidenceIndex -gt $registerEvidenceIndex) {
     throw "Conversation evidence must be registered only after view-mode restoration."
 }
+$sampleFunctionIndex = $source.IndexOf('function Open-ConversationManagementSample')
+$sampleMutationIndex = $source.IndexOf(
+    '$script:conversationSampleOpened = $true',
+    $sampleFunctionIndex
+)
+$sharedSampleIndex = $source.IndexOf(
+    'Open-ChatGptWebSmokeConversationSample',
+    $sampleFunctionIndex
+)
 $sampleIndex = $source.LastIndexOf('Open-ConversationManagementSample')
 $menuIndex = $source.IndexOf('$openedMenu = Open-ConversationManagementMenu', $sampleIndex)
-if ($sampleIndex -lt 0 -or $menuIndex -lt 0 -or $sampleIndex -gt $menuIndex) {
+if ($sampleFunctionIndex -lt 0 -or $sampleIndex -lt 0 -or $sampleMutationIndex -lt 0 -or
+    $sharedSampleIndex -lt 0 -or
+    $menuIndex -lt 0 -or $sampleMutationIndex -gt $sharedSampleIndex -or
+    $sampleIndex -gt $menuIndex) {
     throw "Conversation management must open a deterministic history sample before the menu."
 }
 foreach ($forbidden in @("pm clear", "removeAllCookies", "send_input")) {
