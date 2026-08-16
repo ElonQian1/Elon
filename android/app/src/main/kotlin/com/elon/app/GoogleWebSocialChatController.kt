@@ -25,13 +25,13 @@ internal class GoogleWebSocialChatController(
     private val onComposerStateChanged: () -> Unit,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.GOOGLE_WEB
-    private val messages = mutableListOf<ChatMessage>()
-    private val timestamps = linkedMapOf<String, Long>()
-    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions).apply {
-        onWebChatMessageAction = ::handleWebChatMessageAction
-        onWebChatContentOpen = { _, _ -> openOfficialFallback() }
-    }
-    private val messageListUpdater = WebChatProductionMessageListUpdater(messages, adapter)
+    private val transcript = WebChatProductionTranscript(
+        list = binding.chatList,
+        setChatAdapter = setChatAdapter,
+        onMessageLongPress = showMessageActions,
+        onMessageAction = ::handleWebChatMessageAction,
+        onContentOpen = { _, _ -> openOfficialFallback() },
+    )
     private val session = GoogleWebBackgroundSession(
         activity = activity,
         host = binding.chatListFrame,
@@ -53,13 +53,11 @@ internal class GoogleWebSocialChatController(
     private var pendingSendWatchdog: Runnable? = null
     private var latestCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
-    private var followLatestOnNextSnapshot = false
 
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
         active = true
-        setChatAdapter(adapter)
-        binding.chatList.adapter = adapter
+        transcript.activate()
         session.activate()
         session.currentSnapshot()?.let(::renderSnapshot)
         updateComposerModel()
@@ -72,7 +70,7 @@ internal class GoogleWebSocialChatController(
 
     override fun isActive(): Boolean = active
 
-    override fun currentMessages(): List<ChatMessage> = messages.toList()
+    override fun currentMessages(): List<ChatMessage> = transcript.currentMessages()
 
     override fun stateWireValue(): String = session.state().wireValue
 
@@ -122,7 +120,7 @@ internal class GoogleWebSocialChatController(
             return true
         }
         val sendGeneration = pendingSend.begin(prompt)
-        followLatestOnNextSnapshot = true
+        transcript.requestFollowLatest()
         session.currentSnapshot()?.let(::renderSnapshot)
         if (!session.sendPrompt(prompt)) {
             pendingSend.failSubmission()
@@ -149,7 +147,7 @@ internal class GoogleWebSocialChatController(
 
     override fun startNewConversation() {
         clearPendingSend()
-        followLatestOnNextSnapshot = true
+        transcript.requestFollowLatest()
         session.startNewConversation()
     }
 
@@ -163,9 +161,9 @@ internal class GoogleWebSocialChatController(
 
     override fun openConversation(path: String): Boolean {
         clearPendingSend()
-        followLatestOnNextSnapshot = true
+        transcript.requestFollowLatest()
         return session.openConversation(path).also { opened ->
-            if (!opened) followLatestOnNextSnapshot = false
+            if (!opened) transcript.cancelFollowLatest()
         }
     }
 
@@ -215,7 +213,7 @@ internal class GoogleWebSocialChatController(
             pendingAttachments = emptyList(),
             pendingSendStatus = pendingStatus ?: "发送中…",
             attachmentsForMessage = { emptyList() },
-            timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
+            timestampFor = transcript::timestampFor,
         )
         if (pendingStatus != null && !assistantObserved) {
             mapped.lastOrNull { message ->
@@ -226,13 +224,10 @@ internal class GoogleWebSocialChatController(
             snapshot = snapshot,
             provider = provider,
             messages = mapped,
-            timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
+            timestampFor = transcript::timestampFor,
         )
-        val followLatest = binding.chatList.shouldFollowLatestWebChatMessage(followLatestOnNextSnapshot)
-        followLatestOnNextSnapshot = false
-        messageListUpdater.submit(presented, dispatchUpdates = active)
+        transcript.submit(presented, active)
         if (!active) return
-        if (followLatest && messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel()
         onComposerStateChanged()
     }
@@ -241,7 +236,7 @@ internal class GoogleWebSocialChatController(
         latestStateDetail = detail?.takeIf(String::isNotBlank)
             ?.takeIf { state == GoogleWebBackgroundSession.State.ERROR }
         if (!active) return
-        if (messages.isEmpty()) when (state) {
+        if (!transcript.hasMessages()) when (state) {
             GoogleWebBackgroundSession.State.LOADING -> renderStatus("正在连接 Google 搜索网页 AI…")
             GoogleWebBackgroundSession.State.ERROR -> renderStatus(
                 detail?.takeIf(String::isNotBlank) ?: "Google 搜索网页 AI 暂时不可用。",
@@ -325,17 +320,7 @@ internal class GoogleWebSocialChatController(
     }
 
     private fun renderStatus(content: String) {
-        val id = "${provider.id.wireValue}:status"
-        messages.clear()
-        messages += ChatMessage(
-            role = "friend",
-            content = content,
-            senderLabel = provider.displayName,
-            senderAvatarResId = provider.avatarResId,
-            id = id,
-            createdAtMs = timestamps.getOrPut(id) { System.currentTimeMillis() },
-        )
-        adapter.notifyDataSetChanged()
+        transcript.showStatus(provider, content)
     }
 
     private fun handleWebChatMessageAction(message: ChatMessage, action: WebChatMessageAction) {

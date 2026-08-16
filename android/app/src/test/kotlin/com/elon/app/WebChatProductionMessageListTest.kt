@@ -34,6 +34,24 @@ class WebChatProductionMessageListTest {
         assertTrue(WebChatProductionScrollFollowPolicy.shouldFollow(true, 10, 1))
     }
 
+    @Test
+    fun transcriptStateKeepsStableTimestampsAndConsumesExplicitFollowOnce() {
+        var now = 10L
+        val state = WebChatProductionTranscriptState { now }
+
+        assertTrue(state.timestampFor("message-1") == 10L)
+        now = 20L
+        assertTrue(state.timestampFor("message-1") == 10L)
+        assertTrue(state.timestampFor("message-2") == 20L)
+
+        state.requestFollowLatest()
+        assertTrue(state.consumeFollowLatestRequest())
+        assertFalse(state.consumeFollowLatestRequest())
+        state.requestFollowLatest()
+        state.cancelFollowLatest()
+        assertFalse(state.consumeFollowLatestRequest())
+    }
+
     private fun message(id: String?, content: String) = ChatMessage(
         role = "friend",
         content = content,

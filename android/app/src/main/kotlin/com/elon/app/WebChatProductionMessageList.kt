@@ -1,6 +1,91 @@
 package com.elon.app
 
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.RecyclerView
+
+internal class WebChatProductionTranscriptState(
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    private val timestamps = linkedMapOf<String, Long>()
+    private var followLatestRequested = false
+
+    fun timestampFor(id: String): Long = timestamps.getOrPut(id, clock)
+
+    fun requestFollowLatest() {
+        followLatestRequested = true
+    }
+
+    fun cancelFollowLatest() {
+        followLatestRequested = false
+    }
+
+    fun consumeFollowLatestRequest(): Boolean = followLatestRequested.also {
+        followLatestRequested = false
+    }
+}
+
+internal class WebChatProductionTranscript(
+    private val list: RecyclerView,
+    private val setChatAdapter: (ChatAdapter) -> Unit,
+    onMessageLongPress: (android.view.View, ChatMessage) -> Unit,
+    onMessageAction: (ChatMessage, WebChatMessageAction) -> Unit,
+    onContentOpen: (ChatMessage, WebChatProductionContentPart) -> Unit,
+) {
+    private val state = WebChatProductionTranscriptState()
+    private val messages = mutableListOf<ChatMessage>()
+    private val adapter = ChatAdapter(messages, onMessageLongPress = onMessageLongPress).apply {
+        onWebChatMessageAction = onMessageAction
+        onWebChatContentOpen = onContentOpen
+    }
+    private val updater = WebChatProductionMessageListUpdater(messages, adapter)
+
+    fun activate() {
+        setChatAdapter(adapter)
+        list.adapter = adapter
+        if (messages.isNotEmpty()) list.jumpToLatestMessageBeforeNextDraw()
+    }
+
+    fun currentMessages(): List<ChatMessage> = messages.toList()
+
+    fun hasMessages(): Boolean = messages.isNotEmpty()
+
+    fun timestampFor(id: String): Long = state.timestampFor(id)
+
+    fun requestFollowLatest() = state.requestFollowLatest()
+
+    fun cancelFollowLatest() = state.cancelFollowLatest()
+
+    fun indexOfMessageId(id: String): Int = messages.indexOfFirst { it.id == id }
+
+    fun messageAt(index: Int): ChatMessage? = messages.getOrNull(index)
+
+    fun submit(next: List<ChatMessage>, active: Boolean) {
+        val followLatest = list.shouldFollowLatestWebChatMessage(
+            state.consumeFollowLatestRequest(),
+        )
+        updater.submit(next, dispatchUpdates = active)
+        if (active && followLatest && messages.isNotEmpty()) {
+            list.jumpToLatestMessageBeforeNextDraw()
+        }
+    }
+
+    fun showStatus(provider: WebChatProviderIdentity, content: String) {
+        val id = "${provider.id.wireValue}:status"
+        updater.submit(
+            listOf(
+                ChatMessage(
+                    role = "friend",
+                    content = content,
+                    senderLabel = provider.displayName,
+                    senderAvatarResId = provider.avatarResId,
+                    id = id,
+                    createdAtMs = timestampFor(id),
+                ),
+            ),
+            dispatchUpdates = true,
+        )
+    }
+}
 
 internal class WebChatProductionMessageListUpdater(
     private val messages: MutableList<ChatMessage>,

@@ -29,13 +29,13 @@ internal class ChatGptSocialChatController(
     audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.CHATGPT_WEB
-    private val messages = mutableListOf<ChatMessage>()
-    private val timestamps = linkedMapOf<String, Long>()
-    private val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions).apply {
-        onWebChatMessageAction = ::handleWebChatMessageAction
-        onWebChatContentOpen = { _, _ -> openOfficialFallback() }
-    }
-    private val messageListUpdater = WebChatProductionMessageListUpdater(messages, adapter)
+    private val transcript = WebChatProductionTranscript(
+        list = binding.chatList,
+        setChatAdapter = setChatAdapter,
+        onMessageLongPress = showMessageActions,
+        onMessageAction = ::handleWebChatMessageAction,
+        onContentOpen = { _, _ -> openOfficialFallback() },
+    )
     private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(
         activity = activity,
@@ -56,7 +56,6 @@ internal class ChatGptSocialChatController(
     private var waitingForAttachmentCompletion = false
     private var latestCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
-    private var followLatestOnNextSnapshot = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
             inputText = { binding.inputEdit.text?.toString().orEmpty() },
@@ -82,9 +81,7 @@ internal class ChatGptSocialChatController(
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
         active = true
-        setChatAdapter(adapter)
-        binding.chatList.adapter = adapter
-        if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        transcript.activate()
         session.activate()
         session.currentSnapshot()?.let(::renderSnapshot)
         updateComposerModel(session.currentSnapshot()?.currentModel.orEmpty())
@@ -96,7 +93,7 @@ internal class ChatGptSocialChatController(
 
     override fun isActive(): Boolean = active
 
-    override fun currentMessages(): List<ChatMessage> = messages.toList()
+    override fun currentMessages(): List<ChatMessage> = transcript.currentMessages()
 
     override fun stateWireValue(): String = session.state().wireValue
 
@@ -136,7 +133,7 @@ internal class ChatGptSocialChatController(
             this.pendingPrompt = prompt
             this.pendingAttachments = pendingAttachments.toList()
             waitingForAttachmentCompletion = true
-            followLatestOnNextSnapshot = true
+            transcript.requestFollowLatest()
             renderSnapshot(session.currentSnapshot() ?: return true)
             if (!session.sendAttachments(prompt, pendingAttachments)) {
                 this.pendingPrompt = null
@@ -167,7 +164,7 @@ internal class ChatGptSocialChatController(
             return true
         }
         pendingPrompt = prompt
-        followLatestOnNextSnapshot = true
+        transcript.requestFollowLatest()
         renderSnapshot(session.currentSnapshot() ?: return true)
         if (!session.sendPrompt(prompt)) {
             pendingPrompt = null
@@ -190,7 +187,7 @@ internal class ChatGptSocialChatController(
 
     override fun startNewConversation() {
         pendingPrompt = null
-        followLatestOnNextSnapshot = true
+        transcript.requestFollowLatest()
         session.startNewConversation()
     }
 
@@ -204,9 +201,9 @@ internal class ChatGptSocialChatController(
 
     override fun openConversation(path: String): Boolean {
         pendingPrompt = null
-        followLatestOnNextSnapshot = true
+        transcript.requestFollowLatest()
         return session.openConversation(path).also { opened ->
-            if (!opened) followLatestOnNextSnapshot = false
+            if (!opened) transcript.cancelFollowLatest()
         }
     }
 
@@ -250,9 +247,9 @@ internal class ChatGptSocialChatController(
 
     private fun revealMessageFromMcp(messageId: String, partIndex: Int?, target: String): Boolean {
         val nativeId = "${provider.id.wireValue}:$messageId"
-        val index = messages.indexOfFirst { it.id == nativeId }
+        val index = transcript.indexOfMessageId(nativeId)
         if (index < 0) return false
-        val message = messages[index]
+        val message = transcript.messageAt(index) ?: return false
         if (partIndex != null && partIndex !in message.webChatMessage?.contentParts.orEmpty().indices) {
             return false
         }
@@ -347,19 +344,16 @@ internal class ChatGptSocialChatController(
             messageActionContextIds = WebChatProductionMessageActionControls.messageContextIds(
                 socialConsumerPort.state().controls,
             ),
-            timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
+            timestampFor = transcript::timestampFor,
         )
         val presented = WebChatProductionHistoryNotice.prepend(
             snapshot = snapshot,
             provider = provider,
             messages = mapped,
-            timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
+            timestampFor = transcript::timestampFor,
         )
-        val followLatest = binding.chatList.shouldFollowLatestWebChatMessage(followLatestOnNextSnapshot)
-        followLatestOnNextSnapshot = false
-        messageListUpdater.submit(presented, dispatchUpdates = active)
+        transcript.submit(presented, active)
         if (!active) return
-        if (followLatest && messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel(snapshot.currentModel)
         onComposerStateChanged()
     }
@@ -368,7 +362,7 @@ internal class ChatGptSocialChatController(
         latestStateDetail = detail?.takeIf(String::isNotBlank)
             ?.takeIf { state == ChatGptBackgroundSession.State.ERROR }
         if (!active) return
-        if (messages.isEmpty()) when (state) {
+        if (!transcript.hasMessages()) when (state) {
             ChatGptBackgroundSession.State.LOADING -> renderStatusMessage("正在连接 ChatGPT 网页 AI…")
             ChatGptBackgroundSession.State.LOGIN_REQUIRED -> renderStatusMessage(
                 "当前页面需要登录。可打开“官网功能”登录，也可在官网支持时直接匿名聊天。",
@@ -428,17 +422,7 @@ internal class ChatGptSocialChatController(
     }
 
     private fun renderStatusMessage(content: String) {
-        val id = "${provider.id.wireValue}:status"
-        messages.clear()
-        messages += ChatMessage(
-            role = "friend",
-            content = content,
-            senderLabel = provider.displayName,
-            senderAvatarResId = provider.avatarResId,
-            id = id,
-            createdAtMs = timestamps.getOrPut(id) { System.currentTimeMillis() },
-        )
-        adapter.notifyDataSetChanged()
+        transcript.showStatus(provider, content)
     }
 
     private fun handleWebChatMessageAction(message: ChatMessage, action: WebChatMessageAction) {

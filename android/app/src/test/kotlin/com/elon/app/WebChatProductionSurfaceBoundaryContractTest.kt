@@ -107,6 +107,25 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertFalse(controller.contains("socialMcpPort.uiState()"))
     }
 
+    @Test
+    fun webProvidersShareOneProductionTranscriptInsteadOfDuplicatingListState() {
+        val chatGpt = read(
+            "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
+        )
+        val google = read(
+            "android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt",
+        )
+
+        listOf(chatGpt, google).forEach { controller ->
+            assertTrue(controller.contains("WebChatProductionTranscript("))
+            assertFalse(controller.contains("mutableListOf<ChatMessage>()"))
+            assertFalse(controller.contains("linkedMapOf<String, Long>()"))
+            assertFalse(controller.contains("WebChatProductionMessageListUpdater("))
+            assertTrue(controller.contains("transcript.activate()"))
+            assertTrue(controller.contains("transcript.submit(presented, active)"))
+        }
+    }
+
     private fun read(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 
