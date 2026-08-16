@@ -131,7 +131,7 @@ class WebChatNavigationSessionRegistryTest {
     private fun completeIdentity(providerId: WebChatProviderId) = WebChatProviderIdentity(
         id = providerId,
         displayName = "Test provider",
-        avatarResId = R.drawable.ic_web_ai_google_placeholder_avatar,
+        avatarResId = R.drawable.ic_web_ai_google_avatar,
         available = true,
         capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
     )

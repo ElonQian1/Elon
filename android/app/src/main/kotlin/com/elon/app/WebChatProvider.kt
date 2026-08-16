@@ -81,7 +81,7 @@ internal object WebChatProviderRegistry {
         WebChatProviderIdentity(
             id = WebChatProviderId.GOOGLE_WEB,
             displayName = "Google 搜索网页 AI",
-            avatarResId = R.drawable.ic_web_ai_google_placeholder_avatar,
+            avatarResId = R.drawable.ic_web_ai_google_avatar,
             available = true,
             capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION + setOf(
                 WebChatProviderCapability.MESSAGE_COPY,

@@ -35,6 +35,7 @@ class WebChatProviderRegistryTest {
         assertTrue(chatGpt.supports(WebChatProviderCapability.RICH_TEXT))
         assertTrue(chatGpt.supports(WebChatProviderCapability.RICH_PARTS))
         assertEquals("Google 搜索网页 AI", google.displayName)
+        assertEquals(R.drawable.ic_web_ai_google_avatar, google.avatarResId)
         assertTrue(google.available)
         assertTrue(google.selectable)
         assertTrue(google.supports(WebChatProviderCapability.MESSAGE_COPY))
