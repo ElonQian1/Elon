@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebUiControl
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import org.json.JSONObject
 
 internal data class WebChatProductionPageAction(
@@ -83,6 +84,7 @@ internal class WebChatProductionPageActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeDialog: AlertDialog? = null
+    private var activeSheet: BottomSheetDialog? = null
     private val adaptiveControls = WebChatProductionAdaptiveControlsCoordinator(activity)
 
     fun show(provider: WebChatProviderIdentity) {
@@ -106,6 +108,8 @@ internal class WebChatProductionPageActionsCoordinator(
 
     fun cancelPending() {
         requestEpoch += 1
+        activeSheet?.dismiss()
+        activeSheet = null
         activeDialog?.dismiss()
         activeDialog = null
         adaptiveControls.cancel()
@@ -145,32 +149,36 @@ internal class WebChatProductionPageActionsCoordinator(
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
         if (actions.isEmpty()) return showUnavailable()
-        val labels = actions.map { action ->
-            if (action.officialFallback) "${action.label}（官网）" else action.label
-        }
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("当前网页操作")
-            .setItems(labels.toTypedArray()) { _, index ->
-                actions.getOrNull(index)?.let { action ->
-                    selectAction(provider, port, action, actions.mapTo(mutableSetOf()) { it.controlId })
-                }
+        val byId = actions.associateBy(WebChatProductionPageAction::controlId)
+        val previousControlIds = byId.keys
+        val sheet = WebChatActionSheet.show(
+            activity = activity,
+            title = "当前网页操作",
+            items = actions.map { action ->
+                WebChatActionSheetItem(
+                    id = action.controlId,
+                    title = action.label,
+                    subtitle = if (action.officialFallback) "在官网中完成" else null,
+                    contentDescription = action.nativeSelector,
+                )
+            },
+            footerActions = listOf(
+                WebChatActionSheetFooterAction(
+                    label = "官网完整功能",
+                    contentDescription = "web-chat-page-actions-official:${provider.id.wireValue}",
+                    action = openOfficialFallback,
+                ),
+            ),
+        ) { item ->
+            if (activeProvider() != provider.id) return@show
+            byId[item.id]?.let { action ->
+                selectAction(provider, port, action, previousControlIds)
             }
-            .setNeutralButton("官网完整功能") { _, _ -> openOfficialFallback() }
-            .setNegativeButton("取消", null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.listView?.apply {
-                contentDescription = "web-chat-page-actions:${provider.id.wireValue}"
-                post {
-                    for (childIndex in 0 until childCount) {
-                        val actionIndex = firstVisiblePosition + childIndex
-                        getChildAt(childIndex)?.contentDescription =
-                            actions.getOrNull(actionIndex)?.nativeSelector
-                    }
-                }
-            }
         }
-        showTracked(dialog)
+        activeSheet = sheet
+        sheet?.setOnDismissListener {
+            if (activeSheet === sheet) activeSheet = null
+        }
     }
 
     private fun selectAction(

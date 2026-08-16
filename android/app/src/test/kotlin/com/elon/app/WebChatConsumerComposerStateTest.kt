@@ -43,4 +43,16 @@ class WebChatConsumerComposerStateTest {
         assertFalse(state.attachmentVisible)
         assertFalse(state.toolsVisible)
     }
+
+    @Test
+    fun explicitLoginRequirementIsNotPresentedAsAConnectionDelay() {
+        val state = WebChatConsumerComposerStateResolver.resolve(
+            WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            state = "login_required",
+            composerReady = false,
+            attachmentSupported = false,
+        )
+
+        assertEquals("当前网页要求登录，输入内容将保留", state.inputHint)
+    }
 }

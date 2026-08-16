@@ -4,6 +4,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import org.json.JSONObject
 
 internal data class WebChatProductionFeature(
@@ -58,6 +59,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeDialog: AlertDialog? = null
+    private var activeSheet: BottomSheetDialog? = null
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -83,6 +85,8 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 
     fun cancelPending() {
         requestEpoch += 1
+        activeSheet?.dismiss()
+        activeSheet = null
         activeDialog?.dismiss()
         activeDialog = null
     }
@@ -122,28 +126,39 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
         if (features.isEmpty()) return showUnavailable()
-        val labels = features.map(WebChatProductionFeature::navigationLabel)
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("${provider.displayName}功能")
-            .setItems(labels.toTypedArray()) { _, index ->
-                features.getOrNull(index)?.let { selectFeature(provider, port, it) }
-            }
-            .setNeutralButton("打开官方页") { _, _ -> openOfficialFallback() }
-            .setNegativeButton("取消", null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.listView?.apply {
-                contentDescription = "web-chat-feature-navigation:${provider.id.wireValue}"
-                post {
-                    for (childIndex in 0 until childCount) {
-                        val featureIndex = firstVisiblePosition + childIndex
-                        getChildAt(childIndex)?.contentDescription =
-                            features.getOrNull(featureIndex)?.nativeSelector
-                    }
-                }
-            }
+        val byId = features.associateBy(WebChatProductionFeature::id)
+        val sheet = WebChatActionSheet.show(
+            activity = activity,
+            title = "${provider.displayName}功能",
+            items = features.map { feature ->
+                WebChatActionSheetItem(
+                    id = feature.id,
+                    title = feature.label,
+                    subtitle = when {
+                        feature.selected && feature.officialCompletion -> "当前功能 · 在官网中继续"
+                        feature.selected -> "当前功能"
+                        feature.officialCompletion -> "在官网中完成"
+                        else -> null
+                    },
+                    selected = feature.selected,
+                    contentDescription = feature.nativeSelector,
+                )
+            },
+            footerActions = listOf(
+                WebChatActionSheetFooterAction(
+                    label = "官网完整功能",
+                    contentDescription = "web-chat-feature-official:${provider.id.wireValue}",
+                    action = openOfficialFallback,
+                ),
+            ),
+        ) { item ->
+            if (activeProvider() != provider.id) return@show
+            byId[item.id]?.let { selectFeature(provider, port, it) }
         }
-        showTracked(dialog)
+        activeSheet = sheet
+        sheet?.setOnDismissListener {
+            if (activeSheet === sheet) activeSheet = null
+        }
     }
 
     private fun selectFeature(

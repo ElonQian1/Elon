@@ -3,11 +3,11 @@ package com.elon.app
 import android.graphics.Rect
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptBackgroundSession
 import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
 import com.elon.app.chatgptweb.ChatGptMessageClipboard
+import com.elon.app.chatgptweb.ChatGptNativeControlPresentation
 import com.elon.app.chatgptweb.ChatGptWebAudioPermissionController
 import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
@@ -421,22 +421,28 @@ internal class ChatGptSocialChatController(
             Toast.makeText(activity, R.string.web_chat_model_options_empty, Toast.LENGTH_SHORT).show()
             return
         }
-        val selected = selectable.indexOfFirst(ChatGptWebComposerOption::selected).coerceAtLeast(0)
-        AlertDialog.Builder(activity)
-            .setTitle(R.string.web_chat_model_picker_title)
-            .setSingleChoiceItems(selectable.map { it.label }.toTypedArray(), selected) { dialog, which ->
-                selectable.getOrNull(which)?.let { session.selectModel(it.id) }
-                dialog.dismiss()
-            }
-            .setNeutralButton(R.string.web_chat_open_official, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-            .also { dialog ->
-                dialog.setOnShowListener {
-                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { openOfficialFallback() }
-                }
-                dialog.show()
-            }
+        val byId = selectable.associateBy(ChatGptWebComposerOption::id)
+        WebChatActionSheet.show(
+            activity = activity,
+            title = activity.getString(R.string.web_chat_model_picker_title),
+            items = selectable.map { option ->
+                WebChatActionSheetItem(
+                    id = option.id,
+                    title = option.label,
+                    subtitle = if (option.selected) "当前模型" else null,
+                    selected = option.selected,
+                    contentDescription = "web-chat-model-option:" +
+                        ChatGptNativeControlPresentation.stableContextId(option.id),
+                )
+            },
+            footerActions = listOf(
+                WebChatActionSheetFooterAction(
+                    label = activity.getString(R.string.web_chat_open_official),
+                    contentDescription = "web-chat-model-official",
+                    action = openOfficialFallback,
+                ),
+            ),
+        ) { item -> byId[item.id]?.let { session.selectModel(it.id) } }
     }
 
     private fun updateComposerModel(model: String) {

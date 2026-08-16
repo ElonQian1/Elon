@@ -1,12 +1,8 @@
 package com.elon.app
 
 import android.view.View
-import android.view.LayoutInflater
-import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
-import android.widget.ArrayAdapter
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -176,30 +172,26 @@ internal class WebChatProductionMessageActionCoordinator(
             Toast.makeText(activity, "当前消息没有更多可用操作", Toast.LENGTH_SHORT).show()
             return
         }
-        val adapter = ContextActionAdapter(activity, actions)
-        AlertDialog.Builder(activity)
-            .setTitle("消息操作")
-            .setAdapter(adapter) { opened, index ->
-                opened.dismiss()
-                actions.getOrNull(index)?.let(::confirmAndInvoke)
-            }
-            .setNeutralButton("官网功能") { _, _ -> openOfficialFallback() }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private class ContextActionAdapter(
-        activity: AppCompatActivity,
-        private val actions: List<WebChatContextAction>,
-    ) : ArrayAdapter<WebChatContextAction>(activity, android.R.layout.simple_list_item_1, actions) {
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val textView = (convertView ?: LayoutInflater.from(context)
-                .inflate(android.R.layout.simple_list_item_1, parent, false)) as TextView
-            val action = actions[position]
-            textView.text = action.label
-            textView.contentDescription = action.nativeSelector
-            return textView
-        }
+        val byId = actions.associateBy(WebChatContextAction::controlId)
+        WebChatActionSheet.show(
+            activity = activity,
+            title = "消息操作",
+            items = actions.map { action ->
+                WebChatActionSheetItem(
+                    id = action.controlId,
+                    title = action.label,
+                    subtitle = if (action.requiresUserConfirmation) "执行前需要确认" else null,
+                    contentDescription = action.nativeSelector,
+                )
+            },
+            footerActions = listOf(
+                WebChatActionSheetFooterAction(
+                    label = "官网功能",
+                    contentDescription = "web-chat-message-actions-official",
+                    action = openOfficialFallback,
+                ),
+            ),
+        ) { item -> byId[item.id]?.let(::confirmAndInvoke) }
     }
 
     private fun confirmAndInvoke(action: WebChatContextAction) {

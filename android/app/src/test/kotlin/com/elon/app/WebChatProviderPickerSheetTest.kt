@@ -28,5 +28,6 @@ class WebChatProviderPickerSheetTest {
         assertEquals("正在连接", webChatProviderSessionLabel("loading", true, false))
         assertEquals("账号会话", webChatProviderSessionLabel("ready", true, true))
         assertEquals("连接异常", webChatProviderSessionLabel("error", false, false))
+        assertEquals("需要登录", webChatProviderSessionLabel("login_required", false, false))
     }
 }

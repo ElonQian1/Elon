@@ -76,6 +76,7 @@ internal fun webChatProviderSessionLabel(
     composerReady: Boolean,
 ): String = when {
     state == "error" -> "连接异常"
+    state == "login_required" -> "需要登录"
     !composerReady -> "正在连接"
     authenticated -> "账号会话"
     else -> "访客会话"

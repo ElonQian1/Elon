@@ -2,8 +2,8 @@ package com.elon.app
 
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import org.json.JSONObject
 
 internal data class WebChatProductionComposerTool(
@@ -47,6 +47,7 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val openOfficialFallback: () -> Unit,
 ) {
     private var requestEpoch = 0
+    private var activeSheet: BottomSheetDialog? = null
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -71,6 +72,8 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     fun cancelPending() {
         requestEpoch += 1
+        activeSheet?.dismiss()
+        activeSheet = null
     }
 
     private fun pollTools(
@@ -114,37 +117,44 @@ internal class WebChatProductionComposerToolsCoordinator(
             showUnavailable()
             return
         }
-        val labels = commands.map(WebChatProductionComposerCommand::label) + tools.map { tool ->
-            if (tool.selected) "${tool.label}（已选）" else tool.label
+        val commandById = commands.associateBy { "command:${it.action}" }
+        val toolById = tools.associateBy { "tool:${it.id}" }
+        val items = commands.map { command ->
+            WebChatActionSheetItem(
+                id = "command:${command.action}",
+                title = command.label,
+                subtitle = "当前会话操作",
+                contentDescription = command.nativeSelector,
+            )
+        } + tools.map { tool ->
+            WebChatActionSheetItem(
+                id = "tool:${tool.id}",
+                title = tool.label,
+                subtitle = if (tool.selected) "已启用" else null,
+                selected = tool.selected,
+                contentDescription = tool.nativeSelector,
+            )
         }
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("网页功能")
-            .setItems(labels.toTypedArray()) { _, index ->
-                if (index < commands.size) {
-                    executeCommand(port, commands[index])
-                } else {
-                    selectTool(port, tools[index - commands.size])
-                }
-            }
-            .setNegativeButton("取消", null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.listView?.apply {
-                contentDescription = "web-chat-composer-tools:${provider.id.wireValue}"
-                post {
-                    for (childIndex in 0 until childCount) {
-                        val optionIndex = firstVisiblePosition + childIndex
-                        val selector = if (optionIndex < commands.size) {
-                            commands.getOrNull(optionIndex)?.nativeSelector
-                        } else {
-                            tools.getOrNull(optionIndex - commands.size)?.nativeSelector
-                        }
-                        getChildAt(childIndex)?.contentDescription = selector
-                    }
-                }
-            }
+        val sheet = WebChatActionSheet.show(
+            activity = activity,
+            title = "网页功能",
+            items = items,
+            footerActions = listOf(
+                WebChatActionSheetFooterAction(
+                    label = "官网完整功能",
+                    contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",
+                    action = openOfficialFallback,
+                ),
+            ),
+        ) { item ->
+            if (activeProvider() != provider.id) return@show
+            commandById[item.id]?.let { executeCommand(port, it); return@show }
+            toolById[item.id]?.let { selectTool(port, it) }
         }
-        dialog.show()
+        activeSheet = sheet
+        sheet?.setOnDismissListener {
+            if (activeSheet === sheet) activeSheet = null
+        }
     }
 
     private fun executeCommand(
@@ -167,7 +177,7 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private fun showUnavailable() {
         if (activity.isFinishing || activity.isDestroyed) return
-        AlertDialog.Builder(activity)
+        androidx.appcompat.app.AlertDialog.Builder(activity)
             .setTitle("网页工具")
             .setMessage("当前网页没有返回可用工具，可在官方页面继续。")
             .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
