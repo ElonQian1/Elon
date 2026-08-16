@@ -22,11 +22,14 @@ internal object ChatGptFriendMessageMapper {
         val latestAssistantIndex = snapshot.messages.indexOfLast { it.role == "assistant" }
         val result = snapshot.messages.mapIndexed { index, message ->
             val id = "${provider.id.wireValue}:${message.id}"
-            val messageAttachments = attachmentsForMessage(message.id).ifEmpty {
-                message.parts.mapNotNull(::attachmentFromPart)
-            }
+            val messageAttachments = attachmentsForMessage(message.id)
             val contentParts = if (provider.supports(WebChatProviderCapability.RICH_PARTS)) {
-                message.parts.mapNotNull(::contentPartFromPart)
+                message.parts.mapNotNull { part ->
+                    contentPartFromPart(
+                        part = part,
+                        suppressAttachmentFallback = messageAttachments.isNotEmpty(),
+                    )
+                }
             } else {
                 emptyList()
             }
@@ -105,22 +108,11 @@ internal object ChatGptFriendMessageMapper {
         return result
     }
 
-    private fun attachmentFromPart(part: ChatGptWebMessagePart): ChatAttachment? = when (part.type) {
-        "image" -> ChatAttachment(
-            kind = "image",
-            displayName = part.label,
-            mimeType = part.metadata?.mediaType,
-        )
-        "file" -> ChatAttachment(
-            kind = "file",
-            displayName = part.label,
-            mimeType = part.metadata?.mediaType,
-        )
-        else -> null
-    }
-
-    private fun contentPartFromPart(part: ChatGptWebMessagePart): WebChatProductionContentPart? {
-        if (part.type in setOf("image", "file")) return null
+    private fun contentPartFromPart(
+        part: ChatGptWebMessagePart,
+        suppressAttachmentFallback: Boolean,
+    ): WebChatProductionContentPart? {
+        if (suppressAttachmentFallback && part.type in ATTACHMENT_PART_TYPES) return null
         return WebChatProductionContentPart(
             type = part.type,
             label = part.label,
@@ -132,4 +124,6 @@ internal object ChatGptFriendMessageMapper {
             columnCount = part.metadata?.columnCount,
         )
     }
+
+    private val ATTACHMENT_PART_TYPES = setOf("image", "file")
 }

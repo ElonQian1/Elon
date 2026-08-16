@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import com.elon.app.ChatAttachment
+import com.elon.app.WebChatProductionContentPart
 import com.elon.app.WebChatProviderId
 import com.elon.app.WebChatProviderRegistry
 import com.elon.app.WebChatMessageAction
@@ -99,7 +100,7 @@ class ChatGptFriendMessageMapperTest {
     }
 
     @Test
-    fun restoresOfficialFilePartsIntoTheExistingAttachmentBubble() {
+    fun representsOfficialFilePartsAsAnExplicitFallbackInsteadOfABrokenAttachment() {
         val message = ChatGptWebMessage(
             id = "u-file",
             role = "user",
@@ -121,8 +122,38 @@ class ChatGptFriendMessageMapperTest {
             timestampFor = { 42L },
         )
 
-        assertEquals("fixture.pdf", result.single().attachments?.single()?.displayName)
-        assertEquals("application/pdf", result.single().attachments?.single()?.mimeType)
+        assertEquals(null, result.single().attachments)
+        val part = result.single().webChatMessage?.contentParts?.single()
+        assertEquals("file", part?.type)
+        assertEquals("fixture.pdf", part?.label)
+        assertEquals("application/pdf", part?.mediaType)
+    }
+
+    @Test
+    fun keepsResolvedLocalAttachmentsWithoutADuplicateFallbackRow() {
+        val message = ChatGptWebMessage(
+            id = "u-file",
+            role = "user",
+            content = "查看文件",
+            state = "completed",
+            parts = listOf(ChatGptWebMessagePart(type = "file", label = "fixture.pdf")),
+        )
+        val local = ChatAttachment(
+            kind = "file",
+            displayName = "fixture.pdf",
+            localPath = "fixture.pdf",
+        )
+
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot(messages = listOf(message)),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = null,
+            attachmentsForMessage = { listOf(local) },
+            timestampFor = { 42L },
+        ).single()
+
+        assertEquals(listOf(local), result.attachments)
+        assertEquals(emptyList<WebChatProductionContentPart>(), result.webChatMessage?.contentParts)
     }
 
     @Test

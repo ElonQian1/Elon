@@ -100,6 +100,8 @@ internal object WebChatProductionRichContentBinder {
 
     private fun typeLabel(context: Context, type: String): String = context.getString(
         when (type) {
+            "image" -> R.string.chatgpt_message_part_image
+            "file" -> R.string.chatgpt_message_part_file
             "citation" -> R.string.chatgpt_message_part_citation
             "code" -> R.string.chatgpt_message_part_code
             "table" -> R.string.chatgpt_message_part_table
@@ -115,7 +117,7 @@ internal object WebChatProductionRichContentBinder {
     )
 
     private fun icon(type: String): Int = when (type) {
-        "video", "chart", "map" -> R.drawable.ic_attach_photos
+        "image", "video", "chart", "map" -> R.drawable.ic_attach_photos
         "audio" -> R.drawable.ic_input_voice
         "artifact", "interactive" -> R.drawable.ic_project_documents_menu
         else -> R.drawable.ic_attach_files
