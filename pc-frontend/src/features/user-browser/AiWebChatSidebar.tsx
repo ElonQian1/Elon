@@ -192,9 +192,11 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
         <div className={styles.status} data-error={Boolean(web.controller.sessionState?.lastError)}>
           <strong>{web.userState.title}</strong>
           <span>
-            {web.controller.sessionState?.navigationCacheStatus === 'cached'
+            {web.controller.sessionState?.contextReady === false
+              ? web.contextSummary
+              : web.controller.sessionState?.navigationCacheStatus === 'cached'
               ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
-              : web.message || web.userState.detail}
+              : web.message || web.contextSummary || web.userState.detail}
           </span>
         </div>
         <p className={styles.privacy}><ShieldCheck size={14} />Cookie 仅保存在这台电脑的 WebView2 Profile</p>

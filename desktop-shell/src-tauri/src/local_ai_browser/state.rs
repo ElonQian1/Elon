@@ -9,10 +9,12 @@ use serde::Serialize;
 use serde_json::Value;
 use tauri::Url;
 
-use super::snapshot_cache;
+use super::{semantic_context, snapshot_cache};
 
 #[path = "state/cache.rs"]
 mod cache;
+#[path = "state/context.rs"]
+mod context;
 
 #[derive(Clone, Default)]
 pub struct LocalAiBrowserRuntime {
@@ -48,6 +50,12 @@ struct SessionRecord {
     navigation_live: bool,
     conversation_snapshots: Vec<snapshot_cache::StoredConversationSnapshot>,
     active_restorable_url: Option<String>,
+    active_conversation_id: Option<String>,
+    semantic_conversation_id: Option<String>,
+    active_page_context_key: Option<String>,
+    semantic_page_context_key: Option<String>,
+    pending_context_action: String,
+    preserve_conversation_on_navigation: bool,
     cache_path: Option<PathBuf>,
     cache_updated_at_ms: u64,
     updated_at_ms: u64,
@@ -77,6 +85,8 @@ pub struct LocalAiWebSessionState {
     pub semantic_cache_status: String,
     pub navigation_cache_status: String,
     pub local_conversations: Vec<LocalAiCachedConversation>,
+    pub active_conversation_id: Option<String>,
+    pub context_ready: bool,
     pub cache_updated_at_ms: u64,
     pub updated_at_ms: u64,
 }
@@ -116,6 +126,7 @@ impl LocalAiBrowserRuntime {
             .cloned()?;
         record.semantic_event = Some(cached.semantic_event);
         record.active_restorable_url = Some(cached.restorable_url.clone());
+        record.begin_cached_conversation(cached.id, &cached.restorable_url);
         record.semantic_live = false;
         record.streaming = false;
         record.last_event_kind = "cached_conversation_activated".to_string();
@@ -166,6 +177,11 @@ impl LocalAiBrowserRuntime {
             let active_restorable_url = conversation_snapshots
                 .first()
                 .map(|entry| entry.restorable_url.clone());
+            let active_conversation_id =
+                conversation_snapshots.first().map(|entry| entry.id.clone());
+            let active_page_context_key = active_restorable_url
+                .as_deref()
+                .and_then(|url| semantic_context::page_context_key(provider_id, url));
             SessionRecord {
                 provider_id: provider_id.to_string(),
                 window_label: label.to_string(),
@@ -194,6 +210,12 @@ impl LocalAiBrowserRuntime {
                 navigation_live: false,
                 conversation_snapshots,
                 active_restorable_url,
+                active_conversation_id: active_conversation_id.clone(),
+                semantic_conversation_id: active_conversation_id,
+                active_page_context_key: active_page_context_key.clone(),
+                semantic_page_context_key: active_page_context_key,
+                pending_context_action: String::new(),
+                preserve_conversation_on_navigation: false,
                 cache_path,
                 cache_updated_at_ms,
                 updated_at_ms: now_ms(),
@@ -230,6 +252,7 @@ impl LocalAiBrowserRuntime {
             if allowed {
                 record.active_restorable_url =
                     snapshot_cache::normalize_restorable_url(&record.provider_id, &raw_url);
+                record.mark_context_navigation(&raw_url);
                 record.window_status = "loading".to_string();
                 record.loading = true;
                 record.renderer_status = "connecting".to_string();
@@ -289,6 +312,16 @@ impl LocalAiBrowserRuntime {
     }
 
     pub fn mark_command_pending(&self, label: &str, action: &str, request_id: Option<&str>) {
+        self.mark_command_pending_with_value(label, action, request_id, None);
+    }
+
+    pub fn mark_command_pending_with_value(
+        &self,
+        label: &str,
+        action: &str,
+        request_id: Option<&str>,
+        value: Option<&str>,
+    ) {
         self.update(label, |record| {
             record.command_result = None;
             record.last_event_kind = "command_pending".to_string();
@@ -296,10 +329,21 @@ impl LocalAiBrowserRuntime {
             record.last_command_request_id =
                 request_id.map(|value| truncate(value.to_string(), 36));
             record.last_command_ok = None;
+            record.begin_context_command(action, value);
         });
     }
 
     pub fn record_adapter_event(&self, label: &str, kind: &str, payload: Value) {
+        self.record_adapter_event_with_context(label, kind, payload, None);
+    }
+
+    pub fn record_adapter_event_with_context(
+        &self,
+        label: &str,
+        kind: &str,
+        payload: Value,
+        page_context_key: Option<&str>,
+    ) {
         self.update(label, |record| {
             record.last_event_kind = truncate(kind.to_string(), 48);
             match kind {
@@ -310,7 +354,9 @@ impl LocalAiBrowserRuntime {
                 }
                 "message_snapshot" => {
                     record.renderer_status = "active".to_string();
-                    record.semantic_event = Some(payload);
+                    if !record.apply_message_snapshot(payload, page_context_key) {
+                        return;
+                    }
                     let snapshot = record.semantic_event.as_ref();
                     record.message_count = snapshot
                         .and_then(|event| event.get("messages"))
@@ -349,6 +395,7 @@ impl LocalAiBrowserRuntime {
                 "navigation_snapshot" => record.feature_event = Some(payload),
                 "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
                 "command_result" => {
+                    record.finish_context_command(&payload);
                     record.last_command_action = payload
                         .get("action")
                         .and_then(Value::as_str)
@@ -403,6 +450,7 @@ impl LocalAiBrowserRuntime {
             record.navigation_live = false;
             record.conversation_snapshots.clear();
             record.active_restorable_url = None;
+            record.reset_context();
             record.cache_updated_at_ms = 0;
             record.updated_at_ms = now_ms();
             record.cache_path.clone()
@@ -507,14 +555,15 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             .event_cache_status(record.navigation_event.is_some(), record.navigation_live)
             .to_string();
         let diagnostics = diagnostic_summary(&record);
+        let context_ready =
+            record.pending_context_action.is_empty() && record.semantic_event.is_some();
         let local_conversations = record
             .conversation_snapshots
             .iter()
             .map(|entry| LocalAiCachedConversation {
                 id: entry.id.clone(),
                 title: entry.title.clone(),
-                active: record.active_restorable_url.as_deref()
-                    == Some(entry.restorable_url.as_str()),
+                active: record.active_conversation_id.as_deref() == Some(entry.id.as_str()),
                 updated_at_ms: entry.updated_at_ms,
             })
             .collect();
@@ -540,6 +589,8 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             semantic_cache_status,
             navigation_cache_status,
             local_conversations,
+            active_conversation_id: record.active_conversation_id,
+            context_ready,
             cache_updated_at_ms: record.cache_updated_at_ms,
             updated_at_ms: record.updated_at_ms,
         }
@@ -585,177 +636,5 @@ fn now_ms() -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
-        let runtime = LocalAiBrowserRuntime::default();
-        runtime.ensure_session("session", "chatgpt", "reserved");
-        runtime.record_adapter_event(
-            "session",
-            "message_snapshot",
-            json!({"type": "message_snapshot", "messages": [{"id": "answer"}]}),
-        );
-        runtime.record_adapter_event(
-            "session",
-            "conversation_snapshot",
-            json!({"type": "conversation_snapshot", "projects": [{"id": "project"}]}),
-        );
-
-        let snapshot = runtime.snapshot("session").unwrap();
-        assert_eq!(snapshot.semantic_event.unwrap()["type"], "message_snapshot");
-        assert_eq!(
-            snapshot.navigation_event.unwrap()["type"],
-            "conversation_snapshot"
-        );
-    }
-
-    #[test]
-    fn composer_feature_and_command_receipts_remain_independent() {
-        let runtime = LocalAiBrowserRuntime::default();
-        runtime.ensure_session("session", "chatgpt", "reserved");
-        runtime.record_adapter_event(
-            "session",
-            "composer_controls_snapshot",
-            json!({"type":"composer_controls_snapshot","section":"model","options":[]}),
-        );
-        runtime.record_adapter_event(
-            "session",
-            "navigation_snapshot",
-            json!({"type":"navigation_snapshot","features":[]}),
-        );
-        runtime.mark_command_pending("session", "send_prompt", Some("mcp_receipt1"));
-        runtime.record_adapter_event(
-            "session",
-            "command_result",
-            json!({"type":"command_result","action":"send_prompt","requestId":"mcp_receipt1","ok":true}),
-        );
-
-        let snapshot = runtime.snapshot("session").unwrap();
-        assert_eq!(snapshot.composer_event.unwrap()["section"], "model");
-        assert_eq!(
-            snapshot.feature_event.unwrap()["type"],
-            "navigation_snapshot"
-        );
-        assert_eq!(
-            snapshot.command_result.unwrap()["requestId"],
-            "mcp_receipt1"
-        );
-        assert_eq!(snapshot.diagnostics["lastCommandRequestId"], "mcp_receipt1");
-    }
-
-    #[test]
-    fn background_opening_never_reports_a_visible_official_window() {
-        let runtime = LocalAiBrowserRuntime::default();
-        runtime.ensure_session("session", "chatgpt", "connecting");
-        runtime.mark_opening("session", false);
-
-        let background = runtime.snapshot("session").unwrap();
-        assert_eq!(background.window_status, "opening");
-        assert!(!background.window_visible);
-
-        runtime.mark_opening("session", true);
-        assert!(runtime.snapshot("session").unwrap().window_visible);
-    }
-
-    #[test]
-    fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
-        let runtime = LocalAiBrowserRuntime::default();
-        runtime.ensure_session("local-ai-chatgpt-owner-secret", "chatgpt", "connecting");
-        runtime.record_adapter_event(
-            "local-ai-chatgpt-owner-secret",
-            "message_snapshot",
-            json!({
-                "type": "message_snapshot",
-                "composerReady": true,
-                "pageKind": "home",
-                "draft": "private prompt",
-                "messages": [{"content": "private answer"}],
-            }),
-        );
-        runtime.record_adapter_event(
-            "local-ai-chatgpt-owner-secret",
-            "browser_diagnostic",
-            json!({
-                "kind": "adapter_bootstrap_failed",
-                "detail": "private exception detail",
-            }),
-        );
-
-        let diagnostic = runtime.diagnostic_for_provider("chatgpt").unwrap();
-        assert_eq!(diagnostic["adapter_connected"], true);
-        assert_eq!(diagnostic["semantic_snapshot_ready"], true);
-        assert_eq!(diagnostic["composer_ready"], true);
-        assert_eq!(diagnostic["last_error_code"], "adapter_bootstrap_failed");
-        let encoded = diagnostic.to_string();
-        assert!(!encoded.contains("owner-secret"));
-        assert!(!encoded.contains("private prompt"));
-        assert!(!encoded.contains("private answer"));
-        assert!(!encoded.contains("private exception detail"));
-    }
-
-    #[test]
-    fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages() {
-        let runtime = LocalAiBrowserRuntime::default();
-        runtime.ensure_session("session", "google-ai-mode", "active");
-        runtime.mark_navigation(
-            "session",
-            &Url::parse("https://www.google.com/search?q=private+prompt&udm=50").unwrap(),
-            true,
-            None,
-        );
-        runtime.record_adapter_event(
-            "session",
-            "message_snapshot",
-            json!({
-                "type": "message_snapshot",
-                "title": "Cached search",
-                "streaming": false,
-                "messages": [{"role": "assistant", "content": [{"type": "text", "text": "answer"}]}],
-            }),
-        );
-
-        let snapshot = runtime.snapshot("session").unwrap();
-        assert_eq!(snapshot.local_conversations.len(), 1);
-        assert!(snapshot.local_conversations[0].active);
-        let encoded = serde_json::to_string(&snapshot).unwrap();
-        assert!(!encoded.contains("private+prompt"));
-
-        let id = snapshot.local_conversations[0].id.clone();
-        assert!(runtime
-            .activate_cached_conversation("session", &id)
-            .is_some());
-        let restored = runtime.snapshot("session").unwrap();
-        assert_eq!(restored.semantic_cache_status, "cached");
-        assert_eq!(restored.semantic_event.unwrap()["title"], "Cached search");
-    }
-
-    #[test]
-    fn navigation_keeps_the_snapshot_visible_but_marks_it_cached() {
-        let runtime = LocalAiBrowserRuntime::default();
-        runtime.ensure_session("session", "chatgpt", "reserved");
-        runtime.record_adapter_event(
-            "session",
-            "message_snapshot",
-            json!({"type": "message_snapshot", "messages": []}),
-        );
-        assert_eq!(runtime.snapshot("session").unwrap().cache_status, "live");
-
-        runtime.mark_navigation(
-            "session",
-            &Url::parse("https://chatgpt.com/c/example").unwrap(),
-            true,
-            None,
-        );
-        let cached = runtime.snapshot("session").unwrap();
-        assert_eq!(cached.cache_status, "cached");
-        assert!(cached.semantic_event.is_some());
-
-        runtime.clear_snapshots("session");
-        let cleared = runtime.snapshot("session").unwrap();
-        assert_eq!(cleared.cache_status, "empty");
-        assert!(cleared.semantic_event.is_none());
-    }
-}
+#[path = "state/tests.rs"]
+mod tests;

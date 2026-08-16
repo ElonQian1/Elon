@@ -20,6 +20,8 @@ mod native_window;
 pub(crate) mod native_window_state;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
+#[path = "local_ai_browser/semantic_context.rs"]
+mod semantic_context;
 #[path = "local_ai_browser/snapshot_cache.rs"]
 mod snapshot_cache;
 #[path = "local_ai_browser/state.rs"]
@@ -419,7 +421,14 @@ pub async fn run_local_ai_web_adapter_command(
     let window = app
         .get_webview_window(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
-    runtime.mark_command_pending(&label, &action, request_id.as_deref());
+    if action != "snapshot" {
+        runtime.mark_command_pending_with_value(
+            &label,
+            &action,
+            request_id.as_deref(),
+            value.as_deref(),
+        );
+    }
     let command = adapter_command::build(
         provider.display_name,
         adapter.supported_actions(),
@@ -481,7 +490,12 @@ pub fn publish_local_ai_web_event(
         .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
     let event = provider.adapter.unwrap().sanitize_event(&payload)?;
-    runtime.record_adapter_event(label, &event.kind, event.payload);
+    runtime.record_adapter_event_with_context(
+        label,
+        &event.kind,
+        event.payload,
+        event.page_context_key.as_deref(),
+    );
     Ok(())
 }
 

@@ -68,7 +68,8 @@ export function deriveLocalAiUserState(
     officialOpen
       && !session?.loading
       && !['opening', 'loading', 'blocked', 'error'].includes(session?.windowStatus || '')
-      && session?.semanticCacheStatus !== 'cached',
+      && session?.semanticCacheStatus !== 'cached'
+      && session?.contextReady !== false,
   )
   const canSend = Boolean(
     adapterConnected

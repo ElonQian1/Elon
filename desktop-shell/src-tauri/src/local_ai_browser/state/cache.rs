@@ -19,7 +19,9 @@ impl SessionRecord {
             return;
         };
         let title = conversation_title(event, &self.provider_id);
-        let id = opaque_conversation_id(&restorable_url);
+        let Some(id) = self.active_conversation_id.clone() else {
+            return;
+        };
         self.conversation_snapshots.retain(|entry| entry.id != id);
         self.conversation_snapshots.insert(
             0,
@@ -117,14 +119,4 @@ fn conversation_title(event: &Value, provider_id: &str) -> String {
     } else {
         title
     }
-}
-
-fn opaque_conversation_id(value: &str) -> String {
-    let hash = value
-        .as_bytes()
-        .iter()
-        .fold(0xcbf29ce484222325_u64, |hash, byte| {
-            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-        });
-    format!("{hash:016x}")
 }

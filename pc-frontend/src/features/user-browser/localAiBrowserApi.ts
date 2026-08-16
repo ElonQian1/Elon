@@ -159,6 +159,8 @@ export interface LocalAiWebSessionState {
   semanticCacheStatus: 'empty' | 'cached' | 'live'
   navigationCacheStatus: 'empty' | 'cached' | 'live'
   localConversations?: LocalAiCachedConversation[]
+  activeConversationId?: string | null
+  contextReady?: boolean
   cacheUpdatedAtMs: number
   updatedAtMs: number
 }
@@ -369,6 +371,18 @@ export async function runLocalAiWebAdapterCommand(
     requestId,
   }, LOCAL_AI_INVOKE_TIMEOUTS.action)
   return requestId
+}
+
+export async function requestLocalAiWebSnapshot(
+  providerId: string,
+  ownerKey: string,
+): Promise<void> {
+  assertIdentity(providerId, ownerKey)
+  await invokeDesktop<void>('run_local_ai_web_adapter_command', {
+    providerId,
+    ownerKey,
+    action: 'snapshot',
+  }, LOCAL_AI_INVOKE_TIMEOUTS.state, `snapshot:${providerId}:${ownerKey}`)
 }
 
 export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessageSnapshot {

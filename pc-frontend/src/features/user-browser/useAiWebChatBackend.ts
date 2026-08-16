@@ -72,6 +72,9 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   const streamingMessageId = [...(controller.snapshot?.messages ?? [])]
     .reverse()
     .find((item) => item.state === 'streaming')?.id
+  const contextTurnCount = (controller.snapshot?.messages ?? [])
+    .filter((item) => item.role === 'user').length
+  const contextReady = controller.sessionState?.contextReady !== false
 
   function selectProvider(id: string) {
     setProviderId(id)
@@ -90,6 +93,13 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     canCompose,
     title: controller.snapshot?.title || '新对话',
     streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
+    contextReady,
+    contextTurnCount,
+    contextSummary: !contextReady
+      ? '正在切换官方会话；目标上下文确认前已暂停发送。'
+      : contextTurnCount > 0
+        ? `当前原生界面已保持 ${contextTurnCount} 轮官方网页上下文。`
+        : '新会话上下文已就绪，第一条消息会直接进入当前官方网页会话。',
     accessMode: canCompose
       ? controller.snapshot?.authenticated ? 'account' as const : 'guest' as const
       : 'unavailable' as const,

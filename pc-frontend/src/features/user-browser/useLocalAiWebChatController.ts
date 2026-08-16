@@ -8,6 +8,7 @@ import {
   localAiBrowserErrorMessage,
   openLocalAiCachedConversation,
   openLocalAiWebSession,
+  requestLocalAiWebSnapshot,
   runLocalAiWebAdapterCommand,
   waitForLocalAiAdapterResult,
   type LocalAiAdapterAction,
@@ -28,17 +29,26 @@ export default function useLocalAiWebChatController(
   ownerKey: string,
   clientState: LocalAiClientState = 'ready',
 ) {
-  const [sessionState, setSessionState] = useState<LocalAiWebSessionState | null>(() => (
-    provider && ownerKey ? getCachedLocalAiWebSessionState(provider.id, ownerKey) : null
-  ))
+  const requestedSessionIdentity = provider && ownerKey ? `${provider.id}:${ownerKey}` : ''
+  const [sessionEntry, setSessionEntry] = useState<{
+    identity: string
+    state: LocalAiWebSessionState | null
+  }>(() => ({
+    identity: requestedSessionIdentity,
+    state: provider && ownerKey ? getCachedLocalAiWebSessionState(provider.id, ownerKey) : null,
+  }))
   const [draft, setDraft] = useState('')
   const [draftTouched, setDraftTouched] = useState(false)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const autoStartKey = useRef('')
+  const responseRefreshGeneration = useRef(0)
+  const responseRefreshTimer = useRef(0)
+  const expectedResponsePrompt = useRef('')
   const visibleSessionState = provider && ownerKey
-    ? sessionState?.providerId === provider.id
-      ? sessionState
+    ? sessionEntry.identity === requestedSessionIdentity
+      && sessionEntry.state?.providerId === provider.id
+      ? sessionEntry.state
       : getCachedLocalAiWebSessionState(provider.id, ownerKey)
     : null
   const snapshot = useMemo(
@@ -77,6 +87,10 @@ export default function useLocalAiWebChatController(
     [clientState, provider, snapshot, visibleSessionState],
   )
 
+  function setSessionState(state: LocalAiWebSessionState | null) {
+    setSessionEntry({ identity: requestedSessionIdentity, state })
+  }
+
   useEffect(() => {
     setSessionState(provider && ownerKey
       ? getCachedLocalAiWebSessionState(provider.id, ownerKey)
@@ -86,7 +100,10 @@ export default function useLocalAiWebChatController(
     setBusyAction('')
     setMessage('')
     autoStartKey.current = ''
+    cancelResponseRefresh()
   }, [ownerKey, provider])
+
+  useEffect(() => () => cancelResponseRefresh(), [])
 
   useEffect(() => {
     if (!provider || !ownerKey) return
@@ -140,6 +157,17 @@ export default function useLocalAiWebChatController(
     if (!draftTouched) setDraft(snapshot?.draft ?? '')
   }, [draftTouched, snapshot?.draft])
 
+  useEffect(() => {
+    const expected = normalizePrompt(expectedResponsePrompt.current)
+    if (!expected || !snapshot || snapshot.streaming) return
+    const messages = snapshot.messages
+    const userIndex = lastMatchingUserIndex(messages, expected)
+    if (userIndex < 0) return
+    if (messages.slice(userIndex + 1).some((item) => item.role === 'assistant' && item.state !== 'streaming')) {
+      cancelResponseRefresh()
+    }
+  }, [snapshot])
+
   async function openOfficial() {
     if (!provider || !ownerKey || busyAction) return
     setBusyAction('open')
@@ -180,6 +208,7 @@ export default function useLocalAiWebChatController(
   async function openCachedConversation(conversationId: string) {
     if (!provider || !ownerKey || busyAction) return
     setBusyAction('open_cached_conversation')
+    cancelResponseRefresh()
     setMessage('正在从本机缓存恢复会话，并在后台连接官方上下文…')
     try {
       setSessionState(await openLocalAiCachedConversation(provider.id, ownerKey, conversationId))
@@ -198,6 +227,9 @@ export default function useLocalAiWebChatController(
       return null
     }
     setBusyAction(action)
+    if (['new_conversation', 'open_conversation', 'open_project'].includes(action)) {
+      cancelResponseRefresh()
+    }
     setMessage('')
     try {
       const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
@@ -214,6 +246,7 @@ export default function useLocalAiWebChatController(
         setDraft('')
         setDraftTouched(false)
         setMessage(result?.detail || '消息已交给官方网页发送。')
+        startResponseRefresh(value ?? '')
       } else if (result?.detail) {
         setMessage(result.detail)
       }
@@ -224,6 +257,28 @@ export default function useLocalAiWebChatController(
     } finally {
       setBusyAction('')
     }
+  }
+
+  function startResponseRefresh(prompt: string) {
+    cancelResponseRefresh()
+    if (!provider || !ownerKey || !normalizePrompt(prompt)) return
+    expectedResponsePrompt.current = prompt
+    const generation = responseRefreshGeneration.current
+    let delayIndex = 0
+    const request = () => {
+      if (generation !== responseRefreshGeneration.current || !provider || !ownerKey) return
+      void requestLocalAiWebSnapshot(provider.id, ownerKey).catch(() => {})
+      const delay = RESPONSE_REFRESH_DELAYS_MS[delayIndex++]
+      if (delay !== undefined) responseRefreshTimer.current = window.setTimeout(request, delay)
+    }
+    responseRefreshTimer.current = window.setTimeout(request, RESPONSE_REFRESH_DELAYS_MS[delayIndex++] ?? 400)
+  }
+
+  function cancelResponseRefresh() {
+    responseRefreshGeneration.current += 1
+    window.clearTimeout(responseRefreshTimer.current)
+    responseRefreshTimer.current = 0
+    expectedResponsePrompt.current = ''
   }
 
   async function refreshComposerControls(section: LocalAiComposerControlsSnapshot['section']) {
@@ -294,4 +349,28 @@ export default function useLocalAiWebChatController(
     refreshComposerControls,
     refreshFeatureNavigation,
   }
+}
+
+const RESPONSE_REFRESH_DELAYS_MS = [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000, 10_000] as const
+
+function normalizePrompt(value: string): string {
+  return value.trim().replace(/\s+/g, ' ')
+}
+
+function visibleMessageText(message: { content: Array<{ type: string; text?: string }> }): string {
+  return message.content
+    .filter((part) => part.type === 'text' || part.type === 'markdown')
+    .map((part) => part.text ?? '')
+    .join('\n')
+}
+
+function lastMatchingUserIndex(
+  messages: Array<{ role: string; content: Array<{ type: string; text?: string }> }>,
+  expected: string,
+): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role === 'user' && normalizePrompt(visibleMessageText(message)) === expected) return index
+  }
+  return -1
 }

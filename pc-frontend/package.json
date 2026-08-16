@@ -18,7 +18,7 @@
     "test:project-docs": "node scripts/test-project-document-sections.cjs && node scripts/test-project-document-discussions.cjs && node scripts/test-project-document-native-context.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
     "test:open-commerce": "node scripts/test-capability-invocation-schema.cjs && node scripts/test-developer-production-credential-ui.cjs && node ../scripts/test-open-commerce-pc-workspace.js && node ../scripts/test-open-commerce-portability-merge-pc.js && node ../scripts/test-erp-blueprint-pc-workspace.js && node ../scripts/test-open-commerce-portability-crypto-interop.mjs && node ../scripts/test-open-commerce-consumer-data-vault-crypto.mjs",
-    "test:user-browser": "node scripts/test-local-ai-browser-contract.cjs && node scripts/test-local-ai-user-state.cjs && node scripts/test-local-ai-snapshot-cache.cjs && node ../scripts/test-chatgpt-account-entry.js",
+    "test:user-browser": "node scripts/test-local-ai-browser-contract.cjs && node scripts/test-local-ai-context-contract.cjs && node scripts/test-local-ai-user-state.cjs && node scripts/test-local-ai-snapshot-cache.cjs && node ../scripts/test-chatgpt-account-entry.js",
     "test:node-compute-sharing": "node ../scripts/test-node-compute-sharing-contracts.js",
     "test:node-cache-health": "node ../scripts/test-pc-node-cache-health.js",
     "test:compute-reference-curves": "node ../scripts/test-pc-reference-curve-workbench.js",

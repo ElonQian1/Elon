@@ -1,6 +1,6 @@
 use serde_json::{json, Map, Value};
 
-use super::{adapter::SanitizedAdapterEvent, adapter_content};
+use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 12;
@@ -153,6 +153,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                     "type": "adapter_diagnostic",
                     "kind": "dom_diagnostics",
                 }),
+                page_context_key: None,
             })
         }
         Some("command_result") => Ok(SanitizedAdapterEvent {
@@ -164,6 +165,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "detail": clean_string(value.get("detail"), 240),
                 "requestId": sanitize_request_id(value.get("requestId")),
             }),
+            page_context_key: None,
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
             kind: "browser_diagnostic".to_string(),
@@ -173,6 +175,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "detail": clean_string(value.get("detail"), 240),
                 "url": sanitize_google_url(value.get("url")),
             }),
+            page_context_key: None,
         }),
         _ => Err("不支持的 Google AI 模式本地浏览器事件。".to_string()),
     }
@@ -204,9 +207,18 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
         }),
         _ => return Err("不支持的 Google AI 模式可见语义事件类型。".to_string()),
     };
+    let page_context_key = (kind == "message_snapshot")
+        .then(|| {
+            event
+                .get("url")
+                .and_then(Value::as_str)
+                .and_then(|url| semantic_context::page_context_key("google-ai-mode", url))
+        })
+        .flatten();
     Ok(SanitizedAdapterEvent {
         kind: kind.to_string(),
         payload,
+        page_context_key,
     })
 }
 

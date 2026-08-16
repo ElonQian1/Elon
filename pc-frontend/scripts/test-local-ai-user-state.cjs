@@ -39,6 +39,7 @@ const readySession = {
   cacheStatus: 'live',
   semanticCacheStatus: 'live',
   navigationCacheStatus: 'empty',
+  contextReady: true,
   cacheUpdatedAtMs: 1,
   updatedAtMs: 1,
 }
@@ -102,6 +103,17 @@ const cached = deriveLocalAiUserState('ready', chatgpt, {
 }))
 assert.equal(cached.canSend, false, 'cached semantic state must never unlock live writes')
 assert.equal(cached.canConversationHistory, false)
+
+const switchingContext = deriveLocalAiUserState('ready', chatgpt, {
+  ...readySession,
+  contextReady: false,
+}, snapshot({
+  authenticated: true,
+  composerReady: true,
+  pageKind: 'conversation',
+  capabilities: ['new_conversation', 'conversation_history'],
+}))
+assert.equal(switchingContext.canSend, false, 'conversation transition must block writes until the target context is live')
 
 const chatgptGuest = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
   composerReady: true,

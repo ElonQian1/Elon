@@ -1,0 +1,412 @@
+use super::*;
+use serde_json::json;
+
+#[test]
+fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "reserved");
+    runtime.record_adapter_event(
+        "session",
+        "message_snapshot",
+        json!({"type": "message_snapshot", "messages": [{"id": "answer"}]}),
+    );
+    runtime.record_adapter_event(
+        "session",
+        "conversation_snapshot",
+        json!({"type": "conversation_snapshot", "projects": [{"id": "project"}]}),
+    );
+
+    let snapshot = runtime.snapshot("session").unwrap();
+    assert_eq!(snapshot.semantic_event.unwrap()["type"], "message_snapshot");
+    assert_eq!(
+        snapshot.navigation_event.unwrap()["type"],
+        "conversation_snapshot"
+    );
+}
+
+#[test]
+fn composer_feature_and_command_receipts_remain_independent() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "reserved");
+    runtime.record_adapter_event(
+        "session",
+        "composer_controls_snapshot",
+        json!({"type":"composer_controls_snapshot","section":"model","options":[]}),
+    );
+    runtime.record_adapter_event(
+        "session",
+        "navigation_snapshot",
+        json!({"type":"navigation_snapshot","features":[]}),
+    );
+    runtime.mark_command_pending("session", "send_prompt", Some("mcp_receipt1"));
+    runtime.record_adapter_event(
+        "session",
+        "command_result",
+        json!({"type":"command_result","action":"send_prompt","requestId":"mcp_receipt1","ok":true}),
+    );
+
+    let snapshot = runtime.snapshot("session").unwrap();
+    assert_eq!(snapshot.composer_event.unwrap()["section"], "model");
+    assert_eq!(
+        snapshot.feature_event.unwrap()["type"],
+        "navigation_snapshot"
+    );
+    assert_eq!(
+        snapshot.command_result.unwrap()["requestId"],
+        "mcp_receipt1"
+    );
+    assert_eq!(snapshot.diagnostics["lastCommandRequestId"], "mcp_receipt1");
+}
+
+#[test]
+fn background_opening_never_reports_a_visible_official_window() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "connecting");
+    runtime.mark_opening("session", false);
+
+    let background = runtime.snapshot("session").unwrap();
+    assert_eq!(background.window_status, "opening");
+    assert!(!background.window_visible);
+
+    runtime.mark_opening("session", true);
+    assert!(runtime.snapshot("session").unwrap().window_visible);
+}
+
+#[test]
+fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("local-ai-chatgpt-owner-secret", "chatgpt", "connecting");
+    runtime.record_adapter_event(
+        "local-ai-chatgpt-owner-secret",
+        "message_snapshot",
+        json!({
+            "type": "message_snapshot",
+            "composerReady": true,
+            "pageKind": "home",
+            "draft": "private prompt",
+            "messages": [{"content": "private answer"}],
+        }),
+    );
+    runtime.record_adapter_event(
+        "local-ai-chatgpt-owner-secret",
+        "browser_diagnostic",
+        json!({
+            "kind": "adapter_bootstrap_failed",
+            "detail": "private exception detail",
+        }),
+    );
+
+    let diagnostic = runtime.diagnostic_for_provider("chatgpt").unwrap();
+    assert_eq!(diagnostic["adapter_connected"], true);
+    assert_eq!(diagnostic["semantic_snapshot_ready"], true);
+    assert_eq!(diagnostic["composer_ready"], true);
+    assert_eq!(diagnostic["last_error_code"], "adapter_bootstrap_failed");
+    let encoded = diagnostic.to_string();
+    assert!(!encoded.contains("owner-secret"));
+    assert!(!encoded.contains("private prompt"));
+    assert!(!encoded.contains("private answer"));
+    assert!(!encoded.contains("private exception detail"));
+}
+
+#[test]
+fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "google-ai-mode", "active");
+    runtime.mark_navigation(
+        "session",
+        &Url::parse("https://www.google.com/search?q=private+prompt&udm=50").unwrap(),
+        true,
+        None,
+    );
+    runtime.record_adapter_event(
+        "session",
+        "message_snapshot",
+        json!({
+            "type": "message_snapshot",
+            "title": "Cached search",
+            "streaming": false,
+            "messages": [{"role": "assistant", "content": [{"type": "text", "text": "answer"}]}],
+        }),
+    );
+
+    let snapshot = runtime.snapshot("session").unwrap();
+    assert_eq!(snapshot.local_conversations.len(), 1);
+    assert!(snapshot.local_conversations[0].active);
+    let encoded = serde_json::to_string(&snapshot).unwrap();
+    assert!(!encoded.contains("private+prompt"));
+
+    let id = snapshot.local_conversations[0].id.clone();
+    assert!(runtime
+        .activate_cached_conversation("session", &id)
+        .is_some());
+    let restored = runtime.snapshot("session").unwrap();
+    assert_eq!(restored.semantic_cache_status, "cached");
+    assert_eq!(restored.semantic_event.unwrap()["title"], "Cached search");
+}
+
+#[test]
+fn google_followups_merge_into_one_stable_native_conversation() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "google-ai-mode", "active");
+    let first_url =
+        Url::parse("https://www.google.com/search?udm=50&q=first-private-prompt").unwrap();
+    runtime.mark_navigation("session", &first_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type": "message_snapshot",
+            "title": "First question",
+            "streaming": false,
+            "messages": [
+                {"id":"google-query-current","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+                {"id":"google-answer-current","role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
+            ],
+        }),
+        semantic_context::page_context_key("google-ai-mode", first_url.as_str()).as_deref(),
+    );
+    let first = runtime.snapshot("session").unwrap();
+    let conversation_id = first.active_conversation_id.clone().unwrap();
+
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp_followup"),
+        Some("second"),
+    );
+    let followup_url =
+        Url::parse("https://www.google.com/search?udm=50&q=second-private-prompt").unwrap();
+    runtime.mark_navigation("session", &followup_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type": "message_snapshot",
+            "title": "Second question",
+            "streaming": false,
+            "messages": [
+                {"id":"google-query-current","role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
+                {"id":"google-answer-current","role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+            ],
+        }),
+        semantic_context::page_context_key("google-ai-mode", followup_url.as_str()).as_deref(),
+    );
+
+    let followup = runtime.snapshot("session").unwrap();
+    let messages = followup.semantic_event.unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(messages.len(), 4);
+    assert_eq!(messages[0]["content"][0]["text"], "first");
+    assert_eq!(messages[2]["content"][0]["text"], "second");
+    assert_eq!(
+        followup.active_conversation_id.as_deref(),
+        Some(conversation_id.as_str())
+    );
+    assert_eq!(followup.local_conversations.len(), 1);
+}
+
+#[test]
+fn google_visible_page_followup_keeps_context_without_a_native_send_receipt() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "google-ai-mode", "active");
+    let first_url = Url::parse("https://www.google.com/search?udm=50&q=first").unwrap();
+    runtime.mark_navigation("session", &first_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
+        ]}),
+        semantic_context::page_context_key("google-ai-mode", first_url.as_str()).as_deref(),
+    );
+    let first_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
+
+    let second_url = Url::parse("https://www.google.com/search?udm=50&q=second").unwrap();
+    runtime.mark_navigation("session", &second_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+        ]}),
+        semantic_context::page_context_key("google-ai-mode", second_url.as_str()).as_deref(),
+    );
+    let second = runtime.snapshot("session").unwrap();
+    assert_eq!(
+        second.active_conversation_id.as_deref(),
+        Some(first_id.as_str())
+    );
+    assert_eq!(
+        second.semantic_event.unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+}
+
+#[test]
+fn late_snapshot_from_previous_page_cannot_replace_opened_conversation() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let first_url = Url::parse("https://chatgpt.com/c/first").unwrap();
+    runtime.mark_navigation("session", &first_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","url":first_url.as_str(),"messages":[
+            {"id":"first","role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
+        ]}),
+        semantic_context::page_context_key("chatgpt", first_url.as_str()).as_deref(),
+    );
+
+    runtime.mark_command_pending_with_value(
+        "session",
+        "open_conversation",
+        Some("mcp_open_second"),
+        Some("/c/second"),
+    );
+    let second_url = Url::parse("https://chatgpt.com/c/second").unwrap();
+    runtime.mark_navigation("session", &second_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","url":first_url.as_str(),"messages":[
+            {"id":"late","role":"assistant","state":"completed","content":[{"type":"text","text":"late first answer"}]}
+        ]}),
+        semantic_context::page_context_key("chatgpt", first_url.as_str()).as_deref(),
+    );
+    assert_eq!(
+        runtime.snapshot("session").unwrap().semantic_event.unwrap()["messages"][0]["id"],
+        "first",
+    );
+
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","url":second_url.as_str(),"messages":[
+            {"id":"second","role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+        ]}),
+        semantic_context::page_context_key("chatgpt", second_url.as_str()).as_deref(),
+    );
+    let opened = runtime.snapshot("session").unwrap();
+    assert_eq!(
+        opened.semantic_event.unwrap()["messages"][0]["id"],
+        "second"
+    );
+    assert!(opened.context_ready);
+}
+
+#[test]
+fn new_conversations_on_the_same_home_url_keep_distinct_context_and_cache_ids() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let first_url = Url::parse("https://chatgpt.com/c/first").unwrap();
+    let first_key = semantic_context::page_context_key("chatgpt", first_url.as_str());
+    runtime.mark_navigation("session", &first_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"first-user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"first-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
+        ]}),
+        first_key.as_deref(),
+    );
+    let first_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
+
+    runtime.mark_command_pending_with_value("session", "new_conversation", Some("mcp_new"), None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"late-user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"late-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"late first answer"}]}
+        ]}),
+        first_key.as_deref(),
+    );
+    assert!(!runtime.snapshot("session").unwrap().context_ready);
+
+    let home = Url::parse("https://chatgpt.com/").unwrap();
+    let home_key = semantic_context::page_context_key("chatgpt", home.as_str());
+    runtime.mark_navigation("session", &home, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[]}),
+        home_key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp_second"),
+        Some("second"),
+    );
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"second-user","role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
+            {"id":"second-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+        ]}),
+        home_key.as_deref(),
+    );
+    let second_url = Url::parse("https://chatgpt.com/c/second").unwrap();
+    runtime.mark_navigation("session", &second_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"second-user","role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
+            {"id":"second-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+        ]}),
+        semantic_context::page_context_key("chatgpt", second_url.as_str()).as_deref(),
+    );
+    let second = runtime.snapshot("session").unwrap();
+    let second_id = second.active_conversation_id.unwrap();
+    assert_ne!(first_id, second_id);
+    assert_eq!(second.local_conversations.len(), 2);
+    assert_eq!(
+        second.semantic_event.unwrap()["messages"][0]["id"],
+        "second-user"
+    );
+}
+
+#[test]
+fn navigation_keeps_the_snapshot_visible_but_marks_it_cached() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "reserved");
+    runtime.record_adapter_event(
+        "session",
+        "message_snapshot",
+        json!({"type": "message_snapshot", "messages": []}),
+    );
+    assert_eq!(runtime.snapshot("session").unwrap().cache_status, "live");
+
+    runtime.mark_navigation(
+        "session",
+        &Url::parse("https://chatgpt.com/c/example").unwrap(),
+        true,
+        None,
+    );
+    let cached = runtime.snapshot("session").unwrap();
+    assert_eq!(cached.cache_status, "cached");
+    assert!(cached.semantic_event.is_some());
+
+    runtime.clear_snapshots("session");
+    let cleared = runtime.snapshot("session").unwrap();
+    assert_eq!(cleared.cache_status, "empty");
+    assert!(cleared.semantic_event.is_none());
+}
