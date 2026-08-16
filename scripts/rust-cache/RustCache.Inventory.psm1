@@ -359,6 +359,40 @@ function Test-RustCacheBuildProcesses {
     return $active
 }
 
+function Get-RustCacheGcActionIdentity {
+    param(
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [Parameter(Mandatory)]$Partition
+    )
+
+    Assert-RustCacheManagedPath -CacheRoot $CacheRoot -CandidatePath $Partition.path
+    $root = [System.IO.Path]::GetFullPath($CacheRoot).TrimEnd('\', '/')
+    $path = [System.IO.Path]::GetFullPath([string]$Partition.path)
+    $relativePath = $path.Substring($root.Length).TrimStart('\', '/')
+    if ($env:OS -eq "Windows_NT") { $relativePath = $relativePath.ToLowerInvariant() }
+    $identity = [ordered]@{
+        relative_path = $relativePath.Replace('\', '/')
+        kind = [string]$Partition.kind
+        toolchain_epoch = [string]$Partition.toolchain_epoch
+        project_id = [string]$Partition.project_id
+        domain = [string]$Partition.domain
+        workspace_hash = [string]$Partition.workspace_hash
+        cache_scope = [string]$Partition.cache_scope
+        marker_valid = [bool]$Partition.marker_valid
+        last_used_utc = ([DateTime]$Partition.last_used_utc).ToUniversalTime().ToString("o")
+        reason = [string]$Partition.reason
+        size_bytes = [int64]$Partition.size_bytes
+    }
+    $json = $identity | ConvertTo-Json -Compress
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
 function Write-RustCacheGcReport {
     param(
         [Parameter(Mandatory)][string]$CacheRoot,
@@ -381,7 +415,9 @@ function Invoke-RustCacheGc {
         [switch]$ForceAged,
         [switch]$WorkspaceOnly,
         [switch]$RecoverMissingWorkspaces,
-        [switch]$SharedAliasesOnly
+        [switch]$SharedAliasesOnly,
+        [AllowNull()][object[]]$ApprovedActions,
+        [int]$ExpectedActiveBuildCount = -1
     )
 
     if ($SharedAliasesOnly -and ($WorkspaceOnly -or $RecoverMissingWorkspaces)) {
@@ -494,6 +530,7 @@ function Invoke-RustCacheGc {
     $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.recoverable_missing_workspace) { 0 } elseif ($_.orphaned_task_worktree) { 1 } elseif ($_.retired_domain) { 2 } elseif ($_.retired_shared_alias) { 3 } elseif ($_.old_epoch) { 4 } elseif ($_.kind -eq "quarantine") { 5 } else { 6 } } }, last_used_utc)
     foreach ($partition in $selected) {
         $partition.size_bytes = Get-RustCacheDirectorySize -Path $partition.path
+        $partition | Add-Member -NotePropertyName action_id -NotePropertyValue (Get-RustCacheGcActionIdentity -CacheRoot $root -Partition $partition) -Force
     }
 
     $estimatedFree = [int64]$volumeBefore.free_bytes
@@ -505,7 +542,41 @@ function Invoke-RustCacheGc {
             continue
         }
         $partition.action = if ($Apply) { "delete" } else { "would-delete" }
-        if ($Apply) {
+        $estimatedFree += [int64]$partition.size_bytes
+    }
+
+    $actionable = @($selected | Where-Object { $_.selected })
+    if ($null -ne $ApprovedActions) {
+        if (-not $Apply) { throw "ApprovedActions can only be used with Apply." }
+        if ($ExpectedActiveBuildCount -ge 0 -and $activeBuilds.Count -ne $ExpectedActiveBuildCount) {
+            throw "Approved Rust cache GC refused because the active Cargo/rustc count changed after review."
+        }
+        $approved = @($ApprovedActions)
+        if ($approved.Count -ne $actionable.Count) {
+            throw "Approved Rust cache GC plan drifted: action count changed from $($approved.Count) to $($actionable.Count)."
+        }
+        $approvedById = @{}
+        foreach ($action in $approved) {
+            $actionId = [string]$action.action_id
+            if ($actionId -notmatch '^[0-9a-f]{64}$' -or $approvedById.ContainsKey($actionId)) {
+                throw "Approved Rust cache GC plan contains an invalid or duplicate action identity."
+            }
+            $approvedById[$actionId] = $action
+        }
+        foreach ($partition in $actionable) {
+            $approvedAction = $approvedById[[string]$partition.action_id]
+            if (
+                $null -eq $approvedAction -or
+                [string]$approvedAction.reason -ne [string]$partition.reason -or
+                [int64]$approvedAction.size_bytes -ne [int64]$partition.size_bytes
+            ) {
+                throw "Approved Rust cache GC plan drifted; create and approve a new plan."
+            }
+        }
+    }
+
+    if ($Apply) {
+        foreach ($partition in $actionable) {
             Assert-RustCacheManagedPath -CacheRoot $root -CandidatePath $partition.path
             try {
                 Remove-RustCachePartitionSafely -CacheRoot $root -Path $partition.path -WorkspaceRoot $RepoRoot
@@ -519,7 +590,6 @@ function Invoke-RustCacheGc {
                 throw
             }
         }
-        $estimatedFree += [int64]$partition.size_bytes
     }
 
     $volumeAfter = if ($Apply) { Get-RustCacheVolumeState -CacheRoot $root } else { $volumeBefore }

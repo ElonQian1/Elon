@@ -47,6 +47,31 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             get(node_api::rust_cache_fleet::latest_report),
         )
         .route(
+            "/api/me/nodes/:node_id/cache-gc",
+            get(node_api::rust_cache_fleet::latest_gc_request)
+                .post(node_api::rust_cache_fleet::create_gc_request),
+        )
+        .route(
+            "/api/me/nodes/:node_id/cache-gc/:request_id/approve",
+            post(node_api::rust_cache_fleet::approve_gc_request),
+        )
+        .route(
+            "/api/me/nodes/:node_id/cache-gc/:request_id/reject",
+            post(node_api::rust_cache_fleet::reject_gc_request),
+        )
+        .route(
+            "/api/node/cache-gc/:node_id/next",
+            get(node_api::rust_cache_fleet::next_gc_node_command),
+        )
+        .route(
+            "/api/node/cache-gc/:node_id/:request_id/plan",
+            post(node_api::rust_cache_fleet::upload_gc_node_plan),
+        )
+        .route(
+            "/api/node/cache-gc/:node_id/:request_id/result",
+            post(node_api::rust_cache_fleet::upload_gc_node_result),
+        )
+        .route(
             "/api/me/nodes/:node_id/sharing",
             axum::routing::patch(node_api::update_my_node_sharing),
         )

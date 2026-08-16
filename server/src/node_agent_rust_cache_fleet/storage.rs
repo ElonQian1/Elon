@@ -12,11 +12,17 @@ use super::model::{UploadFailure, UploadReceipt};
 pub(super) fn find_cache_root(node_data_root: Option<&Path>) -> Option<PathBuf> {
     cache_root_candidates(node_data_root)
         .into_iter()
-        .find(|root| root.join("reports").join("fleet").join("outbox").is_dir())
+        .find(|root| {
+            root.join("platform").join("rust-cache.ps1").is_file()
+                || root.join("reports").join("fleet").join("outbox").is_dir()
+        })
 }
 
 pub(super) fn pending_envelopes(cache_root: &Path, limit: usize) -> Result<Vec<PathBuf>> {
     let outbox = cache_root.join("reports").join("fleet").join("outbox");
+    if !outbox.is_dir() {
+        return Ok(Vec::new());
+    }
     let mut files = std::fs::read_dir(&outbox)
         .with_context(|| format!("read Rust cache fleet outbox {}", outbox.display()))?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -56,9 +62,20 @@ pub(super) fn archive_accepted(
         // The immutable accepted copy and matching ACK already exist. Remove only
         // the duplicate outbox copy so this acknowledged item is not retried.
         std::fs::remove_file(envelope_path).context("remove duplicate accepted envelope")?;
+        remove_attempt_state(cache_root, envelope_path)?;
+        prune_fleet_history(cache_root, 100)?;
         return Ok(());
     }
     std::fs::rename(envelope_path, destination).context("archive accepted fleet envelope")?;
+    remove_attempt_state(cache_root, envelope_path)?;
+    prune_fleet_history(cache_root, 100)?;
+    Ok(())
+}
+
+pub(super) fn prune_gc_artifacts(cache_root: &Path, keep: usize) -> Result<()> {
+    let gc_root = cache_root.join("reports").join("gc");
+    prune_json_history(&gc_root.join("plans"), keep)?;
+    prune_json_history(&gc_root.join("receipts"), keep)?;
     Ok(())
 }
 
@@ -69,15 +86,7 @@ pub(super) fn record_attempt(
 ) -> Result<()> {
     let attempts = cache_root.join("reports").join("fleet").join("attempts");
     std::fs::create_dir_all(&attempts)?;
-    let file_name = envelope_path
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .unwrap_or("unknown-envelope");
-    let safe_name = file_name
-        .chars()
-        .filter(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
-        .take(160)
-        .collect::<String>();
+    let safe_name = safe_envelope_stem(envelope_path);
     let receipt = AttemptReceipt {
         schema: "elon.rust_cache.fleet_upload_attempt.v1",
         attempted_at_utc: Utc::now().to_rfc3339(),
@@ -161,6 +170,69 @@ fn write_or_verify_receipt(path: &Path, receipt: &UploadReceipt) -> Result<()> {
         }
         Err(error) => Err(error.into()),
     }
+}
+
+fn prune_fleet_history(cache_root: &Path, keep: usize) -> Result<()> {
+    let fleet_root = cache_root.join("reports").join("fleet");
+    prune_json_history(&fleet_root.join("accepted"), keep)?;
+    prune_json_history(&fleet_root.join("receipts"), keep)?;
+    Ok(())
+}
+
+fn remove_attempt_state(cache_root: &Path, envelope_path: &Path) -> Result<()> {
+    let path = cache_root
+        .join("reports")
+        .join("fleet")
+        .join("attempts")
+        .join(format!("{}.state.json", safe_envelope_stem(envelope_path)));
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn safe_envelope_stem(envelope_path: &Path) -> String {
+    envelope_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown-envelope")
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+        .take(160)
+        .collect()
+}
+
+fn prune_json_history(directory: &Path, keep: usize) -> Result<()> {
+    if !directory.is_dir() {
+        return Ok(());
+    }
+    let mut files = std::fs::read_dir(directory)?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+        })
+        .map(|path| {
+            let modified = path
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .ok();
+            (modified, path)
+        })
+        .collect::<Vec<_>>();
+    files.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.file_name().cmp(&right.1.file_name()))
+    });
+    let remove_count = files.len().saturating_sub(keep);
+    for (_, path) in files.into_iter().take(remove_count) {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -270,6 +342,33 @@ mod tests {
         assert!(state.contains("secure-upload-origin-required"));
         assert!(state.contains("\"destructive_actions_authorized\": false"));
         assert!(!state.contains(root.to_string_lossy().as_ref()));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn local_history_is_bounded_without_touching_non_json_files() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-rust-cache-history-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let plans = root.join("reports/gc/plans");
+        std::fs::create_dir_all(&plans).unwrap();
+        std::fs::write(plans.join("a.json"), b"a").unwrap();
+        std::fs::write(plans.join("b.json"), b"b").unwrap();
+        std::fs::write(plans.join("c.json"), b"c").unwrap();
+        std::fs::write(plans.join("preserve.txt"), b"keep").unwrap();
+
+        prune_gc_artifacts(&root, 2).unwrap();
+
+        assert_eq!(
+            std::fs::read_dir(&plans)
+                .unwrap()
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+                .count(),
+            2
+        );
+        assert!(plans.join("preserve.txt").exists());
         let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -5,6 +5,7 @@ $ModulesRoot = Join-Path $PSScriptRoot "rust-cache"
 Import-Module "$ModulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
+Import-Module "$ModulesRoot\RustCache.GcApproval.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
@@ -419,6 +420,33 @@ exit /b 0
     Assert-True (Test-Path -LiteralPath $sharedTaskPartition) "missing workspace apply must preserve shared partitions"
     Assert-True (Test-Path -LiteralPath $recentOrphanPartition) "missing workspace apply must preserve recent partitions"
     Assert-True (Test-Path -LiteralPath $existingWorkspacePartition) "missing workspace apply must preserve partitions whose workspace still exists"
+
+    $approvedOrphan = Join-Path $CacheRoot "build\$currentEpoch\test-project\dev-host\9999999999999999"
+    New-Item -ItemType Directory -Force -Path $approvedOrphan | Out-Null
+    @{ workspace_root = (Join-Path $env:ELON_AI_TASK_WORKTREE_BASE "98765-cafebabe\server"); cache_scope = "workspace"; cache_partition = "9999999999999999"; last_used_utc = $oldMarkerTime } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $approvedOrphan ".last-used.json") -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $approvedOrphan "artifact.bin") -Value "approved"
+    $gcRequestId = "a" * 32
+    $gcPlan = New-RustCacheGcApprovalPlan -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -RequestId $gcRequestId -NodeId "node-cache-test"
+    Assert-Equal "elon.rust_cache.gc_plan.v1" $gcPlan.schema "remote GC should create a versioned immutable local plan"
+    Assert-Equal 1 @($gcPlan.actions).Count "approval plan should bind the exact actionable partition set"
+    Assert-True ((Get-RustCacheGcPlanSummary -Plan $gcPlan | ConvertTo-Json -Depth 10) -notmatch [regex]::Escape($CacheRoot)) "central approval summary must omit absolute paths"
+    $wrongDigestRejected = $false
+    try { Invoke-RustCacheApprovedPlan -CacheRoot $CacheRoot -RequestId $gcRequestId -PlanId $gcPlan.plan_id -PlanDigest ("0" * 64) -NodeId "node-cache-test" | Out-Null } catch { $wrongDigestRejected = $true }
+    Assert-True $wrongDigestRejected "approved apply must reject a digest not bound to the local plan"
+    $driftFile = Join-Path $approvedOrphan "drift.bin"
+    Set-Content -LiteralPath $driftFile -Value "changed-after-review"
+    $driftRejected = $false
+    try { Invoke-RustCacheApprovedPlan -CacheRoot $CacheRoot -RequestId $gcRequestId -PlanId $gcPlan.plan_id -PlanDigest $gcPlan.plan_digest -NodeId "node-cache-test" | Out-Null } catch { $driftRejected = $_.Exception.Message -like "*drifted*" }
+    Assert-True $driftRejected "approved apply must fail closed when the reviewed partition changes"
+    Assert-True (Test-Path -LiteralPath $approvedOrphan) "drift rejection must preserve the reviewed partition"
+    Remove-Item -LiteralPath $driftFile -Force
+    $gcReceipt = Invoke-RustCacheApprovedPlan -CacheRoot $CacheRoot -RequestId $gcRequestId -PlanId $gcPlan.plan_id -PlanDigest $gcPlan.plan_digest -NodeId "node-cache-test"
+    Assert-Equal "completed" $gcReceipt.status "an unchanged approved plan should execute after the local rescan"
+    Assert-Equal 1 $gcReceipt.removed_action_count "approved receipt should account for the exact removed action"
+    Assert-True (-not (Test-Path -LiteralPath $approvedOrphan)) "approved GC should remove the exact reviewed partition"
+    $gcReceiptReplay = Invoke-RustCacheApprovedPlan -CacheRoot $CacheRoot -RequestId $gcRequestId -PlanId $gcPlan.plan_id -PlanDigest $gcPlan.plan_digest -NodeId "node-cache-test"
+    Assert-Equal $gcReceipt.completed_at_utc $gcReceiptReplay.completed_at_utc "approved GC receipt replay must be idempotent"
 
     $ownedTaskRoot = Join-Path $TempRoot "explicit-finish-task"
     $ownedWorkspace = Join-Path $ownedTaskRoot "server"

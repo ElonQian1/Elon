@@ -6,10 +6,11 @@ use tracing::{debug, warn};
 
 use crate::{node_agent_config::NodeConfig, NodeRuntime};
 
+mod gc;
 mod model;
 mod storage;
 
-const DEFAULT_INTERVAL_SECONDS: u64 = 300;
+const DEFAULT_INTERVAL_SECONDS: u64 = 60;
 const INITIAL_DELAY_SECONDS: u64 = 20;
 const MAX_ACK_BYTES: u64 = 64 * 1024;
 const MAX_BATCH_SIZE: usize = 4;
@@ -43,9 +44,6 @@ async fn upload_once(runtime: &Arc<NodeRuntime>) -> Result<()> {
         return Ok(());
     };
     let envelopes = storage::pending_envelopes(&cache_root, MAX_BATCH_SIZE)?;
-    if envelopes.is_empty() {
-        return Ok(());
-    }
     let base_url = match secure_upload_origin(&runtime.cfg) {
         Ok(base_url) => base_url,
         Err(error) => {
@@ -90,6 +88,15 @@ async fn upload_once(runtime: &Arc<NodeRuntime>) -> Result<()> {
             }
         }
     }
+    runtime.require_credential_epoch(credential_epoch)?;
+    gc::poll_and_execute(
+        &client,
+        &base_url,
+        &credentials.agent_id,
+        &credentials.agent_secret,
+        &cache_root,
+    )
+    .await?;
     Ok(())
 }
 

@@ -1,0 +1,83 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.heading,
+.heading > div,
+.start,
+.actions,
+.loading,
+.result {
+  display: flex;
+  align-items: center;
+}
+
+.heading { justify-content: space-between; gap: 12px; }
+.heading > div { gap: 7px; }
+.heading strong { font-size: 13px; }
+.heading > span { color: var(--text-muted); font-size: 11px; }
+.heading > span[data-status='plan_ready'] { color: #c8a040; }
+.heading > span[data-status='completed'] { color: #4caf78; }
+.heading > span[data-status='failed'],
+.heading > span[data-status='partial'] { color: #e07070; }
+
+.start { justify-content: space-between; gap: 16px; }
+.start p,
+.boundary,
+.error { margin: 0; font-size: 12px; line-height: 1.5; }
+.start p,
+.boundary { color: var(--text-muted); }
+
+.start button,
+.actions button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  font-size: 12px;
+}
+
+.start button:hover,
+.actions button:hover { color: var(--text-primary); background: var(--bg-hover); }
+.start button:disabled,
+.actions button:disabled { opacity: .5; }
+.actions { gap: 8px; }
+.actions .approve { border-color: #4caf78; color: #4caf78; }
+
+.plan {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.plan > div { min-width: 0; }
+.plan span,
+.plan strong { display: block; overflow-wrap: anywhere; }
+.plan span { color: var(--text-muted); font-size: 10px; }
+.plan strong { margin-top: 3px; font-size: 12px; }
+.plan p { grid-column: 1 / -1; margin: 2px 0 0; color: var(--text-muted); font-size: 11px; }
+
+.result { flex-wrap: wrap; gap: 6px 14px; color: var(--text-muted); font-size: 11px; }
+.loading { gap: 6px; color: var(--text-muted); font-size: 11px; }
+.error { color: #e07070; }
+.spinning { animation: spin 900ms linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+  .start { align-items: flex-start; flex-direction: column; }
+  .plan { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

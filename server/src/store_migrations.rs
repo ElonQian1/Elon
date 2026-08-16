@@ -49,6 +49,7 @@ mod migrations_v35_v53;
 mod migrations_v54_v70;
 mod migrations_v71_v82;
 mod rust_cache_fleet;
+mod rust_cache_gc_approval;
 
 use migrations_v17_v34::*;
 use migrations_v1_v16::*;
@@ -376,6 +377,11 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         275,
         "Rust 缓存 Fleet 脱敏报告有界历史",
         rust_cache_fleet::migration_v275,
+    ),
+    (
+        276,
+        "Rust 缓存 GC 摘要绑定审批与节点执行状态机",
+        rust_cache_gc_approval::migration_v276,
     ),
 ];
 

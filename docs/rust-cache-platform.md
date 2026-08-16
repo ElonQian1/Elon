@@ -23,7 +23,7 @@
 PowerShell 窗口，也不要求子项目知道缓存位于 C 盘、D 盘或节点数据根。这样不含平台源码的
 子项目也能使用同一入口；`doctor` 会校验启动器是否缺失、过期或指向错误安装。
 
-多 PC 节点通过 `fleet-report` 输出统一、脱敏、可校验哈希的 JSON 健康报告；中央平台只汇总状态和下发预演请求，真正的 GC 必须回到目标 PC 重新扫描并取得本机分区锁。完整业务流见 `docs/rust-cache-fleet-operations.md`。
+多 PC 节点通过 `fleet-report` 输出统一、脱敏、可校验哈希的 JSON 健康报告。独立 GC 审批通道只下发“生成本机计划”或“执行准确计划摘要”两个固定动作；真正的 GC 必须回到目标 PC 重新扫描并取得本机分区锁。完整业务流见 `docs/rust-cache-fleet-operations.md`。
 
 新电脑先从权威仓库运行只读诊断，再安装或升级：
 
@@ -40,10 +40,20 @@ PowerShell 窗口，也不要求子项目知道缓存位于 C 盘、D 盘或节�
 & "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" run -ProjectRoot D:\work\sample -- check --locked
 ```
 
+节点控制面使用以下内部命令完成不可变计划和准确摘要执行，普通子项目不得复制其实现：
+
+```powershell
+& "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" gc-plan `
+  -ProjectRoot D:\work\sample -RequestId <32-hex-id> -NodeId <node-id>
+& "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" gc-apply-approved `
+  -RequestId <32-hex-id> -NodeId <node-id> `
+  -PlanId <32-hex-plan-id> -PlanDigest <64-hex-digest>
+```
+
+计划完整内容只保存在目标 PC 缓存根，服务端只接收 action/reason/byte/writer 汇总和摘要。不要手改、跨电脑复制或复用过期计划。
+
 不同 PC 只共享 Git 中的 `rust-cache.project.json`、平台版本和 Skill 版本，不共享物理目录。
-每台 PC 独立安装、独立选择缓存盘并持有本机锁。中央节点可以汇总只读 `doctor/status` 结果，
-但 `gc -Apply`、legacy purge、Cargo 父配置激活与缓存迁移必须在目标机器上按预演报告执行，
-避免远程控制面绕过活动构建和本机所有权证据。
+每台 PC 独立安装、独立选择缓存盘并持有本机锁。中央节点可以汇总只读 `doctor/status`，并保存不含路径的计划摘要、精确审批与回执。远程审批只能调用已安装工具的机器级受限托管分区 GC；共享别名治理、workspace 恢复、通用 `gc -Apply`、legacy purge、Cargo 父配置激活与缓存迁移仍必须在目标机器本机执行。
 
 `doctor` 不创建目录、不初始化策略、不删除数据。安装会写入
 `platform/platform-install.json`，记录平台源码和已安装文件指纹；不同电脑可据此识别漏装、版本漂移或本地文件被修改。

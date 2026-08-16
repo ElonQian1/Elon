@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::DateTime;
 use sha2::{Digest, Sha256};
 
-use crate::store::rust_cache_fleet_reports::RustCacheFleetReportInput;
+use crate::store::rust_cache::fleet_reports::RustCacheFleetReportInput;
 
 const ENVELOPE_SCHEMA: &str = "elon.rust_cache.fleet_envelope.v1";
 const REPORT_SCHEMA: &str = "elon.rust_cache.fleet_report.v1";

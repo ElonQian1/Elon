@@ -108,6 +108,8 @@ try {
     Assert-Equal "elon.rust_cache.command_help.v1" $launcherHelp.schema "portable launcher help schema"
     Assert-True (@($launcherHelp.commands.name) -contains "fleet-report") "portable launcher help should advertise fleet reports"
     Assert-True (@($launcherHelp.commands.name) -contains "fleet-stage") "portable launcher help should advertise fleet staging"
+    Assert-True (@($launcherHelp.commands.name) -contains "gc-plan") "portable launcher help should advertise immutable GC plans"
+    Assert-True (@($launcherHelp.commands.name) -contains "gc-apply-approved") "portable launcher help should advertise digest-bound approved GC"
     $launcherResult = & $userLauncher.path init-project -ProjectRoot $projectRoot -ProjectId "portable-test" -AllowedDomain @("dev-windows-msvc", "agent-validation") -SharedPartitionDomain @("validation-light=agent-validation") -Apply
     Assert-Equal "unchanged" $launcherResult.action "portable launcher should invoke the installed platform"
 

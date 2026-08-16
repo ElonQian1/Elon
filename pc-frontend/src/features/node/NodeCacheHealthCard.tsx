@@ -8,6 +8,7 @@ import {
   type NodeCacheHealthResponse,
 } from './nodeCacheHealth'
 import type { NodeSummary } from './types'
+import NodeCacheGcApproval from './NodeCacheGcApproval'
 import styles from './NodeCacheHealthCard.module.css'
 
 type LoadState =
@@ -61,7 +62,7 @@ export default function NodeCacheHealthCard({ node }: { node: NodeSummary }) {
           <strong id={`cache-health-${id}`}>共享构建缓存</strong>
         </div>
         <div className={styles.headerActions}>
-          <span className={styles.readOnly}><ShieldCheck size={13} aria-hidden="true" />只读监控</span>
+          <span className={styles.readOnly}><ShieldCheck size={13} aria-hidden="true" />脱敏摘要</span>
           <button
             className={styles.refresh}
             type="button"
@@ -74,12 +75,12 @@ export default function NodeCacheHealthCard({ node }: { node: NodeSummary }) {
           </button>
         </div>
       </header>
-      {renderState(state)}
+      {renderState(state, id)}
     </section>
   )
 }
 
-function renderState(state: LoadState) {
+function renderState(state: LoadState, nodeId: string) {
   if (state.status === 'loading') {
     return <p className={styles.message}>正在读取节点最近一次脱敏报告...</p>
   }
@@ -133,7 +134,8 @@ function renderState(state: LoadState) {
         <span>待复核项 {checks}</span>
         <span>服务端接收 {formatDateTime(report.received_at) || '未知'}</span>
       </div>
-      <p className={styles.boundary}>报告不会授权远程删除；实际 GC 仍需对应电脑重新预演、加锁和确认。</p>
+      <p className={styles.boundary}>健康报告本身不授权删除；下方操作只批准目标电脑生成并重新校验的精确摘要。</p>
+      <NodeCacheGcApproval nodeId={nodeId} recommended={report.gc_review_recommended} />
     </>
   )
 }

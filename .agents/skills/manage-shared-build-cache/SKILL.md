@@ -77,7 +77,22 @@ For a disconnected or intermittently connected node, stage an upload-safe envelo
 
 The platform server accepts an envelope from the authenticated node owner at `POST /api/me/nodes/{node_id}/cache-reports`; a registered PC node uses its existing node credential at `POST /api/node/cache-reports/{node_id}`. The owner reads the latest accepted report at `GET /api/me/nodes/{node_id}/cache-reports/latest`. The receiver verifies authentication, route/envelope/report node IDs, report byte length and SHA-256, strict schema, privacy flags, and read-only policy before storing bounded history.
 
-Current node runtimes automatically scan the installed cache root's fleet outbox after credentials are available. They upload only to HTTPS or loopback HTTP, accept only an ACK bound to the same node, envelope ID, and report hash, write an immutable local receipt, and then move the envelope to `accepted`. Failed uploads leave the envelope unchanged and write separate attempt state. This path reports health only; it cannot trigger GC, legacy purge, cache migration, or arbitrary commands.
+Current node runtimes automatically scan the installed cache root's fleet outbox after credentials are available. They upload only to HTTPS or loopback HTTP, accept only an ACK bound to the same node, envelope ID, and report hash, write an immutable local receipt, and then move the envelope to `accepted`. Failed uploads leave the envelope unchanged and write separate attempt state. Fleet-report ACKs never authorize GC.
+
+## Approve Remote GC Safely
+
+Use the project control plane only for the bounded managed-partition workflow implemented by the installed cache tool:
+
+1. The owner requests a preview for one owned node. The request contains policy switches, never a path or command line.
+2. The authenticated node runs installed `gc-plan` locally and saves an immutable full plan under its cache root.
+3. The node uploads only the sanitized action count, reason counts, estimated bytes, active-writer count, expiry, plan ID, and SHA-256 digest.
+4. The owner approves the exact plan ID and digest. Treat any changed summary as a new plan requiring a new approval.
+5. The node runs installed `gc-apply-approved`. It verifies the immutable local plan, expiry, node ID, cache root, exact candidate identities and sizes, and unchanged Cargo/rustc writer count before taking local partition locks.
+6. The node uploads a sanitized immutable result. A lock appearing after approval produces a partial receipt and preserves that partition.
+
+The server never receives absolute cache or workspace paths and cannot submit an arbitrary executable, script, deletion target, or PowerShell argument. Remote approval cannot run project-specific shared-alias cleanup, workspace recovery, legacy purge, cache migration, Cargo parent-config activation, or raw `gc -Apply`; keep those operations local. A fleet-report is evidence for deciding whether to request a fresh plan, not authority to reuse an old deletion list.
+
+Public-node polling requires the configured HTTPS node origin. Loopback HTTP is allowed for local development only. Without a trusted TLS endpoint and a current node runtime, report the remote workflow as unavailable rather than weakening transport checks.
 
 ## Run Builds
 
@@ -96,6 +111,16 @@ Current node runtimes automatically scan the installed cache root's fleet outbox
 4. Register external legacy caches and mark them retired before any purge attempt.
 
 Never use raw recursive deletion on shared cache roots. Never delete active, locked, dirty, unmerged, unknown, or external workspace data. Never pass `-ForceAged` merely to silence a low-disk warning.
+
+For local diagnosis of an existing remote request, use only the IDs issued by the control plane:
+
+```powershell
+& <entry> gc-plan -ProjectRoot <root> -RequestId <32-hex-id> -NodeId <node-id>
+& <entry> gc-apply-approved -RequestId <32-hex-id> `
+  -NodeId <node-id> -PlanId <32-hex-plan-id> -PlanDigest <64-hex-digest>
+```
+
+Do not invent IDs, edit plan JSON, or copy a plan between PCs. Normal operators should approve through the PC node page and let the node runtime invoke these commands.
 
 ## Close The Work
 

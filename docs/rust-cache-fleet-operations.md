@@ -14,13 +14,19 @@ implementation_refs:
   - file:scripts/rust-cache/RustCache.FleetQueue.psm1
   - file:scripts/rust-cache/RustCache.Install.psm1
   - file:scripts/rust-cache/RustCache.Launcher.psm1
+  - file:scripts/rust-cache/RustCache.GcApproval.psm1
   - file:server/src/node_api/rust_cache_fleet/mod.rs
   - file:server/src/node_api/rust_cache_fleet/contract.rs
+  - file:server/src/node_api/rust_cache_fleet/gc.rs
+  - file:server/src/node_api/rust_cache_fleet/gc_contract.rs
   - file:server/src/node_agent_rust_cache_fleet.rs
+  - file:server/src/node_agent_rust_cache_fleet/gc.rs
   - file:server/src/node_agent_rust_cache_fleet/model.rs
   - file:server/src/node_agent_rust_cache_fleet/storage.rs
   - file:server/src/store/rust_cache_fleet_reports.rs
+  - file:server/src/store/rust_cache_gc_requests.rs
   - file:pc-frontend/src/features/node/NodeCacheHealthCard.tsx
+  - file:pc-frontend/src/features/node/NodeCacheGcApproval.tsx
   - file:pc-frontend/src/features/node/NodeCacheFleetOverview.tsx
   - file:pc-frontend/src/features/node/nodeCacheFleet.ts
   - file:.agents/skills/manage-shared-build-cache/SKILL.md
@@ -40,7 +46,8 @@ implementation_refs:
 | 稳定启动层 | `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1` | 安装器生成 | 只转发参数，不启动第二个可见 Shell |
 | 项目合同层 | `rust-cache.project.json` | 跟随子项目 Git | 只保存稳定项目 ID 和兼容域，不保存机器路径 |
 | 构建执行层 | SCCache、workspace/shared build-dir、target | 目标 PC 本地 | Cargo 调用持有分区锁，发布产物仍由项目拥有 |
-| Fleet 观测层 | 脱敏报告与不可变 outbox 信封 | 节点按需生成或排队 | 中央只读汇总，不远程递归删除目录 |
+| Fleet 观测层 | 脱敏报告与不可变 outbox 信封 | 节点按需生成或排队 | 报告只读，不能成为删除授权 |
+| GC 审批层 | 请求状态、脱敏计划摘要、精确摘要审批和回执 | 服务端与节点轮询 | 不接收路径或命令，删除只在目标 PC 执行 |
 
 SCCache 负责兼容编译对象的跨项目复用。命名 Cargo build-dir 只允许在同一 `project_id`、rustc 代际和兼容域内跨 worktree 复用。不同 PC 不应通过网络盘共同写一个 Cargo target 或 build-dir。
 
@@ -92,7 +99,7 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
 - 磁盘总量、剩余量及是否建议审查 GC；
 - 按 scope/domain 聚合的数量和可选字节数。
 
-报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出、节点自动上传、服务端有界存储、PC 节点详情健康卡片和本人多节点只读总览；远程审批队列仍是后续集成，不能宣称已经上线。
+报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出、节点自动上传、服务端有界存储、PC 节点详情健康卡片、本人多节点只读总览，以及与报告分离的精确摘要 GC 审批代码。生产 TLS、发布后的节点升级和真实多 PC 验收完成前，不能宣称公网远程回收已经上线。
 
 网络不稳定或需要节点服务稍后上传时，使用 outbox 信封：
 
@@ -113,29 +120,31 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
 
 接收端严格校验节点凭证，以及路由、信封和内嵌报告中的节点 ID，重新计算 UTF-8 JSON 字节长度与 SHA-256，拒绝未知字段、绝对路径、本机身份、破坏性执行记录或破坏性授权。响应始终声明 `destructive_actions_authorized: false`。
 
-PC 节点获得有效凭证后会周期性扫描既有 outbox，每轮最多处理 4 个信封。上传目标只允许 HTTPS 或本机回环 HTTP；只有服务端 ACK 的节点 ID、信封 ID 和报告哈希全部匹配时，节点才先写入不可变 `receipts\<envelope-id>.ack.json`，再把原信封原子移动至 `accepted`。网络或服务端失败只写 `attempts` 状态并保留原信封，后续继续重试。节点不会自动生成报告，也不会因为 ACK 执行 GC、legacy purge、迁移或任意命令；需要上报时仍由受控任务调用 `fleet-stage`。
+PC 节点获得有效凭证后会周期性扫描既有 outbox，每轮最多处理 4 个信封。上传目标只允许 HTTPS 或本机回环 HTTP；只有服务端 ACK 的节点 ID、信封 ID 和报告哈希全部匹配时，节点才先写入不可变 `receipts\<envelope-id>.ack.json`，再把原信封原子移动至 `accepted`。网络或服务端失败只写 `attempts` 状态并保留原信封，后续继续重试。报告 ACK 永远不会触发 GC。节点另行轮询受限 GC 请求，只能选择已安装工具的 `gc-plan` 或 `gc-apply-approved` 两个固定动作，不能接收任意命令或路径。
 
 公网节点必须配置唯一安全真源 `NODE_ENDPOINT_HTTPS_ORIGIN`。当前仍只使用 `http://43.139.149.158:8080` 的旧节点会在本地 `attempts` 写入 `secure-upload-origin-required`，并原样保留 outbox；不得为了上传遥测而把节点长期凭据降级发送到明文 HTTP。TLS 端点未配置时，中央缓存总览显示“暂无报告”是正确状态，不代表远程 GC 可用。
 
-PC 工作台的“我的节点”详情会读取所有者接口，区分尚未上报、读取失败、健康、报告陈旧、建议检查和报告异常。页面只展示受管字节数、磁盘余量、分区、活动写入者及脱敏检查数量；它再次校验响应 schema、节点 ID 和 `destructive_actions_authorized=false`，不提供远程 GC、删除或清理按钮。
+PC 工作台的“我的节点”详情会读取所有者接口，区分尚未上报、读取失败、健康、报告陈旧、建议检查和报告异常。健康摘要再次校验响应 schema、节点 ID 和 `destructive_actions_authorized=false`。独立的“安全回收”区只能请求目标电脑生成新预演、显示脱敏摘要、批准准确的计划 ID 与摘要，或在执行前撤销；它不显示和不接受路径。
 
 “缓存总览”以最多 4 个并发请求读取当前账号名下的全部节点，单台节点的 404 或读取失败不会阻断其他节点。总览复用单节点响应校验和 24 小时陈旧规则，按读取失败、异常、需关注、未上报、健康的顺序展示，并可进入对应节点详情。它不新增聚合数据库、跨所有者查询或写操作；节点数增长到需要服务端分页聚合时，应新增版本化只读端点，而不能放宽现有节点归属校验。
 
 ## GC 业务流
 
-跨 PC 回收必须按以下状态机执行：
+跨 PC 回收使用独立状态机，不能把最近一次健康报告直接升级为删除计划：
 
 ```text
-fleet-report/status 发现风险
-  -> 目标 PC 运行 gc dry-run
-  -> 保存计划、大小、活动写入者和锁证据
-  -> 人工或受权 AI 审核具体 action
-  -> 目标 PC 重新扫描并用 gc -Apply 取分区锁
-  -> 原子移入受管 trash 后删除
-  -> 生成 GC 回执并重新上报 fleet-report
+requested（所有者请求，不含路径）
+  -> plan_ready（目标 PC 保存完整不可变计划，只上传脱敏摘要和 SHA-256）
+  -> approved（所有者批准准确的 plan_id + plan_digest）
+  -> executing（目标 PC 重新扫描动作、大小、活动写入者并取得本机锁）
+  -> completed / partial / failed（上传脱敏回执）
 ```
 
-中央控制面可以请求目标节点预演或执行已批准计划，但不能把旧报告当作删除授权，也不能通过远程文件共享直接删除目录。执行时必须重新扫描，因为报告生成后可能出现新的 Cargo 写入者或锁。
+同一节点同时只允许一个活动请求。计划最多有效 24 小时；本地工具单次最多运行 6 小时，执行状态超过 7 小时没有回执会失败关闭为 `execution-timeout`，释放节点重新生成计划。迟到回执不能覆盖该终态。路由节点、所有者、节点凭证、请求 ID、计划 ID 和摘要必须全部匹配。动作集合、目录大小或活动 Cargo/rustc 数量变化时整批拒绝，审批不能自动迁移到新计划；取锁后新出现的锁只会保留对应分区并生成 `partial` 回执。服务端不能通过远程文件共享删除目录，也不保存绝对路径。
+
+服务端每节点只保留最近 100 条终态 GC 请求。节点仅在服务端确认后，把本地不可变计划、GC 回执、已接收 Fleet 信封和 ACK 各保留最近 100 份；未上传 outbox 和当前失败尝试不因历史上限被删除。
+
+远程审批只覆盖受管分区的机器级普通策略 GC 和显式老化策略。依赖具体项目清单或工作区路径的 `-SharedAliasesOnly`、`-WorkspaceOnly`、`-RecoverMissingWorkspaces`，以及 legacy purge、缓存迁移、Cargo 父配置修改和任意脚本执行，仍必须在目标 PC 本机完成。
 
 常用命令：
 
@@ -161,7 +170,7 @@ fleet-report/status 发现风险
 - 低磁盘时自动生成 GC 预演报告；
 - 节点空闲时生成并排队脱敏 fleet report；已有节点 uploader 会安全消费 outbox。
 
-节点服务只消费 `fleet-stage` outbox，不自行拼接另一种缓存报告。现有 HTTP 接口以节点凭证或已认证所有者和数据库中的节点归属为授权根，并校验路由 `node_id`、信封 `node_id`、报告内 `node_id` 及报告 SHA-256 一致；信封自报身份不能单独构成授权。上传器复用节点宿主的内存凭证，不把长期用户会话或节点密钥写入普通项目目录。
+节点服务消费 `fleet-stage` outbox，并独立轮询受限 GC 状态机；两条通道不共享授权含义。现有 HTTP 接口以节点凭证或已认证所有者和数据库中的节点归属为授权根，并校验路由 `node_id`、信封或计划内 `node_id`、请求身份及 SHA-256 一致；载荷自报身份不能单独构成授权。上传器复用节点宿主的内存凭证，不把长期用户会话或节点密钥写入普通项目目录。
 
 通用 GC `-Apply`、legacy purge、Cargo 父配置激活和平台迁移不能因一次 Git 提交而在所有 PC 自动执行。它们必须在目标 PC 上有明确审批、重新扫描和回执。
 
@@ -179,5 +188,8 @@ fleet-report/status 发现风险
 8. 未登记项目进入 quarantine，不污染正式项目分区。
 9. GC dry-run 不删除；apply 重新取锁并只处理受管路径。
 10. 项目回滚只需取消命名共享分区，不需要手工清空缓存根。
+11. 远程请求不接受路径或任意命令；同一节点不能并行创建两个活动请求。
+12. 审批必须绑定准确计划摘要；计划、活动写入者或候选项漂移时目标 PC 拒绝执行并保留数据。
+13. 后台节点启动 PowerShell 时使用隐藏窗口；公网轮询没有可信 TLS 时失败关闭。
 
 底层路径、域、锁和 GC 细节见 `docs/rust-cache-platform.md`；渐进共享策略见 `docs/rust-cache-on-demand-adoption.md`。

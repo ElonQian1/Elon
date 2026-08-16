@@ -8,7 +8,7 @@ reviewed_at: 2026-08-16
 
 ## 当前产品主链
 
-- 已实现多 PC Rust 缓存平台、可安装 Skill、脱敏 `fleet-report`、不可变 outbox、节点凭证上传、本地 ACK 留证、所有者查询、PC 单节点健康卡片及本人多节点只读缓存总览；公网自动上传严格要求 `NODE_ENDPOINT_HTTPS_ORIGIN`，当前只配置明文 HTTP 的旧节点会保留 outbox 并记录安全阻断，不能宣称已形成生产遥测；远程 GC 审批尚未实现，验证和权限边界见 `docs/rust-cache-fleet-operations.md`。
+- 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
 - 已实现：项目、频道、多人/多 AI 协作、Windows 节点执行、上下文编译、项目文档治理与版本恢复等基础能力。
 - 已实现并完成编译/假数据验收：一龙统一账号已覆盖 Google OIDC 的 Win、Android 与移动 Web 登录/主动绑定，以及 PBKDF2 密码、一次性离线恢复码、可撤销设备会话、脱敏安全事件、导出清单、注销预检和联合登录请求幂等/限流审计；认证存储能力会显式拒绝宣称默认进程内后端具备多副本安全。Win 节点 AI Provider 控制面具备显式登录状态机、原子 journal/备份恢复、Codex/Gemini 假故障矩阵、脱敏诊断和 Codex 保险箱逐操作同意/精确重放合同；ChatGPT Web/Gemini Web 仅保留不可启用的类型化授权生命周期，CLI 登录和浏览器 Cookie 均不可复用。真实 Google/OAuth、真实 Codex/Gemini/Claude/Copilot 账号、邮件/短信恢复、账号最终注销、内部 Web Chat、真机/Renderer、线上部署与安装包发布仍未验收。权威边界见 `docs/unified-account-and-ai-provider-architecture.md`。

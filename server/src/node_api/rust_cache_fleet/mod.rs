@@ -9,6 +9,15 @@ use std::sync::Arc;
 
 mod auth;
 mod contract;
+mod gc;
+mod gc_contract;
+
+pub(crate) use gc::{
+    approve_request as approve_gc_request, create_request as create_gc_request,
+    latest_request as latest_gc_request, next_node_command as next_gc_node_command,
+    reject_request as reject_gc_request, upload_node_plan as upload_gc_node_plan,
+    upload_node_result as upload_gc_node_result,
+};
 
 use crate::{project_auth::auth_from_headers, types::AppState};
 use contract::{types::FleetEnvelopeV1, validate_envelope};

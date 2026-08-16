@@ -16,7 +16,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "fleet-stage", "run", "gc", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
+    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "fleet-stage", "run", "gc", "gc-plan", "gc-apply-approved", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
     [string]$ProjectRoot,
     [string]$Domain,
     [string]$TargetDir,
@@ -33,6 +33,9 @@ param(
     [string]$CodexSkillsRoot,
     [string]$UserLauncherPath,
     [string]$NodeId,
+    [string]$RequestId,
+    [string]$PlanId,
+    [string]$PlanDigest,
     [string]$OutputPath,
     [switch]$Retired,
     [switch]$Apply,
@@ -46,6 +49,7 @@ param(
     [switch]$ResetCargoSourcePolicy,
     [switch]$InstallCodexSkill,
     [switch]$SkipCacheGc,
+    [ValidateRange(5, 1440)][int]$ExpiresMinutes = 1440,
     [int]$LockTimeoutSeconds = 3600,
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$RemainingArgs = @()
 )
@@ -56,6 +60,7 @@ $modulesRoot = Join-Path $scriptsRoot "rust-cache"
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.GcApproval.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
@@ -71,6 +76,7 @@ Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecki
 Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.GcApproval.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
@@ -156,6 +162,26 @@ switch ($Command) {
         Write-Host "Report: $($report.report_path)"
         $report.actions | Format-Table action, reason, project_id, domain, age_days, @{n="GiB";e={[math]::Round($_.size_bytes / 1GB, 2)}}, path -AutoSize
         $report
+    }
+    "gc-plan" {
+        if ([string]::IsNullOrWhiteSpace($RequestId) -or [string]::IsNullOrWhiteSpace($NodeId)) {
+            throw "gc-plan requires -RequestId and -NodeId."
+        }
+        $plan = New-RustCacheGcApprovalPlan -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -RequestId $RequestId -NodeId $NodeId -ForceAged:$ForceAged -WorkspaceOnly:$WorkspaceOnly -RecoverMissingWorkspaces:$RecoverMissingWorkspaces -SharedAliasesOnly:$SharedAliasesOnly -ExpiresMinutes $ExpiresMinutes
+        $summary = Get-RustCacheGcPlanSummary -Plan $plan
+        Write-Host "GC approval plan: $($plan.plan_id)" -ForegroundColor Green
+        Write-Host "Plan SHA-256: $($plan.plan_digest)"
+        Write-Host "Actions: $($summary.action_count); reclaim: $($summary.reclaim_bytes) bytes; active writers: $($summary.active_writer_count)"
+        $summary
+    }
+    "gc-apply-approved" {
+        if ([string]::IsNullOrWhiteSpace($RequestId) -or [string]::IsNullOrWhiteSpace($PlanId) -or [string]::IsNullOrWhiteSpace($PlanDigest)) {
+            throw "gc-apply-approved requires -RequestId, -PlanId, and -PlanDigest."
+        }
+        $receipt = Invoke-RustCacheApprovedPlan -CacheRoot $CacheRoot -RequestId $RequestId -PlanId $PlanId -PlanDigest $PlanDigest -NodeId $NodeId
+        Write-Host "Approved GC status: $($receipt.status)" -ForegroundColor $(if ($receipt.status -eq "completed") { "Green" } else { "Yellow" })
+        Write-Host "Removed: $($receipt.removed_action_count)/$($receipt.approved_action_count); reclaimed: $($receipt.reclaimed_bytes) bytes"
+        $receipt
     }
     "install" {
         if ([string]::IsNullOrWhiteSpace($CargoConfigPath)) {

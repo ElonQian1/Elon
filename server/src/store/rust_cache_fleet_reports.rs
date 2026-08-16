@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
-use super::{common::now, Store};
+use super::super::{common::now, Store};
 
 const MAX_REPORTS_PER_NODE: i64 = 100;
 
