@@ -754,7 +754,8 @@ class ChatGptWebLabContractTest {
         assertTrue(providerActivity.contains("ChatGptWebTestActivity::class.java"))
         assertTrue(providerLayout.contains("android:id=\"@+id/aiProviderChatGptWebLab\""))
         assertTrue(profileEntry.contains("ChatGPT 网页账号"))
-        assertTrue(profileEntry.contains("ChatGptWebTestActivity::class.java"))
+        assertTrue(profileEntry.contains("ChatGptWebOfficialFallbackIntent.create"))
+        assertFalse(profileEntry.contains("ChatGptWebTestActivity::class.java"))
         assertTrue(profileActions.contains("chatGptWebEntry.attach()"))
     }
 

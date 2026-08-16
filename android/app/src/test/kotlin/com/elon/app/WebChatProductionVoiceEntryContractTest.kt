@@ -41,9 +41,11 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(directRoute.contains("openOfficialFallback()"))
         assertFalse(directRoute.contains("mcpPort()"))
         assertTrue(toolRoute.contains("command.action == REALTIME_VOICE_ACTION"))
+        assertFalse(toolRoute.contains("port.control"))
+        assertTrue(toolRoute.contains("port.executeSessionCommand(command.action)"))
         assertTrue(
             toolRoute.indexOf("openOfficialFallback()") <
-                toolRoute.indexOf("port.control"),
+                toolRoute.indexOf("port.executeSessionCommand(command.action)"),
         )
     }
 

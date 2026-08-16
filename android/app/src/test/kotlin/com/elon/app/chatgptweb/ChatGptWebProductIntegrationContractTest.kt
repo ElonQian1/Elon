@@ -124,16 +124,20 @@ class ChatGptWebProductIntegrationContractTest {
     }
 
     @Test
-    fun conversationRowsDoNotPresentPinnedHeadingsAsPerConversationState() {
+    fun pinnedStateIsDetectedButNeverPresentedAsAConversationDateGroup() {
         val adapter = read(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val index = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebConversationIndex.kt",
         )
         val sideMenu = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
         )
 
-        assertFalse(adapter.substringBefore("function cleanText").contains("pinned", ignoreCase = true))
-        assertFalse(adapter.substringBefore("function cleanText").contains("已置顶"))
+        assertTrue(adapter.contains("pinned: pinnedFor(node)"))
+        assertTrue(index.contains("NON_TEMPORAL_GROUP_LABELS"))
+        assertTrue(index.contains("setOf(\"pinned\", \"已置顶\", \"置顶\")"))
         assertFalse(sideMenu.contains("conversation.groupLabel.takeIf"))
     }
 
