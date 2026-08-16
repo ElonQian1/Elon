@@ -107,6 +107,7 @@ assert.equal(cached.canConversationHistory, false)
 const switchingContext = deriveLocalAiUserState('ready', chatgpt, {
   ...readySession,
   contextReady: false,
+  contextStatus: 'restoring',
 }, snapshot({
   authenticated: true,
   composerReady: true,
@@ -114,6 +115,20 @@ const switchingContext = deriveLocalAiUserState('ready', chatgpt, {
   capabilities: ['new_conversation', 'conversation_history'],
 }))
 assert.equal(switchingContext.canSend, false, 'conversation transition must block writes until the target context is live')
+assert.equal(switchingContext.phase, 'context_restoring')
+assert.match(switchingContext.detail, /发送/)
+
+const conflictingContext = deriveLocalAiUserState('ready', chatgpt, {
+  ...readySession,
+  contextReady: false,
+  contextStatus: 'unbound',
+}, snapshot({
+  authenticated: true,
+  composerReady: true,
+  pageKind: 'conversation',
+}))
+assert.equal(conflictingContext.phase, 'context_restoring')
+assert.equal(conflictingContext.fallbackRecommended, true)
 
 const chatgptGuest = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
   composerReady: true,

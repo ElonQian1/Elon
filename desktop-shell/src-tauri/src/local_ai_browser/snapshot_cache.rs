@@ -259,7 +259,12 @@ fn valid_restorable_url(provider_id: &str, value: &str) -> bool {
         }
         "google-ai-mode" => {
             matches!(url.host_str(), Some("google.com" | "www.google.com"))
-                && matches!(url.path(), "/aimode" | "/search")
+                && (url.path() == "/aimode"
+                    || (url.path() == "/search"
+                        && url.query_pairs().any(|(key, value)| {
+                            matches!(key.as_ref(), "udm" | "aep")
+                                && matches!(value.as_ref(), "50" | "11")
+                        })))
         }
         _ => false,
     }

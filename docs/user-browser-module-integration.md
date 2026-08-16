@@ -161,6 +161,19 @@ Markdown 和图片、文件、代码、表格、公式、音视频、图表等�
 ChatGPT 侧栏对缓存采用“先显示、后刷新”：已有项目与会话目录不会阻止原生 UI 首帧回显，
 但每次重新激活 ChatGPT 厂商仍会在实时页面就绪后后台执行一次 `list_conversations`，以官网
 当前目录原子替换旧快照。Google AI 目前只缓存当前 AI 搜索会话，不伪造官网未提供的项目列表。
+Google AI 搜索结果的官方恢复地址会连同 AI Mode 标志和本轮查询参数保存在当前 Windows 用户
+可解密的 DPAPI 快照中；重启时只允许恢复 `google.com` 的 `/aimode`，或明确带 `udm=50` / `aep=11`
+的 `/search`。地址 query 不进入日志、诊断或前端状态。普通 Google 搜索、跨域地址和 ChatGPT
+带 query 的地址都不会作为会话恢复目标。
+
+缓存回显不再代表官方上下文已经可写。Rust 会把上下文标为 `empty`、`cached`、`restoring`、
+`bound` 或 `unbound`；只有实时消息快照的页面键和会话键都与当前 WebView2 页面一致时才进入
+`bound`。生产首页据此解锁输入框，`send_prompt` 在 Tauri 命令入口还会再次检查绑定状态，避免
+前端竞态把追问发进新会话。切换厂商、打开缓存会话、导航或重启恢复期间可以立即看缓存，但发送
+保持暂停，直到目标官方上下文重新确认。发送命令本身也建立一个短暂的上下文转换边界；适配器返回
+包含本轮用户消息的新快照后才重新解锁，避免命令回执先到、SPA 路由和回答快照后到时连续发送到错误页面。
+若 WebView2 没有为 `history.pushState` 产生顶层导航回调，经过清洗的适配器页面键仍可推进当前
+ChatGPT/Google 会话；内部恢复地址只进入 DPAPI 缓存，不进入前端语义事件。
 
 原生界面必须把技术状态归一化为用户可理解的阶段：客户端检查或需更新、官方窗口未打开或加载中、
 导航拦截或错误、适配器等待、ChatGPT 需要登录、Google 地区/语言/账号不可用的只读降级、
@@ -216,6 +229,8 @@ confirmation，再调用商户模块运行时：
   `observedCount` 表示本轮官网实际观察数量，`availableCount` 表示合并缓存后的可展示数量。
 - ChatGPT 消息快照按 `messageWindowStart` 与 `observedMessageCount` 合并同一会话的虚拟化窗口，暂时缩短的
   DOM 快照不会清空上一轮可见上下文；新建、打开会话或项目仍建立明确边界，绝不继承上一会话消息。
+- Google AI 重启恢复不再把带 AI Mode 查询参数的官方会话地址丢弃并退回空白 `/aimode`；缓存内容与
+  官方页绑定前 `contextReady=false`，前端和 Tauri 发送入口都会失败关闭。
 - 没有可验证的一龙云端 owner 或已登录本机节点 owner 时不能创建本地 Profile；两者同时存在
   但不一致时同样失败关闭。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。

@@ -109,15 +109,103 @@ fn background_opening_never_reports_a_visible_official_window() {
 }
 
 #[test]
+fn cached_messages_are_not_sendable_until_the_official_page_is_live_and_bound() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let url = Url::parse("https://chatgpt.com/c/context").unwrap();
+    runtime.mark_navigation("session", &url, true, None);
+    runtime.mark_page_finished("session", &url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","composerReady":true,"messages":[
+            {"id":"user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"answer","role":"assistant","state":"completed","content":[{"type":"text","text":"answer"}]}
+        ]}),
+        semantic_context::page_context_key("chatgpt", url.as_str()).as_deref(),
+    );
+    let bound = runtime.snapshot("session").unwrap();
+    assert!(bound.context_ready);
+    assert_eq!(bound.context_status, "bound");
+    assert!(runtime.require_bound_context("session").is_ok());
+
+    runtime.mark_navigation("session", &url, true, None);
+    let restoring = runtime.snapshot("session").unwrap();
+    assert!(!restoring.context_ready);
+    assert_eq!(restoring.context_status, "restoring");
+    assert!(runtime.require_bound_context("session").is_err());
+}
+
+#[test]
+fn send_snapshot_can_advance_a_chatgpt_spa_route_without_losing_context() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let home = Url::parse("https://chatgpt.com/").unwrap();
+    let home_key = semantic_context::page_context_key("chatgpt", home.as_str());
+    runtime.mark_navigation("session", &home, true, None);
+    runtime.mark_page_finished("session", &home);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","composerReady":true,"messages":[]}),
+        home_key.as_deref(),
+    );
+    let conversation_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
+
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp_first"),
+        Some("first"),
+    );
+    assert!(!runtime.snapshot("session").unwrap().context_ready);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","composerReady":true,"messages":[]}),
+        home_key.as_deref(),
+    );
+    let pending = runtime.snapshot("session").unwrap();
+    assert!(!pending.context_ready);
+    assert_eq!(pending.diagnostics["lastEventKind"], "pending_send_snapshot_ignored");
+
+    let conversation = Url::parse("https://chatgpt.com/c/first").unwrap();
+    let conversation_key = semantic_context::page_context_key("chatgpt", conversation.as_str());
+    runtime.record_adapter_event_with_context_and_url(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","composerReady":true,"messages":[
+            {"id":"user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"answer","role":"assistant","state":"completed","content":[{"type":"text","text":"answer"}]}
+        ]}),
+        conversation_key.as_deref(),
+        Some(conversation.as_str()),
+    );
+
+    let restored = runtime.snapshot("session").unwrap();
+    assert!(restored.context_ready);
+    assert_eq!(restored.context_status, "bound");
+    assert_eq!(
+        restored.active_conversation_id.as_deref(),
+        Some(conversation_id.as_str())
+    );
+    assert_eq!(
+        runtime.cached_restorable_url("session").as_deref(),
+        Some(conversation.as_str())
+    );
+}
+
+#[test]
 fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("local-ai-chatgpt-owner-secret", "chatgpt", "connecting");
-    runtime.mark_navigation(
-        "local-ai-chatgpt-owner-secret",
-        &Url::parse("https://chatgpt.com/c/private-conversation-id").unwrap(),
-        true,
-        None,
-    );
+    let page_url = Url::parse("https://chatgpt.com/c/private-conversation-id").unwrap();
+    runtime.mark_navigation("local-ai-chatgpt-owner-secret", &page_url, true, None);
+    runtime.mark_page_finished("local-ai-chatgpt-owner-secret", &page_url);
     runtime.record_adapter_event(
         "local-ai-chatgpt-owner-secret",
         "message_snapshot",
@@ -363,6 +451,7 @@ fn late_snapshot_from_previous_page_cannot_replace_opened_conversation() {
         "first",
     );
 
+    runtime.mark_page_finished("session", &second_url);
     runtime.record_adapter_event_with_context(
         "session",
         "message_snapshot",

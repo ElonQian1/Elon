@@ -55,6 +55,7 @@ struct SessionRecord {
     active_page_context_key: Option<String>,
     semantic_page_context_key: Option<String>,
     pending_context_action: String,
+    pending_send_prompt: Option<String>,
     preserve_conversation_on_navigation: bool,
     cache_path: Option<PathBuf>,
     cache_updated_at_ms: u64,
@@ -87,6 +88,7 @@ pub struct LocalAiWebSessionState {
     pub local_conversations: Vec<LocalAiCachedConversation>,
     pub active_conversation_id: Option<String>,
     pub context_ready: bool,
+    pub context_status: String,
     pub cache_updated_at_ms: u64,
     pub updated_at_ms: u64,
 }
@@ -215,6 +217,7 @@ impl LocalAiBrowserRuntime {
                 active_page_context_key: active_page_context_key.clone(),
                 semantic_page_context_key: active_page_context_key,
                 pending_context_action: String::new(),
+                pending_send_prompt: None,
                 preserve_conversation_on_navigation: false,
                 cache_path,
                 cache_updated_at_ms,
@@ -344,6 +347,23 @@ impl LocalAiBrowserRuntime {
         payload: Value,
         page_context_key: Option<&str>,
     ) {
+        self.record_adapter_event_with_context_and_url(
+            label,
+            kind,
+            payload,
+            page_context_key,
+            None,
+        );
+    }
+
+    pub fn record_adapter_event_with_context_and_url(
+        &self,
+        label: &str,
+        kind: &str,
+        payload: Value,
+        page_context_key: Option<&str>,
+        restorable_url: Option<&str>,
+    ) {
         self.update(label, |record| {
             record.last_event_kind = truncate(kind.to_string(), 48);
             match kind {
@@ -356,6 +376,11 @@ impl LocalAiBrowserRuntime {
                     record.renderer_status = "active".to_string();
                     if !record.apply_message_snapshot(payload, page_context_key) {
                         return;
+                    }
+                    if let Some(url) = restorable_url.and_then(|url| {
+                        snapshot_cache::normalize_restorable_url(&record.provider_id, url)
+                    }) {
+                        record.active_restorable_url = Some(url);
                     }
                     let snapshot = record.semantic_event.as_ref();
                     record.message_count = snapshot
@@ -467,6 +492,23 @@ impl LocalAiBrowserRuntime {
         self.sessions().get(label).cloned().map(Into::into)
     }
 
+    pub fn require_bound_context(&self, label: &str) -> Result<(), String> {
+        let sessions = self.sessions();
+        let record = sessions
+            .get(label)
+            .ok_or_else(|| "本地 AI 官方会话尚未创建。".to_string())?;
+        if record.context_ready() {
+            return Ok(());
+        }
+        let detail = match record.context_binding_status() {
+            "restoring" => "官方会话正在恢复，请等待当前上下文确认后再发送。",
+            "cached" => "当前只显示本地缓存，官方会话尚未恢复，暂不能发送。",
+            "empty" => "官方页面尚未返回可用会话，请等待页面加载完成。",
+            _ => "当前消息快照与官方页面不属于同一会话，已阻止发送。",
+        };
+        Err(detail.to_string())
+    }
+
     pub fn diagnostic_for_provider(&self, provider_id: &str) -> Option<Value> {
         let sessions = self.sessions();
         let record = sessions
@@ -489,7 +531,8 @@ impl LocalAiBrowserRuntime {
             "adapter_connected": record.renderer_status == "active",
             "semantic_snapshot_ready": snapshot.is_some_and(|event| event.get("type").and_then(Value::as_str) == Some("message_snapshot")),
             "composer_ready": record.semantic_live && snapshot.and_then(|event| event.get("composerReady")).and_then(Value::as_bool).unwrap_or(false),
-            "context_ready": record.pending_context_action.is_empty() && snapshot.is_some(),
+            "context_ready": record.context_ready(),
+            "context_status": record.context_binding_status(),
             "context_transition_pending": !record.pending_context_action.is_empty(),
             "page_kind": snapshot.and_then(|event| event.get("pageKind")).and_then(Value::as_str).unwrap_or("unknown"),
             "cache_status": record.cache_status(),
@@ -579,8 +622,8 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             .event_cache_status(record.navigation_event.is_some(), record.navigation_live)
             .to_string();
         let diagnostics = diagnostic_summary(&record);
-        let context_ready =
-            record.pending_context_action.is_empty() && record.semantic_event.is_some();
+        let context_ready = record.context_ready();
+        let context_status = record.context_binding_status().to_string();
         let local_conversations = record
             .conversation_snapshots
             .iter()
@@ -615,6 +658,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             local_conversations,
             active_conversation_id: record.active_conversation_id,
             context_ready,
+            context_status,
             cache_updated_at_ms: record.cache_updated_at_ms,
             updated_at_ms: record.updated_at_ms,
         }

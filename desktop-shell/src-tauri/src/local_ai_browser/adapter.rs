@@ -1,6 +1,8 @@
 use serde_json::{json, Map, Value};
 
-use super::{adapter_content, chatgpt_adapter_bootstrap::ADAPTER_VERSION, semantic_context};
+use super::{
+    adapter_content, chatgpt_adapter_bootstrap::ADAPTER_VERSION, semantic_context, snapshot_cache,
+};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
@@ -12,6 +14,7 @@ pub struct SanitizedAdapterEvent {
     pub kind: String,
     pub payload: Value,
     pub page_context_key: Option<String>,
+    pub restorable_url: Option<String>,
 }
 
 pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
@@ -51,6 +54,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "requestId": sanitize_request_id(value.get("requestId")),
             }),
             page_context_key: None,
+            restorable_url: None,
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
             kind: "browser_diagnostic".to_string(),
@@ -61,6 +65,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "url": sanitize_chatgpt_url(value.get("url")),
             }),
             page_context_key: None,
+            restorable_url: None,
         }),
         _ => Err("不支持的 ChatGPT 本地浏览器事件。".to_string()),
     }
@@ -144,10 +149,19 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
                 .and_then(|url| semantic_context::page_context_key("chatgpt", url))
         })
         .flatten();
+    let restorable_url = (kind == "message_snapshot")
+        .then(|| {
+            event
+                .get("url")
+                .and_then(Value::as_str)
+                .and_then(|url| snapshot_cache::normalize_restorable_url("chatgpt", url))
+        })
+        .flatten();
     Ok(SanitizedAdapterEvent {
         kind: kind.to_string(),
         payload,
         page_context_key,
+        restorable_url,
     })
 }
 
@@ -545,6 +559,7 @@ mod tests {
         let event = sanitize_event(&raw).unwrap();
         assert_eq!(event.kind, "message_snapshot");
         assert_eq!(event.payload["url"], "https://chatgpt.com/c/test");
+        assert!(event.restorable_url.is_none());
         assert_eq!(event.payload["pageKind"], "auth");
         assert_eq!(event.payload["loginRequired"], true);
         assert!(!event.payload.to_string().contains("secret"));

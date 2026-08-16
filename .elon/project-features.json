@@ -6307,6 +6307,195 @@
       "updated_at_ms": 1786874485287
     },
     {
+      "id": "win-web-ai-official-context-binding-v1",
+      "title": "Win 网页 AI 官方上下文绑定 V1",
+      "summary": "让 Windows 生产首页只在消息快照、官方页面和厂商会话完成实时绑定后发送，并恢复 Google AI Mode 查询会话及 ChatGPT SPA 路由上下文。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-official-context-binding-v1.md",
+        "content_hash": "a4c2174e9e89c87fb421f498f49c25b6e32a1b80886133f92baafcbb27b2e27f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+          "head_blob_oid": "5a42cb959e4850c210b5a1bc95e198f97ae7cd2a",
+          "worktree_blob_oid": "5a42cb959e4850c210b5a1bc95e198f97ae7cd2a",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "windows-web-ai",
+      "tags": [
+        "windows",
+        "webview2",
+        "chatgpt",
+        "google-ai",
+        "context"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/adapter.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/semantic_context.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/state/context.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/tests.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-context-contract.cjs",
+        "pc-frontend/scripts/test-local-ai-user-state.cjs",
+        "pc-frontend/src/features/user-browser/localAiBrowserApi.ts",
+        "pc-frontend/src/features/user-browser/localAiUserState.ts",
+        "pc-frontend/src/features/user-browser/useAiWebChatBackend.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "缓存回显不能解锁发送，只有实时页面键和会话键一致才进入 bound。",
+        "send_prompt 在 Tauri 命令入口拒绝未绑定上下文。",
+        "ChatGPT SPA 路由缺少 WebView2 导航回调时仍保持当前会话。",
+        "Google AI 只恢复明确带 AI Mode 标志的官方搜索地址。",
+        "URL query 不进入前端、诊断或日志。",
+        "合同、类型和定向 Rust 回归通过；真实消息留待用户授权验收。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser.rs",
+          "content_hash": "064e9c1f3a6359fa8be6a8ebd55d47380f1262f3235af2b3ccf8d22ae20a3914",
+          "locator": "run_local_ai_web_adapter_command",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "a006425e07b7987ad97650c2db5c30e1b9656410",
+            "worktree_blob_oid": "a006425e07b7987ad97650c2db5c30e1b9656410",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/semantic_context.rs",
+          "content_hash": "5c0c2183bc5b524b5eef67d48c278df215aee272806bce04a921cddd1891995c",
+          "locator": "has_last_user_text",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "da10b8e9812109435d9860bc3dc84aadfc7adf3b",
+            "worktree_blob_oid": "da10b8e9812109435d9860bc3dc84aadfc7adf3b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs",
+          "content_hash": "bd32daee977b7474f2eb48c2e30982af48486b59a64bbf66f82f37f484c763cc",
+          "locator": "normalize_restorable_url",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "51d1070947fa7b28e9a304e77ce7dbfd73eb8389",
+            "worktree_blob_oid": "51d1070947fa7b28e9a304e77ce7dbfd73eb8389",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state/context.rs",
+          "content_hash": "ec69be826d248543f511b605e1c8848b390255fe87126390c86714e2cb46d6c0",
+          "locator": "context_binding_status",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "ded64431223ebe5d548724b713d50b5a4241c533",
+            "worktree_blob_oid": "ded64431223ebe5d548724b713d50b5a4241c533",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+          "content_hash": "dd21e0a870ecf5688adba1c49d45d5e29772ade8eb513ab45a799ac5574564fd",
+          "locator": "send_snapshot_can_advance_a_chatgpt_spa_route_without_losing_context",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "bf33b96d7e6ea0f12a626b4afc4ce8013e90ac6f",
+            "worktree_blob_oid": "bf33b96d7e6ea0f12a626b4afc4ce8013e90ac6f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/tests.rs",
+          "content_hash": "3add520ee24e89dd240d8af16d272aecbdc96ddde48891b9b8601a0b6a970ac0",
+          "locator": "restores_google_ai_mode_query_but_rejects_ordinary_search",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "954efa5b84c8a953f594ab233ffb411e03c76735",
+            "worktree_blob_oid": "954efa5b84c8a953f594ab233ffb411e03c76735",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "7c65e6ae0136f8cc212eb34b62240045876401ceb7a47d58b484a91e8e5a2ef1",
+          "locator": "缓存回显不再代表官方上下文已经可写",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "1693003d4ad7594223fae2eada77378ac4e57fed",
+            "worktree_blob_oid": "1693003d4ad7594223fae2eada77378ac4e57fed",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-context-contract.cjs",
+          "content_hash": "75a79d82109d40c3bbea7e22bdcd7c2b97c093f942874f5136cb9e7bd5b0b598",
+          "locator": "pending_send_snapshot_ignored",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "b10c25c34b53f953ee74bc983d108f34ff1bd40c",
+            "worktree_blob_oid": "b10c25c34b53f953ee74bc983d108f34ff1bd40c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-user-state.cjs",
+          "content_hash": "ac675ece8ed9fc6b310558c4ff3fded3487f795e3610b24225ed5ae3a9febbd0",
+          "locator": "context_restoring",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "d8998bad3d8a1c50d36102e32103313a2b554f0d",
+            "worktree_blob_oid": "d8998bad3d8a1c50d36102e32103313a2b554f0d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiUserState.ts",
+          "content_hash": "411e9b0399b7e14cbbf434b7b7ef00b4aebede34718a86737399b061ce73f884",
+          "locator": "context_restoring",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ad2e696b7c8f220e27d6069c433d696a7d4043b",
+            "head_blob_oid": "e94d30874540cd0c1a179e6f6d5e2317fedbf900",
+            "worktree_blob_oid": "e94d30874540cd0c1a179e6f6d5e2317fedbf900",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786878793797,
+      "updated_at_ms": 1786878849243
+    },
+    {
       "id": "win-web-ai-production-session-diagnostics-v1",
       "title": "Win 网页 AI 生产会话结构诊断 V1",
       "summary": "让 Win Codex 控制区分测试子窗口与生产首页后台官方会话，并以双重白名单清洗公开上下文、目录、缓存和流式结构状态。",
@@ -6663,66 +6852,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_0cddca2d06b0431899e73f87924d20dc",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "transitioned",
-      "actor": "codex-v265",
-      "reason": "开始实现一次性 ELNW authenticated no-work relay 与 Store-private observation。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786742300273
-    },
-    {
-      "id": "feature_event_0b88e07dc45e45b5897398702b4e1bfd",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-v265",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786748671985
-    },
-    {
-      "id": "feature_event_f8fd7a0c30c1490f885d43c6a53740ae",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "transitioned",
-      "actor": "codex-v265",
-      "reason": "V265 source, tests, authority and acceptance evidence are complete.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786748684536
-    },
-    {
-      "id": "feature_event_9cd2c2fc5c99450785b3dedff211935e",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "transitioned",
-      "actor": "codex-v265",
-      "reason": "Production check, Windows, Linux core, Linux-musl and WSL kernel evidence passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786748696651
-    },
-    {
-      "id": "feature_event_843463f858f9499f9335022690f601f7",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "transitioned",
-      "actor": "codex-v265",
-      "reason": "V265 is verified, documented, and ready for the normal Git release commit.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786748712051
-    },
-    {
-      "id": "feature_event_6966631d7be042b29cffa44f8b483547",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "registered",
-      "actor": "codex-goal-agent",
-      "reason": "",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1786750215286
-    },
     {
       "id": "feature_event_b6d30c4e53ef487b809e8238778cb492",
       "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
@@ -8662,6 +8791,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786877700639
+    },
+    {
+      "id": "feature_event_8117c5574c54423d8015ad323ee17f5d",
+      "feature_id": "win-web-ai-official-context-binding-v1",
+      "action": "registered",
+      "actor": "codex-goal-019fd85d",
+      "reason": "rebase 后通过官方接口恢复本功能登记并保留远端并发功能。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1786878793797
+    },
+    {
+      "id": "feature_event_d42de6e079074715a6882566370852aa",
+      "feature_id": "win-web-ai-official-context-binding-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019fd85d",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786878806275
+    },
+    {
+      "id": "feature_event_f65349f2678a4140b14e47732bdd54f5",
+      "feature_id": "win-web-ai-official-context-binding-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019fd85d",
+      "reason": "rebase 后恢复已完成实现的证据链。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786878818170
+    },
+    {
+      "id": "feature_event_470ac6a007ae4b7389f3104c6dd18354",
+      "feature_id": "win-web-ai-official-context-binding-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019fd85d",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786878835563
+    },
+    {
+      "id": "feature_event_e95bb9e2654146cfa55b827f3382f55f",
+      "feature_id": "win-web-ai-official-context-binding-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019fd85d",
+      "reason": "生产首页共用网页 AI 后端实现已随最新 main 重放。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786878849219
+    },
+    {
+      "id": "feature_event_d67130a65dc349f6bec62bb92b681aa0",
+      "feature_id": "win-web-ai-official-context-binding-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019fd85d",
+      "reason": "rebase 未触及相关业务源码，合同、类型、Rust 与预提交检查均已通过；真实第三方消息留待授权验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786878849243
     }
   ]
 }

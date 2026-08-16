@@ -89,7 +89,7 @@ fn local_ai_navigation_logs_never_include_queries_fragments_or_userinfo() {
 }
 
 #[test]
-fn cached_chatgpt_conversation_is_restored_without_restoring_auth_or_queries() {
+fn cached_provider_conversation_is_restored_without_restoring_auth_or_unrelated_searches() {
     assert_eq!(
         restorable_start_url(&CHATGPT, Some("https://chatgpt.com/c/conversation_123"))
             .unwrap()
@@ -112,6 +112,15 @@ fn cached_chatgpt_conversation_is_restored_without_restoring_auth_or_queries() {
         restorable_start_url(
             &GOOGLE_AI_MODE,
             Some("https://www.google.com/search?q=private&udm=50"),
+        )
+        .unwrap()
+        .as_str(),
+        "https://www.google.com/search?q=private&udm=50"
+    );
+    assert_eq!(
+        restorable_start_url(
+            &GOOGLE_AI_MODE,
+            Some("https://www.google.com/search?q=ordinary-search"),
         )
         .unwrap()
         .as_str(),

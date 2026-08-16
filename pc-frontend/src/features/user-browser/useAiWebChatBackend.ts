@@ -75,6 +75,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   const contextTurnCount = (controller.snapshot?.messages ?? [])
     .filter((item) => item.role === 'user').length
   const contextReady = controller.sessionState?.contextReady !== false
+  const contextStatus = controller.sessionState?.contextStatus
 
   function selectProvider(id: string) {
     setProviderId(id)
@@ -94,12 +95,17 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     title: controller.snapshot?.title || '新对话',
     streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
     contextReady,
+    contextStatus,
     contextTurnCount,
     contextSummary: !contextReady
-      ? '正在切换官方会话；目标上下文确认前已暂停发送。'
+      ? contextStatus === 'cached'
+        ? '已立即显示本地缓存；官方网页尚未恢复到对应会话，发送已暂停。'
+        : contextStatus === 'unbound'
+          ? '缓存内容与当前官方页面不属于同一会话，发送已暂停。'
+          : '正在恢复官方会话；目标上下文确认前已暂停发送。'
       : contextTurnCount > 0
-        ? `当前原生界面已保持 ${contextTurnCount} 轮官方网页上下文。`
-        : '新会话上下文已就绪，第一条消息会直接进入当前官方网页会话。',
+        ? `已确认当前官方会话绑定，并同步 ${contextTurnCount} 轮可见上下文。`
+        : '新会话与当前官方页面已绑定，第一条消息会进入这个会话。',
     accessMode: canCompose
       ? controller.snapshot?.authenticated ? 'account' as const : 'guest' as const
       : 'unavailable' as const,

@@ -11,14 +11,46 @@ const BOUNDARY_ACTIONS: [&str; 4] = [
 ];
 
 impl SessionRecord {
+    pub(super) fn context_binding_status(&self) -> &'static str {
+        if !self.pending_context_action.is_empty() || self.loading {
+            return "restoring";
+        }
+        if self.semantic_event.is_none() {
+            return "empty";
+        }
+        if !self.semantic_live {
+            return "cached";
+        }
+        let conversation_bound = self.active_conversation_id.is_some()
+            && self.active_conversation_id == self.semantic_conversation_id;
+        let page_bound = self.active_page_context_key.is_some()
+            && self.active_page_context_key == self.semantic_page_context_key;
+        if self.window_status == "ready"
+            && self.renderer_status == "active"
+            && conversation_bound
+            && page_bound
+        {
+            "bound"
+        } else {
+            "unbound"
+        }
+    }
+
+    pub(super) fn context_ready(&self) -> bool {
+        self.context_binding_status() == "bound"
+    }
+
     pub(super) fn begin_context_command(&mut self, action: &str, target: Option<&str>) {
         if action == "send_prompt" {
+            self.pending_context_action = action.to_string();
+            self.pending_send_prompt = target.map(|value| value.to_string());
             self.preserve_conversation_on_navigation = true;
             return;
         }
         if !BOUNDARY_ACTIONS.contains(&action) {
             return;
         }
+        self.pending_send_prompt = None;
         self.pending_context_action = action.to_string();
         self.preserve_conversation_on_navigation = false;
         if action == "new_conversation" {
@@ -88,15 +120,37 @@ impl SessionRecord {
         payload: Value,
         page_context_key: Option<&str>,
     ) -> bool {
+        let mut boundary = self.pending_context_action.clone();
+        if boundary == "send_prompt"
+            && self.pending_send_prompt.as_deref().is_some_and(|expected| {
+                !semantic_context::has_last_user_text(&payload, expected)
+            })
+        {
+            self.last_event_kind = "pending_send_snapshot_ignored".to_string();
+            return false;
+        }
         if let (Some(expected), Some(actual)) =
             (self.active_page_context_key.as_deref(), page_context_key)
         {
             if expected != actual {
-                self.last_event_kind = "stale_message_snapshot_ignored".to_string();
-                return false;
+                if self.preserve_conversation_on_navigation || boundary == "new_conversation" {
+                    self.active_page_context_key = Some(actual.to_string());
+                } else if boundary.is_empty() && self.provider_id == "google-ai-mode" {
+                    self.active_page_context_key = Some(actual.to_string());
+                    if self.active_conversation_id.is_none() {
+                        self.active_conversation_id = Some(actual.to_string());
+                    }
+                } else if boundary.is_empty() {
+                    self.active_page_context_key = Some(actual.to_string());
+                    self.active_conversation_id = Some(actual.to_string());
+                    boundary = "semantic_navigation".to_string();
+                    self.pending_context_action = boundary.clone();
+                } else {
+                    self.last_event_kind = "stale_message_snapshot_ignored".to_string();
+                    return false;
+                }
             }
         }
-        let boundary = self.pending_context_action.clone();
         if boundary == "new_conversation" {
             let page_changed = page_context_key.is_some()
                 && page_context_key != self.semantic_page_context_key.as_deref();
@@ -112,7 +166,7 @@ impl SessionRecord {
                     Some(semantic_context::fresh_conversation_id(&self.provider_id));
             }
         }
-        let boundary_pending = !boundary.is_empty();
+        let boundary_pending = !boundary.is_empty() && boundary != "send_prompt";
         if self.active_page_context_key.is_none() {
             self.active_page_context_key = page_context_key.map(ToOwned::to_owned);
         }
@@ -135,6 +189,7 @@ impl SessionRecord {
             .map(ToOwned::to_owned)
             .or_else(|| self.active_page_context_key.clone());
         self.pending_context_action.clear();
+        self.pending_send_prompt = None;
         if self
             .semantic_event
             .as_ref()
@@ -155,6 +210,7 @@ impl SessionRecord {
             self.active_conversation_id = self.semantic_conversation_id.clone();
             self.active_page_context_key = self.semantic_page_context_key.clone();
             self.pending_context_action.clear();
+            self.pending_send_prompt = None;
         }
         if action == "send_prompt" && !ok {
             self.preserve_conversation_on_navigation = false;
@@ -167,6 +223,7 @@ impl SessionRecord {
         self.active_page_context_key = None;
         self.semantic_page_context_key = None;
         self.pending_context_action.clear();
+        self.pending_send_prompt = None;
         self.preserve_conversation_on_navigation = false;
     }
 }

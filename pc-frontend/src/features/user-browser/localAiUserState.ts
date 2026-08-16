@@ -15,6 +15,7 @@ export type LocalAiUserPhase =
   | 'official_blocked'
   | 'official_error'
   | 'adapter_waiting'
+  | 'context_restoring'
   | 'login_required'
   | 'provider_unavailable'
   | 'ready_guest'
@@ -163,6 +164,24 @@ export function deriveLocalAiUserState(
       guestMode ? googleDetail : '官方页面结构或账号状态暂不支持原生输入；可显示官方窗口继续使用。',
       true,
       true,
+      shared,
+    )
+  }
+  if (session?.contextReady === false) {
+    const conflicted = session.contextStatus === 'unbound'
+    const cached = session.contextStatus === 'cached'
+    return result(
+      'context_restoring',
+      conflicted ? 'attention' : 'loading',
+      conflicted ? '上下文冲突' : '恢复中',
+      conflicted ? '缓存会话与当前官方页面不一致' : '正在恢复当前官方会话',
+      conflicted
+        ? '已暂停发送；请等待自动恢复，或显示官方页确认当前会话。'
+        : cached
+          ? '正在用缓存立即回显；发送会在官方页面恢复到同一会话后自动解锁。'
+          : '当前会话切换尚未完成；发送会在本轮页面和消息快照绑定后自动解锁。',
+      true,
+      conflicted,
       shared,
     )
   }

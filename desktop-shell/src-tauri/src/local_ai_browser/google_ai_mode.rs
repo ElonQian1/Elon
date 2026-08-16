@@ -1,6 +1,6 @@
 use serde_json::{json, Map, Value};
 
-use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context};
+use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, snapshot_cache};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 12;
@@ -154,6 +154,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                     "kind": "dom_diagnostics",
                 }),
                 page_context_key: None,
+                restorable_url: None,
             })
         }
         Some("command_result") => Ok(SanitizedAdapterEvent {
@@ -166,6 +167,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "requestId": sanitize_request_id(value.get("requestId")),
             }),
             page_context_key: None,
+            restorable_url: None,
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
             kind: "browser_diagnostic".to_string(),
@@ -176,6 +178,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 "url": sanitize_google_url(value.get("url")),
             }),
             page_context_key: None,
+            restorable_url: None,
         }),
         _ => Err("不支持的 Google AI 模式本地浏览器事件。".to_string()),
     }
@@ -215,10 +218,19 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
                 .and_then(|url| semantic_context::page_context_key("google-ai-mode", url))
         })
         .flatten();
+    let restorable_url = (kind == "message_snapshot")
+        .then(|| {
+            event
+                .get("url")
+                .and_then(Value::as_str)
+                .and_then(|url| snapshot_cache::normalize_restorable_url("google-ai-mode", url))
+        })
+        .flatten();
     Ok(SanitizedAdapterEvent {
         kind: kind.to_string(),
         payload,
         page_context_key,
+        restorable_url,
     })
 }
 
@@ -362,6 +374,10 @@ mod tests {
         assert_eq!(event.kind, "message_snapshot");
         assert_eq!(event.payload["url"], "https://www.google.com/search");
         assert_eq!(event.payload["pageKind"], "ai_mode");
+        assert_eq!(
+            event.restorable_url.as_deref(),
+            Some("https://www.google.com/search?udm=50&q=private")
+        );
         assert!(event.payload.to_string().contains("visible answer"));
         assert!(event
             .payload

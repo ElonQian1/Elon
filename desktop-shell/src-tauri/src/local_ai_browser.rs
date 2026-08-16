@@ -429,6 +429,9 @@ pub async fn run_local_ai_web_adapter_command(
     let window = app
         .get_webview_window(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
+    if action == "send_prompt" {
+        runtime.require_bound_context(&label)?;
+    }
     if action != "snapshot" {
         runtime.mark_command_pending_with_value(
             &label,
@@ -498,11 +501,12 @@ pub fn publish_local_ai_web_event(
         .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
     let event = provider.adapter.unwrap().sanitize_event(&payload)?;
-    runtime.record_adapter_event_with_context(
+    runtime.record_adapter_event_with_context_and_url(
         label,
         &event.kind,
         event.payload,
         event.page_context_key.as_deref(),
+        event.restorable_url.as_deref(),
     );
     Ok(())
 }
@@ -612,22 +616,11 @@ fn restorable_start_url(
     let Some(cached) = cached_url.and_then(|value| value.parse::<Url>().ok()) else {
         return Ok(fallback);
     };
-    if !allows_navigation(provider, &cached)
-        || cached.query().is_some()
-        || cached.fragment().is_some()
-    {
+    if !allows_navigation(provider, &cached) || cached.fragment().is_some() {
         return Ok(fallback);
     }
-    let host = cached.host_str().unwrap_or_default();
-    let path = cached.path();
-    let restorable = match provider.id {
-        "chatgpt" => {
-            host == "chatgpt.com"
-                && (path == "/" || path.starts_with("/c/") || path.starts_with("/g/"))
-        }
-        "google-ai-mode" => matches!(host, "google.com" | "www.google.com") && path == "/aimode",
-        _ => false,
-    };
+    let restorable =
+        snapshot_cache::normalize_restorable_url(provider.id, cached.as_str()).is_some();
     Ok(if restorable { cached } else { fallback })
 }
 
