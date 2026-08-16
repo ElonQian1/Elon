@@ -8,6 +8,7 @@ import {
 } from './localAiWebProviders'
 import useLocalAiBrowserCapability from './useLocalAiBrowserCapability'
 import useLocalAiWebChatController from './useLocalAiWebChatController'
+import { localAiHistoryWindow } from './localAiHistoryWindow'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -76,6 +77,10 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     .filter((item) => item.role === 'user').length
   const contextReady = controller.sessionState?.contextReady !== false
   const contextStatus = controller.sessionState?.contextStatus
+  const historyWindow = useMemo(
+    () => localAiHistoryWindow(controller.snapshot),
+    [controller.snapshot],
+  )
 
   function selectProvider(id: string) {
     setProviderId(id)
@@ -97,6 +102,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     contextReady,
     contextStatus,
     contextTurnCount,
+    historyWindow,
     contextSummary: !contextReady
       ? contextStatus === 'cached'
         ? '已立即显示本地缓存；官方网页尚未恢复到对应会话，发送已暂停。'

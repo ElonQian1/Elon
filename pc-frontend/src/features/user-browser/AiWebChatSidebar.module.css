@@ -70,6 +70,8 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .status { margin: 12px 5px 0; padding: 9px; display: flex; flex-direction: column; gap: 4px; border: 1px solid rgba(255,255,255,.06); border-radius: 6px; background: rgba(0,0,0,.08); }
 .status strong { color: #aeb5c0; font-size: 11px; }
+.status small { color: #89919c; font-size: 10px; line-height: 1.35; }
+.status small[data-complete="true"] { color: #73b985; }
 .status span { color: #7e8590; font-size: 10px; line-height: 1.45; }
 .status[data-error="true"] { border-color: rgba(218,93,93,.28); }
 .privacy { margin: 10px 7px 0; display: flex; align-items: flex-start; gap: 6px; color: #707782; font-size: 10px; line-height: 1.45; }

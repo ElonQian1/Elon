@@ -194,6 +194,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
         )}
         <div className={styles.status} data-error={Boolean(web.controller.sessionState?.lastError)}>
           <strong>{web.userState.title}</strong>
+          {web.ready && <small data-complete={web.historyWindow.complete}>{web.historyWindow.label}</small>}
           <span>
             {web.controller.sessionState?.contextReady === false
               ? web.contextSummary

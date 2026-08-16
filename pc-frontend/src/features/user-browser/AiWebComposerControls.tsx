@@ -1,33 +1,56 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, Clock3, Grid3X3, Mic, Paperclip, StopCircle, Wrench } from 'lucide-react'
+import type { LocalAiComposerOption, LocalAiFeatureNavigationItem } from './localAiBrowserProtocol'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import styles from './AiWebComposerControls.module.css'
 
 type Panel = 'model' | 'tools' | 'features' | null
+type ComposerSection = Exclude<Panel, 'features' | null>
+type CachedMenu<T> = { options: T[]; updatedAt: number }
+const MENU_CACHE_TTL_MS = 60_000
 
 export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }) {
   const [panel, setPanel] = useState<Panel>(null)
   const busy = Boolean(web.controller.busyAction)
   const actions = new Set(web.provider?.adapterActions ?? [])
   const snapshot = web.controller.snapshot
-  const composerOptions = web.controller.composerSnapshot?.section === panel
-    ? web.controller.composerSnapshot.options
-    : []
-  const featureOptions = panel === 'features' ? web.controller.featureSnapshot?.features ?? [] : []
+  const menuUpdatedAt = web.controller.sessionState?.updatedAtMs || Date.now()
+  const [composerCache, setComposerCache] = useState<Record<ComposerSection, CachedMenu<LocalAiComposerOption>>>({
+    model: { options: [], updatedAt: 0 },
+    tools: { options: [], updatedAt: 0 },
+  })
+  const [featureCache, setFeatureCache] = useState<CachedMenu<LocalAiFeatureNavigationItem>>({ options: [], updatedAt: 0 })
+  const composerOptions = panel === 'model' || panel === 'tools' ? composerCache[panel].options : []
+  const featureOptions = panel === 'features' ? featureCache.options : []
   const temporaryChat = web.controller.uiManifest?.controls.find((control) => control.semantic === 'temporary_chat')
 
-  useEffect(() => setPanel(null), [web.provider?.id])
+  useEffect(() => {
+    setPanel(null)
+    setComposerCache({ model: { options: [], updatedAt: 0 }, tools: { options: [], updatedAt: 0 } })
+    setFeatureCache({ options: [], updatedAt: 0 })
+  }, [web.provider?.id])
 
-  async function openComposerPanel(next: Exclude<Panel, 'features' | null>) {
+  useEffect(() => {
+    const current = web.controller.composerSnapshot
+    if (!current) return
+    setComposerCache((cached) => ({ ...cached, [current.section]: { options: current.options, updatedAt: menuUpdatedAt } }))
+  }, [menuUpdatedAt, web.controller.composerSnapshot])
+
+  useEffect(() => {
+    const current = web.controller.featureSnapshot
+    if (current) setFeatureCache({ options: current.features, updatedAt: menuUpdatedAt })
+  }, [menuUpdatedAt, web.controller.featureSnapshot])
+
+  async function openComposerPanel(next: ComposerSection) {
     const opening = panel !== next
     setPanel(opening ? next : null)
-    if (opening) await web.controller.refreshComposerControls(next)
+    if (opening && menuNeedsRefresh(composerCache[next])) await web.controller.refreshComposerControls(next)
   }
 
   async function openFeatures() {
     const opening = panel !== 'features'
     setPanel(opening ? 'features' : null)
-    if (opening) await web.controller.refreshFeatureNavigation()
+    if (opening && menuNeedsRefresh(featureCache)) await web.controller.refreshFeatureNavigation()
   }
 
   async function requestAttachment() {
@@ -139,4 +162,8 @@ function panelLabel(panel: Exclude<Panel, null>) {
   if (panel === 'model') return '选择 ChatGPT 模型'
   if (panel === 'tools') return '选择 ChatGPT 工具'
   return '打开 ChatGPT 功能'
+}
+
+function menuNeedsRefresh(value: { options: unknown[]; updatedAt: number }) {
+  return value.options.length === 0 || Date.now() - value.updatedAt >= MENU_CACHE_TTL_MS
 }
