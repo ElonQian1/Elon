@@ -243,4 +243,33 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(root);
     }
+
+    #[test]
+    fn failed_upload_attempt_keeps_envelope_and_writes_only_safe_state() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-rust-cache-fleet-upload-failure-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let outbox = root.join("reports/fleet/outbox");
+        std::fs::create_dir_all(&outbox).unwrap();
+        let envelope = outbox.join("fleet-envelope-safe.json");
+        std::fs::write(&envelope, br#"{"immutable":true}"#).unwrap();
+
+        record_attempt(
+            &root,
+            &envelope,
+            &UploadFailure::local("secure-upload-origin-required"),
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read(&envelope).unwrap(), br#"{"immutable":true}"#);
+        let state = std::fs::read_to_string(
+            root.join("reports/fleet/attempts/fleet-envelope-safe.state.json"),
+        )
+        .unwrap();
+        assert!(state.contains("secure-upload-origin-required"));
+        assert!(state.contains("\"destructive_actions_authorized\": false"));
+        assert!(!state.contains(root.to_string_lossy().as_ref()));
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

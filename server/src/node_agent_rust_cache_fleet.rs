@@ -46,7 +46,16 @@ async fn upload_once(runtime: &Arc<NodeRuntime>) -> Result<()> {
     if envelopes.is_empty() {
         return Ok(());
     }
-    let base_url = secure_upload_origin(&runtime.cfg)?;
+    let base_url = match secure_upload_origin(&runtime.cfg) {
+        Ok(base_url) => base_url,
+        Err(error) => {
+            let failure = model::UploadFailure::local("secure-upload-origin-required");
+            for path in &envelopes {
+                storage::record_attempt(&cache_root, path, &failure)?;
+            }
+            return Err(error);
+        }
+    };
     let client = Client::builder()
         .timeout(Duration::from_secs(20))
         .build()

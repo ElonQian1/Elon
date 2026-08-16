@@ -43,8 +43,17 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     $SnapshotRepo = Join-Path $TempRoot "snapshot-repo"
     New-Item -ItemType Directory -Force -Path (Join-Path $SnapshotRepo "server"),(Join-Path $SnapshotRepo "docs"),(Join-Path $SnapshotRepo "pc-frontend\src") | Out-Null
     & git -C $SnapshotRepo init --quiet; & git -C $SnapshotRepo config user.email validation@example.invalid; & git -C $SnapshotRepo config user.name validation-test
-    Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\Cargo.lock") -Value "lock"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\lib.rs") -Value "pub fn stable() {}"
+    Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\Cargo.lock") -Value "lock"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\Z.rs") -Value "pub fn upper() {}"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\lib.rs") -Value "pub fn stable() {}"
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\note.md") -Value "one"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "pc-frontend\src\app.tsx") -Value "export const ui = 1"; & git -C $SnapshotRepo add .; & git -C $SnapshotRepo commit -m baseline --quiet
+    $fingerprintModule = Get-Module Validation.Fingerprint | Select-Object -First 1
+    $chunkPaths = @('server/Cargo.lock','server/Z.rs','server/lib.rs')
+    $chunkHashes = @(& $fingerprintModule { param($root,$paths) Get-ValidationGitPathHashes -RepoRoot $root -Paths $paths -ChunkSize 1 } $SnapshotRepo $chunkPaths)
+    $directHashes = @($chunkPaths | ForEach-Object { (& git -C $SnapshotRepo hash-object -- $_).Trim() })
+    Assert-Equal ($directHashes -join "`n") ($chunkHashes -join "`n") "chunked Git hashing must preserve path order and content filters"
+    $orderedSnapshot = Get-ValidationGitSnapshot -RepoRoot $SnapshotRepo
+    $upperIndex = [Array]::IndexOf([object[]]$orderedSnapshot.index, @($orderedSnapshot.index | Where-Object { $_ -like "server/Z.rs`t*" })[0])
+    $lowerIndex = [Array]::IndexOf([object[]]$orderedSnapshot.index, @($orderedSnapshot.index | Where-Object { $_ -like "server/lib.rs`t*" })[0])
+    Assert-True ($upperIndex -ge 0 -and $upperIndex -lt $lowerIndex) "validation paths must use ordinal ordering across PowerShell runtimes"
     $baseDetails = Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")
     $baseFingerprint = $baseDetails.fingerprint
     Assert-True ($baseDetails.payload.project -like 'no-origin:*') "project without origin must use safe hashed fallback"

@@ -50,42 +50,35 @@ function Initialize-ValidationCargoLock {
     if ($LASTEXITCODE -ne 0) { throw "cargo generate-lockfile failed while stabilizing the validation fingerprint." }
 }
 
-function Get-ValidationGitSnapshot {
-    param([Parameter(Mandatory)][string]$RepoRoot)
-    $relevantPattern = '^(server/|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|\.githooks/pre-push$|scripts/(cargo-dev|cargo-network|cargo-source-repair|prepare-push|push|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
-    $tracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files | Where-Object { $_.Replace('\','/') -match $relevantPattern })
-    if ($LASTEXITCODE -ne 0) { throw "Unable to enumerate tracked validation inputs." }
-    $untracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files --others --exclude-standard | Where-Object { $_.Replace('\','/') -match $relevantPattern })
-    $records = New-Object System.Collections.Generic.List[string]
-    $all=@(@($tracked)+@($untracked)|Sort-Object -Unique); $existing=@($all|Where-Object{Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf})
-    # `--stdin-paths` applies Git clean filters, so checkout/rebase CRLF changes
-    # do not invalidate a receipt. Feed UTF-8 without BOM through Process APIs;
-    # Windows PowerShell's native pipeline would prefix the first filename.
-    $info=New-Object Diagnostics.ProcessStartInfo
-    $info.FileName='git';$info.Arguments='hash-object --stdin-paths';$info.WorkingDirectory=$RepoRoot
-    $info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
-    $process=New-Object Diagnostics.Process;$process.StartInfo=$info
-    if(-not $process.Start()){throw 'Unable to start git hash-object.'}
-    $stdoutTask=$process.StandardOutput.ReadToEndAsync();$stderrTask=$process.StandardError.ReadToEndAsync()
-    $writer=New-Object IO.StreamWriter($process.StandardInput.BaseStream,(New-Object Text.UTF8Encoding($false)))
-    $batchWriteError = ''
-    try {
-        foreach($relative in $existing){$writer.WriteLine(([string]$relative).Replace('\','/'))}
-    } catch {
-        $batchWriteError = $_.Exception.Message
-    }
-    try { $writer.Close() } catch { if ([string]::IsNullOrWhiteSpace($batchWriteError)) { $batchWriteError = $_.Exception.Message } }
-    $process.WaitForExit()
-    $stdout=$stdoutTask.GetAwaiter().GetResult();$stderr=$stderrTask.GetAwaiter().GetResult()
-    $batchHashes=@($stdout -split "`r?`n"|Where-Object{$_})
-    $useHashFallback = -not [string]::IsNullOrWhiteSpace($batchWriteError) -or $process.ExitCode -ne 0 -or $batchHashes.Count -ne $existing.Count
-    $process.Dispose()
-    if ($useHashFallback) {
-        # Some Windows Git builds can exit while accepting a large stdin path list.
-        # Preserve the exact input set and provide a path-level failure if retrying fails.
-        Write-Host "VALIDATION_GIT_HASH_FALLBACK=enabled"
-        $hashes = New-Object System.Collections.Generic.List[string]
-        foreach ($relative in $existing) {
+function Get-ValidationGitPathHashes {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Paths,
+        [ValidateRange(1, 256)][int]$ChunkSize = 64
+    )
+
+    $hashes = New-Object System.Collections.Generic.List[string]
+    for ($offset = 0; $offset -lt $Paths.Count; $offset += $ChunkSize) {
+        $count = [Math]::Min($ChunkSize, $Paths.Count - $offset)
+        $chunk = @($Paths[$offset..($offset + $count - 1)])
+        # Windows PowerShell 5.1 prefixes Process.StandardInput with a UTF-8 BOM.
+        # Bounded argv batches avoid that runtime bug while retaining Git filters.
+        $chunkHashes = @(& git -C $RepoRoot hash-object -- @chunk)
+        if ($LASTEXITCODE -eq 0 -and $chunkHashes.Count -eq $chunk.Count) {
+            foreach ($hash in $chunkHashes) {
+                $normalized = ([string]$hash).Trim()
+                if ($normalized -notmatch '^[0-9a-f]{40,64}$') {
+                    throw "Invalid validation workspace hash in a Git batch: $normalized"
+                }
+                $hashes.Add($normalized)
+            }
+            continue
+        }
+
+        # Limit the expensive path-level retry to the failed chunk. A transient
+        # argv failure must not launch one Git process for the whole repo.
+        Write-Host "VALIDATION_GIT_HASH_FALLBACK=path;chunk_size=$($chunk.Count)"
+        foreach ($relative in $chunk) {
             $hashOutput = @(& git -C $RepoRoot hash-object -- $relative)
             if ($LASTEXITCODE -ne 0) {
                 throw "Unable to hash validation workspace input '$relative'."
@@ -96,10 +89,21 @@ function Get-ValidationGitSnapshot {
             }
             $hashes.Add($hash)
         }
-        $hashes = $hashes.ToArray()
-    } else {
-        $hashes = $batchHashes
     }
+    return $hashes.ToArray()
+}
+
+function Get-ValidationGitSnapshot {
+    param([Parameter(Mandatory)][string]$RepoRoot)
+    $relevantPattern = '^(server/|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|\.githooks/pre-push$|scripts/(cargo-dev|cargo-network|cargo-source-repair|prepare-push|push|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
+    $tracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files | Where-Object { $_.Replace('\','/') -match $relevantPattern })
+    if ($LASTEXITCODE -ne 0) { throw "Unable to enumerate tracked validation inputs." }
+    $untracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files --others --exclude-standard | Where-Object { $_.Replace('\','/') -match $relevantPattern })
+    $records = New-Object System.Collections.Generic.List[string]
+    $all = [string[]](@($tracked) + @($untracked))
+    [Array]::Sort($all, [StringComparer]::Ordinal)
+    $existing=@($all|Where-Object{Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf})
+    $hashes = @(Get-ValidationGitPathHashes -RepoRoot $RepoRoot -Paths $existing)
     if ($hashes.Count -ne $existing.Count) { throw "Unable to hash validation workspace inputs." }
     for($i=0;$i -lt $existing.Count;$i++){$records.Add("$($existing[$i].Replace('\','/'))`t$($hashes[$i].Trim())")}
     foreach($relative in @($all|Where-Object{-not (Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf)})){$records.Add("$($relative.Replace('\','/'))`tdeleted")}
