@@ -337,6 +337,7 @@ mod windows_doctor;
 mod ws_client_transport;
 
 mod node_agent_runtime;
+mod node_agent_rust_cache_fleet;
 mod node_agent_session_completion_ack;
 pub(crate) use node_agent_runtime::NodeRuntime;
 
@@ -565,6 +566,7 @@ async fn run_agent_runtime() -> Result<()> {
     node_agent_update_gate_reconcile::spawn_install_gate_reconciler(runtime.clone());
     runtime.spawn_lifecycle_heartbeat();
     node_agent_cancel_saga::spawn_reconciler(runtime.clone());
+    node_agent_rust_cache_fleet::spawn(runtime.clone());
     node_agent_self_evolution::spawn_scheduler(runtime.clone());
     project_document_maintenance::spawn_maintenance_worker();
     node_agent_shared_android_devices::spawn(runtime.clone());

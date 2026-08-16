@@ -7,6 +7,7 @@ use axum::{
 use serde::Serialize;
 use std::sync::Arc;
 
+mod auth;
 mod contract;
 
 use crate::{project_auth::auth_from_headers, types::AppState};
@@ -37,6 +38,28 @@ pub(crate) async fn upload_report(
     if let Err(response) = require_node_owner(&state, &node_id, &user.id) {
         return response;
     }
+    persist_report(&state, &user.id, node_id, envelope).await
+}
+
+pub(crate) async fn upload_node_report(
+    Path(node_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(envelope): Json<FleetEnvelopeV1>,
+) -> Response {
+    let owner_user_id = match auth::authenticate_node_bearer(&state, &headers, &node_id) {
+        Ok(owner_user_id) => owner_user_id,
+        Err(response) => return response,
+    };
+    persist_report(&state, &owner_user_id, node_id, envelope).await
+}
+
+async fn persist_report(
+    state: &AppState,
+    owner_user_id: &str,
+    node_id: String,
+    envelope: FleetEnvelopeV1,
+) -> Response {
     let validated = match validate_envelope(&node_id, envelope) {
         Ok(validated) => validated,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
@@ -45,7 +68,7 @@ pub(crate) async fn upload_report(
     let requested_report_hash = validated.input.report_sha256.clone();
     let write = match state
         .store
-        .record_rust_cache_fleet_report(&user.id, validated.input)
+        .record_rust_cache_fleet_report(owner_user_id, validated.input)
     {
         Ok(write) => write,
         Err(error) => {

@@ -35,6 +35,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/api/me/nodes", get(node_api::my_nodes))
         .route("/api/me/nodes/register", post(node_api::register_node))
         .route(
+            "/api/node/cache-reports/:node_id",
+            post(node_api::rust_cache_fleet::upload_node_report),
+        )
+        .route(
             "/api/me/nodes/:node_id/cache-reports",
             post(node_api::rust_cache_fleet::upload_report),
         )

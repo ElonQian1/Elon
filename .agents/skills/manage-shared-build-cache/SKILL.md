@@ -74,7 +74,9 @@ For a disconnected or intermittently connected node, stage an upload-safe envelo
 
 `fleet-stage` writes an immutable envelope under the cache-owned fleet outbox. The envelope embeds the compact sanitized report, its SHA-256, an explicit requirement that the receiver authenticate the node, and a false destructive-authority flag. Never edit an envelope to record retries; a node uploader must write separate attempt receipts and move an accepted envelope only after the server acknowledges the same envelope ID and report hash.
 
-The platform server accepts an envelope from the authenticated node owner at `POST /api/me/nodes/{node_id}/cache-reports` and exposes the owner's latest accepted report at `GET /api/me/nodes/{node_id}/cache-reports/latest`. It verifies the route, envelope, and embedded report node IDs, report byte length and SHA-256, strict schema, privacy flags, and read-only policy before storing a bounded history. This HTTP receiver does not make `fleet-stage` an automatic uploader: until the node runtime uploader is present, leave accepted and pending envelopes distinguishable and report that upload remains manual.
+The platform server accepts an envelope from the authenticated node owner at `POST /api/me/nodes/{node_id}/cache-reports`; a registered PC node uses its existing node credential at `POST /api/node/cache-reports/{node_id}`. The owner reads the latest accepted report at `GET /api/me/nodes/{node_id}/cache-reports/latest`. The receiver verifies authentication, route/envelope/report node IDs, report byte length and SHA-256, strict schema, privacy flags, and read-only policy before storing bounded history.
+
+Current node runtimes automatically scan the installed cache root's fleet outbox after credentials are available. They upload only to HTTPS or loopback HTTP, accept only an ACK bound to the same node, envelope ID, and report hash, write an immutable local receipt, and then move the envelope to `accepted`. Failed uploads leave the envelope unchanged and write separate attempt state. This path reports health only; it cannot trigger GC, legacy purge, cache migration, or arbitrary commands.
 
 ## Run Builds
 

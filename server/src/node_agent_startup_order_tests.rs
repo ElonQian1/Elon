@@ -19,3 +19,15 @@ fn orphan_sweep_starts_after_recovery_ownership_barrier() {
     assert!(runtime_online < orphan);
     assert!(orphan < periodic);
 }
+
+#[test]
+fn cache_fleet_uploader_starts_after_local_ownership_recovery() {
+    let source = include_str!("node_agent_main.rs");
+    let orphan = source
+        .find("runtime.reconcile_local_completion_outbox().await")
+        .unwrap();
+    let fleet = source
+        .find("node_agent_rust_cache_fleet::spawn(runtime.clone())")
+        .unwrap();
+    assert!(orphan < fleet);
+}
