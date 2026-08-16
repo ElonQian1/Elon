@@ -5555,6 +5555,146 @@
       "updated_at_ms": 1786711941712
     },
     {
+      "id": "sqlite-safe-snapshot-v1",
+      "title": "商户 SQLite 一致性备份与离线恢复 V1",
+      "summary": "为通用 ERP 主库和开放商业商户运行时幂等库提供共享的在线一致性快照、摘要绑定验证和只恢复到全新文件的离线恢复 SDK。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/sqlite-safe-snapshot-v1.md",
+        "content_hash": "62150ae611d9f30ce2f5666279ad1c78c20910ac0e3a06a531006298fd9d3356",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+          "head_blob_oid": "af23eddce7b7b6315458d11246956043ac39b115",
+          "worktree_blob_oid": "af23eddce7b7b6315458d11246956043ac39b115",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "open-commerce-runtime",
+      "tags": [
+        "sqlite",
+        "erp",
+        "open-commerce",
+        "backup",
+        "recovery"
+      ],
+      "task_paths": [
+        "docs/decisions/sqlite-safe-snapshot-v1.md",
+        "docs/erp/README.md",
+        "docs/open-commerce/capability-baseline.md",
+        "docs/sqlite-safe-snapshot-v1-acceptance.md",
+        "sdk/sqlite-safe-snapshot"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "WAL 活跃数据库在线备份包含全部已提交记录并通过 quick_check",
+        "ERP 数据恢复到新文件后可由 SqliteErpStore 重开并读取订单与库存",
+        "幂等存储恢复后重开会 replay 已成功结果而不再次执行动作",
+        "摘要不符、缺表、版本不符、损坏、符号链接和已有目标失败关闭",
+        "并发争抢同一目标时恰好一个成功且失败不留下临时文件",
+        "文档和类型声明准确说明仅支持新文件离线恢复及非生产灾备边界"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/decisions/sqlite-safe-snapshot-v1.md",
+          "content_hash": "80e3895ba03156d6f08bddb5506351ae7a87ff5739269078fbdba6d20694bf10",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "a5a6c1f17248f0b7d60b50639b701e8dd8acfe63",
+            "worktree_blob_oid": "a5a6c1f17248f0b7d60b50639b701e8dd8acfe63",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/capability-baseline.md",
+          "content_hash": "b14b90a89676137d3ab75baa0caa8d6b9451a22f5766612ae8ec039257ca2671",
+          "locator": "通用 ERP 蓝图、公共运行时与独立实例",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "a1c0183e46d19aa6f5b3c20cb7f43c02bacaef27",
+            "worktree_blob_oid": "a1c0183e46d19aa6f5b3c20cb7f43c02bacaef27",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/sqlite-safe-snapshot-v1-acceptance.md",
+          "content_hash": "808ea522681817d30edf2426e4888848effbb715cdc448173609dc58457f5b8c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "66eb6ebfc0f5113e6ef64359994c31490dc6000d",
+            "worktree_blob_oid": "66eb6ebfc0f5113e6ef64359994c31490dc6000d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/sqlite-safe-snapshot/README.md",
+          "content_hash": "6d549f065eefb740cd418986073d7e6ca65b8179d9ac14301b46661c837e1443",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "fcccde827fc3158f885c62ca2787403b87e92235",
+            "worktree_blob_oid": "fcccde827fc3158f885c62ca2787403b87e92235",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/sqlite-safe-snapshot/src/index.d.ts",
+          "content_hash": "00809b369292a4011c77f14a4266fdd1b286d7a00d894c6faa23e4ea34b4a2be",
+          "locator": "SqliteSnapshotReceipt",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "72e0fc86013ada61772e0a9bf4e859845f268be9",
+            "worktree_blob_oid": "72e0fc86013ada61772e0a9bf4e859845f268be9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/sqlite-safe-snapshot/src/index.js",
+          "content_hash": "bd25d9575609e104cba36a3cf03e817194f1f687ba00fd4aedb6bc54facb553f",
+          "locator": "createSqliteSnapshot",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "d07f22f9643b35a72132ef2ecc23219b4cc60e3d",
+            "worktree_blob_oid": "d07f22f9643b35a72132ef2ecc23219b4cc60e3d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/sqlite-safe-snapshot/test/sqlite-safe-snapshot.test.mjs",
+          "content_hash": "e41a33ebfca545da6fde330759d40428d194bdd66fbade286e8d3d74a73df04b",
+          "locator": "online WAL snapshot",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f64aea91ccd64a8a6defa6752868d6da323bac3",
+            "head_blob_oid": "523acd50f5e43873d2a88a3ded25c45580598d7f",
+            "worktree_blob_oid": "523acd50f5e43873d2a88a3ded25c45580598d7f",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786877696400,
+      "updated_at_ms": 1786877700639
+    },
+    {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "title": "Win Google AI 语义桥启动恢复 V1",
       "summary": "修复 WebView2 会话已连接但 Google AI 语义桥因缺少消息提取器、文档令牌及 DOM 就绪门禁而无法发送或接收回复的问题。",
@@ -6523,86 +6663,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_28edc5bc82ad423baaca7747e37b7ee5",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "claimed",
-      "actor": "codex-v264",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786735408932
-    },
-    {
-      "id": "feature_event_b98665a3c7f240ed9e1d1630ac55cead",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-v264",
-      "reason": "Begin scoped broker TLS transport implementation",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786735425492
-    },
-    {
-      "id": "feature_event_d9ae6698adfb49f7ad383aa4b40645ce",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-v264",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786740696664
-    },
-    {
-      "id": "feature_event_9d67e01dafe44079a6db8912a46da769",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-v264",
-      "reason": "Broker TLS implementation, source contracts, local TLS matrix, and authority documentation are complete.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786740710661
-    },
-    {
-      "id": "feature_event_392dc9a7818c41899adf9e0e91cc4c13",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-v264",
-      "reason": "Production cargo check and 11 targeted broker TLS source/dynamic tests passed with recorded validation receipts.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786740780723
-    },
-    {
-      "id": "feature_event_ffd7b2e6358943cf88f4b6402befee3d",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-v264",
-      "reason": "Package the verified V264 capability and evidence in the same Git delivery commit.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786740800005
-    },
-    {
-      "id": "feature_event_136df046b6cd43bba9381cfdb94a2019",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "registered",
-      "actor": "codex-v265",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786742279160
-    },
-    {
-      "id": "feature_event_27abb43aadad418283ae763d60812099",
-      "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
-      "action": "claimed",
-      "actor": "codex-v265",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786742289191
-    },
     {
       "id": "feature_event_0cddca2d06b0431899e73f87924d20dc",
       "feature_id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
@@ -8522,6 +8582,86 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786876824902
+    },
+    {
+      "id": "feature_event_b6aa7d406d4443abbb4a1d83d48d2fb3",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "rebase 后按当前主线重新生成注册表记录。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786877696400
+    },
+    {
+      "id": "feature_event_af86ed92a8564591b73113af90f84486",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "需求和边界已评审。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786877696439
+    },
+    {
+      "id": "feature_event_ee46419199484a978b79e65d91a8f5f6",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "当前提交已具备独立实现和验收路径。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786877696466
+    },
+    {
+      "id": "feature_event_a4baff29a9d8494ba1d1f637aa2aa00e",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "claimed",
+      "actor": "codex-019f3b86-da2f-7c72-9a22-2f711c2ec892",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786877696493
+    },
+    {
+      "id": "feature_event_d4df58b3917f4fcb9a34f8155c68a04e",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "绑定 rebase 后当前实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786877696521
+    },
+    {
+      "id": "feature_event_ea84bd94dd884cf5bb71ceca685abc7c",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786877700591
+    },
+    {
+      "id": "feature_event_6febec7461fe4942964dd0db1868c1f5",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "当前主线祖先上的实现和证据已重新绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786877700617
+    },
+    {
+      "id": "feature_event_07d091fdc09842bfa7cf72c3d6f86fd7",
+      "feature_id": "sqlite-safe-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "新 SDK 6 项、ERP 13 项和连接器 98 项回归全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786877700639
     }
   ]
 }
