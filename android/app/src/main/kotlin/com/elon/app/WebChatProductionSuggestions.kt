@@ -15,7 +15,6 @@ internal data class WebChatProductionSuggestion(
     val controlId: String,
     val label: String,
     val requiresUserConfirmation: Boolean,
-    val nativeSelector: String?,
 )
 
 internal object WebChatProductionSuggestionParser {
@@ -35,7 +34,6 @@ internal object WebChatProductionSuggestionParser {
                     controlId = descriptor.control.id,
                     label = label,
                     requiresUserConfirmation = descriptor.requiresUserConfirmation,
-                    nativeSelector = descriptor.nativeSelector?.trim()?.takeIf(String::isNotBlank),
                 )
             }
             .distinctBy(WebChatProductionSuggestion::controlId)
@@ -142,8 +140,8 @@ internal class WebChatProductionSuggestionsCoordinator(
         textSize = 14f
         isAllCaps = false
         maxLines = 1
-        contentDescription = suggestion.nativeSelector
-            ?: WebChatProductionSelectors.suggestion(provider.id, suggestion.controlId)
+        contentDescription = WebChatProductionSelectors.suggestion(provider.id, suggestion.controlId)
+        tooltipText = suggestion.label
         setOnClickListener {
             if (suggestion.requiresUserConfirmation) {
                 confirmSuggestion(port, suggestion)

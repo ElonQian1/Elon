@@ -20,7 +20,6 @@ class WebChatProductionSuggestionsTest {
         assertEquals(listOf("first", "project"), result.map(WebChatProductionSuggestion::controlId))
         assertFalse(result.first().requiresUserConfirmation)
         assertTrue(result.last().requiresUserConfirmation)
-        assertEquals("selector:first", result.first().nativeSelector)
     }
 
     @Test
