@@ -40,6 +40,7 @@ internal interface WebChatSocialController {
     fun supportsLocalProjects(): Boolean = false
     fun createLocalProject(title: String): Boolean = false
     fun assignConversationToLocalProject(path: String, projectId: String?): Boolean = false
+    fun consumerPort(): WebChatConsumerPort? = null
     fun mcpPort(): WebChatSocialMcpPort? = null
     fun lastCommandStatus(): WebChatCommandStatus? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false

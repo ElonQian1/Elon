@@ -68,6 +68,9 @@ internal class ChatGptSocialChatController(
             revealMessage = ::revealMessageFromMcp,
         )
     }
+    private val socialConsumerPort: WebChatConsumerPort by lazy {
+        session.createConsumerPort(socialMcpPort)
+    }
     private val productionMessageActions by lazy {
         WebChatProductionMessageActionCoordinator(
             activity = activity,
@@ -213,6 +216,8 @@ internal class ChatGptSocialChatController(
     }
 
     override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort
+
+    override fun consumerPort(): WebChatConsumerPort = socialConsumerPort
 
     override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
 

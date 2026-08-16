@@ -15,6 +15,7 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
+import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatSocialMcpPort
 import java.time.LocalDate
 
@@ -269,6 +270,13 @@ internal class ChatGptBackgroundSession(
             revealMessage = revealMessage,
         )
     }
+
+    fun createConsumerPort(mcpPort: WebChatSocialMcpPort): WebChatConsumerPort =
+        ChatGptWebConsumerPortAdapter(
+            snapshot = { latestSnapshot },
+            observedState = observedMcpState::snapshot,
+            executeControl = mcpPort::control,
+        )
 
     fun destroy() {
         conversationNavigation.clear()
