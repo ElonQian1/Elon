@@ -19,6 +19,19 @@ function Get-RustCacheTextHash {
     Get-RustCacheBytesHash -Bytes ([System.Text.Encoding]::UTF8.GetBytes($Text))
 }
 
+function Get-RustCacheFileSha256 {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $stream = [System.IO.File]::OpenRead([System.IO.Path]::GetFullPath($Path))
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $sha.Dispose()
+        $stream.Dispose()
+    }
+}
+
 function Get-RustCacheFileFingerprint {
     param(
         [Parameter(Mandatory)][string]$Path,
@@ -458,4 +471,4 @@ function Get-RustCacheDoctor {
     }
 }
 
-Export-ModuleMember -Function Get-RustCachePlatformFingerprint, Get-RustCachePlatformInstallManifestPath, Read-RustCachePlatformInstallManifest, Write-RustCachePlatformInstallManifest, New-RustCacheProjectManifest, Get-RustCacheCodexSkillsRoot, Get-RustCacheCodexSkillFingerprint, Install-RustCacheCodexSkill, Get-RustCacheDoctor
+Export-ModuleMember -Function Get-RustCacheFileSha256, Get-RustCachePlatformFingerprint, Get-RustCachePlatformInstallManifestPath, Read-RustCachePlatformInstallManifest, Write-RustCachePlatformInstallManifest, New-RustCacheProjectManifest, Get-RustCacheCodexSkillsRoot, Get-RustCacheCodexSkillFingerprint, Install-RustCacheCodexSkill, Get-RustCacheDoctor

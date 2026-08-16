@@ -4273,6 +4273,128 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "rust-cache-portable-file-hash-v1",
+      "title": "Rust cache portable file hashing V1",
+      "summary": "Remove the fleet export dependency on PowerShell Get-FileHash so installed cache reporting and outbox staging work consistently across Windows PowerShell and PowerShell 7 hosts.",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/rust-cache-portable-file-hash-v1.md",
+        "content_hash": "249464fe87c2795e8be77118f827c85044c8a3531b4efbb8a57483f1791ac8ae",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "34915ea7cc9f096ddd737eb3c74217ce76bd4700",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform",
+      "tags": [
+        "rust-cache",
+        "powershell",
+        "portability",
+        "fleet"
+      ],
+      "task_paths": [
+        "scripts/rust-cache/RustCache.Fleet.psm1",
+        "scripts/rust-cache/RustCache.FleetQueue.psm1",
+        "scripts/rust-cache/RustCache.Portability.psm1",
+        "scripts/test-rust-cache-portability.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Fleet report and outbox export use a .NET SHA-256 helper without Get-FileHash.",
+        "No-profile hidden Windows PowerShell portability test passes.",
+        "Cache routing, locks, GC policy, report privacy, and public schemas remain unchanged."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/rust-cache-portable-file-hash-v1.md",
+          "content_hash": "249464fe87c2795e8be77118f827c85044c8a3531b4efbb8a57483f1791ac8ae",
+          "locator": "acceptance contract",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "34915ea7cc9f096ddd737eb3c74217ce76bd4700",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Fleet.psm1",
+          "content_hash": "cb35bd91f6e98c20b49002feadb3adcc4c1c05c6dab90d4e3e9254d4b1a71174",
+          "locator": "Export-RustCacheFleetReport",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+            "head_blob_oid": "5da261b2466c0fb6ec2c826556ee63cdd13ce8a8",
+            "worktree_blob_oid": "eff5e6099b2e78a98c067e73f942c5af73d34361",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.FleetQueue.psm1",
+          "content_hash": "709ee509f477d71e3e1869e66977f502b1bd906cedf98ee0b0b6d86712ca1b30",
+          "locator": "Export-RustCacheFleetEnvelope",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+            "head_blob_oid": "98ddb8ed4aa2b5f95405709258cb999199073360",
+            "worktree_blob_oid": "b25c125952e20b0a60b2624a1d9839f7d751da29",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/rust-cache/RustCache.Portability.psm1",
+          "content_hash": "01f001b31a1a7c92e2ae7373a0ba237b45b3a08931c51058c1fb098b6ee0a456",
+          "locator": "Get-RustCacheFileSha256",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+            "head_blob_oid": "752bbc71ef73bd6cd0f4e67b816158529a8d8867",
+            "worktree_blob_oid": "4d949d45542417ff62b126819a9c4fee1a4adce7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-platform.ps1",
+          "content_hash": "c0c34e83e9969d729ec06437efe03aeb312126a2bd4ea87479aa5b4ae97fdf4b",
+          "locator": "cache routing lock and GC regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+            "head_blob_oid": "fa2aa65c6a9fe8c7f925605f01e698358b65337e",
+            "worktree_blob_oid": "fa2aa65c6a9fe8c7f925605f01e698358b65337e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-rust-cache-portability.ps1",
+          "content_hash": "2a3138b0a68dd092bae71b3dfca1796fc6d177653e770b46cfe968a098a0cbe5",
+          "locator": "fleet report and launcher portability regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53f7f2e17bb313172cbcfea38f7338725aceb447",
+            "head_blob_oid": "f456123ea736007f8e98d3a5de24863385ecd931",
+            "worktree_blob_oid": "f456123ea736007f8e98d3a5de24863385ecd931",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786869458457,
+      "updated_at_ms": 1786869739753
+    },
+    {
       "id": "rust-cache-recovery-exclusive-filter-v2-1",
       "title": "Rust cache missing-workspace exclusive recovery filter V2.1",
       "summary": "Keep explicit missing-workspace recovery exclusive under low disk so valid workspace partitions cannot be selected by the general LRU watermark path.",
@@ -5217,146 +5339,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_ec127866cd164cdab648bc2cdb6d2b6a",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-task-20260814-145135-24584",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786691806592
-    },
-    {
-      "id": "feature_event_1655ee1eba434cfa8a1ca979fba545e7",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-145135-24584",
-      "reason": "Linux x86-64 production memfd path is covered by four real-kernel tests and seven source boundary contracts.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786692121536
-    },
-    {
-      "id": "feature_event_87d96c27cf794fc8a9f35253e7661837",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-145135-24584",
-      "reason": "WSL2 Ubuntu full test target compiled; 11 focused checks passed with zero failures and no prohibited side effects.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786692121685
-    },
-    {
-      "id": "feature_event_36946e65d5394df2ad3c4f9a174c2f96",
-      "feature_id": "compute-v257-entrypoint-capsule-linux-kernel-verification",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-145135-24584",
-      "reason": "Verification-only batch is committed to the project evidence set; no runtime deployment or activation is claimed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786692121767
-    },
-    {
-      "id": "feature_event_29cc66a013a144a28c0fc4f6f0f45b46",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "registered",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Next independent P1 runtime component after released V259 policy and V257 Linux capsule verification.",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786693985794
-    },
-    {
-      "id": "feature_event_2bba468dff3c41afa327be7c54d31904",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Requirement reviewed against V259 authority and accepted for isolated Linux implementation.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786693985867
-    },
-    {
-      "id": "feature_event_29f0347741ff43618b9ff3e348c1f4c4",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Requirement reviewed against V259 authority and accepted for isolated Linux implementation.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786693985940
-    },
-    {
-      "id": "feature_event_84f217b7bc8a490ca46ab9ca2a879fd1",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "claimed",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786693986037
-    },
-    {
-      "id": "feature_event_44d99cbe40bb458b861e5201b5b2aa1a",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Implementation begins in the preflight-isolated worktree.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786693986115
-    },
-    {
-      "id": "feature_event_a48230be99134e6a8e71a0b835b1fcb3",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "evidence_recorded",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786698032720
-    },
-    {
-      "id": "feature_event_2b034732a81a40448c03d617b1145346",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Modular Linux session core, source contracts, cross builds, and real kernel fixtures are complete.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786698047760
-    },
-    {
-      "id": "feature_event_f27af9dea74e41a18af9846af8dc272e",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Six source contracts, Linux-musl product/test builds, and five real WSL2 kernel fixtures passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786698063827
-    },
-    {
-      "id": "feature_event_2429e8a01b8040dbbebcaa291f33f3c5",
-      "feature_id": "compute-v260-authenticated-child-session-core",
-      "action": "transitioned",
-      "actor": "codex-task-20260814-154730-44324",
-      "reason": "Release the private no-effect session core and its bounded authority documentation; no production runtime route is enabled.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786698081475
-    },
-    {
-      "id": "feature_event_d82e97e0d91d470f818a03783afa6300",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "需求与实现边界已评审，并已在最新 main 上完成结构性实现。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786699261278
-    },
     {
       "id": "feature_event_e8a35d3f7b1542adaecf60804297dc63",
       "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
@@ -7216,6 +7198,146 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786791959414
+    },
+    {
+      "id": "feature_event_06a5bce9caee49f2bdf9394a6482e0d7",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Live cross-PC portability validation exposed a missing Get-FileHash dependency.",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786869458457
+    },
+    {
+      "id": "feature_event_3f05c62c36a84d5a869cb19171591b4b",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Requirement scope and acceptance criteria reviewed before implementation.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786869471927
+    },
+    {
+      "id": "feature_event_012958eb73234146b0e3e4cfed76ddd8",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "The fix is bounded to shared hashing and existing portability tests.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786869483097
+    },
+    {
+      "id": "feature_event_62736c3c7b0c41e5a274c8a7186d013b",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786869496376
+    },
+    {
+      "id": "feature_event_09b4b51eef2f41bd9bdea74db2d5f4b0",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Implementation is isolated in the task worktree.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786869510116
+    },
+    {
+      "id": "feature_event_ccd1f4c2b77b45eba18ccb6fa3b0bf4a",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "claim_released",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Release the implementation claim before rebinding verified requirement metadata.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1786869617637
+    },
+    {
+      "id": "feature_event_deaefeb9d72b410e8926b4936f438d47",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Requirement metadata now records completed local verification.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1786869635299
+    },
+    {
+      "id": "feature_event_510c14273fd544d58030b981aebc30d4",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Reviewed the final requirement metadata and unchanged implementation scope.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786869647359
+    },
+    {
+      "id": "feature_event_85584ef6ce08484b89e15da96c13ef07",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Final requirement remains bounded and independently testable.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786869659702
+    },
+    {
+      "id": "feature_event_1435ccc9a4594ff5a31a2e69a1441afb",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786869670746
+    },
+    {
+      "id": "feature_event_2f260304acf84b30addaed4aea2d6336",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Reclaimed after final requirement rebind; implementation and tests are current.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786869685542
+    },
+    {
+      "id": "feature_event_fdea609d51b9462f91d77602fd0b1b11",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786869705628
+    },
+    {
+      "id": "feature_event_6627c34c12194e27836a4224693cbb76",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "Shared .NET file hash helper is wired into both fleet export paths.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786869723912
+    },
+    {
+      "id": "feature_event_abc61fe416b94df2b43f12bb678f3dd2",
+      "feature_id": "rust-cache-portable-file-hash-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "No-profile portability and platform regression suites both passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786869739753
     }
   ]
 }

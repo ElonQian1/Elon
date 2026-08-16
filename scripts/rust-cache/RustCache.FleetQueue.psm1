@@ -150,7 +150,7 @@ function Export-RustCacheFleetEnvelope {
     [pscustomobject]@{
         schema = "elon.rust_cache.fleet_stage.v1"
         envelope_path = $path
-        envelope_sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        envelope_sha256 = Get-RustCacheFileSha256 -Path $path
         report_sha256 = [string]$Envelope.report.content_sha256
         envelope = $Envelope
     }

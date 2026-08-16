@@ -148,7 +148,7 @@ function Export-RustCacheFleetReport {
     [pscustomobject]@{
         schema = "elon.rust_cache.fleet_export.v1"
         report_path = $path
-        content_sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        content_sha256 = Get-RustCacheFileSha256 -Path $path
         report = $Report
     }
 }
