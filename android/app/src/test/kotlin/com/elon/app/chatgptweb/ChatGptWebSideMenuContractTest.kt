@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,6 +32,15 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(actions.contains("ChatGptNativeNavigationSelector.conversationActions(conversation)"))
         assertTrue(actions.contains("LinearLayout.LayoutParams(dp(48)"))
         assertTrue(view.contains("ChatGptNativeNavigationSelector::date"))
+        assertTrue(view.contains("WebChatSideMenuContentState.resolve("))
+        assertTrue(view.contains("WebChatSideMenuStateViews.create("))
+        assertTrue(view.contains("onRetry = ::requestIndexRefresh"))
+        val stateView = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/WebChatSideMenuStateViews.kt",
+        )
+        assertTrue(stateView.contains("ChatGptNativeNavigationSelector.RETRY_CONVERSATIONS"))
+        assertTrue(stateView.contains("LinearLayout.LayoutParams(dp(128), dp(48))"))
+        assertTrue(stateView.contains("读取失败 · 可重新加载"))
         assertTrue(dateStrip.contains("isSelected = selected"))
         assertTrue(controller.contains("applyChatSideMenuContentMode("))
         assertTrue(controller.contains("sideMenus.webChat.attach("))
@@ -44,6 +54,55 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(navigationJson.contains("elon.web_chat.navigation.v1"))
         assertTrue(mcp.contains("elon.web_chat.native_sidebar.v1"))
     }
+
+    @Test
+    fun emptyIndexDistinguishesLoadingFailureAndConfirmedEmptyContent() {
+        assertEquals(WebChatSideMenuContentStatus.LOADING, resolve(
+            collection = ChatGptWebConversationCollection(),
+        ))
+        assertEquals(WebChatSideMenuContentStatus.LOADING, resolve(
+            collection = collection(ChatGptWebConversationCollection.LOAD_LOADING),
+        ))
+        assertEquals(WebChatSideMenuContentStatus.FAILED, resolve(
+            collection = collection(ChatGptWebConversationCollection.LOAD_FAILED),
+        ))
+        assertEquals(WebChatSideMenuContentStatus.EMPTY, resolve(
+            collection = collection(ChatGptWebConversationCollection.LOAD_READY),
+        ))
+    }
+
+    @Test
+    fun cachedRowsStayVisibleWhileRefreshIsLoadingOrFailed() {
+        assertEquals(WebChatSideMenuContentStatus.CONTENT, resolve(
+            collection = collection(ChatGptWebConversationCollection.LOAD_LOADING),
+            availableCount = 4,
+            visibleCount = 2,
+        ))
+        assertEquals(WebChatSideMenuContentStatus.CONTENT, resolve(
+            collection = collection(ChatGptWebConversationCollection.LOAD_FAILED),
+            availableCount = 4,
+            visibleCount = 2,
+        ))
+        assertEquals(WebChatSideMenuContentStatus.EMPTY, resolve(
+            collection = collection(ChatGptWebConversationCollection.LOAD_LOADING),
+            availableCount = 4,
+        ))
+    }
+
+    private fun resolve(
+        collection: ChatGptWebConversationCollection,
+        availableCount: Int = 0,
+        visibleCount: Int = 0,
+    ): WebChatSideMenuContentStatus = WebChatSideMenuContentState.resolve(
+        collection = collection,
+        availableCount = availableCount,
+        visibleCount = visibleCount,
+    )
+
+    private fun collection(loadState: String) = ChatGptWebConversationCollection(
+        source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+        officialLoadState = loadState,
+    )
 
     private fun read(relative: String): String =
         String(Files.readAllBytes(root().resolve(relative)), StandardCharsets.UTF_8)

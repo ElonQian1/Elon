@@ -86,7 +86,7 @@ internal class ChatGptWebSideMenuView(
                 dateContentDescription = ChatGptNativeNavigationSelector::date,
             ))
         }
-        root.addView(statusRow())
+        root.addView(WebChatSideMenuStateViews.status(activity, index(), selectedDate, dp))
         root.addView(contentScroll(), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
@@ -158,9 +158,7 @@ internal class ChatGptWebSideMenuView(
             android.R.drawable.ic_popup_sync,
             ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS,
         ) {
-            lastRefreshRequestedAtMs = System.currentTimeMillis()
-            refreshIndex()
-            render()
+            requestIndexRefresh()
         })
         addView(iconButton(R.drawable.ic_side_menu_new_chat, ChatGptNativeNavigationSelector.NEW_CONVERSATION) {
             requestClose(true)
@@ -226,24 +224,6 @@ internal class ChatGptWebSideMenuView(
         })
     }
 
-    private fun statusRow() = TextView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
-        gravity = Gravity.CENTER_VERTICAL
-        includeFontPadding = false
-        textSize = 12f
-        setTextColor(Color.parseColor("#80BEBEBA"))
-        val state = index()
-        val activeCount = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate).size
-        val unassignedCount = state.conversations.count { it.projectId == null }
-        val countLabel = "$activeCount 个活跃 · $unassignedCount 个未归项目 · 共 ${state.conversations.size} 个会话"
-        text = when (state.collection.officialLoadState) {
-            ChatGptWebConversationCollection.LOAD_LOADING -> "$countLabel · 正在刷新"
-            ChatGptWebConversationCollection.LOAD_FAILED -> "$countLabel · 显示本机缓存"
-            else -> countLabel
-        }
-        contentDescription = ChatGptNativeNavigationSelector.STATUS
-    }
-
     private fun contentScroll() = ScrollView(activity).apply {
         isVerticalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -259,8 +239,19 @@ internal class ChatGptWebSideMenuView(
         if (query.isBlank()) {
             val active = ChatGptWebConversationIndex.activeOn(state.conversations, selectedDate)
             val unassigned = ChatGptWebConversationIndex.unassigned(state.conversations)
-            if (active.isEmpty() && unassigned.isEmpty()) {
-                container.addView(emptyState("${providerName()}在这一天暂无会话活动"))
+            val visibleCount = (active + unassigned).distinctBy { it.id }.size
+            val contentStatus = WebChatSideMenuContentState.resolve(
+                collection = state.collection,
+                availableCount = state.conversations.size,
+                visibleCount = visibleCount,
+            )
+            if (contentStatus != WebChatSideMenuContentStatus.CONTENT) {
+                container.addView(contentStateView(
+                    contentStatus,
+                    emptyMessage = "${providerName()}在这一天暂无会话活动",
+                    loadingMessage = "正在读取${providerName()}会话…",
+                    failedMessage = "暂时无法读取${providerName()}会话",
+                ))
                 return
             }
             renderConversationSection(
@@ -279,8 +270,18 @@ internal class ChatGptWebSideMenuView(
             conversation.title.contains(query, ignoreCase = true) ||
                 conversation.projectTitle.orEmpty().contains(query, ignoreCase = true)
         }
-        if (values.isEmpty()) {
-            container.addView(emptyState("没有匹配的${providerName()}会话"))
+        val contentStatus = WebChatSideMenuContentState.resolve(
+            collection = state.collection,
+            availableCount = state.conversations.size,
+            visibleCount = values.size,
+        )
+        if (contentStatus != WebChatSideMenuContentStatus.CONTENT) {
+            container.addView(contentStateView(
+                contentStatus,
+                emptyMessage = "没有匹配的${providerName()}会话",
+                loadingMessage = "正在读取${providerName()}会话…",
+                failedMessage = "暂时无法读取${providerName()}会话",
+            ))
             return
         }
         ChatGptWebConversationIndex.sections(values).forEach { section ->
@@ -304,13 +305,23 @@ internal class ChatGptWebSideMenuView(
         val projects = state.projects.filter { project ->
             query.isBlank() || project.title.contains(query, ignoreCase = true)
         }
-        if (projects.isEmpty()) {
-            container.addView(emptyState(
-                if (localProjectActions() == null) {
+        val contentStatus = WebChatSideMenuContentState.resolve(
+            collection = state.collection,
+            availableCount = state.projects.size,
+            visibleCount = projects.size,
+        )
+        if (contentStatus != WebChatSideMenuContentStatus.CONTENT) {
+            container.addView(contentStateView(
+                contentStatus,
+                emptyMessage = if (query.isNotBlank()) {
+                    "没有匹配的${providerName()}项目"
+                } else if (localProjectActions() == null) {
                     "${providerName()}当前暂无项目"
                 } else {
                     "还没有本机项目"
                 },
+                loadingMessage = "正在读取${providerName()}项目…",
+                failedMessage = "暂时无法读取${providerName()}项目",
             ))
             return
         }
@@ -400,13 +411,26 @@ internal class ChatGptWebSideMenuView(
         if (conversationActions.available()) addView(conversationActions.button(conversation))
     }
 
-    private fun emptyState(message: String) = TextView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(160))
-        gravity = Gravity.CENTER
-        includeFontPadding = false
-        text = message
-        textSize = 14f
-        setTextColor(Color.parseColor("#80BEBEBA"))
+    private fun contentStateView(
+        status: WebChatSideMenuContentStatus,
+        emptyMessage: String,
+        loadingMessage: String,
+        failedMessage: String,
+    ) = WebChatSideMenuStateViews.create(
+        activity = activity,
+        status = status,
+        emptyMessage = emptyMessage,
+        loadingMessage = loadingMessage,
+        failedMessage = failedMessage,
+        onRetry = ::requestIndexRefresh,
+        dp = dp,
+        selectableForeground = selectableForeground,
+    )
+
+    private fun requestIndexRefresh() {
+        lastRefreshRequestedAtMs = System.currentTimeMillis()
+        refreshIndex()
+        render()
     }
 
     private fun footer() = LinearLayout(activity).apply {
