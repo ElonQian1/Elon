@@ -110,7 +110,14 @@ internal class MainMcpNativeControlActions(
                     ?: return errorJson(action, "social_ai_feature_unavailable")
                 uiState()
             }
-            "open_chatgpt_official_fallback", "open_web_chat_official_fallback" -> {
+            "open_chatgpt_official_fallback" -> {
+                socialAiChatFeature()?.openChatGptWeb()
+                    ?: return errorJson(action, "social_ai_feature_unavailable")
+                socialAiChatFeature()?.openOfficialFallback()
+                    ?: return errorJson(action, "social_ai_feature_unavailable")
+                uiState()
+            }
+            "open_web_chat_official_fallback" -> {
                 socialAiChatFeature()?.openOfficialFallback()
                     ?: return errorJson(action, "social_ai_feature_unavailable")
                 uiState()
@@ -549,6 +556,24 @@ internal class MainMcpNativeControlActions(
             .put(
                 "web_chat_composer_ready",
                 friend.isSocialAi() && feature?.webChatComposerReady() == true,
+            )
+            .put(
+                "web_chat_streaming",
+                friend.isSocialAi() && feature?.webChatStreaming() == true,
+            )
+            .put(
+                "web_chat_last_command",
+                if (friend.isSocialAi()) {
+                    feature?.webChatLastCommandStatus()?.let { status ->
+                        JSONObject()
+                            .put("action", status.action)
+                            .put("ok", status.ok)
+                            .put("detail", status.detail)
+                            .put("observed_at_ms", status.observedAtMs)
+                    } ?: JSONObject.NULL
+                } else {
+                    JSONObject.NULL
+                },
             )
             .put(
                 "web_chat_attachment_supported",

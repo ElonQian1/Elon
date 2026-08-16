@@ -32,6 +32,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
         val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
         val sendVisual = read("android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt")
+        val consumerComposer = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatConsumerComposerState.kt",
+        )
 
         assertTrue(feature.contains("ChatGptSocialChatController"))
         assertTrue(feature.contains("GoogleWebSocialChatController"))
@@ -41,7 +44,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("openFeatureNavigation = ::openProductionFeatureNavigation"))
         assertTrue(feature.contains("WebChatProductionSelectors.pageActions"))
         assertTrue(feature.contains("views.attachmentButton.visibility"))
-        assertTrue(feature.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
+        assertTrue(feature.contains("WebChatConsumerComposerStateResolver.resolve"))
+        assertTrue(consumerComposer.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
         assertTrue(composer.contains("webToolsButton"))

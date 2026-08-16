@@ -26,6 +26,7 @@ internal class MainSocialAiChatFeature(
     private val chatGptWebLifecycle: MainChatGptWebLifecycle,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
+    private val providerDrafts = WebChatProviderDraftState()
     private val chatGptControllerDelegate = lazy {
         ChatGptSocialChatController(
             activity = activity,
@@ -36,7 +37,7 @@ internal class MainSocialAiChatFeature(
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = { onWebChatNavigationChanged() },
-            onComposerStateChanged = refreshInputComposerVisual,
+            onComposerStateChanged = ::refreshConsumerComposerUi,
             audioPermissionController = chatGptWebLifecycle.audioPermissionController,
         )
     }
@@ -51,7 +52,7 @@ internal class MainSocialAiChatFeature(
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = { onWebChatNavigationChanged() },
-            onComposerStateChanged = refreshInputComposerVisual,
+            onComposerStateChanged = ::refreshConsumerComposerUi,
         )
     }
     private val googleController by googleControllerDelegate
@@ -60,7 +61,10 @@ internal class MainSocialAiChatFeature(
             activity = activity,
             currentProvider = ::providerId,
             currentModel = ::webChatModel,
-            selectProvider = modeController::selectChatProvider,
+            currentState = ::webChatState,
+            authenticated = ::webChatAuthenticated,
+            composerReady = ::webChatComposerReady,
+            selectProvider = ::selectChatProvider,
             requestModelOptions = { activeController().requestModelOptions() },
             openOfficialFallback = ::openOfficialFallback,
         )
@@ -193,6 +197,9 @@ internal class MainSocialAiChatFeature(
 
     fun webChatStreaming(): Boolean = isChatModeActive() && activeController().streaming()
 
+    fun webChatLastCommandStatus(): WebChatCommandStatus? =
+        if (isChatModeActive()) activeController().lastCommandStatus() else null
+
     fun stopWebChatGeneration(): Boolean {
         if (!webChatStreaming()) return false
         activeController().stopGeneration()
@@ -229,6 +236,14 @@ internal class MainSocialAiChatFeature(
             openFeatureNavigation = ::openProductionFeatureNavigation,
             providerId = { providerId().wireValue },
             providerName = ::providerName,
+            localProjectActions = {
+                activeController().takeIf(WebChatSocialController::supportsLocalProjects)?.let { controller ->
+                    WebChatLocalProjectActions(
+                        createProject = controller::createLocalProject,
+                        assignConversation = controller::assignConversationToLocalProject,
+                    )
+                }
+            },
             active = { isChatModeActive() && webChatNavigationAvailable() },
         )
         onWebChatNavigationChanged = coordinator::onIndexChanged
@@ -265,7 +280,7 @@ internal class MainSocialAiChatFeature(
 
     fun selectProvider(value: String): Boolean {
         val id = WebChatProviderId.fromWireValue(value)
-        return value == id.wireValue && modeController.selectChatProvider(id)
+        return value == id.wireValue && selectChatProvider(id)
     }
 
     fun onHostResumed(resumeWorkChat: () -> Unit) {
@@ -298,6 +313,7 @@ internal class MainSocialAiChatFeature(
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         binding.modelButton.tag = null
         binding.inputEdit.contentDescription = null
+        binding.inputEdit.hint = "输入内容"
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = null
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
@@ -340,25 +356,52 @@ internal class MainSocialAiChatFeature(
                 width = dp(MODEL_BUTTON_CHAT_WIDTH_DP)
             }
             views.planModeButton.visibility = View.GONE
-            views.webToolsButton.visibility = if (
-                provider.supports(WebChatProviderCapability.COMPOSER_TOOLS)
-            ) View.VISIBLE else View.GONE
             views.webToolsButton.contentDescription = WebChatProductionSelectors.composerTools(provider.id)
             views.webToolsButton.setOnClickListener {
                 productionComposerTools.show(provider)
             }
-            views.attachmentButton.visibility = if (
-                provider.supports(WebChatProviderCapability.ATTACHMENT_UPLOAD)
-            ) View.VISIBLE else View.GONE
             views.attachmentButton.contentDescription = WebChatProductionSelectors.attachment(provider.id)
             views.modelButtonShell.setOnClickListener { providerPicker.show() }
             binding.modelButton.setOnClickListener { providerPicker.show() }
         }
         binding.root.post { controller.refreshComposerModel() }
+        refreshConsumerComposerUi()
+    }
+
+    private fun refreshConsumerComposerUi() {
+        if (isChatModeActive()) {
+            val provider = WebChatProviderRegistry.get(providerId())
+            val controller = activeController()
+            val state = WebChatConsumerComposerStateResolver.resolve(
+                provider = provider,
+                state = controller.stateWireValue(),
+                composerReady = controller.composerReady(),
+                attachmentSupported = controller.attachmentSupported(),
+            )
+            binding.inputEdit.hint = state.inputHint
+            inputComposerViews()?.let { views ->
+                views.attachmentButton.visibility = if (state.attachmentVisible) View.VISIBLE else View.GONE
+                views.webToolsButton.visibility = if (state.toolsVisible) View.VISIBLE else View.GONE
+            }
+        }
         refreshInputComposerVisual()
     }
 
     private fun activeController(): WebChatSocialController = controllerFor(providerId())
+
+    private fun selectChatProvider(id: WebChatProviderId): Boolean {
+        val previous = providerId()
+        if (previous == id && isChatModeActive()) return true
+        if (isChatModeActive()) providerDrafts.remember(previous, binding.inputEdit.text)
+        val selected = modeController.selectChatProvider(id)
+        val target = if (selected) id else previous
+        val draft = providerDrafts.restore(target)
+        if (binding.inputEdit.text?.toString() != draft) {
+            binding.inputEdit.setText(draft)
+            binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        }
+        return selected
+    }
 
     private fun controllerFor(id: WebChatProviderId): WebChatSocialController = when (id) {
         WebChatProviderId.CHATGPT_WEB -> chatGptController

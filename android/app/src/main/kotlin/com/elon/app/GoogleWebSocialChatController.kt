@@ -49,6 +49,7 @@ internal class GoogleWebSocialChatController(
     private var active = false
     private val pendingSend = GoogleWebPendingSendState()
     private var pendingSendWatchdog: Runnable? = null
+    private var latestCommandStatus: WebChatCommandStatus? = null
 
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
@@ -159,6 +160,15 @@ internal class GoogleWebSocialChatController(
 
     override fun openProject(path: String): Boolean = session.openProject(path)
 
+    override fun supportsLocalProjects(): Boolean = true
+
+    override fun createLocalProject(title: String): Boolean = session.createLocalProject(title)
+
+    override fun assignConversationToLocalProject(path: String, projectId: String?): Boolean =
+        session.assignConversationToLocalProject(path, projectId)
+
+    override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
+
     override fun onHostResumed() = session.onHostResumed()
 
     override fun onHostPaused() = session.onHostPaused()
@@ -211,6 +221,12 @@ internal class GoogleWebSocialChatController(
     }
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
+        latestCommandStatus = WebChatCommandStatus(
+            action = event.action,
+            ok = event.ok,
+            detail = event.detail,
+            observedAtMs = System.currentTimeMillis(),
+        )
         if (event.action != "send_prompt") return
         Log.i(SEND_LOG_TAG, "action=send_prompt ok=${event.ok}")
         if (event.ok) {

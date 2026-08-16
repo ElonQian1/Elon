@@ -62,7 +62,15 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("select_web_chat_provider"))
         assertTrue(mainMcp.contains("open_chatgpt_official_fallback"))
         assertTrue(mainMcp.contains("open_web_chat_official_fallback"))
+        assertTrue(
+            mainMcp.substringAfter("\"open_chatgpt_official_fallback\"")
+                .substringBefore("\"open_web_chat_official_fallback\"")
+                .contains("openChatGptWeb()"),
+        )
         assertTrue(mainMcp.contains("web_chat_attachment_phase"))
+        assertTrue(mainMcp.contains("web_chat_last_command"))
+        assertTrue(mainMcp.contains("web_chat_streaming"))
+        assertTrue(feature.contains("webChatLastCommandStatus"))
         assertTrue(mainMcp.contains("start_new_web_chat_conversation"))
         assertTrue(mainMcp.contains("open_web_chat_conversation"))
         assertTrue(mainMcp.contains("open_web_chat_project"))
@@ -132,6 +140,12 @@ class ChatGptWebProductIntegrationContractTest {
     @Test
     fun adaptiveMirrorAndMcpShareStableSemanticControlIds() {
         val layoutAdapter = read("android/app/src/main/assets/chatgpt_web_adapter_layout.js")
+        val portalPolicy = read(
+            "android/app/src/main/assets/chatgpt_web_adapter_message_portal_policy.js",
+        )
+        val pageAdapter = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        )
         val mcp = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt")
         val messageJson = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMessageJson.kt")
         val activity = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt")
@@ -149,6 +163,13 @@ class ChatGptWebProductIntegrationContractTest {
         )
         assertTrue(layoutAdapter.contains("return 'conversation_options';"))
         assertTrue(layoutAdapter.contains("contextId: resolvedContextId"))
+        assertTrue(layoutAdapter.contains("messagePortalPolicy.inferMessageContext"))
+        assertTrue(portalPolicy.contains("function inferMessageIndex"))
+        assertTrue(portalPolicy.contains("role: input && input.role"))
+        assertTrue(
+            pageAdapter.indexOf("chatgpt_web_adapter_message_portal_policy.js") <
+                pageAdapter.indexOf("chatgpt_web_adapter_layout.js"),
+        )
         assertTrue(layoutAdapter.contains("scrollIntoView"))
         val baseAdapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")
         assertTrue(baseAdapter.contains("if (fingerprint !== lastSnapshot)"))
@@ -181,6 +202,9 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(session.contains("uiManifest = { latestUiManifest }"))
         assertTrue(controller.contains("override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort"))
         assertTrue(controller.contains("revealMessage = ::revealMessageFromMcp"))
+        assertTrue(controller.contains("requestChildRectangleOnScreen"))
+        assertTrue(controller.contains("R.id.webChatMessageMore"))
+        assertTrue(controller.contains("MAX_REVEAL_ATTEMPTS"))
         assertTrue(feature.contains("providerId() == WebChatProviderId.CHATGPT_WEB"))
         assertTrue(mainMcp.contains("action.startsWith(\"chatgpt_\")"))
         assertTrue(mainMcp.contains("return port.control(args)"))

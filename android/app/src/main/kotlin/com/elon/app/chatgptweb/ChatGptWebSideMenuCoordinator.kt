@@ -4,6 +4,7 @@ import android.graphics.drawable.Drawable
 import android.view.View
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.WebChatLocalProjectActions
 import java.time.LocalDate
 
 internal enum class ChatGptWebSideMenuTab(val wireValue: String) {
@@ -32,6 +33,7 @@ internal class ChatGptWebSideMenuCoordinator(
     private val openFeatureNavigation: () -> Unit,
     private val providerId: () -> String,
     private val providerName: () -> String,
+    private val localProjectActions: () -> WebChatLocalProjectActions?,
     private val active: () -> Boolean,
 ) {
     private lateinit var view: ChatGptWebSideMenuView
@@ -53,6 +55,7 @@ internal class ChatGptWebSideMenuCoordinator(
             openFeatureNavigation = openFeatureNavigation,
             providerId = providerId,
             providerName = providerName,
+            localProjectActions = localProjectActions,
             openSettings = openSettings,
             requestClose = requestClose,
             dp = dp,

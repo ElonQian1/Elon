@@ -5,6 +5,7 @@ import android.util.AtomicFile
 import com.elon.app.chatgptweb.ChatGptWebConversation
 import com.elon.app.chatgptweb.ChatGptWebConversationCollection
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
+import com.elon.app.chatgptweb.ChatGptWebProject
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -21,28 +22,46 @@ internal data class GoogleWebConversationRecord(
 
 internal class GoogleWebConversationStore(context: Context) {
     private val file = AtomicFile(File(context.noBackupFilesDir, FILE_NAME))
+    private val projectStore = GoogleWebProjectStore(context)
     private var records = restore()
 
-    fun index(activePath: String?): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
-        conversations = records.map { record ->
-            ChatGptWebConversation(
-                id = record.id,
-                title = record.title,
-                path = record.path,
-                active = record.path == activePath,
-                groupLabel = "Google AI 搜索",
-                activityDates = record.activityDates,
-            )
-        },
-        projects = emptyList(),
-        collection = ChatGptWebConversationCollection(
-            observedCount = records.size,
-            source = ChatGptWebConversationCollection.SOURCE_CACHE,
-            stale = false,
-            officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
-            cachedAtMs = System.currentTimeMillis(),
-        ),
-    )
+    fun index(activePath: String?): ChatGptWebConversationIndexState {
+        val organization = projectStore.snapshot()
+        val projectsById = organization.projects.associateBy(GoogleWebProjectRecord::id)
+        return ChatGptWebConversationIndexState(
+            conversations = records.map { record ->
+                val project = organization.assignments[record.path]?.let(projectsById::get)
+                ChatGptWebConversation(
+                    id = record.id,
+                    title = record.title,
+                    path = record.path,
+                    active = record.path == activePath,
+                    groupLabel = "Google AI 搜索",
+                    projectId = project?.id,
+                    projectTitle = project?.title,
+                    projectPath = project?.path,
+                    activityDates = record.activityDates,
+                )
+            },
+            projects = organization.projects.map { project ->
+                ChatGptWebProject(project.id, project.title, project.path)
+            },
+            collection = ChatGptWebConversationCollection(
+                observedCount = records.size,
+                source = ChatGptWebConversationCollection.SOURCE_CACHE,
+                stale = false,
+                officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
+                cachedAtMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    fun createProject(title: String): Boolean = projectStore.createProject(title)
+
+    fun assignConversation(path: String, projectId: String?): Boolean {
+        if (records.none { it.path == path }) return false
+        return projectStore.assignConversation(path, projectId)
+    }
 
     fun observe(
         url: String,

@@ -124,6 +124,18 @@ internal class GoogleWebBackgroundSession(
 
     fun openProject(path: String): Boolean = false
 
+    fun createLocalProject(title: String): Boolean {
+        val changed = conversationStore.createProject(title)
+        if (changed) onConversationIndexChanged(conversationIndex())
+        return changed
+    }
+
+    fun assignConversationToLocalProject(path: String, projectId: String?): Boolean {
+        val changed = conversationStore.assignConversation(path, projectId)
+        if (changed) onConversationIndexChanged(conversationIndex())
+        return changed
+    }
+
     fun destroy() {
         handler.removeCallbacksAndMessages(null)
         pageAdapter?.dispose()

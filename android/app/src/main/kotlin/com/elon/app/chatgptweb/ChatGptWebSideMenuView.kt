@@ -17,6 +17,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.R
+import com.elon.app.WebChatLocalProjectActions
+import com.elon.app.WebChatLocalProjectDialogs
 import com.elon.app.createSocialSidebarDateStrip
 import java.time.LocalDate
 
@@ -30,6 +32,7 @@ internal class ChatGptWebSideMenuView(
     private val openFeatureNavigation: () -> Unit,
     private val providerId: () -> String,
     private val providerName: () -> String,
+    private val localProjectActions: () -> WebChatLocalProjectActions?,
     private val openSettings: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
@@ -44,6 +47,7 @@ internal class ChatGptWebSideMenuView(
     private var selectedDate = LocalDate.now()
     private var searchVisible = false
     private var searchQuery = ""
+    private val collapsedProjectIds = mutableSetOf<String>()
 
     init {
         addView(root, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -108,7 +112,11 @@ internal class ChatGptWebSideMenuView(
             render()
         }, LinearLayout.LayoutParams(dp(92), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(tabText(
-            activity.getString(R.string.chatgpt_side_menu_projects),
+            if (localProjectActions() == null) {
+                activity.getString(R.string.chatgpt_side_menu_projects)
+            } else {
+                "本机项目"
+            },
             selectedTab == ChatGptWebSideMenuTab.PROJECTS,
             ChatGptNativeNavigationSelector.PROJECTS_TAB,
         ) {
@@ -264,14 +272,22 @@ internal class ChatGptWebSideMenuView(
             query.isBlank() || project.title.contains(query, ignoreCase = true)
         }
         if (projects.isEmpty()) {
-            container.addView(emptyState("${providerName()}当前暂无项目"))
+            container.addView(emptyState(
+                if (localProjectActions() == null) {
+                    "${providerName()}当前暂无项目"
+                } else {
+                    "还没有本机项目"
+                },
+            ))
             return
         }
         projects.forEach { project ->
             container.addView(projectRow(project))
-            state.conversations
-                .filter { it.projectId == project.id }
-                .forEach { container.addView(conversationRow(it, nested = true)) }
+            if (project.id !in collapsedProjectIds) {
+                state.conversations
+                    .filter { it.projectId == project.id }
+                    .forEach { container.addView(conversationRow(it, nested = true)) }
+            }
         }
     }
 
@@ -301,7 +317,14 @@ internal class ChatGptWebSideMenuView(
         contentDescription = ChatGptNativeNavigationSelector.project(project)
         isClickable = true
         foreground = selectableForeground()
-        setOnClickListener { closeThen { openProject(project.path) } }
+        setOnClickListener {
+            if (localProjectActions() == null) {
+                closeThen { openProject(project.path) }
+            } else {
+                if (!collapsedProjectIds.add(project.id)) collapsedProjectIds.remove(project.id)
+                render()
+            }
+        }
     }
 
     private fun conversationRow(
@@ -310,30 +333,56 @@ internal class ChatGptWebSideMenuView(
     ) = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(62))
         gravity = Gravity.CENTER_VERTICAL
-        orientation = LinearLayout.VERTICAL
+        orientation = LinearLayout.HORIZONTAL
         setPadding(if (nested) dp(40) else dp(4), dp(8), dp(8), dp(8))
         contentDescription = ChatGptNativeNavigationSelector.conversation(conversation)
         tag = conversation.id
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener { closeThen { openConversation(conversation.path) } }
-        addView(TextView(activity).apply {
-            includeFontPadding = false
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            text = conversation.title
-            textSize = 15f
-            setTextColor(Color.parseColor(if (conversation.active) "#B4C5E3" else "#F8F7F4"))
+        setOnLongClickListener {
+            val actions = localProjectActions() ?: return@setOnLongClickListener false
+            WebChatLocalProjectDialogs.showAssignment(activity, index(), conversation, actions, ::render)
+            true
+        }
+        addView(LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(activity).apply {
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                text = conversation.title
+                textSize = 15f
+                setTextColor(Color.parseColor(if (conversation.active) "#B4C5E3" else "#F8F7F4"))
+            })
+            val metadata = conversation.projectTitle.orEmpty().takeIf { it.isNotBlank() }
+            if (metadata != null) addView(TextView(activity).apply {
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                text = metadata
+                textSize = 12f
+                setPadding(0, dp(5), 0, 0)
+                setTextColor(Color.parseColor("#80BEBEBA"))
+            })
         })
-        val metadata = conversation.projectTitle.orEmpty().takeIf { it.isNotBlank() }
-        if (metadata != null) addView(TextView(activity).apply {
+        if (localProjectActions() != null) addView(TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(40), LinearLayout.LayoutParams.MATCH_PARENT)
+            gravity = Gravity.CENTER
             includeFontPadding = false
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            text = metadata
-            textSize = 12f
-            setPadding(0, dp(5), 0, 0)
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            text = "⋯"
+            textSize = 22f
+            setTextColor(Color.parseColor("#B3DDDBD5"))
+            contentDescription = "整理会话：${conversation.title}"
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener {
+                localProjectActions()?.let { actions ->
+                    WebChatLocalProjectDialogs.showAssignment(activity, index(), conversation, actions, ::render)
+                }
+            }
         })
     }
 
@@ -350,12 +399,25 @@ internal class ChatGptWebSideMenuView(
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54))
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
+        val projectActions = localProjectActions()
         addView(footerAction(
-            activity.getString(R.string.web_chat_open_official),
-            "web-chat-feature-navigation:${providerId()}",
+            if (selectedTab == ChatGptWebSideMenuTab.PROJECTS && projectActions != null) {
+                "新建项目"
+            } else {
+                activity.getString(R.string.web_chat_open_official)
+            },
+            if (selectedTab == ChatGptWebSideMenuTab.PROJECTS && projectActions != null) {
+                "web-chat-local-project-create:${providerId()}"
+            } else {
+                "web-chat-feature-navigation:${providerId()}"
+            },
         ) {
-            requestClose(true)
-            postDelayed(openFeatureNavigation, CLOSE_DELAY_MS)
+            if (selectedTab == ChatGptWebSideMenuTab.PROJECTS && projectActions != null) {
+                WebChatLocalProjectDialogs.showCreate(activity, projectActions, ::render)
+            } else {
+                requestClose(true)
+                postDelayed(openFeatureNavigation, CLOSE_DELAY_MS)
+            }
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         addView(footerAction(
             activity.getString(R.string.chatgpt_side_menu_settings),

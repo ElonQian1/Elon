@@ -1,12 +1,14 @@
 package com.elon.app
 
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 internal class WebChatProviderPicker(
     private val activity: AppCompatActivity,
     private val currentProvider: () -> WebChatProviderId,
     private val currentModel: () -> String,
+    private val currentState: () -> String,
+    private val authenticated: () -> Boolean,
+    private val composerReady: () -> Boolean,
     private val selectProvider: (WebChatProviderId) -> Boolean,
     private val requestModelOptions: () -> Unit,
     private val openOfficialFallback: () -> Unit,
@@ -17,56 +19,64 @@ internal class WebChatProviderPicker(
             providers = WebChatProviderRegistry.available(),
             selectedProvider = selectedProvider,
             currentModel = currentModel(),
+            currentState = currentState(),
+            authenticated = authenticated(),
+            composerReady = composerReady(),
         )
-        val selectedIndex = options.indexOfFirst(WebChatProviderPickerOption::selected).coerceAtLeast(0)
-        val secondaryAction = if (selectedProvider == WebChatProviderId.CHATGPT_WEB) {
-            activity.getString(R.string.web_chat_provider_model_action)
-        } else {
-            activity.getString(R.string.web_chat_open_official)
-        }
-        AlertDialog.Builder(activity)
-            .setTitle(R.string.web_chat_provider_picker_title)
-            .setSingleChoiceItems(options.map { it.label }.toTypedArray(), selectedIndex) { dialog, which ->
-                options.getOrNull(which)?.let { option ->
-                    if (!option.selected) selectProvider(option.providerId)
-                }
-                dialog.dismiss()
-            }
-            .setNeutralButton(secondaryAction, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-            .also { dialog ->
-                dialog.setOnShowListener {
-                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
-                        dialog.dismiss()
-                        if (selectedProvider == WebChatProviderId.CHATGPT_WEB) {
-                            requestModelOptions()
-                        } else {
-                            openOfficialFallback()
-                        }
-                    }
-                }
-                dialog.show()
-            }
+        WebChatProviderPickerSheet.show(
+            activity = activity,
+            options = options,
+            onProviderSelected = selectProvider,
+            onModelOptions = requestModelOptions,
+            onOfficialPage = openOfficialFallback,
+        )
     }
 }
 
 internal data class WebChatProviderPickerOption(
     val providerId: WebChatProviderId,
-    val label: String,
+    val title: String,
+    val subtitle: String,
+    val avatarResId: Int,
     val selected: Boolean,
-)
+) {
+    val label: String
+        get() = listOf(title, subtitle.substringBefore(" · "))
+            .filter(String::isNotBlank)
+            .joinToString(" · ")
+}
 
 internal fun webChatProviderPickerOptions(
     providers: List<WebChatProviderIdentity>,
     selectedProvider: WebChatProviderId,
     currentModel: String,
+    currentState: String = "ready",
+    authenticated: Boolean = false,
+    composerReady: Boolean = true,
 ): List<WebChatProviderPickerOption> = providers.map { provider ->
     val selected = provider.id == selectedProvider
     val model = currentModel.trim().takeIf { selected && it.isNotBlank() }
+    val session = if (selected) {
+        webChatProviderSessionLabel(currentState, authenticated, composerReady)
+    } else {
+        "点击切换"
+    }
     WebChatProviderPickerOption(
         providerId = provider.id,
-        label = listOfNotNull(provider.displayName, model).joinToString(" · "),
+        title = provider.displayName,
+        subtitle = listOfNotNull(model, session).joinToString(" · "),
+        avatarResId = provider.avatarResId,
         selected = selected,
     )
+}
+
+internal fun webChatProviderSessionLabel(
+    state: String,
+    authenticated: Boolean,
+    composerReady: Boolean,
+): String = when {
+    state == "error" -> "连接异常"
+    !composerReady -> "正在连接"
+    authenticated -> "账号会话"
+    else -> "访客会话"
 }
