@@ -104,7 +104,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(session.contains("GoogleWebConversationSnapshotStore"))
         assertTrue(session.contains("GoogleWebSnapshotPresentation.loading"))
         assertTrue(session.contains("ChatGptWebProxyController"))
-        assertTrue(session.contains("snapshot.composerReady && !snapshot.streaming"))
+        assertTrue(session.contains("nextSnapshot.composerReady && !nextSnapshot.streaming"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))
         assertTrue(session.contains("responseRefresh.onSendConfirmed()"))
         assertTrue(session.contains("responseRefresh.onSnapshot("))
@@ -117,6 +117,9 @@ class GoogleWebAdapterContractTest {
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
         assertTrue(controller.contains("session.currentOfficialUrl()"))
         assertTrue(controller.contains("pendingSend.confirmSubmission()"))
+        assertTrue(controller.contains("pendingSend.observeSubmission(latestUserPrompt)"))
+        assertTrue(controller.contains("session.onSubmissionObserved()"))
+        assertTrue(session.contains("fun onSubmissionObserved() = responseRefresh.onSendConfirmed()"))
         assertTrue(controller.contains("GoogleWebPendingSendPresentation.status(pendingSend.phase())"))
         assertTrue(controller.contains("?.sendStatus = pendingStatus"))
         assertTrue(Regex(

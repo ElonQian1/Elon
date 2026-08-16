@@ -52,8 +52,15 @@ internal class GoogleWebPendingSendState {
 
     fun confirmSubmission(): Boolean {
         val current = pending ?: return false
+        if (current.submissionConfirmed) return false
         current.submissionConfirmed = true
         return true
+    }
+
+    fun observeSubmission(content: String?): Boolean {
+        val current = pending ?: return false
+        if (normalize(content) != normalize(current.prompt)) return false
+        return confirmSubmission()
     }
 
     fun failSubmission(): String? {
@@ -64,7 +71,7 @@ internal class GoogleWebPendingSendState {
 
     fun observeCompletedTurn(content: String?, assistantObserved: Boolean): Boolean {
         val current = pending ?: return false
-        if (content?.trim() != current.prompt.trim()) return false
+        if (normalize(content) != normalize(current.prompt)) return false
         if (!assistantObserved) return false
         invalidate()
         return true
@@ -101,8 +108,11 @@ internal class GoogleWebPendingSendState {
         pending = null
     }
 
+    private fun normalize(value: String?): String = value.orEmpty().trim().replace(WHITESPACE, " ")
+
     private companion object {
         const val MAX_CONFIRMATION_RECHECKS = 2
+        val WHITESPACE = Regex("\\s+")
     }
 }
 

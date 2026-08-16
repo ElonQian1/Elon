@@ -193,15 +193,18 @@ internal class GoogleWebSocialChatController(
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
         val lastUserIndex = snapshot.messages.indexOfLast { it.role == "user" }
+        val latestUserPrompt = snapshot.messages.getOrNull(lastUserIndex)?.content
         val assistantObserved = lastUserIndex >= 0 && snapshot.messages
             .drop(lastUserIndex + 1)
             .any { it.role == "assistant" }
         if (pendingSend.observeCompletedTurn(
-                snapshot.messages.getOrNull(lastUserIndex)?.content,
+                latestUserPrompt,
                 assistantObserved,
             )
         ) {
             cancelPendingSendWatchdog()
+        } else if (pendingSend.observeSubmission(latestUserPrompt)) {
+            session.onSubmissionObserved()
         }
         val pendingStatus = GoogleWebPendingSendPresentation.status(pendingSend.phase())
         val pendingPrompt = pendingSend.prompt()

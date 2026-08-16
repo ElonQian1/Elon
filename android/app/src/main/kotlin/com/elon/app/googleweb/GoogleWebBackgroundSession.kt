@@ -100,6 +100,8 @@ internal class GoogleWebBackgroundSession(
         return true
     }
 
+    fun onSubmissionObserved() = responseRefresh.onSendConfirmed()
+
     fun stopGeneration() = pageAdapter?.stopGeneration()
 
     fun startNewConversation() {

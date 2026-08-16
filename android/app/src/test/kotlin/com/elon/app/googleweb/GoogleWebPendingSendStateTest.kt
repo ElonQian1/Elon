@@ -8,6 +8,29 @@ import org.junit.Test
 
 class GoogleWebPendingSendStateTest {
     @Test
+    fun visibleOfficialQueryConfirmsNavigationBasedSubmission() {
+        val state = GoogleWebPendingSendState()
+        val generation = state.begin("hello   world")
+
+        assertTrue(state.observeSubmission(" hello world "))
+        assertFalse(state.observeSubmission("hello world"))
+        assertEquals(GoogleWebPendingSendState.Phase.AWAITING_RESPONSE, state.phase())
+        assertEquals(
+            GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING,
+            state.onConfirmationTimeout(generation).action,
+        )
+    }
+
+    @Test
+    fun unrelatedOfficialQueryDoesNotConfirmPendingSubmission() {
+        val state = GoogleWebPendingSendState()
+        state.begin("expected")
+
+        assertFalse(state.observeSubmission("different"))
+        assertEquals(GoogleWebPendingSendState.Phase.SUBMITTING, state.phase())
+    }
+
+    @Test
     fun unconfirmedSubmissionRestoresPromptAfterTimeout() {
         val state = GoogleWebPendingSendState()
         assertEquals(GoogleWebPendingSendState.Phase.IDLE, state.phase())
