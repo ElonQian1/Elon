@@ -181,6 +181,8 @@
 170. `docs/open-commerce-cofficethinking-real-server-acceptance.md`：查看咖啡商户真实服务器、真实 PostgreSQL、库存事务、幂等下单和原 ERP 回读的隔离验收，以及尚未完成的公网平台链边界。
 171. `docs/open-commerce/public-https-coffee-runtime-acceptance.md`：查看一龙当前源码中的确定性消费者 AI 路径经目录发现、商户授权、动作确认和公网标准 443 HTTPS 调用咖啡真实运行时、落入真实 PostgreSQL/ERP 的未支付纵向验收及其隔离边界。
 172. `docs/open-commerce-verified-erp-handoff-handler-v1-acceptance.md`：查看通用 ERP 插件的稳定来源信封、幂等写入、独立回读匹配、临时释放和生产事实边界。
+173. `docs/decisions/open-commerce-sqlite-runtime-idempotency-v1.md`：查看商户运行时单节点 SQLite 幂等存储的并发、所有权、兼容和非高可用边界。
+174. `docs/open-commerce/sqlite-runtime-idempotency-v1-acceptance.md`：查看重启重放、冲突、超时接管、损坏、锁冲突和发布包验证证据。
 
 ## 专题地图
 

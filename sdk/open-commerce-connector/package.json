@@ -8,6 +8,10 @@
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
     },
+    "./sqlite-idempotency": {
+      "types": "./src/merchant-runtime-sqlite-store.d.ts",
+      "default": "./src/merchant-runtime-sqlite-store.js"
+    },
     "./sui-preflight": "./src/sui-preflight.js"
   },
   "bin": {

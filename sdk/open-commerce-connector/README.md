@@ -278,6 +278,25 @@ const response = await runtime.handleInvoke({ headers, body: rawBody })
 
 处理器上下文包含规范化的 `credentialEnvironment`、`credentialId`、`grantId`、`actionConfirmationId` 与平台 `idempotencyKey`。内存幂等存储只供本机开发和原型使用，进程重启会丢失记录。生产商户必须实现 `claim/complete/release` 持久化接口，并在数据库中对“商户 + App + 能力 + 幂等键”建立唯一约束；只有真正取得 `claimed` 状态的执行者可以释放占位，商品扣减、报价消费和订单创建仍由商户数据库事务负责。
 
+单节点商户可直接使用可选 SQLite 参考实现，而不重复编写领取和重放状态机：
+
+```js
+import {
+  createSqliteMerchantRuntimeIdempotencyStore,
+} from '@elon/open-commerce-connector/sqlite-idempotency'
+
+const idempotencyStore = createSqliteMerchantRuntimeIdempotencyStore({
+  path: process.env.YILONG_RUNTIME_SQLITE_PATH,
+  takeoverAfterMs: 60_000,
+})
+
+process.once('SIGTERM', () => idempotencyStore.close())
+```
+
+该子路径依赖提供 `node:sqlite` 的 Node 版本；连接器根入口仍可在既有 Node 20 环境加载。
+SQLite 实现提供进程重启重放、同文件并发占位和超时接管，不提供跨机器高可用、网络磁盘
+共识、自动备份或清理。数据库文件目录、访问权限、容量和备份仍由商户宿主负责。
+
 ## 数据边界
 
 - 单页最多 500 条标准化变更。
