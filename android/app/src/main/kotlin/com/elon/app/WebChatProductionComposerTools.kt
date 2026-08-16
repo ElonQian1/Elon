@@ -45,6 +45,7 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val mcpPort: () -> WebChatSocialMcpPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
+    private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
 ) {
     private var requestEpoch = 0
     private var activeSheet: BottomSheetDialog? = null
@@ -88,9 +89,7 @@ internal class WebChatProductionComposerToolsCoordinator(
             showCommandError("realtime_voice_unavailable")
             return true
         }
-        if (executeCommand(port, command)) {
-            Toast.makeText(activity, "正在启动网页实时语音…", Toast.LENGTH_SHORT).show()
-        }
+        executeCommand(provider, port, command)
         return true
     }
 
@@ -172,8 +171,8 @@ internal class WebChatProductionComposerToolsCoordinator(
             ),
         ) { item ->
             if (activeProvider() != provider.id) return@show
-            commandById[item.id]?.let { executeCommand(port, it); return@show }
-            toolById[item.id]?.let { selectTool(port, it) }
+            commandById[item.id]?.let { executeCommand(provider, port, it); return@show }
+            toolById[item.id]?.let { selectTool(provider, port, it) }
         }
         activeSheet = sheet
         sheet?.setOnDismissListener {
@@ -182,21 +181,34 @@ internal class WebChatProductionComposerToolsCoordinator(
     }
 
     private fun executeCommand(
+        provider: WebChatProviderIdentity,
         port: WebChatSocialMcpPort,
         command: WebChatProductionComposerCommand,
     ): Boolean {
         val result = port.control(JSONObject().put("action", command.action))
-        if (!result.optBoolean("control_ok")) showCommandError(result.optString("error"))
-        return result.optBoolean("control_ok")
+        val accepted = result.optBoolean("control_ok")
+        if (!accepted) {
+            showCommandError(result.optString("error"))
+        } else {
+            WebChatConsumerComposerOperationPolicy.commandAccepted(provider, command.action)
+                ?.let(onOperationFeedback)
+        }
+        return accepted
     }
 
-    private fun selectTool(port: WebChatSocialMcpPort, tool: WebChatProductionComposerTool) {
+    private fun selectTool(
+        provider: WebChatProviderIdentity,
+        port: WebChatSocialMcpPort,
+        tool: WebChatProductionComposerTool,
+    ) {
         val result = port.control(JSONObject()
             .put("action", "chatgpt_select_composer_option")
             .put("section", TOOLS_SECTION)
             .put("option_id", tool.id))
         if (!result.optBoolean("control_ok")) {
             Toast.makeText(activity, "网页工具状态已变化，请重试", Toast.LENGTH_SHORT).show()
+        } else {
+            onOperationFeedback(WebChatConsumerComposerOperationPolicy.toolAccepted(provider, tool.label))
         }
     }
 

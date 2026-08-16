@@ -32,6 +32,8 @@ internal class MainSocialAiChatFeature(
     private val providerDraftStore = WebChatProviderDraftStore(activity)
     private val providerDrafts = providerDraftStore.restore()
     private val persistProviderDrafts = Runnable { providerDraftStore.save(providerDrafts) }
+    private var composerOperationFeedback: WebChatConsumerComposerFeedback? = null
+    private var composerOperationFeedbackEpoch = 0
     private val composerDrafts = SocialAiComposerDraftCoordinator(
         providerDrafts = providerDrafts,
         readText = { binding.inputEdit.text },
@@ -117,6 +119,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
+            onOperationFeedback = ::showComposerOperationFeedback,
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
@@ -377,6 +380,7 @@ internal class MainSocialAiChatFeature(
 
     private fun deactivateChatProvider(releaseComposerDraft: Boolean = true) {
         if (releaseComposerDraft) composerDrafts.release()
+        clearComposerOperationFeedback()
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
@@ -408,6 +412,7 @@ internal class MainSocialAiChatFeature(
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
+        clearComposerOperationFeedback()
         composerDrafts.activateProvider(provider.id)
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (productionFeatureNavigationDelegate.isInitialized()) {
@@ -456,8 +461,13 @@ internal class MainSocialAiChatFeature(
                 attachmentSupported = controller.attachmentSupported(),
             )
             binding.inputEdit.hint = state.inputHint
+            val recovery = WebChatConsumerRecoveryPolicy.resolve(provider, controller.stateWireValue())
             consumerStatusBanner.render(
-                WebChatConsumerRecoveryPolicy.resolve(provider, controller.stateWireValue()),
+                if (recovery.visible) recovery else WebChatConsumerComposerOperationPolicy.resolve(
+                    provider = provider,
+                    attachmentPhase = controller.attachmentSendPhase(),
+                    feedback = composerOperationFeedback,
+                ),
             )
             inputComposerViews()?.let { views ->
                 views.attachmentButton.visibility = if (state.attachmentVisible) View.VISIBLE else View.GONE
@@ -465,6 +475,23 @@ internal class MainSocialAiChatFeature(
             }
         } else if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         refreshInputComposerVisual()
+    }
+
+    private fun showComposerOperationFeedback(feedback: WebChatConsumerComposerFeedback) {
+        if (!isChatModeActive() || providerId() != feedback.providerId) return
+        val epoch = ++composerOperationFeedbackEpoch
+        composerOperationFeedback = feedback
+        refreshConsumerComposerUi()
+        binding.root.postDelayed({
+            if (epoch != composerOperationFeedbackEpoch) return@postDelayed
+            composerOperationFeedback = null
+            refreshConsumerComposerUi()
+        }, COMPOSER_FEEDBACK_DURATION_MS)
+    }
+
+    private fun clearComposerOperationFeedback() {
+        composerOperationFeedbackEpoch += 1
+        composerOperationFeedback = null
     }
 
     private fun ensureConsumerStatusBannerAttached() {
@@ -514,6 +541,7 @@ internal class MainSocialAiChatFeature(
         const val MODEL_BUTTON_WORK_WIDTH_DP = 76
         const val MODEL_BUTTON_CHAT_WIDTH_DP = 144
         const val DRAFT_SAVE_DELAY_MS = 500L
+        const val COMPOSER_FEEDBACK_DURATION_MS = 4_000L
     }
 
 }
