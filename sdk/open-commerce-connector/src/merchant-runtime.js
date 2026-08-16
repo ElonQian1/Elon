@@ -33,6 +33,11 @@ export function createMerchantRuntime(options) {
   const authorized = new Set(
     definitions.filter((item) => item.access === 'authorized').map((item) => item.key),
   )
+  const actions = new Set(
+    definitions
+      .filter((item) => item.action === true || item.key === 'order.commit')
+      .map((item) => item.key),
+  )
   const idempotencyStore = options.idempotencyStore
   expectIdempotencyStore(idempotencyStore)
   const manifest = deepFreeze({
@@ -68,7 +73,7 @@ export function createMerchantRuntime(options) {
       if (authorized.has(envelope.capability_key) && !nonEmpty(envelope.grant_id)) {
         reject(401, 'signature_rejected', 'authorized capability requires a platform grant')
       }
-      if (envelope.capability_key === 'order.commit') validateOrderConfirmation(envelope)
+      if (actions.has(envelope.capability_key)) validateActionConfirmation(envelope)
 
       claimInput = idempotencyInput(envelope)
       const claim = await idempotencyStore.claim(claimInput)
@@ -308,8 +313,16 @@ function normalizeDefinitions(value, handlers) {
     if (!['public', 'authorized'].includes(item.access)) {
       throw new TypeError(`capability definition ${key} has unsupported access`)
     }
+    if (item.action !== undefined && typeof item.action !== 'boolean') {
+      throw new TypeError(`capability definition ${key} action must be a boolean`)
+    }
     expectObject(item.input_schema, `options.capabilities[${index}].input_schema`)
-    return structuredClone({ key, access: item.access, input_schema: item.input_schema })
+    return structuredClone({
+      key,
+      access: item.access,
+      ...(item.action === undefined ? {} : { action: item.action }),
+      input_schema: item.input_schema,
+    })
   })
   return definitions.sort((left, right) => left.key.localeCompare(right.key))
 }
@@ -323,9 +336,9 @@ function expectIdempotencyStore(store) {
   }
 }
 
-function validateOrderConfirmation(envelope) {
+function validateActionConfirmation(envelope) {
   if (!nonEmpty(envelope.action_confirmation_id)) {
-    reject(400, 'confirmation_required', 'order.commit requires explicit user confirmation')
+    reject(400, 'confirmation_required', 'action capability requires explicit user confirmation')
   }
 }
 

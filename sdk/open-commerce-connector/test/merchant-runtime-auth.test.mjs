@@ -89,6 +89,39 @@ test('authorized capabilities require a grant and order commits require platform
   assert.equal(confirmed.body.result.confirmation, 'action-confirmation-1')
 })
 
+test('every declared action requires platform confirmation before its handler runs', async () => {
+  let calls = 0
+  const runtime = createTestRuntime({
+    capabilities: [{
+      key: 'inventory.reserve',
+      access: 'public',
+      action: true,
+      input_schema: { type: 'object' },
+    }],
+    handlers: {
+      async 'inventory.reserve'() {
+        calls += 1
+        return { reserved: true }
+      },
+    },
+  })
+  const request = {
+    capability_key: 'inventory.reserve',
+    idempotency_key: 'inventory-reserve-1',
+  }
+
+  const missing = await runtime.handleInvoke(signedInvocation(request))
+  const confirmed = await runtime.handleInvoke(signedInvocation({
+    ...request,
+    action_confirmation_id: 'action-confirmation-reserve-1',
+  }))
+
+  assert.equal(missing.status, 400)
+  assert.equal(missing.body.error_code, 'confirmation_required')
+  assert.equal(confirmed.status, 200)
+  assert.equal(calls, 1)
+})
+
 test('runtime rejects oversized and non-raw request bodies before a handler runs', async () => {
   let calls = 0
   const runtime = createTestRuntime({

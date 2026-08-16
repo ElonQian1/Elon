@@ -27,6 +27,38 @@ const kernel = createMerchantErpKernel({ merchantId: "merchant_demo", store: sto
 const provider = createOpenCommerceProvider(kernel);
 ```
 
+## Signed merchant runtime bridge
+
+`createMerchantRuntimeBinding` compiles the provider into the existing signed merchant-runtime
+contract without copying HMAC, Grant, action-confirmation, or envelope logic into this package.
+The platform envelope idempotency key becomes the ERP order idempotency key, and order results carry
+the standard merchant business receipt used by the existing consumer closure and ERP handoff flows.
+
+```js
+import {
+  createMemoryMerchantRuntimeIdempotencyStore,
+  createMerchantRuntime,
+} from "@elon/open-commerce-connector";
+import {
+  createMerchantErpKernel,
+  createMerchantRuntimeBinding,
+  createOpenCommerceProvider,
+} from "@yilong/merchant-erp-kernel";
+
+const kernel = createMerchantErpKernel({ merchantId: "merchant_demo", store: storage });
+const binding = createMerchantRuntimeBinding(createOpenCommerceProvider(kernel));
+const runtime = createMerchantRuntime({
+  ...binding,
+  keyId: process.env.YILONG_RUNTIME_KEY_ID,
+  secret: process.env.YILONG_RUNTIME_SECRET,
+  // Local development only. Production must provide a durable implementation.
+  idempotencyStore: createMemoryMerchantRuntimeIdempotencyStore(),
+});
+```
+
+The bridge does not start an HTTP server or manage credentials. An HTTP host must pass the original
+request bytes and headers to `runtime.handleInvoke`. Orders remain unpaid and no funds move.
+
 `MemoryErpStore` is a deterministic test and local-development adapter. Production merchant systems
 that already own a database can implement `ErpStorageAdapter` with their PostgreSQL or service
 transaction layer.

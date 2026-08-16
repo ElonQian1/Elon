@@ -655,6 +655,7 @@ export function createAdapterHandoffWorker(options: {
 export interface MerchantRuntimeCapabilityDefinition {
   key: string
   access: 'public' | 'authorized'
+  action?: boolean
   input_schema: Record<string, unknown>
 }
 

@@ -79,6 +79,7 @@ export interface MerchantErpKernel {
 
 export interface OpenCommerceProvider {
   readonly schema: "yilong.erp.open_commerce_provider.v1";
+  readonly merchant_id: string;
   readonly capabilities: readonly Record<string, unknown>[];
   invoke(request: { capability_key: string; input: Record<string, unknown> }): Promise<unknown>;
 }
@@ -97,3 +98,12 @@ export class MemoryErpStore implements ErpStorageAdapter {
 
 export function createMerchantErpKernel(options: MerchantErpKernelOptions): MerchantErpKernel;
 export function createOpenCommerceProvider(kernel: MerchantErpKernel): OpenCommerceProvider;
+export function createMerchantRuntimeBinding(provider: OpenCommerceProvider): {
+  readonly schema: "yilong.erp.merchant_runtime_binding.v1";
+  readonly merchantId: string;
+  readonly capabilities: readonly Record<string, unknown>[];
+  readonly handlers: Readonly<Record<string, (
+    input: Record<string, unknown>,
+    context: { merchantId: string; idempotencyKey: string },
+  ) => Promise<unknown>>>;
+};

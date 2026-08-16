@@ -18,7 +18,7 @@
 - **升级活动**：保存升级前后配置快照、兼容结果和商户采用证据；采用与回滚都由商户确认，不覆盖私有扩展。
 - **初始化 Matter**：把蓝图版本、实例配置和边界编译为现有 Matter 计划；项目获授权 Bot 后，可继续走 Assignment、评审、合并和发布门禁。
 - **物化合同与状态投影**：初始化 Matter 固定记录源提交、目标项目、配置修订和证据格式；状态从 Matter、Assignment 与 Artifact 实时派生，不维护第二套易漂移的执行状态。
-- **公共运行时内核**：`sdk/merchant-erp-kernel` 提供无 UI 的门店、商品、库存、采购、订单、审计与消费者 AI 能力映射，以及可选的商户自有 SQLite 参考适配器；商户保留数据库文件、主题和私有插件。
+- **公共运行时内核**：`sdk/merchant-erp-kernel` 提供无 UI 的门店、商品、库存、采购、订单、审计与消费者 AI 能力映射，以及可选的商户自有 SQLite 参考适配器；其运行时桥可把这些能力组合进现有签名商户协议，统一动作确认、平台幂等键和订单业务回执。商户保留数据库文件、主题和私有插件。
 - **开放商业就绪度投影**：只读聚合实例绑定的商户节点、受验证运行时、`merchant_runtime` 能力、目录发布和 ERP 物化状态，分别回答消费者 AI 是否可调用、是否可发现及项目是否已验收；未绑定的多商户项目拒绝自动猜测归属。
 
 ## AI 代理工作顺序
@@ -57,5 +57,7 @@
 - [公共运行时内核 ADR](../decisions/erp-shared-runtime-kernel-v1.md)
 - [公共运行时内核验收](shared-runtime-kernel-v1-acceptance.md)
 - [SQLite 持久化适配器验收](sqlite-storage-adapter-v1-acceptance.md)
+- [开放商业商户运行时桥 ADR](../decisions/merchant-erp-open-commerce-runtime-bridge-v1.md)
+- [开放商业商户运行时桥验收](open-commerce-runtime-bridge-v1-acceptance.md)
 - [`cofficethinking` 参考实例](cofficethinking-reference-instance.md)
 - [开放商业能力基线](../open-commerce/capability-baseline.md)

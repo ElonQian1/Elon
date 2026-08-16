@@ -92,6 +92,32 @@ test('runtime fails closed on missing provenance, unknown capabilities, and over
   assert.equal(oversized.body.error_code, 'result_too_large')
 })
 
+test('runtime preserves action metadata and rejects ambiguous action declarations', () => {
+  const runtime = createTestRuntime({
+    capabilities: [{
+      key: 'inventory.reserve',
+      access: 'authorized',
+      action: true,
+      input_schema: { type: 'object' },
+    }],
+    handlers: { async 'inventory.reserve'() { return {} } },
+  })
+
+  assert.equal(runtime.manifest().capabilities[0].action, true)
+  assert.throws(
+    () => createTestRuntime({
+      capabilities: [{
+        key: 'inventory.reserve',
+        access: 'authorized',
+        action: 'yes',
+        input_schema: { type: 'object' },
+      }],
+      handlers: { async 'inventory.reserve'() { return {} } },
+    }),
+    /action must be a boolean/,
+  )
+})
+
 function manifestRuntime(keys) {
   const capabilities = keys.map((key) => ({
     key,
