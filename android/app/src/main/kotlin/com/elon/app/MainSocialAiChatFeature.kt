@@ -127,7 +127,13 @@ internal class MainSocialAiChatFeature(
         WebChatProductionFeatureNavigationCoordinator(
             activity = activity,
             host = binding.root,
-            mcpPort = ::chatGptMcpPort,
+            consumerPort = {
+                if (isChatModeActive() && providerId() == WebChatProviderId.CHATGPT_WEB) {
+                    activeController().consumerPort()
+                } else {
+                    null
+                }
+            },
             activeProvider = {
                 if (isChatModeActive()) providerId() else null
             },

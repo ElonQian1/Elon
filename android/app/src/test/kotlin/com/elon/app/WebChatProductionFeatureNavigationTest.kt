@@ -1,7 +1,5 @@
 package com.elon.app
 
-import org.json.JSONArray
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,11 +8,10 @@ import org.junit.Test
 class WebChatProductionFeatureNavigationTest {
     @Test
     fun parsesFeatureNavigationForTheProductionFriendChat() {
-        val navigation = JSONObject().put("features", JSONArray()
-            .put(feature("projects", "项目", "projects", selected = true, sensitive = false))
-            .put(feature("health", "健康", "health", selected = false, sensitive = true)))
-
-        val result = WebChatProductionFeatureParser.parse(navigation)
+        val result = WebChatProductionFeatureParser.parse(listOf(
+            feature("projects", "项目", "projects", selected = true, sensitive = false),
+            feature("health", "健康", "health", selected = false, sensitive = true),
+        ))
 
         assertEquals(listOf("projects", "health"), result.map { it.id })
         assertTrue(result.first().selected)
@@ -27,12 +24,11 @@ class WebChatProductionFeatureNavigationTest {
 
     @Test
     fun ignoresInvalidAndDuplicateFeaturesAndUsesAStableFallbackSelector() {
-        val navigation = JSONObject().put("features", JSONArray()
-            .put(feature("tasks", "任务", "tasks", false, false, selector = ""))
-            .put(feature("tasks", "重复任务", "tasks", true, false))
-            .put(JSONObject().put("id", "missing_label")))
-
-        val result = WebChatProductionFeatureParser.parse(navigation)
+        val result = WebChatProductionFeatureParser.parse(listOf(
+            feature("tasks", "任务", "tasks", false, false, selector = ""),
+            feature("tasks", "重复任务", "tasks", true, false),
+            feature("missing_label", "", "tasks", false, false),
+        ))
 
         assertEquals(1, result.size)
         assertEquals("web-chat-feature:tasks", result.single().nativeSelector)
@@ -49,7 +45,7 @@ class WebChatProductionFeatureNavigationTest {
 
     @Test
     fun returnsEmptyWhenThePageHasNoFeatureManifest() {
-        assertTrue(WebChatProductionFeatureParser.parse(JSONObject()).isEmpty())
+        assertTrue(WebChatProductionFeatureParser.parse(emptyList()).isEmpty())
     }
 
     private fun feature(
@@ -59,11 +55,12 @@ class WebChatProductionFeatureNavigationTest {
         selected: Boolean,
         sensitive: Boolean,
         selector: String = "chatgpt-feature:$id",
-    ): JSONObject = JSONObject()
-        .put("id", id)
-        .put("label", label)
-        .put("kind", kind)
-        .put("selected", selected)
-        .put("requires_user_confirmation", sensitive)
-        .put("native_adb_content_description", selector)
+    ) = WebChatConsumerFeature(
+        id = id,
+        label = label,
+        kind = kind,
+        selected = selected,
+        requiresUserConfirmation = sensitive,
+        nativeSelector = selector,
+    )
 }

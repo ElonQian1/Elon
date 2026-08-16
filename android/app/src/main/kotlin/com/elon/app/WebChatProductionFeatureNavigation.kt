@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import org.json.JSONObject
 
 internal data class WebChatProductionFeature(
     val id: String,
@@ -25,35 +24,32 @@ internal data class WebChatProductionFeature(
 }
 
 internal object WebChatProductionFeatureParser {
-    fun parse(navigation: JSONObject): List<WebChatProductionFeature> {
-        val features = navigation.optJSONArray("features") ?: return emptyList()
-        val parsed = mutableListOf<WebChatProductionFeature>()
-        for (index in 0 until features.length()) {
-            val feature = features.optJSONObject(index) ?: continue
-            val id = feature.optString("id").trim()
-            val label = feature.optString("label").trim()
-            if (id.isBlank() || label.isBlank()) continue
-            parsed += WebChatProductionFeature(
+    fun parse(features: List<WebChatConsumerFeature>): List<WebChatProductionFeature> {
+        return features.mapNotNull { feature ->
+            val id = feature.id.trim()
+            val label = feature.label.trim()
+            if (id.isBlank() || label.isBlank()) return@mapNotNull null
+            WebChatProductionFeature(
                 id = id,
                 label = label,
-                kind = feature.optString("kind").trim(),
-                selected = feature.optBoolean("selected"),
-                requiresUserConfirmation = feature.optBoolean("requires_user_confirmation"),
+                kind = feature.kind.trim(),
+                selected = feature.selected,
+                requiresUserConfirmation = feature.requiresUserConfirmation,
                 officialCompletion = WebChatProductionFeatureCompletionPolicy
-                    .requiresOfficialCompletion(feature.optString("kind")),
-                nativeSelector = feature.optString("native_adb_content_description")
+                    .requiresOfficialCompletion(feature.kind),
+                nativeSelector = feature.nativeSelector
                     .trim()
                     .ifBlank { "web-chat-feature:$id" },
             )
         }
-        return parsed.distinctBy(WebChatProductionFeature::id)
+            .distinctBy(WebChatProductionFeature::id)
     }
 }
 
 internal class WebChatProductionFeatureNavigationCoordinator(
     private val activity: AppCompatActivity,
     private val host: View,
-    private val mcpPort: () -> WebChatSocialMcpPort?,
+    private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
 ) {
@@ -67,15 +63,15 @@ internal class WebChatProductionFeatureNavigationCoordinator(
             openOfficialFallback()
             return
         }
-        val port = mcpPort() ?: return showUnavailable()
+        val port = consumerPort() ?: return showUnavailable()
         val epoch = requestEpoch
         val cached = readFeatures(port)
         if (cached.isNotEmpty()) {
             showFeatureDialog(provider, port, cached)
             return
         }
-        val requested = port.control(JSONObject().put("action", "chatgpt_list_features"))
-        if (!requested.optBoolean("control_ok")) {
+        val requested = port.requestFeatures()
+        if (!requested.accepted) {
             showUnavailable()
             return
         }
@@ -93,7 +89,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 
     private fun pollFeatures(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         epoch: Int,
         attempt: Int,
     ) {
@@ -113,15 +109,12 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         )
     }
 
-    private fun readFeatures(port: WebChatSocialMcpPort): List<WebChatProductionFeature> {
-        val navigation = port.control(JSONObject().put("action", "chatgpt_get_navigation"))
-        if (!navigation.optBoolean("control_ok")) return emptyList()
-        return WebChatProductionFeatureParser.parse(navigation)
-    }
+    private fun readFeatures(port: WebChatConsumerPort): List<WebChatProductionFeature> =
+        WebChatProductionFeatureParser.parse(port.state().features)
 
     private fun showFeatureDialog(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         features: List<WebChatProductionFeature>,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
@@ -163,7 +156,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 
     private fun selectFeature(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         feature: WebChatProductionFeature,
     ) {
         if (feature.selected) {
@@ -187,16 +180,13 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 
     private fun dispatchFeature(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         feature: WebChatProductionFeature,
         userConfirmed: Boolean,
     ) {
-        val result = port.control(JSONObject()
-            .put("action", "chatgpt_select_feature")
-            .put("feature_id", feature.id)
-            .put("user_confirmed", userConfirmed))
-        if (!result.optBoolean("control_ok")) {
-            val message = when (result.optString("error")) {
+        val result = port.selectFeature(feature.id, userConfirmed)
+        if (!result.accepted) {
+            val message = when (result.error) {
                 "stale_feature_id" -> "官网功能已变化，请重新打开列表"
                 "user_confirmation_required" -> "需要确认后才能打开此功能"
                 "bridge_not_ready", "adapter_not_current" -> "网页正在恢复，请稍后重试"
@@ -209,7 +199,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
             Toast.makeText(activity, "正在打开${feature.label}", Toast.LENGTH_SHORT).show()
             return
         }
-        val requestId = WebChatProductionFeatureCompletionPolicy.requestId(result)
+        val requestId = result.requestId
         if (requestId == null) {
             Toast.makeText(activity, "官网没有返回可确认的打开状态，请重试", Toast.LENGTH_SHORT).show()
             return
@@ -221,14 +211,14 @@ internal class WebChatProductionFeatureNavigationCoordinator(
 
     private fun pollOfficialCompletion(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         feature: WebChatProductionFeature,
         requestId: String,
         epoch: Int,
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        when (WebChatProductionFeatureCompletionPolicy.evaluate(feature, requestId, port.uiState())) {
+        when (WebChatProductionFeatureCompletionPolicy.evaluate(feature, requestId, port.state())) {
             WebChatProductionFeatureCompletionDecision.OPEN_OFFICIAL -> {
                 Toast.makeText(activity, "已打开${feature.label}", Toast.LENGTH_SHORT).show()
                 openOfficialFallback()

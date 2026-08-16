@@ -2,7 +2,6 @@ package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebNavigationPolicy
 import com.elon.app.chatgptweb.ChatGptWebProductCapabilityCatalog
-import org.json.JSONObject
 import java.net.URI
 
 internal enum class WebChatProductionFeatureCompletionDecision {
@@ -17,29 +16,25 @@ internal object WebChatProductionFeatureCompletionPolicy {
     fun evaluate(
         feature: WebChatProductionFeature,
         requestId: String,
-        uiState: JSONObject,
+        state: WebChatConsumerState,
     ): WebChatProductionFeatureCompletionDecision {
-        return when (commandState(uiState, requestId)) {
-            CommandState.FAILED -> WebChatProductionFeatureCompletionDecision.FAILED
-            CommandState.SUCCEEDED -> if (pageSettled(feature, uiState)) {
+        return when (commandStatus(state, requestId)) {
+            WebChatConsumerCommandStatus.FAILED -> WebChatProductionFeatureCompletionDecision.FAILED
+            WebChatConsumerCommandStatus.SUCCEEDED -> if (pageSettled(feature, state)) {
                 WebChatProductionFeatureCompletionDecision.OPEN_OFFICIAL
             } else {
                 WebChatProductionFeatureCompletionDecision.WAITING
             }
-            CommandState.MISSING,
-            CommandState.PENDING -> WebChatProductionFeatureCompletionDecision.WAITING
+            else -> WebChatProductionFeatureCompletionDecision.WAITING
         }
     }
 
-    fun pageSettled(feature: WebChatProductionFeature, uiState: JSONObject): Boolean {
+    fun pageSettled(feature: WebChatProductionFeature, state: WebChatConsumerState): Boolean {
         val expectedKind = feature.kind.trim().lowercase()
-        val url = uiState.optJSONObject("conversation")
-            ?.optString("url")
-            ?.trim()
-            .orEmpty()
+        val url = state.pageUrl.trim()
         if (!ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) return false
 
-        val pageKind = uiState.optString("page_kind").trim().lowercase()
+        val pageKind = state.pageKind.trim().lowercase()
         if (expectedKind.isNotBlank() && pageKind == expectedKind) return true
 
         val path = runCatching { URI(url).path.orEmpty() }.getOrDefault("")
@@ -50,32 +45,10 @@ internal object WebChatProductionFeatureCompletionPolicy {
         return prefixes.any { prefix -> path == prefix || path.startsWith("$prefix/") }
     }
 
-    fun requestId(response: JSONObject): String? {
-        val receipt = response.optJSONObject("command_receipt") ?: return null
-        if (!receipt.has("request_id") || receipt.isNull("request_id")) return null
-        return receipt.optString("request_id")
-            .trim()
-            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-    }
-
-    private fun commandState(uiState: JSONObject, requestId: String): CommandState {
-        val requests = uiState.optJSONArray("command_requests") ?: return CommandState.MISSING
-        for (index in 0 until requests.length()) {
-            val request = requests.optJSONObject(index) ?: continue
-            if (request.optString("request_id") != requestId) continue
-            return when (request.optString("status").trim().lowercase()) {
-                "succeeded" -> CommandState.SUCCEEDED
-                "failed" -> CommandState.FAILED
-                else -> CommandState.PENDING
-            }
-        }
-        return CommandState.MISSING
-    }
-
-    private enum class CommandState {
-        MISSING,
-        PENDING,
-        SUCCEEDED,
-        FAILED,
-    }
+    private fun commandStatus(
+        state: WebChatConsumerState,
+        requestId: String,
+    ): WebChatConsumerCommandStatus? = state.commandRequests
+        .firstOrNull { it.id == requestId }
+        ?.status
 }
