@@ -3706,6 +3706,180 @@
       "updated_at_ms": 1786871119891
     },
     {
+      "id": "merchant-runtime-http-host-v1",
+      "title": "开放商业商户运行时 HTTP 宿主 V1",
+      "summary": "为签名商户运行时提供默认回环、原始字节直传、严格请求边界和优雅停机的可复用 Node HTTP/HTTPS 宿主。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/merchant-runtime-http-host-v1.md",
+        "content_hash": "b0923b4a62a6327e17406bf085bb82a5b2fd266acf1301c0047e64909cb32a24",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+          "head_blob_oid": "91ab2e3e89bc4bd3274a1c6ab51ee60906ccda5d",
+          "worktree_blob_oid": "91ab2e3e89bc4bd3274a1c6ab51ee60906ccda5d",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "open-commerce",
+      "tags": [
+        "open-commerce",
+        "merchant-runtime",
+        "http",
+        "https",
+        "operations"
+      ],
+      "task_paths": [
+        "docs/decisions/merchant-runtime-http-host-v1.md",
+        "docs/open-commerce/capability-baseline.md",
+        "docs/open-commerce/merchant-runtime-http-host-v1-acceptance.md",
+        "sdk/open-commerce-connector/README.md",
+        "sdk/open-commerce-connector/package.json",
+        "sdk/open-commerce-connector/src/merchant-runtime-http-host.d.ts",
+        "sdk/open-commerce-connector/src/merchant-runtime-http-host.js",
+        "sdk/open-commerce-connector/src/merchant-runtime-http-lifecycle.js",
+        "sdk/open-commerce-connector/test/merchant-runtime-http-host.test.mjs"
+      ],
+      "dependencies": [
+        "merchant-erp-open-commerce-runtime-bridge-v1",
+        "open-commerce-sqlite-runtime-idempotency-v1"
+      ],
+      "acceptance_criteria": [
+        "真实本机 TCP 请求穿过宿主进入签名运行时并保持幂等重放。",
+        "错误方法、路径、Content-Type、声明体积和流式体积在业务处理器前拒绝。",
+        "运行时异常或非法响应只投影稳定宿主错误。",
+        "健康接口无业务副作用并反映 ready 或 draining。",
+        "优雅停机等待在途请求且超期强制关闭，重复关闭幂等。",
+        "HTTP 与调用方证书 HTTPS 共享同一请求处理边界。",
+        "连接器、ERP 回归和包清单验证通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/decisions/merchant-runtime-http-host-v1.md",
+          "content_hash": "8cd87aeb1c1718f23b85a5eac025eda9d396b35654599a34c40033cebe9c3b71",
+          "locator": "accepted decision",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "7c899c6947818cabefaca7b9f07a8b2ba75cd818",
+            "worktree_blob_oid": "7c899c6947818cabefaca7b9f07a8b2ba75cd818",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/capability-baseline.md",
+          "content_hash": "a2bb4a3fa5245872124b38305eb19c4ba97bd4182d866855bb6576d8360d40f9",
+          "locator": "merchant runtime host boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "7fdd395e226a16b0da2f241ad9cdb4d6acdd545f",
+            "worktree_blob_oid": "7fdd395e226a16b0da2f241ad9cdb4d6acdd545f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/merchant-runtime-http-host-v1-acceptance.md",
+          "content_hash": "843b232ddd8bb176198757755a6f3c716bf05ecab9262948696ffcb3121289d6",
+          "locator": "105 connector and 13 ERP tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "db9f28c18b1c13c3cfd04d3e912ff319160775f7",
+            "worktree_blob_oid": "db9f28c18b1c13c3cfd04d3e912ff319160775f7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/README.md",
+          "content_hash": "e5750901c4d682701b1c992608250ae14840fb6c987cee1930c2626dbb7c2077",
+          "locator": "merchant runtime HTTP host usage",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "8b7b6694013d153d1822d78ca3f09d503f1baa71",
+            "worktree_blob_oid": "8b7b6694013d153d1822d78ca3f09d503f1baa71",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/package.json",
+          "content_hash": "2c3cc3bb2fb6d37a5af2a9d685118c877f950ce47ee8055e1051fa8d34fe45cb",
+          "locator": "./merchant-runtime-http export",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "c5123b04fc77720392a62bf2a1b2afe7b9b5e9a0",
+            "worktree_blob_oid": "c5123b04fc77720392a62bf2a1b2afe7b9b5e9a0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/merchant-runtime-http-host.d.ts",
+          "content_hash": "953072ba93f098b2eea3e1349ff4ebc5e63220f53536ba49934b05944aa98500",
+          "locator": "MerchantRuntimeHttpHost",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "377ecd770430ea49010ac86bb2a945f18c0751aa",
+            "worktree_blob_oid": "377ecd770430ea49010ac86bb2a945f18c0751aa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/merchant-runtime-http-host.js",
+          "content_hash": "83c6d8a2eee5429a1705e08f3704ff746eb1c434a37a8f46034939f086054fe8",
+          "locator": "createMerchantRuntimeHttpHost",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "5887bdfa81b7b6c7826d4e699f1141dc08a6dc40",
+            "worktree_blob_oid": "5887bdfa81b7b6c7826d4e699f1141dc08a6dc40",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/merchant-runtime-http-lifecycle.js",
+          "content_hash": "a909bff1b80760fd6d478ed187aa2f7401ae15161c18a89f8692a6883efac28e",
+          "locator": "closeMerchantRuntimeHttpServer",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "529ba284c9170067a8f22a166e07dd8c5a7015a2",
+            "worktree_blob_oid": "529ba284c9170067a8f22a166e07dd8c5a7015a2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/test/merchant-runtime-http-host.test.mjs",
+          "content_hash": "21b7b45b32dda20303f9a085ecb042303da319e372b30ef6089baf17c9d3b97d",
+          "locator": "7 real TCP and lifecycle tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c112221c530c2aa7f8d369568ce64d9ad44c707",
+            "head_blob_oid": "402056c90b82a50405d57c14ca7cd14abca7f0ba",
+            "worktree_blob_oid": "402056c90b82a50405d57c14ca7cd14abca7f0ba",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786879543465,
+      "updated_at_ms": 1786879547042
+    },
+    {
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
@@ -6853,86 +7027,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b6d30c4e53ef487b809e8238778cb492",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Accepted V266 requirement is frozen and V265 dependency is released.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786750225024
-    },
-    {
-      "id": "feature_event_c2c6801db0e8470985a4763359fe7fa0",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "claimed",
-      "actor": "codex-goal-agent",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786750236320
-    },
-    {
-      "id": "feature_event_57720299acff4fb28ad89708a2020b5c",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Implementation started in isolated V266 worktree.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786750246261
-    },
-    {
-      "id": "feature_event_da9633fa40db4d278cd534c9750c0cf0",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-agent",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786753477963
-    },
-    {
-      "id": "feature_event_adc6e5fd31104345802f279c3519beed",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "V266 profile, challenge, candidate validator, machine JSON, tests, authority and acceptance evidence are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786753498089
-    },
-    {
-      "id": "feature_event_e39260604e42487da1c5f6b05b9bf1ab",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Production Rust check, six focused V266 tests, exact profile snapshot, source-size and document modularity gates passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786753510706
-    },
-    {
-      "id": "feature_event_ef783c79689e46caa3a28f5cd747d2d1",
-      "feature_id": "compute-external-pool-adapter-runtime-compatibility-profile-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "V266 implementation, focused tests, production check, evidence drift check, pre-push gates and origin/main publication completed at b6d315072.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786753990538
-    },
-    {
-      "id": "feature_event_04e504e9a46344b6a68fba13e42a1c3c",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "当前系统盘存在多份历史任务专属 Rust cache；现有共享缓存和仓库内临时根不能安全认领这些外部目录。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1786754525015
-    },
-    {
       "id": "feature_event_26a3c9e4bce54323ad021530dcf1039a",
       "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
       "action": "transitioned",
@@ -8851,6 +8945,86 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786878849243
+    },
+    {
+      "id": "feature_event_fdd3bf2194b6463cb94cc6e67cf5d71d",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "registered",
+      "actor": "codex-http-host-20260816",
+      "reason": "rebase 后从远端权威注册表重新生成，源码和需求已在当前工作树。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786879543465
+    },
+    {
+      "id": "feature_event_b9c3c3177f9544ae8f913ea7ab49f82f",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "transitioned",
+      "actor": "codex-http-host-20260816",
+      "reason": "需求、安全边界与既有运行时依赖已复核。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786879543489
+    },
+    {
+      "id": "feature_event_ecbb98ace7d84fb0a5068d6fe6b1d6ca",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "transitioned",
+      "actor": "codex-http-host-20260816",
+      "reason": "依赖均 verified，当前源码不存在重叠实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786879543513
+    },
+    {
+      "id": "feature_event_6108a025a303487faef7ad6ba5d3c5e9",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "claimed",
+      "actor": "codex-http-host-20260816",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786879543534
+    },
+    {
+      "id": "feature_event_c96599bcdcd241529f41f132750850ed",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "transitioned",
+      "actor": "codex-http-host-20260816",
+      "reason": "绑定已重放验证的当前实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786879543558
+    },
+    {
+      "id": "feature_event_21edfb6f186d4c0198f9d43e7ef39f21",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-http-host-20260816",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786879546973
+    },
+    {
+      "id": "feature_event_cc56bf4ada084ff9bfafd128f63e3796",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "transitioned",
+      "actor": "codex-http-host-20260816",
+      "reason": "HTTP/HTTPS 宿主、请求门禁、生命周期和文档已提交。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786879547009
+    },
+    {
+      "id": "feature_event_70990a5ec82942fea6db15dad285bd6c",
+      "feature_id": "merchant-runtime-http-host-v1",
+      "action": "transitioned",
+      "actor": "codex-http-host-20260816",
+      "reason": "专项 7/7、连接器 105/105、ERP 13/13 及 npm pack 清单通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786879547042
     }
   ]
 }
