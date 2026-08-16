@@ -38,12 +38,20 @@ Codex 与一龙控制台能够区分“测试原生子窗口”和“生产首�
 
 | 能力 | 实现 | 验证 | 交付 | 验收 |
 |---|---|---|---|---|
-| 生产后台会话存在性与就绪度 | implemented | offline_passed | not_started | pending |
-| 消息上下文与流式结构状态 | implemented | offline_passed | not_started | pending |
-| 会话/项目/置顶目录结构状态 | implemented | offline_passed | not_started | pending |
-| owner/provider 缓存结构状态 | implemented | offline_passed | not_started | pending |
-| 节点回执二次隐私清洗 | implemented | offline_passed | not_started | pending |
+| 生产后台会话存在性与就绪度 | implemented | offline_passed | deployed | installed_read_only_passed |
+| 消息上下文与流式结构状态 | implemented | offline_passed | deployed | installed_read_only_passed |
+| 会话/项目/置顶目录结构状态 | implemented | offline_passed | deployed | installed_read_only_passed |
+| owner/provider 缓存结构状态 | implemented | offline_passed | deployed | installed_read_only_passed |
+| 节点回执二次隐私清洗 | implemented | offline_passed | deployed | installed_read_only_passed |
 | 真实 ChatGPT/Google 多轮消息 | implemented | user_action_required | deployed | deferred |
+
+## 正式安装版证据
+
+- Windows 精确发布身份：`0.3.69+aaac049520d1368c343579178affdf552b20f565`。
+- 节点、PC 前端与 Tauri 自更新重连后均在线；生产 `/pc/ai` 的 ChatGPT `official_session` 为 `ready`，适配器、语义快照、输入框和上下文均就绪，缓存为 `live`。
+- 同一回执中测试子窗口仍为 `phase=not_created`，证明该阶段不再冒充生产会话状态；Google AI 当前未创建生产会话，不把缺失会话伪造成已验收。
+- 本次脱敏时间线共 202 条，`frontend`、`rust`、`network`、`tauri`、`control` 五类来源均有证据，错误或警告为 0。
+- 未输入或发送任何第三方消息；真实多轮上下文仍保持 `user_action_required`。
 
 ## 回退
 

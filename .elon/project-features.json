@@ -6170,19 +6170,19 @@
       "id": "win-web-ai-production-session-diagnostics-v1",
       "title": "Win 网页 AI 生产会话结构诊断 V1",
       "summary": "让 Win Codex 控制区分测试子窗口与生产首页后台官方会话，并以双重白名单清洗公开上下文、目录、缓存和流式结构状态。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-production-session-diagnostics-v1.md",
-        "content_hash": "d12d17d60bf4bf04ab918ed639653ad67263a3a198b6b64997383715917883a1",
+        "content_hash": "c3360a5b30d0950d3a9a65492d4f25236e4d1c03990214bf44a05f4b0254dd5f",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+          "head_commit": "aaac049520d1368c343579178affdf552b20f565",
           "head_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
-          "worktree_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
-          "state": "tracked_clean"
+          "worktree_blob_oid": "81324808a5fb37b3f3f6f37a5d6fbb8de18790d7",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -6215,7 +6215,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "7c068edf5b8462be80d106a878f79d7592cb6c30",
             "worktree_blob_oid": "7c068edf5b8462be80d106a878f79d7592cb6c30",
             "state": "tracked_clean"
@@ -6228,7 +6228,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "6fbae01f0221ac4fb0554bea19aa3aa9f1502188",
             "worktree_blob_oid": "6fbae01f0221ac4fb0554bea19aa3aa9f1502188",
             "state": "tracked_clean"
@@ -6236,15 +6236,15 @@
         },
         {
           "path": "docs/requirements/win-web-ai-production-session-diagnostics-v1.md",
-          "content_hash": "d12d17d60bf4bf04ab918ed639653ad67263a3a198b6b64997383715917883a1",
-          "locator": "交付矩阵",
+          "content_hash": "c3360a5b30d0950d3a9a65492d4f25236e4d1c03990214bf44a05f4b0254dd5f",
+          "locator": "正式安装版证据",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
-            "worktree_blob_oid": "1352584c3b217f8e888dd5b930fd2c2d5f986629",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "81324808a5fb37b3f3f6f37a5d6fbb8de18790d7",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6254,7 +6254,7 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "1bbd73abf0234624dd219ebe38bc686e0181158f",
             "worktree_blob_oid": "1bbd73abf0234624dd219ebe38bc686e0181158f",
             "state": "tracked_clean"
@@ -6267,7 +6267,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "8cea88da3505dc632d748c5ced0630679fefec11",
             "worktree_blob_oid": "8cea88da3505dc632d748c5ced0630679fefec11",
             "state": "tracked_clean"
@@ -6280,7 +6280,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "b75305988dc0e60830f538af7adb253687de25a5",
             "worktree_blob_oid": "b75305988dc0e60830f538af7adb253687de25a5",
             "state": "tracked_clean"
@@ -6293,7 +6293,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "2b7ca0daa69ca854df48cb2fb417b21993243d67",
             "worktree_blob_oid": "2b7ca0daa69ca854df48cb2fb417b21993243d67",
             "state": "tracked_clean"
@@ -6306,7 +6306,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a6e842a609704e88fbd3b4d316bc3f9b7c09d0dc",
+            "head_commit": "aaac049520d1368c343579178affdf552b20f565",
             "head_blob_oid": "058f0c9af8d7c7c064ff72603ea61d0e71eb15f8",
             "worktree_blob_oid": "058f0c9af8d7c7c064ff72603ea61d0e71eb15f8",
             "state": "tracked_clean"
@@ -6314,7 +6314,7 @@
         }
       ],
       "created_at_ms": 1786875988368,
-      "updated_at_ms": 1786876016089
+      "updated_at_ms": 1786876824902
     },
     {
       "id": "win-web-ai-snapshot-cache-v1",
@@ -6523,116 +6523,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_f26276a9469f4bc3ae6bb6458594f04e",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "transitioned",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "验收证据完整，按本批 CodePushed 交付边界登记为 released；不表示服务端部署或生产 Adapter 启用。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786727523769
-    },
-    {
-      "id": "feature_event_2ebf6e39abe64a589f7968a1461aa6d7",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "registered",
-      "actor": "codex-v263",
-      "reason": "",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786729458479
-    },
-    {
-      "id": "feature_event_8f26f77f8fb24b02aa32a146427ee6fd",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "transitioned",
-      "actor": "codex-v263",
-      "reason": "P0 hard gate after V262; requirement preserves no-network and no-economic boundaries.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786729458507
-    },
-    {
-      "id": "feature_event_7ae985aaaef3420f808a594841ecb984",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "transitioned",
-      "actor": "codex-v263",
-      "reason": "V256 and V262 dependencies are released and implementation scope is bounded.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786729458525
-    },
-    {
-      "id": "feature_event_482a4e0119754dc1818eb939e28aeb14",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "claimed",
-      "actor": "codex-v263",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786729458544
-    },
-    {
-      "id": "feature_event_3b7161cf976b42178fa99055e8aebca1",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "transitioned",
-      "actor": "codex-v263",
-      "reason": "Implementation started in isolated worktree D:/wt/27928-c3f8264d.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786729458565
-    },
-    {
-      "id": "feature_event_d503c0f7830a4c41b9dc3044b5ec08cd",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-v263",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786734602442
-    },
-    {
-      "id": "feature_event_4e02fbc5545147de9aa652b6949dcd77",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "transitioned",
-      "actor": "codex-v263",
-      "reason": "V263 source implementation and bounded evidence recorded",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786734614503
-    },
-    {
-      "id": "feature_event_b780ea5640584ea8a255eedcad9d48ae",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "transitioned",
-      "actor": "codex-v263",
-      "reason": "Windows source contracts, Linux-musl links, and 18 WSL Linux kernel tests passed",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786734626788
-    },
-    {
-      "id": "feature_event_c2d411aaebda44ae931dd39f3d67bb9d",
-      "feature_id": "compute-external-pool-adapter-ephemeral-secret-delivery-v1",
-      "action": "transitioned",
-      "actor": "codex-v263",
-      "reason": "Verified repository capability is ready for mainline delivery; no production deploy or external activation claimed",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786734638141
-    },
-    {
-      "id": "feature_event_8cd9e98839ae463ca938a92bd910ee06",
-      "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
-      "action": "registered",
-      "actor": "codex-v264",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786735398977
-    },
     {
       "id": "feature_event_28edc5bc82ad423baaca7747e37b7ee5",
       "feature_id": "compute-external-pool-adapter-broker-tls-transport-v1",
@@ -8522,6 +8412,116 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786876016089
+    },
+    {
+      "id": "feature_event_4da2f2975bf64fcc952ffd015cbda2e1",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Explicitly reopen the verified metadata to bind exact installed acceptance evidence after intentional requirement update.",
+      "from_status": "verified",
+      "to_status": "retired",
+      "at_ms": 1786876793682
+    },
+    {
+      "id": "feature_event_d06054e4ecca409e80759c5067abedb2",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Reopen metadata for the intentional installed-acceptance requirement update.",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1786876821286
+    },
+    {
+      "id": "feature_event_9ec16662768e4c8b8df04c8383d7e77c",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-win-web-ai",
+      "reason": "Bind exact Win release identity and read-only production /pc/ai acceptance evidence.",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1786876821885
+    },
+    {
+      "id": "feature_event_d465592868bc4466ac7725556c15a640",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Reviewed installed acceptance update; structural scope and no-third-party-send boundary are unchanged.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786876822008
+    },
+    {
+      "id": "feature_event_cf773b4aae864fad825d016f64644979",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Reviewed installed acceptance update; structural scope and no-third-party-send boundary are unchanged.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786876822153
+    },
+    {
+      "id": "feature_event_43d3cccb23754bae99a899ed9aa4dfc2",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "claimed",
+      "actor": "codex-win-web-ai",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786876822303
+    },
+    {
+      "id": "feature_event_7edfc6f2348949feb5c43cbc8e5b9039",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Record current code, tests, contract and installed acceptance evidence.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786876822443
+    },
+    {
+      "id": "feature_event_6b4c7b34248b45bcbed14ccf8a61038f",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-win-web-ai",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786876824487
+    },
+    {
+      "id": "feature_event_e42dea4fdee64d95a3d7fa7f5b6fd997",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Production diagnostic implementation and safe projection are current.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786876824604
+    },
+    {
+      "id": "feature_event_dd6604b05a57438593d8f2c5df131ea6",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Focused Rust and full Win Web AI validation passed; installed read-only timeline has zero warnings/errors.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786876824750
+    },
+    {
+      "id": "feature_event_9f8f47725ba44da182f8f6f9ff8de500",
+      "feature_id": "win-web-ai-production-session-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Exact Win identity 0.3.69+aaac049520d1368c343579178affdf552b20f565 reconnected with production ChatGPT official_session ready; real third-party sends remain deferred.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786876824902
     }
   ]
 }
