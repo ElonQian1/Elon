@@ -9,9 +9,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -230,7 +227,7 @@ internal class MainSpeechInputActions(
         }
         bridge.onStart = {
             // VAD 检测到声音开始：震动反馈确认
-            vibrateOnce(30L)
+            VoiceHapticFeedback.vibrate(activity, 30L)
             voiceHoldButton().text = "正在听..."
             voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.LISTENING)
         }
@@ -393,25 +390,6 @@ internal class MainSpeechInputActions(
         voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
         return true
-    }
-
-    /** 短震动反馈（VAD 说话开始确认）。屏蔽异常，不影响主流程。 */
-    private fun vibrateOnce(ms: Long) {
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vm = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                val v = activity.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    v?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    @Suppress("DEPRECATION")
-                    v?.vibrate(ms)
-                }
-            }
-        }
     }
 
     // ─── 方案 B：实时语音 → OpenAI 转写 → 投递 AI ────────────────────────────
