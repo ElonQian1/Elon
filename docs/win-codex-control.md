@@ -24,8 +24,8 @@ implementation_status: tested
 3. `reload_page`：刷新主工作台。
 4. `open_devtools`、`close_devtools`：只由 Tauri 壳执行并写回回执；生产是否允许由壳能力明确报告。
 5. `capture_state`：读取当前路由、标题、可见/聚焦状态和版本等非秘密状态，不截图、不读输入框正文。
-6. `list_ai_windows`：列出 `chatgpt` 与 `google-ai-mode` 两个固定厂商的逻辑窗口状态；不返回 Tauri label、owner 指纹、窗口句柄或 URL。
-7. `capture_ai_window_state`：按固定 `provider_id` 读取阶段、是否打开/聚焦、页面根节点健康、稳定错误码和可重试标记。
+6. `list_ai_windows`：列出 `chatgpt` 与 `google-ai-mode` 两个固定厂商的逻辑窗口状态；每项同时区分原生测试子窗口状态与生产首页后台 `official_session` 结构状态，不返回 Tauri label、owner 指纹、窗口句柄或 URL。
+7. `capture_ai_window_state`：按固定 `provider_id` 读取测试子窗口阶段、是否打开/聚焦、页面根节点健康，以及生产后台会话的适配器、上下文、缓存、目录和流式就绪度；只公开稳定错误码、固定枚举、布尔值与有界计数。
 8. `focus_ai_window`：按固定 `provider_id` 恢复、显示并聚焦已存在的一龙原生 AI 子窗口；找不到窗口时失败关闭，不隐式创建网页会话。
 9. `update_and_restart`：只接受 Codex MCP 提交的精确 `version+40–64 位 Git SHA` 发布身份。Tauri 仅在正式安装目录中启动外部更新守护器，先写回“已安排”回执，再主动退出桌面壳；守护器复用既有签名、健康检查、任务终态等待和回滚流程，确认更新锁释放后自动重开正式工作台。HTTP/PC UI、模糊版本、任意 URL、任意程序路径和任意进程号均被拒绝。
 
@@ -36,6 +36,14 @@ implementation_status: tested
 `host_unavailable`、`rejected` 或 `expired`。AI 窗口回执的 `window_state` 在节点再次按固定
 schema 清洗并限制为 16 KiB；即使被篡改的 Tauri 页面提交 label、URL、Cookie 或 token，
 节点也不会把这些字段返回给 Codex。
+
+AI 窗口状态中的 `phase` 只描述供开发诊断使用的一龙原生测试子窗口，因此
+`phase=not_created` 不代表生产首页没有建立官方网页会话。生产 `/pc/ai` 实际使用的隐藏
+WebView2 会话由同一 provider 项下的 `official_session` 独立表达。该对象仅返回窗口与加载
+状态、适配器/语义快照/输入框/上下文就绪度、导航与目录完整度、缓存状态、消息/会话/项目/
+置顶有界计数、流式状态、稳定动作名和稳定错误码。Tauri 从运行时生成一次安全投影，节点再按
+固定白名单重建一次；消息正文、标题、草稿、引用、会话 ID、项目名、URL、host、owner、账号、
+Cookie、token、Authorization 和网页异常详情不会进入控制响应。
 
 `update_and_restart` 的 `succeeded` 回执只证明退出与更新守护器已经成功安排，不证明新版本已激活。Codex 必须等待节点重新连接，并从 `win_control_capabilities.release_identity` 回读与请求完全相同的发布身份，才能宣告更新完成；若正式发布正在等待不可安全中断的本机任务，守护器会持续等待，而不是绕过终态门禁。
 
@@ -67,14 +75,14 @@ Tauri 原生桥还在后台把最近 64 条原生事件写入本机 `desktop-dia
 - 页面领取动作后必须核对 `action_id`，重复回执幂等；过期动作不再执行。
 - 事件字段按 key 和内容双重脱敏；Cookie、token、password、secret、authorization、API key 一律替换。
 - AI 窗口控制只接受 `chatgpt`、`google-ai-mode` 两个逻辑 provider；不接受窗口 label、任意厂商字符串、任意 URL 或任意 JavaScript。
-- AI 窗口回执只公开逻辑 provider、阶段、焦点、页面健康、稳定错误码和更新时间；窗口 label、owner 指纹、URL、页面正文、Cookie 与 token 均为明确的 `false` 采集能力。
+- AI 窗口回执只公开逻辑 provider、测试子窗口阶段、生产 `official_session` 结构状态、焦点、页面健康、稳定错误码和更新时间；生产会话诊断只含布尔值、有界计数、固定枚举和稳定动作/错误码。窗口 label、owner 指纹、账号、会话身份、URL、页面正文、Cookie 与 token 均为明确的 `false` 采集能力。
 - 更新重启动作只接受 `requested_by=codex_mcp` 与精确发布身份；能力投影明确报告 `arbitrary_update_target=false`、`update_restart_requires_exact_release=true`。调用方不能指定下载地址、脚本、安装目录、PID 或重开程序。
 - 没有 Tauri 宿主时，浏览器/PWA 控制台仍能读取日志，但 Tauri 动作返回明确 `host_unavailable`。
 - 此能力不恢复已暂停的跨项目自动派发、自动验收、自动续跑或后台自进化。
 
 ## 验收
 
-- Rust 单元测试覆盖动作/路由/provider 白名单、更新来源与精确发布身份、更新清单身份匹配、AI 窗口回执二次清洗、事件脱敏、分页、回执幂等、精确 action 查询和 MCP profile 隔离。
+- Rust 单元测试覆盖动作/路由/provider 白名单、更新来源与精确发布身份、更新清单身份匹配、生产 `official_session` 安全投影、AI 窗口回执二次清洗、恶意正文/凭证字段丢弃、事件脱敏、分页、回执幂等、精确 action 查询和 MCP profile 隔离。
 - Tauri 测试覆盖相对路由校验、事件有界化、白名单动作、正式安装路径限制和守护器的安全退出/自动重开标记。
 - PC 静态测试覆盖路由、全局桥、网络无正文日志、Tauri 回执和控制台五类来源筛选。
 - 编译通过只证明合同和类型闭合；真实 Codex App Server、MCP 客户端、WebView2、DevTools、长时间事件量和发布安装节点仍需分别记录现场证据，不能互相冒充。

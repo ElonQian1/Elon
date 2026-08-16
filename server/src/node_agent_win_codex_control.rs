@@ -11,6 +11,8 @@ use std::{
 #[path = "node_agent_win_codex_control_api.rs"]
 mod api;
 pub(crate) use api::{routes, tauri_diagnostic_snapshot, timeline_payload};
+#[path = "node_agent_win_codex_control/ai_session_diagnostic.rs"]
+mod ai_session_diagnostic;
 
 const MAX_EVENTS: usize = 2_000;
 const MAX_ACTIONS: usize = 256;
@@ -622,6 +624,7 @@ fn sanitize_ai_window(value: &Value) -> Result<Value, String> {
                     | "webview_create_failed"
             )
         });
+    let official_session = ai_session_diagnostic::sanitize(value.get("official_session"))?;
     Ok(json!({
         "provider_id": provider_id,
         "phase": phase,
@@ -633,6 +636,7 @@ fn sanitize_ai_window(value: &Value) -> Result<Value, String> {
         "last_error_code": error_code,
         "retryable": value.get("retryable").and_then(Value::as_bool).unwrap_or(false),
         "updated_at_ms": value.get("updated_at_ms").and_then(Value::as_u64).unwrap_or(0),
+        "official_session": official_session,
     }))
 }
 

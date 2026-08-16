@@ -474,19 +474,40 @@ impl LocalAiBrowserRuntime {
             .filter(|record| record.provider_id == provider_id)
             .max_by_key(|record| record.updated_at_ms)?;
         let snapshot = record.semantic_event.as_ref();
+        let navigation = record.navigation_event.as_ref();
+        let conversations = navigation
+            .and_then(|event| event.get("conversations"))
+            .and_then(Value::as_array);
+        let collection = navigation
+            .and_then(|event| event.get("collection"))
+            .and_then(Value::as_object);
         Some(serde_json::json!({
+            "present": true,
             "window_status": record.window_status,
             "window_visible": record.window_visible,
             "loading": record.loading,
             "adapter_connected": record.renderer_status == "active",
             "semantic_snapshot_ready": snapshot.is_some_and(|event| event.get("type").and_then(Value::as_str) == Some("message_snapshot")),
             "composer_ready": record.semantic_live && snapshot.and_then(|event| event.get("composerReady")).and_then(Value::as_bool).unwrap_or(false),
+            "context_ready": record.pending_context_action.is_empty() && snapshot.is_some(),
+            "context_transition_pending": !record.pending_context_action.is_empty(),
             "page_kind": snapshot.and_then(|event| event.get("pageKind")).and_then(Value::as_str).unwrap_or("unknown"),
             "cache_status": record.cache_status(),
+            "semantic_cache_status": record.event_cache_status(snapshot.is_some(), record.semantic_live),
+            "navigation_cache_status": record.event_cache_status(navigation.is_some(), record.navigation_live),
+            "navigation_snapshot_ready": navigation.is_some_and(|event| event.get("type").and_then(Value::as_str) == Some("conversation_snapshot")),
+            "navigation_live": record.navigation_live,
+            "directory_complete": collection.and_then(|value| value.get("complete")).and_then(Value::as_bool).unwrap_or(false),
+            "directory_observed_count": collection.and_then(|value| value.get("observedCount")).and_then(Value::as_u64).unwrap_or(0),
+            "directory_available_count": collection.and_then(|value| value.get("availableCount")).and_then(Value::as_u64).unwrap_or_else(|| conversations.map_or(0, |items| items.len() as u64)),
+            "conversation_count": conversations.map_or(0, |items| items.len()),
+            "project_count": navigation.and_then(|event| event.get("projects")).and_then(Value::as_array).map_or(0, Vec::len),
+            "pinned_count": conversations.into_iter().flatten().filter(|item| item.get("pinned").and_then(Value::as_bool).unwrap_or(false)).count(),
+            "local_conversation_count": record.conversation_snapshots.len(),
+            "active_conversation": record.active_conversation_id.is_some(),
             "last_error_code": record.last_error_code,
             "last_event_kind": record.last_event_kind,
             "last_command_action": record.last_command_action,
-            "last_command_request_id": record.last_command_request_id,
             "last_command_ok": record.last_command_ok,
             "message_count": record.message_count,
             "assistant_message_count": record.assistant_message_count,

@@ -112,6 +112,12 @@ fn background_opening_never_reports_a_visible_official_window() {
 fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("local-ai-chatgpt-owner-secret", "chatgpt", "connecting");
+    runtime.mark_navigation(
+        "local-ai-chatgpt-owner-secret",
+        &Url::parse("https://chatgpt.com/c/private-conversation-id").unwrap(),
+        true,
+        None,
+    );
     runtime.record_adapter_event(
         "local-ai-chatgpt-owner-secret",
         "message_snapshot",
@@ -120,7 +126,23 @@ fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
             "composerReady": true,
             "pageKind": "home",
             "draft": "private prompt",
-            "messages": [{"content": "private answer"}],
+            "messages": [
+                {"role":"user","content":[{"type":"text","text":"private prompt"}]},
+                {"role":"assistant","content":[{"type":"text","text":"private answer"}]}
+            ],
+        }),
+    );
+    runtime.record_adapter_event(
+        "local-ai-chatgpt-owner-secret",
+        "conversation_snapshot",
+        json!({
+            "type":"conversation_snapshot",
+            "conversations":[
+                {"path":"/c/private-one","title":"private title","pinned":true},
+                {"path":"/c/private-two","title":"private second title","pinned":false}
+            ],
+            "projects":[{"path":"/g/g-p-private/project","title":"private project"}],
+            "collection":{"complete":false,"observedCount":1,"availableCount":2}
         }),
     );
     runtime.record_adapter_event(
@@ -136,11 +158,27 @@ fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
     assert_eq!(diagnostic["adapter_connected"], true);
     assert_eq!(diagnostic["semantic_snapshot_ready"], true);
     assert_eq!(diagnostic["composer_ready"], true);
+    assert_eq!(diagnostic["context_ready"], true);
+    assert_eq!(diagnostic["navigation_snapshot_ready"], true);
+    assert_eq!(diagnostic["navigation_live"], true);
+    assert_eq!(diagnostic["directory_complete"], false);
+    assert_eq!(diagnostic["directory_observed_count"], 1);
+    assert_eq!(diagnostic["directory_available_count"], 2);
+    assert_eq!(diagnostic["conversation_count"], 2);
+    assert_eq!(diagnostic["project_count"], 1);
+    assert_eq!(diagnostic["pinned_count"], 1);
+    assert_eq!(diagnostic["local_conversation_count"], 1);
+    assert_eq!(diagnostic["active_conversation"], true);
+    assert_eq!(diagnostic["message_count"], 2);
+    assert_eq!(diagnostic["assistant_message_count"], 1);
     assert_eq!(diagnostic["last_error_code"], "adapter_bootstrap_failed");
     let encoded = diagnostic.to_string();
     assert!(!encoded.contains("owner-secret"));
+    assert!(!encoded.contains("private-conversation-id"));
     assert!(!encoded.contains("private prompt"));
     assert!(!encoded.contains("private answer"));
+    assert!(!encoded.contains("private title"));
+    assert!(!encoded.contains("private project"));
     assert!(!encoded.contains("private exception detail"));
 }
 

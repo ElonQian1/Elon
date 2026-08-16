@@ -194,7 +194,41 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
                     "retryable":false,
                     "updated_at_ms":42,
                     "window_label":"local-ai-native-chatgpt-owner-secret",
-                    "url":"https://chatgpt.com/private"
+                    "url":"https://chatgpt.com/private",
+                    "official_session":{
+                        "present":true,
+                        "window_status":"ready",
+                        "adapter_connected":true,
+                        "semantic_snapshot_ready":true,
+                        "composer_ready":true,
+                        "context_ready":true,
+                        "page_kind":"conversation",
+                        "cache_status":"live",
+                        "semantic_cache_status":"live",
+                        "navigation_cache_status":"live",
+                        "navigation_snapshot_ready":true,
+                        "navigation_live":true,
+                        "directory_complete":false,
+                        "directory_observed_count":3,
+                        "directory_available_count":9,
+                        "conversation_count":9,
+                        "project_count":2,
+                        "pinned_count":1,
+                        "local_conversation_count":4,
+                        "active_conversation":true,
+                        "last_event_kind":"conversation_snapshot",
+                        "last_command_action":"list_conversations",
+                        "last_command_ok":true,
+                        "message_count":6,
+                        "assistant_message_count":3,
+                        "streaming":false,
+                        "updated_at_ms":41,
+                        "draft":"private prompt",
+                        "owner":"owner-secret",
+                        "cookie":"cookie-secret",
+                        "token":"token-secret",
+                        "exception_detail":"private exception detail"
+                    }
                 },{
                     "provider_id":"google-ai-mode",
                     "phase":"not_created",
@@ -218,10 +252,22 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
     let state = completed.receipt.unwrap().window_state.unwrap();
     let serialized = serde_json::to_string(&state).unwrap();
     assert_eq!(state["windows"][0]["provider_id"], "chatgpt");
+    assert_eq!(
+        state["windows"][0]["official_session"]["directory_available_count"],
+        9
+    );
+    assert_eq!(
+        state["windows"][0]["official_session"]["last_command_action"],
+        "list_conversations"
+    );
     assert_eq!(state["privacy"]["cookies"], false);
     assert!(!serialized.contains("\"window_label\":"));
     assert!(!serialized.contains("chatgpt.com"));
     assert!(!serialized.contains("owner-secret"));
+    assert!(!serialized.contains("private prompt"));
+    assert!(!serialized.contains("cookie-secret"));
+    assert!(!serialized.contains("token-secret"));
+    assert!(!serialized.contains("private exception detail"));
 }
 
 #[test]
