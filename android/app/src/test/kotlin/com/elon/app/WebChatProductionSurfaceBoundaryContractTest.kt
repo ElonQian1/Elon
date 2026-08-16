@@ -47,6 +47,11 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatConsumerComposerStateResolver.resolve"))
         assertTrue(feature.contains("WebChatConsumerStatusBanner"))
         assertTrue(feature.contains("WebChatConsumerRecoveryPolicy.resolve"))
+        val sideMenu = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
+        )
+        assertTrue(sideMenu.contains("WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen"))
+        assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS"))
         assertTrue(consumerComposer.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))

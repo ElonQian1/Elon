@@ -48,6 +48,7 @@ internal class ChatGptWebSideMenuView(
     private var searchVisible = false
     private var searchQuery = ""
     private val collapsedProjectIds = mutableSetOf<String>()
+    private var lastRefreshRequestedAtMs = 0L
 
     init {
         addView(root, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -81,7 +82,16 @@ internal class ChatGptWebSideMenuView(
 
     fun refresh() {
         render()
-        refreshIndex()
+        val nowMs = System.currentTimeMillis()
+        if (WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen(
+                collection = index().collection,
+                nowMs = nowMs,
+                lastRequestedAtMs = lastRefreshRequestedAtMs,
+            )
+        ) {
+            lastRefreshRequestedAtMs = nowMs
+            refreshIndex()
+        }
     }
 
     fun state() = ChatGptWebSideMenuState(selectedTab, selectedDate)
@@ -127,6 +137,14 @@ internal class ChatGptWebSideMenuView(
         addView(iconButton(R.drawable.social_sidebar_search, "搜索${providerName()}会话") {
             searchVisible = !searchVisible
             if (!searchVisible) searchQuery = ""
+            render()
+        })
+        addView(iconButton(
+            android.R.drawable.ic_popup_sync,
+            ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS,
+        ) {
+            lastRefreshRequestedAtMs = System.currentTimeMillis()
+            refreshIndex()
             render()
         })
         addView(iconButton(R.drawable.ic_side_menu_new_chat, ChatGptNativeNavigationSelector.NEW_CONVERSATION) {
