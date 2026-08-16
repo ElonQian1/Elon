@@ -85,6 +85,14 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.onHostResumed(webView?.url)
     }
 
+    fun retryGuestAccess(): Boolean {
+        val view = webView ?: return false
+        view.stopLoading()
+        updateState(State.LOADING)
+        view.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+        return true
+    }
+
     fun onHostPaused() {
         if (webView == null) return
         cookieManager.flush()

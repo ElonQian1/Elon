@@ -13,6 +13,8 @@ internal data class WebChatConsumerRecoveryState(
     val message: String,
     val retryVisible: Boolean,
     val officialVisible: Boolean,
+    val retryLabel: String = "重试",
+    val officialLabel: String = "官网",
 )
 
 internal object WebChatConsumerRecoveryPolicy {
@@ -28,9 +30,11 @@ internal object WebChatConsumerRecoveryPolicy {
         )
         "login_required" -> WebChatConsumerRecoveryState(
             visible = true,
-            message = "当前网页需要登录",
-            retryVisible = false,
+            message = "可尝试免费访客聊天，或登录账号",
+            retryVisible = true,
             officialVisible = true,
+            retryLabel = "访客",
+            officialLabel = "登录",
         )
         else -> WebChatConsumerRecoveryState(
             visible = false,
@@ -50,7 +54,7 @@ internal class WebChatConsumerStatusBanner(
         layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
         gravity = Gravity.CENTER_VERTICAL or Gravity.START
         includeFontPadding = false
-        maxLines = 1
+        maxLines = 2
         textSize = 13f
         setTextColor(Color.parseColor(PRIMARY_TEXT_COLOR))
     }
@@ -58,7 +62,7 @@ internal class WebChatConsumerStatusBanner(
     private val officialButton = actionButton(activity, "官网", OFFICIAL_SELECTOR, onOfficialPage)
 
     init {
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(activity, 40)).apply {
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(activity, 48)).apply {
             marginStart = dp(activity, 20)
             marginEnd = dp(activity, 20)
             bottomMargin = dp(activity, 6)
@@ -78,6 +82,8 @@ internal class WebChatConsumerStatusBanner(
         visibility = if (state.visible) View.VISIBLE else View.GONE
         if (!state.visible) return
         messageView.text = state.message
+        retryButton.text = state.retryLabel
+        officialButton.text = state.officialLabel
         retryButton.visibility = if (state.retryVisible) View.VISIBLE else View.GONE
         officialButton.visibility = if (state.officialVisible) View.VISIBLE else View.GONE
     }

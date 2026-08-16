@@ -86,7 +86,7 @@ internal class MainSocialAiChatFeature(
             activity = activity,
             onRetry = {
                 if (isChatModeActive()) {
-                    activeController().onHostResumed()
+                    if (webChatState() != "login_required" || !activeController().retryGuestAccess()) activeController().onHostResumed()
                     refreshConsumerComposerUi()
                 }
             },
@@ -359,6 +359,7 @@ internal class MainSocialAiChatFeature(
     private fun activateWorkMode() {
         composerDrafts.activateWorkMode()
         deactivateChatProvider(releaseComposerDraft = false)
+        binding.moreButton.visibility = View.GONE
         rebindWorkFriend()
     }
 

@@ -215,6 +215,8 @@ internal class ChatGptSocialChatController(
         return true
     }
 
+    override fun retryGuestAccess(): Boolean = session.retryGuestAccess()
+
     override fun onHostResumed() = session.onHostResumed()
 
     override fun onHostPaused() = session.onHostPaused()

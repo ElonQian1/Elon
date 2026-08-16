@@ -42,6 +42,7 @@ internal interface WebChatSocialController {
     fun mcpPort(): WebChatSocialMcpPort? = null
     fun lastCommandStatus(): WebChatCommandStatus? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false
+    fun retryGuestAccess(): Boolean = false
     fun onHostResumed()
     fun onHostPaused()
     fun destroy()
