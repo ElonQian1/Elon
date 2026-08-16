@@ -18,6 +18,8 @@ mod google_ai_mode;
 mod native_window;
 #[path = "local_ai_browser/native_window_state.rs"]
 pub(crate) mod native_window_state;
+#[path = "local_ai_browser/owner_profile.rs"]
+mod owner_profile;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
 #[path = "local_ai_browser/semantic_context.rs"]
@@ -39,6 +41,8 @@ use tauri::{
 };
 
 pub use native_window_state::{LocalAiNativeWindowRuntime, LocalAiNativeWindowState};
+use owner_profile::fingerprint as owner_fingerprint;
+use owner_profile::resolve as resolve_owner_fingerprint;
 use provider_adapter::ProviderAdapter;
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
@@ -180,7 +184,7 @@ pub async fn open_local_ai_web_session(
     show_window: Option<bool>,
 ) -> Result<LocalAiWebSession, String> {
     let provider = provider(&provider_id)?;
-    let owner_fingerprint = owner_fingerprint(&owner_key)?;
+    let owner_fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     let show_window = show_window.unwrap_or(true);
     ensure_session_webview(&webview, provider, &owner_fingerprint)?;
     let window_label = window_label(provider, &owner_fingerprint);
@@ -245,6 +249,7 @@ pub async fn open_local_ai_web_session(
         .on_navigation(move |url| {
             let allowed = allows_navigation(&navigation_provider, url);
             let blocked_message = navigation_block_message(&navigation_provider, url);
+            let safe_url = safe_log_url(url);
             navigation_state.mark_navigation(
                 &navigation_label,
                 url,
@@ -253,12 +258,12 @@ pub async fn open_local_ai_web_session(
             );
             println!(
                 "[elon-desktop][local-ai] {} 导航 allowed={} -> {}",
-                navigation_provider.id, allowed, url
+                navigation_provider.id, allowed, safe_url
             );
             if !allowed {
                 eprintln!(
                     "[elon-desktop][local-ai] 已阻止 {} 导航到 {}",
-                    navigation_provider.id, url
+                    navigation_provider.id, safe_url
                 );
             }
             allowed
@@ -274,10 +279,11 @@ pub async fn open_local_ai_web_session(
             }
         })
         .on_page_load(move |window, payload| {
+            let safe_url = safe_log_url(payload.url());
             println!(
                 "[elon-desktop][local-ai] 页面事件 {:?} -> {}",
                 payload.event(),
-                payload.url()
+                safe_url
             );
             match payload.event() {
                 PageLoadEvent::Started => {
@@ -330,7 +336,7 @@ pub async fn get_local_ai_web_session_state(
     owner_key: String,
 ) -> Result<LocalAiWebSessionState, String> {
     let provider = provider(&provider_id)?;
-    let fingerprint = owner_fingerprint(&owner_key)?;
+    let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
@@ -355,7 +361,7 @@ pub async fn control_local_ai_web_session(
     action: String,
 ) -> Result<LocalAiWebSessionState, String> {
     let provider = provider(&provider_id)?;
-    let fingerprint = owner_fingerprint(&owner_key)?;
+    let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
@@ -414,7 +420,7 @@ pub async fn run_local_ai_web_adapter_command(
             provider.display_name
         )
     })?;
-    let fingerprint = owner_fingerprint(&owner_key)?;
+    let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
@@ -453,7 +459,7 @@ pub async fn open_local_ai_cached_conversation(
     conversation_id: String,
 ) -> Result<LocalAiWebSessionState, String> {
     let provider = provider(&provider_id)?;
-    let fingerprint = owner_fingerprint(&owner_key)?;
+    let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     if conversation_id.len() != 16 || !conversation_id.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
@@ -509,7 +515,7 @@ pub async fn clear_local_ai_web_session(
 ) -> Result<ClearLocalAiWebSession, String> {
     ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
-    let fingerprint = owner_fingerprint(&owner_key)?;
+    let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     let label = window_label(provider, &fingerprint);
     let window = app
         .get_webview_window(&label)
@@ -621,23 +627,6 @@ fn restorable_start_url(
         _ => false,
     };
     Ok(if restorable { cached } else { fallback })
-}
-
-fn owner_fingerprint(owner_key: &str) -> Result<String, String> {
-    let owner_key = owner_key.trim();
-    if owner_key.is_empty()
-        || owner_key.chars().count() > 128
-        || owner_key.chars().any(char::is_control)
-    {
-        return Err("一龙账号标识无效，无法创建本地隔离 Profile。".to_string());
-    }
-    let hash = owner_key
-        .as_bytes()
-        .iter()
-        .fold(0xcbf29ce484222325_u64, |hash, byte| {
-            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-        });
-    Ok(format!("{hash:016x}"))
 }
 
 fn window_label(provider: &ProviderDefinition, fingerprint: &str) -> String {
@@ -752,6 +741,16 @@ fn navigation_block_message(provider: &ProviderDefinition, url: &Url) -> Option<
         "页面尝试离开 {} 允许的官方网页域名，已由一龙拦截。",
         provider.display_name
     ))
+}
+
+fn safe_log_url(url: &Url) -> String {
+    if url.as_str() == "about:blank" {
+        return "about:blank".to_string();
+    }
+    let Some(host) = url.host_str() else {
+        return format!("{}:[redacted]", url.scheme());
+    };
+    format!("{}://{}{}", url.scheme(), host, url.path())
 }
 
 fn request_adapter_snapshot(provider: &ProviderDefinition, window: &WebviewWindow) {

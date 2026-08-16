@@ -78,14 +78,14 @@ fn unsafe_navigation_is_rejected() {
 }
 
 #[test]
-fn owner_fingerprint_is_stable_separate_and_path_safe() {
-    let first = owner_fingerprint("account-15692409892").unwrap();
-    let second = owner_fingerprint("account-15692409892").unwrap();
-    let other = owner_fingerprint("another-account").unwrap();
-    assert_eq!(first, second);
-    assert_ne!(first, other);
-    assert_eq!(first.len(), 16);
-    assert!(first.chars().all(|value| value.is_ascii_hexdigit()));
+fn local_ai_navigation_logs_never_include_queries_fragments_or_userinfo() {
+    assert_eq!(
+        safe_log_url(&url(
+            "https://user:password@www.google.com/search?q=private-prompt#private-fragment"
+        )),
+        "https://www.google.com/search"
+    );
+    assert_eq!(safe_log_url(&url("about:blank")), "about:blank");
 }
 
 #[test]

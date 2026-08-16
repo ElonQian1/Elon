@@ -153,11 +153,53 @@ fn cacheable_envelope(
 fn encode_with_bounded_history(mut envelope: SnapshotEnvelope) -> Result<Vec<u8>> {
     loop {
         let plaintext = serde_json::to_vec(&envelope).context("encode local AI snapshot cache")?;
-        if plaintext.len() <= MAX_CACHE_BYTES || envelope.conversation_snapshots.is_empty() {
+        if plaintext.len() <= MAX_CACHE_BYTES {
             return Ok(plaintext);
         }
-        envelope.conversation_snapshots.pop();
+        if !envelope.conversation_snapshots.is_empty() {
+            envelope.conversation_snapshots.pop();
+            continue;
+        }
+        if !drop_oldest_semantic_message(&mut envelope) {
+            return Ok(plaintext);
+        }
     }
+}
+
+fn drop_oldest_semantic_message(envelope: &mut SnapshotEnvelope) -> bool {
+    let Some(snapshot) = envelope
+        .semantic_event
+        .as_mut()
+        .and_then(Value::as_object_mut)
+    else {
+        return false;
+    };
+    let message_count = snapshot
+        .get("messages")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    if message_count <= 1 {
+        return false;
+    }
+    let observed = snapshot
+        .get("observedMessageCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(message_count as u64);
+    let window_start = snapshot
+        .get("messageWindowStart")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    snapshot
+        .get_mut("messages")
+        .and_then(Value::as_array_mut)
+        .expect("message array was validated")
+        .remove(0);
+    snapshot.insert(
+        "messageWindowStart".to_string(),
+        Value::from(window_start.saturating_add(1)),
+    );
+    snapshot.insert("observedMessageCount".to_string(), Value::from(observed));
+    true
 }
 
 fn sanitize_stored_conversations(
@@ -440,6 +482,41 @@ mod tests {
             "messages": [{"state": "streaming"}]
         });
         assert!(cacheable_envelope("chatgpt", Some(&streaming), None, &[], 43).is_none());
+    }
+
+    #[test]
+    fn oversized_completed_snapshot_keeps_recent_context_within_the_cache_limit() {
+        let messages = (0..80)
+            .map(|index| {
+                json!({
+                    "id": format!("message-{index}"),
+                    "role": if index % 2 == 0 { "user" } else { "assistant" },
+                    "state": "completed",
+                    "content": [{"type": "text", "text": format!("{index}:{}", "x".repeat(40_000))}],
+                })
+            })
+            .collect::<Vec<_>>();
+        let snapshot = json!({
+            "type": "message_snapshot",
+            "draft": "",
+            "streaming": false,
+            "messages": messages,
+        });
+        let envelope = cacheable_envelope("chatgpt", Some(&snapshot), None, &[], 42).unwrap();
+
+        let encoded = encode_with_bounded_history(envelope).unwrap();
+        let decoded: SnapshotEnvelope = serde_json::from_slice(&encoded).unwrap();
+        let persisted = decoded.semantic_event.unwrap();
+        let persisted_messages = persisted["messages"].as_array().unwrap();
+
+        assert!(encoded.len() <= MAX_CACHE_BYTES);
+        assert!(persisted_messages.len() < 80);
+        assert_eq!(
+            persisted["messageWindowStart"].as_u64().unwrap(),
+            (80 - persisted_messages.len()) as u64
+        );
+        assert_eq!(persisted["observedMessageCount"], 80);
+        assert_eq!(persisted_messages.last().unwrap()["id"], "message-79");
     }
 
     #[cfg(windows)]

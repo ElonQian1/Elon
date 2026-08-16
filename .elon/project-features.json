@@ -5133,6 +5133,134 @@
       "updated_at_ms": 1786700258667
     },
     {
+      "id": "win-web-ai-context-continuity-hardening-v1",
+      "title": "Win 网页 AI 上下文连续性加固 V1",
+      "summary": "以密码学 owner 指纹、旧 Profile 无损迁移、超长快照最近上下文保留和无 query 导航日志加固 Win 生产首页的账号隔离与上下文连续性。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-context-continuity-hardening-v1.md",
+        "content_hash": "3e7e5d1fee5cbed50ad5afb7b396ead634d9ed6c7424364fddac5d2334b42cc0",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+          "head_blob_oid": "7255e07171846097d66735baf7f1699164830f7c",
+          "worktree_blob_oid": "7255e07171846097d66735baf7f1699164830f7c",
+          "state": "tracked_modified"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "desktop-ai-browser",
+      "tags": [
+        "windows",
+        "webview2",
+        "context",
+        "cache",
+        "privacy"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/Cargo.toml",
+        "desktop-shell/src-tauri/src/local_ai_browser.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/tests.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Owner Profile 使用 SHA-256 截断指纹并兼容迁移旧目录。",
+        "迁移不覆盖新目录，失败时保留旧 Profile 后续重试。",
+        "超长完成态快照保留最近消息与正确窗口边界。",
+        "导航日志不含 query、fragment 或 userinfo。",
+        "用户浏览器合同、Tauri Rust 与 PC 生产验证通过。",
+        "Win 工件绑定 Git SHA，真实多轮消息需用户授权后验收。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/owner_profile.rs",
+          "content_hash": "877541c692e775c377ae44fdb8bf4370d92ace453a51fba61342c83eb0ec16ae",
+          "locator": "fingerprint",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+            "head_blob_oid": "95bf55e87f1f95dac46689a8541f36bc5fe7f2aa",
+            "worktree_blob_oid": "95bf55e87f1f95dac46689a8541f36bc5fe7f2aa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/owner_profile.rs",
+          "content_hash": "877541c692e775c377ae44fdb8bf4370d92ace453a51fba61342c83eb0ec16ae",
+          "locator": "legacy_profile_is_migrated_without_losing_provider_data",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+            "head_blob_oid": "95bf55e87f1f95dac46689a8541f36bc5fe7f2aa",
+            "worktree_blob_oid": "95bf55e87f1f95dac46689a8541f36bc5fe7f2aa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs",
+          "content_hash": "fe14f92bba3998b1e478c1be2499ba260e4eb0751a663ccf25166ef9a365b63f",
+          "locator": "oversized_completed_snapshot_keeps_recent_context_within_the_cache_limit",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+            "head_blob_oid": "270918e5b2583c3a72d5f88430724217c0be5710",
+            "worktree_blob_oid": "270918e5b2583c3a72d5f88430724217c0be5710",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/tests.rs",
+          "content_hash": "cb36a2c0bc301b59c9d7234d8e212987afc24d5386998fa153358deab9cb9467",
+          "locator": "local_ai_navigation_logs_never_include_queries_fragments_or_userinfo",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+            "head_blob_oid": "514aa24ced87c76d0b0c5d47d7b43c21055b52ea",
+            "worktree_blob_oid": "514aa24ced87c76d0b0c5d47d7b43c21055b52ea",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "f0fbf22113d0578ee7d263a2ece416f9b104bce66473ed4fbb9ed7913424db5f",
+          "locator": "Win 本地模式",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+            "head_blob_oid": "54bf02560b64dd4b1fd6a3cc53f6418cc148b2c2",
+            "worktree_blob_oid": "54bf02560b64dd4b1fd6a3cc53f6418cc148b2c2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "e93198427d003fae6bbb0ef461665238f6b96b0aaab51bf83fbe0259f4216142",
+          "locator": "ownerProfileRust",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8c965f102454e80c7a694fc095b02f55671e032e",
+            "head_blob_oid": "439518185f1bf8632f232ebbe6da5a288ee0d1bd",
+            "worktree_blob_oid": "439518185f1bf8632f232ebbe6da5a288ee0d1bd",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786869967676,
+      "updated_at_ms": 1786870736965
+    },
+    {
       "id": "win-web-ai-snapshot-cache-v1",
       "title": "Win 网页 AI 快照缓存 V1",
       "summary": "ChatGPT 与 Google AI 厂商切换、PC 页面刷新或客户端重启时，按一龙账号和厂商隔离地即时回显最近语义快照，再后台重验证官方页面；缓存不解锁实时动作。",
@@ -5339,96 +5467,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_e8a35d3f7b1542adaecf60804297dc63",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786699269228
-    },
-    {
-      "id": "feature_event_21f9243d6d4942238f3c8846b097dd23",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "在最新 origin/main 上重新绑定实现与验证证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786699276182
-    },
-    {
-      "id": "feature_event_683defdd2efb467290c2b077ff546797",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786699597932
-    },
-    {
-      "id": "feature_event_d8bd559b31404d5abc390a618cb27ef8",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "最终代码已在最新 main 上完成并绑定精确源码与测试证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786699607020
-    },
-    {
-      "id": "feature_event_7d5a7807d1984a2ba236d4ac9c44d2b0",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "最终 Tauri Rust 强制验证、PC 用户浏览器回归与生产构建均通过；真实账号消息验收独立保留。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786699618886
-    },
-    {
-      "id": "feature_event_503e26c39b5342ca987dca439422f36a",
-      "feature_id": "win-native-multi-provider-web-ai-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Windows release 0.3.69+9a93db344 已完成本机构建验证、远端 outbox 同步和本机安全激活排队；服务端依赖为 none。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786700258667
-    },
-    {
-      "id": "feature_event_69fb1573e9c647cfa8b87ef2347c9bf8",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "registered",
-      "actor": "codex/root",
-      "reason": "用户明确要求优化 ChatGPT/Google AI 切换时会话列表和聊天记录的即时回显体验。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786702015741
-    },
-    {
-      "id": "feature_event_296a2b500e804283a0784b1b16959151",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786702023085
-    },
-    {
-      "id": "feature_event_34cc7702b4dc4e55b3503a9957e628b6",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "开始建立失败基线并实现分层快照缓存。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786702030449
-    },
     {
       "id": "feature_event_359f61c3a61540a996b4a6d978c80e0e",
       "feature_id": "win-web-ai-snapshot-cache-v1",
@@ -7338,6 +7376,96 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786869739753
+    },
+    {
+      "id": "feature_event_6975852a3fb24de6a9c1292a900c4046",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "模块化门禁后需要把新增 owner_profile.rs 正式纳入需求范围，先显式重新打开。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1786870681241
+    },
+    {
+      "id": "feature_event_fcd96884806a487ab48718374d03be34",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root",
+      "reason": "模块化门禁要求新增 owner_profile.rs，正式接受需求实现范围的精确路径变化。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1786870707034
+    },
+    {
+      "id": "feature_event_d5080f1d1d8a45cbbb2251dd7eb6b724",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "需求路径变化只反映已通过门禁的职责拆分，目标与验收标准不变。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786870707247
+    },
+    {
+      "id": "feature_event_0edc0bb0ce444cb68d0494ef850b4c95",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "重绑后的当前需求已审核，依赖为空，可重新进入实现证据绑定。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786870707259
+    },
+    {
+      "id": "feature_event_301849a66d4842c980797516cc03ed5b",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786870735530
+    },
+    {
+      "id": "feature_event_cb06812b6a4c4ab590d4bee077ad2258",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "按重绑后的模块化需求重新绑定当前实现与验证证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786870735542
+    },
+    {
+      "id": "feature_event_f4964deb7a474f219cae3b848f0c05d8",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786870736930
+    },
+    {
+      "id": "feature_event_ecc1b5f5a2d34795be9eacf27cda7da0",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "重绑需求后的实现证据已绑定，代码未发生额外变化。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786870736954
+    },
+    {
+      "id": "feature_event_e1bbdeb6f5e642c8aeb9372a76dc136f",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "统一 Win 网页 AI 验证已通过；需求重绑只增加模块路径，不改变已验证字节。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786870736965
     }
   ]
 }

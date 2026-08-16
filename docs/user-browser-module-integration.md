@@ -44,7 +44,9 @@ Google AI 模式，也不会让 ChatGPT 自动登录。云端账号资料短暂�
 ## Win 本地模式
 
 桌面壳固定登记厂商入口，PC 前端只能传 `providerId` 和当前一龙 `ownerKey`，不能传
-任意 URL。Rust 宿主把 `ownerKey` 做稳定不可逆指纹后建立如下本机目录：
+任意 URL。Rust 宿主以 SHA-256 生成 128 位十六进制稳定指纹后建立如下本机目录；升级时按厂商
+原子迁移旧 64 位目录，迁移被正在使用的 WebView2 暂时阻塞时继续使用旧目录并在后续重试，
+不会为了升级丢失用户已有 Cookie、会话或快照：
 
 ```text
 app-local-data/
@@ -60,6 +62,7 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 不上传这些数据；“清除会话”只调用 WebView2 的整 Profile 浏览数据清理。OpenAI 官方
 文档也明确区分浏览器中的 ChatGPT 网页会话与 Codex 客户端的浏览器回调登录：
 [OpenAI authentication](https://learn.chatgpt.com/docs/auth)。
+宿主导航日志只记录 `scheme + host + path`；搜索问题、登录参数、fragment 和 userinfo 不进入日志。
 
 一龙原生 UI 另使用三层 stale-while-revalidate 快照，避免厂商切换时先清空再等待官网：
 
@@ -70,9 +73,10 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 
 缓存状态明确区分 `empty`、`cached` 与 `live`。缓存只负责显示消息、公开引用、会话和项目目录；
 发送、停止、新建会话和历史同步仍必须等待当前官方页面的实时 `composerReady` 与适配器能力。
-持久快照不保存输入草稿、流式半成品、命令结果、Cookie、token、请求头或原始响应；损坏、未知版本、
-解密失败或体积超限时静默忽略并回退官方页。“清除会话”同时清除 WebView2 浏览数据、内存快照和
-对应 DPAPI 文件。
+持久快照不保存输入草稿、流式半成品、命令结果、Cookie、token、请求头或原始响应；完整会话超过
+2 MiB 时先删除较旧的本机会话副本，再从当前聊天最旧消息开始裁剪，同时保留最近消息和
+`messageWindowStart/observedMessageCount` 边界。单条异常数据仍超限、缓存损坏、版本未知或解密失败时
+静默忽略并回退官方页。“清除会话”同时清除 WebView2 浏览数据、内存快照和对应 DPAPI 文件。
 
 后台访客会话不会主动弹出官方窗口；官网没有提供输入框、首次登录、Cloudflare 或厂商真人验证期间，
 用户可主动显示官方 WebView2，并由本人操作。会话就绪后用户可将官方页收起到本机后台，在一龙 Chat UI 中继续发送、停止、新建会话和
@@ -201,8 +205,10 @@ confirmation，再调用商户模块运行时：
   重复脚本已经删除，新增厂商时必须通过 `ProviderAdapter` 显式登记初始化、动作白名单、事件清洗
   和页面命令绑定。
 - PC TypeScript/Vite 生产构建、ESLint 和本地浏览器安全契约测试通过。
-- Win 已实现按 owner/provider 隔离的前端热缓存、Rust 进程缓存和 DPAPI 持久快照；定向测试覆盖
-  LRU 淘汰、账号/厂商隔离、缓存状态转换、草稿/流式过滤、当前 Windows 用户加密回读与清除。
+- Win 已实现按 owner/provider 隔离的前端热缓存、Rust 进程缓存和 DPAPI 持久快照；owner 目录使用
+  SHA-256 截断指纹并兼容迁移旧目录，超长完成态聊天会保留最近上下文而不是整份放弃持久化。定向测试覆盖
+  LRU 淘汰、账号/厂商隔离、旧 Profile 迁移、缓存状态转换、超长消息裁剪、草稿/流式过滤、当前 Windows
+  用户加密回读与清除。
   缓存快照只读，官方页面重新加载完成前不会解锁发送或历史动作。
 - 没有可验证的一龙云端 owner 或已登录本机节点 owner 时不能创建本地 Profile；两者同时存在
   但不一致时同样失败关闭。
