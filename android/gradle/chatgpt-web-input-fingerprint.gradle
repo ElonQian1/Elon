@@ -123,7 +123,14 @@ def coreCaseInputs = filesMatching([
     "android/app/src/main/assets/chatgpt_web_adapter.js",
     "android/app/src/main/assets/chatgpt_web_adapter_bootstrap.js",
     "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
-    "scripts/chatgpt-web-smoke-*.ps1",
+    "scripts/chatgpt-web-smoke-runtime.ps1",
+    "scripts/chatgpt-web-smoke-evidence.ps1",
+])
+def supervisedSmokeCaseInputs = filesMatching([
+    "scripts/chatgpt-web-smoke-supervised-runtime.ps1",
+])
+def conversationSampleCaseInputs = filesMatching([
+    "scripts/chatgpt-web-smoke-conversation-sample.ps1",
 ])
 def composerCaseInputs = filesMatching([
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Composer*.kt",
@@ -202,7 +209,7 @@ verificationCaseFiles["safe/authenticated_session"] = caseInputs(
     "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["reversible/anonymous_send_probe"] = caseInputs(
-    sessionCaseInputs + composerCaseInputs + messageCaseInputs,
+    sessionCaseInputs + composerCaseInputs + messageCaseInputs + supervisedSmokeCaseInputs,
     "smoke-chatgpt-web-anonymous-chat.ps1",
 )
 verificationCaseFiles["reversible/send_probe"] = caseInputs(
@@ -246,11 +253,11 @@ verificationCaseFiles["supervised/attachment_lifecycle"] = caseInputs(
     "smoke-chatgpt-web-native-attachment-lifecycle.ps1",
 )
 verificationCaseFiles["supervised/dictation_transcription"] = caseInputs(
-    composerCaseInputs + audioCaseInputs,
+    composerCaseInputs + audioCaseInputs + supervisedSmokeCaseInputs,
     "smoke-chatgpt-web-audio-lifecycle.ps1",
 )
 verificationCaseFiles["supervised/realtime_voice_round_trip"] = caseInputs(
-    composerCaseInputs + audioCaseInputs,
+    composerCaseInputs + audioCaseInputs + supervisedSmokeCaseInputs,
     "smoke-chatgpt-web-audio-lifecycle.ps1",
 )
 [
@@ -278,11 +285,11 @@ verificationCaseFiles["reversible/regenerate_response"] = caseInputs(
     "smoke-chatgpt-web-regenerate.ps1",
 )
 verificationCaseFiles["safe/message_actions"] = caseInputs(
-    messageCaseInputs + adaptiveCaseInputs,
+    messageCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
     "smoke-chatgpt-web-message-actions.ps1",
 )
 verificationCaseFiles["supervised/message_actions"] = caseInputs(
-    messageCaseInputs + adaptiveCaseInputs,
+    messageCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
     "smoke-chatgpt-web-message-actions.ps1",
 )
 verificationCaseFiles["safe/feature_pages"] = caseInputs(
@@ -322,11 +329,11 @@ verificationCaseFiles["supervised/account_mutations"] = caseInputs(
     "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["safe/conversation_management_structure"] = caseInputs(
-    navigationCaseInputs + adaptiveCaseInputs,
+    navigationCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
     "smoke-chatgpt-web-conversation-management.ps1",
 )
 verificationCaseFiles["supervised/conversation_mutations"] = caseInputs(
-    navigationCaseInputs + adaptiveCaseInputs,
+    navigationCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
     "smoke-chatgpt-web-conversation-management.ps1",
 )
 verificationCaseFiles["safe/session_long_running_stability"] = caseInputs(
