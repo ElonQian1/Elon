@@ -39,6 +39,11 @@ internal class GoogleWebBackgroundSession(
     private val snapshotStore = WebChatSnapshotStore(activity, "google")
     private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val handler = Handler(Looper.getMainLooper())
+    private val responseRefresh = GoogleWebResponseRefreshCoordinator(
+        requestSnapshot = { pageAdapter?.requestSnapshot() },
+        schedule = { task, delayMs -> handler.postDelayed(task, delayMs) },
+        cancel = handler::removeCallbacks,
+    )
     private var webView: WebView? = null
     private var pageAdapter: GoogleWebPageAdapter? = null
     private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
@@ -78,6 +83,7 @@ internal class GoogleWebBackgroundSession(
     fun sendPrompt(prompt: String): Boolean {
         val snapshot = latestSnapshot ?: return false
         if (!canSend()) return false
+        responseRefresh.onSendStarted(prompt)
         pageAdapter?.sendPrompt(prompt, snapshot.draft) ?: return false
         return true
     }
@@ -85,6 +91,7 @@ internal class GoogleWebBackgroundSession(
     fun stopGeneration() = pageAdapter?.stopGeneration()
 
     fun startNewConversation() {
+        responseRefresh.stop()
         activePath = null
         awaitingNewConversationBoundary = true
         pageAdapter?.startNewConversation()
@@ -108,6 +115,7 @@ internal class GoogleWebBackgroundSession(
         val url = conversationStore.restorableUrl(path) ?: return false
         if (!GoogleWebNavigationPolicy.supportsAiMode(url)) return false
         val view = webView ?: return false
+        responseRefresh.stop()
         awaitingNewConversationBoundary = false
         activePath = path
         latestSnapshotPath = path
@@ -137,6 +145,7 @@ internal class GoogleWebBackgroundSession(
     }
 
     fun destroy() {
+        responseRefresh.stop()
         handler.removeCallbacksAndMessages(null)
         pageAdapter?.dispose()
         pageAdapter = null
@@ -265,6 +274,14 @@ internal class GoogleWebBackgroundSession(
                     preferences.edit().putString(KEY_LAST_URL, url).apply()
                 }
                 updateState(if (nextSnapshot.composerReady) State.READY else State.LOADING)
+                val lastUserIndex = nextSnapshot.messages.indexOfLast { it.role == "user" }
+                responseRefresh.onSnapshot(
+                    latestUserPrompt = nextSnapshot.messages.getOrNull(lastUserIndex)?.content,
+                    assistantObserved = lastUserIndex >= 0 && nextSnapshot.messages
+                        .drop(lastUserIndex + 1)
+                        .any { it.role == "assistant" },
+                    streaming = nextSnapshot.streaming,
+                )
                 onConversationIndexChanged(conversationIndex())
                 onSnapshot(nextSnapshot)
             }
@@ -274,6 +291,9 @@ internal class GoogleWebBackgroundSession(
                     return
                 }
                 onCommandResult(event)
+                if (event.action == "send_prompt") {
+                    if (event.ok) responseRefresh.onSendConfirmed() else responseRefresh.stop()
+                }
                 if (event.ok || event.action == "send_prompt") {
                     handler.postDelayed({ pageAdapter?.requestSnapshot() }, 500L)
                 }
@@ -296,6 +316,7 @@ internal class GoogleWebBackgroundSession(
     }
 
     private fun updateState(next: State, detail: String? = null) {
+        if (next == State.ERROR) responseRefresh.stop()
         state = next
         onStateChanged(next, detail)
     }

@@ -21,6 +21,9 @@ class GoogleWebAdapterContractTest {
         val session = read(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
         )
+        val responseRefresh = read(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebResponseRefreshCoordinator.kt",
+        )
         val officialActivity = read(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebOfficialActivity.kt",
         )
@@ -103,6 +106,9 @@ class GoogleWebAdapterContractTest {
         assertTrue(session.contains("ChatGptWebProxyController"))
         assertTrue(session.contains("snapshot.composerReady && !snapshot.streaming"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))
+        assertTrue(session.contains("responseRefresh.onSendConfirmed()"))
+        assertTrue(session.contains("responseRefresh.onSnapshot("))
+        assertTrue(responseRefresh.contains("DEFAULT_DELAYS_MS"))
         assertTrue(session.contains("fun currentOfficialUrl(): String?"))
         assertTrue(session.contains("conversationStore::restorableUrl"))
         assertTrue(officialActivity.contains("intent.getStringExtra(EXTRA_START_URL)"))
