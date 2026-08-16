@@ -31,6 +31,7 @@ internal class GoogleWebSocialChatController(
         onWebChatMessageAction = ::handleWebChatMessageAction
         onWebChatContentOpen = { _, _ -> openOfficialFallback() }
     }
+    private val messageListUpdater = WebChatProductionMessageListUpdater(messages, adapter)
     private val session = GoogleWebBackgroundSession(
         activity = activity,
         host = binding.chatListFrame,
@@ -51,6 +52,7 @@ internal class GoogleWebSocialChatController(
     private val pendingSend = GoogleWebPendingSendState()
     private var pendingSendWatchdog: Runnable? = null
     private var latestCommandStatus: WebChatCommandStatus? = null
+    private var followLatestOnNextSnapshot = false
 
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
@@ -117,6 +119,7 @@ internal class GoogleWebSocialChatController(
             return true
         }
         val sendGeneration = pendingSend.begin(prompt)
+        followLatestOnNextSnapshot = true
         session.currentSnapshot()?.let(::renderSnapshot)
         if (!session.sendPrompt(prompt)) {
             pendingSend.failSubmission()
@@ -143,6 +146,7 @@ internal class GoogleWebSocialChatController(
 
     override fun startNewConversation() {
         clearPendingSend()
+        followLatestOnNextSnapshot = true
         session.startNewConversation()
     }
 
@@ -156,7 +160,10 @@ internal class GoogleWebSocialChatController(
 
     override fun openConversation(path: String): Boolean {
         clearPendingSend()
-        return session.openConversation(path)
+        followLatestOnNextSnapshot = true
+        return session.openConversation(path).also { opened ->
+            if (!opened) followLatestOnNextSnapshot = false
+        }
     }
 
     override fun openProject(path: String): Boolean = session.openProject(path)
@@ -209,11 +216,11 @@ internal class GoogleWebSocialChatController(
                 message.role == "user" && message.content.trim() == pendingPrompt?.trim()
             }?.sendStatus = pendingStatus
         }
-        messages.clear()
-        messages.addAll(mapped)
+        val followLatest = binding.chatList.shouldFollowLatestWebChatMessage(followLatestOnNextSnapshot)
+        followLatestOnNextSnapshot = false
+        messageListUpdater.submit(mapped, dispatchUpdates = active)
         if (!active) return
-        adapter.notifyDataSetChanged()
-        if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        if (followLatest && messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel()
         onComposerStateChanged()
     }

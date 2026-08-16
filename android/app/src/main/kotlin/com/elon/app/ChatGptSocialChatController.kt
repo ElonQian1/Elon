@@ -35,6 +35,7 @@ internal class ChatGptSocialChatController(
         onWebChatMessageAction = ::handleWebChatMessageAction
         onWebChatContentOpen = { _, _ -> openOfficialFallback() }
     }
+    private val messageListUpdater = WebChatProductionMessageListUpdater(messages, adapter)
     private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(
         activity = activity,
@@ -54,6 +55,7 @@ internal class ChatGptSocialChatController(
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
     private var latestCommandStatus: WebChatCommandStatus? = null
+    private var followLatestOnNextSnapshot = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
             inputText = { binding.inputEdit.text?.toString().orEmpty() },
@@ -128,6 +130,7 @@ internal class ChatGptSocialChatController(
             this.pendingPrompt = prompt
             this.pendingAttachments = pendingAttachments.toList()
             waitingForAttachmentCompletion = true
+            followLatestOnNextSnapshot = true
             renderSnapshot(session.currentSnapshot() ?: return true)
             if (!session.sendAttachments(prompt, pendingAttachments)) {
                 this.pendingPrompt = null
@@ -158,6 +161,7 @@ internal class ChatGptSocialChatController(
             return true
         }
         pendingPrompt = prompt
+        followLatestOnNextSnapshot = true
         renderSnapshot(session.currentSnapshot() ?: return true)
         if (!session.sendPrompt(prompt)) {
             pendingPrompt = null
@@ -180,6 +184,7 @@ internal class ChatGptSocialChatController(
 
     override fun startNewConversation() {
         pendingPrompt = null
+        followLatestOnNextSnapshot = true
         session.startNewConversation()
     }
 
@@ -193,7 +198,10 @@ internal class ChatGptSocialChatController(
 
     override fun openConversation(path: String): Boolean {
         pendingPrompt = null
-        return session.openConversation(path)
+        followLatestOnNextSnapshot = true
+        return session.openConversation(path).also { opened ->
+            if (!opened) followLatestOnNextSnapshot = false
+        }
     }
 
     override fun openProject(path: String): Boolean {
@@ -333,11 +341,11 @@ internal class ChatGptSocialChatController(
             ),
             timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
         )
-        messages.clear()
-        messages.addAll(mapped)
+        val followLatest = binding.chatList.shouldFollowLatestWebChatMessage(followLatestOnNextSnapshot)
+        followLatestOnNextSnapshot = false
+        messageListUpdater.submit(mapped, dispatchUpdates = active)
         if (!active) return
-        adapter.notifyDataSetChanged()
-        if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        if (followLatest && messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel(snapshot.currentModel)
         onComposerStateChanged()
     }

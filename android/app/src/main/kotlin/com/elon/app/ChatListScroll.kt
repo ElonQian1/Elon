@@ -1,7 +1,15 @@
 package com.elon.app
 
 import android.view.ViewTreeObserver
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+
+internal fun RecyclerView.shouldFollowLatestWebChatMessage(force: Boolean): Boolean {
+    val itemCount = adapter?.itemCount ?: 0
+    val lastVisible = (layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition()
+        ?: RecyclerView.NO_POSITION
+    return WebChatProductionScrollFollowPolicy.shouldFollow(force, itemCount, lastVisible)
+}
 
 internal fun RecyclerView.jumpToLatestMessageBeforeNextDraw() {
     jumpToLatestMessage()
