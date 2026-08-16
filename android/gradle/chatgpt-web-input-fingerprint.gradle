@@ -353,10 +353,10 @@ ext.chatGptWebInputFiles = sortedInputs
 ext.chatGptWebInputSha256 = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
 ext.chatGptWebVerificationCaseInputSha256 = verificationCaseHashes
 ext.chatGptWebVerificationCaseInputSha256Json = JsonOutput.toJson(verificationCaseHashes)
-ext.chatGptWebVerifiedInputSha256 = "52eca576928f8debc4578334916a775164999000cfe95ed1f96a68074322f58b"
-ext.chatGptWebVerifiedApkVersionName = "1.1.993"
-ext.chatGptWebVerifiedApkVersionCode = 1003
-ext.chatGptWebVerifiedSourceCommit = "f97454749c2f23e480995faa51a7eab5badf5fd9"
+ext.chatGptWebVerifiedInputSha256 = "c78bdba7b85439f8b1f135c8eb5af0f3ce1d3aea2b05e3b2d1ab035337572596"
+ext.chatGptWebVerifiedApkVersionName = "1.1.1143"
+ext.chatGptWebVerifiedApkVersionCode = 1153
+ext.chatGptWebVerifiedSourceCommit = "abe255037d368948d8b707e243d0c3ca23788b98"
 
 tasks.register("verifyChatGptWebFingerprintPortability") {
     group = "verification"

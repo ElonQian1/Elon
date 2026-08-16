@@ -38,10 +38,10 @@ class ChatGptWebFeatureBaselineTest {
         )
         val provenance = baseline.getJSONObject("device_verification_provenance")
         assertEquals("elon.chatgpt_web.device_evidence.v1", provenance.getString("schema"))
-        assertEquals(1003, provenance.getInt("verified_apk_version_code"))
-        assertEquals("1.1.993", provenance.getString("verified_apk_version_name"))
+        assertEquals(1153, provenance.getInt("verified_apk_version_code"))
+        assertEquals("1.1.1143", provenance.getString("verified_apk_version_name"))
         assertEquals(
-            "f97454749c2f23e480995faa51a7eab5badf5fd9",
+            "abe255037d368948d8b707e243d0c3ca23788b98",
             provenance.getString("verified_source_commit"),
         )
         assertEquals(ids.size, ids.toSet().size)
