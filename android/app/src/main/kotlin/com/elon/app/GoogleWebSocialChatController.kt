@@ -11,6 +11,7 @@ import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.googleweb.GoogleWebBackgroundSession
 import com.elon.app.googleweb.GoogleWebPageAdapter
 import com.elon.app.googleweb.GoogleWebPendingSendState
+import com.elon.app.googleweb.GoogleWebPendingSendPresentation
 
 internal class GoogleWebSocialChatController(
     private val activity: AppCompatActivity,
@@ -192,15 +193,22 @@ internal class GoogleWebSocialChatController(
         ) {
             cancelPendingSendWatchdog()
         }
+        val pendingStatus = GoogleWebPendingSendPresentation.status(pendingSend.phase())
+        val pendingPrompt = pendingSend.prompt()
         val mapped = ChatGptFriendMessageMapper.map(
             snapshot = snapshot,
             provider = provider,
-            pendingPrompt = pendingSend.prompt(),
+            pendingPrompt = pendingPrompt,
             pendingAttachments = emptyList(),
-            pendingSendStatus = "发送中…",
+            pendingSendStatus = pendingStatus ?: "发送中…",
             attachmentsForMessage = { emptyList() },
             timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
         )
+        if (pendingStatus != null && !assistantObserved) {
+            mapped.lastOrNull { message ->
+                message.role == "user" && message.content.trim() == pendingPrompt?.trim()
+            }?.sendStatus = pendingStatus
+        }
         messages.clear()
         messages.addAll(mapped)
         if (!active) return
@@ -234,6 +242,7 @@ internal class GoogleWebSocialChatController(
         Log.i(SEND_LOG_TAG, "action=send_prompt ok=${event.ok}")
         if (event.ok) {
             pendingSend.confirmSubmission()
+            session.currentSnapshot()?.let(::renderSnapshot)
             return
         }
         val failedPrompt = pendingSend.failSubmission()
@@ -256,6 +265,7 @@ internal class GoogleWebSocialChatController(
                 }
                 GoogleWebPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
                     session.requestConversationIndex()
+                    session.currentSnapshot()?.let(::renderSnapshot)
                     if (active) Toast.makeText(
                         activity,
                         "官网已确认发送，但回答同步超时，请打开官方页确认",

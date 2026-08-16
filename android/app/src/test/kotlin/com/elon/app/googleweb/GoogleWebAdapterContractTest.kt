@@ -117,6 +117,12 @@ class GoogleWebAdapterContractTest {
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
         assertTrue(controller.contains("session.currentOfficialUrl()"))
         assertTrue(controller.contains("pendingSend.confirmSubmission()"))
+        assertTrue(controller.contains("GoogleWebPendingSendPresentation.status(pendingSend.phase())"))
+        assertTrue(controller.contains("?.sendStatus = pendingStatus"))
+        assertTrue(Regex(
+            """pendingSend\.confirmSubmission\(\).*?renderSnapshot""",
+            RegexOption.DOT_MATCHES_ALL,
+        ).containsMatchIn(controller))
         assertTrue(controller.contains("pendingSend.observeCompletedTurn"))
         assertTrue(controller.contains("restorePrompt(failedPrompt)"))
         assertTrue(controller.contains("pendingSend.onConfirmationTimeout(generation)"))
@@ -131,6 +137,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(pendingSendState.contains("TimeoutAction.KEEP_WAITING"))
         assertTrue(pendingSendState.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
         assertTrue(pendingSendState.contains("TimeoutAction.RESTORE"))
+        assertTrue(pendingSendState.contains("OFFICIAL_CONFIRMATION"))
     }
 
     private fun read(relative: String): String =

@@ -1,6 +1,13 @@
 package com.elon.app.googleweb
 
 internal class GoogleWebPendingSendState {
+    enum class Phase {
+        IDLE,
+        SUBMITTING,
+        AWAITING_RESPONSE,
+        OFFICIAL_CONFIRMATION,
+    }
+
     enum class TimeoutAction {
         IGNORE,
         KEEP_WAITING,
@@ -34,6 +41,14 @@ internal class GoogleWebPendingSendState {
 
     fun requiresOfficialConfirmation(): Boolean =
         pending?.requiresOfficialConfirmation == true
+
+    fun phase(): Phase = pending?.let { current ->
+        when {
+            current.requiresOfficialConfirmation -> Phase.OFFICIAL_CONFIRMATION
+            current.submissionConfirmed -> Phase.AWAITING_RESPONSE
+            else -> Phase.SUBMITTING
+        }
+    } ?: Phase.IDLE
 
     fun confirmSubmission(): Boolean {
         val current = pending ?: return false
@@ -88,5 +103,14 @@ internal class GoogleWebPendingSendState {
 
     private companion object {
         const val MAX_CONFIRMATION_RECHECKS = 2
+    }
+}
+
+internal object GoogleWebPendingSendPresentation {
+    fun status(phase: GoogleWebPendingSendState.Phase): String? = when (phase) {
+        GoogleWebPendingSendState.Phase.IDLE -> null
+        GoogleWebPendingSendState.Phase.SUBMITTING -> "发送中…"
+        GoogleWebPendingSendState.Phase.AWAITING_RESPONSE -> "已发送 · 等待回复"
+        GoogleWebPendingSendState.Phase.OFFICIAL_CONFIRMATION -> "已发送 · 回答同步较慢"
     }
 }

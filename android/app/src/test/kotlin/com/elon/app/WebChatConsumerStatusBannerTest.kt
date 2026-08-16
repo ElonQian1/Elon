@@ -28,12 +28,14 @@ class WebChatConsumerStatusBannerTest {
     }
 
     @Test
-    fun explicitLoginRequirementOffersOfficialCompletionButNotFakeRetry() {
+    fun explicitLoginRequirementOffersGuestRetryAndOptionalOfficialLogin() {
         val state = WebChatConsumerRecoveryPolicy.resolve(chatGpt, "login_required")
 
         assertTrue(state.visible)
-        assertFalse(state.retryVisible)
+        assertTrue(state.retryVisible)
         assertTrue(state.officialVisible)
-        assertEquals("当前网页需要登录", state.message)
+        assertEquals("可尝试免费访客聊天，或登录账号", state.message)
+        assertEquals("访客", state.retryLabel)
+        assertEquals("登录", state.officialLabel)
     }
 }
