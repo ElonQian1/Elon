@@ -74,22 +74,7 @@ internal class WebChatProductionComposerToolsCoordinator(
     fun startRealtimeVoice(provider: WebChatProviderIdentity): Boolean {
         cancelPending()
         if (activeProvider() != provider.id) return false
-        if (!provider.supports(WebChatProviderCapability.REALTIME_VOICE)) {
-            openOfficialFallback()
-            return true
-        }
-        val port = mcpPort()
-        if (port == null) {
-            showUnavailable()
-            return true
-        }
-        val command = WebChatProductionComposerCommandCatalog.resolve(provider, port.uiState())
-            .firstOrNull { it.action == REALTIME_VOICE_ACTION }
-        if (command == null) {
-            showCommandError("realtime_voice_unavailable")
-            return true
-        }
-        executeCommand(provider, port, command)
+        openOfficialFallback()
         return true
     }
 
@@ -185,6 +170,10 @@ internal class WebChatProductionComposerToolsCoordinator(
         port: WebChatSocialMcpPort,
         command: WebChatProductionComposerCommand,
     ): Boolean {
+        if (command.action == REALTIME_VOICE_ACTION) {
+            openOfficialFallback()
+            return true
+        }
         val result = port.control(JSONObject().put("action", command.action))
         val accepted = result.optBoolean("control_ok")
         if (!accepted) {

@@ -26,13 +26,25 @@ class WebChatProductionVoiceEntryContractTest {
     fun productionFeatureDelegatesToTheCurrentProviderToolCoordinator() {
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
         val tools = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt")
+        val commands = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerCommands.kt")
+        val directRoute = tools.substringAfter("fun startRealtimeVoice")
+            .substringBefore("fun cancelPending")
+        val toolRoute = tools.substringAfter("private fun executeCommand")
+            .substringBefore("private fun selectTool")
 
         assertTrue(feature.contains("fun startWebChatRealtimeVoice(): Boolean"))
         assertTrue(feature.contains("productionComposerTools.startRealtimeVoice"))
-        assertTrue(tools.contains("WebChatProviderCapability.REALTIME_VOICE"))
+        assertTrue(commands.contains("WebChatProviderCapability.REALTIME_VOICE"))
         assertTrue(tools.contains("chatgpt_start_realtime_voice"))
         assertTrue(tools.contains("openOfficialFallback()"))
         assertFalse(tools.contains("ChatGptWebTestActivity"))
+        assertTrue(directRoute.contains("openOfficialFallback()"))
+        assertFalse(directRoute.contains("mcpPort()"))
+        assertTrue(toolRoute.contains("command.action == REALTIME_VOICE_ACTION"))
+        assertTrue(
+            toolRoute.indexOf("openOfficialFallback()") <
+                toolRoute.indexOf("port.control"),
+        )
     }
 
     private fun read(relativePath: String): String =
