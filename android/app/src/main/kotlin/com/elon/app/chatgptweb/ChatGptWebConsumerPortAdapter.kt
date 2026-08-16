@@ -1,6 +1,9 @@
 package com.elon.app.chatgptweb
 
 import com.elon.app.WebChatConsumerCommandResult
+import com.elon.app.WebChatConsumerCommandRequest
+import com.elon.app.WebChatConsumerCommandStatus
+import com.elon.app.WebChatConsumerFeature
 import com.elon.app.WebChatConsumerOption
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatConsumerState
@@ -30,10 +33,34 @@ internal class ChatGptWebConsumerPortAdapter(
         } else {
             emptyMap()
         }
+        val features = if (observed.adapterCurrent) {
+            observed.features.map { feature ->
+                WebChatConsumerFeature(
+                    id = feature.id,
+                    label = feature.label,
+                    kind = feature.kind,
+                    selected = feature.selected,
+                    requiresUserConfirmation = ChatGptWebProductCapabilityCatalog
+                        .requiresUserConfirmation(feature.kind),
+                    nativeSelector = ChatGptNativeNavigationSelector.feature(feature),
+                )
+            }
+        } else {
+            emptyList()
+        }
         return WebChatConsumerState(
             streaming = current?.streaming == true,
             dictationActive = current?.dictationActive == true,
             composerSections = composerSections,
+            pageKind = current?.pageKind ?: "unknown",
+            pageUrl = current?.url.orEmpty(),
+            features = features,
+            commandRequests = observed.commandRequests.map { request ->
+                WebChatConsumerCommandRequest(
+                    id = request.id,
+                    status = request.status.toConsumerStatus(),
+                )
+            },
         )
     }
 
@@ -49,6 +76,17 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("action", "chatgpt_select_composer_option")
         .put("section", section)
         .put("option_id", optionId))
+
+    override fun requestFeatures(): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_list_features"))
+
+    override fun selectFeature(
+        featureId: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_select_feature")
+        .put("feature_id", featureId)
+        .put("user_confirmed", userConfirmed))
 
     override fun executeSessionCommand(action: String): WebChatConsumerCommandResult {
         if (action !in SESSION_COMMANDS) {
@@ -72,6 +110,14 @@ internal class ChatGptWebConsumerPortAdapter(
                 ?.trim()
                 ?.takeIf(String::isNotBlank),
         )
+    }
+
+    private fun String.toConsumerStatus(): WebChatConsumerCommandStatus = when (this) {
+        ChatGptWebObservedState.CommandRequest.PENDING -> WebChatConsumerCommandStatus.PENDING
+        ChatGptWebObservedState.CommandRequest.SUCCEEDED -> WebChatConsumerCommandStatus.SUCCEEDED
+        ChatGptWebObservedState.CommandRequest.FAILED -> WebChatConsumerCommandStatus.FAILED
+        ChatGptWebObservedState.CommandRequest.TIMED_OUT -> WebChatConsumerCommandStatus.TIMED_OUT
+        else -> WebChatConsumerCommandStatus.UNKNOWN
     }
 
     private companion object {

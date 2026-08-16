@@ -9,10 +9,36 @@ internal data class WebChatConsumerOption(
     val nativeSelector: String,
 )
 
+internal data class WebChatConsumerFeature(
+    val id: String,
+    val label: String,
+    val kind: String,
+    val selected: Boolean,
+    val requiresUserConfirmation: Boolean,
+    val nativeSelector: String,
+)
+
+internal enum class WebChatConsumerCommandStatus {
+    PENDING,
+    SUCCEEDED,
+    FAILED,
+    TIMED_OUT,
+    UNKNOWN,
+}
+
+internal data class WebChatConsumerCommandRequest(
+    val id: String,
+    val status: WebChatConsumerCommandStatus,
+)
+
 internal data class WebChatConsumerState(
     val streaming: Boolean,
     val dictationActive: Boolean,
     val composerSections: Map<String, List<WebChatConsumerOption>>,
+    val pageKind: String,
+    val pageUrl: String,
+    val features: List<WebChatConsumerFeature>,
+    val commandRequests: List<WebChatConsumerCommandRequest>,
 )
 
 internal data class WebChatConsumerCommandResult(
@@ -25,5 +51,7 @@ internal interface WebChatConsumerPort {
     fun state(): WebChatConsumerState
     fun requestComposerOptions(section: String): WebChatConsumerCommandResult
     fun selectComposerOption(section: String, optionId: String): WebChatConsumerCommandResult
+    fun requestFeatures(): WebChatConsumerCommandResult
+    fun selectFeature(featureId: String, userConfirmed: Boolean): WebChatConsumerCommandResult
     fun executeSessionCommand(action: String): WebChatConsumerCommandResult
 }
