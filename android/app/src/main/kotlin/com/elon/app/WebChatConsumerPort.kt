@@ -38,6 +38,7 @@ internal data class WebChatConsumerState(
     val pageKind: String,
     val pageUrl: String,
     val features: List<WebChatConsumerFeature>,
+    val controls: List<WebChatConsumerControlDescriptor> = emptyList(),
     val commandRequests: List<WebChatConsumerCommandRequest>,
 )
 
@@ -53,5 +54,11 @@ internal interface WebChatConsumerPort {
     fun selectComposerOption(section: String, optionId: String): WebChatConsumerCommandResult
     fun requestFeatures(): WebChatConsumerCommandResult
     fun selectFeature(featureId: String, userConfirmed: Boolean): WebChatConsumerCommandResult
+    fun requestControls(): WebChatConsumerCommandResult
+    fun invokeControl(controlId: String, userConfirmed: Boolean): WebChatConsumerCommandResult
+    fun updateControl(
+        controlId: String,
+        mutation: WebChatConsumerControlMutation,
+    ): WebChatConsumerCommandResult
     fun executeSessionCommand(action: String): WebChatConsumerCommandResult
 }

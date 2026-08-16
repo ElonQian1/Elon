@@ -3,6 +3,9 @@ package com.elon.app.chatgptweb
 import com.elon.app.WebChatConsumerCommandResult
 import com.elon.app.WebChatConsumerCommandRequest
 import com.elon.app.WebChatConsumerCommandStatus
+import com.elon.app.WebChatConsumerControlDescriptor
+import com.elon.app.WebChatConsumerControlMutation
+import com.elon.app.WebChatConsumerControlPresentation
 import com.elon.app.WebChatConsumerFeature
 import com.elon.app.WebChatConsumerOption
 import com.elon.app.WebChatConsumerPort
@@ -11,6 +14,7 @@ import org.json.JSONObject
 
 internal class ChatGptWebConsumerPortAdapter(
     private val snapshot: () -> ChatGptWebSnapshot?,
+    private val uiManifest: () -> ChatGptWebUiManifest?,
     private val observedState: () -> ChatGptWebObservedState.Snapshot,
     private val executeControl: (JSONObject) -> JSONObject,
 ) : WebChatConsumerPort {
@@ -48,6 +52,22 @@ internal class ChatGptWebConsumerPortAdapter(
         } else {
             emptyList()
         }
+        val controls = uiManifest()
+            .takeIf { observed.adapterCurrent }
+            ?.let { manifest ->
+                val presentations = ChatGptNativeControlPresentation.describe(manifest.controls)
+                manifest.controls.map { control ->
+                    val coverage = presentations[control.id]
+                    WebChatConsumerControlDescriptor(
+                        control = control,
+                        requiresUserConfirmation = ChatGptWebControlInvocationPolicy.risk(control) ==
+                            ChatGptWebControlInvocationPolicy.Risk.USER_CONFIRMATION,
+                        presentation = coverage?.kind.toConsumerPresentation(),
+                        nativeSelector = coverage?.nativeSelector,
+                    )
+                }
+            }
+            .orEmpty()
         return WebChatConsumerState(
             streaming = current?.streaming == true,
             dictationActive = current?.dictationActive == true,
@@ -55,6 +75,7 @@ internal class ChatGptWebConsumerPortAdapter(
             pageKind = current?.pageKind ?: "unknown",
             pageUrl = current?.url.orEmpty(),
             features = features,
+            controls = controls,
             commandRequests = observed.commandRequests.map { request ->
                 WebChatConsumerCommandRequest(
                     id = request.id,
@@ -88,6 +109,37 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("feature_id", featureId)
         .put("user_confirmed", userConfirmed))
 
+    override fun requestControls(): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_refresh_controls"))
+
+    override fun invokeControl(
+        controlId: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_invoke_control")
+        .put("control_id", controlId)
+        .put("user_confirmed", userConfirmed))
+
+    override fun updateControl(
+        controlId: String,
+        mutation: WebChatConsumerControlMutation,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("control_id", controlId)
+        .apply {
+            when (mutation) {
+                is WebChatConsumerControlMutation.Text ->
+                    put("action", "chatgpt_set_control_text").put("text", mutation.value)
+                is WebChatConsumerControlMutation.Choice ->
+                    put("action", "chatgpt_select_control_choice").put("choice_index", mutation.index)
+                is WebChatConsumerControlMutation.Slider ->
+                    put("action", "chatgpt_set_control_slider").put("value", mutation.value)
+                is WebChatConsumerControlMutation.Selected ->
+                    put("action", "chatgpt_set_control_selected").put("selected", mutation.value)
+                is WebChatConsumerControlMutation.Expanded ->
+                    put("action", "chatgpt_set_control_expanded").put("expanded", mutation.value)
+            }
+        })
+
     override fun executeSessionCommand(action: String): WebChatConsumerCommandResult {
         if (action !in SESSION_COMMANDS) {
             return WebChatConsumerCommandResult(
@@ -120,11 +172,21 @@ internal class ChatGptWebConsumerPortAdapter(
         else -> WebChatConsumerCommandStatus.UNKNOWN
     }
 
+    private fun ChatGptNativeControlPresentation.Kind?.toConsumerPresentation() = when (this) {
+        ChatGptNativeControlPresentation.Kind.DIRECT -> WebChatConsumerControlPresentation.DIRECT
+        ChatGptNativeControlPresentation.Kind.DEDICATED -> WebChatConsumerControlPresentation.DEDICATED
+        ChatGptNativeControlPresentation.Kind.MENU -> WebChatConsumerControlPresentation.MENU
+        ChatGptNativeControlPresentation.Kind.METADATA -> WebChatConsumerControlPresentation.METADATA
+        ChatGptNativeControlPresentation.Kind.OFFICIAL_FALLBACK,
+        null -> WebChatConsumerControlPresentation.OFFICIAL_FALLBACK
+    }
+
     private companion object {
         val SESSION_COMMANDS = setOf(
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",
             "chatgpt_submit_dictation",
+            "chatgpt_regenerate_response",
         )
     }
 }

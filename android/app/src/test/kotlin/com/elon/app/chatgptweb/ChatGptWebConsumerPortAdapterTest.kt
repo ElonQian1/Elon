@@ -1,6 +1,8 @@
 package com.elon.app.chatgptweb
 
 import com.elon.app.WebChatConsumerCommandStatus
+import com.elon.app.WebChatConsumerControlMutation
+import com.elon.app.WebChatConsumerControlPresentation
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,6 +49,7 @@ class ChatGptWebConsumerPortAdapterTest {
                     url = "https://chatgpt.com/health",
                 )
             },
+            uiManifest = { manifest() },
             observedState = { observed },
             executeControl = { error("state reads must not use the MCP JSON port") },
         )
@@ -61,6 +64,8 @@ class ChatGptWebConsumerPortAdapterTest {
         assertTrue(state.composerSections.getValue("tools").single().nativeSelector.contains("search"))
         assertTrue(state.features.single().requiresUserConfirmation)
         assertTrue(state.features.single().nativeSelector.contains("health"))
+        assertEquals("temporary", state.controls.single().control.id)
+        assertEquals(WebChatConsumerControlPresentation.DIRECT, state.controls.single().presentation)
         assertEquals(WebChatConsumerCommandStatus.SUCCEEDED, state.commandRequests.single().status)
     }
 
@@ -73,6 +78,7 @@ class ChatGptWebConsumerPortAdapterTest {
         )
         val port = ChatGptWebConsumerPortAdapter(
             snapshot = { snapshot(streaming = true, dictationActive = true) },
+            uiManifest = { manifest() },
             observedState = { observed },
             executeControl = { JSONObject() },
         )
@@ -83,6 +89,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertFalse(state.dictationActive)
         assertTrue(state.composerSections.isEmpty())
         assertTrue(state.features.isEmpty())
+        assertTrue(state.controls.isEmpty())
         assertEquals("unknown", state.pageKind)
         assertEquals("", state.pageUrl)
     }
@@ -92,6 +99,7 @@ class ChatGptWebConsumerPortAdapterTest {
         val requests = mutableListOf<JSONObject>()
         val port = ChatGptWebConsumerPortAdapter(
             snapshot = { null },
+            uiManifest = { null },
             observedState = { ChatGptWebObservedState.Snapshot.EMPTY },
             executeControl = { args ->
                 requests += JSONObject(args.toString())
@@ -105,6 +113,12 @@ class ChatGptWebConsumerPortAdapterTest {
         val selected = port.selectComposerOption("tools", "search")
         val features = port.requestFeatures()
         val feature = port.selectFeature("health", userConfirmed = true)
+        val controls = port.requestControls()
+        val invoked = port.invokeControl("temporary", userConfirmed = false)
+        val updated = port.updateControl(
+            "temporary",
+            WebChatConsumerControlMutation.Selected(true),
+        )
         val dictation = port.executeSessionCommand("chatgpt_start_dictation")
         val unsupported = port.executeSessionCommand("chatgpt_delete_account")
 
@@ -114,11 +128,18 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("chatgpt_list_features", requests[2].getString("action"))
         assertEquals("health", requests[3].getString("feature_id"))
         assertTrue(requests[3].getBoolean("user_confirmed"))
-        assertEquals("chatgpt_start_dictation", requests[4].getString("action"))
+        assertEquals("chatgpt_refresh_controls", requests[4].getString("action"))
+        assertEquals("temporary", requests[5].getString("control_id"))
+        assertEquals("chatgpt_set_control_selected", requests[6].getString("action"))
+        assertTrue(requests[6].getBoolean("selected"))
+        assertEquals("chatgpt_start_dictation", requests[7].getString("action"))
         assertTrue(requested.accepted)
         assertTrue(selected.accepted)
         assertTrue(features.accepted)
         assertTrue(feature.accepted)
+        assertTrue(controls.accepted)
+        assertTrue(invoked.accepted)
+        assertTrue(updated.accepted)
         assertEquals("mcp_1", dictation.requestId)
         assertFalse(unsupported.accepted)
         assertEquals("unsupported_consumer_command", unsupported.error)
@@ -143,5 +164,22 @@ class ChatGptWebConsumerPortAdapterTest {
         dictationActive = dictationActive,
         capabilities = ChatGptWebCapabilities.EMPTY,
         pageKind = pageKind,
+    )
+
+    private fun manifest() = ChatGptWebUiManifest(
+        version = 1,
+        pageKind = "conversation",
+        title = "",
+        compatibility = "compatible",
+        controls = listOf(ChatGptWebUiControl(
+            id = "temporary",
+            semantic = "temporary_chat",
+            label = "Temporary chat",
+            region = ChatGptWebUiRegion.HEADER,
+            role = "switch",
+            enabled = true,
+            selected = false,
+            stateSettable = true,
+        )),
     )
 }

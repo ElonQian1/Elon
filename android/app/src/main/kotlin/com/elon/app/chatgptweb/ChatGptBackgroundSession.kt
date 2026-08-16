@@ -274,6 +274,7 @@ internal class ChatGptBackgroundSession(
     fun createConsumerPort(mcpPort: WebChatSocialMcpPort): WebChatConsumerPort =
         ChatGptWebConsumerPortAdapter(
             snapshot = { latestSnapshot },
+            uiManifest = { latestUiManifest },
             observedState = observedMcpState::snapshot,
             executeControl = mcpPort::control,
         )

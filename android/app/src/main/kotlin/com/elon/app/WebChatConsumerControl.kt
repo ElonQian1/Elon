@@ -48,3 +48,26 @@ internal interface WebChatConsumerControl {
     val supportsExpandedState: Boolean
         get() = enabled && expandable && expanded != null
 }
+
+internal enum class WebChatConsumerControlPresentation {
+    DIRECT,
+    DEDICATED,
+    MENU,
+    METADATA,
+    OFFICIAL_FALLBACK,
+}
+
+internal data class WebChatConsumerControlDescriptor(
+    val control: WebChatConsumerControl,
+    val requiresUserConfirmation: Boolean,
+    val presentation: WebChatConsumerControlPresentation,
+    val nativeSelector: String?,
+)
+
+internal sealed interface WebChatConsumerControlMutation {
+    data class Text(val value: String) : WebChatConsumerControlMutation
+    data class Choice(val index: Int) : WebChatConsumerControlMutation
+    data class Slider(val value: Double) : WebChatConsumerControlMutation
+    data class Selected(val value: Boolean) : WebChatConsumerControlMutation
+    data class Expanded(val value: Boolean) : WebChatConsumerControlMutation
+}
