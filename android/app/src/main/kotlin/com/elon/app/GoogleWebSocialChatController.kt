@@ -222,9 +222,15 @@ internal class GoogleWebSocialChatController(
                 message.role == "user" && message.content.trim() == pendingPrompt?.trim()
             }?.sendStatus = pendingStatus
         }
+        val presented = WebChatProductionHistoryNotice.prepend(
+            snapshot = snapshot,
+            provider = provider,
+            messages = mapped,
+            timestampFor = { id -> timestamps.getOrPut(id) { System.currentTimeMillis() } },
+        )
         val followLatest = binding.chatList.shouldFollowLatestWebChatMessage(followLatestOnNextSnapshot)
         followLatestOnNextSnapshot = false
-        messageListUpdater.submit(mapped, dispatchUpdates = active)
+        messageListUpdater.submit(presented, dispatchUpdates = active)
         if (!active) return
         if (followLatest && messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
         updateComposerModel()
