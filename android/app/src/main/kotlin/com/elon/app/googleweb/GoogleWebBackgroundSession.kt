@@ -17,6 +17,7 @@ import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebProxyController
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
+import com.elon.app.chatgptweb.WebChatSendContextPolicy
 import com.elon.app.chatgptweb.WebChatSnapshotStore
 import java.time.LocalDate
 
@@ -36,6 +37,7 @@ internal class GoogleWebBackgroundSession(
     private val proxyController = ChatGptWebProxyController(activity)
     private val conversationStore = GoogleWebConversationStore(activity)
     private val conversationSnapshotStore = GoogleWebConversationSnapshotStore(activity)
+    private val conversationNavigation = GoogleWebConversationNavigationCoordinator()
     private val snapshotStore = WebChatSnapshotStore(activity, "google")
     private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val handler = Handler(Looper.getMainLooper())
@@ -84,9 +86,11 @@ internal class GoogleWebBackgroundSession(
 
     fun state(): State = state
 
-    fun canSend(): Boolean = state == State.READY && latestSnapshot?.let { snapshot ->
-        snapshot.composerReady && !snapshot.streaming
-    } == true
+    fun canSend(): Boolean = WebChatSendContextPolicy.allows(
+        state == State.READY, latestSnapshot, conversationNavigation.hasPending(),
+        conversationNavigation.selectedPath(activePath),
+        latestSnapshot?.url?.let(conversationStore::currentPath),
+    )
 
     fun sendPrompt(prompt: String): Boolean {
         val snapshot = latestSnapshot ?: return false
@@ -100,12 +104,13 @@ internal class GoogleWebBackgroundSession(
 
     fun startNewConversation() {
         responseRefresh.stop()
+        conversationNavigation.cancel()
         activePath = null
         awaitingNewConversationBoundary = true
         pageAdapter?.startNewConversation()
     }
 
-    fun currentConversationPath(): String? = activePath
+    fun currentConversationPath(): String? = conversationNavigation.selectedPath(activePath)
 
     fun currentOfficialUrl(): String? = activePath
         ?.let(conversationStore::restorableUrl)
@@ -125,6 +130,7 @@ internal class GoogleWebBackgroundSession(
         val view = webView ?: return false
         responseRefresh.stop()
         awaitingNewConversationBoundary = false
+        conversationNavigation.beginOpen(path, url)
         activePath = path
         latestSnapshotPath = path
         latestSnapshot = conversationSnapshotStore.restore(path)?.takeIf { cached ->
@@ -154,6 +160,7 @@ internal class GoogleWebBackgroundSession(
 
     fun destroy() {
         responseRefresh.stop()
+        conversationNavigation.cancel()
         handler.removeCallbacksAndMessages(null)
         pageAdapter?.dispose()
         pageAdapter = null
@@ -234,6 +241,7 @@ internal class GoogleWebBackgroundSession(
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 val rawSnapshot = event.value
+                if (!conversationNavigation.shouldAccept(rawSnapshot.url)) return
                 when (GoogleWebNewConversationPolicy.transition(
                     awaitingBoundary = awaitingNewConversationBoundary,
                     previous = latestSnapshot,

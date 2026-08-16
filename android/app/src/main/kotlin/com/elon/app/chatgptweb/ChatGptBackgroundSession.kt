@@ -133,7 +133,7 @@ internal class ChatGptBackgroundSession(
 
     fun state(): State = state
 
-    fun canSend(): Boolean = state == State.READY && latestSnapshot?.composerReady == true
+    fun canSend(): Boolean = WebChatSendContextPolicy.allows(state == State.READY, latestSnapshot, conversationNavigation.hasPending(), currentConversationPath(), currentConversationPath())
 
     fun sendPrompt(prompt: String): Boolean {
         val adapter = pageAdapter ?: return false
