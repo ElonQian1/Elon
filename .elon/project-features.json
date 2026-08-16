@@ -5615,7 +5615,7 @@
       "id": "win-web-ai-live-context-directory-v1",
       "title": "Win 网页 AI 实时上下文与目录连续性 V1",
       "summary": "修复 Windows 生产首页过早判定网页动作超时、部分快照覆盖会话/项目缓存以及 ChatGPT 可见消息窗口丢失上下文的问题，保持 ChatGPT/Google AI 切换即时回显。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-live-context-directory-v1.md",
@@ -5826,7 +5826,7 @@
         }
       ],
       "created_at_ms": 1786873712394,
-      "updated_at_ms": 1786873801274
+      "updated_at_ms": 1786874485287
     },
     {
       "id": "win-web-ai-snapshot-cache-v1",
@@ -6035,16 +6035,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_fedc17ffd9f44f019904af128d2652ff",
-      "feature_id": "rust-cross-target-cache-routing-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-cache-rebase",
-      "reason": "Focused integration, workflow, prompt, and modularity gates passed before rebase; upstream only changed feature metadata.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786711596357
-    },
     {
       "id": "feature_event_76c7d31871c44b2c826d7a8bcce2bf8b",
       "feature_id": "rust-cross-target-cache-routing-v1",
@@ -8034,6 +8024,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786873801274
+    },
+    {
+      "id": "feature_event_f4cf84d42572449e8331dc0115dd3648",
+      "feature_id": "win-web-ai-live-context-directory-v1",
+      "action": "transitioned",
+      "actor": "codex-win-web-ai",
+      "reason": "Windows 发布 0.3.69+77a6e283274345fb69c7bd42b2998d65f108745e 已构建、自动更新并精确回读；生产 /pc/ai 只读验收 0 error/0 warning。真实第三方消息仍待即时授权。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786874485287
     }
   ]
 }
