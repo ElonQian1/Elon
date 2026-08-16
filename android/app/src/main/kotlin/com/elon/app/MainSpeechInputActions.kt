@@ -44,6 +44,7 @@ internal class MainSpeechInputActions(
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
     private val isFriendChatActive: () -> Boolean = { false },
+    private val isWebChatModeActive: () -> Boolean = { false },
     private val isDirectSocialAiChatActive: () -> Boolean = { false },
     private val isSocialAiChatActive: () -> Boolean = { false },
     private val sendTextDirect: ((String) -> Unit)? = null
@@ -89,11 +90,13 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
-        // 好友/群聊/频道：无论设置里选了哪种语音模式，一律以语音气泡发送。
-        // 一龙AI 私聊的实时语音通话由顶部电话按钮进入，底部恢复为按住说话。
-        if (isFriendChatActive()) {
-            if (startVoiceMessageRecording()) return
-            return
+        when (WebChatProductionVoiceInputPolicy.resolve(isWebChatModeActive(), isFriendChatActive())) {
+            WebChatProductionVoiceInputRoute.WEB_TEXT_TRANSCRIPTION -> if (startAgentVoice()) return
+            WebChatProductionVoiceInputRoute.VOICE_MESSAGE -> {
+                if (startVoiceMessageRecording()) return
+                return
+            }
+            WebChatProductionVoiceInputRoute.CONFIGURED_WORK_INPUT -> Unit
         }
         when (VoiceInputModeSettings.get(activity)) {
             VoiceInputMode.LOCAL_AGENT_ASR -> {
@@ -111,14 +114,19 @@ internal class MainSpeechInputActions(
                 return
             }
         }
+        startSystemSpeechRecognition(showUnavailable = true)
+    }
+
+    private fun startSystemSpeechRecognition(showUnavailable: Boolean): Boolean {
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
-            Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
-            return
+            if (showUnavailable) Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
+            return false
         }
         translationGeneration += 1
         isHoldActive = true
         isSpeechCanceled = false
         startSpeechSession(SpeechAttempt(preferLanguage = true, preferOffline = false))
+        return true
     }
 
     fun stopSpeechToText() {
@@ -208,6 +216,7 @@ internal class MainSpeechInputActions(
 
     /** 启动端上流式识别。成功接管返回 true。 */
     private fun startAgentVoice(): Boolean {
+        val webTextInput = isWebChatModeActive()
         val bridge = agentBridge ?: AgentVoiceBridge(activity).also { agentBridge = it }
         if (bridge.isRunning) return true
         isHoldActive = true
@@ -279,8 +288,12 @@ internal class MainSpeechInputActions(
             // SpeechRecognizer 所有引擎失败时（如 Honor MagicVoice 常驻占用 session），
             // 静默 fallback 到云端语音（AudioRecord PCM，不调 RecognitionService）。
             // 用户仍在按住按钮时无感知切换，松手后走 stopRealtimeVoice 正常提交。
-            val cloudFallback = !isSpeechCanceled && isHoldActive && startRealtimeVoice()
-            if (!cloudFallback) {
+            val systemFallback = webTextInput && !isSpeechCanceled && isHoldActive &&
+                startSystemSpeechRecognition(showUnavailable = false)
+            val cloudFallback = !systemFallback &&
+                WebChatProductionVoiceInputPolicy.allowsDirectCloudAiFallback(webTextInput) &&
+                !isSpeechCanceled && isHoldActive && startRealtimeVoice()
+            if (!systemFallback && !cloudFallback) {
                 voiceHoldButton().text = "按住 说话"
                 if (!isSpeechCanceled) {
                     Toast.makeText(activity, "语音识别失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()

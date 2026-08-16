@@ -214,7 +214,7 @@ class MainActivity : AppCompatActivity() {
             },
             isSocialAiChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive()
-            }, isWebChatStreaming = { socialAiChatFeature.webChatStreaming() }, webChatComposerCanSubmit = { socialAiChatFeature.webChatComposerCanSubmit() }, onComposerTextChanged = { value -> socialAiChatFeature.onComposerTextChanged(value) }, stopWebChatGeneration = { socialAiChatFeature.stopWebChatGeneration() },
+            }, isWebChatStreaming = { socialAiChatFeature.webChatStreaming() }, webChatComposerCanSubmit = { socialAiChatFeature.webChatComposerCanSubmit() }, isWebChatModeActive = { socialAiChatFeature.isChatModeActive() }, onComposerTextChanged = { value -> socialAiChatFeature.onComposerTextChanged(value) }, stopWebChatGeneration = { socialAiChatFeature.stopWebChatGeneration() },
             trySendFriendMessage = { text, attachments ->
                 socialAiChatFeature.trySendMessage(text, attachments) ||
                     projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||

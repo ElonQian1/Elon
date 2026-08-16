@@ -35,6 +35,7 @@ internal class MainInputActions(
     private val isSocialAiChatActive: () -> Boolean,
     private val isWebChatStreaming: () -> Boolean,
     private val webChatComposerCanSubmit: () -> Boolean,
+    private val isWebChatModeActive: () -> Boolean,
     private val onComposerTextChanged: (CharSequence?) -> Unit,
     private val stopWebChatGeneration: () -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
@@ -581,6 +582,7 @@ internal class MainInputActions(
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             isFriendChatActive = isFriendChatActive,
+            isWebChatModeActive = isWebChatModeActive,
             isDirectSocialAiChatActive = isDirectSocialAiChatActive,
             isSocialAiChatActive = isSocialAiChatActive,
             sendTextDirect = { text ->
