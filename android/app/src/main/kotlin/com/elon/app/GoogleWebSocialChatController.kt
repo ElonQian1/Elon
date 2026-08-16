@@ -312,9 +312,7 @@ internal class GoogleWebSocialChatController(
     private fun updateComposerModel() {
         if (!active) return
         val label = currentModel().ifBlank { "Google AI 模式" }
-        binding.modelButton.text = label
-        binding.modelButton.contentDescription = "聊天模式；提供方：${provider.displayName}；模型：$label"
-        (binding.modelButton.parent as? View)?.contentDescription = binding.modelButton.contentDescription
+        WebChatComposerProviderPresentation.apply(binding.modelButton, provider, label)
     }
 
     private companion object {

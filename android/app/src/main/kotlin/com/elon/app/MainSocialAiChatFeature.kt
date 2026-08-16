@@ -327,6 +327,7 @@ internal class MainSocialAiChatFeature(
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         binding.modelButton.tag = null
+        WebChatComposerProviderPresentation.clear(binding.modelButton)
         binding.inputEdit.contentDescription = null
         binding.inputEdit.hint = "输入内容"
         inputComposerViews()?.let { views ->

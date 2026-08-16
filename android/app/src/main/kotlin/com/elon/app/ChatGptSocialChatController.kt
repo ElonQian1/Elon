@@ -448,10 +448,7 @@ internal class ChatGptSocialChatController(
 
     private fun updateComposerModel(model: String) {
         if (!active) return
-        val label = model.ifBlank { provider.displayName }
-        binding.modelButton.text = label
-        binding.modelButton.contentDescription = "聊天模式；提供方：${provider.displayName}；模型：$label"
-        (binding.modelButton.parent as? View)?.contentDescription = binding.modelButton.contentDescription
+        WebChatComposerProviderPresentation.apply(binding.modelButton, provider, model)
     }
 
     private companion object {
