@@ -33,7 +33,9 @@ internal object WebChatProductionRichContentBinder {
         container ?: return
         container.removeAllViews()
         val metadata = message.webChatMessage
-        val parts = metadata?.contentParts.orEmpty()
+        val parts = WebChatProductionRichContentPolicy.fallbackParts(
+            metadata?.contentParts.orEmpty(),
+        )
         parts.forEachIndexed { index, part ->
             container.addView(createPartRow(container, message, metadata!!, part, index, onOpen))
         }
@@ -131,4 +133,16 @@ internal object WebChatProductionRichContentBinder {
 
     private fun dp(container: LinearLayout, value: Int): Int =
         (value * container.resources.displayMetrics.density).toInt()
+}
+
+internal object WebChatProductionRichContentPolicy {
+    fun fallbackParts(parts: List<WebChatProductionContentPart>): List<WebChatProductionContentPart> =
+        parts.filterNot { it.type in INLINE_RENDERED_TYPES }
+
+    private val INLINE_RENDERED_TYPES = setOf(
+        "citation",
+        "code",
+        "table",
+        "math",
+    )
 }
