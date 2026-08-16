@@ -4222,6 +4222,203 @@
       "updated_at_ms": 1786772758494
     },
     {
+      "id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "title": "开放商业商户运行时 SQLite 幂等存储 V1",
+      "summary": "为签名商户运行时提供可选的商户自有 SQLite 幂等存储，覆盖重启重放、并发占位、超时接管和执行所有权。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/open-commerce-sqlite-runtime-idempotency-v1.md",
+        "content_hash": "55a1dd6256ac60581cf3be5867ab8868f4707ba7d3c5cc0693a08b3cc75ab23a",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+          "head_blob_oid": "c0b8e858f72f0e62d81d89c4f9c3e8411db12d93",
+          "worktree_blob_oid": "c0b8e858f72f0e62d81d89c4f9c3e8411db12d93",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "open-commerce",
+      "tags": [
+        "open-commerce",
+        "merchant-runtime",
+        "sqlite",
+        "idempotency"
+      ],
+      "task_paths": [
+        "docs/decisions/open-commerce-sqlite-runtime-idempotency-v1.md",
+        "docs/open-commerce/sqlite-runtime-idempotency-v1-acceptance.md",
+        "docs/requirements/open-commerce-sqlite-runtime-idempotency-v1.md",
+        "sdk/open-commerce-connector/README.md",
+        "sdk/open-commerce-connector/package.json",
+        "sdk/open-commerce-connector/src/merchant-runtime-sqlite-store.d.ts",
+        "sdk/open-commerce-connector/src/merchant-runtime-sqlite-store.js",
+        "sdk/open-commerce-connector/test/merchant-runtime-sqlite-store.test.mjs"
+      ],
+      "dependencies": [
+        "merchant-erp-open-commerce-runtime-bridge-v1"
+      ],
+      "acceptance_criteria": [
+        "重启后同键同输入返回 replayed。",
+        "同键不同输入返回 conflict。",
+        "未超时并发领取 busy，超时后允许新 invocation 接管。",
+        "旧 invocation 不能完成或释放新所有者记录。",
+        "失败释放后新 invocation 可重新领取。",
+        "损坏成功结果失败关闭且不泄漏正文。",
+        "连接器完整 Node 测试和 SQLite 专项全部通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_CURRENT.md",
+          "content_hash": "1d116b5f60cd8ee18bc01b5468f4a5f5637379bced0cba78a4639fa1e292b8c4",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "7be5302f1110c518f9ff38033e9f5eb239617518",
+            "worktree_blob_oid": "7be5302f1110c518f9ff38033e9f5eb239617518",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/decisions/open-commerce-sqlite-runtime-idempotency-v1.md",
+          "content_hash": "b58089807cfd0ca96cc913dddaf56930e29ffddd66fe837f280163828608165e",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "f33233974ff966ffe5639aabb6cec21b2696044a",
+            "worktree_blob_oid": "f33233974ff966ffe5639aabb6cec21b2696044a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/README.md",
+          "content_hash": "1c30375fcfb49080297b89b4e44a117e5205024a0539f182bd6b5a8b6f840ae1",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "7eb735aed55d2b6d9697acd197090c6abc1b0d36",
+            "worktree_blob_oid": "7eb735aed55d2b6d9697acd197090c6abc1b0d36",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/capability-baseline.md",
+          "content_hash": "6ec8c8be7dd2c40f5f2d7fbb1f7b8bb184b649d58de0def0c80f0760f6ca491b",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "993f615e4b00c081e43cb4e6ddf12c42eab0c343",
+            "worktree_blob_oid": "993f615e4b00c081e43cb4e6ddf12c42eab0c343",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/open-commerce/sqlite-runtime-idempotency-v1-acceptance.md",
+          "content_hash": "b2ff0544c00192df3941bf3e38bb79b176a0393700e98aee96a33c7526b4a556",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "0ed05b3d6f976d82e5c23a719d05f344f2a52d1f",
+            "worktree_blob_oid": "0ed05b3d6f976d82e5c23a719d05f344f2a52d1f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/open-commerce-sqlite-runtime-idempotency-v1.md",
+          "content_hash": "55a1dd6256ac60581cf3be5867ab8868f4707ba7d3c5cc0693a08b3cc75ab23a",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "c0b8e858f72f0e62d81d89c4f9c3e8411db12d93",
+            "worktree_blob_oid": "c0b8e858f72f0e62d81d89c4f9c3e8411db12d93",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/README.md",
+          "content_hash": "391cc63da7acc757145c0161ad8957d6a8c74efef0b3d66687455aeb0cb85824",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "6bb56ec896bbce71d1bc389db921fa9c4d050332",
+            "worktree_blob_oid": "6bb56ec896bbce71d1bc389db921fa9c4d050332",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/package.json",
+          "content_hash": "e438f2cd2eba6dc03ce05349242195ec0e950b9b6ea40e178a1416c80e31772c",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "f97aba5532d0364903b061927b0736e02e1e2c3f",
+            "worktree_blob_oid": "f97aba5532d0364903b061927b0736e02e1e2c3f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/merchant-runtime-sqlite-store.d.ts",
+          "content_hash": "e0505cdde20c3b037d0d158ec76e783d7d3f530cf71c017c55324d902851730d",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "c796d84aa535927c49101e9bc25f61e28eb62be3",
+            "worktree_blob_oid": "c796d84aa535927c49101e9bc25f61e28eb62be3",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/merchant-runtime-sqlite-store.js",
+          "content_hash": "e58b66ee0c060720c2ef26aefd4f6cafa60c541638ae2725244a2ebae7edc6ab",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "1b99dac650d48eecb9b46b0fcd804335a6edab45",
+            "worktree_blob_oid": "1b99dac650d48eecb9b46b0fcd804335a6edab45",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/test/merchant-runtime-sqlite-store.test.mjs",
+          "content_hash": "f7c15a8cb94e7bd4094131e26a843183f8d826fe6933d04e72f193039aa36073",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b6d9785c9b963dc8e1b86ece5caff32861de1a08",
+            "head_blob_oid": "e9f1272d664aecde2b50d3d8f2c8f433afd10b34",
+            "worktree_blob_oid": "e9f1272d664aecde2b50d3d8f2c8f433afd10b34",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786874860152,
+      "updated_at_ms": 1786874864710
+    },
+    {
       "id": "open-commerce-verified-erp-handoff-handler-v1",
       "title": "开放商业 ERP 写入与回读验证处理器 V1",
       "summary": "复用现有接入器租约工作器，把终态业务证据以稳定幂等来源信封交给商户 ERP 插件，并且只有外部回读完整匹配项目、商户、Invocation、接入和结果摘要后才允许提交 applied。",
@@ -6035,86 +6232,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_76c7d31871c44b2c826d7a8bcce2bf8b",
-      "feature_id": "rust-cross-target-cache-routing-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-cache-rebase",
-      "reason": "No runtime deployment is required.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786711596449
-    },
-    {
-      "id": "feature_event_651e37f2ac71442f95da7b1e843cb3ae",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "registered",
-      "actor": "codex-goal-cache",
-      "reason": "The V261 one-off target can be registered but the current purge validator cannot preview it.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786711857138
-    },
-    {
-      "id": "feature_event_6373e59afbf44c56ad5b114174f8baba",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "claimed",
-      "actor": "codex-goal-cache",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786711857264
-    },
-    {
-      "id": "feature_event_2d5a9e5637ee431598c100f66a97e2c2",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-cache",
-      "reason": "Implementing the strict name and dual Cargo marker gate.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786711857363
-    },
-    {
-      "id": "feature_event_5d90bf5e7fdd4eeb80f168ef8838ddd1",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-cache",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786711941412
-    },
-    {
-      "id": "feature_event_642513c5dcbe4a82b869fcb9f6f6f3b4",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-cache",
-      "reason": "Strict versioned target validation and regression coverage are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786711941518
-    },
-    {
-      "id": "feature_event_63dad71003264ab4a4a8e2fc2a00d400",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-cache",
-      "reason": "98 platform assertions passed and the real V261 path produced a non-destructive 14.14 GiB dry-run report.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786711941615
-    },
-    {
-      "id": "feature_event_d4b1b5cf3862461aaa1373e6c36b240b",
-      "feature_id": "rust-versioned-legacy-target-purge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-cache",
-      "reason": "No deployment is required; real deletion remains explicit and was not executed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786711941712
-    },
     {
       "id": "feature_event_92d545d736104df8a1cc4393af7c4acb",
       "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
@@ -8034,6 +8151,86 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786874485287
+    },
+    {
+      "id": "feature_event_be7b969e9e39479797f071249cc71e50",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786874860152
+    },
+    {
+      "id": "feature_event_027c189a90154a8ebe1b7e11b4c21bdd",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现与验收范围已按正式需求文档确认。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786874860253
+    },
+    {
+      "id": "feature_event_19ba07a4e3bf45cfa2e2ced199d97a52",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现与验收范围已按正式需求文档确认。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786874860274
+    },
+    {
+      "id": "feature_event_b85a95883e954ec29f2ef6c91c16f6ba",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786874860297
+    },
+    {
+      "id": "feature_event_0eb1bd3aaf254b1784ed54e57d8abb1c",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "绑定当前实现证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786874860322
+    },
+    {
+      "id": "feature_event_86ec7d2c998947c5baa25cf62afeb20d",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786874864655
+    },
+    {
+      "id": "feature_event_aa74d08a863f4616b5833963a8f59c74",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现和专项/完整连接器回归已通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786874864683
+    },
+    {
+      "id": "feature_event_2c30dbe6ad8f443cae35f581cc1b3e65",
+      "feature_id": "open-commerce-sqlite-runtime-idempotency-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现和专项/完整连接器回归已通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786874864710
     }
   ]
 }
