@@ -85,6 +85,14 @@ internal data class WebChatContextAction(
     val nativeSelector: String,
 )
 
+internal object WebChatProductionMessageActionFeedback {
+    fun copyAccepted(): String = "已复制消息"
+
+    fun regenerateAccepted(): String = "正在重新生成回答…"
+
+    fun contextActionAccepted(label: String): String = "已执行：$label"
+}
+
 internal object WebChatProductionMessageActionJson {
     fun messageContextIds(state: JSONObject): Set<String> {
         val controls = state.optJSONObject("ui_manifest")?.optJSONArray("controls") ?: return emptySet()
@@ -148,11 +156,17 @@ internal class WebChatProductionMessageActionCoordinator(
         val metadata = message.webChatMessage ?: return
         if (action !in metadata.actions) return
         when (action) {
-            WebChatMessageAction.COPY -> clipboard.copy(message.content)
-            WebChatMessageAction.REGENERATE -> dispatch(
-                JSONObject().put("action", "chatgpt_regenerate_response"),
-                failureMessage = "当前回答暂时不能重新生成",
-            )
+            WebChatMessageAction.COPY -> {
+                clipboard.copy(message.content)
+                showFeedback(WebChatProductionMessageActionFeedback.copyAccepted())
+            }
+            WebChatMessageAction.REGENERATE -> {
+                val accepted = dispatch(
+                    JSONObject().put("action", "chatgpt_regenerate_response"),
+                    failureMessage = "当前回答暂时不能重新生成",
+                )
+                if (accepted) showFeedback(WebChatProductionMessageActionFeedback.regenerateAccepted())
+            }
             WebChatMessageAction.MORE -> showMore(metadata)
         }
     }
@@ -208,18 +222,25 @@ internal class WebChatProductionMessageActionCoordinator(
     }
 
     private fun invoke(action: WebChatContextAction, userConfirmed: Boolean) {
-        dispatch(
+        val accepted = dispatch(
             JSONObject()
                 .put("action", "chatgpt_invoke_control")
                 .put("control_id", action.controlId)
                 .put("user_confirmed", userConfirmed),
             failureMessage = "网页操作执行失败",
         )
+        if (accepted) {
+            showFeedback(WebChatProductionMessageActionFeedback.contextActionAccepted(action.label))
+        }
     }
 
-    private fun dispatch(args: JSONObject, failureMessage: String) {
+    private fun dispatch(args: JSONObject, failureMessage: String): Boolean {
         val result = mcpPort()?.control(args)
-        if (result?.optBoolean("control_ok", false) == true) return
+        if (result?.optBoolean("control_ok", false) == true) return true
         Toast.makeText(activity, failureMessage, Toast.LENGTH_SHORT).show()
+        return false
     }
+
+    private fun showFeedback(message: String) =
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
 }

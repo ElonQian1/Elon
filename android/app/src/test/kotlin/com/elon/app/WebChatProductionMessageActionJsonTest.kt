@@ -54,6 +54,16 @@ class WebChatProductionMessageActionJsonTest {
         )
     }
 
+    @Test
+    fun consumerActionsExplainSuccessfulImmediateResults() {
+        assertEquals("已复制消息", WebChatProductionMessageActionFeedback.copyAccepted())
+        assertEquals("正在重新生成回答…", WebChatProductionMessageActionFeedback.regenerateAccepted())
+        assertEquals(
+            "已执行：朗读",
+            WebChatProductionMessageActionFeedback.contextActionAccepted("朗读"),
+        )
+    }
+
     private fun control(
         semantic: String,
         label: String,
