@@ -32,6 +32,22 @@ class WebChatActionSheetContractTest {
         assertFalse(source.contains("ChatGptWebTestActivity"))
     }
 
+    @Test
+    fun unavailableMessageActionsOfferTheOfficialConversationFallback() {
+        val source = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageActions.kt",
+        )
+        val noActions = source.substringAfter("if (actions.isEmpty())")
+            .substringBefore("val byId")
+        val dispatch = source.substringAfter("private fun dispatch")
+            .substringBefore("private fun showFeedback")
+
+        assertTrue(noActions.contains("showOfficialFallback"))
+        assertTrue(dispatch.contains("setPositiveButton(\"打开官方页\")"))
+        assertTrue(dispatch.contains("openOfficialFallback()"))
+        assertFalse(noActions.contains("Toast.makeText"))
+    }
+
     private fun read(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 

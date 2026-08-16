@@ -183,7 +183,10 @@ internal class WebChatProductionMessageActionCoordinator(
         )
         val actions = WebChatProductionMessageActionJson.contextActions(response)
         if (actions.isEmpty()) {
-            Toast.makeText(activity, "当前消息没有更多可用操作", Toast.LENGTH_SHORT).show()
+            showOfficialFallback(
+                title = "消息操作",
+                message = "当前消息操作已变化，可以在官方页面继续。",
+            )
             return
         }
         val byId = actions.associateBy(WebChatContextAction::controlId)
@@ -237,8 +240,21 @@ internal class WebChatProductionMessageActionCoordinator(
     private fun dispatch(args: JSONObject, failureMessage: String): Boolean {
         val result = mcpPort()?.control(args)
         if (result?.optBoolean("control_ok", false) == true) return true
-        Toast.makeText(activity, failureMessage, Toast.LENGTH_SHORT).show()
+        showOfficialFallback(
+            title = "消息操作",
+            message = "$failureMessage。可以在官方页面继续。",
+        )
         return false
+    }
+
+    private fun showOfficialFallback(title: String, message: String) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        AlertDialog.Builder(activity)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showFeedback(message: String) =
