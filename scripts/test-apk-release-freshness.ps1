@@ -14,6 +14,7 @@ try {
     git -C $root config user.name 'Elon Test'
     New-Item -ItemType Directory -Path (Join-Path $root 'android') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root 'docs') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force | Out-Null
 
     Set-Content -LiteralPath (Join-Path $root 'android/app.txt') -Value 'A' -Encoding UTF8
     git -C $root add android/app.txt
@@ -30,6 +31,12 @@ try {
     git -C $root commit --quiet -m 'C android'
     $shaC = (git -C $root rev-parse HEAD).Trim()
 
+    Set-Content -LiteralPath (Join-Path $root 'scripts/smoke-chatgpt-web-sample.ps1') `
+        -Value 'Write-Output smoke' -Encoding UTF8
+    git -C $root add scripts/smoke-chatgpt-web-sample.ps1
+    git -C $root commit --quiet -m 'D ChatGPT Web evidence input'
+    $shaD = (git -C $root rev-parse HEAD).Trim()
+
     $docsOnly = Get-ElonApkInputCoverage -RepoRoot $root -CandidateSha $shaB -DeployedSha $shaA
     Assert-True $docsOnly.Covered 'docs-only descendants must reuse the deployed APK'
     Assert-True ($docsOnly.Reason -eq 'same_android_inputs') 'docs-only coverage reason'
@@ -38,10 +45,18 @@ try {
     Assert-True (-not $androidChanged.Covered) 'Android changes must require a new APK'
     Assert-True ($androidChanged.ChangedPaths -contains 'android/app.txt') 'Android diff evidence'
 
+    $evidenceInputChanged = Get-ElonApkInputCoverage `
+        -RepoRoot $root -CandidateSha $shaD -DeployedSha $shaC
+    Assert-True (-not $evidenceInputChanged.Covered) `
+        'ChatGPT Web evidence-input changes must require a new APK'
+    Assert-True (
+        $evidenceInputChanged.ChangedPaths -contains 'scripts/smoke-chatgpt-web-sample.ps1'
+    ) 'ChatGPT Web evidence-input diff evidence'
+
     $newerAlreadyPublished = Get-ElonApkInputCoverage -RepoRoot $root -CandidateSha $shaA -DeployedSha $shaC
     Assert-True $newerAlreadyPublished.Covered 'a deployed descendant covers an older candidate'
 
-    $skipQueuedB = Get-ElonApkBuildStartDecision -RepoRoot $root -CandidateSha $shaB -CurrentMainSha $shaC
+    $skipQueuedB = Get-ElonApkBuildStartDecision -RepoRoot $root -CandidateSha $shaB -CurrentMainSha $shaD
     Assert-True (-not $skipQueuedB.Build) 'an unbuilt queued generation must yield to newer Android main'
 
     $buildCurrent = Get-ElonApkBuildStartDecision -RepoRoot $root -CandidateSha $shaC -CurrentMainSha $shaC

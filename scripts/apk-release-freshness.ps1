@@ -27,6 +27,15 @@ function Test-GitAncestor {
     return (Test-ElonReleaseGitAncestor -RepoRoot $script:RepoRoot -Ancestor $Ancestor -Descendant $Descendant)
 }
 
+function Test-ElonApkInputPath {
+    param([Parameter(Mandatory)][string]$Path)
+
+    return (
+        $Path -match '^android/' -or
+        $Path -match '^scripts/(?:chatgpt-web-smoke-|smoke-chatgpt-web-).+\.ps1$'
+    )
+}
+
 function Get-ElonAndroidInputChanges {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -37,7 +46,10 @@ function Get-ElonAndroidInputChanges {
         -not (Test-ElonReleaseGitCommit -RepoRoot $RepoRoot -Sha $ToSha)) {
         return @()
     }
-    return @(git -C $RepoRoot diff --name-only "$FromSha..$ToSha" -- android 2>$null)
+    return @(
+        git -C $RepoRoot diff --name-only "$FromSha..$ToSha" 2>$null |
+            Where-Object { Test-ElonApkInputPath -Path ([string]$_) }
+    )
 }
 
 function Get-ElonApkInputCoverage {
@@ -96,7 +108,9 @@ function Test-RemoteAdvanceSafeForApk {
     $changed = git -C $script:RepoRoot diff --name-only "$BaseSha..origin/main" 2>$null
     if (-not $changed) { return $true }
     foreach ($path in $changed) {
-        if ($path -match '^android/' -or $path -match '^scripts/publish-apk') { return $false }
+        if ((Test-ElonApkInputPath -Path $path) -or $path -match '^scripts/publish-apk') {
+            return $false
+        }
     }
     return $true
 }
