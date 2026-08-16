@@ -23,6 +23,13 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(view.contains("chatgpt_side_menu_daily_active"))
         assertTrue(view.contains("chatgpt_side_menu_unassigned"))
         assertTrue(view.contains("renderProjects(this)"))
+        assertTrue(view.contains("conversationActions.button(conversation)"))
+        assertTrue(view.contains("conversationActions.show(conversation)"))
+        val actions = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuConversationActions.kt",
+        )
+        assertTrue(actions.contains("ChatGptNativeNavigationSelector.conversationActions(conversation)"))
+        assertTrue(actions.contains("LinearLayout.LayoutParams(dp(48)"))
         assertTrue(view.contains("ChatGptNativeNavigationSelector::date"))
         assertTrue(dateStrip.contains("isSelected = selected"))
         assertTrue(controller.contains("applyChatSideMenuContentMode("))

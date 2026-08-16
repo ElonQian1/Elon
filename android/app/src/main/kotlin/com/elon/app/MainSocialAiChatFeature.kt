@@ -132,6 +132,17 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionPageActions by productionPageActionsDelegate
+    private val productionConversationActions by lazy {
+        WebChatProductionConversationActionsCoordinator(
+            activity, binding.root,
+            activeProvider = { providerId().takeIf { isChatModeActive() } },
+            currentConversationPath = { activeController().currentConversationPath() },
+            currentState = { activeController().stateWireValue() },
+            openConversation = ::openWebChatConversation,
+            showPageActions = { productionPageActions.show(WebChatProviderRegistry.get(providerId())) },
+            openOfficialFallback = ::openOfficialFallback,
+        )
+    }
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -282,6 +293,8 @@ internal class MainSocialAiChatFeature(
                     )
                 }
             },
+            remoteConversationActionsAvailable = { providerId() == WebChatProviderId.CHATGPT_WEB },
+            openRemoteConversationActions = productionConversationActions::show,
             active = { isChatModeActive() && webChatNavigationAvailable() },
         )
         onWebChatNavigationChanged = coordinator::onIndexChanged

@@ -34,6 +34,8 @@ internal class ChatGptWebSideMenuCoordinator(
     private val providerId: () -> String,
     private val providerName: () -> String,
     private val localProjectActions: () -> WebChatLocalProjectActions?,
+    private val remoteConversationActionsAvailable: () -> Boolean,
+    private val openRemoteConversationActions: (ChatGptWebConversation) -> Unit,
     private val active: () -> Boolean,
 ) {
     private lateinit var view: ChatGptWebSideMenuView
@@ -56,6 +58,8 @@ internal class ChatGptWebSideMenuCoordinator(
             providerId = providerId,
             providerName = providerName,
             localProjectActions = localProjectActions,
+            remoteConversationActionsAvailable = remoteConversationActionsAvailable,
+            openRemoteConversationActions = openRemoteConversationActions,
             openSettings = openSettings,
             requestClose = requestClose,
             dp = dp,

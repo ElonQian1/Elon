@@ -44,6 +44,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionComposerToolsCoordinator"))
         assertTrue(feature.contains("WebChatProductionFeatureNavigationCoordinator"))
         assertTrue(feature.contains("WebChatProductionPageActionsCoordinator"))
+        assertTrue(feature.contains("WebChatProductionConversationActionsCoordinator"))
+        assertTrue(feature.contains("openRemoteConversationActions = productionConversationActions::show"))
         assertTrue(feature.contains("openFeatureNavigation = ::openProductionFeatureNavigation"))
         assertTrue(feature.contains("WebChatProductionSelectors.pageActions"))
         assertTrue(feature.contains("views.attachmentButton.visibility"))
@@ -106,6 +108,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureCompletion.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActions.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionConversationActions.kt",
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuConversationActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionAdaptiveControls.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionSelectors.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatConsumerStatusBanner.kt",

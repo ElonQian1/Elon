@@ -28,6 +28,12 @@ internal object ChatGptNativeNavigationSelector {
         label = value.title,
     )
 
+    fun conversationActions(value: ChatGptWebConversation): String = selector(
+        prefix = "chatgpt-conversation-actions",
+        id = value.id,
+        label = value.title,
+    )
+
     fun feature(value: ChatGptWebFeature): String = selector(
         prefix = "chatgpt-feature",
         id = value.id,

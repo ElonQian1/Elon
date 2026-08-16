@@ -18,7 +18,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.R
 import com.elon.app.WebChatLocalProjectActions
-import com.elon.app.WebChatLocalProjectDialogs
 import com.elon.app.createSocialSidebarDateStrip
 import java.time.LocalDate
 
@@ -33,6 +32,8 @@ internal class ChatGptWebSideMenuView(
     private val providerId: () -> String,
     private val providerName: () -> String,
     private val localProjectActions: () -> WebChatLocalProjectActions?,
+    private val remoteConversationActionsAvailable: () -> Boolean,
+    private val openRemoteConversationActions: (ChatGptWebConversation) -> Unit,
     private val openSettings: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
@@ -49,6 +50,19 @@ internal class ChatGptWebSideMenuView(
     private var searchQuery = ""
     private val collapsedProjectIds = mutableSetOf<String>()
     private var lastRefreshRequestedAtMs = 0L
+    private val conversationActions by lazy {
+        ChatGptWebSideMenuConversationActions(
+            activity = activity,
+            index = index,
+            localProjectActions = localProjectActions,
+            remoteActionsAvailable = remoteConversationActionsAvailable,
+            openRemoteActions = openRemoteConversationActions,
+            closeThen = ::closeThen,
+            render = ::render,
+            dp = dp,
+            selectableForeground = selectableForeground,
+        )
+    }
 
     init {
         addView(root, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -358,11 +372,7 @@ internal class ChatGptWebSideMenuView(
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener { closeThen { openConversation(conversation.path) } }
-        setOnLongClickListener {
-            val actions = localProjectActions() ?: return@setOnLongClickListener false
-            WebChatLocalProjectDialogs.showAssignment(activity, index(), conversation, actions, ::render)
-            true
-        }
+        setOnLongClickListener { conversationActions.show(conversation) }
         addView(LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             gravity = Gravity.CENTER_VERTICAL
@@ -386,22 +396,7 @@ internal class ChatGptWebSideMenuView(
                 setTextColor(Color.parseColor("#80BEBEBA"))
             })
         })
-        if (localProjectActions() != null) addView(TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), LinearLayout.LayoutParams.MATCH_PARENT)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            text = "⋯"
-            textSize = 22f
-            setTextColor(Color.parseColor("#B3DDDBD5"))
-            contentDescription = "整理会话：${conversation.title}"
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener {
-                localProjectActions()?.let { actions ->
-                    WebChatLocalProjectDialogs.showAssignment(activity, index(), conversation, actions, ::render)
-                }
-            }
-        })
+        if (conversationActions.available()) addView(conversationActions.button(conversation))
     }
 
     private fun emptyState(message: String) = TextView(activity).apply {
