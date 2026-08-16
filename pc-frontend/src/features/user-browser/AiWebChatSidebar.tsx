@@ -23,8 +23,8 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const filtered = normalizedQuery
     ? conversations.filter((item) => item.title.toLocaleLowerCase().includes(normalizedQuery))
     : conversations
-  const pinned = filtered.filter((item) => /pinned|置顶/i.test(item.groupLabel))
-  const recent = filtered.filter((item) => !/pinned|置顶/i.test(item.groupLabel))
+  const pinned = filtered.filter((item) => item.pinned || /pinned|置顶/i.test(item.groupLabel))
+  const recent = filtered.filter((item) => !item.pinned && !/pinned|置顶/i.test(item.groupLabel))
   const projects = directory?.projects ?? []
   const cachedConversations = web.controller.sessionState?.localConversations ?? []
   const autoSyncKey = useRef('')
@@ -136,6 +136,9 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           <nav className={styles.directory} aria-label="ChatGPT 网页聊天项目与会话">
             <div className={styles.directoryTitle}>
               <span>ChatGPT 网页聊天</span>
+              {directory?.collection && (
+                <small>{directory.collection.complete ? '已完整同步' : '后台同步中'}</small>
+              )}
               <button
                 type="button"
                 title="同步官网侧栏"
@@ -196,6 +199,8 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               ? web.contextSummary
               : web.controller.sessionState?.navigationCacheStatus === 'cached'
               ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
+              : directory?.collection && !directory.collection.complete
+              ? `已显示 ${conversations.length} 个缓存/可见会话；完整官网目录正在后台同步。`
               : web.message || web.contextSummary || web.userState.detail}
           </span>
         </div>

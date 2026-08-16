@@ -107,6 +107,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "type": kind,
             "conversations": sanitize_conversations(event.get("conversations")),
             "projects": sanitize_projects(event.get("projects")),
+            "collection": sanitize_conversation_collection(event.get("collection")),
         }),
         "composer_controls_snapshot" => json!({
             "type": kind,
@@ -289,6 +290,7 @@ fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
                 "title": clean_string(item.get("title"), 160),
                 "path": path,
                 "active": item.get("active").and_then(Value::as_bool).unwrap_or(false),
+                "pinned": item.get("pinned").and_then(Value::as_bool).unwrap_or(false),
                 "groupLabel": clean_string(item.get("groupLabel"), 80),
                 "projectId": is_safe_project_id(&project_id).then_some(project_id),
                 "projectTitle": clean_string(item.get("projectTitle"), 160),
@@ -297,6 +299,43 @@ fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
             }))
         })
         .collect()
+}
+
+fn sanitize_conversation_collection(value: Option<&Value>) -> Value {
+    let collection = value.and_then(Value::as_object);
+    let boolean = |key: &str| {
+        collection
+            .and_then(|collection| collection.get(key))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    };
+    let reached_end = boolean("reachedEnd");
+    let scroll_restored = boolean("scrollRestored");
+    let truncated = boolean("truncated");
+    let timed_out = boolean("timedOut");
+    let complete = collection
+        .and_then(|collection| collection.get("complete"))
+        .and_then(Value::as_bool)
+        .unwrap_or(reached_end && scroll_restored && !truncated && !timed_out);
+    json!({
+        "scrollerFound": boolean("scrollerFound"),
+        "scrolled": boolean("scrolled"),
+        "scrollRestored": scroll_restored,
+        "reachedEnd": reached_end,
+        "truncated": truncated,
+        "timedOut": timed_out,
+        "observedCount": bounded_u64(
+            collection.and_then(|collection| collection.get("observedCount")),
+            0,
+            10_000,
+        ),
+        "steps": bounded_u64(
+            collection.and_then(|collection| collection.get("steps")),
+            0,
+            1_000,
+        ),
+        "complete": complete,
+    })
 }
 
 fn sanitize_projects(value: Option<&Value>) -> Vec<Value> {
@@ -540,16 +579,30 @@ mod tests {
                         "projectTitle": "路线图",
                         "projectPath": "/g/g-p-roadmap/project",
                         "groupLabel": "已置顶",
+                        "pinned": true,
                         "activityDates": ["2026-08-14", "not-a-date"]
                     },
                     {"id": "bad", "title": "丢弃", "path": "/g/../../secret"}
-                ]
+                ],
+                "collection": {
+                    "scrollerFound": true,
+                    "scrolled": true,
+                    "scrollRestored": true,
+                    "reachedEnd": false,
+                    "truncated": false,
+                    "timedOut": true,
+                    "observedCount": 123,
+                    "steps": 9
+                }
             }
         }))
         .unwrap();
         let event = sanitize_event(&raw).unwrap();
         assert_eq!(event.payload["projects"].as_array().unwrap().len(), 1);
         assert_eq!(event.payload["conversations"].as_array().unwrap().len(), 1);
+        assert_eq!(event.payload["conversations"][0]["pinned"], true);
+        assert_eq!(event.payload["collection"]["complete"], false);
+        assert_eq!(event.payload["collection"]["observedCount"], 123);
         assert_eq!(
             event.payload["conversations"][0]["activityDates"],
             json!(["2026-08-14"])

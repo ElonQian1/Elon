@@ -196,7 +196,7 @@ confirmation，再调用商户模块运行时：
 - Google AI 模式提供商固定指向官方 `google.com/aimode`，以独立 Profile 打开；Win 代码已
   接通问题、回答、引用、草稿、发送、停止和新对话的可见语义路径。账号登录仍定向到系统
   浏览器；地区、语言、设备或账号灰度未开放时保留完整 Google 官方窗口。
-- ChatGPT Win 桥已补齐 APK 使用的完整 31 模块、版本 124 与文档令牌绑定；启动错误额外记录稳定的
+- ChatGPT Win 桥已补齐 APK 使用的完整 31 模块、版本 125 与文档令牌绑定；启动错误额外记录稳定的
   模块阶段名，但不记录页面正文、Cookie、Token 或异常消息。Google Win 桥复用
   APK 版本 1 的消息提取器和 `google_web` 适配器，并在每页生成独立文档令牌。WebView2 的
   initialization script 只先安装本机消息出口，等待 DOM 根节点和 `DOMContentLoaded` 后再安装
@@ -210,6 +210,12 @@ confirmation，再调用商户模块运行时：
   LRU 淘汰、账号/厂商隔离、旧 Profile 迁移、缓存状态转换、超长消息裁剪、草稿/流式过滤、当前 Windows
   用户加密回读与清除。
   缓存快照只读，官方页面重新加载完成前不会解锁发送或历史动作。
+- 生产首页不再用统一的 2.4 秒轮询窗口判断所有网页动作：发送、会话目录、附件和延迟菜单分别使用有界
+  动作期限。ChatGPT 会话目录先回传当前可见项和 `complete=false`，随后在后台滚动同步完整历史；Rust
+  合并层会保留部分采集没有看到的缓存会话、项目和置顶项，完整采集才可移除官网已不存在的普通会话。
+  `observedCount` 表示本轮官网实际观察数量，`availableCount` 表示合并缓存后的可展示数量。
+- ChatGPT 消息快照按 `messageWindowStart` 与 `observedMessageCount` 合并同一会话的虚拟化窗口，暂时缩短的
+  DOM 快照不会清空上一轮可见上下文；新建、打开会话或项目仍建立明确边界，绝不继承上一会话消息。
 - 没有可验证的一龙云端 owner 或已登录本机节点 owner 时不能创建本地 Profile；两者同时存在
   但不一致时同样失败关闭。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。

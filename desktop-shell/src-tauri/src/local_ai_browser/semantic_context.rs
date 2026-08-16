@@ -1,11 +1,13 @@
 use serde_json::Value;
 use std::{
+    collections::BTreeMap,
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::Url;
 
 const GOOGLE_HISTORY_LIMIT: usize = 32;
+const CHATGPT_HISTORY_LIMIT: usize = 160;
 static NEXT_CONVERSATION_NONCE: AtomicU64 = AtomicU64::new(1);
 
 pub(super) fn page_context_key(provider_id: &str, raw_url: &str) -> Option<String> {
@@ -84,6 +86,9 @@ pub(super) fn merge_message_snapshot(
     mut incoming: Value,
     same_conversation: bool,
 ) -> Value {
+    if provider_id == "chatgpt" {
+        return merge_chatgpt_window(previous, incoming, same_conversation);
+    }
     if provider_id != "google-ai-mode" {
         return incoming;
     }
@@ -139,6 +144,82 @@ pub(super) fn merge_message_snapshot(
     }
     replace_messages(&mut incoming, merged, base_window_start);
     incoming
+}
+
+fn merge_chatgpt_window(
+    previous: Option<&Value>,
+    mut incoming: Value,
+    same_conversation: bool,
+) -> Value {
+    if !same_conversation {
+        return incoming;
+    }
+    let Some(previous) = previous else {
+        return incoming;
+    };
+    let previous_messages = messages(previous);
+    let incoming_messages = messages(&incoming);
+    if previous_messages.is_empty() || incoming_messages.is_empty() {
+        return incoming;
+    }
+    let previous_start = window_start(previous);
+    let incoming_start = window_start(&incoming);
+    let previous_observed = observed_count(previous, previous_start, previous_messages.len());
+    let incoming_observed = observed_count(&incoming, incoming_start, incoming_messages.len());
+    if incoming_start == 0
+        && incoming_observed >= previous_observed
+        && incoming_observed as usize <= incoming_messages.len()
+    {
+        return incoming;
+    }
+
+    let mut positioned = BTreeMap::new();
+    for (offset, message) in previous_messages.into_iter().enumerate() {
+        positioned.insert(previous_start + offset, message);
+    }
+    for (offset, message) in incoming_messages.into_iter().enumerate() {
+        positioned.insert(incoming_start + offset, message);
+    }
+    let dropped = positioned.len().saturating_sub(CHATGPT_HISTORY_LIMIT);
+    let merged = positioned
+        .into_iter()
+        .skip(dropped)
+        .collect::<Vec<_>>();
+    let merged_start = merged
+        .first()
+        .map(|(index, _)| *index)
+        .unwrap_or(incoming_start);
+    let merged_messages = merged
+        .into_iter()
+        .map(|(_, message)| message)
+        .collect::<Vec<_>>();
+    if let Some(snapshot) = incoming.as_object_mut() {
+        snapshot.insert("messages".to_string(), Value::Array(merged_messages));
+        snapshot.insert(
+            "messageWindowStart".to_string(),
+            Value::from(merged_start as u64),
+        );
+        snapshot.insert(
+            "observedMessageCount".to_string(),
+            Value::from(previous_observed.max(incoming_observed)),
+        );
+    }
+    incoming
+}
+
+fn window_start(snapshot: &Value) -> usize {
+    snapshot
+        .get("messageWindowStart")
+        .and_then(Value::as_u64)
+        .unwrap_or_default() as usize
+}
+
+fn observed_count(snapshot: &Value, start: usize, message_count: usize) -> u64 {
+    snapshot
+        .get("observedMessageCount")
+        .and_then(Value::as_u64)
+        .unwrap_or((start + message_count) as u64)
+        .max((start + message_count) as u64)
 }
 
 pub(super) fn has_visible_messages(snapshot: &Value) -> bool {
@@ -274,5 +355,70 @@ mod tests {
         let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
         assert_eq!(merged["messages"].as_array().unwrap().len(), 2);
         assert_eq!(merged["messages"][1]["content"][0]["text"], "complete");
+    }
+
+    #[test]
+    fn chatgpt_rolling_window_keeps_the_overlapping_conversation_prefix() {
+        let previous = json!({
+            "messageWindowStart": 0,
+            "observedMessageCount": 4,
+            "messages": [
+                {"id":"u1","role":"user"},
+                {"id":"a1","role":"assistant"},
+                {"id":"u2","role":"user"},
+                {"id":"a2","role":"assistant"}
+            ]
+        });
+        let incoming = json!({
+            "messageWindowStart": 2,
+            "observedMessageCount": 6,
+            "messages": [
+                {"id":"u2","role":"user"},
+                {"id":"a2","role":"assistant"},
+                {"id":"u3","role":"user"},
+                {"id":"a3","role":"assistant"}
+            ]
+        });
+        let merged = merge_message_snapshot("chatgpt", Some(&previous), incoming, true);
+        let messages = merged["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 6);
+        assert_eq!(messages[0]["id"], "u1");
+        assert_eq!(messages[5]["id"], "a3");
+        assert_eq!(merged["messageWindowStart"], 0);
+        assert_eq!(merged["observedMessageCount"], 6);
+    }
+
+    #[test]
+    fn chatgpt_temporary_short_snapshot_does_not_erase_later_turns() {
+        let previous = json!({
+            "messageWindowStart": 0,
+            "observedMessageCount": 4,
+            "messages": [
+                {"id":"u1","role":"user"},
+                {"id":"a1","role":"assistant"},
+                {"id":"u2","role":"user"},
+                {"id":"a2","role":"assistant"}
+            ]
+        });
+        let incoming = json!({
+            "messageWindowStart": 0,
+            "observedMessageCount": 2,
+            "messages": [
+                {"id":"u1","role":"user"},
+                {"id":"a1","role":"assistant"}
+            ]
+        });
+        let merged = merge_message_snapshot("chatgpt", Some(&previous), incoming, true);
+        assert_eq!(merged["messages"].as_array().unwrap().len(), 4);
+        assert_eq!(merged["observedMessageCount"], 4);
+    }
+
+    #[test]
+    fn chatgpt_new_conversation_never_inherits_the_previous_window() {
+        let previous = json!({"messages":[{"id":"old","role":"assistant"}]});
+        let incoming = json!({"messages":[{"id":"new","role":"assistant"}]});
+        let merged = merge_message_snapshot("chatgpt", Some(&previous), incoming, false);
+        assert_eq!(merged["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(merged["messages"][0]["id"], "new");
     }
 }

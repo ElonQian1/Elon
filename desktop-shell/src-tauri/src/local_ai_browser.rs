@@ -12,6 +12,8 @@ mod adapter_command;
 mod adapter_content;
 #[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]
 mod chatgpt_adapter_bootstrap;
+#[path = "local_ai_browser/conversation_directory.rs"]
+mod conversation_directory;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
 #[path = "local_ai_browser/native_window.rs"]

@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::Value;
 use tauri::Url;
 
-use super::{semantic_context, snapshot_cache};
+use super::{conversation_directory, semantic_context, snapshot_cache};
 
 #[path = "state/cache.rs"]
 mod cache;
@@ -385,7 +385,10 @@ impl LocalAiBrowserRuntime {
                 }
                 "conversation_snapshot" => {
                     record.renderer_status = "active".to_string();
-                    record.navigation_event = Some(payload);
+                    record.navigation_event = Some(conversation_directory::merge(
+                        record.navigation_event.as_ref(),
+                        payload,
+                    ));
                     record.navigation_live = true;
                     record.cache_updated_at_ms = now_ms();
                     record.last_error = None;

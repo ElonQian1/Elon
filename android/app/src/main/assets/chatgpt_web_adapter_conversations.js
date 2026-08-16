@@ -10,6 +10,7 @@
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/(g-p-[A-Za-z0-9_-]{1,160})\/c\/[A-Za-z0-9_-]{1,160})$/;
   const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
   const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早)$/i;
+  const PINNED_LABEL = /^(?:pinned|已置顶|置顶)$/i;
   let sidebarOpenedByAdapter = false;
 
   function cleanText(value) {
@@ -115,14 +116,14 @@
     });
   }
 
-  function groupLabelFor(node) {
+  function nearestSectionLabel(node, pattern) {
     const nodeTop = node.getBoundingClientRect().top;
     let scope = node.parentElement;
     for (let depth = 0; scope && depth < 7; depth += 1, scope = scope.parentElement) {
       const candidates = Array.from(scope.children).filter((candidate) => {
         if (candidate === node || candidate.contains(node)) return false;
         const text = cleanText(candidate.textContent || candidate.getAttribute('aria-label'));
-        if (!text || text.length > 80 || !GROUP_LABEL.test(text)) return false;
+        if (!text || text.length > 80 || !pattern.test(text)) return false;
         return candidate.getBoundingClientRect().top <= nodeTop + 1;
       });
       const nearest = candidates.sort((left, right) =>
@@ -131,6 +132,23 @@
       if (nearest) return cleanText(nearest.textContent || nearest.getAttribute('aria-label')).slice(0, 80);
     }
     return '';
+  }
+
+  function groupLabelFor(node) {
+    return nearestSectionLabel(node, GROUP_LABEL);
+  }
+
+  function pinnedFor(node) {
+    const metadata = cleanText([
+      node.getAttribute('data-pinned'),
+      node.getAttribute('data-testid'),
+      node.getAttribute('aria-label'),
+      node.parentElement && node.parentElement.getAttribute('data-pinned'),
+      node.parentElement && node.parentElement.getAttribute('data-testid')
+    ].filter(Boolean).join(' ')).toLowerCase();
+    if (/^(?:true|1)$/.test(cleanText(node.getAttribute('data-pinned')).toLowerCase())) return true;
+    if (/\bunpin\b|取消置顶|取消固定/.test(metadata)) return true;
+    return !!nearestSectionLabel(node, PINNED_LABEL);
   }
 
   function localIsoDate(date) {
@@ -181,6 +199,7 @@
         title,
         path,
         active: path === location.pathname || node.getAttribute('aria-current') === 'page',
+        pinned: pinnedFor(node),
         groupLabel,
         projectId: projectId || null,
         projectTitle: null,
@@ -393,11 +412,51 @@
     visitNext();
   }
 
-  function emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter) {
+  function initialProjectsFor(command) {
     const observedProjects = readProjects();
-    const initialProjects = projectHints && typeof projectHints.merge === 'function'
+    return projectHints && typeof projectHints.merge === 'function'
       ? projectHints.merge(observedProjects, command && command.projectHints)
       : observedProjects;
+  }
+
+  function emitFastDirectorySnapshots(initial, command, emitEvent, result, closeAfter) {
+    const initialProjects = initialProjectsFor(command);
+    emitEvent({
+      type: 'conversation_snapshot',
+      conversations: enrichProjectConversations(initial, initialProjects),
+      projects: initialProjects,
+      collection: {
+        scrollerFound: !!findConversationScroller(),
+        scrolled: false,
+        scrollRestored: true,
+        reachedEnd: false,
+        truncated: false,
+        timedOut: false,
+        observedCount: initial.length,
+        steps: 0,
+        complete: false
+      }
+    });
+    result('list_conversations', true, '官网当前可见目录已同步，完整历史继续在后台加载。');
+    collectConversationHistory(initial, (snapshot) => {
+      collectProjectHistory(initialProjects, (projects) => {
+        emitEvent({
+          type: 'conversation_snapshot',
+          conversations: enrichProjectConversations(snapshot.conversations, projects),
+          projects,
+          collection: snapshot.collection
+        });
+        if (closeAfter) {
+          const close = findSidebarButton(false);
+          if (close) close.click();
+          sidebarOpenedByAdapter = false;
+        }
+      });
+    });
+  }
+
+  function emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter) {
+    const initialProjects = initialProjectsFor(command);
     collectProjectHistory(initialProjects, (observedProjects) => {
       collectProjects(observedProjects, (projects) => {
         emitEvent({
@@ -416,6 +475,15 @@
     });
   }
 
+  function collectAndEmitDirectory(initial, command, emitEvent, result, closeAfter) {
+    if (command && command.fastDirectoryAck === true) {
+      return emitFastDirectorySnapshots(initial, command, emitEvent, result, closeAfter);
+    }
+    collectConversationHistory(initial, (snapshot) => {
+      emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter);
+    });
+  }
+
   function requestList(command, emitEvent, result) {
     const open = findSidebarButton(true);
     if (open) {
@@ -423,9 +491,9 @@
       open.click();
       return waitForConversations(
         (conversations) => {
-          collectConversationHistory(conversations, (snapshot) => {
-            emitConversationSnapshot(snapshot, command, emitEvent, result, sidebarOpenedByAdapter);
-          });
+          collectAndEmitDirectory(
+            conversations, command, emitEvent, result, sidebarOpenedByAdapter
+          );
         },
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
       );
@@ -435,17 +503,13 @@
     if (!existing.length && sidebarOpenedByAdapter && findSidebarButton(false)) {
       return waitForConversations(
         (conversations) => {
-          collectConversationHistory(conversations, (snapshot) => {
-            emitConversationSnapshot(snapshot, command, emitEvent, result, true);
-          });
+          collectAndEmitDirectory(conversations, command, emitEvent, result, true);
         },
         () => result('list_conversations', false, '官网会话列表尚未加载完成。')
       );
     }
     if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
-    collectConversationHistory(existing, (snapshot) => {
-      emitConversationSnapshot(snapshot, command, emitEvent, result, false);
-    });
+    collectAndEmitDirectory(existing, command, emitEvent, result, false);
   }
 
   function newConversation(result) {

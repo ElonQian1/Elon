@@ -2,6 +2,10 @@ import { getDesktopInvoke } from '../shell/desktopShell'
 import { localAiSnapshotCache } from './localAiSnapshotCache'
 import { UNIFIED_AI_PROTOCOL } from './unifiedAiProtocol'
 import { createLocalAiRequestId, isLocalAiRequestId } from './localAiCommandReceipt'
+import {
+  LOCAL_AI_RESULT_POLL_INTERVAL_MS,
+  localAiAdapterResultAttempts,
+} from './localAiAdapterTiming'
 import type {
   LocalAiAttachment,
   LocalAiComposerControlsSnapshot,
@@ -110,11 +114,26 @@ export interface LocalAiConversationDirectoryItem {
   title: string
   path: string
   active: boolean
+  pinned?: boolean
   groupLabel: string
   projectId?: string | null
   projectTitle?: string
   projectPath?: string | null
   activityDates: string[]
+}
+
+export interface LocalAiConversationCollection {
+  scrollerFound: boolean
+  scrolled: boolean
+  scrollRestored: boolean
+  reachedEnd: boolean
+  truncated: boolean
+  timedOut: boolean
+  observedCount: number
+  availableCount?: number
+  steps: number
+  complete: boolean
+  source?: 'official_partial' | 'official_complete'
 }
 
 export interface LocalAiProjectDirectoryItem {
@@ -128,6 +147,7 @@ export interface LocalAiConversationSnapshot {
   type: 'conversation_snapshot'
   conversations: LocalAiConversationDirectoryItem[]
   projects: LocalAiProjectDirectoryItem[]
+  collection?: LocalAiConversationCollection
 }
 
 export interface LocalAiCommandResult {
@@ -409,8 +429,9 @@ export async function waitForLocalAiAdapterResult(
   requestId: string,
 ): Promise<LocalAiWebSessionState | null> {
   if (!isLocalAiRequestId(requestId)) throw new Error('本地 AI 命令回执标识无效。')
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 200))
+  const attempts = localAiAdapterResultAttempts(action)
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, LOCAL_AI_RESULT_POLL_INTERVAL_MS))
     const state = await getLocalAiWebSessionState(providerId, ownerKey)
     if (state.commandResult?.action === action && state.commandResult.requestId === requestId) return state
   }

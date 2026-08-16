@@ -25,6 +25,42 @@ fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
 }
 
 #[test]
+fn partial_official_directory_updates_do_not_erase_cached_sidebar_items() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    runtime.record_adapter_event(
+        "session",
+        "conversation_snapshot",
+        json!({
+            "type":"conversation_snapshot",
+            "conversations":[
+                {"path":"/c/one","title":"One","pinned":true},
+                {"path":"/c/two","title":"Two","pinned":false}
+            ],
+            "projects":[{"path":"/g/g-p-roadmap/project","id":"g-p-roadmap","title":"Roadmap"}],
+            "collection":{"complete":false,"observedCount":2}
+        }),
+    );
+    runtime.record_adapter_event(
+        "session",
+        "conversation_snapshot",
+        json!({
+            "type":"conversation_snapshot",
+            "conversations":[{"path":"/c/one","title":"One updated","pinned":false}],
+            "projects":[],
+            "collection":{"complete":false,"observedCount":1}
+        }),
+    );
+
+    let snapshot = runtime.snapshot("session").unwrap();
+    let directory = snapshot.navigation_event.unwrap();
+    assert_eq!(directory["conversations"].as_array().unwrap().len(), 2);
+    assert_eq!(directory["conversations"][0]["pinned"], true);
+    assert_eq!(directory["projects"].as_array().unwrap().len(), 1);
+    assert_eq!(directory["collection"]["source"], "official_partial");
+}
+
+#[test]
 fn composer_feature_and_command_receipts_remain_independent() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "chatgpt", "reserved");

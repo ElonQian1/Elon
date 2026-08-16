@@ -69,6 +69,9 @@ pub fn build(
     }
     let mut command = Map::new();
     command.insert("action".to_string(), Value::String(action.to_string()));
+    if action == "list_conversations" {
+        command.insert("fastDirectoryAck".to_string(), Value::Bool(true));
+    }
     if let Some(request_id) = request_id {
         if !is_safe_request_id(&request_id) {
             return Err(format!("{provider_name} 命令回执标识无效。"));
@@ -233,6 +236,20 @@ mod tests {
             Some("unsafe-request".into()),
         )
         .is_err());
+    }
+
+    #[test]
+    fn desktop_directory_commands_request_fast_non_destructive_acknowledgement() {
+        let command = build(
+            "ChatGPT",
+            CHATGPT_ACTIONS,
+            "list_conversations",
+            None,
+            None,
+            Some("mcp_directory1".into()),
+        )
+        .unwrap();
+        assert_eq!(command["fastDirectoryAck"], true);
     }
 
     #[test]
