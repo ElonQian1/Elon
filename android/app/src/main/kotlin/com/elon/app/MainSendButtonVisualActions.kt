@@ -19,6 +19,7 @@ internal class MainSendButtonVisualActions(
     private val isVoiceMode: () -> Boolean,
     private val hasPendingAttachments: () -> Boolean,
     private val inputCanSend: () -> Boolean,
+    private val composerCanSubmit: () -> Boolean,
     private val isWebChatStreaming: () -> Boolean,
     private val activeConversation: () -> AppConversation,
     private val isFriendChatActive: () -> Boolean
@@ -77,13 +78,15 @@ internal class MainSendButtonVisualActions(
         }
 
         val conversationEnded = !isFriendChatActive() && activeConversation().ended
+        val submissionEnabled = composerCanSubmit()
         val sendEnabled = !conversationEnded && (
-            visualMode == WebChatProductionComposerVisualMode.STOP || inputCanSend()
+            visualMode == WebChatProductionComposerVisualMode.STOP ||
+                (inputCanSend() && submissionEnabled)
         )
         binding.sendButton.isEnabled = sendEnabled
         binding.sendButton.alpha = if (sendEnabled) 1f else 0.55f
         attachmentButton()?.let { button ->
-            button.isEnabled = !conversationEnded && !streaming
+            button.isEnabled = !conversationEnded && !streaming && submissionEnabled
             button.alpha = if (button.isEnabled) 1f else 0.55f
         }
         inputModeButton()?.let { button ->

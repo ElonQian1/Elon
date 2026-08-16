@@ -34,6 +34,8 @@ internal class MainInputActions(
     private val isDirectSocialAiChatActive: () -> Boolean,
     private val isSocialAiChatActive: () -> Boolean,
     private val isWebChatStreaming: () -> Boolean,
+    private val webChatComposerCanSubmit: () -> Boolean,
+    private val onComposerTextChanged: (CharSequence?) -> Unit,
     private val stopWebChatGeneration: () -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
     private val forkForRunningInput: (String, String) -> ForkedConversation,
@@ -109,6 +111,7 @@ internal class MainInputActions(
             updateCollapsedInputPreview = { collapsedInputPreviewActions.updateCollapsedInputPreview() },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() },
+            onInputTextChanged = onComposerTextChanged,
             selectRunningInputMode = { mode ->
                 runningInputMode = mode
                 updateRunningInputModeStrip()
@@ -543,6 +546,7 @@ internal class MainInputActions(
             isVoiceMode = { voiceMode },
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
+            composerCanSubmit = webChatComposerCanSubmit,
             isWebChatStreaming = isWebChatStreaming,
             activeConversation = projectStateActions()::activeConversation,
             isFriendChatActive = isFriendChatActive

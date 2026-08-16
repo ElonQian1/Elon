@@ -27,7 +27,18 @@ internal class MainSocialAiChatFeature(
     private val chatGptWebLifecycle: MainChatGptWebLifecycle,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
-    private val providerDrafts = WebChatProviderDraftState()
+    private val providerDraftStore = WebChatProviderDraftStore(activity)
+    private val providerDrafts = providerDraftStore.restore()
+    private val persistProviderDrafts = Runnable { providerDraftStore.save(providerDrafts) }
+    private val composerDrafts = SocialAiComposerDraftCoordinator(
+        providerDrafts = providerDrafts,
+        readText = { binding.inputEdit.text },
+        writeText = { draft ->
+            binding.inputEdit.setText(draft)
+            binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        },
+        onProviderDraftChanged = ::scheduleProviderDraftSave,
+    )
     private val chatGptControllerDelegate = lazy {
         ChatGptSocialChatController(
             activity = activity,
@@ -132,7 +143,7 @@ internal class MainSocialAiChatFeature(
             onFriendOpened = onFriendOpened,
             activateWorkMode = ::activateWorkMode,
             activateChatProvider = ::activateChatProvider,
-            deactivateChatProvider = ::deactivateChatProvider,
+            deactivateChatProvider = { deactivateChatProvider() },
             officialFallbackUrl = { activeController().officialFallbackUrl() },
         )
     }
@@ -208,6 +219,19 @@ internal class MainSocialAiChatFeature(
     fun webChatAuthenticated(): Boolean = activeController().authenticated()
 
     fun webChatComposerReady(): Boolean = activeController().composerReady()
+
+    fun webChatComposerCanSubmit(): Boolean {
+        if (!isChatModeActive()) return true
+        val controller = activeController()
+        return WebChatConsumerComposerStateResolver.resolve(
+            provider = WebChatProviderRegistry.get(providerId()),
+            state = controller.stateWireValue(),
+            composerReady = controller.composerReady(),
+            attachmentSupported = controller.attachmentSupported(),
+        ).submissionEnabled
+    }
+
+    fun onComposerTextChanged(value: CharSequence?) = composerDrafts.onTextChanged(value)
 
     fun webChatStreaming(): Boolean = isChatModeActive() && activeController().streaming()
 
@@ -302,22 +326,28 @@ internal class MainSocialAiChatFeature(
     }
 
     fun onHostPaused() {
+        composerDrafts.rememberCurrent()
+        flushProviderDrafts()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.onHostPaused()
         if (googleControllerDelegate.isInitialized()) googleController.onHostPaused()
     }
 
     fun destroy() {
+        composerDrafts.rememberCurrent()
+        flushProviderDrafts()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
         if (googleControllerDelegate.isInitialized()) googleController.destroy()
         chatGptWebLifecycle.dispose()
     }
 
     private fun activateWorkMode() {
-        deactivateChatProvider()
+        composerDrafts.activateWorkMode()
+        deactivateChatProvider(releaseComposerDraft = false)
         rebindWorkFriend()
     }
 
-    private fun deactivateChatProvider() {
+    private fun deactivateChatProvider(releaseComposerDraft: Boolean = true) {
+        if (releaseComposerDraft) composerDrafts.release()
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
@@ -349,6 +379,7 @@ internal class MainSocialAiChatFeature(
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
+        composerDrafts.activateProvider(provider.id)
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
@@ -417,17 +448,18 @@ internal class MainSocialAiChatFeature(
     private fun activeController(): WebChatSocialController = controllerFor(providerId())
 
     private fun selectChatProvider(id: WebChatProviderId): Boolean {
-        val previous = providerId()
-        if (previous == id && isChatModeActive()) return true
-        if (isChatModeActive()) providerDrafts.remember(previous, binding.inputEdit.text)
-        val selected = modeController.selectChatProvider(id)
-        val target = if (selected) id else previous
-        val draft = providerDrafts.restore(target)
-        if (binding.inputEdit.text?.toString() != draft) {
-            binding.inputEdit.setText(draft)
-            binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
-        }
-        return selected
+        if (providerId() == id && isChatModeActive()) return true
+        return modeController.selectChatProvider(id)
+    }
+
+    private fun scheduleProviderDraftSave() {
+        binding.root.removeCallbacks(persistProviderDrafts)
+        binding.root.postDelayed(persistProviderDrafts, DRAFT_SAVE_DELAY_MS)
+    }
+
+    private fun flushProviderDrafts() {
+        binding.root.removeCallbacks(persistProviderDrafts)
+        providerDraftStore.save(providerDrafts)
     }
 
     private fun controllerFor(id: WebChatProviderId): WebChatSocialController = when (id) {
@@ -443,7 +475,9 @@ internal class MainSocialAiChatFeature(
     private companion object {
         const val MODEL_BUTTON_WORK_WIDTH_DP = 76
         const val MODEL_BUTTON_CHAT_WIDTH_DP = 144
+        const val DRAFT_SAVE_DELAY_MS = 500L
     }
+
 }
 
 internal const val WEB_CHAT_MODEL_BUTTON_OWNER = "web_chat_model_button"

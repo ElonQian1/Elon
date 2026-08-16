@@ -72,6 +72,7 @@ internal class MainInputComposerSetup(
     private val updateCollapsedInputPreview: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit,
+    private val onInputTextChanged: (CharSequence?) -> Unit,
     private val selectRunningInputMode: (RunningInputMode) -> Unit,
     private val showFullScreenEditor: () -> Unit
 ) {
@@ -489,6 +490,7 @@ internal class MainInputComposerSetup(
                 updateCollapsedInputPreview()
                 updateSendButtonVisual()
                 updateAdaptiveInputHeight()
+                onInputTextChanged(s)
             }
             override fun afterTextChanged(s: Editable?) = Unit
         })
