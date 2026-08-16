@@ -84,6 +84,8 @@ owners: backend, node, ai-economy
 
 ## 阅读顺序
 
+阶段目标与退出门槛见 [`implementation-roadmap.md`](implementation-roadmap.md)，瞬时成熟度见 [`current-implementation-status.md`](current-implementation-status.md)。以下按领域依赖继续阅读：
+
 1. `docs/decisions/distributed-compute-federation-v1.md`：不可随意改变的架构决定。
 2. `docs/distributed-compute/architecture.md`：Provider、控制面、数据面和任务状态。
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
@@ -134,70 +136,7 @@ owners: backend, node, ai-economy
 
 ## 分阶段落地
 
-### F0：统一语言和合同
-
-版本化的 Provider、Offer、Workload、Job、Reservation、Attempt Lease、Execution Receipt、Settlement Receipt 和 Price Snapshot 基础合同已经写入代码。节点侧还形成了带 `fencing_generation` 的 Start / RenewLease / Cancel Attempt 命令、Runner typed events 和 Host 盖章事件合同；这些代码均尚未编译、接线或运行验证。现有 `LlmStreamRequest` 继续工作，不在首批协议变更中制造强制升级。
-
-### F1：用户节点成为可插拔 Provider
-
-节点内部已经形成 Plugin Host 兼容 seam、Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架，并写入真实 Ed25519/JCS 验证、Manifest 语义校验及本机 InstallPlan 准入内核；节点供应链源码已随 `elon-pc-node` 编译通过，但未启动或生产接线。云端还形成 v169 版本化 Provider Registry、v170 追加式 Offer Registry及 v182-v184 发布/生命周期控制；本人可创建规范化 draft Offer，平台管理员可发布 active、转为 draining，并在无活动预留时终结为 expired/revoked。Offer 已通过 Store/Service、进程内 HTTP/MCP 与文件重开专项，但生产数据库和真实 TCP 仍未验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
-
-目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件；只有用户开启并确需 cleanup hard-fence 时，才按独立首方特权组件合同下载并经 UAC 安装驱动，普通插件签名无权授权内核代码。本机耐久真源已选定为独立 SQLite，根签名双 keyring、原子计划应用、候选所有权、三段式下载认领、候选级全工件验证和可信时间边界见 `docs/distributed-compute/node-plugin-local-authority.md`。raw verified 只把本机槽推进到 `verifying`；staged 候选可经健康失败 quarantine 进入 `failed`，再进入 cleanup authorization。固定句柄旧执行器和 completion Store 内核已编译；中间路线已能封存 topology 并写入首对象 intent、disposition、absence 与 namespace durability，sequence 1–4 的 32 项清理测试均已通过，但 sequence 3/4 只覆盖 builder 链和 SQLite exact-row。mutation fence 是 exact scope/authority-bound 的线性租约；其签名 minifilter wire/供应链 shape 已通过 9+5 项独立合同测试，但真实驱动、首方信任/fingerprint、Windows catalog、安装、transport、safe constructor、evidence v2 与显式 release 仍未实现，后续对象/terminal producer 也缺。只有完整 journal exact readback 后返回的不透明终态能力才能进入 completion，并恢复为 `NotCreated` 或 exact `Completed`。因此当前完整清理链仍不可达，不会因内存物理证据或首对象完成直接释放 owner。候选观察值仍由 Host 调用方提供，尚未证明真实 Sidecar 已运行；v216 retained-handle 再验与本机 install/promotion 双回执已随节点编译，v7 schema 全新安装、重开及 v3-v6 原子迁移等 11 项测试通过。生产磁盘迁移、install/promotion 完整事务夹具、生产时间权威、真实下载器、Sidecar/IPC/探针调度、完整清理事务夹具、跨重启恢复、Host 接线、work-admission、云端 capability gate 和通用 Attempt 协议仍未实现。
-
-NodeRuntime 已挂载默认关闭的 Compute Bootstrap，只派生 installation/data-root/authority 身份与路径并绑定节点状态目录实例锁 weak witness；该 witness 只作为进程存活前提，不能替代工件根锁。现有 `pin_compute_plugin_root()` 已能返回同时持有 canonical pinned root 与 share-none 锁句柄的非 Clone capability，但 Bootstrap 尚无 sharing-on transition，因此管理状态仍如实显示根锁未取得，生产 trusted-time、生产回滚见证、root pin、authority open 和 process fence 也不可用。数据根变化要求重启；默认关闭不会打开数据库、执行下载或启动 Sidecar。后续 Runner/节点 Attempt 持久化将使用 schema v4 的独立执行 fence 域，不把高频 run 状态塞入 inventory，也不复用下载 cancellation。
-
-F1 的下一硬门槛是实际执行 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的 Windows SHM、联合关闭、route/registration 与多 Connection 逐 case 验证，并把动态观察逐条对齐 A2b2 静态 key。A2b2 仍未编译、未运行，不能据此进入生产 VFS/open、Planning producer、v15、Runtime 或 Ready。
-
-### F2：Broker、验证和真实结算
-
-共享 CapacityPool 与追加式容量账本已形成 checked-i128 reducer、v165-v168 schema 和隔离 Store：多 meter 发行/撤出、Claim hold/release/expire 均保存 causal binding，Reservation Claim 绑定 Offer、Job 与同主体 Reservation；公开 standalone 方法拥有事务，组合 kernel 不自行提交。v169-v174 形成 Provider、Offer、Price Snapshot、Job、Claim 历史与 Reservation Registry；v175 在一个 `BEGIN IMMEDIATE` 中组合余额预授权、Claim Hold、Reservation 与 Job 并保存不可变回执，任何依赖或资金步骤失败均整体回滚。v176 对没有 Start command 的 Reservation 可按原合同 Release/Expire；一旦已有 Start，则只有逐字段复算并写入 finish receipt 的 exact no-start proof 才能退款和归还容量，无 ACK、accepted、quarantined、超时或 cancel ACK 都继续失败关闭。
-
-v185 保留唯一 Attempt 激活状态推进 kernel：单事务把 Claim `held -> active`、Job `reserved -> running`，更新 Reservation 并保存 staging Lease/回执。v211 已关闭 Provider 所有者人工确认激活；v214 形成 rejected/quarantine/reconcile 的 Store-local cleanup/recovery。v215 源码再把 authenticated accepted observation、ACK、v185、application actor、LeaseAuthorityBinding、commit outbox 与 application 放入同一事务；既有 ACK-null cleanup pair 只能 quarantine，历史重放不重新要求当前授权。服务端及测试源码已编译，内存与临时文件 SQLite 完整迁移、重复迁移、两次重开、关键对象和冲突 backfill 门卫已验证；accepted 成功闭包、生产数据库原位升级和生产链路仍未运行。Offer `draining` 继续按 Reservation 历史版本履约，人工 Renew/Abort 写入口固定失败，也没有 sealed 输入构造器、网络或 worker。
-
-登录用户 HTTP/MCP 可读本人 Job/Reservation 并发起 Reserve、Release、Expire；旧 Attempt 激活 POST 已稳定失败，历史参与方仍可读激活回执与 Lease。上述 Broker 仅支持 `platform_balance_cny`，Store/Service、进程内接口、两连接竞争和两次临时磁盘重开已定向验证；生产数据库升级、异常断电恢复、真实 TCP、高并发压力、真实派发、超时归还和实际用量结算仍未验证，不能视为完整算力交易系统。
-
-v187 保留最窄 staging 无用量中止 kernel 与历史回执，但 Provider 所有者人工写入口已关闭：未认证的 `executor_abort_ref` 或勾选“未执行”不能解 no-start 门。v214 产生的 exact rejected/final-reconcile proof 只可供 v176 重审计，不调用 v187，也不替代尚缺的 service-actor 补偿 kernel；当前没有真实取消/reconcile 网络，更不覆盖已开始执行、部分扣费、自动超时、调度重试或最终结算。
-
-v188 再补齐 running Attempt 的累计声明用量证据：Provider 所有者只能在当前 Lease 精确 revision/digest/fencing 下追加完整 meter 快照，序号严格递增、累计值不得回退；高于预留合同的 meter 被保留并标记为 overage。v226 已用 Rust/SQLite 动态测试固定候选前可追加、候选原子绑定当前流头、候选后只可精确重放，并覆盖双连接竞争和 legacy 漂移失败关闭。回执仍为 `unverified_provider_declaration`，不更新 Lease/Job/Reservation/Claim，不消费容量、不扣款，也不产生 Provider 收益。
-
-v189 再保存 Provider 首次终态候选：当前 running Lease 必须已有最新 v188 用量快照，且 Lease、Job、Reservation、Claim 版本和摘要完全一致；v226 源码以 IMMEDIATE 迁移门卫和统一 Store 审计固定 final usage 仍是当前流头，并使 v190-v195 对漂移失败关闭。`succeeded` 结果按 Workload 输出合同校验，`failed/canceled` 不得携带伪最终产物。候选只保存为 `unverified_provider_declaration`，不更新状态、容量或资金，也不等于 Execution Receipt。
-
-v190 再保存消费者第一份终态审核证据：只有 v189 候选绑定的 Job 消费者可提交 `accepted/rejected/disputed`，并固定候选事件摘要和完整因果链；拒绝或争议必须提供证据引用。该记录固定为 `consumer_attestation_only`，不产生 Verification 决定，不更新状态、容量或资金，也不会因消费者接受而自动付款。
-
-v191 再保存平台第一份终态观测证据：平台 `admin/owner` 可登记 control plane、transport gateway 或 server metering 的完整累计 meter，并固定与最终 v188 快照不同的 meter。该记录固定为 `unverified_platform_observation`；差异或一致都不产生 Verification 决定，也不更新状态、容量或资金。
-
-v192 首次保存平台 Verification 决定：管理员精确绑定 v189-v191 后，`conservative_min_v1` 仅在消费者接受且 Provider/平台 outcome 一致时允许 accepted；verified usage 逐 meter 取双方较小值，compensable usage 再受 Reservation 预留上限约束。rejected/disputed 记录零用量。回执不可覆盖，但不生成 Execution Receipt、不推进状态、不消费容量、不移动资金。
-
-v193 再基于 accepted v192 签发 Execution Receipt：回执重新审计 Attempt 激活、Job/Reservation 历史及 v188-v192，固定 executor、Offer、runner/plugin/model、输入输出、四类用量、三方证明和 Verification。回执不可覆盖，但不推进 Lease/Job、不消费 Claim/Reservation、不移动资金。
-
-v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用可信终态：单一事务把 Lease 推进为 terminal、Job 推进为 `verification_pending`、Reservation/Claim 推进为 consumed；consumable meter 消费 compensable usage 并归还余量，reusable meter 全量归还。回执不可覆盖，预授权与 Provider 收益仍不变。
-
-v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。管理员现可读取有界到期候选并逐笔复用 v198；这是人工触发的部分成功批处理，不是后台定时清算。v200 再允许 Provider 所有者把本人 available 原子转入 withdrawn 提款保留区；v201 为申请增加取消、拒绝或外部已付款声明的唯一终态。取消/拒绝返还内部余额，付款声明只保存证据，不调用或验证外部资金网络。
-Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。平台 reference fallback 现由管理员 HTTP/MCP 完成 exact batch 提交、独立复核、preflight 和原子 application；v223/v224 直接登记 entry 对应的唯一 v171 Snapshot，并通过临时文件迁移与重开专项。它仍固定为 `fallback_curve/sample_count=0`，不代表 index/mark/trade；平台曲线 PC、真实 TCP 与生产部署未验证。候选不返回节点路由、凭据或适配器配置，任何报价发布和锁价都不自动移动资金或容量。
-
-各控制面的证据由本页“阅读顺序”中的专题文档维护。PC 算力管理和 12 个 Attempt/结算角色路由已完成静态生产构建；v200/v201 另已完成本地 Store/Service 专项。其余成熟度统一见 [`current-implementation-status.md`](current-implementation-status.md)。静态构建不代表接口联调、浏览器验收、生产迁移或发布。
-
-v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 从 `submitted` 创建并只从当前合格候选进入 `quoted`；消费者幂等键、revision/digest CAS、历史依赖审计及临时磁盘重开已随 Broker 组合链通过定向测试。该结论不代表真实 TCP、生产数据库升级、异常断电恢复、自动撮合或任务派发已经验证。
-
-v173/v174 Claim 与 Reservation Registry 保存不可变历史并精确绑定 Job、Offer、Price Snapshot 和 Claim 版本；v175/v176 Broker 组合入口已通过成功预留、未执行释放、双向幂等重放、余额不足整笔回滚、两连接竞争和两次临时磁盘重开测试。注册表单独调用仍不创建 Claim、不冻结预算或移动容量；真实 TCP、高并发压力、生产数据库升级和异常断电恢复尚未验证。
-
-平台 reference fallback 管理面已形成；后续不再重复实现其 DTO 或五账本，应分别推进真实价格源/期货曲线、批量报价与撮合、容量自动调度与受控修复、Attempt 真实派发/续租/归还、重试时递增 `fencing_generation`、运行中任务与最终用量结算、多源计量、挑战任务、争议状态和可提取收益账本。
-
-### F3：外部矿池与企业集群
-
-V227-V272 的历史和局部动态证据不能外推为 production activation。V272 已覆盖同进程 authenticated session/wire，但独立 child、内核清理、process HMAC、成功写链和故障矩阵仍缺。V273 已编译，18 项源码合同和 3 项动态迁移统一 21/21 通过；它仍是 default-off、无公开 API、无 v213 constructor、production runtime `passed=0/failed=0` 的 dormant kernel。V274 已铺 Store-private active-successor 合同，但未编译/运行、V275 前零行；V253 pre-V275 currentness 为 registering-only。后继固定为 V275 atomic activation → V276 reachability；真实 Secret/upstream 与 V254 replacement 仍缺，Provider=`registering`、`eligible_rows=0`、18 deny 不变。见 [`V272 conformance`](external-pool-adapter-task-protocol-conformance-authority.md)、[`V273`](external-pool-adapter-task-protocol-production-authority.md)、[`V274`](external-pool-adapter-provider-active-successor-authority.md) 与 [`当前状态`](current-implementation-status.md)。
-
-### F4：容量期货市场
-
-以标准化 Compute SKU 和交付窗口发行容量合约，引入订单、持仓、指数价、标记价、保证资源和到期交割；任务结算消费已锁定的价格快照。
-
-首段平台参考价格只走四眼治理的 `fallback_curve/sample_count=0`；v223/v224 application 已在一个事务中直接登记既有 v171 Snapshot，并通过管理员 HTTP、迁移与文件重开专项。它不是指数、标记价、成交、订单簿或持仓，详见 [`platform-reference-price-curve-authority.md`](platform-reference-price-curve-authority.md) 与 [`platform-reference-price-curve-api-acceptance.md`](platform-reference-price-curve-api-acceptance.md)。
-
-v238 CapacityInstrument 已通过完整服务端编译和全新文件数据库迁移冒烟，专属行为仍为 `passed=0`。见 [`capacity-instrument-authority.md`](capacity-instrument-authority.md) 与 [`capacity-instrument-acceptance.md`](capacity-instrument-acceptance.md)。
-
-v225 Capacity Commitment 为 `implementation_partially_verified`，不包含外部矿池、交付授权、资金或结算。见 [`capacity-commitment-authority.md`](capacity-commitment-authority.md) 与 [`capacity-commitment-acceptance.md`](capacity-commitment-acceptance.md)。
-
-v228 Delivery Allocation 的 Grant/Exercise 纵切面为 `design_frozen/implementation_partially_verified`；v234 公平恢复已完成 7 项本地专项，但并发、崩溃、历史升级、真实 TCP 和生产周期仍未验收。见 [`delivery-allocation-authority.md`](delivery-allocation-authority.md)、[`delivery-allocation-acceptance.md`](delivery-allocation-acceptance.md) 和 [`current-implementation-status.md`](current-implementation-status.md)。
+长期阶段目标、顺序约束和退出门槛统一见 [`implementation-roadmap.md`](implementation-roadmap.md)。当前验证强度只在 [`current-implementation-status.md`](current-implementation-status.md) 更新，README 不再复制易过期的实现明细。
 
 ## 当前工程指令
 

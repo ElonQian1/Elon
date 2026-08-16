@@ -254,6 +254,7 @@
     "docs/distributed-compute/README.md": "custom:distributed-compute",
     "docs/distributed-compute/architecture.md": "custom:distributed-compute",
     "docs/distributed-compute/current-implementation-status.md": "custom:distributed-compute",
+    "docs/distributed-compute/implementation-roadmap.md": "custom:distributed-compute",
     "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md": "custom:distributed-compute",
     "docs/distributed-compute/external-pool-adapter-credential-verifier-acceptance.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-abort-api.md": "custom:distributed-compute",
@@ -412,6 +413,7 @@
     "docs/distributed-compute/README.md": "current",
     "docs/distributed-compute/architecture.md": "current",
     "docs/distributed-compute/current-implementation-status.md": "current",
+    "docs/distributed-compute/implementation-roadmap.md": "on-demand",
     "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md": "current",
     "docs/distributed-compute/external-pool-adapter-credential-verifier-acceptance.md": "evidence",
     "docs/distributed-compute/attempt-abort-api.md": "current",
@@ -625,6 +627,12 @@
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "architecture"
+    },
+    "docs/distributed-compute/implementation-roadmap.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "roadmap"
     },
     "docs/drafts/open-commerce-network-roadmap.md": {
       "retrieval": "excluded",
@@ -875,6 +883,7 @@
       "related": [
         "AI_CURRENT.md",
         "docs/distributed-compute/README.md",
+        "docs/distributed-compute/implementation-roadmap.md",
         "docs/distributed-compute/capacity-instrument-acceptance.md",
         "docs/distributed-compute/external-pool-adapter-artifact-sandbox-conformance-authority.md",
         "docs/distributed-compute/external-pool-adapter-credential-verifier-authority.md"
@@ -925,6 +934,27 @@
         "docs/distributed-compute/current-implementation-status.md"
       ]
     },
+    "docs/distributed-compute/implementation-roadmap.md": {
+      "id": "distributed-compute-implementation-roadmap",
+      "doc_type": "roadmap",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-16",
+      "review_interval_days": 30,
+      "order": 59,
+      "pinned": true,
+      "implementation_refs": [],
+      "related": [
+        "docs/distributed-compute/README.md",
+        "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/architecture.md"
+      ]
+    },
     "docs/distributed-compute/README.md": {
       "doc_type": "subproject_overview",
       "audience": [
@@ -972,6 +1002,7 @@
       ],
       "related": [
         "docs/distributed-compute/current-implementation-status.md",
+        "docs/distributed-compute/implementation-roadmap.md",
         "docs/decisions/distributed-compute-capacity-ledger-v1.md",
         "docs/decisions/distributed-compute-federation-v1.md",
         "docs/distributed-compute/architecture.md",
@@ -2937,6 +2968,8 @@
         "entrypoint": "docs/distributed-compute/README.md",
         "document_paths": [
           "docs/distributed-compute/README.md",
+          "docs/distributed-compute/current-implementation-status.md",
+          "docs/distributed-compute/implementation-roadmap.md",
           "docs/decisions/distributed-compute-capacity-ledger-v1.md",
           "docs/decisions/distributed-compute-federation-v1.md"
         ],
@@ -2949,6 +2982,30 @@
           "federation",
           "provider",
           "market"
+        ]
+      },
+      {
+        "id": "cap-distributed-compute-roadmap",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "分布式算力实施路线",
+        "detail": "分布式算力后续阶段、推进顺序、阶段目标和退出门槛",
+        "parent_id": "cap-distributed-compute",
+        "order": 9,
+        "color": "#7A8C9E",
+        "entrypoint": "docs/distributed-compute/implementation-roadmap.md",
+        "document_paths": [
+          "docs/distributed-compute/implementation-roadmap.md",
+          "docs/distributed-compute/current-implementation-status.md",
+          "docs/distributed-compute/architecture.md"
+        ],
+        "implementation_refs": [],
+        "tags": [
+          "算力",
+          "后续阶段",
+          "推进顺序",
+          "目标",
+          "退出门槛"
         ]
       },
       {

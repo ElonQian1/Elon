@@ -31,6 +31,7 @@ $requiredFiles = @(
     "docs/decisions/reject-demo-oracle-role.md",
     "docs/decisions/reject-ai-to-ai-skill-route.md",
     "docs/distributed-compute/current-implementation-status.md",
+    "docs/distributed-compute/implementation-roadmap.md",
     "docs/distributed-compute/README.md",
     "docs/distributed-compute/settlement-withdrawal-request-api.md",
     "docs/distributed-compute/settlement-withdrawal-terminal-api.md",
@@ -49,6 +50,7 @@ $defaultSeeder = [System.IO.File]::ReadAllText("server/src/project_default_docs.
 $current = [System.IO.File]::ReadAllText("AI_CURRENT.md")
 $architecture = [System.IO.File]::ReadAllText("AI_ARCHITECTURE.md")
 $computeStatus = [System.IO.File]::ReadAllText("docs/distributed-compute/current-implementation-status.md")
+$computeRoadmap = [System.IO.File]::ReadAllText("docs/distributed-compute/implementation-roadmap.md")
 $computeReadme = [System.IO.File]::ReadAllText("docs/distributed-compute/README.md")
 Assert-Contains $agents "AI_CURRENT.md" "AGENTS.md"
 Assert-Contains $copilot "AI_CURRENT.md" ".github/copilot-instructions.md"
@@ -87,6 +89,14 @@ foreach ($withdrawalDoc in @(
     Assert-Contains $computeStatus $withdrawalDoc "distributed-compute current status"
     Assert-Contains $computeReadme $withdrawalDoc "distributed-compute README"
 }
+Assert-Contains $computeReadme "implementation-roadmap.md" "distributed-compute README"
+Assert-Contains $computeRoadmap "current-implementation-status.md" "distributed-compute roadmap"
+if ($computeReadme -match '(?m)^### F[0-9]') {
+    throw "Distributed-compute phase details belong in implementation-roadmap.md, not README.md."
+}
+if ($computeRoadmap -match '\bimplementation_(?:uncompiled|unrun|unwired|partially_verified|verified)\b') {
+    throw "Distributed-compute maturity labels belong in current-implementation-status.md, not implementation-roadmap.md."
+}
 
 $manifest = Read-Json ".elon/document-sections.json"
 $currentGovernance = $manifest.governance_facets."AI_CURRENT.md"
@@ -103,7 +113,13 @@ if (
 
 $retrieval = Read-Json ".elon/document-retrieval-cases.json"
 $caseIds = @($retrieval.cases | ForEach-Object { $_.id })
-foreach ($caseId in @("current-project-status", "rejected-demo-oracle-role", "rejected-ai-to-ai-skill-route")) {
+foreach ($caseId in @(
+    "current-project-status",
+    "rejected-demo-oracle-role",
+    "rejected-ai-to-ai-skill-route",
+    "distributed-compute-current-status",
+    "distributed-compute-implementation-roadmap"
+)) {
     if ($caseIds -notcontains $caseId) {
         throw "Document retrieval regression case is missing: $caseId"
     }
