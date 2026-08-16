@@ -297,6 +297,34 @@ process.once('SIGTERM', () => idempotencyStore.close())
 SQLite 实现提供进程重启重放、同文件并发占位和超时接管，不提供跨机器高可用、网络磁盘
 共识、自动备份或清理。数据库文件目录、访问权限、容量和备份仍由商户宿主负责。
 
+商户项目不需要重复编写 HTTP 读取、体积限制和停机状态机。可选宿主子路径默认只监听
+`127.0.0.1`，适合作为可信反向代理后的源站；也可以显式传入商户自己管理的 TLS 证书：
+
+```js
+import { createMerchantRuntimeHttpHost } from '@elon/open-commerce-connector/merchant-runtime-http'
+
+const host = createMerchantRuntimeHttpHost({
+  runtime,
+  shutdownGraceMs: 10_000,
+})
+const listening = await host.listen({ port: 8787 })
+console.log(`merchant runtime listening at ${listening.origin}`)
+
+async function shutdown() {
+  const receipt = await host.close({ graceMs: 10_000 })
+  idempotencyStore.close()
+  return receipt
+}
+process.once('SIGTERM', shutdown)
+process.once('SIGINT', shutdown)
+```
+
+调用入口固定为 `POST /commerce/v1/invoke`，健康入口为 `GET /healthz`。宿主把未经重新
+序列化的原始字节交给签名内核，在业务处理器前限制路由、方法、Content-Type、编码和请求
+体积，并在停机时先停止接收连接、等待在途调用、到期后关闭剩余连接。健康状态只证明该
+进程可接收请求，不证明 ERP、开放目录、支付、外部平台或公网 TLS 已准备完成。直接 HTTPS
+模式的证书签发、续期和私钥权限仍由商户负责。
+
 ## 数据边界
 
 - 单页最多 500 条标准化变更。
