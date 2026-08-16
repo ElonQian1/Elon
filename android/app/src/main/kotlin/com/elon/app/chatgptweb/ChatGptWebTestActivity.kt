@@ -587,30 +587,33 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             when (event.purpose) {
                 "list_model_options" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::collectModelOptions,
-                    COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "list_composer_tools" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::collectComposerTools,
-                    COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "open_model_submenu" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::collectModelOptions,
-                    COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "open_composer_tools_submenu" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::collectComposerTools,
-                    COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "list_navigation" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::collectFeatures,
-                    NAVIGATION_SETTLE_MS,
+                    ChatGptWebInteractionTimings.NAVIGATION_SETTLE_MS,
                 )
                 "select_model_option", "select_composer_tool", "remove_attachment", "start_dictation",
                 "cancel_dictation", "submit_dictation" ->
-                    binding.chatGptWebView.postDelayed(pageAdapter::requestSnapshot, COMPOSER_MENU_SETTLE_MS)
+                    binding.chatGptWebView.postDelayed(
+                        pageAdapter::requestSnapshot,
+                        ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
+                    )
                 "select_navigation" -> binding.chatGptWebView.postDelayed(
                     pageAdapter::requestSnapshot,
-                    NAVIGATION_SETTLE_MS,
+                    ChatGptWebInteractionTimings.NAVIGATION_SETTLE_MS,
                 )
                 "invoke_ui_control" -> manifestRefreshScheduler.afterAdaptiveTouch()
                 "regenerate_open_menu", "regenerate_retry" ->
@@ -663,7 +666,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         binding.chatGptWebView.postDelayed({
             if (section == "model") pageAdapter.listModelOptions()
             else pageAdapter.listComposerTools()
-        }, COMPOSER_MENU_SETTLE_MS)
+        }, ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS)
     }
 
     private fun statusWithProxy(messageResource: Int): String =
@@ -788,8 +791,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val COMPOSER_MENU_SETTLE_MS = 320L
-        const val NAVIGATION_SETTLE_MS = 420L
         val DICTATION_START_ACTIONS = setOf("start_dictation", "invoke_ui_control")
 
         fun createProductIntent(context: Context): Intent =

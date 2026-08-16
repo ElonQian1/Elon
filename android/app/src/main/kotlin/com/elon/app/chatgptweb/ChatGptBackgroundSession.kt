@@ -528,23 +528,26 @@ internal class ChatGptBackgroundSession(
             when (event.purpose) {
                 "list_model_options", "open_model_submenu" -> view.postDelayed(
                     adapter::collectModelOptions,
-                    ChatGptWebTestActivity.COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "list_composer_tools", "open_composer_tools_submenu" -> view.postDelayed(
                     adapter::collectComposerTools,
-                    ChatGptWebTestActivity.COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "list_navigation" -> view.postDelayed(
                     adapter::collectFeatures,
-                    ChatGptWebTestActivity.NAVIGATION_SETTLE_MS,
+                    ChatGptWebInteractionTimings.NAVIGATION_SETTLE_MS,
                 )
                 "select_model_option", "select_composer_tool", "remove_attachment",
                 "start_dictation", "cancel_dictation", "submit_dictation" -> view.postDelayed(
                     adapter::requestSnapshot,
-                    ChatGptWebTestActivity.COMPOSER_MENU_SETTLE_MS,
+                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
                 "select_navigation", "invoke_ui_control", "regenerate_open_menu", "regenerate_retry" ->
-                    view.postDelayed(adapter::requestSnapshot, ChatGptWebTestActivity.NAVIGATION_SETTLE_MS)
+                    view.postDelayed(
+                        adapter::requestSnapshot,
+                        ChatGptWebInteractionTimings.NAVIGATION_SETTLE_MS,
+                    )
             }
         }
     }

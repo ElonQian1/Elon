@@ -1,13 +1,12 @@
 package com.elon.app
 
-import android.content.Intent
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.chatgptweb.ChatGptWebTestActivity
+import com.elon.app.chatgptweb.ChatGptWebOfficialFallbackIntent
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class ProfileChatGptWebEntry(
@@ -41,7 +40,7 @@ internal class ProfileChatGptWebEntry(
             intArrayOf(android.R.attr.selectableItemBackground),
         ).let { values -> values.getDrawable(0).also { values.recycle() } }
         setOnClickListener {
-            activity.startActivity(Intent(activity, ChatGptWebTestActivity::class.java))
+            activity.startActivity(ChatGptWebOfficialFallbackIntent.create(activity, currentUrl = null))
         }
 
         addView(ImageView(activity).apply {

@@ -36,6 +36,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val consumerComposer = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatConsumerComposerState.kt",
         )
+        val consumerStatusBanner = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatConsumerStatusBanner.kt",
+        )
         val chatGptBackground = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
@@ -54,7 +57,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("views.attachmentButton.visibility"))
         assertTrue(feature.contains("WebChatConsumerComposerStateResolver.resolve"))
         assertTrue(feature.contains("WebChatConsumerStatusBanner"))
-        assertTrue(feature.contains("WebChatConsumerRecoveryPolicy.resolve"))
+        assertTrue(feature.contains("controller.consumerRecoveryState(provider)"))
+        assertTrue(consumerStatusBanner.contains("WebChatConsumerRecoveryPolicy.resolve"))
         val sideMenu = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
         )
@@ -64,6 +68,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(chatGptBackground.contains("conversationNavigation.beginOpen"))
         assertTrue(chatGptBackground.contains("conversationNavigation.beginNew"))
         assertTrue(chatGptBackground.contains("conversationNavigation.save"))
+        assertTrue(chatGptBackground.contains("ChatGptWebInteractionTimings"))
         assertTrue(consumerComposer.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
@@ -104,6 +109,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
             "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
             "android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt",
+            "android/app/src/main/kotlin/com/elon/app/ProfileChatGptWebEntry.kt",
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionRichContent.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
