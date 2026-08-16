@@ -19,26 +19,49 @@ class InputElement extends NodeElement {
     this.disabled = false;
   }
   focus() {}
-  closest() { return null; }
+  closest() { return form; }
   getAttribute() { return null; }
-  getBoundingClientRect() { return { width: 100, height: 40 }; }
-  dispatchEvent() {}
+  getBoundingClientRect() { return { width: 240, height: 48 }; }
+  dispatchEvent(event) {
+    if (event && event.type === 'input') {
+      setTimeout(() => { sendButton.disabled = false; }, 20);
+    }
+  }
 }
-const composer = new InputElement('old draft');
+
+const composer = new InputElement('');
+let clickedAt = 0;
+const sendButton = {
+  disabled: true,
+  getAttribute(name) { return name === 'aria-disabled' ? String(this.disabled) : null; },
+  getBoundingClientRect() { return { width: 48, height: 48 }; },
+  click() {
+    clickedAt = Date.now();
+    composer.value = '';
+  }
+};
+const form = {
+  querySelector(selector) {
+    return selector.includes('send-button') ? sendButton : null;
+  },
+  querySelectorAll() { return [sendButton]; }
+};
 const document = {
   title: 'ChatGPT',
   documentElement: new NodeElement(),
-  querySelector: () => null,
+  querySelector() { return null; },
   querySelectorAll(selector) {
-    return selector.includes('prompt-textarea') ? [composer] : [];
+    if (selector.includes('prompt-textarea')) return [composer];
+    if (selector === 'button') return [sendButton];
+    return [];
   }
 };
 const window = {
   document,
-  location: { origin: 'https://chatgpt.com', pathname: '/c/test' },
+  location: { origin: 'https://chatgpt.com', pathname: '/' },
   elonChatGptNative: { postMessage: (payload) => events.push(JSON.parse(payload)) },
-  __elonChatGptAdapterVersion: 70,
-  __elonChatGptDocumentToken: 'doc_test_1',
+  __elonChatGptAdapterVersion: 118,
+  __elonChatGptDocumentToken: 'doc_send_settle',
   __elonChatGptSnapshotScheduler: {
     create() { return { schedule() {}, dispose() {} }; }
   },
@@ -49,8 +72,8 @@ const window = {
   removeEventListener() {},
   HTMLInputElement: InputElement,
   HTMLTextAreaElement: class extends InputElement {},
-  InputEvent: class {},
-  Event: class {},
+  InputEvent: class { constructor(type) { this.type = type; } },
+  Event: class { constructor(type) { this.type = type; } },
   MutationObserver: class { observe() {} disconnect() {} }
 };
 window.Node = NodeElement;
@@ -75,28 +98,21 @@ vm.runInNewContext(source, {
   clearTimeout
 }, { filename: 'chatgpt_web_adapter.js' });
 
+const startedAt = Date.now();
 window.__elonChatGptBridge.command(JSON.stringify({
-  action: 'set_draft',
-  documentToken: 'doc_test_1',
-  requestId: 'mcp_a',
-  value: 'next draft',
-  expectedDraft: 'old draft'
+  action: 'send_prompt',
+  documentToken: 'doc_send_settle',
+  requestId: 'mcp_send',
+  value: 'production timing probe',
+  expectedDraft: ''
 }));
-assert.equal(composer.value, 'next draft');
-assert.equal(events.at(-1).action, 'set_draft');
-assert.equal(events.at(-1).ok, true);
-assert.equal(events.at(-1).requestId, 'mcp_a');
 
-window.__elonChatGptBridge.command(JSON.stringify({
-  action: 'set_draft',
-  documentToken: 'doc_test_1',
-  requestId: 'mcp_b',
-  value: 'must not overwrite',
-  expectedDraft: 'stale draft'
-}));
-assert.equal(composer.value, 'next draft');
-assert.equal(events.at(-1).action, 'set_draft');
-assert.equal(events.at(-1).ok, false);
-assert.equal(events.at(-1).requestId, 'mcp_b');
-
-console.log('CHATGPT_DRAFT_SYNC_POLICY=passed');
+setTimeout(() => {
+  const result = events.find((event) => event.action === 'send_prompt');
+  assert.ok(result, 'send command must produce a receipt');
+  assert.equal(result.ok, true);
+  assert.equal(result.requestId, 'mcp_send');
+  assert.equal(composer.value, '');
+  assert.ok(clickedAt - startedAt >= 180, 'send must wait for a stable enabled button');
+  console.log('CHATGPT_SEND_SETTLE_POLICY=passed');
+}, 650);

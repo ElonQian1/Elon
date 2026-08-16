@@ -20,6 +20,10 @@
   let disposed = false;
   let observer = null;
   let snapshotScheduler = null;
+  const SEND_BUTTON_POLL_MS = 60;
+  const SEND_BUTTON_SETTLE_MS = 180;
+  const SEND_BUTTON_TIMEOUT_MS = 4000;
+  const SEND_ACCEPT_TIMEOUT_MS = 3000;
 
   function emitEvent(event) {
     if (disposed) return;
@@ -259,6 +263,42 @@
     poll();
   }
 
+  function waitForStableSendButton(composer, expectedValue, onReady, onTimeout) {
+    const started = Date.now();
+    let readySince = 0;
+    let readyButton = null;
+    function poll() {
+      const button = findSendButton(composer);
+      const draftMatches = comparableText(composerValue(composer)) === comparableText(expectedValue);
+      if (button && draftMatches) {
+        if (button !== readyButton) {
+          readyButton = button;
+          readySince = Date.now();
+        }
+        if (Date.now() - readySince >= SEND_BUTTON_SETTLE_MS) return onReady(button);
+      } else {
+        readyButton = null;
+        readySince = 0;
+      }
+      if (Date.now() - started >= SEND_BUTTON_TIMEOUT_MS) return onTimeout();
+      window.setTimeout(poll, SEND_BUTTON_POLL_MS);
+    }
+    poll();
+  }
+
+  function waitForSendAccepted(composer, expectedValue, onAccepted, onTimeout) {
+    const started = Date.now();
+    function poll() {
+      const currentValue = comparableText(composerValue(composer));
+      if (!currentValue || currentValue !== comparableText(expectedValue) || isStreaming()) {
+        return onAccepted();
+      }
+      if (Date.now() - started >= SEND_ACCEPT_TIMEOUT_MS) return onTimeout();
+      window.setTimeout(poll, SEND_BUTTON_POLL_MS);
+    }
+    poll();
+  }
+
   function sendPrompt(value, expectedDraft, respond) {
     const composer = findComposer();
     if (!composer) return respond('send_prompt', false, '未找到输入框，请切换网页模式。');
@@ -268,13 +308,21 @@
     if (!setComposerValue(composer, value)) {
       return respond('send_prompt', false, '官方输入框未接受文本，请返回官网重试。');
     }
-    waitForReady(
-      () => findSendButton(composer),
-      2500,
+    waitForStableSendButton(
+      composer,
+      value,
       (button) => {
-        respond('send_prompt', true, '已交给官方网页发送。');
         button.click();
         scheduleSnapshot();
+        waitForSendAccepted(
+          composer,
+          value,
+          () => {
+            respond('send_prompt', true, '官方网页已确认发送。');
+            scheduleSnapshot();
+          },
+          () => respond('send_prompt', false, '官方网页未确认发送，请重试。')
+        );
       },
       () => respond('send_prompt', false, '发送按钮尚未就绪，请返回官网重试。')
     );

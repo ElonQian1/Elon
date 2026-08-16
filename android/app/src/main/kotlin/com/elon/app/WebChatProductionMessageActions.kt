@@ -1,8 +1,12 @@
 package com.elon.app
 
 import android.view.View
+import android.view.LayoutInflater
+import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.ArrayAdapter
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -82,6 +86,7 @@ internal data class WebChatContextAction(
     val controlId: String,
     val label: String,
     val requiresUserConfirmation: Boolean,
+    val nativeSelector: String,
 )
 
 internal object WebChatProductionMessageActionJson {
@@ -118,6 +123,8 @@ internal object WebChatProductionMessageActionJson {
                             controlId = id,
                             label = label,
                             requiresUserConfirmation = control.optBoolean("requires_user_confirmation", false),
+                            nativeSelector = "web-chat-message-context-action:" +
+                                ChatGptNativeControlPresentation.stableContextId(id),
                         ),
                     )
                 }
@@ -169,14 +176,30 @@ internal class WebChatProductionMessageActionCoordinator(
             Toast.makeText(activity, "当前消息没有更多可用操作", Toast.LENGTH_SHORT).show()
             return
         }
+        val adapter = ContextActionAdapter(activity, actions)
         AlertDialog.Builder(activity)
             .setTitle("消息操作")
-            .setItems(actions.map(WebChatContextAction::label).toTypedArray()) { _, index ->
+            .setAdapter(adapter) { opened, index ->
+                opened.dismiss()
                 actions.getOrNull(index)?.let(::confirmAndInvoke)
             }
             .setNeutralButton("官网功能") { _, _ -> openOfficialFallback() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private class ContextActionAdapter(
+        activity: AppCompatActivity,
+        private val actions: List<WebChatContextAction>,
+    ) : ArrayAdapter<WebChatContextAction>(activity, android.R.layout.simple_list_item_1, actions) {
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val textView = (convertView ?: LayoutInflater.from(context)
+                .inflate(android.R.layout.simple_list_item_1, parent, false)) as TextView
+            val action = actions[position]
+            textView.text = action.label
+            textView.contentDescription = action.nativeSelector
+            return textView
+        }
     }
 
     private fun confirmAndInvoke(action: WebChatContextAction) {

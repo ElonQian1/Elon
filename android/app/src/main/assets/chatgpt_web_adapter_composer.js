@@ -5,6 +5,7 @@
 
   const MAX_OPTIONS = 30;
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
+  const composerSubmenu = window.__elonChatGptComposerSubmenu;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
   const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
@@ -18,6 +19,17 @@
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
+  const submenuRecovery = composerSubmenu.createRecovery({
+    captureOptionBaseline,
+    emitOptions,
+    emitTriggerTouch,
+    emitVisibleNodeTouch,
+    isOptionVisible,
+    isVisible,
+    schedule: (callback, delayMs) => window.setTimeout(callback, delayMs),
+    triggerFor,
+    waitForOptionsMatching
+  });
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -351,7 +363,9 @@
   function visibleOptionNodes() {
     return Array.from(document.querySelectorAll(
       '[role="menuitemradio"], [role="menuitemcheckbox"], [role="menuitem"], [role="option"]'
-    )).filter(isOptionVisible);
+    )).filter((node) =>
+      isOptionVisible(node) && !composerSubmenu.containsNestedInteractiveControl(node)
+    );
   }
 
   function isActionable(node) {
@@ -447,15 +461,19 @@
     return optionPolicy.filter(section, candidates).slice(0, MAX_OPTIONS);
   }
 
-  function waitForOptions(section, baseline, onReady, onTimeout) {
+  function waitForOptionsMatching(section, baseline, predicate, onReady, onTimeout) {
     const started = Date.now();
     function poll() {
       const options = collectOptions(section, baseline);
-      if (options.length > 0) return onReady(options);
+      if (options.length > 0 && (!predicate || predicate(options))) return onReady(options);
       if (Date.now() - started > 1600) return onTimeout();
       window.setTimeout(poll, 60);
     }
     poll();
+  }
+
+  function waitForOptions(section, baseline, onReady, onTimeout) {
+    return waitForOptionsMatching(section, baseline, null, onReady, onTimeout);
   }
 
   function triggerFor(section, composer) {
@@ -555,12 +573,27 @@
     const pending = pendingOptions[section];
     if (!pending) return result(action, false, '没有等待读取的官网菜单。');
     function collect() {
-      waitForOptions(
+      waitForOptionsMatching(
         section,
         pending.baseline,
+        pending.parentOption
+          ? (options) => composerSubmenu.withoutKnownOptionIds(options, pending.rootOptionIds)
+              .some((option) => !option.opensSubmenu)
+          : null,
         (options) => {
           if (pendingOptions[section] !== pending) return;
-          emitOptions(section, options, composer, emitEvent);
+          const nestedOptions = pending.parentOption
+            ? composerSubmenu.withoutKnownOptionIds(options, pending.rootOptionIds)
+            : options;
+          const contextualOptions = pending.parentOption
+            ? nestedOptions.map((option) => Object.assign(option, {
+                parentOption: {
+                  id: pending.parentOption.id,
+                  label: pending.parentOption.label
+                }
+              }))
+            : nestedOptions;
+          emitOptions(section, contextualOptions, composer, emitEvent);
           settlePendingOptions(section, true, '');
         },
         () => {
@@ -587,7 +620,15 @@
       return result(action, false, '选项已过期，请重新打开列表。');
     }
     const target = lastOptions[section].find((option) => option.id === id);
-    if (!target || !isOptionVisible(target.node)) {
+    if (!target) {
+      return result(action, false, '官网菜单已经关闭，请重新选择。');
+    }
+    if (!isOptionVisible(target.node)) {
+      if (target.parentOption) {
+        return submenuRecovery.recover(
+          section, target, composer, emitEvent, result, scheduleSnapshot
+        );
+      }
       return result(action, false, '官网菜单已经关闭，请重新选择。');
     }
     const submenuPurpose = section === 'model' ? 'open_model_submenu' : 'open_composer_tools_submenu';
@@ -597,23 +638,19 @@
         baseline: captureOptionBaseline(),
         trigger: target.node,
         action,
+        parentOption: target,
+        rootOptionIds: new Set(lastOptions[section].map((option) => option.id)),
         complete: result
       });
-      const layout = window.__elonChatGptLayout;
-      if (layout && typeof layout.setNodeExpanded === 'function') {
-        layout.setNodeExpanded(target.node, true, emitEvent, (_action, ok, detail) => {
-          if (!ok) return settlePendingOptions(section, false, detail);
-          window.setTimeout(() => {
-            collectRequestedOptions(section, composer, emitEvent, () => {});
-          }, 220);
-        });
-        return;
-      }
-    }
-    if (!emitVisibleNodeTouch(purpose, target.node, emitEvent)) {
-      if (target.opensSubmenu) {
+      if (!emitVisibleNodeTouch(purpose, target.node, emitEvent)) {
         return settlePendingOptions(section, false, '官网选项当前不可见。');
       }
+      window.setTimeout(() => {
+        collectRequestedOptions(section, composer, emitEvent, () => {});
+      }, 220);
+      return;
+    }
+    if (!emitVisibleNodeTouch(purpose, target.node, emitEvent)) {
       return result(action, false, '官网选项当前不可见。');
     }
     if (!target.opensSubmenu) {

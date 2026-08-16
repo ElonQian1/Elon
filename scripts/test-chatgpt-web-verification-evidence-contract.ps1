@@ -149,6 +149,14 @@ if ($missingManualCases.Count -gt 0 -or $unregisteredCaseIds.Count -ne $manualOn
     throw "Manual-only acceptance coverage does not exactly match the catalog gap."
 }
 
+$fingerprintSource = Get-Content (Join-Path $repoRoot `
+    "android/gradle/chatgpt-web-input-fingerprint.gradle") -Raw
+if (-not $fingerprintSource.Contains(
+    'verificationCaseFiles["reversible/temporary_chat_toggle"]'
+)) {
+    throw "Temporary Chat acceptance has no APK input fingerprint mapping."
+}
+
 $adapterSource = Get-Content (Join-Path $repoRoot `
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt") -Raw
 $adapterMatch = [regex]::Match($adapterSource, "ADAPTER_VERSION\s*=\s*(\d+)")

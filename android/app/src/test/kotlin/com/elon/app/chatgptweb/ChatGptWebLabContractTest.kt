@@ -560,6 +560,8 @@ class ChatGptWebLabContractTest {
         assertFalse(partRenderer.contains("OkHttpClient"))
         assertFalse(partRenderer.contains("getCookie("))
         assertTrue(adapter.contains("position == messages.indexOfLast"))
+        assertTrue(adapter.contains("val availableActions = actions.distinctBy"))
+        assertFalse(adapter.contains("actions.filter(ChatGptWebUiControl::enabled)"))
         assertTrue(controller.contains("revealAttachedTarget"))
         assertTrue(controller.contains("getGlobalVisibleRect"))
         assertTrue(controller.contains("MAX_REVEAL_ATTEMPTS"))

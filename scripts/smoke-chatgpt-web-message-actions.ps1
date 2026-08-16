@@ -78,12 +78,22 @@ function Get-Controls {
         if ($Semantic) { $arguments.semantic = $Semantic }
         if ($Region) { $arguments.region = $Region }
         if ($ContextId) { $arguments.context_id = $ContextId }
-        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_find_controls" -Arguments $arguments
+        $page = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_find_controls" -Arguments $arguments `
+            -TimeoutSec $ReadyTimeoutSec
         @($page.controls | Where-Object { $null -ne $_ }).ForEach({ $controls.Add($_) })
         $offset = if ($null -eq $page.next_offset) { 0 } else { [int]$page.next_offset }
     } while ($page.has_more -eq $true -and $offset -gt 0)
     return @($controls)
+}
+
+function Get-BlockingOverlayControls {
+    return @(Get-Controls -Region "overlay") | Where-Object {
+        -not [string]::IsNullOrWhiteSpace([string]$_.context_id) -or
+        [string]$_.role -in @(
+            "dialog", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "slider"
+        )
+    }
 }
 
 function Wait-ContextualOverlay {
@@ -91,6 +101,8 @@ function Wait-ContextualOverlay {
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
+        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
+            -ExpectedAction "snapshot_ui_manifest" | Out-Null
         $controls = @(Get-Controls -Region "overlay")
         if (
             $controls.Count -gt 0 -and
@@ -106,7 +118,9 @@ function Wait-ContextualOverlay {
 function Wait-OverlayClosed {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min($ReadyTimeoutSec, 30))
     do {
-        if (@(Get-Controls -Region "overlay").Count -eq 0) { return $true }
+        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
+            -ExpectedAction "snapshot_ui_manifest" | Out-Null
+        if (@(Get-BlockingOverlayControls).Count -eq 0) { return $true }
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     return $false
@@ -114,7 +128,9 @@ function Wait-OverlayClosed {
 
 function Dismiss-VisibleOverlays {
     for ($attempt = 0; $attempt -lt 3; $attempt++) {
-        if (@(Get-Controls -Region "overlay").Count -eq 0) { return $true }
+        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
+            -ExpectedAction "snapshot_ui_manifest" | Out-Null
+        if (@(Get-BlockingOverlayControls).Count -eq 0) { return $true }
         Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
             -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
             -Label "dismiss pre-existing ChatGPT overlay" | Out-Null
@@ -143,6 +159,61 @@ function Restore-OriginalViewMode {
     return $true
 }
 
+function Get-UiAutomatorNodes {
+    param(
+        [Parameter(Mandatory = $true)][string]$UiXml,
+        [string]$ContentDescription = ""
+    )
+
+    $document = [xml]$UiXml
+    $nodes = @($document.SelectNodes("//node"))
+    if (-not $ContentDescription) { return $nodes }
+    return @($nodes | Where-Object {
+        [string]$_.GetAttribute("content-desc") -eq $ContentDescription
+    })
+}
+
+function Invoke-NativeSelector {
+    param([Parameter(Mandatory = $true)][string]$Selector)
+
+    $remotePath = "/sdcard/elon-chatgpt-native-selector.xml"
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
+    try {
+        do {
+            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                -Arguments @("shell", "uiautomator", "dump", $remotePath) -TimeoutSec 30 `
+                -Label "dump native ChatGPT selector" | Out-Null
+            $xml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                -Arguments @("shell", "cat", $remotePath) -TimeoutSec 30 `
+                -Label "read native ChatGPT selector"
+            $node = @(Get-UiAutomatorNodes -UiXml $xml -ContentDescription $Selector) |
+                Select-Object -First 1
+            if ($null -ne $node) {
+                $match = [regex]::Match([string]$node.GetAttribute("bounds"),
+                    '^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$')
+                if (-not $match.Success) { throw "Native selector returned invalid bounds." }
+                $x = [int](
+                    ([int]$match.Groups[1].Value + [int]$match.Groups[3].Value) / 2
+                )
+                $y = [int](
+                    ([int]$match.Groups[2].Value + [int]$match.Groups[4].Value) / 2
+                )
+                Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                    -Arguments @("shell", "input", "tap", "$x", "$y") -TimeoutSec 5 `
+                    -Label "open native ChatGPT message actions" | Out-Null
+                Start-Sleep -Milliseconds 400
+                return $true
+            }
+            Start-Sleep -Milliseconds 400
+        } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    } finally {
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "rm", "-f", $remotePath) -TimeoutSec 5 `
+            -Label "remove native ChatGPT selector dump" | Out-Null
+    }
+    throw "The requested native ChatGPT selector was not visible to ADB."
+}
+
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
@@ -168,23 +239,6 @@ try {
 
     Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
         -ExpectedAction "snapshot_ui_manifest" | Out-Null
-    $saveToProject = @(Get-Controls -Semantic "save_to_project" -Region "message") |
-        Where-Object {
-            $_.enabled -eq $true -and
-            -not [string]::IsNullOrWhiteSpace([string]$_.context_id)
-        } |
-        Select-Object -Last 1
-    if ($null -eq $saveToProject) {
-        throw "No message-scoped save-to-project control is available for safe verification."
-    }
-    if ([string]$saveToProject.native_presentation -ne "menu") {
-        throw "The save-to-project control is not exposed through the native message menu."
-    }
-    $nativeMessageSelector = [string]$saveToProject.native_trigger_content_description
-    $nativeSaveSelector = [string]$saveToProject.native_adb_content_description
-    if (-not $nativeMessageSelector -or -not $nativeSaveSelector) {
-        throw "The save-to-project control did not export stable native selectors."
-    }
     $messageMore = @(Get-Controls -Semantic "more" -Region "message") |
         Where-Object {
             $_.enabled -eq $true -and $_.in_viewport -eq $true -and
@@ -192,20 +246,59 @@ try {
         } |
         Select-Object -Last 1
     if ($null -eq $messageMore) {
-        throw "No visible message overflow control is available for safe verification."
+        $messageMore = @(Get-Controls -Semantic "more" -Region "message") |
+            Where-Object {
+                $_.enabled -eq $true -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.context_id)
+            } |
+            Select-Object -Last 1
     }
+    if ($null -eq $messageMore) {
+        throw "No message overflow control is available for safe verification."
+    }
+    $messageContextId = [string]$messageMore.context_id
+    $messageActions = @(Get-Controls -Region "message" -ContextId $messageContextId) |
+        Where-Object {
+            $_.enabled -eq $true -and
+            [string]$_.native_presentation -eq "menu" -and
+            -not [string]::IsNullOrWhiteSpace([string]$_.native_adb_content_description)
+        }
+    $nativeMessageSelector = [string]$messageMore.native_trigger_content_description
+    $nativeActionSelector = [string](@(
+        $messageActions |
+            Where-Object { [string]$_.semantic -ne "more" } |
+            Select-Object -ExpandProperty native_adb_content_description -Unique
+    ) | Select-Object -First 1)
+    if (-not $nativeActionSelector) {
+        $nativeActionSelector = [string](@(
+            $messageActions |
+                Select-Object -ExpandProperty native_adb_content_description -Unique
+        ) | Select-Object -First 1)
+    }
+    if (-not $nativeMessageSelector -or -not $nativeActionSelector) {
+        throw "The current message actions did not export stable native selectors."
+    }
+    $saveToProject = @($messageActions | Where-Object semantic -eq "save_to_project") |
+        Select-Object -First 1
+    $nativeSaveSelector = if ($null -ne $saveToProject) {
+        [string]$saveToProject.native_adb_content_description
+    } else { "" }
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
         -Arguments @{ view_mode = "native" } | Out-Null
     $script:viewModeChanged = $true
     Wait-ViewMode -ExpectedMode "native" | Out-Null
     $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
-        -Arguments @{ message_id = [string]$saveToProject.context_id; target = "actions" }
+        -Arguments @{ message_id = $messageContextId; target = "actions" }
     if ($reveal.control_ok -ne $true) {
         throw "The native message action target could not be revealed."
     }
+    $nativeMessageSelectorFound =
+        Invoke-NativeSelector -Selector $nativeMessageSelector
     $script:nativeActionDialogOpened = $true
 
     $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
+    $nativeDialogItemCount = 0
+    $nativeDialogActionDescriptionCount = 0
     try {
         $selectorDeadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
         do {
@@ -215,13 +308,25 @@ try {
             $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
                 -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
                 -Label "read native ChatGPT message menu selectors"
-            $nativeMessageSelectorFound = $uiXml.Contains($nativeMessageSelector)
-            $nativeSaveSelectorFound = $uiXml.Contains($nativeSaveSelector)
-            if (-not ($nativeMessageSelectorFound -and $nativeSaveSelectorFound)) {
+            $uiNodes = @(Get-UiAutomatorNodes -UiXml $uiXml)
+            $nativeActionSelectorFound = @($uiNodes | Where-Object {
+                [string]$_.GetAttribute("content-desc") -eq $nativeActionSelector
+            }).Count -gt 0
+            $nativeSaveSelectorFound = $nativeSaveSelector -and @($uiNodes | Where-Object {
+                [string]$_.GetAttribute("content-desc") -eq $nativeSaveSelector
+            }).Count -gt 0
+            $nativeDialogItems = @($uiNodes | Where-Object {
+                [string]$_.GetAttribute("resource-id") -eq "android:id/text1"
+            })
+            $nativeDialogItemCount = $nativeDialogItems.Count
+            $nativeDialogActionDescriptionCount = @($nativeDialogItems | Where-Object {
+                -not [string]::IsNullOrWhiteSpace([string]$_.GetAttribute("content-desc"))
+            }).Count
+            if (-not $nativeActionSelectorFound) {
                 Start-Sleep -Milliseconds 500
             }
         } while (
-            -not ($nativeMessageSelectorFound -and $nativeSaveSelectorFound) -and
+            -not $nativeActionSelectorFound -and
             [DateTimeOffset]::UtcNow -lt $selectorDeadline
         )
     } finally {
@@ -229,11 +334,9 @@ try {
             -Arguments @("shell", "rm", "-f", $remoteDump) -TimeoutSec 5 `
             -Label "remove native ChatGPT message selector dump" | Out-Null
     }
-    if (-not $nativeMessageSelectorFound) {
-        throw "The native message menu selector was not visible to ADB."
-    }
-    if (-not $nativeSaveSelectorFound) {
-        throw "The native save-to-project selector was not visible to ADB."
+    if (-not $nativeActionSelectorFound) {
+        throw "No current native message action selector was visible to ADB " +
+            "(dialog_items=$nativeDialogItemCount, described_items=$nativeDialogActionDescriptionCount)."
     }
     Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
         -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
@@ -297,8 +400,13 @@ try {
         context_bound = $true
         native_message_revealed = $true
         native_message_selector_found = $nativeMessageSelectorFound
-        save_to_project_discovered = $true
-        save_to_project_context_bound = $true
+        native_action_selector_found = $nativeActionSelectorFound
+        available_message_action_semantics = @(
+            $messageActions.semantic | Sort-Object -Unique
+        )
+        save_to_project_discovered = $null -ne $saveToProject
+        save_to_project_context_bound = $null -ne $saveToProject -and
+            [string]$saveToProject.context_id -eq $messageContextId
         save_to_project_native_selector_found = $nativeSaveSelectorFound
         save_to_project_invoked = 0
         native_overlay_selector_exported = $true

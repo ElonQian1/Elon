@@ -24,6 +24,7 @@
     const role = clean(candidate && candidate.role).toLowerCase();
     if (!label || isForeignMenuLabel(label)) return false;
     if (section === 'model') {
+      if (/^(?:能力|capabilit(?:y|ies))$/iu.test(label)) return false;
       const sharedModelMatch = modelLabelPolicy &&
         typeof modelLabelPolicy.isModelLabel === 'function' &&
         modelLabelPolicy.isModelLabel(label);

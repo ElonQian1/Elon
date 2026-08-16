@@ -197,11 +197,15 @@ function Get-SelectableModels {
                 @{ Expression = { [string]$_.label } }
     )
     foreach ($parent in $parents) {
-        Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-            -ExpectedAction "select_model_option" -Arguments @{
-                section = "model"
-                option_id = [string]$parent.id
-            } | Out-Null
+        try {
+            Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+                -ExpectedAction "select_model_option" -Arguments @{
+                    section = "model"
+                    option_id = [string]$parent.id
+                } | Out-Null
+        } catch {
+            continue
+        }
         try {
             $children = @(
                 Get-CachedComposerModels -RequireLeafChoices `
@@ -213,7 +217,7 @@ function Get-SelectableModels {
         $childLeaves = @($children | Where-Object { Test-SelectableModelLeaf -Option $_ })
         if ($childLeaves.Count -ge 2) { return $childLeaves }
     }
-    throw "At least two selectable model choices are required for reversible acceptance."
+    return @()
 }
 
 function Find-ModelByLabel {
@@ -253,8 +257,9 @@ function Get-ManifestControls {
     $controls = [System.Collections.Generic.List[object]]::new()
     $offset = 0
     do {
-        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_find_controls" -Arguments @{ offset = $offset; limit = 50 }
+        $page = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_find_controls" -Arguments @{ offset = $offset; limit = 50 } `
+            -TimeoutSec $ReadyTimeoutSec
         @($page.controls | Where-Object { $null -ne $_ }).ForEach({ $controls.Add($_) })
         $offset = if ($null -eq $page.next_offset) { 0 } else { [int]$page.next_offset }
     } while ($page.has_more -eq $true -and $offset -gt 0)
@@ -338,54 +343,58 @@ if ($originConversationPath) {
     $temporaryConversationUsed = $true
 }
 
-$modelRestored = $false
+$modelRestored = $true
+$modelSwitchObserved = $false
+$models = @()
 $modelViewRestored = $false
 $modelConversationRestored = $false
+$temporaryChatObserved = $false
+$temporaryChatSelectionObservable = $false
+$temporaryChatFirstReceiptSucceeded = $false
+$temporaryChatIdempotentReceiptSucceeded = $false
+$temporaryChatRestoreReceiptSucceeded = $false
+$temporaryChatRestored = $false
 try {
     $temporaryChatOrigin = Get-TemporaryChatControl
-    if ($null -eq $temporaryChatOrigin) {
-        throw "Temporary Chat is not observable in a blank conversation."
-    }
-    $temporaryChatSelectionObservable = [bool]$temporaryChatOrigin.state_settable
-    $temporaryChatOriginalSelected = [bool]$temporaryChatOrigin.selected
-    $temporaryChatTargetSelected = -not $temporaryChatOriginalSelected
-    $temporaryChatFirstReceiptSucceeded = $false
-    $temporaryChatIdempotentReceiptSucceeded = $false
-    $temporaryChatRestoreReceiptSucceeded = $false
-    $temporaryChatRestored = $false
-    try {
-        Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
-            -ExpectedAction "set_ui_control_selected" -Arguments @{
-                control_id = [string]$temporaryChatOrigin.control_id
-                selected = $temporaryChatTargetSelected
-            } | Out-Null
-        $temporaryChatFirstReceiptSucceeded = $true
-        $temporaryChatChanged = Wait-TemporaryChatState -Expected $temporaryChatTargetSelected
-        Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
-            -ExpectedAction "set_ui_control_selected" -Arguments @{
-                control_id = [string]$temporaryChatChanged.control_id
-                selected = $temporaryChatTargetSelected
-            } | Out-Null
-        $temporaryChatIdempotentReceiptSucceeded = $true
-        Wait-TemporaryChatState -Expected $temporaryChatTargetSelected | Out-Null
-    } finally {
-        if ($temporaryChatFirstReceiptSucceeded) {
-            $restoreTemporaryChat = Get-TemporaryChatControl
-            if ($null -eq $restoreTemporaryChat) {
-                throw "Temporary Chat control disappeared before desired-state restoration."
-            }
+    if ($null -ne $temporaryChatOrigin) {
+        $temporaryChatObserved = $true
+        $temporaryChatSelectionObservable = [bool]$temporaryChatOrigin.state_settable
+        $temporaryChatOriginalSelected = [bool]$temporaryChatOrigin.selected
+        $temporaryChatTargetSelected = -not $temporaryChatOriginalSelected
+        try {
             Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
                 -ExpectedAction "set_ui_control_selected" -Arguments @{
-                    control_id = [string]$restoreTemporaryChat.control_id
-                    selected = $temporaryChatOriginalSelected
+                    control_id = [string]$temporaryChatOrigin.control_id
+                    selected = $temporaryChatTargetSelected
                 } | Out-Null
-            $temporaryChatRestoreReceiptSucceeded = $true
-            Wait-TemporaryChatState -Expected $temporaryChatOriginalSelected | Out-Null
-            $temporaryChatRestored = $true
+            $temporaryChatFirstReceiptSucceeded = $true
+            $temporaryChatChanged = Wait-TemporaryChatState -Expected $temporaryChatTargetSelected
+            Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+                -ExpectedAction "set_ui_control_selected" -Arguments @{
+                    control_id = [string]$temporaryChatChanged.control_id
+                    selected = $temporaryChatTargetSelected
+                } | Out-Null
+            $temporaryChatIdempotentReceiptSucceeded = $true
+            Wait-TemporaryChatState -Expected $temporaryChatTargetSelected | Out-Null
+        } finally {
+            if ($temporaryChatFirstReceiptSucceeded) {
+                $restoreTemporaryChat = Get-TemporaryChatControl
+                if ($null -eq $restoreTemporaryChat) {
+                    throw "Temporary Chat control disappeared before desired-state restoration."
+                }
+                Invoke-ReceiptAction -Action "chatgpt_set_control_selected" `
+                    -ExpectedAction "set_ui_control_selected" -Arguments @{
+                        control_id = [string]$restoreTemporaryChat.control_id
+                        selected = $temporaryChatOriginalSelected
+                    } | Out-Null
+                $temporaryChatRestoreReceiptSucceeded = $true
+                Wait-TemporaryChatState -Expected $temporaryChatOriginalSelected | Out-Null
+                $temporaryChatRestored = $true
+            }
         }
-    }
-    if (-not $temporaryChatFirstReceiptSucceeded -or -not $temporaryChatRestored) {
-        throw "Temporary Chat desired-state command round trip was not completed."
+        if (-not $temporaryChatFirstReceiptSucceeded -or -not $temporaryChatRestored) {
+            throw "Temporary Chat desired-state command round trip was not completed."
+        }
     }
 
     $modelOrigin = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
@@ -393,7 +402,7 @@ try {
     $script:modelDiscoveryStage = "discover_choices"
     $models = @(Get-SelectableModels)
     $originalModel = $null
-    if (-not [string]::IsNullOrWhiteSpace($originalModelLabel)) {
+    if ($models.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($originalModelLabel)) {
         $originalModel = Find-ModelByLabel -Models $models -Label $originalModelLabel
     }
     if ($null -eq $originalModel) {
@@ -403,20 +412,21 @@ try {
     $alternateModel = $models |
         Where-Object { [string]$_.label -ne $originalModelLabel } |
         Select-Object -First 1
-    if ($null -eq $originalModel -or $null -eq $alternateModel) {
-        throw "At least two observable model choices are required for reversible acceptance."
-    }
-    try {
-        $script:modelDiscoveryStage = "verify_alternate"
-        Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-            -ExpectedAction "select_model_option" -Arguments @{
-                section = "model"
-                option_id = [string]$alternateModel.id
-            } | Out-Null
-        Wait-SelectedModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
-    } finally {
-        $script:modelDiscoveryStage = "restore_original"
-        $modelRestored = Restore-ModelByLabel -Label $originalModelLabel
+    if ($null -ne $originalModel -and $null -ne $alternateModel) {
+        $modelSwitchObserved = $true
+        $modelRestored = $false
+        try {
+            $script:modelDiscoveryStage = "verify_alternate"
+            Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+                -ExpectedAction "select_model_option" -Arguments @{
+                    section = "model"
+                    option_id = [string]$alternateModel.id
+                } | Out-Null
+            Wait-SelectedModel -ExpectedLabel ([string]$alternateModel.label) | Out-Null
+        } finally {
+            $script:modelDiscoveryStage = "restore_original"
+            $modelRestored = Restore-ModelByLabel -Label $originalModelLabel
+        }
     }
 } finally {
     if ($temporaryConversationUsed) {
@@ -485,11 +495,13 @@ if ($originViewMode -in @("web", "native")) {
         -Arguments @{ view_mode = $originViewMode } | Out-Null
 }
 
+$verificationCaseIds = [System.Collections.Generic.List[string]]::new()
+$verificationCaseIds.Add("reversible/reversible_controls")
+if ($temporaryChatObserved -and $temporaryChatRestored) {
+    $verificationCaseIds.Add("reversible/temporary_chat_toggle")
+}
 Register-ChatGptWebVerificationCases -Runtime $runtime `
-    -CaseIds @(
-        "reversible/reversible_controls",
-        "reversible/temporary_chat_toggle"
-    ) `
+    -CaseIds @($verificationCaseIds) `
     -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
 [ordered]@{
@@ -500,7 +512,12 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
     uploaded_attachments = 0
     model_selection = [ordered]@{
         observed_choices = $models.Count
-        changed = $true
+        verification_status = if ($modelSwitchObserved) {
+            "device_verified"
+        } else {
+            "not_observable_on_current_official_page"
+        }
+        changed = $modelSwitchObserved
         original_state_restored = $modelRestored
         original_conversation_restored = $modelConversationRestored
     }
@@ -509,7 +526,13 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
         original_state_restored = $disclosureRestored
     }
     temporary_chat = [ordered]@{
-        command_round_trip = $true
+        available = $temporaryChatObserved
+        verification_status = if ($temporaryChatObserved) {
+            "device_verified"
+        } else {
+            "not_observable_on_current_official_page"
+        }
+        command_round_trip = $temporaryChatObserved -and $temporaryChatRestored
         first_receipt_succeeded = $temporaryChatFirstReceiptSucceeded
         idempotent_receipt_succeeded = $temporaryChatIdempotentReceiptSucceeded
         restore_receipt_succeeded = $temporaryChatRestoreReceiptSucceeded

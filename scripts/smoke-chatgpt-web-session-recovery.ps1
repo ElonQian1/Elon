@@ -81,6 +81,46 @@ function Get-NativeIdentity {
     }
 }
 
+function Get-NativeIdentityKey {
+    param([Parameter(Mandatory = $true)]$Identity)
+
+    return @(
+        [string]$Identity.authenticated,
+        [string]$Identity.conversation_path,
+        [string]$Identity.message_count,
+        [string]$Identity.visible_message_count,
+        [string]$Identity.message_shape_sha256
+    ) -join "|"
+}
+
+function Wait-StableNativeIdentity {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
+    $previousKey = ""
+    $confirmations = 0
+    do {
+        $state = Get-ChatGptWebNativeChatState -Runtime $runtime
+        try {
+            $identity = Get-NativeIdentity -State $state
+            $key = Get-NativeIdentityKey -Identity $identity
+            if ($key -eq $previousKey) {
+                $confirmations++
+            } else {
+                $previousKey = $key
+                $confirmations = 1
+            }
+            if ($confirmations -ge 3) {
+                return [pscustomobject]@{ state = $state; identity = $identity }
+            }
+        } catch {
+            if ($_.Exception.Message -notmatch "not ready") { throw }
+            $previousKey = ""
+            $confirmations = 0
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Native ChatGPT Web AI conversation did not stabilize before restart."
+}
+
 function Wait-NativeIdentity {
     param([Parameter(Mandatory = $true)]$Expected)
 
@@ -109,8 +149,10 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
-    $beforeState = Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $ReadyTimeoutSec
-    $beforeIdentity = Get-NativeIdentity -State $beforeState
+    Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $ReadyTimeoutSec | Out-Null
+    $stableBefore = Wait-StableNativeIdentity
+    $beforeState = $stableBefore.state
+    $beforeIdentity = $stableBefore.identity
     $beforePid = Get-AppPid
     if ([string]::IsNullOrWhiteSpace($beforePid)) { throw "Elon app pid is unavailable before restart." }
 

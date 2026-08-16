@@ -15,6 +15,9 @@ $errors = $null
 if (@($errors).Count -gt 0) {
     throw "PowerShell parse failed for $smokePath`: $($errors[0].Message)"
 }
+if ($smoke -notmatch '(?s)function Get-ManifestControls \{.*?Invoke-ChatGptWebSmokeReadyAction.*?-Action "chatgpt_find_controls"') {
+    throw "Reversible controls smoke must wait for the current bridge generation before paging manifest controls."
+}
 
 $required = @(
     "ExpectedHardwareSerial",
@@ -42,7 +45,9 @@ $required = @(
     'Action "chatgpt_new_conversation"',
     'Action "chatgpt_open_conversation"',
     "`$temporaryConversationUsed = `$false",
-    "Temporary Chat is not observable in a blank conversation",
+    "`$temporaryChatObserved = `$false",
+    'if ($null -ne $temporaryChatOrigin)',
+    'not_observable_on_current_official_page',
     "original_conversation_restored = `$modelConversationRestored",
     'view_mode = "web"',
     "original_view_mode_restored = `$modelViewRestored",
@@ -50,6 +55,10 @@ $required = @(
     "Timed out waiting for ChatGPT model options",
     "modelDiscoveryStage",
     "model entry finishes hydrating",
+    '$models.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($originalModelLabel)',
+    'verification_status = if ($modelSwitchObserved)',
+    'not_observable_on_current_official_page',
+    'changed = $modelSwitchObserved',
     "chatgpt_refresh_controls",
     "chatgpt_find_controls",
     "chatgpt_set_control_expanded",
@@ -67,6 +76,8 @@ $required = @(
     "selection_state_observable = `$temporaryChatSelectionObservable",
     'ExpectedAction "set_ui_control_selected"',
     '"reversible/temporary_chat_toggle"',
+    'if ($temporaryChatObserved -and $temporaryChatRestored)',
+    'CaseIds @($verificationCaseIds)',
     "original_state_restored = `$temporaryChatRestored",
     "sent_messages = 0",
     "uploaded_attachments = 0",
@@ -157,6 +168,12 @@ try {
 if (-not $emulatorRejected) { throw "Emulator smoke runtime must be rejected." }
 if ($smoke.Contains('ExpectedAction "invoke_ui_control"')) {
     throw "Temporary Chat acceptance must use desired-state commands, not blind invocation."
+}
+if ($smoke -notmatch '(?s)foreach \(\$parent in \$parents\).*?Invoke-ReceiptAction.*?catch\s*\{\s*continue\s*\}') {
+    throw "Reversible control smoke must skip official model groups that expose no selectable children."
+}
+if ($smoke.Contains('throw "Temporary Chat is not observable in a blank conversation."')) {
+    throw "Unavailable Temporary Chat must be reported as not observable, not fail model acceptance."
 }
 if ($smoke -notmatch '(?s)finally\s*\{.*?if \(\$temporaryChatFirstReceiptSucceeded\).*?chatgpt_set_control_selected.*?selected = \$temporaryChatOriginalSelected.*?\$temporaryChatRestoreReceiptSucceeded = \$true') {
     throw "Temporary Chat acceptance must restore every successful state change in finally."

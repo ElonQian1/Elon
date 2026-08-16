@@ -7,6 +7,7 @@
   const composerAdapter = window.__elonChatGptComposer;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const controlOwnershipPolicy = window.__elonChatGptControlOwnershipPolicy;
+  const messagePortalPolicy = window.__elonChatGptMessagePortalPolicy;
   const formCommands = window.__elonChatGptFormCommands;
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
@@ -360,18 +361,28 @@
       used.nodes && used.nodes.add(node); const semantic = semanticFor(node, region, index);
       const label = labelOf(node, defaultLabel(semantic));
       const path = relatedSameOriginPath(node);
-      const resolvedContextId = contextId || (
+      const portalContextId = region === 'overlay' && !contextId && messagePortalPolicy
+        ? messagePortalPolicy.inferMessageContext({
+            semantic,
+            role: roleOf(node),
+            actionRect: node.getBoundingClientRect(),
+            messages: messageNodes(24),
+            viewportHeight: window.innerHeight
+          })
+        : '';
+      const resolvedRegion = portalContextId ? 'message' : region;
+      const resolvedContextId = contextId || portalContextId || (
         window.__elonChatGptPageSemanticPolicy &&
         typeof window.__elonChatGptPageSemanticPolicy.conversationContextId === 'function'
           ? window.__elonChatGptPageSemanticPolicy.conversationContextId({
               semantic,
-              region,
+              region: resolvedRegion,
               path,
               pathname: location.pathname
             })
           : ''
       );
-      const id = controlId(semantic, node, label, region, used, resolvedContextId);
+      const id = controlId(semantic, node, label, resolvedRegion, used, resolvedContextId);
       const rect = node.getBoundingClientRect();
       const form = formAdapter && formAdapter.describe(node);
       const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
@@ -404,14 +415,14 @@
       const selected = semanticState ? semanticState.selected : composerToolStatePolicy &&
         typeof composerToolStatePolicy.controlSelected === 'function'
         ? composerToolStatePolicy.controlSelected({
-            semantic, region, directSelected, directKnown: selection.known
+            semantic, region: resolvedRegion, directSelected, directKnown: selection.known
           })
         : directSelected;
       const control = {
         id,
         semantic,
         label,
-        region,
+        region: resolvedRegion,
         role: roleOf(node),
         enabled: !node.matches(':disabled') && node.getAttribute('aria-disabled') !== 'true',
         selected,
@@ -443,26 +454,14 @@
     });
   }
 
-  function messageNodes() {
-    const main = document.querySelector('main');
-    if (!main) return [];
-    const turns = Array.from(main.querySelectorAll('[data-testid^="conversation-turn-"]'));
-    return turns.length ? turns : Array.from(main.querySelectorAll('[data-message-author-role]'));
-  }
-
-  function messageContextId(node, index) {
-    return String(
-      node.getAttribute('data-message-id')
-      || node.getAttribute('data-testid')
-      || node.id
-      || 'message-' + index
-    ).replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 160);
+  function messageNodes(limit) {
+    return messagePortalPolicy ? messagePortalPolicy.findMessageNodes(document, limit) : [];
   }
 
   function addMessageControls(target, used) {
-    messageNodes().slice(-24).forEach((turn, index) => {
+    messageNodes(24).forEach((turn, index) => {
       const content = turn.querySelector('.markdown, [data-message-content], .whitespace-pre-wrap');
-      const contextId = messageContextId(turn, index);
+      const contextId = messagePortalPolicy.messageContextId(turn, index);
       addRegionControls(target, turn, 'message', used, (node) => {
         if (content && content.contains(node) && node.matches('a[href]')) return false;
         return node.matches('button, [role="button"], [role="menuitem"]');

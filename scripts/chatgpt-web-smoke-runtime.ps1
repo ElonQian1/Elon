@@ -459,15 +459,22 @@ function Register-ChatGptWebVerificationCases {
     param(
         [Parameter(Mandatory = $true)]$Runtime,
         [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string[]]$CaseIds,
-        [Parameter(Mandatory = $true)][ValidateRange(1, 9999)][int]$ExpectedAdapterVersion
+        [Parameter(Mandatory = $true)][ValidateRange(1, 9999)][int]$ExpectedAdapterVersion,
+        [switch]$ProductionSurface
     )
 
     $expected = @($CaseIds | Sort-Object -Unique)
-    $result = Invoke-ChatGptWebSmokeReadyAction -Runtime $Runtime `
-        -Action "chatgpt_record_verification_cases" -Arguments @{
-            case_ids = $expected
-            expected_adapter_version = $ExpectedAdapterVersion
-        }
+    $arguments = @{
+        case_ids = $expected
+        expected_adapter_version = $ExpectedAdapterVersion
+    }
+    $result = if ($ProductionSurface) {
+        Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
+            -Action "chatgpt_record_verification_cases" -Arguments $arguments
+    } else {
+        Invoke-ChatGptWebSmokeReadyAction -Runtime $Runtime `
+            -Action "chatgpt_record_verification_cases" -Arguments $arguments
+    }
     $recorded = @($result.recorded_case_ids | Sort-Object -Unique)
     if (($recorded -join "`n") -ne ($expected -join "`n")) {
         throw "ChatGPT Web verification evidence did not record the requested cases."

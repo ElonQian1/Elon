@@ -13,12 +13,18 @@ $errors = $null
 if (@($errors).Count -gt 0) {
     throw "PowerShell parse failed for $path`: $($errors[0].Message)"
 }
+if ($source -notmatch '(?s)function Get-Controls \{.*?Invoke-ChatGptWebSmokeReadyAction.*?-Action "chatgpt_find_controls"') {
+    throw "Message action smoke must wait for the current bridge generation before paging controls."
+}
 
 $required = @(
     "ExpectedHardwareSerial",
     "Assert-ChatGptWebSmokeTrustedDevice",
     "Assert-ChatGptWebSmokeAdapterVersion",
     "Dismiss-VisibleOverlays",
+    "function Get-BlockingOverlayControls",
+    '"dialog", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "slider"',
+    'Invoke-ReceiptAction -Action "chatgpt_refresh_controls"',
     "Restore-OriginalViewMode",
     'view_mode = "official"',
     'view_mode = "native"',
@@ -27,9 +33,19 @@ $required = @(
     'target = "actions"',
     "native_message_revealed",
     "native_message_selector_found",
-    'Get-Controls -Semantic "save_to_project" -Region "message"',
-    "save_to_project_discovered = `$true",
-    "save_to_project_context_bound = `$true",
+    "function Invoke-NativeSelector",
+    "function Get-UiAutomatorNodes",
+    'Invoke-NativeSelector -Selector $nativeMessageSelector',
+    '$nativeMessageSelectorFound =',
+    '[string]$_.GetAttribute("content-desc") -eq $nativeActionSelector',
+    'dialog_items=$nativeDialogItemCount, described_items=$nativeDialogActionDescriptionCount',
+    '@("shell", "input", "tap", "$x", "$y")',
+    'Get-Controls -Semantic "more" -Region "message"',
+    'Get-Controls -Region "message" -ContextId $messageContextId',
+    'available_message_action_semantics',
+    'native_action_selector_found',
+    'save_to_project_discovered = $null -ne $saveToProject',
+    'save_to_project_context_bound = $null -ne $saveToProject',
     "save_to_project_native_selector_found",
     "save_to_project_invoked = 0",
     "native_overlay_selector_exported",
@@ -55,6 +71,7 @@ foreach ($forbidden in @(
     "chatgpt_remove_attachment",
     "chatgpt_stop_generation",
     'control_id = [string]$saveToProject.control_id',
+    'No message-scoped save-to-project control is available for safe verification.',
     "removeAllCookies",
     "pm clear"
 )) {

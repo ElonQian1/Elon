@@ -42,7 +42,14 @@ class WebChatProductionMessageActionJsonTest {
         )
 
         assertEquals(
-            listOf(WebChatContextAction("control_read_aloud", "朗读", true)),
+            listOf(
+                WebChatContextAction(
+                    "control_read_aloud",
+                    "朗读",
+                    true,
+                    "web-chat-message-context-action:control_read_aloud",
+                ),
+            ),
             WebChatProductionMessageActionJson.contextActions(response),
         )
     }

@@ -2,6 +2,13 @@ package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 
+internal data class WebChatCommandStatus(
+    val action: String,
+    val ok: Boolean,
+    val detail: String,
+    val observedAtMs: Long,
+)
+
 internal interface WebChatSocialController {
     val providerId: WebChatProviderId
 
@@ -29,7 +36,11 @@ internal interface WebChatSocialController {
     fun requestConversationIndex(): Boolean
     fun openConversation(path: String): Boolean
     fun openProject(path: String): Boolean
+    fun supportsLocalProjects(): Boolean = false
+    fun createLocalProject(title: String): Boolean = false
+    fun assignConversationToLocalProject(path: String, projectId: String?): Boolean = false
     fun mcpPort(): WebChatSocialMcpPort? = null
+    fun lastCommandStatus(): WebChatCommandStatus? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false
     fun onHostResumed()
     fun onHostPaused()

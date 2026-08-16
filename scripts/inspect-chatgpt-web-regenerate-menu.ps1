@@ -51,12 +51,22 @@ function Get-Controls {
         if ($Semantic) { $arguments.semantic = $Semantic }
         if ($Region) { $arguments.region = $Region }
         if ($ContextId) { $arguments.context_id = $ContextId }
-        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-            -Action "chatgpt_find_controls" -Arguments $arguments
+        $page = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_find_controls" -Arguments $arguments `
+            -TimeoutSec $ReadyTimeoutSec
         @($page.controls | Where-Object { $null -ne $_ }).ForEach({ $controls.Add($_) })
         $offset = if ($null -eq $page.next_offset) { 0 } else { [int]$page.next_offset }
     } while ($page.has_more -eq $true -and $offset -gt 0)
     return @($controls)
+}
+
+function Get-BlockingOverlayControls {
+    return @(Get-Controls -Region "overlay") | Where-Object {
+        -not [string]::IsNullOrWhiteSpace([string]$_.context_id) -or
+        [string]$_.role -in @(
+            "dialog", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "slider"
+        )
+    }
 }
 
 function Convert-SafeControl {
@@ -89,6 +99,8 @@ function Wait-OverlayControls {
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
     do {
+        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
+            -ExpectedAction "snapshot_ui_manifest" | Out-Null
         $controls = @(Get-Controls -Region "overlay")
         if ($controls.Count -gt 0) {
             $foreign = @($controls | Where-Object {
@@ -105,7 +117,9 @@ function Wait-OverlayControls {
 function Wait-OverlayClosed {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
     do {
-        if (@(Get-Controls -Region "overlay").Count -eq 0) { return $true }
+        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
+            -ExpectedAction "snapshot_ui_manifest" | Out-Null
+        if (@(Get-BlockingOverlayControls).Count -eq 0) { return $true }
         Start-Sleep -Seconds $PollIntervalSec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     return $false
@@ -222,18 +236,27 @@ try {
     })
     $messageMore = @(Get-Controls -Semantic "more" -Region "message") |
         Where-Object {
-            $_.enabled -eq $true -and $_.in_viewport -eq $true -and
+            $_.enabled -eq $true -and
                 [string]$_.context_id -eq [string]$assistant.id
         } |
         Select-Object -Last 1
+    $messageMoreSource = "synthetic_assistant"
     if ($null -eq $messageMore) {
         $messageMore = @(Get-Controls -Semantic "more" -Region "message") |
             Where-Object { $_.enabled -eq $true -and $_.in_viewport -eq $true } |
             Select-Object -Last 1
+        $messageMoreSource = "current_visible_message"
     }
     if ($null -eq $messageMore) {
-        throw "Synthetic assistant message exported no visible overflow control."
+        $messageMore = @(Get-Controls -Semantic "more" -Region "message") |
+            Where-Object { $_.enabled -eq $true } |
+            Select-Object -Last 1
+        $messageMoreSource = "current_message"
     }
+    if ($null -eq $messageMore) {
+        throw "The current official conversation exported no message overflow control."
+    }
+    $syntheticContextBound = [string]$messageMore.context_id -eq [string]$assistant.id
     $messageModel = @($messageControls) |
         Where-Object {
             [string]$_.semantic -eq "model" -and
@@ -298,6 +321,8 @@ try {
         isolated_conversation = $true
         assistant_completed = $true
         overflow_control_found = $true
+        overflow_control_source = $messageMoreSource
+        synthetic_context_bound = $syntheticContextBound
         message_control_count = $safeMessageControls.Count
         message_controls = $safeMessageControls
         overlay_control_count = $safeControls.Count

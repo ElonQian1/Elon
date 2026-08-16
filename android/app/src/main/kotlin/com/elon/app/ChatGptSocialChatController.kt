@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.graphics.Rect
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -52,6 +53,7 @@ internal class ChatGptSocialChatController(
     private var pendingAttachments = emptyList<PendingAttachment>()
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
+    private var latestCommandStatus: WebChatCommandStatus? = null
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
             inputText = { binding.inputEdit.text?.toString().orEmpty() },
@@ -199,6 +201,8 @@ internal class ChatGptSocialChatController(
 
     override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort
 
+    override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
+
     override fun discardAcceptanceAttachmentSend(): Boolean {
         if (waitingForAttachmentCompletion) return false
         val hadFixture = pendingAttachments.any {
@@ -226,18 +230,77 @@ internal class ChatGptSocialChatController(
         val nativeId = "${provider.id.wireValue}:$messageId"
         val index = messages.indexOfFirst { it.id == nativeId }
         if (index < 0) return false
-        binding.chatList.scrollToPosition(index)
-        binding.chatList.post {
-            binding.chatList.findViewHolderForAdapterPosition(index)?.itemView?.apply {
-                contentDescription = listOfNotNull(
-                    "ChatGPT message $messageId",
-                    partIndex?.let { "part $it" },
-                    target.takeIf(String::isNotBlank),
-                ).joinToString("; ")
-                requestFocus()
-            }
+        val message = messages[index]
+        if (partIndex != null && partIndex !in message.webChatMessage?.contentParts.orEmpty().indices) {
+            return false
         }
+        val requiredAction = when (target) {
+            "copy" -> WebChatMessageAction.COPY
+            "regenerate" -> WebChatMessageAction.REGENERATE
+            "actions" -> WebChatMessageAction.MORE
+            else -> null
+        }
+        if (requiredAction != null && requiredAction !in message.webChatMessage?.actions.orEmpty()) {
+            return false
+        }
+        binding.chatList.scrollToPosition(index)
+        revealMessageTarget(index, messageId, partIndex, target, attempt = 0)
         return true
+    }
+
+    private fun revealMessageTarget(
+        index: Int,
+        messageId: String,
+        partIndex: Int?,
+        target: String,
+        attempt: Int,
+    ) {
+        binding.chatList.postDelayed({
+            val itemView = binding.chatList.findViewHolderForAdapterPosition(index)?.itemView
+            val targetView = itemView?.let { row ->
+                partIndex?.let {
+                    row.findViewById<android.widget.LinearLayout>(R.id.webChatMessagePartList)
+                        ?.getChildAt(it)
+                } ?: when (target) {
+                    "copy" -> row.findViewById<View>(R.id.webChatMessageCopy)
+                    "regenerate" -> row.findViewById<View>(R.id.webChatMessageRegenerate)
+                    "actions" -> row.findViewById<View>(R.id.webChatMessageMore)
+                    else -> row
+                }
+            }
+            if (itemView == null || targetView == null || targetView.visibility != View.VISIBLE) {
+                retryRevealMessageTarget(index, messageId, partIndex, target, attempt)
+                return@postDelayed
+            }
+
+            itemView.contentDescription = "web-chat-message:${provider.id.wireValue}:" +
+                com.elon.app.chatgptweb.ChatGptNativeControlPresentation.stableContextId(messageId)
+            val targetRect = Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1))
+            binding.chatList.offsetDescendantRectToMyCoords(targetView, targetRect)
+            val itemRect = Rect(0, 0, itemView.width.coerceAtLeast(1), itemView.height.coerceAtLeast(1))
+            binding.chatList.offsetDescendantRectToMyCoords(itemView, itemRect)
+            targetRect.offset(-itemRect.left, -itemRect.top)
+            binding.chatList.requestChildRectangleOnScreen(itemView, targetRect, true)
+            targetView.requestFocus()
+            val visibleRect = Rect()
+            val fullyVisible = targetView.getGlobalVisibleRect(visibleRect) &&
+                visibleRect.width() >= targetView.width &&
+                visibleRect.height() >= targetView.height
+            if (!fullyVisible) {
+                retryRevealMessageTarget(index, messageId, partIndex, target, attempt)
+            }
+        }, if (attempt == 0) 0L else REVEAL_RETRY_DELAY_MS)
+    }
+
+    private fun retryRevealMessageTarget(
+        index: Int,
+        messageId: String,
+        partIndex: Int?,
+        target: String,
+        attempt: Int,
+    ) {
+        if (attempt >= MAX_REVEAL_ATTEMPTS) return
+        revealMessageTarget(index, messageId, partIndex, target, attempt + 1)
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
@@ -291,6 +354,12 @@ internal class ChatGptSocialChatController(
     }
 
     private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
+        latestCommandStatus = WebChatCommandStatus(
+            action = event.action,
+            ok = event.ok,
+            detail = event.detail,
+            observedAtMs = System.currentTimeMillis(),
+        )
         if (pendingAttachments.isNotEmpty()) return
         if (event.action != "send_prompt" || event.ok) return
         pendingPrompt = null
@@ -376,5 +445,10 @@ internal class ChatGptSocialChatController(
         binding.modelButton.text = label
         binding.modelButton.contentDescription = "聊天模式；提供方：${provider.displayName}；模型：$label"
         (binding.modelButton.parent as? View)?.contentDescription = binding.modelButton.contentDescription
+    }
+
+    private companion object {
+        const val MAX_REVEAL_ATTEMPTS = 8
+        const val REVEAL_RETRY_DELAY_MS = 80L
     }
 }

@@ -217,6 +217,10 @@ verificationCaseFiles["reversible/reversible_controls"] = caseInputs(
     composerCaseInputs + adaptiveCaseInputs,
     "smoke-chatgpt-web-reversible-controls.ps1",
 )
+verificationCaseFiles["reversible/temporary_chat_toggle"] = caseInputs(
+    composerCaseInputs + adaptiveCaseInputs,
+    "smoke-chatgpt-web-reversible-controls.ps1",
+)
 verificationCaseFiles["reversible/tool_execution_with_citations"] = caseInputs(
     composerCaseInputs + messageCaseInputs,
     "smoke-chatgpt-web-tool-execution.ps1",

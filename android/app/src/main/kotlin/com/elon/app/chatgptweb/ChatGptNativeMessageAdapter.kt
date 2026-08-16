@@ -102,12 +102,12 @@ internal class ChatGptNativeMessageAdapter(
             capabilities.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE)
 
     private fun showMessageActions(holder: MessageViewHolder, actions: List<ChatGptWebUiControl>) {
-        val enabledActions = actions.filter(ChatGptWebUiControl::enabled).distinctBy(ChatGptWebUiControl::id)
-        if (enabledActions.isEmpty()) return
+        val availableActions = actions.distinctBy(ChatGptWebUiControl::id)
+        if (availableActions.isEmpty()) return
         ChatGptNativeControlDialog.show(
             context = holder.itemView.context,
             title = holder.itemView.context.getString(R.string.chatgpt_message_more_actions),
-            controls = enabledActions,
+            controls = availableActions,
             onSelected = { onInvokeControl(it.id) },
         )
     }

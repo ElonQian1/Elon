@@ -13,6 +13,9 @@ $errors = $null
 if (@($errors).Count -gt 0) {
     throw "PowerShell parse failed for $path`: $($errors[0].Message)"
 }
+if ($source -notmatch '(?s)function Get-Controls \{.*?Invoke-ChatGptWebSmokeReadyAction.*?-Action "chatgpt_find_controls"') {
+    throw "Regenerate-menu diagnostic must wait for the current bridge generation before paging controls."
+}
 
 foreach ($required in @(
     "ExpectedHardwareSerial",
@@ -24,9 +27,18 @@ foreach ($required in @(
     'Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input"',
     "function Convert-SafeControl",
     "function Dismiss-Overlays",
+    "function Get-BlockingOverlayControls",
+    '"dialog", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "slider"',
+    'Invoke-ReceiptAction -Action "chatgpt_refresh_controls"',
     'Get-Controls -Region "message"',
     'message_controls = $safeMessageControls',
     'Get-Controls -Semantic "more" -Region "message"',
+    '$messageMoreSource = "synthetic_assistant"',
+    '$messageMoreSource = "current_visible_message"',
+    '$messageMoreSource = "current_message"',
+    '$syntheticContextBound = [string]$messageMore.context_id -eq [string]$assistant.id',
+    'overflow_control_source = $messageMoreSource',
+    'synthetic_context_bound = $syntheticContextBound',
     'Get-Controls -Semantic "model" -Region "message"',
     'CHATGPT_REGENERATE_MENU_PHASE phase=open_model_menu',
     'model_overlay_controls = $safeModelControls',
@@ -45,6 +57,9 @@ foreach ($required in @(
     if (-not $source.Contains($required)) {
         throw "ChatGPT regenerate-menu diagnostic contract is missing: $required"
     }
+}
+if ($source.Contains('Synthetic assistant message exported no visible overflow control.')) {
+    throw "Regenerate-menu diagnostic must accept current official message controls outside the viewport."
 }
 
 foreach ($forbidden in @(

@@ -22,6 +22,8 @@ function Assert-Contains {
 
 foreach ($required in @(
     '"PrepareAndRemove", "StageForSend", "SendAndVerifyReply"',
+    '$nativePredicate = $Predicate',
+    '}.GetNewClosure()',
     '[switch]$UserConfirmedAttachmentSend',
     'fixed_ascii_text_v1',
     'Open-ChatGptWebNativeChatSurface',

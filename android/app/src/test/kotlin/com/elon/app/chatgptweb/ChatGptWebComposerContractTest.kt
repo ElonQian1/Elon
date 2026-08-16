@@ -17,6 +17,9 @@ class ChatGptWebComposerContractTest {
         val optionPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_composer_option_policy.js",
         )
+        val submenuAdapter = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_composer_submenu.js",
+        )
         val toolStatePolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_composer_tool_state_policy.js",
         )
@@ -44,6 +47,7 @@ class ChatGptWebComposerContractTest {
         )
 
         val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
+        val submenuAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_submenu.js")
         val toolStateAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_state_policy.js")
         val toolSelectionAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_selection.js")
         val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
@@ -52,7 +56,8 @@ class ChatGptWebComposerContractTest {
         val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
         assertTrue(modelLabelAsset >= 0)
         assertTrue(policyAsset > modelLabelAsset)
-        assertTrue(toolStateAsset > policyAsset)
+        assertTrue(submenuAsset > policyAsset)
+        assertTrue(toolStateAsset > submenuAsset)
         assertTrue(toolSelectionAsset > toolStateAsset)
         assertTrue(actionTargetAsset > toolSelectionAsset)
         assertTrue(dictationSessionAsset > actionTargetAsset)
@@ -60,6 +65,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
+        assertTrue(core.contains("function waitForStableSendButton"))
+        assertTrue(core.contains("function waitForSendAccepted"))
+        assertTrue(core.contains("官方网页已确认发送"))
         assertTrue(adapter.contains("#upload-fast-tools-files"))
         assertTrue(adapter.contains("#composer-plus-btn"))
         assertTrue(adapter.contains("layout.findSemanticNode('attachment', 'composer')"))
@@ -89,7 +97,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("rect.top < window.innerHeight"))
         assertTrue(adapter.contains("actionTargetPolicy.actionPoint(node)"))
         assertTrue(adapter.contains("filter((option) => isOptionVisible(option.node))"))
-        assertTrue(adapter.contains("!target || !isOptionVisible(target.node)"))
+        assertTrue(adapter.contains("if (!target)"))
+        assertTrue(adapter.contains("if (!isOptionVisible(target.node))"))
         assertTrue(adapter.contains("emitVisibleNodeTouch(purpose, target.node, emitEvent)"))
         assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
         assertTrue(adapter.contains("const semantic = optionSemantic(section, node, label)"))
@@ -111,8 +120,20 @@ class ChatGptWebComposerContractTest {
         assertFalse(adapter.contains("select_composer_tool_retry"))
         assertTrue(adapter.contains("opensSubmenu: opensSubmenu(node)"))
         assertTrue(adapter.contains("open_model_submenu"))
-        assertTrue(adapter.contains("layout.setNodeExpanded(target.node, true"))
+        assertFalse(adapter.contains("layout.setNodeExpanded(target.node, true"))
+        assertTrue(adapter.contains("if (!emitVisibleNodeTouch(purpose, target.node, emitEvent))"))
+        assertTrue(adapter.contains("}, 220)"))
         assertTrue(adapter.contains("collectRequestedOptions(section, composer, emitEvent, () => {})"))
+        assertTrue(adapter.contains("submenuRecovery.recover"))
+        assertTrue(adapter.contains("function waitForOptionsMatching"))
+        assertTrue(submenuAdapter.contains("function withoutKnownOptionIds"))
+        assertTrue(submenuAdapter.contains("function containsNestedInteractiveControl"))
+        assertTrue(submenuAdapter.contains("function createRecovery"))
+        assertTrue(adapter.contains("rootOptionIds: new Set(lastOptions[section].map"))
+        assertTrue(adapter.contains("composerSubmenu.withoutKnownOptionIds(options, pending.rootOptionIds)"))
+        assertTrue(adapter.contains("if (target.parentOption)"))
+        assertTrue(submenuAdapter.contains("const parent = matchingOption(rootOptions, parentIdentity)"))
+        assertTrue(submenuAdapter.contains("const recovered = matchingOption(nestedChildren, target)"))
         assertTrue(adapter.contains("open_composer_tools_submenu"))
         assertTrue(adapter.contains("complete: result"))
         assertTrue(adapter.contains("settlePendingOptions(section, true, '')"))
@@ -120,7 +141,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("!pending.syntheticRetried"))
         assertTrue(adapter.contains("pending.trigger.click()"))
         assertTrue(adapter.contains("if (!target.opensSubmenu) {"))
-        assertTrue(adapter.contains("window.setTimeout(scheduleSnapshot, 240)"))
+        assertTrue(submenuAdapter.contains("deps.schedule(scheduleSnapshot, 240)"))
         assertTrue(toolSelection.contains("const MAX_OBSERVATION_ATTEMPTS = 24"))
         assertTrue(toolSelection.contains("const REQUIRED_CONFIRMATIONS = 4"))
         assertTrue(toolSelection.contains("function completeWhenObserved"))
@@ -137,6 +158,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("optionPolicy.filter(section, candidates)"))
         assertTrue(optionPolicy.contains("root && root.__elonChatGptModelLabelPolicy"))
         assertTrue(optionPolicy.contains("modelLabelPolicy.isModelLabel(label)"))
+        assertTrue(optionPolicy.contains("capabilit(?:y|ies)"))
         assertTrue(optionPolicy.contains("isForeignMenuLabel"))
         assertTrue(optionPolicy.contains("return []"))
         assertTrue(adapter.contains("readAttachments"))
@@ -170,6 +192,7 @@ class ChatGptWebComposerContractTest {
         listOf(
             adapter,
             optionPolicy,
+            submenuAdapter,
             toolStatePolicy,
             actionTargetPolicy,
             attachmentPolicy,

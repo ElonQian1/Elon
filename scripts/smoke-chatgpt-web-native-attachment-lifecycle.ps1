@@ -98,11 +98,13 @@ function Wait-NativeState {
         [Parameter(Mandatory = $true)][string]$Description
     )
 
+    $nativePredicate = $Predicate
+    $surfacePredicate = {
+        param($state)
+        $state.active_surface -eq "social_ai" -and (& $nativePredicate $state)
+    }.GetNewClosure()
     return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-        -Description $Description -Predicate {
-            param($state)
-            $state.active_surface -eq "social_ai" -and (& $Predicate $state)
-        }
+        -Description $Description -Predicate $surfacePredicate
 }
 
 function Invoke-NativeAction {

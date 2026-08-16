@@ -144,7 +144,8 @@ try {
                 -ExpectedReply $probeExpectedReply -WaitTimeoutSec $TimeoutSec | Out-Null
             Register-ChatGptWebVerificationCases -Runtime $runtime `
                 -CaseIds @("reversible/send_probe") `
-                -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+                -ExpectedAdapterVersion $ExpectedAdapterVersion `
+                -ProductionSurface | Out-Null
             $report.sent_messages = 1
             $report.assistant_completed = $true
         } finally {
