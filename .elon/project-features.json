@@ -4943,6 +4943,55 @@
       "updated_at_ms": 1786869739753
     },
     {
+      "id": "rust-cache-project-adoption-v1",
+      "title": "Rust 缓存子项目一键接入 V1",
+      "summary": "为 Rust 子项目生成可提交的缓存项目清单和跨 PC 薄启动器，使所有 AI 代理复用已安装平台而不复制缓存逻辑。",
+      "status": "proposed",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/rust-cache-project-adoption-v1.md",
+        "content_hash": "39fc0b33ff8d8d0c2620b9c79de2e8991dd67b14b9ed746746c0be5870c58300",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7c7b46fe149bd868a82940fadd24767f1e6405da",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "43a4ad01e3e2cd96b596c3ff6537604a9896b164",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform",
+      "tags": [
+        "rust-cache",
+        "project-adoption",
+        "windows",
+        "ai-agents"
+      ],
+      "task_paths": [
+        ".agents/skills/manage-shared-build-cache/SKILL.md",
+        "docs/rust-cache-on-demand-adoption.md",
+        "scripts/rust-cache.ps1",
+        "scripts/rust-cache/RustCache.Help.psm1",
+        "scripts/rust-cache/RustCache.ProjectAdoption.psm1",
+        "scripts/test-rust-cache-portability.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "默认预演不写文件。",
+        "显式应用生成项目清单和薄启动器。",
+        "薄启动器不含机器路径且不启动可见子 PowerShell。",
+        "相同输入幂等，内容冲突失败关闭。",
+        "薄启动器固定自身项目根并正确转发参数。",
+        "便携性回归覆盖接入完整流程。",
+        "Skill 以新命令作为首选子项目接入流程。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1786875253989,
+      "updated_at_ms": 1786875253989
+    },
+    {
       "id": "rust-cache-recovery-exclusive-filter-v2-1",
       "title": "Rust cache missing-workspace exclusive recovery filter V2.1",
       "summary": "Keep explicit missing-workspace recovery exclusive under low disk so valid workspace partitions cannot be selected by the general LRU watermark path.",
@@ -6232,16 +6281,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_92d545d736104df8a1cc4393af7c4acb",
-      "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
-      "action": "registered",
-      "actor": "codex-task-13092-865d4229",
-      "reason": "",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786713112122
-    },
     {
       "id": "feature_event_cad466781753471db2d758f73b23b001",
       "feature_id": "compute-external-pool-adapter-authenticated-runtime-v1",
@@ -8231,6 +8270,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786874864710
+    },
+    {
+      "id": "feature_event_6f085e375a464b5b932305742c3fb99f",
+      "feature_id": "rust-cache-project-adoption-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786875253989
     }
   ]
 }
