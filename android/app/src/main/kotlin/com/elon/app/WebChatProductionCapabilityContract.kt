@@ -254,6 +254,15 @@ internal object WebChatProductionCapabilityContract {
             readAction = "chatgpt_find_controls",
             controlAction = "chatgpt_invoke_control",
         ),
+        chatGpt(
+            WebChatProviderCapability.PROMPT_SUGGESTIONS,
+            "friend_chat_suggestion_strip",
+            Access.ADB_AND_MCP,
+            "web-chat-suggestion:{provider}:{control_id}",
+            SelectorMode.TEMPLATE,
+            readAction = "chatgpt_find_controls",
+            controlAction = "chatgpt_invoke_control",
+        ),
         shared(
             WebChatProviderCapability.STOP_GENERATION,
             "friend_chat_composer",

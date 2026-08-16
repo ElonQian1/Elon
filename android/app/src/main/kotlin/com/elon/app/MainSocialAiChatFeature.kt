@@ -108,6 +108,10 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val consumerStatusBanner by consumerStatusBannerDelegate
+    private val productionSuggestionsDelegate = lazy {
+        WebChatProductionSuggestionsCoordinator(activity)
+    }
+    private val productionSuggestions by productionSuggestionsDelegate
     private val productionComposerToolsDelegate = lazy {
         WebChatProductionComposerToolsCoordinator(
             activity = activity,
@@ -398,6 +402,7 @@ internal class MainSocialAiChatFeature(
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
+        if (productionSuggestionsDelegate.isInitialized()) productionSuggestions.hide()
         binding.modelButton.tag = null
         WebChatComposerProviderPresentation.clear(binding.modelButton)
         binding.inputEdit.contentDescription = null
@@ -433,7 +438,7 @@ internal class MainSocialAiChatFeature(
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         val controller = controllerFor(provider.id)
         controller.activate(provider)
-        ensureConsumerStatusBannerAttached()
+        ensureConsumerEnhancementsAttached()
         binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
             visibility = View.VISIBLE
@@ -482,6 +487,7 @@ internal class MainSocialAiChatFeature(
                 views.attachmentButton.visibility = if (state.attachmentVisible) View.VISIBLE else View.GONE
                 views.webToolsButton.visibility = if (state.toolsVisible) View.VISIBLE else View.GONE
             }
+            productionSuggestions.render(provider, controller.consumerPort())
         } else if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         refreshInputComposerVisual()
     }
@@ -503,11 +509,13 @@ internal class MainSocialAiChatFeature(
         composerOperationFeedback = null
     }
 
-    private fun ensureConsumerStatusBannerAttached() {
+    private fun ensureConsumerEnhancementsAttached() {
         val banner = consumerStatusBanner
-        if (banner.parent === binding.inputLayout) return
-        (banner.parent as? ViewGroup)?.removeView(banner)
-        binding.inputLayout.addView(banner, 0)
+        if (banner.parent !== binding.inputLayout) {
+            (banner.parent as? ViewGroup)?.removeView(banner)
+            binding.inputLayout.addView(banner, 0)
+        }
+        productionSuggestions.attach(binding.inputLayout, 1)
     }
 
     private fun activeController(): WebChatSocialController = controllerFor(providerId())
