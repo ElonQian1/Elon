@@ -18,7 +18,7 @@ verification_status: targeted_local_verified
 
 ## 当前边界
 
-- `MemoryErpStore` 只用于测试和本地开发，不是生产数据库。
+- `MemoryErpStore` 只用于测试和本地开发；可选 Node SQLite 参考适配器已单独完成事务、重启恢复、幂等、锁竞争和版本迁移验收，但仍不是多主或分布式生产数据库。
 - 基础采购分录不等于完整财务核算、税务、付款或结账。
 - 尚未把 `cofficethinking` 接入公共内核，也未验证真实商户迁移。
 - 尚未发布 npm 包、部署商户运行时或执行消费者公网订单。
@@ -27,6 +27,7 @@ verification_status: targeted_local_verified
 
 - `sdk/merchant-erp-kernel/src/`
 - `sdk/merchant-erp-kernel/test/`
+- `docs/erp/sqlite-storage-adapter-v1-acceptance.md`
 - `server/src/erp_blueprint/model.rs`
 - `server/src/erp_blueprint/validation.rs`
 - `server/src/erp_blueprint/materialization.rs`

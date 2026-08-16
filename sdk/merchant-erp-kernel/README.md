@@ -28,4 +28,34 @@ const provider = createOpenCommerceProvider(kernel);
 ```
 
 `MemoryErpStore` is a deterministic test and local-development adapter. Production merchant systems
-must implement `ErpStorageAdapter` with their own PostgreSQL, SQLite, or service transaction layer.
+that already own a database can implement `ErpStorageAdapter` with their PostgreSQL or service
+transaction layer.
+
+## Merchant-owned SQLite
+
+Node 22.13 and newer projects can use the optional built-in SQLite adapter without adding a native
+third-party package. Node 22.5 through 22.12 require the `--experimental-sqlite` flag. Importing the
+core entry does not load `node:sqlite`, so Node 20 projects can continue using the kernel with
+another adapter.
+
+```js
+import { createMerchantErpKernel } from "@yilong/merchant-erp-kernel";
+import { SqliteErpStore } from "@yilong/merchant-erp-kernel/sqlite";
+
+const storage = new SqliteErpStore({
+  path: "./erp.sqlite3",
+  busyTimeoutMs: 5_000,
+});
+const kernel = createMerchantErpKernel({ merchantId: "merchant_demo", store: storage });
+
+try {
+  await kernel.listStores();
+} finally {
+  await storage.close();
+}
+```
+
+The adapter owns a versioned schema, `BEGIN IMMEDIATE` write transactions, deterministic snapshots,
+and structured `STORAGE_BUSY` failures. Keep one adapter instance per database in a process. SQLite
+still coordinates other processes through its file lock; this adapter is not a multi-primary or
+distributed database and does not add payment, fulfillment, deployment, or platform credentials.

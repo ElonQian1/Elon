@@ -11,6 +11,10 @@
     "./open-commerce": {
       "types": "./src/open-commerce.d.ts",
       "default": "./src/open-commerce.js"
+    },
+    "./sqlite": {
+      "types": "./src/sqlite.d.ts",
+      "default": "./src/sqlite-store.js"
     }
   },
   "scripts": {

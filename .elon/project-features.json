@@ -3355,6 +3355,146 @@
       "updated_at_ms": 1786638099721
     },
     {
+      "id": "merchant-erp-sqlite-store-v1",
+      "title": "通用 ERP SQLite 持久化适配器 V1",
+      "summary": "为通用 ERP 内核提供商户自有、可重启恢复、事务原子且无需第三方原生依赖的 Node SQLite 适配器。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/merchant-erp-sqlite-store-v1.md",
+        "content_hash": "369fafe3cd691dc9213667ae3954ce324bf64473a9619644ee2c42db8c16733b",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "bd62bce6aab7abdc231ad7f75296c92c022db3fa",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "merchant-erp",
+      "tags": [
+        "erp",
+        "sqlite",
+        "merchant-runtime"
+      ],
+      "task_paths": [
+        "docs/erp/sqlite-storage-adapter-v1-acceptance.md",
+        "docs/requirements/merchant-erp-sqlite-store-v1.md",
+        "sdk/merchant-erp-kernel/README.md",
+        "sdk/merchant-erp-kernel/package.json",
+        "sdk/merchant-erp-kernel/src/sqlite-schema.js",
+        "sdk/merchant-erp-kernel/src/sqlite-store.js",
+        "sdk/merchant-erp-kernel/src/sqlite.d.ts",
+        "sdk/merchant-erp-kernel/test/sqlite-store.test.mjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "SQLite 重启后保持库存、订单、采购、分录、幂等和审计。",
+        "失败事务不留下部分写入。",
+        "双连接竞争不产生丢失更新或重复订单。",
+        "迁移幂等且未知版本失败关闭。",
+        "既有内存适配器和开放商业测试继续通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/erp/sqlite-storage-adapter-v1-acceptance.md",
+          "content_hash": "1851d285446f891603cc301a1d389871c46a41c0048c6dc0cd4cf330f46ba720",
+          "locator": "acceptance evidence",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fa8c94b2255be8ad7a86636fef8e476fc3163c12",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/requirements/merchant-erp-sqlite-store-v1.md",
+          "content_hash": "369fafe3cd691dc9213667ae3954ce324bf64473a9619644ee2c42db8c16733b",
+          "locator": "current requirement",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bd62bce6aab7abdc231ad7f75296c92c022db3fa",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/package.json",
+          "content_hash": "48bf5ab42d4119adefc21a5a26107055a0948557ab42a8d871cb3fd40760f348",
+          "locator": "./sqlite export",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "73ef54b5d62c42cc535c2fd6a6560b6a0d3440d3",
+            "worktree_blob_oid": "8f0e5047e7b78910ddca4528b103ded468dcd5ed",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/sqlite-schema.js",
+          "content_hash": "7c2f49b9871043e0eff1925de88b01197d341e61732ecb864e2a232be7b58820",
+          "locator": "versioned schema",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "17327d4c4e9e5f7e63e9fbc03110a1bc3f5893bc",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/sqlite-store.js",
+          "content_hash": "ce9ef06430afd2306c33872a848019eb4a074a20a4a2e3f150a8ff1683da3c58",
+          "locator": "SqliteErpStore",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1a632f4623ac2777e7e33cf0f32e6555c52aa850",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/sqlite.d.ts",
+          "content_hash": "6bbd370d351fe78c1f2149c83bb798497056075475cfe70a2431c35d455fde56",
+          "locator": "SQLite public types",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ce8331907b9b99929473035fd220791956b717d2",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/test/sqlite-store.test.mjs",
+          "content_hash": "bc54e9fc3828a9ca19354de25b49aafef35be1b89a9992e4c693337f66f12a54",
+          "locator": "SQLite adapter tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "49825af1e63811d5675244c59ed994cd8cd5baee",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0fcd1a9951834cc29f115cb4ca361c10fe25ad7f",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1786871115323,
+      "updated_at_ms": 1786871119891
+    },
+    {
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
@@ -5468,86 +5608,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_359f61c3a61540a996b4a6d978c80e0e",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786704445506
-    },
-    {
-      "id": "feature_event_25674ac973cf4fbda653bfd8ffc8a2b9",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "三层缓存、实时写门禁与清理链路实现完成，当前源码和测试证据已绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786704455789
-    },
-    {
-      "id": "feature_event_c3adaa14ae0748e7b4462af8bb72e6c7",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "PC 合同/热缓存/用户状态、ESLint、生产构建与 Tauri 30 项定向测试全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786704463474
-    },
-    {
-      "id": "feature_event_84f9d0df0c8c4247afba29720766397f",
-      "feature_id": "win-web-ai-snapshot-cache-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Windows 工件 0.3.69+e68a1fbb 已完成本机构建验证并由远端 outbox 同步；本机激活等待当前终端任务结束。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786705060526
-    },
-    {
-      "id": "feature_event_5412d0d9b8c04dcfae8e317c3e87919e",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "registered",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "Re-register V261 on the rebased mainline registry after preserving concurrent remote features.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786709613473
-    },
-    {
-      "id": "feature_event_1b06cac3fb4e4b2ca74f75eab73db643",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "claimed",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786709613559
-    },
-    {
-      "id": "feature_event_fc300784e0884a98b542ab78d423cf6c",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "transitioned",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "Bind rebased implementation and evidence identities.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786709613647
-    },
-    {
-      "id": "feature_event_9ce2eeda79614cffb633da2db15b8793",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786709619403
-    },
-    {
       "id": "feature_event_bae439c7a5f541cf9aadffdd0e643ed7",
       "feature_id": "compute-v261-linux-supervisor-enforcement-core",
       "action": "transitioned",
@@ -7466,6 +7526,86 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786870736965
+    },
+    {
+      "id": "feature_event_84a08be4027b4a09b774a0aa170358e2",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "在再次前进的远程注册表上恢复已完成实现的正式登记。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786871115323
+    },
+    {
+      "id": "feature_event_981363c16aad4d8e845f2ca26d5ab645",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "需求范围和验收标准已完成评审。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786871115554
+    },
+    {
+      "id": "feature_event_f55a7a20281d40a78bf49cbe699f4e6d",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "实现路径和验收方式已明确。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786871115818
+    },
+    {
+      "id": "feature_event_5cf7de0600ab479c94cb8c13eb2023d3",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786871116095
+    },
+    {
+      "id": "feature_event_ecc11854291741f493df3f520ab3a02e",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "恢复已完成实现的正式生命周期登记。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786871116376
+    },
+    {
+      "id": "feature_event_6d2373091fd242219548fb082f5a0458",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786871119439
+    },
+    {
+      "id": "feature_event_af64b4f5ebd84d33ad3a4ece33e30919",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "SQLite 适配器、类型、文档和自动化测试均已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786871119656
+    },
+    {
+      "id": "feature_event_2c48cb82e882475c8ae8b447fd6e64ae",
+      "feature_id": "merchant-erp-sqlite-store-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "内存与 SQLite 测试共 11 项全部通过，打包与治理检查通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786871119891
     }
   ]
 }
