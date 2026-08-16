@@ -16,7 +16,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "run", "gc", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
+    [Parameter(Position = 0)][ValidateSet("help", "status", "doctor", "fleet-report", "fleet-stage", "run", "gc", "install", "init-project", "register-legacy", "purge-legacy")][string]$Command = "status",
     [string]$ProjectRoot,
     [string]$Domain,
     [string]$TargetDir,
@@ -62,10 +62,13 @@ Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Help.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to their owning module. Re-import public
 # management surfaces after Fleet has loaded its own dependencies.
+Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
@@ -125,6 +128,17 @@ switch ($Command) {
         Write-Host "Report SHA-256: $($export.content_sha256)"
         Write-Host "Health: $($report.platform.health); active writers: $($report.activity.active_writer_count); managed partitions: $($report.cache.partition_count)"
         $export
+    }
+    "fleet-stage" {
+        $sourceSkillRoot = Join-Path (Split-Path $scriptsRoot -Parent) ".agents\skills\manage-shared-build-cache"
+        $report = New-RustCacheFleetReport -ProjectRoot $ProjectRoot -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -CargoConfigPath $CargoConfigPath -SourceSkillRoot $sourceSkillRoot -CodexSkillsRoot $CodexSkillsRoot -UserLauncherPath $UserLauncherPath -NodeId $NodeId -IncludeSizes:$IncludeSizes
+        $envelope = New-RustCacheFleetEnvelope -Report $report
+        $resolvedRoot = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $ProjectRoot
+        $stage = Export-RustCacheFleetEnvelope -Envelope $envelope -CacheRoot $resolvedRoot -OutputPath $OutputPath
+        Write-Host "Fleet envelope queued: $($stage.envelope_path)" -ForegroundColor Green
+        Write-Host "Envelope SHA-256: $($stage.envelope_sha256)"
+        Write-Host "Report SHA-256: $($stage.report_sha256)"
+        $stage
     }
     "run" {
         if ($RemainingArgs.Count -eq 0) {

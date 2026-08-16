@@ -66,6 +66,14 @@ Generate the standard sanitized fleet artifact on each node:
 
 Use the platform node ID supplied by the owning system; do not invent identity from a host name or user profile. The report intentionally omits absolute paths and user/host names. A central service may aggregate it and request a dry-run, but deletion must be re-evaluated and executed on the target PC under the local partition locks.
 
+For a disconnected or intermittently connected node, stage an upload-safe envelope instead:
+
+```powershell
+& <entry> fleet-stage -ProjectRoot <root> -NodeId <platform-node-id> -IncludeSizes
+```
+
+`fleet-stage` writes an immutable envelope under the cache-owned fleet outbox. The envelope embeds the compact sanitized report, its SHA-256, an explicit requirement that the receiver authenticate the node, and a false destructive-authority flag. Never edit an envelope to record retries; a node uploader must write separate attempt receipts and move an accepted envelope only after the server acknowledges the same envelope ID and report hash.
+
 ## Run Builds
 
 - Prefer the project's `cargo-dev.ps1`, `cargo-cross.ps1`, validation, and release scripts.

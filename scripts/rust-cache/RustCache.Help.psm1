@@ -3,6 +3,7 @@ function Get-RustCacheCommandHelp {
         [pscustomobject]@{ name = "help"; purpose = "Show the command contract and common examples." }
         [pscustomobject]@{ name = "doctor"; purpose = "Read-only health check for one PC and project." }
         [pscustomobject]@{ name = "fleet-report"; purpose = "Write a sanitized machine report for fleet aggregation." }
+        [pscustomobject]@{ name = "fleet-stage"; purpose = "Queue an immutable hashed report envelope for node upload." }
         [pscustomobject]@{ name = "status"; purpose = "Inspect local partitions, disk state, and legacy registrations." }
         [pscustomobject]@{ name = "run"; purpose = "Run Cargo through the managed cache and partition locks." }
         [pscustomobject]@{ name = "gc"; purpose = "Preview or apply managed partition reclamation." }
@@ -18,6 +19,7 @@ function Get-RustCacheCommandHelp {
         examples = @(
             "rust-cache.ps1 doctor -ProjectRoot D:\work\project"
             "rust-cache.ps1 fleet-report -ProjectRoot D:\work\project -NodeId <platform-node-id> -IncludeSizes"
+            "rust-cache.ps1 fleet-stage -ProjectRoot D:\work\project -NodeId <platform-node-id> -IncludeSizes"
             "rust-cache.ps1 init-project -ProjectRoot D:\work\project -ProjectId stable-project-id"
             "rust-cache.ps1 gc -ProjectRoot D:\work\project -IncludeSizes"
             "rust-cache.ps1 run -ProjectRoot D:\work\project -Domain dev-windows-msvc -- check --locked"

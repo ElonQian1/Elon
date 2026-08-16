@@ -8,8 +8,11 @@ Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Help.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to the owner. Re-import public test surfaces last.
+Import-Module "$modulesRoot\RustCache.FleetQueue.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Fleet.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
@@ -104,6 +107,7 @@ try {
     $launcherHelp = & $userLauncher.path help | Select-Object -Last 1
     Assert-Equal "elon.rust_cache.command_help.v1" $launcherHelp.schema "portable launcher help schema"
     Assert-True (@($launcherHelp.commands.name) -contains "fleet-report") "portable launcher help should advertise fleet reports"
+    Assert-True (@($launcherHelp.commands.name) -contains "fleet-stage") "portable launcher help should advertise fleet staging"
     $launcherResult = & $userLauncher.path init-project -ProjectRoot $projectRoot -ProjectId "portable-test" -AllowedDomain @("dev-windows-msvc", "agent-validation") -SharedPartitionDomain @("validation-light=agent-validation") -Apply
     Assert-Equal "unchanged" $launcherResult.action "portable launcher should invoke the installed platform"
 
@@ -151,6 +155,29 @@ try {
     Assert-True ($fleetJson -notmatch [regex]::Escape($projectRoot)) "fleet report must omit the project absolute path"
     Assert-True ($fleetJson -notmatch [regex]::Escape($cacheRoot)) "fleet report must omit the cache absolute path"
     Assert-True ($fleetJson -notmatch 'project_root|cache_root|user_launcher_path') "fleet report must omit path-bearing fields"
+    $fleetEnvelope = New-RustCacheFleetEnvelope -Report $fleetReport
+    Assert-Equal "elon.rust_cache.fleet_envelope.v1" $fleetEnvelope.schema "fleet envelope schema"
+    Assert-Equal "portable-node-1" $fleetEnvelope.node_id "fleet envelope node identity"
+    Assert-True (-not $fleetEnvelope.security.destructive_actions_authorized) "fleet envelope must not authorize destructive actions"
+    $fleetEnvelopeValidation = Test-RustCacheFleetEnvelope -Envelope $fleetEnvelope
+    Assert-True $fleetEnvelopeValidation.valid "fresh fleet envelope validation"
+    Assert-Equal "portable-test" $fleetEnvelopeValidation.report.project.project_id "fleet envelope should retain the sanitized report"
+    $fleetEnvelopePath = Join-Path $tempRoot "exports\fleet-envelope.json"
+    $fleetStage = Export-RustCacheFleetEnvelope -Envelope $fleetEnvelope -CacheRoot $cacheRoot -OutputPath $fleetEnvelopePath
+    Assert-Equal "elon.rust_cache.fleet_stage.v1" $fleetStage.schema "fleet stage schema"
+    Assert-True (Test-Path -LiteralPath $fleetStage.envelope_path -PathType Leaf) "fleet envelope export path"
+    $fleetEnvelopeJson = Get-Content -Raw -LiteralPath $fleetEnvelopePath -Encoding UTF8
+    Assert-True ($fleetEnvelopeJson -notmatch [regex]::Escape($projectRoot)) "fleet envelope must omit the project absolute path"
+    Assert-True ($fleetEnvelopeJson -notmatch [regex]::Escape($cacheRoot)) "fleet envelope must omit the cache absolute path"
+    Assert-True ([string]::IsNullOrWhiteSpace($env:COMPUTERNAME) -or $fleetEnvelopeJson -notmatch [regex]::Escape($env:COMPUTERNAME)) "fleet envelope must omit the host name"
+    $tamperedEnvelope = $fleetEnvelope | ConvertTo-Json -Depth 10 | ConvertFrom-Json
+    $tamperedEnvelope.report.json = $tamperedEnvelope.report.json.Replace("portable-test", "tampered-project")
+    Assert-True (-not (Test-RustCacheFleetEnvelope -Envelope $tamperedEnvelope).valid) "fleet envelope should detect report tampering"
+    $missingEnvelopeNodeRejected = $false
+    $reportWithoutNode = $fleetReport | ConvertTo-Json -Depth 10 | ConvertFrom-Json
+    $reportWithoutNode.node.node_id = $null
+    try { New-RustCacheFleetEnvelope -Report $reportWithoutNode | Out-Null } catch { $missingEnvelopeNodeRejected = $_.Exception.Message -match "NodeId" }
+    Assert-True $missingEnvelopeNodeRejected "fleet staging should require an explicit platform node identity"
     $invalidNodeRejected = $false
     try { New-RustCacheFleetReport -ProjectRoot $projectRoot -SourceScriptsRoot $PSScriptRoot -CacheRoot $cacheRoot -NodeId "invalid node id" | Out-Null } catch { $invalidNodeRejected = $_.Exception.Message -match "NodeId" }
     Assert-True $invalidNodeRejected "fleet report should reject unstable node identifiers"
@@ -161,6 +188,12 @@ try {
     $launcherFleet = & $userLauncherPath fleet-report -ProjectRoot $projectRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath -NodeId "portable-node-2" -OutputPath $launcherFleetPath | Select-Object -Last 1
     Assert-Equal "elon.rust_cache.fleet_export.v1" $launcherFleet.schema "installed launcher fleet export schema"
     Assert-True (Test-Path -LiteralPath $launcherFleetPath -PathType Leaf) "installed launcher should write fleet report"
+    $launcherFleetEnvelopePath = Join-Path $tempRoot "exports\launcher-fleet-envelope.json"
+    $launcherFleetStage = & $userLauncherPath fleet-stage -ProjectRoot $projectRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath -NodeId "portable-node-3" -OutputPath $launcherFleetEnvelopePath | Select-Object -Last 1
+    Assert-Equal "elon.rust_cache.fleet_stage.v1" $launcherFleetStage.schema "installed launcher fleet stage schema"
+    Assert-True (Test-Path -LiteralPath $launcherFleetEnvelopePath -PathType Leaf) "installed launcher should queue a fleet envelope"
+    $defaultFleetStage = & $userLauncherPath fleet-stage -ProjectRoot $projectRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath -NodeId "portable-node-4" | Select-Object -Last 1
+    Assert-True ($defaultFleetStage.envelope_path.StartsWith((Join-Path $cacheRoot "reports\fleet\outbox"), [System.StringComparison]::OrdinalIgnoreCase)) "default fleet stage should stay inside the managed outbox"
     $installedDoctor = Get-RustCacheDoctor -ProjectRoot $projectRoot -SourceScriptsRoot $platformRoot -CacheRoot $cacheRoot -CargoConfigPath $cargoConfig -UserLauncherPath $userLauncherPath
     Assert-Equal "installed" $installedDoctor.source_mode "installed entry doctor mode"
     Assert-Equal "warn" ($installedDoctor.checks | Where-Object id -eq "platform-version").status "installed entry should defer source freshness"

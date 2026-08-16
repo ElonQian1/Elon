@@ -153,4 +153,4 @@ function Export-RustCacheFleetReport {
     }
 }
 
-Export-ModuleMember -Function New-RustCacheFleetReport, Export-RustCacheFleetReport
+Export-ModuleMember -Function Assert-RustCacheFleetNodeId, New-RustCacheFleetReport, Export-RustCacheFleetReport

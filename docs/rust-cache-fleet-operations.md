@@ -11,6 +11,7 @@ version_status: current
 implementation_refs:
   - file:scripts/rust-cache.ps1
   - file:scripts/rust-cache/RustCache.Fleet.psm1
+  - file:scripts/rust-cache/RustCache.FleetQueue.psm1
   - file:scripts/rust-cache/RustCache.Install.psm1
   - file:scripts/rust-cache/RustCache.Launcher.psm1
   - file:.agents/skills/manage-shared-build-cache/SKILL.md
@@ -30,7 +31,7 @@ implementation_refs:
 | 稳定启动层 | `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1` | 安装器生成 | 只转发参数，不启动第二个可见 Shell |
 | 项目合同层 | `rust-cache.project.json` | 跟随子项目 Git | 只保存稳定项目 ID 和兼容域，不保存机器路径 |
 | 构建执行层 | SCCache、workspace/shared build-dir、target | 目标 PC 本地 | Cargo 调用持有分区锁，发布产物仍由项目拥有 |
-| Fleet 观测层 | 脱敏 `fleet-report` JSON | 节点按需上报 | 中央只读汇总，不远程递归删除目录 |
+| Fleet 观测层 | 脱敏报告与不可变 outbox 信封 | 节点按需生成或排队 | 中央只读汇总，不远程递归删除目录 |
 
 SCCache 负责兼容编译对象的跨项目复用。命名 Cargo build-dir 只允许在同一 `project_id`、rustc 代际和兼容域内跨 worktree 复用。不同 PC 不应通过网络盘共同写一个 Cargo target 或 build-dir。
 
@@ -84,6 +85,15 @@ $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
 
 报告不包含项目根、缓存根、用户名、电脑名、启动器路径或分区绝对路径。`node_id` 必须由一龙节点身份层显式传入，缓存工具不把电脑名当身份。当前仓库已实现本地报告导出；节点上传接口、中央看板和远程审批队列仍是后续集成，不能宣称已经上线。
 
+网络不稳定或需要节点服务稍后上传时，使用 outbox 信封：
+
+```powershell
+& "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1" fleet-stage `
+  -ProjectRoot D:\work\shop-app -NodeId <platform-node-id> -IncludeSizes
+```
+
+默认信封写入缓存根的 `reports\fleet\outbox`，包含紧凑脱敏报告、报告字节长度、SHA-256、稳定节点 ID，以及“接收端必须认证节点、不得据此执行破坏操作”的机器可读约束。信封生成后保持不可变；上传尝试、失败原因和服务端 ACK 应写独立回执，避免重试修改原始证据。节点上传接口、服务端 ACK 和中央看板仍未接通，当前 `fleet-stage` 只完成可靠本地排队。
+
 ## GC 业务流
 
 跨 PC 回收必须按以下状态机执行：
@@ -124,6 +134,8 @@ fleet-report/status 发现风险
 - 低磁盘时自动生成 GC 预演报告；
 - 节点空闲时生成并上传脱敏 fleet report。
 
+节点服务应优先消费 `fleet-stage` outbox，而不是自行拼接另一种缓存报告。服务端必须以已认证会话中的节点身份为准，并校验它与信封 `node_id`、报告内 `node_id` 及报告 SHA-256 一致；信封自报身份不能单独构成授权。
+
 通用 GC `-Apply`、legacy purge、Cargo 父配置激活和平台迁移不能因一次 Git 提交而在所有 PC 自动执行。它们必须在目标 PC 上有明确审批、重新扫描和回执。
 
 ## 验收标准
@@ -133,9 +145,10 @@ fleet-report/status 发现风险
 1. `doctor` 能识别项目清单、规范化源码身份、平台与 Skill 的原始字节完整性、启动器、SCCache、磁盘和活动写入者。
 2. 用户启动器不包含 `Start-Process`、`powershell.exe` 或 `pwsh.exe` 嵌套启动。
 3. `fleet-report` 通过同一 schema 输出，JSON 中不含本机绝对路径。
-4. 两个 worktree 只有在相同项目与兼容域内才命中同一命名分区，并由同一锁串行化。
-5. 未登记项目进入 quarantine，不污染正式项目分区。
-6. GC dry-run 不删除；apply 重新取锁并只处理受管路径。
-7. 项目回滚只需取消命名共享分区，不需要手工清空缓存根。
+4. `fleet-stage` 生成不可变信封，篡改内嵌报告后校验失败，且信封不携带删除授权。
+5. 两个 worktree 只有在相同项目与兼容域内才命中同一命名分区，并由同一锁串行化。
+6. 未登记项目进入 quarantine，不污染正式项目分区。
+7. GC dry-run 不删除；apply 重新取锁并只处理受管路径。
+8. 项目回滚只需取消命名共享分区，不需要手工清空缓存根。
 
 底层路径、域、锁和 GC 细节见 `docs/rust-cache-platform.md`；渐进共享策略见 `docs/rust-cache-on-demand-adoption.md`。
