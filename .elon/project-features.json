@@ -5276,7 +5276,7 @@
       "id": "win-web-ai-context-continuity-hardening-v1",
       "title": "Win 网页 AI 上下文连续性加固 V1",
       "summary": "以密码学 owner 指纹、旧 Profile 无损迁移、超长快照最近上下文保留和无 query 导航日志加固 Win 生产首页的账号隔离与上下文连续性。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-context-continuity-hardening-v1.md",
@@ -5398,7 +5398,7 @@
         }
       ],
       "created_at_ms": 1786869967676,
-      "updated_at_ms": 1786870736965
+      "updated_at_ms": 1786871598283
     },
     {
       "id": "win-web-ai-snapshot-cache-v1",
@@ -5607,16 +5607,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_bae439c7a5f541cf9aadffdd0e643ed7",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "transitioned",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "Rebased modular implementation and bounded evidence are complete.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786709619503
-    },
     {
       "id": "feature_event_f800a57c535541af9b6046e68cc56f4f",
       "feature_id": "compute-v261-linux-supervisor-enforcement-core",
@@ -7606,6 +7596,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786871119891
+    },
+    {
+      "id": "feature_event_f9cacaade24340ad84c643bbd2228deb",
+      "feature_id": "win-web-ai-context-continuity-hardening-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Windows release 0.3.69+49825af1e63811d5675244c59ed994cd8cd5baee was published, self-updated, restarted, and the installed release identity was read back exactly.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1786871598283
     }
   ]
 }
