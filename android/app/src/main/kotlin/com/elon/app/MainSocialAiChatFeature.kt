@@ -21,6 +21,8 @@ internal class MainSocialAiChatFeature(
     clearPendingSendState: () -> Unit,
     collapseInputComposer: () -> Unit,
     private val inputComposerViews: () -> MainInputComposerViews?,
+    pendingInputAttachmentCount: () -> Int,
+    prepareInputForProviderSwitch: (Boolean) -> Unit,
     private val showWorkModelSelector: () -> Unit,
     private val updateWorkModel: () -> Unit,
     private val refreshInputComposerVisual: () -> Unit,
@@ -68,6 +70,16 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val googleController by googleControllerDelegate
+    private val providerSwitchCoordinator by lazy {
+        WebChatProviderSwitchCoordinator(
+            activity = activity,
+            currentProvider = ::providerId,
+            chatModeActive = ::isChatModeActive,
+            pendingAttachmentCount = pendingInputAttachmentCount,
+            prepareInputHandoff = prepareInputForProviderSwitch,
+            commitProvider = modeController::selectChatProvider,
+        )
+    }
     private val providerPicker by lazy {
         WebChatProviderPicker(
             activity = activity,
@@ -76,7 +88,7 @@ internal class MainSocialAiChatFeature(
             currentState = ::webChatState,
             authenticated = ::webChatAuthenticated,
             composerReady = ::webChatComposerReady,
-            selectProvider = ::selectChatProvider,
+            selectProvider = providerSwitchCoordinator::requestFromConsumer,
             requestModelOptions = { activeController().requestModelOptions() },
             openOfficialFallback = ::openOfficialFallback,
         )
@@ -475,8 +487,7 @@ internal class MainSocialAiChatFeature(
     }
 
     private fun selectChatProvider(id: WebChatProviderId): Boolean {
-        if (providerId() == id && isChatModeActive()) return true
-        return modeController.selectChatProvider(id)
+        return providerSwitchCoordinator.selectWithoutPrompt(id)
     }
 
     private fun scheduleProviderDraftSave() {

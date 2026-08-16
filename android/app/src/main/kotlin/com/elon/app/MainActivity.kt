@@ -1037,7 +1037,7 @@ class MainActivity : AppCompatActivity() {
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             clearPendingSendState = inputActions::clearPendingSendState,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
-            inputComposerViews = inputActions::inputComposerViewsOrNull,
+            inputComposerViews = inputActions::inputComposerViewsOrNull, pendingInputAttachmentCount = inputActions.pendingAttachmentActions::pendingAttachmentCount, prepareInputForProviderSwitch = inputActions::prepareForWebChatProviderSwitch,
             showWorkModelSelector = modelActions::showModelPopupOrLoad,
             updateWorkModel = modelActions::updateModelButton, refreshInputComposerVisual = inputActions.sendButtonVisualActions::updateSendButtonVisual, chatGptWebLifecycle = chatGptWebLifecycle,
         )

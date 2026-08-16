@@ -163,6 +163,16 @@ internal class MainInputActions(
         return inputFocusActions.collapseInputComposerForBack()
     }
 
+    fun prepareForWebChatProviderSwitch(discardPendingAttachments: Boolean) {
+        fullScreenEditorOverlay?.takeIf(FullScreenEditorOverlay::isShowing)?.hide()
+        emojiActions.collapseEmojiPanel()
+        attachmentPanelActions.collapseAttachmentPanel()
+        if (discardPendingAttachments) {
+            pendingAttachmentActions.clearPendingAttachments(deleteFiles = true)
+            clearUiDesignRequestSelection()
+        }
+    }
+
     fun updateRunningInputModeStrip() {
         val visible = conversationTaskRegistryActions().isActiveConversationWorking() && !isFriendChatActive()
         inputComposerViewsOrNull()?.runtimeInputModeStrip?.refresh(
