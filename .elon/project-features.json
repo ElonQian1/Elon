@@ -3355,6 +3355,217 @@
       "updated_at_ms": 1786638099721
     },
     {
+      "id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "title": "通用 ERP 开放商业商户运行时桥 V1",
+      "summary": "把通用 ERP 能力编译为签名商户运行时绑定，以能力合同统一动作确认、平台幂等键和标准订单业务回执。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/merchant-erp-open-commerce-runtime-bridge-v1.md",
+        "content_hash": "cf819c8e623632ff8755f9f5f16c2a56ab156e20ee7e5014f1a3a6962ad11987",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+          "head_blob_oid": "c1cf8831a9bc33700acd25eea38b34a4cb6b2d90",
+          "worktree_blob_oid": "c1cf8831a9bc33700acd25eea38b34a4cb6b2d90",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "merchant-erp",
+      "tags": [
+        "erp",
+        "open-commerce",
+        "merchant-runtime",
+        "consumer-ai"
+      ],
+      "task_paths": [
+        "docs/erp/open-commerce-runtime-bridge-v1-acceptance.md",
+        "docs/requirements/merchant-erp-open-commerce-runtime-bridge-v1.md",
+        "sdk/merchant-erp-kernel/src/open-commerce.d.ts",
+        "sdk/merchant-erp-kernel/src/open-commerce.js",
+        "sdk/merchant-erp-kernel/test/open-commerce-runtime.test.mjs",
+        "sdk/open-commerce-connector/src/index.d.ts",
+        "sdk/open-commerce-connector/src/merchant-runtime.js",
+        "sdk/open-commerce-connector/test/merchant-runtime-auth.test.mjs",
+        "sdk/open-commerce-connector/test/merchant-runtime-contract.test.mjs"
+      ],
+      "dependencies": [
+        "merchant-erp-sqlite-store-v1"
+      ],
+      "acceptance_criteria": [
+        "任意 action 能力缺少动作确认时不执行处理器。",
+        "历史 order.commit 未声明 action 时仍要求确认。",
+        "ERP 绑定公开四项能力且只把 order.create 标记为动作。",
+        "相同平台幂等键重放只生成一个订单并只扣一次库存。",
+        "订单结果包含标准商户业务回执。",
+        "商户身份失配和幂等冲突失败关闭。",
+        "两个 SDK 的既有完整 Node 测试继续通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/decisions/merchant-erp-open-commerce-runtime-bridge-v1.md",
+          "content_hash": "0c5e3e27af75afb3a8530136822d6aac01a4c3499846b52260ae0b449ac90786",
+          "locator": "accepted architecture decision",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "9fc6c4a9744adb2c79e6c845a57711da90754e4f",
+            "worktree_blob_oid": "9fc6c4a9744adb2c79e6c845a57711da90754e4f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/erp/open-commerce-runtime-bridge-v1-acceptance.md",
+          "content_hash": "552ffc170a00dfb76f02e14d10323f8709de7e98e5431e5f92298cfe239fcd05",
+          "locator": "verified evidence and boundaries",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "df54368adef7969fbb9917ce61bc73bbff0c41e8",
+            "worktree_blob_oid": "df54368adef7969fbb9917ce61bc73bbff0c41e8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/merchant-erp-open-commerce-runtime-bridge-v1.md",
+          "content_hash": "cf819c8e623632ff8755f9f5f16c2a56ab156e20ee7e5014f1a3a6962ad11987",
+          "locator": "current requirement",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "c1cf8831a9bc33700acd25eea38b34a4cb6b2d90",
+            "worktree_blob_oid": "c1cf8831a9bc33700acd25eea38b34a4cb6b2d90",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/index.d.ts",
+          "content_hash": "671683eeeea6c75d5c3d363467c8845758f275d94e05e2411360f18f3a669a0b",
+          "locator": "package root types",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "d47dc7326767f5ce48adbdc5242ed252129f3aea",
+            "worktree_blob_oid": "d47dc7326767f5ce48adbdc5242ed252129f3aea",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/index.js",
+          "content_hash": "f076d32c93b3df04291f5a59a74c90f3b095396abdac82142f4b9da941466b42",
+          "locator": "package root export",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "21e3053397ed707ce56675d8f3d290027fddf72e",
+            "worktree_blob_oid": "21e3053397ed707ce56675d8f3d290027fddf72e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/open-commerce.d.ts",
+          "content_hash": "0a5003ea926d6d3ecc342cac1a3420b630712cff13e8fdc7d382270e4cc0c1a1",
+          "locator": "binding public types",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "5eef0682faa2c08a9b8571e04e96a6a3a289ab09",
+            "worktree_blob_oid": "5eef0682faa2c08a9b8571e04e96a6a3a289ab09",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/src/open-commerce.js",
+          "content_hash": "6f6ff7da6b062d7331931c67d1d9925c32773353dfaacc563f259d4cbd1aaef3",
+          "locator": "createMerchantRuntimeBinding",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "2a59a574da6134c1b5ebfe76d9ba6558ddbbd944",
+            "worktree_blob_oid": "2a59a574da6134c1b5ebfe76d9ba6558ddbbd944",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/merchant-erp-kernel/test/open-commerce-runtime.test.mjs",
+          "content_hash": "deb2ae21304760d9bb0692012813f90246e43f64489cea3566a9c23068aec8c0",
+          "locator": "signed runtime integration",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "d9741fadd64c56f014aafb5d61159843023222dd",
+            "worktree_blob_oid": "d9741fadd64c56f014aafb5d61159843023222dd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/index.d.ts",
+          "content_hash": "46438f68c6e49da8d1beb5263b9a370651747c01eea649436f524b73d7ae3d92",
+          "locator": "MerchantRuntimeCapabilityDefinition.action",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "4fb966d05e6e47465887a0b59bf500568eb05c0d",
+            "worktree_blob_oid": "4fb966d05e6e47465887a0b59bf500568eb05c0d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/src/merchant-runtime.js",
+          "content_hash": "6a85f80a98bac1a3d1582a1b91f13d58b443035ceed03247b2c1dea5b7ecb970",
+          "locator": "createMerchantRuntime action contract",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "39dcd8c09c64a1ff7257e9a82730cd2fbaf21c80",
+            "worktree_blob_oid": "39dcd8c09c64a1ff7257e9a82730cd2fbaf21c80",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/test/merchant-runtime-auth.test.mjs",
+          "content_hash": "f5f0db507701b8d1762dda988687885a1cbee9109e35769dccd9fc24253a9473",
+          "locator": "arbitrary action confirmation test",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "49f65a4825ec4d8f81408d78da9c26cd5fb07826",
+            "worktree_blob_oid": "49f65a4825ec4d8f81408d78da9c26cd5fb07826",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "sdk/open-commerce-connector/test/merchant-runtime-contract.test.mjs",
+          "content_hash": "dcb443b48d9cd41fbd304dc299f60363c9f19b28ed95c384847da0e42098aaad",
+          "locator": "action manifest and validation tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "93a46302b2f6ad6ca519a82cff4167b4c4685bf2",
+            "head_blob_oid": "6d9dddf0918feb39d8d6fabbb2bb44f2b3f80da6",
+            "worktree_blob_oid": "6d9dddf0918feb39d8d6fabbb2bb44f2b3f80da6",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1786872595424,
+      "updated_at_ms": 1786872704199
+    },
+    {
       "id": "merchant-erp-sqlite-store-v1",
       "title": "通用 ERP SQLite 持久化适配器 V1",
       "summary": "为通用 ERP 内核提供商户自有、可重启恢复、事务原子且无需第三方原生依赖的 Node SQLite 适配器。",
@@ -5608,86 +5819,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_f800a57c535541af9b6046e68cc56f4f",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "transitioned",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "Source contract, Linux-musl product/test builds, and three WSL2 real-kernel fixtures passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786709619603
-    },
-    {
-      "id": "feature_event_b7beae7c53684ea98df8ad3379a8c44a",
-      "feature_id": "compute-v261-linux-supervisor-enforcement-core",
-      "action": "transitioned",
-      "actor": "codex-goal-v261-rebase",
-      "reason": "Release the private supervisor enforcement core; no production adapter activation or deployment is claimed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786709619703
-    },
-    {
-      "id": "feature_event_38c496e6843b42659f750918e3a9aa6d",
-      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
-      "action": "registered",
-      "actor": "codex/root",
-      "reason": "用户现场报告 MutationObserver 非 Node 异常且原生 UI 无法发送和回显。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786710137772
-    },
-    {
-      "id": "feature_event_0650684a41f448a483ec957c7d6e58de",
-      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786710137786
-    },
-    {
-      "id": "feature_event_2de099b84b1c4a70b1db1a4b017f8502",
-      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "修复已在最新主线重放并通过受影响回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786710137797
-    },
-    {
-      "id": "feature_event_d1f7bb98e77a4d698cb8431c893a6f02",
-      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786710138846
-    },
-    {
-      "id": "feature_event_18a5e978e4b74c84a00a29f19304df5a",
-      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "共享提取器、文档令牌、DOM 就绪门禁和脱敏诊断已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786710138856
-    },
-    {
-      "id": "feature_event_8ecbd16e06334de8a244fc03fdb874c2",
-      "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "失败优先合同、用户浏览器测试、ESLint、Vite 生产构建及重放后 Tauri Rust 回归通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786710138865
-    },
-    {
       "id": "feature_event_6ac786466c1e4a6aaf847dccf730ae72",
       "feature_id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "action": "transitioned",
@@ -7606,6 +7737,86 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1786871598283
+    },
+    {
+      "id": "feature_event_7d85ed5688b04518958ad865e695ae29",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "registered",
+      "actor": "codex-goal-019f3b86",
+      "reason": "在最新远端注册表真源上登记已完成验证的 ERP 运行时桥",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1786872595424
+    },
+    {
+      "id": "feature_event_eaa18449424f464fb72e246af0644be5",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "需求范围、非目标和七项验收标准已审查",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1786872608647
+    },
+    {
+      "id": "feature_event_dfd8d031fc834147a2cdea6b1263ff76",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "依赖已 verified，任务路径与验收入口齐全",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1786872623029
+    },
+    {
+      "id": "feature_event_4f3fee0cb8474a79a870e67d2f40c723",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "claimed",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1786872635114
+    },
+    {
+      "id": "feature_event_d61f1af81ec141f884a0c5d79218ac80",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "在已验证提交上绑定当前证据",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1786872645568
+    },
+    {
+      "id": "feature_event_f86ae9791e20492a978f55eeca97c243",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-019f3b86",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1786872671004
+    },
+    {
+      "id": "feature_event_9fdb181ff4c84d6892b28a2be90e7aa7",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "实现和文档证据已绑定到重放后的当前提交",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1786872687127
+    },
+    {
+      "id": "feature_event_5aba3164459d45aca31e39c04e6a6f64",
+      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-019f3b86",
+      "reason": "连接器 90/90、ERP 13/13 Node 回归及两个 npm 发布包 dry-run 均通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1786872704199
     }
   ]
 }
