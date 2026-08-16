@@ -26,10 +26,28 @@ $observedSemantics = @()
 $mutationsInvoked = 0
 $pinRoundTripVerified = $false
 $originalViewMode = ""
+$originConversationPath = ""
 $viewModeChanged = $false
+$conversationSampleOpened = $false
 $originalPinned = $false
 $pinOriginalStateKnown = $false
 $pinStateChanged = $false
+$conversationManagementSemantics = @(
+    "conversation_files",
+    "rename",
+    "pin",
+    "archive",
+    "share",
+    "delete"
+)
+
+function Test-ConversationManagementControls {
+    param([AllowNull()][object[]]$Controls)
+
+    return @($Controls | Where-Object {
+        [string]$_.semantic -in $script:conversationManagementSemantics
+    }).Count -gt 0
+}
 
 function Wait-ConversationOptions {
     param([AllowEmptyString()][string]$ExpectedContextId = "")
@@ -60,14 +78,6 @@ function Wait-ConversationManagementMenu {
         [ValidateRange(1, 300)][int]$WaitTimeoutSec = $TimeoutSec
     )
 
-    $managementSemantics = @(
-        "conversation_files",
-        "rename",
-        "pin",
-        "archive",
-        "share",
-        "delete"
-    )
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($WaitTimeoutSec)
     $lastControls = @()
     do {
@@ -80,10 +90,7 @@ function Wait-ConversationManagementMenu {
                 limit = 100
             }
         $lastControls = @($menu.controls)
-        $recognized = @($lastControls | Where-Object {
-            [string]$_.semantic -in $managementSemantics
-        })
-        if ($recognized.Count -gt 0) {
+        if (Test-ConversationManagementControls -Controls $lastControls) {
             return $lastControls
         }
         Start-Sleep -Seconds 1
@@ -117,6 +124,44 @@ function Close-FeatureNavigation {
     throw "Feature navigation did not close before conversation management."
 }
 
+function Open-ConversationManagementSample {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    do {
+        Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+            -Action "chatgpt_list_conversations" -TimeoutSec 15 | Out-Null
+        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 }
+        $samplePath = @($page.conversations | Where-Object {
+            -not [string]::IsNullOrWhiteSpace([string]$_.path)
+        } | Select-Object -First 1 | ForEach-Object { [string]$_.path })
+        if ($samplePath.Count -gt 0) {
+            $path = $samplePath[0]
+            Invoke-ChatGptWebSmokeReceiptAction -Runtime $runtime `
+                -Action "chatgpt_open_conversation" -ExpectedAction "open_conversation" `
+                -Arguments @{ conversation_path = $path } -TimeoutSec $TimeoutSec | Out-Null
+            $script:conversationSampleOpened = $true
+            Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+                -Description "conversation management sample" -Predicate {
+                    param($state)
+                    [string]$state.conversation.url -like "*$path*" -and
+                        $state.bridge_state -eq "ready"
+                }.GetNewClosure() | Out-Null
+            return
+        }
+        Start-Sleep -Seconds 1
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Conversation management verification is deferred without conversation history."
+}
+
+function Restore-ConversationManagementOrigin {
+    if (-not $script:conversationSampleOpened) { return }
+    Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
+        -ConversationPath $script:originConversationPath `
+        -ViewMode $script:originalViewMode -TimeoutSec $TimeoutSec | Out-Null
+    $script:conversationSampleOpened = $false
+    $script:viewModeChanged = $false
+}
+
 function Get-ConversationPinState {
     param([Parameter(Mandatory = $true)]$Control)
 
@@ -146,7 +191,7 @@ function Open-ConversationManagementMenu {
         $menuWaitSec = if ($attempt -eq 1) { [Math]::Min(12, $TimeoutSec) } else { $TimeoutSec }
         $controls = @(Wait-ConversationManagementMenu `
             -ContextId $contextId -WaitTimeoutSec $menuWaitSec)
-        if ($controls.Count -gt 0 -or $attempt -eq 2) {
+        if ((Test-ConversationManagementControls -Controls $controls) -or $attempt -eq 2) {
             return [pscustomobject]@{
                 context_id = $contextId
                 controls = $controls
@@ -279,12 +324,17 @@ try {
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
     $originalViewMode = [string]$origin.view_mode
+    $originConversationPath = Get-ChatGptWebSmokeConversationPath `
+        -Url ([string]$origin.conversation.url)
     if ([string]$origin.view_mode -ne "web") {
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
             -Arguments @{ view_mode = "official" } | Out-Null
         $viewModeChanged = $true
         $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
             -TimeoutSec $TimeoutSec -InitialWaitSec 5
+    }
+    if (-not $originConversationPath) {
+        Open-ConversationManagementSample
     }
 
     Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
@@ -312,9 +362,7 @@ try {
     if (@($menuControls | Where-Object { [string]$_.semantic -eq "action" }).Count -gt 0) {
         throw "Conversation menu contains unknown generic controls."
     }
-    if (@($observedSemantics | Where-Object {
-        $_ -in @("conversation_files", "rename", "pin", "archive", "share", "delete")
-    }).Count -eq 0) {
+    if (-not (Test-ConversationManagementControls -Controls $menuControls)) {
         $safeSemantics = ($observedSemantics -join ",").Replace(" ", "")
         $safeRoles = ($observedRoles -join ",").Replace(" ", "")
         throw "Conversation menu contains no recognized management action; semantics=$safeSemantics roles=$safeRoles."
@@ -359,6 +407,7 @@ try {
     Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
         -TimeoutSec $TimeoutSec -InitialWaitSec 5 | Out-Null
 
+    Restore-ConversationManagementOrigin
     Restore-OriginalViewMode
     $caseIds = @("safe/conversation_management_structure")
     if ($pinRoundTripVerified) { $caseIds += "supervised/conversation_mutations" }
@@ -385,6 +434,7 @@ try {
     $cleanupFailures = [System.Collections.Generic.List[string]]::new()
     try { Restore-ConversationPinState } catch { $cleanupFailures.Add("pin state") }
     try { Close-ConversationManagementMenu } catch { $cleanupFailures.Add("menu") }
+    try { Restore-ConversationManagementOrigin } catch { $cleanupFailures.Add("conversation") }
     try { Restore-OriginalViewMode } catch { $cleanupFailures.Add("view mode") }
     try {
         Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null

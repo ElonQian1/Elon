@@ -18,12 +18,18 @@ foreach ($required in @(
     "ExpectedAdapterVersion",
     '[switch]$ConfirmPinRoundTrip',
     'semantic = "conversation_options"',
+    "Test-ConversationManagementControls",
     "Wait-ConversationManagementMenu",
     'for ($attempt = 1; $attempt -le 2; $attempt++)',
     '-WaitTimeoutSec $menuWaitSec',
     'Start-Sleep -Milliseconds 1200',
     "Close-FeatureNavigation",
     'Action "chatgpt_dismiss_features"',
+    "Open-ConversationManagementSample",
+    'Action "chatgpt_get_conversations"',
+    'Action "chatgpt_open_conversation"',
+    "Restore-ConversationManagementOrigin",
+    "Restore-ChatGptWebSmokeOrigin",
     "Get-ConversationPinState",
     "Open-ConversationManagementMenu",
     "Wait-ConversationManagementMenuClosed",
@@ -38,7 +44,7 @@ foreach ($required in @(
     'context_id = $ContextId',
     'region = "overlay"',
     'chatgpt-conversation-actions:*',
-    '"conversation_files", "rename", "pin", "archive", "share", "delete"',
+    'if ((Test-ConversationManagementControls -Controls $controls) -or $attempt -eq 2)',
     '"safe/conversation_management_structure"',
     '"supervised/conversation_mutations"',
     'pin_round_trip_verified = $pinRoundTripVerified',
@@ -63,9 +69,11 @@ if ($confirmationIndex -lt 0 -or $mutationIndex -lt 0 -or $confirmationIndex -gt
     throw "Conversation mutation must remain behind explicit confirmation."
 }
 $rollbackIndex = $source.LastIndexOf('Restore-ConversationPinState')
+$conversationRestoreIndex = $source.LastIndexOf('Restore-ConversationManagementOrigin')
 $viewRestoreIndex = $source.LastIndexOf('Restore-OriginalViewMode')
-if ($rollbackIndex -lt 0 -or $viewRestoreIndex -lt 0 -or $rollbackIndex -gt $viewRestoreIndex) {
-    throw "Conversation pin recovery must run before view-mode restoration."
+if ($rollbackIndex -lt 0 -or $conversationRestoreIndex -lt 0 -or $viewRestoreIndex -lt 0 -or
+    $rollbackIndex -gt $conversationRestoreIndex -or $conversationRestoreIndex -gt $viewRestoreIndex) {
+    throw "Conversation and pin recovery must run before view-mode restoration."
 }
 $viewRestoreBeforeEvidenceIndex = $source.IndexOf('Restore-OriginalViewMode', $mutationIndex)
 $registerEvidenceIndex = $source.IndexOf('Register-ChatGptWebVerificationCases', $mutationIndex)
