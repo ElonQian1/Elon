@@ -1,5 +1,8 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatConsumerControl
+import com.elon.app.WebChatConsumerSlider
+
 internal data class ChatGptWebUiManifest(
     val version: Int,
     val pageKind: String,
@@ -11,56 +14,38 @@ internal data class ChatGptWebUiManifest(
 )
 
 internal data class ChatGptWebUiControl(
-    val id: String,
-    val semantic: String,
-    val label: String,
-    val region: String,
-    val role: String,
-    val enabled: Boolean,
-    val selected: Boolean,
-    val inputKind: String? = null,
-    val writable: Boolean = false,
-    val stateSettable: Boolean = false,
-    val choiceLabels: List<String> = emptyList(),
-    val selectedChoiceIndex: Int? = null,
-    val slider: ChatGptWebSlider? = null,
-    val expanded: Boolean? = null,
-    val expandable: Boolean = false,
-    val contextId: String? = null,
-    val inViewport: Boolean = true,
-    val webXRatio: Double? = null,
-    val webYRatio: Double? = null,
-) {
-    val supportsTextEntry: Boolean
-        get() = role == "textbox" && writable && inputKind != "password"
-
-    val supportsSelectedState: Boolean
-        get() = stateSettable && enabled && (
-            role in setOf(
-                "checkbox", "radio", "menuitemcheckbox", "menuitemradio", "switch", "tab",
-            ) || semantic == "temporary_chat"
-            )
-
-    val supportsChoiceSelection: Boolean
-        get() = enabled && role == "combobox" && inputKind == "select" && choiceLabels.isNotEmpty()
-
-    val supportsSliderValue: Boolean
-        get() = enabled && role == "slider" && inputKind == "range" && slider != null
-
-    val supportsExpandedState: Boolean
-        get() = enabled && expandable && expanded != null
+    override val id: String,
+    override val semantic: String,
+    override val label: String,
+    override val region: String,
+    override val role: String,
+    override val enabled: Boolean,
+    override val selected: Boolean,
+    override val inputKind: String? = null,
+    override val writable: Boolean = false,
+    override val stateSettable: Boolean = false,
+    override val choiceLabels: List<String> = emptyList(),
+    override val selectedChoiceIndex: Int? = null,
+    override val slider: ChatGptWebSlider? = null,
+    override val expanded: Boolean? = null,
+    override val expandable: Boolean = false,
+    override val contextId: String? = null,
+    override val inViewport: Boolean = true,
+    override val webXRatio: Double? = null,
+    override val webYRatio: Double? = null,
+) : WebChatConsumerControl {
 
     val accessibilityLabel: String
         get() = "chatgpt-control:$id:$label"
 }
 
 internal data class ChatGptWebSlider(
-    val min: Double,
-    val max: Double,
-    val step: Double,
-    val value: Double,
-) {
-    val stepCount: Int
+    override val min: Double,
+    override val max: Double,
+    override val step: Double,
+    override val value: Double,
+) : WebChatConsumerSlider {
+    override val stepCount: Int
         get() = kotlin.math.round((max - min) / step).toInt()
 }
 

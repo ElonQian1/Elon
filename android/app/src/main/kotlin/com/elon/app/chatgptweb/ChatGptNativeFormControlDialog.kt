@@ -5,6 +5,7 @@ import android.text.InputType
 import android.widget.FrameLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.AppCompatEditText
+import com.elon.app.WebChatConsumerControl
 
 internal object ChatGptNativeFormControlDialog {
     fun inputSelector(controlId: String): String =
@@ -15,7 +16,7 @@ internal object ChatGptNativeFormControlDialog {
 
     fun show(
         context: Context,
-        control: ChatGptWebUiControl,
+        control: WebChatConsumerControl,
         onSubmit: (String, String) -> Unit,
     ): AlertDialog {
         require(control.supportsTextEntry) { "Control is not a writable text field." }

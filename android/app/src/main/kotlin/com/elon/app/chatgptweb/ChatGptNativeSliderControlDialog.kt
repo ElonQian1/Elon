@@ -7,6 +7,7 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import com.elon.app.WebChatConsumerControl
 import java.math.BigDecimal
 import kotlin.math.roundToInt
 
@@ -22,7 +23,7 @@ internal object ChatGptNativeSliderControlDialog {
 
     fun show(
         context: Context,
-        control: ChatGptWebUiControl,
+        control: WebChatConsumerControl,
         onSubmit: (String, Double) -> Unit,
     ): AlertDialog {
         require(control.supportsSliderValue) { "Control does not expose a writable native slider." }

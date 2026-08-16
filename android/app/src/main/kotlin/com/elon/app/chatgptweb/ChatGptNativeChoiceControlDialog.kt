@@ -8,6 +8,7 @@ import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import com.elon.app.WebChatConsumerControl
 
 internal object ChatGptNativeChoiceControlDialog {
     fun choiceSelector(controlId: String, choiceIndex: Int): String =
@@ -15,7 +16,7 @@ internal object ChatGptNativeChoiceControlDialog {
 
     fun show(
         context: Context,
-        control: ChatGptWebUiControl,
+        control: WebChatConsumerControl,
         onSelected: (String, Int) -> Unit,
     ): AlertDialog {
         require(control.supportsChoiceSelection) { "Control does not expose selectable choices." }
@@ -41,7 +42,7 @@ internal object ChatGptNativeChoiceControlDialog {
 
     private class ChoiceAdapter(
         context: Context,
-        private val control: ChatGptWebUiControl,
+        private val control: WebChatConsumerControl,
     ) : ArrayAdapter<String>(context, android.R.layout.simple_list_item_single_choice, control.choiceLabels) {
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = convertView ?: LayoutInflater.from(context).inflate(
