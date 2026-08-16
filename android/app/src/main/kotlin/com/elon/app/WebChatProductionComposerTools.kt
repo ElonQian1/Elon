@@ -4,7 +4,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import org.json.JSONObject
 
 internal data class WebChatProductionComposerTool(
     val id: String,
@@ -14,35 +13,28 @@ internal data class WebChatProductionComposerTool(
 )
 
 internal object WebChatProductionComposerToolParser {
-    fun parse(navigation: JSONObject): List<WebChatProductionComposerTool> {
-        val options = navigation.optJSONObject("composer_sections")
-            ?.optJSONArray(TOOLS_SECTION)
-            ?: return emptyList()
-        val parsed = mutableListOf<WebChatProductionComposerTool>()
-        for (index in 0 until options.length()) {
-            val option = options.optJSONObject(index) ?: continue
-            val id = option.optString("id").trim()
-            val label = option.optString("label").trim()
-            if (id.isBlank() || label.isBlank()) continue
-            parsed += WebChatProductionComposerTool(
+    fun parse(options: List<WebChatConsumerOption>): List<WebChatProductionComposerTool> {
+        return options.mapNotNull { option ->
+            val id = option.id.trim()
+            val label = option.label.trim()
+            if (id.isBlank() || label.isBlank()) return@mapNotNull null
+            WebChatProductionComposerTool(
                 id = id,
                 label = label,
-                selected = option.optBoolean("selected"),
-                nativeSelector = option.optString("native_adb_content_description")
+                selected = option.selected,
+                nativeSelector = option.nativeSelector
                     .trim()
                     .ifBlank { "web-chat-composer-tool:$id" },
             )
         }
-        return parsed.distinctBy(WebChatProductionComposerTool::id)
+            .distinctBy(WebChatProductionComposerTool::id)
     }
-
-    private const val TOOLS_SECTION = "tools"
 }
 
 internal class WebChatProductionComposerToolsCoordinator(
     private val activity: AppCompatActivity,
     private val host: View,
-    private val mcpPort: () -> WebChatSocialMcpPort?,
+    private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
     private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
@@ -53,17 +45,15 @@ internal class WebChatProductionComposerToolsCoordinator(
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
         if (!provider.supports(WebChatProviderCapability.COMPOSER_TOOLS)) return
-        val port = mcpPort() ?: return showUnavailable()
+        val port = consumerPort() ?: return showUnavailable()
         val epoch = requestEpoch
         val cached = readTools(port)
         if (cached.isNotEmpty()) {
             showToolDialog(provider, port, cached)
             return
         }
-        val requested = port.control(JSONObject()
-            .put("action", "chatgpt_list_composer_options")
-            .put("section", TOOLS_SECTION))
-        if (!requested.optBoolean("control_ok")) {
+        val requested = port.requestComposerOptions(TOOLS_SECTION)
+        if (!requested.accepted) {
             showToolDialog(provider, port, emptyList())
             return
         }
@@ -86,7 +76,7 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private fun pollTools(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         epoch: Int,
         attempt: Int,
     ) {
@@ -106,21 +96,23 @@ internal class WebChatProductionComposerToolsCoordinator(
         )
     }
 
-    private fun readTools(port: WebChatSocialMcpPort): List<WebChatProductionComposerTool> {
-        val navigation = port.control(JSONObject()
-            .put("action", "chatgpt_get_navigation")
-            .put("section", TOOLS_SECTION))
-        if (!navigation.optBoolean("control_ok")) return emptyList()
-        return WebChatProductionComposerToolParser.parse(navigation)
-    }
+    private fun readTools(port: WebChatConsumerPort): List<WebChatProductionComposerTool> =
+        WebChatProductionComposerToolParser.parse(
+            port.state().composerSections[TOOLS_SECTION].orEmpty(),
+        )
 
     private fun showToolDialog(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         tools: List<WebChatProductionComposerTool>,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
-        val commands = WebChatProductionComposerCommandCatalog.resolve(provider, port.uiState())
+        val state = port.state()
+        val commands = WebChatProductionComposerCommandCatalog.resolve(
+            provider = provider,
+            streaming = state.streaming,
+            dictationActive = state.dictationActive,
+        )
         if (commands.isEmpty() && tools.isEmpty()) {
             showUnavailable()
             return
@@ -167,17 +159,17 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private fun executeCommand(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         command: WebChatProductionComposerCommand,
     ): Boolean {
         if (command.action == REALTIME_VOICE_ACTION) {
             openOfficialFallback()
             return true
         }
-        val result = port.control(JSONObject().put("action", command.action))
-        val accepted = result.optBoolean("control_ok")
+        val result = port.executeSessionCommand(command.action)
+        val accepted = result.accepted
         if (!accepted) {
-            showCommandError(result.optString("error"))
+            showCommandError(result.error.orEmpty())
         } else {
             WebChatConsumerComposerOperationPolicy.commandAccepted(provider, command.action)
                 ?.let(onOperationFeedback)
@@ -187,14 +179,11 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private fun selectTool(
         provider: WebChatProviderIdentity,
-        port: WebChatSocialMcpPort,
+        port: WebChatConsumerPort,
         tool: WebChatProductionComposerTool,
     ) {
-        val result = port.control(JSONObject()
-            .put("action", "chatgpt_select_composer_option")
-            .put("section", TOOLS_SECTION)
-            .put("option_id", tool.id))
-        if (!result.optBoolean("control_ok")) {
+        val result = port.selectComposerOption(TOOLS_SECTION, tool.id)
+        if (!result.accepted) {
             Toast.makeText(activity, "网页工具状态已变化，请重试", Toast.LENGTH_SHORT).show()
         } else {
             onOperationFeedback(WebChatConsumerComposerOperationPolicy.toolAccepted(provider, tool.label))

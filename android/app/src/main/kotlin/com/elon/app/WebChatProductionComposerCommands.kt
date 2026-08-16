@@ -1,7 +1,5 @@
 package com.elon.app
 
-import org.json.JSONObject
-
 internal data class WebChatProductionComposerCommand(
     val action: String,
     val label: String,
@@ -11,11 +9,10 @@ internal data class WebChatProductionComposerCommand(
 internal object WebChatProductionComposerCommandCatalog {
     fun resolve(
         provider: WebChatProviderIdentity,
-        uiState: JSONObject,
+        streaming: Boolean,
+        dictationActive: Boolean,
     ): List<WebChatProductionComposerCommand> {
         val commands = mutableListOf<WebChatProductionComposerCommand>()
-        val streaming = uiState.optBoolean("streaming")
-        val dictationActive = uiState.optBoolean("dictation_active")
         if (provider.supports(WebChatProviderCapability.STOP_GENERATION) && streaming) {
             commands += command(provider, "chatgpt_stop_generation", "停止生成", "stop-generation")
         }

@@ -112,8 +112,8 @@ internal class MainSocialAiChatFeature(
         WebChatProductionComposerToolsCoordinator(
             activity = activity,
             host = binding.root,
-            mcpPort = {
-                if (isChatModeActive()) activeController().mcpPort() else null
+            consumerPort = {
+                if (isChatModeActive()) activeController().consumerPort() else null
             },
             activeProvider = {
                 if (isChatModeActive()) providerId() else null

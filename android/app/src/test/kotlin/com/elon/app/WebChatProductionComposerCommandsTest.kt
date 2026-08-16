@@ -1,6 +1,5 @@
 package com.elon.app
 
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,7 +9,11 @@ class WebChatProductionComposerCommandsTest {
 
     @Test
     fun offersDictationAndRealtimeVoiceWhenIdle() {
-        val commands = WebChatProductionComposerCommandCatalog.resolve(chatGpt, JSONObject())
+        val commands = WebChatProductionComposerCommandCatalog.resolve(
+            chatGpt,
+            streaming = false,
+            dictationActive = false,
+        )
 
         assertEquals(
             listOf("chatgpt_start_dictation", "chatgpt_start_realtime_voice"),
@@ -26,7 +29,8 @@ class WebChatProductionComposerCommandsTest {
     fun replacesVoiceActionsWithStopWhileStreaming() {
         val commands = WebChatProductionComposerCommandCatalog.resolve(
             chatGpt,
-            JSONObject().put("streaming", true),
+            streaming = true,
+            dictationActive = false,
         )
 
         assertEquals(listOf("chatgpt_stop_generation"), commands.map { it.action })
@@ -36,7 +40,8 @@ class WebChatProductionComposerCommandsTest {
     fun offersSubmitInsteadOfStartingAnotherDictation() {
         val commands = WebChatProductionComposerCommandCatalog.resolve(
             chatGpt,
-            JSONObject().put("dictation_active", true),
+            streaming = false,
+            dictationActive = true,
         )
 
         assertEquals(listOf("chatgpt_submit_dictation"), commands.map { it.action })
@@ -46,12 +51,17 @@ class WebChatProductionComposerCommandsTest {
     fun doesNotExposeUnsupportedCommandsForGoogle() {
         val google = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
 
-        assertTrue(WebChatProductionComposerCommandCatalog.resolve(google, JSONObject()).isEmpty())
+        assertTrue(WebChatProductionComposerCommandCatalog.resolve(
+            google,
+            streaming = false,
+            dictationActive = false,
+        ).isEmpty())
         assertEquals(
             listOf("chatgpt_stop_generation"),
             WebChatProductionComposerCommandCatalog.resolve(
                 google,
-                JSONObject().put("streaming", true),
+                streaming = true,
+                dictationActive = false,
             ).map { it.action },
         )
     }
