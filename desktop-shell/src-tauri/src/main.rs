@@ -26,6 +26,7 @@
 
 mod autostart;
 mod codex_semantic_bridge;
+mod external_navigation;
 mod local_ai_browser;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,6 +34,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    webview::NewWindowResponse,
     Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -192,6 +194,18 @@ fn main() {
                 .on_navigation(|url| {
                     println!("[elon-desktop] 导航 -> {url}");
                     true
+                })
+                .on_new_window(|url, _features| {
+                    match external_navigation::open_in_system_browser(&url) {
+                        Ok(()) => println!(
+                            "[elon-desktop] 已交给系统浏览器打开 -> {}",
+                            external_navigation::safe_log_origin(&url)
+                        ),
+                        Err(error) => eprintln!("[elon-desktop] 外部链接打开失败: {error}"),
+                    }
+                    // 主工作台不创建不受管理的新 WebView 窗口。有效 HTTPS 链接已经交给
+                    // Windows 默认浏览器；无效协议则保持拒绝。
+                    NewWindowResponse::Deny
                 })
                 .on_page_load(|_window, payload| {
                     println!(
