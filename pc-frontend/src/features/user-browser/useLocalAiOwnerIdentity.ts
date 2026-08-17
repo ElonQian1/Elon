@@ -3,6 +3,7 @@ import { LOCAL_NODE_BASE_CHANGED_EVENT } from '../../api/runtime'
 import { useAuthStore } from '../../store/auth'
 import { probeLocalNode } from '../node/localNodeApi'
 import { safeNodeAdminUrl } from '../../lib/utils'
+import { createLocalAiRuntimeToken } from './localAiCommandReceipt'
 
 export type LocalAiOwnerSource = 'cloud_account' | 'local_node' | 'anonymous_device' | 'conflict' | 'none'
 
@@ -108,12 +109,22 @@ function readAnonymousOwnerKey(): string {
   try {
     const existing = window.localStorage.getItem(storageKey)?.trim()
     if (existing) return `anonymous-device:${existing}`
-    const created = `pc:${window.crypto.randomUUID()}`
+    const created = `pc:${createAnonymousOwnerToken()}`
     window.localStorage.setItem(storageKey, created)
     return `anonymous-device:${created}`
   } catch {
-    return `anonymous-session:${window.crypto.randomUUID()}`
+    return `anonymous-session:${createAnonymousOwnerToken()}`
   }
+}
+
+function createAnonymousOwnerToken(): string {
+  try {
+    const nativeId = globalThis.crypto?.randomUUID?.()
+    if (nativeId) return nativeId
+  } catch {
+    // Public HTTP and older WebView2 runtimes may not expose a usable randomUUID.
+  }
+  return createLocalAiRuntimeToken()
 }
 
 function clean(value: unknown): string {
