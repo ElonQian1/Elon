@@ -18,6 +18,7 @@ internal class ChatGptWebPageAdapter(
     private val onEvent: (ChatGptWebEvent) -> Unit,
     private val onStateChanged: (State) -> Unit,
     private val onDocumentChanged: (WebBridgeDocumentSession.Snapshot) -> Unit = {},
+    private val onWebExecutionRequested: () -> Unit = {},
 ) {
     enum class State {
         WEB_ONLY,
@@ -332,6 +333,7 @@ internal class ChatGptWebPageAdapter(
         projectHints: List<ChatGptWebProject> = emptyList(),
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
+        onWebExecutionRequested()
         val command = JSONObject()
             .put("action", action)
             .put("documentToken", documentSession.snapshot().documentToken)

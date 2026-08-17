@@ -53,5 +53,11 @@ internal object ChatGptWebNavigationPolicy {
         return supportsEnhancedMode(rawUrl) && uri.path.startsWith("/auth")
     }
 
+    fun restorableStartUrl(savedUrl: String): String {
+        val path = parse(savedUrl)?.path.orEmpty()
+        return if (path == "/" || path.startsWith("/c/") || path.startsWith("/g/")) savedUrl
+        else START_URL
+    }
+
     private fun parse(rawUrl: String): URI? = runCatching { URI(rawUrl) }.getOrNull()
 }

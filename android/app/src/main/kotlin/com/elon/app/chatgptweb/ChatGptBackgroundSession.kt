@@ -106,13 +106,17 @@ internal class ChatGptBackgroundSession(
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
     private var reloadAfterPause = false
+    private val webExecution = chatGptBackgroundExecutionController({ webView }) {
+        state == State.LOADING || latestSnapshot?.streaming == true ||
+            conversationNavigation.hasPending() || attachmentSendTracker != null
+    }
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
         onConversationIndexChanged(conversationIndex())
         recovery.activate()
         ensureInitialized()
-        webView?.onResume()
+        webExecution.hostResumed()
         pageAdapter?.onHostResumed(webView?.url)
         resumeRecovery()
     }
@@ -120,7 +124,7 @@ internal class ChatGptBackgroundSession(
     fun onHostResumed() {
         if (webView == null) return
         recovery.activate()
-        webView?.onResume()
+        webExecution.hostResumed()
         pageAdapter?.onHostResumed(webView?.url)
         resumeRecovery()
     }
@@ -128,19 +132,18 @@ internal class ChatGptBackgroundSession(
         val view = webView ?: return false
         view.stopLoading()
         updateState(State.LOADING)
+        webExecution.interactionRequested()
         view.loadUrl(ChatGptWebNavigationPolicy.START_URL)
         return true
     }
     fun retryConnection(): Boolean = recovery.retryNow()
     fun onHostPaused() = pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
-
     fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
         conversations = conversations,
         projects = ChatGptWebConversationIndex.projects(conversations, projects),
         collection = conversationCollection,
     )
-
     fun requestConversationIndex(): Boolean {
         return conversationRefresh.requestNow()
     }
@@ -381,6 +384,7 @@ internal class ChatGptBackgroundSession(
             onEvent = ::handleEvent,
             onStateChanged = ::handleAdapterState,
             onDocumentChanged = ::handleDocumentChanged,
+            onWebExecutionRequested = webExecution::interactionRequested,
         )
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
@@ -427,6 +431,7 @@ internal class ChatGptBackgroundSession(
             ),
         )
         webView = view
+        webExecution.webViewAttached()
         pageAdapter = adapter
         touchDispatcher = ChatGptWebTouchDispatcher(view)
         adapter.install()
@@ -439,7 +444,8 @@ internal class ChatGptBackgroundSession(
                 return@prepare
             }
             updateState(State.LOADING)
-            view.loadUrl(chatRestorableUrl(sessionRestorer.restoreUrl()))
+            webExecution.interactionRequested()
+            view.loadUrl(ChatGptWebNavigationPolicy.restorableStartUrl(sessionRestorer.restoreUrl()))
         }
     }
 
@@ -566,6 +572,7 @@ internal class ChatGptBackgroundSession(
             is ChatGptWebEvent.FeatureNavigation -> Unit
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
         }
+        webExecution.activitySettled()
     }
 
     private fun handleDocumentChanged(document: com.elon.app.WebBridgeDocumentSession.Snapshot) {
@@ -579,15 +586,10 @@ internal class ChatGptBackgroundSession(
         observedMcpState.updateDocument(document)
     }
 
-    private fun chatRestorableUrl(savedUrl: String): String {
-        val path = runCatching { java.net.URI(savedUrl).path.orEmpty() }.getOrDefault("")
-        return if (path == "/" || path.startsWith("/c/") || path.startsWith("/g/")) savedUrl
-        else ChatGptWebNavigationPolicy.START_URL
-    }
-
     private fun handleWebTouchRequest(event: ChatGptWebEvent.WebTouchRequest) {
         val view = webView ?: return
         val adapter = pageAdapter ?: return
+        webExecution.interactionRequested()
         touchDispatcher?.dispatch(event) { dispatched ->
             if (!dispatched) {
                 chatGptComposerSectionForAction(event.purpose)?.let { composerOptionRequests.dismiss() }
@@ -660,6 +662,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun pauseSession() {
+        webExecution.hostPaused()
         composerOptionInteraction.release()
         recovery.deactivate()
         conversationRefresh.reset()
@@ -672,7 +675,6 @@ internal class ChatGptBackgroundSession(
                 reloadAfterPause = true
             }
             cookieManager.flush()
-            view.onPause()
         }
     }
 
@@ -696,7 +698,8 @@ internal class ChatGptBackgroundSession(
             ?: ChatGptWebNavigationPolicy.START_URL
         view.stopLoading()
         updateState(State.LOADING)
-        view.loadUrl(chatRestorableUrl(savedUrl))
+        webExecution.interactionRequested()
+        view.loadUrl(ChatGptWebNavigationPolicy.restorableStartUrl(savedUrl))
         return true
     }
 
