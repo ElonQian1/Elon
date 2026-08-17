@@ -9,7 +9,7 @@
 
   function containsNestedInteractiveControl(node) {
     return !!(node && node.querySelector && node.querySelector(
-      '[role="slider"], input, select, textarea, button, [role="menuitem"], [role="option"]'
+      '[role="menuitemradio"], [role="menuitemcheckbox"], [role="menuitem"], [role="option"]'
     ));
   }
 

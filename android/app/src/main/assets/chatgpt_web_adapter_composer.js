@@ -541,24 +541,21 @@
 
   function requestOptions(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
-    const reusable = lastOptions[section].filter((option) => isOptionVisible(option.node));
-    if (reusable.length > 0) {
-      emitOptions(section, reusable, composer, emitEvent);
-      return result(action, true, '');
-    }
     if (section === 'tools' && composerToolSelection) {
       const composerSelection = webSearchComposerSelection();
       if (composerSelection.known) {
         composerToolSelection.observe('web_search', composerSelection.selected);
       }
     }
-    const alreadyOpen = collectOptions(section, null);
+    const trigger = triggerFor(section, composer);
+    if (!trigger) return result(action, false, '官网当前没有可用入口。');
+    const alreadyOpen = trigger.getAttribute('aria-expanded') === 'true'
+      ? collectOptions(section, null)
+      : [];
     if (alreadyOpen.length > 0) {
       emitOptions(section, alreadyOpen, composer, emitEvent);
       return result(action, true, '');
     }
-    const trigger = triggerFor(section, composer);
-    if (!trigger) return result(action, false, '官网当前没有可用入口。');
     replacePendingOptions(section, {
       baseline: captureOptionBaseline(),
       trigger,

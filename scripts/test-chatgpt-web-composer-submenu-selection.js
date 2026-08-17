@@ -65,7 +65,7 @@ const modelTrigger = {
   id: 'model-trigger',
   isConnected: true,
   textContent: '模型',
-  getAttribute: () => null,
+  getAttribute: (name) => name === 'aria-expanded' ? 'true' : null,
   hasAttribute: () => false,
   getBoundingClientRect: () => rect
 };
@@ -137,6 +137,22 @@ sandbox.window.location = sandbox.location;
 vm.runInNewContext(submenuSource, sandbox, {
   filename: 'chatgpt_web_adapter_composer_submenu.js'
 });
+
+assert.equal(
+  sandbox.window.__elonChatGptComposerSubmenu.containsNestedInteractiveControl({
+    querySelector: (selector) => selector.includes('button') ? {} : null
+  }),
+  false,
+  'an official option may contain an inner button without becoming a parent menu'
+);
+assert.equal(
+  sandbox.window.__elonChatGptComposerSubmenu.containsNestedInteractiveControl({
+    querySelector: (selector) => selector.includes('[role="menuitem"]') ? {} : null
+  }),
+  true,
+  'a container with nested menu items must not be emitted as a selectable leaf'
+);
+
 vm.runInNewContext(source, sandbox, {
   filename: 'chatgpt_web_adapter_composer.js'
 });

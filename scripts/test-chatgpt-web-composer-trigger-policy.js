@@ -411,6 +411,21 @@ assert.equal(sessionEvents[0].xRatio, 0.775);
 
 const optionEvents = [];
 const optionResults = [];
+const optionTrigger = {
+  id: 'model-trigger',
+  textContent: '极高',
+  getAttribute(name) {
+    return name === 'aria-expanded' ? 'true' : null;
+  },
+  getBoundingClientRect: () => ({
+    left: 120,
+    top: 680,
+    right: 220,
+    bottom: 730,
+    width: 100,
+    height: 50
+  })
+};
 const optionNode = {
   id: '',
   textContent: '思考强度 极高',
@@ -447,7 +462,12 @@ const optionSandbox = {
     __elonChatGptComposerOptionPolicy: {
       filter: (_section, options) => options
     },
-    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy,
+    __elonChatGptLayout: {
+      findSemanticNode(semantic, region) {
+        return semantic === 'model' && region === 'composer' ? optionTrigger : null;
+      }
+    }
   }
 };
 optionSandbox.window.window = optionSandbox.window;
@@ -556,6 +576,22 @@ const currentComposerPlus = {
     return name === 'aria-label' ? 'Add photos and files' : null;
   }
 };
+const unrelatedFileOption = {
+  id: '',
+  textContent: '文件',
+  getAttribute(name) {
+    return name === 'role' ? 'menuitem' : null;
+  },
+  hasAttribute: () => false,
+  getBoundingClientRect: () => ({
+    left: 0,
+    top: 120,
+    right: 120,
+    bottom: 170,
+    width: 120,
+    height: 50
+  })
+};
 const currentComposerScope = {
   querySelector(selector) {
     return selector === '#composer-plus-btn' ? currentComposerPlus : null;
@@ -574,7 +610,9 @@ const currentSandbox = {
     querySelector(selector) {
       return selector === 'button[aria-label*="tool" i]' ? sidebarButton : null;
     },
-    querySelectorAll: () => []
+    querySelectorAll(selector) {
+      return selector.includes('[role="menuitem"]') ? [unrelatedFileOption] : [];
+    }
   },
   location: { origin: 'https://chatgpt.com' },
   window: {
@@ -584,6 +622,7 @@ const currentSandbox = {
       actionPoint(node) {
         if (node === currentComposerPlus) return { x: 40, y: 700 };
         if (node === sidebarButton) return { x: 200, y: 60 };
+        if (node === unrelatedFileOption) return { x: 60, y: 145 };
         return null;
       },
       signature: () => 'visible'
