@@ -55,14 +55,35 @@ class WebChatProductionCapabilityPrewarmerTest {
         assertEquals(2, port.requests.count { it == "controls" })
     }
 
+    @Test
+    fun confirmedCacheSnapshotsSkipRedundantOfficialMenuReads() {
+        val scheduler = Scheduler()
+        val port = FakePort()
+        val cache = WebChatProductionInteractionCache().apply {
+            replaceComposerOptions(WebChatProviderId.CHATGPT_WEB, "model", emptyList())
+            composerOptions(WebChatProviderId.CHATGPT_WEB, "tools", listOf(option("search")))
+            features(WebChatProviderId.CHATGPT_WEB, listOf(feature("projects")))
+            controls(WebChatProviderId.CHATGPT_WEB, listOf(control("more")))
+        }
+        val prewarmer = prewarmer(port, scheduler, cache = cache) {
+            WebChatProviderId.CHATGPT_WEB
+        }
+
+        prewarmer.schedule(WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB))
+        scheduler.drain()
+
+        assertTrue(port.requests.isEmpty())
+    }
+
     private fun prewarmer(
         port: FakePort,
         scheduler: Scheduler,
+        cache: WebChatProductionInteractionCache = WebChatProductionInteractionCache(),
         activeProvider: () -> WebChatProviderId,
     ) = WebChatProductionCapabilityPrewarmer(
         consumerPort = { port },
         activeProvider = activeProvider,
-        interactionCache = WebChatProductionInteractionCache(),
+        interactionCache = cache,
         scheduleAction = scheduler::schedule,
         nowMs = scheduler::now,
     )

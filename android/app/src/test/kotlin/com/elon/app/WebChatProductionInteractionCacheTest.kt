@@ -38,6 +38,7 @@ class WebChatProductionInteractionCacheTest {
             "model",
             emptyList(),
         ).isEmpty())
+        assertTrue(cache.hasComposerSnapshot(WebChatProviderId.CHATGPT_WEB, "MODEL"))
     }
 
     @Test
@@ -53,6 +54,8 @@ class WebChatProductionInteractionCacheTest {
             "profile",
             cache.controls(WebChatProviderId.CHATGPT_WEB, emptyList()).single().control.id,
         )
+        assertTrue(cache.hasFeatureSnapshot(WebChatProviderId.CHATGPT_WEB))
+        assertTrue(cache.hasControlSnapshot(WebChatProviderId.CHATGPT_WEB))
 
         assertEquals(
             "tasks",

@@ -58,6 +58,8 @@ class WebChatProductionInteractionLatencyContractTest {
         assertTrue(prewarmer.contains("SUCCESS_COOLDOWN_MS"))
         assertTrue(prewarmer.contains("RETRY_DELAYS_MS"))
         assertTrue(feature.contains("productionCapabilityPrewarmer.cancel()"))
+        assertTrue(feature.contains("prioritizeConsumerInteraction()"))
+        assertTrue(prewarmer.contains("cache.hasComposerSnapshot"))
     }
 
     private fun assertBefore(source: String, first: String, second: String) {

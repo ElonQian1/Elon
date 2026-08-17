@@ -54,7 +54,9 @@ internal class WebChatProductionCapabilityPrewarmer(
             }
             val state = port.state()
             interactionCache.capture(provider.id, state)
-            val unresolved = pending.filterNot { it.isAvailable(state) }
+            val unresolved = pending.filterNot {
+                it.isAvailable(provider.id, state, interactionCache)
+            }
             val requirement = unresolved.firstOrNull()
             when {
                 requirement == null -> settle(provider, runEpoch)
@@ -92,7 +94,9 @@ internal class WebChatProductionCapabilityPrewarmer(
                     val state = consumerPort()?.state()
                     finish(
                         provider.id,
-                        success = state != null && requirements(provider).all { it.isAvailable(state) },
+                        success = state != null && requirements(provider).all {
+                            it.isAvailable(provider.id, state, interactionCache)
+                        },
                     )
                 }
             }
@@ -130,11 +134,17 @@ internal class WebChatProductionCapabilityPrewarmer(
         FEATURES,
         CONTROLS;
 
-        fun isAvailable(state: WebChatConsumerState): Boolean = when (this) {
-            MODELS -> state.composerSections[MODEL_SECTION].orEmpty().isNotEmpty()
-            TOOLS -> state.composerSections[TOOLS_SECTION].orEmpty().isNotEmpty()
-            FEATURES -> state.features.isNotEmpty()
-            CONTROLS -> state.controls.isNotEmpty()
+        fun isAvailable(
+            providerId: WebChatProviderId,
+            state: WebChatConsumerState,
+            cache: WebChatProductionInteractionCache,
+        ): Boolean = when (this) {
+            MODELS -> state.composerSections[MODEL_SECTION].orEmpty().isNotEmpty() ||
+                cache.hasComposerSnapshot(providerId, MODEL_SECTION)
+            TOOLS -> state.composerSections[TOOLS_SECTION].orEmpty().isNotEmpty() ||
+                cache.hasComposerSnapshot(providerId, TOOLS_SECTION)
+            FEATURES -> state.features.isNotEmpty() || cache.hasFeatureSnapshot(providerId)
+            CONTROLS -> state.controls.isNotEmpty() || cache.hasControlSnapshot(providerId)
         }
 
         fun request(port: WebChatConsumerPort): WebChatConsumerCommandResult = when (this) {

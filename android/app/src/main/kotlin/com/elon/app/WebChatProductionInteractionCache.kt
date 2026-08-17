@@ -29,6 +29,13 @@ internal class WebChatProductionInteractionCache {
         return observed
     }
 
+    fun hasComposerSnapshot(providerId: WebChatProviderId, section: String): Boolean =
+        ComposerKey(providerId, section.trim().lowercase()) in composerSections
+
+    fun hasFeatureSnapshot(providerId: WebChatProviderId): Boolean = providerId in features
+
+    fun hasControlSnapshot(providerId: WebChatProviderId): Boolean = providerId in controls
+
     fun features(
         providerId: WebChatProviderId,
         observed: List<WebChatConsumerFeature>,

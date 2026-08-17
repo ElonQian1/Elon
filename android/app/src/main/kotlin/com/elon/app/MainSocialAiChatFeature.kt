@@ -93,7 +93,10 @@ internal class MainSocialAiChatFeature(
             authenticated = ::webChatAuthenticated,
             composerReady = ::webChatComposerReady,
             selectProvider = providerSwitchCoordinator::requestFromConsumer,
-            requestModelOptions = { activeController().requestModelOptions() },
+            requestModelOptions = {
+                prioritizeConsumerInteraction()
+                activeController().requestModelOptions()
+            },
             openOfficialFallback = ::openOfficialFallback,
         )
     }
@@ -176,7 +179,10 @@ internal class MainSocialAiChatFeature(
             currentConversationPath = { activeController().currentConversationPath() },
             currentState = { activeController().stateWireValue() },
             openConversation = ::openWebChatConversation,
-            showPageActions = { productionPageActions.show(WebChatProviderRegistry.get(providerId())) },
+            showPageActions = {
+                prioritizeConsumerInteraction()
+                productionPageActions.show(WebChatProviderRegistry.get(providerId()))
+            },
             openOfficialFallback = ::openOfficialFallback,
         )
     }
@@ -370,7 +376,14 @@ internal class MainSocialAiChatFeature(
         activeController().discardAcceptanceAttachmentSend()
 
     private fun openProductionFeatureNavigation() {
+        prioritizeConsumerInteraction()
         productionFeatureNavigation.show(WebChatProviderRegistry.get(providerId()))
+    }
+
+    private fun prioritizeConsumerInteraction() {
+        if (productionCapabilityPrewarmerDelegate.isInitialized()) {
+            productionCapabilityPrewarmer.cancel()
+        }
     }
 
     fun selectInteractionMode(value: String): Boolean {
@@ -476,7 +489,10 @@ internal class MainSocialAiChatFeature(
             visibility = View.VISIBLE
             setImageResource(R.drawable.ic_more_horizontal)
             contentDescription = WebChatProductionSelectors.pageActions(provider.id)
-            setOnClickListener { productionPageActions.show(provider) }
+            setOnClickListener {
+                prioritizeConsumerInteraction()
+                productionPageActions.show(provider)
+            }
         }
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
@@ -486,6 +502,7 @@ internal class MainSocialAiChatFeature(
             views.planModeButton.visibility = View.GONE
             views.webToolsButton.contentDescription = WebChatProductionSelectors.composerTools(provider.id)
             views.webToolsButton.setOnClickListener {
+                prioritizeConsumerInteraction()
                 productionComposerTools.show(provider)
             }
             views.attachmentButton.contentDescription = WebChatProductionSelectors.attachment(provider.id)
