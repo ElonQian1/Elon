@@ -8,7 +8,6 @@ use tauri::{
 
 use crate::{
     external_navigation, local_ai_browser::embedded_view::EmbeddedWebviewBounds, MAIN_WINDOW_LABEL,
-    WEBVIEW2_BROWSER_ARGS,
 };
 
 const INTERNAL_BROWSER_LABEL: &str = "internal-browser-source";
@@ -21,7 +20,9 @@ pub(crate) struct InternalBrowserTabState {
     current_url: String,
     current_host: String,
     loading: bool,
+    loaded: bool,
     visible: bool,
+    last_error: Option<String>,
 }
 
 #[derive(Clone, Default)]
@@ -73,6 +74,7 @@ pub async fn open_internal_browser_tab(
         tab.set_size(bounds.size()).map_err(display_error)?;
         tab.navigate(url).map_err(display_error)?;
         tab.show().map_err(display_error)?;
+        raise_webview(&tab)?;
         tab.set_focus().map_err(display_error)?;
         return runtime.snapshot();
     }
@@ -81,7 +83,6 @@ pub async fn open_internal_browser_tab(
     let page_runtime = runtime.inner().clone();
     let title_runtime = runtime.inner().clone();
     let builder = WebviewBuilder::new(INTERNAL_BROWSER_LABEL, WebviewUrl::External(url.clone()))
-        .additional_browser_args(WEBVIEW2_BROWSER_ARGS)
         .incognito(true)
         .enable_clipboard_access()
         .on_navigation(|next| external_navigation::validate_external_url(next).is_ok())
@@ -93,10 +94,17 @@ pub async fn open_internal_browser_tab(
             let current_url = payload.url().as_str().to_string();
             let current_host = payload.url().host_str().unwrap_or_default().to_string();
             let loading = payload.event() == PageLoadEvent::Started;
+            let loaded = payload.event() == PageLoadEvent::Finished;
+            let failed = payload.url().scheme() == "edge-error";
+            let last_error = failed.then(|| "页面加载失败，建议改用系统浏览器。".to_string());
             page_runtime.update(|state| {
-                state.current_url = current_url;
-                state.current_host = current_host;
+                if !failed {
+                    state.current_url = current_url;
+                    state.current_host = current_host;
+                }
                 state.loading = loading;
+                state.loaded = loaded;
+                state.last_error = last_error;
             });
         })
         .on_document_title_changed(move |_webview, title| {
@@ -111,6 +119,7 @@ pub async fn open_internal_browser_tab(
         .map_err(display_error)?;
     navigation_runtime.update(|state| state.visible = true);
     tab.show().map_err(display_error)?;
+    raise_webview(&tab)?;
     tab.set_focus().map_err(display_error)?;
     runtime.snapshot()
 }
@@ -147,6 +156,7 @@ pub async fn control_internal_browser_tab(
         "reload" => tab.reload().map_err(display_error)?,
         "show" => {
             tab.show().map_err(display_error)?;
+            raise_webview(&tab)?;
             tab.set_focus().map_err(display_error)?;
             runtime.update(|state| state.visible = true);
         }
@@ -197,8 +207,45 @@ fn state_for(
         current_url: url.as_str().to_string(),
         current_host: url.host_str().unwrap_or_default().to_string(),
         loading,
+        loaded: false,
         visible,
+        last_error: None,
     }
+}
+
+#[cfg(windows)]
+pub(crate) fn raise_webview(webview: &Webview) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_TOP, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
+        SWP_NOSIZE,
+    };
+
+    webview
+        .with_webview(|platform| unsafe {
+            let controller = platform.controller();
+            let mut host = Default::default();
+            if controller.ParentWindow(&mut host).is_ok() {
+                let _ = SetWindowPos(
+                    host.0 as _,
+                    HWND_TOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_ASYNCWINDOWPOS
+                        | SWP_NOACTIVATE
+                        | SWP_NOMOVE
+                        | SWP_NOOWNERZORDER
+                        | SWP_NOSIZE,
+                );
+            }
+        })
+        .map_err(display_error)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn raise_webview(_webview: &Webview) -> Result<(), String> {
+    Ok(())
 }
 
 fn safe_title(value: Option<&str>, fallback: &str) -> String {

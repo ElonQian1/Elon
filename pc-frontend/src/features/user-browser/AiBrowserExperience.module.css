@@ -28,6 +28,19 @@
   min-width: 0;
 }
 
+.notice {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: #9ea5b1;
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice[data-error="true"] { color: #ffb2b2; }
+
 .tabs { overflow: hidden; }
 
 .tab,
@@ -88,9 +101,21 @@
   line-height: 1.6;
 }
 
+.status button {
+  display: block;
+  margin: 12px auto 0;
+  padding: 7px 12px;
+  border: 1px solid rgba(88, 177, 122, .45);
+  border-radius: 6px;
+  background: rgba(46, 168, 97, .16);
+  color: #dff7e8;
+  cursor: pointer;
+}
+
 .status[data-error="true"] { color: #f2a6a6; }
 
 @media (max-width: 760px) {
   .tab { max-width: 140px; padding: 0 8px; }
   .bar { padding-inline: 6px; }
+  .notice { display: none; }
 }

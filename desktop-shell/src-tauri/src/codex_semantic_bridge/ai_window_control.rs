@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Manager, Webview};
 
-use crate::local_ai_browser::LocalAiBrowserRuntime;
+use crate::{internal_browser::raise_webview, local_ai_browser::LocalAiBrowserRuntime};
 
 const PROVIDERS: [&str; 2] = ["chatgpt", "google-ai-mode"];
 
@@ -45,35 +45,35 @@ pub(super) fn focus(
     web_runtime: &LocalAiBrowserRuntime,
     provider_id: &str,
 ) -> Result<Value, String> {
-    let window = official_window(app, provider_id)
+    let webview = official_webview(app, provider_id)
         .ok_or_else(|| "目标 AI 官方网页会话尚未创建或已经关闭。".to_string())?;
+    let window = webview.window();
     window.show().map_err(display_error)?;
     if window.is_minimized().unwrap_or(false) {
         window.unminimize().map_err(display_error)?;
     }
     window.set_focus().map_err(display_error)?;
+    webview.show().map_err(display_error)?;
+    raise_webview(&webview).map_err(display_error)?;
+    webview.set_focus().map_err(display_error)?;
     Ok(capture(app, web_runtime, provider_id))
 }
 
 fn state(app: &AppHandle, web_runtime: &LocalAiBrowserRuntime, provider_id: &str) -> Value {
     let official_session = web_runtime.diagnostic_for_provider(provider_id);
-    let window = official_window(app, provider_id);
-    view(provider_id, window.as_ref(), official_session)
+    let webview = official_webview(app, provider_id);
+    view(provider_id, webview.as_ref(), official_session)
 }
 
-fn official_window(app: &AppHandle, provider_id: &str) -> Option<WebviewWindow> {
+fn official_webview(app: &AppHandle, provider_id: &str) -> Option<Webview> {
     let prefix = format!("local-ai-{provider_id}-");
-    app.webview_windows()
+    app.webviews()
         .into_iter()
-        .find_map(|(label, window)| label.starts_with(&prefix).then_some(window))
+        .find_map(|(label, webview)| label.starts_with(&prefix).then_some(webview))
 }
 
-fn view(
-    provider_id: &str,
-    window: Option<&WebviewWindow>,
-    official_session: Option<Value>,
-) -> Value {
-    let open = window.is_some();
+fn view(provider_id: &str, webview: Option<&Webview>, official_session: Option<Value>) -> Value {
+    let open = webview.is_some();
     let status = official_session
         .as_ref()
         .and_then(|session| session.get("window_status"))
@@ -103,7 +103,7 @@ fn view(
         "provider_id": provider_id,
         "phase": official_phase(open, status, loading, page_ready),
         "open": open,
-        "focused": window.and_then(|window| window.is_focused().ok()).unwrap_or(false),
+        "focused": webview.and_then(|webview| webview.window().is_focused().ok()).unwrap_or(false),
         "page_ready": page_ready,
         "root_exists": page_ready,
         "root_child_count": usize::from(page_ready),

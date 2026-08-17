@@ -41,8 +41,8 @@ export default function AiChatTopbar({
             : <ChevronRight size={14} aria-hidden="true" />}
         </button>
         <span className={styles.modelBadge}>{modelButtonCopy.source} · {modelButtonCopy.detail}</span>
-        {onOpenOfficial && <button className={styles.topbarBtn} type="button" title="显示官网完整富文本、地图、天气和交互内容" onClick={onOpenOfficial}>
-          官网原生页
+        {onOpenOfficial && <button className={styles.topbarBtn} type="button" title="显示官网完整富文本、地图、天气、图片、图标和交互内容" onClick={onOpenOfficial}>
+          官网完整内容
         </button>}
         <button className={styles.topbarBtn} type="button" title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
           分享算力

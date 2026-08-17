@@ -28,6 +28,9 @@ export default function AiBrowserExperience() {
   const [error, setError] = useState('')
   const hostRef = useRef<HTMLDivElement>(null)
   const generationRef = useRef(0)
+  const openedSourceUrlRef = useRef('')
+  const sourceOpenedAtRef = useRef(0)
+  const sourceFallbackOpenedRef = useRef(false)
 
   useEffect(() => {
     const openOfficial = (event: Event) => {
@@ -40,6 +43,8 @@ export default function AiBrowserExperience() {
       const detail = (event as CustomEvent<InternalBrowserLinkRequest>).detail
       if (!detail?.url) return
       setSource(detail)
+      sourceOpenedAtRef.current = Date.now()
+      sourceFallbackOpenedRef.current = false
       setSurface('source')
     }
     window.addEventListener(OPEN_OFFICIAL_AI_TAB_EVENT, openOfficial)
@@ -58,7 +63,7 @@ export default function AiBrowserExperience() {
     }
     let frame = 0
     let observer: ResizeObserver | null = null
-    const synchronize = async (open = false) => {
+    const synchronize = async () => {
       const host = hostRef.current
       if (!host || generation !== generationRef.current) return
       setError('')
@@ -67,26 +72,36 @@ export default function AiBrowserExperience() {
         if (surface === 'official' && official) {
           await controlInternalBrowserTab('hide').catch(() => null)
           await presentLocalAiWebSessionEmbedded(official, bounds)
-          setStatus(`${official.providerName} 官方原生页面`)
+          setStatus(`官网原生内容 · ${official.providerName} 的天气、地图、图片、图标和交互按官网原样显示`)
         } else if (surface === 'source' && source) {
           if (official) await hideLocalAiWebSessionEmbedded(official).catch(() => null)
-          const next = open || sourceState?.currentUrl !== new URL(source.url).toString()
+          const requestedUrl = new URL(source.url).toString()
+          const shouldOpen = openedSourceUrlRef.current !== requestedUrl
+          const next = shouldOpen
             ? await openInternalBrowserTab(source, bounds)
-            : await resizeInternalBrowserTab(bounds).then(() => getInternalBrowserTabState())
+            : await controlInternalBrowserTab('show').then(async () => {
+                const shown = await getInternalBrowserTabState()
+                if (!shown) throw new Error('内部网页标签恢复失败。')
+                await resizeInternalBrowserTab(bounds)
+                return shown
+              })
+          if (shouldOpen) openedSourceUrlRef.current = requestedUrl
           if (generation === generationRef.current) setSourceState(next)
-          setStatus('来源网页使用隔离临时会话，不共享 AI 官网登录状态。')
+          setStatus(next.loading
+            ? `正在加载 ${next.currentHost || '来源网页'}…`
+            : `${next.currentHost || '来源网页'} · 隔离临时会话，不共享 AI 官网登录状态`)
         }
       } catch (cause) {
         if (generation === generationRef.current) setError(messageFor(cause))
       }
     }
     frame = window.requestAnimationFrame(() => {
-      void synchronize(sourceState == null)
+      void synchronize()
       const host = hostRef.current
       if (host) {
         observer = new ResizeObserver(() => {
           window.cancelAnimationFrame(frame)
-          frame = window.requestAnimationFrame(() => { void synchronize(false) })
+          frame = window.requestAnimationFrame(() => { void synchronize() })
         })
         observer.observe(host)
       }
@@ -95,7 +110,39 @@ export default function AiBrowserExperience() {
       window.cancelAnimationFrame(frame)
       observer?.disconnect()
     }
-  }, [official, source, sourceState?.currentUrl, surface])
+  }, [official, source, surface])
+
+  useEffect(() => {
+    if (surface !== 'source' || !source) return
+    let active = true
+    const refresh = async () => {
+      try {
+        const next = await getInternalBrowserTabState()
+        if (!active) return
+        setSourceState(next)
+        if (next.lastError || (next.loading && Date.now() - sourceOpenedAtRef.current > 20_000)) {
+          const reason = next.lastError || '页面加载失败或超时'
+          setError(`${reason}，已改用系统浏览器打开。`)
+          if (!sourceFallbackOpenedRef.current) {
+            sourceFallbackOpenedRef.current = true
+            await controlInternalBrowserTab('external')
+          }
+        } else {
+          setStatus(next.loading
+            ? `正在加载 ${next.currentHost || '来源网页'}…`
+            : `${next.currentHost || '来源网页'} · 已加载，可随时改用系统浏览器`)
+        }
+      } catch (cause) {
+        if (active) setError(messageFor(cause))
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => { void refresh() }, 700)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [source, surface])
 
   useEffect(() => () => { void hideSurfaces(official) }, [official])
 
@@ -120,6 +167,7 @@ export default function AiBrowserExperience() {
   function closeActive() {
     if (surface === 'source') {
       void controlInternalBrowserTab('close').catch(() => null)
+      openedSourceUrlRef.current = ''
       setSource(null)
       setSourceState(null)
       setSurface(official ? 'official' : 'chat')
@@ -142,6 +190,9 @@ export default function AiBrowserExperience() {
             {sourceState?.title || source.title || '来源网页'}
           </button>}
         </div>
+        <span className={styles.notice} data-error={error ? 'true' : undefined}>
+          {error || status || (surface === 'official' ? '正在准备官网原生内容…' : '正在打开来源网页…')}
+        </span>
         <div className={styles.actions} aria-label="网页控制">
           <button className={styles.action} type="button" title="后退" onClick={() => void control('back')}><ArrowLeft size={15} /></button>
           <button className={styles.action} type="button" title="前进" disabled={surface === 'official'} onClick={() => void control('forward')}><ArrowRight size={15} /></button>
@@ -152,7 +203,10 @@ export default function AiBrowserExperience() {
         </div>
       </div>
       <div className={styles.host} ref={hostRef}>
-        <p className={styles.status} data-error={error ? 'true' : undefined}>{error || status || '正在打开网页…'}</p>
+        <p className={styles.status} data-error={error ? 'true' : undefined}>
+          {error || status || '正在打开网页…'}
+          {error && <button type="button" onClick={() => void control('external')}>使用系统浏览器</button>}
+        </p>
       </div>
     </section>
   )

@@ -44,7 +44,6 @@ use tauri::{
 };
 
 pub use guest_identity::LocalAiGuestOwnerIdentity;
-use owner_profile::fingerprint as owner_fingerprint;
 use owner_profile::resolve as resolve_owner_fingerprint;
 use provider_adapter::ProviderAdapter;
 pub use state::LocalAiBrowserRuntime;
@@ -150,9 +149,7 @@ pub struct ClearLocalAiWebSession {
 }
 
 #[tauri::command]
-pub fn list_local_ai_web_providers(
-    webview: WebviewWindow,
-) -> Result<Vec<LocalAiWebProvider>, String> {
+pub fn list_local_ai_web_providers(webview: Webview) -> Result<Vec<LocalAiWebProvider>, String> {
     ensure_provider_list_webview(&webview)?;
     Ok(PROVIDERS.iter().map(provider_summary).collect())
 }
@@ -160,7 +157,7 @@ pub fn list_local_ai_web_providers(
 #[tauri::command]
 pub async fn open_local_ai_web_session(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -179,13 +176,13 @@ pub async fn open_local_ai_web_session(
         &window_label,
     )?;
 
-    if let Some(window) = app.get_webview_window(&window_label) {
+    if let Some(page) = app.get_webview(&window_label) {
         if show_window {
             embedded_view::restore_popout(&app, &window_label)?;
             runtime.mark_window_visible(&window_label, true);
         }
         runtime.mark_window_status(&window_label, "ready");
-        request_adapter_snapshot(provider, window.as_ref());
+        request_adapter_snapshot(provider, &page);
         return Ok(session_response(
             provider,
             window_label,
@@ -313,7 +310,7 @@ pub async fn open_local_ai_web_session(
 #[tauri::command]
 pub async fn get_local_ai_web_session_state(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -337,7 +334,7 @@ pub async fn get_local_ai_web_session_state(
 #[tauri::command]
 pub async fn control_local_ai_web_session(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -387,7 +384,7 @@ pub async fn control_local_ai_web_session(
 #[tauri::command]
 pub async fn run_local_ai_web_adapter_command(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -437,7 +434,7 @@ pub async fn run_local_ai_web_adapter_command(
 #[tauri::command]
 pub async fn open_local_ai_cached_conversation(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -494,7 +491,7 @@ pub fn publish_local_ai_web_event(
 #[tauri::command]
 pub async fn clear_local_ai_web_session(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -536,7 +533,7 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
     }
 }
 
-fn ensure_main_webview(webview: &WebviewWindow) -> Result<(), String> {
+fn ensure_main_webview(webview: &Webview) -> Result<(), String> {
     if webview.label() == MAIN_WEBVIEW_LABEL {
         Ok(())
     } else {
@@ -544,7 +541,7 @@ fn ensure_main_webview(webview: &WebviewWindow) -> Result<(), String> {
     }
 }
 
-fn ensure_provider_list_webview(webview: &WebviewWindow) -> Result<(), String> {
+fn ensure_provider_list_webview(webview: &Webview) -> Result<(), String> {
     if webview.label() == MAIN_WEBVIEW_LABEL {
         Ok(())
     } else {
@@ -553,7 +550,7 @@ fn ensure_provider_list_webview(webview: &WebviewWindow) -> Result<(), String> {
 }
 
 fn ensure_session_webview(
-    webview: &WebviewWindow,
+    webview: &Webview,
     _provider: &ProviderDefinition,
     _fingerprint: &str,
 ) -> Result<(), String> {

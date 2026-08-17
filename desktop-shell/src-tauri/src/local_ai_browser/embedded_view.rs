@@ -1,9 +1,7 @@
 use serde::Deserialize;
-use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, WebviewWindow,
-};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Webview};
 
-use crate::MAIN_WINDOW_LABEL;
+use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
 use super::{
     ensure_runtime_session, ensure_session_webview, provider, resolve_owner_fingerprint,
@@ -49,7 +47,7 @@ impl EmbeddedWebviewBounds {
 #[tauri::command]
 pub(crate) async fn present_local_ai_web_session_embedded(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -71,7 +69,7 @@ pub(crate) async fn present_local_ai_web_session_embedded(
 #[tauri::command]
 pub(crate) async fn hide_local_ai_web_session_embedded(
     app: AppHandle,
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
@@ -100,17 +98,19 @@ pub(crate) fn present(
     let main_window = app
         .get_window(MAIN_WINDOW_LABEL)
         .ok_or_else(|| "一龙主窗口不可用。".to_string())?;
-    if let Some(popout) = app.get_window(webview_label) {
-        popout.hide().map_err(display_error)?;
-    }
+    webview.hide().map_err(display_error)?;
     if webview.window().label() != MAIN_WINDOW_LABEL {
         webview.reparent(&main_window).map_err(display_error)?;
+    }
+    if let Some(popout) = app.get_window(webview_label) {
+        popout.hide().map_err(display_error)?;
     }
     webview
         .set_position(bounds.position())
         .map_err(display_error)?;
     webview.set_size(bounds.size()).map_err(display_error)?;
     webview.show().map_err(display_error)?;
+    raise_webview(&webview)?;
     webview.set_focus().map_err(display_error)
 }
 

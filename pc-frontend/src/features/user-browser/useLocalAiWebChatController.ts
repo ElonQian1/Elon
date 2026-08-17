@@ -283,8 +283,9 @@ export default function useLocalAiWebChatController(
         rollbackPendingSend(pendingSend)
         setMessage(result.detail || '官方网页没有完成这个动作，请显示官方窗口后重试。')
       } else if (action === 'send_prompt') {
-        setMessage(result?.detail || '消息已交给官方网页发送。')
+        setMessage(result?.detail || '消息已交给官方网页发送；正在显示官网完整内容。')
         startResponseRefresh(value ?? '')
+        showOfficialAfterSend()
       } else if (result?.detail) {
         setMessage(result.detail)
       }
@@ -306,6 +307,15 @@ export default function useLocalAiWebChatController(
       setDraft(pending.prompt)
       setDraftTouched(true)
     }
+  }
+
+  function showOfficialAfterSend() {
+    if (!provider || !ownerKey) return
+    requestOfficialAiTab({
+      providerId: provider.id,
+      providerName: provider.displayName,
+      ownerKey,
+    })
   }
 
   function startResponseRefresh(prompt: string) {

@@ -1,13 +1,13 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{Manager, WebviewWindow};
+use tauri::{Manager, Webview};
 
 const GUARD_SCRIPT: &str = include_str!("update_restart_guard.ps1");
 const EXIT_DELAY: Duration = Duration::from_millis(2_500);
 static RESTART_SCHEDULED: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn schedule(
-    window: &WebviewWindow,
+    webview: &Webview,
     action_id: &str,
     requested_by: &str,
     target_release_identity: &str,
@@ -19,7 +19,7 @@ pub(super) fn schedule(
     if RESTART_SCHEDULED.swap(true, Ordering::SeqCst) {
         return Err("本桌面进程已经安排更新重启，拒绝重复触发".to_string());
     }
-    if let Err(error) = schedule_platform_guard(window, action_id, target_release_identity) {
+    if let Err(error) = schedule_platform_guard(webview, action_id, target_release_identity) {
         RESTART_SCHEDULED.store(false, Ordering::SeqCst);
         return Err(error);
     }
@@ -48,7 +48,7 @@ pub(super) fn schedule_target_is_valid(value: &str) -> Result<(), String> {
 
 #[cfg(windows)]
 fn schedule_platform_guard(
-    window: &WebviewWindow,
+    webview: &Webview,
     action_id: &str,
     target_release_identity: &str,
 ) -> Result<(), String> {
@@ -106,8 +106,8 @@ fn schedule_platform_guard(
         .spawn()
         .map_err(|error| format!("无法启动独立更新重启守卫: {error}"))?;
 
-    let _ = window.eval("window.dispatchEvent(new CustomEvent('elon:update-restart-scheduled'));");
-    let app = window.app_handle().clone();
+    let _ = webview.eval("window.dispatchEvent(new CustomEvent('elon:update-restart-scheduled'));");
+    let app = webview.app_handle().clone();
     std::thread::spawn(move || {
         std::thread::sleep(EXIT_DELAY);
         app.exit(0);
@@ -117,7 +117,7 @@ fn schedule_platform_guard(
 
 #[cfg(not(windows))]
 fn schedule_platform_guard(
-    _window: &WebviewWindow,
+    _webview: &Webview,
     _action_id: &str,
     _target_release_identity: &str,
 ) -> Result<(), String> {

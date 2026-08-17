@@ -33,7 +33,9 @@ export interface InternalBrowserTabState {
   currentUrl: string
   currentHost: string
   loading: boolean
+  loaded: boolean
   visible: boolean
+  lastError?: string | null
 }
 
 export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show' | 'hide' | 'external' | 'close'
@@ -54,11 +56,29 @@ export async function presentLocalAiWebSessionEmbedded(
   bounds: EmbeddedWebviewBounds,
 ): Promise<LocalAiWebSessionState> {
   await openLocalAiWebSession(request.providerId, request.ownerKey, { showWindow: false })
+  await waitForOfficialPage(request)
   return invoke<LocalAiWebSessionState>('present_local_ai_web_session_embedded', {
     providerId: request.providerId,
     ownerKey: request.ownerKey,
     bounds: safeBounds(bounds),
   })
+}
+
+async function waitForOfficialPage(request: OfficialAiTabRequest) {
+  const deadline = Date.now() + 15_000
+  let latest: LocalAiWebSessionState | null = null
+  while (Date.now() < deadline) {
+    latest = await getLocalAiWebSessionState(request.providerId, request.ownerKey)
+    if (['error', 'closed'].includes(latest.windowStatus)) {
+      throw new Error(latest.lastError?.trim() || `${request.providerName} 官网页面当前不可用。`)
+    }
+    const ready = !latest.loading
+      && ['ready', 'minimized', 'blocked'].includes(latest.windowStatus)
+    if (ready) return latest
+    await new Promise((resolve) => window.setTimeout(resolve, 220))
+  }
+  const detail = latest?.lastError?.trim()
+  throw new Error(detail || `${request.providerName} 官网页面加载失败或超时，请重试或使用系统浏览器。`)
 }
 
 export async function hideLocalAiWebSessionEmbedded(

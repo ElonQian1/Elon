@@ -67,7 +67,7 @@ fn toggle_shortcut() -> Shortcut {
 
 /// 显示并聚焦主窗口；找不到窗口就什么都不做。
 fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -75,7 +75,7 @@ fn show_main_window(app: &tauri::AppHandle) {
 
 /// 全局快捷键行为：窗口可见就隐藏，隐藏/最小化到托盘就唤出，符合"快速呼出"预期。
 fn toggle_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    if let Some(window) = app.get_window(MAIN_WINDOW_LABEL) {
         let visible = window.is_visible().unwrap_or(false);
         if visible {
             let _ = window.hide();

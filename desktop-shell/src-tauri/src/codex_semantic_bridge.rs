@@ -9,7 +9,7 @@ use std::{
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Manager, State, Webview, Window};
 
 #[path = "codex_semantic_bridge/ai_window_control.rs"]
 mod ai_window_control;
@@ -203,38 +203,41 @@ pub(crate) fn record_app_event(
 
 #[tauri::command]
 pub(crate) fn codex_win_capabilities(
-    window: WebviewWindow,
+    webview: Webview,
     bridge: State<'_, CodexSemanticBridge>,
-) -> Value {
+) -> Result<Value, String> {
+    ensure_main_webview(&webview)?;
     bridge.record(
         "tauri_heartbeat",
         "debug",
         "bridge.heartbeat",
         "Tauri 语义桥在线",
-        json!({"window_label": window.label()}),
+        json!({"window_label": webview.label()}),
     );
-    json!({
+    Ok(json!({
         "schema":"elon.tauri_codex_bridge.v1",
         "available":true,
-        "window_label":window.label(),
+        "window_label":webview.label(),
         "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"],
         "ai_window_providers":["chatgpt","google-ai-mode"],
         "devtools_supported":cfg!(debug_assertions),
         "arbitrary_javascript":false,
         "arbitrary_command":false,
         "arbitrary_url":false,
-    })
+    }))
 }
 
 #[tauri::command]
 pub(crate) fn codex_execute_semantic_action(
-    window: WebviewWindow,
+    webview: Webview,
     bridge: State<'_, CodexSemanticBridge>,
     ai_web_sessions: State<'_, LocalAiBrowserRuntime>,
     action: SemanticAction,
 ) -> Result<Value, String> {
+    ensure_main_webview(&webview)?;
     validate_action(&action)?;
-    let result = execute(&window, ai_web_sessions.inner(), &action);
+    let window = webview.window();
+    let result = execute(&webview, &window, ai_web_sessions.inner(), &action);
     let captured_state = result.as_ref().ok().and_then(|result| result.state.clone());
     let (status, level) = match &result {
         Ok(_) => ("succeeded", "info"),
@@ -259,6 +262,14 @@ pub(crate) fn codex_execute_semantic_action(
             "at_ms":now_ms(),
         })
     })
+}
+
+fn ensure_main_webview(webview: &Webview) -> Result<(), String> {
+    if webview.label() == "main" {
+        Ok(())
+    } else {
+        Err("Codex 语义控制只允许一龙主工作台调用。".to_string())
+    }
 }
 
 #[tauri::command]
@@ -295,7 +306,8 @@ fn outcome(
 }
 
 fn execute(
-    window: &WebviewWindow,
+    webview: &Webview,
+    window: &Window,
     ai_web_sessions: &LocalAiBrowserRuntime,
     action: &SemanticAction,
 ) -> Result<SemanticActionResult, String> {
@@ -313,7 +325,7 @@ fn execute(
             let route = action.route.as_deref().ok_or("navigate 缺少 route")?;
             let browser_route = pc_browser_route(route)?;
             let encoded = serde_json::to_string(&browser_route).map_err(display_error)?;
-            window
+            webview
                 .eval(&format!(
                     "window.history.pushState({{}}, '', {encoded}); window.dispatchEvent(new PopStateEvent('popstate'));"
                 ))
@@ -321,18 +333,18 @@ fn execute(
             outcome(format!("已导航到 {route}"), None)
         }
         "reload_page" => {
-            window
+            webview
                 .eval("window.setTimeout(function () { window.location.reload(); }, 500);")
                 .map_err(display_error)?;
             outcome("页面刷新将在回执写回后触发", None)
         }
-        "open_devtools" => devtools(window, true).and_then(|message| outcome(message, None)),
-        "close_devtools" => devtools(window, false).and_then(|message| outcome(message, None)),
-        "capture_state" => outcome("已捕获非秘密窗口状态", Some(window_state(window))),
+        "open_devtools" => devtools(webview, true).and_then(|message| outcome(message, None)),
+        "close_devtools" => devtools(webview, false).and_then(|message| outcome(message, None)),
+        "capture_state" => outcome("已捕获非秘密窗口状态", Some(window_state(webview, window))),
         "list_ai_windows" => outcome(
             "已列出生产 AI 官方网页窗口",
             Some(ai_window_control::list(
-                window.app_handle(),
+                webview.app_handle(),
                 ai_web_sessions,
             )),
         ),
@@ -342,7 +354,7 @@ fn execute(
             outcome(
                 "已捕获生产 AI 官方网页窗口脱敏状态",
                 Some(ai_window_control::capture(
-                    window.app_handle(),
+                    webview.app_handle(),
                     ai_web_sessions,
                     provider_id,
                 )),
@@ -352,11 +364,11 @@ fn execute(
             let provider_id =
                 ai_window_control::validate_provider_id(action.provider_id.as_deref())?;
             let state =
-                ai_window_control::focus(window.app_handle(), ai_web_sessions, provider_id)?;
+                ai_window_control::focus(webview.app_handle(), ai_web_sessions, provider_id)?;
             outcome("生产 AI 官方网页窗口已聚焦", Some(state))
         }
         "update_and_restart" => update_restart::schedule(
-            window,
+            webview,
             &action.action_id,
             &action.requested_by,
             action
@@ -369,22 +381,22 @@ fn execute(
     }
 }
 
-fn window_state(window: &WebviewWindow) -> Value {
+fn window_state(webview: &Webview, window: &Window) -> Value {
     let mut window_roles = window
         .app_handle()
-        .webview_windows()
+        .windows()
         .keys()
         .map(|label| semantic_window_role(label))
         .collect::<Vec<_>>();
     window_roles.sort_unstable();
     window_roles.dedup();
     json!({
-        "label": window.label(),
+        "label": webview.label(),
         "visible": window.is_visible().ok(),
         "focused": window.is_focused().ok(),
         "maximized": window.is_maximized().ok(),
         "minimized": window.is_minimized().ok(),
-        "devtools_open": devtools_open(window),
+        "devtools_open": devtools_open(webview),
         "window_roles": window_roles,
     })
 }
@@ -402,28 +414,28 @@ fn semantic_window_role(label: &str) -> &'static str {
 }
 
 #[cfg(debug_assertions)]
-fn devtools_open(window: &WebviewWindow) -> Option<bool> {
-    Some(window.is_devtools_open())
+fn devtools_open(webview: &Webview) -> Option<bool> {
+    Some(webview.is_devtools_open())
 }
 
 #[cfg(not(debug_assertions))]
-fn devtools_open(_window: &WebviewWindow) -> Option<bool> {
+fn devtools_open(_webview: &Webview) -> Option<bool> {
     None
 }
 
 #[cfg(debug_assertions)]
-fn devtools(window: &WebviewWindow, open: bool) -> Result<String, String> {
+fn devtools(webview: &Webview, open: bool) -> Result<String, String> {
     if open {
-        window.open_devtools();
+        webview.open_devtools();
         Ok("DevTools 已打开".to_string())
     } else {
-        window.close_devtools();
+        webview.close_devtools();
         Ok("DevTools 已关闭".to_string())
     }
 }
 
 #[cfg(not(debug_assertions))]
-fn devtools(_window: &WebviewWindow, _open: bool) -> Result<String, String> {
+fn devtools(_webview: &Webview, _open: bool) -> Result<String, String> {
     Err("当前生产壳未启用 DevTools；能力已明确标记为不可用。".to_string())
 }
 
