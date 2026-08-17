@@ -50,6 +50,12 @@ export interface ClearedLocalAiWebSession {
   status: 'cleared'
 }
 
+export interface LocalAiGuestOwnerIdentity {
+  ownerKey: string
+  persistence: 'native_device'
+  migratedLegacy: boolean
+}
+
 export type LocalAiBrowserWindowStatus =
   | 'opening'
   | 'loading'
@@ -239,6 +245,22 @@ export async function listLocalAiWebProviders(): Promise<LocalAiWebProvider[]> {
   if (!Array.isArray(providers)) throw new Error('桌面壳返回了无效的 AI 网页厂商列表。')
   for (const provider of providers) normalizeProvider(provider)
   return providers
+}
+
+export async function resolveNativeLocalAiGuestOwnerIdentity(
+  legacyOwnerKey?: string,
+): Promise<LocalAiGuestOwnerIdentity> {
+  const identity = await invokeDesktop<LocalAiGuestOwnerIdentity>(
+    'resolve_local_ai_guest_owner_identity',
+    { legacyOwnerKey },
+    LOCAL_AI_INVOKE_TIMEOUTS.capability,
+    'guest-owner-identity',
+  )
+  if (!identity.ownerKey.startsWith('anonymous-device:')
+    || identity.persistence !== 'native_device') {
+    throw new Error('桌面壳返回了无效的本机游客身份。')
+  }
+  return identity
 }
 
 export async function openLocalAiWebSession(

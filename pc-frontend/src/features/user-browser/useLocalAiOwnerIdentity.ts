@@ -3,7 +3,10 @@ import { LOCAL_NODE_BASE_CHANGED_EVENT } from '../../api/runtime'
 import { useAuthStore } from '../../store/auth'
 import { probeLocalNode } from '../node/localNodeApi'
 import { safeNodeAdminUrl } from '../../lib/utils'
-import { createLocalAiRuntimeToken } from './localAiCommandReceipt'
+import {
+  readBrowserLocalAiGuestOwnerKey,
+  resolveLocalAiGuestIdentity,
+} from './localAiGuestIdentity'
 
 export type LocalAiOwnerSource = 'cloud_account' | 'local_node' | 'anonymous_device' | 'conflict' | 'none'
 
@@ -25,20 +28,40 @@ interface LocalOwnerStatus {
 export default function useLocalAiOwnerIdentity(): LocalAiOwnerIdentity {
   const user = useAuthStore((state) => state.user)
   const [localOwnerKey, setLocalOwnerKey] = useState('')
-  const [anonymousOwnerKey] = useState(readAnonymousOwnerKey)
-  const [checking, setChecking] = useState(true)
+  const [browserGuestOwnerKey] = useState(readBrowserLocalAiGuestOwnerKey)
+  const [anonymousOwnerKey, setAnonymousOwnerKey] = useState('')
+  const [localOwnerChecking, setLocalOwnerChecking] = useState(true)
+  const [guestOwnerChecking, setGuestOwnerChecking] = useState(true)
+  const checking = localOwnerChecking || guestOwnerChecking
 
   const refresh = useCallback(async () => {
-    setChecking(true)
+    setLocalOwnerChecking(true)
     try {
       const status = await probeLocalNode(safeNodeAdminUrl()) as LocalOwnerStatus
       setLocalOwnerKey(status.logged_in ? clean(status.owner_user_id) : '')
     } catch {
       setLocalOwnerKey('')
     } finally {
-      setChecking(false)
+      setLocalOwnerChecking(false)
     }
   }, [])
+
+  useEffect(() => {
+    let active = true
+    void resolveLocalAiGuestIdentity(browserGuestOwnerKey).then(
+      (ownerKey) => {
+        if (!active) return
+        setAnonymousOwnerKey(ownerKey)
+        setGuestOwnerChecking(false)
+      },
+      () => {
+        if (!active) return
+        setAnonymousOwnerKey(browserGuestOwnerKey)
+        setGuestOwnerChecking(false)
+      },
+    )
+    return () => { active = false }
+  }, [browserGuestOwnerKey])
 
   useEffect(() => {
     void refresh()
@@ -102,29 +125,6 @@ export default function useLocalAiOwnerIdentity(): LocalAiOwnerIdentity {
       refresh,
     }
   }, [anonymousOwnerKey, checking, localOwnerKey, refresh, user?.account, user?.id, user?.nickname])
-}
-
-function readAnonymousOwnerKey(): string {
-  const storageKey = 'elon_auth_client_instance_id'
-  try {
-    const existing = window.localStorage.getItem(storageKey)?.trim()
-    if (existing) return `anonymous-device:${existing}`
-    const created = `pc:${createAnonymousOwnerToken()}`
-    window.localStorage.setItem(storageKey, created)
-    return `anonymous-device:${created}`
-  } catch {
-    return `anonymous-session:${createAnonymousOwnerToken()}`
-  }
-}
-
-function createAnonymousOwnerToken(): string {
-  try {
-    const nativeId = globalThis.crypto?.randomUUID?.()
-    if (nativeId) return nativeId
-  } catch {
-    // Public HTTP and older WebView2 runtimes may not expose a usable randomUUID.
-  }
-  return createLocalAiRuntimeToken()
 }
 
 function clean(value: unknown): string {

@@ -16,6 +16,8 @@ mod chatgpt_adapter_bootstrap;
 mod conversation_directory;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
+#[path = "local_ai_browser/guest_identity.rs"]
+mod guest_identity;
 #[path = "local_ai_browser/owner_profile.rs"]
 mod owner_profile;
 #[path = "local_ai_browser/provider_adapter.rs"]
@@ -38,6 +40,7 @@ use tauri::{
     AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
+pub use guest_identity::LocalAiGuestOwnerIdentity;
 use owner_profile::fingerprint as owner_fingerprint;
 use owner_profile::resolve as resolve_owner_fingerprint;
 use provider_adapter::ProviderAdapter;
@@ -49,6 +52,14 @@ const PROFILE_ROOT: &str = "ai-web-profiles";
 const SNAPSHOT_CACHE_FILE: &str = "yilong-semantic-snapshot.v1.dpapi";
 const MAIN_WEBVIEW_LABEL: &str = "main";
 const LOCAL_AI_WINDOW_PREFIX: &str = "local-ai-";
+
+#[tauri::command]
+pub fn resolve_local_ai_guest_owner_identity(
+    app: AppHandle,
+    legacy_owner_key: Option<String>,
+) -> Result<LocalAiGuestOwnerIdentity, String> {
+    guest_identity::resolve(app, legacy_owner_key)
+}
 
 #[derive(Clone, Copy)]
 struct ProviderDefinition {

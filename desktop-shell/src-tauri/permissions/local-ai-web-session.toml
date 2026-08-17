@@ -3,6 +3,7 @@ identifier = "local-ai-web-session"
 description = "允许一龙 PC 主窗口列出、打开、控制和清除当前用户的本地 AI WebView2 会话。"
 commands.allow = [
   "list_local_ai_web_providers",
+  "resolve_local_ai_guest_owner_identity",
   "open_local_ai_web_session",
   "get_local_ai_web_session_state",
   "control_local_ai_web_session",

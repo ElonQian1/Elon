@@ -32,7 +32,7 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。基础聊天优�
 
 Win 的“账号与本机会话中心”固定把三层状态分开显示：
 
-1. 一龙账号：决定本机 Profile 的 owner 隔离键；
+1. 一龙账号：决定已登录账号 Profile 的 owner 隔离键；未登录时由 Win 原生游客设备身份恢复独立 Profile；
 2. Google 作为一龙登录方式：只允许用户用同一 Google 身份进入一龙账号；
 3. ChatGPT / Google AI 官方网页：基础能力先尝试访客使用，需要增强能力时再在各自 WebView2 Profile 内单独登录。
 
@@ -51,6 +51,7 @@ Google AI 模式，也不会让 ChatGPT 自动登录。云端账号资料短暂�
 ```text
 app-local-data/
 └── ai-web-profiles/
+    ├── guest-owner.v1.json
     └── <owner-fingerprint>/
         ├── chatgpt/
         │   └── yilong-semantic-snapshot.v1.dpapi
@@ -63,6 +64,11 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 文档也明确区分浏览器中的 ChatGPT 网页会话与 Codex 客户端的浏览器回调登录：
 [OpenAI authentication](https://learn.chatgpt.com/docs/auth)。
 宿主导航日志只记录 `scheme + host + path`；搜索问题、登录参数、fragment 和 userinfo 不进入日志。
+
+`guest-owner.v1.json` 是不含 Cookie、Token 或聊天正文的版本化本机设备锚点。新版 Win 客户端首次
+运行时优先导入浏览器 LocalStorage 中已有的 `anonymous-device` owner，因此继续使用原指纹目录；
+后续即使前端缓存丢失，原生锚点仍优先恢复同一游客 Profile。返回的原生 owner 同时回写浏览器存储，
+保证旧客户端回退仍能定位同一目录。普通浏览器/PWA 不调用该命令，继续使用各自浏览器 Profile。
 
 一龙原生 UI 另使用三层 stale-while-revalidate 快照，避免厂商切换时先清空再等待官网：
 
@@ -229,8 +235,8 @@ confirmation，再调用商户模块运行时：
   DOM 快照不会清空上一轮可见上下文；新建、打开会话或项目仍建立明确边界，绝不继承上一会话消息。
 - Google AI 重启恢复不再把带 AI Mode 查询参数的官方会话地址丢弃并退回空白 `/aimode`；缓存内容与
   官方页绑定前 `contextReady=false`，前端和 Tauri 发送入口都会失败关闭。
-- 没有可验证的一龙云端 owner 或已登录本机节点 owner 时不能创建本地 Profile；两者同时存在
-  但不一致时同样失败关闭。
+- 没有可验证的一龙云端 owner 或已登录本机节点 owner 时使用 Win 原生游客设备 owner；两者同时存在
+  但不一致时仍失败关闭，不会打开任一账号或游客 Profile。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。
 - 进入 Chat 模式即可在后台打开本地访客会话，不需要先勾选账号确认；用户主动登录时仍只操作本人账号，清除会话前再次确认。
 - ChatGPT 与 Google AI 的输入权限只绑定经过清洗的 `composerReady` 可见语义，不把 `authenticated=false`

@@ -139,6 +139,7 @@ fn main() {
         .manage(local_ai_browser::LocalAiBrowserRuntime::default())
         .invoke_handler(tauri::generate_handler![
             local_ai_browser::list_local_ai_web_providers,
+            local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,
             local_ai_browser::get_local_ai_web_session_state,
             local_ai_browser::control_local_ai_web_session,
