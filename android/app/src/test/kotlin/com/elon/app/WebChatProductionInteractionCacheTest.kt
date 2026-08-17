@@ -25,6 +25,22 @@ class WebChatProductionInteractionCacheTest {
     }
 
     @Test
+    fun authoritativeEmptyComposerSnapshotClearsAStaleSection() {
+        cache.composerOptions(WebChatProviderId.CHATGPT_WEB, "model", listOf(option("stale")))
+
+        assertTrue(cache.replaceComposerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "MODEL",
+            emptyList(),
+        ).isEmpty())
+        assertTrue(cache.composerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "model",
+            emptyList(),
+        ).isEmpty())
+    }
+
+    @Test
     fun replacesCachedManifestOnlyWhenThePageReturnsAUsableSnapshot() {
         cache.features(WebChatProviderId.CHATGPT_WEB, listOf(feature("projects")))
         cache.controls(WebChatProviderId.CHATGPT_WEB, listOf(control("profile")))

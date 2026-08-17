@@ -310,6 +310,37 @@ assert.equal(backgroundModelEvents[0].purpose, 'list_model_options');
 assert.equal(backgroundModelEvents[0].xRatio, 0.5);
 assert.equal(backgroundModelEvents[0].yRatio, 0.825);
 
+const automaticModelEvents = [];
+const automaticModelResults = [];
+const automaticModelSandbox = {
+  document: { querySelector: () => null, querySelectorAll: () => [] },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    __elonChatGptActionTargetPolicy: { actionPoint: () => null, signature: () => '' },
+    __elonChatGptComposerOptionPolicy: { filter: (_section, options) => options },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+  }
+};
+automaticModelSandbox.window.window = automaticModelSandbox.window;
+automaticModelSandbox.window.document = automaticModelSandbox.document;
+automaticModelSandbox.window.location = automaticModelSandbox.location;
+
+runComposer(automaticModelSandbox);
+automaticModelSandbox.window.__elonChatGptComposer.requestOptions(
+  'model',
+  { closest: () => null },
+  (event) => automaticModelEvents.push(event),
+  (...args) => automaticModelResults.push(args)
+);
+
+assert.equal(automaticModelEvents.length, 1);
+assert.equal(automaticModelEvents[0].type, 'composer_controls_snapshot');
+assert.equal(automaticModelEvents[0].options.length, 0);
+assert.deepEqual(
+  Array.from(automaticModelResults[0]),
+  ['list_model_options', true, '官网当前由系统自动选择模型。']
+);
+
 const dictationEvents = [];
 const dictationResults = [];
 const dictationButton = {

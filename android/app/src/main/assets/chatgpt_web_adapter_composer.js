@@ -551,7 +551,11 @@
       }
     }
     const trigger = triggerFor(section, composer);
-    if (!trigger) return result(action, false, '官网当前没有可用入口。');
+    if (!trigger) {
+      if (section !== 'model') return result(action, false, '官网当前没有可用入口。');
+      emitOptions(section, [], composer, emitEvent);
+      return result(action, true, '官网当前由系统自动选择模型。');
+    }
     const alreadyOpen = trigger.getAttribute('aria-expanded') === 'true'
       ? collectOptions(section, null)
       : [];

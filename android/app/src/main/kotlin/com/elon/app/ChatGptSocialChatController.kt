@@ -444,7 +444,7 @@ internal class ChatGptSocialChatController(
         if (!active) return
         val observed = socialConsumerPort.state().composerSections[MODEL_SECTION].orEmpty()
             .ifEmpty { options.mapNotNull(::consumerModelOption) }
-        val resolved = interactionCache.composerOptions(provider.id, MODEL_SECTION, observed)
+        val resolved = interactionCache.replaceComposerOptions(provider.id, MODEL_SECTION, observed)
         if (modelPickerActive) presentModelOptions(resolved)
     }
 
@@ -471,10 +471,12 @@ internal class ChatGptSocialChatController(
             )
         }
         val items = availableItems.ifEmpty {
-            listOf(WebChatProductionInteractionPlaceholder.item(
-                provider.id,
-                surface = "model-options",
-                title = "网页模型",
+            listOf(WebChatActionSheetItem(
+                id = "official-auto-model",
+                title = "ChatGPT 自动",
+                subtitle = "官网当前未提供手动切换",
+                enabled = false,
+                contentDescription = "web-chat-model-auto:chatgpt_web",
             ))
         }
         modelSheet?.let {
@@ -524,7 +526,11 @@ internal class ChatGptSocialChatController(
 
     private fun updateComposerModel(model: String) {
         if (!active) return
-        WebChatComposerProviderPresentation.apply(binding.modelButton, provider, model)
+        WebChatComposerProviderPresentation.apply(
+            binding.modelButton,
+            provider,
+            model.ifBlank { "ChatGPT 自动" },
+        )
     }
 
     private companion object {

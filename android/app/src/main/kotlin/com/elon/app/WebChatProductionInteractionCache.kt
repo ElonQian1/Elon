@@ -20,6 +20,15 @@ internal class WebChatProductionInteractionCache {
         cache = composerSections,
     )
 
+    fun replaceComposerOptions(
+        providerId: WebChatProviderId,
+        section: String,
+        observed: List<WebChatConsumerOption>,
+    ): List<WebChatConsumerOption> {
+        composerSections[ComposerKey(providerId, section.trim().lowercase())] = observed.toList()
+        return observed
+    }
+
     fun features(
         providerId: WebChatProviderId,
         observed: List<WebChatConsumerFeature>,
