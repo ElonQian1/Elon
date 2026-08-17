@@ -4,7 +4,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.bottomsheet.BottomSheetDialog
 
 internal data class WebChatProductionPageAction(
     val control: WebChatConsumerControl,
@@ -81,10 +80,12 @@ internal class WebChatProductionPageActionsCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
+    private val interactionCache: WebChatProductionInteractionCache,
 ) {
     private var requestEpoch = 0
     private var activeDialog: AlertDialog? = null
-    private var activeSheet: BottomSheetDialog? = null
+    private var activeSheet: WebChatActionSheetHandle? = null
+    private var actionById = emptyMap<String, WebChatProductionPageAction>()
     private val adaptiveControls = WebChatProductionAdaptiveControlsCoordinator(activity)
 
     fun show(provider: WebChatProviderIdentity) {
@@ -95,21 +96,16 @@ internal class WebChatProductionPageActionsCoordinator(
         }
         val port = consumerPort() ?: return showUnavailable()
         val epoch = requestEpoch
-        val cached = readActions(port)
-        if (cached.isNotEmpty()) {
-            showActionDialog(provider, port, cached)
-            return
-        }
+        showActionDialog(provider, port, readActions(provider.id, port))
         val requested = port.requestControls()
-        if (!requested.accepted) return showUnavailable()
-        Toast.makeText(activity, "正在读取当前网页操作...", Toast.LENGTH_SHORT).show()
-        pollActions(provider, port, epoch, attempt = 0)
+        if (requested.accepted) pollActions(provider, port, epoch, attempt = 0)
     }
 
     fun cancelPending() {
         requestEpoch += 1
         activeSheet?.dismiss()
         activeSheet = null
+        actionById = emptyMap()
         activeDialog?.dismiss()
         activeDialog = null
         adaptiveControls.cancel()
@@ -122,21 +118,29 @@ internal class WebChatProductionPageActionsCoordinator(
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val actions = readActions(port)
+        val observed = port.state().controls.take(MAX_CONTROL_COUNT)
+        val actions = WebChatProductionPageActionParser.parse(observed)
         if (actions.isNotEmpty()) {
+            interactionCache.controls(provider.id, observed)
             showActionDialog(provider, port, actions)
             return
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) return showUnavailable()
+        if (attempt >= MAX_POLL_ATTEMPTS) return
         host.postDelayed(
             { pollActions(provider, port, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
 
-    private fun readActions(port: WebChatConsumerPort): List<WebChatProductionPageAction> =
+    private fun readActions(
+        providerId: WebChatProviderId,
+        port: WebChatConsumerPort,
+    ): List<WebChatProductionPageAction> =
         WebChatProductionPageActionParser.parse(
-            port.state().controls.take(MAX_CONTROL_COUNT),
+            interactionCache.controls(
+                providerId,
+                port.state().controls.take(MAX_CONTROL_COUNT),
+            ),
         )
 
     private fun showActionDialog(
@@ -145,20 +149,31 @@ internal class WebChatProductionPageActionsCoordinator(
         actions: List<WebChatProductionPageAction>,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
-        if (actions.isEmpty()) return showUnavailable()
-        val byId = actions.associateBy(WebChatProductionPageAction::controlId)
-        val previousControlIds = byId.keys
-        val sheet = WebChatActionSheet.show(
+        actionById = actions.associateBy(WebChatProductionPageAction::controlId)
+        val previousControlIds = actionById.keys
+        val availableItems = actions.map { action ->
+            WebChatActionSheetItem(
+                id = action.controlId,
+                title = action.label,
+                subtitle = if (action.officialFallback) "在官网中完成" else null,
+                contentDescription = action.nativeSelector,
+            )
+        }
+        val items = availableItems.ifEmpty {
+            listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "page-actions",
+                title = "当前网页操作",
+            ))
+        }
+        activeSheet?.let {
+            it.updateItems(items)
+            return
+        }
+        val sheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = "当前网页操作",
-            items = actions.map { action ->
-                WebChatActionSheetItem(
-                    id = action.controlId,
-                    title = action.label,
-                    subtitle = if (action.officialFallback) "在官网中完成" else null,
-                    contentDescription = action.nativeSelector,
-                )
-            },
+            items = items,
             footerActions = listOf(
                 WebChatActionSheetFooterAction(
                     label = "官网完整功能",
@@ -166,10 +181,14 @@ internal class WebChatProductionPageActionsCoordinator(
                     action = openOfficialFallback,
                 ),
             ),
-            onDismissed = { activeSheet = null },
+            onCancelled = { requestEpoch += 1 },
+            onDismissed = {
+                activeSheet = null
+                actionById = emptyMap()
+            },
         ) { item ->
-            if (activeProvider() != provider.id) return@show
-            byId[item.id]?.let { action ->
+            if (activeProvider() != provider.id) return@showUpdatable
+            actionById[item.id]?.let { action ->
                 selectAction(provider, port, action, previousControlIds)
             }
         }
@@ -229,7 +248,7 @@ internal class WebChatProductionPageActionsCoordinator(
         val epoch = requestEpoch
         host.postDelayed({
             if (epoch != requestEpoch || activeProvider() != provider.id) return@postDelayed
-            val actions = readActions(port)
+            val actions = readActions(provider.id, port)
             if (actions.isNotEmpty()) showActionDialog(provider, port, actions)
         }, ADAPTIVE_MUTATION_SETTLE_MS)
     }
@@ -248,8 +267,11 @@ internal class WebChatProductionPageActionsCoordinator(
         }
         if (action.semantic !in NESTED_MENU_SEMANTICS) return
         val epoch = requestEpoch
-        Toast.makeText(activity, "正在读取${action.label}...", Toast.LENGTH_SHORT).show()
-        pollNestedActions(provider, port, epoch, previousControlIds, attempt = 0)
+        host.post {
+            if (epoch != requestEpoch || activeProvider() != provider.id) return@post
+            showNestedTransition(provider, action.label)
+            pollNestedActions(provider, port, epoch, previousControlIds, attempt = 0)
+        }
     }
 
     private fun pollNestedActions(
@@ -260,15 +282,52 @@ internal class WebChatProductionPageActionsCoordinator(
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val nested = readActions(port).filterNot { it.controlId in previousControlIds }
+        val nested = readActions(provider.id, port).filterNot { it.controlId in previousControlIds }
         if (nested.isNotEmpty()) {
             showActionDialog(provider, port, nested)
             return
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) return
+        if (attempt >= MAX_POLL_ATTEMPTS) {
+            activeSheet?.updateItems(listOf(WebChatActionSheetItem(
+                id = "nested-actions-unavailable",
+                title = "${provider.displayName}暂未返回更多操作",
+                subtitle = "可在官网完整功能中继续",
+                enabled = false,
+                contentDescription = "web-chat-page-actions-nested-unavailable:${provider.id.wireValue}",
+            )))
+            return
+        }
         host.postDelayed({
             pollNestedActions(provider, port, epoch, previousControlIds, attempt + 1)
         }, POLL_INTERVAL_MS)
+    }
+
+    private fun showNestedTransition(provider: WebChatProviderIdentity, label: String) {
+        actionById = emptyMap()
+        activeSheet = WebChatActionSheet.showUpdatable(
+            activity = activity,
+            title = label,
+            items = listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "nested-actions",
+                title = label,
+            )),
+            footerActions = listOf(WebChatActionSheetFooterAction(
+                label = "官网完整功能",
+                contentDescription = "web-chat-page-actions-official:${provider.id.wireValue}",
+                action = openOfficialFallback,
+            )),
+            onCancelled = { requestEpoch += 1 },
+            onDismissed = {
+                activeSheet = null
+                actionById = emptyMap()
+            },
+        ) { item ->
+            if (activeProvider() != provider.id) return@showUpdatable
+            actionById[item.id]?.let { action ->
+                selectAction(provider, consumerPort() ?: return@showUpdatable, action, actionById.keys)
+            }
+        }
     }
 
     private fun showUnavailable() {

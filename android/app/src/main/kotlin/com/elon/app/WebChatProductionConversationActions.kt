@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.view.View
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebConversation
@@ -37,6 +36,7 @@ internal class WebChatProductionConversationActionsCoordinator(
     private val openOfficialFallback: () -> Unit,
 ) {
     private var requestEpoch = 0
+    private var activeSheet: WebChatActionSheetHandle? = null
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
@@ -48,7 +48,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             WebChatConversationActionReadiness.CANCEL -> Unit
             WebChatConversationActionReadiness.WAIT -> {
                 if (!openConversation(targetPath)) return showRecovery(conversation)
-                Toast.makeText(activity, "正在打开会话操作…", Toast.LENGTH_SHORT).show()
+                showTransition(conversation)
                 poll(conversation, targetPath, epoch, attempt = 0)
             }
         }
@@ -56,6 +56,9 @@ internal class WebChatProductionConversationActionsCoordinator(
 
     fun cancelPending() {
         requestEpoch += 1
+        val sheet = activeSheet
+        activeSheet = null
+        sheet?.dismiss()
     }
 
     private fun poll(
@@ -66,7 +69,10 @@ internal class WebChatProductionConversationActionsCoordinator(
     ) {
         if (epoch != requestEpoch) return
         when (readiness(targetPath)) {
-            WebChatConversationActionReadiness.SHOW -> showPageActions()
+            WebChatConversationActionReadiness.SHOW -> {
+                dismissTransition()
+                showPageActions()
+            }
             WebChatConversationActionReadiness.CANCEL -> Unit
             WebChatConversationActionReadiness.WAIT -> {
                 if (attempt >= MAX_POLL_ATTEMPTS) return showRecovery(conversation)
@@ -86,8 +92,38 @@ internal class WebChatProductionConversationActionsCoordinator(
             state = currentState(),
         )
 
+    private fun showTransition(conversation: ChatGptWebConversation) {
+        activeSheet = WebChatActionSheet.showUpdatable(
+            activity = activity,
+            title = "会话操作",
+            items = listOf(WebChatActionSheetItem(
+                id = "conversation-transition",
+                title = conversation.title,
+                subtitle = "正在切换到该会话",
+                enabled = false,
+                contentDescription = "web-chat-conversation-actions-transition",
+            )),
+            footerActions = listOf(WebChatActionSheetFooterAction(
+                label = "官网完成",
+                contentDescription = "web-chat-conversation-actions-official",
+                action = openOfficialFallback,
+            )),
+            onCancelled = {
+                if (activeSheet != null) requestEpoch += 1
+            },
+            onDismissed = { activeSheet = null },
+        ) {}
+    }
+
+    private fun dismissTransition() {
+        val sheet = activeSheet
+        activeSheet = null
+        sheet?.dismiss()
+    }
+
     private fun showRecovery(conversation: ChatGptWebConversation) {
         if (activity.isFinishing || activity.isDestroyed) return
+        dismissTransition()
         AlertDialog.Builder(activity)
             .setTitle("会话操作暂不可用")
             .setMessage("“${conversation.title}”已经保留在会话列表中。可以重试，或在官网中完成管理操作。")

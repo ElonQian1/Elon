@@ -4,7 +4,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.bottomsheet.BottomSheetDialog
 
 internal data class WebChatProductionFeature(
     val id: String,
@@ -52,10 +51,12 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
+    private val interactionCache: WebChatProductionInteractionCache,
 ) {
     private var requestEpoch = 0
     private var activeDialog: AlertDialog? = null
-    private var activeSheet: BottomSheetDialog? = null
+    private var activeSheet: WebChatActionSheetHandle? = null
+    private var featureById = emptyMap<String, WebChatProductionFeature>()
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -65,24 +66,16 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         }
         val port = consumerPort() ?: return showUnavailable()
         val epoch = requestEpoch
-        val cached = readFeatures(port)
-        if (cached.isNotEmpty()) {
-            showFeatureDialog(provider, port, cached)
-            return
-        }
+        showFeatureDialog(provider, port, readFeatures(provider.id, port))
         val requested = port.requestFeatures()
-        if (!requested.accepted) {
-            showUnavailable()
-            return
-        }
-        Toast.makeText(activity, "正在读取官网功能...", Toast.LENGTH_SHORT).show()
-        pollFeatures(provider, port, epoch, attempt = 0)
+        if (requested.accepted) pollFeatures(provider, port, epoch, attempt = 0)
     }
 
     fun cancelPending() {
         requestEpoch += 1
         activeSheet?.dismiss()
         activeSheet = null
+        featureById = emptyMap()
         activeDialog?.dismiss()
         activeDialog = null
     }
@@ -94,23 +87,26 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val features = readFeatures(port)
+        val observed = port.state().features
+        val features = WebChatProductionFeatureParser.parse(observed)
         if (features.isNotEmpty()) {
+            interactionCache.features(provider.id, observed)
             showFeatureDialog(provider, port, features)
             return
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) {
-            showUnavailable()
-            return
-        }
+        if (attempt >= MAX_POLL_ATTEMPTS) return
         host.postDelayed(
             { pollFeatures(provider, port, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
 
-    private fun readFeatures(port: WebChatConsumerPort): List<WebChatProductionFeature> =
-        WebChatProductionFeatureParser.parse(port.state().features)
+    private fun readFeatures(
+        providerId: WebChatProviderId,
+        port: WebChatConsumerPort,
+    ): List<WebChatProductionFeature> = WebChatProductionFeatureParser.parse(
+        interactionCache.features(providerId, port.state().features),
+    )
 
     private fun showFeatureDialog(
         provider: WebChatProviderIdentity,
@@ -118,25 +114,36 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         features: List<WebChatProductionFeature>,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
-        if (features.isEmpty()) return showUnavailable()
-        val byId = features.associateBy(WebChatProductionFeature::id)
-        val sheet = WebChatActionSheet.show(
+        featureById = features.associateBy(WebChatProductionFeature::id)
+        val availableItems = features.map { feature ->
+            WebChatActionSheetItem(
+                id = feature.id,
+                title = feature.label,
+                subtitle = when {
+                    feature.selected && feature.officialCompletion -> "当前功能 · 在官网中继续"
+                    feature.selected -> "当前功能"
+                    feature.officialCompletion -> "在官网中完成"
+                    else -> null
+                },
+                selected = feature.selected,
+                contentDescription = feature.nativeSelector,
+            )
+        }
+        val items = availableItems.ifEmpty {
+            listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "features",
+                title = "官网功能",
+            ))
+        }
+        activeSheet?.let {
+            it.updateItems(items)
+            return
+        }
+        val sheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = "${provider.displayName}功能",
-            items = features.map { feature ->
-                WebChatActionSheetItem(
-                    id = feature.id,
-                    title = feature.label,
-                    subtitle = when {
-                        feature.selected && feature.officialCompletion -> "当前功能 · 在官网中继续"
-                        feature.selected -> "当前功能"
-                        feature.officialCompletion -> "在官网中完成"
-                        else -> null
-                    },
-                    selected = feature.selected,
-                    contentDescription = feature.nativeSelector,
-                )
-            },
+            items = items,
             footerActions = listOf(
                 WebChatActionSheetFooterAction(
                     label = "官网完整功能",
@@ -144,10 +151,14 @@ internal class WebChatProductionFeatureNavigationCoordinator(
                     action = openOfficialFallback,
                 ),
             ),
-            onDismissed = { activeSheet = null },
+            onCancelled = { requestEpoch += 1 },
+            onDismissed = {
+                activeSheet = null
+                featureById = emptyMap()
+            },
         ) { item ->
-            if (activeProvider() != provider.id) return@show
-            byId[item.id]?.let { selectFeature(provider, port, it) }
+            if (activeProvider() != provider.id) return@showUpdatable
+            featureById[item.id]?.let { selectFeature(provider, port, it) }
         }
         activeSheet = sheet
     }

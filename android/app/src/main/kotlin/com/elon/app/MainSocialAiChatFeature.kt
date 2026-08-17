@@ -29,6 +29,7 @@ internal class MainSocialAiChatFeature(
     private val chatGptWebLifecycle: MainChatGptWebLifecycle,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
+    private val webChatInteractionCache = WebChatProductionInteractionCache()
     private val providerDraftStore = WebChatProviderDraftStore(activity)
     private val providerDrafts = providerDraftStore.restore()
     private val persistProviderDrafts = Runnable { providerDraftStore.save(providerDrafts) }
@@ -54,6 +55,7 @@ internal class MainSocialAiChatFeature(
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = { onWebChatNavigationChanged() },
             onComposerStateChanged = ::refreshConsumerComposerUi,
+            interactionCache = webChatInteractionCache,
             audioPermissionController = chatGptWebLifecycle.audioPermissionController,
         )
     }
@@ -124,6 +126,7 @@ internal class MainSocialAiChatFeature(
             },
             openOfficialFallback = ::openOfficialFallback,
             onOperationFeedback = ::showComposerOperationFeedback,
+            interactionCache = webChatInteractionCache,
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
@@ -136,6 +139,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
+            interactionCache = webChatInteractionCache,
         )
     }
     private val productionFeatureNavigation by productionFeatureNavigationDelegate
@@ -148,6 +152,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
+            interactionCache = webChatInteractionCache,
         )
     }
     private val productionPageActions by productionPageActionsDelegate

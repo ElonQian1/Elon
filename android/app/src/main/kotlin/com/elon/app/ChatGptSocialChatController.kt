@@ -26,6 +26,7 @@ internal class ChatGptSocialChatController(
     private val openOfficialFallback: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
     private val onComposerStateChanged: () -> Unit,
+    private val interactionCache: WebChatProductionInteractionCache,
     audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.CHATGPT_WEB
@@ -56,6 +57,9 @@ internal class ChatGptSocialChatController(
     private var waitingForAttachmentCompletion = false
     private var latestCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
+    private var modelSheet: WebChatActionSheetHandle? = null
+    private var modelOptionById = emptyMap<String, WebChatConsumerOption>()
+    private var modelPickerActive = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
             inputText = { binding.inputEdit.text?.toString().orEmpty() },
@@ -89,6 +93,10 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
+        modelSheet?.dismiss()
+        modelSheet = null
+        modelOptionById = emptyMap()
+        modelPickerActive = false
         session.dismissComposerOptions()
         session.deactivate()
     }
@@ -180,9 +188,10 @@ internal class ChatGptSocialChatController(
     }
 
     override fun requestModelOptions() {
-        if (!session.requestModelOptions()) {
-            Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_SHORT).show()
-        }
+        if (!active) return
+        modelPickerActive = true
+        presentModelOptions(readModelOptions())
+        session.requestModelOptions()
     }
 
     override fun stopGeneration() = session.stopGeneration()
@@ -433,26 +442,49 @@ internal class ChatGptSocialChatController(
 
     private fun showModelOptions(options: List<ChatGptWebComposerOption>) {
         if (!active) return
-        val selectable = options.filter { it.id.isNotBlank() }
-        if (selectable.isEmpty()) {
-            socialConsumerPort.dismissComposerOptions()
-            Toast.makeText(activity, R.string.web_chat_model_options_empty, Toast.LENGTH_SHORT).show()
+        val observed = socialConsumerPort.state().composerSections[MODEL_SECTION].orEmpty()
+            .ifEmpty { options.mapNotNull(::consumerModelOption) }
+        val resolved = interactionCache.composerOptions(provider.id, MODEL_SECTION, observed)
+        if (modelPickerActive) presentModelOptions(resolved)
+    }
+
+    private fun readModelOptions(): List<WebChatConsumerOption> =
+        interactionCache.composerOptions(
+            provider.id,
+            MODEL_SECTION,
+            socialConsumerPort.state().composerSections[MODEL_SECTION].orEmpty(),
+        )
+
+    private fun presentModelOptions(options: List<WebChatConsumerOption>) {
+        val selectable = options.filter { it.id.isNotBlank() && it.label.isNotBlank() }
+        modelOptionById = selectable.associateBy(WebChatConsumerOption::id)
+        val availableItems = selectable.map { option ->
+            WebChatActionSheetItem(
+                id = option.id,
+                title = option.label,
+                subtitle = if (option.selected) "当前模型" else null,
+                selected = option.selected,
+                contentDescription = option.nativeSelector.ifBlank {
+                    "web-chat-model-option:" +
+                        ChatGptNativeControlPresentation.stableContextId(option.id)
+                },
+            )
+        }
+        val items = availableItems.ifEmpty {
+            listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "model-options",
+                title = "网页模型",
+            ))
+        }
+        modelSheet?.let {
+            it.updateItems(items)
             return
         }
-        val byId = selectable.associateBy(ChatGptWebComposerOption::id)
-        WebChatActionSheet.show(
+        modelSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = activity.getString(R.string.web_chat_model_picker_title),
-            items = selectable.map { option ->
-                WebChatActionSheetItem(
-                    id = option.id,
-                    title = option.label,
-                    subtitle = if (option.selected) "当前模型" else null,
-                    selected = option.selected,
-                    contentDescription = "web-chat-model-option:" +
-                        ChatGptNativeControlPresentation.stableContextId(option.id),
-                )
-            },
+            items = items,
             footerActions = listOf(
                 WebChatActionSheetFooterAction(
                     label = activity.getString(R.string.web_chat_open_official),
@@ -463,8 +495,31 @@ internal class ChatGptSocialChatController(
                     },
                 ),
             ),
-            onCancelled = { socialConsumerPort.dismissComposerOptions() },
-        ) { item -> byId[item.id]?.let { session.selectModel(it.id) } }
+            onCancelled = {
+                modelPickerActive = false
+                socialConsumerPort.dismissComposerOptions()
+            },
+            onDismissed = {
+                modelSheet = null
+                modelOptionById = emptyMap()
+                modelPickerActive = false
+            },
+        ) { item -> modelOptionById[item.id]?.let { session.selectModel(it.id) } }
+    }
+
+    private fun consumerModelOption(option: ChatGptWebComposerOption): WebChatConsumerOption? {
+        val id = option.id.trim()
+        val label = option.label.trim()
+        if (id.isBlank() || label.isBlank()) return null
+        return WebChatConsumerOption(
+            id = id,
+            label = label,
+            selected = option.selected,
+            semantic = option.semantic,
+            opensSubmenu = option.opensSubmenu,
+            nativeSelector = "web-chat-model-option:" +
+                ChatGptNativeControlPresentation.stableContextId(id),
+        )
     }
 
     private fun updateComposerModel(model: String) {
@@ -473,6 +528,7 @@ internal class ChatGptSocialChatController(
     }
 
     private companion object {
+        const val MODEL_SECTION = "model"
         const val MAX_REVEAL_ATTEMPTS = 8
         const val REVEAL_RETRY_DELAY_MS = 80L
     }

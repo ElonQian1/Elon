@@ -32,6 +32,9 @@ class WebChatActionSheetContractTest {
         assertTrue(source.contains("onCancelled: () -> Unit"))
         assertTrue(source.contains("if (!handled) onCancelled()"))
         assertTrue(source.contains("onDismissed()"))
+        assertTrue(source.contains("fun showUpdatable("))
+        assertTrue(source.contains("fun updateItems(items: List<WebChatActionSheetItem>)"))
+        assertTrue(source.contains("itemContainer.removeAllViews()"))
         assertFalse(source.contains("ChatGptWebTestActivity"))
     }
 
@@ -40,8 +43,10 @@ class WebChatActionSheetContractTest {
         val model = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
         val tools = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt")
 
-        assertTrue(model.contains("onCancelled = { socialConsumerPort.dismissComposerOptions() }"))
-        assertTrue(tools.contains("onCancelled = { port.dismissComposerOptions() }"))
+        assertTrue(model.contains("modelPickerActive = false"))
+        assertTrue(model.contains("socialConsumerPort.dismissComposerOptions()"))
+        assertTrue(tools.contains("requestEpoch += 1"))
+        assertTrue(tools.contains("port.dismissComposerOptions()"))
         val commandDispatch = tools.substringBefore("executeCommand(provider, port, it)")
         assertTrue(commandDispatch.endsWith("port.dismissComposerOptions()\r\n                ") ||
             commandDispatch.endsWith("port.dismissComposerOptions()\n                "))

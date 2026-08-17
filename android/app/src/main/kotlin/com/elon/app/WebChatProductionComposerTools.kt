@@ -3,7 +3,6 @@ package com.elon.app
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.bottomsheet.BottomSheetDialog
 
 internal data class WebChatProductionComposerTool(
     val id: String,
@@ -38,27 +37,21 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
     private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
+    private val interactionCache: WebChatProductionInteractionCache,
 ) {
     private var requestEpoch = 0
-    private var activeSheet: BottomSheetDialog? = null
+    private var activeSheet: WebChatActionSheetHandle? = null
+    private var commandById = emptyMap<String, WebChatProductionComposerCommand>()
+    private var toolById = emptyMap<String, WebChatProductionComposerTool>()
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
         if (!provider.supports(WebChatProviderCapability.COMPOSER_TOOLS)) return
         val port = consumerPort() ?: return showUnavailable()
         val epoch = requestEpoch
-        val cached = readTools(port)
-        if (cached.isNotEmpty()) {
-            showToolDialog(provider, port, cached)
-            return
-        }
+        showToolDialog(provider, port, readTools(provider.id, port))
         val requested = port.requestComposerOptions(TOOLS_SECTION)
-        if (!requested.accepted) {
-            showToolDialog(provider, port, emptyList())
-            return
-        }
-        Toast.makeText(activity, "正在读取网页工具...", Toast.LENGTH_SHORT).show()
-        pollTools(provider, port, epoch, attempt = 0)
+        if (requested.accepted) pollTools(provider, port, epoch, attempt = 0)
     }
 
     fun startRealtimeVoice(provider: WebChatProviderIdentity): Boolean {
@@ -72,6 +65,8 @@ internal class WebChatProductionComposerToolsCoordinator(
         requestEpoch += 1
         activeSheet?.dismiss()
         activeSheet = null
+        commandById = emptyMap()
+        toolById = emptyMap()
     }
 
     private fun pollTools(
@@ -81,25 +76,34 @@ internal class WebChatProductionComposerToolsCoordinator(
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val tools = readTools(port)
+        val observed = observedToolOptions(port)
+        val tools = WebChatProductionComposerToolParser.parse(observed)
         if (tools.isNotEmpty()) {
+            interactionCache.composerOptions(provider.id, TOOLS_SECTION, observed)
             showToolDialog(provider, port, tools)
             return
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) {
-            showToolDialog(provider, port, emptyList())
-            return
-        }
+        if (attempt >= MAX_POLL_ATTEMPTS) return
         host.postDelayed(
             { pollTools(provider, port, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
 
-    private fun readTools(port: WebChatConsumerPort): List<WebChatProductionComposerTool> =
+    private fun readTools(
+        providerId: WebChatProviderId,
+        port: WebChatConsumerPort,
+    ): List<WebChatProductionComposerTool> =
         WebChatProductionComposerToolParser.parse(
-            port.state().composerSections[TOOLS_SECTION].orEmpty(),
+            interactionCache.composerOptions(
+                providerId,
+                TOOLS_SECTION,
+                observedToolOptions(port),
+            ),
         )
+
+    private fun observedToolOptions(port: WebChatConsumerPort): List<WebChatConsumerOption> =
+        port.state().composerSections[TOOLS_SECTION].orEmpty()
 
     private fun showToolDialog(
         provider: WebChatProviderIdentity,
@@ -113,13 +117,9 @@ internal class WebChatProductionComposerToolsCoordinator(
             streaming = state.streaming,
             dictationActive = state.dictationActive,
         )
-        if (commands.isEmpty() && tools.isEmpty()) {
-            showUnavailable()
-            return
-        }
-        val commandById = commands.associateBy { "command:${it.action}" }
-        val toolById = tools.associateBy { "tool:${it.id}" }
-        val items = commands.map { command ->
+        commandById = commands.associateBy { "command:${it.action}" }
+        toolById = tools.associateBy { "tool:${it.id}" }
+        val availableItems = commands.map { command ->
             WebChatActionSheetItem(
                 id = "command:${command.action}",
                 title = command.label,
@@ -135,7 +135,18 @@ internal class WebChatProductionComposerToolsCoordinator(
                 contentDescription = tool.nativeSelector,
             )
         }
-        val sheet = WebChatActionSheet.show(
+        val items = availableItems.ifEmpty {
+            listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "composer-tools",
+                title = "网页工具",
+            ))
+        }
+        activeSheet?.let {
+            it.updateItems(items)
+            return
+        }
+        val sheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = "网页功能",
             items = items,
@@ -149,14 +160,21 @@ internal class WebChatProductionComposerToolsCoordinator(
                     },
                 ),
             ),
-            onCancelled = { port.dismissComposerOptions() },
-            onDismissed = { activeSheet = null },
+            onCancelled = {
+                requestEpoch += 1
+                port.dismissComposerOptions()
+            },
+            onDismissed = {
+                activeSheet = null
+                commandById = emptyMap()
+                toolById = emptyMap()
+            },
         ) { item ->
-            if (activeProvider() != provider.id) return@show
+            if (activeProvider() != provider.id) return@showUpdatable
             commandById[item.id]?.let {
                 port.dismissComposerOptions()
                 executeCommand(provider, port, it)
-                return@show
+                return@showUpdatable
             }
             toolById[item.id]?.let { selectTool(provider, port, it) }
         }
