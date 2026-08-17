@@ -4,7 +4,7 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
-    [Parameter(Mandatory = $true)][string]$ExpectedHardwareSerial,
+    [string]$ExpectedHardwareSerial = "",
     [ValidateRange(20, 180)][int]$TimeoutSec = 90,
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$ConfirmPinRoundTrip

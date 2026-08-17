@@ -42,7 +42,7 @@ $required = @(
     "Restore-ChatGptWebSmokeInteractiveBaseline",
     "CHATGPT_WEB_SAFE_CASE_BASELINE=ready",
     'id = "read_only_surface"',
-    'AllowStaleDeviceEvidence = $true',
+    'script = "smoke-chatgpt-web-native-chat.ps1"',
     'id = "feature_pages"',
     'id = "settings_structure"',
     'id = "session_recovery"',
@@ -102,7 +102,7 @@ if (
 }
 
 foreach ($childScript in @(
-    "smoke-chatgpt-web-apk.ps1",
+    "smoke-chatgpt-web-native-chat.ps1",
     "smoke-chatgpt-web-feature-pages.ps1",
     "smoke-chatgpt-web-settings.ps1",
     "smoke-chatgpt-web-session-recovery.ps1"

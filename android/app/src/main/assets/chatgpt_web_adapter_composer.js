@@ -44,7 +44,9 @@
 
   function composerScope(composer) {
     return (composer && composer.closest('form')) ||
+      (composer && composer.closest('#thread-bottom-container')) ||
       (composer && composer.closest('#thread-bottom')) ||
+      document.querySelector('#thread-bottom-container') ||
       document.querySelector('#thread-bottom') ||
       document;
   }

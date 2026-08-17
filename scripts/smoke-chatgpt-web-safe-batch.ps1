@@ -38,10 +38,9 @@ $pinned.ExpectedHardwareSerial = $ExpectedHardwareSerial
 $cases = @(
     [pscustomobject]@{
         id = "read_only_surface"
-        script = "smoke-chatgpt-web-apk.ps1"
+        script = "smoke-chatgpt-web-native-chat.ps1"
         arguments = $common + @{
-            ReplyTimeoutSec = $ReadyTimeoutSec
-            AllowStaleDeviceEvidence = $true
+            TimeoutSec = $ReadyTimeoutSec
         }
     },
     [pscustomobject]@{

@@ -16,6 +16,12 @@ const source = fs.readFileSync(path.join(
   'chatgpt_web_adapter_composer.js'
 ), 'utf8');
 const dictationSessionPolicy = require('../android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js');
+const composerSubmenu = require('../android/app/src/main/assets/chatgpt_web_adapter_composer_submenu.js');
+
+function runComposer(sandbox) {
+  sandbox.window.__elonChatGptComposerSubmenu = composerSubmenu;
+  vm.runInNewContext(source, sandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+}
 
 const roleButton = {
   id: '',
@@ -62,7 +68,7 @@ sandbox.window.window = sandbox.window;
 sandbox.window.document = sandbox.document;
 sandbox.window.location = sandbox.location;
 
-vm.runInNewContext(source, sandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(sandbox);
 sandbox.window.__elonChatGptComposer.requestOptions(
   'model',
   composer,
@@ -116,7 +122,7 @@ const mobileSandbox = {
 mobileSandbox.window.window = mobileSandbox.window;
 mobileSandbox.window.document = mobileSandbox.document;
 mobileSandbox.window.location = mobileSandbox.location;
-vm.runInNewContext(source, mobileSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(mobileSandbox);
 assert.equal(mobileSandbox.window.__elonChatGptComposer.currentModel(mobileComposer), 'Auto');
 
 const renamedModelButton = {
@@ -175,7 +181,7 @@ renamedSandbox.window.window = renamedSandbox.window;
 renamedSandbox.window.document = renamedSandbox.document;
 renamedSandbox.window.location = renamedSandbox.location;
 
-vm.runInNewContext(source, renamedSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(renamedSandbox);
 renamedSandbox.window.__elonChatGptComposer.requestOptions(
   'model',
   renamedComposer,
@@ -234,7 +240,7 @@ semanticSandbox.window.window = semanticSandbox.window;
 semanticSandbox.window.document = semanticSandbox.document;
 semanticSandbox.window.location = semanticSandbox.location;
 
-vm.runInNewContext(source, semanticSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(semanticSandbox);
 semanticSandbox.window.__elonChatGptComposer.requestOptions(
   'model',
   composer,
@@ -306,7 +312,7 @@ dictationSandbox.window.window = dictationSandbox.window;
 dictationSandbox.window.document = dictationSandbox.document;
 dictationSandbox.window.location = dictationSandbox.location;
 
-vm.runInNewContext(source, dictationSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(dictationSandbox);
 assert.ok(
   Array.from(dictationSandbox.window.__elonChatGptComposer.capabilities(dictationComposer))
     .includes('dictation'),
@@ -374,7 +380,7 @@ sessionSandbox.window.window = sessionSandbox.window;
 sessionSandbox.window.document = sessionSandbox.document;
 sessionSandbox.window.location = sessionSandbox.location;
 
-vm.runInNewContext(source, sessionSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(sessionSandbox);
 assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
 sessionSandbox.window.__elonChatGptComposer.cancelDictation(
   (event) => sessionEvents.push(event),
@@ -448,7 +454,7 @@ optionSandbox.window.window = optionSandbox.window;
 optionSandbox.window.document = optionSandbox.document;
 optionSandbox.window.location = optionSandbox.location;
 
-vm.runInNewContext(source, optionSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(optionSandbox);
 optionSandbox.window.__elonChatGptComposer.requestOptions(
   'model',
   composer,
@@ -521,7 +527,7 @@ toolsSandbox.window.window = toolsSandbox.window;
 toolsSandbox.window.document = toolsSandbox.document;
 toolsSandbox.window.location = toolsSandbox.location;
 
-vm.runInNewContext(source, toolsSandbox, { filename: 'chatgpt_web_adapter_composer.js' });
+runComposer(toolsSandbox);
 toolsSandbox.window.__elonChatGptComposer.requestOptions(
   'tools',
   composer,
@@ -535,5 +541,75 @@ assert.equal(toolsEvents[0].type, 'web_touch_request');
 assert.equal(toolsEvents[0].purpose, 'list_composer_tools');
 assert.equal(toolsEvents[0].xRatio, 0.1);
 assert.equal(toolsEvents[0].yRatio, 0.825);
+
+const sidebarButton = {
+  id: '',
+  textContent: '',
+  getAttribute(name) {
+    return name === 'aria-label' ? 'Open tools sidebar' : null;
+  }
+};
+const currentComposerPlus = {
+  id: 'composer-plus-btn',
+  textContent: '',
+  getAttribute(name) {
+    return name === 'aria-label' ? 'Add photos and files' : null;
+  }
+};
+const currentComposerScope = {
+  querySelector(selector) {
+    return selector === '#composer-plus-btn' ? currentComposerPlus : null;
+  },
+  querySelectorAll: () => []
+};
+const currentComposer = {
+  closest(selector) {
+    return selector === '#thread-bottom-container' ? currentComposerScope : null;
+  }
+};
+const currentEvents = [];
+const currentResults = [];
+const currentSandbox = {
+  document: {
+    querySelector(selector) {
+      return selector === 'button[aria-label*="tool" i]' ? sidebarButton : null;
+    },
+    querySelectorAll: () => []
+  },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    __elonChatGptActionTargetPolicy: {
+      actionPoint(node) {
+        if (node === currentComposerPlus) return { x: 40, y: 700 };
+        if (node === sidebarButton) return { x: 200, y: 60 };
+        return null;
+      },
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: {
+      filter: (_section, options) => options
+    },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+  }
+};
+currentSandbox.window.window = currentSandbox.window;
+currentSandbox.window.document = currentSandbox.document;
+currentSandbox.window.location = currentSandbox.location;
+
+runComposer(currentSandbox);
+currentSandbox.window.__elonChatGptComposer.requestOptions(
+  'tools',
+  currentComposer,
+  (event) => currentEvents.push(event),
+  (...args) => currentResults.push(args)
+);
+
+assert.equal(currentResults.length, 0);
+assert.equal(currentEvents.length, 1);
+assert.equal(currentEvents[0].purpose, 'list_composer_tools');
+assert.equal(currentEvents[0].xRatio, 0.1);
+assert.equal(currentEvents[0].yRatio, 0.875);
 
 process.stdout.write('CHATGPT_COMPOSER_TRIGGER_POLICY=passed\n');
