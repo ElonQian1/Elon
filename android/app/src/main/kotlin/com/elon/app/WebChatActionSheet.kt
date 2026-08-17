@@ -28,6 +28,17 @@ internal data class WebChatActionSheetFooterAction(
     val action: () -> Unit,
 )
 
+internal class WebChatActionSheetHandle(
+    val dialog: BottomSheetDialog,
+    private val replaceItems: (List<WebChatActionSheetItem>) -> Unit,
+) {
+    fun updateItems(items: List<WebChatActionSheetItem>) {
+        if (items.isNotEmpty()) replaceItems(items)
+    }
+
+    fun dismiss() = dialog.dismiss()
+}
+
 internal object WebChatActionSheet {
     fun show(
         activity: AppCompatActivity,
@@ -37,28 +48,65 @@ internal object WebChatActionSheet {
         onCancelled: () -> Unit = {},
         onDismissed: () -> Unit = {},
         onSelected: (WebChatActionSheetItem) -> Unit,
-    ): BottomSheetDialog? {
+    ): BottomSheetDialog? = showUpdatable(
+        activity = activity,
+        title = title,
+        items = items,
+        footerActions = footerActions,
+        onCancelled = onCancelled,
+        onDismissed = onDismissed,
+        onSelected = onSelected,
+    )?.dialog
+
+    fun showUpdatable(
+        activity: AppCompatActivity,
+        title: String,
+        items: List<WebChatActionSheetItem>,
+        footerActions: List<WebChatActionSheetFooterAction> = emptyList(),
+        onCancelled: () -> Unit = {},
+        onDismissed: () -> Unit = {},
+        onSelected: (WebChatActionSheetItem) -> Unit,
+    ): WebChatActionSheetHandle? {
         if (activity.isFinishing || activity.isDestroyed || items.isEmpty()) return null
         val dialog = BottomSheetDialog(activity)
         var handled = false
+        val itemContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val itemScroll = ScrollView(activity).apply {
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(itemContainer)
+        }
+        fun renderItems(updatedItems: List<WebChatActionSheetItem>) {
+            itemScroll.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(activity, (updatedItems.size * ITEM_HEIGHT_DP).coerceAtMost(MAX_LIST_HEIGHT_DP)),
+            )
+            itemContainer.removeAllViews()
+            updatedItems.forEach { item ->
+                itemContainer.addView(itemRow(activity, item) {
+                    if (!item.enabled) return@itemRow
+                    handled = true
+                    onSelected(item)
+                    dialog.dismiss()
+                })
+            }
+        }
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(activity, 20), dp(activity, 12), dp(activity, 20), dp(activity, 18))
             background = roundedBackground(activity, PANEL_COLOR, 8)
             addView(dragHandle(activity))
             addView(sheetTitle(activity, title))
-            addView(itemList(activity, items) { item ->
-                if (!item.enabled) return@itemList
-                handled = true
-                dialog.dismiss()
-                onSelected(item)
-            })
+            addView(itemScroll)
             if (footerActions.isNotEmpty()) addView(footer(activity, footerActions) { action ->
                 handled = true
-                dialog.dismiss()
                 action.action()
+                dialog.dismiss()
             })
         }
+        renderItems(items)
         dialog.setContentView(root)
         dialog.setOnShowListener {
             dialog.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)?.let { sheet ->
@@ -74,7 +122,9 @@ internal object WebChatActionSheet {
             onDismissed()
         }
         dialog.show()
-        return dialog
+        return WebChatActionSheetHandle(dialog) { updatedItems ->
+            if (dialog.isShowing) itemScroll.post { renderItems(updatedItems) }
+        }
     }
 
     private fun dragHandle(activity: AppCompatActivity) = View(activity).apply {
@@ -97,23 +147,6 @@ internal object WebChatActionSheet {
         textSize = 20f
         setTypeface(typeface, Typeface.BOLD)
         setTextColor(Color.parseColor(PRIMARY_TEXT_COLOR))
-    }
-
-    private fun itemList(
-        activity: AppCompatActivity,
-        items: List<WebChatActionSheetItem>,
-        onClick: (WebChatActionSheetItem) -> Unit,
-    ) = ScrollView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(activity, (items.size * ITEM_HEIGHT_DP).coerceAtMost(MAX_LIST_HEIGHT_DP)),
-        )
-        isVerticalScrollBarEnabled = false
-        overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-        addView(LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            items.forEach { item -> addView(itemRow(activity, item) { onClick(item) }) }
-        })
     }
 
     private fun itemRow(
