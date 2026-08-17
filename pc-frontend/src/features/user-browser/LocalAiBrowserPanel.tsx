@@ -27,6 +27,7 @@ import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
 import type { LocalAiOwnerSource } from './useLocalAiOwnerIdentity'
 import AiProviderSessionStatus from './AiProviderSessionStatus'
 import { deriveLocalAiUserState } from './localAiUserState'
+import useLocalAiSessionPolling from './useLocalAiSessionPolling'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface LocalAiBrowserPanelProps {
@@ -57,26 +58,13 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, ownerSource,
     setMessage('')
   }, [provider?.id])
 
-  useEffect(() => {
-    if (!ownerKey || !provider || state !== 'ready') return
-    let active = true
-    let timer = 0
-    const poll = async () => {
-      try {
-        const next = await getLocalAiWebSessionState(provider.id, ownerKey)
-        if (active) setSessionState(next)
-      } catch {
-        // 能力检查负责显示兼容性错误；短暂轮询失败不覆盖用户正在看的消息。
-      } finally {
-        if (active) timer = window.setTimeout(() => void poll(), 1_500)
-      }
-    }
-    void poll()
-    return () => {
-      active = false
-      window.clearTimeout(timer)
-    }
-  }, [ownerKey, provider, state])
+  useLocalAiSessionPolling({
+    enabled: state === 'ready',
+    providerId: provider?.id,
+    ownerKey,
+    state: sessionState,
+    onState: setSessionState,
+  })
 
   async function open(item: LocalAiWebProvider) {
     if (!ownerKey || busyProvider) return

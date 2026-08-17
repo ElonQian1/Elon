@@ -23,13 +23,16 @@ import {
   type LocalAiComposerControlsSnapshot,
 } from './localAiBrowserProtocol'
 import { deriveLocalAiUserState, type LocalAiClientState } from './localAiUserState'
+import useLocalAiSessionPolling from './useLocalAiSessionPolling'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
   clientState: LocalAiClientState = 'ready',
 ) {
-  const requestedSessionIdentity = provider && ownerKey ? `${provider.id}:${ownerKey}` : ''
+  const providerId = provider?.id ?? ''
+  const providerDisplayName = provider?.displayName ?? ''
+  const requestedSessionIdentity = providerId && ownerKey ? `${providerId}:${ownerKey}` : ''
   const [sessionEntry, setSessionEntry] = useState<{
     identity: string
     state: LocalAiWebSessionState | null
@@ -91,9 +94,17 @@ export default function useLocalAiWebChatController(
     setSessionEntry({ identity: requestedSessionIdentity, state })
   }
 
+  const refreshSessionState = useLocalAiSessionPolling({
+    enabled: Boolean(providerId && ownerKey),
+    providerId,
+    ownerKey,
+    state: visibleSessionState,
+    onState: setSessionState,
+  })
+
   useEffect(() => {
-    setSessionState(provider && ownerKey
-      ? getCachedLocalAiWebSessionState(provider.id, ownerKey)
+    setSessionState(providerId && ownerKey
+      ? getCachedLocalAiWebSessionState(providerId, ownerKey)
       : null)
     setDraft('')
     setDraftTouched(false)
@@ -101,27 +112,27 @@ export default function useLocalAiWebChatController(
     setMessage('')
     autoStartKey.current = ''
     cancelResponseRefresh()
-  }, [ownerKey, provider])
+  }, [ownerKey, providerId, requestedSessionIdentity])
 
   useEffect(() => () => cancelResponseRefresh(), [])
 
   useEffect(() => {
-    if (!provider || !ownerKey) return
-    const key = `${provider.id}:${ownerKey}`
+    if (!providerId || !ownerKey) return
+    const key = requestedSessionIdentity
     if (autoStartKey.current === key) return
     autoStartKey.current = key
     let active = true
     setBusyAction('prepare_guest_session')
-    setMessage(`正在后台连接 ${provider.displayName}；官网允许时可直接使用访客模式。`)
-    void openLocalAiWebSession(provider.id, ownerKey, { showWindow: false })
+    setMessage(`正在后台连接 ${providerDisplayName}；官网允许时可直接使用访客模式。`)
+    void openLocalAiWebSession(providerId, ownerKey, { showWindow: false })
       .then(async () => {
         try {
-          const next = await getLocalAiWebSessionState(provider.id, ownerKey)
+          const next = await getLocalAiWebSessionState(providerId, ownerKey)
           if (active) setSessionState(next)
         } catch {
-          // 后续有界轮询会恢复状态，不重复创建窗口。
+          // 后续共享状态同步会恢复，不重复创建窗口。
         }
-        if (active) setMessage(`${provider.displayName} 已在本机后台连接；登录是历史与增强能力的可选项。`)
+        if (active) setMessage(`${providerDisplayName} 已在本机后台连接；登录是历史与增强能力的可选项。`)
       })
       .catch((error) => {
         if (active) setMessage(localAiBrowserErrorMessage(error))
@@ -130,28 +141,7 @@ export default function useLocalAiWebChatController(
         if (active) setBusyAction('')
       })
     return () => { active = false }
-  }, [ownerKey, provider])
-
-  useEffect(() => {
-    if (!provider || !ownerKey) return
-    let active = true
-    let timer = 0
-    const poll = async () => {
-      try {
-        const next = await getLocalAiWebSessionState(provider.id, ownerKey)
-        if (active) setSessionState(next)
-      } catch (error) {
-        if (active) setMessage(localAiBrowserErrorMessage(error))
-      } finally {
-        if (active) timer = window.setTimeout(() => void poll(), 1_500)
-      }
-    }
-    void poll()
-    return () => {
-      active = false
-      window.clearTimeout(timer)
-    }
-  }, [ownerKey, provider])
+  }, [ownerKey, providerDisplayName, providerId, requestedSessionIdentity])
 
   useEffect(() => {
     if (!draftTouched) setDraft(snapshot?.draft ?? '')
@@ -267,7 +257,8 @@ export default function useLocalAiWebChatController(
     let delayIndex = 0
     const request = () => {
       if (generation !== responseRefreshGeneration.current || !provider || !ownerKey) return
-      void requestLocalAiWebSnapshot(provider.id, ownerKey).catch(() => {})
+      void requestLocalAiWebSnapshot(provider.id, ownerKey)
+        .then(refreshSessionState, () => {})
       const delay = RESPONSE_REFRESH_DELAYS_MS[delayIndex++]
       if (delay !== undefined) responseRefreshTimer.current = window.setTimeout(request, delay)
     }
