@@ -430,8 +430,9 @@ const optionNode = {
   id: '',
   textContent: '思考强度 极高',
   getAttribute(name) {
-    return name === 'role' ? 'menuitem' : null;
+    return name === 'role' ? 'menuitemradio' : null;
   },
+  querySelector: () => ({}),
   hasAttribute: () => false,
   getBoundingClientRect: () => ({
     left: 40,

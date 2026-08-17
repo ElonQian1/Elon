@@ -366,7 +366,10 @@
     return Array.from(document.querySelectorAll(
       '[role="menuitemradio"], [role="menuitemcheckbox"], [role="menuitem"], [role="option"]'
     )).filter((node) =>
-      isOptionVisible(node) && !composerSubmenu.containsNestedInteractiveControl(node)
+      isOptionVisible(node) && (
+        /^(?:menuitemradio|menuitemcheckbox)$/i.test(String(node.getAttribute('role') || '')) ||
+        !composerSubmenu.containsNestedInteractiveControl(node)
+      )
     );
   }
 
