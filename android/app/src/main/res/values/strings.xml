@@ -135,6 +135,7 @@
     <string name="web_chat_provider_switch_attachment_message">当前有 %1$d 个未发送附件。切换到 %2$s 会移除这些附件，已输入的文字会分别保留。</string>
     <string name="web_chat_provider_switch_discard">移除并切换</string>
     <string name="web_chat_login_required">当前页面需要登录；官网支持匿名聊天时可直接使用</string>
+    <string name="web_chat_guest_retrying">正在恢复匿名聊天，登录仅用于历史记录和账号增强功能</string>
     <string name="web_chat_not_ready">ChatGPT 网页 AI 正在连接，请稍后重试</string>
     <string name="web_chat_attachment_fallback">当前附件类型暂需在官网页面完成</string>
     <string name="web_chat_attachment_upload_failed">附件未能交给 ChatGPT 网页 AI，请重试</string>

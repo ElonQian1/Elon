@@ -89,6 +89,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
+        session.dismissComposerOptions()
     }
 
     override fun isActive(): Boolean = active
@@ -152,9 +153,9 @@ internal class ChatGptSocialChatController(
             when (WebChatSendFallbackPolicy.decide(
                 loginRequired = session.state() == ChatGptBackgroundSession.State.LOGIN_REQUIRED,
             )) {
-                WebChatSendFallbackPolicy.Action.OPEN_OFFICIAL_AUTHENTICATION -> {
-                    Toast.makeText(activity, R.string.web_chat_login_required, Toast.LENGTH_LONG).show()
-                    openOfficialFallback()
+                WebChatSendFallbackPolicy.Action.RETRY_GUEST_ACCESS -> {
+                    if (!session.retryGuestAccess()) session.onHostResumed()
+                    Toast.makeText(activity, R.string.web_chat_guest_retrying, Toast.LENGTH_LONG).show()
                 }
                 WebChatSendFallbackPolicy.Action.RETRY_IN_PLACE -> {
                     session.onHostResumed()

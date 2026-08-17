@@ -3,9 +3,9 @@ package com.elon.app
 internal object WebChatSendFallbackPolicy {
     enum class Action {
         RETRY_IN_PLACE,
-        OPEN_OFFICIAL_AUTHENTICATION,
+        RETRY_GUEST_ACCESS,
     }
 
     fun decide(loginRequired: Boolean): Action =
-        if (loginRequired) Action.OPEN_OFFICIAL_AUTHENTICATION else Action.RETRY_IN_PLACE
+        if (loginRequired) Action.RETRY_GUEST_ACCESS else Action.RETRY_IN_PLACE
 }

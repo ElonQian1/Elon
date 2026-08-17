@@ -6,6 +6,7 @@ internal class ChatGptWebMcpCommandAdapter(
     private val invokeControlAction: (String, String) -> Unit,
     private val startDictationAction: (String) -> Unit,
     private val requestComposerOptionsAction: (String, String) -> Unit,
+    private val dismissComposerOptionsAction: (String?) -> Unit,
 ) : ChatGptWebMcpCommandPort {
     override fun setDraft(value: String, expectedDraft: String, requestId: String) =
         pageAdapter.setDraft(value, expectedDraft, requestId)
@@ -45,7 +46,7 @@ internal class ChatGptWebMcpCommandAdapter(
         requestComposerOptionsAction(section, requestId)
 
     override fun dismissComposerOptions(requestId: String) =
-        pageAdapter.dismissComposerMenu(requestId)
+        dismissComposerOptionsAction(requestId)
 
     override fun selectComposerOption(section: String, optionId: String, requestId: String) {
         if (section == "model") pageAdapter.selectModelOption(optionId, requestId)

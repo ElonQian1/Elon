@@ -13,9 +13,9 @@ class WebChatSendFallbackPolicyTest {
     }
 
     @Test
-    fun explicitAuthenticationPageCanOpenTheOfficialAuthenticationSurface() {
+    fun explicitAuthenticationPageRetriesGuestAccessBeforeOfferingLogin() {
         assertEquals(
-            WebChatSendFallbackPolicy.Action.OPEN_OFFICIAL_AUTHENTICATION,
+            WebChatSendFallbackPolicy.Action.RETRY_GUEST_ACCESS,
             WebChatSendFallbackPolicy.decide(loginRequired = true),
         )
     }

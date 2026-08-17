@@ -111,11 +111,11 @@ internal class GoogleWebSocialChatController(
         }
         if (!session.canSend()) {
             when (WebChatSendFallbackPolicy.decide(loginRequired = false)) {
-                WebChatSendFallbackPolicy.Action.RETRY_IN_PLACE -> {
+                WebChatSendFallbackPolicy.Action.RETRY_IN_PLACE,
+                WebChatSendFallbackPolicy.Action.RETRY_GUEST_ACCESS -> {
                     session.onHostResumed()
                     Toast.makeText(activity, "Google 网页 AI 正在连接，请稍后重试", Toast.LENGTH_LONG).show()
                 }
-                WebChatSendFallbackPolicy.Action.OPEN_OFFICIAL_AUTHENTICATION -> openOfficialFallback()
             }
             return true
         }

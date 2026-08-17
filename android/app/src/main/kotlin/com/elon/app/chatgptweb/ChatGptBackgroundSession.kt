@@ -40,26 +40,49 @@ internal class ChatGptBackgroundSession(
 
     private val cookieManager = CookieManager.getInstance()
     private val sessionRestorer = ChatGptWebSessionRestorer(activity)
-    private val sessionContinuity = ChatGptWebSessionContinuity()
     private val proxyController = ChatGptWebProxyController(activity)
     private val uploadStager = ChatGptWebUploadStager(activity)
     private val conversationHistoryStore = ChatGptConversationHistoryStore(activity)
     private val conversationNavigation = ChatGptConversationNavigationCoordinator(activity)
     private val snapshotStore = WebChatSnapshotStore(activity, "chatgpt")
     private val restoredConversationHistory = conversationHistoryStore.restore()
+    private val restoredSnapshot = snapshotStore.restore()
+    private val sessionContinuity = ChatGptWebSessionContinuity(
+        initialAuthenticated = restoredSnapshot?.authenticated == true ||
+            restoredConversationHistory != null,
+    )
     private val observedMcpState = ChatGptWebObservedState(restoredConversationHistory)
     private val verificationEvidenceStore = ChatGptWebVerificationEvidenceStore(activity.applicationContext)
     private val attachmentHandler = Handler(Looper.getMainLooper())
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
+    private val composerOptionHandler = Handler(Looper.getMainLooper())
+    private val sessionContinuityHandler = Handler(Looper.getMainLooper())
     private val conversationRefresh = ChatGptConversationRefreshCoordinator(
         dispatch = ::dispatchConversationIndexRequest,
         schedule = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
         cancel = conversationRefreshHandler::removeCallbacks,
     )
+    private val composerOptionRequests = ChatGptComposerOptionRequestCoordinator(
+        dismissMenu = { requestId -> pageAdapter?.dismissComposerMenu(requestId) },
+        dispatchRequest = { section, requestId ->
+            if (section == "model") pageAdapter?.listModelOptions(requestId)
+            else pageAdapter?.listComposerTools(requestId)
+        },
+        collectOptions = { section ->
+            if (section == "model") pageAdapter?.collectModelOptions()
+            else pageAdapter?.collectComposerTools()
+        },
+        schedule = { task, delayMs -> composerOptionHandler.postDelayed(task, delayMs) },
+        cancel = composerOptionHandler::removeCallbacks,
+        prepareSection = observedMcpState::beginComposerRequest,
+        failSuperseded = { requestId, section ->
+            observedMcpState.failCommand(requestId, composerListAction(section), "composer_request_superseded")
+        },
+    )
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
-    private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
+    private var latestSnapshot: ChatGptWebSnapshot? = restoredSnapshot
     private var latestUiManifest: ChatGptWebUiManifest? = null
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var state = State.IDLE
@@ -170,9 +193,10 @@ internal class ChatGptBackgroundSession(
 
     fun requestModelOptions(): Boolean {
         if (state != State.READY) return false
-        pageAdapter?.listModelOptions()
-        return true
+        return composerOptionRequests.request("model")
     }
+
+    fun dismissComposerOptions() = composerOptionRequests.dismiss()
 
     fun selectModel(id: String) {
         pageAdapter?.selectModelOption(id)
@@ -246,10 +270,9 @@ internal class ChatGptBackgroundSession(
                 )
             },
             requestComposerOptionsAction = { section, requestId ->
-                observedMcpState.beginComposerRequest(section)
-                if (section == "model") adapter.listModelOptions(requestId)
-                else adapter.listComposerTools(requestId)
+                composerOptionRequests.request(section, requestId)
             },
+            dismissComposerOptionsAction = composerOptionRequests::dismiss,
         )
         return ChatGptWebMcpActions(
             snapshot = { latestSnapshot },
@@ -281,10 +304,13 @@ internal class ChatGptBackgroundSession(
 
     fun destroy() {
         conversationNavigation.clear()
+        composerOptionRequests.reset()
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)
         conversationRefresh.reset()
         conversationRefreshHandler.removeCallbacksAndMessages(null)
+        composerOptionHandler.removeCallbacksAndMessages(null)
+        sessionContinuityHandler.removeCallbacksAndMessages(null)
         pageAdapter = null
         touchDispatcher = null
         webView?.apply {
@@ -358,6 +384,8 @@ internal class ChatGptBackgroundSession(
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
                 conversationRefresh.reset()
+                composerOptionRequests.reset()
+                sessionContinuityHandler.removeCallbacksAndMessages(null)
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
             },
@@ -400,7 +428,10 @@ internal class ChatGptBackgroundSession(
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 if (!conversationNavigation.shouldAccept(event.value)) return
-                val snapshot = sessionContinuity.reconcile(event.value)
+                val reconciliation = sessionContinuity.reconcileWithDecision(event.value)
+                val snapshot = reconciliation.snapshot
+                scheduleSessionContinuityRecheck(reconciliation.recheckAfterMs)
+                if (reconciliation.clearConversationHistory) clearConversationHistory()
                 latestSnapshot = snapshot
                 ChatGptWebConversationPath.fromUrl(snapshot.url)?.let { activePath ->
                     conversations = conversations.map { conversation ->
@@ -419,7 +450,6 @@ internal class ChatGptBackgroundSession(
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
                         snapshotStore.clear()
-                        observedMcpState.clearConversationHistory()
                         pageAdapter?.markLoginRequired()
                         updateState(State.LOGIN_REQUIRED)
                     }
@@ -446,9 +476,12 @@ internal class ChatGptBackgroundSession(
                 onSnapshot(snapshot)
             }
             is ChatGptWebEvent.ComposerControls -> {
+                composerOptionRequests.complete(event.section)
                 if (event.section == "model") onComposerOptions(event.options)
             }
             is ChatGptWebEvent.CommandResult -> {
+                if (event.action == "dismiss_composer_menu") composerOptionRequests.onMenuDismissed()
+                composerSectionForAction(event.action)?.let(composerOptionRequests::complete)
                 onCommandResult(event)
                 processAttachmentCommandResult(event)
                 if (event.ok) {
@@ -531,15 +564,18 @@ internal class ChatGptBackgroundSession(
         val adapter = pageAdapter ?: return
         touchDispatcher?.dispatch(event) { dispatched ->
             if (!dispatched) {
+                composerSectionForAction(event.purpose)?.let { composerOptionRequests.dismiss() }
                 onStateChanged(state, "官网控件操作未就绪")
                 return@dispatch
             }
             when (event.purpose) {
-                "list_model_options", "open_model_submenu" -> view.postDelayed(
+                "list_model_options" -> composerOptionRequests.scheduleCollection("model")
+                "list_composer_tools" -> composerOptionRequests.scheduleCollection("tools")
+                "open_model_submenu" -> view.postDelayed(
                     adapter::collectModelOptions,
                     ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
-                "list_composer_tools", "open_composer_tools_submenu" -> view.postDelayed(
+                "open_composer_tools_submenu" -> view.postDelayed(
                     adapter::collectComposerTools,
                     ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
                 )
@@ -559,6 +595,33 @@ internal class ChatGptBackgroundSession(
                     )
             }
         }
+    }
+
+    private fun scheduleSessionContinuityRecheck(delayMs: Long?) {
+        sessionContinuityHandler.removeCallbacksAndMessages(null)
+        delayMs ?: return
+        sessionContinuityHandler.postDelayed({
+            val reconciliation = sessionContinuity.confirmPendingLoginEvidence() ?: return@postDelayed
+            reconciliation.recheckAfterMs?.let {
+                scheduleSessionContinuityRecheck(it)
+                return@postDelayed
+            }
+            if (reconciliation.clearConversationHistory) clearConversationHistory()
+            latestSnapshot = reconciliation.snapshot
+            snapshotStore.clear()
+            pageAdapter?.markLoginRequired()
+            updateState(State.LOGIN_REQUIRED)
+            onSnapshot(reconciliation.snapshot)
+        }, delayMs)
+    }
+
+    private fun clearConversationHistory() {
+        conversations = emptyList()
+        projects = emptyList()
+        conversationCollection = ChatGptWebConversationCollection()
+        conversationHistoryStore.clear()
+        observedMcpState.clearConversationHistory()
+        onConversationIndexChanged(conversationIndex())
     }
 
     private fun handleAdapterState(adapterState: ChatGptWebPageAdapter.State) {
@@ -654,6 +717,15 @@ internal class ChatGptBackgroundSession(
         const val ATTACHMENT_PHASE_IDLE = "idle"
         const val ATTACHMENT_PHASE_COMPLETED = "completed"
         const val ATTACHMENT_TIMEOUT_MS = 120_000L
+
+        fun composerListAction(section: String): String =
+            if (section == "model") "list_model_options" else "list_composer_tools"
+
+        fun composerSectionForAction(action: String): String? = when (action) {
+            "list_model_options", "collect_model_options" -> "model"
+            "list_composer_tools", "collect_composer_tools" -> "tools"
+            else -> null
+        }
     }
 }
 

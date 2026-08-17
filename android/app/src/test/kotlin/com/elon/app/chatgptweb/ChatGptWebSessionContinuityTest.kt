@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,11 +11,13 @@ class ChatGptWebSessionContinuityTest {
         val continuity = ChatGptWebSessionContinuity()
         continuity.reconcile(snapshot(authenticated = true, pageKind = "conversation"))
 
-        val anonymous = continuity.reconcile(
+        val decision = continuity.reconcileWithDecision(
             snapshot(pageKind = "conversation").copy(composerReady = true),
         )
+        val anonymous = decision.snapshot
 
         assertFalse(anonymous.authenticated)
+        assertTrue(decision.clearConversationHistory)
         assertFalse(continuity.reconcile(snapshot(pageKind = "feature")).authenticated)
     }
 
@@ -56,16 +59,49 @@ class ChatGptWebSessionContinuityTest {
     }
 
     @Test
-    fun visibleLoginEvidenceClearsSessionContinuity() {
-        val continuity = ChatGptWebSessionContinuity()
+    fun transientLoginEvidencePreservesSessionDuringRefreshGracePeriod() {
+        var nowMs = 1_000L
+        val continuity = ChatGptWebSessionContinuity(
+            nowMs = { nowMs },
+            loginEvidenceGraceMs = 2_000L,
+        )
         continuity.reconcile(snapshot(authenticated = true, pageKind = "conversation"))
 
-        val login = continuity.reconcile(
-            snapshot(pageKind = "feature", loginRequired = true, authenticated = true),
+        val transient = continuity.reconcileWithDecision(
+            snapshot(pageKind = "auth", loginRequired = true, authenticated = true),
         )
 
-        assertFalse(login.authenticated)
-        assertTrue(login.loginRequired)
+        assertTrue(transient.snapshot.authenticated)
+        assertFalse(transient.snapshot.loginRequired)
+        assertFalse(ChatGptWebAccessPolicy.requiresLogin(transient.snapshot))
+        assertFalse(transient.clearConversationHistory)
+        assertTrue(transient.recheckAfterMs == 2_000L)
+
+        nowMs += 1_000L
+        val recovered = continuity.reconcileWithDecision(
+            snapshot(authenticated = true, pageKind = "conversation"),
+        )
+        assertTrue(recovered.snapshot.authenticated)
+        assertNull(recovered.recheckAfterMs)
+        assertNull(continuity.confirmPendingLoginEvidence())
+    }
+
+    @Test
+    fun stableLoginEvidenceClearsSessionAfterGracePeriod() {
+        var nowMs = 1_000L
+        val continuity = ChatGptWebSessionContinuity(
+            nowMs = { nowMs },
+            loginEvidenceGraceMs = 2_000L,
+        )
+        continuity.reconcile(snapshot(authenticated = true, pageKind = "conversation"))
+        continuity.reconcileWithDecision(snapshot(pageKind = "auth", loginRequired = true))
+        nowMs += 2_000L
+
+        val login = checkNotNull(continuity.confirmPendingLoginEvidence())
+
+        assertFalse(login.snapshot.authenticated)
+        assertTrue(login.snapshot.loginRequired)
+        assertTrue(login.clearConversationHistory)
         assertFalse(continuity.reconcile(snapshot(pageKind = "feature")).authenticated)
     }
 
@@ -74,7 +110,7 @@ class ChatGptWebSessionContinuityTest {
         val continuity = ChatGptWebSessionContinuity()
         continuity.reconcile(snapshot(authenticated = true, pageKind = "conversation"))
 
-        val login = continuity.reconcile(
+        val login = continuity.reconcileWithDecision(
             snapshot(
                 authenticated = true,
                 pageKind = "feature",
@@ -82,8 +118,26 @@ class ChatGptWebSessionContinuityTest {
             ),
         )
 
-        assertFalse(login.authenticated)
-        assertTrue(login.loginRequired)
+        assertFalse(login.snapshot.authenticated)
+        assertTrue(login.snapshot.loginRequired)
+        assertTrue(login.clearConversationHistory)
+    }
+
+    @Test
+    fun restoredAuthenticatedCacheGetsRefreshGraceBeforeItCanBeCleared() {
+        val continuity = ChatGptWebSessionContinuity(
+            initialAuthenticated = true,
+            nowMs = { 1_000L },
+            loginEvidenceGraceMs = 2_000L,
+        )
+
+        val transient = continuity.reconcileWithDecision(
+            snapshot(pageKind = "home", loginRequired = true),
+        )
+
+        assertTrue(transient.snapshot.authenticated)
+        assertFalse(transient.clearConversationHistory)
+        assertTrue(transient.recheckAfterMs == 2_000L)
     }
 
     @Test

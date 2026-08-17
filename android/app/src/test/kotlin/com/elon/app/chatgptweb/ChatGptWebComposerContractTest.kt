@@ -248,12 +248,19 @@ class ChatGptWebComposerContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val optionRequests = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptComposerOptionRequestCoordinator.kt",
+        )
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
 
         assertTrue(coordinator.contains("WebChatProviderCapability.COMPOSER_TOOLS"))
         assertTrue(coordinator.contains("openOfficialFallback"))
-        assertTrue(background.contains("adapter.listModelOptions"))
-        assertTrue(background.contains("adapter.listComposerTools"))
+        assertTrue(background.contains("ChatGptComposerOptionRequestCoordinator("))
+        assertTrue(background.contains("composerOptionRequests.request(\"model\")"))
+        assertTrue(background.contains("pageAdapter?.listModelOptions"))
+        assertTrue(background.contains("pageAdapter?.listComposerTools"))
+        assertTrue(optionRequests.contains("dismissMenu(requestId)"))
+        assertTrue(optionRequests.contains("dispatchRequest(request.section, request.requestId)"))
         assertTrue(background.contains("adapter.startDictation"))
         val permissionController = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAudioPermissionController.kt",

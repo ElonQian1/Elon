@@ -42,7 +42,9 @@ class WebChatActionSheetContractTest {
 
         assertTrue(model.contains("onCancelled = { socialConsumerPort.dismissComposerOptions() }"))
         assertTrue(tools.contains("onCancelled = { port.dismissComposerOptions() }"))
-        assertTrue(tools.contains("port.dismissComposerOptions()\n                executeCommand"))
+        val commandDispatch = tools.substringBefore("executeCommand(provider, port, it)")
+        assertTrue(commandDispatch.endsWith("port.dismissComposerOptions()\r\n                ") ||
+            commandDispatch.endsWith("port.dismissComposerOptions()\n                "))
     }
 
     @Test
