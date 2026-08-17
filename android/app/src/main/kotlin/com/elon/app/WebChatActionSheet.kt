@@ -34,10 +34,13 @@ internal object WebChatActionSheet {
         title: String,
         items: List<WebChatActionSheetItem>,
         footerActions: List<WebChatActionSheetFooterAction> = emptyList(),
+        onCancelled: () -> Unit = {},
+        onDismissed: () -> Unit = {},
         onSelected: (WebChatActionSheetItem) -> Unit,
     ): BottomSheetDialog? {
         if (activity.isFinishing || activity.isDestroyed || items.isEmpty()) return null
         val dialog = BottomSheetDialog(activity)
+        var handled = false
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(activity, 20), dp(activity, 12), dp(activity, 20), dp(activity, 18))
@@ -46,10 +49,12 @@ internal object WebChatActionSheet {
             addView(sheetTitle(activity, title))
             addView(itemList(activity, items) { item ->
                 if (!item.enabled) return@itemList
+                handled = true
                 dialog.dismiss()
                 onSelected(item)
             })
             if (footerActions.isNotEmpty()) addView(footer(activity, footerActions) { action ->
+                handled = true
                 dialog.dismiss()
                 action.action()
             })
@@ -63,6 +68,10 @@ internal object WebChatActionSheet {
                     skipCollapsed = true
                 }
             }
+        }
+        dialog.setOnDismissListener {
+            if (!handled) onCancelled()
+            onDismissed()
         }
         dialog.show()
         return dialog

@@ -90,6 +90,9 @@ internal class ChatGptWebConsumerPortAdapter(
             .put("action", "chatgpt_list_composer_options")
             .put("section", section))
 
+    override fun dismissComposerOptions(): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_dismiss_composer_options"))
+
     override fun selectComposerOption(
         section: String,
         optionId: String,

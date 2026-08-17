@@ -237,6 +237,8 @@ internal class ChatGptWebMcpActions(
                     commands.requestComposerOptions(section, requestId)
                 }
             }
+            "chatgpt_dismiss_composer_options" ->
+                dispatch("dismiss_composer_menu", commands::dismissComposerOptions)
             "chatgpt_select_composer_option" -> {
                 val section = args.optString("section").trim().lowercase()
                 if (section !in COMPOSER_SECTIONS) return error(action, "invalid_section")
@@ -761,6 +763,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_refresh_controls",
             "chatgpt_list_conversations",
             "chatgpt_list_composer_options",
+            "chatgpt_dismiss_composer_options",
             "chatgpt_select_composer_option",
             "chatgpt_list_features",
             "chatgpt_dismiss_features",

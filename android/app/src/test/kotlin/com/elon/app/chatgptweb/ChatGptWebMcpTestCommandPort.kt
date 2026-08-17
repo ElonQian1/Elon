@@ -88,6 +88,9 @@ internal class ChatGptWebMcpTestCommandPort(
         dispatch(if (section == "model") "list_model_options" else "list_composer_tools", requestId)
     }
 
+    override fun dismissComposerOptions(requestId: String) =
+        dispatch("dismiss_composer_menu", requestId)
+
     override fun selectComposerOption(section: String, optionId: String, requestId: String) {
         onSelectComposerOption(section, optionId)
         dispatch(if (section == "model") "select_model_option" else "select_composer_tool", requestId)

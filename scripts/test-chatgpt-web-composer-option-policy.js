@@ -45,6 +45,12 @@ assert.deepEqual(policy.filter('tools', [
   '相机', '照片', '文件', '创建图片', '网页搜索', '创建任务', 'Figma', 'GitHub', 'OpenAI Platform'
 ]);
 
+assert.deepEqual(policy.filter('tools', [
+  option('模型 GPT-5.6 Sol'),
+  option('推理强度 极高'),
+  option('网页搜索')
+]).map((value) => value.label), ['网页搜索']);
+
 assert.equal(policy.accepts('model', option('帮助')), false);
 assert.equal(policy.accepts('tools', option('', 'menuitem')), false);
 

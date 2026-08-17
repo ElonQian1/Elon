@@ -44,6 +44,9 @@ internal class ChatGptWebMcpCommandAdapter(
     override fun requestComposerOptions(section: String, requestId: String) =
         requestComposerOptionsAction(section, requestId)
 
+    override fun dismissComposerOptions(requestId: String) =
+        pageAdapter.dismissComposerMenu(requestId)
+
     override fun selectComposerOption(section: String, optionId: String, requestId: String) {
         if (section == "model") pageAdapter.selectModelOption(optionId, requestId)
         else pageAdapter.selectComposerTool(optionId, requestId)

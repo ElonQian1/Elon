@@ -143,18 +143,24 @@ internal class WebChatProductionComposerToolsCoordinator(
                 WebChatActionSheetFooterAction(
                     label = "官网完整功能",
                     contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",
-                    action = openOfficialFallback,
+                    action = {
+                        port.dismissComposerOptions()
+                        openOfficialFallback()
+                    },
                 ),
             ),
+            onCancelled = { port.dismissComposerOptions() },
+            onDismissed = { activeSheet = null },
         ) { item ->
             if (activeProvider() != provider.id) return@show
-            commandById[item.id]?.let { executeCommand(provider, port, it); return@show }
+            commandById[item.id]?.let {
+                port.dismissComposerOptions()
+                executeCommand(provider, port, it)
+                return@show
+            }
             toolById[item.id]?.let { selectTool(provider, port, it) }
         }
         activeSheet = sheet
-        sheet?.setOnDismissListener {
-            if (activeSheet === sheet) activeSheet = null
-        }
     }
 
     private fun executeCommand(

@@ -331,6 +331,7 @@ class ChatGptWebMcpActionsTest {
             JSONObject().put("action", "chatgpt_list_conversations") to "list_conversations",
             JSONObject().put("action", "chatgpt_list_composer_options")
                 .put("section", "model") to "list_model_options",
+            JSONObject().put("action", "chatgpt_dismiss_composer_options") to "dismiss_composer_menu",
             JSONObject().put("action", "chatgpt_select_composer_option")
                 .put("section", "model")
                 .put("option_id", "model_fast") to "select_model_option",

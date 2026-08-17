@@ -158,6 +158,7 @@ class ChatGptWebMcpGenerationTest {
             override fun requestComposerOptions(section: String, requestId: String) {
                 onRequestComposerOptions()
             }
+            override fun dismissComposerOptions(requestId: String) = Unit
             override fun selectComposerOption(section: String, optionId: String, requestId: String) = Unit
             override fun requestFeatures(requestId: String) = Unit
             override fun dismissFeatures(requestId: String) = Unit

@@ -29,7 +29,20 @@ class WebChatActionSheetContractTest {
         assertTrue(source.contains("BottomSheetDialog"))
         assertTrue(source.contains("contentDescription = item.contentDescription"))
         assertTrue(source.contains("ITEM_HEIGHT_DP"))
+        assertTrue(source.contains("onCancelled: () -> Unit"))
+        assertTrue(source.contains("if (!handled) onCancelled()"))
+        assertTrue(source.contains("onDismissed()"))
         assertFalse(source.contains("ChatGptWebTestActivity"))
+    }
+
+    @Test
+    fun composerSheetsCloseTheHiddenOfficialMenuWhenCancelled() {
+        val model = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
+        val tools = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt")
+
+        assertTrue(model.contains("onCancelled = { socialConsumerPort.dismissComposerOptions() }"))
+        assertTrue(tools.contains("onCancelled = { port.dismissComposerOptions() }"))
+        assertTrue(tools.contains("port.dismissComposerOptions()\n                executeCommand"))
     }
 
     @Test

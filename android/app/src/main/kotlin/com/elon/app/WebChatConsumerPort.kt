@@ -51,6 +51,7 @@ internal data class WebChatConsumerCommandResult(
 internal interface WebChatConsumerPort {
     fun state(): WebChatConsumerState
     fun requestComposerOptions(section: String): WebChatConsumerCommandResult
+    fun dismissComposerOptions(): WebChatConsumerCommandResult
     fun selectComposerOption(section: String, optionId: String): WebChatConsumerCommandResult
     fun requestFeatures(): WebChatConsumerCommandResult
     fun selectFeature(featureId: String, userConfirmed: Boolean): WebChatConsumerCommandResult

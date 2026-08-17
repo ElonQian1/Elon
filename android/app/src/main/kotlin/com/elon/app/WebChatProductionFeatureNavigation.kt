@@ -144,14 +144,12 @@ internal class WebChatProductionFeatureNavigationCoordinator(
                     action = openOfficialFallback,
                 ),
             ),
+            onDismissed = { activeSheet = null },
         ) { item ->
             if (activeProvider() != provider.id) return@show
             byId[item.id]?.let { selectFeature(provider, port, it) }
         }
         activeSheet = sheet
-        sheet?.setOnDismissListener {
-            if (activeSheet === sheet) activeSheet = null
-        }
     }
 
     private fun selectFeature(

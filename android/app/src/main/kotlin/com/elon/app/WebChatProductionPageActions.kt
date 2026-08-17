@@ -166,6 +166,7 @@ internal class WebChatProductionPageActionsCoordinator(
                     action = openOfficialFallback,
                 ),
             ),
+            onDismissed = { activeSheet = null },
         ) { item ->
             if (activeProvider() != provider.id) return@show
             byId[item.id]?.let { action ->
@@ -173,9 +174,6 @@ internal class WebChatProductionPageActionsCoordinator(
             }
         }
         activeSheet = sheet
-        sheet?.setOnDismissListener {
-            if (activeSheet === sheet) activeSheet = null
-        }
     }
 
     private fun selectAction(

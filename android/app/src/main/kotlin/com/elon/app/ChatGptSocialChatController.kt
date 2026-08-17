@@ -433,6 +433,7 @@ internal class ChatGptSocialChatController(
         if (!active) return
         val selectable = options.filter { it.id.isNotBlank() }
         if (selectable.isEmpty()) {
+            socialConsumerPort.dismissComposerOptions()
             Toast.makeText(activity, R.string.web_chat_model_options_empty, Toast.LENGTH_SHORT).show()
             return
         }
@@ -454,9 +455,13 @@ internal class ChatGptSocialChatController(
                 WebChatActionSheetFooterAction(
                     label = activity.getString(R.string.web_chat_open_official),
                     contentDescription = "web-chat-model-official",
-                    action = openOfficialFallback,
+                    action = {
+                        socialConsumerPort.dismissComposerOptions()
+                        openOfficialFallback()
+                    },
                 ),
             ),
+            onCancelled = { socialConsumerPort.dismissComposerOptions() },
         ) { item -> byId[item.id]?.let { session.selectModel(it.id) } }
     }
 

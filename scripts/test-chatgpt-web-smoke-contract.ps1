@@ -108,6 +108,8 @@ Assert-Contains 'schema = "elon.chatgpt_web.apk_smoke.v2"'
 Assert-Contains 'recorded_at_utc = [DateTimeOffset]::UtcNow.ToString("o")'
 Assert-Contains 'feature_baseline = $featureBaseline'
 Assert-Contains 'Invoke-Adb shell input keyevent 4'
+Assert-Contains 'Invoke-UiAction -Action "chatgpt_dismiss_composer_options"'
+Assert-Contains 'Wait-CommandResult -Action "dismiss_composer_menu"'
 Assert-Contains 'Get-ChatGptContextPagingEvidence'
 Assert-Contains 'Add-Check "context_cursor_roundtrip"'
 Assert-Contains 'Add-Check "context_cursor_next"'
@@ -249,6 +251,9 @@ if ($source.Contains('Wait-CommandResult -Action $commandAction')) {
 }
 if ($source.Contains('ToUnixTimeMilliseconds()')) {
     throw "ChatGPT Web smoke must compare bridge timestamps from the same device clock."
+}
+if ([regex]::Matches($source, 'Invoke-Adb shell input keyevent 4').Count -ne 1) {
+    throw "Android back must only return from the official fallback, never dismiss hidden composer menus."
 }
 if ($source -notmatch '(?s)if \(\$EnsureMainActivity\) \{\s*\$params\.EnsureMainActivity = \$true\s*\$params\.OpenAppOnFailure = \$true\s*\}') {
     throw "ChatGPT Web smoke must relaunch MainActivity only for an explicit initial bootstrap."

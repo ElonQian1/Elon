@@ -120,6 +120,7 @@ class ChatGptWebConsumerPortAdapterTest {
             WebChatConsumerControlMutation.Selected(true),
         )
         val dictation = port.executeSessionCommand("chatgpt_start_dictation")
+        val dismissed = port.dismissComposerOptions()
         val unsupported = port.executeSessionCommand("chatgpt_delete_account")
 
         assertEquals("chatgpt_list_composer_options", requests[0].getString("action"))
@@ -133,6 +134,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("chatgpt_set_control_selected", requests[6].getString("action"))
         assertTrue(requests[6].getBoolean("selected"))
         assertEquals("chatgpt_start_dictation", requests[7].getString("action"))
+        assertEquals("chatgpt_dismiss_composer_options", requests[8].getString("action"))
         assertTrue(requested.accepted)
         assertTrue(selected.accepted)
         assertTrue(features.accepted)
@@ -141,6 +143,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertTrue(invoked.accepted)
         assertTrue(updated.accepted)
         assertEquals("mcp_1", dictation.requestId)
+        assertTrue(dismissed.accepted)
         assertFalse(unsupported.accepted)
         assertEquals("unsupported_consumer_command", unsupported.error)
         assertNull(unsupported.requestId)

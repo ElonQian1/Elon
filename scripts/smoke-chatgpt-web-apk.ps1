@@ -318,6 +318,19 @@ function Get-ComposerOptions {
     return Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs -TimeoutSec $TimeoutSec
 }
 
+function Dismiss-ComposerOptions {
+    param([int]$TimeoutSec = $ReadyTimeoutSec)
+
+    $beforeState = Invoke-ApkMcp -Tool "ui_state"
+    $afterMs = [long]$beforeState.last_command.observed_at_ms
+    Invoke-UiAction -Action "chatgpt_dismiss_composer_options" | Out-Null
+    $closed = Wait-CommandResult -Action "dismiss_composer_menu" `
+        -AfterMs $afterMs -TimeoutSec $TimeoutSec
+    if ($closed.last_command.ok -ne $true) {
+        throw "ChatGPT composer menu did not close cleanly."
+    }
+}
+
 function Get-ForeignComposerLabels {
     param([object[]]$Options)
 
@@ -580,8 +593,7 @@ try {
     Add-Check "composer_model_options" ($modelOptions.Count -gt 0) ($modelLabels -join ",")
     Add-Check "composer_model_scope" ($foreignModelLabels.Count -eq 0) ($foreignModelLabels -join ",")
     if ($modelOptions.Count -gt 0) {
-        Invoke-Adb shell input keyevent 4 | Out-Null
-        Start-Sleep -Milliseconds 500
+        Dismiss-ComposerOptions
     }
 
     $toolsResult = Get-ComposerOptions -Section "tools"
@@ -591,8 +603,7 @@ try {
     Add-Check "composer_tool_options" ($toolOptions.Count -gt 0) ($toolLabels -join ",")
     Add-Check "composer_tool_scope" ($foreignToolLabels.Count -eq 0) ($foreignToolLabels -join ",")
     if ($toolsResult.command_state.last_command.ok -eq $true -and $toolOptions.Count -gt 0) {
-        Invoke-Adb shell input keyevent 4 | Out-Null
-        Start-Sleep -Milliseconds 500
+        Dismiss-ComposerOptions
     }
 } finally {
     if ($temporaryComposerConversation) {

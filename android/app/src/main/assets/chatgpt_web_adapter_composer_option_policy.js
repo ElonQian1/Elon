@@ -30,7 +30,12 @@
         modelLabelPolicy.isModelLabel(label);
       return role === 'menuitemradio' || role === 'option' || sharedModelMatch || MODEL_LABEL.test(label);
     }
-    return section === 'tools' && (OPTION_ROLES.has(role) || !!(candidate && candidate.selectable));
+    if (section !== 'tools') return false;
+    const sharedModelMatch = modelLabelPolicy &&
+      typeof modelLabelPolicy.isModelLabel === 'function' &&
+      modelLabelPolicy.isModelLabel(label);
+    if (sharedModelMatch || MODEL_LABEL.test(label)) return false;
+    return OPTION_ROLES.has(role) || !!(candidate && candidate.selectable);
   }
 
   function filter(section, candidates) {
