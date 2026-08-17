@@ -91,6 +91,26 @@
     return /^(?:(?:收起|展开)(?:全部)?|(?:全部)?显示|显示全部|隐藏全部){1,3}$/.test(compact);
   }
 
+  function pageChromeText(value) {
+    const text = String(value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!text || text.length > 1600) return false;
+    const signedOut = /您已退出(?:账号|帐号)|若要访问历史记录.*请登录|you(?:'re| are) signed out|sign in to (?:access|view).*history/.test(text);
+    const chromePatterns = [
+      /打开边栏|关闭边栏|open (?:the )?sidebar|close (?:the )?sidebar/,
+      /新话题|新对话|new (?:chat|conversation|thread)/,
+      /共享的公开链接|分享公开链接|shared public links?|public links?/,
+      /查看我的.*历史记录|ai\s*模式历史记录|view my.*history|ai mode history/,
+      /搜索消息串|search (?:chats?|threads?|conversations?)/,
+      /管理\s*ai\s*模式|manage\s*ai\s*mode/
+    ];
+    const chromeSignals = chromePatterns.filter((pattern) => pattern.test(text)).length;
+    return signedOut && chromeSignals >= 1 || chromeSignals >= 4;
+  }
+
   function shortAnswerAllowed(metrics) {
     const trustedAnswerContainer = metrics && metrics.trustedAnswerContainer === true;
     if (!metrics || (metrics.afterQuery !== true && !trustedAnswerContainer) ||
@@ -115,6 +135,7 @@
     if (transientStatusText(metrics && metrics.text)) return false;
     if (shareSurfaceText(metrics && metrics.text)) return false;
     if (disclosureOnlyText(metrics && metrics.text)) return false;
+    if (pageChromeText(metrics && metrics.text)) return false;
     if (textLength < 8) return shortAnswerAllowed(metrics);
     if (liveRegion && semanticBlocks === 0 && citations === 0) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
@@ -142,7 +163,7 @@
   }
 
   return Object.freeze({
-    version: 10,
+    version: 11,
     accepts,
     penalty,
     select,
@@ -150,6 +171,7 @@
     transientStatusText,
     shareSurfaceText,
     disclosureOnlyText,
+    pageChromeText,
     shortAnswerAllowed
   });
 });

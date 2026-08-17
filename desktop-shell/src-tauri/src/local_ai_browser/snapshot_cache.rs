@@ -8,6 +8,8 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::semantic_context;
+
 const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v2";
 const LEGACY_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v1";
 const DPAPI_ENTROPY: &[u8] = b"elon.local-ai-web-snapshot.v1";
@@ -66,13 +68,23 @@ pub(super) fn load(path: &Path, provider_id: &str) -> Result<Option<LoadedSnapsh
         clear(path);
         return Ok(None);
     }
+    let mut semantic_event = envelope.semantic_event;
+    let mut conversation_snapshots = sanitize_stored_conversations(
+        provider_id,
+        envelope.conversation_snapshots,
+    );
+    if provider_id == "google-ai-mode" {
+        if let Some(snapshot) = semantic_event.as_mut() {
+            semantic_context::sanitize_google_snapshot(snapshot);
+        }
+        for entry in &mut conversation_snapshots {
+            semantic_context::sanitize_google_snapshot(&mut entry.semantic_event);
+        }
+    }
     Ok(Some(LoadedSnapshot {
-        semantic_event: envelope.semantic_event,
+        semantic_event,
         navigation_event: envelope.navigation_event,
-        conversation_snapshots: sanitize_stored_conversations(
-            provider_id,
-            envelope.conversation_snapshots,
-        ),
+        conversation_snapshots,
         updated_at_ms: envelope.updated_at_ms,
     }))
 }

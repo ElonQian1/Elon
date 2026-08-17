@@ -8,7 +8,7 @@ use std::{
 };
 use tauri::Url;
 
-const GOOGLE_HISTORY_LIMIT: usize = 32;
+const GOOGLE_HISTORY_LIMIT: usize = 80;
 static NEXT_CONVERSATION_NONCE: AtomicU64 = AtomicU64::new(1);
 
 pub(super) fn page_context_key(provider_id: &str, raw_url: &str) -> Option<String> {
@@ -98,6 +98,7 @@ pub(super) fn merge_message_snapshot(
     if provider_id != "google-ai-mode" {
         return incoming;
     }
+    sanitize_google_snapshot(&mut incoming);
     let base_window_start = previous
         .and_then(|snapshot| snapshot.get("messageWindowStart"))
         .and_then(Value::as_u64)
@@ -111,45 +112,106 @@ pub(super) fn merge_message_snapshot(
         replace_messages(&mut incoming, incoming_messages, base_window_start);
         return incoming;
     };
-    let previous_messages = messages(previous);
-    let Some(current_user) = incoming_messages
-        .iter()
-        .rev()
-        .find(|message| role(message) == Some("user"))
-        .cloned()
-    else {
+    let previous_messages = messages(previous)
+        .into_iter()
+        .filter(|message| !google_page_chrome_message(message))
+        .collect::<Vec<_>>();
+    if incoming_messages.is_empty() {
         replace_messages(&mut incoming, previous_messages, base_window_start);
         return incoming;
-    };
-    let previous_user_index = previous_messages
-        .iter()
-        .rposition(|message| role(message) == Some("user"));
-    let same_turn = previous_user_index.is_some_and(|index| {
-        normalized_text(&previous_messages[index]) == normalized_text(&current_user)
-    });
-    let mut merged = if same_turn {
-        previous_messages[..previous_user_index.unwrap_or_default()].to_vec()
-    } else {
-        previous_messages.clone()
-    };
-    let current_assistant = incoming_messages
-        .iter()
-        .rev()
-        .find(|message| role(message) == Some("assistant"))
-        .cloned();
-    let previous_assistant = same_turn.then(|| {
-        previous_messages[previous_user_index.unwrap_or_default() + 1..]
-            .iter()
-            .rev()
-            .find(|message| role(message) == Some("assistant"))
-            .cloned()
-    });
-    merged.push(current_user);
-    if let Some(assistant) = current_assistant.or_else(|| previous_assistant.flatten()) {
-        merged.push(assistant);
     }
+    let merged = merge_google_turns(previous_messages, incoming_messages);
     replace_messages(&mut incoming, merged, base_window_start);
     incoming
+}
+
+pub(super) fn sanitize_google_snapshot(snapshot: &mut Value) {
+    let window_start = snapshot
+        .get("messageWindowStart")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let Some(messages) = snapshot.get_mut("messages").and_then(Value::as_array_mut) else {
+        return;
+    };
+    messages.retain(|message| !google_page_chrome_message(message));
+    let observed = window_start.saturating_add(messages.len() as u64);
+    if let Some(snapshot) = snapshot.as_object_mut() {
+        snapshot.insert("observedMessageCount".to_string(), Value::from(observed));
+    }
+}
+
+fn google_page_chrome_message(message: &Value) -> bool {
+    if role(message) != Some("assistant") {
+        return false;
+    }
+    let text = normalized_text(message).to_lowercase();
+    if text.is_empty() || text.chars().count() > 1_600 {
+        return false;
+    }
+    let signed_out = [
+        "您已退出账号",
+        "您已退出帐号",
+        "若要访问历史记录",
+        "you are signed out",
+        "you're signed out",
+        "sign in to access",
+        "sign in to view",
+    ]
+    .iter()
+    .any(|needle| text.contains(needle));
+    let chrome_signals = [
+        "打开边栏",
+        "关闭边栏",
+        "open sidebar",
+        "close sidebar",
+        "新话题",
+        "新对话",
+        "new chat",
+        "new conversation",
+        "共享的公开链接",
+        "分享公开链接",
+        "public link",
+        "ai 模式历史记录",
+        "ai mode history",
+        "搜索消息串",
+        "search chats",
+    ]
+    .iter()
+    .filter(|needle| text.contains(**needle))
+    .count();
+    (signed_out && chrome_signals >= 1) || chrome_signals >= 4
+}
+
+fn merge_google_turns(previous: Vec<Value>, incoming: Vec<Value>) -> Vec<Value> {
+    let mut merged = message_turns(previous);
+    for incoming_turn in message_turns(incoming) {
+        let user_text = incoming_turn.first().map(normalized_text).unwrap_or_default();
+        if user_text.is_empty() {
+            continue;
+        }
+        if let Some(index) = merged.iter().position(|turn| {
+            turn.first().map(normalized_text).as_deref() == Some(user_text.as_str())
+        }) {
+            if incoming_turn.iter().any(|message| role(message) == Some("assistant")) {
+                merged[index] = incoming_turn;
+            }
+        } else {
+            merged.push(incoming_turn);
+        }
+    }
+    merged.into_iter().flatten().collect()
+}
+
+fn message_turns(source: Vec<Value>) -> Vec<Vec<Value>> {
+    let mut turns = Vec::<Vec<Value>>::new();
+    for message in source {
+        if role(&message) == Some("user") {
+            turns.push(vec![message]);
+        } else if let Some(turn) = turns.last_mut() {
+            turn.push(message);
+        }
+    }
+    turns
 }
 
 pub(super) fn has_visible_messages(snapshot: &Value) -> bool {
@@ -285,6 +347,62 @@ mod tests {
         let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
         assert_eq!(merged["messages"].as_array().unwrap().len(), 2);
         assert_eq!(merged["messages"][1]["content"][0]["text"], "complete");
+    }
+
+    #[test]
+    fn google_partial_prefix_refresh_keeps_cached_followups() {
+        let previous = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]},
+            {"role":"user","content":[{"type":"text","text":"second"}]},
+            {"role":"assistant","content":[{"type":"text","text":"second answer"}]}
+        ]});
+        let incoming = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]}
+        ]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
+
+        assert_eq!(merged["messages"].as_array().unwrap().len(), 4);
+        assert_eq!(merged["messages"][2]["content"][0]["text"], "second");
+    }
+
+    #[test]
+    fn google_full_dom_refresh_replaces_matching_cached_window_without_duplicates() {
+        let previous = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","content":[{"type":"text","text":"old first answer"}]},
+            {"role":"user","content":[{"type":"text","text":"second"}]},
+            {"role":"assistant","content":[{"type":"text","text":"old second answer"}]}
+        ]});
+        let incoming = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","content":[{"type":"text","text":"fresh first answer"}]},
+            {"role":"user","content":[{"type":"text","text":"second"}]},
+            {"role":"assistant","content":[{"type":"text","text":"fresh second answer"}]}
+        ]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
+
+        assert_eq!(merged["messages"].as_array().unwrap().len(), 4);
+        assert_eq!(
+            merged["messages"][3]["content"][0]["text"],
+            "fresh second answer"
+        );
+    }
+
+    #[test]
+    fn google_page_chrome_answer_is_removed_from_a_cached_snapshot() {
+        let mut snapshot = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"hello"}]},
+            {"role":"assistant","content":[{"type":"text","text":"打开边栏 新话题 共享的公开链接 AI 模式历史记录 您已退出账号 若要访问历史记录，请登录您的账号"}]}
+        ]});
+
+        sanitize_google_snapshot(&mut snapshot);
+
+        assert_eq!(snapshot["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(snapshot["messages"][0]["role"], "user");
     }
 
     #[test]

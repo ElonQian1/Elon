@@ -174,7 +174,10 @@ impl SessionRecord {
         {
             self.active_conversation_id = page_context_key.map(ToOwned::to_owned);
         }
-        let same_conversation = !boundary_pending
+        let cached_restore = boundary == "open_cached_conversation"
+            && self.active_conversation_id.is_some()
+            && self.active_conversation_id == self.semantic_conversation_id;
+        let same_conversation = (!boundary_pending || cached_restore)
             && self.active_conversation_id.is_some()
             && self.active_conversation_id == self.semantic_conversation_id;
         let merged = semantic_context::merge_message_snapshot(

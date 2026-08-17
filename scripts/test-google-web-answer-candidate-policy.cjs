@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 10)
+assert.equal(policy.version, 11)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -176,6 +176,26 @@ assert.equal(policy.disclosureOnlyText('收起全部显示'), true)
 assert.equal(policy.disclosureOnlyText('全部显示'), true)
 assert.equal(policy.disclosureOnlyText('Show all'), true)
 assert.equal(policy.disclosureOnlyText('下面给出完整回答，并说明如何展开全部内容。'), false)
+
+const signedOutHistoryChrome =
+  '打开边栏 新话题 管理 AI 模式 共享的公开链接 查看我的 AI 模式历史记录 ' +
+  '设置 新对话 搜索消息串 关闭边栏 AI 模式历史记录 您已退出账号 ' +
+  '若要访问历史记录和共享其他好处，请登录您的账号'
+assert.equal(policy.pageChromeText(signedOutHistoryChrome), true)
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: signedOutHistoryChrome,
+  textLength: signedOutHistoryChrome.length,
+  citations: 0,
+  semanticBlocks: 1,
+  controls: 3,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
+  explicit: true,
+}), false)
 
 assert.equal(policy.accepts({
   hasQuery: true,

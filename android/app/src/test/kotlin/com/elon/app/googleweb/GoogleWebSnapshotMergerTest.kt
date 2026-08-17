@@ -45,6 +45,32 @@ class GoogleWebSnapshotMergerTest {
     }
 
     @Test
+    fun partialFirstTurnRefreshDoesNotEraseCachedFollowUps() {
+        val cached = snapshot("first", "first answer", "second", "second answer")
+        val partial = snapshot("first", "first answer")
+
+        val merged = GoogleWebSnapshotMerger.merge(cached, partial, sameConversation = true)
+
+        assertEquals(
+            listOf("first", "first answer", "second", "second answer"),
+            merged.messages.map { it.content },
+        )
+    }
+
+    @Test
+    fun fullDomRefreshUpdatesAllTurnsWithoutDuplicatingHistory() {
+        val cached = snapshot("first", "old first", "second", "old second")
+        val refreshed = snapshot("first", "fresh first", "second", "fresh second")
+
+        val merged = GoogleWebSnapshotMerger.merge(cached, refreshed, sameConversation = true)
+
+        assertEquals(
+            listOf("first", "fresh first", "second", "fresh second"),
+            merged.messages.map { it.content },
+        )
+    }
+
+    @Test
     fun switchingConversationDoesNotLeakPreviousMessages() {
         val merged = GoogleWebSnapshotMerger.merge(
             snapshot("private old", "old answer"),
@@ -66,14 +92,14 @@ class GoogleWebSnapshotMergerTest {
 
     @Test
     fun boundedHistoryKeepsGlobalMessageIdsAndOffsets() {
-        val values = (0 until 34).map { "message-$it" }.toTypedArray()
+        val values = (0 until 82).map { "message-$it" }.toTypedArray()
 
         val bounded = GoogleWebSnapshotMerger.merge(null, snapshot(*values), false)
 
         assertEquals(2, bounded.messageWindowStart)
-        assertEquals(34, bounded.observedMessageCount)
+        assertEquals(82, bounded.observedMessageCount)
         assertEquals("google-message-2-user", bounded.messages.first().id)
-        assertEquals("google-message-33-assistant", bounded.messages.last().id)
+        assertEquals("google-message-81-assistant", bounded.messages.last().id)
     }
 
     private fun snapshot(vararg values: String) = ChatGptWebSnapshot(

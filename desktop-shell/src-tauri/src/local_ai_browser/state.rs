@@ -128,6 +128,9 @@ impl LocalAiBrowserRuntime {
             .cloned()?;
         record.semantic_event = Some(cached.semantic_event);
         record.active_restorable_url = Some(cached.restorable_url.clone());
+        record.semantic_conversation_id = Some(cached.id.clone());
+        record.semantic_page_context_key =
+            semantic_context::page_context_key(&record.provider_id, &cached.restorable_url);
         record.begin_cached_conversation(cached.id, &cached.restorable_url);
         record.semantic_live = false;
         record.streaming = false;

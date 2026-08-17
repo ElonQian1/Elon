@@ -3,9 +3,9 @@ use serde_json::{json, Map, Value};
 use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, snapshot_cache};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
-const MAX_MESSAGES: usize = 12;
+const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 7;
+const ADAPTER_VERSION: u32 = 8;
 
 pub fn initialization_script() -> String {
     let answer_candidate_policy = include_str!(
@@ -200,6 +200,8 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "url": sanitize_google_url(event.get("url")),
             "draft": clean_string(event.get("draft"), MAX_DRAFT_CHARS),
             "messages": sanitize_messages(event.get("messages")),
+            "observedMessageCount": bounded_u64(event.get("observedMessageCount"), 0, 1_000_000),
+            "messageWindowStart": bounded_u64(event.get("messageWindowStart"), 0, 1_000_000),
             "authenticated": event.get("authenticated").and_then(Value::as_bool).unwrap_or(false),
             "pageKind": sanitize_page_kind(event.get("pageKind")),
             "loginRequired": event.get("loginRequired").and_then(Value::as_bool).unwrap_or(false),
@@ -272,6 +274,13 @@ fn clean_identifiers(value: Option<&Value>, max: usize) -> Vec<String> {
         .map(|item| clean_identifier(Some(item), 48))
         .filter(|item| !item.is_empty())
         .collect()
+}
+
+fn bounded_u64(value: Option<&Value>, default: u64, max: u64) -> u64 {
+    value
+        .and_then(Value::as_u64)
+        .unwrap_or(default)
+        .min(max)
 }
 
 fn clean_identifier(value: Option<&Value>, max: usize) -> String {
@@ -398,7 +407,7 @@ mod tests {
     #[test]
     fn desktop_bootstrap_reuses_the_android_google_adapter() {
         let script = initialization_script();
-        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 7"));
+        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 8"));
         assert!(script.contains("window.__elonGoogleWebDocumentToken"));
         assert!(script.contains("window.__elonGoogleWebAnswerCandidatePolicy"));
         assert!(script.contains("window.__elonGoogleWebMessageExtractor"));

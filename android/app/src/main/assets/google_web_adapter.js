@@ -154,6 +154,8 @@
       url: location.href.slice(0, 8192),
       draft: composerValue(composer).slice(0, 20000),
       messages: extraction.messages,
+      observedMessageCount: extraction.observedMessageCount,
+      messageWindowStart: extraction.messageWindowStart,
       authenticated: isAuthenticated(),
       pageKind: isAiModePage() ? 'conversation' : 'unknown',
       loginRequired: false,

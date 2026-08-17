@@ -307,6 +307,48 @@ fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages(
 }
 
 #[test]
+fn google_cached_conversation_rejects_a_partial_live_history_overwrite() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "google-ai-mode", "active");
+    let url = Url::parse("https://www.google.com/search?q=first&udm=50").unwrap();
+    runtime.mark_navigation("session", &url, true, None);
+    let context_key = semantic_context::page_context_key("google-ai-mode", url.as_str());
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","url":url.as_str(),"messages":[
+            {"role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]},
+            {"role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+        ]}),
+        context_key.as_deref(),
+    );
+    let id = runtime.snapshot("session").unwrap().local_conversations[0]
+        .id
+        .clone();
+
+    assert!(runtime.activate_cached_conversation("session", &id).is_some());
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","url":url.as_str(),"messages":[
+            {"role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
+        ]}),
+        context_key.as_deref(),
+    );
+
+    let restored = runtime.snapshot("session").unwrap();
+    let messages = restored.semantic_event.unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(messages.len(), 4);
+    assert_eq!(messages[2]["content"][0]["text"], "second");
+}
+
+#[test]
 fn google_followups_merge_into_one_stable_native_conversation() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "google-ai-mode", "active");

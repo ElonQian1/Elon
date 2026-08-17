@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 16;
+  const extractorVersion = 17;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -18,6 +18,12 @@
     '[role="article"]'
   ];
   const TRUSTED_ANSWER_SELECTOR = TRUSTED_ANSWER_SELECTORS.join(',');
+  const QUERY_SELECTORS = [
+    'main [data-user-query]',
+    'main [data-query]',
+    'main [aria-label*="your question" i]',
+    'main [aria-label*="您的问题" i]'
+  ];
   let rememberedQueryValue = '';
   let rememberedQueryOwned = false;
 
@@ -65,13 +71,7 @@
 
   function currentQuery() {
     const urlQuery = cleanText(new URLSearchParams(location.search).get('q')).slice(0, 40000);
-    const selectors = [
-      'main [data-user-query]',
-      'main [data-query]',
-      'main [aria-label*="your question" i]',
-      'main [aria-label*="您的问题" i]'
-    ];
-    const headings = Array.from(document.querySelectorAll(selectors.join(',')))
+    const headings = Array.from(document.querySelectorAll(QUERY_SELECTORS.join(',')))
       .filter(isVisible)
       .map((node) => cleanText(node.innerText || node.textContent))
       .filter((text) => text.length > 1 && text.length <= 40000);
@@ -147,10 +147,7 @@
   function findQueryAnchor(query) {
     if (!query) return null;
     const nodes = uniqueNodes([
-      'main [data-user-query]',
-      'main [data-query]',
-      'main [aria-label*="your question" i]',
-      'main [aria-label*="您的问题" i]',
+      ...QUERY_SELECTORS,
       'body div',
       'body span',
       'body p'
@@ -160,8 +157,16 @@
     return nodes[nodes.length - 1] || null;
   }
 
-  function candidateFrom(node, composer, query, queryAnchor, explicit) {
+  function precedesBoundary(node, boundary) {
+    if (!boundary || node === boundary || node.contains(boundary) || typeof Node === 'undefined') {
+      return !boundary;
+    }
+    return !!(node.compareDocumentPosition(boundary) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  function candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, explicit) {
     if (excludedContainer(node, composer)) return null;
+    if (nextQueryAnchor && !precedesBoundary(node, nextQueryAnchor)) return null;
     let text = cleanText(node.innerText || node.textContent).slice(0, 40000);
     if (query && text.startsWith(query)) text = cleanText(text.slice(query.length));
     if (!text || text === query) return null;
@@ -219,8 +224,8 @@
     return nodes;
   }
 
-  function answerCandidate(composer, query) {
-    const queryAnchor = findQueryAnchor(query);
+  function answerCandidate(composer, query, queryAnchor, nextQueryAnchor) {
+    queryAnchor = queryAnchor || findQueryAnchor(query);
     const explicitSelectors = TRUSTED_ANSWER_SELECTORS.concat('[role="region"]');
     const semanticSelectors = [
       'body section',
@@ -229,18 +234,18 @@
     ];
     const genericSelectors = ['body div'];
     const explicit = uniqueNodes(explicitSelectors)
-      .map((node) => candidateFrom(node, composer, query, queryAnchor, true))
+      .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, true))
       .filter(Boolean);
     const semantic = uniqueNodes(semanticSelectors)
-      .map((node) => candidateFrom(node, composer, query, queryAnchor, true))
+      .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, true))
       .filter(Boolean);
     const generic = uniqueNodes(genericSelectors).slice(0, 1200)
-      .map((node) => candidateFrom(node, composer, query, queryAnchor, false))
+      .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, false))
       .filter(Boolean)
       .filter((candidate) => {
         if (candidate.text.length < 8) return true;
         const child = Array.from(candidate.node.children)
-          .map((node) => candidateFrom(node, composer, query, queryAnchor, false))
+          .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, false))
           .filter(Boolean)
           .sort((left, right) => right.text.length - left.text.length)[0];
         return !child || child.text.length < candidate.text.length * 0.92;
@@ -270,27 +275,59 @@
     )[0] || null;
   }
 
+  function explicitQueries() {
+    const entries = uniqueNodes(QUERY_SELECTORS)
+      .filter(isVisible)
+      .map((node) => ({ node, text: cleanText(node.innerText || node.textContent).slice(0, 40000) }))
+      .filter((entry) => entry.text.length > 1);
+    return entries.filter((entry, index) => !entries.some((other, otherIndex) =>
+      otherIndex !== index && entry.node.contains(other.node) && entry.text === other.text
+    )).filter((entry, index, values) =>
+      index === 0 || entry.text !== values[index - 1].text
+    );
+  }
+
+  function queryEntries() {
+    const entries = explicitQueries();
+    const current = currentQuery();
+    if (current && !entries.some((entry) => entry.text === current)) {
+      entries.push({ node: findQueryAnchor(current), text: current });
+    }
+    return entries.length ? entries : (current ? [{ node: findQueryAnchor(current), text: current }] : []);
+  }
+
   function extract(composer, streaming) {
-    const query = currentQuery();
-    const answer = query ? answerCandidate(composer, query) : null;
+    const queries = queryEntries();
     const messages = [];
-    if (query) messages.push({
-      id: 'google-query-current',
-      role: 'user',
-      state: 'completed',
-      content: [{ type: 'text', text: query }]
-    });
-    if (answer) {
+    let answerCount = 0;
+    queries.forEach((entry, index) => {
+      const next = queries[index + 1];
+      const answer = answerCandidate(composer, entry.text, entry.node, next && next.node);
+      messages.push({
+        id: 'google-query-' + index,
+        role: 'user',
+        state: 'completed',
+        content: [{ type: 'text', text: entry.text }]
+      });
+      if (!answer) return;
       const content = answer.text ? [{ type: 'text', text: answer.text }] : [];
       content.push(...answer.citations);
       if (content.length) messages.push({
-        id: 'google-answer-current',
+        id: 'google-answer-' + index,
         role: 'assistant',
-        state: streaming ? 'streaming' : 'completed',
+        state: streaming && index === queries.length - 1 ? 'streaming' : 'completed',
         content
       });
-    }
-    return { messages, queryFound: !!query, answerFound: !!answer };
+      answerCount += 1;
+    });
+    return {
+      messages,
+      queryFound: queries.length > 0,
+      answerFound: answerCount > 0,
+      observedMessageCount: messages.length,
+      messageWindowStart: 0,
+      turnCount: queries.length
+    };
   }
 
   function diagnostics(composer, extraction) {
@@ -317,7 +354,8 @@
       'composer=' + (composer ? 1 : 0),
       'query=' + (extraction.queryFound ? 1 : 0),
       'owned=' + (rememberedQueryOwned ? 1 : 0),
-      'answer=' + (extraction.answerFound ? 1 : 0)
+      'answer=' + (extraction.answerFound ? 1 : 0),
+      'turns=' + Math.min(99, extraction.turnCount || 0)
     ].join('|').slice(0, 160);
   }
 

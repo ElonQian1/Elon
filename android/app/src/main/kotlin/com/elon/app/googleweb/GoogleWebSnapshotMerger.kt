@@ -10,34 +10,40 @@ internal object GoogleWebSnapshotMerger {
         sameConversation: Boolean,
     ): ChatGptWebSnapshot {
         if (!sameConversation || previous == null) return stabilized(incoming)
-        val currentUser = incoming.messages.lastOrNull { it.role == "user" }
-            ?: return incoming.copy(
+        if (incoming.messages.isEmpty()) {
+            return incoming.copy(
                 messages = previous.messages,
                 messageWindowStart = previous.messageWindowStart,
                 observedMessageCount = previous.observedMessageCount,
             )
-        val previousUserIndex = previous.messages.indexOfLast { it.role == "user" }
-        val sameTurn = previousUserIndex >= 0 &&
-            normalized(previous.messages[previousUserIndex].content) == normalized(currentUser.content)
-        val prefix = if (sameTurn) {
-            previous.messages.take(previousUserIndex)
-        } else {
-            previous.messages
         }
-        val currentAssistant = incoming.messages.lastOrNull { it.role == "assistant" }
-        val previousAssistant = if (sameTurn) {
-            previous.messages
-                .drop(previousUserIndex + 1)
-                .lastOrNull { it.role == "assistant" }
-        } else {
-            null
+        val mergedTurns = messageTurns(previous.messages).toMutableList()
+        messageTurns(incoming.messages).forEach { incomingTurn ->
+            val userText = incomingTurn.firstOrNull()?.content?.let(::normalized).orEmpty()
+            if (userText.isEmpty()) return@forEach
+            val existingIndex = mergedTurns.indexOfFirst { turn ->
+                turn.firstOrNull()?.content?.let(::normalized) == userText
+            }
+            if (existingIndex < 0) {
+                mergedTurns += incomingTurn
+            } else if (incomingTurn.any { it.role == "assistant" }) {
+                mergedTurns[existingIndex] = incomingTurn
+            }
         }
-        val merged = buildList {
-            addAll(prefix)
-            add(currentUser)
-            (currentAssistant ?: previousAssistant)?.let(::add)
-        }
+        val merged = mergedTurns.flatten()
         return incoming.withBoundedMessages(merged, previous.messageWindowStart)
+    }
+
+    private fun messageTurns(messages: List<ChatGptWebMessage>): List<List<ChatGptWebMessage>> {
+        val turns = mutableListOf<MutableList<ChatGptWebMessage>>()
+        messages.forEach { message ->
+            if (message.role == "user") {
+                turns += mutableListOf(message)
+            } else {
+                turns.lastOrNull()?.add(message)
+            }
+        }
+        return turns
     }
 
     private fun stabilized(snapshot: ChatGptWebSnapshot): ChatGptWebSnapshot {
@@ -70,5 +76,5 @@ internal object GoogleWebSnapshotMerger {
     private fun normalized(value: String): String = value.trim().replace(WHITESPACE, " ")
 
     private val WHITESPACE = Regex("\\s+")
-    private const val MAX_MESSAGES = 32
+    private const val MAX_MESSAGES = 80
 }
