@@ -105,6 +105,11 @@ internal class ChatGptWebPageAdapter(
         }
     }
 
+    fun onHostPaused() {
+        handshake.cancel()
+        mainHandler.removeCallbacksAndMessages(null)
+    }
+
     fun sendPrompt(prompt: String, expectedDraft: String, requestId: String? = null) = runCommand(
         action = "send_prompt",
         value = prompt.take(MAX_PROMPT_LENGTH),
@@ -279,8 +284,7 @@ internal class ChatGptWebPageAdapter(
     fun markLoginRequired() = onStateChanged(State.WEB_ONLY)
 
     fun dispose() {
-        handshake.cancel()
-        mainHandler.removeCallbacksAndMessages(null)
+        onHostPaused()
         if (listenerInstalled && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.removeWebMessageListener(webView, BRIDGE_OBJECT)
         }

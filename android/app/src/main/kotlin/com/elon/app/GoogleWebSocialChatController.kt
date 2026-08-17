@@ -65,6 +65,7 @@ internal class GoogleWebSocialChatController(
 
     override fun deactivate() {
         active = false
+        cancelPendingSendWatchdog()
         session.deactivate()
     }
 

@@ -13,6 +13,7 @@ import android.webkit.WebView
 import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebProxyController
@@ -41,10 +42,19 @@ internal class GoogleWebBackgroundSession(
     private val snapshotStore = WebChatSnapshotStore(activity, "google")
     private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val handler = Handler(Looper.getMainLooper())
+    private val recoveryHandler = Handler(Looper.getMainLooper())
     private val responseRefresh = GoogleWebResponseRefreshCoordinator(
         requestSnapshot = { pageAdapter?.requestSnapshot() },
         schedule = { task, delayMs -> handler.postDelayed(task, delayMs) },
         cancel = handler::removeCallbacks,
+    )
+    private val recovery = WebChatSessionRecoveryCoordinator(
+        schedule = { task, delayMs -> recoveryHandler.postDelayed(task, delayMs) },
+        cancel = recoveryHandler::removeCallbacks,
+        retry = ::reloadRestorablePage,
+        onExhausted = {
+            updateState(State.ERROR, "Google 网页 AI 自动重连多次失败，请检查网络后重试")
+        },
     )
     private var webView: WebView? = null
     private var pageAdapter: GoogleWebPageAdapter? = null
@@ -53,34 +63,30 @@ internal class GoogleWebBackgroundSession(
     private var activePath: String? = null
     private var awaitingNewConversationBoundary = false
     private var state = State.IDLE
+    private var reloadAfterPause = false
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
         onConversationIndexChanged(conversationIndex())
+        recovery.activate()
         ensureInitialized()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
+        resumeRecovery()
     }
 
-    fun deactivate() = Unit
+    fun deactivate() = pauseSession()
 
     fun onHostResumed() {
+        recovery.activate()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
+        resumeRecovery()
     }
 
-    fun retryConnection(): Boolean {
-        val view = webView ?: return false
-        view.stopLoading()
-        updateState(State.LOADING)
-        view.reload()
-        return true
-    }
+    fun retryConnection(): Boolean = recovery.retryNow()
 
-    fun onHostPaused() {
-        cookieManager.flush()
-        webView?.onPause()
-    }
+    fun onHostPaused() = pauseSession()
 
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
 
@@ -161,6 +167,8 @@ internal class GoogleWebBackgroundSession(
     }
 
     fun destroy() {
+        recovery.dispose()
+        recoveryHandler.removeCallbacksAndMessages(null)
         responseRefresh.stop()
         conversationNavigation.cancel()
         handler.removeCallbacksAndMessages(null)
@@ -211,15 +219,42 @@ internal class GoogleWebBackgroundSession(
             onPageStarted = { url ->
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
+                if (!recovery.isActive()) {
+                    reloadAfterPause = true
+                    adapter.onHostPaused()
+                } else if (GoogleWebNavigationPolicy.supportsAiMode(url)) {
+                    recovery.onNavigationStarted()
+                } else {
+                    recovery.onTerminal()
+                }
             },
             onPageReady = { url ->
                 cookieManager.flush()
-                adapter.onPageReady(url)
+                if (!recovery.isActive()) {
+                    reloadAfterPause = false
+                    adapter.onHostPaused()
+                } else {
+                    adapter.onPageReady(url)
+                    if (GoogleWebNavigationPolicy.supportsAiMode(url)) {
+                        recovery.onPageFinished()
+                    } else {
+                        recovery.onTerminal()
+                        updateState(State.ERROR, "Google 官方页面未进入 AI 模式，请打开官方页确认")
+                    }
+                }
             },
             onBlockedNavigation = { hostName ->
+                recovery.onTerminal()
                 updateState(State.ERROR, "Google 官方导航被拦截：$hostName")
             },
-            onPageError = { detail -> updateState(State.ERROR, detail) },
+            onPageError = { detail ->
+                updateState(State.ERROR, detail)
+                if (GoogleWebNavigationPolicy.supportsAiMode(view.url)) {
+                    recovery.onFailure()
+                } else {
+                    recovery.onTerminal()
+                }
+            },
         )
         host.addView(view, 0, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -230,7 +265,15 @@ internal class GoogleWebBackgroundSession(
         adapter.install()
         proxyController.prepare { status ->
             if (activity.isFinishing || activity.isDestroyed || webView !== view) return@prepare
-            status.error?.let { updateState(State.ERROR, it); return@prepare }
+            if (!recovery.isActive()) {
+                reloadAfterPause = true
+                return@prepare
+            }
+            status.error?.let {
+                updateState(State.ERROR, it)
+                recovery.onFailure()
+                return@prepare
+            }
             val restored = GoogleWebNavigationPolicy.sanitizeRestorableUrl(
                 preferences.getString(KEY_LAST_URL, null),
             ) ?: GoogleWebNavigationPolicy.START_URL
@@ -291,7 +334,12 @@ internal class GoogleWebBackgroundSession(
                 GoogleWebNavigationPolicy.sanitizeRestorableUrl(rawSnapshot.url)?.let { url ->
                     preferences.edit().putString(KEY_LAST_URL, url).apply()
                 }
-                updateState(if (nextSnapshot.composerReady) State.READY else State.LOADING)
+                if (nextSnapshot.composerReady) {
+                    recovery.onReady()
+                    updateState(State.READY)
+                } else {
+                    updateState(State.LOADING)
+                }
                 val lastUserIndex = nextSnapshot.messages.indexOfLast { it.role == "user" }
                 responseRefresh.onSnapshot(
                     latestUserPrompt = nextSnapshot.messages.getOrNull(lastUserIndex)?.content,
@@ -324,10 +372,10 @@ internal class GoogleWebBackgroundSession(
     private fun handleAdapterState(next: GoogleWebPageAdapter.State) {
         when (next) {
             GoogleWebPageAdapter.State.READY -> Unit
-            GoogleWebPageAdapter.State.UNSUPPORTED -> updateState(
-                State.ERROR,
-                "当前 WebView 不支持 Google 网页 AI 语义桥接",
-            )
+            GoogleWebPageAdapter.State.UNSUPPORTED -> {
+                recovery.onTerminal()
+                updateState(State.ERROR, "当前 WebView 不支持 Google 网页 AI 语义桥接")
+            }
             GoogleWebPageAdapter.State.CONNECTING -> updateState(State.LOADING)
             GoogleWebPageAdapter.State.WEB_ONLY -> Unit
         }
@@ -337,6 +385,47 @@ internal class GoogleWebBackgroundSession(
         if (next == State.ERROR) responseRefresh.stop()
         state = next
         onStateChanged(next, detail)
+    }
+
+    private fun pauseSession() {
+        recovery.deactivate()
+        responseRefresh.stop()
+        handler.removeCallbacksAndMessages(null)
+        pageAdapter?.onHostPaused()
+        webView?.let { view ->
+            if (state == State.LOADING && GoogleWebNavigationPolicy.supportsAiMode(view.url)) {
+                view.stopLoading()
+                reloadAfterPause = true
+            }
+            cookieManager.flush()
+            view.onPause()
+        }
+    }
+
+    private fun resumeRecovery() {
+        when {
+            reloadAfterPause -> {
+                reloadAfterPause = false
+                recovery.retryNow()
+            }
+            state == State.ERROR && GoogleWebNavigationPolicy.supportsAiMode(webView?.url) ->
+                recovery.onFailure()
+            state == State.LOADING && GoogleWebNavigationPolicy.supportsAiMode(webView?.url) ->
+                recovery.onPageFinished()
+        }
+    }
+
+    private fun reloadRestorablePage(): Boolean {
+        val view = webView ?: return false
+        val restored = GoogleWebNavigationPolicy.sanitizeRestorableUrl(view.url)
+            ?: GoogleWebNavigationPolicy.sanitizeRestorableUrl(
+                preferences.getString(KEY_LAST_URL, null),
+            )
+            ?: GoogleWebNavigationPolicy.START_URL
+        view.stopLoading()
+        updateState(State.LOADING)
+        view.loadUrl(restored)
+        return true
     }
 
     private companion object {

@@ -90,6 +90,7 @@ internal class ChatGptSocialChatController(
     override fun deactivate() {
         active = false
         session.dismissComposerOptions()
+        session.deactivate()
     }
 
     override fun isActive(): Boolean = active

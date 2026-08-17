@@ -16,6 +16,7 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
 import com.elon.app.WebChatConsumerPort
+import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.WebChatSocialMcpPort
 import java.time.LocalDate
 
@@ -57,6 +58,7 @@ internal class ChatGptBackgroundSession(
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
     private val composerOptionHandler = Handler(Looper.getMainLooper())
     private val sessionContinuityHandler = Handler(Looper.getMainLooper())
+    private val recoveryHandler = Handler(Looper.getMainLooper())
     private val conversationRefresh = ChatGptConversationRefreshCoordinator(
         dispatch = ::dispatchConversationIndexRequest,
         schedule = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
@@ -79,6 +81,12 @@ internal class ChatGptBackgroundSession(
             observedMcpState.failCommand(requestId, composerListAction(section), "composer_request_superseded")
         },
     )
+    private val recovery = WebChatSessionRecoveryCoordinator(
+        schedule = { task, delayMs -> recoveryHandler.postDelayed(task, delayMs) },
+        cancel = recoveryHandler::removeCallbacks,
+        retry = ::reloadRestorablePage,
+        onExhausted = { updateState(State.ERROR, "网页 AI 自动重连多次失败，请检查网络后重试") },
+    )
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
@@ -94,21 +102,25 @@ internal class ChatGptBackgroundSession(
     private var conversationCollection = restoredConversationHistory?.let {
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
+    private var reloadAfterPause = false
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
         onConversationIndexChanged(conversationIndex())
+        recovery.activate()
         ensureInitialized()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
+        resumeRecovery()
     }
-
+    fun deactivate() = pauseSession()
     fun onHostResumed() {
         if (webView == null) return
+        recovery.activate()
         webView?.onResume()
         pageAdapter?.onHostResumed(webView?.url)
+        resumeRecovery()
     }
-
     fun retryGuestAccess(): Boolean {
         val view = webView ?: return false
         view.stopLoading()
@@ -116,21 +128,8 @@ internal class ChatGptBackgroundSession(
         view.loadUrl(ChatGptWebNavigationPolicy.START_URL)
         return true
     }
-
-    fun retryConnection(): Boolean {
-        val view = webView ?: return false
-        view.stopLoading()
-        updateState(State.LOADING)
-        view.reload()
-        return true
-    }
-
-    fun onHostPaused() {
-        if (webView == null) return
-        cookieManager.flush()
-        webView?.onPause()
-    }
-
+    fun retryConnection(): Boolean = recovery.retryNow()
+    fun onHostPaused() = pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
 
     fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
@@ -303,6 +302,8 @@ internal class ChatGptBackgroundSession(
         )
 
     fun destroy() {
+        recovery.dispose()
+        recoveryHandler.removeCallbacksAndMessages(null)
         conversationNavigation.clear()
         composerOptionRequests.reset()
         pageAdapter?.dispose()
@@ -388,16 +389,32 @@ internal class ChatGptBackgroundSession(
                 sessionContinuityHandler.removeCallbacksAndMessages(null)
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
+                if (!recovery.isActive()) {
+                    reloadAfterPause = true
+                    adapter.onHostPaused()
+                } else if (ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) recovery.onNavigationStarted()
+                else recovery.onTerminal()
             },
             onPageReady = { url ->
                 cookieManager.flush()
                 sessionRestorer.onPageReady(url)
-                adapter.onPageReady(url)
+                if (!recovery.isActive()) {
+                    reloadAfterPause = false
+                    adapter.onHostPaused()
+                } else {
+                    adapter.onPageReady(url)
+                    if (ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) recovery.onPageFinished()
+                    else recovery.onTerminal()
+                }
             },
             onBlockedNavigation = { hostName ->
+                recovery.onTerminal()
                 updateState(State.ERROR, "官网导航被拦截：$hostName")
             },
-            onPageError = { detail -> updateState(State.ERROR, detail) },
+            onPageError = { detail ->
+                updateState(State.ERROR, detail)
+                if (ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) recovery.onFailure() else recovery.onTerminal()
+            },
             rewriteAllowedMainFrameUrl = { null },
         )
         host.addView(
@@ -414,8 +431,10 @@ internal class ChatGptBackgroundSession(
         adapter.install()
         proxyController.prepare { status ->
             if (activity.isFinishing || activity.isDestroyed || webView !== view) return@prepare
+            if (!recovery.isActive()) { reloadAfterPause = true; return@prepare }
             status.error?.let {
                 updateState(State.ERROR, it)
+                recovery.onFailure()
                 return@prepare
             }
             updateState(State.LOADING)
@@ -451,6 +470,7 @@ internal class ChatGptBackgroundSession(
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
                         snapshotStore.clear()
                         pageAdapter?.markLoginRequired()
+                        recovery.onTerminal()
                         updateState(State.LOGIN_REQUIRED)
                     }
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
@@ -461,6 +481,7 @@ internal class ChatGptBackgroundSession(
                             }
                         }
                         pageAdapter?.markReady()
+                        recovery.onReady()
                         updateState(State.READY)
                         if (
                             snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
@@ -610,6 +631,7 @@ internal class ChatGptBackgroundSession(
             latestSnapshot = reconciliation.snapshot
             snapshotStore.clear()
             pageAdapter?.markLoginRequired()
+            recovery.onTerminal()
             updateState(State.LOGIN_REQUIRED)
             onSnapshot(reconciliation.snapshot)
         }, delayMs)
@@ -627,8 +649,49 @@ internal class ChatGptBackgroundSession(
     private fun handleAdapterState(adapterState: ChatGptWebPageAdapter.State) {
         latestBridgeState = adapterState
         if (adapterState == ChatGptWebPageAdapter.State.UNSUPPORTED) {
+            recovery.onTerminal()
             updateState(State.ERROR, "当前 WebView 不支持网页 AI 语义桥接")
         }
+    }
+
+    private fun pauseSession() {
+        recovery.deactivate()
+        conversationRefresh.reset()
+        composerOptionRequests.reset()
+        sessionContinuityHandler.removeCallbacksAndMessages(null)
+        pageAdapter?.onHostPaused()
+        webView?.let { view ->
+            if (state == State.LOADING && ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) {
+                view.stopLoading()
+                reloadAfterPause = true
+            }
+            cookieManager.flush()
+            view.onPause()
+        }
+    }
+
+    private fun resumeRecovery() {
+        when {
+            reloadAfterPause -> {
+                reloadAfterPause = false
+                recovery.retryNow()
+            }
+            state == State.ERROR && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView?.url) -> recovery.onFailure()
+            state == State.LOADING && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView?.url) ->
+                recovery.onPageFinished()
+        }
+    }
+
+    private fun reloadRestorablePage(): Boolean {
+        val view = webView ?: return false
+        val savedUrl = sequenceOf(latestSnapshot?.url, sessionRestorer.restoreUrl())
+            .filterNotNull()
+            .firstOrNull(ChatGptWebNavigationPolicy::supportsEnhancedMode)
+            ?: ChatGptWebNavigationPolicy.START_URL
+        view.stopLoading()
+        updateState(State.LOADING)
+        view.loadUrl(chatRestorableUrl(savedUrl))
+        return true
     }
 
     private fun updateState(next: State, detail: String? = null) {

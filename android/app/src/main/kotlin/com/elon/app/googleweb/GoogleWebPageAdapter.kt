@@ -92,6 +92,8 @@ internal class GoogleWebPageAdapter(
         }
     }
 
+    fun onHostPaused() = handler.removeCallbacksAndMessages(null)
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun sendPrompt(value: String, expectedDraft: String) = runCommand(
@@ -105,7 +107,7 @@ internal class GoogleWebPageAdapter(
 
     fun startNewConversation() = runCommand("new_conversation")
 
-    fun dispose() = handler.removeCallbacksAndMessages(null)
+    fun dispose() = onHostPaused()
 
     private fun injectAndSnapshot() {
         if (!supports(webView.url)) return

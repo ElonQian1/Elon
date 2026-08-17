@@ -91,8 +91,19 @@ class ChatGptWebProductIntegrationContractTest {
         assertFalse(official.contains("ChatGptWebPageAdapter"))
         assertTrue(chatController.contains("WebChatSendFallbackPolicy.decide"))
         assertTrue(chatController.contains("session.onHostResumed()"))
+        assertTrue(chatController.contains("session.deactivate()"))
         assertTrue(googleController.contains("WebChatSendFallbackPolicy.decide(loginRequired = false)"))
         assertTrue(googleController.contains("session.onHostResumed()"))
+        assertTrue(googleController.contains("cancelPendingSendWatchdog()"))
+        assertTrue(googleController.contains("session.deactivate()"))
+        val chatPageAdapter = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        )
+        val googlePageAdapter = read(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPageAdapter.kt",
+        )
+        assertTrue(chatPageAdapter.contains("fun onHostPaused()"))
+        assertTrue(googlePageAdapter.contains("fun onHostPaused()"))
     }
 
     @Test

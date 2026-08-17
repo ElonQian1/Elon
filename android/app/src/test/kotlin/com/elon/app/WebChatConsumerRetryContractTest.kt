@@ -9,7 +9,7 @@ import org.junit.Test
 
 class WebChatConsumerRetryContractTest {
     @Test
-    fun retryReloadsBothProviderSessionsWithoutClearingCookiesOrData() {
+    fun retryUsesBoundedRecoveryForBothProvidersWithoutClearingCookiesOrData() {
         val chatGpt = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
@@ -20,8 +20,14 @@ class WebChatConsumerRetryContractTest {
 
         listOf(chatGpt, google).forEach { source ->
             assertTrue(source.contains("fun retryConnection(): Boolean"))
-            assertTrue(source.contains("view.reload()"))
-            assertTrue(source.contains("updateState(State.LOADING)"))
+            assertTrue(source.contains("WebChatSessionRecoveryCoordinator"))
+            assertTrue(source.contains("recovery.retryNow()"))
+            assertTrue(source.contains("recovery.onFailure()"))
+            assertTrue(source.contains("recovery.onReady()"))
+            assertTrue(source.contains("view.onPause()"))
+            assertTrue(source.contains("webView?.onResume()"))
+            assertTrue(!source.contains("removeAllCookies"))
+            assertTrue(!source.contains("clearCache(true)"))
         }
         assertTrue(feature.contains("controller.retryGuestAccess()"))
         assertTrue(feature.contains("controller.retryConnection()"))
