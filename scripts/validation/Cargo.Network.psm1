@@ -96,12 +96,19 @@ function Write-CargoAttemptTestFailureContext {
     $testFailureSummary = $null
     $fallbackIndex = -1
     for ($index = 0; $index -lt $plainLines.Count; $index++) {
-        $end = [Math]::Min($plainLines.Count - 1, $index + 4)
-        $window = $plainLines[$index..$end] -join ' '
-        if ($window -match '\btest\s+.+?\s+\.\s*\.\s*\.\s+FAILED\b') {
-            $testFailureIndex = $index
-            $testFailureSummary = (($Matches[0] -replace '\s+', ' ') -replace '\.\s*\.\s*\.', '...').Trim()
-        } elseif ($plainLines[$index] -match '^\s*failures:\s*$|panicked at|assertion .* failed') {
+        $end = [Math]::Min($plainLines.Count - 1, $index + 8)
+        $windows = @(
+            ($plainLines[$index..$end] -join ''),
+            ($plainLines[$index..$end] -join ' ')
+        )
+        foreach ($window in $windows) {
+            if ($window -match '\btest\s+.+?\s+\.\s*\.\s*\.\s+FAILED\b') {
+                $testFailureIndex = $index
+                $testFailureSummary = (($Matches[0] -replace '\s+', ' ') -replace '\.\s*\.\s*\.', '...').Trim()
+                break
+            }
+        }
+        if ($testFailureIndex -lt 0 -and $plainLines[$index] -match '^\s*failures:\s*$|panicked at|assertion .* failed') {
             $fallbackIndex = $index
         }
     }

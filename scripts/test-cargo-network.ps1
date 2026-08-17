@@ -59,6 +59,7 @@ checksum = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         'crate'=@('failed to download crate serde','CARGO_CRATE_DOWNLOAD_FAILURE',$true)
         'index'=@('failed to query replaced source registry','CARGO_INDEX_FAILURE',$true)
         'offline'=@('attempting to make an HTTP request, but --offline was specified','CARGO_OFFLINE_MISSING',$true)
+        'offline-index-lag'=@("error: failed to select a version for the requirement hyper (locked to 1.11.0)`ncandidate versions found which didn't match: 1.10.1`nnote: offline mode (via '--offline') can sometimes cause surprising resolution failures",'CARGO_OFFLINE_MISSING',$true)
         'test'=@('proxy configuration was discovered`ntest result: FAILED. 1 passed; 1 failed','CARGO_TEST_FAILURE',$false)
         'compile'=@('error[E0308]: mismatched types','RUST_COMPILE_ERROR',$false)
         'lock'=@('Blocking waiting for file lock on package cache','CARGO_CACHE_LOCKED',$false)

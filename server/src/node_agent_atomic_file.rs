@@ -42,6 +42,10 @@ fn write_via_temporary(
             .with_context(|| format!("无法写入临时配置文件 {}", temporary.display()))?;
         file.sync_all()
             .with_context(|| format!("无法同步临时配置文件 {}", temporary.display()))?;
+        // Windows cannot reliably rename an open file. Close our temporary
+        // handle before MoveFileExW installs it, especially under parallel tests
+        // and antivirus/indexer activity.
+        drop(file);
         commit(&temporary, path)
     })();
     if result.is_err() {

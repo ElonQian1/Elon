@@ -203,10 +203,24 @@ where
                 .as_mut()
                 .expect("live pinned file operation must retain exact custody");
             let ManagedSqliteRegistryPinnedFileCustody::WalMain { file, .. } = custody else {
-                return Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole);
+                return callback.complete().map_or_else(
+                    |rejection| {
+                        Err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry(
+                            rejection,
+                        ))
+                    },
+                    |_| Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole),
+                );
             };
             let Some(shm) = file.shm_mut() else {
-                return Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached);
+                return callback.complete().map_or_else(
+                    |rejection| {
+                        Err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry(
+                            rejection,
+                        ))
+                    },
+                    |_| Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached),
+                );
             };
             shm.barrier()
         };

@@ -13,6 +13,7 @@ use crate::node_agent_android_live::fit_run::workspace_fingerprint;
 
 const MAX_CHANGED_FILES: usize = 256;
 const SOURCE_HASH_DELETED: &str = "deleted";
+const RECEIPT_STATE_PREFIX: &str = ".elon/ui-tuner/writeback-receipts/";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub(super) struct WorkspaceSnapshot {
@@ -79,6 +80,7 @@ fn current_dirty_files(root: &Path) -> Result<BTreeSet<String>> {
         root,
         &["ls-files", "--others", "--exclude-standard", "-z"],
     )?);
+    paths.retain(|path| !path.starts_with(RECEIPT_STATE_PREFIX));
     Ok(paths)
 }
 

@@ -1,21 +1,13 @@
 {
   "version": 1,
-  "npm": [
-    {
-      "name": "react-router",
-      "packageVersion": "7.18.1",
-      "source": 1124282,
-      "expiresOn": "2026-08-09",
-      "reason": "npm advisory fix boundary is 8.3.0, which is not published. The PC frontend is BrowserRouter-only and does not enable React Server Components or server-side route actions."
-    }
-  ],
+  "npm": [],
   "rust": [
     {
       "id": "RUSTSEC-2023-0071",
       "name": "rsa",
       "packageVersion": "0.9.10",
-      "expiresOn": "2026-08-09",
-      "reason": "Desktop review RSA private keys are generated per Windows NodeAgent process, remain memory-only, and signing is reachable only through an attested same-SID Codex Desktop named pipe that rejects every Elon executor ancestry. Reassess when rsa publishes a patch or this protocol is migrated."
+      "expiresOn": "2026-09-17",
+      "reason": "Upstream still has no patched release as reviewed on 2026-08-17. Desktop review RSA keys are process-local, memory-only, and guarded by an attested same-SID Codex Desktop pipe; WeChat payment signing remains authenticated and is obscured by randomized nonces plus an outbound API round trip, but is not considered fixed. Migrate network-reachable signing or adopt an upstream constant-time release before this short exception expires."
     }
   ]
 }

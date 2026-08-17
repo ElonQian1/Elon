@@ -103,7 +103,12 @@ fn repository_self_project_is_scanned_with_zero_model_tokens() {
         true
     );
     let quality = &analysis["document_health"]["quality"];
-    assert_eq!(quality["summary"]["errors"], 0);
+    assert_eq!(
+        quality["summary"]["errors"],
+        0,
+        "{}",
+        serde_json::to_string_pretty(quality).unwrap()
+    );
     assert!(quality["summary"]["warnings"].as_u64().is_some());
     assert!(quality["summary"]["duplicate_titles"].as_u64().is_some());
     assert!(quality["summary"]["missing_implementation_declarations"]

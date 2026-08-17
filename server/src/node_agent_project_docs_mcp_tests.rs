@@ -174,9 +174,24 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_get_history",
             "project_docs_get_version_diff",
             "project_docs_restore_version",
+            "project_docs_record_native_context_candidate",
+            "project_docs_record_native_context_receipt",
+            "project_docs_list_native_context_candidates",
+            "project_docs_check_native_context_memory",
             "project_docs_read_sections",
             "project_docs_review_modularity",
-            "project_docs_test_retrieval"
+            "project_docs_test_retrieval",
+            "project_features_register",
+            "project_features_list",
+            "project_features_update",
+            "project_features_rebind_requirement",
+            "project_features_plan",
+            "project_features_claim",
+            "project_features_release_claim",
+            "project_features_transition",
+            "project_features_record_evidence",
+            "project_features_check_drift",
+            "project_features_history"
         ]
     );
     let save_schema = listed["result"]["tools"]

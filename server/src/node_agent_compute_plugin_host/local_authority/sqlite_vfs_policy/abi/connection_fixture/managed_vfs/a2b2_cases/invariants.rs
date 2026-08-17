@@ -110,9 +110,10 @@ fn validate_case(case: &Case) -> Result<(), &'static str> {
         return Err("only the void barrier failure path abandons installed raw state");
     }
     if case.counts.raw_state_take_success != 0
-        && (case.path != Path::JointClose || case.counts.methods_clear != 1)
+        && (!matches!(case.path, Path::JointClose | Path::RegistryLifecycle)
+            || case.counts.methods_clear != 1)
     {
-        return Err("only xClose linearly takes and clears raw state");
+        return Err("only the xClose physical or registry lifecycle takes and clears raw state");
     }
     if case.counts.logical_names_remove != 0 && case.counts.logical_names_remove != 3 {
         return Err("one exact route owns exactly three logical names");

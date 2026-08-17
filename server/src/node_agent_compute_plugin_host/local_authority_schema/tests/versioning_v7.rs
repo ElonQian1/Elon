@@ -3,6 +3,7 @@ use rusqlite::Connection;
 use super::super::{
     create_schema_objects_v3, create_schema_objects_v4, create_schema_objects_v5,
     create_schema_objects_v6, ensure_schema,
+    versioning::COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION_V8,
 };
 
 const APPLICATION_ID: i64 = 0x454c_4350;
@@ -10,7 +11,6 @@ const VERSION_V3: i64 = 3;
 const VERSION_V4: i64 = 4;
 const VERSION_V5: i64 = 5;
 const VERSION_V6: i64 = 6;
-const VERSION_V7: i64 = 7;
 const PLAN_APPLICATION_TRIGGER: &str = "plan_application_matches_authority";
 const POLICY_BINDING_TABLE: &str = "sharing_policy_binding_receipts";
 const POLICY_REVOCATION_TABLE: &str = "sharing_policy_binding_revocation_receipts";
@@ -71,8 +71,11 @@ fn trigger_sql(connection: &Connection, name: &str) -> String {
         .unwrap()
 }
 
-fn assert_v7_shape(connection: &Connection) {
-    assert_eq!(pragma(connection, "user_version"), VERSION_V7);
+fn assert_v8_shape(connection: &Connection) {
+    assert_eq!(
+        pragma(connection, "user_version"),
+        COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION_V8
+    );
     assert_eq!(pragma(connection, "application_id"), APPLICATION_ID);
     assert_eq!(object_count(connection, "table", POLICY_BINDING_TABLE), 1);
     assert_eq!(
@@ -121,7 +124,7 @@ fn assert_v7_shape(connection: &Connection) {
     assert!(!plan_gate.contains("NEW.applied_at_ms >= meta.trusted_time_high_water_ms"));
 }
 
-fn assert_migrates_to_v7(version: i64) {
+fn assert_migrates_to_v8(version: i64) {
     let mut connection = connection();
     install_legacy(&connection, version);
     if version == VERSION_V3 {
@@ -130,7 +133,7 @@ fn assert_migrates_to_v7(version: i64) {
     }
 
     ensure_schema(&mut connection).unwrap();
-    assert_v7_shape(&connection);
+    assert_v8_shape(&connection);
     ensure_schema(&mut connection).unwrap();
 }
 
@@ -170,33 +173,33 @@ fn assert_drift_rejected_without_later_schema(
 }
 
 #[test]
-fn fresh_v7_installs_exact_version_chain_and_reopens() {
+fn fresh_v8_installs_exact_version_chain_and_reopens() {
     let mut connection = connection();
 
     ensure_schema(&mut connection).unwrap();
-    assert_v7_shape(&connection);
+    assert_v8_shape(&connection);
     ensure_schema(&mut connection).unwrap();
-    assert_v7_shape(&connection);
+    assert_v8_shape(&connection);
 }
 
 #[test]
-fn exact_v3_migrates_atomically_to_v7() {
-    assert_migrates_to_v7(VERSION_V3);
+fn exact_v3_migrates_atomically_to_v8() {
+    assert_migrates_to_v8(VERSION_V3);
 }
 
 #[test]
-fn exact_v4_migrates_atomically_to_v7() {
-    assert_migrates_to_v7(VERSION_V4);
+fn exact_v4_migrates_atomically_to_v8() {
+    assert_migrates_to_v8(VERSION_V4);
 }
 
 #[test]
-fn exact_v5_migrates_atomically_to_v7() {
-    assert_migrates_to_v7(VERSION_V5);
+fn exact_v5_migrates_atomically_to_v8() {
+    assert_migrates_to_v8(VERSION_V5);
 }
 
 #[test]
-fn exact_v6_migrates_atomically_to_v7() {
-    assert_migrates_to_v7(VERSION_V6);
+fn exact_v6_migrates_atomically_to_v8() {
+    assert_migrates_to_v8(VERSION_V6);
 }
 
 #[test]
@@ -215,12 +218,12 @@ fn drifted_v5_is_rejected_without_later_ddl() {
 }
 
 #[test]
-fn drifted_v6_is_rejected_without_v7_ddl() {
+fn drifted_v6_is_rejected_without_v8_ddl() {
     assert_drift_rejected_without_later_schema(VERSION_V6, 1, 1, 1);
 }
 
 #[test]
-fn drifted_v7_is_rejected_on_reopen() {
+fn drifted_v8_is_rejected_on_reopen() {
     let mut connection = connection();
     ensure_schema(&mut connection).unwrap();
     connection
@@ -232,5 +235,8 @@ fn drifted_v7_is_rejected_on_reopen() {
     let message = format!("{error:#}");
     assert!(message.contains("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INCOMPLETE"));
     assert!(message.contains("sharing_policy_binding_receipt_delete_forbidden"));
-    assert_eq!(pragma(&connection, "user_version"), VERSION_V7);
+    assert_eq!(
+        pragma(&connection, "user_version"),
+        COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION_V8
+    );
 }

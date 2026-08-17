@@ -29,7 +29,11 @@ function Count-RustWarningLines {
 
     $count = 0
     foreach ($line in $Lines) {
-        if ((Remove-AnsiEscape $line) -match "^\s*warning:") {
+        $text = Remove-AnsiEscape $line
+        $isGitLineEndingNotice =
+            $text -match "^\s*warning: in the working copy of '.+', (?:LF|CRLF) will be replaced by (?:LF|CRLF) the next time Git touches it\s*$" -or
+            $text -match "^\s*warning: (?:LF|CRLF) will be replaced by (?:LF|CRLF) in .+\s*$"
+        if ($text -match "^\s*warning:" -and -not $isGitLineEndingNotice) {
             $count += 1
         }
     }
@@ -48,7 +52,9 @@ function Invoke-SelfTest {
         "  --> src\main.rs:1:5",
         "`e[33mwarning:`e[0m dead code",
         "error: not a warning",
-        "warning: ``elon-server`` generated 2 warnings"
+        "warning: ``elon-server`` generated 2 warnings",
+        "warning: in the working copy of 'server/Cargo.lock', LF will be replaced by CRLF the next time Git touches it",
+        "warning: CRLF will be replaced by LF in scripts/check.ps1"
     )
     $count = Count-RustWarningLines $sample
     if ($count -ne 3) {

@@ -7,6 +7,8 @@ use sha2::{Digest, Sha256};
 const MAX_DIFF_BYTES: usize = 64 * 1024 * 1024;
 const MAX_UNTRACKED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_TOTAL_UNTRACKED_BYTES: u64 = 128 * 1024 * 1024;
+const RECEIPT_STATE_PATHSPEC: &str = ":(exclude).elon/ui-tuner/writeback-receipts/**";
+const RECEIPT_STATE_PREFIX: &str = ".elon/ui-tuner/writeback-receipts/";
 
 /// Returns a content-sensitive workspace identity. Unlike `git rev-parse HEAD`,
 /// this changes for staged, unstaged and untracked files as well.
@@ -17,12 +19,33 @@ pub(crate) fn workspace_fingerprint(project_root: &str) -> Result<Option<String>
     let Some(head) = git_output(&root, &["rev-parse", "--verify", "HEAD"])? else {
         return Ok(None);
     };
-    let diff = git_output_required(&root, &["diff", "--binary", "--no-ext-diff", "HEAD", "--"])?;
+    let diff = git_output_required(
+        &root,
+        &[
+            "diff",
+            "--binary",
+            "--no-ext-diff",
+            "HEAD",
+            "--",
+            ".",
+            RECEIPT_STATE_PATHSPEC,
+        ],
+    )?;
     if diff.len() > MAX_DIFF_BYTES {
         bail!("工作区差异超过 64MiB，拒绝生成不完整 Source Revision");
     }
-    let untracked =
-        git_output_required(&root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+    let untracked = git_output_required(
+        &root,
+        &[
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            ".",
+            RECEIPT_STATE_PATHSPEC,
+        ],
+    )?;
 
     let mut hasher = Sha256::new();
     hasher.update(b"elon-workspace-v1\0");
@@ -44,6 +67,12 @@ fn hash_untracked_files(root: &Path, names: &[u8], hasher: &mut Sha256) -> Resul
         .filter(|value| !value.is_empty())
     {
         let relative = std::str::from_utf8(raw).context("Git 返回了非 UTF-8 的未跟踪文件名")?;
+        if relative
+            .replace('\\', "/")
+            .starts_with(RECEIPT_STATE_PREFIX)
+        {
+            continue;
+        }
         let path = root.join(relative);
         let canonical = path
             .canonicalize()
@@ -119,6 +148,13 @@ mod tests {
         fs::write(root.join("new.txt"), "new").unwrap();
         let untracked = workspace_fingerprint(root.to_str().unwrap()).unwrap();
         assert_ne!(dirty, untracked);
+        let receipt_dir = root.join(".elon/ui-tuner/writeback-receipts");
+        fs::create_dir_all(&receipt_dir).unwrap();
+        fs::write(receipt_dir.join("receipt.json"), "runtime state").unwrap();
+        assert_eq!(
+            workspace_fingerprint(root.to_str().unwrap()).unwrap(),
+            untracked
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

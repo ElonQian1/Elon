@@ -3975,7 +3975,7 @@
         "implementation_refs": [
           "file:server/src/ai_resource_control/model.rs",
           "file:server/src/ai_resource_control/service.rs",
-          "file:server/src/store/ai_resource_control.rs"
+          "file:server/src/ai_resource_control_migration.rs"
         ],
         "tags": [
           "policy",

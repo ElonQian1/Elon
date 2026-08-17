@@ -131,7 +131,7 @@ $requiredEntries = @(
     "java-version: '17'",
     "android-actions/setup-android@v3",
     "Android Build Prerequisites",
-    "..\scripts\check-build-prerequisites.ps1 -Scope Android",
+    "scripts\check-build-prerequisites.ps1 -Scope Android",
     ":app:testDebugUnitTest :app:assembleDebug"
 )
 

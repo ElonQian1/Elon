@@ -46,7 +46,8 @@ fn existing_marker_must_contain_nonempty_install_id() {
     let error = validate_and_prepare(root.to_string_lossy().as_ref(), "ins_current")
         .expect_err("marker without identity must block startup");
 
-    assert!(error.to_string().contains("缺少有效 install_id"));
+    let message = format!("{error:#}");
+    assert!(message.contains("install_id"));
     let _ = std::fs::remove_dir_all(root);
 }
 
@@ -63,7 +64,9 @@ fn existing_marker_must_use_supported_schema() {
     let error = validate_and_prepare(root.to_string_lossy().as_ref(), "ins_current")
         .expect_err("unknown marker schema must block root reuse");
 
-    assert!(error.to_string().contains("schema_version 不受支持"));
+    let message = format!("{error:#}");
+    assert!(message.contains("schema_version"));
+    assert!(message.contains("expected 1, actual 2"));
     let _ = std::fs::remove_dir_all(root);
 }
 

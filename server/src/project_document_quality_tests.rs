@@ -13,9 +13,10 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     fs::create_dir_all(root.join("docs")).unwrap();
     fs::write(
         root.join("README.md"),
-        "# Home\n\n[Guide](docs/guide.md#missing) [Gone](docs/gone.md)\n\n按需读取 `docs/routed.md`。\n",
+        "# Home\n\n[Guide](docs/guide.md#missing) [Gone](docs/gone.md) [Schema](docs/schema.json)\n\n按需读取 `docs/routed.md`。\n",
     )
     .unwrap();
+    fs::write(root.join("docs/schema.json"), "{}\n").unwrap();
     fs::write(root.join("docs/guide.md"), "# Guide\n\nUseful.\n").unwrap();
     fs::write(root.join("docs/orphan.md"), "# Orphan\n\nHidden.\n").unwrap();
     fs::write(root.join("docs/routed.md"), "# Routed\n\nRouted.\n").unwrap();
@@ -96,6 +97,10 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     assert!(kinds.contains(&"implementation_conflict"));
     assert!(kinds.contains(&"duplicate_title"));
     assert!(kinds.contains(&"implementation_reference_missing"));
+    assert!(!report
+        .issues
+        .iter()
+        .any(|issue| issue.message.contains("schema.json")));
     assert_eq!(report.summary.duplicate_titles, 1);
     assert!(!report.issues.iter().any(|issue| {
         issue.issue_type == "orphan_document"

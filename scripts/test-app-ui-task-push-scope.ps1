@@ -43,10 +43,12 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $fixtureRoot 'server\src\assets') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $fixtureRoot 'android\app') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $fixtureRoot 'docs') -Force | Out-Null
+    $unicodeDocName = '{0}{1}{2}{3}.md' -f [char]0x989C, [char]0x8272, [char]0x89C4, [char]0x8303
+    $unicodeDocPath = "docs/$unicodeDocName"
     Set-Content -LiteralPath (Join-Path $fixtureRoot 'server\src\assets\web_page.html') -Value '<main>glass</main>' -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $fixtureRoot 'server\src\assets\orbital_mobile_theme.css') -Value '.glass {}' -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $fixtureRoot 'android\app\glass.txt') -Value 'glass' -Encoding UTF8
-    Set-Content -LiteralPath (Join-Path $fixtureRoot 'docs\颜色规范.md') -Value '深色玻璃' -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $fixtureRoot $unicodeDocPath) -Value 'dark glass' -Encoding UTF8
     Remove-Item -LiteralPath (Join-Path $fixtureRoot 'android\app\obsolete.txt') -Force
     Invoke-TestGit -Root $fixtureRoot -Arguments @('add', '-A')
     Invoke-TestGit -Root $fixtureRoot -Arguments @('commit', '-q', '-m', 'task UI change after rebase')
@@ -60,7 +62,7 @@ try {
     $candidate = New-ElonAppUiPushScopeCandidate `
         -RepoRoot $fixtureRoot -GitArgs @('push', 'origin', 'HEAD:main') -RemoteName 'origin'
     Assert-Equal $candidate.ScopeBaseSha $upstreamSha 'Successful push candidate must start after unrelated upstream history'
-    Assert-Equal @($candidate.ChangedPaths | Where-Object { $_ -eq 'docs/颜色规范.md' }).Count 1 `
+    Assert-Equal @($candidate.ChangedPaths | Where-Object { $_ -eq $unicodeDocPath }).Count 1 `
         'Successful push paths must preserve Unicode names without Git quoting'
     Assert-Equal @($candidate.ChangedPaths | Where-Object { $_ -eq 'android/app/obsolete.txt' }).Count 1 `
         'Successful push paths must retain deleted files for scope classification'

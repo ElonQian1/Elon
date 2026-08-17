@@ -10,12 +10,12 @@
 ## 当前基线
 
 - PC frontend 已升级到 `vite@8.1.5`、`@vitejs/plugin-react@6.0.4`、`eslint@10.8.0` 与 flat config；`npm audit` 中除受控例外外不得有任何漏洞。
-- `react-router@7.18.1` 的 `GHSA-qwww-vcr4-c8h2` 修复边界被 advisory 标记为尚未发布的 `8.3.0`。`.github/dependency-audit-exceptions.json` 仅以精确版本和 source `1124282` 临时豁免该项至 `2026-08-09`；PC frontend 只使用 `BrowserRouter`，不启用 React Server Components、SSR 或服务端 route actions。
+- PC frontend 已升级到 `react-router@7.18.2`；当前 npm advisory 已将该版本识别为 `GHSA-qwww-vcr4-c8h2` 的修复版本，原临时例外已删除。
 - Vite 8 要求 Node `^20.19.0 || >=22.12.0`，`pc-frontend/package.json` 与 CI 均显式固定该运行要求。
 - PC frontend lint 基线已升级到 `eslint@10.8.0` flat config，直接声明 `@typescript-eslint/*`、`eslint-plugin-react-hooks`、`eslint-plugin-react-refresh` 和 `globals`，不再依赖旧 `.eslintrc.cjs`。
 - Rust 侧 CI 已固定安装 `cargo-audit@0.22.2`，并通过 `-RequireRustAudit` 防止 CI 静默 skipped；漏洞数量已进入 `Strict` 阻断模式。
 - `quick-xml` 已升级至 `0.41.0`，修复 `RUSTSEC-2026-0194` 与 `RUSTSEC-2026-0195`。Android XML 资源文本和 launcher 属性解析都已适配新版解码 API，并有资源文本实体回归测试。
-- `rsa@0.9.10` 仍受 `RUSTSEC-2023-0071` 影响，且上游尚无可用修复版本。它用于微信支付签名，以及 Windows Desktop review broker 的进程内 RSA-3072 临时密钥。后者只能经受保护 Codex Desktop 祖先进程的本机命名管道调用，Elon executor 祖先进程会被拒绝；密钥不落盘、重启轮换。该例外以编号、包名、精确版本和到期日绑定，必须在 `2026-08-09` 前复查上游补丁或迁移方案。
+- `rsa@0.9.10` 仍受 `RUSTSEC-2023-0071` 影响；2026-08-17 复查时，上游仍无可用修复版本。它用于微信支付签名，以及 Windows Desktop review broker 的进程内 RSA-3072 临时密钥。Desktop broker 只能经受保护 Codex Desktop 祖先进程的本机命名管道调用，Elon executor 祖先进程会被拒绝；密钥不落盘、重启轮换。微信支付创建订单需要已登录用户，签名消息包含随机 nonce，且响应还包含一次微信 API 往返，但这些只增加远程时序攻击难度，不等于修复。该例外以编号、包名、精确版本绑定，仅续期至 `2026-09-17`；到期前必须迁移网络可观测的私钥操作，或采用上游恒定时间修复版本。
 - RustSec 当前 warning 基线为 0 warnings；原 `spin v0.9.8` yanked warning 已通过升级 `axum@0.8` / `tower@0.5` / `tower-http@0.6` 并刷新 `server/Cargo.lock` 到 `spin v0.9.9` 清理。
 - `server/Cargo.lock` 已纳入版本控制，用于保证 RustSec 审计和 CI 构建解析同一套服务端依赖图。
 

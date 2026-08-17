@@ -24,6 +24,7 @@ function Get-CargoFailureDiagnostic {
         [switch]$TimedOut
     )
     $text = (@($Lines) -join "`n")
+    $compactText = (@($Lines) -join '')
     $evidence = @($Lines | Where-Object { $_ -and $_.Trim() } | Select-Object -Last 12)
     if ($TimedOut) {
         return New-CargoDiagnostic 'CARGO_NETWORK_TIMEOUT' $Stage $true 'Cargo network stage exceeded its bounded timeout.' $evidence
@@ -35,7 +36,7 @@ function Get-CargoFailureDiagnostic {
     $rules = @(
         @{ code='CARGO_DISK_CRITICAL'; retry=$false; pattern='No space left on device|not enough space|os error 112|disk full|insufficient disk' },
         @{ code='CARGO_CACHE_LOCKED'; retry=$false; pattern='Blocking waiting for file lock|failed to acquire package cache lock|cache lock|lock file.*busy|Timed out waiting for Rust cache lock' },
-        @{ code='CARGO_OFFLINE_MISSING'; retry=$true; pattern='--offline was specified|no matching package named .+ found|failed to download .+offline|attempting to make an HTTP request, but --offline' },
+        @{ code='CARGO_OFFLINE_MISSING'; retry=$true; pattern='--offline was specified|no matching package named .+ found|failed to download .+offline|attempting to make an HTTP request, but --offline|(?s)failed to select a version for the requirement.+locked to .+candidate versions found which didn.t match.+offline mode \(via .--offline.\)' },
         @{ code='CARGO_TEST_FAILURE'; retry=$false; pattern='test failed, to rerun pass|test result: FAILED|(?m)^\s*failures:\s*$' },
         @{ code='CARGO_DNS_FAILURE'; retry=$true; pattern='Could not resolve host|failed to lookup address|Name or service not known|Temporary failure in name resolution|dns error' },
         @{ code='CARGO_TLS_FAILURE'; retry=$true; pattern='certificate|\bSSL\b|\bTLS\b|schannel|peer certificate|UnknownIssuer|InitializeSecurityContext' },
@@ -43,10 +44,10 @@ function Get-CargoFailureDiagnostic {
         @{ code='CARGO_GIT_DEPENDENCY_FAILURE'; retry=$false; pattern='Unable to update git\+|failed to clone into|git fetch|revision [0-9a-f]+ not found.*git|network failure seems to have happened.*git' },
         @{ code='CARGO_CRATE_DOWNLOAD_FAILURE'; retry=$true; pattern='failed to download|download of .+ failed|failed to get successful HTTP response.*\.crate|failed to unpack package' },
         @{ code='CARGO_INDEX_FAILURE'; retry=$true; pattern='failed to query replaced source registry|failed to update registry|failed to fetch .*index|config\.json|registry index|spurious network error' },
-        @{ code='RUST_COMPILE_ERROR'; retry=$false; pattern='could not compile|error\[E[0-9]+\]|error: aborting due to|linking with .+ failed|test result: FAILED' }
+        @{ code='RUST_COMPILE_ERROR'; retry=$false; pattern='could not compile|error\s*\[\s*E\s*[0-9]+\s*\]|error: aborting due to|linking with .+ failed|test result: FAILED' }
     )
     foreach ($rule in $rules) {
-        if ($text -match $rule.pattern) {
+        if ($text -match $rule.pattern -or $compactText -match $rule.pattern) {
             return New-CargoDiagnostic $rule.code $Stage ([bool]$rule.retry) "Cargo failure classified as $($rule.code)." $evidence
         }
     }

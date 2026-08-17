@@ -131,6 +131,9 @@ pub(crate) fn analyze_document_quality(
                 continue;
             }
             let Some(target_document) = known.get(&target_key) else {
+                if workspace.join(&target_path).is_file() && anchor.is_empty() {
+                    continue;
+                }
                 issues.push(make_issue(
                     "broken_link",
                     "error",

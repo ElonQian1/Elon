@@ -192,7 +192,7 @@ jobs:
 
       - name: Android Build Prerequisites
         shell: pwsh
-        run: ..\scripts\check-build-prerequisites.ps1 -Scope Android
+        run: scripts\check-build-prerequisites.ps1 -Scope Android
 
       - name: Unit Tests and Debug APK
         working-directory: android
