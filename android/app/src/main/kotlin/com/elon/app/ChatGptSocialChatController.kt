@@ -12,7 +12,7 @@ import com.elon.app.chatgptweb.ChatGptWebAudioPermissionController
 import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
-import com.elon.app.chatgptweb.ChatGptWebModeController
+import com.elon.app.chatgptweb.ChatGptWebPresentationMode
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -62,7 +62,7 @@ internal class ChatGptSocialChatController(
             setInputText = ::setInputTextFromMcp,
             copyMessage = messageClipboard::copy,
             selectMode = { mode ->
-                if (mode != ChatGptWebModeController.Mode.NATIVE) openOfficialFallback()
+                if (mode != ChatGptWebPresentationMode.NATIVE) openOfficialFallback()
             },
             revealMessage = ::revealMessageFromMcp,
         )

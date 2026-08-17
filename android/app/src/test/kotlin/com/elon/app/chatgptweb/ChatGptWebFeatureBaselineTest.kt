@@ -12,7 +12,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
         val features = baseline.getJSONArray("features")
         val ids = (0 until features.length()).map { index ->
@@ -193,7 +193,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = snapshot,
             manifest = manifest,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             composerOptions = listOf(
                 ChatGptWebComposerOption(
                     "tools_study",
@@ -225,7 +225,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.WEB,
+            mode = ChatGptWebPresentationMode.WEB,
         )
         val summary = baseline.getJSONObject("summary")
         val codeSummary = baseline.getJSONObject("code_summary")
@@ -373,7 +373,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             verificationEvidence = evidence,
         )
 
@@ -416,7 +416,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             verificationEvidence = evidence,
         )
 
@@ -438,7 +438,7 @@ class ChatGptWebFeatureBaselineTest {
         val baselineWithoutEvidence = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
         assertEquals(
             "complete",
@@ -468,7 +468,7 @@ class ChatGptWebFeatureBaselineTest {
         val verifiedBaseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             verificationEvidence = evidence,
         )
 
@@ -484,7 +484,7 @@ class ChatGptWebFeatureBaselineTest {
         val withoutEvidence = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
         val pending = feature(withoutEvidence, "attachment_lifecycle")
         assertEquals(caseId, pending.getString("verification_case"))
@@ -516,7 +516,7 @@ class ChatGptWebFeatureBaselineTest {
         val verified = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             verificationEvidence = evidence,
         )
         assertEquals(
@@ -547,7 +547,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             verificationEvidence = evidence,
         )
 
@@ -586,7 +586,7 @@ class ChatGptWebFeatureBaselineTest {
         val baseline = ChatGptWebFeatureBaseline.describe(
             snapshot = null,
             manifest = null,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             verificationEvidence = evidence,
         )
 

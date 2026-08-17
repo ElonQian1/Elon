@@ -218,7 +218,7 @@ internal class ChatGptBackgroundSession(
         inputText: () -> String,
         setInputText: (String) -> Unit,
         copyMessage: (String) -> ChatGptClipboardMetadata,
-        selectMode: (ChatGptWebModeController.Mode) -> Unit,
+        selectMode: (ChatGptWebPresentationMode) -> Unit,
         revealMessage: (String, Int?, String) -> Boolean,
     ): WebChatSocialMcpPort {
         ensureInitialized()
@@ -257,7 +257,7 @@ internal class ChatGptBackgroundSession(
             observedState = observedMcpState::snapshot,
             beginCommand = observedMcpState::beginCommand,
             bridgeState = { latestBridgeState },
-            mode = { ChatGptWebModeController.Mode.NATIVE },
+            mode = { ChatGptWebPresentationMode.NATIVE },
             inputText = inputText,
             audioPermissionState = audioPermissionController::snapshot,
             verificationEvidence = verificationEvidenceStore::snapshot,

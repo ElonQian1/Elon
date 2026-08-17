@@ -9,7 +9,7 @@ internal object ChatGptWebCapabilityMatrix {
         snapshot: ChatGptWebSnapshot?,
         manifest: ChatGptWebUiManifest?,
         bridgeState: ChatGptWebPageAdapter.State,
-        mode: ChatGptWebModeController.Mode,
+        mode: ChatGptWebPresentationMode,
         document: ChatGptWebObservedState.Snapshot? = null,
         verificationEvidence: ChatGptWebVerificationEvidenceStore.Snapshot =
             ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY,

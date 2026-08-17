@@ -25,8 +25,9 @@ class ChatGptWebProductIntegrationContractTest {
         val fixtureActions = read(
             "android/app/src/main/kotlin/com/elon/app/ChatGptWebAcceptanceAttachmentNativeActions.kt",
         )
-        val activity = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt")
-        val layout = read("android/app/src/main/res/layout/activity_chatgpt_web_test.xml")
+        val official = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebOfficialActivity.kt",
+        )
         val strings = read("android/app/src/main/res/values/strings.xml")
 
         assertTrue(strings.contains("ChatGPT 网页 AI"))
@@ -84,10 +85,10 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("chatgpt_web_acceptance_attachment"))
         assertTrue(fixtureActions.contains("stage_chatgpt_web_acceptance_attachment"))
         assertTrue(fixtureActions.contains("remove_chatgpt_web_acceptance_attachment"))
-        assertTrue(layout.contains("android:id=\"@+id/chatGptWebToolbar\""))
-        assertTrue(activity.contains("binding.chatGptWebToolbar.visibility = View.GONE"))
-        assertTrue(activity.contains("modeController.select(ChatGptWebModeController.Mode.WEB)"))
-        assertTrue(activity.contains("ChatGptWebAccessPolicy.canChat(snapshot)"))
+        assertTrue(official.contains("class ChatGptWebOfficialActivity"))
+        assertTrue(official.contains("ChatGptWebOfficialFallbackIntent.startUrl(intent)"))
+        assertTrue(official.contains("fileChooserController.show("))
+        assertFalse(official.contains("ChatGptWebPageAdapter"))
         assertTrue(chatController.contains("WebChatSendFallbackPolicy.decide"))
         assertTrue(chatController.contains("session.onHostResumed()"))
         assertTrue(googleController.contains("WebChatSendFallbackPolicy.decide(loginRequired = false)"))
@@ -152,7 +153,9 @@ class ChatGptWebProductIntegrationContractTest {
         )
         val mcp = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt")
         val messageJson = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMessageJson.kt")
-        val activity = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt")
+        val background = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
         val mcpBinding = read("android/app/src/main/kotlin/com/elon/app/mcp/McpNativeControlBinding.kt")
 
         assertTrue(layoutAdapter.contains("ui_manifest_snapshot"))
@@ -184,7 +187,7 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(messageJson.contains("message.content.take"))
         assertTrue(messageJson.contains("messagePartSelector"))
         assertTrue(mcp.contains("chatgpt_get_context"))
-        assertTrue(activity.contains("mcpNativeControlBinding.register()"))
+        assertTrue(background.contains("observedMcpState.accept(event)"))
         assertTrue(mcpBinding.contains("controlHandler(args)"))
         assertTrue(!mcpBinding.contains("private val control: (JSONObject)"))
     }

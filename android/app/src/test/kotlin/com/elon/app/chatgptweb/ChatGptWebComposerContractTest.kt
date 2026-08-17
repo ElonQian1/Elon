@@ -205,18 +205,27 @@ class ChatGptWebComposerContractTest {
     }
 
     @Test
-    fun nativeAttachmentFlowUsesTheSystemPickerAndCurrentWebViewCallback() {
-        val activity = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
+    fun attachmentFlowUsesTheSystemPickerAndCurrentProductionWebViewCallback() {
+        val official = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebOfficialActivity.kt",
+        )
+        val background = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
         val chooser = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebFileChooserController.kt",
         )
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
 
-        assertTrue(activity.contains("override fun onShowFileChooser("))
-        assertTrue(activity.contains("fileChooserController.show("))
-        assertTrue(activity.contains("allowContentAccess = true"))
+        listOf(official, background).forEach { host ->
+            assertTrue(host.contains("override fun onShowFileChooser("))
+            assertTrue(host.contains("allowContentAccess = true"))
+        }
+        assertTrue(official.contains("fileChooserController.show("))
+        assertTrue(background.contains("val values = queuedUploadUris"))
+        assertTrue(background.contains("queuedUploadUris = emptyList()"))
+        assertTrue(background.contains("filePathCallback.onReceiveValue("))
+        assertFalse(background.contains("fileChooserController.show("))
         assertTrue(chooser.contains("Intent.ACTION_OPEN_DOCUMENT"))
         assertTrue(chooser.contains("Intent.ACTION_GET_CONTENT"))
         assertTrue(chooser.contains("com.google.android.documentsui"))
@@ -232,44 +241,27 @@ class ChatGptWebComposerContractTest {
     }
 
     @Test
-    fun nativeComposerControlsRemainCapabilityGated() {
-        val controller = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeComposerToolsController.kt",
+    fun productionComposerControlsRemainCapabilityGated() {
+        val coordinator = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
         )
-        val layout = readRepositoryFile(
-            "android/app/src/main/res/layout/activity_chatgpt_web_test.xml",
+        val background = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
 
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeModel\""))
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachment\""))
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeTools\""))
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeDictation\""))
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeRealtimeVoice\""))
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachments\""))
-        assertTrue(controller.contains("ChatGptWebCapabilityId.MODEL_SELECTOR"))
-        assertTrue(controller.contains("ChatGptWebCapabilityId.ATTACHMENTS"))
-        assertTrue(controller.contains("ChatGptWebCapabilityId.COMPOSER_TOOLS"))
-        assertTrue(controller.contains("ChatGptWebComposerOptionSemantics.isAttachment"))
-        assertTrue(controller.contains("usesSingleChoice(section, options)"))
-        assertTrue(controller.contains("pendingSection = if (option.opensSubmenu) section else null"))
-        assertFalse(controller.contains("ATTACHMENT_LABELS"))
-        assertTrue(controller.contains("bridgeReady && capabilities.supports"))
-        val voiceController = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeVoiceController.kt",
-        )
+        assertTrue(coordinator.contains("WebChatProviderCapability.COMPOSER_TOOLS"))
+        assertTrue(coordinator.contains("openOfficialFallback"))
+        assertTrue(background.contains("adapter.listModelOptions"))
+        assertTrue(background.contains("adapter.listComposerTools"))
+        assertTrue(background.contains("adapter.startDictation"))
         val permissionController = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAudioPermissionController.kt",
-        )
-        assertTrue(voiceController.contains("ChatGptDictationPolicy.isAvailable(value, manifest)"))
-        val realtimeVoiceController = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeRealtimeVoiceController.kt",
         )
         val realtimeVoicePolicy = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptRealtimeVoicePolicy.kt",
         )
         assertTrue(realtimeVoicePolicy.contains("const val SEMANTIC = \"voice_mode\""))
-        assertTrue(realtimeVoiceController.contains("ChatGptNativeNavigationSelector.REALTIME_VOICE"))
         assertTrue(permissionController.contains("request.origin.host == \"chatgpt.com\""))
         assertTrue(permissionController.contains("RESOURCE_AUDIO_CAPTURE"))
         assertTrue(manifest.contains("android.permission.RECORD_AUDIO"))
@@ -281,8 +273,8 @@ class ChatGptWebComposerContractTest {
         val dispatcher = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchDispatcher.kt",
         )
-        val activity = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
+        val background = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
 
         assertTrue(dispatcher.contains("request.purpose in ALLOWED_PURPOSES"))
@@ -293,9 +285,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(dispatcher.contains("open_composer_tools_submenu"))
         assertFalse(dispatcher.contains("Instrumentation"))
         assertFalse(dispatcher.contains("AccessibilityService"))
-        assertTrue(activity.contains("pageAdapter::collectModelOptions"))
-        assertTrue(activity.contains("pageAdapter::collectComposerTools"))
-        assertTrue(activity.contains("openOfficialComposerOptions(\"model\")"))
+        assertTrue(background.contains("adapter::collectModelOptions"))
+        assertTrue(background.contains("adapter::collectComposerTools"))
+        assertTrue(background.contains("is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

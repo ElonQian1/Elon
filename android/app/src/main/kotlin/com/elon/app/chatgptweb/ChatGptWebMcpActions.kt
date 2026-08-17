@@ -10,7 +10,7 @@ internal class ChatGptWebMcpActions(
     private val observedState: () -> ChatGptWebObservedState.Snapshot,
     private val beginCommand: (String) -> ChatGptWebObservedState.CommandRequest,
     private val bridgeState: () -> ChatGptWebPageAdapter.State,
-    private val mode: () -> ChatGptWebModeController.Mode,
+    private val mode: () -> ChatGptWebPresentationMode,
     private val inputText: () -> String,
     private val audioPermissionState: () -> ChatGptWebAudioPermissionState.Snapshot = { ChatGptWebAudioPermissionState.UNOBSERVED },
     private val verificationEvidence: () -> ChatGptWebVerificationEvidenceStore.Snapshot = { ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY },
@@ -21,7 +21,7 @@ internal class ChatGptWebMcpActions(
     },
     private val commands: ChatGptWebMcpCommandPort,
     private val refresh: () -> Unit,
-    private val selectMode: (ChatGptWebModeController.Mode) -> Unit,
+    private val selectMode: (ChatGptWebPresentationMode) -> Unit,
     private val revealMessage: (String, Int?, String) -> Boolean,
 ) : WebChatSocialMcpPort {
     override fun uiState(): JSONObject {
@@ -262,7 +262,7 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_get_context" -> return contextPage(args)
             "chatgpt_reveal_message" -> {
-                if (mode() != ChatGptWebModeController.Mode.NATIVE) {
+                if (mode() != ChatGptWebPresentationMode.NATIVE) {
                     return error(action, "native_view_required")
                 }
                 val messageId = args.optString("message_id").trim()
@@ -322,9 +322,9 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_select_view" -> {
                 val next = when (args.optString("view_mode").lowercase()) {
-                    "login", "quick" -> ChatGptWebModeController.Mode.QUICK
-                    "official", "web" -> ChatGptWebModeController.Mode.WEB
-                    "native", "yilong" -> ChatGptWebModeController.Mode.NATIVE
+                    "login", "quick" -> ChatGptWebPresentationMode.QUICK
+                    "official", "web" -> ChatGptWebPresentationMode.WEB
+                    "native", "yilong" -> ChatGptWebPresentationMode.NATIVE
                     else -> return error(action, "invalid_view_mode")
                 }
                 selectMode(next)

@@ -17,7 +17,7 @@ class ChatGptWebCapabilityMatrixTest {
             ),
             manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         ).getJSONArray("capabilities")
         val regenerate = (0 until rows.length())
             .map(rows::getJSONObject)
@@ -43,7 +43,7 @@ class ChatGptWebCapabilityMatrixTest {
             ),
             manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         assertTrue(matrix.getBoolean("ready_for_chat"))
@@ -77,7 +77,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(emptySet()),
             manifest = manifest("healthy", "suggestion"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         val control = matrix.getJSONArray("control_coverage").getJSONObject(0)
@@ -92,7 +92,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(setOf("future_official_capability")),
             manifest = manifest("partial", "future_semantic"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.WEB,
+            mode = ChatGptWebPresentationMode.WEB,
         )
 
         assertEquals(
@@ -113,7 +113,7 @@ class ChatGptWebCapabilityMatrixTest {
                 controlsTruncated = true,
             ),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         assertFalse(matrix.getBoolean("ready_for_mcp"))
@@ -135,7 +135,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot,
             manifest = null,
             bridgeState = ChatGptWebPageAdapter.State.CONNECTING,
-            mode = ChatGptWebModeController.Mode.WEB,
+            mode = ChatGptWebPresentationMode.WEB,
         )
 
         val gaps = matrix.getJSONArray("blocking_gaps")
@@ -152,7 +152,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = null,
             manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         assertFalse(matrix.getBoolean("chat_access_available"))
@@ -168,7 +168,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = anonymous,
             manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         assertFalse(matrix.getBoolean("authenticated"))
@@ -191,7 +191,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = authenticationPage,
             manifest = manifest("healthy", "action").copy(pageKind = "auth"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.WEB,
+            mode = ChatGptWebPresentationMode.WEB,
         )
 
         assertFalse(matrix.getBoolean("authenticated"))
@@ -211,7 +211,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(emptySet()),
             manifest = manifest("healthy", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
             document = document,
         )
 
@@ -236,7 +236,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = dictating,
             manifest = manifest("partial", "action"),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.WEB,
+            mode = ChatGptWebPresentationMode.WEB,
         )
 
         assertTrue(matrix.getBoolean("dictation_active"))
@@ -254,7 +254,7 @@ class ChatGptWebCapabilityMatrixTest {
                 },
             ),
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         assertEquals(1, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
@@ -282,7 +282,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(emptySet()),
             manifest = voiceManifest,
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         val manifest = matrix.getJSONObject("manifest")
@@ -320,7 +320,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(emptySet()),
             manifest = sliderManifest,
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         val manifest = matrix.getJSONObject("manifest")
@@ -342,7 +342,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(emptySet()),
             manifest = contentManifest,
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         val manifest = matrix.getJSONObject("manifest")
@@ -367,7 +367,7 @@ class ChatGptWebCapabilityMatrixTest {
             snapshot = snapshot(emptySet()),
             manifest = titleManifest,
             bridgeState = ChatGptWebPageAdapter.State.READY,
-            mode = ChatGptWebModeController.Mode.NATIVE,
+            mode = ChatGptWebPresentationMode.NATIVE,
         )
 
         assertEquals(0, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
@@ -386,7 +386,7 @@ class ChatGptWebCapabilityMatrixTest {
                 snapshot = snapshot(emptySet()),
                 manifest = manifest("healthy", semantic),
                 bridgeState = ChatGptWebPageAdapter.State.READY,
-                mode = ChatGptWebModeController.Mode.NATIVE,
+                mode = ChatGptWebPresentationMode.NATIVE,
             )
 
             assertEquals(0, matrix.getJSONObject("manifest").getInt("generic_control_count"))

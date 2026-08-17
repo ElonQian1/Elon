@@ -63,14 +63,14 @@
         android:textSize="12sp" />
 
     <Button
-        android:id="@+id/aiProviderChatGptWebLab"
+        android:id="@+id/aiProviderChatGptOfficial"
         android:layout_width="match_parent"
         android:layout_height="52dp"
         android:layout_marginTop="10dp"
         android:backgroundTint="@color/elon_button_secondary_bg"
         android:drawableStart="@android:drawable/ic_menu_view"
         android:drawableTint="@color/elon_button_secondary_text"
-        android:text="@string/chatgpt_web_lab_entry"
+        android:text="@string/chatgpt_web_official_entry"
         android:textColor="@color/elon_button_secondary_text"
         android:textSize="14sp"
         android:textStyle="bold" />

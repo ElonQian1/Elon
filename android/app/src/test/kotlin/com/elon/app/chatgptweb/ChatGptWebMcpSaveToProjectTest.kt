@@ -45,7 +45,7 @@ class ChatGptWebMcpSaveToProjectTest {
                 )
             },
             bridgeState = { ChatGptWebPageAdapter.State.READY },
-            mode = { ChatGptWebModeController.Mode.NATIVE },
+            mode = { ChatGptWebPresentationMode.NATIVE },
             inputText = { "" },
             setInputText = {},
             commands = ChatGptWebMcpTestCommandPort(onInvoke = { invoked = it }),

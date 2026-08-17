@@ -80,14 +80,23 @@ class WebChatProductionSurfaceBoundaryContractTest {
     }
 
     @Test
-    fun diagnosticActivityKeepsItsOwnExplicitTestBinding() {
-        val diagnostic = read(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
+    fun officialFallbackIsSeparateAndTheDiagnosticSurfaceIsGone() {
+        val official = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebOfficialActivity.kt",
         )
+        val root = repositoryRoot()
 
-        assertTrue(diagnostic.contains("class ChatGptWebTestActivity"))
-        assertTrue(diagnostic.contains("ActivityChatgptWebTestBinding"))
-        assertTrue(diagnostic.contains("binding.chatGptNativeComposer"))
+        assertTrue(official.contains("class ChatGptWebOfficialActivity"))
+        assertFalse(official.contains("McpNativeControlBinding"))
+        assertFalse(official.contains("ChatGptWebPageAdapter"))
+        assertFalse(
+            Files.exists(
+                root.resolve(
+                    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
+                ),
+            ),
+        )
+        assertFalse(Files.exists(root.resolve("android/app/src/main/res/layout/activity_chatgpt_web_test.xml")))
     }
 
     @Test

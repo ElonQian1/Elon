@@ -970,7 +970,7 @@ class ChatGptWebMcpActionsTest {
                 )
             },
             bridgeState = { ChatGptWebPageAdapter.State.READY },
-            mode = { ChatGptWebModeController.Mode.NATIVE },
+            mode = { ChatGptWebPresentationMode.NATIVE },
             inputText = { "" },
             setInputText = onSetInputText,
             commands = ChatGptWebMcpTestCommandPort(

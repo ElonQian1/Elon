@@ -75,7 +75,7 @@ internal object ChatGptWebFeatureBaseline {
     fun describe(
         snapshot: ChatGptWebSnapshot?,
         manifest: ChatGptWebUiManifest?,
-        mode: ChatGptWebModeController.Mode,
+        mode: ChatGptWebPresentationMode,
         composerOptions: Collection<ChatGptWebComposerOption> = emptyList(),
         verificationEvidence: ChatGptWebVerificationEvidenceStore.Snapshot =
             ChatGptWebVerificationEvidenceStore.Snapshot.EMPTY,
@@ -100,7 +100,7 @@ internal object ChatGptWebFeatureBaseline {
                 "anonymous_chat_access" -> snapshot?.let {
                     !it.authenticated && ChatGptWebAccessPolicy.canChat(it)
                 } == true
-                "official_fullscreen_fallback" -> mode == ChatGptWebModeController.Mode.WEB
+                "official_fullscreen_fallback" -> mode == ChatGptWebPresentationMode.WEB
                 "native_chat_composer" -> snapshot?.composerReady == true
                 "disclosure_controls" -> manifest?.controls.orEmpty()
                     .any(ChatGptWebUiControl::supportsExpandedState)

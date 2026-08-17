@@ -14,15 +14,6 @@ internal class ChatGptWebSessionStateStore(context: Context) {
         preferences.edit().putString(KEY_URL, normalized).apply()
     }
 
-    fun restoreMode(): ChatGptWebModeController.Mode? = preferences.getString(KEY_MODE, null)
-        ?.let { value ->
-            ChatGptWebModeController.Mode.values().firstOrNull { it.name == value }
-        }
-
-    fun saveMode(mode: ChatGptWebModeController.Mode) {
-        preferences.edit().putString(KEY_MODE, mode.name).apply()
-    }
-
     fun clear() {
         preferences.edit().clear().apply()
     }
@@ -30,7 +21,6 @@ internal class ChatGptWebSessionStateStore(context: Context) {
     companion object {
         private const val PREFERENCES = "chatgpt_web_session_state"
         private const val KEY_URL = "last_safe_url"
-        private const val KEY_MODE = "last_mode"
         private const val MAX_PATH_LENGTH = 512
         private val SAFE_PATH = Regex("/[A-Za-z0-9_./%~-]{0,$MAX_PATH_LENGTH}")
         private val RESTORABLE_PREFIXES = listOf(

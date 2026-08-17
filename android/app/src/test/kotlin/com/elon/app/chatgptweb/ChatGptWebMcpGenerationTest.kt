@@ -134,7 +134,7 @@ class ChatGptWebMcpGenerationTest {
             )
         },
         bridgeState = { bridgeState },
-        mode = { ChatGptWebModeController.Mode.NATIVE },
+        mode = { ChatGptWebPresentationMode.NATIVE },
         inputText = { "" },
         setInputText = {},
         commands = object : ChatGptWebMcpCommandPort {

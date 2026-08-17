@@ -47,7 +47,7 @@ class ChatGptWebMcpConversationActionsTest {
                 )
             },
             bridgeState = { ChatGptWebPageAdapter.State.READY },
-            mode = { ChatGptWebModeController.Mode.NATIVE },
+            mode = { ChatGptWebPresentationMode.NATIVE },
             inputText = { "" },
             setInputText = {},
             commands = ChatGptWebMcpTestCommandPort(onOpenConversation = { openedPath = it }),

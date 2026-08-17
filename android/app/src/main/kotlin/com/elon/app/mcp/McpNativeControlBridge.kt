@@ -100,12 +100,6 @@ internal object McpNativeControlBridge {
                     .put("retryable", true)
                     .put("hint", "Retry the same action after MainActivity finishes starting.")
         }
-        if (action == "open_chatgpt_official_fallback" && current.surfaceId == targetSurface) {
-            return decorateControlResult(current.uiState(), action)
-                .put("control_ok", true)
-                .put("target_surface", targetSurface)
-                .put("target_activity_bound", true)
-        }
         val sourceResult = current.control(args)
         if (
             targetSurface == null ||
@@ -193,9 +187,9 @@ internal object McpNativeControlBridge {
     }
 
     internal fun targetSurfaceFor(action: String): String? = when (action) {
-        "open_chatgpt_official_fallback" -> "chatgpt_web"
         "open_social_ai_chat",
         "open_chatgpt_web",
+        "open_chatgpt_official_fallback",
         "set_social_ai_interaction_mode",
         "select_web_chat_provider",
         "start_new_web_chat_conversation",

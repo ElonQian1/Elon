@@ -51,23 +51,18 @@ class ChatGptWebNavigationContractTest {
     }
 
     @Test
-    fun nativeFeatureHubIsCapabilityGatedAndKeepsOfficialFallback() {
-        val controller = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeFeatureHubController.kt",
+    fun productionFeatureNavigationKeepsTheOfficialFallback() {
+        val coordinator = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt",
         )
-        val activity = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
-        )
-        val layout = readRepositoryFile(
-            "android/app/src/main/res/layout/activity_chatgpt_web_test.xml",
+        val background = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
 
-        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeFeatures\""))
-        assertTrue(controller.contains("ChatGptWebCapabilityId.FEATURE_NAVIGATION"))
-        assertTrue(controller.contains("onOpenOfficial"))
-        assertTrue(controller.contains("onDismissNavigation"))
-        assertTrue(activity.contains("pageAdapter::collectFeatures"))
-        assertTrue(activity.contains("ChatGptWebEvent.FeatureNavigation"))
+        assertTrue(coordinator.contains("openOfficialFallback"))
+        assertTrue(coordinator.contains("打开官方页"))
+        assertTrue(background.contains("ChatGptWebEvent.FeatureNavigation"))
+        assertTrue(background.contains("adapter::collectFeatures"))
     }
 
     @Test
@@ -100,29 +95,15 @@ class ChatGptWebNavigationContractTest {
     }
 
     @Test
-    fun nativeNavigationRowsAndComposerOptionsUseTheSharedStableSelectorContract() {
-        val composer = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeComposerToolsController.kt",
-        )
-        val optionDialog = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeComposerOptionDialog.kt",
-        )
-        val conversations = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationListController.kt",
-        )
-        val conversationLayout = readRepositoryFile(
-            "android/app/src/main/res/layout/sheet_chatgpt_conversations.xml",
-        )
-        val features = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeFeatureHubController.kt",
+    fun productionSideMenuUsesStableSelectorsForProjectsAndConversations() {
+        val sideMenu = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuView.kt",
         )
 
-        assertTrue(composer.contains("ChatGptNativeComposerOptionDialog.show"))
-        assertTrue(optionDialog.contains("ChatGptNativeNavigationSelector.composerOption"))
-        assertTrue(conversations.contains("ChatGptNativeNavigationSelector.conversation"))
-        assertTrue(conversations.contains("ChatGptNativeNavigationSelector.NEW_CONVERSATION"))
-        assertTrue(conversationLayout.contains("android:id=\"@+id/chatGptConversationNew\""))
-        assertTrue(features.contains("ChatGptNativeNavigationSelector.feature"))
+        assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.conversation"))
+        assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.project"))
+        assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.NEW_CONVERSATION"))
+        assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

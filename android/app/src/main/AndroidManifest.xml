@@ -113,7 +113,7 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".chatgptweb.ChatGptWebTestActivity"
+            android:name=".chatgptweb.ChatGptWebOfficialActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 

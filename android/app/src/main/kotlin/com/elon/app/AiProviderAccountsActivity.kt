@@ -16,7 +16,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.chatgptweb.ChatGptWebTestActivity
+import com.elon.app.chatgptweb.ChatGptWebOfficialFallbackIntent
 import com.elon.app.chatkit.OpenAiChatKitActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,8 +65,8 @@ class AiProviderAccountsActivity : AppCompatActivity() {
         providerContainer = findViewById(R.id.aiProviderContainer)
         findViewById<Button>(R.id.aiProviderRefresh).setOnClickListener { loadNodes() }
         findViewById<Button>(R.id.aiProviderDiagnostics).setOnClickListener { loadDiagnostics() }
-        findViewById<Button>(R.id.aiProviderChatGptWebLab).setOnClickListener {
-            startActivity(Intent(this, ChatGptWebTestActivity::class.java))
+        findViewById<Button>(R.id.aiProviderChatGptOfficial).setOnClickListener {
+            startActivity(ChatGptWebOfficialFallbackIntent.create(this, currentUrl = null))
         }
         findViewById<Button>(R.id.aiProviderOpenAiChatKit).setOnClickListener {
             startActivity(Intent(this, OpenAiChatKitActivity::class.java))
