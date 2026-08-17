@@ -1,0 +1,49 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.link,
+.choice button,
+.choice a {
+  color: #7ab4e8;
+  font-size: 11px;
+  text-decoration: none;
+  border: 1px solid rgba(122, 180, 232, .28);
+  background: transparent;
+}
+
+.link,
+.choice button {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link { border-radius: 4px; padding: 2px 7px; }
+.link:hover { text-decoration: underline; }
+
+.choice {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.choice button {
+  border-radius: 4px 0 0 4px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+
+.choice a {
+  width: 24px;
+  display: grid;
+  place-items: center;
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.choice button:hover,
+.choice a:hover { background: rgba(122, 180, 232, .12); color: #a9d3f7; }

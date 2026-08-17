@@ -7,6 +7,7 @@ import MessageActions, { messageActionsHostClassName, messageCopySourceId } from
 import UserAvatar from '../shell/UserAvatar'
 import styles from './AiChatPage.module.css'
 import AiStructuredContent, { type AiStructuredPart } from './AiStructuredContent'
+import AiSourceLinks from './AiSourceLinks'
 
 export interface AiMessage {
   id?: string
@@ -103,15 +104,7 @@ export default function AiChatMessageRow({
           : hasMarkdown
           ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy /></div>
           : <div id={copySourceId} className={styles.msgContent}>{content}</div>}
-        {!isUser && message.sources && message.sources.length > 0 && (
-          <div className={styles.sourceList}>
-            {message.sources.map((source) => (
-              <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
-                {source.title || source.url}
-              </a>
-            ))}
-          </div>
-        )}
+        {!isUser && <AiSourceLinks sources={message.sources} />}
         {!isUser && <AiStructuredContent parts={message.structured_parts} />}
         {!isUser && message.handoff && (
           <div className={styles.handoffCard}>

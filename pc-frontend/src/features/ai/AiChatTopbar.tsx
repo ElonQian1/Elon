@@ -9,6 +9,7 @@ export default function AiChatTopbar({
   sending,
   onToggleUserPanel,
   onCodexVaultBackup,
+  onOpenOfficial,
   mode,
   onModeChange,
 }: {
@@ -18,6 +19,7 @@ export default function AiChatTopbar({
   sending: boolean
   onToggleUserPanel: () => void
   onCodexVaultBackup: () => void
+  onOpenOfficial?: () => void
   mode: AiHomeMode
   onModeChange: (mode: AiHomeMode) => void
 }) {
@@ -39,6 +41,9 @@ export default function AiChatTopbar({
             : <ChevronRight size={14} aria-hidden="true" />}
         </button>
         <span className={styles.modelBadge}>{modelButtonCopy.source} · {modelButtonCopy.detail}</span>
+        {onOpenOfficial && <button className={styles.topbarBtn} type="button" title="显示官网完整富文本、地图、天气和交互内容" onClick={onOpenOfficial}>
+          官网原生页
+        </button>}
         <button className={styles.topbarBtn} type="button" title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
           分享算力
         </button>

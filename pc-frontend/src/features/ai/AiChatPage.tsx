@@ -29,7 +29,7 @@ import { safeNodeAdminUrl } from '../../lib/utils'
 import { DEFAULT_POPOVER_ANCHOR, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import AiWebChatSidebar from '../user-browser/AiWebChatSidebar'
 import AiWebProviderPopover from '../user-browser/AiWebProviderPopover'
-import AiWebComposerControls from '../user-browser/AiWebComposerControls'
+import AiWebComposerControls, { AiBrowserExperience } from '../user-browser/AiWebComposerControls'
 import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import NodeStatusBanner from './NodeStatusBanner'
@@ -875,7 +875,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
       </aside>
 
       {/* 聊天区 */}
-      <div className={styles.chat}>
+      <div className={styles.chat} data-ai-chat-main>
         <AiChatTopbar
           title={chatMode ? web.title : activeConversationTitle}
           userPanelCollapsed={userPanelCollapsed}
@@ -884,7 +884,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           mode={mode}
           onModeChange={onModeChange}
           onToggleUserPanel={() => setUserPanelCollapsed((collapsed) => !collapsed)}
-          onCodexVaultBackup={handleCodexVaultShortcut}
+          onCodexVaultBackup={handleCodexVaultShortcut} onOpenOfficial={chatMode ? () => { void web.controller.openOfficial() } : undefined}
         />
 
         <div
@@ -964,7 +964,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               {visibleSending ? '…' : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
             </button>
           </form>
-        {error && <p className={styles.sendError}>{error}</p>}
+        {error && <p className={styles.sendError}>{error}</p>}<AiBrowserExperience />
       </div>
 
       {/* ══ 右侧用户栏 ══ */}

@@ -30,6 +30,7 @@ import {
   pendingLocalAiSendObserved,
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
+import { requestOfficialAiTab } from './internalBrowserApi'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -194,13 +195,14 @@ export default function useLocalAiWebChatController(
     setBusyAction('open')
     setMessage('')
     try {
-      await openLocalAiWebSession(provider.id, ownerKey)
+      await openLocalAiWebSession(provider.id, ownerKey, { showWindow: false })
       try {
         setSessionState(await getLocalAiWebSessionState(provider.id, ownerKey))
       } catch {
         // The bounded poll recovers a state refresh without reopening the window.
       }
-      setMessage(`已显示 ${provider.displayName} 官方窗口；可检查访客能力，也可按官网要求登录或完成人机验证。`)
+      requestOfficialAiTab({ providerId: provider.id, providerName: provider.displayName, ownerKey })
+      setMessage(`已切换到 ${provider.displayName} 官方原生标签；天气、地图、图标和交互内容由官网直接显示。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
     } finally {

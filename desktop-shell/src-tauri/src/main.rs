@@ -27,6 +27,7 @@
 mod autostart;
 mod codex_semantic_bridge;
 mod external_navigation;
+mod internal_browser;
 mod local_ai_browser;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -138,17 +139,24 @@ const FRAMELESS_FLAG_SCRIPT: &str = "window.__ELON_DESKTOP_FRAMELESS__ = true;";
 fn main() {
     tauri::Builder::default()
         .manage(codex_semantic_bridge::CodexSemanticBridge::default())
+        .manage(internal_browser::InternalBrowserRuntime::default())
         .manage(local_ai_browser::LocalAiBrowserRuntime::default())
         .invoke_handler(tauri::generate_handler![
             local_ai_browser::list_local_ai_web_providers,
             local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,
+            local_ai_browser::embedded_view::present_local_ai_web_session_embedded,
+            local_ai_browser::embedded_view::hide_local_ai_web_session_embedded,
             local_ai_browser::get_local_ai_web_session_state,
             local_ai_browser::control_local_ai_web_session,
             local_ai_browser::run_local_ai_web_adapter_command,
             local_ai_browser::open_local_ai_cached_conversation,
             local_ai_browser::publish_local_ai_web_event,
             local_ai_browser::clear_local_ai_web_session,
+            internal_browser::open_internal_browser_tab,
+            internal_browser::resize_internal_browser_tab,
+            internal_browser::control_internal_browser_tab,
+            internal_browser::get_internal_browser_tab_state,
             codex_semantic_bridge::codex_win_capabilities,
             codex_semantic_bridge::codex_execute_semantic_action,
             codex_semantic_bridge::codex_read_native_events,

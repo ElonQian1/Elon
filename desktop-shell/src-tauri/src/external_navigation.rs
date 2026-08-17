@@ -5,7 +5,7 @@ pub(crate) fn open_in_system_browser(url: &Url) -> Result<(), String> {
     open_platform_url(url.as_str())
 }
 
-fn validate_external_url(url: &Url) -> Result<(), String> {
+pub(crate) fn validate_external_url(url: &Url) -> Result<(), String> {
     if url.scheme() != "https" {
         return Err("只允许在系统浏览器打开 HTTPS 链接".to_string());
     }
@@ -26,10 +26,7 @@ pub(crate) fn safe_log_origin(url: &Url) -> String {
 #[cfg(target_os = "windows")]
 fn open_platform_url(value: &str) -> Result<(), String> {
     use std::{ffi::OsStr, iter, os::windows::ffi::OsStrExt, ptr};
-    use windows_sys::Win32::{
-        UI::Shell::ShellExecuteW,
-        UI::WindowsAndMessaging::SW_SHOWNORMAL,
-    };
+    use windows_sys::Win32::{UI::Shell::ShellExecuteW, UI::WindowsAndMessaging::SW_SHOWNORMAL};
 
     fn wide(value: &str) -> Vec<u16> {
         OsStr::new(value)
@@ -51,7 +48,9 @@ fn open_platform_url(value: &str) -> Result<(), String> {
         )
     };
     if result as isize <= 32 {
-        return Err(format!("Windows 默认浏览器启动失败（ShellExecute={result:?}）"));
+        return Err(format!(
+            "Windows 默认浏览器启动失败（ShellExecute={result:?}）"
+        ));
     }
     Ok(())
 }

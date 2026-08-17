@@ -117,7 +117,7 @@ server/src/
 |---|---|---|---|
 | 账号信息 + 登录方式 + 账号安全 | 🟡 中 | `src/features/account/AccountPage.tsx`、`src/features/account/LinkedIdentitiesCard.tsx`、`src/features/account/AccountSecurityCard.tsx`、`src/features/auth/GoogleIdentityButton.tsx`、`src/features/auth/PasswordRecoveryPanel.tsx` | 🟡 源码与编译级完成：账号信息、Google OIDC 登录/主动绑定/解绑/最后入口保护，以及设置或修改密码、一次性恢复码、设备会话撤销和登录页离线恢复均已接入并通过 PC 构建与 ESLint；真实 OAuth、真实账号、邮件/短信投递和页面视觉验收仍待统一执行 |
 | OpenAI ChatKit（API 聊天） | 🟡 中 | `src/features/chatkit/`、`src/features/account/OpenAiChatKitCard.tsx`、`server/src/openai_chatkit_api.rs` | 🟡 源码与编译级完成：使用一龙登录态和服务端 OpenAI 配置创建短时 ChatKit session，明确不冒充 ChatGPT 账号登录、不读取 Cookie/历史/Plus/Codex 凭据；Win、PWA、APK 入口已同步，真实 Key/Workflow、会话网络、视觉验收和发布仍待统一执行 |
-| Win 官方 AI 网页 | 🟡 中 | `src/features/user-browser/`、`desktop-shell/src-tauri/src/local_ai_browser.rs` | 🟡 ChatGPT 与 Google AI 模式共用首页原生消息流并按一龙账号/厂商隔离 WebView2 Profile；已补唯一命令回执、Markdown/结构化内容、ChatGPT 模型/工具/附件/听写/功能入口和脱敏计数诊断。适配器不读取或复制 Cookie；真实收发、模型菜单、文件选择、麦克风权限、Google 地区/账号开放与切换性能仍待统一现场验收 |
+| Win 官方 AI 网页 | 🟡 中 | `src/features/user-browser/`、`desktop-shell/src-tauri/src/local_ai_browser.rs` | 🟡 ChatGPT 与 Google AI 模式共用首页原生消息流并按一龙账号/厂商隔离 WebView2 Profile；生产首页已增加聊天/官网原生页/来源页标签，复杂天气、地图、Logo 和交互卡片可直接使用官方页面，来源可选临时隔离标签或系统浏览器。适配器不读取或复制 Cookie；真实收发、模型菜单、文件选择、麦克风权限、Google 地区/账号开放与切换性能仍待统一现场验收 |
 
 纯 PC 前端发布默认仍要求候选与线上服务器之间没有 `server/contracts/sdk` 差异。若差异来自
 其他已经进入主线但尚未发布的服务器任务，且本次前端明确不依赖它们，可显式运行

@@ -4,6 +4,8 @@ import type { LocalAiComposerOption, LocalAiFeatureNavigationItem } from './loca
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import styles from './AiWebComposerControls.module.css'
 
+export { default as AiBrowserExperience } from './AiBrowserExperience'
+
 type Panel = 'model' | 'tools' | 'features' | null
 type ComposerSection = Exclude<Panel, 'features' | null>
 type CachedMenu<T> = { options: T[]; updatedAt: number }

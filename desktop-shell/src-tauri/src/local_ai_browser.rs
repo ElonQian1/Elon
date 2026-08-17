@@ -14,6 +14,8 @@ mod adapter_content;
 mod chatgpt_adapter_bootstrap;
 #[path = "local_ai_browser/conversation_directory.rs"]
 mod conversation_directory;
+#[path = "local_ai_browser/embedded_view.rs"]
+pub(crate) mod embedded_view;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
 #[path = "local_ai_browser/guest_identity.rs"]
@@ -37,7 +39,8 @@ use std::{fs, path::PathBuf, process::Command};
 use serde::Serialize;
 use tauri::{
     webview::{NewWindowResponse, PageLoadEvent},
-    AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Manager, State, Url, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
 };
 
 pub use guest_identity::LocalAiGuestOwnerIdentity;
@@ -178,11 +181,11 @@ pub async fn open_local_ai_web_session(
 
     if let Some(window) = app.get_webview_window(&window_label) {
         if show_window {
-            restore_window(&window)?;
+            embedded_view::restore_popout(&app, &window_label)?;
             runtime.mark_window_visible(&window_label, true);
         }
         runtime.mark_window_status(&window_label, "ready");
-        request_adapter_snapshot(provider, &window);
+        request_adapter_snapshot(provider, window.as_ref());
         return Ok(session_response(
             provider,
             window_label,
@@ -271,7 +274,7 @@ pub async fn open_local_ai_web_session(
                 }
                 PageLoadEvent::Finished => {
                     page_state.mark_page_finished(&page_label, payload.url());
-                    reconnect_adapter(&page_provider, &window);
+                    reconnect_adapter(&page_provider, window.as_ref());
                 }
             }
         })
@@ -323,7 +326,7 @@ pub async fn get_local_ai_web_session_state(
     // 高频状态轮询只能读取宿主内存，不能向 Windows UI 线程发送同步 getter。
     // WebView2 加载或聚焦期间，url()/is_minimized() 会等待同一条消息循环，曾导致
     // 官方页和原生聊天窗一起不响应。URL 与关闭状态均由窗口事件回调持续维护。
-    if app.get_webview_window(&label).is_none() {
+    if app.get_webview(&label).is_none() {
         runtime.mark_window_status(&label, "closed");
     }
     runtime
@@ -351,12 +354,12 @@ pub async fn control_local_ai_web_session(
             .snapshot(&label)
             .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name));
     }
-    let window = app
-        .get_webview_window(&label)
+    let page = app
+        .get_webview(&label)
         .ok_or_else(|| format!("请先打开 {} 本地网页会话。", provider.display_name))?;
 
     if action == "background" {
-        window.hide().map_err(display_error)?;
+        embedded_view::hide(&app, &label)?;
         runtime.mark_window_visible(&label, false);
         return runtime
             .snapshot(&label)
@@ -365,13 +368,13 @@ pub async fn control_local_ai_web_session(
 
     match action.as_str() {
         "restore" => {
-            restore_window(&window)?;
+            embedded_view::restore_popout(&app, &label)?;
             runtime.mark_window_status(&label, "ready");
             runtime.mark_window_visible(&label, true);
         }
-        "reload" => window.reload().map_err(display_error)?,
-        "back" => window.eval("history.back();").map_err(display_error)?,
-        "home" => window
+        "reload" => page.reload().map_err(display_error)?,
+        "back" => page.eval("history.back();").map_err(display_error)?,
+        "home" => page
             .navigate(parse_start_url(provider)?)
             .map_err(display_error)?,
         _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
@@ -404,8 +407,8 @@ pub async fn run_local_ai_web_adapter_command(
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
-    let window = app
-        .get_webview_window(&label)
+    let page = app
+        .get_webview(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
     if action == "send_prompt" {
         runtime.require_bound_context(&label)?;
@@ -427,8 +430,7 @@ pub async fn run_local_ai_web_adapter_command(
         request_id,
     )?;
     let raw = serde_json::to_string(&command).map_err(display_error)?;
-    window
-        .eval(adapter.page_invocation_script(&raw)?)
+    page.eval(adapter.page_invocation_script(&raw)?)
         .map_err(display_error)
 }
 
@@ -450,8 +452,8 @@ pub async fn open_local_ai_cached_conversation(
     }
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
-    let window = app
-        .get_webview_window(&label)
+    let page = app
+        .get_webview(&label)
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
     let restorable_url = runtime
         .activate_cached_conversation(&label, &conversation_id)
@@ -462,7 +464,7 @@ pub async fn open_local_ai_cached_conversation(
     if !allows_navigation(provider, &url) {
         return Err("本机会话缓存不再属于当前 AI 厂商。".to_string());
     }
-    window.navigate(url).map_err(display_error)?;
+    page.navigate(url).map_err(display_error)?;
     runtime
         .snapshot(&label)
         .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))
@@ -470,7 +472,7 @@ pub async fn open_local_ai_cached_conversation(
 
 #[tauri::command]
 pub fn publish_local_ai_web_event(
-    webview: WebviewWindow,
+    webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     payload: String,
 ) -> Result<(), String> {
@@ -501,13 +503,12 @@ pub async fn clear_local_ai_web_session(
     let provider = provider(&provider_id)?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     let label = window_label(provider, &fingerprint);
-    let window = app
-        .get_webview_window(&label)
+    let page = app
+        .get_webview(&label)
         .ok_or_else(|| "请先打开本地网页会话，再清除它的本地数据。".to_string())?;
-    window.clear_all_browsing_data().map_err(display_error)?;
+    page.clear_all_browsing_data().map_err(display_error)?;
     runtime.clear_snapshots(&label);
-    window
-        .navigate(parse_start_url(provider)?)
+    page.navigate(parse_start_url(provider)?)
         .map_err(display_error)?;
     let window_visible = runtime
         .snapshot(&label)
@@ -723,18 +724,18 @@ fn safe_log_url(url: &Url) -> String {
     format!("{}://{}{}", url.scheme(), host, url.path())
 }
 
-fn request_adapter_snapshot(provider: &ProviderDefinition, window: &WebviewWindow) {
+fn request_adapter_snapshot(provider: &ProviderDefinition, webview: &Webview) {
     if let Some(adapter) = provider.adapter {
         if let Ok(script) = adapter.page_invocation_script(r#"{"action":"snapshot"}"#) {
-            let _ = window.eval(script);
+            let _ = webview.eval(script);
         }
     }
 }
 
-fn reconnect_adapter(provider: &ProviderDefinition, window: &WebviewWindow) {
+fn reconnect_adapter(provider: &ProviderDefinition, webview: &Webview) {
     if let Some(adapter) = provider.adapter {
-        let _ = window.eval(adapter.initialization_script());
-        request_adapter_snapshot(provider, window);
+        let _ = webview.eval(adapter.initialization_script());
+        request_adapter_snapshot(provider, webview);
     }
 }
 
