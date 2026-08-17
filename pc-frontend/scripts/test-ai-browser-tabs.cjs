@@ -49,6 +49,7 @@ assert.match(sourceLinks, /使用系统浏览器打开/)
 assert.match(topbar, /onOpenOfficial/)
 assert.match(chat, /AiBrowserExperience/)
 assert.match(chat, /data-ai-chat-main/)
+assert.match(chat, /chatMode && web\.ready/)
 
 process.stdout.write('PASS Win AI internal browser tab contract\n')
 

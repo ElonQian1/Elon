@@ -884,7 +884,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           mode={mode}
           onModeChange={onModeChange}
           onToggleUserPanel={() => setUserPanelCollapsed((collapsed) => !collapsed)}
-          onCodexVaultBackup={handleCodexVaultShortcut} onOpenOfficial={chatMode ? () => { void web.controller.openOfficial() } : undefined}
+          onCodexVaultBackup={handleCodexVaultShortcut} onOpenOfficial={chatMode && web.ready ? () => { void web.controller.openOfficial() } : undefined}
         />
 
         <div
