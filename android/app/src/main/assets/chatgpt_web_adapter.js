@@ -199,34 +199,9 @@
     optional(undefined, () => layoutAdapter && layoutAdapter.emitSnapshot(emitEvent));
   }
 
-  function mutationElement(node) {
-    if (node instanceof Element) return node;
-    return node && node.parentElement instanceof Element ? node.parentElement : null;
-  }
-
-  function isActiveMutation(records) {
-    const selector = [
-      'form',
-      'nav',
-      'aside',
-      '[data-message-author-role]',
-      '[data-testid="prompt-textarea"]',
-      '[role="dialog"]',
-      '[role="menu"]'
-    ].join(',');
-    return Array.from(records || []).some((record) => {
-      const candidates = [record.target].concat(Array.from(record.addedNodes || []));
-      return candidates.some((candidate) => {
-        const element = mutationElement(candidate);
-        return !!element && (element.matches(selector) || !!element.closest(selector));
-      });
-    });
-  }
-
   function scheduleSnapshot(recordsOrActive) {
     if (disposed || !snapshotScheduler) return;
-    const active = recordsOrActive === true || optional(false, isStreaming) ||
-      isActiveMutation(Array.isArray(recordsOrActive) ? recordsOrActive : []);
+    const active = recordsOrActive === true || optional(false, isStreaming);
     snapshotScheduler.schedule(active);
   }
 
