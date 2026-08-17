@@ -1,13 +1,14 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 17;
+  const extractorVersion = 19;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
   const allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   const candidatePolicy = window.__elonGoogleWebAnswerCandidatePolicy;
   const queryPolicy = window.__elonGoogleWebQueryPolicy;
+  const richContent = window.__elonGoogleWebRichContent;
   const TRUSTED_ANSWER_SELECTORS = [
     '[data-sfc-cp][data-hveid]',
     '[id^="aim-chrome-initial-inline-async-container"]',
@@ -189,6 +190,7 @@
       controls,
       afterQuery: followsQuery(node, queryAnchor),
       trustedAnswerContainer: node.matches(TRUSTED_ANSWER_SELECTOR),
+      resultListItem: !!node.closest('li, [role="listitem"]'),
       interactive: !!node.closest(
         'a[href], button, input, textarea, select, [role="button"], [role="link"], ' +
         '[role="menuitem"], [role="tab"]'
@@ -310,7 +312,9 @@
         content: [{ type: 'text', text: entry.text }]
       });
       if (!answer) return;
-      const content = answer.text ? [{ type: 'text', text: answer.text }] : [];
+      const content = richContent && typeof richContent.parts === 'function'
+        ? richContent.parts(answer.node, answer.text, entry.text)
+        : (answer.text ? [{ type: 'text', text: answer.text }] : []);
       content.push(...answer.citations);
       if (content.length) messages.push({
         id: 'google-answer-' + index,

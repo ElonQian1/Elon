@@ -33,7 +33,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   }, [provider, providerId])
 
   const messages = useMemo<AiMessage[]>(() => (
-    (controller.snapshot?.messages ?? []).flatMap((item): AiMessage[] => {
+    controller.visibleMessages.flatMap((item): AiMessage[] => {
       const sources = item.content
         .filter((part): part is Extract<typeof part, { type: 'citation' }> => part.type === 'citation' && Boolean(part.url))
         .map<AiSource>((part) => ({ title: part.text || publicHost(part.url!), url: part.url! }))
@@ -44,6 +44,9 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         .map((part) => part.text)
         .filter(Boolean)
         .join('\n\n')
+      const contentFormat = item.content.some((part) => part.type === 'markdown')
+        ? 'markdown' as const
+        : 'plain' as const
       const structuredParts = item.content
         .filter((part) => !['text', 'markdown', 'citation'].includes(part.type))
         .map<AiStructuredPart>((part) => ({
@@ -62,12 +65,13 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         id: `web:${provider?.id || 'ai'}:${item.id}`,
         role: item.role,
         content: content || '相关来源',
+        content_format: contentFormat,
         tool_used: item.role === 'assistant' && provider?.id === 'google-ai-mode' ? 'web_search' : null,
         sources,
         structured_parts: structuredParts,
       }]
     })
-  ), [controller.snapshot?.messages, provider?.id])
+  ), [controller.visibleMessages, provider?.id])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
   const canCompose = ready && controller.userState.canSend
   const streamingMessageId = [...(controller.snapshot?.messages ?? [])]

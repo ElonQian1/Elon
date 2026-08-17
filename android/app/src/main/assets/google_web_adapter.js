@@ -164,7 +164,7 @@
       currentModel: 'Google AI 模式',
       attachments: [],
       dictationActive: false,
-      capabilities: ['streaming', 'citations', 'new_conversation', 'conversation_history']
+      capabilities: ['streaming', 'citations', 'rich_text', 'new_conversation', 'conversation_history']
     };
     const fingerprint = JSON.stringify(event);
     if (fingerprint === lastSnapshot) return;
@@ -313,7 +313,7 @@
   });
   emitEvent({
     type: 'adapter_ready',
-    capabilities: ['streaming', 'citations', 'new_conversation', 'conversation_history']
+    capabilities: ['streaming', 'citations', 'rich_text', 'new_conversation', 'conversation_history']
   });
   const observer = new MutationObserver(scheduleSnapshot);
   const observeDocument = () => {

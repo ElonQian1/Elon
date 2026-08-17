@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 11)
+assert.equal(policy.version, 12)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -141,6 +141,19 @@ assert.equal(policy.accepts({
 }), true)
 
 assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '彰化縣- 縣市預報 | 交通部中央氣象署 天氣...',
+  textLength: 38,
+  citations: 0,
+  semanticBlocks: 1,
+  links: 1,
+  tabControls: 0,
+  afterQuery: true,
+  resultListItem: true,
+  explicit: true,
+}), false, 'organic result cards must not be rendered as the AI answer')
+
+assert.equal(policy.accepts({
   hasQuery: false,
   textLength: 240,
   citations: 2,
@@ -277,9 +290,10 @@ assert.equal(policy.accepts({
 assert.ok(policy.penalty({ links: 3, tabControls: 2 }) > policy.penalty({ links: 0, tabControls: 0 }))
 
 assert.equal(policy.select([
-  { id: 'older-long', trustedAnswerContainer: true, domOrder: 2, score: 9000, textLength: 900 },
-  { id: 'latest-short', trustedAnswerContainer: true, domOrder: 5, score: 20, textLength: 2 },
-]).id, 'latest-short')
+  { id: 'complete-answer', afterQuery: true, trustedAnswerContainer: true, domOrder: 2, score: 9000, textLength: 900 },
+  { id: 'last-sentence', afterQuery: true, trustedAnswerContainer: true, domOrder: 5, score: 20, textLength: 22 },
+  { id: 'organic-result', afterQuery: true, trustedAnswerContainer: true, domOrder: 9, score: 400, textLength: 80 },
+]).id, 'complete-answer', 'the complete AI response must win over later leaf text and result cards')
 assert.equal(policy.select([
   { id: 'later-unrelated', domOrder: 9, score: 9000, textLength: 900 },
   { id: 'current-answer', afterQuery: true, domOrder: 4, score: 20, textLength: 2 },

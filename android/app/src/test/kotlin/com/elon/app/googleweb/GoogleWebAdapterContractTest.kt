@@ -13,6 +13,7 @@ class GoogleWebAdapterContractTest {
         val adapter = read("android/app/src/main/assets/google_web_adapter.js")
         val extractor = read("android/app/src/main/assets/google_web_message_extractor.js")
         val queryPolicy = read("android/app/src/main/assets/google_web_query_policy.js")
+        val richContent = read("android/app/src/main/assets/google_web_rich_content.js")
         val composerBridge = read("android/app/src/main/assets/google_web_composer_bridge.js")
         val sendPolicy = read("android/app/src/main/assets/google_web_send_policy.js")
         val pageAdapter = read(
@@ -62,6 +63,8 @@ class GoogleWebAdapterContractTest {
         assertTrue(extractor.contains("answerCandidate"))
         assertTrue(extractor.contains("[id^=\"aim-chrome-initial-inline-async-container\"]"))
         assertTrue(extractor.contains("const queries = queryEntries()"))
+        assertTrue(extractor.contains("richContent.parts(answer.node, answer.text, entry.text)"))
+        assertTrue(richContent.contains("__elonGoogleWebRichContent"))
         assertTrue(extractor.contains("answerCandidate(composer, entry.text, entry.node"))
         assertTrue(extractor.contains("rememberQuery"))
         assertTrue(extractor.contains("queryPolicy.select"))

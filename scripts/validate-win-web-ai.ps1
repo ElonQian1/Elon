@@ -18,7 +18,7 @@ function Invoke-Checked {
 
 Invoke-Checked 'adapter_js_syntax' {
     $AdapterAssets = @(Get-ChildItem (Join-Path $TaskRepoRoot 'android\app\src\main\assets\*') `
-        -Include 'chatgpt_web_adapter*.js','google_web_adapter*.js' -File)
+        -Include 'chatgpt_web_adapter*.js','google_web_*.js' -File)
     if (-not $AdapterAssets.Count) { throw 'No shared Web AI adapter assets were found.' }
     foreach ($Asset in $AdapterAssets) {
         & node --check $Asset.FullName

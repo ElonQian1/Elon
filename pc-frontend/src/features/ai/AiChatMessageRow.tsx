@@ -12,6 +12,7 @@ export interface AiMessage {
   id?: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  content_format?: 'plain' | 'markdown'
   created_at?: string
   node_exec?: boolean
   node_display_name?: string
@@ -68,7 +69,9 @@ export default function AiChatMessageRow({
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
   const content = displayMessageContentOrAttachment(message.content)
-  const hasMarkdown = !isUser && /[#*`\[\]>|]/.test(content)
+  const hasMarkdown = !isUser && (
+    message.content_format === 'markdown' || /[#*`\[\]>|]/.test(content)
+  )
   const messageActionKey = message.id ?? `${activeConvId}:${message.role}:${message.created_at ?? index}:${content.slice(0, 80)}`
   const copySourceId = messageCopySourceId('ai-chat', messageActionKey)
   const nodePrefix = message.node_remote ? '远程' : '本机'

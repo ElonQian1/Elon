@@ -24,6 +24,12 @@ import {
 } from './localAiBrowserProtocol'
 import { deriveLocalAiUserState, type LocalAiClientState } from './localAiUserState'
 import useLocalAiSessionPolling from './useLocalAiSessionPolling'
+import {
+  beginOptimisticLocalAiSend,
+  mergeOptimisticLocalAiMessages,
+  pendingLocalAiSendObserved,
+  type PendingLocalAiSend,
+} from './localAiOptimisticSend'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -42,12 +48,15 @@ export default function useLocalAiWebChatController(
   }))
   const [draft, setDraft] = useState('')
   const [draftTouched, setDraftTouched] = useState(false)
+  const [pendingSends, setPendingSends] = useState<PendingLocalAiSend[]>([])
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const autoStartKey = useRef('')
   const responseRefreshGeneration = useRef(0)
   const responseRefreshTimer = useRef(0)
   const expectedResponsePrompt = useRef('')
+  const optimisticSendSequence = useRef(0)
+  const draftRef = useRef('')
   const visibleSessionState = provider && ownerKey
     ? sessionEntry.identity === requestedSessionIdentity
       && sessionEntry.state?.providerId === provider.id
@@ -59,6 +68,10 @@ export default function useLocalAiWebChatController(
       ? visibleSessionState.semanticEvent
       : null,
     [visibleSessionState?.semanticEvent],
+  )
+  const visibleMessages = useMemo(
+    () => mergeOptimisticLocalAiMessages(snapshot?.messages ?? [], pendingSends),
+    [pendingSends, snapshot?.messages],
   )
   const navigationSnapshot = useMemo(
     () => isLocalAiConversationSnapshot(visibleSessionState?.navigationEvent)
@@ -107,7 +120,9 @@ export default function useLocalAiWebChatController(
       ? getCachedLocalAiWebSessionState(providerId, ownerKey)
       : null)
     setDraft('')
+    draftRef.current = ''
     setDraftTouched(false)
+    setPendingSends([])
     setBusyAction('')
     setMessage('')
     autoStartKey.current = ''
@@ -144,8 +159,24 @@ export default function useLocalAiWebChatController(
   }, [ownerKey, providerDisplayName, providerId, requestedSessionIdentity])
 
   useEffect(() => {
-    if (!draftTouched) setDraft(snapshot?.draft ?? '')
+    if (!draftTouched) {
+      const nextDraft = snapshot?.draft ?? ''
+      draftRef.current = nextDraft
+      setDraft(nextDraft)
+    }
   }, [draftTouched, snapshot?.draft])
+
+  useEffect(() => {
+    if (!snapshot || pendingSends.length === 0) return
+    const remaining = pendingSends.filter((pending) => (
+      !pendingLocalAiSendObserved(snapshot.messages, pending)
+    ))
+    if (remaining.length === pendingSends.length) return
+    setPendingSends(remaining)
+    if (remaining.length === 0 && !snapshot.draft && !draftRef.current) {
+      setDraftTouched(false)
+    }
+  }, [pendingSends, snapshot])
 
   useEffect(() => {
     const expected = normalizePrompt(expectedResponsePrompt.current)
@@ -198,6 +229,7 @@ export default function useLocalAiWebChatController(
   async function openCachedConversation(conversationId: string) {
     if (!provider || !ownerKey || busyAction) return
     setBusyAction('open_cached_conversation')
+    setPendingSends([])
     cancelResponseRefresh()
     setMessage('正在从本机缓存恢复会话，并在后台连接官方上下文…')
     try {
@@ -217,6 +249,20 @@ export default function useLocalAiWebChatController(
       return null
     }
     setBusyAction(action)
+    const pendingSend = action === 'send_prompt'
+      ? beginOptimisticLocalAiSend(
+          snapshot?.messages ?? [],
+          pendingSends,
+          value ?? '',
+          `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
+        )
+      : null
+    if (pendingSend) {
+      setPendingSends((current) => current.concat(pendingSend))
+      draftRef.current = ''
+      setDraft('')
+      setDraftTouched(true)
+    }
     if (['new_conversation', 'open_conversation', 'open_project'].includes(action)) {
       cancelResponseRefresh()
     }
@@ -225,16 +271,16 @@ export default function useLocalAiWebChatController(
       const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
       const next = await waitForLocalAiAdapterResult(provider.id, ownerKey, action, requestId)
       if (!next) {
+        rollbackPendingSend(pendingSend)
         setMessage('没有收到当前命令的匹配回执；为避免误判，一龙没有把这次操作标记为成功。请显示官方页检查后重试。')
         return null
       }
       if (next) setSessionState(next)
       const result = next?.commandResult
       if (result?.action === action && !result.ok) {
+        rollbackPendingSend(pendingSend)
         setMessage(result.detail || '官方网页没有完成这个动作，请显示官方窗口后重试。')
       } else if (action === 'send_prompt') {
-        setDraft('')
-        setDraftTouched(false)
         setMessage(result?.detail || '消息已交给官方网页发送。')
         startResponseRefresh(value ?? '')
       } else if (result?.detail) {
@@ -242,10 +288,21 @@ export default function useLocalAiWebChatController(
       }
       return next
     } catch (error) {
+      rollbackPendingSend(pendingSend)
       setMessage(localAiBrowserErrorMessage(error))
       return null
     } finally {
       setBusyAction('')
+    }
+  }
+
+  function rollbackPendingSend(pending: PendingLocalAiSend | null) {
+    if (!pending) return
+    setPendingSends((current) => current.filter((item) => item.id !== pending.id))
+    if (!draftRef.current) {
+      draftRef.current = pending.prompt
+      setDraft(pending.prompt)
+      setDraftTouched(true)
     }
   }
 
@@ -320,6 +377,7 @@ export default function useLocalAiWebChatController(
   return {
     sessionState: visibleSessionState,
     snapshot,
+    visibleMessages,
     navigationSnapshot,
     composerSnapshot,
     featureSnapshot,
@@ -328,6 +386,7 @@ export default function useLocalAiWebChatController(
     sessionOpen,
     draft,
     setDraft: (value: string) => {
+      draftRef.current = value
       setDraft(value)
       setDraftTouched(true)
     },

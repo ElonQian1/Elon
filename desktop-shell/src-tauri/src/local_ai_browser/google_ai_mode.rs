@@ -5,12 +5,14 @@ use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, s
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 8;
+const ADAPTER_VERSION: u32 = 10;
 
 pub fn initialization_script() -> String {
     let answer_candidate_policy = include_str!(
         "../../../../android/app/src/main/assets/google_web_answer_candidate_policy.js"
     );
+    let rich_content =
+        include_str!("../../../../android/app/src/main/assets/google_web_rich_content.js");
     let message_extractor =
         include_str!("../../../../android/app/src/main/assets/google_web_message_extractor.js");
     let composer_bridge =
@@ -79,6 +81,7 @@ pub fn initialization_script() -> String {
     try {
       window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
       __ANSWER_CANDIDATE_POLICY_SOURCE__
+      __RICH_CONTENT_SOURCE__
       __MESSAGE_EXTRACTOR_SOURCE__
       __COMPOSER_BRIDGE_SOURCE__
       __SEND_POLICY_SOURCE__
@@ -118,6 +121,7 @@ pub fn initialization_script() -> String {
         "__ANSWER_CANDIDATE_POLICY_SOURCE__",
         answer_candidate_policy,
     )
+    .replace("__RICH_CONTENT_SOURCE__", rich_content)
     .replace("__MESSAGE_EXTRACTOR_SOURCE__", message_extractor)
     .replace("__COMPOSER_BRIDGE_SOURCE__", composer_bridge)
     .replace("__SEND_POLICY_SOURCE__", send_policy)
@@ -407,9 +411,12 @@ mod tests {
     #[test]
     fn desktop_bootstrap_reuses_the_android_google_adapter() {
         let script = initialization_script();
-        assert!(script.contains("window.__elonGoogleWebAdapterVersion = 8"));
+        assert!(script.contains(&format!(
+            "window.__elonGoogleWebAdapterVersion = {ADAPTER_VERSION}"
+        )));
         assert!(script.contains("window.__elonGoogleWebDocumentToken"));
         assert!(script.contains("window.__elonGoogleWebAnswerCandidatePolicy"));
+        assert!(script.contains("window.__elonGoogleWebRichContent"));
         assert!(script.contains("window.__elonGoogleWebMessageExtractor"));
         assert!(script.contains("window.__elonGoogleWebComposerBridge"));
         assert!(script.contains("window.__elonGoogleWebSendPolicy"));

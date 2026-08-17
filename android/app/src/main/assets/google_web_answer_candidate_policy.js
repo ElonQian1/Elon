@@ -131,6 +131,7 @@
     const liveRegion = metrics && metrics.liveRegion === true;
     const explicit = metrics && metrics.explicit === true;
     if (!hasQuery || textLength < 1) return false;
+    if (metrics && metrics.resultListItem === true) return false;
     if (navigationOnlyText(metrics && metrics.text)) return false;
     if (transientStatusText(metrics && metrics.text)) return false;
     if (shareSurfaceText(metrics && metrics.text)) return false;
@@ -156,14 +157,14 @@
     const trusted = values.filter((candidate) => candidate.trustedAnswerContainer === true);
     const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : values);
     return pool.sort((left, right) =>
-      nonNegative(right.domOrder) - nonNegative(left.domOrder) ||
       Number(right.score || 0) - Number(left.score || 0) ||
-      nonNegative(left.textLength) - nonNegative(right.textLength)
+      nonNegative(right.textLength) - nonNegative(left.textLength) ||
+      nonNegative(left.domOrder) - nonNegative(right.domOrder)
     )[0] || null;
   }
 
   return Object.freeze({
-    version: 11,
+    version: 12,
     accepts,
     penalty,
     select,
