@@ -45,6 +45,21 @@ class WebChatProductionInteractionLatencyContractTest {
         assertTrue(combined.contains("interactionCache"))
     }
 
+    @Test
+    fun productionChatPrewarmsDeclaredCapabilitiesBeforeTheUserOpensMenus() {
+        val feature = read("MainSocialAiChatFeature.kt")
+        val prewarmer = read("WebChatProductionCapabilityPrewarmer.kt")
+
+        assertTrue(feature.contains("productionCapabilityPrewarmer.schedule(provider)"))
+        assertTrue(prewarmer.contains("WebChatProviderCapability.MODEL_SELECTOR"))
+        assertTrue(prewarmer.contains("WebChatProviderCapability.COMPOSER_TOOLS"))
+        assertTrue(prewarmer.contains("WebChatProviderCapability.FEATURE_NAVIGATION"))
+        assertTrue(prewarmer.contains("WebChatProviderCapability.PAGE_ACTIONS"))
+        assertTrue(prewarmer.contains("SUCCESS_COOLDOWN_MS"))
+        assertTrue(prewarmer.contains("RETRY_DELAYS_MS"))
+        assertTrue(feature.contains("productionCapabilityPrewarmer.cancel()"))
+    }
+
     private fun assertBefore(source: String, first: String, second: String) {
         val firstIndex = source.indexOf(first)
         val secondIndex = source.indexOf(second, startIndex = firstIndex.coerceAtLeast(0))

@@ -156,6 +156,19 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionPageActions by productionPageActionsDelegate
+    private val productionCapabilityPrewarmerDelegate = lazy {
+        WebChatProductionCapabilityPrewarmer(
+            consumerPort = {
+                if (isChatModeActive()) activeController().consumerPort() else null
+            },
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            interactionCache = webChatInteractionCache,
+            scheduleAction = { delayMs, action -> binding.root.postDelayed(action, delayMs) },
+        )
+    }
+    private val productionCapabilityPrewarmer by productionCapabilityPrewarmerDelegate
     private val productionConversationActions by lazy {
         WebChatProductionConversationActionsCoordinator(
             activity, binding.root,
@@ -371,12 +384,20 @@ internal class MainSocialAiChatFeature(
     }
 
     fun onHostResumed(resumeWorkChat: () -> Unit) {
-        if (isChatModeActive()) activeController().onHostResumed() else resumeWorkChat()
+        if (isChatModeActive()) {
+            activeController().onHostResumed()
+            productionCapabilityPrewarmer.schedule(WebChatProviderRegistry.get(providerId()))
+        } else {
+            resumeWorkChat()
+        }
     }
 
     fun onHostPaused() {
         composerDrafts.rememberCurrent()
         flushProviderDrafts()
+        if (productionCapabilityPrewarmerDelegate.isInitialized()) {
+            productionCapabilityPrewarmer.cancel()
+        }
         if (chatGptControllerDelegate.isInitialized()) chatGptController.onHostPaused()
         if (googleControllerDelegate.isInitialized()) googleController.onHostPaused()
     }
@@ -384,6 +405,9 @@ internal class MainSocialAiChatFeature(
     fun destroy() {
         composerDrafts.rememberCurrent()
         flushProviderDrafts()
+        if (productionCapabilityPrewarmerDelegate.isInitialized()) {
+            productionCapabilityPrewarmer.cancel()
+        }
         if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
         if (googleControllerDelegate.isInitialized()) googleController.destroy()
         chatGptWebLifecycle.dispose()
@@ -404,6 +428,9 @@ internal class MainSocialAiChatFeature(
             productionFeatureNavigation.cancelPending()
         }
         if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
+        if (productionCapabilityPrewarmerDelegate.isInitialized()) {
+            productionCapabilityPrewarmer.cancel()
+        }
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
@@ -467,6 +494,7 @@ internal class MainSocialAiChatFeature(
         }
         binding.root.post { controller.refreshComposerModel() }
         refreshConsumerComposerUi()
+        productionCapabilityPrewarmer.schedule(provider)
     }
 
     private fun refreshConsumerComposerUi() {
@@ -493,6 +521,7 @@ internal class MainSocialAiChatFeature(
                 views.webToolsButton.visibility = if (state.toolsVisible) View.VISIBLE else View.GONE
             }
             productionSuggestions.render(provider, controller.consumerPort())
+            productionCapabilityPrewarmer.schedule(provider)
         } else if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         refreshInputComposerVisual()
     }

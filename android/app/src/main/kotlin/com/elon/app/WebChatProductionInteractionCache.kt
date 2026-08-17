@@ -30,6 +30,14 @@ internal class WebChatProductionInteractionCache {
         observed: List<WebChatConsumerControlDescriptor>,
     ): List<WebChatConsumerControlDescriptor> = retainLatest(providerId, observed, controls)
 
+    fun capture(providerId: WebChatProviderId, state: WebChatConsumerState) {
+        state.composerSections.forEach { (section, options) ->
+            composerOptions(providerId, section, options)
+        }
+        features(providerId, state.features)
+        controls(providerId, state.controls)
+    }
+
     fun clear(providerId: WebChatProviderId) {
         composerSections.keys.removeAll { it.providerId == providerId }
         features.remove(providerId)

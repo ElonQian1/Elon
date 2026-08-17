@@ -62,6 +62,45 @@ class WebChatProductionInteractionCacheTest {
         )
     }
 
+    @Test
+    fun capturesEveryInteractionSurfaceDuringBackgroundPrewarm() {
+        cache.capture(
+            WebChatProviderId.CHATGPT_WEB,
+            WebChatConsumerState(
+                streaming = false,
+                dictationActive = false,
+                composerSections = mapOf(
+                    "model" to listOf(option("fast")),
+                    "tools" to listOf(option("search")),
+                ),
+                pageKind = "conversation",
+                pageUrl = "https://example.invalid/",
+                features = listOf(feature("projects")),
+                controls = listOf(control("more")),
+                commandRequests = emptyList(),
+            ),
+        )
+
+        assertEquals("fast", cache.composerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "model",
+            emptyList(),
+        ).single().id)
+        assertEquals("search", cache.composerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "tools",
+            emptyList(),
+        ).single().id)
+        assertEquals("projects", cache.features(
+            WebChatProviderId.CHATGPT_WEB,
+            emptyList(),
+        ).single().id)
+        assertEquals("more", cache.controls(
+            WebChatProviderId.CHATGPT_WEB,
+            emptyList(),
+        ).single().control.id)
+    }
+
     private fun option(id: String) = WebChatConsumerOption(
         id = id,
         label = id,
