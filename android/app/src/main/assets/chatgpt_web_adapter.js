@@ -20,6 +20,7 @@
   let disposed = false;
   let observer = null;
   let snapshotScheduler = null;
+  let streamingSnapshotMode = false;
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
   const SEND_BUTTON_TIMEOUT_MS = 4000;
@@ -163,6 +164,7 @@
     const composer = findComposer();
     const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
     const streaming = optional(false, isStreaming);
+    streamingSnapshotMode = streaming;
     const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
       messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
         ? messageAdapter.readMessageWindow(streaming)
@@ -201,7 +203,7 @@
 
   function scheduleSnapshot(recordsOrActive) {
     if (disposed || !snapshotScheduler) return;
-    const active = recordsOrActive === true || optional(false, isStreaming);
+    const active = recordsOrActive === true || streamingSnapshotMode;
     snapshotScheduler.schedule(active);
   }
 
@@ -315,7 +317,7 @@
       value,
       (button) => {
         button.click();
-        scheduleSnapshot();
+        scheduleSnapshot(true);
         waitForSendAccepted(
           composer,
           value,

@@ -97,7 +97,9 @@ const adapterSource = fs.readFileSync(path.join(
   'chatgpt_web_adapter.js'
 ), 'utf8');
 assert.match(adapterSource, /function scheduleSnapshot\(recordsOrActive\)/);
-assert.match(adapterSource, /recordsOrActive === true \|\| optional\(false, isStreaming\)/);
+assert.match(adapterSource, /streamingSnapshotMode = streaming/);
+assert.match(adapterSource, /recordsOrActive === true \|\| streamingSnapshotMode/);
+assert.match(adapterSource, /button\.click\(\);\s*scheduleSnapshot\(true\)/);
 assert.match(adapterSource, /snapshotScheduler\.schedule\(active\)/);
 assert.match(adapterSource, /quietDelayMs:\s*240/);
 assert.match(adapterSource, /maxDelayMs:\s*5000/);
