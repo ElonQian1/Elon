@@ -18,7 +18,7 @@ foreach ($required in @(
     "Assert-ChatGptWebSmokeAdapterVersion",
     'ExpectedAdapterVersion = 0',
     'Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion',
-    'view_mode -notin @("official", "web")',
+    'Open-ChatGptWebSmokeSurface -Runtime $runtime',
     '$state.bridge_state -eq "ready"',
     '$state.adapter_current -eq $true',
     'Wait-FirstControl -Semantic "profile" -Region "overlay"',
@@ -53,6 +53,7 @@ foreach ($required in @(
 }
 
 foreach ($forbidden in @(
+    "chatgpt_select_view",
     "send_input",
     "chatgpt_set_control_text",
     "chatgpt_select_control_choice",

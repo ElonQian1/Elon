@@ -84,6 +84,9 @@ function Invoke-ApkMcp {
     if ($null -eq $structured) {
         throw "APK MCP tool returned no structured content: $Tool"
     }
+    if ($Tool -eq "ui_state" -and $null -ne $structured.chatgpt_web_mcp) {
+        return $structured.chatgpt_web_mcp
+    }
     return $structured
 }
 
@@ -134,7 +137,7 @@ function Wait-ChatGptActivityForeground {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
     do {
         $top = Get-TopResumedActivity
-        if ($top -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b') {
+        if ($top -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebOfficialActivity\b') {
             return $top
         }
         Start-Sleep -Milliseconds 250
@@ -162,7 +165,7 @@ function Get-VisibleNativeSelectors {
     return @(Get-ChatGptNativeSelectorsFromXml -UiXml $UiXml)
 }
 
-function Wait-VisibleNativeSelectors {
+function Wait-VisibleProductionSelectors {
     param(
         [Parameter(Mandatory = $true)][string[]]$RequiredPrefixes,
         [Parameter(Mandatory = $true)][int]$TimeoutSec
@@ -355,36 +358,30 @@ $smokeRuntime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $smokeRuntime
 Start-ChatGptWebSmokeAwakeLease -Runtime $smokeRuntime | Out-Null
 try {
+$state = Open-ChatGptWebSmokeSurface -Runtime $smokeRuntime
 $opened = Invoke-UiAction -Action "open_chatgpt_official_fallback" -Arguments @{
     wait_for_target_bind_ms = 12000
 } -EnsureMainActivity
-$officialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
-$state = Wait-ChatGptState -TimeoutSec $ReadyTimeoutSec -Description "ChatGPT Web readiness" -Predicate {
-    param($value)
-    $value.surface -eq "chatgpt_web" -and
-        $value.bridge_state -eq "ready" -and
-        $value.activity_bound -eq $true
-}
-Assert-ChatGptWebSmokeAdapterVersion -State $state `
-    -ExpectedAdapterVersion $ExpectedAdapterVersion
 $topResumedActivity = Wait-ChatGptActivityForeground
 $officialUiXml = Get-VisibleUiXml
 
 Add-Check "open_chatgpt_official_fallback" ($opened.control_ok -eq $true) ([string]$opened.action)
-Add-Check "official_view_selected" ($officialView.control_ok -eq $true) ([string]$officialView.view_mode)
-Add-Check "chatgpt_target_bound" (
-    $opened.target_activity_bound -eq $true -or $opened.surface -eq "chatgpt_web"
-) ([string]$opened.target_surface)
 Add-Check "chatgpt_activity_foreground" (
-    $topResumedActivity -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
+    $topResumedActivity -match 'com\.elon\.app/\.chatgptweb\.ChatGptWebOfficialActivity\b'
 ) $topResumedActivity
-Add-Check "chatgpt_surface" ($state.surface -eq "chatgpt_web") ([string]$state.surface)
-Add-Check "official_fullscreen_mode" ($state.view_mode -eq "web") ([string]$state.view_mode)
 foreach ($chromeId in @("chatGptWebToolbar", "chatGptWebStatus", "chatGptModeToggle")) {
     Add-Check "official_fullscreen_chrome_$chromeId" (
         -not (Test-ChatGptResourceVisible -UiXml $officialUiXml -ResourceId $chromeId)
     ) $chromeId
 }
+Invoke-Adb shell input keyevent 4 | Out-Null
+$state = Open-ChatGptWebSmokeSurface -Runtime $smokeRuntime
+Assert-ChatGptWebSmokeAdapterVersion -State $state `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
+Add-Check "chatgpt_surface" ($state.surface -eq "chatgpt_web") ([string]$state.surface)
+Add-Check "production_activity_foreground" (
+    (Get-TopResumedActivity) -match 'com\.elon\.app/\.MainActivity\b'
+) (Get-TopResumedActivity)
 Add-Check "bridge_ready" ($state.bridge_state -eq "ready") ([string]$state.bridge_state)
 Add-Check "authenticated" ($state.authenticated -eq $true) ([string]$state.authenticated)
 Add-Check "composer_ready" ($state.composer_ready -eq $true) ([string]$state.composer_ready)
@@ -723,27 +720,19 @@ Add-Check "conversation_collection_timeout" (
     $conversationCollection.timed_out -ne $true
 ) "reached_end=$($conversationCollection.reached_end),truncated=$($conversationCollection.truncated)"
 
-$nativeView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "native" }
-Add-Check "native_view_selected" ($nativeView.control_ok -eq $true) ([string]$nativeView.view_mode)
 $requiredSelectors = @(
-    "chatgpt-native:conversation-list:",
-    "chatgpt-native:feature-list:",
-    "chatgpt-native:composer-input:",
-    "chatgpt-native:composer-model:",
-    "chatgpt-native:composer-tools:",
-    "chatgpt-native:dictation:",
-    "chatgpt-native:send:"
+    "web-chat-composer-input:chatgpt_web",
+    "web-chat-attachment:chatgpt_web",
+    "web-chat-composer-tools:chatgpt_web",
+    "web-chat-page-actions:chatgpt_web",
+    "web-chat-send"
 )
-$visibleSelectors = Wait-VisibleNativeSelectors -RequiredPrefixes $requiredSelectors `
+$visibleSelectors = Wait-VisibleProductionSelectors -RequiredPrefixes $requiredSelectors `
     -TimeoutSec $ReadyTimeoutSec
 foreach ($prefix in $requiredSelectors) {
     $match = @($visibleSelectors | Where-Object { $_.StartsWith($prefix) })
-    Add-Check "selector_$($prefix.Split(':')[1])" ($match.Count -gt 0) ($match -join ",")
+    Add-Check "production_selector_$($prefix.Replace(':', '_'))" ($match.Count -gt 0) ($match -join ",")
 }
-$restoredOfficialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }
-Add-Check "official_view_restored" (
-    $restoredOfficialView.control_ok -eq $true
-) ([string]$restoredOfficialView.view_mode)
 
 $failed = @($checks | Where-Object { -not $_.passed })
 $summary = [ordered]@{
@@ -756,7 +745,7 @@ $summary = [ordered]@{
     adapter_version = [int]$state.adapter_version
     authenticated = [bool]$state.authenticated
     composer_ready = [bool]$state.composer_ready
-    visible_native_selector_count = $visibleSelectors.Count
+    visible_production_selector_count = $visibleSelectors.Count
     manifest = $matrix.manifest
     feature_baseline = $featureBaseline
     adaptation_review = $matrix.adaptation_review

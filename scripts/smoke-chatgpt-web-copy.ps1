@@ -38,10 +38,7 @@ function Invoke-ReceiptAction {
 }
 
 function Restore-Origin {
-    param(
-        [AllowEmptyString()][string]$ConversationPath,
-        [Parameter(Mandatory = $true)][string]$ViewMode
-    )
+    param([AllowEmptyString()][string]$ConversationPath)
 
     if ($ConversationPath) {
         Invoke-ReceiptAction -Action "chatgpt_open_conversation" `
@@ -57,20 +54,10 @@ function Restore-Origin {
         Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
             -ExpectedAction "new_conversation" | Out-Null
     }
-    if ($ViewMode -in @("web", "native")) {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = $ViewMode } | Out-Null
-        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-            -Description "original ChatGPT view mode restoration" -Predicate {
-                param($state)
-                [string]$state.view_mode -eq $ViewMode
-            }.GetNewClosure() | Out-Null
-    }
 }
 
 $result = $null
 $originPath = ""
-$originMode = ""
 $originRestored = $false
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
@@ -79,7 +66,6 @@ try {
         -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    $originMode = [string]$origin.view_mode
     $originPath = [regex]::Match(
         [string]$origin.conversation.url,
         '/c/[A-Za-z0-9_-]{1,160}'
@@ -127,7 +113,7 @@ try {
         throw "ChatGPT clipboard receipt leaked the synthetic reply."
     }
 
-    Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+    Restore-Origin -ConversationPath $originPath
     $originRestored = $true
     $result = [ordered]@{
         schema = "elon.chatgpt_web.copy_acceptance.v1"
@@ -140,7 +126,7 @@ try {
         clipboard_mime_types = @($copy.receipt.mime_types)
         clipboard_content_read_back = $false
         original_conversation_restored = $true
-        original_view_mode_restored = $true
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         private_content_emitted = $false
         cleared_cookies = $false
         cleared_app_data = $false
@@ -149,9 +135,9 @@ try {
         -CaseIds @("reversible/copy_receipt_without_content_readback") `
         -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 } finally {
-    if (-not $originRestored -and $originMode) {
+    if (-not $originRestored) {
         try {
-            Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+            Restore-Origin -ConversationPath $originPath
         } catch {
             Write-Warning "Unable to restore the original ChatGPT view after a failed copy smoke."
         }

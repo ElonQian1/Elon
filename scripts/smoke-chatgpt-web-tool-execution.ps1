@@ -153,10 +153,7 @@ function Restore-ToolSelection {
 }
 
 function Restore-Origin {
-    param(
-        [AllowEmptyString()][string]$ConversationPath,
-        [Parameter(Mandatory = $true)][string]$ViewMode
-    )
+    param([AllowEmptyString()][string]$ConversationPath)
 
     if ($ConversationPath) {
         Invoke-ReceiptAction -Action "chatgpt_open_conversation" `
@@ -172,20 +169,10 @@ function Restore-Origin {
         Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
             -ExpectedAction "new_conversation" | Out-Null
     }
-    if ($ViewMode -in @("web", "native")) {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = $ViewMode } | Out-Null
-        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-            -Description "original ChatGPT view mode restoration" -Predicate {
-                param($state)
-                [string]$state.view_mode -eq $ViewMode
-            }.GetNewClosure() | Out-Null
-    }
 }
 
 $result = $null
 $originPath = ""
-$originMode = ""
 $originRestored = $false
 $enabledBySmoke = $false
 $toolStateRestored = $false
@@ -196,7 +183,6 @@ try {
         -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    $originMode = [string]$origin.view_mode
     $originPath = [regex]::Match(
         [string]$origin.conversation.url,
         '/c/[A-Za-z0-9_-]{1,160}'
@@ -257,7 +243,7 @@ try {
 
     Restore-ToolSelection
     $toolStateRestored = $true
-    Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+    Restore-Origin -ConversationPath $originPath
     $originRestored = $true
     $result = [ordered]@{
         schema = "elon.chatgpt_web.tool_execution_acceptance.v2"
@@ -274,7 +260,7 @@ try {
         matching_structural_part_count = $matchingPartCount
         tool_state_restored = $toolStateRestored
         original_conversation_restored = $true
-        original_view_mode_restored = $true
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         private_content_emitted = $false
         cleared_cookies = $false
         cleared_app_data = $false
@@ -291,9 +277,9 @@ try {
             Write-Warning "Unable to restore the original ChatGPT tool selection after a failed smoke."
         }
     }
-    if (-not $originRestored -and $originMode) {
+    if (-not $originRestored) {
         try {
-            Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+            Restore-Origin -ConversationPath $originPath
         } catch {
             Write-Warning "Unable to restore the original ChatGPT view after a failed tool smoke."
         }

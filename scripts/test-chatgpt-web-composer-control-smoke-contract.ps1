@@ -14,7 +14,7 @@ $required = @(
     "RequireChatGptForeground",
     "chatgpt_start_dictation",
     '[string]$_.semantic -eq "dictation"',
-    'view_mode = "native"',
+    'Open-ChatGptWebSmokeSurface -Runtime $runtime',
     'finally {',
     '$restoreSearch',
     "chatgpt_cancel_dictation",
@@ -29,6 +29,7 @@ $required = @(
     '$composerToolDiscoveryCases = [ordered]@{',
     'composer_tool_discovery',
     'executed_tools = 0',
+    'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground',
     "CHATGPT_WEB_COMPOSER_CONTROL_SMOKE_STATUS=passed"
 )
 foreach ($token in $required) {

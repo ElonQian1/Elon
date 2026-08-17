@@ -26,9 +26,7 @@ $conversationContextId = ""
 $observedSemantics = @()
 $mutationsInvoked = 0
 $pinRoundTripVerified = $false
-$originalViewMode = ""
 $originConversationPath = ""
-$viewModeChanged = $false
 $conversationSampleOpened = $false
 $originalPinned = $false
 $pinOriginalStateKnown = $false
@@ -135,9 +133,8 @@ function Restore-ConversationManagementOrigin {
     if (-not $script:conversationSampleOpened) { return }
     Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
         -ConversationPath $script:originConversationPath `
-        -ViewMode $script:originalViewMode -TimeoutSec $TimeoutSec | Out-Null
+        -TimeoutSec $TimeoutSec | Out-Null
     $script:conversationSampleOpened = $false
-    $script:viewModeChanged = $false
 }
 
 function Get-ConversationPinState {
@@ -245,25 +242,6 @@ function Invoke-ConversationPinToggle {
         -TimeoutSec $TimeoutSec -InitialWaitSec 2 | Out-Null
 }
 
-function Restore-OriginalViewMode {
-    if (-not $script:viewModeChanged) { return }
-    $targetMode = switch ($script:originalViewMode) {
-        "native" { "native" }
-        "web" { "official" }
-        "quick" { "quick" }
-        default { throw "Unsupported original ChatGPT view mode." }
-    }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = $targetMode } | Out-Null
-    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-        -Description "original ChatGPT view mode restoration" -Predicate {
-            param($state)
-            [string]$state.view_mode -eq $script:originalViewMode -and
-                $state.bridge_state -eq "ready"
-        } | Out-Null
-    $script:viewModeChanged = $false
-}
-
 function Restore-ConversationPinState {
     if (-not $script:pinStateChanged -or -not $script:pinOriginalStateKnown) { return }
     Close-ConversationManagementMenu
@@ -301,16 +279,8 @@ try {
         -TimeoutSec $TimeoutSec -InitialWaitSec ([Math]::Min(15, $TimeoutSec))
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    $originalViewMode = [string]$origin.view_mode
     $originConversationPath = Get-ChatGptWebSmokeConversationPath `
         -Url ([string]$origin.conversation.url)
-    if ([string]$origin.view_mode -ne "web") {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = "official" } | Out-Null
-        $viewModeChanged = $true
-        $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-            -TimeoutSec $TimeoutSec -InitialWaitSec 5
-    }
     Close-FeatureNavigation
     Open-ConversationManagementSample
     Close-FeatureNavigation
@@ -382,7 +352,6 @@ try {
         -TimeoutSec $TimeoutSec -InitialWaitSec 5 | Out-Null
 
     Restore-ConversationManagementOrigin
-    Restore-OriginalViewMode
     $caseIds = @("safe/conversation_management_structure")
     if ($pinRoundTripVerified) { $caseIds += "supervised/conversation_mutations" }
     Register-ChatGptWebVerificationCases -Runtime $runtime `
@@ -398,7 +367,7 @@ try {
         pin_round_trip_requested = [bool]$ConfirmPinRoundTrip
         pin_round_trip_verified = $pinRoundTripVerified
         mutations_invoked = $mutationsInvoked
-        view_mode_restored = -not $viewModeChanged
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         sent_messages = 0
         cleared_cookies = $false
         cleared_app_data = $false
@@ -409,7 +378,6 @@ try {
     try { Restore-ConversationPinState } catch { $cleanupFailures.Add("pin state") }
     try { Close-ConversationManagementMenu } catch { $cleanupFailures.Add("menu") }
     try { Restore-ConversationManagementOrigin } catch { $cleanupFailures.Add("conversation") }
-    try { Restore-OriginalViewMode } catch { $cleanupFailures.Add("view mode") }
     try {
         Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
     } catch {

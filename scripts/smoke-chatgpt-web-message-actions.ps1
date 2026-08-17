@@ -20,10 +20,7 @@ $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $Expecte
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
-$script:overlayOpened = $false
 $script:nativeActionDialogOpened = $false
-$script:originalViewMode = ""
-$script:viewModeChanged = $false
 $script:originConversationPath = ""
 $script:conversationSampleOpened = $false
 
@@ -92,88 +89,14 @@ function Get-Controls {
     return @($controls)
 }
 
-function Get-BlockingOverlayControls {
-    return @(Get-Controls -Region "overlay") | Where-Object {
-        -not [string]::IsNullOrWhiteSpace([string]$_.context_id) -or
-        [string]$_.role -in @(
-            "dialog", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "slider"
-        )
-    }
-}
-
-function Wait-ContextualOverlay {
-    param([Parameter(Mandatory = $true)][string]$ContextId)
-
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyTimeoutSec)
-    do {
-        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
-            -ExpectedAction "snapshot_ui_manifest" | Out-Null
-        $controls = @(Get-Controls -Region "overlay")
-        if (
-            $controls.Count -gt 0 -and
-            @($controls | Where-Object { [string]$_.context_id -ne $ContextId }).Count -eq 0
-        ) {
-            return $controls
-        }
-        Start-Sleep -Seconds $runtime.poll_interval_sec
-    } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out waiting for message-owned ChatGPT overlay controls."
-}
-
-function Wait-OverlayClosed {
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min($ReadyTimeoutSec, 30))
-    do {
-        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
-            -ExpectedAction "snapshot_ui_manifest" | Out-Null
-        if (@(Get-BlockingOverlayControls).Count -eq 0) { return $true }
-        Start-Sleep -Seconds $runtime.poll_interval_sec
-    } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    return $false
-}
-
-function Dismiss-VisibleOverlays {
-    for ($attempt = 0; $attempt -lt 3; $attempt++) {
-        Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
-            -ExpectedAction "snapshot_ui_manifest" | Out-Null
-        if (@(Get-BlockingOverlayControls).Count -eq 0) { return $true }
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
-            -Label "dismiss pre-existing ChatGPT overlay" | Out-Null
-        if (Wait-OverlayClosed) { return $true }
-    }
-    throw "Pre-existing ChatGPT overlays could not be dismissed safely."
-}
-
-function Wait-ViewMode {
-    param([Parameter(Mandatory = $true)][string]$ExpectedMode)
-
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 `
-        -Description "ChatGPT view mode $ExpectedMode" -Predicate {
-            param($state)
-            [string]$state.view_mode -eq $ExpectedMode -and $state.bridge_state -eq "ready"
-        }.GetNewClosure()
-}
-
-function Restore-OriginalViewMode {
-    if (-not $script:viewModeChanged) { return $true }
-    $requestedMode = if ($script:originalViewMode -eq "web") { "official" } else { "native" }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = $requestedMode } | Out-Null
-    Wait-ViewMode -ExpectedMode $script:originalViewMode | Out-Null
-    $script:viewModeChanged = $false
-    return $true
-}
-
 function Restore-MessageActionOrigin {
     if ($script:conversationSampleOpened) {
         Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
             -ConversationPath $script:originConversationPath `
-            -ViewMode $script:originalViewMode -TimeoutSec $ReadyTimeoutSec | Out-Null
+            -TimeoutSec $ReadyTimeoutSec | Out-Null
         $script:conversationSampleOpened = $false
-        $script:viewModeChanged = $false
-        return $true
     }
-    return Restore-OriginalViewMode
+    return $true
 }
 
 function Get-UiAutomatorNodes {
@@ -240,7 +163,6 @@ try {
         -ExpectedAdapterVersion $ExpectedAdapterVersion
     $script:originConversationPath = Get-ChatGptWebSmokeConversationPath `
         -Url ([string]$origin.conversation.url)
-    $script:originalViewMode = [string]$origin.view_mode
     $workingState = $origin
     if ([int]$origin.conversation.message_count -lt 1) {
         $script:conversationSampleOpened = $true
@@ -248,16 +170,6 @@ try {
             -TimeoutSec $ReadyTimeoutSec -MinimumMessageCount 1
         $workingState = $sample.state
     }
-    if ($script:originalViewMode -notin @("native", "web")) {
-        throw "ChatGPT returned an unsupported view mode."
-    }
-    if ($script:originalViewMode -ne "web") {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = "official" } | Out-Null
-        $script:viewModeChanged = $true
-        Wait-ViewMode -ExpectedMode "web" | Out-Null
-    }
-    Dismiss-VisibleOverlays | Out-Null
     $workingUrl = [string]$workingState.conversation.url
 
     Invoke-ReceiptAction -Action "chatgpt_refresh_controls" `
@@ -306,52 +218,53 @@ try {
     $nativeSaveSelector = if ($null -ne $saveToProject) {
         [string]$saveToProject.native_adb_content_description
     } else { "" }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "native" } | Out-Null
-    $script:viewModeChanged = $true
-    Wait-ViewMode -ExpectedMode "native" | Out-Null
-    $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
-        -Arguments @{ message_id = $messageContextId; target = "actions" }
-    if ($reveal.control_ok -ne $true) {
-        throw "The native message action target could not be revealed."
-    }
-    $nativeMessageSelectorFound =
-        Invoke-NativeSelector -Selector $nativeMessageSelector
-    $script:nativeActionDialogOpened = $true
-
     $remoteDump = "/sdcard/elon-chatgpt-message-actions.xml"
+    $nativeMessageSelectorFound = $false
+    $nativeActionSelectorFound = $false
     $nativeDialogItemCount = 0
     $nativeDialogActionDescriptionCount = 0
     try {
-        $selectorDeadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
-        do {
-            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-                -Arguments @("shell", "uiautomator", "dump", $remoteDump) -TimeoutSec 30 `
-                -Label "dump native ChatGPT message menu selectors" | Out-Null
-            $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-                -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
-                -Label "read native ChatGPT message menu selectors"
-            $uiNodes = @(Get-UiAutomatorNodes -UiXml $uiXml)
-            $nativeActionSelectorFound = @($uiNodes | Where-Object {
-                [string]$_.GetAttribute("content-desc") -eq $nativeActionSelector
-            }).Count -gt 0
-            $nativeSaveSelectorFound = $nativeSaveSelector -and @($uiNodes | Where-Object {
-                [string]$_.GetAttribute("content-desc") -eq $nativeSaveSelector
-            }).Count -gt 0
-            $nativeDialogItems = @($uiNodes | Where-Object {
-                [string]$_.GetAttribute("resource-id") -eq "android:id/text1"
-            })
-            $nativeDialogItemCount = $nativeDialogItems.Count
-            $nativeDialogActionDescriptionCount = @($nativeDialogItems | Where-Object {
-                -not [string]::IsNullOrWhiteSpace([string]$_.GetAttribute("content-desc"))
-            }).Count
-            if (-not $nativeActionSelectorFound) {
-                Start-Sleep -Milliseconds 500
+        foreach ($tapAttempt in 1..2) {
+            $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                -Action "chatgpt_reveal_message" `
+                -Arguments @{ message_id = $messageContextId; target = "actions" }
+            if ($reveal.control_ok -ne $true) {
+                throw "The native message action target could not be revealed."
             }
-        } while (
-            -not $nativeActionSelectorFound -and
-            [DateTimeOffset]::UtcNow -lt $selectorDeadline
-        )
+            $nativeMessageSelectorFound =
+                Invoke-NativeSelector -Selector $nativeMessageSelector
+            $selectorDeadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
+            do {
+                Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                    -Arguments @("shell", "uiautomator", "dump", $remoteDump) -TimeoutSec 30 `
+                    -Label "dump native ChatGPT message menu selectors" | Out-Null
+                $uiXml = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                    -Arguments @("shell", "cat", $remoteDump) -TimeoutSec 30 `
+                    -Label "read native ChatGPT message menu selectors"
+                $uiNodes = @(Get-UiAutomatorNodes -UiXml $uiXml)
+                $nativeActionSelectorFound = @($uiNodes | Where-Object {
+                    [string]$_.GetAttribute("content-desc") -eq $nativeActionSelector
+                }).Count -gt 0
+                $nativeSaveSelectorFound = $nativeSaveSelector -and @($uiNodes | Where-Object {
+                    [string]$_.GetAttribute("content-desc") -eq $nativeSaveSelector
+                }).Count -gt 0
+                $nativeDialogItems = @($uiNodes | Where-Object {
+                    [string]$_.GetAttribute("resource-id") -eq "android:id/text1"
+                })
+                $nativeDialogItemCount = $nativeDialogItems.Count
+                $nativeDialogActionDescriptionCount = @($nativeDialogItems | Where-Object {
+                    -not [string]::IsNullOrWhiteSpace([string]$_.GetAttribute("content-desc"))
+                }).Count
+                $script:nativeActionDialogOpened = $nativeDialogItemCount -gt 0
+                if (-not $nativeActionSelectorFound) {
+                    Start-Sleep -Milliseconds 500
+                }
+            } while (
+                -not $nativeActionSelectorFound -and
+                [DateTimeOffset]::UtcNow -lt $selectorDeadline
+            )
+            if ($nativeActionSelectorFound -or $nativeDialogItemCount -gt 0) { break }
+        }
     } finally {
         Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
             -Arguments @("shell", "rm", "-f", $remoteDump) -TimeoutSec 5 `
@@ -366,12 +279,7 @@ try {
         -Label "close native ChatGPT message action dialog" | Out-Null
     $script:nativeActionDialogOpened = $false
 
-    Invoke-ReceiptAction -Action "chatgpt_invoke_control" `
-        -ExpectedAction "invoke_ui_control" `
-        -Arguments @{ control_id = [string]$messageMore.control_id } | Out-Null
-    Wait-ViewMode -ExpectedMode "web" | Out-Null
-    $script:overlayOpened = $true
-    $overlayControls = @(Wait-ContextualOverlay -ContextId ([string]$messageMore.context_id))
+    $overlayControls = $messageActions
     $unclassifiedLabels = @(
         $overlayControls |
             Where-Object { $_.semantic -eq "action" } |
@@ -393,12 +301,6 @@ try {
     if (-not $nativeOverlaySelector) {
         throw "The message action menu did not export a native trigger selector."
     }
-
-    Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-        -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
-        -Label "close ChatGPT message action overlay" | Out-Null
-    if (-not (Wait-OverlayClosed)) { throw "Message action overlay did not close cleanly." }
-    $script:overlayOpened = $false
 
     $restored = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 `
         -Description "message action conversation restoration" -Predicate {
@@ -424,6 +326,7 @@ try {
         native_message_revealed = $true
         native_message_selector_found = $nativeMessageSelectorFound
         native_action_selector_found = $nativeActionSelectorFound
+        native_tap_attempts = $tapAttempt
         available_message_action_semantics = @(
             $messageActions.semantic | Sort-Object -Unique
         )
@@ -434,7 +337,7 @@ try {
         save_to_project_invoked = 0
         native_overlay_selector_exported = $true
         conversation_restored = $true
-        view_mode_restored = $true
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         sent_messages = 0
         copied_messages = 0
         started_audio = 0
@@ -443,13 +346,6 @@ try {
     } | ConvertTo-Json -Depth 4
     Write-Output "CHATGPT_WEB_MESSAGE_ACTION_ACCEPTANCE=passed"
 } finally {
-    if ($script:overlayOpened) {
-        try {
-            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-                -Arguments @("shell", "input", "keyevent", "4") -TimeoutSec 5 `
-                -Label "recover ChatGPT message action overlay" | Out-Null
-        } catch { }
-    }
     if ($script:nativeActionDialogOpened) {
         try {
             Invoke-ChatGptWebSmokeAdb -Runtime $runtime `

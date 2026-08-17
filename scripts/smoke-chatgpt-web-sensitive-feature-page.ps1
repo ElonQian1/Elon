@@ -81,12 +81,6 @@ try {
         -TimeoutSec $TimeoutSec -InitialWaitSec ([Math]::Min(15, $TimeoutSec))
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    if ([string]$origin.view_mode -ne "web") {
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = "official" } | Out-Null
-        $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-            -TimeoutSec $TimeoutSec -InitialWaitSec 5
-    }
     $originPath = Get-ObservedPath -State $origin
     $originPageKind = [string]$origin.page_kind
 

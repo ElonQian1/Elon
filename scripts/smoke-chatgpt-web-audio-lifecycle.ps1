@@ -311,12 +311,10 @@ try {
                 updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 device_binding_sha256 = Get-Sha256Text $ExpectedHardwareSerial.Trim()
                 origin_conversation_path = [string]$isolation.origin_conversation_path
-                origin_view_mode = [string]$isolation.origin_view_mode
                 conversation_binding_sha256 = Get-ConversationBinding $isolated
                 isolated_conversation_path = Get-ChatGptWebSmokeConversationPath `
                     -Url ([string]$isolated.conversation.url)
                 adapter_version = [int]$isolated.adapter_version
-                initial_view_mode = [string]$isolated.view_mode
                 message_count = 0
                 dictation_request_id = ""
                 realtime_voice_request_id = ""
@@ -386,8 +384,7 @@ try {
                 -RequireChatGptForeground -Description "completed non-empty ChatGPT dictation draft" -Predicate {
                     param($state)
                     $state.dictation_active -ne $true -and
-                        [int]$state.input.text_length -gt 0 -and
-                        [string]$state.view_mode -eq [string]$checkpoint.initial_view_mode
+                        [int]$state.input.text_length -gt 0
                 }
             Assert-ConversationUnchanged -State $transcribed -Checkpoint $checkpoint `
                 -AllowNonEmptyDraft
@@ -472,19 +469,11 @@ try {
             if ($checkpoint.voice_round_trip_confirmed -ne $true) {
                 throw "Realtime voice round-trip confirmation is missing."
             }
-            $targetMode = switch ([string]$checkpoint.initial_view_mode) {
-                "native" { "native" }
-                "web" { "official" }
-                "quick" { "quick" }
-                default { throw "Checkpoint contains an unsupported initial view mode." }
-            }
-            Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-                -Arguments @{ view_mode = $targetMode } | Out-Null
+            Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
             $restored = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-                -RequireChatGptForeground -Description "restored ChatGPT view" -Predicate {
+                -RequireChatGptForeground -Description "restored production ChatGPT chat" -Predicate {
                     param($state)
-                    [string]$state.view_mode -eq [string]$checkpoint.initial_view_mode -and
-                        $state.dictation_active -ne $true -and
+                    $state.dictation_active -ne $true -and
                         $state.audio.local_request_pending -ne $true -and
                         $state.audio.web_request_pending -ne $true
                 }
@@ -495,7 +484,7 @@ try {
             }
             Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
                 -ConversationPath ([string]$checkpoint.origin_conversation_path) `
-                -ViewMode ([string]$checkpoint.origin_view_mode) -TimeoutSec $TimeoutSec | Out-Null
+                -TimeoutSec $TimeoutSec | Out-Null
             Register-ChatGptWebVerificationCases -Runtime $runtime `
                 -CaseIds @("supervised/realtime_voice_round_trip") `
                 -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null

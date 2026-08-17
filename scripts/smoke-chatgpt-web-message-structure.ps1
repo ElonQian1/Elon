@@ -167,17 +167,12 @@ function Wait-VisibleMessageSelectors {
 }
 
 function Restore-Origin {
-    param(
-        [Parameter(Mandatory = $true)]$Origin,
-        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$OriginPath
-    )
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$OriginPath)
 
     $current = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
     if ([string]$current.surface -ne "chatgpt_web") {
         throw "ChatGPT surface left the foreground before origin restoration."
     }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "web" } | Out-Null
     if ($OriginPath) {
         Open-ConversationPath -Path $OriginPath | Out-Null
     } else {
@@ -191,13 +186,6 @@ function Restore-Origin {
                     $state.streaming -eq $false
             } | Out-Null
     }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = [string]$Origin.view_mode } | Out-Null
-    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "restored ChatGPT view mode" -Predicate {
-            param($state)
-            [string]$state.view_mode -eq [string]$Origin.view_mode
-        } | Out-Null
 }
 
 Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
@@ -218,8 +206,6 @@ $originPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url
 $restoreRequired = $false
 $result = $null
 try {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "web" } | Out-Null
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_list_conversations" | Out-Null
     $page = Wait-ConversationList
     $candidates = @(
@@ -287,13 +273,6 @@ try {
     }
     $targetSelector = [string]$sampleMessage.parts[0].native_adb_content_description
 
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "native" } | Out-Null
-    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "native structured message surface" -Predicate {
-            param($state)
-            $state.view_mode -eq "native" -and $state.bridge_state -eq "ready"
-        } | Out-Null
     $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_reveal_message" `
         -Arguments @{ message_id = [string]$sampleMessage.id; part_index = 0 }
     if ($reveal.control_ok -ne $true) {
@@ -323,7 +302,7 @@ try {
         matched_part_selector_count = $matchedSelectors.Count
         reveal_action_succeeded = $true
         original_conversation_restored = $true
-        original_view_mode_restored = $true
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         sent_messages = 0
         uploaded_attachments = 0
         cleared_cookies = $false
@@ -331,7 +310,7 @@ try {
     }
 } finally {
     if ($restoreRequired) {
-        Restore-Origin -Origin $origin -OriginPath $originPath
+        Restore-Origin -OriginPath $originPath
     }
 }
 

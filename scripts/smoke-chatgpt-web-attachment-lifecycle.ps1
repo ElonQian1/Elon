@@ -233,7 +233,6 @@ try {
                 updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 device_binding_sha256 = Get-Sha256Text -Value $ExpectedHardwareSerial.Trim()
                 origin_conversation_path = [string]$isolation.origin_conversation_path
-                origin_view_mode = [string]$isolation.origin_view_mode
                 conversation_binding_sha256 = Get-ConversationBinding -State $isolated
                 adapter_version = [int]$isolated.adapter_version
                 message_count = 0
@@ -384,7 +383,7 @@ try {
                 -TimeoutSec $TimeoutSec -PollIntervalSec $runtime.poll_interval_sec | Out-Null
             Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
                 -ConversationPath ([string]$checkpoint.origin_conversation_path) `
-                -ViewMode ([string]$checkpoint.origin_view_mode) -TimeoutSec $TimeoutSec | Out-Null
+                -TimeoutSec $TimeoutSec | Out-Null
             $checkpoint.phase = "passed"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             Write-Checkpoint -Value $checkpoint

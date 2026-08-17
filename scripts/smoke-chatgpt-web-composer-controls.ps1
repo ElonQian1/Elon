@@ -103,7 +103,6 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
     }
 Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
-$originViewMode = [string]$origin.view_mode
 
 $dictationResult = [ordered]@{ skipped = $true; reason = "user_assisted_audio_capture" }
 if (-not $SkipDictation) {
@@ -128,9 +127,6 @@ if (-not $SkipDictation) {
         input_cleared = $true
     }
 }
-
-Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-    -Arguments @{ view_mode = "native" } | Out-Null
 
 $search = Get-WebSearchOption
 $initialSearchSelected = $search.selected -eq $true
@@ -184,11 +180,6 @@ $discoveryCases = @(
     $observedToolSemantics | ForEach-Object { $composerToolDiscoveryCases[$_] }
 )
 
-if ($originViewMode -in @("web", "native")) {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = $originViewMode } | Out-Null
-}
-
 Register-ChatGptWebVerificationCases -Runtime $runtime `
     -CaseIds (@("reversible/composer_controls") + $discoveryCases) `
     -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
@@ -221,6 +212,6 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
         )
         executed_tools = 0
     }
-    original_view_mode_restored = $true
+    production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
 } | ConvertTo-Json -Depth 10
 Write-Output "CHATGPT_WEB_COMPOSER_CONTROL_SMOKE_STATUS=passed"

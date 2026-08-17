@@ -19,7 +19,8 @@ foreach ($required in @(
     '-CaseIds @([string]$toolSpec.case_id)',
     'if (-not $toolStateRestored -and $enabledBySmoke)',
     'Restore-ToolSelection',
-    'Restore-Origin -ConversationPath $originPath -ViewMode $originMode',
+    'Restore-Origin -ConversationPath $originPath',
+    'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground',
     'private_content_emitted = $false',
     'cleared_cookies = $false',
     'cleared_app_data = $false'
@@ -30,6 +31,7 @@ foreach ($required in @(
 }
 
 foreach ($forbidden in @(
+    'chatgpt_select_view',
     'Write-Output $marker',
     'conversation_url =',
     'assistant_content ='

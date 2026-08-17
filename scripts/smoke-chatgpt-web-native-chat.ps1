@@ -48,7 +48,7 @@ function Wait-ChatGptWebNativeProbeReply {
         if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $Runtime)) {
             throw "ChatGPT Web AI acceptance was interrupted because another app took the foreground."
         }
-        $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state" -MainState
         $messages = @($state.social_chat.messages)
         $user = @($messages | Where-Object { [string]$_.role -eq "user" }) |
             Select-Object -Last 1
@@ -130,7 +130,7 @@ try {
         try {
             Invoke-ChatGptWebSmokeAction -Runtime $runtime `
                 -Action "start_new_web_chat_conversation" | Out-Null
-            Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+            Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec -MainState `
                 -Description "blank ChatGPT Web AI probe conversation" -Predicate {
                     param($state)
                     [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and

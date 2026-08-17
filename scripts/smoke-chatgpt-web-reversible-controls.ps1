@@ -132,17 +132,6 @@ function Wait-SelectedModel {
     return Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
 }
 
-function Wait-ViewMode {
-    param([Parameter(Mandatory = $true)][string]$ExpectedMode)
-
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "requested ChatGPT view mode" -Predicate {
-            param($state)
-            [string]$state.view_mode -eq $ExpectedMode -and
-                $state.adapter_current -eq $true
-        }
-}
-
 function Get-ConversationPathFromUrl {
     param([string]$Url)
 
@@ -329,14 +318,8 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
     }
 Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
-$originViewMode = [string]$origin.view_mode
 $originConversationPath = Get-ConversationPathFromUrl -Url ([string]$origin.conversation.url)
 $temporaryConversationUsed = $false
-if ($originViewMode -ne "web") {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "web" } | Out-Null
-    Wait-ViewMode -ExpectedMode "web" | Out-Null
-}
 if ($originConversationPath) {
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation" | Out-Null
     Wait-BlankConversation | Out-Null
@@ -346,7 +329,6 @@ if ($originConversationPath) {
 $modelRestored = $true
 $modelSwitchObserved = $false
 $models = @()
-$modelViewRestored = $false
 $modelConversationRestored = $false
 $temporaryChatObserved = $false
 $temporaryChatSelectionObservable = $false
@@ -435,10 +417,6 @@ try {
         Wait-ConversationPath -Path $originConversationPath | Out-Null
     }
     $modelConversationRestored = $true
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = $originViewMode } | Out-Null
-    Wait-ViewMode -ExpectedMode $originViewMode | Out-Null
-    $modelViewRestored = $true
 }
 if (-not $modelRestored) { throw "Original ChatGPT model was not restored." }
 
@@ -490,11 +468,6 @@ try {
 }
 if (-not $disclosureRestored) { throw "Original disclosure state was not restored." }
 
-if ($originViewMode -in @("web", "native")) {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = $originViewMode } | Out-Null
-}
-
 $verificationCaseIds = [System.Collections.Generic.List[string]]::new()
 $verificationCaseIds.Add("reversible/reversible_controls")
 if ($temporaryChatObserved -and $temporaryChatRestored) {
@@ -540,6 +513,6 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
         restoration_strategy = "desired_state"
         original_state_restored = $temporaryChatRestored
     }
-    original_view_mode_restored = $modelViewRestored
+    production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
 } | ConvertTo-Json -Depth 10
 Write-Output "CHATGPT_WEB_REVERSIBLE_CONTROL_SMOKE_STATUS=passed"

@@ -40,7 +40,7 @@ foreach ($required in @(
     'assistant_content_changed',
     'regenerated_assistant_completed = $true',
     'original_conversation_restored = $true',
-    'original_view_mode_restored = $true',
+    'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground',
     'sent_messages = 1',
     'regenerated_messages = 1',
     'Register-ChatGptWebVerificationCases -Runtime $runtime',

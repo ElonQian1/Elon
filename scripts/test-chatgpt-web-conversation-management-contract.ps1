@@ -37,7 +37,6 @@ foreach ($required in @(
     'user_confirmed = $true',
     "Restore-ConversationPinState",
     'throw "Conversation pin state recovery could not be verified."',
-    "Restore-OriginalViewMode",
     'Action "chatgpt_refresh_controls"',
     '"conversation_files",',
     '"rename",',
@@ -49,7 +48,7 @@ foreach ($required in @(
     '"supervised/conversation_mutations"',
     'pin_round_trip_verified = $pinRoundTripVerified',
     'mutations_invoked = $mutationsInvoked',
-    'view_mode_restored = -not $viewModeChanged',
+    'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground',
     "sent_messages = 0",
     "cleared_cookies = `$false",
     "cleared_app_data = `$false",
@@ -70,16 +69,18 @@ if ($confirmationIndex -lt 0 -or $mutationIndex -lt 0 -or $confirmationIndex -gt
 }
 $rollbackIndex = $source.LastIndexOf('Restore-ConversationPinState')
 $conversationRestoreIndex = $source.LastIndexOf('Restore-ConversationManagementOrigin')
-$viewRestoreIndex = $source.LastIndexOf('Restore-OriginalViewMode')
-if ($rollbackIndex -lt 0 -or $conversationRestoreIndex -lt 0 -or $viewRestoreIndex -lt 0 -or
-    $rollbackIndex -gt $conversationRestoreIndex -or $conversationRestoreIndex -gt $viewRestoreIndex) {
-    throw "Conversation and pin recovery must run before view-mode restoration."
+if ($rollbackIndex -lt 0 -or $conversationRestoreIndex -lt 0 -or
+    $rollbackIndex -gt $conversationRestoreIndex) {
+    throw "Conversation and pin recovery must run in a deterministic order."
 }
-$viewRestoreBeforeEvidenceIndex = $source.IndexOf('Restore-OriginalViewMode', $mutationIndex)
+$conversationRestoreBeforeEvidenceIndex = $source.IndexOf(
+    'Restore-ConversationManagementOrigin',
+    $mutationIndex
+)
 $registerEvidenceIndex = $source.IndexOf('Register-ChatGptWebVerificationCases', $mutationIndex)
-if ($viewRestoreBeforeEvidenceIndex -lt 0 -or $registerEvidenceIndex -lt 0 -or
-    $viewRestoreBeforeEvidenceIndex -gt $registerEvidenceIndex) {
-    throw "Conversation evidence must be registered only after view-mode restoration."
+if ($conversationRestoreBeforeEvidenceIndex -lt 0 -or $registerEvidenceIndex -lt 0 -or
+    $conversationRestoreBeforeEvidenceIndex -gt $registerEvidenceIndex) {
+    throw "Conversation evidence must be registered only after conversation restoration."
 }
 $sampleFunctionIndex = $source.IndexOf('function Open-ConversationManagementSample')
 $sampleMutationIndex = $source.IndexOf(
@@ -98,7 +99,7 @@ if ($sampleFunctionIndex -lt 0 -or $sampleIndex -lt 0 -or $sampleMutationIndex -
     $sampleIndex -gt $menuIndex) {
     throw "Conversation management must open a deterministic history sample before the menu."
 }
-foreach ($forbidden in @("pm clear", "removeAllCookies", "send_input")) {
+foreach ($forbidden in @("pm clear", "removeAllCookies", "send_input", "chatgpt_select_view")) {
     if ($source.Contains($forbidden)) {
         throw "Conversation management smoke contains forbidden operation: $forbidden"
     }

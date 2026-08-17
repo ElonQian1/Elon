@@ -25,7 +25,7 @@ foreach ($required in @(
     '[int]$state.input.text_length -eq 0',
     "function Restore-ChatGptWebSmokeOrigin",
     'chatgpt_open_conversation',
-    'chatgpt_select_view'
+    'Open-ChatGptWebSmokeSurface -Runtime $Runtime'
 )) {
     if (-not $source.Contains($required)) {
         throw "Supervised ChatGPT Web smoke runtime contract is missing: $required"
@@ -33,6 +33,8 @@ foreach ($required in @(
 }
 
 foreach ($forbidden in @(
+    "chatgpt_select_view",
+    "origin_view_mode",
     "pm clear",
     "removeAllCookies",
     "input tap",

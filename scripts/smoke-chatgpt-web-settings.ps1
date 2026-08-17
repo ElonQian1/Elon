@@ -223,12 +223,6 @@ function Restore-Origin {
 Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
 $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
     -TimeoutSec $ReadyTimeoutSec -InitialWaitSec ([Math]::Min(5, $ReadyTimeoutSec))
-if ([string]$origin.view_mode -notin @("official", "web")) {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "official" } | Out-Null
-    $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-        -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 3
-}
 Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originPageKind = [string]$origin.page_kind

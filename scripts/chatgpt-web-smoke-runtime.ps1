@@ -304,7 +304,7 @@ function Test-ChatGptWebSmokeActivityForeground {
         -Arguments @("shell", "dumpsys", "activity", "activities") `
         -TimeoutSec 8 -Label "read ChatGPT Web foreground activity"
     return $activities -match
-        '(?m)^\s*topResumedActivity=.*com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
+        '(?m)^\s*topResumedActivity=.*com\.elon\.app/\.MainActivity\b'
 }
 
 function Test-WebChatNativeChatSurfaceForeground {
@@ -368,7 +368,8 @@ function Invoke-ChatGptWebSmokeMcp {
         [Parameter(Mandatory = $true)]$Runtime,
         [Parameter(Mandatory = $true)][string]$Tool,
         [hashtable]$Arguments = @{},
-        [switch]$EnsureMainActivity
+        [switch]$EnsureMainActivity,
+        [switch]$MainState
     )
 
     $params = @{
@@ -404,6 +405,13 @@ function Invoke-ChatGptWebSmokeMcp {
         throw "APK MCP tool returned no structured content: $Tool"
     }
     $Runtime.mcp_bootstrapped = $true
+    if (
+        $Tool -eq "ui_state" -and
+        -not $MainState -and
+        $null -ne $structured.chatgpt_web_mcp
+    ) {
+        return $structured.chatgpt_web_mcp
+    }
     return $structured
 }
 
@@ -491,20 +499,8 @@ function Register-ChatGptWebVerificationCases {
 function Open-ChatGptWebSmokeSurface {
     param([Parameter(Mandatory = $true)]$Runtime)
 
-    $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
-    if ($state.activity_bound -eq $true -and $state.surface -eq "chatgpt_web") {
-        return $state
-    }
-    if ($state.activity_bound -eq $true) {
-        return Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
-            -Action "open_chatgpt_official_fallback" -Arguments @{
-                wait_for_target_bind_ms = 12000
-            }
-    }
-    return Invoke-ChatGptWebSmokeAction -Runtime $Runtime `
-        -Action "open_chatgpt_official_fallback" -Arguments @{
-            wait_for_target_bind_ms = 12000
-        } -EnsureMainActivity
+    Open-WebChatNativeChatSurface -Runtime $Runtime -ProviderId "chatgpt_web" | Out-Null
+    return Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
 }
 
 function Open-WebChatNativeChatSurface {
@@ -530,7 +526,7 @@ function Open-WebChatNativeChatSurface {
         throw "Unable to select $providerName in the native chat surface."
     }
 
-    return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $TimeoutSec `
+    return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $TimeoutSec -MainState `
         -Description "ready $providerName native chat surface" -Predicate {
             param($state)
             $state.active_surface -eq "social_ai" -and
@@ -566,7 +562,7 @@ function Restore-WebChatNativeConversation {
     $dispatched = $false
     do {
         try {
-            $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+            $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state" -MainState
             if (
                 [string]$state.social_chat.web_chat_provider_id -eq $ProviderId -and
                 [string]$state.social_chat.web_chat_conversation_path -eq $ConversationPath
@@ -590,7 +586,7 @@ function Restore-WebChatNativeConversation {
 function Get-ChatGptWebNativeChatState {
     param([Parameter(Mandatory = $true)]$Runtime)
 
-    $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+    $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state" -MainState
     if ($state.active_surface -ne "social_ai") {
         throw "The native social AI chat surface is not active."
     }
@@ -614,13 +610,6 @@ function Restore-ChatGptWebSmokeInteractiveBaseline {
         if ($last.login_required -eq $true -or [string]$last.page_kind -eq "auth") {
             throw "ChatGPT Web interactive baseline requires an authenticated session."
         }
-        if ([string]$last.view_mode -notin @("web", "official")) {
-            Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "chatgpt_select_view" `
-                -Arguments @{ view_mode = "official" } | Out-Null
-            Start-Sleep -Milliseconds 500
-            continue
-        }
-
         $blockingControls = @(
             @($last.ui_manifest.controls) |
                 Where-Object { [string]$_.region -in @("overlay", "dialog") }
@@ -725,7 +714,8 @@ function Wait-ChatGptWebSmokeState {
         [Parameter(Mandatory = $true)][scriptblock]$Predicate,
         [Parameter(Mandatory = $true)][ValidateRange(1, 300)][int]$TimeoutSec,
         [Parameter(Mandatory = $true)][string]$Description,
-        [switch]$RequireChatGptForeground
+        [switch]$RequireChatGptForeground,
+        [switch]$MainState
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
@@ -734,7 +724,7 @@ function Wait-ChatGptWebSmokeState {
         if ($RequireChatGptForeground -and -not (Test-ChatGptWebSmokeActivityForeground -Runtime $Runtime)) {
             throw "ChatGPT Web acceptance was interrupted because another app took the foreground."
         }
-        $last = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+        $last = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state" -MainState:$MainState
         if (& $Predicate $last) { return $last }
         Start-Sleep -Seconds $Runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)

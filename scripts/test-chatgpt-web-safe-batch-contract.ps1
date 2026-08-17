@@ -80,7 +80,8 @@ if (
 
 $runtimeRequired = @(
     "function Restore-ChatGptWebSmokeInteractiveBaseline",
-    'Action "open_chatgpt_official_fallback"',
+    'Open-WebChatNativeChatSurface -Runtime $Runtime -ProviderId "chatgpt_web"',
+    'Action "select_web_chat_provider"',
     'wait_for_target_bind_ms = 12000',
     'page_kind -in @("conversation", "home")',
     'region -in @("overlay", "dialog")',
@@ -93,8 +94,11 @@ foreach ($needle in $runtimeRequired) {
         throw "ChatGPT Web safe baseline contract is missing: $needle"
     }
 }
-if ($runtimeSource.Contains('-Action "open_chatgpt_web"')) {
-    throw "Official WebView smoke bootstrap must not reuse the native chat entry action."
+if (
+    $runtimeSource.Contains('-Action "open_chatgpt_web"') -or
+    $runtimeSource.Contains('Action "open_chatgpt_official_fallback"')
+) {
+    throw "Safe baseline must not route through the retired diagnostic or official-only bootstrap."
 }
 
 foreach ($childScript in @(

@@ -47,7 +47,7 @@ foreach ($required in @(
     "ConvertTo-ChatGptWebSmokeSafeDiagnostic",
     '$safe.context_bound = [string]$_.context_id -eq [string]$messageMore.context_id',
     'original_conversation_restored = $true',
-    'original_view_mode_restored = $true',
+    'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground',
     'sent_messages = 1',
     'private_content_emitted = $false',
     'cleared_cookies = $false',

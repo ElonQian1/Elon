@@ -19,11 +19,11 @@ Assert-Contains 'ExpectedAdapterVersion'
 Assert-Contains 'Assert-ChatGptWebSmokeAdapterVersion -State $state'
 Assert-Contains 'Start-ChatGptWebSmokeAwakeLease'
 Assert-Contains 'Stop-ChatGptWebSmokeAwakeLease'
-Assert-Contains 'Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
+Assert-Contains '$state = Open-ChatGptWebSmokeSurface -Runtime $smokeRuntime'
 Assert-Contains 'function Wait-NavigationReady'
 Assert-Contains '$nextOpenAttemptAt = [DateTimeOffset]::UtcNow.AddSeconds(3)'
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features" | Out-Null'
-Assert-Contains 'function Wait-VisibleNativeSelectors'
+Assert-Contains 'function Wait-VisibleProductionSelectors'
 Assert-Contains 'foreach ($attempt in 1..3)'
 Assert-Contains 'UIAutomator dump failed after 3 attempts.'
 Assert-Contains 'function Wait-AccountMenuReady'
@@ -52,21 +52,18 @@ Assert-Contains 'control_id = [string]$profileControls[0].control_id'
 Assert-Contains 'Wait-AccountMenuClosed -TimeoutSec $ReadyTimeoutSec'
 Assert-Contains '$navigationCloseCount = [int]$navigationMatrix.observed_semantics.close'
 Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0)'
-Assert-Contains '$nativeView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "native" }'
-Assert-Contains 'Add-Check "native_view_selected"'
-Assert-Contains '$visibleSelectors = Wait-VisibleNativeSelectors -RequiredPrefixes $requiredSelectors'
-Assert-Contains '$restoredOfficialView = Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }'
-Assert-Contains 'Add-Check "official_view_restored"'
+Assert-Contains '$visibleSelectors = Wait-VisibleProductionSelectors -RequiredPrefixes $requiredSelectors'
+Assert-Contains 'web-chat-composer-input:chatgpt_web'
+Assert-Contains 'web-chat-page-actions:chatgpt_web'
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
 Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
 Assert-Contains 'function Get-TopResumedActivity'
 Assert-Contains 'if ($null -eq $line) { return "" }'
 Assert-Contains 'function Wait-ChatGptActivityForeground'
 Assert-Contains '$topResumedActivity = Wait-ChatGptActivityForeground'
-Assert-Contains 'Add-Check "chatgpt_target_bound"'
-Assert-Contains '$opened.target_activity_bound -eq $true'
 Assert-Contains 'Add-Check "chatgpt_activity_foreground"'
-Assert-Contains 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
+Assert-Contains 'com\.elon\.app/\.chatgptweb\.ChatGptWebOfficialActivity\b'
+Assert-Contains 'Add-Check "production_activity_foreground"'
 Assert-Contains 'Get-ComposerOptions -Section "model"'
 Assert-Contains 'Get-ComposerOptions -Section "model" -TimeoutSec $initialComposerTimeoutSec'
 Assert-Contains 'if ($null -eq $modelResult -and $composerOptionsOriginPath)'
@@ -115,7 +112,6 @@ Assert-Contains 'Get-ChatGptContextPagingEvidence'
 Assert-Contains 'Add-Check "context_cursor_roundtrip"'
 Assert-Contains 'Add-Check "context_cursor_next"'
 Assert-Contains 'Get-ChatGptConversationCollectionCoverage'
-Assert-Contains 'Add-Check "official_fullscreen_mode"'
 Assert-Contains 'official_fullscreen_chrome_$chromeId'
 Assert-Contains '$sendRequestId = [string]$sendDispatch.command_receipt.request_id'
 Assert-Contains 'Wait-ChatGptProbeReply -RequestId $sendRequestId'
@@ -264,19 +260,19 @@ $featuresIndex = $source.IndexOf(
     $featuresFlowIndex
 )
 $openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_official_fallback"')
-$officialIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_select_view" -Arguments @{ view_mode = "official" }')
+$returnIndex = $source.IndexOf('Invoke-Adb shell input keyevent 4', $openIndex)
+$productionIndex = $source.IndexOf('$state = Open-ChatGptWebSmokeSurface -Runtime $smokeRuntime', $returnIndex)
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
 $toolsIndex = $source.IndexOf('Get-ComposerOptions -Section "tools"')
-$nativeIndex = $source.IndexOf('$nativeView = Invoke-UiAction -Action "chatgpt_select_view"')
-$selectorsIndex = $source.IndexOf('$visibleSelectors = Wait-VisibleNativeSelectors')
-if (-not ($openIndex -lt $officialIndex -and $officialIndex -lt $featuresIndex)) {
-    throw "ChatGPT Web smoke must select the official view before readiness and navigation checks."
+$selectorsIndex = $source.IndexOf('$visibleSelectors = Wait-VisibleProductionSelectors')
+if (-not ($openIndex -lt $returnIndex -and $returnIndex -lt $productionIndex -and $productionIndex -lt $featuresIndex)) {
+    throw "ChatGPT Web smoke must verify the official fallback, then return to the production friend-chat surface."
 }
 if (-not ($featuresIndex -lt $modelIndex -and $modelIndex -lt $toolsIndex)) {
     throw "Composer contamination smoke must open the sidebar before model and tools checks."
 }
-if (-not ($toolsIndex -lt $nativeIndex -and $nativeIndex -lt $selectorsIndex)) {
-    throw "Native selectors must be audited only after official WebView checks complete."
+if (-not ($toolsIndex -lt $selectorsIndex)) {
+    throw "Production selectors must be audited only after adapter checks complete."
 }
 
 Write-Output "CHATGPT_WEB_SMOKE_CONTRACT=passed"

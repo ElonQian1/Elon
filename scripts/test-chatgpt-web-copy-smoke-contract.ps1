@@ -16,7 +16,7 @@ Assert-Contains 'content_exported -ne $false'
 Assert-Contains 'clipboard_content_read_back = $false'
 Assert-Contains 'private_content_emitted = $false'
 Assert-Contains 'original_conversation_restored = $true'
-Assert-Contains 'original_view_mode_restored = $true'
+Assert-Contains 'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground'
 Assert-Contains 'cleared_cookies = $false'
 Assert-Contains 'cleared_app_data = $false'
 

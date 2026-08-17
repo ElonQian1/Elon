@@ -175,17 +175,6 @@ $initialReadySec = Get-RemainingSeconds -Deadline $scriptDeadline -Minimum 10 `
 if ($initialReadySec -eq 0) { throw "Feature-page smoke exhausted its total budget during bootstrap." }
 $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
     -TimeoutSec $initialReadySec -InitialWaitSec ([Math]::Min(5, $initialReadySec))
-if ([string]$origin.view_mode -notin @("official", "web")) {
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = "official" } | Out-Null
-    $officialReadySec = Get-RemainingSeconds -Deadline $scriptDeadline -Minimum 10 `
-        -Maximum $ReadyTimeoutSec
-    if ($officialReadySec -eq 0) {
-        throw "Feature-page smoke exhausted its total budget selecting official view."
-    }
-    $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-        -TimeoutSec $officialReadySec -InitialWaitSec ([Math]::Min(5, $officialReadySec))
-}
 Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originPageKind = [string]$origin.page_kind

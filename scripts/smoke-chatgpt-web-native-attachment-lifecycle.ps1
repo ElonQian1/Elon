@@ -103,7 +103,7 @@ function Wait-NativeState {
         param($state)
         $state.active_surface -eq "social_ai" -and (& $nativePredicate $state)
     }.GetNewClosure()
-    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+    return Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec -MainState `
         -Description $Description -Predicate $surfacePredicate
 }
 

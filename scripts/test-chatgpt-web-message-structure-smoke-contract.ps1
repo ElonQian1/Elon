@@ -38,7 +38,7 @@ $required = @(
     "matched_part_selector_count",
     "reveal_action_succeeded = `$true",
     "original_conversation_restored = `$true",
-    "original_view_mode_restored = `$true",
+    "production_surface_preserved = Test-ChatGptWebSmokeActivityForeground",
     "sent_messages = 0",
     "uploaded_attachments = 0",
     "cleared_cookies = `$false",

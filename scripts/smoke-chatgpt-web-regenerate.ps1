@@ -50,10 +50,7 @@ function Invoke-ReceiptAction {
 }
 
 function Restore-Origin {
-    param(
-        [AllowEmptyString()][string]$ConversationPath,
-        [Parameter(Mandatory = $true)][string]$ViewMode
-    )
+    param([AllowEmptyString()][string]$ConversationPath)
 
     if ($ConversationPath) {
         Invoke-ReceiptAction -Action "chatgpt_open_conversation" `
@@ -68,16 +65,6 @@ function Restore-Origin {
     } else {
         Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
             -ExpectedAction "new_conversation" | Out-Null
-    }
-    if ($ViewMode -in @("web", "native")) {
-        $requestedMode = if ($ViewMode -eq "web") { "official" } else { "native" }
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = $requestedMode } | Out-Null
-        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-            -Description "original ChatGPT view mode restoration" -Predicate {
-                param($state)
-                [string]$state.view_mode -eq $ViewMode
-            }.GetNewClosure() | Out-Null
     }
 }
 
@@ -138,7 +125,6 @@ function Wait-RegeneratedReply {
 
 $result = $null
 $originPath = ""
-$originMode = ""
 $originRestored = $false
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
@@ -147,7 +133,6 @@ try {
         -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    $originMode = [string]$origin.view_mode
     $originPath = [regex]::Match(
         [string]$origin.conversation.url,
         '/c/[A-Za-z0-9_-]{1,160}'
@@ -206,7 +191,7 @@ try {
         -PreviousContentDigest $initialDigest
 
     Write-Output "CHATGPT_REGENERATE_PROGRESS phase=restore_origin"
-    Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+    Restore-Origin -ConversationPath $originPath
     $originRestored = $true
     $result = [ordered]@{
         schema = "elon.chatgpt_web.regenerate_acceptance.v1"
@@ -220,7 +205,7 @@ try {
         assistant_content_changed = [bool]$regenerated.assistant_content_changed
         regenerated_assistant_completed = $true
         original_conversation_restored = $true
-        original_view_mode_restored = $true
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         sent_messages = 1
         regenerated_messages = 1
         private_content_emitted = $false
@@ -231,9 +216,9 @@ try {
         -CaseIds @("reversible/regenerate_response") `
         -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 } finally {
-    if (-not $originRestored -and $originMode) {
+    if (-not $originRestored) {
         try {
-            Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+            Restore-Origin -ConversationPath $originPath
         } catch {
             Write-Warning "Unable to restore the original ChatGPT view after a failed regenerate smoke."
         }

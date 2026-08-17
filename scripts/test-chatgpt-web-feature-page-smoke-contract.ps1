@@ -36,8 +36,8 @@ Assert-Contains $runtime "function Wait-ChatGptWebSmokeAuthenticatedReady" `
     "Runtime must centralize bounded bridge recovery before navigation."
 Assert-Contains $runtime "function Open-ChatGptWebSmokeSurface" `
     "Runtime must centralize idempotent ChatGPT Web surface entry."
-Assert-Contains $runtime '$state.activity_bound -eq $true -and $state.surface -eq "chatgpt_web"' `
-    "Runtime must reuse an already bound ChatGPT Web activity."
+Assert-Contains $runtime 'Open-WebChatNativeChatSurface -Runtime $Runtime -ProviderId "chatgpt_web"' `
+    "Runtime must enter the production ChatGPT friend-chat surface."
 Assert-Contains $runtime '-Action "chatgpt_refresh"' `
     "Runtime must repair a current authenticated adapter stuck connecting."
 Assert-Contains $runtime '$state.adapter_current -eq $true' `
@@ -46,8 +46,11 @@ Assert-Contains $smoke "Wait-ChatGptWebSmokeAuthenticatedReady -Runtime `$runtim
     "Feature-page smoke must await a ready bridge before feature controls."
 Assert-Contains $smoke "Open-ChatGptWebSmokeSurface -Runtime `$runtime" `
     "Feature-page smoke must use the idempotent surface entry helper."
-if ($smoke -notmatch '(?s)CHATGPT_FEATURE_PAGE_PHASE phase=bootstrap.*Open-ChatGptWebSmokeSurface.*Wait-ChatGptWebSmokeAuthenticatedReady.*\$origin\.view_mode.*chatgpt_select_view') {
-    throw "Feature-page smoke must recover the bridge before selecting official view."
+if ($smoke -notmatch '(?s)CHATGPT_FEATURE_PAGE_PHASE phase=bootstrap.*Open-ChatGptWebSmokeSurface.*Wait-ChatGptWebSmokeAuthenticatedReady.*Assert-ChatGptWebSmokeAdapterVersion') {
+    throw "Feature-page smoke must recover the production bridge before auditing features."
+}
+if ($smoke.Contains("chatgpt_select_view")) {
+    throw "Feature-page smoke must not route through the retired test-page view switch."
 }
 Assert-Contains $smoke "function Get-RemainingSeconds" `
     "Feature-page smoke must enforce one deadline across nested bridge waits."

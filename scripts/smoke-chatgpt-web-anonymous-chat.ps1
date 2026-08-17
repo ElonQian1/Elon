@@ -98,7 +98,7 @@ try {
         } finally {
             Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
                 -ConversationPath $checkpoint.origin_conversation_path `
-                -ViewMode $checkpoint.origin_view_mode -TimeoutSec $TimeoutSec | Out-Null
+                -TimeoutSec $TimeoutSec | Out-Null
         }
     }
 

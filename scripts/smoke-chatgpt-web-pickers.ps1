@@ -16,7 +16,7 @@ $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $Expecte
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
-$chatGptActivity = 'com\.elon\.app/\.chatgptweb\.ChatGptWebTestActivity\b'
+$chatGptActivity = 'com\.elon\.app/\.MainActivity\b'
 $results = [System.Collections.Generic.List[object]]::new()
 
 function Get-TopResumedActivity {

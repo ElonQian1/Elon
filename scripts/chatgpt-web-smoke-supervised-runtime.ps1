@@ -34,7 +34,6 @@ function Start-ChatGptWebSmokeIsolatedConversation {
 
     $originPath = Get-ChatGptWebSmokeConversationPath `
         -Url ([string]$OriginState.conversation.url)
-    $originMode = [string]$OriginState.view_mode
     Invoke-ChatGptWebSmokeReceiptAction -Runtime $Runtime `
         -Action "chatgpt_new_conversation" -ExpectedAction "new_conversation" `
         -TimeoutSec $TimeoutSec | Out-Null
@@ -48,7 +47,6 @@ function Start-ChatGptWebSmokeIsolatedConversation {
         }
     return [pscustomobject]@{
         origin_conversation_path = $originPath
-        origin_view_mode = $originMode
         isolated_state = $isolated
     }
 }
@@ -57,10 +55,10 @@ function Restore-ChatGptWebSmokeOrigin {
     param(
         [Parameter(Mandatory = $true)]$Runtime,
         [AllowEmptyString()][string]$ConversationPath,
-        [Parameter(Mandatory = $true)][string]$ViewMode,
         [ValidateRange(10, 600)][int]$TimeoutSec = 90
     )
 
+    Open-ChatGptWebSmokeSurface -Runtime $Runtime | Out-Null
     if ($ConversationPath) {
         Invoke-ChatGptWebSmokeReceiptAction -Runtime $Runtime `
             -Action "chatgpt_open_conversation" -ExpectedAction "open_conversation" `
@@ -78,17 +76,9 @@ function Restore-ChatGptWebSmokeOrigin {
             -TimeoutSec $TimeoutSec | Out-Null
     }
 
-    $targetMode = switch ($ViewMode) {
-        "native" { "native" }
-        "web" { "official" }
-        "quick" { "quick" }
-        default { throw "Unsupported original ChatGPT view mode." }
-    }
-    Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "chatgpt_select_view" `
-        -Arguments @{ view_mode = $targetMode } | Out-Null
     return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $TimeoutSec `
-        -Description "original ChatGPT view mode restoration" -Predicate {
+        -Description "production ChatGPT conversation restoration" -Predicate {
             param($state)
-            [string]$state.view_mode -eq $ViewMode -and $state.bridge_state -eq "ready"
-        }.GetNewClosure()
+            $state.bridge_state -eq "ready"
+        }
 }

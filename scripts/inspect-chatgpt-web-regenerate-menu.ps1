@@ -138,10 +138,7 @@ function Dismiss-Overlays {
 }
 
 function Restore-Origin {
-    param(
-        [AllowEmptyString()][string]$ConversationPath,
-        [Parameter(Mandatory = $true)][string]$ViewMode
-    )
+    param([AllowEmptyString()][string]$ConversationPath)
 
     if ($ConversationPath) {
         Invoke-ReceiptAction -Action "chatgpt_open_conversation" `
@@ -157,20 +154,9 @@ function Restore-Origin {
         Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
             -ExpectedAction "new_conversation" | Out-Null
     }
-    if ($ViewMode -in @("web", "native")) {
-        $requestedMode = if ($ViewMode -eq "web") { "official" } else { "native" }
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_select_view" `
-            -Arguments @{ view_mode = $requestedMode } | Out-Null
-        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-            -Description "original ChatGPT view mode restoration" -Predicate {
-                param($state)
-                [string]$state.view_mode -eq $ViewMode
-            }.GetNewClosure() | Out-Null
-    }
 }
 
 $originPath = ""
-$originMode = ""
 $originRestored = $false
 $overlayOpened = $false
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
@@ -180,7 +166,6 @@ try {
         -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    $originMode = [string]$origin.view_mode
     $originPath = [regex]::Match(
         [string]$origin.conversation.url,
         '/c/[A-Za-z0-9_-]{1,160}'
@@ -312,7 +297,7 @@ try {
     }
 
     Write-Output "CHATGPT_REGENERATE_MENU_PHASE phase=restore_origin"
-    Restore-Origin -ConversationPath $originPath -ViewMode $originMode
+    Restore-Origin -ConversationPath $originPath
     $originRestored = $true
     [ordered]@{
         schema = "elon.chatgpt_web.regenerate_menu_diagnostic.v1"
@@ -331,7 +316,7 @@ try {
         model_overlay_control_count = $safeModelControls.Count
         model_overlay_controls = $safeModelControls
         original_conversation_restored = $true
-        original_view_mode_restored = $true
+        production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
         sent_messages = 1
         private_content_emitted = $false
         cleared_cookies = $false
@@ -346,8 +331,8 @@ try {
                 -Label "recover synthetic ChatGPT message menu" | Out-Null
         } catch { }
     }
-    if (-not $originRestored -and $originMode) {
-        try { Restore-Origin -ConversationPath $originPath -ViewMode $originMode } catch { }
+    if (-not $originRestored) {
+        try { Restore-Origin -ConversationPath $originPath } catch { }
     }
     Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 }
