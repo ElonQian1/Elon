@@ -255,6 +255,61 @@ assert.equal(semanticEvents[0].purpose, 'list_model_options');
 assert.equal(semanticEvents[0].xRatio, 0.5);
 assert.equal(semanticEvents[0].yRatio, 0.825);
 
+const backgroundModelEvents = [];
+const backgroundModelResults = [];
+const backgroundModelButton = {
+  id: '',
+  textContent: '极高',
+  getAttribute(name) {
+    return name === 'data-testid' ? 'model-switcher' : null;
+  }
+};
+const backgroundModelScope = {
+  querySelector(selector) {
+    return selector.includes('model-switcher') ? backgroundModelButton : null;
+  },
+  querySelectorAll: () => []
+};
+const backgroundModelComposer = {
+  closest(selector) {
+    return selector === 'form' ? backgroundModelScope : null;
+  }
+};
+const backgroundModelSandbox = {
+  document: { querySelector: () => null, querySelectorAll: () => [] },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    getComputedStyle: () => ({ display: 'block', visibility: 'hidden' }),
+    __elonChatGptActionTargetPolicy: {
+      actionPoint(node) {
+        return node === backgroundModelButton ? { x: 200, y: 660 } : null;
+      },
+      signature: () => 'background-actionable'
+    },
+    __elonChatGptComposerOptionPolicy: { filter: (_section, options) => options },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+  }
+};
+backgroundModelSandbox.window.window = backgroundModelSandbox.window;
+backgroundModelSandbox.window.document = backgroundModelSandbox.document;
+backgroundModelSandbox.window.location = backgroundModelSandbox.location;
+
+runComposer(backgroundModelSandbox);
+backgroundModelSandbox.window.__elonChatGptComposer.requestOptions(
+  'model',
+  backgroundModelComposer,
+  (event) => backgroundModelEvents.push(event),
+  (...args) => backgroundModelResults.push(args)
+);
+
+assert.equal(backgroundModelResults.length, 0, 'background model control remains actionable');
+assert.equal(backgroundModelEvents.length, 1);
+assert.equal(backgroundModelEvents[0].purpose, 'list_model_options');
+assert.equal(backgroundModelEvents[0].xRatio, 0.5);
+assert.equal(backgroundModelEvents[0].yRatio, 0.825);
+
 const dictationEvents = [];
 const dictationResults = [];
 const dictationButton = {

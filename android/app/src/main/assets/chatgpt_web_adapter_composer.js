@@ -206,13 +206,13 @@
     ];
     for (const selector of directSelectors) {
       const node = scope.querySelector(selector) || document.querySelector(selector);
-      if (isVisible(node)) return node;
+      if (isActionable(node) || isVisible(node)) return node;
     }
     const layout = window.__elonChatGptLayout;
     const semanticNode = layout && typeof layout.findSemanticNode === 'function'
       ? layout.findSemanticNode('model', 'composer')
       : null;
-    if (isVisible(semanticNode)) return semanticNode;
+    if (isActionable(semanticNode) || isVisible(semanticNode)) return semanticNode;
     const candidates = Array.from(scope.querySelectorAll('button, [role="button"]')).filter((button) => {
       const label = nodeLabel(button);
       return isActionable(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
@@ -374,7 +374,7 @@
   }
 
   function isActionable(node) {
-    return !!(actionTargetPolicy && actionTargetPolicy.actionPoint(node));
+    return !!(node && actionTargetPolicy && actionTargetPolicy.actionPoint(node));
   }
 
   function isOptionVisible(node) {
