@@ -56,6 +56,9 @@ internal class ChatGptBackgroundSession(
     private val attachmentHandler = Handler(Looper.getMainLooper())
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
     private val composerOptionHandler = Handler(Looper.getMainLooper())
+    private val composerOptionInteraction by lazy(LazyThreadSafetyMode.NONE) {
+        ChatGptComposerOptionInteraction({ webView }, { pageAdapter }, composerOptionHandler)
+    }
     private val sessionContinuityHandler = Handler(Looper.getMainLooper())
     private val recoveryHandler = Handler(Looper.getMainLooper())
     private val conversationRefresh = ChatGptConversationRefreshCoordinator(
@@ -64,11 +67,8 @@ internal class ChatGptBackgroundSession(
         cancel = conversationRefreshHandler::removeCallbacks,
     )
     private val composerOptionRequests = ChatGptComposerOptionRequestCoordinator(
-        dismissMenu = { requestId -> pageAdapter?.dismissComposerMenu(requestId) },
-        dispatchRequest = { section, requestId ->
-            if (section == "model") pageAdapter?.listModelOptions(requestId)
-            else pageAdapter?.listComposerTools(requestId)
-        },
+        dismissMenu = composerOptionInteraction::dismiss,
+        dispatchRequest = composerOptionInteraction::dispatch,
         collectOptions = { section ->
             if (section == "model") pageAdapter?.collectModelOptions()
             else pageAdapter?.collectComposerTools()
@@ -77,7 +77,11 @@ internal class ChatGptBackgroundSession(
         cancel = composerOptionHandler::removeCallbacks,
         prepareSection = observedMcpState::beginComposerRequest,
         failSuperseded = { requestId, section ->
-            observedMcpState.failCommand(requestId, composerListAction(section), "composer_request_superseded")
+            observedMcpState.failCommand(
+                requestId,
+                chatGptComposerListAction(section),
+                "composer_request_superseded",
+            )
         },
     )
     private val recovery = WebChatSessionRecoveryCoordinator(
@@ -301,6 +305,7 @@ internal class ChatGptBackgroundSession(
         )
 
     fun destroy() {
+        composerOptionInteraction.release()
         recovery.dispose()
         recoveryHandler.removeCallbacksAndMessages(null)
         conversationNavigation.clear()
@@ -379,6 +384,7 @@ internal class ChatGptBackgroundSession(
         )
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
+                composerOptionInteraction.release()
                 conversationRefresh.reset()
                 composerOptionRequests.reset()
                 sessionContinuityHandler.removeCallbacksAndMessages(null)
@@ -492,12 +498,16 @@ internal class ChatGptBackgroundSession(
                 onSnapshot(snapshot)
             }
             is ChatGptWebEvent.ComposerControls -> {
+                composerOptionInteraction.release()
                 composerOptionRequests.complete(event.section)
                 if (event.section == "model") onComposerOptions(event.options)
             }
             is ChatGptWebEvent.CommandResult -> {
                 if (event.action == "dismiss_composer_menu") composerOptionRequests.onMenuDismissed()
-                composerSectionForAction(event.action)?.let(composerOptionRequests::complete)
+                chatGptComposerSectionForAction(event.action)?.let { section ->
+                    composerOptionInteraction.release()
+                    composerOptionRequests.complete(section)
+                }
                 onCommandResult(event)
                 processAttachmentCommandResult(event)
                 if (event.ok) {
@@ -580,7 +590,7 @@ internal class ChatGptBackgroundSession(
         val adapter = pageAdapter ?: return
         touchDispatcher?.dispatch(event) { dispatched ->
             if (!dispatched) {
-                composerSectionForAction(event.purpose)?.let { composerOptionRequests.dismiss() }
+                chatGptComposerSectionForAction(event.purpose)?.let { composerOptionRequests.dismiss() }
                 onStateChanged(state, "官网控件操作未就绪")
                 return@dispatch
             }
@@ -650,6 +660,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun pauseSession() {
+        composerOptionInteraction.release()
         recovery.deactivate()
         conversationRefresh.reset()
         composerOptionRequests.reset()
@@ -776,14 +787,6 @@ internal class ChatGptBackgroundSession(
         const val ATTACHMENT_PHASE_COMPLETED = "completed"
         const val ATTACHMENT_TIMEOUT_MS = 120_000L
 
-        fun composerListAction(section: String): String =
-            if (section == "model") "list_model_options" else "list_composer_tools"
-
-        fun composerSectionForAction(action: String): String? = when (action) {
-            "list_model_options", "collect_model_options" -> "model"
-            "list_composer_tools", "collect_composer_tools" -> "tools"
-            else -> null
-        }
     }
 }
 

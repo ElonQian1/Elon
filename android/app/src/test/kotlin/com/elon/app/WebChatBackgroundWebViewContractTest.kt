@@ -16,14 +16,23 @@ class WebChatBackgroundWebViewContractTest {
         val chatGpt = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val composerInteraction = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptComposerOptionInteraction.kt",
+        )
         val google = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
         )
 
         assertTrue(presentation.contains("visibility = View.INVISIBLE"))
+        assertTrue(presentation.contains("beginWebChatBackgroundInteraction()"))
+        assertTrue(presentation.contains("endWebChatBackgroundInteraction()"))
+        assertTrue(presentation.contains("const val MAX_LEASE_MS = 2_500L"))
         assertFalse(presentation.contains("View.GONE"))
         assertFalse(presentation.contains("pauseTimers"))
         assertTrue(chatGpt.contains("configureWebChatBackgroundSurface()"))
+        assertTrue(chatGpt.contains("composerOptionInteraction::dispatch"))
+        assertTrue(composerInteraction.contains("backgroundLease.run(action)"))
+        assertTrue(composerInteraction.contains("backgroundLease.release()"))
         assertTrue(google.contains("configureWebChatBackgroundSurface()"))
         assertFalse(chatGpt.contains("alpha = 0.01f"))
         assertFalse(google.contains("alpha = 0.01f"))
