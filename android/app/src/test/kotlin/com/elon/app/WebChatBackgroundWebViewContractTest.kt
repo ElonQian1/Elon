@@ -1,0 +1,43 @@
+package com.elon.app
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class WebChatBackgroundWebViewContractTest {
+    @Test
+    fun providersShareANonRenderingBackgroundSurface() {
+        val presentation = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/WebChatBackgroundWebViewPresentation.kt",
+        )
+        val chatGpt = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+        val google = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
+        )
+
+        assertTrue(presentation.contains("visibility = View.INVISIBLE"))
+        assertFalse(presentation.contains("View.GONE"))
+        assertFalse(presentation.contains("pauseTimers"))
+        assertTrue(chatGpt.contains("configureWebChatBackgroundSurface()"))
+        assertTrue(google.contains("configureWebChatBackgroundSurface()"))
+        assertFalse(chatGpt.contains("alpha = 0.01f"))
+        assertFalse(google.contains("alpha = 0.01f"))
+    }
+
+    private fun readRepositoryFile(relativePath: String): String =
+        String(Files.readAllBytes(repositoryRoot().resolve(relativePath)))
+
+    private fun repositoryRoot(): Path {
+        var current = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()
+        repeat(6) {
+            if (Files.isRegularFile(current.resolve("android/app/build.gradle"))) return current
+            current = current.parent ?: return@repeat
+        }
+        error("Repository root not found")
+    }
+}

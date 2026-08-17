@@ -1,11 +1,9 @@
 package com.elon.app.chatgptweb
 
 import android.annotation.SuppressLint
-import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.view.View
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -18,6 +16,7 @@ import com.elon.app.PendingAttachment
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.WebChatSocialMcpPort
+import com.elon.app.configureWebChatBackgroundSurface
 import java.time.LocalDate
 
 internal class ChatGptBackgroundSession(
@@ -333,11 +332,7 @@ internal class ChatGptBackgroundSession(
         if (webView != null) return
         WebView.setWebContentsDebuggingEnabled(false)
         val view = WebView(activity).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            alpha = 0.01f
-            isClickable = false
-            isFocusable = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            configureWebChatBackgroundSurface()
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true

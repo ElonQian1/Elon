@@ -2,11 +2,9 @@ package com.elon.app.googleweb
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -14,6 +12,7 @@ import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.WebChatSessionRecoveryCoordinator
+import com.elon.app.configureWebChatBackgroundSurface
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebProxyController
@@ -189,11 +188,7 @@ internal class GoogleWebBackgroundSession(
     private fun ensureInitialized() {
         if (webView != null) return
         val view = WebView(activity).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            alpha = 0.01f
-            isClickable = false
-            isFocusable = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            configureWebChatBackgroundSurface()
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
