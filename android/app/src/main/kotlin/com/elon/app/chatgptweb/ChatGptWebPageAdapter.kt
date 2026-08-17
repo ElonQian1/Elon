@@ -108,6 +108,11 @@ internal class ChatGptWebPageAdapter(
     fun onHostPaused() {
         handshake.cancel()
         mainHandler.removeCallbacksAndMessages(null)
+        webView.evaluateJavascript(
+            "try{var b=window.__elonChatGptBridge;if(b&&typeof b.dispose==='function')b.dispose();}catch(_){}" +
+                "try{delete window.__elonChatGptBridge;}catch(_){window.__elonChatGptBridge=undefined;}",
+            null,
+        )
     }
 
     fun sendPrompt(prompt: String, expectedDraft: String, requestId: String? = null) = runCommand(

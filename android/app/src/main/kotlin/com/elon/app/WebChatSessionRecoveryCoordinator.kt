@@ -44,12 +44,12 @@ internal class WebChatSessionRecoveryCoordinator(
     fun onNavigationStarted() {
         if (!active) return
         cancelRetry()
-        armReadinessWatchdog()
+        ensureReadinessWatchdog()
     }
 
     fun onPageFinished() {
         if (!active) return
-        armReadinessWatchdog()
+        ensureReadinessWatchdog()
     }
 
     fun onReady() {
@@ -105,15 +105,15 @@ internal class WebChatSessionRecoveryCoordinator(
     private fun dispatchRetry(): Boolean {
         val dispatched = retry()
         if (dispatched) {
-            armReadinessWatchdog()
+            ensureReadinessWatchdog()
         } else {
             scheduleRetry()
         }
         return dispatched
     }
 
-    private fun armReadinessWatchdog() {
-        cancelReadiness()
+    private fun ensureReadinessWatchdog() {
+        if (readinessTask != null) return
         lateinit var task: Runnable
         task = Runnable {
             if (readinessTask !== task) return@Runnable

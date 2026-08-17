@@ -92,7 +92,14 @@ internal class GoogleWebPageAdapter(
         }
     }
 
-    fun onHostPaused() = handler.removeCallbacksAndMessages(null)
+    fun onHostPaused() {
+        handler.removeCallbacksAndMessages(null)
+        webView.evaluateJavascript(
+            "try{var b=window.__elonGoogleWebBridge;if(b&&typeof b.dispose==='function')b.dispose();}catch(_){}" +
+                "try{delete window.__elonGoogleWebBridge;}catch(_){window.__elonGoogleWebBridge=undefined;}",
+            null,
+        )
+    }
 
     fun requestSnapshot() = runCommand("snapshot")
 
@@ -142,7 +149,7 @@ internal class GoogleWebPageAdapter(
         origin.scheme == "https" && origin.port == -1 && origin.host?.lowercase() in ALLOWED_HOSTS
 
     companion object {
-        const val ADAPTER_VERSION = 25
+        const val ADAPTER_VERSION = 26
         private val ADAPTER_ASSETS = listOf(
             "google_web_answer_candidate_policy.js",
             "google_web_query_policy.js",

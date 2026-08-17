@@ -88,6 +88,33 @@ class WebChatSessionRecoveryCoordinatorTest {
     }
 
     @Test
+    fun repeatedPageEventsCannotPostponeTheCurrentRecoveryDeadline() {
+        val scheduler = FakeScheduler()
+        var retries = 0
+        val coordinator = coordinator(scheduler, retry = { retries += 1; true })
+
+        coordinator.activate()
+        coordinator.onNavigationStarted()
+        val originalWatchdog = scheduler.nextRunnable()
+
+        repeat(8) {
+            coordinator.onPageFinished()
+            coordinator.onNavigationStarted()
+        }
+
+        assertEquals(1, scheduler.size)
+        assertTrue(originalWatchdog === scheduler.nextRunnable())
+        assertEquals(20_000L, scheduler.nextDelay())
+
+        scheduler.runNext()
+        assertEquals(2_000L, scheduler.nextDelay())
+        scheduler.runNext()
+
+        assertEquals(1, retries)
+        assertEquals(20_000L, scheduler.nextDelay())
+    }
+
+    @Test
     fun manualRetryIsImmediateAndUsesFreshBudget() {
         val scheduler = FakeScheduler()
         var retries = 0
@@ -133,6 +160,8 @@ class WebChatSessionRecoveryCoordinatorTest {
         }
 
         fun nextDelay(): Long? = tasks.minByOrNull(Task::delayMs)?.delayMs
+
+        fun nextRunnable(): Runnable? = tasks.minByOrNull(Task::delayMs)?.runnable
 
         fun runNext(): Boolean {
             val task = tasks.minByOrNull(Task::delayMs) ?: return false

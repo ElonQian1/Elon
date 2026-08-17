@@ -23,6 +23,8 @@
   let emitTimer = 0;
   let lastSnapshot = '';
   let lastDiagnostics = '';
+  let observer = null;
+  let disposed = false;
   const SUBMIT_READY_TIMEOUT_MS = 1600;
   const MAX_NAVIGATION_PROMPT_LENGTH = 4000;
 
@@ -35,6 +37,7 @@
   }
 
   function emitEvent(event) {
+    if (disposed) return;
     nativeBridge.postMessage(JSON.stringify({
       schema: 'yilong.ai.ui.v1',
       adapterVersion,
@@ -49,6 +52,7 @@
   }
 
   function emitResult(action, ok, detail, requestId) {
+    if (disposed) return;
     const event = {
       adapterVersion,
       documentToken,
@@ -145,6 +149,7 @@
   }
 
   function snapshot() {
+    if (disposed) return;
     const composer = findComposer();
     const streaming = isStreaming();
     const extraction = messageExtractor.extract(composer, streaming);
@@ -179,6 +184,7 @@
   }
 
   function scheduleSnapshot() {
+    if (disposed) return;
     clearTimeout(emitTimer);
     emitTimer = window.setTimeout(snapshot, 320);
   }
@@ -276,6 +282,7 @@
   }
 
   function runCommand(raw) {
+    if (disposed) return;
     let command = {};
     try { command = JSON.parse(String(raw || '{}')); }
     catch (_) { return emitResult('unknown', false, '命令格式无效。'); }
@@ -306,16 +313,26 @@
     emitResult(action || 'unknown', false, 'Google AI 不支持这个本地动作。', requestId);
   }
 
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearTimeout(emitTimer);
+    emitTimer = 0;
+    if (observer) observer.disconnect();
+    window.removeEventListener('popstate', scheduleSnapshot);
+  }
+
   window.__elonGoogleWebBridge = Object.freeze({
     version: adapterVersion,
     documentToken,
-    command: runCommand
+    command: runCommand,
+    dispose
   });
   emitEvent({
     type: 'adapter_ready',
     capabilities: ['streaming', 'citations', 'rich_text', 'new_conversation', 'conversation_history']
   });
-  const observer = new MutationObserver(scheduleSnapshot);
+  observer = new MutationObserver(scheduleSnapshot);
   const observeDocument = () => {
     const root = document.documentElement;
     if (!(root instanceof Node)) return false;
@@ -328,6 +345,7 @@
   };
   if (!observeDocument()) {
     window.addEventListener('DOMContentLoaded', () => {
+      if (disposed) return;
       observeDocument();
       scheduleSnapshot();
     }, { once: true });
