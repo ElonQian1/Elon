@@ -5872,7 +5872,7 @@
       "id": "win-google-ai-guest-new-conversation-recovery-v1",
       "title": "Win Google AI 游客新对话快速恢复 V1",
       "summary": "让 Win 原生聊天在 Google 游客适配器未连接或缓存上下文未绑定时仍可立即发起新会话恢复，并保留发送绑定门禁。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-guest-new-conversation-recovery-v1.md",
@@ -5914,15 +5914,101 @@
         "操作始终显示进度或失败原因",
         "前端合同与构建测试通过"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_ab2d369672b74d0fbffe2f8887d08a5f",
-        "agent_id": "codex-root-23272",
-        "claimed_at_ms": 1787052335037,
-        "expires_at_ms": 1787063135037
-      },
+      "implementation_evidence": [
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "989735f14b86f075039d185c9a725ec6a6c8bb09a25dcc1379143a4ec18324e8",
+          "locator": "new conversation recovery contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "0f2d16ae6d4d79f83d31b04ed8d7a99abfcb543b",
+            "worktree_blob_oid": "0f2d16ae6d4d79f83d31b04ed8d7a99abfcb543b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-new-conversation.cjs",
+          "content_hash": "355916dbf886a204550981740c0ba3a0785fd18ba5ce53e22d29340205636324",
+          "locator": "recovery policy assertions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "1f19375b06de67b4bfc63f6dcf1fc68df2955239",
+            "worktree_blob_oid": "1f19375b06de67b4bfc63f6dcf1fc68df2955239",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-user-state.cjs",
+          "content_hash": "262236687d22c098f922abf0680bd47b357dd753a866554f77aba3da08209ac0",
+          "locator": "disconnected guest assertions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "eb2b0db557c50551b2b80c359c3c99f93f61a0b9",
+            "worktree_blob_oid": "eb2b0db557c50551b2b80c359c3c99f93f61a0b9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/AiWebChatSidebar.tsx",
+          "content_hash": "a9b7c656b94475cae57ced341560315cf8e2648b5b81b9552ca44a3d4bb74d95",
+          "locator": "newConversationRecoveryActive",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "a5ed54e5a5cd207753d1d0199bc20f3b6db622ee",
+            "worktree_blob_oid": "a5ed54e5a5cd207753d1d0199bc20f3b6db622ee",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiNewConversation.ts",
+          "content_hash": "6bb0e21c1c79dcdd00fd67d304230873b0a2fbfb1523f29df972c3572d74a919",
+          "locator": "selectLocalAiNewConversationPath",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "3f76cc7cdfb423e33f5e87466474994da5a79661",
+            "worktree_blob_oid": "3f76cc7cdfb423e33f5e87466474994da5a79661",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiUserState.ts",
+          "content_hash": "5ad3c1acea1be744c42298df111f4131ca53a7bfdaf380d92c4438af7e36ff7f",
+          "locator": "canNewConversation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "2c0d8b3cb9367cd92ee3903ac29b116a4e772d2c",
+            "worktree_blob_oid": "2c0d8b3cb9367cd92ee3903ac29b116a4e772d2c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts",
+          "content_hash": "d05ac49245560f1591b08867c5b16703eee7ce14106bda63417f905c10e858e1",
+          "locator": "recoverNewConversation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd88cf68b1fcf7eaacfcabe04f41327ae77b750b",
+            "head_blob_oid": "1735ab16d4b128e6d5ed6ea7c74b20d02ede9cad",
+            "worktree_blob_oid": "1735ab16d4b128e6d5ed6ea7c74b20d02ede9cad",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787052321882,
-      "updated_at_ms": 1787052345915
+      "updated_at_ms": 1787052768930
     },
     {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
@@ -7082,36 +7168,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_0083d9181e2b45c1a12c796686b72498",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "claim_released",
-      "actor": "codex-goal-019feb34",
-      "reason": "Requirement clarification changed the bound hash; release the claim before explicit rebind and review.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786755811441
-    },
-    {
-      "id": "feature_event_bad1a6303050494fad2f2cae99370d69",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-019feb34",
-      "reason": "Bind the reviewed wording that keeps absolute allocator assignments terminal-local and finish logs path-bounded.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786755825986
-    },
-    {
-      "id": "feature_event_289d36803a5d4984bcbc30dca9eb3adf",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "Reviewed requirement wording and confirmed the frozen ownership and cleanup boundaries.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786755852650
-    },
     {
       "id": "feature_event_f61cccf555484a5e918e673a40189f77",
       "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
@@ -9081,6 +9137,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787052345915
+    },
+    {
+      "id": "feature_event_0b680bc999bc47dabe0de51d4668d950",
+      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787052768906
+    },
+    {
+      "id": "feature_event_ef91ec91d2104569b624d1ec8c5345bb",
+      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "恢复策略、状态门控和可见反馈已实现并通过专项测试与构建",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787052768919
+    },
+    {
+      "id": "feature_event_c67ff99418014f1e8c9b063f13bcd38d",
+      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "npm test:user-browser、npm build 与 bundle budget 均通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787052768930
     }
   ]
 }
