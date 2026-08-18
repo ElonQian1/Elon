@@ -4,4 +4,5 @@ internal enum class ChatGptWebPresentationMode {
     QUICK,
     WEB,
     NATIVE,
+    SKIN,
 }

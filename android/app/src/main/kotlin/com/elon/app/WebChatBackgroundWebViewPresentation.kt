@@ -22,6 +22,23 @@ internal fun WebView.endWebChatBackgroundInteraction() {
     alpha = 1f
 }
 
+internal fun WebView.showWebChatSkinSurface() {
+    alpha = 1f
+    visibility = View.VISIBLE
+    isClickable = true
+    isFocusable = true
+    isFocusableInTouchMode = true
+    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+}
+
+internal fun WebView.showWebChatBackgroundSurface() {
+    isClickable = false
+    isFocusable = false
+    isFocusableInTouchMode = false
+    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+    endWebChatBackgroundInteraction()
+}
+
 internal class WebChatBackgroundInteractionLease(
     private val webView: () -> WebView?,
     private val schedule: (Runnable, Long) -> Unit,

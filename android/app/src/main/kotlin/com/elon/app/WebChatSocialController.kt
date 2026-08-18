@@ -33,6 +33,10 @@ internal interface WebChatSocialController {
     fun startNewConversation()
     fun currentConversationPath(): String?
     fun officialFallbackUrl(): String? = null
+    fun supportsWebSkin(): Boolean = false
+    fun showWebSkin(): Boolean = false
+    fun showNativeMirror(): Boolean = false
+    fun presentationMode(): String = "native"
     fun conversationIndex(): ChatGptWebConversationIndexState
     fun requestConversationIndex(): Boolean
     fun openConversation(path: String): Boolean

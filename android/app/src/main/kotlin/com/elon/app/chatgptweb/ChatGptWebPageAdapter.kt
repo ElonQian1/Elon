@@ -39,6 +39,7 @@ internal class ChatGptWebPageAdapter(
         injectAndRequestSnapshot = ::injectAndRequestSnapshot,
     )
     private var listenerInstalled = false
+    private var skinEnabled = false
 
     fun install() {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
@@ -281,6 +282,14 @@ internal class ChatGptWebPageAdapter(
         expanded = expanded,
     )
 
+    fun setSkinMode(enabled: Boolean) {
+        skinEnabled = enabled
+        runCommand(
+            action = "set_skin_mode",
+            selected = enabled,
+        )
+    }
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() {
@@ -304,7 +313,8 @@ internal class ChatGptWebPageAdapter(
             "window.__elonChatGptAdapterTargetVersion=$ADAPTER_VERSION;"
         webView.evaluateJavascript("$tokenSetup\n$adapterScript") {
             if (listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
-                requestSnapshot()
+                setSkinMode(skinEnabled)
+                if (!skinEnabled) requestSnapshot()
             }
         }
     }
@@ -368,7 +378,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 130
+        internal const val ADAPTER_VERSION = 131
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -400,6 +410,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_form_commands.js",
             "chatgpt_web_adapter_disclosure_controls.js",
             "chatgpt_web_adapter_snapshot_scheduler.js",
+            "chatgpt_web_adapter_skin.js",
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_adapter.js",
         )

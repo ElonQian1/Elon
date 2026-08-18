@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ChatGptWebFeatureBaseline {
-    const val VERSION = 8
+    const val VERSION = 9
     internal const val DEVICE_VERIFICATION_ADAPTER_VERSION = 125
     private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
     private val DEVICE_VERIFICATION_CURRENT = isDeviceVerificationCurrent()
@@ -101,6 +101,7 @@ internal object ChatGptWebFeatureBaseline {
                     !it.authenticated && ChatGptWebAccessPolicy.canChat(it)
                 } == true
                 "official_fullscreen_fallback" -> mode == ChatGptWebPresentationMode.WEB
+                "single_webview_skin" -> mode == ChatGptWebPresentationMode.SKIN
                 "native_chat_composer" -> snapshot?.composerReady == true
                 "disclosure_controls" -> manifest?.controls.orEmpty()
                     .any(ChatGptWebUiControl::supportsExpandedState)
@@ -145,7 +146,7 @@ internal object ChatGptWebFeatureBaseline {
             it.verificationStatus != VerificationStatus.DEVICE_VERIFIED
         }
         return JSONObject()
-            .put("schema", "elon.chatgpt_web.feature_baseline.v8")
+            .put("schema", "elon.chatgpt_web.feature_baseline.v9")
             .put("version", VERSION)
             .put("device_verification_adapter_version", DEVICE_VERIFICATION_ADAPTER_VERSION)
             .put("device_verification_current", DEVICE_VERIFICATION_CURRENT)
@@ -350,6 +351,13 @@ internal object ChatGptWebFeatureBaseline {
             group = "session",
             delivery = Delivery.FULLSCREEN_OFFICIAL,
             mcpActions = listOf("chatgpt_select_view"),
+        ),
+        feature(
+            id = "single_webview_skin",
+            group = "session",
+            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            mcpActions = listOf("chatgpt_select_view", "state"),
+            verificationGap = "single_webview_skin_mode_device_acceptance",
         ),
         feature(
             id = "native_chat_composer",

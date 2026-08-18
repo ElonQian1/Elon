@@ -212,7 +212,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("context_id", stringProperty("Optional message or conversation context id for chatgpt_find_controls."))
                         .put("conversation_path", stringProperty("Provider-scoped path returned by get_web_chat_navigation; treat it as opaque."))
                         .put("project_path", stringProperty("Provider-scoped project path returned by get_web_chat_navigation; treat it as opaque."))
-                        .put("view_mode", stringProperty("ChatGPT view mode: native, official, or login."))
+                        .put("view_mode", stringProperty("ChatGPT view mode: native, skin, official, or login."))
                         .put("section", stringProperty("ChatGPT composer section model or tools; also filters chatgpt_get_navigation."))
                         .put("date", stringProperty("Optional ISO date for the native web chat sidebar or navigation query."))
                         .put("offset", intProperty("Zero-based page offset for web chat conversation queries."))

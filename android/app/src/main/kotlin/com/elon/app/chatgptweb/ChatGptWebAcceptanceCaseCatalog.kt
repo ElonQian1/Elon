@@ -10,6 +10,7 @@ internal object ChatGptWebAcceptanceCaseCatalog {
         "official_authentication" to "safe/authenticated_session",
         "anonymous_chat_access" to "reversible/anonymous_send_probe",
         "official_fullscreen_fallback" to "safe/read_only_surface",
+        "single_webview_skin" to "safe/single_webview_skin",
         "native_chat_composer" to "reversible/send_probe",
         "streaming_and_stop" to "reversible/send_probe_with_stop",
         "conversation_context_paging" to "safe/read_only_surface",

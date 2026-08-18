@@ -16,6 +16,9 @@ class WebChatBackgroundWebViewContractTest {
         val chatGpt = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val chatGptWebView = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundWebViewFactory.kt",
+        )
         val composerInteraction = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptComposerOptionInteraction.kt",
         )
@@ -29,7 +32,7 @@ class WebChatBackgroundWebViewContractTest {
         assertTrue(presentation.contains("const val MAX_LEASE_MS = 2_500L"))
         assertFalse(presentation.contains("View.GONE"))
         assertFalse(presentation.contains("pauseTimers"))
-        assertTrue(chatGpt.contains("configureWebChatBackgroundSurface()"))
+        assertTrue(chatGptWebView.contains("configureWebChatBackgroundSurface()"))
         assertTrue(chatGpt.contains("composerOptionInteraction::dispatch"))
         assertTrue(composerInteraction.contains("backgroundLease.run(action)"))
         assertTrue(composerInteraction.contains("backgroundLease.release()"))

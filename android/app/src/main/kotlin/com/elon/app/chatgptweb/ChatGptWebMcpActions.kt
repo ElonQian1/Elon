@@ -327,6 +327,7 @@ internal class ChatGptWebMcpActions(
                     "login", "quick" -> ChatGptWebPresentationMode.QUICK
                     "official", "web" -> ChatGptWebPresentationMode.WEB
                     "native", "yilong" -> ChatGptWebPresentationMode.NATIVE
+                    "skin", "web_skin" -> ChatGptWebPresentationMode.SKIN
                     else -> return error(action, "invalid_view_mode")
                 }
                 selectMode(next)

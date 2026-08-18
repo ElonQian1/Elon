@@ -19,6 +19,7 @@ internal object WebChatProviderPickerSheet {
         options: List<WebChatProviderPickerOption>,
         onProviderSelected: (WebChatProviderId) -> Boolean,
         onModelOptions: () -> Unit,
+        onWebSkin: () -> Unit,
         onOfficialPage: () -> Unit,
     ) {
         if (activity.isFinishing || activity.isDestroyed || options.isEmpty()) return
@@ -39,9 +40,14 @@ internal object WebChatProviderPickerSheet {
             addView(actionRow(
                 activity = activity,
                 showModelAction = selectedProvider == WebChatProviderId.CHATGPT_WEB,
+                showWebSkinAction = selectedProvider == WebChatProviderId.CHATGPT_WEB,
                 onModelOptions = {
                     dialog.dismiss()
                     onModelOptions()
+                },
+                onWebSkin = {
+                    dialog.dismiss()
+                    onWebSkin()
                 },
                 onOfficialPage = {
                     dialog.dismiss()
@@ -146,7 +152,9 @@ internal object WebChatProviderPickerSheet {
     private fun actionRow(
         activity: AppCompatActivity,
         showModelAction: Boolean,
+        showWebSkinAction: Boolean,
         onModelOptions: () -> Unit,
+        onWebSkin: () -> Unit,
         onOfficialPage: () -> Unit,
     ) = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(
@@ -160,6 +168,12 @@ internal object WebChatProviderPickerSheet {
             activity.getString(R.string.web_chat_provider_model_action),
             "web-chat-provider-model-options",
             onModelOptions,
+        ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        if (showWebSkinAction) addView(actionButton(
+            activity,
+            activity.getString(R.string.web_chat_open_skin),
+            "web-chat-provider-skin",
+            onWebSkin,
         ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         addView(actionButton(
             activity,

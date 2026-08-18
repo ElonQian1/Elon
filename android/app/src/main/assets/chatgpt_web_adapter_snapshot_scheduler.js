@@ -46,7 +46,7 @@
       cancelPending();
     }
 
-    return Object.freeze({ schedule, dispose });
+    return Object.freeze({ schedule, cancelPending, dispose });
   }
 
   root.__elonChatGptSnapshotScheduler = Object.freeze({ create });

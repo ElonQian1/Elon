@@ -10,6 +10,7 @@
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
   const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
+  const skinAdapter = window.__elonChatGptSkin;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
@@ -21,6 +22,7 @@
   let observer = null;
   let snapshotScheduler = null;
   let streamingSnapshotMode = false;
+  let skinMode = false;
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
   const SEND_BUTTON_TIMEOUT_MS = 4000;
@@ -202,7 +204,7 @@
   }
 
   function scheduleSnapshot(recordsOrActive) {
-    if (disposed || !snapshotScheduler) return;
+    if (disposed || skinMode || !snapshotScheduler) return;
     const active = recordsOrActive === true || streamingSnapshotMode;
     snapshotScheduler.schedule(active);
   }
@@ -373,6 +375,27 @@
     }
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     if (action === 'snapshot') return snapshot();
+    if (action === 'set_skin_mode') {
+      if (!skinAdapter || typeof skinAdapter.setEnabled !== 'function') {
+        return respond(action, false, '网页皮肤模块尚未就绪。');
+      }
+      const enabled = command.selected === true;
+      const applied = skinAdapter.setEnabled(enabled);
+      if (!applied || applied.ok !== true) {
+        return respond(action, false, '当前官方页面无法启用网页皮肤。');
+      }
+      skinMode = enabled;
+      if (skinMode) {
+        if (observer) observer.disconnect();
+        if (snapshotScheduler && typeof snapshotScheduler.cancelPending === 'function') {
+          snapshotScheduler.cancelPending();
+        }
+      } else {
+        observeDocument();
+        scheduleSnapshot();
+      }
+      return respond(action, true, '');
+    }
     if (action === 'snapshot_ui_manifest' && layoutAdapter) {
       layoutAdapter.emitSnapshot(emitEvent, true);
       return respond(action, true, '');
@@ -525,6 +548,9 @@
 
   function dispose() {
     if (disposed) return;
+    if (skinAdapter && typeof skinAdapter.setEnabled === 'function') {
+      skinAdapter.setEnabled(false);
+    }
     disposed = true;
     if (snapshotScheduler) snapshotScheduler.dispose();
     if (observer) observer.disconnect();

@@ -14,6 +14,7 @@ import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebPresentationMode
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
+import com.elon.app.chatgptweb.ChatGptWebSkinPresentationController
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class ChatGptSocialChatController(
@@ -49,6 +50,7 @@ internal class ChatGptSocialChatController(
         onConversationIndexChanged = { onConversationIndexChanged() },
         audioPermissionController = audioPermissionController,
     )
+    private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
     private var pendingPrompt: String? = null
@@ -66,7 +68,12 @@ internal class ChatGptSocialChatController(
             setInputText = ::setInputTextFromMcp,
             copyMessage = messageClipboard::copy,
             selectMode = { mode ->
-                if (mode != ChatGptWebPresentationMode.NATIVE) openOfficialFallback()
+                when (mode) {
+                    ChatGptWebPresentationMode.NATIVE -> skinPresentation.exit()
+                    ChatGptWebPresentationMode.SKIN -> skinPresentation.enter()
+                    ChatGptWebPresentationMode.QUICK,
+                    ChatGptWebPresentationMode.WEB -> openOfficialFallback()
+                }
             },
             revealMessage = ::revealMessageFromMcp,
         )
@@ -93,6 +100,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
+        skinPresentation.exit()
         modelSheet?.dismiss()
         modelSheet = null
         modelOptionById = emptyMap()
@@ -206,6 +214,14 @@ internal class ChatGptSocialChatController(
 
     override fun officialFallbackUrl(): String? = session.currentOfficialUrl()
 
+    override fun supportsWebSkin(): Boolean = true
+
+    override fun showWebSkin(): Boolean = active && skinPresentation.enter()
+
+    override fun showNativeMirror(): Boolean = skinPresentation.exit()
+
+    override fun presentationMode(): String = session.presentationMode().name.lowercase()
+
     override fun conversationIndex() = session.conversationIndex()
 
     override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
@@ -249,7 +265,10 @@ internal class ChatGptSocialChatController(
 
     override fun onHostPaused() = session.onHostPaused()
 
-    override fun destroy() = session.destroy()
+    override fun destroy() {
+        skinPresentation.destroy()
+        session.destroy()
+    }
 
     private fun setInputTextFromMcp(value: String) {
         binding.inputEdit.setText(value)

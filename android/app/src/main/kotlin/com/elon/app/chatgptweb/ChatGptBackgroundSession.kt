@@ -1,14 +1,9 @@
 package com.elon.app.chatgptweb
 
-import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.webkit.CookieManager
-import android.webkit.PermissionRequest
-import android.webkit.ValueCallback
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
@@ -16,7 +11,6 @@ import com.elon.app.PendingAttachment
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.WebChatSocialMcpPort
-import com.elon.app.configureWebChatBackgroundSurface
 import java.time.LocalDate
 
 internal class ChatGptBackgroundSession(
@@ -56,8 +50,13 @@ internal class ChatGptBackgroundSession(
     private val attachmentHandler = Handler(Looper.getMainLooper())
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
     private val composerOptionHandler = Handler(Looper.getMainLooper())
+    private val surfaceMode: ChatGptWebSurfaceModeController by lazy(LazyThreadSafetyMode.NONE) {
+        ChatGptWebSurfaceModeController(
+            { webView }, { pageAdapter }, webExecution::interactionRequested, ::ensureInitialized,
+        )
+    }
     private val composerOptionInteraction by lazy(LazyThreadSafetyMode.NONE) {
-        ChatGptComposerOptionInteraction({ webView }, { pageAdapter }, composerOptionHandler)
+        ChatGptComposerOptionInteraction({ webView }, { pageAdapter }, surfaceMode::isSkin, composerOptionHandler)
     }
     private val sessionContinuityHandler = Handler(Looper.getMainLooper())
     private val recoveryHandler = Handler(Looper.getMainLooper())
@@ -107,7 +106,7 @@ internal class ChatGptBackgroundSession(
     } ?: ChatGptWebConversationCollection()
     private var reloadAfterPause = false
     private val webExecution = chatGptBackgroundExecutionController({ webView }) {
-        state == State.LOADING || latestSnapshot?.streaming == true ||
+        surfaceMode.isSkin() || state == State.LOADING || latestSnapshot?.streaming == true ||
             conversationNavigation.hasPending() || attachmentSendTracker != null
     }
 
@@ -161,6 +160,9 @@ internal class ChatGptBackgroundSession(
     }
 
     fun state(): State = state
+
+    fun presentationMode(): ChatGptWebPresentationMode = surfaceMode.mode()
+    fun selectPresentationMode(mode: ChatGptWebPresentationMode): Boolean = surfaceMode.select(mode)
 
     fun canSend(): Boolean = WebChatSendContextPolicy.allows(state == State.READY, latestSnapshot, conversationNavigation.hasPending(), currentConversationPath(), currentConversationPath())
 
@@ -285,7 +287,7 @@ internal class ChatGptBackgroundSession(
             observedState = observedMcpState::snapshot,
             beginCommand = observedMcpState::beginCommand,
             bridgeState = { latestBridgeState },
-            mode = { ChatGptWebPresentationMode.NATIVE },
+            mode = ::presentationMode,
             inputText = inputText,
             audioPermissionState = audioPermissionController::snapshot,
             verificationEvidence = verificationEvidenceStore::snapshot,
@@ -335,47 +337,16 @@ internal class ChatGptBackgroundSession(
         updateState(State.IDLE)
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
     private fun ensureInitialized() {
         if (webView != null) return
         WebView.setWebContentsDebuggingEnabled(false)
-        val view = WebView(activity).apply {
-            configureWebChatBackgroundSurface()
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                allowFileAccess = false
-                allowContentAccess = true
-                javaScriptCanOpenWindowsAutomatically = false
-                setSupportMultipleWindows(false)
-                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                safeBrowsingEnabled = true
-                mediaPlaybackRequiresUserGesture = true
-                builtInZoomControls = false
-                displayZoomControls = false
-            }
-            webChromeClient = object : WebChromeClient() {
-                override fun onShowFileChooser(
-                    webView: WebView,
-                    filePathCallback: ValueCallback<Array<Uri>>,
-                    fileChooserParams: FileChooserParams,
-                ): Boolean {
-                    val values = queuedUploadUris
-                    queuedUploadUris = emptyList()
-                    filePathCallback.onReceiveValue(values.takeIf { it.isNotEmpty() }?.toTypedArray())
-                    if (values.isEmpty()) failAttachmentSend("附件请求已失效，请重新选择。")
-                    return true
-                }
-
-                override fun onPermissionRequest(request: PermissionRequest) {
-                    activity.runOnUiThread { audioPermissionController.handle(request) }
-                }
-
-                override fun onPermissionRequestCanceled(request: PermissionRequest) {
-                    activity.runOnUiThread { audioPermissionController.cancel(request) }
-                }
-            }
+        val view = createChatGptBackgroundWebView(activity, audioPermissionController) { callback ->
+            val values = queuedUploadUris
+            queuedUploadUris = emptyList()
+            callback.onReceiveValue(values.takeIf { it.isNotEmpty() }?.toTypedArray())
+            if (values.isEmpty()) failAttachmentSend("附件请求已失效，请重新选择。")
         }
+        surfaceMode.attach(view)
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(view, true)
         val adapter = ChatGptWebPageAdapter(
@@ -435,6 +406,7 @@ internal class ChatGptBackgroundSession(
         pageAdapter = adapter
         touchDispatcher = ChatGptWebTouchDispatcher(view)
         adapter.install()
+        surfaceMode.apply()
         proxyController.prepare { status ->
             if (activity.isFinishing || activity.isDestroyed || webView !== view) return@prepare
             if (!recovery.isActive()) { reloadAfterPause = true; return@prepare }

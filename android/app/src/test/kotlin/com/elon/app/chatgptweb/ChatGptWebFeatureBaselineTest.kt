@@ -19,7 +19,7 @@ class ChatGptWebFeatureBaselineTest {
             features.getJSONObject(index).getString("id")
         }
 
-        assertEquals("elon.chatgpt_web.feature_baseline.v8", baseline.getString("schema"))
+        assertEquals("elon.chatgpt_web.feature_baseline.v9", baseline.getString("schema"))
         assertEquals(ChatGptWebFeatureBaseline.VERSION, baseline.getInt("version"))
         assertEquals(
             ChatGptWebFeatureBaseline.DEVICE_VERIFICATION_ADAPTER_VERSION,
@@ -245,18 +245,18 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(0, summary.getInt("partial"))
         assertEquals(1, summary.getInt("fallback_only"))
         assertEquals(0, summary.getInt("remaining"))
-        assertEquals(45, codeSummary.getInt("implemented"))
+        assertEquals(46, codeSummary.getInt("implemented"))
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
         assertEquals(0, verificationSummary.getInt("offline_verified"))
         assertEquals(0, verificationSummary.getInt("device_verified"))
         assertEquals(0, verificationSummary.getInt("verified"))
-        assertEquals(36, verificationSummary.getInt("pending"))
+        assertEquals(37, verificationSummary.getInt("pending"))
         assertEquals(10, verificationSummary.getInt("user_action_required"))
-        assertEquals(36, verificationSummary.getInt("deferred"))
+        assertEquals(37, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(46, verificationSummary.getInt("remaining"))
+        assertEquals(47, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
@@ -607,6 +607,7 @@ class ChatGptWebFeatureBaselineTest {
             "official_authentication",
             "anonymous_chat_access",
             "official_fullscreen_fallback",
+            "single_webview_skin",
             "native_chat_composer",
             "streaming_and_stop",
             "conversation_context_paging",

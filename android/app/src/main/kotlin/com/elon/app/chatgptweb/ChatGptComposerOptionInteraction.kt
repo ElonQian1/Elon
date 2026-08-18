@@ -7,6 +7,7 @@ import com.elon.app.WebChatBackgroundInteractionLease
 internal class ChatGptComposerOptionInteraction(
     webView: () -> WebView?,
     private val pageAdapter: () -> ChatGptWebPageAdapter?,
+    private val isInteractiveSurface: () -> Boolean,
     handler: Handler,
 ) {
     private val backgroundLease = WebChatBackgroundInteractionLease(
@@ -26,7 +27,7 @@ internal class ChatGptComposerOptionInteraction(
             else pageAdapter()?.listComposerTools(requestId)
             Unit
         }
-        if (!backgroundLease.run(action)) action()
+        if (isInteractiveSurface() || !backgroundLease.run(action)) action()
     }
 
     fun release() = backgroundLease.release()

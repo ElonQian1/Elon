@@ -213,19 +213,22 @@ class ChatGptWebComposerContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val backgroundWebView = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundWebViewFactory.kt",
+        )
         val chooser = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebFileChooserController.kt",
         )
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
 
-        listOf(official, background).forEach { host ->
+        listOf(official, backgroundWebView).forEach { host ->
             assertTrue(host.contains("override fun onShowFileChooser("))
             assertTrue(host.contains("allowContentAccess = true"))
         }
         assertTrue(official.contains("fileChooserController.show("))
         assertTrue(background.contains("val values = queuedUploadUris"))
         assertTrue(background.contains("queuedUploadUris = emptyList()"))
-        assertTrue(background.contains("filePathCallback.onReceiveValue("))
+        assertTrue(background.contains("callback.onReceiveValue("))
         assertFalse(background.contains("fileChooserController.show("))
         assertTrue(chooser.contains("Intent.ACTION_OPEN_DOCUMENT"))
         assertTrue(chooser.contains("Intent.ACTION_GET_CONTENT"))

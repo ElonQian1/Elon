@@ -11,6 +11,7 @@ internal class WebChatProviderPicker(
     private val composerReady: () -> Boolean,
     private val selectProvider: (WebChatProviderId) -> Boolean,
     private val requestModelOptions: () -> Unit,
+    private val openWebSkin: () -> Unit,
     private val openOfficialFallback: () -> Unit,
 ) {
     fun show() {
@@ -28,6 +29,7 @@ internal class WebChatProviderPicker(
             options = options,
             onProviderSelected = selectProvider,
             onModelOptions = requestModelOptions,
+            onWebSkin = openWebSkin,
             onOfficialPage = openOfficialFallback,
         )
     }

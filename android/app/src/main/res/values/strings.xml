@@ -130,6 +130,7 @@
     <string name="social_ai_mode_tab_description">%1$s模式 %2$s</string>
     <string name="web_chat_provider_picker_title">选择网页 AI</string>
     <string name="web_chat_provider_model_action">模型设置</string>
+    <string name="web_chat_open_skin">网页皮肤</string>
     <string name="web_chat_open_official">官网功能</string>
     <string name="web_chat_provider_switch_title">切换网页 AI</string>
     <string name="web_chat_provider_switch_attachment_message">当前有 %1$d 个未发送附件。切换到 %2$s 会移除这些附件，已输入的文字会分别保留。</string>

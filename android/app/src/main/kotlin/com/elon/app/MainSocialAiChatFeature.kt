@@ -97,6 +97,10 @@ internal class MainSocialAiChatFeature(
                 prioritizeConsumerInteraction()
                 activeController().requestModelOptions()
             },
+            openWebSkin = {
+                prioritizeConsumerInteraction()
+                activeController().showWebSkin()
+            },
             openOfficialFallback = ::openOfficialFallback,
         )
     }
