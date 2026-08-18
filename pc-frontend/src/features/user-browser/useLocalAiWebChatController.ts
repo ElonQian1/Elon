@@ -31,6 +31,7 @@ import {
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
 import { requestOfficialAiTab } from './internalBrowserApi'
+import { selectLocalAiNewConversationPath } from './localAiNewConversation'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -52,6 +53,7 @@ export default function useLocalAiWebChatController(
   const [pendingSends, setPendingSends] = useState<PendingLocalAiSend[]>([])
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
+  const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
   const autoStartKey = useRef('')
   const responseRefreshGeneration = useRef(0)
   const responseRefreshTimer = useRef(0)
@@ -64,12 +66,13 @@ export default function useLocalAiWebChatController(
       ? sessionEntry.state
       : getCachedLocalAiWebSessionState(provider.id, ownerKey)
     : null
-  const snapshot = useMemo(
+  const liveSnapshot = useMemo(
     () => isLocalAiMessageSnapshot(visibleSessionState?.semanticEvent)
       ? visibleSessionState.semanticEvent
       : null,
     [visibleSessionState?.semanticEvent],
   )
+  const snapshot = newConversationRecoveryStartedAtMs ? null : liveSnapshot
   const visibleMessages = useMemo(
     () => mergeOptimisticLocalAiMessages(snapshot?.messages ?? [], pendingSends),
     [pendingSends, snapshot?.messages],
@@ -126,6 +129,7 @@ export default function useLocalAiWebChatController(
     setPendingSends([])
     setBusyAction('')
     setMessage('')
+    setNewConversationRecoveryStartedAtMs(0)
     autoStartKey.current = ''
     cancelResponseRefresh()
   }, [ownerKey, providerId, requestedSessionIdentity])
@@ -133,12 +137,21 @@ export default function useLocalAiWebChatController(
   useEffect(() => () => cancelResponseRefresh(), [])
 
   useEffect(() => {
+    if (!newConversationRecoveryStartedAtMs
+      || visibleSessionState?.rendererStatus !== 'active'
+      || visibleSessionState.semanticCacheStatus !== 'live'
+      || visibleSessionState.contextReady !== true
+      || visibleSessionState.updatedAtMs < newConversationRecoveryStartedAtMs
+      || !liveSnapshot) return
+    setNewConversationRecoveryStartedAtMs(0)
+  }, [liveSnapshot, newConversationRecoveryStartedAtMs, visibleSessionState])
+
+  useEffect(() => {
     if (!providerId || !ownerKey) return
     const key = requestedSessionIdentity
     if (autoStartKey.current === key) return
     autoStartKey.current = key
     let active = true
-    setBusyAction('prepare_guest_session')
     setMessage(`正在后台连接 ${providerDisplayName}；官网允许时可直接使用访客模式。`)
     void openLocalAiWebSession(providerId, ownerKey, { showWindow: false })
       .then(async () => {
@@ -152,9 +165,6 @@ export default function useLocalAiWebChatController(
       })
       .catch((error) => {
         if (active) setMessage(localAiBrowserErrorMessage(error))
-      })
-      .finally(() => {
-        if (active) setBusyAction('')
       })
     return () => { active = false }
   }, [ownerKey, providerDisplayName, providerId, requestedSessionIdentity])
@@ -250,6 +260,10 @@ export default function useLocalAiWebChatController(
       setMessage(`${provider.displayName} 当前不支持这个原生动作；可以显示官方窗口继续使用。`)
       return null
     }
+    if (action === 'new_conversation'
+      && selectLocalAiNewConversationPath(visibleSessionState, snapshot) === 'home') {
+      return recoverNewConversation()
+    }
     setBusyAction(action)
     const pendingSend = action === 'send_prompt'
       ? beginOptimisticLocalAiSend(
@@ -292,6 +306,30 @@ export default function useLocalAiWebChatController(
       return next
     } catch (error) {
       rollbackPendingSend(pendingSend)
+      setMessage(localAiBrowserErrorMessage(error))
+      return null
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function recoverNewConversation(): Promise<LocalAiWebSessionState | null> {
+    if (!provider || !ownerKey) return null
+    setBusyAction('new_conversation')
+    setNewConversationRecoveryStartedAtMs(Date.now())
+    setPendingSends([])
+    cancelResponseRefresh()
+    draftRef.current = ''
+    setDraft('')
+    setDraftTouched(false)
+    setMessage(`正在为 ${provider.displayName} 建立全新的官方会话…`)
+    try {
+      const next = await controlLocalAiWebSession(provider.id, ownerKey, 'home')
+      setSessionState(next)
+      setMessage(`已进入 ${provider.displayName} 新会话；正在连接访客输入框，连接完成前不会把旧缓存误发出去。`)
+      return next
+    } catch (error) {
+      setNewConversationRecoveryStartedAtMs(0)
       setMessage(localAiBrowserErrorMessage(error))
       return null
     } finally {
@@ -404,6 +442,7 @@ export default function useLocalAiWebChatController(
     },
     busyAction,
     message,
+    newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
     openOfficial,
     control,
     openCachedConversation,

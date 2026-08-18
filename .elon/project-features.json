@@ -5869,6 +5869,62 @@
       "updated_at_ms": 1786877700639
     },
     {
+      "id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "title": "Win Google AI 游客新对话快速恢复 V1",
+      "summary": "让 Win 原生聊天在 Google 游客适配器未连接或缓存上下文未绑定时仍可立即发起新会话恢复，并保留发送绑定门禁。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-google-ai-guest-new-conversation-recovery-v1.md",
+        "content_hash": "4885696d96142baf1e4c1a3a4c2d59dd50d03985f3db63ae2362c143f65dcc01",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "d564652a8a98036569ef21dd9c784261780eef30",
+          "head_blob_oid": "d13cbcb452f21b006dda611b66bce83fc2988684",
+          "worktree_blob_oid": "d13cbcb452f21b006dda611b66bce83fc2988684",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "windows-web-ai",
+      "tags": [
+        "windows",
+        "google-ai",
+        "guest",
+        "recovery"
+      ],
+      "task_paths": [
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+        "pc-frontend/scripts/test-local-ai-new-conversation.cjs",
+        "pc-frontend/scripts/test-local-ai-user-state.cjs",
+        "pc-frontend/src/features/ai/AiChatPage.tsx",
+        "pc-frontend/src/features/user-browser/AiWebChatSidebar.tsx",
+        "pc-frontend/src/features/user-browser/localAiNewConversation.ts",
+        "pc-frontend/src/features/user-browser/localAiUserState.ts",
+        "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "新对话不依赖 canSend 才可点击",
+        "适配器未连接或上下文未绑定时立即回到固定主页恢复",
+        "恢复期间发送保持禁用直到上下文绑定",
+        "已连接会话继续使用适配器命令回执",
+        "操作始终显示进度或失败原因",
+        "前端合同与构建测试通过"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_ab2d369672b74d0fbffe2f8887d08a5f",
+        "agent_id": "codex-root-23272",
+        "claimed_at_ms": 1787052335037,
+        "expires_at_ms": 1787063135037
+      },
+      "created_at_ms": 1787052321882,
+      "updated_at_ms": 1787052345915
+    },
+    {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "title": "Win Google AI 语义桥启动恢复 V1",
       "summary": "修复 WebView2 会话已连接但 Google AI 语义桥因缺少消息提取器、文档令牌及 DOM 就绪门禁而无法发送或接收回复的问题。",
@@ -7026,36 +7082,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_26a3c9e4bce54323ad021530dcf1039a",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "需求、边界、验收与非目标已冻结，可在独立 workflow 模块内实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786754535609
-    },
-    {
-      "id": "feature_event_bcd0ff91d4124c7885d62174e4f715ae",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019feb34",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786754549409
-    },
-    {
-      "id": "feature_event_0ad1b7800403493fbe8ce8121e5f6135",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "开始实现合同绑定分配器、统一收尾回收与安全测试。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786754563090
-    },
     {
       "id": "feature_event_0083d9181e2b45c1a12c796686b72498",
       "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
@@ -9025,6 +9051,36 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1786879547042
+    },
+    {
+      "id": "feature_event_cceaf7602d6c460d97e463f1a750bde1",
+      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "修复生产 Win Google 游客新对话无反馈和长等待",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787052321882
+    },
+    {
+      "id": "feature_event_40f9c111045c47499f7380bcd5a2ddd1",
+      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "action": "claimed",
+      "actor": "codex-root-23272",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787052335037
+    },
+    {
+      "id": "feature_event_f79f06d4f7404efe85063bcdec89f0c9",
+      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已捕获生产运行时状态并开始测试优先修复",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787052345915
     }
   ]
 }

@@ -47,6 +47,11 @@ const readySession = {
 assert.equal(deriveLocalAiUserState('checking', chatgpt, null, null).phase, 'client_checking')
 assert.equal(deriveLocalAiUserState('upgrade_required', chatgpt, null, null).phase, 'client_unavailable')
 assert.equal(deriveLocalAiUserState('ready', chatgpt, null, null).phase, 'official_closed')
+assert.equal(
+  deriveLocalAiUserState('ready', google, null, null).canNewConversation,
+  true,
+  'new conversation must remain available as a recovery action before the official page connects',
+)
 
 const login = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
   authenticated: false,
@@ -79,6 +84,26 @@ assert.equal(guest.phase, 'ready_guest')
 assert.equal(guest.canSend, true)
 assert.equal(guest.canNewConversation, true)
 assert.equal(guest.canConversationHistory, false)
+
+const disconnectedGuest = deriveLocalAiUserState('ready', google, {
+  ...readySession,
+  providerId: google.id,
+  currentHost: 'google.com',
+  rendererStatus: 'connecting',
+  semanticCacheStatus: 'cached',
+  contextReady: false,
+  contextStatus: 'cached',
+}, snapshot({
+  composerReady: false,
+  pageKind: 'unknown',
+  capabilities: ['new_conversation'],
+}))
+assert.equal(disconnectedGuest.phase, 'adapter_waiting')
+assert.equal(
+  disconnectedGuest.canNewConversation,
+  true,
+  'cached guest sessions must allow a new-conversation recovery instead of a silent disabled button',
+)
 
 const authenticated = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
   authenticated: true,

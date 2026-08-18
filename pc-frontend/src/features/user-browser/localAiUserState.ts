@@ -80,9 +80,9 @@ export function deriveLocalAiUserState(
       && supportedActions.has('send_prompt'),
   )
   const canNewConversation = Boolean(
-    canSend
-      && supportedActions.has('new_conversation')
-      && liveCapabilities.has('new_conversation'),
+    clientState === 'ready'
+      && provider
+      && supportedActions.has('new_conversation'),
   )
   const canConversationHistory = Boolean(
     livePageReady

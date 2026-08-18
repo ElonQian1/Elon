@@ -210,13 +210,15 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           <strong>{web.userState.title}</strong>
           {web.ready && <small data-complete={web.historyWindow.complete}>{web.historyWindow.label}</small>}
           <span>
-            {web.controller.sessionState?.contextReady === false
+            {web.controller.newConversationRecoveryActive && web.message
+              ? web.message
+              : web.controller.sessionState?.contextReady === false
               ? web.contextSummary
               : web.controller.sessionState?.navigationCacheStatus === 'cached'
               ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
               : directory?.collection && !directory.collection.complete
               ? `已显示 ${conversations.length} 个缓存/可见会话；完整官网目录正在后台同步。`
-              : web.message || web.contextSummary || web.userState.detail}
+              : web.contextSummary || web.userState.detail}
           </span>
         </div>
         <p className={styles.privacy}><ShieldCheck size={14} />Cookie 仅保存在这台电脑的 WebView2 Profile</p>
