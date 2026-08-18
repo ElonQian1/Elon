@@ -23,6 +23,8 @@ class ChatGptWebSkinContractTest {
         assertTrue(surfaceMode.contains("showWebChatBackgroundSurface()"))
         assertTrue(session.contains("mode = ::presentationMode"))
         assertTrue(session.contains("surfaceMode.isSkin() || state == State.LOADING"))
+        assertTrue(session.contains("{ webExecution.interactionRequested() }"))
+        assertFalse(session.contains("webExecution::interactionRequested"))
         assertTrue(controller.contains("binding.chatList.visibility = View.GONE"))
         assertTrue(controller.contains("binding.inputLayout.visibility = View.GONE"))
         assertTrue(controller.contains("web-chat-skin-exit:chatgpt"))

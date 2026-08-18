@@ -52,7 +52,7 @@ internal class ChatGptBackgroundSession(
     private val composerOptionHandler = Handler(Looper.getMainLooper())
     private val surfaceMode: ChatGptWebSurfaceModeController by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptWebSurfaceModeController(
-            { webView }, { pageAdapter }, webExecution::interactionRequested, ::ensureInitialized,
+            { webView }, { pageAdapter }, { webExecution.interactionRequested() }, ::ensureInitialized,
         )
     }
     private val composerOptionInteraction by lazy(LazyThreadSafetyMode.NONE) {
@@ -355,7 +355,7 @@ internal class ChatGptBackgroundSession(
             onEvent = ::handleEvent,
             onStateChanged = ::handleAdapterState,
             onDocumentChanged = ::handleDocumentChanged,
-            onWebExecutionRequested = webExecution::interactionRequested,
+            onWebExecutionRequested = { webExecution.interactionRequested() },
         )
         view.webViewClient = ChatGptWebViewClient(
             onPageStarted = { url ->
