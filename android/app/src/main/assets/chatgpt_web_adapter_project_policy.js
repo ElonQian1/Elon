@@ -8,7 +8,9 @@
   'use strict';
 
   const PROJECT_ID = /(?:^|[^A-Za-z0-9_-])(g-p-[A-Za-z0-9_-]{1,160})(?:[^A-Za-z0-9_-]|$)/;
+  const PRODUCTION_PROJECT_ID = /^(g-p-[A-Fa-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?$/;
   const PROJECT_PATH = /(?:^|https:\/\/chatgpt\.com)?\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?(?:[/?#]|$)/i;
+  const CONVERSATION_PATH = /(?:^|https:\/\/chatgpt\.com)?\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})(?:[/?#]|$)/i;
   const PROJECT_OPTIONS = /(?:project|\u9879\u76ee).*(?:options?|menu|\u9009\u9879|\u64cd\u4f5c|\u83dc\u5355)|(?:open|\u6253\u5f00).*(?:options?|\u9009\u9879)/i;
   const RESERVED_TITLE = /^(?:projects?|\u9879\u76ee|new project|create project|\u65b0\u5efa\u9879\u76ee|\u65b0\u9879\u76ee|view more|\u67e5\u770b\u66f4\u591a)$/i;
 
@@ -20,12 +22,18 @@
     return id ? '/g/' + id + '/project' : '';
   }
 
+  function canonicalId(value) {
+    const id = clean(value);
+    const production = id.match(PRODUCTION_PROJECT_ID);
+    return production ? production[1] : id;
+  }
+
   function projectId(value) {
     const text = String(value || '');
     const route = text.match(PROJECT_PATH);
-    if (route) return route[1];
+    if (route) return canonicalId(route[1]);
     const direct = text.match(PROJECT_ID);
-    return direct ? direct[1] : '';
+    return direct ? canonicalId(direct[1]) : '';
   }
 
   function attributeValues(node) {
@@ -68,7 +76,17 @@
     return '';
   }
 
+  function belongsToConversationRow(node) {
+    let current = node;
+    for (let depth = 0; current && depth < 7; depth += 1, current = current.parentElement) {
+      const href = current.getAttribute && current.getAttribute('href');
+      if (href && CONVERSATION_PATH.test(href)) return true;
+    }
+    return false;
+  }
+
   function projectIdForNode(node) {
+    if (belongsToConversationRow(node)) return '';
     const candidates = [];
     let current = node;
     for (let depth = 0; current && depth < 7; depth += 1, current = current.parentElement) {
@@ -119,7 +137,7 @@
       const id = attributeValues(node).map(projectId).find(Boolean) || runtimeProjectId(node);
       if (!id) return;
       const nearby = actionable.find((candidate) => candidate === node || candidate.contains(node) || node.contains(candidate));
-      if (!nearby) return;
+      if (!nearby || belongsToConversationRow(nearby)) return;
       const title = clean(label(nearby));
       if (title && !RESERVED_TITLE.test(title) && !PROJECT_OPTIONS.test(title)) {
         candidates.push({ node: nearby, id, title });
@@ -159,7 +177,7 @@
     const optionTitles = new Set(actionable.map((node) => referencedTitle(label(node))).filter(Boolean));
     const seen = new Set();
     return actionable.filter((node) => {
-      if (!visible(node) || node.getAttribute('aria-expanded') !== null) return false;
+      if (!visible(node) || belongsToConversationRow(node) || node.getAttribute('aria-expanded') !== null) return false;
       const title = clean(label(node));
       if (!title || !optionTitles.has(title) || RESERVED_TITLE.test(title) || PROJECT_OPTIONS.test(title)) return false;
       if (projectIdForNode(node) || seen.has(title)) return false;
@@ -169,6 +187,6 @@
   }
 
   return Object.freeze({
-    canonicalPath, findNode, projectId, read, referencedTitle, runtimeProjectId, unresolved
+    canonicalId, canonicalPath, findNode, projectId, read, referencedTitle, runtimeProjectId, unresolved
   });
 });

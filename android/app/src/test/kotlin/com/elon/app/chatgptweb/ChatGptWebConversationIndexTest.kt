@@ -237,6 +237,54 @@ class ChatGptWebConversationIndexTest {
         assertEquals(setOf("2026-08-13", "2026-08-14"), merged.single().activityDates)
     }
 
+    @Test
+    fun canonicalizesProductionProjectRoutesWithReadableSuffixes() {
+        val id = "g-p-6916e3fec8d8819195edffedd2f6e08e"
+        val suffixed = "$id-tou-zi-jia-mi-huo-bi"
+
+        assertEquals(id, ChatGptWebConversationPath.canonicalProjectId(suffixed))
+        assertEquals(id, ChatGptWebConversationPath.projectId("/g/$suffixed/c/inside"))
+        assertEquals("/g/$id/project", ChatGptWebConversationPath.normalizeProject("/g/$suffixed/project"))
+    }
+
+    @Test
+    fun mergesLegacyAndReadableProjectRoutesIntoOneCanonicalProject() {
+        val id = "g-p-6916e3fec8d8819195edffedd2f6e08e"
+        val observed = ChatGptWebProject(
+            "$id-tou-zi-jia-mi-huo-bi",
+            "投资加密货币",
+            "/g/$id-tou-zi-jia-mi-huo-bi/project",
+        )
+        val cached = ChatGptWebProject(id, "启动语音功能", "/g/$id/project")
+
+        val projects = ChatGptWebConversationIndex.mergeObservedProjects(
+            conversations = emptyList(),
+            previous = listOf(cached),
+            observed = listOf(observed),
+        )
+
+        assertEquals(1, projects.size)
+        assertEquals(id, projects.single().id)
+        assertEquals("投资加密货币", projects.single().title)
+        assertEquals("/g/$id/project", projects.single().path)
+    }
+
+    @Test
+    fun canonicalizesCachedConversationProjectMembership() {
+        val id = "g-p-6916e3fec8d8819195edffedd2f6e08e"
+        val suffixed = "$id-tou-zi-jia-mi-huo-bi"
+        val sanitized = ChatGptWebConversationIndex.sanitize(
+            conversation("inside", "今天", suffixed).copy(
+                path = "/g/$suffixed/c/inside",
+                projectTitle = "投资加密货币",
+                projectPath = "/g/$suffixed/project",
+            ),
+        )
+
+        assertEquals(id, sanitized.projectId)
+        assertEquals("/g/$id/project", sanitized.projectPath)
+    }
+
     private fun conversation(id: String, group: String, projectId: String?) = ChatGptWebConversation(
         id = id,
         title = "会话 $id",

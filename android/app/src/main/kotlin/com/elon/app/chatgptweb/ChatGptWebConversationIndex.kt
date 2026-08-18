@@ -27,14 +27,15 @@ internal object ChatGptWebConversationIndex {
         observed: List<ChatGptWebProject> = emptyList(),
     ): List<ChatGptWebProject> {
         val values = linkedMapOf<String, ChatGptWebProject>()
-        observed.forEach { project -> values.putIfAbsent(project.path, project) }
+        canonicalProjects(observed).forEach { canonical ->
+            values.putIfAbsent(canonical.id, canonical)
+        }
         conversations.forEach { conversation ->
-            val id = conversation.projectId ?: return@forEach
-            val path = conversation.projectPath
-                ?.let(ChatGptWebConversationPath::normalizeProject)
-                ?: "/g/$id/project"
-            val title = metadataLabel(conversation.projectTitle) ?: return@forEach
-            values.putIfAbsent(path, ChatGptWebProject(id, title, path))
+            val sanitized = sanitize(conversation)
+            val id = sanitized.projectId ?: return@forEach
+            val path = sanitized.projectPath ?: "/g/$id/project"
+            val title = metadataLabel(sanitized.projectTitle) ?: return@forEach
+            values.putIfAbsent(id, ChatGptWebProject(id, title, path))
         }
         return values.values.toList()
     }
@@ -46,7 +47,7 @@ internal object ChatGptWebConversationIndex {
         retainMissing: Boolean,
     ): List<ChatGptWebProject> = projects(
         conversations,
-        if (retainMissing) observed + previous else observed,
+        canonicalProjects(observed) + if (retainMissing) canonicalProjects(previous) else emptyList(),
     )
 
     fun mergeObservedProjects(
@@ -109,10 +110,16 @@ internal object ChatGptWebConversationIndex {
         return merged + cachedProjectConversations
     }
 
-    fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation = value.copy(
-        groupLabel = groupLabel(value.groupLabel).orEmpty(),
-        projectTitle = metadataLabel(value.projectTitle),
-    )
+    fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation {
+        val projectId = ChatGptWebConversationPath.canonicalProjectId(value.projectId)
+            ?: ChatGptWebConversationPath.projectId(value.path)
+        return value.copy(
+            groupLabel = groupLabel(value.groupLabel).orEmpty(),
+            projectId = projectId,
+            projectTitle = metadataLabel(value.projectTitle),
+            projectPath = projectId?.let { "/g/$it/project" },
+        )
+    }
 
     private fun collapse(values: List<ChatGptWebConversation>): LinkedHashMap<String, ChatGptWebConversation> =
         linkedMapOf<String, ChatGptWebConversation>().apply {
@@ -140,6 +147,28 @@ internal object ChatGptWebConversationIndex {
             projectPath = next.projectPath ?: previous.projectPath,
             activityDates = previous.activityDates + next.activityDates,
         )
+    }
+
+    private fun sanitizeProject(value: ChatGptWebProject): ChatGptWebProject? {
+        val id = ChatGptWebConversationPath.canonicalProjectId(value.id)
+            ?: ChatGptWebConversationPath.projectId(value.path)
+            ?: return null
+        val title = metadataLabel(value.title) ?: return null
+        return value.copy(id = id, title = title, path = "/g/$id/project")
+    }
+
+    private fun canonicalProjects(values: List<ChatGptWebProject>): List<ChatGptWebProject> {
+        val projects = linkedMapOf<String, Pair<Int, ChatGptWebProject>>()
+        values.forEach { value ->
+            val canonical = sanitizeProject(value) ?: return@forEach
+            val specificity = (if (value.id.trim() != canonical.id) 2 else 0) +
+                (if (value.path.trim() != canonical.path) 1 else 0)
+            val current = projects[canonical.id]
+            if (current == null || specificity > current.first) {
+                projects[canonical.id] = specificity to canonical
+            }
+        }
+        return projects.values.map { it.second }
     }
 
     private fun metadataLabel(value: String?): String? = value

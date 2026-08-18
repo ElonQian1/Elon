@@ -55,6 +55,9 @@
   }
 
   function projectIdFromPath(path) {
+    if (projectPolicy && typeof projectPolicy.projectId === 'function') {
+      return projectPolicy.projectId(path);
+    }
     const match = String(path || '').match(CONVERSATION_PATH) || String(path || '').match(PROJECT_PATH);
     return match && match[1] ? match[1] : '';
   }
@@ -77,7 +80,8 @@
     return Array.from(document.querySelectorAll('a[href*="/g/g-p-"]')).map((node) => {
       const path = sameOriginPath(node);
       const match = path.match(PROJECT_PATH);
-      if (!match || seen.has(path)) return null;
+      const id = projectIdFromPath(path);
+      if (!match || !id || seen.has(id)) return null;
       const title = cleanText(
         node.getAttribute('data-project-title') ||
           node.getAttribute('title') ||
@@ -85,12 +89,12 @@
           node.textContent
       ).slice(0, 160);
       if (!title) return null;
-      seen.add(path);
+      seen.add(id);
       return {
-        id: match[1],
+        id,
         title,
-        path,
-        active: location.pathname.startsWith('/g/' + match[1] + '/')
+        path: '/g/' + id + '/project',
+        active: location.pathname.startsWith('/g/' + id)
       };
     }).filter(Boolean).slice(0, MAX_PROJECTS);
   }
@@ -401,7 +405,12 @@
           const id = projectIdFromPath(path);
           if (id && !seen.has(id)) {
             seen.add(id);
-            values.push({ id, title, path, active: originalPath.startsWith('/g/' + id + '/') });
+            values.push({
+              id,
+              title,
+              path: '/g/' + id + '/project',
+              active: originalPath.startsWith('/g/' + id)
+            });
           }
           restore(visitNext);
         },

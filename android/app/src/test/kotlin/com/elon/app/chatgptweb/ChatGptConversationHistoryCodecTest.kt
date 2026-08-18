@@ -56,6 +56,19 @@ class ChatGptConversationHistoryCodecTest {
     }
 
     @Test
+    fun decodeCanonicalizesDuplicateProductionProjectRoutes() {
+        val id = "g-p-6916e3fec8d8819195edffedd2f6e08e"
+        val decoded = ChatGptConversationHistoryCodec.decode(
+            """{"schema":"elon.chatgpt_web.conversation_index.v2","saved_at_ms":1,"conversations":[],"projects":[{"id":"$id","title":"启动语音功能","path":"/g/$id/project"},{"id":"$id-tou-zi-jia-mi-huo-bi","title":"投资加密货币","path":"/g/$id-tou-zi-jia-mi-huo-bi/project"}]}""",
+        )!!
+
+        assertEquals(1, decoded.projects.size)
+        assertEquals(id, decoded.projects.single().id)
+        assertEquals("投资加密货币", decoded.projects.single().title)
+        assertEquals("/g/$id/project", decoded.projects.single().path)
+    }
+
+    @Test
     fun rejectsUnknownSchemaAndUnsafeOrEmptyIndexes() {
         assertNull(ChatGptConversationHistoryCodec.decode("{}"))
         assertNull(ChatGptConversationHistoryCodec.decode(

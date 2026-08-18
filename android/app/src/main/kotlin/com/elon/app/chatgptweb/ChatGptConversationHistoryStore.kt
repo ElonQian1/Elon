@@ -141,7 +141,7 @@ internal object ChatGptConversationHistoryCodec {
                 )))
             }
         }.let { ChatGptWebConversationIndex.merge(emptyList(), it) }
-        val projects = buildList {
+        val decodedProjects = buildList {
             val projectValues = root.optJSONArray("projects") ?: return@buildList
             val seen = mutableSetOf<String>()
             for (index in 0 until minOf(projectValues.length(), MAX_PROJECTS)) {
@@ -155,6 +155,7 @@ internal object ChatGptConversationHistoryCodec {
                 add(ChatGptWebProject(id, title, path))
             }
         }
+        val projects = ChatGptWebConversationIndex.projects(conversations, decodedProjects)
         if (conversations.isEmpty() && projects.isEmpty()) return null
         return ChatGptConversationHistoryCache(conversations, savedAtMs, projects)
     }
