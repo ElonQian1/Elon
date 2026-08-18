@@ -21,6 +21,7 @@ internal enum class ChatGptWebSideMenuTab(val wireValue: String) {
 internal data class ChatGptWebSideMenuState(
     val tab: ChatGptWebSideMenuTab,
     val date: LocalDate,
+    val selectedProjectId: String? = null,
 )
 
 internal class ChatGptWebSideMenuCoordinator(
@@ -97,6 +98,11 @@ internal class ChatGptWebSideMenuCoordinator(
         if (!active() || !::view.isInitialized) return false
         view.selectDate(date)
         return true
+    }
+
+    fun selectProject(projectId: String): Boolean {
+        if (!active() || !::view.isInitialized) return false
+        return view.selectProject(projectId)
     }
 
     fun hide() {

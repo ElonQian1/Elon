@@ -47,6 +47,12 @@ internal object ChatGptNativeNavigationSelector {
         label = value.title,
     )
 
+    fun projectBack(value: ChatGptWebProject): String = selector(
+        prefix = "chatgpt-project-back",
+        id = value.id,
+        label = value.title,
+    )
+
     fun composerOption(section: String, value: ChatGptWebComposerOption): String = selector(
         prefix = "chatgpt-composer-option:${stableToken(section)}",
         id = value.id,

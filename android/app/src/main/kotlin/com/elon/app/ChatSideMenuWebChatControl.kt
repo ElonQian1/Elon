@@ -19,6 +19,10 @@ internal class ChatSideMenuWebChatControl(
         coordinator().selectDate(date)
     }
 
+    fun selectProject(projectId: String): Boolean = select {
+        coordinator().selectProject(projectId)
+    }
+
     private fun select(apply: () -> Boolean): Boolean {
         if (!apply()) return false
         ensureOpen()

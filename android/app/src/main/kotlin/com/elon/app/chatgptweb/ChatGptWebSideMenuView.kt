@@ -47,9 +47,9 @@ internal class ChatGptWebSideMenuView(
     }
     private var selectedTab = ChatGptWebSideMenuTab.DATE
     private var selectedDate = LocalDate.now()
+    private var selectedProjectId: String? = null
     private var searchVisible = false
     private var searchQuery = ""
-    private val collapsedProjectIds = mutableSetOf<String>()
     private var lastRefreshRequestedAtMs = 0L
     private val conversationActions by lazy {
         ChatGptWebSideMenuConversationActions(
@@ -109,11 +109,13 @@ internal class ChatGptWebSideMenuView(
         }
     }
 
-    fun state() = ChatGptWebSideMenuState(selectedTab, selectedDate)
+    fun state() = ChatGptWebSideMenuState(selectedTab, selectedDate, selectedProjectId)
 
     fun selectTab(tab: ChatGptWebSideMenuTab) {
-        if (selectedTab == tab) return
+        if (selectedTab == tab && (tab != ChatGptWebSideMenuTab.PROJECTS || selectedProjectId == null)) return
         selectedTab = tab
+        selectedProjectId = null
+        searchQuery = ""
         render()
     }
 
@@ -121,7 +123,15 @@ internal class ChatGptWebSideMenuView(
         if (selectedTab == ChatGptWebSideMenuTab.DATE && selectedDate == date) return
         selectedTab = ChatGptWebSideMenuTab.DATE
         selectedDate = date
+        selectedProjectId = null
+        searchQuery = ""
         render()
+    }
+
+    fun selectProject(projectId: String): Boolean {
+        val project = index().projects.firstOrNull { it.id == projectId } ?: return false
+        enterProject(project)
+        return true
     }
 
     private fun topTabs(): LinearLayout = LinearLayout(activity).apply {
@@ -134,6 +144,8 @@ internal class ChatGptWebSideMenuView(
             ChatGptNativeNavigationSelector.DATE_TAB,
         ) {
             selectedTab = ChatGptWebSideMenuTab.DATE
+            selectedProjectId = null
+            searchQuery = ""
             render()
         }, LinearLayout.LayoutParams(dp(92), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(tabText(
@@ -146,6 +158,8 @@ internal class ChatGptWebSideMenuView(
             ChatGptNativeNavigationSelector.PROJECTS_TAB,
         ) {
             selectedTab = ChatGptWebSideMenuTab.PROJECTS
+            selectedProjectId = null
+            searchQuery = ""
             render()
         }, LinearLayout.LayoutParams(dp(58), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
@@ -229,7 +243,11 @@ internal class ChatGptWebSideMenuView(
         overScrollMode = View.OVER_SCROLL_NEVER
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            if (selectedTab == ChatGptWebSideMenuTab.PROJECTS) renderProjects(this) else renderConversations(this)
+            if (selectedTab == ChatGptWebSideMenuTab.PROJECTS) {
+                selectedProject()?.let { renderProjectConversations(this, it) } ?: renderProjects(this)
+            } else {
+                renderConversations(this)
+            }
         })
     }
 
@@ -327,11 +345,42 @@ internal class ChatGptWebSideMenuView(
         }
         projects.forEach { project ->
             container.addView(projectRow(project))
-            if (project.id !in collapsedProjectIds) {
-                state.conversations
-                    .filter { it.projectId == project.id }
-                    .forEach { container.addView(conversationRow(it, nested = true)) }
-            }
+        }
+    }
+
+    private fun renderProjectConversations(container: LinearLayout, project: ChatGptWebProject) {
+        val state = index()
+        container.addView(projectBackRow(project))
+        val all = state.conversations.filter { it.projectId == project.id }
+        val query = searchQuery.trim()
+        val visible = all.filter { conversation ->
+            query.isBlank() || conversation.title.contains(query, ignoreCase = true)
+        }
+        val contentStatus = WebChatSideMenuContentState.resolve(
+            collection = state.collection,
+            availableCount = all.size,
+            visibleCount = visible.size,
+        )
+        if (contentStatus != WebChatSideMenuContentStatus.CONTENT) {
+            container.addView(contentStateView(
+                contentStatus,
+                emptyMessage = if (query.isBlank()) {
+                    "${project.title}暂无已同步会话"
+                } else {
+                    "${project.title}没有匹配的会话"
+                },
+                loadingMessage = "正在读取${project.title}会话…",
+                failedMessage = "暂时无法读取${project.title}会话",
+            ))
+            return
+        }
+        renderConversationSection(container, activity.getString(R.string.chatgpt_side_menu_project_conversations), visible)
+    }
+
+    private fun selectedProject(): ChatGptWebProject? {
+        val id = selectedProjectId ?: return null
+        return index().projects.firstOrNull { it.id == id }.also { project ->
+            if (project == null) selectedProjectId = null
         }
     }
 
@@ -356,19 +405,52 @@ internal class ChatGptWebSideMenuView(
         textSize = 16f
         setTypeface(typeface, Typeface.BOLD)
         setTextColor(Color.parseColor("#F8F7F4"))
-        setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_side_menu_project, 0, 0, 0)
+        setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_side_menu_folder_closed, 0, 0, 0)
         compoundDrawablePadding = dp(12)
         contentDescription = ChatGptNativeNavigationSelector.project(project)
         isClickable = true
         foreground = selectableForeground()
+        setOnClickListener { enterProject(project) }
+    }
+
+    private fun projectBackRow(project: ChatGptWebProject) = LinearLayout(activity).apply {
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56))
+        gravity = Gravity.CENTER_VERTICAL
+        orientation = LinearLayout.HORIZONTAL
+        contentDescription = ChatGptNativeNavigationSelector.projectBack(project)
+        isClickable = true
+        foreground = selectableForeground()
         setOnClickListener {
-            if (localProjectActions() == null) {
-                closeThen { openProject(project.path) }
-            } else {
-                if (!collapsedProjectIds.add(project.id)) collapsedProjectIds.remove(project.id)
-                render()
-            }
+            selectedProjectId = null
+            searchQuery = ""
+            render()
         }
+        addView(ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            setImageResource(R.drawable.ic_toolbar_back_custom)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        })
+        addView(TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            gravity = Gravity.CENTER_VERTICAL
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            text = project.title
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor("#F8F7F4"))
+        })
+    }
+
+    private fun enterProject(project: ChatGptWebProject) {
+        selectedTab = ChatGptWebSideMenuTab.PROJECTS
+        selectedProjectId = project.id
+        searchQuery = ""
+        render()
+        if (localProjectActions() == null) post { openProject(project.path) }
     }
 
     private fun conversationRow(

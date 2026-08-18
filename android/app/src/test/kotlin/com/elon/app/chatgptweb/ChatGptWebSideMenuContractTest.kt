@@ -24,6 +24,12 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(view.contains("chatgpt_side_menu_daily_active"))
         assertTrue(view.contains("chatgpt_side_menu_unassigned"))
         assertTrue(view.contains("renderProjects(this)"))
+        assertTrue(view.contains("renderProjectConversations(this, it)"))
+        assertTrue(view.contains("selectedProjectId = project.id"))
+        assertTrue(view.contains("ChatGptNativeNavigationSelector.projectBack(project)"))
+        assertTrue(view.contains("if (localProjectActions() == null) post { openProject(project.path) }"))
+        assertTrue(view.contains("setOnClickListener { closeThen { openConversation(conversation.path) } }"))
+        assertTrue(!view.contains("closeThen { openProject(project.path) }"))
         assertTrue(view.contains("conversationActions.button(conversation)"))
         assertTrue(view.contains("conversationActions.show(conversation)"))
         val actions = read(
@@ -47,12 +53,15 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(controller.contains("ChatSideMenuWebChatControl("))
         assertTrue(webChatControl.contains("fun selectTab(tab: ChatGptWebSideMenuTab)"))
         assertTrue(webChatControl.contains("fun selectDate(date: LocalDate)"))
+        assertTrue(webChatControl.contains("fun selectProject(projectId: String)"))
         assertTrue(view.contains("fun selectTab(tab: ChatGptWebSideMenuTab)"))
         assertTrue(view.contains("fun selectDate(date: LocalDate)"))
         assertTrue(mcp.contains("\"get_web_chat_navigation\""))
         assertTrue(mcp.contains("\"set_web_chat_sidebar\""))
         assertTrue(navigationJson.contains("elon.web_chat.navigation.v1"))
         assertTrue(mcp.contains("elon.web_chat.native_sidebar.v1"))
+        assertTrue(mcp.contains("selected_project_id"))
+        assertTrue(mcp.contains("selectWebChatProject(requestedProjectId)"))
     }
 
     @Test

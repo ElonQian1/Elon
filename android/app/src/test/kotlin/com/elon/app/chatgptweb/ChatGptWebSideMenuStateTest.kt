@@ -11,4 +11,15 @@ class ChatGptWebSideMenuStateTest {
         assertEquals(ChatGptWebSideMenuTab.PROJECTS, ChatGptWebSideMenuTab.parse(" PROJECTS "))
         assertNull(ChatGptWebSideMenuTab.parse("unknown"))
     }
+
+    @Test
+    fun sidebarStateKeepsSelectedProjectFolder() {
+        val state = ChatGptWebSideMenuState(
+            tab = ChatGptWebSideMenuTab.PROJECTS,
+            date = java.time.LocalDate.of(2026, 8, 18),
+            selectedProjectId = "project-1",
+        )
+
+        assertEquals("project-1", state.selectedProjectId)
+    }
 }

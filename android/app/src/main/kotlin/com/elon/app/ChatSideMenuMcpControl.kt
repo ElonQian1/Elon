@@ -24,4 +24,7 @@ internal class ChatSideMenuMcpControl(
 
     fun selectWebChatDate(date: LocalDate): Boolean =
         controller.webChatControl.selectDate(date)
+
+    fun selectWebChatProject(projectId: String): Boolean =
+        controller.webChatControl.selectProject(projectId)
 }

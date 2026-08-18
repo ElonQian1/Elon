@@ -168,6 +168,7 @@ internal class MainMcpNativeControlActions(
                 val tab = ChatGptWebSideMenuTab.parse(args.optString("section"))
                     ?: return errorJson(action, "unsupported_web_chat_sidebar_section")
                 val requestedDate = args.optString("date").trim()
+                val requestedProjectId = args.optString("project_id").trim()
                 val selected = if (requestedDate.isNotBlank()) {
                     if (tab != ChatGptWebSideMenuTab.DATE) {
                         return errorJson(action, "date_requires_date_section")
@@ -175,6 +176,11 @@ internal class MainMcpNativeControlActions(
                     val date = runCatching { LocalDate.parse(requestedDate) }.getOrNull()
                         ?: return errorJson(action, "invalid_web_chat_sidebar_date")
                     chatSideMenuControl?.selectWebChatDate(date)
+                } else if (requestedProjectId.isNotBlank()) {
+                    if (tab != ChatGptWebSideMenuTab.PROJECTS) {
+                        return errorJson(action, "project_requires_projects_section")
+                    }
+                    chatSideMenuControl?.selectWebChatProject(requestedProjectId)
                 } else {
                     chatSideMenuControl?.selectWebChatTab(tab)
                 }
@@ -624,6 +630,7 @@ internal class MainMcpNativeControlActions(
             .put("schema", "elon.web_chat.native_sidebar.v1")
             .put("selected_section", state.tab.wireValue)
             .put("selected_date", state.date.toString())
+            .put("selected_project_id", state.selectedProjectId ?: JSONObject.NULL)
             .put("open", chatSideMenuControl.isOpen())
     }
 
