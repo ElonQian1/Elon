@@ -47,6 +47,7 @@ $expected = [ordered]@{
         "safe/feature_pages",
         "safe/feature_page/projects",
         "safe/feature_page/tasks",
+        "safe/feature_page/images",
         "safe/feature_page/library",
         "safe/feature_page/gpts",
         "safe/feature_page/apps",

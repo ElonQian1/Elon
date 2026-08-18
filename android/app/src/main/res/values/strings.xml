@@ -83,6 +83,7 @@
     <string name="chatgpt_features_opening">正在打开官方功能</string>
     <string name="chatgpt_features_official">在官网查看全部功能</string>
     <string name="chatgpt_features_current">当前</string>
+    <string name="chatgpt_feature_kind_images">图像</string>
     <string name="chatgpt_feature_kind_library">文件库</string>
     <string name="chatgpt_feature_kind_tasks">已安排</string>
     <string name="chatgpt_feature_kind_projects">项目</string>

@@ -245,18 +245,18 @@ class ChatGptWebFeatureBaselineTest {
         assertEquals(0, summary.getInt("partial"))
         assertEquals(1, summary.getInt("fallback_only"))
         assertEquals(0, summary.getInt("remaining"))
-        assertEquals(46, codeSummary.getInt("implemented"))
+        assertEquals(47, codeSummary.getInt("implemented"))
         assertEquals(0, codeSummary.getInt("partial"))
         assertEquals(1, codeSummary.getInt("official_fallback"))
         assertEquals(0, codeSummary.getInt("remaining"))
         assertEquals(0, verificationSummary.getInt("offline_verified"))
         assertEquals(0, verificationSummary.getInt("device_verified"))
         assertEquals(0, verificationSummary.getInt("verified"))
-        assertEquals(37, verificationSummary.getInt("pending"))
+        assertEquals(38, verificationSummary.getInt("pending"))
         assertEquals(10, verificationSummary.getInt("user_action_required"))
-        assertEquals(37, verificationSummary.getInt("deferred"))
+        assertEquals(38, verificationSummary.getInt("deferred"))
         assertEquals(0, verificationSummary.getInt("failed"))
-        assertEquals(47, verificationSummary.getInt("remaining"))
+        assertEquals(48, verificationSummary.getInt("remaining"))
         assertEquals(0, baseline.getJSONArray("remaining_code_feature_ids").length())
         assertEquals("complete", feature(baseline, "model_selection").getString("implementation_status"))
         assertEquals("implemented", feature(baseline, "model_selection").getString("code_status"))
@@ -314,6 +314,7 @@ class ChatGptWebFeatureBaselineTest {
         listOf(
             "projects",
             "tasks",
+            "images",
             "library",
             "gpts",
             "apps",
@@ -630,6 +631,7 @@ class ChatGptWebFeatureBaselineTest {
             "conversation_mutations",
             "projects",
             "tasks",
+            "images",
             "library",
             "gpts",
             "apps",

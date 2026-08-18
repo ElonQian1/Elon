@@ -40,6 +40,21 @@ class WebChatProductionFeatureCompletionTest {
     }
 
     @Test
+    fun acceptsOfficialImageGalleryRoute() {
+        val state = state(
+            "mcp_images",
+            WebChatConsumerCommandStatus.SUCCEEDED,
+            pageKind = "images",
+            pageUrl = "https://chatgpt.com/images",
+        )
+
+        assertTrue(WebChatProductionFeatureCompletionPolicy.pageSettled(
+            feature("images", "images"),
+            state,
+        ))
+    }
+
+    @Test
     fun rejectsUntrustedUrlAndFailedCommand() {
         val state = state(
             "mcp_3",

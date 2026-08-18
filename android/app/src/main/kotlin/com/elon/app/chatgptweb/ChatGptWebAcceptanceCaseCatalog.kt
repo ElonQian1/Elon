@@ -37,6 +37,7 @@ internal object ChatGptWebAcceptanceCaseCatalog {
         "feature_navigation" to "safe/feature_pages",
         "projects" to "safe/feature_page/projects",
         "tasks" to "safe/feature_page/tasks",
+        "images" to "safe/feature_page/images",
         "library" to "safe/feature_page/library",
         "gpts" to "safe/feature_page/gpts",
         "apps" to "safe/feature_page/apps",

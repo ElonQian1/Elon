@@ -235,6 +235,7 @@
     if (/health|健康/.test(signal + ' ' + path)) return 'health';
     if (/finances?|个人财务|财务/.test(signal + ' ' + path)) return 'finances';
     if (/^\/work(?:\/|$)/.test(path) || /^(?:work|工作)$/.test(signal)) return 'work';
+    if (/^\/images?(?:\/|$)/.test(path) || /^(?:images?|图像|图片)$/.test(signal)) return 'images';
     if (/library|sidebar-item-recall|文件库|资料库/.test(signal + ' ' + path)) return 'library';
     if (/scheduled|schedule|已安排|任务/.test(signal + ' ' + path)) return 'tasks';
     if (/project|项目/.test(signal + ' ' + path)) return 'project';

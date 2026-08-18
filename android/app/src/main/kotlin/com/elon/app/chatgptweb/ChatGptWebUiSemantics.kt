@@ -48,6 +48,7 @@ internal object ChatGptWebUiSemantics {
         "selection",
         "toggle",
         "slider",
+        "images",
         "library",
         "apps",
         "tasks",

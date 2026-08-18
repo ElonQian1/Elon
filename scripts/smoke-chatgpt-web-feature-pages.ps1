@@ -23,6 +23,7 @@ Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 $scriptDeadline = [DateTimeOffset]::UtcNow.AddSeconds($TotalTimeoutSec)
 
 $safeFeatureCases = [ordered]@{
+    images = "safe/feature_page/images"
     library = "safe/feature_page/library"
     tasks = "safe/feature_page/tasks"
     apps = "safe/feature_page/apps"

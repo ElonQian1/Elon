@@ -33,6 +33,12 @@ expectEqual(policy.classify({
 }), 'library', 'library page action');
 
 expectEqual(policy.classify({
+  pathname: '/images',
+  region: 'content',
+  signal: 'Open generated image'
+}), 'images', 'image gallery page action');
+
+expectEqual(policy.classify({
   pathname: '/health',
   path: '',
   region: 'content'

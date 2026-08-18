@@ -34,6 +34,9 @@
       return 'finances';
     }
     if (/^\/work(?:\/|$)/.test(cleanPath) || /^(?:work|工作)$/.test(cleanLabel)) return 'work';
+    if (/^\/images?(?:\/|$)/.test(cleanPath) || /^(?:images?|图像|图片)$/.test(cleanLabel)) {
+      return 'images';
+    }
     if (/library|sidebar-item-recall|文件库|资料库/.test(value)) return 'library';
     if (/scheduled|schedule|task|已安排|任务/.test(value)) return 'tasks';
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(value)) return 'gpts';

@@ -16,6 +16,7 @@
     { pattern: /^\/finances?(?:\/|$)/, semantic: 'finances' },
     { pattern: /^\/work(?:\/|$)/, semantic: 'work' },
     { pattern: /^\/scheduled(?:\/|$)/, semantic: 'tasks' },
+    { pattern: /^\/images?(?:\/|$)/, semantic: 'images' },
     { pattern: /^\/library(?:\/|$)/, semantic: 'library' },
     { pattern: /^\/plugins(?:\/|$)/, semantic: 'apps' },
     { pattern: /^\/g\/g-p-[a-z0-9_-]+\/project(?:\/|$)/, semantic: 'project' }

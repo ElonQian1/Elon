@@ -77,7 +77,7 @@ if ($runtime.Contains('adb connect') -or $runtime.Contains('connect",')) {
 }
 Assert-Contains $smoke '$safeFeatureCases = [ordered]@{' `
     "Feature-page smoke must define one ordered allowlist and evidence mapping."
-foreach ($kind in @("library", "tasks", "apps", "projects", "gpts", "work")) {
+foreach ($kind in @("images", "library", "tasks", "apps", "projects", "gpts", "work")) {
     Assert-Contains $smoke "$kind = `"safe/feature_page/$kind`"" `
         "Feature-page smoke must map $kind to its own verification case."
 }

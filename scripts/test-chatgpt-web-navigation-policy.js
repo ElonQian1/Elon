@@ -31,6 +31,8 @@ expectEqual(
   'project disclosure header is not a feature page'
 );
 expectEqual(policy.classify('Library', '/library'), 'library', 'library route');
+expectEqual(policy.classify('Images', '/images'), 'images', 'image gallery route');
+expectEqual(policy.classify('图像', ''), 'images', 'localized image gallery label');
 expectEqual(
   policy.classify('sidebar-item-recall', ''),
   'library',

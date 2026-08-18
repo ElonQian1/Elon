@@ -550,6 +550,7 @@ internal object ChatGptWebFeatureBaseline {
         ),
         featurePage("projects", "project"),
         featurePage("tasks", "tasks"),
+        featurePage("images", "images"),
         featurePage("library", "library"),
         featurePage("gpts", "gpts"),
         featurePage("apps", "apps"),

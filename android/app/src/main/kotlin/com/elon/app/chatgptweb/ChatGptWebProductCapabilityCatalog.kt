@@ -25,6 +25,7 @@ internal object ChatGptWebProductCapabilityCatalog {
     val PAGE_FEATURES = listOf(
         PageFeature("projects", "projects", "project", listOf("/projects")),
         PageFeature("tasks", "tasks", "tasks", listOf("/tasks", "/scheduled")),
+        PageFeature("images", "images", "images", listOf("/images")),
         PageFeature("library", "library", "library", listOf("/library")),
         PageFeature("gpts", "gpts", "gpts", listOf("/gpts")),
         PageFeature("apps", "apps", "apps", listOf("/apps", "/plugins")),

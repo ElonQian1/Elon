@@ -26,13 +26,14 @@ class ChatGptWebProductCapabilityCatalogTest {
         assertTrue(ChatGptWebProductCapabilityCatalog.requiresUserConfirmation("health"))
         assertTrue(ChatGptWebProductCapabilityCatalog.requiresUserConfirmation("finances"))
         assertFalse(ChatGptWebProductCapabilityCatalog.requiresUserConfirmation("work"))
+        assertFalse(ChatGptWebProductCapabilityCatalog.requiresUserConfirmation("images"))
         assertFalse(ChatGptWebProductCapabilityCatalog.requiresUserConfirmation("library"))
     }
 
     @Test
     fun requiresConfirmationOnlyForObservedSensitiveFeatureSelection() {
         val health = ChatGptWebFeature("feature_health", "健康", "health", false)
-        val library = ChatGptWebFeature("feature_library", "文件库", "library", false)
+        val images = ChatGptWebFeature("feature_images", "图像", "images", false)
 
         assertEquals(
             "stale_feature_id",
@@ -43,7 +44,7 @@ class ChatGptWebProductCapabilityCatalogTest {
             ChatGptWebProductCapabilityCatalog.selectionError(health, false),
         )
         assertEquals(null, ChatGptWebProductCapabilityCatalog.selectionError(health, true))
-        assertEquals(null, ChatGptWebProductCapabilityCatalog.selectionError(library, false))
+        assertEquals(null, ChatGptWebProductCapabilityCatalog.selectionError(images, false))
         assertTrue(
             ChatGptWebProductCapabilityCatalog.navigationJson(health)
                 .getBoolean("requires_user_confirmation"),
