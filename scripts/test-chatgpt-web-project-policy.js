@@ -31,6 +31,7 @@ const legacy = node('Legacy project', { href: '/g/g-p-legacy_1/project' }, root)
 const modern = node('Modern project', { 'data-project-id': 'g-p-modern_2' }, root);
 const react = node('React project', {}, root);
 react.__reactProps$test = { project: { id: 'g-p-react_3' } };
+const reactOptions = node('Open React project project options', {}, root);
 const modernOptions = node('Open Modern project project options', {}, root);
 const unresolved = node('Unresolved project', {}, root);
 const unresolvedOptions = node('Open Unresolved project project options', {}, root);
@@ -39,19 +40,23 @@ const hidden = node('Private script metadata', { content: 'g-p-hidden_4' }, null
 const productionId = 'g-p-6916e3fec8d8819195edffedd2f6e08e';
 const conversation = node('启动语音功能', { href: '/g/' + productionId + '/c/voice-chat' }, root);
 conversation.__reactProps$test = { project: { id: productionId } };
+const activeConversationHeading = node('启动语音功能', {}, root);
+activeConversationHeading.__reactProps$test = { activeProject: { id: productionId } };
 const renamedProject = node('投资加密货币', {
   href: '/g/' + productionId + '-tou-zi-jia-mi-huo-bi/project'
 }, root);
 const documentMock = {
   querySelectorAll(selector) {
     if (selector === '*') return [
-      root, legacy, modern, react, modernOptions, unresolved, unresolvedOptions, create, hidden,
-      conversation, renamedProject
+      root, legacy, modern, react, reactOptions, modernOptions, unresolved, unresolvedOptions, create, hidden,
+      conversation, activeConversationHeading, renamedProject
     ];
-    if (selector === 'button, [role="button"]') return [modernOptions, unresolved, unresolvedOptions, create];
+    if (selector === 'button, [role="button"]') return [
+      reactOptions, modernOptions, unresolved, unresolvedOptions, create
+    ];
     return [
-      legacy, modern, react, modernOptions, unresolved, unresolvedOptions, create,
-      conversation, renamedProject
+      legacy, modern, react, reactOptions, modernOptions, unresolved, unresolvedOptions, create,
+      conversation, activeConversationHeading, renamedProject
     ];
   }
 };

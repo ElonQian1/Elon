@@ -85,7 +85,7 @@
     return false;
   }
 
-  function projectIdForNode(node) {
+  function projectIdForNode(node, allowRuntime) {
     if (belongsToConversationRow(node)) return '';
     const candidates = [];
     let current = node;
@@ -96,7 +96,7 @@
       Array.from(node.querySelectorAll('[href], [data-project-id], [data-project-gizmo-id]'))
         .slice(0, 40).forEach((child) => candidates.push.apply(candidates, attributeValues(child)));
     }
-    return candidates.map(projectId).find(Boolean) || runtimeProjectId(node);
+    return candidates.map(projectId).find(Boolean) || (allowRuntime ? runtimeProjectId(node) : '');
   }
 
   function referencedTitle(value) {
@@ -128,13 +128,14 @@
     const candidates = [];
     actionable.forEach((node) => {
       const title = clean(label(node));
-      const id = projectIdForNode(node);
+      const id = projectIdForNode(node, false) ||
+        (optionsTitles.has(title) ? projectIdForNode(node, true) : '');
       if (id && title && !RESERVED_TITLE.test(title) && !PROJECT_OPTIONS.test(title)) {
         candidates.push({ node, id, title });
       }
     });
     Array.from(document.querySelectorAll('*')).slice(0, 6000).forEach((node) => {
-      const id = attributeValues(node).map(projectId).find(Boolean) || runtimeProjectId(node);
+      const id = projectIdForNode(node, false);
       if (!id) return;
       const nearby = actionable.find((candidate) => candidate === node || candidate.contains(node) || node.contains(candidate));
       if (!nearby || belongsToConversationRow(nearby)) return;
@@ -145,7 +146,7 @@
     });
     optionsTitles.forEach((title) => {
       (titles.get(title) || []).forEach((node) => {
-        const id = projectIdForNode(node);
+        const id = projectIdForNode(node, true);
         if (id) candidates.push({ node, id, title });
       });
     });
@@ -180,7 +181,7 @@
       if (!visible(node) || belongsToConversationRow(node) || node.getAttribute('aria-expanded') !== null) return false;
       const title = clean(label(node));
       if (!title || !optionTitles.has(title) || RESERVED_TITLE.test(title) || PROJECT_OPTIONS.test(title)) return false;
-      if (projectIdForNode(node) || seen.has(title)) return false;
+      if (projectIdForNode(node, true) || seen.has(title)) return false;
       seen.add(title);
       return true;
     }).map((node) => ({ node, title: clean(label(node)).slice(0, 160) })).slice(0, 20);
