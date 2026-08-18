@@ -8,6 +8,7 @@ import {
 
 export const OPEN_OFFICIAL_AI_TAB_EVENT = 'elon:open-official-ai-tab'
 export const OPEN_INTERNAL_BROWSER_LINK_EVENT = 'elon:open-internal-browser-link'
+export const REQUEST_RETURN_TO_AI_CHAT_EVENT = 'elon:request-return-to-ai-chat'
 
 export interface EmbeddedWebviewBounds {
   x: number
@@ -42,6 +43,12 @@ export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show
 
 export function requestOfficialAiTab(request: OfficialAiTabRequest) {
   window.dispatchEvent(new CustomEvent<OfficialAiTabRequest>(OPEN_OFFICIAL_AI_TAB_EVENT, { detail: request }))
+}
+
+export function requestReturnToAiChat(request?: OfficialAiTabRequest) {
+  window.dispatchEvent(new CustomEvent<OfficialAiTabRequest | undefined>(REQUEST_RETURN_TO_AI_CHAT_EVENT, {
+    detail: request,
+  }))
 }
 
 export function openInternalBrowserLink(request: InternalBrowserLinkRequest) {

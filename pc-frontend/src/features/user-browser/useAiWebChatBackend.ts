@@ -85,6 +85,11 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     () => localAiHistoryWindow(controller.snapshot),
     [controller.snapshot],
   )
+  const officialRequest = useMemo(() => (
+    provider && ownerKey
+      ? { providerId: provider.id, providerName: provider.displayName, ownerKey }
+      : undefined
+  ), [ownerKey, provider])
 
   function selectProvider(id: string) {
     setProviderId(id)
@@ -97,6 +102,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     provider,
     selectProvider,
     controller,
+    officialRequest,
     userState: controller.userState,
     messages,
     ready,
