@@ -43,6 +43,9 @@ expectEqual(policy.classify('Apps', '/plugins'), 'apps', 'apps route');
 expectEqual(policy.classify('Health', '/health'), 'health', 'health route');
 expectEqual(policy.classify('个人财务', '/finances'), 'finances', 'finances route');
 expectEqual(policy.classify('工作', '/work'), 'work', 'work route');
+expectEqual(policy.builtInFeatures().length, 1, 'built-in feature count');
+expectEqual(policy.builtInFeatures()[0].kind, 'images', 'built-in image gallery kind');
+expectEqual(policy.builtInFeatures()[0].path, '/images', 'built-in image gallery route');
 expectEqual(policy.isConversationPath('/c/demo_123'), true, 'normal conversation path');
 expectEqual(
   policy.isConversationPath('/g/g-p-demo_123/c/conversation_456'),

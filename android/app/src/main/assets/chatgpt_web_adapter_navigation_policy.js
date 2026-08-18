@@ -11,6 +11,14 @@
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  const BUILT_IN_FEATURES = Object.freeze([
+    Object.freeze({ label: '图像', kind: 'images', path: '/images' })
+  ]);
+
+  function builtInFeatures() {
+    return BUILT_IN_FEATURES.map((feature) => Object.assign({}, feature));
+  }
+
   function isConversationPath(path) {
     const value = clean(path);
     return /^\/c\/[a-z0-9_-]+$/.test(value) ||
@@ -47,5 +55,5 @@
     return 'navigation';
   }
 
-  return Object.freeze({ classify, isConversationPath, isProjectRoute });
+  return Object.freeze({ builtInFeatures, classify, isConversationPath, isProjectRoute });
 });

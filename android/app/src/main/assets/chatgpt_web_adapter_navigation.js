@@ -98,8 +98,13 @@
   }
 
   function readFeatures() {
+    const observed = featureNodes();
+    const observedKinds = new Set(observed.map((item) => item.kind));
+    const builtIn = navigationPolicy.builtInFeatures()
+      .filter((item) => !observedKinds.has(item.kind))
+      .map((item) => Object.assign({ node: null }, item));
     const occurrences = new Map();
-    lastFeatures = featureNodes().map((item) => {
+    lastFeatures = observed.concat(builtIn).map((item) => {
       const key = item.kind + '|' + item.label + '|' + item.path;
       const occurrence = occurrences.get(key) || 0;
       occurrences.set(key, occurrence + 1);
@@ -107,9 +112,10 @@
         id: featureId(item.label, item.kind, item.path, occurrence),
         label: item.label,
         kind: item.kind,
-        selected: item.node.getAttribute('aria-current') === 'page' ||
-          item.node.getAttribute('aria-selected') === 'true',
-        node: item.node
+        selected: item.node ? item.node.getAttribute('aria-current') === 'page' ||
+          item.node.getAttribute('aria-selected') === 'true' : location.pathname === item.path,
+        node: item.node,
+        path: item.path
       };
     }).slice(0, MAX_FEATURES);
     return lastFeatures.map(({ id, label, kind, selected }) => ({ id, label, kind, selected }));
@@ -175,6 +181,10 @@
 
   function selectFeature(id, emitEvent, result) {
     const feature = lastFeatures.find((item) => item.id === id);
+    if (feature && !feature.node && feature.path) {
+      location.assign(feature.path);
+      return result('select_navigation', true, '');
+    }
     if (!feature || !isVisible(feature.node)) {
       return result('select_navigation', false, '官网功能入口已变化，请重新打开功能面板。');
     }
