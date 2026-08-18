@@ -38,9 +38,9 @@ use std::{fs, path::PathBuf, process::Command};
 
 use serde::Serialize;
 use tauri::{
-    webview::{NewWindowResponse, PageLoadEvent},
-    AppHandle, Manager, State, Url, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder},
+    AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewUrl, Window,
+    WindowBuilder, WindowEvent,
 };
 
 pub use guest_identity::LocalAiGuestOwnerIdentity;
@@ -212,20 +212,32 @@ pub async fn open_local_ai_web_session(
     let window_state = runtime.inner().clone();
     let window_state_label = window_label.clone();
 
-    let mut builder =
-        WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(bootstrap_url))
+    let popout = if let Some(window) = app.get_window(&window_label) {
+        window
+    } else {
+        WindowBuilder::new(&app, &window_label)
             .title(format!("{} · 一龙本地会话", provider.display_name))
             .inner_size(1180.0, 780.0)
             .min_inner_size(900.0, 620.0)
             .center()
-            .visible(show_window)
-            .data_directory(profile_directory)
-            .incognito(false)
-            .enable_clipboard_access();
+            .visible(false)
+            .build()
+            .map_err(|error| {
+                runtime.record_error(
+                    &window_label,
+                    format!("无法创建 {} 弹出宿主：{error}", provider.display_name),
+                );
+                display_error(error)
+            })?
+    };
+    let mut builder = WebviewBuilder::new(&window_label, WebviewUrl::External(bootstrap_url))
+        .data_directory(profile_directory)
+        .incognito(false)
+        .enable_clipboard_access();
     if let Some(adapter) = provider.adapter {
         builder = builder.initialization_script(adapter.initialization_script());
     }
-    let window = builder
+    builder = builder
         .on_navigation(move |url| {
             let allowed = allows_navigation(&navigation_provider, url);
             let blocked_message = navigation_block_message(&navigation_provider, url);
@@ -258,7 +270,7 @@ pub async fn open_local_ai_web_session(
                 NewWindowResponse::Deny
             }
         })
-        .on_page_load(move |window, payload| {
+        .on_page_load(move |page, payload| {
             let safe_url = safe_log_url(payload.url());
             println!(
                 "[elon-desktop][local-ai] 页面事件 {:?} -> {}",
@@ -271,29 +283,48 @@ pub async fn open_local_ai_web_session(
                 }
                 PageLoadEvent::Finished => {
                     page_state.mark_page_finished(&page_label, payload.url());
-                    reconnect_adapter(&page_provider, window.as_ref());
+                    reconnect_adapter(&page_provider, &page);
                 }
             }
-        })
-        .build()
-        .map_err(|error| {
-            runtime.record_error(
-                &window_label,
-                format!("无法创建 {} WebView2：{error}", provider.display_name),
-            );
-            display_error(error)
-        })?;
+        });
+    let main_window = app
+        .get_window(MAIN_WEBVIEW_LABEL)
+        .ok_or_else(|| "一龙主窗口不可用。".to_string())?;
+    let page = if !show_window {
+        main_window.add_child(
+            builder,
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(1.0, 1.0),
+        )
+    } else {
+        let size = popout.inner_size().map_err(display_error)?;
+        popout.add_child(builder, LogicalPosition::new(0.0, 0.0), size)
+    }
+    .map_err(|error| {
+        runtime.record_error(
+            &window_label,
+            format!("无法创建 {} WebView2：{error}", provider.display_name),
+        );
+        display_error(error)
+    })?;
 
-    window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Destroyed) {
+    let destroyed_app = app.clone();
+    popout.on_window_event(move |event| {
+        if matches!(event, WindowEvent::Destroyed)
+            && destroyed_app.get_webview(&window_state_label).is_none()
+        {
             window_state.mark_window_status(&window_state_label, "closed");
         }
     });
     if show_window {
-        restore_window(&window)?;
+        page.show().map_err(display_error)?;
+        restore_window(&popout)?;
+        page.set_focus().map_err(display_error)?;
+    } else {
+        page.hide().map_err(display_error)?;
     }
     runtime.mark_window_visible(&window_label, show_window);
-    window.navigate(start_url).map_err(|error| {
+    page.navigate(start_url).map_err(|error| {
         runtime.record_error(
             &window_label,
             format!("{} 首次导航失败：{error}", provider.display_name),
@@ -680,7 +711,7 @@ fn allows_navigation(provider: &ProviderDefinition, url: &Url) -> bool {
             .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
 }
 
-fn restore_window(window: &WebviewWindow) -> Result<(), String> {
+fn restore_window(window: &Window) -> Result<(), String> {
     // Setter 调用只投递到事件循环，不执行会阻塞等待回执的窗口 getter。
     window.unminimize().map_err(display_error)?;
     window.show().map_err(display_error)?;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, ExternalLink, House, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ExternalLink, House, LockKeyhole, RefreshCw, X } from 'lucide-react'
 import {
   boundsFor,
   controlInternalBrowserTab,
@@ -29,7 +29,7 @@ export default function AiBrowserExperience() {
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [transitioning, setTransitioning] = useState(false)
-  const hostRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const generationRef = useRef(0)
   const transitionRef = useRef(false)
   const officialRef = useRef<OfficialAiTabRequest | null>(null)
@@ -112,11 +112,11 @@ export default function AiBrowserExperience() {
     let frame = 0
     let observer: ResizeObserver | null = null
     const synchronize = async () => {
-      const host = hostRef.current
-      if (!host || generation !== generationRef.current) return
+      const viewport = viewportRef.current
+      if (!viewport || generation !== generationRef.current) return
       setError('')
       try {
-        const bounds = boundsFor(host)
+        const bounds = boundsFor(viewport)
         if (surface === 'official' && official) {
           await presentLocalAiWebSessionEmbedded(official, bounds)
           setStatus(`官网原生内容 · ${official.providerName} 的天气、地图、图片、图标和交互按官网原样显示`)
@@ -143,13 +143,13 @@ export default function AiBrowserExperience() {
     }
     frame = window.requestAnimationFrame(() => {
       void synchronize()
-      const host = hostRef.current
-      if (host) {
+      const viewport = viewportRef.current
+      if (viewport) {
         observer = new ResizeObserver(() => {
           window.cancelAnimationFrame(frame)
           frame = window.requestAnimationFrame(() => { void synchronize() })
         })
-        observer.observe(host)
+        observer.observe(viewport)
       }
     })
     return () => {
@@ -228,31 +228,49 @@ export default function AiBrowserExperience() {
     })
   }
 
+  const siteName = surface === 'official'
+    ? official?.providerId === 'chatgpt' ? 'chatgpt.com' : 'google.com/aimode'
+    : sourceState?.currentHost || hostFor(source?.url) || '来源网页'
+  const siteDetail = surface === 'official'
+    ? '官方网页 · 本机会话 Profile'
+    : '来源网页 · 临时隔离标签'
+
   const content = (
     <section className={styles.surface} aria-label="一龙内部网页标签" aria-busy={transitioning}>
-      <div className={styles.bar}>
+      <div className={styles.tabStrip}>
         <div className={styles.tabs} role="tablist" aria-label="AI 与网页标签">
-          <button className={styles.tab} type="button" role="tab" disabled={transitioning} onClick={() => void switchSurface('chat')}>聊天</button>
-          {official && <button className={styles.tab} data-active={surface === 'official'} type="button" role="tab" disabled={transitioning} onClick={() => void switchSurface('official')} title={`${official.providerName} 官方页`}>
-            {official.providerName} 官方页
+          <button className={styles.tab} type="button" role="tab" aria-selected={false} disabled={transitioning} onClick={() => void switchSurface('chat')}>
+            <span className={styles.tabIcon}>龙</span><span className={styles.tabLabel}>一龙聊天</span>
+          </button>
+          {official && <button className={styles.tab} data-active={surface === 'official'} type="button" role="tab" aria-selected={surface === 'official'} disabled={transitioning} onClick={() => void switchSurface('official')} title={`${official.providerName} 官方页`}>
+            <span className={styles.tabIcon} data-provider={official.providerId}>{official.providerId === 'chatgpt' ? '◎' : 'G'}</span>
+            <span className={styles.tabLabel}>{official.providerName} 官方页</span>
           </button>}
-          {source && <button className={styles.tab} data-active={surface === 'source'} type="button" role="tab" disabled={transitioning} onClick={() => void switchSurface('source')} title={source.title}>
-            {sourceState?.title || source.title || '来源网页'}
+          {source && <button className={styles.tab} data-active={surface === 'source'} type="button" role="tab" aria-selected={surface === 'source'} disabled={transitioning} onClick={() => void switchSurface('source')} title={source.title}>
+            <span className={styles.tabIcon}>↗</span>
+            <span className={styles.tabLabel}>{sourceState?.title || source.title || '来源网页'}</span>
           </button>}
+        </div>
+        <button className={styles.closeTab} type="button" title="关闭当前标签" disabled={transitioning} onClick={() => void closeActive()}><X size={15} /></button>
+      </div>
+      <div className={styles.navigationBar}>
+        <div className={styles.actions} aria-label="网页导航">
+          <button className={styles.action} type="button" title="后退" disabled={transitioning} onClick={() => void control('back')}><ArrowLeft size={15} /></button>
+          <button className={styles.action} type="button" title="前进" disabled={transitioning || surface === 'official'} onClick={() => void control('forward')}><ArrowRight size={15} /></button>
+          <button className={styles.action} type="button" title="刷新" disabled={transitioning} onClick={() => void control('reload')}><RefreshCw size={15} /></button>
+          {surface === 'official' && <button className={styles.action} type="button" title="返回官网首页" disabled={transitioning} onClick={() => void control('home')}><House size={15} /></button>}
+        </div>
+        <div className={styles.siteIdentity} title={siteDetail}>
+          <LockKeyhole size={13} aria-hidden="true" />
+          <strong>{siteName}</strong>
+          <span>{siteDetail}</span>
         </div>
         <span className={styles.notice} data-error={error ? 'true' : undefined}>
           {error || status || (surface === 'official' ? '正在准备官网原生内容…' : '正在打开来源网页…')}
         </span>
-        <div className={styles.actions} aria-label="网页控制">
-          <button className={styles.action} type="button" title="后退" disabled={transitioning} onClick={() => void control('back')}><ArrowLeft size={15} /></button>
-          <button className={styles.action} type="button" title="前进" disabled={transitioning || surface === 'official'} onClick={() => void control('forward')}><ArrowRight size={15} /></button>
-          {surface === 'official' && <button className={styles.action} type="button" title="返回官网首页" disabled={transitioning} onClick={() => void control('home')}><House size={15} /></button>}
-          <button className={styles.action} type="button" title="刷新" disabled={transitioning} onClick={() => void control('reload')}><RefreshCw size={15} /></button>
-          <button className={styles.action} type="button" title="使用系统浏览器打开" disabled={transitioning} onClick={() => void control('external')}><ExternalLink size={15} /></button>
-          <button className={styles.action} type="button" title="关闭当前标签" disabled={transitioning} onClick={() => void closeActive()}><X size={16} /></button>
-        </div>
+        <button className={styles.action} type="button" title="使用系统浏览器打开" disabled={transitioning} onClick={() => void control('external')}><ExternalLink size={15} /></button>
       </div>
-      <div className={styles.host} ref={hostRef}>
+      <div className={styles.viewport} data-browser-viewport="native" ref={viewportRef}>
         <p className={styles.status} data-error={error ? 'true' : undefined}>
           {error || status || '正在打开网页…'}
           {error && <button type="button" onClick={() => void control('external')}>使用系统浏览器</button>}
@@ -277,4 +295,10 @@ async function hideSurfacesOnUnmount(official: OfficialAiTabRequest | null, sour
 
 function messageFor(cause: unknown) {
   return cause instanceof Error && cause.message ? cause.message : '内部网页标签打开失败，请使用系统浏览器。'
+}
+
+function hostFor(value: string | undefined) {
+  if (!value) return ''
+  try { return new URL(value).hostname }
+  catch { return '' }
 }
