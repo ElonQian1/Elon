@@ -109,6 +109,13 @@ internal class ChatGptBackgroundSession(
         surfaceMode.isSkin() || state == State.LOADING || latestSnapshot?.streaming == true ||
             conversationNavigation.hasPending() || attachmentSendTracker != null
     }
+    private val newConversationRecovery = ChatGptNewConversationRecoveryCoordinator(
+        webView = { webView },
+        navigationActive = conversationNavigation::isNavigating,
+        loading = { state == State.LOADING },
+        composerReady = { latestSnapshot?.composerReady == true },
+        interactionRequested = webExecution::interactionRequested,
+    )
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
@@ -215,11 +222,14 @@ internal class ChatGptBackgroundSession(
     }
 
     fun startNewConversation() {
+        if (state != State.READY) return
         val adapter = pageAdapter ?: return
+        newConversationRecovery.cancel()
         latestSnapshot = conversationNavigation.beginNew(latestSnapshot)
         latestSnapshot?.let(onSnapshot)
         updateState(State.LOADING)
         adapter.startNewConversation()
+        newConversationRecovery.schedule()
     }
 
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
@@ -231,6 +241,7 @@ internal class ChatGptBackgroundSession(
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
         if (state != State.READY) return false
         val adapter = pageAdapter ?: return false
+        newConversationRecovery.cancel()
         val previous = latestSnapshot
         latestSnapshot = conversationNavigation.beginOpen(normalized, previous)
         latestSnapshot?.let(onSnapshot)
@@ -314,6 +325,7 @@ internal class ChatGptBackgroundSession(
         composerOptionInteraction.release()
         recovery.dispose()
         recoveryHandler.removeCallbacksAndMessages(null)
+        newConversationRecovery.cancel()
         conversationNavigation.clear()
         composerOptionRequests.reset()
         pageAdapter?.dispose()
@@ -448,6 +460,7 @@ internal class ChatGptBackgroundSession(
                 }
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
+                        newConversationRecovery.cancel()
                         conversationNavigation.complete()
                         snapshotStore.clear()
                         pageAdapter?.markLoginRequired()
@@ -455,6 +468,7 @@ internal class ChatGptBackgroundSession(
                         updateState(State.LOGIN_REQUIRED)
                     }
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
+                        newConversationRecovery.cancel()
                         conversationNavigation.complete()
                         if (!snapshot.streaming) {
                             snapshotStore.save(snapshot)
@@ -495,6 +509,7 @@ internal class ChatGptBackgroundSession(
                     pageAdapter?.requestSnapshot()
                 } else {
                     if (event.action == "open_conversation" || event.action == "new_conversation") {
+                        newConversationRecovery.cancel()
                         conversationNavigation.restoreAfterFailure(event.action)?.let { previous ->
                             latestSnapshot = previous
                             onSnapshot(previous)
@@ -764,7 +779,6 @@ internal class ChatGptBackgroundSession(
         const val ATTACHMENT_PHASE_IDLE = "idle"
         const val ATTACHMENT_PHASE_COMPLETED = "completed"
         const val ATTACHMENT_TIMEOUT_MS = 120_000L
-
     }
 }
 
