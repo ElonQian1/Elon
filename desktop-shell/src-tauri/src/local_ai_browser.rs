@@ -324,7 +324,7 @@ pub async fn open_local_ai_web_session(
         restore_window(&popout)?;
         page.set_focus().map_err(display_error)?;
     } else {
-        page.hide().map_err(display_error)?;
+        embedded_view::park(&page)?;
     }
     runtime.mark_window_visible(&window_label, show_window);
     page.navigate(start_url).map_err(|error| {

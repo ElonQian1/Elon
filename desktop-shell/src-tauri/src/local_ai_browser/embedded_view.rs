@@ -5,7 +5,8 @@ use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
 use super::{
     ensure_runtime_session, ensure_session_webview, provider, resolve_owner_fingerprint,
-    window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
+    window_label, LocalAiBrowserRuntime, LocalAiWebSessionState, DEFAULT_VIEWPORT_HEIGHT,
+    DEFAULT_VIEWPORT_WIDTH,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -86,6 +87,14 @@ pub(crate) async fn hide_local_ai_web_session_embedded(
         .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))
 }
 
+pub(crate) fn park(webview: &Webview) -> Result<(), String> {
+    webview.hide().map_err(display_error)?;
+    webview
+        .set_position(LogicalPosition::new(-DEFAULT_VIEWPORT_WIDTH, -DEFAULT_VIEWPORT_HEIGHT))
+        .map_err(display_error)?;
+    webview.show().map_err(display_error)
+}
+
 pub(crate) fn present(
     app: &AppHandle,
     webview_label: &str,
@@ -116,7 +125,7 @@ pub(crate) fn present(
 
 pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     if let Some(webview) = app.get_webview(webview_label) {
-        webview.hide().map_err(display_error)?;
+        park(&webview)?;
     }
     if let Some(popout) = app.get_window(webview_label) {
         popout.hide().map_err(display_error)?;
