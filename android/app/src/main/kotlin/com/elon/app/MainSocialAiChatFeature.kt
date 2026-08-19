@@ -260,6 +260,17 @@ internal class MainSocialAiChatFeature(
     fun startWebChatRealtimeVoice(): Boolean =
         productionComposerTools.startRealtimeVoice(WebChatProviderRegistry.get(providerId()))
 
+    fun webChatQuickComposerActions(): List<WebChatProductionQuickComposerAction> =
+        if (isChatModeActive()) {
+            productionComposerTools.quickActions(WebChatProviderRegistry.get(providerId()))
+        } else {
+            emptyList()
+        }
+
+    fun selectWebChatQuickComposerAction(action: WebChatProductionQuickComposerAction): Boolean =
+        isChatModeActive() &&
+            productionComposerTools.selectQuickAction(WebChatProviderRegistry.get(providerId()), action)
+
     fun interactionMode(): SocialAiInteractionMode = modeController.interactionMode()
 
     fun providerId(): WebChatProviderId = modeController.providerId()

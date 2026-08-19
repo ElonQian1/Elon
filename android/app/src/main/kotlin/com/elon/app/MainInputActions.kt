@@ -38,6 +38,8 @@ internal class MainInputActions(
     private val isWebChatModeActive: () -> Boolean,
     private val onComposerTextChanged: (CharSequence?) -> Unit,
     private val stopWebChatGeneration: () -> Boolean,
+    private val webChatQuickComposerActions: () -> List<WebChatProductionQuickComposerAction>,
+    private val selectWebChatQuickComposerAction: (WebChatProductionQuickComposerAction) -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
     private val forkForRunningInput: (String, String) -> ForkedConversation,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean
@@ -479,7 +481,9 @@ internal class MainInputActions(
                     uiDesignRequestSelection = selection
                     Toast.makeText(activity, "已应用 UI 设计任务方式", Toast.LENGTH_SHORT).show()
                 }
-            }
+            },
+            webChatQuickActions = webChatQuickComposerActions,
+            selectWebChatQuickAction = selectWebChatQuickComposerAction,
         )
     }
 

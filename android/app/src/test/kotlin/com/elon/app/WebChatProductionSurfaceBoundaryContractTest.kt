@@ -32,6 +32,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
         val modeController = read("android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt")
         val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
+        val attachmentMenu = read(
+            "android/app/src/main/kotlin/com/elon/app/MainAttachmentPanelActions.kt",
+        )
         val sendVisual = read("android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt")
         val consumerComposer = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatConsumerComposerState.kt",
@@ -76,6 +79,11 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
         assertTrue(composer.contains("webToolsButton"))
         assertTrue(composer.contains("web-chat-composer-tools:unavailable"))
+        assertTrue(attachmentMenu.contains("attachment-action-camera"))
+        assertTrue(attachmentMenu.contains("attachment-action-photos"))
+        assertTrue(attachmentMenu.contains("attachment-action-files"))
+        assertTrue(attachmentMenu.contains("web-chat-quick-action:"))
+        assertTrue(feature.contains("selectWebChatQuickComposerAction"))
         assertTrue(sendVisual.contains("WebChatProductionSelectors.composerAction"))
     }
 
@@ -154,6 +162,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt",
             "android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt",
             "android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt",
+            "android/app/src/main/kotlin/com/elon/app/MainAttachmentPanelActions.kt",
             "android/app/src/main/kotlin/com/elon/app/MainSendButtonVisualActions.kt",
             "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
             "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",

@@ -54,6 +54,29 @@ internal class WebChatProductionComposerToolsCoordinator(
         if (requested.accepted) pollTools(provider, port, epoch, attempt = 0)
     }
 
+    fun quickActions(provider: WebChatProviderIdentity): List<WebChatProductionQuickComposerAction> =
+        WebChatProductionQuickComposerActionCatalog.availableFor(provider)
+
+    fun selectQuickAction(
+        provider: WebChatProviderIdentity,
+        action: WebChatProductionQuickComposerAction,
+    ): Boolean {
+        cancelPending()
+        if (activeProvider() != provider.id || action !in quickActions(provider)) return false
+        val port = consumerPort() ?: return false
+        val requested = port.requestComposerOptions(TOOLS_SECTION)
+        if (!requested.accepted) {
+            showQuickActionUnavailable(action)
+            return false
+        }
+        val epoch = requestEpoch
+        host.postDelayed(
+            { pollQuickAction(provider, port, action, epoch, attempt = 0) },
+            QUICK_ACTION_INITIAL_DELAY_MS,
+        )
+        return true
+    }
+
     fun startRealtimeVoice(provider: WebChatProviderIdentity): Boolean {
         cancelPending()
         if (activeProvider() != provider.id) return false
@@ -86,6 +109,35 @@ internal class WebChatProductionComposerToolsCoordinator(
         if (attempt >= MAX_POLL_ATTEMPTS) return
         host.postDelayed(
             { pollTools(provider, port, epoch, attempt + 1) },
+            POLL_INTERVAL_MS,
+        )
+    }
+
+    private fun pollQuickAction(
+        provider: WebChatProviderIdentity,
+        port: WebChatConsumerPort,
+        action: WebChatProductionQuickComposerAction,
+        epoch: Int,
+        attempt: Int,
+    ) {
+        if (epoch != requestEpoch || activeProvider() != provider.id) return
+        val observed = observedToolOptions(port)
+        if (observed.isNotEmpty()) {
+            interactionCache.composerOptions(provider.id, TOOLS_SECTION, observed)
+            val tools = WebChatProductionComposerToolParser.parse(observed)
+            val target = WebChatProductionQuickComposerActionResolver.find(action, tools, observed)
+            if (target != null) {
+                selectTool(provider, port, target)
+                return
+            }
+        }
+        if (attempt >= MAX_POLL_ATTEMPTS) {
+            port.dismissComposerOptions()
+            showQuickActionUnavailable(action)
+            return
+        }
+        host.postDelayed(
+            { pollQuickAction(provider, port, action, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
@@ -224,6 +276,14 @@ internal class WebChatProductionComposerToolsCoordinator(
             .show()
     }
 
+    private fun showQuickActionUnavailable(action: WebChatProductionQuickComposerAction) {
+        Toast.makeText(
+            activity,
+            "当前官网暂未提供${action.label}，可在“工具”中查看完整列表",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+
     private fun showCommandError(error: String) {
         val message = when (error) {
             "dictation_unavailable" -> "当前网页暂不支持听写"
@@ -239,5 +299,6 @@ internal class WebChatProductionComposerToolsCoordinator(
         const val REALTIME_VOICE_ACTION = "chatgpt_start_realtime_voice"
         const val MAX_POLL_ATTEMPTS = 8
         const val POLL_INTERVAL_MS = 250L
+        const val QUICK_ACTION_INITIAL_DELAY_MS = 180L
     }
 }

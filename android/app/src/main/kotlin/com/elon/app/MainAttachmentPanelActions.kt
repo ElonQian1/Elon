@@ -25,36 +25,59 @@ internal class MainAttachmentPanelActions(
     private val openPhotoAttachment: () -> Unit,
     private val openDocumentAttachment: () -> Unit,
     private val showUiDesignAction: () -> Boolean,
-    private val openUiDesignOptions: () -> Unit
+    private val openUiDesignOptions: () -> Unit,
+    private val webChatQuickActions: () -> List<WebChatProductionQuickComposerAction>,
+    private val selectWebChatQuickAction: (WebChatProductionQuickComposerAction) -> Boolean,
 ) {
     var isOpen = false
         private set
 
     private var iconAnimationToken = 0
     private var uiDesignAction: View? = null
+    private val webQuickActionViews = mutableMapOf<WebChatProductionQuickComposerAction, View>()
 
     fun buildAttachmentPanel(): LinearLayout {
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(108)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
             background = ColorDrawable(Color.TRANSPARENT)
-            gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(18), dp(4), dp(10), dp(16))
+            gravity = Gravity.START
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(4), dp(10), dp(12))
             visibility = View.GONE
 
-            addView(createAttachmentAction("拍照", R.drawable.ic_input_camera_new, addEndMargin = true) {
+            addView(createAttachmentAction("相机", R.drawable.ic_attach_camera, "attachment-action-camera") {
                 openCameraAttachment()
             })
-            addView(createAttachmentAction("图片", R.drawable.ic_input_photo_new, addEndMargin = true) {
+            addView(createAttachmentAction("照片", R.drawable.ic_attach_photos, "attachment-action-photos") {
                 openPhotoAttachment()
             })
-            addView(createAttachmentAction("文件", R.drawable.ic_input_file_new, addEndMargin = true) {
+            addView(createAttachmentAction("文件", R.drawable.ic_attach_files, "attachment-action-files") {
                 openDocumentAttachment()
             })
-            val designAction = createAttachmentAction("UI设计", R.drawable.ic_input_photo_new, addEndMargin = false) {
+            WebChatProductionQuickComposerAction.entries.forEach { quickAction ->
+                val icon = when (quickAction) {
+                    WebChatProductionQuickComposerAction.IMAGE_GENERATION -> R.drawable.ic_attach_function
+                    WebChatProductionQuickComposerAction.WEB_SEARCH -> R.drawable.ic_search_simple
+                }
+                val actionView = createAttachmentAction(
+                    quickAction.label,
+                    icon,
+                    "web-chat-quick-action:${quickAction.semantic}",
+                ) {
+                    selectWebChatQuickAction(quickAction)
+                }
+                actionView.visibility = View.GONE
+                webQuickActionViews[quickAction] = actionView
+                addView(actionView)
+            }
+            val designAction = createAttachmentAction(
+                "UI设计",
+                R.drawable.ic_attach_function,
+                "attachment-action-ui-design",
+            ) {
                 openUiDesignOptions()
             }
             uiDesignAction = designAction
@@ -73,6 +96,10 @@ internal class MainAttachmentPanelActions(
         if (isOpen) return
         val panel = attachmentPanel() ?: return
         uiDesignAction?.visibility = if (showUiDesignAction()) View.VISIBLE else View.GONE
+        val availableQuickActions = webChatQuickActions().toSet()
+        webQuickActionViews.forEach { (action, view) ->
+            view.visibility = if (action in availableQuickActions) View.VISIBLE else View.GONE
+        }
         isOpen = true
         applyAttachmentPanelBackground(expanded = true)
         panel.visibility = View.VISIBLE
@@ -95,39 +122,41 @@ internal class MainAttachmentPanelActions(
     private fun createAttachmentAction(
         label: String,
         iconRes: Int,
-        addEndMargin: Boolean = true,
+        selector: String,
         action: () -> Unit
     ): View {
         return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(66), dp(78)).apply {
-                if (addEndMargin) marginEnd = dp(8)
-            }
-            background = GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
-                setColor(Color.parseColor("#111111"))
-                setStroke(dp(1), Color.parseColor("#667B8793"))
-            }
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(56),
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             isClickable = true
+            isFocusable = true
             foreground = selectableForeground()
+            contentDescription = selector
+            setPadding(dp(8), 0, dp(12), 0)
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                    marginEnd = dp(14)
+                }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor("#2A2A2A"))
+                }
                 setImageResource(iconRes)
                 scaleType = ImageView.ScaleType.FIT_CENTER
+                setPadding(dp(8), dp(8), dp(8), dp(8))
             })
             addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dp(8)
-                }
+                layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+                gravity = Gravity.CENTER_VERTICAL
                 includeFontPadding = false
                 text = label
                 setTextColor(Color.parseColor("#F8F7F4"))
-                textSize = 14f
+                textSize = 16f
             })
             setOnClickListener {
                 collapseAttachmentPanel()
