@@ -8,6 +8,7 @@ import com.elon.app.chatgptweb.ChatGptBackgroundSession
 import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
 import com.elon.app.chatgptweb.ChatGptMessageClipboard
 import com.elon.app.chatgptweb.ChatGptNativeControlPresentation
+import com.elon.app.chatgptweb.ChatGptWebConnectionMessagePolicy
 import com.elon.app.chatgptweb.ChatGptWebAudioPermissionController
 import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
@@ -392,15 +393,23 @@ internal class ChatGptSocialChatController(
         latestStateDetail = detail?.takeIf(String::isNotBlank)
             ?.takeIf { state == ChatGptBackgroundSession.State.ERROR }
         if (!active) return
+        if (ChatGptWebConnectionMessagePolicy.shouldShow(
+                state = state,
+                hasMessages = transcript.hasMessages(),
+                conversationNavigationPending = session.conversationNavigationPending(),
+            )) {
+            renderStatusMessage("正在连接 ChatGPT 网页 AI…")
+        }
         if (!transcript.hasMessages()) when (state) {
-            ChatGptBackgroundSession.State.LOADING -> renderStatusMessage("正在连接 ChatGPT 网页 AI…")
             ChatGptBackgroundSession.State.LOGIN_REQUIRED -> renderStatusMessage(
                 "当前页面需要登录。可打开“官网功能”登录，也可在官网支持时直接匿名聊天。",
             )
             ChatGptBackgroundSession.State.ERROR -> renderStatusMessage(
                 detail?.takeIf(String::isNotBlank) ?: "ChatGPT 网页 AI 暂时不可用。",
             )
-            ChatGptBackgroundSession.State.IDLE, ChatGptBackgroundSession.State.READY -> Unit
+            ChatGptBackgroundSession.State.IDLE,
+            ChatGptBackgroundSession.State.LOADING,
+            ChatGptBackgroundSession.State.READY -> Unit
         }
         if (state == ChatGptBackgroundSession.State.ERROR && !detail.isNullOrBlank()) {
             Toast.makeText(activity, detail, Toast.LENGTH_LONG).show()

@@ -138,6 +138,7 @@ internal class ChatGptBackgroundSession(
     fun retryConnection(): Boolean = recovery.retryNow()
     fun onHostPaused() = pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
+    fun conversationNavigationPending(): Boolean = conversationNavigation.hasPending()
     fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
         conversations = conversations,
         projects = ChatGptWebConversationIndex.projects(conversations, projects),
