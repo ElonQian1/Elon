@@ -574,6 +574,7 @@ internal class MainSocialAiChatFeature(
                 }
                 views.activeWebToolChip.render(activeQuickComposerAction, ::clearQuickComposerAction)
             }
+            productionComposerTools.onSessionStateChanged(provider)
             productionSuggestions.render(provider, controller.consumerPort())
             productionCapabilityPrewarmer.schedule(provider)
         } else if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()

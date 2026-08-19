@@ -39,19 +39,32 @@ class WebChatProductionComposerToolsTest {
     }
 
     @Test
-    fun doesNotDeclareAFeatureMissingUntilACompletedOfficialSyncStaysEmpty() {
+    fun retriesCompletedDiscoveryInsteadOfDeclaringAFeatureUnsupported() {
         assertEquals(
             WebChatProductionQuickActionSyncOutcome.KEEP_WAITING,
             WebChatProductionQuickActionSyncPolicy.resolve(
                 WebChatConsumerCommandStatus.SUCCEEDED,
                 attemptsExhausted = false,
+                discoveryRound = 0,
+                maxDiscoveryRounds = 2,
             ),
         )
         assertEquals(
-            WebChatProductionQuickActionSyncOutcome.NOT_OBSERVED,
+            WebChatProductionQuickActionSyncOutcome.RETRY_DISCOVERY,
             WebChatProductionQuickActionSyncPolicy.resolve(
                 WebChatConsumerCommandStatus.SUCCEEDED,
                 attemptsExhausted = true,
+                discoveryRound = 0,
+                maxDiscoveryRounds = 2,
+            ),
+        )
+        assertEquals(
+            WebChatProductionQuickActionSyncOutcome.RETRY_LATER,
+            WebChatProductionQuickActionSyncPolicy.resolve(
+                WebChatConsumerCommandStatus.SUCCEEDED,
+                attemptsExhausted = true,
+                discoveryRound = 2,
+                maxDiscoveryRounds = 2,
             ),
         )
     }
@@ -68,6 +81,8 @@ class WebChatProductionComposerToolsTest {
                 WebChatProductionQuickActionSyncPolicy.resolve(
                     status,
                     attemptsExhausted = true,
+                    discoveryRound = 0,
+                    maxDiscoveryRounds = 2,
                 ),
             )
         }

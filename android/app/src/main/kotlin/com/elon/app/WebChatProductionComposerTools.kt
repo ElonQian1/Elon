@@ -34,21 +34,24 @@ internal object WebChatProductionComposerToolParser {
 
 internal enum class WebChatProductionQuickActionSyncOutcome {
     KEEP_WAITING,
+    RETRY_DISCOVERY,
     RETRY_LATER,
-    NOT_OBSERVED,
 }
 
 internal object WebChatProductionQuickActionSyncPolicy {
     fun resolve(
         requestStatus: WebChatConsumerCommandStatus?,
         attemptsExhausted: Boolean,
+        discoveryRound: Int,
+        maxDiscoveryRounds: Int,
     ): WebChatProductionQuickActionSyncOutcome = when {
         requestStatus == WebChatConsumerCommandStatus.FAILED ||
             requestStatus == WebChatConsumerCommandStatus.TIMED_OUT ->
             WebChatProductionQuickActionSyncOutcome.RETRY_LATER
         !attemptsExhausted -> WebChatProductionQuickActionSyncOutcome.KEEP_WAITING
-        requestStatus == WebChatConsumerCommandStatus.SUCCEEDED ->
-            WebChatProductionQuickActionSyncOutcome.NOT_OBSERVED
+        requestStatus == WebChatConsumerCommandStatus.SUCCEEDED &&
+            discoveryRound < maxDiscoveryRounds ->
+            WebChatProductionQuickActionSyncOutcome.RETRY_DISCOVERY
         else -> WebChatProductionQuickActionSyncOutcome.RETRY_LATER
     }
 }
@@ -67,6 +70,7 @@ internal class WebChatProductionComposerToolsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
+    private var pendingQuickAction: PendingQuickAction? = null
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -125,6 +129,13 @@ internal class WebChatProductionComposerToolsCoordinator(
         action: WebChatProductionQuickComposerAction,
     ): Boolean = changeQuickAction(provider, action, desiredActive = false)
 
+    fun onSessionStateChanged(provider: WebChatProviderIdentity) {
+        val pending = pendingQuickAction ?: return
+        if (pending.providerId != provider.id || activeProvider() != provider.id) return
+        if (!sessionReady() || pending.requestInFlight) return
+        startPendingRequest(pending)
+    }
+
     private fun changeQuickAction(
         provider: WebChatProviderIdentity,
         action: WebChatProductionQuickComposerAction,
@@ -132,66 +143,40 @@ internal class WebChatProductionComposerToolsCoordinator(
     ): Boolean {
         cancelPending()
         if (activeProvider() != provider.id || action !in quickActions(provider)) return false
-        val port = consumerPort() ?: run {
-            showQuickActionRetry(action)
-            return false
-        }
+        val pending = PendingQuickAction(
+            providerId = provider.id,
+            action = action,
+            desiredActive = desiredActive,
+            epoch = requestEpoch,
+        )
+        pendingQuickAction = pending
         if (!sessionReady()) {
             requestSessionRecovery()
-            showQuickActionRestoring(action)
-            val epoch = requestEpoch
-            host.postDelayed(
-                { waitForSession(provider, port, action, desiredActive, epoch, attempt = 0) },
-                READY_POLL_INTERVAL_MS,
-            )
+            showQuickActionQueued(action)
             return true
         }
-        return requestQuickAction(provider, port, action, desiredActive, requestEpoch)
+        return startPendingRequest(pending)
     }
 
-    private fun waitForSession(
-        provider: WebChatProviderIdentity,
-        port: WebChatConsumerPort,
-        action: WebChatProductionQuickComposerAction,
-        desiredActive: Boolean,
-        epoch: Int,
-        attempt: Int,
-    ) {
-        if (epoch != requestEpoch || activeProvider() != provider.id) return
-        if (sessionReady()) {
-            requestQuickAction(provider, port, action, desiredActive, epoch)
-            return
-        }
-        if (attempt >= MAX_READY_POLL_ATTEMPTS) {
-            showQuickActionRetry(action)
-            return
-        }
-        host.postDelayed(
-            { waitForSession(provider, port, action, desiredActive, epoch, attempt + 1) },
-            READY_POLL_INTERVAL_MS,
-        )
-    }
-
-    private fun requestQuickAction(
-        provider: WebChatProviderIdentity,
-        port: WebChatConsumerPort,
-        action: WebChatProductionQuickComposerAction,
-        desiredActive: Boolean,
-        epoch: Int,
+    private fun startPendingRequest(
+        pending: PendingQuickAction,
     ): Boolean {
-        val requested = port.requestComposerOptions(TOOLS_SECTION)
-        if (!requested.accepted) {
-            showQuickActionRetry(action)
+        if (pending.epoch != requestEpoch || pendingQuickAction != pending) return false
+        val port = consumerPort() ?: run {
+            failPendingQuickAction(pending)
             return false
         }
+        val requested = port.requestComposerOptions(TOOLS_SECTION)
+        if (!requested.accepted) {
+            failPendingQuickAction(pending)
+            return false
+        }
+        pendingQuickAction = pending.copy(requestInFlight = true)
         host.postDelayed(
             {
                 pollQuickAction(
-                    provider,
                     port,
-                    action,
-                    desiredActive,
-                    epoch,
+                    pending.copy(requestInFlight = true),
                     requested.requestId,
                     attempt = 0,
                 )
@@ -210,31 +195,45 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     fun cancelPending() {
         requestEpoch += 1
+        pendingQuickAction = null
         activeSheet?.dismiss()
         activeSheet = null
     }
 
     private fun pollQuickAction(
-        provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
-        action: WebChatProductionQuickComposerAction,
-        desiredActive: Boolean,
-        epoch: Int,
+        pending: PendingQuickAction,
         requestId: String?,
         attempt: Int,
     ) {
-        if (epoch != requestEpoch || activeProvider() != provider.id) return
+        if (
+            pending.epoch != requestEpoch ||
+            activeProvider() != pending.providerId ||
+            pendingQuickAction != pending
+        ) return
+        if (!sessionReady()) {
+            port.dismissComposerOptions()
+            pendingQuickAction = pending.copy(requestInFlight = false)
+            requestSessionRecovery()
+            return
+        }
         val observed = observedToolOptions(port)
         if (observed.isNotEmpty()) {
-            interactionCache.composerOptions(provider.id, TOOLS_SECTION, observed)
+            interactionCache.composerOptions(pending.providerId, TOOLS_SECTION, observed)
             val tools = WebChatProductionComposerToolParser.parse(observed)
-            val target = WebChatProductionQuickComposerActionResolver.find(action, tools)
+            val target = WebChatProductionQuickComposerActionResolver.find(pending.action, tools)
             if (target != null) {
-                if (target.selected == desiredActive) {
+                if (target.selected == pending.desiredActive) {
                     port.dismissComposerOptions()
-                    onQuickActionChanged(action.takeIf { desiredActive })
-                } else if (applyTool(provider, port, target)) {
-                    onQuickActionChanged(action.takeIf { desiredActive })
+                    completePendingQuickAction(pending)
+                } else if (applyTool(
+                        WebChatProviderRegistry.get(pending.providerId),
+                        port,
+                        target,
+                    )) {
+                    completePendingQuickAction(pending)
+                } else {
+                    pendingQuickAction = null
                 }
                 return
             }
@@ -245,27 +244,34 @@ internal class WebChatProductionComposerToolsCoordinator(
         when (WebChatProductionQuickActionSyncPolicy.resolve(
             requestStatus = requestStatus,
             attemptsExhausted = attempt >= MAX_POLL_ATTEMPTS,
+            discoveryRound = pending.discoveryRound,
+            maxDiscoveryRounds = MAX_DISCOVERY_ROUNDS,
         )) {
             WebChatProductionQuickActionSyncOutcome.KEEP_WAITING -> Unit
-            WebChatProductionQuickActionSyncOutcome.RETRY_LATER -> {
+            WebChatProductionQuickActionSyncOutcome.RETRY_DISCOVERY -> {
                 port.dismissComposerOptions()
-                showQuickActionRetry(action)
+                val next = pending.copy(
+                    discoveryRound = pending.discoveryRound + 1,
+                    requestInFlight = false,
+                )
+                pendingQuickAction = next
+                host.postDelayed(
+                    { if (sessionReady()) startPendingRequest(next) },
+                    DISCOVERY_RETRY_DELAY_MS,
+                )
                 return
             }
-            WebChatProductionQuickActionSyncOutcome.NOT_OBSERVED -> {
+            WebChatProductionQuickActionSyncOutcome.RETRY_LATER -> {
                 port.dismissComposerOptions()
-                showQuickActionNotObserved(action)
+                failPendingQuickAction(pending)
                 return
             }
         }
         host.postDelayed(
             {
                 pollQuickAction(
-                    provider,
                     port,
-                    action,
-                    desiredActive,
-                    epoch,
+                    pending,
                     requestId,
                     attempt + 1,
                 )
@@ -301,36 +307,49 @@ internal class WebChatProductionComposerToolsCoordinator(
             .show()
     }
 
-    private fun showQuickActionRestoring(action: WebChatProductionQuickComposerAction) {
+    private fun showQuickActionQueued(action: WebChatProductionQuickComposerAction) {
         Toast.makeText(
             activity,
-            "网页会话正在后台恢复，连接后会继续打开${action.label}",
+            "已保留${action.label}选择，网页连接后自动开启",
             Toast.LENGTH_SHORT,
         ).show()
     }
 
-    private fun showQuickActionNotObserved(action: WebChatProductionQuickComposerAction) {
-        Toast.makeText(
-            activity,
-            "未读取到${action.label}入口，可在官网完整功能中继续",
-            Toast.LENGTH_SHORT,
-        ).show()
+    private fun completePendingQuickAction(pending: PendingQuickAction) {
+        if (pendingQuickAction != pending) return
+        pendingQuickAction = null
+        onQuickActionChanged(pending.action.takeIf { pending.desiredActive })
+    }
+
+    private fun failPendingQuickAction(pending: PendingQuickAction) {
+        if (pending.epoch != requestEpoch) return
+        pendingQuickAction = null
+        showQuickActionRetry(pending.action)
     }
 
     private fun showQuickActionRetry(action: WebChatProductionQuickComposerAction) {
         Toast.makeText(
             activity,
-            "${action.label}状态同步未完成，请稍后重试",
+            "${action.label}暂时未能启用，请稍后重试",
             Toast.LENGTH_SHORT,
         ).show()
     }
 
+    private data class PendingQuickAction(
+        val providerId: WebChatProviderId,
+        val action: WebChatProductionQuickComposerAction,
+        val desiredActive: Boolean,
+        val epoch: Int,
+        val discoveryRound: Int = 0,
+        val requestInFlight: Boolean = false,
+    )
+
     private companion object {
         const val TOOLS_SECTION = "tools"
         const val MAX_POLL_ATTEMPTS = 8
+        const val MAX_DISCOVERY_ROUNDS = 2
         const val POLL_INTERVAL_MS = 250L
         const val QUICK_ACTION_INITIAL_DELAY_MS = 180L
-        const val READY_POLL_INTERVAL_MS = 250L
-        const val MAX_READY_POLL_ATTEMPTS = 40
+        const val DISCOVERY_RETRY_DELAY_MS = 600L
     }
 }
