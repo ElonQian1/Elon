@@ -54,6 +54,9 @@ const PROFILE_ROOT: &str = "ai-web-profiles";
 const SNAPSHOT_CACHE_FILE: &str = "yilong-semantic-snapshot.v1.dpapi";
 const MAIN_WEBVIEW_LABEL: &str = "main";
 const LOCAL_AI_WINDOW_PREFIX: &str = "local-ai-";
+// 后台会话隐藏但仍需真实视口：官方响应式页面（如 Google AI 模式）在极小视口下不会渲染输入框。
+const DEFAULT_VIEWPORT_WIDTH: f64 = 1180.0;
+const DEFAULT_VIEWPORT_HEIGHT: f64 = 780.0;
 
 #[tauri::command]
 pub fn resolve_local_ai_guest_owner_identity(
@@ -217,7 +220,7 @@ pub async fn open_local_ai_web_session(
     } else {
         WindowBuilder::new(&app, &window_label)
             .title(format!("{} · 一龙本地会话", provider.display_name))
-            .inner_size(1180.0, 780.0)
+            .inner_size(DEFAULT_VIEWPORT_WIDTH, DEFAULT_VIEWPORT_HEIGHT)
             .min_inner_size(900.0, 620.0)
             .center()
             .visible(false)
@@ -294,7 +297,7 @@ pub async fn open_local_ai_web_session(
         main_window.add_child(
             builder,
             LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(1.0, 1.0),
+            LogicalSize::new(DEFAULT_VIEWPORT_WIDTH, DEFAULT_VIEWPORT_HEIGHT),
         )
     } else {
         let size = popout.inner_size().map_err(display_error)?;
