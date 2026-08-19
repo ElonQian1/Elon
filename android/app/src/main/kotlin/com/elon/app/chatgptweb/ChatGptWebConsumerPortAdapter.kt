@@ -64,6 +64,8 @@ internal class ChatGptWebConsumerPortAdapter(
                             ChatGptWebControlInvocationPolicy.Risk.USER_CONFIRMATION,
                         presentation = coverage?.kind.toConsumerPresentation(),
                         nativeSelector = coverage?.nativeSelector,
+                        pageActionPlacement = ChatGptNativeControlPresentation
+                            .pageActionPlacement(control),
                     )
                 }
             }

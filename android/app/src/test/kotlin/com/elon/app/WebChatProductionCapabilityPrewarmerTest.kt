@@ -63,7 +63,10 @@ class WebChatProductionCapabilityPrewarmerTest {
             replaceComposerOptions(WebChatProviderId.CHATGPT_WEB, "model", emptyList())
             composerOptions(WebChatProviderId.CHATGPT_WEB, "tools", listOf(option("search")))
             features(WebChatProviderId.CHATGPT_WEB, listOf(feature("projects")))
-            controls(WebChatProviderId.CHATGPT_WEB, listOf(control("more")))
+            controls(
+                WebChatProviderId.CHATGPT_WEB,
+                emptyState().copy(controls = listOf(control("more"))),
+            )
         }
         val prewarmer = prewarmer(port, scheduler, cache = cache) {
             WebChatProviderId.CHATGPT_WEB

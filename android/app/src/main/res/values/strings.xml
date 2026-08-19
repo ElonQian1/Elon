@@ -115,7 +115,6 @@
     <string name="chatgpt_message_copied">消息已复制</string>
     <string name="chatgpt_message_regenerate">重新生成回复</string>
     <string name="chatgpt_message_more_actions">更多消息操作</string>
-    <string name="chatgpt_official_page_actions">当前网页操作</string>
     <string name="chatgpt_product_host">ChatGPT 网页 AI</string>
     <string name="social_ai_mode_picker_title">选择 AI 模式</string>
     <string name="social_ai_mode_work">工作模式 · 一龙 AI 路由</string>

@@ -187,6 +187,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureCompletion.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActions.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActionPolicy.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionConversationActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionSuggestions.kt",
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSideMenuConversationActions.kt",

@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatConsumerPageActionPlacement
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -178,7 +179,7 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
-    fun coversEveryBoundedFeatureControlIncludingDisabledEntries() {
+    fun marksUnknownFeatureControlsAsTechnicalCoverageWithoutUserMenuPlacement() {
         val controls = (1..48).map { index ->
             control(
                 id = "feature_$index",
@@ -193,13 +194,15 @@ class ChatGptNativeControlPresentationTest {
         val coverage = ChatGptNativeControlPresentation.describe(controls)
 
         assertEquals(48, actions.size)
-        assertEquals(false, actions.last().enabled)
         assertEquals(48, coverage.values.count { it.kind.wireName == "menu" })
-        assertEquals("chatgpt-page-actions:48", coverage.getValue("feature_48").nativeTriggerSelector)
+        assertTrue(controls.all {
+            ChatGptNativeControlPresentation.pageActionPlacement(it) ==
+                WebChatConsumerPageActionPlacement.NONE
+        })
     }
 
     @Test
-    fun coversTheFullProtocolControlBoundaryWithoutDroppingPageActions() {
+    fun preservesTheFullProtocolControlBoundaryWithoutGivingUnknownControlsPlacement() {
         val controls = (1..512).map { index ->
             control(
                 id = "feature_$index",
@@ -215,10 +218,14 @@ class ChatGptNativeControlPresentationTest {
         assertEquals(512, actions.size)
         assertEquals(512, coverage.values.count { it.kind.wireName == "menu" })
         assertEquals("chatgpt-page-actions:512", coverage.getValue("feature_512").nativeTriggerSelector)
+        assertEquals(
+            WebChatConsumerPageActionPlacement.NONE,
+            ChatGptNativeControlPresentation.pageActionPlacement(controls.last()),
+        )
     }
 
     @Test
-    fun movesSuggestionOverflowIntoTheNativeMenu() {
+    fun suggestionsNeverLeakIntoTheCurrentPageOperationsMenu() {
         val controls = (1..5).map { index ->
             control(
                 id = "suggestion_$index",
@@ -233,8 +240,8 @@ class ChatGptNativeControlPresentationTest {
         assertEquals(4, ChatGptNativeControlPresentation.suggestions(controls).size)
         assertEquals("menu", coverage.getValue("suggestion_5").kind.wireName)
         assertEquals(
-            "chatgpt-overflow-actions:1",
-            coverage.getValue("suggestion_5").nativeTriggerSelector,
+            WebChatConsumerPageActionPlacement.NONE,
+            ChatGptNativeControlPresentation.pageActionPlacement(controls.last()),
         )
     }
 

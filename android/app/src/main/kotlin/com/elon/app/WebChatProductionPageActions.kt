@@ -5,75 +5,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
-internal data class WebChatProductionPageAction(
-    val control: WebChatConsumerControl,
-    val requiresUserConfirmation: Boolean,
-    val officialFallback: Boolean,
-    val nativeSelector: String,
-) {
-    val controlId: String get() = control.id
-    val label: String get() = control.label
-    val semantic: String get() = control.semantic
-}
-
-internal object WebChatProductionPageActionParser {
-    fun parse(descriptors: List<WebChatConsumerControlDescriptor>): List<WebChatProductionPageAction> {
-        return descriptors.mapNotNull { descriptor ->
-            val control = descriptor.control
-            if (
-                !control.enabled ||
-                control.region !in PAGE_REGIONS ||
-                control.semantic in EXCLUDED_SEMANTICS ||
-                descriptor.presentation !in SUPPORTED_PRESENTATIONS
-            ) return@mapNotNull null
-            WebChatProductionPageAction(
-                control = control,
-                requiresUserConfirmation = descriptor.requiresUserConfirmation,
-                officialFallback = descriptor.presentation ==
-                    WebChatConsumerControlPresentation.OFFICIAL_FALLBACK ||
-                    control.semantic in OFFICIAL_COMPLETION_SEMANTICS,
-                nativeSelector = descriptor.nativeSelector
-                    .orEmpty()
-                    .trim()
-                    .ifBlank { "web-chat-page-action:${control.semantic}:${control.id}" },
-            )
-        }
-            .distinctBy(WebChatProductionPageAction::controlId)
-    }
-
-    private val PAGE_REGIONS = setOf("header", "content", "suggestions", "overlay")
-    private val SUPPORTED_PRESENTATIONS = setOf(
-        WebChatConsumerControlPresentation.DIRECT,
-        WebChatConsumerControlPresentation.DEDICATED,
-        WebChatConsumerControlPresentation.MENU,
-        WebChatConsumerControlPresentation.OFFICIAL_FALLBACK,
-    )
-    private val EXCLUDED_SEMANTICS = setOf(
-        "navigation",
-        "title",
-        "send",
-        "stop",
-        "copy",
-        "regenerate",
-        "model",
-        "attachment",
-        "dictation",
-        "voice_mode",
-        "search",
-        "conversation",
-        "timestamp",
-    )
-    private val OFFICIAL_COMPLETION_SEMANTICS = setOf(
-        "conversation_files",
-        "share",
-        "create_asset",
-        "open_media",
-        "personalization",
-        "plan",
-        "logout",
-    )
-}
-
 internal class WebChatProductionPageActionsCoordinator(
     private val activity: AppCompatActivity,
     private val host: View,
@@ -101,21 +32,25 @@ internal class WebChatProductionPageActionsCoordinator(
         val epoch = requestEpoch
         val state = port.state()
         val actions = readActions(provider.id, state)
-        showActionDialog(
+        val initialObservation = observation(
             provider,
-            port,
+            state,
             actions,
-            observation(provider, state, actions, request = null, pollingExhausted = false),
+            request = null,
+            pollingExhausted = false,
         )
+        if (presentActions(provider, port, state, actions, initialObservation)) return
         val requested = port.requestControls()
         if (requested.accepted) {
             pollActions(provider, port, requested, epoch, attempt = 0)
         } else {
-            showActionDialog(
+            val latestState = port.state()
+            presentActions(
                 provider,
                 port,
+                latestState,
                 actions,
-                observation(provider, port.state(), actions, requested, pollingExhausted = false),
+                observation(provider, latestState, actions, requested, pollingExhausted = false),
             )
         }
     }
@@ -139,14 +74,16 @@ internal class WebChatProductionPageActionsCoordinator(
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
         val state = port.state()
+        val pageIdentity = WebChatProductionPageIdentity.from(state)
         val observed = WebChatProductionPageActionParser.parse(
             state.controls.take(MAX_CONTROL_COUNT),
+            pageIdentity,
         )
         val actions = readActions(provider.id, state)
         val exhausted = attempt >= MAX_POLL_ATTEMPTS
         val observation = observation(provider, state, actions, request, exhausted)
-        showActionDialog(provider, port, actions, observation)
-        if (observed.isNotEmpty() || exhausted || observation in TERMINAL_OBSERVATION_STATES) {
+        val presented = presentActions(provider, port, state, actions, observation)
+        if (presented || observed.isNotEmpty() || exhausted || observation in TERMINAL_OBSERVATION_STATES) {
             return
         }
         host.postDelayed(
@@ -160,10 +97,10 @@ internal class WebChatProductionPageActionsCoordinator(
         state: WebChatConsumerState,
     ): List<WebChatProductionPageAction> =
         WebChatProductionPageActionParser.parse(
-            interactionCache.controls(
-                providerId,
-                state.controls.take(MAX_CONTROL_COUNT),
-            ),
+            interactionCache.controls(providerId, state.copy(
+                controls = state.controls.take(MAX_CONTROL_COUNT),
+            )),
+            WebChatProductionPageIdentity.from(state),
         )
 
     private fun observation(
@@ -178,6 +115,7 @@ internal class WebChatProductionPageActionsCoordinator(
             adapterCurrent = state.adapterCurrent,
             observedCount = WebChatProductionPageActionParser.parse(
                 state.controls.take(MAX_CONTROL_COUNT),
+                WebChatProductionPageIdentity.from(state),
             ).size,
             cachedCount = if (state.controls.isEmpty()) resolved.size else 0,
             requestAccepted = request?.accepted,
@@ -187,9 +125,40 @@ internal class WebChatProductionPageActionsCoordinator(
         ),
     )
 
+    private fun presentActions(
+        provider: WebChatProviderIdentity,
+        port: WebChatConsumerPort,
+        state: WebChatConsumerState,
+        actions: List<WebChatProductionPageAction>,
+        observation: WebChatProductionObservationState,
+    ): Boolean {
+        val pageIdentity = WebChatProductionPageIdentity.from(state)
+        if (pageIdentity.actionPlacement == WebChatConsumerPageActionPlacement.CONVERSATION) {
+            val trigger = actions.firstOrNull { it.semantic == "conversation_options" }
+            val nested = actions.filterNot { it.semantic == "conversation_options" }
+            if (trigger != null && nested.none { it.control.region == "overlay" }) {
+                invoke(
+                    provider,
+                    port,
+                    trigger,
+                    previousControlIds = actions.mapTo(mutableSetOf(), WebChatProductionPageAction::controlId),
+                    userConfirmed = false,
+                )
+                return true
+            }
+            if (nested.isNotEmpty()) {
+                showActionDialog(provider, port, pageIdentity, nested, observation)
+                return true
+            }
+        }
+        showActionDialog(provider, port, pageIdentity, actions, observation)
+        return actions.isNotEmpty()
+    }
+
     private fun showActionDialog(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
+        pageIdentity: WebChatProductionPageIdentity,
         actions: List<WebChatProductionPageAction>,
         observation: WebChatProductionObservationState,
     ) {
@@ -208,7 +177,7 @@ internal class WebChatProductionPageActionsCoordinator(
             listOf(WebChatProductionInteractionPlaceholder.item(
                 provider.id,
                 surface = "page-actions",
-                title = "当前网页操作",
+                title = pageIdentity.sheetTitle,
                 state = observation,
             ))
         }
@@ -218,11 +187,11 @@ internal class WebChatProductionPageActionsCoordinator(
         }
         val sheet = WebChatActionSheet.showUpdatable(
             activity = activity,
-            title = "当前网页操作",
+            title = pageIdentity.sheetTitle,
             items = items,
             footerActions = listOf(
                 WebChatActionSheetFooterAction(
-                    label = "官网完整功能",
+                    label = "打开官网",
                     contentDescription = "web-chat-page-actions-official:${provider.id.wireValue}",
                     action = openOfficialFallback,
                 ),
@@ -300,6 +269,7 @@ internal class WebChatProductionPageActionsCoordinator(
                 showActionDialog(
                     provider,
                     port,
+                    WebChatProductionPageIdentity.from(state),
                     actions,
                     WebChatProductionObservationState.AVAILABLE,
                 )
@@ -342,6 +312,7 @@ internal class WebChatProductionPageActionsCoordinator(
             showActionDialog(
                 provider,
                 port,
+                WebChatProductionPageIdentity.from(port.state()),
                 nested,
                 WebChatProductionObservationState.AVAILABLE,
             )
@@ -363,16 +334,21 @@ internal class WebChatProductionPageActionsCoordinator(
 
     private fun showNestedTransition(provider: WebChatProviderIdentity, label: String) {
         actionById = emptyMap()
+        val transitionItems = listOf(WebChatProductionInteractionPlaceholder.item(
+            provider.id,
+            surface = "nested-actions",
+            title = label,
+        ))
+        activeSheet?.let { sheet ->
+            sheet.updateItems(transitionItems)
+            return
+        }
         activeSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = label,
-            items = listOf(WebChatProductionInteractionPlaceholder.item(
-                provider.id,
-                surface = "nested-actions",
-                title = label,
-            )),
+            items = transitionItems,
             footerActions = listOf(WebChatActionSheetFooterAction(
-                label = "官网完整功能",
+                label = "打开官网",
                 contentDescription = "web-chat-page-actions-official:${provider.id.wireValue}",
                 action = openOfficialFallback,
             )),
@@ -395,7 +371,7 @@ internal class WebChatProductionPageActionsCoordinator(
     ) {
         if (activity.isFinishing || activity.isDestroyed) return
         val dialog = AlertDialog.Builder(activity)
-            .setTitle("当前网页操作")
+            .setTitle("网页功能")
             .setMessage(WebChatProductionCapabilityEvidencePolicy.subtitle(state))
             .setNeutralButton("重试") { _, _ -> show(provider) }
             .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }

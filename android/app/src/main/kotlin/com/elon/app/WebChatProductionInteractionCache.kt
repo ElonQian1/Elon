@@ -8,7 +8,7 @@ package com.elon.app
 internal class WebChatProductionInteractionCache {
     private val composerSections = mutableMapOf<ComposerKey, List<WebChatConsumerOption>>()
     private val features = mutableMapOf<WebChatProviderId, List<WebChatConsumerFeature>>()
-    private val controls = mutableMapOf<WebChatProviderId, List<WebChatConsumerControlDescriptor>>()
+    private val controls = mutableMapOf<ControlKey, List<WebChatConsumerControlDescriptor>>()
 
     fun composerOptions(
         providerId: WebChatProviderId,
@@ -34,7 +34,8 @@ internal class WebChatProductionInteractionCache {
 
     fun hasFeatureSnapshot(providerId: WebChatProviderId): Boolean = providerId in features
 
-    fun hasControlSnapshot(providerId: WebChatProviderId): Boolean = providerId in controls
+    fun hasControlSnapshot(providerId: WebChatProviderId, state: WebChatConsumerState): Boolean =
+        controlKey(providerId, state) in controls
 
     fun features(
         providerId: WebChatProviderId,
@@ -43,21 +44,25 @@ internal class WebChatProductionInteractionCache {
 
     fun controls(
         providerId: WebChatProviderId,
-        observed: List<WebChatConsumerControlDescriptor>,
-    ): List<WebChatConsumerControlDescriptor> = retainLatest(providerId, observed, controls)
+        state: WebChatConsumerState,
+    ): List<WebChatConsumerControlDescriptor> = retainLatest(
+        controlKey(providerId, state),
+        state.controls,
+        controls,
+    )
 
     fun capture(providerId: WebChatProviderId, state: WebChatConsumerState) {
         state.composerSections.forEach { (section, options) ->
             composerOptions(providerId, section, options)
         }
         features(providerId, state.features)
-        controls(providerId, state.controls)
+        controls(providerId, state)
     }
 
     fun clear(providerId: WebChatProviderId) {
         composerSections.keys.removeAll { it.providerId == providerId }
         features.remove(providerId)
-        controls.remove(providerId)
+        controls.keys.removeAll { it.providerId == providerId }
     }
 
     private fun <K, T> retainLatest(
@@ -73,6 +78,16 @@ internal class WebChatProductionInteractionCache {
         val providerId: WebChatProviderId,
         val section: String,
     )
+
+    private data class ControlKey(
+        val providerId: WebChatProviderId,
+        val pageKey: String,
+    )
+
+    private fun controlKey(
+        providerId: WebChatProviderId,
+        state: WebChatConsumerState,
+    ) = ControlKey(providerId, WebChatProductionPageIdentity.from(state).cacheKey)
 }
 
 internal object WebChatProductionInteractionPlaceholder {

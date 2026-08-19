@@ -43,8 +43,12 @@ class WebChatProductionInteractionCacheTest {
 
     @Test
     fun replacesCachedManifestOnlyWhenThePageReturnsAUsableSnapshot() {
+        val conversationState = state("conversation", "https://chatgpt.com/c/one")
         cache.features(WebChatProviderId.CHATGPT_WEB, listOf(feature("projects")))
-        cache.controls(WebChatProviderId.CHATGPT_WEB, listOf(control("profile")))
+        cache.controls(
+            WebChatProviderId.CHATGPT_WEB,
+            conversationState.copy(controls = listOf(control("profile"))),
+        )
 
         assertEquals(
             "projects",
@@ -52,10 +56,10 @@ class WebChatProductionInteractionCacheTest {
         )
         assertEquals(
             "profile",
-            cache.controls(WebChatProviderId.CHATGPT_WEB, emptyList()).single().control.id,
+            cache.controls(WebChatProviderId.CHATGPT_WEB, conversationState).single().control.id,
         )
         assertTrue(cache.hasFeatureSnapshot(WebChatProviderId.CHATGPT_WEB))
-        assertTrue(cache.hasControlSnapshot(WebChatProviderId.CHATGPT_WEB))
+        assertTrue(cache.hasControlSnapshot(WebChatProviderId.CHATGPT_WEB, conversationState))
 
         assertEquals(
             "tasks",
@@ -63,7 +67,29 @@ class WebChatProductionInteractionCacheTest {
         )
         assertEquals(
             "more",
-            cache.controls(WebChatProviderId.CHATGPT_WEB, listOf(control("more"))).single().control.id,
+            cache.controls(
+                WebChatProviderId.CHATGPT_WEB,
+                conversationState.copy(controls = listOf(control("more"))),
+            ).single().control.id,
+        )
+    }
+
+    @Test
+    fun controlSnapshotsNeverLeakAcrossPagesOrConversations() {
+        val firstConversation = state("conversation", "https://chatgpt.com/c/first")
+        val secondConversation = state("conversation", "https://chatgpt.com/c/second")
+        val featurePage = state("feature", "https://chatgpt.com/images")
+
+        cache.controls(
+            WebChatProviderId.CHATGPT_WEB,
+            firstConversation.copy(controls = listOf(control("first-actions"))),
+        )
+
+        assertTrue(cache.controls(WebChatProviderId.CHATGPT_WEB, secondConversation).isEmpty())
+        assertTrue(cache.controls(WebChatProviderId.CHATGPT_WEB, featurePage).isEmpty())
+        assertEquals(
+            "first-actions",
+            cache.controls(WebChatProviderId.CHATGPT_WEB, firstConversation).single().control.id,
         )
     }
 
@@ -116,7 +142,7 @@ class WebChatProductionInteractionCacheTest {
         ).single().id)
         assertEquals("more", cache.controls(
             WebChatProviderId.CHATGPT_WEB,
-            emptyList(),
+            state("conversation", "https://example.invalid/"),
         ).single().control.id)
     }
 
@@ -151,5 +177,16 @@ class WebChatProductionInteractionCacheTest {
         requiresUserConfirmation = false,
         presentation = WebChatConsumerControlPresentation.DIRECT,
         nativeSelector = "control:$id",
+    )
+
+    private fun state(pageKind: String, pageUrl: String) = WebChatConsumerState(
+        streaming = false,
+        dictationActive = false,
+        composerSections = emptyMap(),
+        pageKind = pageKind,
+        pageUrl = pageUrl,
+        features = emptyList(),
+        controls = emptyList(),
+        commandRequests = emptyList(),
     )
 }

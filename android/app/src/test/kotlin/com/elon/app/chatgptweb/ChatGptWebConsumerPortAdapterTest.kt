@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 import com.elon.app.WebChatConsumerCommandStatus
 import com.elon.app.WebChatConsumerControlMutation
 import com.elon.app.WebChatConsumerControlPresentation
+import com.elon.app.WebChatConsumerPageActionPlacement
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,6 +68,10 @@ class ChatGptWebConsumerPortAdapterTest {
         assertTrue(state.features.single().nativeSelector.contains("health"))
         assertEquals("temporary", state.controls.single().control.id)
         assertEquals(WebChatConsumerControlPresentation.DIRECT, state.controls.single().presentation)
+        assertEquals(
+            WebChatConsumerPageActionPlacement.CONVERSATION,
+            state.controls.single().pageActionPlacement,
+        )
         assertEquals(WebChatConsumerCommandStatus.SUCCEEDED, state.commandRequests.single().status)
     }
 

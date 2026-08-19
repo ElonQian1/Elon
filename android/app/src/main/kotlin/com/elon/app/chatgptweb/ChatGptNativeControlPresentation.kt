@@ -1,5 +1,7 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatConsumerPageActionPlacement
+
 internal object ChatGptNativeControlPresentation {
     const val HEADER_ACTION_LIMIT = 2
     const val SUGGESTION_LIMIT = 4
@@ -108,6 +110,14 @@ internal object ChatGptNativeControlPresentation {
 
     fun isExpectedOfficialFallback(control: ChatGptWebUiControl): Boolean =
         control.role == "slider" && !control.supportsSliderValue
+
+    fun pageActionPlacement(control: ChatGptWebUiControl): WebChatConsumerPageActionPlacement = when {
+        control.semantic in CONVERSATION_PAGE_ACTION_SEMANTICS ->
+            WebChatConsumerPageActionPlacement.CONVERSATION
+        control.semantic in PAGE_ACTION_SEMANTICS ->
+            WebChatConsumerPageActionPlacement.PAGE
+        else -> WebChatConsumerPageActionPlacement.NONE
+    }
 
     fun messageActions(controls: List<ChatGptWebUiControl>): Map<String, List<ChatGptWebUiControl>> =
         controls.asSequence()
@@ -276,6 +286,28 @@ internal object ChatGptNativeControlPresentation {
         "rename",
         "pin",
         "archive",
+    )
+    private val CONVERSATION_PAGE_ACTION_SEMANTICS = setOf(
+        "conversation_options",
+        "conversation_files",
+        "temporary_chat",
+        "save_to_project",
+        "rename",
+        "pin",
+        "archive",
+        "share",
+        "delete",
+    )
+    private val PAGE_ACTION_SEMANTICS = setOf(
+        "profile",
+        "personalization",
+        "settings",
+        "apps",
+        "help",
+        "plan",
+        "logout",
+        "create_asset",
+        "open_media",
     )
     private val PRIMARY_COPY_LABELS = setOf(
         "复制回复",

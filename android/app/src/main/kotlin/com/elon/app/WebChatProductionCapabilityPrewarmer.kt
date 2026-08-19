@@ -144,7 +144,7 @@ internal class WebChatProductionCapabilityPrewarmer(
             TOOLS -> state.composerSections[TOOLS_SECTION].orEmpty().isNotEmpty() ||
                 cache.hasComposerSnapshot(providerId, TOOLS_SECTION)
             FEATURES -> state.features.isNotEmpty() || cache.hasFeatureSnapshot(providerId)
-            CONTROLS -> state.controls.isNotEmpty() || cache.hasControlSnapshot(providerId)
+            CONTROLS -> state.controls.isNotEmpty() || cache.hasControlSnapshot(providerId, state)
         }
 
         fun request(port: WebChatConsumerPort): WebChatConsumerCommandResult = when (this) {

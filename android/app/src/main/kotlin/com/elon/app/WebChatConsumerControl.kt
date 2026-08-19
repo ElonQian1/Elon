@@ -57,11 +57,19 @@ internal enum class WebChatConsumerControlPresentation {
     OFFICIAL_FALLBACK,
 }
 
+internal enum class WebChatConsumerPageActionPlacement {
+    NONE,
+    CONVERSATION,
+    PAGE,
+}
+
 internal data class WebChatConsumerControlDescriptor(
     val control: WebChatConsumerControl,
     val requiresUserConfirmation: Boolean,
     val presentation: WebChatConsumerControlPresentation,
     val nativeSelector: String?,
+    val pageActionPlacement: WebChatConsumerPageActionPlacement =
+        WebChatConsumerPageActionPlacement.NONE,
 )
 
 internal sealed interface WebChatConsumerControlMutation {
