@@ -73,4 +73,20 @@ class WebChatConsumerComposerStateTest {
         assertFalse(state.attachmentVisible)
         assertFalse(state.toolsVisible)
     }
+
+    @Test
+    fun warmSessionKeepsTheComposerStableDuringBackgroundRecovery() {
+        val state = WebChatConsumerComposerStateResolver.resolve(
+            WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            state = "loading",
+            composerReady = false,
+            attachmentSupported = true,
+            warmSessionAvailable = true,
+        )
+
+        assertFalse(state.submissionEnabled)
+        assertTrue(state.attachmentVisible)
+        assertTrue(state.toolsVisible)
+        assertEquals("输入内容", state.inputHint)
+    }
 }

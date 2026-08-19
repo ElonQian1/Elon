@@ -5,7 +5,9 @@ internal object ChatGptWebConnectionMessagePolicy {
         state: ChatGptBackgroundSession.State,
         hasMessages: Boolean,
         conversationNavigationActive: Boolean,
+        warmSessionAvailable: Boolean = false,
     ): Boolean = state == ChatGptBackgroundSession.State.LOADING &&
         !hasMessages &&
-        !conversationNavigationActive
+        !conversationNavigationActive &&
+        !warmSessionAvailable
 }

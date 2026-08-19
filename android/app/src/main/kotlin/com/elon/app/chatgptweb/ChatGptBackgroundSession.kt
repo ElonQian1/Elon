@@ -93,6 +93,7 @@ internal class ChatGptBackgroundSession(
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
     private var latestSnapshot: ChatGptWebSnapshot? = restoredSnapshot
+    private var warmSessionAvailable = restoredSnapshot != null
     private var latestUiManifest: ChatGptWebUiManifest? = null
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var state = State.IDLE
@@ -145,6 +146,7 @@ internal class ChatGptBackgroundSession(
     fun retryConnection(): Boolean = recovery.retryNow()
     fun onHostPaused() = pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
+    fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
         conversations = conversations,
@@ -440,7 +442,13 @@ internal class ChatGptBackgroundSession(
             is ChatGptWebEvent.Snapshot -> {
                 if (!conversationNavigation.shouldAccept(event.value)) return
                 val reconciliation = sessionContinuity.reconcileWithDecision(event.value)
-                val snapshot = reconciliation.snapshot
+                val snapshot = ChatGptWebTransientComposerReadiness.reconcile(
+                    previous = latestSnapshot,
+                    incoming = reconciliation.snapshot,
+                    composerInteractionActive = ChatGptWebTransientComposerReadiness.interactionActive(
+                        composerOptionRequests.isActive(), observedMcpState.snapshot().commandRequests,
+                    ),
+                )
                 scheduleSessionContinuityRecheck(reconciliation.recheckAfterMs)
                 if (reconciliation.clearConversationHistory) clearConversationHistory()
                 latestSnapshot = snapshot
@@ -463,6 +471,7 @@ internal class ChatGptBackgroundSession(
                         newConversationRecovery.cancel()
                         conversationNavigation.complete()
                         snapshotStore.clear()
+                        warmSessionAvailable = false
                         pageAdapter?.markLoginRequired()
                         recovery.onTerminal()
                         updateState(State.LOGIN_REQUIRED)
@@ -476,6 +485,7 @@ internal class ChatGptBackgroundSession(
                                 conversationNavigation.save(path, snapshot)
                             }
                         }
+                        warmSessionAvailable = true
                         pageAdapter?.markReady()
                         recovery.onReady()
                         updateState(State.READY)

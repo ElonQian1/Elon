@@ -136,6 +136,13 @@ internal class MainSocialAiChatFeature(
             onOperationFeedback = ::showComposerOperationFeedback,
             onQuickActionChanged = ::onQuickComposerActionChanged,
             interactionCache = webChatInteractionCache,
+            sessionReady = {
+                isChatModeActive() && activeController().stateWireValue() == "ready" &&
+                    activeController().composerReady()
+            },
+            requestSessionRecovery = {
+                if (isChatModeActive()) activeController().onHostResumed()
+            },
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
@@ -291,6 +298,7 @@ internal class MainSocialAiChatFeature(
             state = controller.stateWireValue(),
             composerReady = controller.composerReady(),
             attachmentSupported = controller.attachmentSupported(),
+            warmSessionAvailable = controller.warmSessionAvailable(),
         ).submissionEnabled
     }
 
@@ -537,6 +545,7 @@ internal class MainSocialAiChatFeature(
                 state = controller.stateWireValue(),
                 composerReady = controller.composerReady(),
                 attachmentSupported = controller.attachmentSupported(),
+                warmSessionAvailable = controller.warmSessionAvailable(),
             )
             binding.inputEdit.hint = WebChatProductionComposerContext.inputHint(
                 state.inputHint,

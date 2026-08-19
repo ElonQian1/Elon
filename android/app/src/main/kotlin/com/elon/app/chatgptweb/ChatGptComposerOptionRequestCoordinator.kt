@@ -81,6 +81,8 @@ internal class ChatGptComposerOptionRequestCoordinator(
         activeSection = null
     }
 
+    fun isActive(): Boolean = queuedRequest != null || activeSection != null
+
     private fun cancelQueuedRequest() {
         scheduledOpen?.let(cancel)
         scheduledOpen = null

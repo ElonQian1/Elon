@@ -126,6 +126,8 @@ internal class ChatGptSocialChatController(
 
     override fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
 
+    override fun warmSessionAvailable(): Boolean = session.warmSessionAvailable()
+
     override fun streaming(): Boolean = session.currentSnapshot()?.streaming == true
 
     override fun attachmentSupported(): Boolean = session.currentSnapshot()?.capabilities
@@ -397,6 +399,7 @@ internal class ChatGptSocialChatController(
                 state = state,
                 hasMessages = transcript.hasMessages(),
                 conversationNavigationActive = session.conversationNavigationActive(),
+                warmSessionAvailable = session.warmSessionAvailable(),
             )) {
             renderStatusMessage("正在连接 ChatGPT 网页 AI…")
         }

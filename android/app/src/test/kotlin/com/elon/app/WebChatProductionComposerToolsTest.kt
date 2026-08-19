@@ -38,6 +38,41 @@ class WebChatProductionComposerToolsTest {
         assertTrue(WebChatProductionComposerToolParser.parse(emptyList()).isEmpty())
     }
 
+    @Test
+    fun doesNotDeclareAFeatureMissingUntilACompletedOfficialSyncStaysEmpty() {
+        assertEquals(
+            WebChatProductionQuickActionSyncOutcome.KEEP_WAITING,
+            WebChatProductionQuickActionSyncPolicy.resolve(
+                WebChatConsumerCommandStatus.SUCCEEDED,
+                attemptsExhausted = false,
+            ),
+        )
+        assertEquals(
+            WebChatProductionQuickActionSyncOutcome.NOT_OBSERVED,
+            WebChatProductionQuickActionSyncPolicy.resolve(
+                WebChatConsumerCommandStatus.SUCCEEDED,
+                attemptsExhausted = true,
+            ),
+        )
+    }
+
+    @Test
+    fun failedOrTimedOutToolSyncAsksForRetryInsteadOfBlamingTheOfficialProduct() {
+        listOf(
+            WebChatConsumerCommandStatus.FAILED,
+            WebChatConsumerCommandStatus.TIMED_OUT,
+            WebChatConsumerCommandStatus.PENDING,
+        ).forEach { status ->
+            assertEquals(
+                WebChatProductionQuickActionSyncOutcome.RETRY_LATER,
+                WebChatProductionQuickActionSyncPolicy.resolve(
+                    status,
+                    attemptsExhausted = true,
+                ),
+            )
+        }
+    }
+
     private fun tool(
         id: String,
         label: String,

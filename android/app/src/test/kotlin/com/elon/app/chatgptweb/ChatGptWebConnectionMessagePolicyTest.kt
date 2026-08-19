@@ -31,4 +31,14 @@ class ChatGptWebConnectionMessagePolicyTest {
             conversationNavigationActive = false,
         ))
     }
+
+    @Test
+    fun restoredWarmSessionDoesNotRenderAColdConnectionMessage() {
+        assertFalse(ChatGptWebConnectionMessagePolicy.shouldShow(
+            state = ChatGptBackgroundSession.State.LOADING,
+            hasMessages = false,
+            conversationNavigationActive = false,
+            warmSessionAvailable = true,
+        ))
+    }
 }

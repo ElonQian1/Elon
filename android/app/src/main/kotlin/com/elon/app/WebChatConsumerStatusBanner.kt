@@ -23,8 +23,11 @@ internal object WebChatConsumerRecoveryPolicy {
         state: String,
         detail: String? = null,
         hasConversationContent: Boolean = false,
+        warmSessionAvailable: Boolean = false,
     ): WebChatConsumerRecoveryState = when (state) {
-        "loading" -> if (hasConversationContent) {
+        "loading" -> if (warmSessionAvailable) {
+            hidden()
+        } else if (hasConversationContent) {
             WebChatConsumerRecoveryState(
                 visible = true,
                 message = "正在重新连接${provider.displayName}，当前对话已保留",
@@ -81,6 +84,7 @@ internal fun WebChatSocialController.consumerRecoveryState(
     state = stateWireValue(),
     detail = stateDetail(),
     hasConversationContent = currentMessages().any { it.webChatMessage != null },
+    warmSessionAvailable = warmSessionAvailable(),
 )
 
 internal class WebChatConsumerStatusBanner(

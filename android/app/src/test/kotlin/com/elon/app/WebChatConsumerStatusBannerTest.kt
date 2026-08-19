@@ -52,6 +52,18 @@ class WebChatConsumerStatusBannerTest {
     }
 
     @Test
+    fun warmSessionRecoveryDoesNotCoverTheComposerWithAReconnectBanner() {
+        val state = WebChatConsumerRecoveryPolicy.resolve(
+            provider = chatGpt,
+            state = "loading",
+            hasConversationContent = true,
+            warmSessionAvailable = true,
+        )
+
+        assertFalse(state.visible)
+    }
+
+    @Test
     fun commonNetworkFailuresUseConsumerFriendlyRecoveryText() {
         val offline = WebChatConsumerRecoveryPolicy.resolve(
             provider = google,
