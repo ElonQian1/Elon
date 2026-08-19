@@ -4,8 +4,8 @@ internal object ChatGptWebConnectionMessagePolicy {
     fun shouldShow(
         state: ChatGptBackgroundSession.State,
         hasMessages: Boolean,
-        conversationNavigationPending: Boolean,
+        conversationNavigationActive: Boolean,
     ): Boolean = state == ChatGptBackgroundSession.State.LOADING &&
         !hasMessages &&
-        !conversationNavigationPending
+        !conversationNavigationActive
 }

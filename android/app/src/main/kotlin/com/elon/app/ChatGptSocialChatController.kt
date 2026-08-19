@@ -396,7 +396,7 @@ internal class ChatGptSocialChatController(
         if (ChatGptWebConnectionMessagePolicy.shouldShow(
                 state = state,
                 hasMessages = transcript.hasMessages(),
-                conversationNavigationPending = session.conversationNavigationPending(),
+                conversationNavigationActive = session.conversationNavigationActive(),
             )) {
             renderStatusMessage("正在连接 ChatGPT 网页 AI…")
         }

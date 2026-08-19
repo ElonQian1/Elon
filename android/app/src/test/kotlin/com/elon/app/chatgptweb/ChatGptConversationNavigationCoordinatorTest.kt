@@ -22,6 +22,9 @@ class ChatGptConversationNavigationCoordinatorTest {
         assertFalse(coordinator.shouldAccept(previous))
         assertTrue(coordinator.shouldAccept(snapshot("fresh target", "/c/target")))
         assertFalse(coordinator.hasPending())
+        assertTrue(coordinator.isNavigating())
+        coordinator.complete()
+        assertFalse(coordinator.isNavigating())
     }
 
     @Test
@@ -41,6 +44,9 @@ class ChatGptConversationNavigationCoordinatorTest {
         assertFalse(coordinator.shouldAccept(previous))
         assertTrue(coordinator.shouldAccept(snapshot("", "/")))
         assertFalse(coordinator.hasPending())
+        assertTrue(coordinator.isNavigating())
+        coordinator.complete()
+        assertFalse(coordinator.isNavigating())
     }
 
     @Test
@@ -50,6 +56,7 @@ class ChatGptConversationNavigationCoordinatorTest {
 
         assertEquals(previous, coordinator.restoreAfterFailure("open_conversation"))
         assertFalse(coordinator.hasPending())
+        assertFalse(coordinator.isNavigating())
         assertNull(coordinator.restoreAfterFailure("open_conversation"))
     }
 

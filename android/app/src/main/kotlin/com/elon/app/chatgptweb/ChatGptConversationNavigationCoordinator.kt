@@ -11,6 +11,7 @@ internal class ChatGptConversationNavigationCoordinator(
     private var previousSnapshot: ChatGptWebSnapshot? = null
     private var pendingConversationPath: String? = null
     private var awaitingNewConversationBoundary = false
+    private var navigationActive = false
 
     fun beginNew(previous: ChatGptWebSnapshot?): ChatGptWebSnapshot {
         begin(previous, targetPath = null, newConversation = true)
@@ -29,18 +30,18 @@ internal class ChatGptConversationNavigationCoordinator(
     fun shouldAccept(incoming: ChatGptWebSnapshot): Boolean {
         pendingConversationPath?.let { targetPath ->
             if (ChatGptWebConversationPath.fromUrl(incoming.url) == targetPath) {
-                clear()
+                clearBoundary()
                 return true
             }
             val transition = boundaryTransition(incoming)
             if (transition == WebChatNewConversationTransition.IGNORE_STALE) return false
-            clear()
+            clearBoundary()
             return true
         }
         return when (boundaryTransition(incoming)) {
             WebChatNewConversationTransition.IGNORE_STALE -> false
             WebChatNewConversationTransition.START_NEW -> {
-                clear()
+                clearBoundary()
                 true
             }
             WebChatNewConversationTransition.CONTINUE_CURRENT -> true
@@ -61,10 +62,15 @@ internal class ChatGptConversationNavigationCoordinator(
 
     fun hasPending(): Boolean = pendingConversationPath != null || awaitingNewConversationBoundary
 
+    fun isNavigating(): Boolean = navigationActive
+
+    fun complete() = clear()
+
     fun clear() {
         previousSnapshot = null
         pendingConversationPath = null
         awaitingNewConversationBoundary = false
+        navigationActive = false
     }
 
     private fun begin(
@@ -75,6 +81,12 @@ internal class ChatGptConversationNavigationCoordinator(
         previousSnapshot = previous
         pendingConversationPath = targetPath
         awaitingNewConversationBoundary = newConversation
+        navigationActive = true
+    }
+
+    private fun clearBoundary() {
+        pendingConversationPath = null
+        awaitingNewConversationBoundary = false
     }
 
     private fun boundaryTransition(incoming: ChatGptWebSnapshot) =

@@ -10,7 +10,7 @@ class ChatGptWebConnectionMessagePolicyTest {
         assertTrue(ChatGptWebConnectionMessagePolicy.shouldShow(
             state = ChatGptBackgroundSession.State.LOADING,
             hasMessages = false,
-            conversationNavigationPending = false,
+            conversationNavigationActive = false,
         ))
     }
 
@@ -19,7 +19,7 @@ class ChatGptWebConnectionMessagePolicyTest {
         assertFalse(ChatGptWebConnectionMessagePolicy.shouldShow(
             state = ChatGptBackgroundSession.State.LOADING,
             hasMessages = false,
-            conversationNavigationPending = true,
+            conversationNavigationActive = true,
         ))
     }
 
@@ -28,7 +28,7 @@ class ChatGptWebConnectionMessagePolicyTest {
         assertFalse(ChatGptWebConnectionMessagePolicy.shouldShow(
             state = ChatGptBackgroundSession.State.LOADING,
             hasMessages = true,
-            conversationNavigationPending = false,
+            conversationNavigationActive = false,
         ))
     }
 }

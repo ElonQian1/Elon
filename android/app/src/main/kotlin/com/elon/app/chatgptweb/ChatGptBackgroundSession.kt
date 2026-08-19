@@ -138,7 +138,7 @@ internal class ChatGptBackgroundSession(
     fun retryConnection(): Boolean = recovery.retryNow()
     fun onHostPaused() = pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
-    fun conversationNavigationPending(): Boolean = conversationNavigation.hasPending()
+    fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
         conversations = conversations,
         projects = ChatGptWebConversationIndex.projects(conversations, projects),
@@ -448,12 +448,14 @@ internal class ChatGptBackgroundSession(
                 }
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
+                        conversationNavigation.complete()
                         snapshotStore.clear()
                         pageAdapter?.markLoginRequired()
                         recovery.onTerminal()
                         updateState(State.LOGIN_REQUIRED)
                     }
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
+                        conversationNavigation.complete()
                         if (!snapshot.streaming) {
                             snapshotStore.save(snapshot)
                             ChatGptWebConversationPath.fromUrl(snapshot.url)?.let { path ->
