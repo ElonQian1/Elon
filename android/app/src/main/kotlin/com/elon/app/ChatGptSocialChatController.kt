@@ -502,12 +502,10 @@ internal class ChatGptSocialChatController(
             )
         }
         val items = availableItems.ifEmpty {
-            listOf(WebChatActionSheetItem(
-                id = "official-auto-model",
-                title = "ChatGPT 自动",
-                subtitle = "官网当前未提供手动切换",
-                enabled = false,
-                contentDescription = "web-chat-model-auto:chatgpt_web",
+            listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "models",
+                title = "ChatGPT 模型",
             ))
         }
         modelSheet?.let {

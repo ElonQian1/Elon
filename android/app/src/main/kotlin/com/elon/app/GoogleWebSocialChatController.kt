@@ -96,7 +96,11 @@ internal class GoogleWebSocialChatController(
     override fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
         if (pendingAttachments.isNotEmpty()) {
-            Toast.makeText(activity, "Google 网页 AI 暂不支持从一龙界面上传附件", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                activity,
+                "当前一龙 Google 网页 AI 适配尚未接入附件上传，可在官方页使用",
+                Toast.LENGTH_LONG,
+            ).show()
             return true
         }
         val prompt = rawText.trim()

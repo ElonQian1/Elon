@@ -80,11 +80,13 @@ internal object WebChatProductionInteractionPlaceholder {
         providerId: WebChatProviderId,
         surface: String,
         title: String,
+        state: WebChatProductionObservationState = WebChatProductionObservationState.SYNCING,
     ) = WebChatActionSheetItem(
-        id = "sync:$surface",
+        id = "status:$surface:${WebChatProductionCapabilityEvidencePolicy.selectorState(state)}",
         title = title,
-        subtitle = "后台同步中",
+        subtitle = WebChatProductionCapabilityEvidencePolicy.subtitle(state),
         enabled = false,
-        contentDescription = "web-chat-$surface-syncing:${providerId.wireValue}",
+        contentDescription = "web-chat-$surface-" +
+            "${WebChatProductionCapabilityEvidencePolicy.selectorState(state)}:${providerId.wireValue}",
     )
 }

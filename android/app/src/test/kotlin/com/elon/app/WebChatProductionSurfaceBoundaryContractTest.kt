@@ -81,7 +81,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
         assertTrue(composer.contains("webToolsButton"))
-        assertTrue(composer.contains("web-chat-composer-tools:unavailable"))
+        assertTrue(composer.contains("web-chat-composer-tools:not-bound"))
         assertTrue(attachmentMenu.contains("attachment-action-camera"))
         assertTrue(attachmentMenu.contains("attachment-action-photos"))
         assertTrue(attachmentMenu.contains("attachment-action-files"))

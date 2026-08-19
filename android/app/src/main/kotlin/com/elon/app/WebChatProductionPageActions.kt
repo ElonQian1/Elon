@@ -94,11 +94,30 @@ internal class WebChatProductionPageActionsCoordinator(
             openOfficialFallback()
             return
         }
-        val port = consumerPort() ?: return showUnavailable()
+        val port = consumerPort() ?: return showObservationDialog(
+            provider,
+            WebChatProductionObservationState.SESSION_RECOVERING,
+        )
         val epoch = requestEpoch
-        showActionDialog(provider, port, readActions(provider.id, port))
+        val state = port.state()
+        val actions = readActions(provider.id, state)
+        showActionDialog(
+            provider,
+            port,
+            actions,
+            observation(provider, state, actions, request = null, pollingExhausted = false),
+        )
         val requested = port.requestControls()
-        if (requested.accepted) pollActions(provider, port, epoch, attempt = 0)
+        if (requested.accepted) {
+            pollActions(provider, port, requested, epoch, attempt = 0)
+        } else {
+            showActionDialog(
+                provider,
+                port,
+                actions,
+                observation(provider, port.state(), actions, requested, pollingExhausted = false),
+            )
+        }
     }
 
     fun cancelPending() {
@@ -114,39 +133,65 @@ internal class WebChatProductionPageActionsCoordinator(
     private fun pollActions(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
+        request: WebChatConsumerCommandResult,
         epoch: Int,
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val observed = port.state().controls.take(MAX_CONTROL_COUNT)
-        val actions = WebChatProductionPageActionParser.parse(observed)
-        if (actions.isNotEmpty()) {
-            interactionCache.controls(provider.id, observed)
-            showActionDialog(provider, port, actions)
+        val state = port.state()
+        val observed = WebChatProductionPageActionParser.parse(
+            state.controls.take(MAX_CONTROL_COUNT),
+        )
+        val actions = readActions(provider.id, state)
+        val exhausted = attempt >= MAX_POLL_ATTEMPTS
+        val observation = observation(provider, state, actions, request, exhausted)
+        showActionDialog(provider, port, actions, observation)
+        if (observed.isNotEmpty() || exhausted || observation in TERMINAL_OBSERVATION_STATES) {
             return
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) return
         host.postDelayed(
-            { pollActions(provider, port, epoch, attempt + 1) },
+            { pollActions(provider, port, request, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
 
     private fun readActions(
         providerId: WebChatProviderId,
-        port: WebChatConsumerPort,
+        state: WebChatConsumerState,
     ): List<WebChatProductionPageAction> =
         WebChatProductionPageActionParser.parse(
             interactionCache.controls(
                 providerId,
-                port.state().controls.take(MAX_CONTROL_COUNT),
+                state.controls.take(MAX_CONTROL_COUNT),
             ),
         )
+
+    private fun observation(
+        provider: WebChatProviderIdentity,
+        state: WebChatConsumerState,
+        resolved: List<WebChatProductionPageAction>,
+        request: WebChatConsumerCommandResult?,
+        pollingExhausted: Boolean,
+    ): WebChatProductionObservationState = WebChatProductionCapabilityEvidencePolicy.resolve(
+        WebChatProductionCapabilityEvidence(
+            declaredSupported = provider.supports(WebChatProviderCapability.PAGE_ACTIONS),
+            adapterCurrent = state.adapterCurrent,
+            observedCount = WebChatProductionPageActionParser.parse(
+                state.controls.take(MAX_CONTROL_COUNT),
+            ).size,
+            cachedCount = if (state.controls.isEmpty()) resolved.size else 0,
+            requestAccepted = request?.accepted,
+            requestError = request?.error,
+            requestStatus = WebChatProductionCapabilityEvidencePolicy.requestStatus(request, state),
+            pollingExhausted = pollingExhausted,
+        ),
+    )
 
     private fun showActionDialog(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
         actions: List<WebChatProductionPageAction>,
+        observation: WebChatProductionObservationState,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
         actionById = actions.associateBy(WebChatProductionPageAction::controlId)
@@ -164,6 +209,7 @@ internal class WebChatProductionPageActionsCoordinator(
                 provider.id,
                 surface = "page-actions",
                 title = "当前网页操作",
+                state = observation,
             ))
         }
         activeSheet?.let {
@@ -248,8 +294,16 @@ internal class WebChatProductionPageActionsCoordinator(
         val epoch = requestEpoch
         host.postDelayed({
             if (epoch != requestEpoch || activeProvider() != provider.id) return@postDelayed
-            val actions = readActions(provider.id, port)
-            if (actions.isNotEmpty()) showActionDialog(provider, port, actions)
+            val state = port.state()
+            val actions = readActions(provider.id, state)
+            if (actions.isNotEmpty()) {
+                showActionDialog(
+                    provider,
+                    port,
+                    actions,
+                    WebChatProductionObservationState.AVAILABLE,
+                )
+            }
         }, ADAPTIVE_MUTATION_SETTLE_MS)
     }
 
@@ -282,18 +336,23 @@ internal class WebChatProductionPageActionsCoordinator(
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val nested = readActions(provider.id, port).filterNot { it.controlId in previousControlIds }
+        val nested = readActions(provider.id, port.state())
+            .filterNot { it.controlId in previousControlIds }
         if (nested.isNotEmpty()) {
-            showActionDialog(provider, port, nested)
+            showActionDialog(
+                provider,
+                port,
+                nested,
+                WebChatProductionObservationState.AVAILABLE,
+            )
             return
         }
         if (attempt >= MAX_POLL_ATTEMPTS) {
-            activeSheet?.updateItems(listOf(WebChatActionSheetItem(
-                id = "nested-actions-unavailable",
-                title = "${provider.displayName}暂未返回更多操作",
-                subtitle = "可在官网完整功能中继续",
-                enabled = false,
-                contentDescription = "web-chat-page-actions-nested-unavailable:${provider.id.wireValue}",
+            activeSheet?.updateItems(listOf(WebChatProductionInteractionPlaceholder.item(
+                provider.id,
+                surface = "nested-actions",
+                title = "更多操作",
+                state = WebChatProductionObservationState.TEMPORARILY_UNOBSERVED,
             )))
             return
         }
@@ -330,11 +389,15 @@ internal class WebChatProductionPageActionsCoordinator(
         }
     }
 
-    private fun showUnavailable() {
+    private fun showObservationDialog(
+        provider: WebChatProviderIdentity,
+        state: WebChatProductionObservationState,
+    ) {
         if (activity.isFinishing || activity.isDestroyed) return
         val dialog = AlertDialog.Builder(activity)
             .setTitle("当前网页操作")
-            .setMessage("当前网页没有返回可用操作，可在官方页面继续。")
+            .setMessage(WebChatProductionCapabilityEvidencePolicy.subtitle(state))
+            .setNeutralButton("重试") { _, _ -> show(provider) }
             .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
             .setNegativeButton("取消", null)
             .create()
@@ -369,6 +432,10 @@ internal class WebChatProductionPageActionsCoordinator(
             "sources",
             "rename",
             "save_to_project",
+        )
+        val TERMINAL_OBSERVATION_STATES = setOf(
+            WebChatProductionObservationState.REQUEST_FAILED,
+            WebChatProductionObservationState.ADAPTER_UNSUPPORTED,
         )
     }
 }

@@ -82,6 +82,7 @@ internal class ChatGptWebConsumerPortAdapter(
                     status = request.status.toConsumerStatus(),
                 )
             },
+            adapterCurrent = observed.adapterCurrent,
         )
     }
 

@@ -40,6 +40,7 @@ internal data class WebChatConsumerState(
     val features: List<WebChatConsumerFeature>,
     val controls: List<WebChatConsumerControlDescriptor> = emptyList(),
     val commandRequests: List<WebChatConsumerCommandRequest>,
+    val adapterCurrent: Boolean = true,
 )
 
 internal data class WebChatConsumerCommandResult(

@@ -75,7 +75,7 @@ internal class WebChatProductionComposerToolsCoordinator(
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
         val actions = quickActions(provider)
-        if (actions.isEmpty()) return showUnavailable()
+        if (actions.isEmpty()) return showAdapterUnavailable()
         val selected = selectedQuickAction(provider)
         val actionById = actions.associateBy { "quick:${it.semantic}" }
         activeSheet = WebChatActionSheet.showUpdatable(
@@ -297,11 +297,11 @@ internal class WebChatProductionComposerToolsCoordinator(
         return result.accepted
     }
 
-    private fun showUnavailable() {
+    private fun showAdapterUnavailable() {
         if (activity.isFinishing || activity.isDestroyed) return
         androidx.appcompat.app.AlertDialog.Builder(activity)
             .setTitle("网页工具")
-            .setMessage("当前网页没有返回可用工具，可在官方页面继续。")
+            .setMessage("当前一龙原生适配尚未接入该提供方的网页工具控制。")
             .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
             .setNegativeButton("取消", null)
             .show()

@@ -64,11 +64,30 @@ internal class WebChatProductionFeatureNavigationCoordinator(
             openOfficialFallback()
             return
         }
-        val port = consumerPort() ?: return showUnavailable()
+        val port = consumerPort() ?: return showObservationDialog(
+            provider,
+            WebChatProductionObservationState.SESSION_RECOVERING,
+        )
         val epoch = requestEpoch
-        showFeatureDialog(provider, port, readFeatures(provider.id, port))
+        val state = port.state()
+        val features = readFeatures(provider.id, state)
+        showFeatureDialog(
+            provider,
+            port,
+            features,
+            observation(provider, state, features, request = null, pollingExhausted = false),
+        )
         val requested = port.requestFeatures()
-        if (requested.accepted) pollFeatures(provider, port, epoch, attempt = 0)
+        if (requested.accepted) {
+            pollFeatures(provider, port, requested, epoch, attempt = 0)
+        } else {
+            showFeatureDialog(
+                provider,
+                port,
+                features,
+                observation(provider, port.state(), features, requested, pollingExhausted = false),
+            )
+        }
     }
 
     fun cancelPending() {
@@ -83,35 +102,57 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     private fun pollFeatures(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
+        request: WebChatConsumerCommandResult,
         epoch: Int,
         attempt: Int,
     ) {
         if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val observed = port.state().features
-        val features = WebChatProductionFeatureParser.parse(observed)
-        if (features.isNotEmpty()) {
-            interactionCache.features(provider.id, observed)
-            showFeatureDialog(provider, port, features)
+        val state = port.state()
+        val observed = WebChatProductionFeatureParser.parse(state.features)
+        val features = readFeatures(provider.id, state)
+        val exhausted = attempt >= MAX_POLL_ATTEMPTS
+        val observation = observation(provider, state, features, request, exhausted)
+        showFeatureDialog(provider, port, features, observation)
+        if (observed.isNotEmpty() || exhausted || observation in TERMINAL_OBSERVATION_STATES) {
             return
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) return
         host.postDelayed(
-            { pollFeatures(provider, port, epoch, attempt + 1) },
+            { pollFeatures(provider, port, request, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
 
     private fun readFeatures(
         providerId: WebChatProviderId,
-        port: WebChatConsumerPort,
+        state: WebChatConsumerState,
     ): List<WebChatProductionFeature> = WebChatProductionFeatureParser.parse(
-        interactionCache.features(providerId, port.state().features),
+        interactionCache.features(providerId, state.features),
+    )
+
+    private fun observation(
+        provider: WebChatProviderIdentity,
+        state: WebChatConsumerState,
+        resolved: List<WebChatProductionFeature>,
+        request: WebChatConsumerCommandResult?,
+        pollingExhausted: Boolean,
+    ): WebChatProductionObservationState = WebChatProductionCapabilityEvidencePolicy.resolve(
+        WebChatProductionCapabilityEvidence(
+            declaredSupported = provider.supports(WebChatProviderCapability.FEATURE_NAVIGATION),
+            adapterCurrent = state.adapterCurrent,
+            observedCount = WebChatProductionFeatureParser.parse(state.features).size,
+            cachedCount = if (state.features.isEmpty()) resolved.size else 0,
+            requestAccepted = request?.accepted,
+            requestError = request?.error,
+            requestStatus = WebChatProductionCapabilityEvidencePolicy.requestStatus(request, state),
+            pollingExhausted = pollingExhausted,
+        ),
     )
 
     private fun showFeatureDialog(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
         features: List<WebChatProductionFeature>,
+        observation: WebChatProductionObservationState,
     ) {
         if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
         featureById = features.associateBy(WebChatProductionFeature::id)
@@ -134,6 +175,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
                 provider.id,
                 surface = "features",
                 title = "官网功能",
+                state = observation,
             ))
         }
         activeSheet?.let {
@@ -210,7 +252,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         }
         val requestId = result.requestId
         if (requestId == null) {
-            Toast.makeText(activity, "官网没有返回可确认的打开状态，请重试", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "打开请求暂未返回确认回执，请重试", Toast.LENGTH_SHORT).show()
             return
         }
         val epoch = requestEpoch
@@ -256,11 +298,15 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         showTracked(dialog)
     }
 
-    private fun showUnavailable() {
+    private fun showObservationDialog(
+        provider: WebChatProviderIdentity,
+        state: WebChatProductionObservationState,
+    ) {
         if (activity.isFinishing || activity.isDestroyed) return
         val dialog = AlertDialog.Builder(activity)
             .setTitle("官网功能")
-            .setMessage("当前网页没有返回可用功能，可在官方页面继续。")
+            .setMessage(WebChatProductionCapabilityEvidencePolicy.subtitle(state))
+            .setNeutralButton("重试") { _, _ -> show(provider) }
             .setPositiveButton("打开官方页") { _, _ -> openOfficialFallback() }
             .setNegativeButton("取消", null)
             .create()
@@ -280,5 +326,9 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         const val MAX_POLL_ATTEMPTS = 8
         const val MAX_FEATURE_SETTLE_ATTEMPTS = 32
         const val POLL_INTERVAL_MS = 250L
+        val TERMINAL_OBSERVATION_STATES = setOf(
+            WebChatProductionObservationState.REQUEST_FAILED,
+            WebChatProductionObservationState.ADAPTER_UNSUPPORTED,
+        )
     }
 }

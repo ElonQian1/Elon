@@ -57,6 +57,7 @@ class ChatGptWebConsumerPortAdapterTest {
         val state = port.state()
 
         assertTrue(state.streaming)
+        assertTrue(state.adapterCurrent)
         assertFalse(state.dictationActive)
         assertEquals("health", state.pageKind)
         assertEquals("https://chatgpt.com/health", state.pageUrl)
@@ -86,6 +87,7 @@ class ChatGptWebConsumerPortAdapterTest {
         val state = port.state()
 
         assertFalse(state.streaming)
+        assertFalse(state.adapterCurrent)
         assertFalse(state.dictationActive)
         assertTrue(state.composerSections.isEmpty())
         assertTrue(state.features.isEmpty())

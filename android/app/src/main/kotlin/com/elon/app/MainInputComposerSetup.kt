@@ -373,7 +373,7 @@ internal class MainInputComposerSetup(
             visibility = View.GONE
             isClickable = true
             isFocusable = true
-            contentDescription = "web-chat-composer-tools:unavailable"
+            contentDescription = "web-chat-composer-tools:not-bound"
         }
 
         val emojiButton = ImageButton(activity).apply {
