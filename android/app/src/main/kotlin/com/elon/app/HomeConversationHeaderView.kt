@@ -30,12 +30,13 @@ internal class HomeConversationHeaderView(
     fun create(
         selected: HomeListFilterMode,
         counts: HomeConversationCounts,
-        onSelect: (HomeListFilterMode) -> Unit
+        onSelect: (HomeListFilterMode) -> Unit,
+        onOpenSummary: () -> Unit,
     ): View = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
         addView(createFilters(selected, counts, onSelect))
-        addView(createSummaryCard(counts))
+        addView(createSummaryCard(counts, onOpenSummary))
         addView(createRecentHeader())
     }
 
@@ -97,7 +98,7 @@ internal class HomeConversationHeaderView(
             })
         }
 
-    private fun createSummaryCard(counts: HomeConversationCounts): View = LinearLayout(activity).apply {
+    private fun createSummaryCard(counts: HomeConversationCounts, onOpenSummary: () -> Unit): View = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(126)).apply {
             marginStart = dp(16); marginEnd = dp(16); topMargin = dp(7)
         }
@@ -161,6 +162,11 @@ internal class HomeConversationHeaderView(
             textSize = 12f
             typeface = regular
             setTextColor(Color.parseColor("#F0F8F7F4"))
+            isClickable = true
+            isFocusable = true
+            foreground = selectableForeground()
+            contentDescription = "查看 AI 工作摘要详情"
+            setOnClickListener { onOpenSummary() }
         })
     }
 

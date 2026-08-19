@@ -83,6 +83,8 @@ const BOTTOM_NAV_COMPOSE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_top_add_plus_custom.png");
 const HOME_AI_AVATAR_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_ai_avatar.png");
+const WORK_SUMMARY_CALENDAR_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_work_summary_calendar.png");
 const HOME_ACTION_GROUP_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_action_group.png");
 const HOME_ACTION_ADD_FRIEND_PNG: &[u8] =
@@ -233,6 +235,7 @@ fn build_html(template: &str) -> String {
     let bottom_nav_menu_active_png_b64 = encode_png(BOTTOM_NAV_MENU_ACTIVE_PNG);
     let bottom_nav_compose_icon_png_b64 = encode_png(BOTTOM_NAV_COMPOSE_ICON_PNG);
     let home_ai_avatar_png_b64 = encode_png(HOME_AI_AVATAR_PNG);
+    let work_summary_calendar_png_b64 = encode_png(WORK_SUMMARY_CALENDAR_PNG);
     let home_action_group_png_b64 = encode_png(HOME_ACTION_GROUP_PNG);
     let home_action_add_friend_png_b64 = encode_png(HOME_ACTION_ADD_FRIEND_PNG);
     let home_action_new_project_png_b64 = encode_png(HOME_ACTION_NEW_PROJECT_PNG);
@@ -348,6 +351,10 @@ fn build_html(template: &str) -> String {
             &bottom_nav_compose_icon_png_b64,
         )
         .replace("__HOME_AI_AVATAR_PNG_B64__", &home_ai_avatar_png_b64)
+        .replace(
+            "__WORK_SUMMARY_CALENDAR_PNG_B64__",
+            &work_summary_calendar_png_b64,
+        )
         .replace("__HOME_ACTION_GROUP_PNG_B64__", &home_action_group_png_b64)
         .replace(
             "__HOME_ACTION_ADD_FRIEND_PNG_B64__",

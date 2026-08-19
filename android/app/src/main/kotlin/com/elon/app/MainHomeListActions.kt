@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.text.Editable
@@ -129,7 +130,10 @@ internal class MainHomeListActions(
             conversationHeader.create(
                 selected = homeListFilterMode,
                 counts = homeConversationCounts(allChatItems),
-                onSelect = ::applyHomeListFilterMode
+                onSelect = ::applyHomeListFilterMode,
+                onOpenSummary = {
+                    activity.startActivity(Intent(activity, AiWorkSummaryActivity::class.java))
+                },
             )
         )
         val chatItems = filterHomeChatItemsForMode(allChatItems)
