@@ -414,12 +414,16 @@
     return { known: false, selected: false };
   }
 
-  function webSearchComposerSelection() {
+  function composerSemanticSelection(semantic) {
     const layout = window.__elonChatGptLayout;
     const node = layout && typeof layout.findSemanticNode === 'function'
-      ? layout.findSemanticNode('web_search', 'composer')
+      ? layout.findSemanticNode(semantic, 'composer')
       : null;
     return directSelection(node);
+  }
+
+  function webSearchComposerSelection() {
+    return composerSemanticSelection('web_search');
   }
 
   function collectOptions(section, baseline) {
@@ -433,9 +437,7 @@
       const direct = directSelection(node);
       const directSelected = direct.selected;
       const semantic = optionSemantic(section, node, label);
-      const composerSelection = semantic === 'web_search'
-        ? webSearchComposerSelection()
-        : { known: false, selected: false };
+      const composerSelection = composerSemanticSelection(semantic);
       const liveActiveInComposer = composerSelection.known && composerSelection.selected;
       const activeInComposer = composerToolSelection
         ? composerToolSelection.value(semantic, liveActiveInComposer)
@@ -545,10 +547,12 @@
   function requestOptions(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
     if (section === 'tools' && composerToolSelection) {
-      const composerSelection = webSearchComposerSelection();
-      if (composerSelection.known) {
-        composerToolSelection.observe('web_search', composerSelection.selected);
-      }
+      ['web_search', 'image_generation'].forEach((semantic) => {
+        const composerSelection = composerSemanticSelection(semantic);
+        if (composerSelection.known) {
+          composerToolSelection.observe(semantic, composerSelection.selected);
+        }
+      });
     }
     const trigger = triggerFor(section, composer);
     if (!trigger) {

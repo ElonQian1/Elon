@@ -42,6 +42,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val consumerStatusBanner = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatConsumerStatusBanner.kt",
         )
+        val composerTools = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
+        )
         val chatGptBackground = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
@@ -82,8 +85,13 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(attachmentMenu.contains("attachment-action-camera"))
         assertTrue(attachmentMenu.contains("attachment-action-photos"))
         assertTrue(attachmentMenu.contains("attachment-action-files"))
-        assertTrue(attachmentMenu.contains("web-chat-quick-action:"))
-        assertTrue(feature.contains("selectWebChatQuickComposerAction"))
+        assertFalse(attachmentMenu.contains("web-chat-quick-action:"))
+        assertTrue(composerTools.contains("title = \"工具\""))
+        assertTrue(composerTools.contains("quick:${'$'}{it.semantic}"))
+        assertTrue(feature.contains("productionComposerTools.show(provider)"))
+        assertTrue(feature.contains("views.activeWebToolChip.render"))
+        assertTrue(feature.contains("WebChatProductionComposerContext.inputHint"))
+        assertTrue(feature.contains("productionComposerTools.quickActions(provider).isEmpty()"))
         assertTrue(sendVisual.contains("WebChatProductionSelectors.composerAction"))
     }
 
@@ -171,6 +179,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionRichContent.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionActiveToolChip.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerContext.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerCommands.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerVisualMode.kt",

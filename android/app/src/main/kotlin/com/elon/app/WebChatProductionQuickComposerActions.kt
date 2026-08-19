@@ -21,13 +21,12 @@ internal object WebChatProductionQuickComposerActionResolver {
     fun find(
         action: WebChatProductionQuickComposerAction,
         tools: List<WebChatProductionComposerTool>,
-        sourceOptions: List<WebChatConsumerOption>,
-    ): WebChatProductionComposerTool? {
-        val semanticById = sourceOptions.associate { it.id to it.semantic }
-        return tools.firstOrNull { tool ->
-            matches(action, listOf(tool.id, tool.label, semanticById[tool.id].orEmpty()))
+    ): WebChatProductionComposerTool? = tools.firstOrNull { actionFor(it) == action }
+
+    fun actionFor(tool: WebChatProductionComposerTool): WebChatProductionQuickComposerAction? =
+        WebChatProductionQuickComposerAction.entries.firstOrNull { action ->
+            matches(action, listOf(tool.id, tool.label, tool.semantic))
         }
-    }
 
     private fun matches(
         action: WebChatProductionQuickComposerAction,

@@ -103,11 +103,12 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("emitVisibleNodeTouch(purpose, target.node, emitEvent)"))
         assertTrue(adapter.contains("function optionSemantic(section, node, label)"))
         assertTrue(adapter.contains("const semantic = optionSemantic(section, node, label)"))
-        assertTrue(adapter.contains("layout.findSemanticNode('web_search', 'composer')"))
+        assertTrue(adapter.contains("layout.findSemanticNode(semantic, 'composer')"))
         assertTrue(adapter.contains("composerToolStatePolicy.optionSelected"))
         assertTrue(layoutAdapter.contains("composerToolStatePolicy.semantic"))
         assertTrue(layoutAdapter.contains("composerToolStatePolicy.controlSelected"))
         assertTrue(toolStatePolicy.contains("function isWebSearchSignal"))
+        assertTrue(toolStatePolicy.contains("function isImageGenerationSignal"))
         assertTrue(toolStatePolicy.contains("function optionSelected"))
         assertTrue(toolStatePolicy.contains("function directSelection"))
         assertTrue(toolStatePolicy.contains("function createSelectionTracker"))
@@ -249,6 +250,9 @@ class ChatGptWebComposerContractTest {
         val coordinator = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
         )
+        val quickActions = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionQuickComposerActions.kt",
+        )
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
@@ -260,7 +264,8 @@ class ChatGptWebComposerContractTest {
         )
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
 
-        assertTrue(coordinator.contains("WebChatProviderCapability.COMPOSER_TOOLS"))
+        assertTrue(quickActions.contains("WebChatProviderCapability.COMPOSER_TOOLS"))
+        assertTrue(coordinator.contains("action !in quickActions(provider)"))
         assertTrue(coordinator.contains("openOfficialFallback"))
         assertTrue(background.contains("ChatGptComposerOptionRequestCoordinator("))
         assertTrue(background.contains("composerOptionRequests.request(\"model\")"))

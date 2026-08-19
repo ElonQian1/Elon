@@ -31,7 +31,6 @@ class WebChatProductionQuickComposerActionsTest {
             WebChatProductionQuickComposerActionResolver.find(
                 WebChatProductionQuickComposerAction.IMAGE_GENERATION,
                 tools,
-                options,
             )?.id,
         )
         assertEquals(
@@ -39,7 +38,6 @@ class WebChatProductionQuickComposerActionsTest {
             WebChatProductionQuickComposerActionResolver.find(
                 WebChatProductionQuickComposerAction.WEB_SEARCH,
                 tools,
-                options,
             )?.id,
         )
     }
@@ -58,7 +56,6 @@ class WebChatProductionQuickComposerActionsTest {
             WebChatProductionQuickComposerActionResolver.find(
                 WebChatProductionQuickComposerAction.IMAGE_GENERATION,
                 tools,
-                options,
             )?.id,
         )
         assertEquals(
@@ -66,14 +63,12 @@ class WebChatProductionQuickComposerActionsTest {
             WebChatProductionQuickComposerActionResolver.find(
                 WebChatProductionQuickComposerAction.WEB_SEARCH,
                 tools,
-                options,
             )?.id,
         )
         assertNull(
             WebChatProductionQuickComposerActionResolver.find(
                 WebChatProductionQuickComposerAction.IMAGE_GENERATION,
                 WebChatProductionComposerToolParser.parse(options.take(1)),
-                options.take(1),
             ),
         )
     }

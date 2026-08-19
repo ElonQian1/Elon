@@ -4,6 +4,7 @@ internal object ChatGptWebUiSemantics {
     const val GENERIC_ACTION = "action"
     const val DICTATION = "dictation"
     const val WEB_SEARCH = "web_search"
+    const val IMAGE_GENERATION = "image_generation"
 
     val KNOWN = setOf(
         "navigation",
@@ -14,6 +15,7 @@ internal object ChatGptWebUiSemantics {
         "attachment",
         "model",
         WEB_SEARCH,
+        IMAGE_GENERATION,
         DICTATION,
         "voice_mode",
         "send",

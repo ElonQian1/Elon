@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 internal data class WebChatProductionComposerTool(
     val id: String,
     val label: String,
+    val semantic: String,
     val selected: Boolean,
     val nativeSelector: String,
 )
@@ -20,6 +21,7 @@ internal object WebChatProductionComposerToolParser {
             WebChatProductionComposerTool(
                 id = id,
                 label = label,
+                semantic = option.semantic.trim(),
                 selected = option.selected,
                 nativeSelector = option.nativeSelector
                     .trim()
@@ -37,33 +39,80 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
     private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
+    private val onQuickActionChanged: (WebChatProductionQuickComposerAction?) -> Unit,
     private val interactionCache: WebChatProductionInteractionCache,
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
-    private var commandById = emptyMap<String, WebChatProductionComposerCommand>()
-    private var toolById = emptyMap<String, WebChatProductionComposerTool>()
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
-        if (!provider.supports(WebChatProviderCapability.COMPOSER_TOOLS)) return
-        val port = consumerPort() ?: return showUnavailable()
-        val epoch = requestEpoch
-        showToolDialog(provider, port, readTools(provider.id, port))
-        val requested = port.requestComposerOptions(TOOLS_SECTION)
-        if (requested.accepted) pollTools(provider, port, epoch, attempt = 0)
+        val actions = quickActions(provider)
+        if (actions.isEmpty()) return showUnavailable()
+        val selected = selectedQuickAction(provider)
+        val actionById = actions.associateBy { "quick:${it.semantic}" }
+        activeSheet = WebChatActionSheet.showUpdatable(
+            activity = activity,
+            title = "工具",
+            items = actions.map { action ->
+                WebChatActionSheetItem(
+                    id = "quick:${action.semantic}",
+                    title = action.label,
+                    subtitle = if (action == selected) "已启用" else null,
+                    selected = action == selected,
+                    contentDescription = "web-chat-composer-tool:${provider.id.wireValue}:${action.semantic}",
+                )
+            },
+            footerActions = listOf(
+                WebChatActionSheetFooterAction(
+                    label = "官网完整功能",
+                    contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",
+                    action = openOfficialFallback,
+                ),
+            ),
+            onCancelled = { requestEpoch += 1 },
+            onDismissed = { activeSheet = null },
+        ) { item ->
+            if (activeProvider() != provider.id) return@showUpdatable
+            actionById[item.id]?.let { selectQuickAction(provider, it) }
+        }
     }
 
     fun quickActions(provider: WebChatProviderIdentity): List<WebChatProductionQuickComposerAction> =
         WebChatProductionQuickComposerActionCatalog.availableFor(provider)
 
+    fun selectedQuickAction(provider: WebChatProviderIdentity): WebChatProductionQuickComposerAction? {
+        if (activeProvider() != provider.id) return null
+        return consumerPort()
+            ?.let(::observedToolOptions)
+            ?.let(WebChatProductionComposerToolParser::parse)
+            ?.asSequence()
+            ?.filter(WebChatProductionComposerTool::selected)
+            ?.mapNotNull(WebChatProductionQuickComposerActionResolver::actionFor)
+            ?.firstOrNull()
+    }
+
     fun selectQuickAction(
         provider: WebChatProviderIdentity,
         action: WebChatProductionQuickComposerAction,
+    ): Boolean = changeQuickAction(provider, action, desiredActive = true)
+
+    fun clearQuickAction(
+        provider: WebChatProviderIdentity,
+        action: WebChatProductionQuickComposerAction,
+    ): Boolean = changeQuickAction(provider, action, desiredActive = false)
+
+    private fun changeQuickAction(
+        provider: WebChatProviderIdentity,
+        action: WebChatProductionQuickComposerAction,
+        desiredActive: Boolean,
     ): Boolean {
         cancelPending()
         if (activeProvider() != provider.id || action !in quickActions(provider)) return false
-        val port = consumerPort() ?: return false
+        val port = consumerPort() ?: run {
+            showQuickActionUnavailable(action)
+            return false
+        }
         val requested = port.requestComposerOptions(TOOLS_SECTION)
         if (!requested.accepted) {
             showQuickActionUnavailable(action)
@@ -71,7 +120,7 @@ internal class WebChatProductionComposerToolsCoordinator(
         }
         val epoch = requestEpoch
         host.postDelayed(
-            { pollQuickAction(provider, port, action, epoch, attempt = 0) },
+            { pollQuickAction(provider, port, action, desiredActive, epoch, attempt = 0) },
             QUICK_ACTION_INITIAL_DELAY_MS,
         )
         return true
@@ -88,35 +137,13 @@ internal class WebChatProductionComposerToolsCoordinator(
         requestEpoch += 1
         activeSheet?.dismiss()
         activeSheet = null
-        commandById = emptyMap()
-        toolById = emptyMap()
-    }
-
-    private fun pollTools(
-        provider: WebChatProviderIdentity,
-        port: WebChatConsumerPort,
-        epoch: Int,
-        attempt: Int,
-    ) {
-        if (epoch != requestEpoch || activeProvider() != provider.id) return
-        val observed = observedToolOptions(port)
-        val tools = WebChatProductionComposerToolParser.parse(observed)
-        if (tools.isNotEmpty()) {
-            interactionCache.composerOptions(provider.id, TOOLS_SECTION, observed)
-            showToolDialog(provider, port, tools)
-            return
-        }
-        if (attempt >= MAX_POLL_ATTEMPTS) return
-        host.postDelayed(
-            { pollTools(provider, port, epoch, attempt + 1) },
-            POLL_INTERVAL_MS,
-        )
     }
 
     private fun pollQuickAction(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
         action: WebChatProductionQuickComposerAction,
+        desiredActive: Boolean,
         epoch: Int,
         attempt: Int,
     ) {
@@ -125,9 +152,14 @@ internal class WebChatProductionComposerToolsCoordinator(
         if (observed.isNotEmpty()) {
             interactionCache.composerOptions(provider.id, TOOLS_SECTION, observed)
             val tools = WebChatProductionComposerToolParser.parse(observed)
-            val target = WebChatProductionQuickComposerActionResolver.find(action, tools, observed)
+            val target = WebChatProductionQuickComposerActionResolver.find(action, tools)
             if (target != null) {
-                selectTool(provider, port, target)
+                if (target.selected == desiredActive) {
+                    port.dismissComposerOptions()
+                    onQuickActionChanged(action.takeIf { desiredActive })
+                } else if (applyTool(provider, port, target)) {
+                    onQuickActionChanged(action.takeIf { desiredActive })
+                }
                 return
             }
         }
@@ -137,133 +169,26 @@ internal class WebChatProductionComposerToolsCoordinator(
             return
         }
         host.postDelayed(
-            { pollQuickAction(provider, port, action, epoch, attempt + 1) },
+            { pollQuickAction(provider, port, action, desiredActive, epoch, attempt + 1) },
             POLL_INTERVAL_MS,
         )
     }
 
-    private fun readTools(
-        providerId: WebChatProviderId,
-        port: WebChatConsumerPort,
-    ): List<WebChatProductionComposerTool> =
-        WebChatProductionComposerToolParser.parse(
-            interactionCache.composerOptions(
-                providerId,
-                TOOLS_SECTION,
-                observedToolOptions(port),
-            ),
-        )
-
     private fun observedToolOptions(port: WebChatConsumerPort): List<WebChatConsumerOption> =
         port.state().composerSections[TOOLS_SECTION].orEmpty()
 
-    private fun showToolDialog(
-        provider: WebChatProviderIdentity,
-        port: WebChatConsumerPort,
-        tools: List<WebChatProductionComposerTool>,
-    ) {
-        if (activity.isFinishing || activity.isDestroyed || activeProvider() != provider.id) return
-        val state = port.state()
-        val commands = WebChatProductionComposerCommandCatalog.resolve(
-            provider = provider,
-            streaming = state.streaming,
-            dictationActive = state.dictationActive,
-        )
-        commandById = commands.associateBy { "command:${it.action}" }
-        toolById = tools.associateBy { "tool:${it.id}" }
-        val availableItems = commands.map { command ->
-            WebChatActionSheetItem(
-                id = "command:${command.action}",
-                title = command.label,
-                subtitle = "当前会话操作",
-                contentDescription = command.nativeSelector,
-            )
-        } + tools.map { tool ->
-            WebChatActionSheetItem(
-                id = "tool:${tool.id}",
-                title = tool.label,
-                subtitle = if (tool.selected) "已启用" else null,
-                selected = tool.selected,
-                contentDescription = tool.nativeSelector,
-            )
-        }
-        val items = availableItems.ifEmpty {
-            listOf(WebChatProductionInteractionPlaceholder.item(
-                provider.id,
-                surface = "composer-tools",
-                title = "网页工具",
-            ))
-        }
-        activeSheet?.let {
-            it.updateItems(items)
-            return
-        }
-        val sheet = WebChatActionSheet.showUpdatable(
-            activity = activity,
-            title = "网页功能",
-            items = items,
-            footerActions = listOf(
-                WebChatActionSheetFooterAction(
-                    label = "官网完整功能",
-                    contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",
-                    action = {
-                        port.dismissComposerOptions()
-                        openOfficialFallback()
-                    },
-                ),
-            ),
-            onCancelled = {
-                requestEpoch += 1
-                port.dismissComposerOptions()
-            },
-            onDismissed = {
-                activeSheet = null
-                commandById = emptyMap()
-                toolById = emptyMap()
-            },
-        ) { item ->
-            if (activeProvider() != provider.id) return@showUpdatable
-            commandById[item.id]?.let {
-                port.dismissComposerOptions()
-                executeCommand(provider, port, it)
-                return@showUpdatable
-            }
-            toolById[item.id]?.let { selectTool(provider, port, it) }
-        }
-        activeSheet = sheet
-    }
-
-    private fun executeCommand(
-        provider: WebChatProviderIdentity,
-        port: WebChatConsumerPort,
-        command: WebChatProductionComposerCommand,
-    ): Boolean {
-        if (command.action == REALTIME_VOICE_ACTION) {
-            openOfficialFallback()
-            return true
-        }
-        val result = port.executeSessionCommand(command.action)
-        val accepted = result.accepted
-        if (!accepted) {
-            showCommandError(result.error.orEmpty())
-        } else {
-            WebChatConsumerComposerOperationPolicy.commandAccepted(provider, command.action)
-                ?.let(onOperationFeedback)
-        }
-        return accepted
-    }
-
-    private fun selectTool(
+    private fun applyTool(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
         tool: WebChatProductionComposerTool,
-    ) {
+    ): Boolean {
         val result = port.selectComposerOption(TOOLS_SECTION, tool.id)
         if (!result.accepted) {
             Toast.makeText(activity, "网页工具状态已变化，请重试", Toast.LENGTH_SHORT).show()
         } else {
             onOperationFeedback(WebChatConsumerComposerOperationPolicy.toolAccepted(provider, tool.label))
         }
+        return result.accepted
     }
 
     private fun showUnavailable() {
@@ -279,24 +204,13 @@ internal class WebChatProductionComposerToolsCoordinator(
     private fun showQuickActionUnavailable(action: WebChatProductionQuickComposerAction) {
         Toast.makeText(
             activity,
-            "当前官网暂未提供${action.label}，可在“工具”中查看完整列表",
+            "当前官网暂未提供${action.label}，可在官网完整功能中查看",
             Toast.LENGTH_SHORT,
         ).show()
     }
 
-    private fun showCommandError(error: String) {
-        val message = when (error) {
-            "dictation_unavailable" -> "当前网页暂不支持听写"
-            "realtime_voice_unavailable" -> "当前网页暂不支持实时语音"
-            "bridge_not_ready", "adapter_not_current" -> "网页正在恢复，请稍后重试"
-            else -> "网页功能状态已变化，请重试"
-        }
-        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
-    }
-
     private companion object {
         const val TOOLS_SECTION = "tools"
-        const val REALTIME_VOICE_ACTION = "chatgpt_start_realtime_voice"
         const val MAX_POLL_ATTEMPTS = 8
         const val POLL_INTERVAL_MS = 250L
         const val QUICK_ACTION_INITIAL_DELAY_MS = 180L

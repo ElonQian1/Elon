@@ -23,11 +23,18 @@
     return /web[\s_-]*search|search[\s_-]*(?:the[\s_-]*)?web|browse|网页搜索|联网搜索|^搜索$/.test(value);
   }
 
+  function isImageGenerationSignal(signal) {
+    const value = clean(signal);
+    return /create[\s_-]*(?:an?[\s_-]*)?image|image[\s_-]*generation|创建(?:图片|图像)|生成(?:图片|图像)/.test(value);
+  }
+
   function semantic(input) {
     if (!input || clean(input.region) !== 'composer') return '';
     const label = clean(input.label);
     if (isWebSearchSignal(label)) return 'web_search';
-    return isWebSearchSignal(input.signal) ? 'web_search' : '';
+    if (isImageGenerationSignal(label)) return 'image_generation';
+    if (isWebSearchSignal(input.signal)) return 'web_search';
+    return isImageGenerationSignal(input.signal) ? 'image_generation' : '';
   }
 
   function directSelection(input) {
@@ -54,9 +61,7 @@
   function optionSelected(input) {
     const directSelected = !!(input && input.directSelected);
     if (input && input.directKnown) return directSelected;
-    return directSelected || !!(
-      input && input.semantic === 'web_search' && input.activeInComposer
-    );
+    return directSelected || !!(input && input.activeInComposer);
   }
 
   function createSelectionTracker() {
@@ -78,6 +83,7 @@
     controlSelected,
     createSelectionTracker,
     directSelection,
+    isImageGenerationSignal,
     isWebSearchSignal,
     optionSelected,
     semantic

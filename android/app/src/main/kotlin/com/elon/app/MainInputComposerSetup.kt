@@ -33,6 +33,7 @@ internal data class MainInputComposerViews(
     val modelChevron: ImageView,
     val planModeButton: TextView,
     val webToolsButton: TextView,
+    val activeWebToolChip: WebChatProductionActiveToolChip,
     val modeButtonRow: LinearLayout,
     val pendingAttachmentHost: LinearLayout,
     val inputRightControls: FrameLayout,
@@ -408,6 +409,8 @@ internal class MainInputComposerSetup(
             setOnClickListener { toggleAttachmentPanel() }
         }
 
+        val activeWebToolChip = WebChatProductionActiveToolChip(activity, dp)
+
         sendButton.apply {
             layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL)
             activity.getDrawable(R.drawable.ic_input_send_new)?.let { background = InsetDrawable(it, dp(5)) }
@@ -447,6 +450,7 @@ internal class MainInputComposerSetup(
         modeButtonRow.addView(webToolsButton)
 
         inputBarContainer.addView(attachmentButton)
+        inputBarContainer.addView(activeWebToolChip)
         inputBarContainer.addView(emojiButton)
         inputBarContainer.addView(ttsSpeakerButton)
         inputBarContainer.addView(inputCenterContainer)
@@ -526,6 +530,7 @@ internal class MainInputComposerSetup(
             modelChevron = modelChevron,
             planModeButton = planModeButton,
             webToolsButton = webToolsButton,
+            activeWebToolChip = activeWebToolChip,
             modeButtonRow = modeButtonRow,
             pendingAttachmentHost = pendingAttachmentHost,
             inputRightControls = inputRightControls,

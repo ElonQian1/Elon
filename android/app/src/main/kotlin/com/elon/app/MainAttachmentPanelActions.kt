@@ -26,15 +26,12 @@ internal class MainAttachmentPanelActions(
     private val openDocumentAttachment: () -> Unit,
     private val showUiDesignAction: () -> Boolean,
     private val openUiDesignOptions: () -> Unit,
-    private val webChatQuickActions: () -> List<WebChatProductionQuickComposerAction>,
-    private val selectWebChatQuickAction: (WebChatProductionQuickComposerAction) -> Boolean,
 ) {
     var isOpen = false
         private set
 
     private var iconAnimationToken = 0
     private var uiDesignAction: View? = null
-    private val webQuickActionViews = mutableMapOf<WebChatProductionQuickComposerAction, View>()
 
     fun buildAttachmentPanel(): LinearLayout {
         return LinearLayout(activity).apply {
@@ -57,22 +54,6 @@ internal class MainAttachmentPanelActions(
             addView(createAttachmentAction("文件", R.drawable.ic_attach_files, "attachment-action-files") {
                 openDocumentAttachment()
             })
-            WebChatProductionQuickComposerAction.entries.forEach { quickAction ->
-                val icon = when (quickAction) {
-                    WebChatProductionQuickComposerAction.IMAGE_GENERATION -> R.drawable.ic_attach_function
-                    WebChatProductionQuickComposerAction.WEB_SEARCH -> R.drawable.ic_search_simple
-                }
-                val actionView = createAttachmentAction(
-                    quickAction.label,
-                    icon,
-                    "web-chat-quick-action:${quickAction.semantic}",
-                ) {
-                    selectWebChatQuickAction(quickAction)
-                }
-                actionView.visibility = View.GONE
-                webQuickActionViews[quickAction] = actionView
-                addView(actionView)
-            }
             val designAction = createAttachmentAction(
                 "UI设计",
                 R.drawable.ic_attach_function,
@@ -96,10 +77,6 @@ internal class MainAttachmentPanelActions(
         if (isOpen) return
         val panel = attachmentPanel() ?: return
         uiDesignAction?.visibility = if (showUiDesignAction()) View.VISIBLE else View.GONE
-        val availableQuickActions = webChatQuickActions().toSet()
-        webQuickActionViews.forEach { (action, view) ->
-            view.visibility = if (action in availableQuickActions) View.VISIBLE else View.GONE
-        }
         isOpen = true
         applyAttachmentPanelBackground(expanded = true)
         panel.visibility = View.VISIBLE

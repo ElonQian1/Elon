@@ -16,6 +16,7 @@ class WebChatProductionComposerToolsTest {
         assertEquals(listOf("search", "study"), result.map { it.id })
         assertTrue(result.first().selected)
         assertFalse(result.last().selected)
+        assertEquals("web_search", result.first().semantic)
         assertEquals("chatgpt-tool:search", result.first().nativeSelector)
     }
 
@@ -42,11 +43,12 @@ class WebChatProductionComposerToolsTest {
         label: String,
         selected: Boolean,
         selector: String,
+        semantic: String = if (id == "search") "web_search" else "",
     ) = WebChatConsumerOption(
         id = id,
         label = label,
         selected = selected,
-        semantic = "",
+        semantic = semantic,
         opensSubmenu = false,
         nativeSelector = selector,
     )

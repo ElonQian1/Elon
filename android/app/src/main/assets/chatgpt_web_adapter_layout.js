@@ -283,7 +283,7 @@
       profile: '账户',
       new_conversation: '新建会话',
       temporary_chat: '临时聊天',
-      attachment: '添加附件',
+      attachment: '添加附件', image_generation: '创建图片',
       model: '选择模型',
       dictation: '开始听写',
       voice_mode: '启动语音功能',

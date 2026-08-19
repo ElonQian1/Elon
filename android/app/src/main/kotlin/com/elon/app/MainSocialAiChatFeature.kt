@@ -35,6 +35,7 @@ internal class MainSocialAiChatFeature(
     private val persistProviderDrafts = Runnable { providerDraftStore.save(providerDrafts) }
     private var composerOperationFeedback: WebChatConsumerComposerFeedback? = null
     private var composerOperationFeedbackEpoch = 0
+    private var activeQuickComposerAction: WebChatProductionQuickComposerAction? = null
     private val composerDrafts = SocialAiComposerDraftCoordinator(
         providerDrafts = providerDrafts,
         readText = { binding.inputEdit.text },
@@ -53,7 +54,7 @@ internal class MainSocialAiChatFeature(
             clearPendingSendState = clearPendingSendState,
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
-            onConversationIndexChanged = { onWebChatNavigationChanged() },
+            onConversationIndexChanged = ::handleConversationIndexChanged,
             onComposerStateChanged = ::refreshConsumerComposerUi,
             interactionCache = webChatInteractionCache,
             audioPermissionController = chatGptWebLifecycle.audioPermissionController,
@@ -69,7 +70,7 @@ internal class MainSocialAiChatFeature(
             clearPendingSendState = clearPendingSendState,
             collapseInputComposer = collapseInputComposer,
             openOfficialFallback = { modeController.openOfficialFallback() },
-            onConversationIndexChanged = { onWebChatNavigationChanged() },
+            onConversationIndexChanged = ::handleConversationIndexChanged,
             onComposerStateChanged = ::refreshConsumerComposerUi,
         )
     }
@@ -133,6 +134,7 @@ internal class MainSocialAiChatFeature(
             },
             openOfficialFallback = ::openOfficialFallback,
             onOperationFeedback = ::showComposerOperationFeedback,
+            onQuickActionChanged = ::onQuickComposerActionChanged,
             interactionCache = webChatInteractionCache,
         )
     }
@@ -259,17 +261,6 @@ internal class MainSocialAiChatFeature(
 
     fun startWebChatRealtimeVoice(): Boolean =
         productionComposerTools.startRealtimeVoice(WebChatProviderRegistry.get(providerId()))
-
-    fun webChatQuickComposerActions(): List<WebChatProductionQuickComposerAction> =
-        if (isChatModeActive()) {
-            productionComposerTools.quickActions(WebChatProviderRegistry.get(providerId()))
-        } else {
-            emptyList()
-        }
-
-    fun selectWebChatQuickComposerAction(action: WebChatProductionQuickComposerAction): Boolean =
-        isChatModeActive() &&
-            productionComposerTools.selectQuickAction(WebChatProviderRegistry.get(providerId()), action)
 
     fun interactionMode(): SocialAiInteractionMode = modeController.interactionMode()
 
@@ -451,6 +442,7 @@ internal class MainSocialAiChatFeature(
     private fun deactivateChatProvider(releaseComposerDraft: Boolean = true) {
         if (releaseComposerDraft) composerDrafts.release()
         clearComposerOperationFeedback()
+        activeQuickComposerAction = null
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
@@ -468,6 +460,7 @@ internal class MainSocialAiChatFeature(
         binding.inputEdit.contentDescription = null
         binding.inputEdit.hint = "输入内容"
         inputComposerViews()?.let { views ->
+            views.activeWebToolChip.render(null, ::clearQuickComposerAction)
             views.modelButtonShell.tag = null
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
                 width = dp(MODEL_BUTTON_WORK_WIDTH_DP)
@@ -487,6 +480,7 @@ internal class MainSocialAiChatFeature(
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
         clearComposerOperationFeedback()
+        activeQuickComposerAction = null
         composerDrafts.activateProvider(provider.id)
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
         if (productionFeatureNavigationDelegate.isInitialized()) {
@@ -516,6 +510,11 @@ internal class MainSocialAiChatFeature(
             }
             views.planModeButton.visibility = View.GONE
             views.webToolsButton.contentDescription = WebChatProductionSelectors.composerTools(provider.id)
+            views.webToolsButton.visibility = if (productionComposerTools.quickActions(provider).isEmpty()) {
+                View.GONE
+            } else {
+                View.VISIBLE
+            }
             views.webToolsButton.setOnClickListener {
                 prioritizeConsumerInteraction()
                 productionComposerTools.show(provider)
@@ -539,7 +538,13 @@ internal class MainSocialAiChatFeature(
                 composerReady = controller.composerReady(),
                 attachmentSupported = controller.attachmentSupported(),
             )
-            binding.inputEdit.hint = state.inputHint
+            binding.inputEdit.hint = WebChatProductionComposerContext.inputHint(
+                state.inputHint,
+                WebChatProductionComposerContext.projectTitle(
+                    webChatConversationIndex(),
+                    controller.currentConversationPath(),
+                ),
+            )
             val recovery = controller.consumerRecoveryState(provider)
             consumerStatusBanner.render(
                 if (recovery.visible) recovery else WebChatConsumerComposerOperationPolicy.resolve(
@@ -549,8 +554,16 @@ internal class MainSocialAiChatFeature(
                 ),
             )
             inputComposerViews()?.let { views ->
+                productionComposerTools.selectedQuickAction(provider)?.let {
+                    activeQuickComposerAction = it
+                }
                 views.attachmentButton.visibility = if (state.attachmentVisible) View.VISIBLE else View.GONE
-                views.webToolsButton.visibility = if (state.toolsVisible) View.VISIBLE else View.GONE
+                views.webToolsButton.visibility = if (productionComposerTools.quickActions(provider).isEmpty()) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                views.activeWebToolChip.render(activeQuickComposerAction, ::clearQuickComposerAction)
             }
             productionSuggestions.render(provider, controller.consumerPort())
             productionCapabilityPrewarmer.schedule(provider)
@@ -573,6 +586,30 @@ internal class MainSocialAiChatFeature(
     private fun clearComposerOperationFeedback() {
         composerOperationFeedbackEpoch += 1
         composerOperationFeedback = null
+    }
+
+    private fun onQuickComposerActionChanged(action: WebChatProductionQuickComposerAction?) {
+        activeQuickComposerAction = action
+        refreshConsumerComposerUi()
+    }
+
+    private fun handleConversationIndexChanged() {
+        onWebChatNavigationChanged()
+        if (isChatModeActive()) refreshConsumerComposerUi()
+    }
+
+    private fun clearQuickComposerAction(action: WebChatProductionQuickComposerAction) {
+        if (!isChatModeActive() || activeQuickComposerAction != action) return
+        activeQuickComposerAction = null
+        inputComposerViews()?.activeWebToolChip?.render(null, ::clearQuickComposerAction)
+        if (!productionComposerTools.clearQuickAction(
+                WebChatProviderRegistry.get(providerId()),
+                action,
+            )
+        ) {
+            activeQuickComposerAction = action
+            refreshConsumerComposerUi()
+        }
     }
 
     private fun ensureConsumerEnhancementsAttached() {

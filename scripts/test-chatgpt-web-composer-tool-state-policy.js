@@ -25,6 +25,11 @@ assert.equal(policy.semantic({
   signal: 'search chats',
   label: '搜索聊天'
 }), '');
+assert.equal(policy.semantic({
+  region: 'composer',
+  signal: 'composer tool create image',
+  label: '创建图片'
+}), 'image_generation');
 
 assert.equal(policy.controlSelected({
   semantic: 'web_search',
@@ -64,6 +69,12 @@ assert.equal(policy.optionSelected({
   semantic: 'tool',
   directSelected: true,
   activeInComposer: false
+}), true);
+assert.equal(policy.optionSelected({
+  semantic: 'image_generation',
+  directSelected: false,
+  directKnown: false,
+  activeInComposer: true
 }), true);
 
 assert.deepEqual(policy.directSelection({ ariaChecked: 'true' }), {
