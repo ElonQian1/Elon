@@ -56,6 +56,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionComposerToolsCoordinator"))
         assertTrue(feature.contains("WebChatProductionFeatureNavigationCoordinator"))
         assertTrue(feature.contains("WebChatProductionPageActionsCoordinator"))
+        assertTrue(feature.contains("WebChatProductionPageActionEntryPolicy.visible"))
         assertTrue(feature.contains("WebChatProductionConversationActionsCoordinator"))
         assertTrue(feature.contains("WebChatProductionSuggestionsCoordinator"))
         assertTrue(feature.contains("productionSuggestions.render(provider, controller.consumerPort())"))

@@ -85,6 +85,32 @@ class WebChatProductionPageActionsTest {
     }
 
     @Test
+    fun recognizesProjectConversationsAndShowsTheEntryOnlyForAReadyChatGptConversation() {
+        val projectConversation = WebChatProductionPageIdentity.from(state(
+            pageKind = "conversation",
+            pageUrl = "https://chatgpt.com/g/g-p-project/c/conversation-id",
+        ))
+
+        assertEquals("conversation-id", projectConversation.conversationId)
+        assertTrue(projectConversation.hasConversationTarget)
+        assertTrue(WebChatProductionPageActionEntryPolicy.visible(
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            currentConversationPath = "/g/g-p-project/c/conversation-id",
+            state = "ready",
+        ))
+        assertFalse(WebChatProductionPageActionEntryPolicy.visible(
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            currentConversationPath = null,
+            state = "ready",
+        ))
+        assertFalse(WebChatProductionPageActionEntryPolicy.visible(
+            provider = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB),
+            currentConversationPath = "/c/conversation-id",
+            state = "ready",
+        ))
+    }
+
+    @Test
     fun pageActionsAreNativeForChatGptAndUseOfficialGoogleFallback() {
         assertTrue(WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
             .supports(WebChatProviderCapability.PAGE_ACTIONS))
@@ -129,5 +155,16 @@ class WebChatProductionPageActionsTest {
         pageKind = "feature",
         path = "/settings",
         conversationId = null,
+    )
+
+    private fun state(pageKind: String, pageUrl: String) = WebChatConsumerState(
+        streaming = false,
+        dictationActive = false,
+        composerSections = emptyMap(),
+        pageKind = pageKind,
+        pageUrl = pageUrl,
+        features = emptyList(),
+        controls = emptyList(),
+        commandRequests = emptyList(),
     )
 }

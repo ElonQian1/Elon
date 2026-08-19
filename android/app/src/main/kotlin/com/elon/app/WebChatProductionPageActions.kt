@@ -31,6 +31,7 @@ internal class WebChatProductionPageActionsCoordinator(
         )
         val epoch = requestEpoch
         val state = port.state()
+        if (!WebChatProductionPageIdentity.from(state).hasConversationTarget) return
         val actions = readActions(provider.id, state)
         val initialObservation = observation(
             provider,

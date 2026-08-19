@@ -1,5 +1,6 @@
 package com.elon.app
 
+import com.elon.app.chatgptweb.ChatGptWebConversationPath
 import java.net.URI
 
 internal data class WebChatProductionPageAction(
@@ -32,6 +33,10 @@ internal data class WebChatProductionPageIdentity(
             "网页功能"
         }
 
+    val hasConversationTarget: Boolean
+        get() = actionPlacement == WebChatConsumerPageActionPlacement.CONVERSATION &&
+            conversationId != null
+
     val cacheKey: String get() = "$pageKind:$path"
 
     companion object {
@@ -42,10 +47,8 @@ internal data class WebChatProductionPageIdentity(
                 pageKind = kind,
                 path = path,
                 conversationId = if (kind == CONVERSATION_PAGE_KIND) {
-                    CONVERSATION_PATH.matchEntire(path)?.groupValues?.getOrNull(1)
-                } else {
-                    null
-                },
+                    ChatGptWebConversationPath.identity(path)
+                } else null,
             )
         }
 
@@ -61,8 +64,17 @@ internal data class WebChatProductionPageIdentity(
 
         private const val CONVERSATION_PAGE_KIND = "conversation"
         private const val MAX_PAGE_PATH_LENGTH = 320
-        private val CONVERSATION_PATH = Regex("^/c/([A-Za-z0-9_-]{1,160})/?$")
     }
+}
+
+internal object WebChatProductionPageActionEntryPolicy {
+    fun visible(
+        provider: WebChatProviderIdentity,
+        currentConversationPath: String?,
+        state: String,
+    ): Boolean = provider.supports(WebChatProviderCapability.PAGE_ACTIONS) &&
+        state == "ready" &&
+        ChatGptWebConversationPath.normalize(currentConversationPath) != null
 }
 
 internal object WebChatProductionPageActionParser {

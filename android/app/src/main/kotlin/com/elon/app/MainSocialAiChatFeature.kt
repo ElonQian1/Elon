@@ -503,7 +503,7 @@ internal class MainSocialAiChatFeature(
         ensureConsumerEnhancementsAttached()
         binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
-            visibility = View.VISIBLE
+            visibility = View.GONE
             setImageResource(R.drawable.ic_more_horizontal)
             contentDescription = WebChatProductionSelectors.pageActions(provider.id)
             setOnClickListener {
@@ -540,6 +540,16 @@ internal class MainSocialAiChatFeature(
         if (isChatModeActive()) {
             val provider = WebChatProviderRegistry.get(providerId())
             val controller = activeController()
+            val pageActionsVisible = WebChatProductionPageActionEntryPolicy.visible(
+                provider = provider,
+                currentConversationPath = controller.currentConversationPath(),
+                state = controller.stateWireValue(),
+            )
+            binding.moreButton.visibility = if (pageActionsVisible) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
             val state = WebChatConsumerComposerStateResolver.resolve(
                 provider = provider,
                 state = controller.stateWireValue(),
