@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 18)
+assert.equal(policy.version, 19)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -325,6 +325,18 @@ assert.equal(policy.sourceCollection({
   narrativeBlocks: 3,
   sourceResultItems: 3,
   links: 3,
+  citationTextRatio: 0.42,
+  queryAligned: false,
+  answerActionRelation: 'contains',
+}), false, 'a response root containing Copy text is not a source-card collection')
+
+assert.equal(policy.sourceCollection({
+  textLength: 620,
+  citations: 3,
+  semanticBlocks: 5,
+  narrativeBlocks: 3,
+  sourceResultItems: 3,
+  links: 3,
   citationTextRatio: 0.24,
   queryAligned: true,
 }), false, 'inline citations in question-aligned answer bullets remain primary prose')
@@ -429,6 +441,11 @@ assert.equal(policy.select([
   { id: 'full-answer', afterQuery: true, queryAligned: true, answerActionRelation: 'before', narrativeBlocks: 3, domOrder: 3, score: 2400, textLength: 620 },
   { id: 'responsive-sources', afterQuery: true, queryAligned: true, answerActionRelation: 'after', narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
 ]).id, 'full-answer', 'the response before Copy text wins when sources collapse into the same column')
+assert.equal(policy.select([
+  { id: 'full-response-root', afterQuery: true, trustedAnswerContainer: true, queryAligned: false, answerActionRelation: 'contains', narrativeBlocks: 3, domOrder: 3, score: 2100, textLength: 620 },
+  { id: 'last-follow-up', afterQuery: true, trustedAnswerContainer: true, queryAligned: true, answerActionRelation: 'before', narrativeBlocks: 0, domOrder: 6, score: 6200, textLength: 34 },
+  { id: 'responsive-sources', afterQuery: true, queryAligned: true, answerActionRelation: 'after', narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
+]).id, 'full-response-root', 'the trusted response root containing Copy text wins over its final follow-up sentence')
 assert.equal(policy.select([
   { id: 'responsive-sources', afterQuery: true, queryAligned: true, answerActionRelation: 'after', narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
 ]), null, 'the final selector fails closed when only post-answer sources remain')

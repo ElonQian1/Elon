@@ -33,6 +33,10 @@
     const answerActionRelation = String(metrics && metrics.answerActionRelation || 'unknown');
     if (citations < 2 || links < 2) return false;
     if (answerActionRelation === 'after') return true;
+    // Copy text belongs to Google's response action row. Content before that
+    // row, or the narrow response root that contains it, is primary answer
+    // content even when inline citation chips resemble linked result cards.
+    if (answerActionRelation === 'before' || answerActionRelation === 'contains') return false;
     // The primary answer is rendered in the same visual column as the user's
     // question. Inline citation links inside long answer bullets must not turn
     // that answer into a false source-card collection.
@@ -194,11 +198,19 @@
     const afterQuery = eligible.filter((candidate) => candidate.afterQuery === true);
     const trusted = eligible.filter((candidate) => candidate.trustedAnswerContainer === true);
     const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : eligible);
+    const answerActionContainers = pool.filter(
+      (candidate) => candidate.answerActionRelation === 'contains' &&
+        nonNegative(candidate.narrativeBlocks) >= 2
+    );
     const beforeAnswerActions = pool.filter(
       (candidate) => candidate.answerActionRelation === 'before'
     );
-    const boundedPool = beforeAnswerActions.length ? beforeAnswerActions : pool;
-    const alignedPool = boundedPool.filter((candidate) => candidate.queryAligned === true);
+    const boundedPool = answerActionContainers.length
+      ? answerActionContainers
+      : (beforeAnswerActions.length ? beforeAnswerActions : pool);
+    const alignedPool = answerActionContainers.length
+      ? []
+      : boundedPool.filter((candidate) => candidate.queryAligned === true);
     const answerColumnPool = alignedPool.length ? alignedPool : boundedPool;
     // Google AI Mode commonly nests the complete answer above short trusted leaf nodes.
     // Prefer a multi-block narrative before using the numeric score so that link/control
@@ -207,15 +219,23 @@
       (candidate) => nonNegative(candidate.narrativeBlocks) >= 2
     );
     const preferredPool = narrativePool.length ? narrativePool : answerColumnPool;
-    return preferredPool.sort((left, right) =>
-      Number(right.score || 0) - Number(left.score || 0) ||
-      nonNegative(right.textLength) - nonNegative(left.textLength) ||
-      nonNegative(left.domOrder) - nonNegative(right.domOrder)
-    )[0] || null;
+    return preferredPool.sort((left, right) => {
+      if (answerActionContainers.length) {
+        // Ancestors can contain the same Copy text row plus later result rails.
+        // The smallest multi-block container is the response body boundary.
+        return nonNegative(left.textLength) - nonNegative(right.textLength) ||
+          Number(right.trustedAnswerContainer === true) -
+            Number(left.trustedAnswerContainer === true) ||
+          Number(right.score || 0) - Number(left.score || 0);
+      }
+      return Number(right.score || 0) - Number(left.score || 0) ||
+        nonNegative(right.textLength) - nonNegative(left.textLength) ||
+        nonNegative(left.domOrder) - nonNegative(right.domOrder);
+    })[0] || null;
   }
 
   return Object.freeze({
-    version: 18,
+    version: 19,
     accepts,
     penalty,
     select,

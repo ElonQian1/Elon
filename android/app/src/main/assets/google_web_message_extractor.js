@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 24;
+  const extractorVersion = 25;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
