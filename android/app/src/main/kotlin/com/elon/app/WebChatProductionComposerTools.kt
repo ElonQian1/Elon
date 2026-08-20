@@ -71,6 +71,7 @@ internal class WebChatProductionComposerToolsCoordinator(
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
     private var pendingQuickAction: PendingQuickAction? = null
+    private var pendingSessionCommand: PendingSessionCommand? = null
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -130,6 +131,15 @@ internal class WebChatProductionComposerToolsCoordinator(
     ): Boolean = changeQuickAction(provider, action, desiredActive = false)
 
     fun onSessionStateChanged(provider: WebChatProviderIdentity) {
+        pendingSessionCommand?.let { pending ->
+            if (
+                pending.providerId == provider.id &&
+                activeProvider() == provider.id &&
+                sessionReady()
+            ) {
+                executePendingCommand(provider, pending)
+            }
+        }
         val pending = pendingQuickAction ?: return
         if (pending.providerId != provider.id || activeProvider() != provider.id) return
         if (!sessionReady() || pending.requestInFlight) return
@@ -187,15 +197,43 @@ internal class WebChatProductionComposerToolsCoordinator(
     }
 
     fun startRealtimeVoice(provider: WebChatProviderIdentity): Boolean {
+        val command = WebChatProductionComposerCommandCatalog.resolve(
+            provider = provider,
+            streaming = false,
+            dictationActive = false,
+        ).firstOrNull { it.action == REALTIME_VOICE_ACTION } ?: return false
+        return executeCommand(provider, command)
+    }
+
+    fun executeCommand(
+        provider: WebChatProviderIdentity,
+        command: WebChatProductionComposerCommand,
+    ): Boolean {
         cancelPending()
         if (activeProvider() != provider.id) return false
-        openOfficialFallback()
-        return true
+        if (command.action == REALTIME_VOICE_ACTION) {
+            WebChatConsumerComposerOperationPolicy.commandAccepted(provider, command.action)
+                ?.let(onOperationFeedback)
+            openOfficialFallback()
+            return true
+        }
+        val pending = PendingSessionCommand(provider.id, command, requestEpoch)
+        pendingSessionCommand = pending
+        if (!sessionReady()) {
+            requestSessionRecovery()
+            onOperationFeedback(WebChatConsumerComposerFeedback(
+                providerId = provider.id,
+                message = "正在恢复网页会话，连接后会继续${command.label}",
+            ))
+            return true
+        }
+        return executePendingCommand(provider, pending)
     }
 
     fun cancelPending() {
         requestEpoch += 1
         pendingQuickAction = null
+        pendingSessionCommand = null
         activeSheet?.dismiss()
         activeSheet = null
     }
@@ -283,6 +321,38 @@ internal class WebChatProductionComposerToolsCoordinator(
     private fun observedToolOptions(port: WebChatConsumerPort): List<WebChatConsumerOption> =
         port.state().composerSections[TOOLS_SECTION].orEmpty()
 
+    private fun executePendingCommand(
+        provider: WebChatProviderIdentity,
+        pending: PendingSessionCommand,
+    ): Boolean {
+        if (pending.epoch != requestEpoch || pendingSessionCommand != pending) return false
+        val port = consumerPort() ?: return failPendingCommand(provider, pending)
+        pendingSessionCommand = null
+        val result = port.executeSessionCommand(pending.command.action)
+        if (result.accepted) {
+            WebChatConsumerComposerOperationPolicy.commandAccepted(provider, pending.command.action)
+                ?.let(onOperationFeedback)
+        } else {
+            onOperationFeedback(WebChatConsumerComposerFeedback(
+                providerId = provider.id,
+                message = "${pending.command.label}暂时没有响应，请重试",
+            ))
+        }
+        return result.accepted
+    }
+
+    private fun failPendingCommand(
+        provider: WebChatProviderIdentity,
+        pending: PendingSessionCommand,
+    ): Boolean {
+        if (pendingSessionCommand == pending) pendingSessionCommand = null
+        onOperationFeedback(WebChatConsumerComposerFeedback(
+            providerId = provider.id,
+            message = "${pending.command.label}暂时没有响应，请重试",
+        ))
+        return false
+    }
+
     private fun applyTool(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
@@ -344,7 +414,14 @@ internal class WebChatProductionComposerToolsCoordinator(
         val requestInFlight: Boolean = false,
     )
 
+    private data class PendingSessionCommand(
+        val providerId: WebChatProviderId,
+        val command: WebChatProductionComposerCommand,
+        val epoch: Int,
+    )
+
     private companion object {
+        const val REALTIME_VOICE_ACTION = "chatgpt_start_realtime_voice"
         const val TOOLS_SECTION = "tools"
         const val MAX_POLL_ATTEMPTS = 8
         const val MAX_DISCOVERY_ROUNDS = 2

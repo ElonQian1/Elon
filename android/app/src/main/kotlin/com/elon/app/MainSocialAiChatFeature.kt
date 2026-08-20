@@ -147,6 +147,14 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
+    private val productionVoiceControlsDelegate = lazy {
+        WebChatProductionVoiceControls(
+            dp = ::dp,
+            inputComposerViews = inputComposerViews,
+            executeCommand = productionComposerTools::executeCommand,
+        )
+    }
+    private val productionVoiceControls by productionVoiceControlsDelegate
     private val productionFeatureNavigationDelegate = lazy {
         WebChatProductionFeatureNavigationCoordinator(
             activity = activity,
@@ -478,6 +486,9 @@ internal class MainSocialAiChatFeature(
         clearComposerOperationFeedback()
         activeQuickComposerAction = null
         if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
+        if (productionVoiceControlsDelegate.isInitialized()) {
+            productionVoiceControls.restoreLocalVoiceInput()
+        }
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
         }
@@ -624,6 +635,14 @@ internal class MainSocialAiChatFeature(
                 }
                 views.activeWebToolChip.render(activeQuickComposerAction, ::clearQuickComposerAction)
             }
+            val dictationActive = runCatching {
+                controller.consumerPort()?.state()?.dictationActive == true
+            }.getOrDefault(false)
+            productionVoiceControls.render(
+                provider = provider,
+                streaming = controller.streaming(),
+                dictationActive = dictationActive,
+            )
             productionComposerTools.onSessionStateChanged(provider)
             productionSuggestions.render(provider, controller.consumerPort())
             productionCapabilityPrewarmer.schedule(provider)
