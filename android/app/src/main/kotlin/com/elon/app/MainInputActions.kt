@@ -553,6 +553,7 @@ internal class MainInputActions(
             dp = uiTools()::dp,
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
             inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            webDictationButton = { inputComposerViewsOrNull()?.webDictationButton },
             inputRightControls = { inputComposerViewsOrNull()?.inputRightControls },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },

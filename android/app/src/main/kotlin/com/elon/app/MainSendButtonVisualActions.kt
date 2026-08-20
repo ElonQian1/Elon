@@ -14,6 +14,7 @@ internal class MainSendButtonVisualActions(
     private val dp: (Int) -> Int,
     private val attachmentButton: () -> ImageButton?,
     private val inputModeButton: () -> ImageButton?,
+    private val webDictationButton: () -> ImageButton?,
     private val inputRightControls: () -> FrameLayout?,
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val isVoiceMode: () -> Boolean,
@@ -62,7 +63,22 @@ internal class MainSendButtonVisualActions(
             inputModeButton()?.visibility = View.GONE
         } else {
             binding.sendButton.visibility = View.GONE
-            inputModeButton()?.visibility = View.VISIBLE
+            inputModeButton()?.let { button ->
+                button.visibility = if (button.tag == WEB_CHAT_REALTIME_VOICE_HIDDEN_TAG) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+            }
+        }
+        webDictationButton()?.let { button ->
+            button.visibility = if (
+                visualMode == WebChatProductionComposerVisualMode.INPUT_MODE && button.isActivated
+            ) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
         }
         params?.height = dp(38)
         params?.gravity = Gravity.END or Gravity.CENTER_VERTICAL
@@ -92,6 +108,10 @@ internal class MainSendButtonVisualActions(
         inputModeButton()?.let { button ->
             button.isEnabled = !conversationEnded
             button.alpha = if (conversationEnded) 0.55f else 1f
+        }
+        webDictationButton()?.let { button ->
+            button.isEnabled = !conversationEnded && !streaming
+            button.alpha = if (button.isEnabled) 1f else 0.55f
         }
     }
 }

@@ -22,6 +22,7 @@ import com.elon.app.databinding.ActivityMainBinding
 
 internal data class MainInputComposerViews(
     val inputModeButton: ImageButton,
+    val webDictationButton: ImageButton,
     val attachmentButton: ImageButton,
     val emojiButton: ImageButton,
     val voiceHoldButton: TextView,
@@ -42,7 +43,8 @@ internal data class MainInputComposerViews(
     val emojiPanel: LinearLayout,
     val runtimeInputModeStrip: RuntimeInputModeStrip,
     val expandEditorButton: ImageButton,
-    val ttsSpeakerButton: ImageButton
+    val ttsSpeakerButton: ImageButton,
+    val toggleLocalVoiceMode: () -> Unit,
 )
 
 internal class MainInputComposerSetup(
@@ -165,6 +167,17 @@ internal class MainInputComposerSetup(
             setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "切换语音输入"
             setOnClickListener { toggleVoiceMode() }
+        }
+
+        val webDictationButton = ImageButton(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(48))
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageResource(R.drawable.ic_web_chat_dictation)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(8), dp(9), dp(8), dp(9))
+            visibility = View.GONE
+            isActivated = false
+            contentDescription = "web-chat-composer-command:not-bound:dictation"
         }
 
         lateinit var inputComposerMotion: InputComposerMotion
@@ -454,6 +467,7 @@ internal class MainInputComposerSetup(
         inputBarContainer.addView(emojiButton)
         inputBarContainer.addView(ttsSpeakerButton)
         inputBarContainer.addView(inputCenterContainer)
+        inputBarContainer.addView(webDictationButton)
         inputRightControls.addView(inputModeButton)
         inputRightControls.addView(sendButton)
         inputBarContainer.addView(inputRightControls)
@@ -519,6 +533,7 @@ internal class MainInputComposerSetup(
 
         return MainInputComposerViews(
             inputModeButton = inputModeButton,
+            webDictationButton = webDictationButton,
             attachmentButton = attachmentButton,
             emojiButton = emojiButton,
             voiceHoldButton = voiceHoldButton,
@@ -539,7 +554,8 @@ internal class MainInputComposerSetup(
             emojiPanel = emojiPanel,
             runtimeInputModeStrip = runtimeInputModeStrip,
             expandEditorButton = expandEditorButton,
-            ttsSpeakerButton = ttsSpeakerButton
+            ttsSpeakerButton = ttsSpeakerButton,
+            toggleLocalVoiceMode = toggleVoiceMode,
         )
     }
 
