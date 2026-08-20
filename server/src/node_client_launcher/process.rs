@@ -317,7 +317,10 @@ do {{
     }
 }
 
-pub(crate) fn stop_installed_client_processes(install_dir: &Path, include_desktop_shell: bool) {
+pub(crate) fn stop_installed_client_processes(
+    install_dir: &Path,
+    include_desktop_shell: bool,
+) -> Result<()> {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
@@ -329,12 +332,19 @@ pub(crate) fn stop_installed_client_processes(install_dir: &Path, include_deskto
             include_desktop_shell,
         );
         let mut ps = launcher_command::powershell_hidden_command(&script);
-        let _ = launcher_command::status_hidden(&mut ps);
+        let output = launcher_command::output_hidden(&mut ps)
+            .context("failed to stop installed launcher processes before repair")?;
+        anyhow::ensure!(
+            output.status.success(),
+            "installed launcher processes did not stop before repair: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
     }
     #[cfg(not(windows))]
     {
         let _ = (install_dir, include_desktop_shell);
     }
+    Ok(())
 }
 
 pub(crate) fn desktop_shell_running(install_dir: &Path) -> Result<bool> {
@@ -384,7 +394,7 @@ $currentPid = {current_pid}
 $includeDesktopShell = {include_desktop_shell}
 $deadline = (Get-Date).AddSeconds(20)
 do {{
-  $targets = @(Get-CimInstance Win32_Process | Where-Object {{
+  $targets = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {{
     $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
     $matchesClient = $false
     $matchesDesktopShell = $false
@@ -400,11 +410,16 @@ do {{
     ([uint32]$_.ProcessId -ne [uint32]$currentPid) -and ($matchesClient -or ($includeDesktopShell -and $matchesDesktopShell) -or ($_.Name -eq 'elon-node-agent.exe'))
   }})
   foreach ($targetProcess in $targets) {{
-    try {{ Invoke-CimMethod -InputObject $targetProcess -MethodName Terminate | Out-Null }} catch {{}}
+    Invoke-CimMethod -InputObject $targetProcess -MethodName Terminate -ErrorAction Stop | Out-Null
   }}
   if ($targets.Count -eq 0) {{ break }}
   Start-Sleep -Milliseconds 300
 }} while ((Get-Date) -lt $deadline)
+if ($targets.Count -ne 0) {{
+  $remaining = ($targets | ForEach-Object {{ [string]$_.ProcessId }}) -join ','
+  Write-Error "installed launcher processes still running after bounded stop: $remaining"
+  exit 1
+}}
 "#,
         client = launcher_command::ps_single_quote(&client.to_string_lossy()),
         desktop_shell = launcher_command::ps_single_quote(&desktop_shell.to_string_lossy()),

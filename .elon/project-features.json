@@ -7355,6 +7355,59 @@
       "updated_at_ms": 1786700258667
     },
     {
+      "id": "win-node-agent-background-repair-file-lock-v1",
+      "title": "Win node-agent background repair file-lock recovery",
+      "summary": "Make verified Win node-agent background activation fail closed on process-stop errors and retry transient executable sharing violations so the new runtime can replace the installed launcher and recover on the exact release identity.",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-node-agent-background-repair-file-lock-v1.md",
+        "content_hash": "e038ecf748acd2ef21a9ce9ad087c1e86875dee47f813ec70336b63ddbced028",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "dfdc3386cc12c3f249fa58a09fea42be50e63cd2",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "0d7dc7ac1ba8d6d8d07bb5b3de6b9e48a035f134",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-node-agent",
+      "tags": [
+        "win",
+        "node-agent",
+        "release",
+        "repair"
+      ],
+      "task_paths": [
+        "scripts/node-agent-post-terminal-activator.ps1",
+        "scripts/test-node-agent-local-first-release.ps1",
+        "server/src/node_client_launcher/installer.rs",
+        "server/src/node_client_launcher/launcher_tests.rs",
+        "server/src/node_client_launcher/process.rs",
+        "server/src/node_client_launcher/process_tests.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Background repair proves replaceable installed launcher processes have exited before copying.",
+        "Process enumeration or termination failures fail closed with actionable detail.",
+        "Transient Windows sharing violations are retried within a bounded window.",
+        "Installed runtime and watchdog recover on the exact published identity.",
+        "Launcher, release, Rust, and Google AI regression tests pass."
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_1d79286b4aba41a2be5fbc39214b555f",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787244472909,
+        "expires_at_ms": 1787258872909
+      },
+      "created_at_ms": 1787244462582,
+      "updated_at_ms": 1787244483783
+    },
+    {
       "id": "win-web-ai-context-continuity-hardening-v1",
       "title": "Win 网页 AI 上下文连续性加固 V1",
       "summary": "以密码学 owner 指纹、旧 Profile 无损迁移、超长快照最近上下文保留和无 query 导航日志加固 Win 生产首页的账号隔离与上下文连续性。",
@@ -8245,36 +8298,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_510c14273fd544d58030b981aebc30d4",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Reviewed the final requirement metadata and unchanged implementation scope.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786869647359
-    },
-    {
-      "id": "feature_event_85584ef6ce08484b89e15da96c13ef07",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Final requirement remains bounded and independently testable.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786869659702
-    },
-    {
-      "id": "feature_event_1435ccc9a4594ff5a31a2e69a1441afb",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786869670746
-    },
     {
       "id": "feature_event_2f260304acf84b30addaed4aea2d6336",
       "feature_id": "rust-cache-portable-file-hash-v1",
@@ -10244,6 +10267,36 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787242968669
+    },
+    {
+      "id": "feature_event_018712cc89324e16abfff5d237eafab3",
+      "feature_id": "win-node-agent-background-repair-file-lock-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "Exact local activation of the user-approved Google AI fix failed with Windows os error 32 while replacing the installed launcher.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787244462582
+    },
+    {
+      "id": "feature_event_bc7d28e2fbf7432b848eb839fcdbdb43",
+      "feature_id": "win-node-agent-background-repair-file-lock-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787244472911
+    },
+    {
+      "id": "feature_event_afe6b1130ba64b76a6e584a61f909fd5",
+      "feature_id": "win-node-agent-background-repair-file-lock-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Diagnosed exact activation failure from client-launcher.jsonl: installed launcher copy hit os error 32 while the old client image remained mapped.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787244483783
     }
   ]
 }

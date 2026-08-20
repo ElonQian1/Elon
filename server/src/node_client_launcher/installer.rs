@@ -2,8 +2,9 @@
 
 use anyhow::{Context, Result};
 use std::{
+    io::ErrorKind,
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use super::{
@@ -99,7 +100,7 @@ fn install_or_repair_with_desktop_policy(stop_desktop_shell: bool) -> Result<Pat
     let previous_port = configured_admin_port(&install_dir);
     watchdog::stop_running(&install_dir);
     process::stop_agent();
-    process::stop_installed_client_processes(&install_dir, stop_desktop_shell);
+    process::stop_installed_client_processes(&install_dir, stop_desktop_shell)?;
     process::wait_for_port_closed(previous_port, Duration::from_secs(5));
 
     let current_exe = std::env::current_exe().context("无法定位当前客户端 exe")?;
@@ -261,9 +262,25 @@ fn copy_if_needed(source: &Path, dest: &Path) -> Result<()> {
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::copy(source, dest)
-        .with_context(|| format!("复制 {} -> {} 失败", source.display(), dest.display()))?;
-    Ok(())
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        match std::fs::copy(source, dest) {
+            Ok(_) => return Ok(()),
+            Err(error)
+                if error.kind() == ErrorKind::PermissionDenied && Instant::now() < deadline =>
+            {
+                // Windows can keep a just-terminated executable image mapped for a
+                // short time. Retry only that transient sharing/permission class;
+                // all other copy failures remain immediate and actionable.
+                std::thread::sleep(Duration::from_millis(250));
+            }
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!("复制 {} -> {} 失败", source.display(), dest.display())
+                });
+            }
+        }
+    }
 }
 
 fn same_path(left: &Path, right: &Path) -> bool {

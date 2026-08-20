@@ -96,7 +96,9 @@ fn background_package_repair_checks_desktop_before_stopping_runtime() {
     let stop = source.find("watchdog::stop_running(&install_dir)").unwrap();
 
     assert!(guard < stop);
-    assert!(source.contains("stop_installed_client_processes(&install_dir, stop_desktop_shell)"));
+    assert!(source.contains("stop_installed_client_processes(&install_dir, stop_desktop_shell)?"));
+    assert!(source.contains("ErrorKind::PermissionDenied"));
+    assert!(source.contains("Duration::from_secs(15)"));
 }
 
 #[test]

@@ -204,6 +204,8 @@ fn stop_installed_client_processes_excludes_current_pid() {
     assert!(script.contains("ProcessId -ne"));
     assert!(script.contains("elon-node-agent.exe"));
     assert!(script.contains("Terminate"));
+    assert!(script.contains("-ErrorAction Stop"));
+    assert!(script.contains("installed launcher processes still running after bounded stop"));
 }
 
 #[cfg(windows)]
