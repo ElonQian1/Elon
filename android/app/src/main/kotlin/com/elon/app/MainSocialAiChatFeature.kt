@@ -172,6 +172,30 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionPageActions by productionPageActionsDelegate
+    private val productionHeaderActionsDelegate = lazy {
+        WebChatProductionHeaderActionsCoordinator(
+            activity = activity,
+            host = binding.root,
+            consumerPort = ::chatGptConsumerPort,
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            currentSessionState = {
+                if (isChatModeActive()) activeController().stateWireValue() else "inactive"
+            },
+            currentConversationPath = {
+                if (isChatModeActive()) activeController().currentConversationPath() else null
+            },
+            openConversationSettings = {
+                prioritizeConsumerInteraction()
+                productionPageActions.show(WebChatProviderRegistry.get(providerId()))
+            },
+            openOfficialFallback = ::openOfficialFallback,
+            interactionCache = webChatInteractionCache,
+            onStateChanged = ::refreshConsumerComposerUi,
+        )
+    }
+    private val productionHeaderActions by productionHeaderActionsDelegate
     private val productionCapabilityPrewarmerDelegate = lazy {
         WebChatProductionCapabilityPrewarmer(
             consumerPort = {
@@ -455,6 +479,7 @@ internal class MainSocialAiChatFeature(
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
         }
+        if (productionHeaderActionsDelegate.isInitialized()) productionHeaderActions.cancelPending()
         if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
@@ -494,6 +519,7 @@ internal class MainSocialAiChatFeature(
         if (productionFeatureNavigationDelegate.isInitialized()) {
             productionFeatureNavigation.cancelPending()
         }
+        if (productionHeaderActionsDelegate.isInitialized()) productionHeaderActions.cancelPending()
         if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
@@ -508,7 +534,7 @@ internal class MainSocialAiChatFeature(
             contentDescription = WebChatProductionSelectors.pageActions(provider.id)
             setOnClickListener {
                 prioritizeConsumerInteraction()
-                productionPageActions.show(provider)
+                productionHeaderActions.show(provider)
             }
         }
         inputComposerViews()?.let { views ->
@@ -540,16 +566,7 @@ internal class MainSocialAiChatFeature(
         if (isChatModeActive()) {
             val provider = WebChatProviderRegistry.get(providerId())
             val controller = activeController()
-            val pageActionsVisible = WebChatProductionPageActionEntryPolicy.visible(
-                provider = provider,
-                currentConversationPath = controller.currentConversationPath(),
-                state = controller.stateWireValue(),
-            )
-            binding.moreButton.visibility = if (pageActionsVisible) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
+            productionHeaderActions.render(binding.moreButton, provider, controller.stateWireValue())
             val state = WebChatConsumerComposerStateResolver.resolve(
                 provider = provider,
                 state = controller.stateWireValue(),

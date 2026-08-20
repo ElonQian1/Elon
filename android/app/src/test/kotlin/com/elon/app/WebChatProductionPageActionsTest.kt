@@ -18,8 +18,8 @@ class WebChatProductionPageActionsTest {
             control("copy", "复制", "copy", "message", WebChatConsumerControlPresentation.DEDICATED),
         ), conversationIdentity)
 
-        assertEquals(listOf("options", "temporary"), result.map { it.controlId })
-        assertEquals(listOf("会话设置", "临时聊天"), result.map { it.label })
+        assertEquals(listOf("options"), result.map { it.controlId })
+        assertEquals(listOf("会话设置"), result.map { it.label })
         assertFalse(result.first().officialFallback)
         assertEquals("selector:options", result.first().nativeSelector)
     }
@@ -85,7 +85,7 @@ class WebChatProductionPageActionsTest {
     }
 
     @Test
-    fun recognizesProjectConversationsAndShowsTheEntryOnlyForAReadyChatGptConversation() {
+    fun recognizesProjectConversations() {
         val projectConversation = WebChatProductionPageIdentity.from(state(
             pageKind = "conversation",
             pageUrl = "https://chatgpt.com/g/g-p-project/c/conversation-id",
@@ -93,21 +93,6 @@ class WebChatProductionPageActionsTest {
 
         assertEquals("conversation-id", projectConversation.conversationId)
         assertTrue(projectConversation.hasConversationTarget)
-        assertTrue(WebChatProductionPageActionEntryPolicy.visible(
-            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
-            currentConversationPath = "/g/g-p-project/c/conversation-id",
-            state = "ready",
-        ))
-        assertFalse(WebChatProductionPageActionEntryPolicy.visible(
-            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
-            currentConversationPath = null,
-            state = "ready",
-        ))
-        assertFalse(WebChatProductionPageActionEntryPolicy.visible(
-            provider = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB),
-            currentConversationPath = "/c/conversation-id",
-            state = "ready",
-        ))
     }
 
     @Test

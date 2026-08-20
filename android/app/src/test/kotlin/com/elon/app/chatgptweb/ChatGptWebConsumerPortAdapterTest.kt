@@ -69,7 +69,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("temporary", state.controls.single().control.id)
         assertEquals(WebChatConsumerControlPresentation.DIRECT, state.controls.single().presentation)
         assertEquals(
-            WebChatConsumerPageActionPlacement.CONVERSATION,
+            WebChatConsumerPageActionPlacement.NONE,
             state.controls.single().pageActionPlacement,
         )
         assertEquals(WebChatConsumerCommandStatus.SUCCEEDED, state.commandRequests.single().status)

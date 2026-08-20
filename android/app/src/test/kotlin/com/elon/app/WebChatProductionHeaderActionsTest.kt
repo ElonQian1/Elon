@@ -1,0 +1,104 @@
+package com.elon.app
+
+import com.elon.app.chatgptweb.ChatGptWebUiControl
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class WebChatProductionHeaderActionsTest {
+    @Test
+    fun exposesTheHeaderEntryOnlyOnReadyChatGptChatPages() {
+        val chatGpt = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+        val google = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
+
+        assertTrue(WebChatProductionHeaderActionPolicy.visible(chatGpt, "ready", "home"))
+        assertTrue(WebChatProductionHeaderActionPolicy.visible(chatGpt, "ready", "conversation"))
+        assertFalse(WebChatProductionHeaderActionPolicy.visible(chatGpt, "connecting", "home"))
+        assertFalse(WebChatProductionHeaderActionPolicy.visible(chatGpt, "ready", "feature"))
+        assertFalse(WebChatProductionHeaderActionPolicy.visible(google, "ready", "conversation"))
+    }
+
+    @Test
+    fun resolvesObservedTemporaryStateWithoutDuplicatingConversationSettings() {
+        val resolved = WebChatProductionHeaderActionPolicy.resolve(
+            state(
+                pageKind = "conversation",
+                control = temporaryControl(selected = true),
+            ),
+            currentConversationPath = "/c/current",
+        )
+
+        assertNotNull(resolved.temporaryChat)
+        assertTrue(resolved.temporaryChatSelected)
+        assertTrue(resolved.conversationSettingsAvailable)
+    }
+
+    @Test
+    fun keepsTemporaryStateUnknownUntilTheOfficialControlIsObserved() {
+        val resolved = WebChatProductionHeaderActionPolicy.resolve(
+            state(pageKind = "home", control = null),
+            currentConversationPath = null,
+        )
+
+        assertNull(resolved.temporaryChat)
+        assertFalse(resolved.temporaryChatSelected)
+        assertFalse(resolved.conversationSettingsAvailable)
+    }
+
+    @Test
+    fun rejectsDisabledOrNonSettableTemporaryControls() {
+        val disabled = temporaryControl(selected = false, enabled = false)
+        val nonSettable = temporaryControl(selected = false, stateSettable = false)
+
+        assertNull(WebChatProductionHeaderActionPolicy.resolve(
+            state("home", disabled),
+            null,
+        ).temporaryChat)
+        assertNull(WebChatProductionHeaderActionPolicy.resolve(
+            state("home", nonSettable),
+            null,
+        ).temporaryChat)
+    }
+
+    private fun state(
+        pageKind: String,
+        control: ChatGptWebUiControl?,
+    ) = WebChatConsumerState(
+        streaming = false,
+        dictationActive = false,
+        composerSections = emptyMap(),
+        pageKind = pageKind,
+        pageUrl = if (pageKind == "conversation") {
+            "https://chatgpt.com/c/current"
+        } else {
+            "https://chatgpt.com/"
+        },
+        features = emptyList(),
+        controls = control?.let {
+            listOf(WebChatConsumerControlDescriptor(
+                control = it,
+                requiresUserConfirmation = false,
+                presentation = WebChatConsumerControlPresentation.DIRECT,
+                nativeSelector = "chatgpt-native:temporary-chat:临时聊天",
+            ))
+        }.orEmpty(),
+        commandRequests = emptyList(),
+    )
+
+    private fun temporaryControl(
+        selected: Boolean,
+        enabled: Boolean = true,
+        stateSettable: Boolean = true,
+    ) = ChatGptWebUiControl(
+        id = "control_temporary_chat",
+        label = if (selected) "关闭临时聊天" else "临时聊天",
+        semantic = "temporary_chat",
+        region = "header",
+        role = "button",
+        enabled = enabled,
+        selected = selected,
+        stateSettable = stateSettable,
+    )
+}

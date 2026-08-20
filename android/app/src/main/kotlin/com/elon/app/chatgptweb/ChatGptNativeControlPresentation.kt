@@ -290,7 +290,6 @@ internal object ChatGptNativeControlPresentation {
     private val CONVERSATION_PAGE_ACTION_SEMANTICS = setOf(
         "conversation_options",
         "conversation_files",
-        "temporary_chat",
         "save_to_project",
         "rename",
         "pin",

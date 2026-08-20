@@ -105,6 +105,10 @@ class ChatGptNativeControlPresentationTest {
 
         assertEquals("direct", coverage.kind.wireName)
         assertEquals(ChatGptNativeNavigationSelector.TEMPORARY_CHAT, coverage.nativeSelector)
+        assertEquals(
+            WebChatConsumerPageActionPlacement.NONE,
+            ChatGptNativeControlPresentation.pageActionPlacement(temporary),
+        )
     }
 
     @Test

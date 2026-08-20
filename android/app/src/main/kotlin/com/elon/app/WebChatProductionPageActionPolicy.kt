@@ -67,21 +67,12 @@ internal data class WebChatProductionPageIdentity(
     }
 }
 
-internal object WebChatProductionPageActionEntryPolicy {
-    fun visible(
-        provider: WebChatProviderIdentity,
-        currentConversationPath: String?,
-        state: String,
-    ): Boolean = provider.supports(WebChatProviderCapability.PAGE_ACTIONS) &&
-        state == "ready" &&
-        ChatGptWebConversationPath.normalize(currentConversationPath) != null
-}
-
 internal object WebChatProductionPageActionParser {
     fun parse(
         descriptors: List<WebChatConsumerControlDescriptor>,
         pageIdentity: WebChatProductionPageIdentity,
     ): List<WebChatProductionPageAction> = descriptors.asSequence()
+        .filterNot { it.control.semantic == WebChatProductionHeaderActionPolicy.TEMPORARY_CHAT }
         .filter(::isPresentable)
         .filter { it.pageActionPlacement == pageIdentity.actionPlacement }
         .filter { descriptor -> belongsToCurrentPage(descriptor.control, pageIdentity) }
@@ -118,7 +109,6 @@ internal object WebChatProductionPageActionParser {
         identity: WebChatProductionPageIdentity,
     ): Boolean {
         if (identity.actionPlacement != WebChatConsumerPageActionPlacement.CONVERSATION) return true
-        if (control.semantic == "temporary_chat") return true
         val expectedContext = identity.conversationId
         val observedContext = control.contextId?.trim().orEmpty()
         if (expectedContext != null && observedContext.isNotBlank()) {
@@ -133,7 +123,6 @@ internal object WebChatProductionPageActionParser {
     private fun displayLabel(control: WebChatConsumerControl): String = when (control.semantic) {
         "conversation_options" -> "会话设置"
         "conversation_files" -> "会话文件"
-        "temporary_chat" -> if (control.selected) "关闭临时聊天" else "临时聊天"
         "save_to_project" -> "添加到项目"
         "rename" -> "重命名"
         "pin" -> if (UNPIN_LABEL.containsMatchIn(control.label)) "取消置顶" else "置顶"
@@ -178,7 +167,6 @@ internal object WebChatProductionPageActionParser {
         "rename",
         "pin",
         "archive",
-        "temporary_chat",
         "delete",
         "profile",
         "personalization",

@@ -56,7 +56,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionComposerToolsCoordinator"))
         assertTrue(feature.contains("WebChatProductionFeatureNavigationCoordinator"))
         assertTrue(feature.contains("WebChatProductionPageActionsCoordinator"))
-        assertTrue(feature.contains("WebChatProductionPageActionEntryPolicy.visible"))
+        assertTrue(feature.contains("WebChatProductionHeaderActionsCoordinator"))
+        assertTrue(feature.contains("productionHeaderActions.render"))
         assertTrue(feature.contains("WebChatProductionConversationActionsCoordinator"))
         assertTrue(feature.contains("WebChatProductionSuggestionsCoordinator"))
         assertTrue(feature.contains("productionSuggestions.render(provider, controller.consumerPort())"))
@@ -187,6 +188,7 @@ class WebChatProductionSurfaceBoundaryContractTest {
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerVisualMode.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureCompletion.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionHeaderActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActions.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActionPolicy.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionConversationActions.kt",
