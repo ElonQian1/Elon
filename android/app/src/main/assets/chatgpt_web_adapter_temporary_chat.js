@@ -38,6 +38,16 @@
         values.result('set_ui_control_selected', false, '官网控件已变化，请刷新结构后重试。');
         return;
       }
+      if (typeof node.click === 'function') {
+        try {
+          node.click();
+          values.result('set_ui_control_selected', true, '');
+          window.setTimeout(values.emitSnapshot, 180);
+          return;
+        } catch (_) {
+          // Fall through to a native touch for pages that reject DOM activation.
+        }
+      }
       const rect = node.getBoundingClientRect();
       const xRatio = (rect.left + rect.width / 2) / Math.max(1, window.innerWidth);
       const yRatio = (rect.top + rect.height / 2) / Math.max(1, window.innerHeight);
