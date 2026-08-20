@@ -7358,7 +7358,7 @@
       "id": "win-node-agent-background-repair-file-lock-v1",
       "title": "Win node-agent background repair file-lock recovery",
       "summary": "Make verified Win node-agent background activation fail closed on process-stop errors and retry transient executable sharing violations so the new runtime can replace the installed launcher and recover on the exact release identity.",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-node-agent-background-repair-file-lock-v1.md",
@@ -7397,15 +7397,88 @@
         "Installed runtime and watchdog recover on the exact published identity.",
         "Launcher, release, Rust, and Google AI regression tests pass."
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_1d79286b4aba41a2be5fbc39214b555f",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787244472909,
-        "expires_at_ms": 1787258872909
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/win-node-agent-background-repair-file-lock-v1.md",
+          "content_hash": "e038ecf748acd2ef21a9ce9ad087c1e86875dee47f813ec70336b63ddbced028",
+          "locator": "Acceptance criteria",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2a5344c34d4718a4b5185907836eff2080d0f152",
+            "head_blob_oid": "0d7dc7ac1ba8d6d8d07bb5b3de6b9e48a035f134",
+            "worktree_blob_oid": "0d7dc7ac1ba8d6d8d07bb5b3de6b9e48a035f134",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-node-agent-local-first-release.ps1",
+          "content_hash": "4b3f8e76f9fc4257a1a9f76ba82d58afc7cb50802d4348052d88df39af4501fe",
+          "locator": "NODE_AGENT_LOCAL_FIRST_TESTS=passed",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2a5344c34d4718a4b5185907836eff2080d0f152",
+            "head_blob_oid": "62e9f7f6e43458fa4466c7417cb6070e9c2ca4ef",
+            "worktree_blob_oid": "62e9f7f6e43458fa4466c7417cb6070e9c2ca4ef",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_client_launcher/installer.rs",
+          "content_hash": "75723d8f612fff056855e9d36fe5008aaf1dc582b6a0ae86273441a594b96bec",
+          "locator": "copy_if_needed",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2a5344c34d4718a4b5185907836eff2080d0f152",
+            "head_blob_oid": "c40e4d2b09c1ed57a838adb918dc377da75a3f76",
+            "worktree_blob_oid": "c40e4d2b09c1ed57a838adb918dc377da75a3f76",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_client_launcher/launcher_tests.rs",
+          "content_hash": "97973f2189b79eeeffa89eb540601476d6951383650e1827dc7cebf1a7ba08aa",
+          "locator": "background_package_repair_checks_desktop_before_stopping_runtime",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2a5344c34d4718a4b5185907836eff2080d0f152",
+            "head_blob_oid": "48fd5d88276ee7dfd3cffc043ffdc47fb67a1e1a",
+            "worktree_blob_oid": "48fd5d88276ee7dfd3cffc043ffdc47fb67a1e1a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_client_launcher/process.rs",
+          "content_hash": "3b31ce9261e01d17d0b2b5dd24e3b1592e59051661ebeb8974f4111d635f466b",
+          "locator": "stop_installed_client_processes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2a5344c34d4718a4b5185907836eff2080d0f152",
+            "head_blob_oid": "b2a8bb10abc82a9844a70d19e25112b8fdbdf677",
+            "worktree_blob_oid": "b2a8bb10abc82a9844a70d19e25112b8fdbdf677",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_client_launcher/process_tests.rs",
+          "content_hash": "3ca8defd6a65c2899ae3e6310555a0f74c58499d24d8a6521f35e86dddd2ff4a",
+          "locator": "stop_installed_client_processes_excludes_current_pid",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2a5344c34d4718a4b5185907836eff2080d0f152",
+            "head_blob_oid": "4610eae59af503ddca9abdeee252538cc6a448d7",
+            "worktree_blob_oid": "4610eae59af503ddca9abdeee252538cc6a448d7",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787244462582,
-      "updated_at_ms": 1787244483783
+      "updated_at_ms": 1787245305621
     },
     {
       "id": "win-web-ai-context-continuity-hardening-v1",
@@ -8298,36 +8371,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_2f260304acf84b30addaed4aea2d6336",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Reclaimed after final requirement rebind; implementation and tests are current.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786869685542
-    },
-    {
-      "id": "feature_event_fdea609d51b9462f91d77602fd0b1b11",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786869705628
-    },
-    {
-      "id": "feature_event_6627c34c12194e27836a4224693cbb76",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Shared .NET file hash helper is wired into both fleet export paths.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786869723912
-    },
     {
       "id": "feature_event_abc61fe416b94df2b43f12bb678f3dd2",
       "feature_id": "rust-cache-portable-file-hash-v1",
@@ -10297,6 +10340,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787244483783
+    },
+    {
+      "id": "feature_event_d08d02fd434043f9a2f4013a419e1885",
+      "feature_id": "win-node-agent-background-repair-file-lock-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787245292028
+    },
+    {
+      "id": "feature_event_7f375f6eee0e4390a54c73bde0824919",
+      "feature_id": "win-node-agent-background-repair-file-lock-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Implemented fail-closed installed-process termination and bounded Windows sharing-violation retry.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787245305569
+    },
+    {
+      "id": "feature_event_e508a198f17448f18d5272bf577d087a",
+      "feature_id": "win-node-agent-background-repair-file-lock-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Focused elon-pc-node launcher tests, node-agent local-first release tests, source-size guard, and Google AI user-browser regressions passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787245305621
     }
   ]
 }
