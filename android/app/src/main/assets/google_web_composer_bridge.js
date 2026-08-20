@@ -22,9 +22,14 @@
     '[contenteditable="plaintext-only"]'
   ].join(',');
   const POSITIVE_LABEL = /ask|anything|follow.?up|chat|prompt|question|提问|尽情|追问|输入|询问/i;
+  const BLOCKING_MENU_CLOSE_LABEL = /^(?:close\s+(?:menu|popover)|关闭菜单|關閉選單|關閉菜單)$/i;
 
   function cleanText(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isBlockingMenuCloseLabel(value) {
+    return BLOCKING_MENU_CLOSE_LABEL.test(cleanText(value));
   }
 
   function scoreMeta(meta) {
@@ -219,6 +224,24 @@
     return matches.sort((left, right) => right.score - left.score || right.right - left.right)[0]?.node || null;
   }
 
+  function dismissBlockingMenu() {
+    for (const doc of documents()) {
+      for (const scope of roots(doc)) {
+        for (const node of scope.querySelectorAll('button, [role="button"]')) {
+          if (!visible(node) || node.matches(':disabled') ||
+              node.getAttribute('aria-disabled') === 'true') continue;
+          const label = cleanText([
+            node.getAttribute('aria-label'), node.getAttribute('title'), node.textContent
+          ].filter(Boolean).join(' '));
+          if (!isBlockingMenuCloseLabel(label)) continue;
+          node.click();
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function pressEnter(composer) {
     if (!composer) return false;
     const KeyboardEventType = composer.ownerDocument.defaultView.KeyboardEvent;
@@ -239,15 +262,17 @@
   }
 
   return Object.freeze({
-    version: 2,
+    version: 3,
     scoreMeta,
     scoreSubmitAction,
+    isBlockingMenuCloseLabel,
     find,
     value,
     setValue,
     form,
     findAction,
     findSubmitAction,
+    dismissBlockingMenu,
     pressEnter,
     diagnostics
   });

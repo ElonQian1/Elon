@@ -217,6 +217,7 @@
     }
     const beforeHref = location.href;
     const submitStartedAt = Date.now();
+    let blockingMenuDismissals = 0;
 
     function confirmSubmission(startedAt) {
       const currentComposer = findComposer();
@@ -242,13 +243,19 @@
 
     function submitWhenReady() {
       const currentComposer = findComposer() || composer;
+      const elapsedMs = Date.now() - submitStartedAt;
+      if (blockingMenuDismissals < 3 &&
+          typeof composerBridge.dismissBlockingMenu === 'function' &&
+          composerBridge.dismissBlockingMenu()) {
+        blockingMenuDismissals += 1;
+        return window.setTimeout(submitWhenReady, 120);
+      }
       const form = composerBridge.form(currentComposer);
       const scope = form || currentComposer.parentElement?.parentElement?.parentElement ||
         currentComposer.parentElement;
       const button = composerBridge.findSubmitAction(currentComposer) ||
         composerBridge.findAction(currentComposer, ['send', 'submit', '发送', '提交']) ||
         findButton(['send', 'submit', '发送', '提交'], scope || document);
-      const elapsedMs = Date.now() - submitStartedAt;
       const navigationFallbackAllowed = elapsedMs >= SUBMIT_READY_TIMEOUT_MS &&
         prompt.length <= MAX_NAVIGATION_PROMPT_LENGTH && !messageExtractor.hasCurrentQuery();
       const step = sendPolicy.submissionStep({

@@ -6057,6 +6057,108 @@
       "updated_at_ms": 1787221739704
     },
     {
+      "id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "title": "Win Google AI 发送前清理阻塞菜单 V4",
+      "summary": "复用现有 Google 语义适配器，在发送前关闭明确的残留回答菜单焦点陷阱，恢复原生输入到官方页的真实发送和回复同步。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-google-ai-dismiss-blocking-menu-before-send-v4.md",
+        "content_hash": "7038c6b824f3e849e3641e4d5a389844aab5bc1a63984672fa2635ab2635ea85",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "aa03be8d833ec4b66eb7a92a94ad02c64ed2a1b9",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "22e7d87d4647af44981bcb0a25bd22fc05d1ebb9",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "tauri",
+        "webview2",
+        "google-ai",
+        "guest",
+        "send",
+        "overlay",
+        "ux"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/google_web_adapter.js",
+        "android/app/src/main/assets/google_web_composer_bridge.js",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "识别并关闭明确的 Google Close menu 阻塞控件",
+        "保留草稿归属和发送回执校验",
+        "PC浏览器契约、PC构建和Rust定向测试通过",
+        "真实发送留在原生UI且不回滚",
+        "Google回复同步回原生聊天UI"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/google_web_adapter.js",
+          "content_hash": "2535c0fb92c49cbbee474ec989262ec16b18a0f6f532ab45804393a427a5dd2f",
+          "locator": "blockingMenuDismissals",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aa03be8d833ec4b66eb7a92a94ad02c64ed2a1b9",
+            "head_blob_oid": "97b53b276648dad85e841845a1881fd4dc0b6d16",
+            "worktree_blob_oid": "1039514181e61540aa16b3b880b52fea51199f17",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/google_web_composer_bridge.js",
+          "content_hash": "bf743638d9255a65991b1341be90ae154984edf5a7d42642aa44dbade3c925fb",
+          "locator": "dismissBlockingMenu",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aa03be8d833ec4b66eb7a92a94ad02c64ed2a1b9",
+            "head_blob_oid": "ecb59d6a94b36dac88e877a1ce5af2a76bcca575",
+            "worktree_blob_oid": "f336cc4693327b67e2bf9e89b06dde8a4968cd2d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "e0a58193a2eb455b50415e40898ef3d2db3a928b602fa8cc44dade518fbbfa67",
+          "locator": "菜单焦点陷阱",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aa03be8d833ec4b66eb7a92a94ad02c64ed2a1b9",
+            "head_blob_oid": "677c2e6c33af30590af3e750e13bb3dc0237c4d7",
+            "worktree_blob_oid": "3439ee3306bea499b24b9009360ce846f47c404c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "01832e04dab6c4a4e8257b72b80a4d99b3224c076af804a5e806718d2e99fa17",
+          "locator": "isBlockingMenuCloseLabel",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aa03be8d833ec4b66eb7a92a94ad02c64ed2a1b9",
+            "head_blob_oid": "8aade9fb94a73fca56d8bf33d8330ac8361993d8",
+            "worktree_blob_oid": "827a7ca05a1d8e0e76096ce666cbf75621d3ad59",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787223014214,
+      "updated_at_ms": 1787223222811
+    },
+    {
       "id": "win-google-ai-guest-new-conversation-recovery-v1",
       "title": "Win Google AI 游客新对话快速恢复 V1",
       "summary": "让 Win 原生聊天在 Google 游客适配器未连接或缓存上下文未绑定时仍可立即发起新会话恢复，并保留发送绑定门禁。",
@@ -7617,76 +7719,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_12d9d1a187c2464081d74b024f762da4",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "Rust 8 项定向回归、完整开放商业 PC 契约和 TypeScript/Vite 生产构建已通过；远端新增 Android 改动不影响本范围。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786766909820
-    },
-    {
-      "id": "feature_event_1a49010f4a3a4fa7aa15cb1bd7d5aa80",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "验证闭环已随提交 f56e2846e 推送到 origin/main。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786766985323
-    },
-    {
-      "id": "feature_event_2fafaa8b1df743b495809ab17892a682",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "registered",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Accepted V1 ADR has an uncompiled and divergent implementation; this scoped V2 closes the independently verifiable SSRF and DNS rebinding boundary.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786767952681
-    },
-    {
-      "id": "feature_event_a5eefd63fb0545559ed661ef708f3536",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "claimed",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786767962422
-    },
-    {
-      "id": "feature_event_81e5b6ff28734675b4ecf4f77ee2d253",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Implementation started after confirming divergent address policies and uncompiled open-commerce coverage.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786767974273
-    },
-    {
-      "id": "feature_event_45be158d8df948ffad6275eff29afa62",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "claim_released",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Requirement wording was intentionally finalized during implementation; release the active claim before explicit rebind and review.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786772344775
-    },
-    {
-      "id": "feature_event_9211a1c2dd49446f8ec22561f7c850ed",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "requirement_rebound",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Bind the intentionally finalized V2 requirement before evidence and lifecycle review.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786772358478
-    },
     {
       "id": "feature_event_5ed2fb5bf25d44fdae646ccfb3040a33",
       "feature_id": "open-commerce-outbound-public-address-policy-v2",
@@ -9616,6 +9648,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787221739704
+    },
+    {
+      "id": "feature_event_a929a96b7fe747c0a8651a5ce82ad999",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "真实 Win 验收确认残留导出菜单阻止发送；手动关闭后同一草稿立即成功。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1787223014214
+    },
+    {
+      "id": "feature_event_95343d21d05a4174a38d5e041f2d61a6",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "真实故障证据、最小适配范围和验收标准已明确。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787223029875
+    },
+    {
+      "id": "feature_event_103ba50b474e472680f476672ca6cf43",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787223040048
+    },
+    {
+      "id": "feature_event_48bf2667afc44e83b7813edd9f93b25a",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始实现发送前阻塞菜单清理并补充回归契约。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787223050262
+    },
+    {
+      "id": "feature_event_8c5a78c709ea4e8da3037ceb19a2729d",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787223188685
+    },
+    {
+      "id": "feature_event_26bf2ad4d2e74437a7a3a78059e482ce",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "阻塞菜单清理、有限重试与回归契约已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787223207885
+    },
+    {
+      "id": "feature_event_4ea73a58e6084fb3a73ffcf79b980790",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "完整用户浏览器测试、PC生产构建、Rust定向验证均通过；等待发布后真实Win复验。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787223222811
     }
   ]
 }
