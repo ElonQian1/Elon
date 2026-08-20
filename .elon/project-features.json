@@ -6212,7 +6212,7 @@
       "id": "win-native-ai-send-surface-continuity-v1",
       "title": "Win 原生 AI 发送界面连续性 V1",
       "summary": "修复原生发送成功后被前端策略强制切换到 Google AI 或 ChatGPT 官方标签页的问题，保留后台回复同步与手动官网入口。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-native-ai-send-surface-continuity-v1.md",
@@ -6292,7 +6292,7 @@
         }
       ],
       "created_at_ms": 1787217360989,
-      "updated_at_ms": 1787218056035
+      "updated_at_ms": 1787218879911
     },
     {
       "id": "win-native-multi-provider-web-ai-bridge-v1",
@@ -7353,16 +7353,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_61673a722c544681bc3dd69a2771318b",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "审计发现大量已删除短期 worktree 遗留 workspace build 分区长期占用共享 D 盘，需要把创建与销毁闭环纳入任务生命周期。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786761137731
-    },
     {
       "id": "feature_event_032bc6ae554d4f83a479345d75206f8f",
       "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
@@ -9352,6 +9342,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787218056035
+    },
+    {
+      "id": "feature_event_e1e205c3ec834f96a7a64caf8da4ac28",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Win 发布身份 0.3.69+a6cb7d852b13630377bdf0b16c154bd0e86be953 已同步，本机节点重启后精确版本匹配，前端与 Tauri 在线。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787218879911
     }
   ]
 }
