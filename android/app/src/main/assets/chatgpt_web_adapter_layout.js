@@ -747,7 +747,7 @@
       return result('set_ui_control_slider', false, '官网滑块已变化，请刷新结构后重试。');
     }
     return formCommands.setSliderValue(
-      node, value, formAdapter, result,
+      node, id, value, formAdapter, emitEvent, result,
       () => emitSnapshot(emitEvent, true)
     );
   }

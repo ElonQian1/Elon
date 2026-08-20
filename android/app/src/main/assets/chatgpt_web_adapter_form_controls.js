@@ -97,13 +97,19 @@
     );
   }
 
-  function nativeSliderDetails(node, kind) {
-    if (tagName(node) !== 'input' || kind !== 'range') return null;
-    const min = Number(node.min || attribute(node, 'min') || 0);
-    const max = Number(node.max || attribute(node, 'max') || 100);
-    const rawStep = String(node.step || attribute(node, 'step') || '1').toLowerCase();
+  function sliderDetails(node, kind) {
+    if (kind !== 'range') return null;
+    const nativeInput = tagName(node) === 'input';
+    const rawMin = nativeInput ? (node.min || attribute(node, 'min') || 0) : attribute(node, 'aria-valuemin');
+    const rawMax = nativeInput ? (node.max || attribute(node, 'max') || 100) : attribute(node, 'aria-valuemax');
+    const rawValue = nativeInput ? node.value : attribute(node, 'aria-valuenow');
+    if (!nativeInput && [rawMin, rawMax, rawValue].some((value) => value === '')) return null;
+    const min = Number(rawMin);
+    const max = Number(rawMax);
+    const rawStep = String(nativeInput ? (node.step || attribute(node, 'step') || '1') :
+      (attribute(node, 'aria-valuestep') || '1')).toLowerCase();
     const step = rawStep === 'any' ? NaN : Number(rawStep);
-    const value = Number(node.value);
+    const value = Number(rawValue);
     const rawStepCount = (max - min) / step;
     const stepCount = Math.round(rawStepCount);
     if (![min, max, step, value].every(Number.isFinite) || max <= min || step <= 0) return null;
@@ -122,7 +128,7 @@
     const selectedChoiceIndex = choiceLabels.length && Number.isInteger(node.selectedIndex)
       ? node.selectedIndex
       : -1;
-    const slider = nativeSliderDetails(node, kind);
+    const slider = sliderDetails(node, kind);
     return {
       role: resolvedRole,
       inputKind: kind,
@@ -218,6 +224,20 @@
   }
 
   function setSliderValue(node, rawValue) {
+    const plan = planSliderValue(node, rawValue);
+    if (!plan.ok) return plan;
+    if (tagName(node) !== 'input') return { ok: false, reason: 'requires_pointer' };
+    if (!plan.changed) return { ok: true, reason: '', changed: false };
+    const normalized = plan.value;
+    const setter = nativeValueSetter(node);
+    if (setter) setter.call(node, String(normalized));
+    else node.value = String(normalized);
+    if (typeof node.focus === 'function') node.focus();
+    dispatchValueEvents(node);
+    return { ok: true, reason: '', changed: true };
+  }
+
+  function planSliderValue(node, rawValue) {
     const details = describe(node);
     if (!details || !details.sliderSettable) return { ok: false, reason: 'not_settable' };
     const requested = Number(rawValue);
@@ -228,15 +248,15 @@
       Math.max(details.sliderMin, details.sliderMin + stepIndex * details.sliderStep)
     );
     const tolerance = Math.max(1e-9, Math.abs(details.sliderStep) * 1e-7);
-    if (Math.abs(details.sliderValue - normalized) <= tolerance) {
-      return { ok: true, reason: '', changed: false };
-    }
-    const setter = nativeValueSetter(node);
-    if (setter) setter.call(node, String(normalized));
-    else node.value = String(normalized);
-    if (typeof node.focus === 'function') node.focus();
-    dispatchValueEvents(node);
-    return { ok: true, reason: '', changed: true };
+    return {
+      ok: true,
+      reason: '',
+      changed: Math.abs(details.sliderValue - normalized) > tolerance,
+      min: details.sliderMin,
+      max: details.sliderMax,
+      value: normalized,
+      pointer: tagName(node) !== 'input'
+    };
   }
 
   function setText(node, rawValue) {
@@ -261,6 +281,7 @@
   return Object.freeze({
     ACTIONABLE_SELECTOR,
     describe,
+    planSliderValue,
     planSelectedState,
     semantic,
     selectChoice,

@@ -143,6 +143,25 @@ assert.equal(range.value, '1.5');
 assert.deepEqual(range.events, ['input', 'change']);
 assert.equal(forms.setSliderValue(range, Number.NaN).reason, 'invalid_value');
 
+const ariaRange = control({
+  tagName: 'DIV',
+  attributes: {
+    role: 'slider',
+    'aria-label': 'Thinking effort',
+    'aria-valuemin': '0',
+    'aria-valuemax': '3',
+    'aria-valuenow': '2'
+  }
+});
+const ariaRangeDetails = forms.describe(ariaRange);
+assert.equal(ariaRangeDetails.sliderSettable, true);
+assert.equal(ariaRangeDetails.sliderMin, 0);
+assert.equal(ariaRangeDetails.sliderMax, 3);
+assert.equal(ariaRangeDetails.sliderStep, 1);
+assert.equal(ariaRangeDetails.sliderValue, 2);
+assert.equal(forms.planSliderValue(ariaRange, 3).pointer, true);
+assert.equal(forms.setSliderValue(ariaRange, 3).reason, 'requires_pointer');
+
 const richText = control({
   tagName: 'DIV',
   isContentEditable: true,

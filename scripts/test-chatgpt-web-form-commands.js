@@ -98,12 +98,34 @@ range.min = '0';
 range.max = '10';
 range.step = '2';
 range.value = '4';
-commands.setSliderValue(range, 8, forms, (action, ok) => {
+commands.setSliderValue(range, 'control_range', 8, forms, () => {}, (action, ok) => {
   receipt = { action, ok };
 }, () => { snapshots += 1; });
 assert.equal(receipt.action, 'set_ui_control_slider');
 assert.equal(receipt.ok, true);
 assert.equal(range.value, '8');
 assert.deepEqual(range.events, ['input', 'change']);
+
+const ariaRange = node({
+  role: 'slider',
+  'aria-label': 'Thinking effort',
+  'aria-valuemin': '0',
+  'aria-valuemax': '3',
+  'aria-valuenow': '2'
+});
+ariaRange.getBoundingClientRect = () => ({
+  left: 100, top: 200, right: 500, bottom: 240, width: 400, height: 40
+});
+let sliderTouch = null;
+commands.setSliderValue(ariaRange, 'control_slider', 3, forms, (event) => {
+  sliderTouch = event;
+}, (action, ok) => {
+  receipt = { action, ok };
+}, () => { snapshots += 1; });
+assert.equal(receipt.ok, true);
+assert.equal(sliderTouch.purpose, 'set_ui_control_slider');
+assert.equal(sliderTouch.controlId, 'control_slider');
+assert.equal(sliderTouch.xRatio, 0.5);
+assert.equal(sliderTouch.yRatio, 0.22);
 
 process.stdout.write('CHATGPT_FORM_COMMANDS=passed\n');

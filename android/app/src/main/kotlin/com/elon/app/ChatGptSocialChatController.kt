@@ -64,6 +64,7 @@ internal class ChatGptSocialChatController(
     private var modelPopup: WebChatModelControlPopupHandle? = null
     private var modelOptionById = emptyMap<String, WebChatConsumerOption>()
     private var modelLiveOptionIds = emptySet<String>()
+    private var modelRangeSelectionById = emptyMap<String, WebChatModelRangeSelection>()
     private var modelPickerActive = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
@@ -108,6 +109,7 @@ internal class ChatGptSocialChatController(
         modelPopup = null
         modelOptionById = emptyMap()
         modelLiveOptionIds = emptySet()
+        modelRangeSelectionById = emptyMap()
         modelPickerActive = false
         session.dismissComposerOptions()
         session.deactivate()
@@ -491,19 +493,24 @@ internal class ChatGptSocialChatController(
 
     private fun presentModelOptions(options: List<WebChatConsumerOption>) {
         val selectable = options.filter { it.id.isNotBlank() && it.label.isNotBlank() }
-        val presentation = WebChatModelControlPolicy.resolve(selectable, currentModel())
+        val rangeBinding = WebChatModelRangePolicy.resolve(
+            socialConsumerPort.state().controls.map(WebChatConsumerControlDescriptor::control),
+        )
+        val displayed = rangeBinding?.options ?: selectable
+        val presentation = WebChatModelControlPolicy.resolve(displayed, currentModel())
+        modelRangeSelectionById = rangeBinding?.selections.orEmpty()
         modelLiveOptionIds = selectable.mapTo(linkedSetOf(), WebChatConsumerOption::id)
-        modelOptionById = (selectable + listOfNotNull(presentation.advanced))
+        modelOptionById = (displayed + listOfNotNull(presentation.advanced))
             .associateBy(WebChatConsumerOption::id)
         modelPopup?.let {
-            it.update(selectable, currentModel())
+            it.update(displayed, currentModel())
             return
         }
         val anchor = (binding.modelButton.parent as? View) ?: binding.modelButton
         modelPopup = WebChatModelControlPopup.show(
             activity = activity,
             anchor = anchor,
-            options = selectable,
+            options = displayed,
             currentModel = currentModel(),
             onOptionSelected = ::selectModelOption,
             onProviderSwitch = openProviderPicker,
@@ -511,6 +518,7 @@ internal class ChatGptSocialChatController(
                 modelPopup = null
                 modelOptionById = emptyMap()
                 modelLiveOptionIds = emptySet()
+                modelRangeSelectionById = emptyMap()
                 modelPickerActive = false
                 socialConsumerPort.dismissComposerOptions()
             },
@@ -519,10 +527,18 @@ internal class ChatGptSocialChatController(
             modelPickerActive = false
             modelOptionById = emptyMap()
             modelLiveOptionIds = emptySet()
+            modelRangeSelectionById = emptyMap()
         }
     }
 
     private fun selectModelOption(option: WebChatConsumerOption) {
+        modelRangeSelectionById[option.id]?.let { selection ->
+            socialConsumerPort.updateControl(
+                selection.controlId,
+                WebChatConsumerControlMutation.Slider(selection.value),
+            )
+            return
+        }
         if (option.opensSubmenu && option.id !in modelLiveOptionIds) {
             socialConsumerPort.dismissComposerOptions()
             session.requestModelOptions()

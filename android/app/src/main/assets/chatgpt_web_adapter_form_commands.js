@@ -65,8 +65,30 @@
     window.setTimeout(emitSnapshot, update.changed ? 180 : 0);
   }
 
-  function setSliderValue(node, value, formAdapter, result, emitSnapshot) {
+  function setSliderValue(node, controlId, value, formAdapter, emitEvent, result, emitSnapshot) {
     if (!formAdapter) return result('set_ui_control_slider', false, '官网表单适配器尚未就绪。');
+    const plan = formAdapter.planSliderValue(node, value);
+    if (plan.ok && plan.pointer) {
+      if (!plan.changed) {
+        result('set_ui_control_slider', true, '');
+        return emitSnapshot();
+      }
+      const rect = node.getBoundingClientRect();
+      if (!inViewport(rect)) return result('set_ui_control_slider', false, '官网滑块当前不在可操作区域。');
+      const ratio = (plan.value - plan.min) / Math.max(Number.EPSILON, plan.max - plan.min);
+      const vertical = String(node.getAttribute('aria-orientation') || '').toLowerCase() === 'vertical';
+      const x = vertical ? rect.left + rect.width / 2 : rect.left + rect.width * ratio;
+      const y = vertical ? rect.bottom - rect.height * ratio : rect.top + rect.height / 2;
+      emitEvent({
+        type: 'web_touch_request',
+        purpose: 'set_ui_control_slider',
+        controlId,
+        xRatio: x / Math.max(1, window.innerWidth),
+        yRatio: y / Math.max(1, window.innerHeight)
+      });
+      result('set_ui_control_slider', true, '');
+      return window.setTimeout(emitSnapshot, 180);
+    }
     const update = formAdapter.setSliderValue(node, value);
     if (!update.ok) {
       return result('set_ui_control_slider', false, '该官网滑块不可写，或数值范围已经变化。');
