@@ -74,7 +74,8 @@
     <string name="chatgpt_native_dictation_start">开始听写</string>
     <string name="chatgpt_native_dictation_stop">停止听写</string>
     <string name="chatgpt_native_realtime_voice">实时语音</string>
-    <string name="chatgpt_native_microphone_denied">需要麦克风权限才能使用听写</string>
+    <string name="chatgpt_native_microphone_denied">需要麦克风权限才能使用语音功能</string>
+    <string name="chatgpt_realtime_voice_start_unavailable">未能自动开启实时语音，请点击官网蓝色语音按钮</string>
     <string name="chatgpt_features_title">ChatGPT 功能</string>
     <string name="chatgpt_features_close">关闭功能面板</string>
     <string name="chatgpt_features_loading">正在读取当前账号可用的官方功能</string>

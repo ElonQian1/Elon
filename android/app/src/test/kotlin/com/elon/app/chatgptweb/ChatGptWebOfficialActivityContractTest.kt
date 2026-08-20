@@ -17,6 +17,9 @@ class ChatGptWebOfficialActivityContractTest {
         val intent = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebOfficialFallbackIntent.kt",
         )
+        val actionRuntime = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebOfficialActionRuntime.kt",
+        )
         val manifest = read("android/app/src/main/AndroidManifest.xml")
 
         assertTrue(activity.contains("class ChatGptWebOfficialActivity"))
@@ -27,13 +30,19 @@ class ChatGptWebOfficialActivityContractTest {
         assertTrue(activity.contains("audioPermissionController.handle(request)"))
         assertTrue(activity.contains("proxyController.prepare"))
         assertTrue(activity.contains("sessionRestorer.onPageReady(url)"))
+        assertTrue(activity.contains("ChatGptWebOfficialActionRuntime"))
+        assertTrue(activity.contains("officialActionRuntime.onHostResumed()"))
+        assertTrue(activity.contains("officialActionRuntime.onHostPaused()"))
         assertTrue(activity.contains("cookieManager.flush()"))
         assertFalse(activity.contains("removeAllCookies"))
         assertFalse(activity.contains("clearCache("))
         assertFalse(activity.contains("evaluateJavascript"))
         assertFalse(activity.contains("McpNativeControlBinding"))
         assertFalse(activity.contains("ChatGptWebPageAdapter"))
+        assertTrue(actionRuntime.contains("ChatGptWebPageAdapter"))
+        assertTrue(actionRuntime.contains("ChatGptWebTouchDispatcher"))
         assertTrue(intent.contains("ChatGptWebOfficialActivity::class.java"))
+        assertTrue(intent.contains("EXTRA_STARTUP_ACTION"))
         assertTrue(manifest.contains(".chatgptweb.ChatGptWebOfficialActivity"))
         assertFalse(manifest.contains(".chatgptweb.ChatGptWebTestActivity"))
     }

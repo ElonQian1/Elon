@@ -26,6 +26,7 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
     private lateinit var fileChooserController: ChatGptWebFileChooserController
     private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
     private lateinit var proxyController: ChatGptWebProxyController
+    private lateinit var officialActionRuntime: ChatGptWebOfficialActionRuntime
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
     private val sessionRestorer by lazy { ChatGptWebSessionRestorer(this) }
 
@@ -59,12 +60,14 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
             }
             ChatGptWebAuthenticationSupport.configure(settings)
             webViewClient = ChatGptWebViewClient(
-                onPageStarted = {
+                onPageStarted = { url ->
                     this@ChatGptWebOfficialActivity.progress.visibility = View.VISIBLE
+                    officialActionRuntime.onPageStarted(url)
                 },
                 onPageReady = { url ->
                     cookieManager.flush()
                     sessionRestorer.onPageReady(url)
+                    officialActionRuntime.onPageReady(url)
                 },
                 onBlockedNavigation = { host ->
                     Toast.makeText(
@@ -104,6 +107,19 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
         }
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
+        officialActionRuntime = ChatGptWebOfficialActionRuntime(
+            context = this,
+            webView = webView,
+            startupAction = if (
+                savedInstanceState?.getBoolean(STATE_STARTUP_ACTION_CONSUMED) == true
+            ) {
+                null
+            } else {
+                ChatGptWebOfficialFallbackIntent.startupAction(intent)
+            },
+            audioPermissionController = audioPermissionController,
+            onFeedback = ::showStartupFeedback,
+        )
 
         progress = ProgressBar(
             this,
@@ -155,9 +171,11 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        officialActionRuntime.onHostResumed()
     }
 
     override fun onPause() {
+        officialActionRuntime.onHostPaused()
         cookieManager.flush()
         webView.onPause()
         super.onPause()
@@ -165,10 +183,15 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         webView.saveState(outState)
+        outState.putBoolean(
+            STATE_STARTUP_ACTION_CONSUMED,
+            officialActionRuntime.requestConsumed(),
+        )
         super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {
+        officialActionRuntime.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()
         webView.apply {
@@ -187,10 +210,26 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
         ).show()
     }
 
+    private fun showStartupFeedback(feedback: ChatGptWebOfficialStartupFeedback) {
+        when (feedback) {
+            ChatGptWebOfficialStartupFeedback.MICROPHONE_DENIED -> showMicrophoneDenied()
+            ChatGptWebOfficialStartupFeedback.UNAVAILABLE -> Toast.makeText(
+                this,
+                R.string.chatgpt_realtime_voice_start_unavailable,
+                Toast.LENGTH_LONG,
+            ).show()
+            else -> Unit
+        }
+    }
+
     private fun showPageError(message: String) {
         progress.visibility = View.GONE
         Toast.makeText(this, message.take(160), Toast.LENGTH_LONG).show()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val STATE_STARTUP_ACTION_CONSUMED = "chatgpt_startup_action_consumed"
+    }
 }

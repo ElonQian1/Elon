@@ -25,4 +25,14 @@ class ChatGptWebOfficialFallbackIntentTest {
         assertNull(ChatGptWebOfficialFallbackIntent.sanitizeStartUrl("https://example.com/phishing"))
         assertNull(ChatGptWebOfficialFallbackIntent.sanitizeStartUrl("javascript:alert(1)"))
     }
+
+    @Test
+    fun parsesOnlyKnownOneShotStartupActions() {
+        assertEquals(
+            ChatGptWebOfficialStartupAction.REALTIME_VOICE,
+            ChatGptWebOfficialStartupAction.fromWireValue(" realtime_voice "),
+        )
+        assertNull(ChatGptWebOfficialStartupAction.fromWireValue("unknown"))
+        assertNull(ChatGptWebOfficialStartupAction.fromWireValue(null))
+    }
 }
