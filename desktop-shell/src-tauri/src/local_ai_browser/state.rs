@@ -55,6 +55,7 @@ struct SessionRecord {
     active_page_context_key: Option<String>,
     semantic_page_context_key: Option<String>,
     pending_context_action: String,
+    pending_context_since_ms: u64,
     pending_send_prompt: Option<String>,
     preserve_conversation_on_navigation: bool,
     cache_path: Option<PathBuf>,
@@ -220,6 +221,7 @@ impl LocalAiBrowserRuntime {
                 active_page_context_key: active_page_context_key.clone(),
                 semantic_page_context_key: active_page_context_key,
                 pending_context_action: String::new(),
+                pending_context_since_ms: 0,
                 pending_send_prompt: None,
                 preserve_conversation_on_navigation: false,
                 cache_path,
@@ -492,14 +494,25 @@ impl LocalAiBrowserRuntime {
     }
 
     pub fn snapshot(&self, label: &str) -> Option<LocalAiWebSessionState> {
-        self.sessions().get(label).cloned().map(Into::into)
+        let mut sessions = self.sessions();
+        let record = sessions.get_mut(label)?;
+        record.expire_stale_pending_context();
+        Some(record.clone().into())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn backdate_pending_context_for_test(&self, label: &str, ms_ago: u64) {
+        self.update(label, |record| {
+            record.pending_context_since_ms = now_ms().saturating_sub(ms_ago);
+        });
     }
 
     pub fn require_bound_context(&self, label: &str) -> Result<(), String> {
-        let sessions = self.sessions();
+        let mut sessions = self.sessions();
         let record = sessions
-            .get(label)
+            .get_mut(label)
             .ok_or_else(|| "本地 AI 官方会话尚未创建。".to_string())?;
+        record.expire_stale_pending_context();
         if record.context_ready() {
             return Ok(());
         }

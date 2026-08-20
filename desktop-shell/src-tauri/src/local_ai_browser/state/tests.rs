@@ -137,6 +137,38 @@ fn cached_messages_are_not_sendable_until_the_official_page_is_live_and_bound() 
 }
 
 #[test]
+fn stale_pending_context_self_heals_after_timeout_without_a_matching_snapshot() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let url = Url::parse("https://chatgpt.com/c/context").unwrap();
+    runtime.mark_navigation("session", &url, true, None);
+    runtime.mark_page_finished("session", &url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","composerReady":true,"messages":[
+            {"id":"user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"answer","role":"assistant","state":"completed","content":[{"type":"text","text":"answer"}]}
+        ]}),
+        semantic_context::page_context_key("chatgpt", url.as_str()).as_deref(),
+    );
+    assert!(runtime.snapshot("session").unwrap().context_ready);
+
+    // 官网从未回过匹配这次命令的可见快照（例如提取逻辑判定内容未变化而丢弃了事件）。
+    runtime.mark_command_pending("session", "send_prompt", Some("mcp_stall1"));
+    let stalled = runtime.snapshot("session").unwrap();
+    assert!(!stalled.context_ready);
+    assert_eq!(stalled.context_status, "restoring");
+    assert!(runtime.require_bound_context("session").is_err());
+
+    runtime.backdate_pending_context_for_test("session", 9_500);
+    let recovered = runtime.snapshot("session").unwrap();
+    assert!(recovered.context_ready);
+    assert_eq!(recovered.context_status, "bound");
+    assert!(runtime.require_bound_context("session").is_ok());
+}
+
+#[test]
 fn send_snapshot_can_advance_a_chatgpt_spa_route_without_losing_context() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "chatgpt", "active");

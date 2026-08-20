@@ -10,6 +10,9 @@ const BOUNDARY_ACTIONS: [&str; 4] = [
     "open_cached_conversation",
 ];
 
+// 适配器静默丢弃一次快照时，悬挂超过这个时长就不再等待原本边界，回退到最新已确认快照。
+const PENDING_CONTEXT_TIMEOUT_MS: u64 = 9_000;
+
 impl SessionRecord {
     pub(super) fn context_binding_status(&self) -> &'static str {
         if !self.pending_context_action.is_empty() || self.loading {
@@ -40,9 +43,27 @@ impl SessionRecord {
         self.context_binding_status() == "bound"
     }
 
+    pub(super) fn expire_stale_pending_context(&mut self) {
+        if self.pending_context_action.is_empty() {
+            return;
+        }
+        let elapsed = super::now_ms().saturating_sub(self.pending_context_since_ms);
+        if elapsed < PENDING_CONTEXT_TIMEOUT_MS {
+            return;
+        }
+        self.active_conversation_id = self.semantic_conversation_id.clone();
+        self.active_page_context_key = self.semantic_page_context_key.clone();
+        self.pending_context_action.clear();
+        self.pending_context_since_ms = 0;
+        self.pending_send_prompt = None;
+        self.preserve_conversation_on_navigation = false;
+        self.last_event_kind = "context_transition_timed_out".to_string();
+    }
+
     pub(super) fn begin_context_command(&mut self, action: &str, target: Option<&str>) {
         if action == "send_prompt" {
             self.pending_context_action = action.to_string();
+            self.pending_context_since_ms = super::now_ms();
             self.pending_send_prompt = target.map(|value| value.to_string());
             self.preserve_conversation_on_navigation = true;
             return;
@@ -52,6 +73,7 @@ impl SessionRecord {
         }
         self.pending_send_prompt = None;
         self.pending_context_action = action.to_string();
+        self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
         if action == "new_conversation" {
             self.active_conversation_id =
@@ -68,6 +90,7 @@ impl SessionRecord {
 
     pub(super) fn begin_cached_conversation(&mut self, id: String, restorable_url: &str) {
         self.pending_context_action = "open_cached_conversation".to_string();
+        self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
         self.active_conversation_id = Some(id);
         self.active_page_context_key =
@@ -113,6 +136,7 @@ impl SessionRecord {
             },
         );
         self.pending_context_action = "navigation".to_string();
+        self.pending_context_since_ms = super::now_ms();
     }
 
     pub(super) fn apply_message_snapshot(
@@ -145,6 +169,7 @@ impl SessionRecord {
                     self.active_conversation_id = Some(actual.to_string());
                     boundary = "semantic_navigation".to_string();
                     self.pending_context_action = boundary.clone();
+                    self.pending_context_since_ms = super::now_ms();
                 } else {
                     self.last_event_kind = "stale_message_snapshot_ignored".to_string();
                     return false;
@@ -192,6 +217,7 @@ impl SessionRecord {
             .map(ToOwned::to_owned)
             .or_else(|| self.active_page_context_key.clone());
         self.pending_context_action.clear();
+        self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
         if self
             .semantic_event
@@ -213,6 +239,7 @@ impl SessionRecord {
             self.active_conversation_id = self.semantic_conversation_id.clone();
             self.active_page_context_key = self.semantic_page_context_key.clone();
             self.pending_context_action.clear();
+            self.pending_context_since_ms = 0;
             self.pending_send_prompt = None;
         }
         if action == "send_prompt" && !ok {
@@ -226,6 +253,7 @@ impl SessionRecord {
         self.active_page_context_key = None;
         self.semantic_page_context_key = None;
         self.pending_context_action.clear();
+        self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
         self.preserve_conversation_on_navigation = false;
     }
