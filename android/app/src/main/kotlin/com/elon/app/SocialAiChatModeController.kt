@@ -2,6 +2,7 @@ package com.elon.app
 
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebOfficialFallbackIntent
+import com.elon.app.chatgptweb.ChatGptWebOfficialStartupAction
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.googleweb.GoogleWebOfficialActivity
 
@@ -65,6 +66,18 @@ internal class SocialAiChatModeController(
             )
         }
         activity.startActivity(intent)
+    }
+
+    fun openOfficialRealtimeVoice(): Boolean {
+        if (providerId != WebChatProviderId.CHATGPT_WEB) return false
+        activity.startActivity(
+            ChatGptWebOfficialFallbackIntent.create(
+                context = activity,
+                currentUrl = officialFallbackUrl(),
+                startupAction = ChatGptWebOfficialStartupAction.REALTIME_VOICE,
+            ),
+        )
+        return true
     }
 
     fun openSocialAiChat(): Boolean {

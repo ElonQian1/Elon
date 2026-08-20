@@ -62,6 +62,7 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
+    private val openOfficialRealtimeVoice: () -> Boolean,
     private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
     private val onQuickActionChanged: (WebChatProductionQuickComposerAction?) -> Unit,
     private val interactionCache: WebChatProductionInteractionCache,
@@ -214,7 +215,7 @@ internal class WebChatProductionComposerToolsCoordinator(
         if (command.action == REALTIME_VOICE_ACTION) {
             WebChatConsumerComposerOperationPolicy.commandAccepted(provider, command.action)
                 ?.let(onOperationFeedback)
-            openOfficialFallback()
+            if (!openOfficialRealtimeVoice()) openOfficialFallback()
             return true
         }
         val pending = PendingSessionCommand(provider.id, command, requestEpoch)

@@ -134,6 +134,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
+            openOfficialRealtimeVoice = modeController::openOfficialRealtimeVoice,
             onOperationFeedback = ::showComposerOperationFeedback,
             onQuickActionChanged = ::onQuickComposerActionChanged,
             interactionCache = webChatInteractionCache,
