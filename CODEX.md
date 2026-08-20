@@ -24,3 +24,4 @@ When a script prints `NEXT=`, `EDIT_ROOT=`, `FINISH_COMMAND_*=`, `FINALIZABLE=`,
 - **Tool output budget**：长命令成功只读结构化摘要；失败先筛选错误并分页，禁止打开完整日志。
 - **Stale session**：`codex resume` 失败时标记 stale，带旧 `codex://threads/<thread_id>` URI 和最近后端消息重试一次（不冷启动）。
 - **Executor guard**：请求含 `<elon-pc-executor>` 时，本轮已经是 PC 节点执行者；直接完成项目任务，不得再次派发到本机节点。
+- **Commit identity**：Codex CLI 与 Codex 桌面端提交时，覆盖 `copilot-instructions.md` 的 `WF-PUSH` 默认后缀，作者名 = 本机 `git user.name` 追加 ` ai助手`，用 `git -c user.name="<user.name> ai助手" commit` 单次指定，不写入 config。
