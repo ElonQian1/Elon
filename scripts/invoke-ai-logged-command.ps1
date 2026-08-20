@@ -28,6 +28,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+$barePowerShellScriptPattern = '^\s*(?:"[^"]+\.ps1"|[^\s"]+\.ps1)(?:\s|$)'
+if ($CommandLine -match $barePowerShellScriptPattern) {
+    throw "CommandLine must not start with a bare .ps1 path because cmd may open it through the Windows file association. Prefix the command with pwsh.exe -NoProfile -File."
+}
+
 . (Join-Path $PSScriptRoot 'git-path-resolution.ps1')
 
 function Get-LineCount {

@@ -31,6 +31,8 @@ Assert-True (-not $runnerSource.Contains('$heartbeatCount -lt')) `
     "Command runner must not silently stop heartbeat output while still running."
 Assert-True ($runnerSource.Contains('cmd /d /s /c `"call $CommandLine`"')) `
     "Command runner must isolate batch-compatible commands in a child cmd process."
+Assert-True ($runnerSource.Contains('CommandLine must not start with a bare .ps1 path')) `
+    "Command runner must reject bare PowerShell script paths before cmd uses a file association."
 Assert-True ($runnerSource.Contains('$exitCode = [int]$process.ExitCode')) `
     "Command runner must use the wrapper process exit code."
 $gitCommonDir = (& git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
@@ -46,6 +48,7 @@ $timeoutFixture = Join-Path $fixtureRoot "timeout.cmd"
 $silentFixture = Join-Path $fixtureRoot "silent.cmd"
 $heartbeatFixture = Join-Path $fixtureRoot "heartbeat.cmd"
 $nestedFailureFixture = Join-Path $fixtureRoot "nested-failure.cmd"
+$barePowerShellFixture = Join-Path $fixtureRoot "bare-script.ps1"
 
 Set-Content -LiteralPath $successFixture -Encoding ASCII -Value @(
     "@echo off",
@@ -77,6 +80,7 @@ Set-Content -LiteralPath $nestedFailureFixture -Encoding ASCII -Value @(
     "echo error: nested batch failure 1>&2",
     "exit /b 9"
 )
+Set-Content -LiteralPath $barePowerShellFixture -Encoding ASCII -Value 'Write-Output "must-not-run"'
 
 $oldPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
@@ -130,6 +134,12 @@ try {
         -WorkingDirectory $repoRoot `
         -CommandLine "`"$nestedFailureFixture`"" 2>&1)
     $nestedFailureExit = $LASTEXITCODE
+
+    $barePowerShellOutput = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -LogName "reject-bare-powershell" `
+        -WorkingDirectory $repoRoot `
+        -CommandLine "`"$barePowerShellFixture`"" 2>&1)
+    $barePowerShellExit = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $oldPreference
 }
@@ -174,6 +184,13 @@ Assert-True ($nestedFailureExit -eq 9) `
     "Nested batch failure must preserve the called script exit code."
 Assert-True ($nestedFailureText.Contains("AI_COMMAND_STATUS=failed")) `
     "Nested batch failure summary is missing."
+
+$barePowerShellText = $barePowerShellOutput -join "`n"
+Assert-True ($barePowerShellExit -ne 0) "Bare PowerShell script paths must fail before launch."
+Assert-True ($barePowerShellText.Contains("CommandLine must not start with a bare .ps1 path")) `
+    "Bare PowerShell rejection must explain the required explicit pwsh invocation."
+Assert-True (-not $barePowerShellText.Contains("must-not-run")) `
+    "Bare PowerShell script must never execute through the Windows file association."
 
 $recoveryName = "bounded-recovery-$([Guid]::NewGuid().ToString('N'))"
 $recoveryBase = Join-Path $commandLogRoot "$recoveryName-20000101-000000-000"
