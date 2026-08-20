@@ -17,6 +17,7 @@ const source = fs.readFileSync(path.join(
 ), 'utf8');
 const dictationSessionPolicy = require('../android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js');
 const composerSubmenu = require('../android/app/src/main/assets/chatgpt_web_adapter_composer_submenu.js');
+const modelLabelPolicy = require('../android/app/src/main/assets/chatgpt_web_adapter_model_label_policy.js');
 
 function runComposer(sandbox) {
   sandbox.window.__elonChatGptComposerSubmenu = composerSubmenu;
@@ -82,6 +83,55 @@ assert.equal(events[0].type, 'web_touch_request');
 assert.equal(events[0].purpose, 'list_model_options');
 assert.equal(events[0].xRatio, 0.5);
 assert.equal(events[0].yRatio, 0.875);
+
+const compactLevelButton = {
+  id: '',
+  textContent: '高',
+  getAttribute: () => null
+};
+const compactLevelComposer = {
+  closest(selector) {
+    if (selector !== 'form') return null;
+    return {
+      querySelector: () => null,
+      querySelectorAll: (candidate) => candidate === 'button, [role="button"]'
+        ? [compactLevelButton]
+        : []
+    };
+  }
+};
+const compactLevelEvents = [];
+const compactLevelResults = [];
+const compactLevelSandbox = {
+  document: { querySelector: () => null, querySelectorAll: () => [] },
+  location: { origin: 'https://chatgpt.com' },
+  window: {
+    innerWidth: 400,
+    innerHeight: 800,
+    __elonChatGptActionTargetPolicy: {
+      actionPoint: (node) => node === compactLevelButton ? { x: 300, y: 700 } : null,
+      signature: () => 'visible'
+    },
+    __elonChatGptComposerOptionPolicy: { filter: (_section, options) => options },
+    __elonChatGptDictationSessionPolicy: dictationSessionPolicy,
+    __elonChatGptModelLabelPolicy: modelLabelPolicy
+  }
+};
+compactLevelSandbox.window.window = compactLevelSandbox.window;
+compactLevelSandbox.window.document = compactLevelSandbox.document;
+compactLevelSandbox.window.location = compactLevelSandbox.location;
+
+runComposer(compactLevelSandbox);
+compactLevelSandbox.window.__elonChatGptComposer.requestOptions(
+  'model',
+  compactLevelComposer,
+  (event) => compactLevelEvents.push(event),
+  (...args) => compactLevelResults.push(args)
+);
+
+assert.equal(compactLevelResults.length, 0, 'compact level opens the official model control');
+assert.equal(compactLevelEvents.length, 1);
+assert.equal(compactLevelEvents[0].purpose, 'list_model_options');
 
 const mobileModelButton = {
   id: '',
