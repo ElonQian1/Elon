@@ -6442,6 +6442,147 @@
       "updated_at_ms": 1787052768930
     },
     {
+      "id": "win-google-ai-native-complete-answer-root-v1",
+      "title": "Win Google AI 完整回答根节点同步",
+      "summary": "在回答操作区边界内选择完整多段回答根节点，避免原生页退化为来源摘要或正文末尾单句。",
+      "status": "released",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-google-ai-native-primary-answer-routing-v2.md",
+        "content_hash": "f3011d06982e7ae4592c042a04794e9eac3b82dac39f37f896eb3aad9b935943",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+          "head_blob_oid": "1764d77d47565f0eab368f1611e47a9c25bd422b",
+          "worktree_blob_oid": "1764d77d47565f0eab368f1611e47a9c25bd422b",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-ai-browser",
+      "tags": [
+        "win",
+        "google-ai",
+        "webview",
+        "answer-root",
+        "production-regression"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/google_web_answer_candidate_policy.js",
+        "android/app/src/main/assets/google_web_message_extractor.js",
+        "desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs",
+        "docs/requirements/win-google-ai-native-primary-answer-routing-v2.md",
+        "docs/user-browser-module-integration.md",
+        "scripts/test-google-web-answer-candidate-policy.cjs",
+        "scripts/test-google-web-message-extractor-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Google 来源列表折叠到正文同一列时，回答操作区之后的来源结果失败关闭。",
+        "回答操作区嵌套于回答根节点时，选择包含该操作区的最窄多段正文容器。",
+        "完整三点正文必须胜过正文末尾的单句追问，且行内引用继续保留。",
+        "Google 游客会话、输入框、上下文绑定和官方页入口保持可用。",
+        "JS 合同、PC lint/typecheck、Rust 定向测试、Win 安装身份及真实页面对照通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/google_web_answer_candidate_policy.js",
+          "content_hash": "8b7add799973722d94e764069c23cb03f397f4debe9fb5d01a565693916dc5f0",
+          "locator": "sourceCollection/select answerActionContainers",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "c0b9f4926510846787ab5f574f229b24ff43f86f",
+            "worktree_blob_oid": "c0b9f4926510846787ab5f574f229b24ff43f86f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/google_web_message_extractor.js",
+          "content_hash": "69978c3256fe8be8fe745e5615c19717fb92ce2b852e01005324032c2907db6a",
+          "locator": "answerActionRelation/candidateFrom",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "d00d8037b780c9498f606a40195ed320a22eaa29",
+            "worktree_blob_oid": "d00d8037b780c9498f606a40195ed320a22eaa29",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs",
+          "content_hash": "0bf4caa8bdb2e5df6dfa8278d8c5ace20fb6e81ee6ec8d87476aa2abbdc74fb6",
+          "locator": "ADAPTER_VERSION/initialization_script",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "4f9c94d4df01aa8d1d86a86100961bf40a4abad2",
+            "worktree_blob_oid": "4f9c94d4df01aa8d1d86a86100961bf40a4abad2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/win-google-ai-native-primary-answer-routing-v2.md",
+          "content_hash": "f3011d06982e7ae4592c042a04794e9eac3b82dac39f37f896eb3aad9b935943",
+          "locator": "complete answer root acceptance",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "1764d77d47565f0eab368f1611e47a9c25bd422b",
+            "worktree_blob_oid": "1764d77d47565f0eab368f1611e47a9c25bd422b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "79e15d9c1f2d83adb88ced63231be0466a1157d39f5d52da307148b32e2078ea",
+          "locator": "Google primary answer boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "8a2e9edce1448aacefbafff58dd4fd9a5c70d079",
+            "worktree_blob_oid": "8a2e9edce1448aacefbafff58dd4fd9a5c70d079",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-answer-candidate-policy.cjs",
+          "content_hash": "a0520d503dff8b32057f1ca62c35c9ec26c215a544512debc8cbc9e5a159fa3f",
+          "locator": "full-response-root regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "e8d4b32887716bf25eee9df16732c80b8627babd",
+            "worktree_blob_oid": "e8d4b32887716bf25eee9df16732c80b8627babd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-message-extractor-contract.cjs",
+          "content_hash": "c1d5248d13fdbceec145914a300e9a53371d43f2a63b8bf41552aa2a13468735",
+          "locator": "answer action boundary contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc73a1a15e500f567899d370fb25109e9e3bf7b8",
+            "head_blob_oid": "18d16c41d78ad2dd2faa509c14cd6ad2d9bcf5b0",
+            "worktree_blob_oid": "18d16c41d78ad2dd2faa509c14cd6ad2d9bcf5b0",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1787256653031,
+      "updated_at_ms": 1787256740088
+    },
+    {
       "id": "win-google-ai-native-primary-answer-routing-v2",
       "title": "Win Google AI 原生正文路由与前台连续性 V2",
       "summary": "修复原生发送后官方 WebView 抢前台，以及 Google 右侧三条来源卡片被误选为主回答正文的生产回归。",
@@ -8372,76 +8513,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cb06812b6a4c4ab590d4bee077ad2258",
-      "feature_id": "win-web-ai-context-continuity-hardening-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "按重绑后的模块化需求重新绑定当前实现与验证证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786870735542
-    },
-    {
-      "id": "feature_event_f4964deb7a474f219cae3b848f0c05d8",
-      "feature_id": "win-web-ai-context-continuity-hardening-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786870736930
-    },
-    {
-      "id": "feature_event_ecc1b5f5a2d34795be9eacf27cda7da0",
-      "feature_id": "win-web-ai-context-continuity-hardening-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "重绑需求后的实现证据已绑定，代码未发生额外变化。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786870736954
-    },
-    {
-      "id": "feature_event_e1bbdeb6f5e642c8aeb9372a76dc136f",
-      "feature_id": "win-web-ai-context-continuity-hardening-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "统一 Win 网页 AI 验证已通过；需求重绑只增加模块路径，不改变已验证字节。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786870736965
-    },
-    {
-      "id": "feature_event_84a08be4027b4a09b774a0aa170358e2",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "在再次前进的远程注册表上恢复已完成实现的正式登记。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786871115323
-    },
-    {
-      "id": "feature_event_981363c16aad4d8e845f2ca26d5ab645",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "需求范围和验收标准已完成评审。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786871115554
-    },
-    {
-      "id": "feature_event_f55a7a20281d40a78bf49cbe699f4e6d",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "实现路径和验收方式已明确。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786871115818
-    },
-    {
       "id": "feature_event_5cf7de0600ab479c94cb8c13eb2023d3",
       "feature_id": "merchant-erp-sqlite-store-v1",
       "action": "claimed",
@@ -10370,6 +10441,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787247073998
+    },
+    {
+      "id": "feature_event_9e6c3f54924e43629ac46454df050a4b",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "真实 Win 对照发现旧边界只剩末尾追问，作为已验证 V2 的后续生产修复登记。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787256653031
+    },
+    {
+      "id": "feature_event_2261fde2c12743db9d986a76177e4c9e",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787256664103
+    },
+    {
+      "id": "feature_event_88123bdf90544191927ef2f69c3e1069",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现、发布和真实 Win 验收已完成，补录当前提交证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787256677056
+    },
+    {
+      "id": "feature_event_36467413da5a4ab7b9bbab7c3c6c20fb",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787256698520
+    },
+    {
+      "id": "feature_event_e58e675b6d0942bf87a6f0cd0a5bee71",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "完整回答根节点策略、版本门和回归测试已在 cc73a1a15 实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787256712951
+    },
+    {
+      "id": "feature_event_e455d8fe29d649379940ddc15c0ca983",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "前端合同、lint/typecheck、Rust 定向测试和 Google 原生烟测通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787256727468
+    },
+    {
+      "id": "feature_event_eaa08614adc64a66ad58faf627e6a7ed",
+      "feature_id": "win-google-ai-native-complete-answer-root-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Win 0.3.69+cc73a1a15 已激活，真实 Google 游客会话原生页显示完整三点正文和行内引用，语义状态 ready/live。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787256740088
     }
   ]
 }
