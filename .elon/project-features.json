@@ -5968,6 +5968,95 @@
       "updated_at_ms": 1787215120290
     },
     {
+      "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "title": "Win 完整视口后台官方 AI WebView 输入命中隔离 V3",
+      "summary": "保持 Google/ChatGPT 完整官网视口尺寸并将控制器整体停放到父窗口右下可见边界之外，同时满足原生输入命中和后台会话发送。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-full-size-parked-ai-webview-input-hit-test-v3.md",
+        "content_hash": "16a3bc8339abf73625b57347ce6e7ac494326df1c74de10ce02dc8447c2229ad",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "bb8f522c9cd7be28112e3597acfb5553e5936e5e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "e98691a2e313a41776e0c9b1c13ecf05b8c9f7e9",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "tauri",
+        "webview2",
+        "google-ai",
+        "chatgpt",
+        "input",
+        "background-session",
+        "responsive-layout",
+        "ux"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "后台使用父窗口物理边界且不修改官网视口尺寸",
+        "Win合同、Rust定向测试与PC构建通过",
+        "原生输入可用且后台官网保持完整桌面DOM",
+        "真实发送停留原生UI且不回滚",
+        "Google回复同步回原生聊天UI"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+          "content_hash": "e5fdfcfc41e4635051e5d49ed621d7655487fd0f8a5780193011af977f5348e0",
+          "locator": "park",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb8f522c9cd7be28112e3597acfb5553e5936e5e",
+            "head_blob_oid": "a578b291268b115b0b908250274bc87112c0bbaa",
+            "worktree_blob_oid": "35379b473724992cfeff3ad6cbcab38b1bf505e5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "1fc1c605a21b57e7dfe5f4de0a52602ddd0b0617fbca7291d49f6cf5091f790a",
+          "locator": "完整官网视口",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb8f522c9cd7be28112e3597acfb5553e5936e5e",
+            "head_blob_oid": "bed723db9044e48967b7a7d2690c5f4c37f4c78b",
+            "worktree_blob_oid": "677c2e6c33af30590af3e750e13bb3dc0237c4d7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "e221e543f6302c97ac7bc99e8c90718a96ca2b0493da571002441db0484b97ab",
+          "locator": "parkOfficialWebview",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb8f522c9cd7be28112e3597acfb5553e5936e5e",
+            "head_blob_oid": "ed1ce543ff0ea105ff2cc954f26d6556d622a724",
+            "worktree_blob_oid": "8aade9fb94a73fca56d8bf33d8330ac8361993d8",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787221517770,
+      "updated_at_ms": 1787221739704
+    },
+    {
       "id": "win-google-ai-guest-new-conversation-recovery-v1",
       "title": "Win Google AI 游客新对话快速恢复 V1",
       "summary": "让 Win 原生聊天在 Google 游客适配器未连接或缓存上下文未绑定时仍可立即发起新会话恢复，并保留发送绑定门禁。",
@@ -7528,76 +7617,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_1fc6b9fdff2444a2966910acc2551f3c",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "绑定已提交且通过差异检查的当前需求文档。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1786766904822
-    },
-    {
-      "id": "feature_event_c6e52e4ea62943b2b87aebd4d5b8c5cb",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "需求仅修正末尾空白，目标与验收范围不变。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786766904840
-    },
-    {
-      "id": "feature_event_8e70344f5392451985706557c896e121",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "依赖为空，现有验证证据可重新绑定。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786766904858
-    },
-    {
-      "id": "feature_event_9d4ee7c635f74784b634a4730d6fcbcb",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "claimed",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786766904876
-    },
-    {
-      "id": "feature_event_bf93628d639d463bab3208895eaa8079",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "重新绑定当前实现与测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786766904896
-    },
-    {
-      "id": "feature_event_9254881fabf543ba9c97ba09ab4e114f",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786766909776
-    },
-    {
-      "id": "feature_event_11af531a1f034a30a43178bd97817a22",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "当前实现与验证文件重新绑定完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786766909798
-    },
     {
       "id": "feature_event_12d9d1a187c2464081d74b024f762da4",
       "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
@@ -9527,6 +9546,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787220731639
+    },
+    {
+      "id": "feature_event_4ac6b729c8414fdebf453640e8bbe3bf",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "V2 真实发送证明 1×1 会触发 Google 极窄响应式布局和错误控件，需要保留完整官网视口。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1787221517770
+    },
+    {
+      "id": "feature_event_f589377245b142bba2ade8b073e14922",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "V3 完整视口停放约束与真实验收标准已接受。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787221517800
+    },
+    {
+      "id": "feature_event_5f202ea473564bad99662ea221f92450",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787221517822
+    },
+    {
+      "id": "feature_event_9177a02acf5941d28066e58d150a2281",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现完整视口可视区外停放并重新发布验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787221517835
+    },
+    {
+      "id": "feature_event_a065f9e35b2b433686e5fa7ab9ec3eae",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787221716794
+    },
+    {
+      "id": "feature_event_181a5907efc94efa8d1028dfa1ff8a22",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "完整视口后台停放实现完成，PC构建、浏览器合同和Rust定向测试均通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787221728327
+    },
+    {
+      "id": "feature_event_bb9ae7c50253422cb9793ae5024c4de6",
+      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "静态契约、PC生产构建与Rust定向测试通过，等待发布后的真实Win端消息验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787221739704
     }
   ]
 }

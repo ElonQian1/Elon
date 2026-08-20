@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, State,
-    Webview,
+    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Webview,
 };
 
 use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
@@ -98,9 +97,6 @@ pub(crate) fn park(webview: &Webview) -> Result<(), String> {
     webview.hide().map_err(display_error)?;
     webview
         .set_position(PhysicalPosition::new(parked_x, parked_y))
-        .map_err(display_error)?;
-    webview
-        .set_size(PhysicalSize::new(1, 1))
         .map_err(display_error)?;
     webview.show().map_err(display_error)
 }
