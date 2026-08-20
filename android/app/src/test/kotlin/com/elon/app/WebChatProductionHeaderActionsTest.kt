@@ -1,6 +1,7 @@
 package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebUiControl
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -60,6 +61,19 @@ class WebChatProductionHeaderActionsTest {
             state("home", nonSettable),
             null,
         ).temporaryChat)
+    }
+
+    @Test
+    fun usesADedicatedTemporaryChatIconAndStateLabel() {
+        val inactive = WebChatProductionHeaderActionPolicy.buttonPresentation(selected = false)
+        val active = WebChatProductionHeaderActionPolicy.buttonPresentation(selected = true)
+
+        assertEquals(R.drawable.ic_temporary_chat, inactive.iconRes)
+        assertFalse(inactive.selected)
+        assertEquals("临时聊天未开启", inactive.statusLabel)
+        assertEquals(R.drawable.ic_temporary_chat, active.iconRes)
+        assertTrue(active.selected)
+        assertEquals("临时聊天已开启", active.statusLabel)
     }
 
     private fun state(

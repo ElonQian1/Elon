@@ -467,6 +467,7 @@ internal class MainSocialAiChatFeature(
     private fun activateWorkMode() {
         composerDrafts.activateWorkMode()
         deactivateChatProvider(releaseComposerDraft = false)
+        renderToolbarVoiceAction(webChatModeActive = false)
         binding.moreButton.visibility = View.GONE
         rebindWorkFriend()
     }
@@ -512,6 +513,7 @@ internal class MainSocialAiChatFeature(
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
+        renderToolbarVoiceAction(webChatModeActive = true)
         clearComposerOperationFeedback()
         activeQuickComposerAction = null
         composerDrafts.activateProvider(provider.id)
@@ -530,7 +532,7 @@ internal class MainSocialAiChatFeature(
         binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
             visibility = View.GONE
-            setImageResource(R.drawable.ic_more_horizontal)
+            setImageResource(R.drawable.ic_temporary_chat)
             contentDescription = WebChatProductionSelectors.pageActions(provider.id)
             setOnClickListener {
                 prioritizeConsumerInteraction()
@@ -560,6 +562,14 @@ internal class MainSocialAiChatFeature(
         binding.root.post { controller.refreshComposerModel() }
         refreshConsumerComposerUi()
         productionCapabilityPrewarmer.schedule(provider)
+    }
+
+    private fun renderToolbarVoiceAction(webChatModeActive: Boolean) {
+        val showVoiceCall = SocialAiToolbarActionPolicy.showVoiceCall(
+            directSocialAiChatActive = true,
+            webChatModeActive = webChatModeActive,
+        )
+        binding.voiceCallButton.visibility = if (showVoiceCall) View.VISIBLE else View.GONE
     }
 
     private fun refreshConsumerComposerUi() {

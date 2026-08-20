@@ -16,6 +16,12 @@ internal data class WebChatProductionHeaderActionState(
     val temporaryChatSelected: Boolean get() = temporaryChat?.selected == true
 }
 
+internal data class WebChatProductionHeaderButtonPresentation(
+    val iconRes: Int,
+    val selected: Boolean,
+    val statusLabel: String,
+)
+
 internal object WebChatProductionHeaderActionPolicy {
     fun visible(
         provider: WebChatProviderIdentity,
@@ -39,6 +45,12 @@ internal object WebChatProductionHeaderActionPolicy {
             },
         conversationSettingsAvailable = state.pageKind.equals("conversation", ignoreCase = true) &&
             ChatGptWebConversationPath.normalize(currentConversationPath) != null,
+    )
+
+    fun buttonPresentation(selected: Boolean) = WebChatProductionHeaderButtonPresentation(
+        iconRes = R.drawable.ic_temporary_chat,
+        selected = selected,
+        statusLabel = if (selected) "临时聊天已开启" else "临时聊天未开启",
     )
 
     private val CHAT_PAGE_KINDS = setOf("home", "conversation")
@@ -76,12 +88,15 @@ internal class WebChatProductionHeaderActionsCoordinator(
         val selected = visible && WebChatProductionHeaderActionPolicy
             .resolve(state!!, currentConversationPath())
             .temporaryChatSelected
-        button.isSelected = selected
+        val presentation = WebChatProductionHeaderActionPolicy.buttonPresentation(selected)
+        button.setImageResource(presentation.iconRes)
+        button.isSelected = presentation.selected
         button.imageTintList = ColorStateList.valueOf(activity.getColor(
-            if (selected) R.color.elon_accent_primary else R.color.elon_text_primary,
+            if (presentation.selected) R.color.elon_accent_primary else R.color.elon_text_primary,
         ))
+        button.tooltipText = "聊天设置 · ${presentation.statusLabel}"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            button.stateDescription = if (selected) "临时聊天已开启" else "临时聊天未开启"
+            button.stateDescription = presentation.statusLabel
         }
     }
 
