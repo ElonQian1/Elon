@@ -2,6 +2,25 @@ use super::*;
 use serde_json::json;
 
 #[test]
+fn parked_session_labels_excludes_visible_and_closed_sessions() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("parked", "chatgpt", "active");
+    runtime.mark_opening("parked", false);
+    runtime.mark_window_status("parked", "ready");
+
+    runtime.ensure_session("visible", "chatgpt", "active");
+    runtime.mark_opening("visible", true);
+    runtime.mark_window_status("visible", "ready");
+
+    runtime.ensure_session("closed", "chatgpt", "active");
+    runtime.mark_window_status("closed", "closed");
+
+    let mut parked = runtime.parked_session_labels();
+    parked.sort();
+    assert_eq!(parked, vec!["parked".to_string()]);
+}
+
+#[test]
 fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "chatgpt", "reserved");

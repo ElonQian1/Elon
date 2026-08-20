@@ -139,6 +139,17 @@ pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 停放坐标只在停放那一刻按当前主窗口尺寸算一次；主窗口后续被拖大、还原或
+/// 最大化后必须重新停放，否则旧坐标可能落回新的可见区域内，重新盖住原生界面。
+pub(crate) fn reflow_parked_sessions(app: &AppHandle) {
+    let runtime = app.state::<LocalAiBrowserRuntime>();
+    for label in runtime.parked_session_labels() {
+        if let Some(webview) = app.get_webview(&label) {
+            let _ = park(&webview);
+        }
+    }
+}
+
 pub(crate) fn restore_popout(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     let webview = app
         .get_webview(webview_label)

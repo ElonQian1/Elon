@@ -235,6 +235,7 @@ fn main() {
             // 弹一次系统通知，告诉用户它还在后台运行，之后不再重复打扰。
             let hide_on_close_window = window.clone();
             let notify_handle = app.handle().clone();
+            let resize_app_handle = app.handle().clone();
             window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
@@ -250,6 +251,10 @@ fn main() {
                             eprintln!("[elon-desktop] 系统通知发送失败: {error:#}");
                         }
                     }
+                } else if let WindowEvent::Resized(_) = event {
+                    // 主窗口尺寸变化后，之前按旧尺寸算出的停放坐标可能落回新的
+                    // 可见区域，必须重新停放，否则隐藏的官方 AI 网页会重新盖住原生界面。
+                    local_ai_browser::embedded_view::reflow_parked_sessions(&resize_app_handle);
                 }
             });
 

@@ -244,6 +244,16 @@ impl LocalAiBrowserRuntime {
         });
     }
 
+    /// 当前停放在后台（未关闭、也没有对用户显示）的会话标签，供主窗口尺寸变化后
+    /// 重新计算停放坐标，避免旧坐标落回放大/还原后的可见区域内。
+    pub fn parked_session_labels(&self) -> Vec<String> {
+        self.sessions()
+            .iter()
+            .filter(|(_, record)| !record.window_visible && record.window_status != "closed")
+            .map(|(label, _)| label.clone())
+            .collect()
+    }
+
     pub fn mark_navigation(
         &self,
         label: &str,
