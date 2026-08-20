@@ -30,7 +30,7 @@ import {
   pendingLocalAiSendObserved,
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
-import { requestOfficialAiTab } from './internalBrowserApi'
+import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
 import { selectLocalAiNewConversationPath } from './localAiNewConversation'
 
 export default function useLocalAiWebChatController(
@@ -339,6 +339,17 @@ export default function useLocalAiWebChatController(
     }
     setMessage('')
     try {
+      if (action === 'send_prompt') {
+        // Sending belongs to the production native surface. Explicitly cancel any
+        // in-flight official-tab presentation and park the child WebView before its
+        // page command can navigate or focus itself.
+        requestReturnToAiChat({
+          providerId: provider.id,
+          providerName: provider.displayName,
+          ownerKey,
+        })
+        setSessionState(await controlLocalAiWebSession(provider.id, ownerKey, 'background'))
+      }
       const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
       const next = await waitForLocalAiAdapterResult(provider.id, ownerKey, action, requestId)
       if (!next) {

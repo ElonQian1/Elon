@@ -71,6 +71,11 @@ assert.match(experience, /className={styles\.siteIdentity}/)
 assert.match(experience, /className={styles\.viewport}/)
 assert.match(experienceStyles, /grid-template-rows:\s*38px 40px minmax\(0, 1fr\)/)
 assert.match(experience, /await hideLocalAiWebSessionEmbedded/)
+assert.match(
+  experience,
+  /await presentLocalAiWebSessionEmbedded\(official, bounds\)[\s\S]*?if \(generation !== generationRef\.current\) \{[\s\S]*?await hideOfficialSurface\(official\)/,
+)
+assert.match(experience, /if \(next === 'chat'\) \{[\s\S]*?generationRef\.current \+= 1[\s\S]*?setSurface\('chat'\)/)
 assert.match(experience, /windowVisible/)
 assert.match(experience, /event\.key === 'Escape'/)
 assert.match(api, /REQUEST_RETURN_TO_AI_CHAT_EVENT/)
@@ -93,6 +98,8 @@ assert.match(chat, /chatMode && web\.ready/)
 assert.match(sendSuccessBranch, /startResponseRefresh/)
 assert.doesNotMatch(sendSuccessBranch, /requestOfficialAiTab|showOfficialAfterSend|openOfficial/)
 assert.doesNotMatch(controller, /showOfficialAfterSend/)
+assert.match(controller, /requestReturnToAiChat/)
+assert.match(controller, /controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/)
 assert.match(controller, /消息已交给官方网页发送；正在一龙聊天界面同步回复/)
 
 process.stdout.write('PASS Win AI internal browser tab contract\n')

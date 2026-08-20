@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 21;
+  const extractorVersion = 22;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -156,6 +156,21 @@
     return count;
   }
 
+  function sourceResultItemCount(container) {
+    if (!container) return 0;
+    let count = 0;
+    for (const item of container.querySelectorAll('li, [role="listitem"]')) {
+      if (!isVisible(item)) continue;
+      const text = cleanText(item.innerText || item.textContent);
+      if (text.length < 60 || text.length > 400) continue;
+      const linkedLength = externalLinkTextLength(item);
+      if (linkedLength < 12 || linkedLength / text.length < 0.08) continue;
+      count += 1;
+      if (count >= 12) break;
+    }
+    return count;
+  }
+
   function containsComposer(node, composer) {
     return !!composer && (node === composer || node.contains(composer));
   }
@@ -206,6 +221,7 @@
     const links = node.querySelectorAll('a[href]').length;
     const linkedTextLength = externalLinkTextLength(node);
     const narrativeBlocks = narrativeBlockCount(node);
+    const sourceResultItems = sourceResultItemCount(node);
     const citationTextRatio = text.length ? Math.min(linkedTextLength, text.length) / text.length : 0;
     const sourceCollection = candidatePolicy && typeof candidatePolicy.sourceCollection === 'function'
       ? candidatePolicy.sourceCollection({
@@ -213,6 +229,7 @@
           links,
           semanticBlocks,
           narrativeBlocks,
+          sourceResultItems,
           textLength: text.length,
           citationTextRatio
         })
@@ -227,6 +244,7 @@
       citations: citations.length,
       semanticBlocks,
       narrativeBlocks,
+      sourceResultItems,
       links,
       tabControls,
       liveRegion,
@@ -257,6 +275,8 @@
       score,
       explicit,
       narrativeBlocks,
+      sourceCollection,
+      sourceResultItems,
       afterQuery: metrics.afterQuery,
       trustedAnswerContainer: metrics.trustedAnswerContainer
     };

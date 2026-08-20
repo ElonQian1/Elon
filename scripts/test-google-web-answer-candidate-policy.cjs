@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 15)
+assert.equal(policy.version, 16)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -303,9 +303,38 @@ assert.equal(policy.sourceCollection({
   citations: 6,
   semanticBlocks: 6,
   narrativeBlocks: 3,
+  sourceResultItems: 0,
   links: 6,
   citationTextRatio: 0.28,
 }), false, 'a multi-paragraph answer with citation chips is not a source-card collection')
+
+assert.equal(policy.sourceCollection({
+  textLength: 540,
+  citations: 3,
+  semanticBlocks: 3,
+  narrativeBlocks: 3,
+  sourceResultItems: 3,
+  links: 3,
+  citationTextRatio: 0.24,
+}), true, 'three long linked result summaries are still a source-card collection')
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '来源一标题与摘要 来源二标题与摘要 来源三标题与摘要',
+  textLength: 540,
+  citations: 3,
+  semanticBlocks: 3,
+  narrativeBlocks: 3,
+  sourceResultItems: 3,
+  controls: 0,
+  links: 3,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
+  explicit: true,
+  citationTextRatio: 0.24,
+}), false, 'the three-result source rail is rejected before scoring')
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -353,6 +382,10 @@ assert.equal(policy.select([
   { id: 'last-sentence', afterQuery: true, trustedAnswerContainer: true, narrativeBlocks: 0, domOrder: 5, score: 1430, textLength: 22 },
   { id: 'organic-result', afterQuery: true, trustedAnswerContainer: true, domOrder: 9, score: 400, textLength: 80 },
 ]).id, 'complete-answer', 'the complete AI response must win over later leaf text and result cards')
+assert.equal(policy.select([
+  { id: 'complete-answer', afterQuery: true, sourceCollection: false, narrativeBlocks: 1, domOrder: 2, score: 530, textLength: 1400 },
+  { id: 'three-source-card', afterQuery: true, sourceCollection: true, narrativeBlocks: 3, domOrder: 7, score: 9500, textLength: 540 },
+]).id, 'complete-answer', 'a scored source collection cannot replace the primary answer')
 assert.equal(policy.select([
   { id: 'later-unrelated', domOrder: 9, score: 9000, textLength: 900 },
   { id: 'current-answer', afterQuery: true, domOrder: 4, score: 20, textLength: 2 },

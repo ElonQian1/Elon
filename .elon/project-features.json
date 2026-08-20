@@ -6442,6 +6442,62 @@
       "updated_at_ms": 1787052768930
     },
     {
+      "id": "win-google-ai-native-primary-answer-routing-v2",
+      "title": "Win Google AI 原生正文路由与前台连续性 V2",
+      "summary": "修复原生发送后官方 WebView 抢前台，以及 Google 右侧三条来源卡片被误选为主回答正文的生产回归。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-google-ai-native-primary-answer-routing-v2.md",
+        "content_hash": "11e85c16f381034033a226f078521b4c78d499ecc7077d4af36135acbdc6ce41",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "01cf022d9cb82885be247dfc91abc2932d6e155e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ecb3d8a645da011cd48b5898f3b601e9faeed448",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-ai-browser",
+      "tags": [
+        "win",
+        "google-ai",
+        "webview",
+        "production-regression"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/google_web_answer_candidate_policy.js",
+        "android/app/src/main/assets/google_web_message_extractor.js",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+        "pc-frontend/src/features/user-browser/AiBrowserExperience.tsx",
+        "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts",
+        "scripts/test-google-web-answer-candidate-policy.cjs",
+        "scripts/test-google-web-message-extractor-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "原生 send_prompt 前隐藏官方 WebView，发送和回复刷新不切换官方标签。",
+        "过期的官方页显示请求在返回聊天后不能重新覆盖原生界面。",
+        "三条来源标题与摘要组成的长列表即使有多个 narrative block 也不能成为正文。",
+        "主回答与来源卡同页时原生消息显示主回答富文本，来源仅追加引用。",
+        "官方页主动入口、Google 游客 Profile、上下文绑定和新会话保持可用。",
+        "JS 合同、PC lint/build、Rust 定向测试及发布后真实 Win 发送闭环通过。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_7945575f67bf4bd6a62cf5c4d0b7aa19",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787241720595,
+        "expires_at_ms": 1787256120595
+      },
+      "created_at_ms": 1787241699763,
+      "updated_at_ms": 1787241746393
+    },
+    {
       "id": "win-google-ai-primary-answer-continuity-v1",
       "title": "Win Google AI 主回答与发送界面连续性 V1",
       "summary": "修复官方 WebView 自动跳页、后台焦点拦截与 Google 新会话假失败，并让 Google AI 主正文稳定优先于来源卡片集合，保留访客 Profile、富文本和引用组件。",
@@ -8090,36 +8146,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_3f05c62c36a84d5a869cb19171591b4b",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Requirement scope and acceptance criteria reviewed before implementation.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786869471927
-    },
-    {
-      "id": "feature_event_012958eb73234146b0e3e4cfed76ddd8",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "The fix is bounded to shared hashing and existing portability tests.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786869483097
-    },
-    {
-      "id": "feature_event_62736c3c7b0c41e5a274c8a7186d013b",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786869496376
-    },
     {
       "id": "feature_event_09b4b51eef2f41bd9bdea74db2d5f4b0",
       "feature_id": "rust-cache-portable-file-hash-v1",
@@ -10089,6 +10115,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787239415844
+    },
+    {
+      "id": "feature_event_b91d7c2bad0a400bb29b720acc413594",
+      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户在当前发布版按真实发送闭环复现，截图同时提供官方完整正文与原生来源卡误判证据。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787241699763
+    },
+    {
+      "id": "feature_event_7cfe35168a2645a595147c84fce89da6",
+      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787241720596
+    },
+    {
+      "id": "feature_event_1b37698672ae40929aa83ee5b7884a3c",
+      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已固化用户截图中的来源卡误判与官方页抢前台组合回归，开始定向实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787241746393
     }
   ]
 }

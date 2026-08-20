@@ -26,10 +26,17 @@
     const links = nonNegative(metrics && metrics.links);
     const semanticBlocks = nonNegative(metrics && metrics.semanticBlocks);
     const narrativeBlocks = nonNegative(metrics && metrics.narrativeBlocks);
+    const sourceResultItems = nonNegative(metrics && metrics.sourceResultItems);
     const textLength = nonNegative(metrics && metrics.textLength);
     const citationTextRatio = nonNegative(metrics && metrics.citationTextRatio);
+    if (citations < 2 || links < 2) return false;
+    // Google renders the right-hand source rail as several long list items. Those
+    // snippets look narrative, but each item is a compact externally-linked result.
+    if (sourceResultItems >= 2 && textLength <= Math.min(1200, sourceResultItems * 400)) {
+      return true;
+    }
     if (narrativeBlocks >= 2) return false;
-    return citations >= 2 && links >= 2 && (
+    return (
       citationTextRatio >= 0.45 ||
       (semanticBlocks <= citations + 1 && textLength <= citations * 240)
     );
@@ -168,9 +175,12 @@
 
   function select(candidates) {
     const values = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
-    const afterQuery = values.filter((candidate) => candidate.afterQuery === true);
-    const trusted = values.filter((candidate) => candidate.trustedAnswerContainer === true);
-    const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : values);
+    // `accepts` normally removes source rails. Keep the final selector fail-closed
+    // too, so a future scoring change cannot promote a known source collection.
+    const eligible = values.filter((candidate) => candidate.sourceCollection !== true);
+    const afterQuery = eligible.filter((candidate) => candidate.afterQuery === true);
+    const trusted = eligible.filter((candidate) => candidate.trustedAnswerContainer === true);
+    const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : eligible);
     // Google AI Mode commonly nests the complete answer above short trusted leaf nodes.
     // Prefer a multi-block narrative before using the numeric score so that link/control
     // penalties cannot reduce the full numbered response to its introduction or last line.
@@ -184,7 +194,7 @@
   }
 
   return Object.freeze({
-    version: 15,
+    version: 16,
     accepts,
     penalty,
     select,

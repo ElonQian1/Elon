@@ -55,6 +55,23 @@ export default function AiBrowserExperience() {
 
   const switchSurface = useCallback(async (next: Surface) => {
     if (next === surface) return
+    if (next === 'chat') {
+      // Chat is a foreground intent, not merely another queued transition. Invalidate
+      // an older async `present` immediately and hide both child surfaces even when a
+      // previous transition has not finished yet.
+      generationRef.current += 1
+      setSurface('chat')
+      const activeOfficial = officialRef.current
+      try {
+        if (openedSourceUrlRef.current) {
+          await controlInternalBrowserTab('hide').catch(() => null)
+        }
+        if (activeOfficial) await hideOfficialSurface(activeOfficial)
+      } catch (cause) {
+        setError(messageFor(cause))
+      }
+      return
+    }
     await runTransition(async () => {
       if (surface === 'official' && official) await hideOfficialSurface(official)
       if (surface === 'source' && openedSourceUrlRef.current) {
@@ -119,6 +136,10 @@ export default function AiBrowserExperience() {
         const bounds = boundsFor(viewport)
         if (surface === 'official' && official) {
           await presentLocalAiWebSessionEmbedded(official, bounds)
+          if (generation !== generationRef.current) {
+            await hideOfficialSurface(official)
+            return
+          }
           setStatus(`官网原生内容 · ${official.providerName} 的天气、地图、图片、图标和交互按官网原样显示`)
         } else if (surface === 'source' && source) {
           const requestedUrl = new URL(source.url).toString()
@@ -153,6 +174,7 @@ export default function AiBrowserExperience() {
       }
     })
     return () => {
+      if (generationRef.current === generation) generationRef.current += 1
       window.cancelAnimationFrame(frame)
       observer?.disconnect()
     }
