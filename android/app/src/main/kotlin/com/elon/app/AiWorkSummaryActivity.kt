@@ -90,38 +90,38 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         addView(View(this@AiWorkSummaryActivity), LinearLayout.LayoutParams(dp(48), dp(48)))
     }
 
-    private fun createDateRow(): View = LinearLayout(this).apply {
+    private fun createDateRow(): View = FrameLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(38))
-        gravity = Gravity.CENTER_VERTICAL
-        orientation = LinearLayout.HORIZONTAL
-        setPadding(dp(48), 0, 0, 0)
-        val dateLabel = label("今天  ⌄", 15f, "#E7ECEB", regular).apply { gravity = Gravity.CENTER_VERTICAL }
-        addView(dateLabel, LinearLayout.LayoutParams(0, MATCH, 1f))
+        val dateLabel = label("今天  ⌄", 15f, "#E7ECEB", regular).apply {
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showDatePicker(this) }
+        }
+        addView(dateLabel, FrameLayout.LayoutParams(dp(96), MATCH, Gravity.CENTER))
         addView(ImageButton(this@AiWorkSummaryActivity).apply {
             setImageResource(R.drawable.ic_work_summary_calendar)
             setBackgroundColor(Color.TRANSPARENT)
             contentDescription = "选择摘要日期"
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(dp(9), dp(9), dp(9), dp(9))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
             setOnClickListener { showDatePicker(dateLabel) }
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER_VERTICAL or Gravity.END))
     }
 
-    private fun createGreeting(): View = LinearLayout(this).apply {
+    private fun createGreeting(): View = FrameLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(94)).apply { topMargin = dp(11) }
-        gravity = Gravity.CENTER_VERTICAL
-        orientation = LinearLayout.HORIZONTAL
         addView(ImageView(this@AiWorkSummaryActivity).apply {
             setImageResource(R.drawable.ic_home_ai_avatar)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-        }, LinearLayout.LayoutParams(dp(86), dp(86)).apply { marginStart = dp(16) })
+        }, FrameLayout.LayoutParams(dp(86), dp(86), Gravity.CENTER_VERTICAL).apply { marginStart = dp(16) })
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(label("早上好", 17f, "#F0F8F7F4", regular))
             addView(label("AI 已分析你的 21 个项目", 14f, "#CDD2D1", regular).apply {
                 setPadding(0, dp(6), 0, 0)
             })
-        }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(-7) })
+        }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER_VERTICAL).apply { marginStart = dp(94) })
     }
 
     private fun createMetrics(): View = LinearLayout(this).apply {
@@ -228,7 +228,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
             items.forEach { item -> addView(updateRow(item)) }
             addView(label("查看全部  ›", 15f, "#8FAEC5", regular).apply {
                 gravity = Gravity.CENTER_VERTICAL or Gravity.END
-                setPadding(0, 0, dp(14), 0)
+                setPadding(0, 0, dp(28), 0)
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { toast("已展开${title}全部内容") }
@@ -237,6 +237,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         val chevron = label("⌃", 21f, "#E1E5E4", regular).apply { gravity = Gravity.CENTER }
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, dp(55)).apply { topMargin = dp(5) }
+            setPadding(dp(13), 0, dp(9), 0)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             isClickable = true
@@ -255,7 +256,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(76))
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
-        setPadding(dp(16), 0, dp(4), 0)
+        setPadding(dp(29), 0, dp(4), 0)
         addView(projectIcon(item.project), LinearLayout.LayoutParams(dp(48), dp(48)))
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -263,7 +264,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
             addView(label("•  ${item.update}", 14f, "#818786", regular).apply {
                 maxLines = 1; setPadding(0, dp(8), 0, 0)
             })
-        }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(18) })
+        }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(16) })
         addView(label(item.date, 13f, "#707574", regular).apply { gravity = Gravity.TOP or Gravity.END },
             LinearLayout.LayoutParams(dp(68), dp(48)))
     }

@@ -345,10 +345,12 @@
     .work-summary-entry-action { padding: 9px 13px; border-radius: 999px; background: #353a42; white-space: nowrap; }
     .work-summary-page { position: absolute; inset: 0; overflow-y: auto; z-index: 20; padding: 0 19px max(40px, env(safe-area-inset-bottom)) 15px; background: #07090d; color: #f8f7f4; box-sizing: border-box; }
     .work-summary-page.hidden { display: none; }
-    .work-summary-date { display: flex; justify-content: space-between; align-items: center; height: 38px; padding-left: 48px; font-size: 15px; }
-    .work-summary-calendar { width: 30px; height: 30px; padding: 9px; object-fit: contain; cursor: pointer; }
-    .work-summary-greeting { display: flex; gap: 0; align-items: center; height: 94px; margin: 11px 0 13px; padding-left: 16px; }
-    .work-summary-avatar { width: 86px; height: 86px; margin-right: -7px; object-fit: contain; }
+    .work-summary-date { position: relative; display: grid; place-items: center; height: 38px; font-size: 15px; }
+    .work-summary-date > span { width: 96px; text-align: center; cursor: pointer; }
+    .work-summary-calendar { position: absolute; right: 0; width: 24px; height: 24px; padding: 12px; object-fit: contain; cursor: pointer; }
+    .work-summary-greeting { position: relative; height: 94px; margin: 11px 0 13px; }
+    .work-summary-avatar { position: absolute; left: 16px; top: 4px; width: 86px; height: 86px; object-fit: contain; }
+    .work-summary-greeting > div { position: absolute; left: 94px; top: 50%; transform: translateY(-50%); }
     .work-summary-greeting strong { display: block; font-size: 17px; font-weight: 400; margin-bottom: 6px; }
     .work-summary-greeting span { font-size: 14px; color: #cdd2d1; }
     .work-summary-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; height: 82px; margin-bottom: 22px; }
@@ -372,12 +374,12 @@
     .work-summary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 42px; margin-top: 8px; align-items: center; }
     .work-summary-actions button { min-height: 36px; border: 0; border-radius: 11px; background: #353a42; color: #e8eceb; font-size: 13px; }
     .work-summary-actions button.primary { background: #3d83ed; color: #f2f5f4; }
-    .work-summary-fold { border: 0; width: 100%; height: 55px; margin-top: 5px; padding: 0; display: flex; justify-content: space-between; align-items: center; background: transparent; color: #f8f7f4; font-size: 16px; }
-    .work-summary-update { height: 76px; padding: 0 4px 0 16px; color: #818786; display: grid; grid-template-columns: 48px 1fr 68px; gap: 18px; align-items: center; box-sizing: border-box; }
+    .work-summary-fold { border: 0; width: 100%; height: 55px; margin-top: 5px; padding: 0 9px 0 13px; display: flex; justify-content: space-between; align-items: center; background: transparent; color: #f8f7f4; font-size: 16px; }
+    .work-summary-update { height: 76px; padding: 0 4px 0 29px; color: #818786; display: grid; grid-template-columns: 48px minmax(0, 1fr) 68px; gap: 16px; align-items: center; box-sizing: border-box; }
     .work-summary-update-copy strong { display:block; color:#e8eceb; font-size:16px; font-weight:400; margin-bottom:8px; }
     .work-summary-update-copy span { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:14px; }
     .work-summary-update-date { align-self:start; padding-top:14px; text-align:right; color:#707574; font-size:13px; }
-    .work-summary-view-all { height:48px; display:flex; justify-content:flex-end; align-items:center; padding-right:14px; color:#8faec5; font-size:15px; }
+    .work-summary-view-all { width:100%; height:48px; border:0; background:transparent; display:flex; justify-content:flex-end; align-items:center; padding-right:28px; color:#8faec5; font-size:15px; }
     .conversation-filter-pull {
       position: absolute;
       top: 8px;
