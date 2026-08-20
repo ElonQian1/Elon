@@ -44,6 +44,8 @@ internal data class ChatGptWebComposerOption(
     val kind: String,
     val semantic: String = ChatGptWebComposerOptionSemantics.TOOL,
     val opensSubmenu: Boolean = false,
+    val parentId: String? = null,
+    val parentLabel: String? = null,
 )
 
 internal data class ChatGptWebFeature(
@@ -274,6 +276,14 @@ internal object ChatGptWebProtocol {
                 val id = item.optString("id").take(MAX_OPTION_ID_LENGTH)
                 val label = item.optString("label").trim().take(MAX_OPTION_LABEL_LENGTH)
                 if (!OPTION_ID.matches(id) || label.isBlank()) continue
+                val parent = item.optJSONObject("parentOption")
+                val parentId = parent?.optString("id")
+                    ?.take(MAX_OPTION_ID_LENGTH)
+                    ?.takeIf(OPTION_ID::matches)
+                val parentLabel = parent?.optString("label")
+                    ?.trim()
+                    ?.take(MAX_OPTION_LABEL_LENGTH)
+                    ?.takeIf { parentId != null && it.isNotBlank() }
                 add(
                     ChatGptWebComposerOption(
                         id = id,
@@ -284,6 +294,8 @@ internal object ChatGptWebProtocol {
                             .takeIf { it in ChatGptWebComposerOptionSemantics.KNOWN }
                             ?: ChatGptWebComposerOptionSemantics.fallback(section),
                         opensSubmenu = item.optBoolean("opensSubmenu"),
+                        parentId = parentId,
+                        parentLabel = parentLabel,
                     ),
                 )
             }

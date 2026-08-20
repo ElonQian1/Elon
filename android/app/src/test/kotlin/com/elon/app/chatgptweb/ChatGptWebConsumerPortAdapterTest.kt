@@ -31,6 +31,8 @@ class ChatGptWebConsumerPortAdapterTest {
                     kind = "tool",
                     semantic = "web_search",
                     opensSubmenu = false,
+                    parentId = "tools_parent",
+                    parentLabel = "Tools",
                 )),
             ),
             commandRequests = listOf(ChatGptWebObservedState.CommandRequest(
@@ -63,6 +65,8 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("health", state.pageKind)
         assertEquals("https://chatgpt.com/health", state.pageUrl)
         assertEquals("search", state.composerSections.getValue("tools").single().id)
+        assertEquals("tools_parent", state.composerSections.getValue("tools").single().parentId)
+        assertEquals("Tools", state.composerSections.getValue("tools").single().parentLabel)
         assertTrue(state.composerSections.getValue("tools").single().nativeSelector.contains("search"))
         assertTrue(state.features.single().requiresUserConfirmation)
         assertTrue(state.features.single().nativeSelector.contains("health"))

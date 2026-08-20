@@ -7,6 +7,8 @@ internal data class WebChatConsumerOption(
     val semantic: String,
     val opensSubmenu: Boolean,
     val nativeSelector: String,
+    val parentId: String? = null,
+    val parentLabel: String? = null,
 )
 
 internal data class WebChatConsumerFeature(

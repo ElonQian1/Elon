@@ -31,6 +31,8 @@ internal class ChatGptWebConsumerPortAdapter(
                         semantic = option.semantic,
                         opensSubmenu = option.opensSubmenu,
                         nativeSelector = ChatGptNativeNavigationSelector.composerOption(section, option),
+                        parentId = option.parentId,
+                        parentLabel = option.parentLabel,
                     )
                 }
             }
