@@ -6060,7 +6060,7 @@
       "id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
       "title": "Win Google AI 发送前清理阻塞菜单 V4",
       "summary": "复用现有 Google 语义适配器，在发送前关闭明确的残留回答菜单焦点陷阱，恢复原生输入到官方页的真实发送和回复同步。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-dismiss-blocking-menu-before-send-v4.md",
@@ -6156,7 +6156,7 @@
         }
       ],
       "created_at_ms": 1787223014214,
-      "updated_at_ms": 1787223222811
+      "updated_at_ms": 1787224119819
     },
     {
       "id": "win-google-ai-guest-new-conversation-recovery-v1",
@@ -7719,16 +7719,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_5ed2fb5bf25d44fdae646ccfb3040a33",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Reviewed finalized V2 scope, non-goals, acceptance criteria and implementation paths against the current source boundary.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786772371392
-    },
     {
       "id": "feature_event_79e9b81a4358422a87bdf3faaecff7f5",
       "feature_id": "open-commerce-outbound-public-address-policy-v2",
@@ -9718,6 +9708,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787223222811
+    },
+    {
+      "id": "feature_event_f5a2cb2dcdd7428bbe51e0bd2b4f976c",
+      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Win版本37c508a45已安装；真实制造Google导出菜单残留后，原生消息不跳官网、不回滚，菜单自动关闭并同步回复“通过”。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787224119819
     }
   ]
 }
