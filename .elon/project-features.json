@@ -6445,7 +6445,7 @@
       "id": "win-google-ai-primary-answer-continuity-v1",
       "title": "Win Google AI 主回答与发送界面连续性 V1",
       "summary": "修复后台官方 WebView 状态误触发前台标签切换，并让 Google AI 主正文稳定优先于来源卡片集合，保留现有访客会话、富文本和引用组件。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-primary-answer-continuity-v1.md",
@@ -6489,15 +6489,114 @@
         "Google 访客会话、同机 Profile 与上下文连续性保持不变。",
         "Win 合同、构建、Rust 定向测试与发布后真实复杂问答验收通过。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_21b6548a69ee4a48a3ffa8fc0c943516",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787230184859,
-        "expires_at_ms": 1787244584859
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/google_web_answer_candidate_policy.js",
+          "content_hash": "f21dfd564b2087a58d881a5013011e53d1ae37da5c7bf41c0b0fc4f253c7ce3a",
+          "locator": "sourceCollection",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "e644ee435f63eda074a4250625ef3381e0f66be5",
+            "worktree_blob_oid": "e644ee435f63eda074a4250625ef3381e0f66be5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/google_web_message_extractor.js",
+          "content_hash": "47515c6b091b32d9f0b3de68cddde012ffbfd70dc7db1f4d14cacaa21661a8fb",
+          "locator": "candidateFrom",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "99e3cdee0aa15634d4e43b158ffb242a6a7a4c05",
+            "worktree_blob_oid": "99e3cdee0aa15634d4e43b158ffb242a6a7a4c05",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "041ae900ad34df148c29dc1581210576f7613881da90d685998c99ab8b021919",
+          "locator": "official surface intent and primary answer rule",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "e579c9277136a5d012d74470e71f32a7618c6c84",
+            "worktree_blob_oid": "e579c9277136a5d012d74470e71f32a7618c6c84",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+          "content_hash": "8d1e2857804f8282a074dc3d20a6fe67410ea0a027cfefa7dc69e0ab77952888",
+          "locator": "background visibility contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "98b8fc40c3cff93f4148bd4717f0be347e9346df",
+            "worktree_blob_oid": "98b8fc40c3cff93f4148bd4717f0be347e9346df",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/AiWebChatSidebar.tsx",
+          "content_hash": "2708552e78aa88d3a9dab8221df7b064a95bc827cd41f87b54586c056f8142f7",
+          "locator": "AiWebChatSidebar explicit official tab intent",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "2fd5d3b93dc600572e321d06c927d157e8e286f4",
+            "worktree_blob_oid": "2fd5d3b93dc600572e321d06c927d157e8e286f4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-answer-candidate-policy.cjs",
+          "content_hash": "303239c6c4a5f6779dfb1d1eaa73da320a03453482816a5d087e704711d2d76c",
+          "locator": "source collection and primary prose cases",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "7b1912f419816f869a4e8c75931fc728ba3de760",
+            "worktree_blob_oid": "7b1912f419816f869a4e8c75931fc728ba3de760",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-message-extractor-contract.cjs",
+          "content_hash": "5dbc6255ae98a30de5627b0b6321caa76d17aa5816b53574fd5deb20acb3159e",
+          "locator": "source collection metrics contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "8413e8d206ddef703475efddf6e1b81d8bea20c9",
+            "worktree_blob_oid": "8413e8d206ddef703475efddf6e1b81d8bea20c9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/validate-win-web-ai.ps1",
+          "content_hash": "46d871d6691a411818fcbfa1d1d4417e523084916777a14e3cb971dadc52b169",
+          "locator": "WIN_WEB_AI_VALIDATION",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8eff811603aac0c950a5574b65cd9638e091ae2",
+            "head_blob_oid": "76770c8edf668b2c83cfddda74e3cade4e19409e",
+            "worktree_blob_oid": "76770c8edf668b2c83cfddda74e3cade4e19409e",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787230184845,
-      "updated_at_ms": 1787230184872
+      "updated_at_ms": 1787230930179
     },
     {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
@@ -7918,36 +8017,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_a205ca58c2474cb4b9f8a5671941e64e",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "绑定最终受管 check 指纹后的权威文档，并清除旧证据哈希。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1786788905580
-    },
-    {
-      "id": "feature_event_fb8b055f7377427daf7e1cca66766a7f",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "最终权威文档与验收边界已复核，接受当前范围。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786788917972
-    },
-    {
-      "id": "feature_event_beeb388a836a4fb08605e91ed178490d",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "验收标准、任务路径和生产边界已明确，可绑定实现证据。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786788927637
-    },
     {
       "id": "feature_event_1f63b07d42e14ee6ba9cc93d843d641f",
       "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
@@ -9917,6 +9986,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787230184872
+    },
+    {
+      "id": "feature_event_d8031717bef14f0aa5a16266c17f8a98",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787230930147
+    },
+    {
+      "id": "feature_event_4f29d4c1b93a40cc9fa8731c499f8b9a",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "根因修复和失败契约均已提交。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787230930165
+    },
+    {
+      "id": "feature_event_6b4c2e6b23404f5a945fb97072802913",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "validate-win-web-ai 全量通过：适配器语法、用户浏览器合同、前端构建、ESLint、Tauri 本地 AI Rust 测试。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787230930179
     }
   ]
 }
