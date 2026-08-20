@@ -67,6 +67,10 @@ const presentOfficialWebview = embeddedViewRust.slice(
   embeddedViewRust.indexOf('pub(crate) fn present'),
   embeddedViewRust.indexOf('pub(crate) fn hide'),
 )
+const hideOfficialWebview = embeddedViewRust.slice(
+  embeddedViewRust.indexOf('pub(crate) fn hide'),
+  embeddedViewRust.indexOf('pub(crate) fn reflow_parked_sessions'),
+)
 
 assert.match(rust, /\.data_directory\(profile_directory\)/)
 assert.match(rust, /owner_fingerprint/)
@@ -108,6 +112,12 @@ assert.match(parkOfficialWebview, /webview\.show\(\)/)
 assert.doesNotMatch(parkOfficialWebview, /-DEFAULT_VIEWPORT_(?:WIDTH|HEIGHT)/)
 assert.match(presentOfficialWebview, /webview\.show\(\)/)
 assert.match(presentOfficialWebview, /webview\.set_focus\(\)/)
+assert.match(hideOfficialWebview, /get_webview\(MAIN_WINDOW_LABEL\)/)
+assert.match(hideOfficialWebview, /raise_webview\(&main_webview\)/)
+assert.match(hideOfficialWebview, /main_webview\.set_focus\(\)/)
+assert.match(embeddedViewRust, /pub\(crate\) fn park_if_background/)
+assert.match(rust, /PageLoadEvent::Finished[\s\S]*embedded_view::park_if_background\(&page_app, &page_state, &page_label\)/)
+assert.match(rust, /page\.eval\([\s\S]*embedded_view::park_if_background\(&app, runtime\.inner\(\), &label\)/)
 assert.match(stateRust, /window_visible: bool/)
 assert.match(stateRust, /diagnostic_for_provider/)
 assert.match(stateRust, /semantic_snapshot_ready/)

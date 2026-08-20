@@ -212,6 +212,7 @@ pub async fn open_local_ai_web_session(
     let page_state = runtime.inner().clone();
     let page_label = window_label.clone();
     let page_provider = *provider;
+    let page_app = app.clone();
     let window_state = runtime.inner().clone();
     let window_state_label = window_label.clone();
 
@@ -287,6 +288,7 @@ pub async fn open_local_ai_web_session(
                 PageLoadEvent::Finished => {
                     page_state.mark_page_finished(&page_label, payload.url());
                     reconnect_adapter(&page_provider, &page);
+                    let _ = embedded_view::park_if_background(&page_app, &page_state, &page_label);
                 }
             }
         });
@@ -324,7 +326,7 @@ pub async fn open_local_ai_web_session(
         restore_window(&popout)?;
         page.set_focus().map_err(display_error)?;
     } else {
-        embedded_view::park(&page)?;
+        embedded_view::hide(&app, &window_label)?;
     }
     runtime.mark_window_visible(&window_label, show_window);
     page.navigate(start_url).map_err(|error| {
@@ -405,9 +407,11 @@ pub async fn control_local_ai_web_session(
         }
         "reload" => page.reload().map_err(display_error)?,
         "back" => page.eval("history.back();").map_err(display_error)?,
-        "home" => page
-            .navigate(parse_start_url(provider)?)
-            .map_err(display_error)?,
+        "home" => {
+            page.navigate(parse_start_url(provider)?)
+                .map_err(display_error)?;
+            embedded_view::park_if_background(&app, runtime.inner(), &label)?;
+        }
         _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
     }
     runtime
@@ -462,7 +466,9 @@ pub async fn run_local_ai_web_adapter_command(
     )?;
     let raw = serde_json::to_string(&command).map_err(display_error)?;
     page.eval(adapter.page_invocation_script(&raw)?)
-        .map_err(display_error)
+        .map_err(display_error)?;
+    embedded_view::park_if_background(&app, runtime.inner(), &label)?;
+    Ok(())
 }
 
 #[tauri::command]

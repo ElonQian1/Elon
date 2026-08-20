@@ -30,22 +30,23 @@ const liveSession = {
 }
 const liveSnapshot = { composerReady: true }
 
-assert.equal(selectLocalAiNewConversationPath(null, null), 'home')
-assert.equal(selectLocalAiNewConversationPath({
+assert.equal(selectLocalAiNewConversationPath('chatgpt', null, null), 'home')
+assert.equal(selectLocalAiNewConversationPath('chatgpt', {
   ...liveSession,
   rendererStatus: 'connecting',
   semanticCacheStatus: 'cached',
   contextReady: false,
 }, { composerReady: false }), 'home')
-assert.equal(selectLocalAiNewConversationPath({
+assert.equal(selectLocalAiNewConversationPath('chatgpt', {
   ...liveSession,
   contextReady: false,
 }, liveSnapshot), 'home')
-assert.equal(selectLocalAiNewConversationPath({
+assert.equal(selectLocalAiNewConversationPath('chatgpt', {
   ...liveSession,
   semanticCacheStatus: 'cached',
 }, liveSnapshot), 'home')
-assert.equal(selectLocalAiNewConversationPath(liveSession, { composerReady: false }), 'home')
-assert.equal(selectLocalAiNewConversationPath(liveSession, liveSnapshot), 'adapter')
+assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, { composerReady: false }), 'home')
+assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, liveSnapshot), 'adapter')
+assert.equal(selectLocalAiNewConversationPath('google-ai-mode', liveSession, liveSnapshot), 'home')
 
 process.stdout.write('PASS local AI new-conversation recovery policy\n')

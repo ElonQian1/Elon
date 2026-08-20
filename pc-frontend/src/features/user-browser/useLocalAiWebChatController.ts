@@ -294,7 +294,7 @@ export default function useLocalAiWebChatController(
       return null
     }
     if (action === 'new_conversation'
-      && selectLocalAiNewConversationPath(visibleSessionState, snapshot) === 'home') {
+      && selectLocalAiNewConversationPath(provider.id, visibleSessionState, snapshot) === 'home') {
       return recoverNewConversation()
     }
     setBusyAction(action)

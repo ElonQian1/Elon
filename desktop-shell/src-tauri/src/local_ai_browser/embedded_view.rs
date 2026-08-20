@@ -155,6 +155,25 @@ pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     if let Some(popout) = app.get_window(webview_label) {
         popout.hide().map_err(display_error)?;
     }
+    let main_webview = app
+        .get_webview(MAIN_WINDOW_LABEL)
+        .ok_or_else(|| "一龙主工作台 WebView 不可用。".to_string())?;
+    main_webview.show().map_err(display_error)?;
+    raise_webview(&main_webview)?;
+    main_webview.set_focus().map_err(display_error)
+}
+
+pub(crate) fn park_if_background(
+    app: &AppHandle,
+    runtime: &LocalAiBrowserRuntime,
+    webview_label: &str,
+) -> Result<(), String> {
+    if runtime
+        .snapshot(webview_label)
+        .is_some_and(|state| !state.window_visible)
+    {
+        hide(app, webview_label)?;
+    }
     Ok(())
 }
 
@@ -163,9 +182,7 @@ pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
 pub(crate) fn reflow_parked_sessions(app: &AppHandle) {
     let runtime = app.state::<LocalAiBrowserRuntime>();
     for label in runtime.parked_session_labels() {
-        if let Some(webview) = app.get_webview(&label) {
-            let _ = park(&webview);
-        }
+        let _ = hide(app, &label);
     }
 }
 
