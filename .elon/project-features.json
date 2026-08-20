@@ -5968,6 +5968,60 @@
       "updated_at_ms": 1787215120290
     },
     {
+      "id": "win-background-ai-webview-resize-parking-v1",
+      "title": "Windows 后台 AI 官方 WebView 随窗口缩放重新停放",
+      "summary": "修复原生 AI 聊天中后台 Google/ChatGPT 子 WebView 在主窗口最大化、还原或 DPI 变化后从右下角露出并覆盖输入区，同时保留完整视口、游客 Profile 与上下文同步。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-background-ai-webview-resize-parking-v1.md",
+        "content_hash": "1bbe96100fb72ff9644f60ad412ce44bdb72c948726dae91cdec0c8a9752bb7a",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7faad035fb568252c678ee9de293aafc34485552",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "34eabfd50eb79d296ed7dcb2699623e499f887a7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "tauri",
+        "webview2",
+        "ai-chat",
+        "production-fix"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+        "desktop-shell/src-tauri/src/main.rs",
+        "docs/user-browser-module-integration.md"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "窗口最大化、还原、手动缩放或 DPI 变化后，后台 Google/ChatGPT 官方页不出现在原生聊天界面。",
+        "正在前台展示的官方页不会被 resize 处理移走。",
+        "最大化状态点击新对话后，原生输入框可立即聚焦、输入和发送。",
+        "后台官方页保持完整视口和同一 WebView2 Profile，游客 Cookie 与上下文同步不丢失。",
+        "Rust 定向测试、格式检查、生产发布构建和本机真实最大化工作流通过。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_c78bca694265409da246f302848a7123",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787225544333,
+        "expires_at_ms": 1787239944333
+      },
+      "created_at_ms": 1787225006617,
+      "updated_at_ms": 1787225556558
+    },
+    {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
       "title": "Win 完整视口后台官方 AI WebView 输入命中隔离 V3",
       "summary": "保持 Google/ChatGPT 完整官网视口尺寸并将控制器整体停放到父窗口右下可见边界之外，同时满足原生输入命中和后台会话发送。",
@@ -7719,106 +7773,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_79e9b81a4358422a87bdf3faaecff7f5",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Accepted V2 requirement has no unresolved dependency blockers and is ready for evidence-bound delivery.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786772383955
-    },
-    {
-      "id": "feature_event_8ac001749af44583a4aae19d709c65c3",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "claimed",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786772395989
-    },
-    {
-      "id": "feature_event_8717d3e5ab744042808d2b9717095787",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Resume evidence-bound delivery under the re-reviewed requirement.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786772408183
-    },
-    {
-      "id": "feature_event_740da8372bcf47918815322f64222a5c",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "evidence_recorded",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786772435680
-    },
-    {
-      "id": "feature_event_0fb103f9b01a4787a1a4e3f5e7d246ed",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Shared policy, bounded DNS resolution and all-address reqwest pinning are implemented with current source evidence.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786772451867
-    },
-    {
-      "id": "feature_event_bed70161de2148a0973e03c59af398ba",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex:task-20260815-122407-18652-e47884c7",
-      "reason": "Eight outbound policy tests, ten broker compatibility tests and all source/document gates passed with current evidence.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786772464958
-    },
-    {
-      "id": "feature_event_8342a6b1e18d4de59e73984bcd9432ad",
-      "feature_id": "open-commerce-outbound-public-address-policy-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Verified implementation and evidence were pushed to origin/main at b890be82a8c6a0fc306131bece42de2e84f9359b.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786772758494
-    },
-    {
-      "id": "feature_event_728df1e278124380925ac79c9a578124",
-      "feature_id": "rust-cache-recovery-governance-v2",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "Live machine audit found over 100 GiB of missing-workspace partitions plus a stale lock that current GC cannot safely reclaim.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786779464857
-    },
-    {
-      "id": "feature_event_48a36d200c744efd8eb52b6e026c9233",
-      "feature_id": "rust-cache-recovery-governance-v2",
-      "action": "claimed",
-      "actor": "codex-cache-recovery-20260815",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786779480037
-    },
-    {
-      "id": "feature_event_96a46ab9d6aa45fe8dce77151963786d",
-      "feature_id": "rust-cache-recovery-governance-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Implementation started after live inventory reproduced missing-workspace accumulation and stale lock blockage.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786779494263
-    },
     {
       "id": "feature_event_e5a03f64ce3a40afa573dda5ed83c4ec",
       "feature_id": "rust-cache-recovery-governance-v2",
@@ -9718,6 +9672,106 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787224119819
+    },
+    {
+      "id": "feature_event_eb3aa7b41f3a43339349629bc53af64f",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "用户在本机最大化后可稳定复现，阻断新对话输入；需求范围与验收标准已明确。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787225006617
+    },
+    {
+      "id": "feature_event_81ba8e63831144f68ca0b8ee25500b32",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787225023207
+    },
+    {
+      "id": "feature_event_873fc032e6de4d38964ad31d1e641d3d",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已复现并定位到后台 WebView 固定旧边界坐标，开始实现主窗口 resize/DPI 事件重新停放。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787225038783
+    },
+    {
+      "id": "feature_event_19c549ad80ea44ff94c1e5ff82b77793",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "验证发现需把现有 ChatGPT skin 适配器清单缺口纳入当前需求，先释放认领后按合同重绑。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1787225463636
+    },
+    {
+      "id": "feature_event_847f286ad6f845b7838ebe0ca53f3996",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root",
+      "reason": "纳入验证发现的 Win ChatGPT 适配器 skin 清单缺口，复用 Android 现有模块并保持主交付边界。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1787225480064
+    },
+    {
+      "id": "feature_event_7c511f13e91b40f4bf6a7dbf6e75ef0c",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "metadata_updated",
+      "actor": "codex-root",
+      "reason": "把验证发现并修复的 Win ChatGPT skin 清单文件加入正式任务边界。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1787225495198
+    },
+    {
+      "id": "feature_event_0589fc12b7a24c568e1753cbb5febc01",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已复核扩展范围：只复用既有 Android skin 资产补齐 Win 清单，不引入新实现或扩大 PWA/Android 改动。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787225512013
+    },
+    {
+      "id": "feature_event_de2186cd2b574a7e9b5b5af50606e105",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "扩展需求已评审且无依赖阻塞，继续同一 Windows 生产修复。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787225529150
+    },
+    {
+      "id": "feature_event_45646616f12f4979a3f210efe49d0073",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787225544333
+    },
+    {
+      "id": "feature_event_a7adf07610b44b94a3be01d2fe1ac707",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "扩展范围已重新认领，继续定向验证和 Windows 发布。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787225556558
     }
   ]
 }
