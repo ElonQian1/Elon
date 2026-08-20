@@ -58,6 +58,14 @@ const aiChatWelcome = read('pc-frontend/src/features/ai/AiChatWelcome.tsx')
 const aiModeSwitch = read('pc-frontend/src/features/ai/AiHomeModeSwitch.tsx')
 const app = read('pc-frontend/src/App.tsx')
 const serverRail = read('pc-frontend/src/features/shell/ServerRail.tsx')
+const parkOfficialWebview = embeddedViewRust.slice(
+  embeddedViewRust.indexOf('pub(crate) fn park'),
+  embeddedViewRust.indexOf('pub(crate) fn present'),
+)
+const presentOfficialWebview = embeddedViewRust.slice(
+  embeddedViewRust.indexOf('pub(crate) fn present'),
+  embeddedViewRust.indexOf('pub(crate) fn hide'),
+)
 
 assert.match(rust, /\.data_directory\(profile_directory\)/)
 assert.match(rust, /owner_fingerprint/)
@@ -91,6 +99,10 @@ assert.match(rust, /\.unminimize\(\)/)
 assert.match(rust, /if action == "background"/)
 assert.match(embeddedViewRust, /webview\.hide\(\)/)
 assert.match(embeddedViewRust, /webview\.reparent\(/)
+assert.match(parkOfficialWebview, /webview\.hide\(\)/)
+assert.doesNotMatch(parkOfficialWebview, /webview\.show\(\)/)
+assert.match(presentOfficialWebview, /webview\.show\(\)/)
+assert.match(presentOfficialWebview, /webview\.set_focus\(\)/)
 assert.match(stateRust, /window_visible: bool/)
 assert.match(stateRust, /diagnostic_for_provider/)
 assert.match(stateRust, /semantic_snapshot_ready/)

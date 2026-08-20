@@ -6209,6 +6209,93 @@
       "updated_at_ms": 1786710654944
     },
     {
+      "id": "win-hidden-ai-webview-input-hit-test-v1",
+      "title": "Win 后台官方 AI WebView 输入命中隔离 V1",
+      "summary": "修复官方 AI WebView 收起后仍拦截原生聊天输入框和新对话点击的问题，保留同一 WebView2 会话与手动官网显示能力。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-hidden-ai-webview-input-hit-test-v1.md",
+        "content_hash": "98bb2ca1e0fec0e21c28cf68e0daf146357c99d7b09cfffab71ab7559d90d2f7",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9bbdc4992bdaf24770fd6f5e17a91786cbce1b4b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "249c706c11f65a4d7136cde60112aa316c93a3b7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "tauri",
+        "webview2",
+        "google-ai",
+        "chatgpt",
+        "input",
+        "ux"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "隐藏官方 WebView 时不重新 show，避免后台命中层",
+        "显示官网仍恢复嵌入边界与焦点",
+        "Win 合同、Rust 定向测试与 PC 构建通过",
+        "发布后原生输入框可获得焦点并发送测试消息",
+        "发送后停留原生聊天 UI并同步回复"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+          "content_hash": "ae4216b84bca409113ac5c79ed885a6b310fe9169f539397d0f02f0d0aaa400f",
+          "locator": "park",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9bbdc4992bdaf24770fd6f5e17a91786cbce1b4b",
+            "head_blob_oid": "021113e139d8b6aacc2cd3832c49ae4551932bc8",
+            "worktree_blob_oid": "a749cb13fadc0f11cf150ea5c86a1b48aa48558b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "03e540f5f20f82a316a3113f71f68cdec555ff9450904ce5fbb09cd17d58e3ae",
+          "locator": "控制器维持隐藏状态",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9bbdc4992bdaf24770fd6f5e17a91786cbce1b4b",
+            "head_blob_oid": "c6a57dc8c8c752ff93d5061c3a3f8c08a2419eb7",
+            "worktree_blob_oid": "975d5c01d3bf08527ee3fc991d6414cc9840d635",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "61c7694d9676881991deea9d4e8fb7344080838392f1335b5b55fe8a464c35d3",
+          "locator": "parkOfficialWebview",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9bbdc4992bdaf24770fd6f5e17a91786cbce1b4b",
+            "head_blob_oid": "e7da22ddea5367034fcbcd3b47b1b450211185c0",
+            "worktree_blob_oid": "c23e01af271d7408bdcf2f8db7d892293a186326",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787219168634,
+      "updated_at_ms": 1787219376752
+    },
+    {
       "id": "win-native-ai-send-surface-continuity-v1",
       "title": "Win 原生 AI 发送界面连续性 V1",
       "summary": "修复原生发送成功后被前端策略强制切换到 Google AI 或 ChatGPT 官方标签页的问题，保留后台回复同步与手动官网入口。",
@@ -7353,76 +7440,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_032bc6ae554d4f83a479345d75206f8f",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "claimed",
-      "actor": "codex-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786761148663
-    },
-    {
-      "id": "feature_event_2f7cf66d02fe4bde8540ced215758ff3",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始实现定向任务清理、孤儿分区识别及验证。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786761162685
-    },
-    {
-      "id": "feature_event_62564d08f4ad409bb0e5c3c60589f161",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786762533147
-    },
-    {
-      "id": "feature_event_3ae4cdcb72a042018bca8ae273cbec3c",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "任务定向清理、孤儿任务分区识别、兼容策略默认值及审计报告均已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786762547479
-    },
-    {
-      "id": "feature_event_b006361e88de4972be5253a07653656b",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "缓存平台、统一收尾、预检工作流、Prompt 审计、源码尺寸和文档模块化验证均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786762559973
-    },
-    {
-      "id": "feature_event_1afac90992df456aa30dc077346a5a6d",
-      "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "实现与验证证据已通过 pre-push 门禁并推送 origin/main@a2a59aada。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786762799336
-    },
-    {
-      "id": "feature_event_af5dfe1e15314da7af5f181c67ce2417",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "registered",
-      "actor": "codex-agent",
-      "reason": "AI_CURRENT 与现有验收文档均表明代码存在但统一验证未完成。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786764390292
-    },
     {
       "id": "feature_event_4891102563294cddbc7fc8bde44927c9",
       "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
@@ -9352,6 +9369,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787218879911
+    },
+    {
+      "id": "feature_event_bda7e2f3ba484b43b6191fbce891765c",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "真实 Win 桌面验收确认后台 Google WebView RootWebArea 仍获得点击焦点，阻断原生输入。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1787219168634
+    },
+    {
+      "id": "feature_event_a5c14bd3b2be4ac4ba321648ce79db70",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "需求已接受，真实桌面焦点证据和精确实现路径已确认。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787219184182
+    },
+    {
+      "id": "feature_event_9c6a0a46e60a4762a1c3342e518a750e",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787219184207
+    },
+    {
+      "id": "feature_event_9f9225c5921d403b8207a29b48f77ad7",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始修复隐藏官方 WebView 的命中隔离并补回归。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787219184219
+    },
+    {
+      "id": "feature_event_8177c0f19cb447c0bd3d754617f3fe79",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787219376669
+    },
+    {
+      "id": "feature_event_294702adb0fd4668bdb8de16169c4d4f",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "隐藏态不再重新 show 官方 WebView；前台显示与聚焦路径保持。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787219376730
+    },
+    {
+      "id": "feature_event_9d872954a9a64a48b7e58e4785f0cb81",
+      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "静态合同、Win 用户浏览器套件、Rust 定向测试与 PC 生产构建通过；待发布后真实桌面验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787219376752
     }
   ]
 }

@@ -91,8 +91,7 @@ pub(crate) fn park(webview: &Webview) -> Result<(), String> {
     webview.hide().map_err(display_error)?;
     webview
         .set_position(LogicalPosition::new(-DEFAULT_VIEWPORT_WIDTH, -DEFAULT_VIEWPORT_HEIGHT))
-        .map_err(display_error)?;
-    webview.show().map_err(display_error)
+        .map_err(display_error)
 }
 
 pub(crate) fn present(
