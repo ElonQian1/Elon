@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 23;
+  const extractorVersion = 24;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -212,6 +212,25 @@
     return nodes[nodes.length - 1] || null;
   }
 
+  function answerActionLabel(value) {
+    const label = cleanText(value).replace(/\s+/g, ' ').replace(/[.!。！]+$/, '');
+    return /^(?:copy (?:text|response|answer)|复制(?:文字|回答|回复))$/i.test(label);
+  }
+
+  function findAnswerActionAnchor(queryAnchor, nextQueryAnchor, composer) {
+    if (!queryAnchor) return null;
+    return uniqueNodes(['main button', 'main [role="button"]', 'body button', 'body [role="button"]'])
+      .filter((node) => {
+        if (!isVisible(node) || !followsQuery(node, queryAnchor)) return false;
+        if (nextQueryAnchor && !precedesBoundary(node, nextQueryAnchor)) return false;
+        if (composer && !precedesBoundary(node, composer)) return false;
+        return answerActionLabel(
+          node.getAttribute('aria-label') || node.getAttribute('title') ||
+          node.innerText || node.textContent
+        );
+      })[0] || null;
+  }
+
   function precedesBoundary(node, boundary) {
     if (!boundary || node === boundary || node.contains(boundary) || typeof Node === 'undefined') {
       return !boundary;
@@ -219,7 +238,18 @@
     return !!(node.compareDocumentPosition(boundary) & Node.DOCUMENT_POSITION_FOLLOWING);
   }
 
-  function candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, explicit) {
+  function boundaryRelation(node, boundary) {
+    if (!boundary || typeof Node === 'undefined') return 'unknown';
+    if (node === boundary || node.contains(boundary)) return 'contains';
+    const position = node.compareDocumentPosition(boundary);
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return 'before';
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) return 'after';
+    return 'unknown';
+  }
+
+  function candidateFrom(
+    node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, explicit
+  ) {
     if (excludedContainer(node, composer)) return null;
     if (nextQueryAnchor && !precedesBoundary(node, nextQueryAnchor)) return null;
     let text = cleanText(node.innerText || node.textContent).slice(0, 40000);
@@ -233,6 +263,7 @@
     const narrativeBlocks = narrativeBlockCount(node);
     const sourceResultItems = sourceResultItemCount(node);
     const queryAligned = alignedWithQuery(node, queryAnchor);
+    const answerActionRelation = boundaryRelation(node, answerActionAnchor);
     const citationTextRatio = text.length ? Math.min(linkedTextLength, text.length) / text.length : 0;
     const sourceCollection = candidatePolicy && typeof candidatePolicy.sourceCollection === 'function'
       ? candidatePolicy.sourceCollection({
@@ -242,6 +273,7 @@
           narrativeBlocks,
           sourceResultItems,
           queryAligned,
+          answerActionRelation,
           textLength: text.length,
           citationTextRatio
         })
@@ -263,6 +295,7 @@
       controls,
       afterQuery: followsQuery(node, queryAnchor),
       queryAligned,
+      answerActionRelation,
       trustedAnswerContainer: node.matches(TRUSTED_ANSWER_SELECTOR),
       resultListItem: !!node.closest('li, [role="listitem"]'),
       sourceCollection: sourceCollection,
@@ -278,7 +311,8 @@
     const depth = Math.min(12, node.closest('main, [role="main"]') ? 1 : 0);
     const score = Math.min(text.length, 8000) + Math.min(citations.length, 3) * 180 +
       Math.min(semanticBlocks, 20) * 90 + Math.min(narrativeBlocks, 8) * 520 +
-      (explicit ? 1400 : 0) + (queryAligned ? 2200 : 0) + depth * 30 -
+      (explicit ? 1400 : 0) + (queryAligned ? 2200 : 0) +
+      (answerActionRelation === 'before' ? 2600 : 0) + depth * 30 -
       Math.min(controls, 20) * 120 -
       (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);
     return {
@@ -292,6 +326,7 @@
       sourceResultItems,
       afterQuery: metrics.afterQuery,
       queryAligned,
+      answerActionRelation,
       trustedAnswerContainer: metrics.trustedAnswerContainer
     };
   }
@@ -310,6 +345,7 @@
 
   function answerCandidate(composer, query, queryAnchor, nextQueryAnchor) {
     queryAnchor = queryAnchor || findQueryAnchor(query);
+    const answerActionAnchor = findAnswerActionAnchor(queryAnchor, nextQueryAnchor, composer);
     const explicitSelectors = TRUSTED_ANSWER_SELECTORS.concat('[role="region"]');
     const semanticSelectors = [
       'body section',
@@ -318,18 +354,26 @@
     ];
     const genericSelectors = ['body div'];
     const explicit = uniqueNodes(explicitSelectors)
-      .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, true))
+      .map((node) => candidateFrom(
+        node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, true
+      ))
       .filter(Boolean);
     const semantic = uniqueNodes(semanticSelectors)
-      .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, true))
+      .map((node) => candidateFrom(
+        node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, true
+      ))
       .filter(Boolean);
     const generic = uniqueNodes(genericSelectors).slice(0, 1200)
-      .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, false))
+      .map((node) => candidateFrom(
+        node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, false
+      ))
       .filter(Boolean)
       .filter((candidate) => {
         if (candidate.text.length < 8) return true;
         const child = Array.from(candidate.node.children)
-          .map((node) => candidateFrom(node, composer, query, queryAnchor, nextQueryAnchor, false))
+          .map((node) => candidateFrom(
+            node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, false
+          ))
           .filter(Boolean)
           .sort((left, right) => right.text.length - left.text.length)[0];
         return !child || child.text.length < candidate.text.length * 0.92;

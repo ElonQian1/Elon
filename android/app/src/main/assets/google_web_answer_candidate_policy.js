@@ -30,7 +30,9 @@
     const textLength = nonNegative(metrics && metrics.textLength);
     const citationTextRatio = nonNegative(metrics && metrics.citationTextRatio);
     const queryAligned = metrics && metrics.queryAligned === true;
+    const answerActionRelation = String(metrics && metrics.answerActionRelation || 'unknown');
     if (citations < 2 || links < 2) return false;
+    if (answerActionRelation === 'after') return true;
     // The primary answer is rendered in the same visual column as the user's
     // question. Inline citation links inside long answer bullets must not turn
     // that answer into a false source-card collection.
@@ -157,6 +159,10 @@
     const liveRegion = metrics && metrics.liveRegion === true;
     const explicit = metrics && metrics.explicit === true;
     if (!hasQuery || textLength < 1) return false;
+    // Copy/share/feedback controls terminate Google's primary response. In a
+    // responsive layout the organic source list moves into the same column, but
+    // it still follows those controls in document order and is never answer text.
+    if (metrics && metrics.answerActionRelation === 'after') return false;
     if (metrics && metrics.resultListItem === true) return false;
     if (sourceCollection(metrics)) return false;
     if (navigationOnlyText(metrics && metrics.text)) return false;
@@ -182,12 +188,18 @@
     const values = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
     // `accepts` normally removes source rails. Keep the final selector fail-closed
     // too, so a future scoring change cannot promote a known source collection.
-    const eligible = values.filter((candidate) => candidate.sourceCollection !== true);
+    const eligible = values.filter((candidate) =>
+      candidate.sourceCollection !== true && candidate.answerActionRelation !== 'after'
+    );
     const afterQuery = eligible.filter((candidate) => candidate.afterQuery === true);
     const trusted = eligible.filter((candidate) => candidate.trustedAnswerContainer === true);
     const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : eligible);
-    const alignedPool = pool.filter((candidate) => candidate.queryAligned === true);
-    const answerColumnPool = alignedPool.length ? alignedPool : pool;
+    const beforeAnswerActions = pool.filter(
+      (candidate) => candidate.answerActionRelation === 'before'
+    );
+    const boundedPool = beforeAnswerActions.length ? beforeAnswerActions : pool;
+    const alignedPool = boundedPool.filter((candidate) => candidate.queryAligned === true);
+    const answerColumnPool = alignedPool.length ? alignedPool : boundedPool;
     // Google AI Mode commonly nests the complete answer above short trusted leaf nodes.
     // Prefer a multi-block narrative before using the numeric score so that link/control
     // penalties cannot reduce the full numbered response to its introduction or last line.
@@ -203,7 +215,7 @@
   }
 
   return Object.freeze({
-    version: 17,
+    version: 18,
     accepts,
     penalty,
     select,

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 17)
+assert.equal(policy.version, 18)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -388,6 +388,26 @@ assert.equal(policy.accepts({
   citationTextRatio: 0.08,
 }), true, 'numbered prose with citations remains a primary answer candidate')
 
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '来源一标题与摘要 来源二标题与摘要 来源三标题与摘要',
+  textLength: 560,
+  citations: 3,
+  semanticBlocks: 3,
+  narrativeBlocks: 3,
+  sourceResultItems: 3,
+  controls: 0,
+  links: 3,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  queryAligned: true,
+  answerActionRelation: 'after',
+  interactive: false,
+  explicit: true,
+  citationTextRatio: 0.24,
+}), false, 'responsive source results after the answer actions cannot become the answer')
+
 assert.equal(policy.select([
   { id: 'complete-answer', afterQuery: true, trustedAnswerContainer: false, narrativeBlocks: 3, domOrder: 2, score: 530, textLength: 1400 },
   { id: 'last-sentence', afterQuery: true, trustedAnswerContainer: true, narrativeBlocks: 0, domOrder: 5, score: 1430, textLength: 22 },
@@ -405,4 +425,11 @@ assert.equal(policy.select([
   { id: 'full-answer', afterQuery: true, queryAligned: true, narrativeBlocks: 3, domOrder: 3, score: 2400, textLength: 620 },
   { id: 'source-rail', afterQuery: true, queryAligned: false, narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
 ]).id, 'full-answer', 'the answer column wins over a longer right-hand source rail')
+assert.equal(policy.select([
+  { id: 'full-answer', afterQuery: true, queryAligned: true, answerActionRelation: 'before', narrativeBlocks: 3, domOrder: 3, score: 2400, textLength: 620 },
+  { id: 'responsive-sources', afterQuery: true, queryAligned: true, answerActionRelation: 'after', narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
+]).id, 'full-answer', 'the response before Copy text wins when sources collapse into the same column')
+assert.equal(policy.select([
+  { id: 'responsive-sources', afterQuery: true, queryAligned: true, answerActionRelation: 'after', narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
+]), null, 'the final selector fails closed when only post-answer sources remain')
 console.log('google web answer candidate policy passed')
