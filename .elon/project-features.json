@@ -6442,6 +6442,64 @@
       "updated_at_ms": 1787052768930
     },
     {
+      "id": "win-google-ai-primary-answer-continuity-v1",
+      "title": "Win Google AI 主回答与发送界面连续性 V1",
+      "summary": "修复后台官方 WebView 状态误触发前台标签切换，并让 Google AI 主正文稳定优先于来源卡片集合，保留现有访客会话、富文本和引用组件。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-google-ai-primary-answer-continuity-v1.md",
+        "content_hash": "fb281b4d766847ed5df5e61149e70992587b7ec98e29c40dae066ffd2ae71ae1",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "e7ff20ef25a8f674f9a8ef6290cf0cc57cea1e0b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "072540555b406f3a3b912f7c5f2f2c614f1c907b",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "pc",
+        "google-ai",
+        "webview",
+        "chat",
+        "rich-text",
+        "regression"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/google_web_answer_candidate_policy.js",
+        "android/app/src/main/assets/google_web_message_extractor.js",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+        "pc-frontend/src/features/user-browser/AiWebChatSidebar.tsx",
+        "scripts/test-google-web-answer-candidate-policy.cjs",
+        "scripts/test-google-web-message-extractor-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "原生发送成功和官方 WebView 状态刷新都不会自动派发官方标签事件。",
+        "用户主动显示、切换、收起官方页的现有入口继续可用。",
+        "带编号正文和多个来源卡片的 Google AI 页面选择正文为主内容，来源只追加为引用。",
+        "原生 UI 同时显示正文富文本和来源链接，不再只显示来源摘要。",
+        "Google 访客会话、同机 Profile 与上下文连续性保持不变。",
+        "Win 合同、构建、Rust 定向测试与发布后真实复杂问答验收通过。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_21b6548a69ee4a48a3ffa8fc0c943516",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787230184859,
+        "expires_at_ms": 1787244584859
+      },
+      "created_at_ms": 1787230184845,
+      "updated_at_ms": 1787230184872
+    },
+    {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
       "title": "Win Google AI 语义桥启动恢复 V1",
       "summary": "修复 WebView2 会话已连接但 Google AI 语义桥因缺少消息提取器、文档令牌及 DOM 就绪门禁而无法发送或接收回复的问题。",
@@ -7860,36 +7918,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_f91840ff948344e5a8ce2fa12b7278ba",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "源码、跨平台编译修复、WSL2 内核矩阵和文档纠偏已完成，正在绑定证据与收尾。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786788460189
-    },
-    {
-      "id": "feature_event_1a248ea939b6484e864fa2b327cecf3e",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786788485503
-    },
-    {
-      "id": "feature_event_0fde01366c554c4bb344d9fef856da8f",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "claim_released",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "最终受管 check 产生新指纹并写回 requirement，先释放 claim 后重新绑定最终哈希。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1786788893619
-    },
     {
       "id": "feature_event_a205ca58c2474cb4b9f8a5671941e64e",
       "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
@@ -9859,6 +9887,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787228653680
+    },
+    {
+      "id": "feature_event_7fdf2dbaa39144c983fe64d96ef71734",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "用户在生产 Win 端复现发送后跳官方页，返回原生 UI 只显示来源摘要；按现有共享模块修复，不建立重复聊天实现。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787230184845
+    },
+    {
+      "id": "feature_event_52f568b4b782474a935932a8bc348856",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787230184860
+    },
+    {
+      "id": "feature_event_976baa19beb0452dafff34135e33d6b6",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "根因已定位，开始补失败契约并修复。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787230184872
     }
   ]
 }

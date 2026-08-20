@@ -76,8 +76,12 @@ assert.match(experience, /event\.key === 'Escape'/)
 assert.match(api, /REQUEST_RETURN_TO_AI_CHAT_EVENT/)
 assert.match(api, /CustomEvent<OfficialAiTabRequest \| undefined>/)
 assert.match(sidebar, /requestReturnToAiChat/)
-assert.match(sidebar, /officialVisible && officialProviderId/)
 assert.doesNotMatch(sidebar, /controller\.control\('background'\)/)
+assert.doesNotMatch(
+  sidebar,
+  /requestOfficialAiTab/,
+  'background official WebView visibility must not be promoted into a foreground tab request',
+)
 assert.match(message, /AiSourceLinks/)
 assert.match(sourceLinks, /openInternalBrowserLink/)
 assert.match(sourceLinks, /isLocalAiBrowserAvailable/)

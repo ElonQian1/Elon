@@ -11,15 +11,11 @@ import {
   SquarePen,
 } from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
-import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
+import { requestReturnToAiChat } from './internalBrowserApi'
 import styles from './AiWebChatSidebar.module.css'
 
 export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const busy = Boolean(web.controller.busyAction)
-  const officialVisible = Boolean(web.controller.sessionState?.windowVisible)
-  const officialProviderId = web.officialRequest?.providerId
-  const officialProviderName = web.officialRequest?.providerName
-  const officialOwnerKey = web.officialRequest?.ownerKey
   const directory = web.controller.navigationSnapshot
   const conversations = directory?.conversations ?? []
   const [query, setQuery] = useState('')
@@ -75,16 +71,6 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   }, [cancelSyncRetry, web.provider?.id])
 
   useEffect(() => () => cancelSyncRetry(), [cancelSyncRetry])
-
-  useEffect(() => {
-    if (officialVisible && officialProviderId && officialProviderName && officialOwnerKey) {
-      requestOfficialAiTab({
-        providerId: officialProviderId,
-        providerName: officialProviderName,
-        ownerKey: officialOwnerKey,
-      })
-    }
-  }, [officialOwnerKey, officialProviderId, officialProviderName, officialVisible])
 
   useEffect(() => {
     if (!web.userState.canConversationHistory

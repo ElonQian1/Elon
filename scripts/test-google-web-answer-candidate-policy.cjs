@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 12)
+assert.equal(policy.version, 13)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -288,6 +288,54 @@ assert.equal(policy.accepts({
 }), false)
 
 assert.ok(policy.penalty({ links: 3, tabControls: 2 }) > policy.penalty({ links: 0, tabControls: 0 }))
+
+assert.equal(policy.sourceCollection({
+  textLength: 180,
+  citations: 3,
+  semanticBlocks: 3,
+  links: 3,
+  citationTextRatio: 0.62,
+}), true)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '来源一摘要 来源二摘要 来源三摘要',
+  textLength: 180,
+  citations: 3,
+  semanticBlocks: 3,
+  controls: 0,
+  links: 3,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
+  explicit: true,
+  citationTextRatio: 0.62,
+}), false, 'a source-card collection must never replace the primary AI answer body')
+
+assert.equal(policy.sourceCollection({
+  textLength: 240,
+  citations: 1,
+  semanticBlocks: 5,
+  links: 1,
+  citationTextRatio: 0.08,
+}), false)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: '今晚操作与观察策略\n1. 观察利率\n2. 关注财报\n3. 控制风险',
+  textLength: 240,
+  citations: 1,
+  semanticBlocks: 5,
+  controls: 0,
+  links: 1,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  interactive: false,
+  explicit: true,
+  citationTextRatio: 0.08,
+}), true, 'numbered prose with citations remains a primary answer candidate')
 
 assert.equal(policy.select([
   { id: 'complete-answer', afterQuery: true, trustedAnswerContainer: true, domOrder: 2, score: 9000, textLength: 900 },

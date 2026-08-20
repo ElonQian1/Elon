@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 19;
+  const extractorVersion = 20;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -127,6 +127,20 @@
     return parts;
   }
 
+  function externalLinkTextLength(container) {
+    if (!container) return 0;
+    let length = 0;
+    for (const link of container.querySelectorAll('a[href^="https://"]')) {
+      if (!isVisible(link)) continue;
+      try {
+        const url = new URL(link.href);
+        if (allowedOrigins.has(url.origin)) continue;
+        length += cleanText(link.innerText || link.textContent || link.getAttribute('aria-label')).length;
+      } catch (_) {}
+    }
+    return Math.min(length, 40000);
+  }
+
   function containsComposer(node, composer) {
     return !!composer && (node === composer || node.contains(composer));
   }
@@ -175,6 +189,17 @@
     const semanticBlocks = node.querySelectorAll('p, li, blockquote, pre, table, h2, h3').length;
     const controls = node.querySelectorAll('button, [role="button"], input, textarea').length;
     const links = node.querySelectorAll('a[href]').length;
+    const linkedTextLength = externalLinkTextLength(node);
+    const citationTextRatio = text.length ? Math.min(linkedTextLength, text.length) / text.length : 0;
+    const sourceCollection = candidatePolicy && typeof candidatePolicy.sourceCollection === 'function'
+      ? candidatePolicy.sourceCollection({
+          citations: citations.length,
+          links,
+          semanticBlocks,
+          textLength: text.length,
+          citationTextRatio
+        })
+      : citations.length >= 2 && links >= 2 && citationTextRatio >= 0.45;
     const tabControls = node.querySelectorAll('[role="tab"], [role="tablist"], [role="toolbar"]').length +
       (node.matches('[role="tab"], [role="tablist"], [role="toolbar"]') ? 1 : 0);
     const liveRegion = node.matches('[aria-live], [role="status"], [role="alert"]');
@@ -191,6 +216,9 @@
       afterQuery: followsQuery(node, queryAnchor),
       trustedAnswerContainer: node.matches(TRUSTED_ANSWER_SELECTOR),
       resultListItem: !!node.closest('li, [role="listitem"]'),
+      sourceCollection: sourceCollection,
+      externalLinkTextLength: linkedTextLength,
+      citationTextRatio,
       interactive: !!node.closest(
         'a[href], button, input, textarea, select, [role="button"], [role="link"], ' +
         '[role="menuitem"], [role="tab"]'
@@ -199,7 +227,7 @@
     };
     if (candidatePolicy && !candidatePolicy.accepts(metrics)) return null;
     const depth = Math.min(12, node.closest('main, [role="main"]') ? 1 : 0);
-    const score = Math.min(text.length, 8000) + citations.length * 900 +
+    const score = Math.min(text.length, 8000) + Math.min(citations.length, 3) * 180 +
       Math.min(semanticBlocks, 20) * 90 + (explicit ? 1400 : 0) + depth * 30 -
       Math.min(controls, 20) * 120 -
       (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);

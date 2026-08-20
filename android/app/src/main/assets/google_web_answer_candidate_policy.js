@@ -21,6 +21,18 @@
     return Number.isFinite(number) ? Math.max(0, number) : 0;
   }
 
+  function sourceCollection(metrics) {
+    const citations = nonNegative(metrics && metrics.citations);
+    const links = nonNegative(metrics && metrics.links);
+    const semanticBlocks = nonNegative(metrics && metrics.semanticBlocks);
+    const textLength = nonNegative(metrics && metrics.textLength);
+    const citationTextRatio = nonNegative(metrics && metrics.citationTextRatio);
+    return citations >= 2 && links >= 2 && (
+      citationTextRatio >= 0.45 ||
+      (semanticBlocks <= citations + 1 && textLength <= citations * 240)
+    );
+  }
+
   function navigationOnlyText(value) {
     const text = String(value || '')
       .replace(/\u00a0/g, ' ')
@@ -132,6 +144,7 @@
     const explicit = metrics && metrics.explicit === true;
     if (!hasQuery || textLength < 1) return false;
     if (metrics && metrics.resultListItem === true) return false;
+    if (sourceCollection(metrics)) return false;
     if (navigationOnlyText(metrics && metrics.text)) return false;
     if (transientStatusText(metrics && metrics.text)) return false;
     if (shareSurfaceText(metrics && metrics.text)) return false;
@@ -164,10 +177,11 @@
   }
 
   return Object.freeze({
-    version: 12,
+    version: 13,
     accepts,
     penalty,
     select,
+    sourceCollection,
     navigationOnlyText,
     transientStatusText,
     shareSurfaceText,
