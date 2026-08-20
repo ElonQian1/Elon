@@ -72,6 +72,10 @@ const hideOfficialWebview = embeddedViewRust.slice(
   embeddedViewRust.indexOf('pub(crate) fn hide'),
   embeddedViewRust.indexOf('pub(crate) fn reflow_parked_sessions'),
 )
+const controlOfficialWebview = rust.slice(
+  rust.indexOf('pub async fn control_local_ai_web_session'),
+  rust.indexOf('pub async fn run_local_ai_web_adapter_command'),
+)
 
 assert.match(rust, /\.data_directory\(profile_directory\)/)
 assert.match(rust, /owner_fingerprint/)
@@ -103,6 +107,7 @@ assert.match(rust, /WebviewUrl::External\(bootstrap_url\)/)
 assert.match(rust, /page\.navigate\(start_url\)/)
 assert.match(rust, /\.unminimize\(\)/)
 assert.match(rust, /if action == "background"/)
+assert.match(controlOfficialWebview, /}\s*embedded_view::park_if_background\(&app, runtime\.inner\(\), &label\)\?;/)
 assert.match(embeddedViewRust, /webview\.hide\(\)/)
 assert.match(embeddedViewRust, /webview\.reparent\(/)
 assert.match(parkOfficialWebview, /webview\.hide\(\)/)

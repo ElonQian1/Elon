@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 14)
+assert.equal(policy.version, 15)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -349,8 +349,8 @@ assert.equal(policy.accepts({
 }), true, 'numbered prose with citations remains a primary answer candidate')
 
 assert.equal(policy.select([
-  { id: 'complete-answer', afterQuery: true, trustedAnswerContainer: true, domOrder: 2, score: 9000, textLength: 900 },
-  { id: 'last-sentence', afterQuery: true, trustedAnswerContainer: true, domOrder: 5, score: 20, textLength: 22 },
+  { id: 'complete-answer', afterQuery: true, trustedAnswerContainer: false, narrativeBlocks: 3, domOrder: 2, score: 530, textLength: 1400 },
+  { id: 'last-sentence', afterQuery: true, trustedAnswerContainer: true, narrativeBlocks: 0, domOrder: 5, score: 1430, textLength: 22 },
   { id: 'organic-result', afterQuery: true, trustedAnswerContainer: true, domOrder: 9, score: 400, textLength: 80 },
 ]).id, 'complete-answer', 'the complete AI response must win over later leaf text and result cards')
 assert.equal(policy.select([

@@ -171,7 +171,12 @@
     const afterQuery = values.filter((candidate) => candidate.afterQuery === true);
     const trusted = values.filter((candidate) => candidate.trustedAnswerContainer === true);
     const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : values);
-    return pool.sort((left, right) =>
+    // Google AI Mode commonly nests the complete answer above short trusted leaf nodes.
+    // Prefer a multi-block narrative before using the numeric score so that link/control
+    // penalties cannot reduce the full numbered response to its introduction or last line.
+    const narrativePool = pool.filter((candidate) => nonNegative(candidate.narrativeBlocks) >= 2);
+    const preferredPool = narrativePool.length ? narrativePool : pool;
+    return preferredPool.sort((left, right) =>
       Number(right.score || 0) - Number(left.score || 0) ||
       nonNegative(right.textLength) - nonNegative(left.textLength) ||
       nonNegative(left.domOrder) - nonNegative(right.domOrder)
@@ -179,7 +184,7 @@
   }
 
   return Object.freeze({
-    version: 14,
+    version: 15,
     accepts,
     penalty,
     select,

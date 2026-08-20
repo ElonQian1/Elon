@@ -6,6 +6,10 @@ const ts = require('typescript')
 
 const filename = path.resolve(__dirname, '../src/features/user-browser/localAiNewConversation.ts')
 const source = fs.readFileSync(filename, 'utf8')
+const controllerSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useLocalAiWebChatController.ts'),
+  'utf8',
+)
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -48,5 +52,8 @@ assert.equal(selectLocalAiNewConversationPath('chatgpt', {
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, { composerReady: false }), 'home')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, liveSnapshot), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('google-ai-mode', liveSession, liveSnapshot), 'home')
+assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
+assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
+assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, 'reload'\)/)
 
 process.stdout.write('PASS local AI new-conversation recovery policy\n')

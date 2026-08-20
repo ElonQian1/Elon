@@ -410,10 +410,10 @@ pub async fn control_local_ai_web_session(
         "home" => {
             page.navigate(parse_start_url(provider)?)
                 .map_err(display_error)?;
-            embedded_view::park_if_background(&app, runtime.inner(), &label)?;
         }
         _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
     }
+    embedded_view::park_if_background(&app, runtime.inner(), &label)?;
     runtime
         .snapshot(&label)
         .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))

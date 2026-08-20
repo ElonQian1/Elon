@@ -159,6 +159,28 @@ export default function useLocalAiWebChatController(
   }, [liveSnapshot, newConversationRecoveryStartedAtMs, visibleSessionState])
 
   useEffect(() => {
+    if (!newConversationRecoveryStartedAtMs || providerId !== 'google-ai-mode' || !ownerKey) return
+    let active = true
+    const timer = window.setTimeout(() => {
+      void getLocalAiWebSessionState(providerId, ownerKey)
+        .then(async (current) => {
+          if (!active || current.rendererStatus === 'active' || !current.loading) return
+          const next = await controlLocalAiWebSession(providerId, ownerKey, 'reload')
+          if (!active) return
+          setSessionState(next)
+          setMessage('Google AI 模式首次新会话加载较慢，已在后台自动重试一次。')
+        })
+        .catch(() => {
+          // 最终恢复超时仍会释放输入框，不让官网偶发加载失败永久阻塞原生 UI。
+        })
+    }, GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [newConversationRecoveryStartedAtMs, ownerKey, providerId])
+
+  useEffect(() => {
     if (!providerId || !ownerKey) return
     const key = requestedSessionIdentity
     if (autoStartKey.current === key) return
@@ -485,7 +507,8 @@ const RESPONSE_REFRESH_DELAYS_MS = [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000,
 // 避免真正打不开时无休止地重建 WebView2。
 const BACKGROUND_RECONNECT_MAX_ATTEMPTS = 3
 // 新建会话后等待官网给出可信实时快照的上限；超过就不再无限期把输入框清空。
-const NEW_CONVERSATION_RECOVERY_TIMEOUT_MS = 12_000
+const GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS = 8_000
+const NEW_CONVERSATION_RECOVERY_TIMEOUT_MS = 24_000
 
 function normalizePrompt(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
