@@ -14,6 +14,9 @@ import com.elon.app.update.UpdateCheckWorker
 
 internal const val EXTRA_OPEN_PROJECT_SPACE_ID = "com.elon.app.extra.OPEN_PROJECT_SPACE_ID"
 internal const val EXTRA_OPEN_PROJECT_SPACE_TITLE = "com.elon.app.extra.OPEN_PROJECT_SPACE_TITLE"
+internal const val EXTRA_OPEN_WORK_SUMMARY_PROJECT_TITLE = "com.elon.app.extra.OPEN_WORK_SUMMARY_PROJECT_TITLE"
+internal const val EXTRA_WORK_SUMMARY_AI_PROMPT = "com.elon.app.extra.WORK_SUMMARY_AI_PROMPT"
+internal const val EXTRA_WORK_SUMMARY_AUTO_SEND = "com.elon.app.extra.WORK_SUMMARY_AUTO_SEND"
 
 internal class MainCreateActions(
     private val activity: AppCompatActivity,
@@ -46,6 +49,7 @@ internal class MainCreateActions(
     private val startTaskWorkService: (String) -> Boolean,
     private val openConversation: (Int) -> Unit,
     private val openProjectSpaceById: (String, String) -> Unit,
+    private val openProjectByTitle: (String) -> Boolean,
     private val loadModelOptions: () -> Unit,
     private val sendMessage: () -> Unit
 ) {
@@ -95,6 +99,22 @@ internal class MainCreateActions(
             intent?.removeExtra(EXTRA_OPEN_PROJECT_SPACE_ID)
             intent?.removeExtra(EXTRA_OPEN_PROJECT_SPACE_TITLE)
             openProjectSpaceById(projectId, title)
+        }
+        val projectTitle = intent?.getStringExtra(EXTRA_OPEN_WORK_SUMMARY_PROJECT_TITLE)?.trim().orEmpty()
+        if (projectTitle.isNotBlank()) {
+            intent?.removeExtra(EXTRA_OPEN_WORK_SUMMARY_PROJECT_TITLE)
+            if (!openProjectByTitle(projectTitle)) {
+                Toast.makeText(activity, "未找到项目：$projectTitle", Toast.LENGTH_SHORT).show()
+            }
+        }
+        val summaryPrompt = intent?.getStringExtra(EXTRA_WORK_SUMMARY_AI_PROMPT)?.trim().orEmpty()
+        if (summaryPrompt.isNotBlank()) {
+            intent?.removeExtra(EXTRA_WORK_SUMMARY_AI_PROMPT)
+            val autoSend = intent?.getBooleanExtra(EXTRA_WORK_SUMMARY_AUTO_SEND, false) == true
+            intent?.removeExtra(EXTRA_WORK_SUMMARY_AUTO_SEND)
+            binding.inputEdit.setText(summaryPrompt)
+            binding.inputEdit.setSelection(binding.inputEdit.text.length)
+            if (autoSend) sendMessage()
         }
     }
 

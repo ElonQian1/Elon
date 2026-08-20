@@ -324,11 +324,11 @@ class MainActivity : AppCompatActivity() {
             openProjectSpaceById = { projectId, title ->
                 projectSpaceController.openProjectSpace(projectId, title, true)
             },
+            openProjectByTitle = { title -> s.projects.firstOrNull { it.title == title }?.let { openProjectSpaceForProject(it, true); true } ?: false },
             loadModelOptions = { modelActions.loadModelOptions() },
             sendMessage = { inputActions.sendMessageActions.sendMessage() }
         )
     }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
