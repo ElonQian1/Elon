@@ -5869,6 +5869,105 @@
       "updated_at_ms": 1786877700639
     },
     {
+      "id": "win-ai-child-webview-capability-v1",
+      "title": "Win 官方 AI 子 WebView 权限绑定 V1",
+      "summary": "修复官方 AI 子 WebView 按宿主窗口匹配 capability 导致语义事件 IPC 被拒绝、原生输入与新会话永久禁用的问题。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-ai-child-webview-capability-v1.md",
+        "content_hash": "2d2f73e3519bc4e6b99fdafe20205e4c9aeea4ed5ce7eaeb130ace1850f23aab",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "288bb3491d3758517a2cf0e7c16f71406af31683",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "2829c5768b06d63fb4c14247b206b39ea1bd1438",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "desktop-ai-browser",
+      "tags": [
+        "windows",
+        "tauri",
+        "webview2",
+        "google-ai",
+        "chatgpt",
+        "ipc"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/capabilities/local-ai-google-web.json",
+        "desktop-shell/src-tauri/capabilities/local-ai-web.json",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "两个官方 AI capability 按 webviews 标签而非宿主 windows 匹配",
+        "子 WebView 只获得既有语义事件上报权限",
+        "PC 合同与 Tauri 定向测试和生产构建通过",
+        "Win 发布后 Google 适配器状态可实时回传"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/capabilities/local-ai-google-web.json",
+          "content_hash": "132be8e94ce0c35e43fefa77b9ce3fc6b6d4d13e3ea31e8d88c8631bd1fde879",
+          "locator": "webviews",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "288bb3491d3758517a2cf0e7c16f71406af31683",
+            "head_blob_oid": "07ecdd08db64c2b0ac05e3591526802ac9fae6c8",
+            "worktree_blob_oid": "05d5645cf16f36f1ad892b3d47cd8fd1dc16a97e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/capabilities/local-ai-web.json",
+          "content_hash": "23f80460da5c06e819c5a2d4d7ca532105a7b38dc9ece571fd07ea3eb6bb14fa",
+          "locator": "webviews",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "288bb3491d3758517a2cf0e7c16f71406af31683",
+            "head_blob_oid": "ac2d5dc96567ea2108effdc3b396e6a31d06cee1",
+            "worktree_blob_oid": "f4bf3ba7c47237025e45a424e0f9ba9caab286bc",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "3fdf51fdbc8f805071145d800bb7e24f7bf3b0c63c0c3790f632c9f728ed6eec",
+          "locator": "IPC 与导航边界",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "288bb3491d3758517a2cf0e7c16f71406af31683",
+            "head_blob_oid": "153120a78dc28f5ae153e348ad65d16ed812c6e6",
+            "worktree_blob_oid": "cf58cb8e14d6bb528dfec3234ef1dcaba2a24629",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "9df2f87d962c5d1059d4b77e676e120c7b3371d37261e91d5b16f3bce78fc9e5",
+          "locator": "adapterCapabilityJson.webviews",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "288bb3491d3758517a2cf0e7c16f71406af31683",
+            "head_blob_oid": "0f2d16ae6d4d79f83d31b04ed8d7a99abfcb543b",
+            "worktree_blob_oid": "e7da22ddea5367034fcbcd3b47b1b450211185c0",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787209947927,
+      "updated_at_ms": 1787213379795
+    },
+    {
       "id": "win-google-ai-guest-new-conversation-recovery-v1",
       "title": "Win Google AI 游客新对话快速恢复 V1",
       "summary": "让 Win 原生聊天在 Google 游客适配器未连接或缓存上下文未绑定时仍可立即发起新会话恢复，并保留发送绑定门禁。",
@@ -7168,56 +7267,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_f61cccf555484a5e918e673a40189f77",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "Dependencies are empty and task paths plus acceptance criteria are implementation-ready.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786755852722
-    },
-    {
-      "id": "feature_event_f44aae83f8b24dbca9b392986c8dc3ce",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019feb34",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786755852814
-    },
-    {
-      "id": "feature_event_552497877a0c40d4adec67d7e8b3568f",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "Implementation, targeted tests, workflow gates, and documentation are now being evidence-bound.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786755852889
-    },
-    {
-      "id": "feature_event_9261a73cdc9b42588fd604297659505a",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019feb34",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786755911068
-    },
-    {
-      "id": "feature_event_d7ec565d568545eea5ff1930b5a3be38",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "Task-owned allocator, two-phase fail-closed cleanup, unified finish integration, isolated tests, workflow gates, and operator documentation are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786755938481
-    },
     {
       "id": "feature_event_e22a6a0235b14c728c986bcdba0f5517",
       "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
@@ -9167,6 +9216,56 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787052768930
+    },
+    {
+      "id": "feature_event_430f4379ee8d490ea2e7d23902988650",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "d5ad89d8 Win 现场证明官方页可加载但 adapter_connected 仍为 false，Tauri 多 WebView capability 目标范围错误。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787209947927
+    },
+    {
+      "id": "feature_event_e6fb353417494802931781d268d9adf9",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787212868408
+    },
+    {
+      "id": "feature_event_8a70d8302f294572aa7903107f2a64e7",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始修复官方 AI 子 WebView capability 标签匹配并添加回归测试",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787212888330
+    },
+    {
+      "id": "feature_event_c7f44edcb2b74588828f04ed3d18344e",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787213361492
+    },
+    {
+      "id": "feature_event_8df6fcf6e30149498a7e8e8998de3f98",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "两个官方 AI capability 已改为按 webviews 标签匹配；最小权限合同、PC 用户浏览器测试、前端生产构建、Tauri check 与相关 Rust 测试通过",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787213379795
     }
   ]
 }

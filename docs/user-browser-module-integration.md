@@ -120,6 +120,8 @@ WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色�
 - ChatGPT 与 Google AI 模式官方 WebView 分别匹配独立 capability，只能上报经过 Rust 白名单
   清洗的可见语义；它们不能调用主窗口的会话控制命令。初始化脚本不读取 Cookie、Token、
   请求头或原始响应，也不发起厂商私有网络请求。
+- 官方 AI capability 必须通过 `webviews` 匹配子 WebView 标签，不能通过 `windows` 匹配宿主窗口；
+  这样子 WebView 在独立窗口与主窗口标签页之间切换时都能上报就绪状态，同时不会扩大主窗口权限。
 - ChatGPT 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
 - Google AI 模式只接受 `google.com` 与 `www.google.com` 的官方搜索顶层页面；
   `accounts.google.com` 在本地窗口被明确拦截，并提示用户使用系统浏览器。
