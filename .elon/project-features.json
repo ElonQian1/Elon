@@ -5872,7 +5872,7 @@
       "id": "win-ai-child-webview-capability-v1",
       "title": "Win 官方 AI 子 WebView 权限绑定 V1",
       "summary": "修复官方 AI 子 WebView 按宿主窗口匹配 capability 导致语义事件 IPC 被拒绝、原生输入与新会话永久禁用的问题。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-ai-child-webview-capability-v1.md",
@@ -5965,7 +5965,7 @@
         }
       ],
       "created_at_ms": 1787209947927,
-      "updated_at_ms": 1787213379795
+      "updated_at_ms": 1787215120290
     },
     {
       "id": "win-google-ai-guest-new-conversation-recovery-v1",
@@ -7267,26 +7267,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_e22a6a0235b14c728c986bcdba0f5517",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "Dedicated PowerShell 5 lifecycle test, unified finish fixture, complete preflight workflow, source-size, document-modularity, prompt audit, and registry adoption gates passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786756056855
-    },
-    {
-      "id": "feature_event_bf9095379dbc432db0653b8cdfa5153e",
-      "feature_id": "ai-task-external-rust-scratch-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019feb34",
-      "reason": "Implementation commit dbca464da5e4d4e4b331099cbb1e5a52372d4a79 is present on origin/main and all bound evidence remains current.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786756056943
-    },
     {
       "id": "feature_event_11f2203cda014bacaf64161358c9036a",
       "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
@@ -9266,6 +9246,26 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1787213379795
+    },
+    {
+      "id": "feature_event_5613c70e845a4d10bb31674fbc670083",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "PC 用户浏览器合同、生产前端构建、Tauri check 与桌面 AI 定向 Rust 测试通过；发布后 ChatGPT 与 Google 均实测 adapter/composer/context ready，Google 新聊天成功并恢复空会话输入",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787215094359
+    },
+    {
+      "id": "feature_event_41e0cea1c66b44fc89000834efbc238f",
+      "feature_id": "win-ai-child-webview-capability-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Win 版本 0.3.69+e105758901f076034c45a7bec935652b11b54b40 已发布并通过正式 update_and_restart 安装；节点与 Tauri 以精确身份重连，现场验收通过",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787215120290
     }
   ]
 }
