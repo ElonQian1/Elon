@@ -7,6 +7,7 @@ internal class ChatGptConversationRefreshCoordinator(
     private val retryDelaysMs: List<Long> = DEFAULT_RETRY_DELAYS_MS,
 ) {
     private var inFlight = false
+    private var refreshAgain = false
     private var retryIndex = 0
     private var scheduledRetry: Runnable? = null
 
@@ -26,19 +27,31 @@ internal class ChatGptConversationRefreshCoordinator(
         return dispatchIfIdle()
     }
 
+    fun requestAfterCurrent(): Boolean {
+        cancelScheduledRetry()
+        retryIndex = 0
+        if (inFlight) {
+            refreshAgain = true
+            return true
+        }
+        return dispatchIfIdle()
+    }
+
     fun onSucceeded() {
         inFlight = false
         retryIndex = 0
         cancelScheduledRetry()
+        dispatchQueuedRefresh()
     }
 
     fun onFailed() {
         inFlight = false
-        scheduleNextRetry()
+        if (!dispatchQueuedRefresh()) scheduleNextRetry()
     }
 
     fun reset() {
         inFlight = false
+        refreshAgain = false
         retryIndex = 0
         cancelScheduledRetry()
     }
@@ -59,6 +72,12 @@ internal class ChatGptConversationRefreshCoordinator(
         }
         scheduledRetry = retry
         schedule(retry, delayMs)
+    }
+
+    private fun dispatchQueuedRefresh(): Boolean {
+        if (!refreshAgain) return false
+        refreshAgain = false
+        return dispatchIfIdle()
     }
 
     private fun cancelScheduledRetry() {

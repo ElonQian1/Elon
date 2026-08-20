@@ -105,6 +105,7 @@ internal class ChatGptBackgroundSession(
     private var conversationCollection = restoredConversationHistory?.let {
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
+    private var forceConversationRefreshAfterVoice = false
     private var reloadAfterPause = false
     private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
         lazy(LazyThreadSafetyMode.NONE) {
@@ -342,7 +343,18 @@ internal class ChatGptBackgroundSession(
         )
 
     fun beginRealtimeVoiceBacking(): Boolean = realtimeVoiceBacking.begin()
-    fun endRealtimeVoiceBacking() = realtimeVoiceBacking.end()
+    fun endRealtimeVoiceBacking() {
+        if (!realtimeVoiceBacking.isActive()) return
+        if (latestSnapshot?.capabilities?.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) == true) {
+            conversationCollection = conversationCollection.copy(
+                stale = conversations.isNotEmpty(),
+                officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
+            )
+            forceConversationRefreshAfterVoice = true
+            onConversationIndexChanged(conversationIndex())
+        }
+        realtimeVoiceBacking.end()
+    }
 
     fun destroy() {
         realtimeVoiceBacking.release()
@@ -355,6 +367,7 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)
         conversationRefresh.reset()
+        forceConversationRefreshAfterVoice = false
         conversationRefreshHandler.removeCallbacksAndMessages(null)
         composerOptionHandler.removeCallbacksAndMessages(null)
         sessionContinuityHandler.removeCallbacksAndMessages(null)
@@ -474,17 +487,13 @@ internal class ChatGptBackgroundSession(
                 scheduleSessionContinuityRecheck(reconciliation.recheckAfterMs)
                 if (reconciliation.clearConversationHistory) clearConversationHistory()
                 latestSnapshot = snapshot
-                ChatGptWebConversationPath.fromUrl(snapshot.url)?.let { activePath ->
-                    conversations = conversations.map { conversation ->
-                        conversation.copy(
-                            active = conversation.path == activePath,
-                            activityDates = if (conversation.path == activePath) {
-                                conversation.activityDates + LocalDate.now().toString()
-                            } else {
-                                conversation.activityDates
-                            },
-                        )
-                    }
+                ChatGptWebConversationPath.fromUrl(snapshot.url)?.let {
+                    conversations = ChatGptWebConversationIndex.observeCurrent(
+                        previous = conversations,
+                        snapshot = snapshot,
+                        activityDate = LocalDate.now(),
+                        knownProjects = projects,
+                    )
                     conversationHistoryStore.save(conversations, projects)
                     onConversationIndexChanged(conversationIndex())
                 }
@@ -512,6 +521,12 @@ internal class ChatGptBackgroundSession(
                         recovery.onReady()
                         updateState(State.READY)
                         if (
+                            forceConversationRefreshAfterVoice &&
+                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST)
+                        ) {
+                            forceConversationRefreshAfterVoice = false
+                            conversationRefresh.requestAfterCurrent()
+                        } else if (
                             snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
                             conversationCollection.officialLoadState !=
                                 ChatGptWebConversationCollection.LOAD_READY

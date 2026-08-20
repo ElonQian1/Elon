@@ -72,6 +72,38 @@ internal object ChatGptWebConversationIndex {
     fun identityOf(value: ChatGptWebConversation): String =
         ChatGptWebConversationPath.identity(value.path) ?: value.id
 
+    fun observeCurrent(
+        previous: List<ChatGptWebConversation>,
+        snapshot: ChatGptWebSnapshot,
+        activityDate: LocalDate,
+        knownProjects: List<ChatGptWebProject> = emptyList(),
+    ): List<ChatGptWebConversation> {
+        val path = ChatGptWebConversationPath.fromUrl(snapshot.url) ?: return previous
+        val identity = ChatGptWebConversationPath.identity(path) ?: return previous
+        val existing = previous.firstOrNull { identityOf(it) == identity }
+        val projectId = ChatGptWebConversationPath.projectId(path)
+        val project = knownProjects.firstOrNull { it.id == projectId }
+        val observedTitle = metadataLabel(snapshot.title)
+            ?.takeUnless { it.lowercase(Locale.ROOT) in PLACEHOLDER_TITLES }
+        val current = (existing ?: ChatGptWebConversation(
+            id = identity,
+            title = observedTitle ?: "新会话",
+            path = path,
+            active = true,
+        )).copy(
+            title = observedTitle ?: existing?.title ?: "新会话",
+            path = path,
+            active = true,
+            projectId = projectId ?: existing?.projectId,
+            projectTitle = project?.title ?: existing?.projectTitle,
+            projectPath = projectId?.let { "/g/$it/project" } ?: existing?.projectPath,
+            activityDates = existing?.activityDates.orEmpty() + activityDate.toString(),
+        )
+        return listOf(sanitize(current)) + previous
+            .filterNot { identityOf(it) == identity }
+            .map { sanitize(it.copy(active = false)) }
+    }
+
     fun merge(
         previous: List<ChatGptWebConversation>,
         observed: List<ChatGptWebConversation>,
@@ -179,5 +211,6 @@ internal object ChatGptWebConversationIndex {
         ?.takeUnless { it.lowercase(Locale.ROOT) in NON_TEMPORAL_GROUP_LABELS }
 
     private val NON_TEMPORAL_GROUP_LABELS = setOf("pinned", "已置顶", "置顶")
+    private val PLACEHOLDER_TITLES = setOf("chatgpt", "new chat", "新聊天", "新会话")
 
 }

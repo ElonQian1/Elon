@@ -66,6 +66,10 @@ internal class ChatGptSocialChatController(
     private var modelLiveOptionIds = emptySet<String>()
     private var modelRangeSelectionById = emptyMap<String, WebChatModelRangeSelection>()
     private var modelPickerActive = false
+    private var realtimeVoiceBackingStarted = false
+    private var realtimeVoiceExitRecoveryActive = false
+    private var realtimeVoiceOriginPath: String? = null
+    private var realtimeVoiceHadTranscript = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
             inputText = { binding.inputEdit.text?.toString().orEmpty() },
@@ -104,6 +108,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
+        resetRealtimeVoiceExitPresentation()
         skinPresentation.exit()
         modelPopup?.dismiss()
         modelPopup = null
@@ -213,6 +218,7 @@ internal class ChatGptSocialChatController(
     override fun stopGeneration() = session.stopGeneration()
 
     override fun startNewConversation() {
+        resetRealtimeVoiceExitPresentation()
         pendingPrompt = null
         transcript.requestFollowLatest()
         session.startNewConversation()
@@ -235,6 +241,7 @@ internal class ChatGptSocialChatController(
     override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
 
     override fun openConversation(path: String): Boolean {
+        resetRealtimeVoiceExitPresentation()
         pendingPrompt = null
         transcript.requestFollowLatest()
         return session.openConversation(path).also { opened ->
@@ -243,6 +250,7 @@ internal class ChatGptSocialChatController(
     }
 
     override fun openProject(path: String): Boolean {
+        resetRealtimeVoiceExitPresentation()
         pendingPrompt = null
         return session.openProject(path)
     }
@@ -251,9 +259,26 @@ internal class ChatGptSocialChatController(
 
     override fun consumerPort(): WebChatConsumerPort = socialConsumerPort
 
-    override fun beginRealtimeVoiceBacking(): Boolean = session.beginRealtimeVoiceBacking()
+    override fun beginRealtimeVoiceBacking(): Boolean {
+        val started = session.beginRealtimeVoiceBacking()
+        if (!started) return false
+        realtimeVoiceBackingStarted = true
+        realtimeVoiceExitRecoveryActive = false
+        realtimeVoiceOriginPath = session.currentConversationPath()
+        realtimeVoiceHadTranscript = transcript.hasMessages()
+        return true
+    }
 
-    override fun endRealtimeVoiceBacking() = session.endRealtimeVoiceBacking()
+    override fun endRealtimeVoiceBacking() {
+        if (realtimeVoiceBackingStarted) {
+            realtimeVoiceBackingStarted = false
+            realtimeVoiceExitRecoveryActive = true
+            if (!realtimeVoiceHadTranscript) {
+                renderStatusMessage("正在同步语音会话…")
+            }
+        }
+        session.endRealtimeVoiceBacking()
+    }
 
     override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
 
@@ -365,6 +390,19 @@ internal class ChatGptSocialChatController(
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
+        if (WebChatRealtimeVoiceExitPresentationPolicy.shouldHoldCurrentTranscript(
+                recoveryActive = realtimeVoiceExitRecoveryActive,
+                originConversationPath = realtimeVoiceOriginPath,
+                hadTranscriptBeforeVoice = realtimeVoiceHadTranscript,
+                incoming = snapshot,
+            )) {
+            if (active) {
+                updateComposerModel(snapshot.currentModel)
+                onComposerStateChanged()
+            }
+            return
+        }
+        resetRealtimeVoiceExitPresentation()
         val cleanPending = pendingPrompt?.trim().orEmpty()
         if (
             cleanPending.isNotEmpty() &&
@@ -398,6 +436,13 @@ internal class ChatGptSocialChatController(
         if (!active) return
         updateComposerModel(snapshot.currentModel)
         onComposerStateChanged()
+    }
+
+    private fun resetRealtimeVoiceExitPresentation() {
+        realtimeVoiceBackingStarted = false
+        realtimeVoiceExitRecoveryActive = false
+        realtimeVoiceOriginPath = null
+        realtimeVoiceHadTranscript = false
     }
 
     private fun renderState(state: ChatGptBackgroundSession.State, detail: String?) {

@@ -285,6 +285,36 @@ class ChatGptWebConversationIndexTest {
         assertEquals("/g/$id/project", sanitized.projectPath)
     }
 
+    @Test
+    fun currentSnapshotImmediatelyAddsAConversationMissingFromCachedSidebar() {
+        val observed = ChatGptWebConversationIndex.observeCurrent(
+            previous = listOf(conversation("old", "昨天", null)),
+            snapshot = snapshot("fresh", "语音创建的会话"),
+            activityDate = LocalDate.of(2026, 8, 21),
+        )
+
+        assertEquals(listOf("fresh", "old"), observed.map { it.id })
+        assertEquals("语音创建的会话", observed.first().title)
+        assertEquals(setOf("2026-08-21"), observed.first().activityDates)
+        assertEquals(true, observed.first().active)
+        assertEquals(false, observed.last().active)
+    }
+
+    @Test
+    fun currentProjectSnapshotUsesKnownProjectMetadata() {
+        val project = ChatGptWebProject("g-p-demo", "家庭成员健康", "/g/g-p-demo/project")
+        val observed = ChatGptWebConversationIndex.observeCurrent(
+            previous = emptyList(),
+            snapshot = snapshot("inside", "项目语音会话", "/g/g-p-demo/c/inside"),
+            activityDate = LocalDate.of(2026, 8, 21),
+            knownProjects = listOf(project),
+        ).single()
+
+        assertEquals("g-p-demo", observed.projectId)
+        assertEquals("家庭成员健康", observed.projectTitle)
+        assertEquals("/g/g-p-demo/project", observed.projectPath)
+    }
+
     private fun conversation(id: String, group: String, projectId: String?) = ChatGptWebConversation(
         id = id,
         title = "会话 $id",
@@ -292,5 +322,20 @@ class ChatGptWebConversationIndexTest {
         active = false,
         groupLabel = group,
         projectId = projectId,
+    )
+
+    private fun snapshot(id: String, title: String, path: String = "/c/$id") = ChatGptWebSnapshot(
+        title = title,
+        url = "https://chatgpt.com$path",
+        draft = "",
+        messages = emptyList(),
+        authenticated = true,
+        composerReady = true,
+        streaming = false,
+        currentModel = "",
+        attachments = emptyList(),
+        dictationActive = false,
+        capabilities = ChatGptWebCapabilities(emptySet()),
+        pageKind = "conversation",
     )
 }

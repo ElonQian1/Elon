@@ -80,6 +80,27 @@ class ChatGptConversationRefreshCoordinatorTest {
     }
 
     @Test
+    fun refreshAfterCurrentDispatchesAgainWhenTheInflightRequestCompletes() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            true
+        }
+
+        assertTrue(coordinator.requestNow())
+        assertTrue(coordinator.requestAfterCurrent())
+        assertEquals(1, dispatches)
+
+        coordinator.onSucceeded()
+
+        assertEquals(2, dispatches)
+        assertTrue(coordinator.isBusy)
+        coordinator.onSucceeded()
+        assertFalse(coordinator.isBusy)
+    }
+
+    @Test
     fun resetCancelsPendingWorkForANewDocument() {
         val scheduled = mutableListOf<Scheduled>()
         val coordinator = coordinator(scheduled) { true }
