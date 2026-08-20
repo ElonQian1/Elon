@@ -7,6 +7,7 @@ use zeroize::Zeroize;
 
 use super::{
     atomic_activation_plan::ExternalPoolAdapterAtomicActivationPendingPlanGuard,
+    provider_active_successor_refresh_plan::ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanGuard,
     support::{constant_time_equal, is_lower_hex_sha256, update_field},
     ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
 };
@@ -222,6 +223,41 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
         );
         plan_guard.ensure_same_connection(connection)?;
         plan_guard.ensure_fully_consumed()?;
+        self.promote_exact_provider_active_successor_process_seal(
+            kind,
+            entity_id,
+            receipt_integrity_digest,
+        )
+    }
+
+    /// Refresh promotion accepts only the dedicated V278 guard after same-connection commit.
+    pub(in crate::store) fn promote_provider_active_successor_process_seal_for_refresh(
+        &self,
+        connection: &Connection,
+        plan_guard: &ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanGuard,
+        kind: &str,
+        entity_id: &str,
+        receipt_integrity_digest: &str,
+    ) -> Result<bool> {
+        ensure!(
+            connection.is_autocommit(),
+            "V274 refresh seal promotion requires a committed autocommit connection"
+        );
+        plan_guard.ensure_same_connection(connection)?;
+        plan_guard.ensure_fully_consumed()?;
+        self.promote_exact_provider_active_successor_process_seal(
+            kind,
+            entity_id,
+            receipt_integrity_digest,
+        )
+    }
+
+    fn promote_exact_provider_active_successor_process_seal(
+        &self,
+        kind: &str,
+        entity_id: &str,
+        receipt_integrity_digest: &str,
+    ) -> Result<bool> {
         if !valid_kind(kind)
             || !valid_id(entity_id)
             || !is_lower_hex_sha256(receipt_integrity_digest)

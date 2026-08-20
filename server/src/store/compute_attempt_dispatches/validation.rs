@@ -6,7 +6,7 @@ use crate::{
         canonical_adapter_ack_json_and_digest, canonical_adapter_binding_json_and_digest,
         canonical_dispatch_application_json_and_digest, canonical_dispatch_command_json_and_digest,
         ComputeAttemptAdapterAckEnvelope, ComputeAttemptDispatchApplicationEnvelope,
-        ValidatedComputeAttemptStartDispatch, VerifiedComputeAttemptAdapterAck,
+        ValidatedComputeAttemptStartDispatch, VerifiedComputeAttemptAdapterAckView,
         COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED, COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED,
         COMPUTE_ATTEMPT_ADAPTER_ACK_SCHEMA, COMPUTE_ATTEMPT_ADAPTER_BINDING_SCHEMA,
         COMPUTE_ATTEMPT_DISPATCH_APPLICATION_ACTION_V185_ACTIVATE,
@@ -150,7 +150,7 @@ pub(super) fn prepare_start_dispatch(
 }
 
 pub(super) fn prepare_verified_ack(
-    verified: &VerifiedComputeAttemptAdapterAck,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
 ) -> Result<PreparedVerifiedAck> {
     let adapter = verified.adapter();
     let ack = verified.ack();

@@ -18,6 +18,8 @@ const LAUNCH_ARGUMENTS: &str = include_str!(
 );
 const BROKER_ROOT: &str = include_str!("../external_pool_adapter_broker_tls.rs");
 const BROKER_TASK: &str = include_str!("../external_pool_adapter_broker_tls/task_protocol.rs");
+const BROKER_TASK_TYPES: &str =
+    include_str!("../external_pool_adapter_broker_tls/task_protocol_types.rs");
 const TASK_DELIVERY: &str =
     include_str!("../../store/compute_external_pool_adapter_runtime_bundle/task_delivery.rs");
 
@@ -106,16 +108,45 @@ fn task_protocol_production_reuses_exact_eltp_v1_and_bounded_receipt_only_tls() 
             "stream.write_all(request).await?",
             "stream.flush().await?",
             "stream.read_exact(&mut response[..]).await?",
-            "exchange.complete(&response, validate_observation)?",
-            "Ok(receipt)",
+            "exchange.complete(&response, |raw| validator.validate(raw))?",
+            "Ok(VerifiedExternalPoolAdapterBrokerTaskExchange::new(",
         ],
     );
     assert_eq!(
         BROKER_TASK.matches("begin_application_exchange()?").count(),
         1
     );
-    assert!(BROKER_TASK.contains("FnOnce(&[u8]) -> Result<()> + Send"));
-    assert!(BROKER_TASK.contains("Result<ExternalPoolAdapterTaskProtocolHostReceipt>"));
+    assert!(BROKER_TASK.contains("Validator: ExternalPoolAdapterBrokerTaskObservationValidator"));
+    assert!(BROKER_TASK
+        .contains("Result<VerifiedExternalPoolAdapterBrokerTaskExchange<Validator::Output>>"));
+    for marker in [
+        "mod sealed {",
+        "trait ExternalPoolAdapterBrokerTaskVerifiedObservation:",
+        "sealed::VerifiedObservation + Send",
+        "trait ExternalPoolAdapterBrokerTaskObservationValidator:",
+        "sealed::Sealed + Send",
+        "type Output: ExternalPoolAdapterBrokerTaskVerifiedObservation",
+        "struct VerifiedExternalPoolAdapterBrokerTaskExchange<",
+        "pub(super) fn new(",
+        "pub(crate) fn into_parts(self)",
+    ] {
+        assert!(
+            BROKER_TASK_TYPES.contains(marker),
+            "sealed relay lost {marker}"
+        );
+    }
+    let sealed_relay = format!("{BROKER_TASK}{BROKER_TASK_TYPES}");
+    for forbidden in [
+        "FnOnce(&[u8]) -> Result<T>",
+        "Result<(ExternalPoolAdapterTaskProtocolHostReceipt, T)>",
+        "pub(crate) receipt:",
+        "pub(crate) observation:",
+    ] {
+        assert!(
+            !sealed_relay.contains(forbidden),
+            "relay exposed {forbidden}"
+        );
+    }
     assert!(BROKER_TASK.contains("let timeout = exchange.remaining_timeout()?"));
     assert!(!BROKER_TASK.contains("timeout: Duration"));
     assert!(!BROKER_TASK.contains("MAX_EXCHANGE_TIMEOUT"));

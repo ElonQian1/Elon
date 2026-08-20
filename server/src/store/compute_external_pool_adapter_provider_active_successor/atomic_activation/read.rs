@@ -119,6 +119,32 @@ pub(in crate::store) fn historical_external_pool_adapter_atomic_activation_for_b
     };
     authority_from_stored(connection, stored, ProjectionAudit::Live(Some(checked_at))).map(Some)
 }
+pub(in crate::store) fn historical_external_pool_adapter_atomic_activation_history_for_binding_on(
+    connection: &Connection,
+    provider_binding_id: &str,
+) -> Result<Option<HistoricalExternalPoolAdapterAtomicActivationAuthority>> {
+    let Some(stored) = receipt_by_binding_on(connection, provider_binding_id)? else {
+        return Ok(None);
+    };
+    let provider_id = stored
+        .receipt
+        .activation
+        .provider_transition
+        .target_active_provider
+        .provider_id
+        .clone();
+    let current = current_registered_provider_on(connection, &provider_id)?
+        .ok_or_else(|| anyhow::anyhow!("V277 historical lookup lost its live active Provider"))?;
+    authority_from_stored(
+        connection,
+        stored,
+        ProjectionAudit::Historical {
+            provider_policy_revision: current.provider.policy_revision,
+            provider_digest: &current.provider_digest,
+        },
+    )
+    .map(Some)
+}
 pub(in crate::store) fn historical_external_pool_adapter_atomic_activation_for_observed_provider_on(
     connection: &Connection,
     provider_binding_id: &str,

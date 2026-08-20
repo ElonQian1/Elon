@@ -18,6 +18,7 @@ use crate::{
             derive_external_pool_adapter_task_production_lane_subject,
             validate_task_production_carrier_policy_digest,
             ExternalPoolAdapterTaskProductionLaneSubjectInput,
+            TASK_PRODUCTION_CARRIER_POLICY_DIGEST,
         },
         external_pool_adapter_upstream_transport_target::ExternalPoolAdapterUpstreamTransportTargetReceipt,
         external_pool_provider_activation_candidate::{
@@ -120,11 +121,9 @@ pub(super) fn audited_structural_input(
     companion: &ExternalPoolAdapterSupervisorSessionPolicyCompanionReceipt,
     compatibility: &CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'_, '_>,
     task_protocol_profile_digest: &str,
-    expected_lane_subject_digest: &str,
-    task_production_carrier_policy_digest: &str,
     checked_at: &str,
 ) -> Result<ExternalPoolAdapterProviderActiveSuccessorStructuralInput> {
-    validate_task_production_carrier_policy_digest(task_production_carrier_policy_digest)?;
+    validate_task_production_carrier_policy_digest(TASK_PRODUCTION_CARRIER_POLICY_DIGEST)?;
     let binding = registry.binding();
     let release = registry.release();
     let b = &binding.binding;
@@ -200,9 +199,6 @@ pub(super) fn audited_structural_input(
                 .clone(),
         },
     )?;
-    if lane.lane_subject_digest != expected_lane_subject_digest {
-        bail!("provider active-successor lane subject is not exact");
-    }
     Ok(ExternalPoolAdapterProviderActiveSuccessorStructuralInput {
         provider_id: b.provider_id.clone(),
         provider_owner_account_id: b.provider_owner_account_id.clone(),
@@ -236,7 +232,7 @@ pub(super) fn audited_structural_input(
         launch_image_sha256: observation.launch_image_sha256.clone(),
         task_protocol_profile_digest: task_protocol_profile_digest.into(),
         lane_subject_digest: lane.lane_subject_digest,
-        task_production_carrier_policy_digest: task_production_carrier_policy_digest.into(),
+        task_production_carrier_policy_digest: TASK_PRODUCTION_CARRIER_POLICY_DIGEST.into(),
     })
 }
 

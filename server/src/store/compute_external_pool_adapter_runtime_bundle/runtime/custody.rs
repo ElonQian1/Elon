@@ -1,7 +1,10 @@
 //! Locked HMAC custody and epoch-local durable receipt seals.
 
 mod atomic_activation_plan;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod projected_active_bundle;
 mod provider_active_successor;
+mod provider_active_successor_refresh_plan;
 mod support;
 mod task_protocol_conformance;
 
@@ -46,6 +49,13 @@ pub(in crate::store) use atomic_activation_plan::{
 pub(in crate::store) use provider_active_successor::{
     ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
     ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,
+};
+pub(crate) use provider_active_successor_refresh_plan::register_external_pool_adapter_provider_active_successor_refresh_pending_plan_udf;
+pub(in crate::store) use provider_active_successor_refresh_plan::{
+    install_external_pool_adapter_provider_active_successor_refresh_pending_plan_on,
+    ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlan,
+    ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanGuard,
+    ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanInput,
 };
 pub(in crate::store) use task_protocol_conformance::{
     ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
@@ -178,8 +188,6 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
     }
 
     /// Remembers only a pending exact receipt seal for the life of this process custody epoch.
-    /// A failed transaction may leave a harmless pending seal without a row; it expires within 15
-    /// seconds and cannot attest until an exact post-commit promotion occurs.
     pub(in crate::store) fn remember_readiness_seal(
         &self,
         readiness_receipt_id: &str,
@@ -230,8 +238,7 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
         Ok(())
     }
 
-    /// Promotes only an exact pending seal after its enclosing final IMMEDIATE transaction has
-    /// committed. Absence never creates authority; exact already-committed state is idempotent.
+    /// Promotes only an exact pending seal after its enclosing transaction commits.
     pub(in crate::store) fn commit_readiness_seal(
         &self,
         readiness_receipt_id: &str,
@@ -259,8 +266,7 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
         Ok(true)
     }
 
-    /// Attests only an exact seal minted in this process. Database contents alone cannot recreate
-    /// this authority, and restart drops the registry together with the HMAC key and epoch.
+    /// Attests only an exact seal minted in this process custody epoch.
     pub(in crate::store) fn attests_readiness_seal(
         &self,
         readiness_receipt_id: &str,
@@ -341,7 +347,7 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
         )
     }
 
-    fn with_commitment(
+    pub(super) fn with_commitment(
         &self,
         domain: &[u8],
         update: impl FnOnce(&mut HmacSha256),

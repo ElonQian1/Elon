@@ -20,11 +20,16 @@ mod write;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use active_carrier::create_external_pool_adapter_task_protocol_conformance_run_for_projected_active;
 pub(in crate::store) use active_carrier::{
+    build_external_pool_adapter_task_protocol_active_refresh_input_on,
+    current_external_pool_adapter_task_protocol_conformance_for_renewed_route_carrier_on,
+    current_external_pool_adapter_task_protocol_conformance_leaf_for_renewed_route_carrier_on,
     current_external_pool_adapter_task_protocol_conformance_projected_active_authority_on,
     CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority,
+    CurrentExternalPoolAdapterTaskProtocolProjectedActiveLeafAuthority,
 };
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use active_carrier::{
+    build_external_pool_adapter_task_protocol_registering_activation_input_on,
     prepare_external_pool_adapter_task_protocol_planned_active_carrier_on,
     PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier,
 };

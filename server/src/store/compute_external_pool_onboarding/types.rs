@@ -213,6 +213,8 @@ pub(in crate::store) struct HistoricalExternalPoolOnboardingApplicationAuthority
     adapter_config_revision: i64,
     adapter_config_digest: String,
     non_bearer_credential_ref: String,
+    credential_hint: String,
+    approved_by_user_id: String,
     applied_at: String,
 }
 
@@ -227,6 +229,7 @@ impl HistoricalExternalPoolOnboardingApplicationAuthority {
             .non_bearer_credential_ref
             .clone()
             .ok_or_else(|| anyhow::anyhow!("external-pool onboarding has no credential locator"))?;
+        let credential_hint = item.credential_hint.clone().unwrap_or_default();
         Ok(Self {
             application_id: stored.envelope.application_id.clone(),
             application_digest: stored.envelope.application_digest.clone(),
@@ -237,6 +240,8 @@ impl HistoricalExternalPoolOnboardingApplicationAuthority {
             adapter_config_revision: item.adapter_config_revision,
             adapter_config_digest: item.adapter_config_digest.clone(),
             non_bearer_credential_ref,
+            credential_hint,
+            approved_by_user_id: item.approved_by_user_id.clone(),
             applied_at: item.applied_at.clone(),
         })
     }
@@ -267,6 +272,12 @@ impl HistoricalExternalPoolOnboardingApplicationAuthority {
     }
     pub(in crate::store) fn non_bearer_credential_ref(&self) -> &str {
         &self.non_bearer_credential_ref
+    }
+    pub(in crate::store) fn credential_hint(&self) -> &str {
+        &self.credential_hint
+    }
+    pub(in crate::store) fn approved_by_user_id(&self) -> &str {
+        &self.approved_by_user_id
     }
     pub(in crate::store) fn applied_at(&self) -> &str {
         &self.applied_at
@@ -308,6 +319,12 @@ impl CurrentExternalPoolOnboardingApplicationAuthority {
     }
     pub(in crate::store) fn non_bearer_credential_ref(&self) -> &str {
         self.historical.non_bearer_credential_ref()
+    }
+    pub(in crate::store) fn credential_hint(&self) -> &str {
+        self.historical.credential_hint()
+    }
+    pub(in crate::store) fn approved_by_user_id(&self) -> &str {
+        self.historical.approved_by_user_id()
     }
     pub(in crate::store) fn applied_at(&self) -> &str {
         self.historical.applied_at()

@@ -82,6 +82,10 @@ mod provider_runtime_readiness_runtime_source_contract_test;
 mod provider_runtime_readiness_service_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/provider_runtime_readiness_store_source_contract_test.rs"]
 mod provider_runtime_readiness_store_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/route_renewal_domain_migration_source_contract_test.rs"]
+mod route_renewal_domain_migration_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/route_renewal_store_active_preparation_source_contract_test.rs"]
+mod route_renewal_store_active_preparation_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/route_source_projection_migration_source_contract_test.rs"]
 mod route_source_projection_migration_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/runtime_compatibility_signing_handoff_runtime_source_contract_test.rs"]
@@ -142,6 +146,8 @@ mod task_protocol_production_session_source_contract_test;
 mod task_protocol_production_store_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/task_protocol_production_worker_source_contract_test.rs"]
 mod task_protocol_production_worker_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/task_reachability_source_contract_test.rs"]
+mod task_reachability_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_admin_http_test.rs"]
 mod upstream_transport_target_admin_http_test;
 #[path = "external_pool_adapter_release_api_tests/upstream_transport_target_owner_http_test.rs"]

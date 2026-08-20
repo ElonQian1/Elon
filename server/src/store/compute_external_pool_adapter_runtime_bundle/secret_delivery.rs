@@ -4,10 +4,12 @@ use anyhow::{bail, Result};
 use chrono::{SecondsFormat, Utc};
 use rusqlite::TransactionBehavior;
 
+mod active;
 mod binding;
 
 pub(super) use binding::{
-    audit_delivery_roots, delivery_binding, ExternalPoolAdapterEphemeralSecretDeliveryBinding,
+    audit_delivery_roots, audit_projected_active_delivery_binding_on, delivery_binding,
+    projected_active_delivery_binding, ExternalPoolAdapterEphemeralSecretDeliveryBinding,
 };
 
 use super::{

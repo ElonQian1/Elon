@@ -86,6 +86,7 @@ pub(crate) mod external_pool_adapter_release_lifecycle_api;
 pub(crate) mod external_pool_adapter_release_lifecycle_service;
 pub(crate) mod external_pool_adapter_release_mcp;
 pub(crate) mod external_pool_adapter_release_service;
+pub(crate) mod external_pool_adapter_route_renewal;
 #[cfg(test)]
 mod external_pool_adapter_runtime_bundle_source_contract_tests;
 pub(crate) mod external_pool_adapter_runtime_compatibility;

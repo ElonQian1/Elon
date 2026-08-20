@@ -14,10 +14,7 @@ use crate::{
         },
         external_pool_adapter_task_protocol_conformance::ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
     },
-    store::{
-        compute_external_pool_adapter_provider_active_successor::CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority,
-        compute_external_pool_adapter_task_protocol_conformance::CurrentExternalPoolAdapterTaskProtocolConformanceAuthority,
-    },
+    store::compute_external_pool_adapter_provider_active_successor::CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority,
 };
 
 /// Current registering V272 evidence re-bound to an exact planned projected-active target.
@@ -25,7 +22,7 @@ use crate::{
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) struct PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier<'tx, 'conn>
 {
-    run: CurrentExternalPoolAdapterTaskProtocolConformanceAuthority<'tx, 'conn>,
+    run: ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
     material_json: String,
     digest: String,
     transaction: PhantomData<&'tx Transaction<'conn>>,
@@ -38,83 +35,71 @@ pub(in crate::store) struct CurrentExternalPoolAdapterTaskProtocolProjectedActiv
     'conn,
 > {
     receipt: ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
-    carrier: CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<'tx, 'conn>,
+    carrier: CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn>,
     material_json: String,
     digest: String,
     checked_at: String,
     transaction: PhantomData<&'tx Transaction<'conn>>,
 }
 
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-pub(in crate::store) fn prepare_external_pool_adapter_task_protocol_planned_active_carrier_on<
+/// Borrowed-carrier V272 leaf used to pin one exact current run while another authority retains
+/// ownership of the renewed-route carrier (for example, an active runtime bundle).
+pub(in crate::store) struct CurrentExternalPoolAdapterTaskProtocolProjectedActiveLeafAuthority<
+    'authority,
     'tx,
     'conn,
->(
-    transaction: &'tx Transaction<'conn>,
-    no_work: &ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject<'_, 'tx, 'conn>,
-    run: CurrentExternalPoolAdapterTaskProtocolConformanceAuthority<'tx, 'conn>,
-) -> Result<PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier<'tx, 'conn>> {
-    let target = no_work.preflight();
-    let evidence_checked_at = no_work.evidence_checked_at();
-    let root = &target.activation_root().activation_root;
-    let carrier = run.carrier();
-    let binding = carrier.binding();
-    let binding_material = &binding.binding;
-    let run_material = &run.receipt().run;
-    if run.checked_at() != evidence_checked_at
-        || target.activation_target_updated_at() > evidence_checked_at
-        || carrier.checked_at() != evidence_checked_at
-        || binding.provider_binding_id != root.provider_binding_id
-        || binding.provider_binding_digest != root.provider_binding_digest
-        || binding_material.registry_release_id != root.registry_release_id
-        || binding_material.registry_release_digest != root.registry_release_digest
-        || run_material.registry_release.registry_release_id != root.registry_release_id
-        || run_material.registry_release.registry_release_digest != root.registry_release_digest
-        || run_material
-            .registry_release
-            .registry_release_material_digest
-            != root.registry_release_material_digest
-        || binding_material.installation_receipt_id != root.installation_receipt_id
-        || binding_material.installation_receipt_digest != root.installation_receipt_digest
-        || binding_material.installation_content_digest != root.installation_content_digest
-        || binding_material.route_adapter_projection_id != root.route_adapter_projection_id
-        || binding_material.provider_id != root.source_registering_provider_id
-        || binding_material.provider_policy_revision
-            != root.source_registering_provider_policy_revision
-        || binding_material.provider_digest != root.source_registering_provider_digest
-        || binding_material.adapter_id != root.logical_adapter_id
-        || run_material.task_protocol_profile_digest != root.task_protocol_profile_digest
-    {
-        bail!("planned-active V272 carrier differs from the exact registering activation roots");
-    }
-    let material = material_for(
-        root.provider_binding_id.clone(),
-        root.provider_binding_digest.clone(),
-        target.activation_root().activation_root_digest.clone(),
-        target.target().provider_id.clone(),
-        target.target().policy_revision,
-        &root.initial_active_provider_digest,
-        root.route_adapter_projection_id.clone(),
-        run.receipt(),
-    );
-    let (material_json, digest) =
-        canonical_task_protocol_active_carrier_json_and_digest(&material)?;
-    Ok(
-        PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier {
-            run,
-            material_json,
-            digest,
-            transaction: PhantomData,
-        },
-    )
+> {
+    receipt: ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
+    carrier: &'authority CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn>,
+    checked_at: String,
+    transaction: PhantomData<&'tx Transaction<'conn>>,
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 impl<'tx, 'conn> PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier<'tx, 'conn> {
+    pub(super) fn new(
+        _transaction: &'tx Transaction<'conn>,
+        no_work: &ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject<'_, 'tx, 'conn>,
+        run: ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
+    ) -> Result<Self> {
+        let target = no_work.preflight();
+        let root = &target.activation_root().activation_root;
+        let material = &run.run;
+        if target.activation_target_updated_at() > no_work.evidence_checked_at()
+            || material.registry_release.registry_release_id != root.registry_release_id
+            || material.registry_release.registry_release_digest != root.registry_release_digest
+            || material.registry_release.registry_release_material_digest
+                != root.registry_release_material_digest
+            || material.registry_release.installation_content_digest
+                != root.installation_content_digest
+            || material.task_protocol_profile_digest != root.task_protocol_profile_digest
+        {
+            bail!("planned-active V272 carrier differs from registering activation roots");
+        }
+        let carrier_material = material_for(
+            root.provider_binding_id.clone(),
+            root.provider_binding_digest.clone(),
+            target.activation_root().activation_root_digest.clone(),
+            target.target().provider_id.clone(),
+            target.target().policy_revision,
+            &root.initial_active_provider_digest,
+            root.route_adapter_projection_id.clone(),
+            &run,
+        );
+        let (material_json, digest) =
+            canonical_task_protocol_active_carrier_json_and_digest(&carrier_material)?;
+        Ok(Self {
+            run,
+            material_json,
+            digest,
+            transaction: PhantomData,
+        })
+    }
+
     pub(in crate::store) fn receipt(
         &self,
     ) -> &ExternalPoolAdapterTaskProtocolConformanceRunReceipt {
-        self.run.receipt()
+        &self.run
     }
     pub(in crate::store) fn material_json(&self) -> &str {
         &self.material_json
@@ -122,13 +107,27 @@ impl<'tx, 'conn> PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier<'tx
     pub(in crate::store) fn digest(&self) -> &str {
         &self.digest
     }
+
+    pub(in crate::store) fn fresh_expires_at_for(
+        &self,
+        no_work: &ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject<'_, '_, '_>,
+    ) -> Result<String> {
+        let expires = std::cmp::min(
+            no_work.observation().expires_at(),
+            self.receipt().run.expires_at.as_str(),
+        );
+        if expires <= no_work.evidence_checked_at() {
+            bail!("planned-active V272/no-work evidence expired before V277 append");
+        }
+        Ok(expires.into())
+    }
 }
 
 impl<'tx, 'conn> CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority<'tx, 'conn> {
     pub(super) fn new(
         transaction: &'tx Transaction<'conn>,
         receipt: ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
-        carrier: CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<'tx, 'conn>,
+        carrier: CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn>,
         checked_at: String,
     ) -> Result<Self> {
         let activation = carrier.historical_activation();
@@ -165,7 +164,7 @@ impl<'tx, 'conn> CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority<
     }
     pub(in crate::store) fn carrier(
         &self,
-    ) -> &CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<'tx, 'conn> {
+    ) -> &CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn> {
         &self.carrier
     }
     pub(in crate::store) fn material_json(&self) -> &str {
@@ -174,6 +173,44 @@ impl<'tx, 'conn> CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority<
     pub(in crate::store) fn digest(&self) -> &str {
         &self.digest
     }
+    pub(in crate::store) fn checked_at(&self) -> &str {
+        &self.checked_at
+    }
+}
+
+impl<'authority, 'tx, 'conn>
+    CurrentExternalPoolAdapterTaskProtocolProjectedActiveLeafAuthority<'authority, 'tx, 'conn>
+{
+    pub(super) fn new(
+        transaction: &'tx Transaction<'conn>,
+        receipt: ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
+        carrier: &'authority CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<
+            'tx,
+            'conn,
+        >,
+        checked_at: String,
+    ) -> Self {
+        let _ = transaction;
+        Self {
+            receipt,
+            carrier,
+            checked_at,
+            transaction: PhantomData,
+        }
+    }
+
+    pub(in crate::store) fn receipt(
+        &self,
+    ) -> &ExternalPoolAdapterTaskProtocolConformanceRunReceipt {
+        &self.receipt
+    }
+
+    pub(in crate::store) fn carrier(
+        &self,
+    ) -> &CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn> {
+        self.carrier
+    }
+
     pub(in crate::store) fn checked_at(&self) -> &str {
         &self.checked_at
     }

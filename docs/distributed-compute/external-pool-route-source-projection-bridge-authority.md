@@ -1,7 +1,7 @@
 ---
 title: 外部矿池 Route source logical-to-projection bridge 权威
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-20
 owners: backend, security, ai-economy
 design_status: design_frozen
 implementation_status: implementation_partially_verified
@@ -91,16 +91,21 @@ V271 只消除一个 schema-level P0，不足以创建 v213 route 或推进 Prov
 
 - 六项 v213 capability 的真实 production producer/worker 与 authenticated ACK/event、prepare、idempotent
   commit、cancel-no-start、reconcile 协议仍不存在；V249/V268 的六能力声明不是运行实现；
-- V277文档已冻结稳定`executor_id`/binding与projected v211 digest，但Rust/DDL/Store尚未实现；projection ID、service
-  actor或短时process identity仍不能临时代替；
-- V277文档已冻结active V253与fresh V274 successor/restart路径，但尚未实现/编译/运行；registering evidence仍不能
-  被长期复用；
+- V277稳定`executor_id`/binding、projected v211 digest、active V253与fresh V274 successor/restart private源码已写，
+  但仍未编译/运行且没有public Store orchestrator；projection ID、service actor或短时process identity仍不能代替；
 - V254 18 fences只能由V277 exact pending-plan UDF把#1/#5-#12九项改为permit；#2-#4/#13-#18九项保持absolute deny。
   在fresh/repeat/reopen、并发、crash、revocation、expiry、direct-SQL与完整失败原子性通过前不能由V271删除或旁路。
 
-因此实现与production atomic activation仍为NO-GO。V277 final transaction必须在`evidence_checked_at`消费fresh
+因此production atomic activation仍为NO-GO。V277 final transaction必须在`evidence_checked_at`消费fresh
 V270-equivalent/V272 Store-private authority、建立完整route/runtime closure、UPDATE既有Provider到adjacent active并
 写version；#2 active Provider INSERT永久deny，任何失败整体回滚。V278才负责route renewal/reachability。
+
+V278 FORMAL freeze不改V271 trigger的source identity：active branch仍从exact V221 application经V249/V254 lineage
+映射projection，并由V277 witness/root证明；V271 trigger不调用或消费任何V278 ordered-plan UDF。Route renewal自身只
+消费V277 historical activation recovery、exact V274 sequence-1 genesis历史见证与fresh V253，不要求current
+V274/V268/V272。V254在V278后也只有#8-#12显式接受V277或V278 plan；#1/#5-#7仍V277-only，#2-#4/#13-#18
+absolute deny。V278当前为`design_frozen/source_written/source_review_only/implementation_uncompiled/
+implementation_unrun`、`passed=0/failed=0`，不能使本页历史6/6变成route可达证据。
 
 ## 6. 计划实现边界
 

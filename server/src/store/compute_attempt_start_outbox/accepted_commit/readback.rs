@@ -5,16 +5,36 @@ use crate::compute_federation::start_outbox::{
     canonical_attempt_dispatch_actor_receipt_json_and_digest,
     ComputeAttemptDispatchActorReceiptEnvelope, COMPUTE_ACTOR_RECEIPT_PHASE_APPLICATION,
 };
+use crate::store::compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority;
 
 use super::{
-    derive::derive_closure, source::load_source_for_replay_on, AcceptedStartCommitClosureReceipt,
-    DerivedAcceptedCommitClosure,
+    derive::{derive_closure, derive_historical_closure},
+    source::load_source_for_replay_on,
+    AcceptedStartCommitClosureReceipt, AcceptedStartCommitFreshness, DerivedAcceptedCommitClosure,
 };
 
 pub(super) fn audit_on(
     connection: &Connection,
     command_id: &str,
     replayed: bool,
+) -> Result<AcceptedStartCommitClosureReceipt> {
+    audit_with_mode_on(connection, command_id, replayed, None)
+}
+
+pub(super) fn audit_historical_on(
+    connection: &Connection,
+    command_id: &str,
+    replayed: bool,
+    authority: &HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<AcceptedStartCommitClosureReceipt> {
+    audit_with_mode_on(connection, command_id, replayed, Some(authority))
+}
+
+fn audit_with_mode_on(
+    connection: &Connection,
+    command_id: &str,
+    replayed: bool,
+    historical: Option<&HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>>,
 ) -> Result<AcceptedStartCommitClosureReceipt> {
     let (actor_json, actor_digest) = connection
         .query_row(
@@ -35,8 +55,27 @@ pub(super) fn audit_on(
             && recomputed_actor == actor_digest,
         "accepted application actor failed canonical replay audit"
     );
+    if let Some(authority) = historical {
+        ensure!(
+            matches!(
+                super::currentness::ensure_historical_on(
+                    connection,
+                    command_id,
+                    &actor.recorded_at,
+                    authority,
+                )?,
+                AcceptedStartCommitFreshness::Current
+            ),
+            "historical accepted replay lost its exact exchange cleanup authority"
+        );
+    }
     let source = load_source_for_replay_on(connection, command_id)?;
-    let expected = derive_closure(&source, &actor.recorded_at)?;
+    let expected = match historical {
+        Some(authority) => {
+            derive_historical_closure(&source, &actor.recorded_at, authority.cleanup_expires_at())?
+        }
+        None => derive_closure(&source, &actor.recorded_at)?,
+    };
     audit_expected_immutable_on(connection, &expected, false)?;
     Ok(expected.receipt(replayed))
 }

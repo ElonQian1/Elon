@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::compute_federation::start_outbox::{
     canonical_start_outbox_operation_json_and_digest, ComputeStartOutboxClaimProjection,
-    ComputeStartOutboxOperationEnvelope, ValidatedComputeStartOutboxOperation,
+    ComputeStartOutboxOperationEnvelope,
 };
 
 use super::types::{NoStartProofSource, StoredStartOutboxOperation};
@@ -206,79 +206,6 @@ pub(super) fn no_start_source_on(
         .map_err(Into::into)
 }
 
-pub(super) fn persist_prepare_operation_on(
-    connection: &Connection,
-    operation: &ValidatedComputeStartOutboxOperation,
-    created_at: &str,
-) -> Result<()> {
-    let envelope = operation.envelope();
-    let route = operation.route_authorization().envelope();
-    let (json, digest) = canonical_start_outbox_operation_json_and_digest(envelope)?;
-    ensure!(
-        digest == envelope.outbox_digest,
-        "prepare outbox digest mismatch"
-    );
-    ensure!(
-        created_at < envelope.not_after.as_str(),
-        "prepare outbox is already outside its delivery window"
-    );
-    connection.execute(
-        "INSERT INTO compute_attempt_start_outbox (
-            outbox_id, outbox_schema, outbox_digest, outbox_json,
-            canonicalization, digest_algorithm, operation_kind, operation_generation,
-            subject_outbox_id, command_id, command_digest, provider_id, adapter_id,
-            adapter_binding_digest, route_authorization_id, route_authorization_digest,
-            actor_receipt_id, actor_receipt_digest, plan_id, plan_digest, lease_id,
-            fencing_generation, ack_id, ack_digest, application_id, application_digest,
-            lease_authority_id, lease_authority_revision, lease_authority_digest,
-            issued_at, not_before, not_after, state, state_revision, attempt_count,
-            next_attempt_at, claim_owner_id, claim_token_digest, claim_generation,
-            claim_expires_at, last_failure_code, created_at, updated_at
-         ) VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-            ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26,
-            ?27, ?28, ?29, ?30, ?31, ?32, 'pending', 1, 0, ?31,
-            NULL, NULL, 0, NULL, NULL, ?33, ?33
-         )",
-        params![
-            envelope.outbox_id,
-            envelope.schema,
-            envelope.outbox_digest,
-            json,
-            envelope.canonicalization,
-            envelope.digest_algorithm,
-            envelope.operation_kind,
-            envelope.operation_generation,
-            envelope.subject_outbox_id,
-            envelope.command_id,
-            envelope.command_digest,
-            route.authorization.provider.provider_id,
-            route.authorization.route.adapter.adapter_id,
-            envelope.adapter_binding_digest,
-            envelope.route_authorization_id,
-            envelope.route_authorization_digest,
-            envelope.actor_receipt_id,
-            envelope.actor_receipt_digest,
-            envelope.plan_id,
-            envelope.plan_digest,
-            envelope.lease_id,
-            envelope.fencing_generation,
-            envelope.ack_id,
-            envelope.ack_digest,
-            envelope.application_id,
-            envelope.application_digest,
-            envelope.lease_authority_id,
-            envelope.lease_authority_revision,
-            envelope.lease_authority_digest,
-            envelope.issued_at,
-            envelope.not_before,
-            envelope.not_after,
-            created_at,
-        ],
-    )?;
-    Ok(())
-}
-
 pub(super) fn no_start_semantics_exact_on(
     connection: &Connection,
     proof: &crate::compute_federation::start_outbox::ComputeStartNoStartProofEnvelope,
@@ -350,7 +277,7 @@ pub(super) fn no_start_semantics_exact_on(
                           AND ack.adapter_binding_digest=prepare.adapter_binding_digest
                           AND ack.adapter_ack_id=observation.adapter_observation_id
                     ))
-                    OR (?7='remote_never_committed' AND EXISTS (
+                    OR (?7='remote_never_committed' AND (EXISTS (
                         SELECT 1 FROM compute_attempt_start_remote_observations observation
                         JOIN compute_attempt_start_outbox reconcile
                           ON reconcile.outbox_id=observation.outbox_id
@@ -377,9 +304,69 @@ pub(super) fn no_start_semantics_exact_on(
                           AND cancel.ack_id IS reconcile.ack_id
                           AND cancel.ack_digest IS reconcile.ack_digest
                           AND observation.no_commit_tombstone_id=?10
+                           AND observation.no_commit_tombstone_digest=?11
+                           AND cancel.subject_outbox_id=prepare.outbox_id
+                    ) OR EXISTS (
+                        SELECT 1 FROM compute_attempt_start_remote_observations observation
+                        JOIN compute_external_pool_adapter_task_exchange_receipts receipt
+                          ON receipt.exchange_receipt_id=observation.verifier_id
+                         AND receipt.semantic_observation_sha256
+                             =observation.verification_digest
+                        JOIN compute_external_pool_adapter_task_reconcile_polls poll
+                          ON poll.reconcile_poll_id=receipt.source_id
+                         AND poll.reconcile_poll_digest=receipt.source_digest
+                        JOIN compute_attempt_start_send_attempts send
+                          ON send.send_attempt_id=poll.send_attempt_id
+                         AND send.send_attempt_digest=poll.send_attempt_digest
+                        JOIN compute_external_pool_adapter_task_exchange_receipts cancel_receipt
+                          ON cancel_receipt.exchange_attempt_id
+                             =poll.uncertain_exchange_attempt_id
+                         AND cancel_receipt.exchange_attempt_digest
+                             =poll.uncertain_exchange_attempt_digest
+                         AND cancel_receipt.operation_kind='cancel_no_start'
+                         AND cancel_receipt.source_kind='start_outbox_send_attempt'
+                         AND cancel_receipt.source_id=send.send_attempt_id
+                         AND cancel_receipt.source_digest=send.send_attempt_digest
+                        JOIN compute_attempt_start_outbox source_outbox
+                          ON source_outbox.outbox_id=send.outbox_id
+                         AND source_outbox.outbox_digest=send.outbox_digest
+                        WHERE observation.observation_id=?8
+                          AND observation.observation_digest=?9
+                          AND observation.command_id=?3
+                          AND observation.command_digest=?4
+                          AND observation.provider_id=prepare.provider_id
+                          AND observation.adapter_id=prepare.adapter_id
+                          AND observation.adapter_binding_digest=prepare.adapter_binding_digest
+                          AND observation.observation_kind='reconcile_attestation'
+                          AND observation.response_outcome='observed'
+                          AND observation.remote_execution_state='terminal_no_start'
+                          AND observation.terminality='final'
+                          AND observation.verification_kind
+                              ='external_pool_adapter_task_receipt.v1'
+                          AND observation.no_commit_tombstone_id=?10
                           AND observation.no_commit_tombstone_digest=?11
-                          AND cancel.subject_outbox_id=prepare.outbox_id
-                    ))
+                          AND receipt.operation_kind='reconcile'
+                          AND receipt.source_kind='reconcile_poll'
+                          AND receipt.command_id=observation.command_id
+                          AND receipt.command_digest=observation.command_digest
+                          AND receipt.outbox_id=observation.outbox_id
+                          AND receipt.outbox_digest=observation.outbox_digest
+                          AND receipt.send_attempt_id=observation.send_attempt_id
+                          AND receipt.authenticated_at=observation.authenticated_at
+                          AND receipt.received_at=observation.received_at
+                          AND receipt.recorded_at=observation.recorded_at
+                          AND poll.claim_status='delivery_observed'
+                          AND poll.command_id=receipt.command_id
+                          AND poll.command_digest=receipt.command_digest
+                          AND poll.outbox_id=receipt.outbox_id
+                          AND poll.outbox_digest=receipt.outbox_digest
+                          AND poll.authenticated_subject_sha256
+                              =cancel_receipt.semantic_observation_sha256
+                          AND source_outbox.state='delivery_observed'
+                          AND send.operation_kind='cancel'
+                          AND observation.operation_kind=send.operation_kind
+                          AND source_outbox.subject_outbox_id=prepare.outbox_id
+                    )))
                 )",
             params![
                 proof.outbox_id,

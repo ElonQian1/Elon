@@ -15,28 +15,41 @@ mod currentness;
 mod enqueue;
 mod no_start;
 mod observations;
+mod prepare_write;
 mod read;
 mod replay;
 mod route_persistence;
 mod send;
 mod types;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in crate::store) use claim::try_claim_external_pool_on;
+pub(in crate::store) use claim::try_claim_historical_external_pool_cleanup_on;
+
 pub(crate) use accepted_commit::AcceptedStartCommitClosureReceipt;
 pub(in crate::store) use accepted_commit::{
-    audit_accepted_start_commit_closure_on, ensure_fresh_accepted_start_commit_on,
-    persist_accepted_start_commit_closure_on, AcceptedStartCommitFreshness,
+    audit_accepted_start_commit_closure_on, audit_historical_accepted_start_commit_closure_on,
+    ensure_fresh_accepted_start_commit_on, ensure_historical_accepted_start_commit_on,
+    persist_accepted_start_commit_closure_on, persist_historical_accepted_start_commit_closure_on,
+    AcceptedStartCommitFreshness,
 };
 pub(super) use cleanup::{enqueue_quarantined_cleanup_on, has_cleanup_pair_on};
 pub(super) use enqueue::enqueue_prepare_on;
 pub(in crate::store) use no_start::BrokerFinishStartUnresolved;
 pub(super) use no_start::{
-    ensure_start_resolved_for_broker_finish_on, record_prepare_rejected_no_start_on,
+    ensure_start_resolved_for_broker_finish_on, record_prepare_rejected_no_start_at_on,
+    record_prepare_rejected_no_start_on,
 };
-pub(super) use observations::record_verified_observation_on;
+pub(super) use observations::{record_verified_observation_at_on, record_verified_observation_on};
 pub(in crate::store) use route_persistence::{
     audit_persisted_compute_route_authority_on, ensure_compute_route_registry_current_on,
     persist_compute_route_authority_on,
 };
+pub(in crate::store) use send::{
+    finish_prepared_send_started_on, insert_prepared_send_started_on, prepare_send_started_at_on,
+    prepared_send_attempt_envelope, prepared_send_attempt_values, prepared_send_outbox_cas_values,
+};
+pub(in crate::store) use types::PreparedStartSendMutation;
 pub(super) use types::{
     BrokerFinishStartResolutionBinding, StartOutboxEnqueueReceipt, StartOutboxObservationReceipt,
     StartResolutionProofReceipt,

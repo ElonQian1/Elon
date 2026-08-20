@@ -60,11 +60,13 @@ pub(super) fn current_projected_active_subject_on(
     binding: &ExternalPoolAdapterCredentialReattestationBinding,
     checked_at: &str,
 ) -> Result<Option<HistoricalExternalPoolAdapterAtomicActivationAuthority>> {
-    let Some(activation) = historical_external_pool_adapter_atomic_activation_for_binding_on(
-        conn,
-        &binding.provider_binding_id,
-        checked_at,
-    )?
+    let Some(activation) =
+        historical_external_pool_adapter_atomic_activation_for_observed_provider_on(
+            conn,
+            &binding.provider_binding_id,
+            binding.observed_provider_policy_revision,
+            &binding.observed_provider_digest,
+        )?
     else {
         return Ok(None);
     };

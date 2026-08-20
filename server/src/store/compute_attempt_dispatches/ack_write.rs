@@ -1,42 +1,118 @@
 use anyhow::{anyhow, bail, ensure, Result};
-use chrono::{SecondsFormat, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 
 use crate::{
     compute_federation::attempt_gateway::{
-        ComputeAttemptAdapterAckEnvelope, VerifiedComputeAttemptAdapterAck,
-        COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED, COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED,
+        VerifiedComputeAttemptAdapterAckView, COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED,
+        COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED,
     },
     store::{
-        compute_attempt_activations::activate_compute_attempt_on,
-        compute_attempt_start_outbox::{
-            audit_accepted_start_commit_closure_on, enqueue_quarantined_cleanup_on,
-            ensure_fresh_accepted_start_commit_on, has_cleanup_pair_on,
-            persist_accepted_start_commit_closure_on, record_prepare_rejected_no_start_on,
-            record_verified_observation_on, AcceptedStartCommitFreshness,
+        compute_attempt_activations::{
+            activate_compute_attempt_at_on, activate_compute_attempt_on,
         },
-        ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
+        compute_attempt_start_outbox::{
+            audit_accepted_start_commit_closure_on,
+            audit_historical_accepted_start_commit_closure_on,
+            ensure_fresh_accepted_start_commit_on, ensure_historical_accepted_start_commit_on,
+            has_cleanup_pair_on, persist_accepted_start_commit_closure_on,
+            persist_historical_accepted_start_commit_closure_on,
+            record_prepare_rejected_no_start_at_on, record_prepare_rejected_no_start_on,
+            record_verified_observation_at_on, record_verified_observation_on,
+            AcceptedStartCommitFreshness,
+        },
+        compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority,
     },
 };
+
+mod mutation;
+mod times;
+
+use mutation::{
+    activation_request, application_created_at, ensure_ack_binds_command, insert_ack_on,
+    now_dispatch, quarantine_ack_on,
+};
+pub(in crate::store) use times::ComputeAttemptAdapterAckIngressTimes;
 
 use super::{
     read::{
         ack_by_adapter_ack_on, ack_by_command_on, ack_receipt, application_by_command_on,
         command_by_id_on, ensure_ack_replay_matches, ensure_application_matches,
-        ensure_remote_ack_replay_matches, StoredDispatchCommand,
+        ensure_remote_ack_replay_matches,
     },
     replay::{ensure_activation_matches_command, replay_ack_commit},
     source::{ack_received_after_deadline, current_budget_blocker_on, current_source_blocker_on},
     types::ComputeAttemptDispatchAckCommit,
-    validation::{
-        application_id_for_ack, prepare_application, PreparedApplication, PreparedVerifiedAck,
-    },
+    validation::{prepare_application, PreparedVerifiedAck},
 };
 
 pub(super) fn ingest_verified_ack_on(
     connection: &Connection,
-    verified: &VerifiedComputeAttemptAdapterAck,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
     prepared: &PreparedVerifiedAck,
+) -> Result<ComputeAttemptDispatchAckCommit> {
+    ingest_verified_ack_with_times_on(
+        connection,
+        verified,
+        prepared,
+        None,
+        AcceptedAckIngressMode::Fresh,
+    )
+}
+
+pub(in crate::store) fn ingest_verified_ack_at_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+    times: &ComputeAttemptAdapterAckIngressTimes,
+) -> Result<ComputeAttemptDispatchAckCommit> {
+    let prepared = super::validation::prepare_verified_ack(verified)?;
+    ingest_verified_ack_with_times_on(
+        connection,
+        verified,
+        &prepared,
+        Some(times),
+        AcceptedAckIngressMode::Fresh,
+    )
+}
+
+pub(in crate::store) fn ingest_verified_historical_external_pool_adapter_ack_at_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+    times: &ComputeAttemptAdapterAckIngressTimes,
+    authority: &HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<ComputeAttemptDispatchAckCommit> {
+    let prepared = super::validation::prepare_verified_ack(verified)?;
+    ingest_verified_ack_with_times_on(
+        connection,
+        verified,
+        &prepared,
+        Some(times),
+        AcceptedAckIngressMode::HistoricalTerminal(authority),
+    )
+}
+
+#[derive(Clone, Copy)]
+enum AcceptedAckIngressMode<'a, 'tx, 'conn> {
+    Fresh,
+    HistoricalTerminal(&'a HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'tx, 'conn>),
+}
+
+impl<'a, 'tx, 'conn> AcceptedAckIngressMode<'a, 'tx, 'conn> {
+    fn historical_authority(
+        self,
+    ) -> Option<&'a HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'tx, 'conn>> {
+        match self {
+            Self::Fresh => None,
+            Self::HistoricalTerminal(authority) => Some(authority),
+        }
+    }
+}
+
+fn ingest_verified_ack_with_times_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+    prepared: &PreparedVerifiedAck,
+    times: Option<&ComputeAttemptAdapterAckIngressTimes>,
+    mode: AcceptedAckIngressMode<'_, '_, '_>,
 ) -> Result<ComputeAttemptDispatchAckCommit> {
     let ack = verified.ack();
     if let Some(stored) = ack_by_adapter_ack_on(
@@ -49,11 +125,11 @@ pub(super) fn ingest_verified_ack_on(
         let command = command_by_id_on(connection, &stored.ack.command_id)?
             .ok_or_else(|| anyhow!("Stored Adapter ACK lost its immutable command"))?;
         ensure_ack_binds_command(&command, verified, prepared)?;
-        record_verified_observation_on(connection, verified.prepare_observation())?;
+        record_observation_on(connection, verified, times)?;
         if ack.outcome == COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED {
-            record_prepare_rejected_no_start_on(connection, verified)?;
+            record_rejected_no_start_on(connection, verified, times)?;
         }
-        return replay_ack_commit(connection, &command, stored);
+        return replay_ack_commit(connection, &command, stored, mode.historical_authority());
     }
     if ack_by_command_on(connection, &ack.command_id)?.is_some() {
         bail!("Attempt command already has a different immutable Adapter ACK");
@@ -61,13 +137,16 @@ pub(super) fn ingest_verified_ack_on(
     let command = command_by_id_on(connection, &ack.command_id)?
         .ok_or_else(|| anyhow!("Adapter ACK references an unknown Attempt command"))?;
     ensure_ack_binds_command(&command, verified, prepared)?;
-    let ingested_at = now_dispatch();
+    let ingested_at = times
+        .map(ComputeAttemptAdapterAckIngressTimes::ingested_at)
+        .map(str::to_string)
+        .unwrap_or_else(now_dispatch);
     if chrono::DateTime::parse_from_rfc3339(&ack.received_at)?
         > chrono::DateTime::parse_from_rfc3339(&ingested_at)?
     {
         bail!("Adapter ACK received_at cannot be later than durable ingestion");
     }
-    record_verified_observation_on(connection, verified.prepare_observation())?;
+    record_observation_on(connection, verified, times)?;
     match ack.outcome.as_str() {
         COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED => {
             insert_ack_on(
@@ -80,7 +159,7 @@ pub(super) fn ingest_verified_ack_on(
                 None,
                 &ingested_at,
             )?;
-            record_prepare_rejected_no_start_on(connection, verified)?;
+            record_rejected_no_start_on(connection, verified, times)?;
             let stored = ack_by_command_on(connection, &ack.command_id)?
                 .ok_or_else(|| anyhow!("Rejected Adapter ACK is not visible after insert"))?;
             ensure_ack_replay_matches(&stored, verified, prepared)?;
@@ -140,8 +219,7 @@ pub(super) fn ingest_verified_ack_on(
                     &ingested_at,
                 );
             }
-            match ensure_fresh_accepted_start_commit_on(connection, &ack.command_id, &ingested_at)?
-            {
+            match ensure_accepted_currentness_on(connection, &ack.command_id, &ingested_at, mode)? {
                 AcceptedStartCommitFreshness::Current => {}
                 AcceptedStartCommitFreshness::Quarantine { reason_code } => {
                     return quarantine_ack_on(
@@ -165,15 +243,23 @@ pub(super) fn ingest_verified_ack_on(
                 Some(&command.command.command.identity.attempt_lease_id),
                 &ingested_at,
             )?;
-            let activation = activate_compute_attempt_on(
-                connection,
-                &activation_request(&command, remote_execution_ref),
-            )?;
+            let activation_request = activation_request(&command, remote_execution_ref);
+            let activation = match times {
+                Some(times) => activate_compute_attempt_at_on(
+                    connection,
+                    &activation_request,
+                    times.activated_at(),
+                )?,
+                None => activate_compute_attempt_on(connection, &activation_request)?,
+            };
             ensure_activation_matches_command(&command, ack, &activation)?;
             let prepared_application = prepare_application(ack, &activation)?;
-            let closure_at = application_created_at(&activation.activated_at)?;
+            let closure_at = match times {
+                Some(times) => times.closure_at().to_string(),
+                None => application_created_at(&activation.activated_at)?,
+            };
             if let AcceptedStartCommitFreshness::Quarantine { reason_code } =
-                ensure_fresh_accepted_start_commit_on(connection, &ack.command_id, &closure_at)?
+                ensure_accepted_currentness_on(connection, &ack.command_id, &closure_at, mode)?
             {
                 connection.execute_batch(
                     "ROLLBACK TO accepted_apply_v215; RELEASE accepted_apply_v215",
@@ -187,19 +273,23 @@ pub(super) fn ingest_verified_ack_on(
                     &closure_at,
                 );
             }
-            let accepted_closure = persist_accepted_start_commit_closure_on(
-                connection,
-                &ack.command_id,
-                &prepared_application,
-                &closure_at,
-            )?;
-            insert_application_on(
-                connection,
-                ack,
-                &activation,
-                &prepared_application,
-                &closure_at,
-            )?;
+            let accepted_closure = match mode {
+                AcceptedAckIngressMode::Fresh => persist_accepted_start_commit_closure_on(
+                    connection,
+                    &ack.command_id,
+                    &prepared_application,
+                    &closure_at,
+                )?,
+                AcceptedAckIngressMode::HistoricalTerminal(authority) => {
+                    persist_historical_accepted_start_commit_closure_on(
+                        connection,
+                        &ack.command_id,
+                        &prepared_application,
+                        &closure_at,
+                        authority,
+                    )?
+                }
+            };
             let stored_ack = ack_by_command_on(connection, &ack.command_id)?
                 .ok_or_else(|| anyhow!("Accepted Adapter ACK is not visible after activation"))?;
             ensure_ack_replay_matches(&stored_ack, verified, prepared)?;
@@ -213,8 +303,18 @@ pub(super) fn ingest_verified_ack_on(
             let stored_application = application_by_command_on(connection, &ack.command_id)?
                 .ok_or_else(|| anyhow!("Accepted Adapter ACK is missing its application"))?;
             ensure_application_matches(&stored_application, ack, &activation)?;
-            let mut audited_closure =
-                audit_accepted_start_commit_closure_on(connection, &ack.command_id)?;
+            let mut audited_closure = match mode {
+                AcceptedAckIngressMode::Fresh => {
+                    audit_accepted_start_commit_closure_on(connection, &ack.command_id)?
+                }
+                AcceptedAckIngressMode::HistoricalTerminal(authority) => {
+                    audit_historical_accepted_start_commit_closure_on(
+                        connection,
+                        &ack.command_id,
+                        authority,
+                    )?
+                }
+            };
             audited_closure.replayed = false;
             ensure!(
                 audited_closure == accepted_closure,
@@ -232,160 +332,56 @@ pub(super) fn ingest_verified_ack_on(
     }
 }
 
-fn quarantine_ack_on(
+fn ensure_accepted_currentness_on(
     connection: &Connection,
-    command: &StoredDispatchCommand,
-    verified: &VerifiedComputeAttemptAdapterAck,
-    prepared: &PreparedVerifiedAck,
-    reason: &str,
-    created_at: &str,
-) -> Result<ComputeAttemptDispatchAckCommit> {
-    enqueue_quarantined_cleanup_on(connection, verified, created_at)?;
-    insert_ack_on(
-        connection,
-        command,
-        verified,
-        prepared,
-        "quarantined",
-        Some(reason),
-        None,
-        created_at,
-    )?;
-    let stored = ack_by_command_on(connection, &verified.ack().command_id)?
-        .ok_or_else(|| anyhow!("Quarantined Adapter ACK is not visible after insert"))?;
-    ensure_ack_replay_matches(&stored, verified, prepared)?;
-    Ok(ComputeAttemptDispatchAckCommit::Quarantined {
-        ack: ack_receipt(stored, false),
-    })
-}
-
-fn insert_ack_on(
-    connection: &Connection,
-    command: &StoredDispatchCommand,
-    verified: &VerifiedComputeAttemptAdapterAck,
-    prepared: &PreparedVerifiedAck,
-    disposition: &str,
-    disposition_reason_code: Option<&str>,
-    activation_lease_id: Option<&str>,
-    created_at: &str,
-) -> Result<()> {
-    let ack = verified.ack();
-    let application_id = (disposition == "accepted_applied").then(|| application_id_for_ack(ack));
-    connection.execute(
-        "INSERT INTO compute_attempt_dispatch_acks (
-            ack_id, command_id, provider_id, adapter_id, adapter_ack_id,
-            command_digest, adapter_binding_digest, outcome, disposition,
-            disposition_reason_code, activation_lease_id, application_id,
-            remote_execution_ref, reason_code,
-            ack_json, ack_digest, observed_at, received_at, created_at
-         ) VALUES (
-            ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19
-         )",
-        params![
-            ack.ack_id,
-            ack.command_id,
-            command.adapter.provider_id,
-            command.adapter.adapter_id,
-            ack.adapter_ack_id,
-            ack.command_digest,
-            prepared.adapter_digest,
-            ack.outcome,
-            disposition,
-            disposition_reason_code,
-            activation_lease_id,
-            application_id,
-            ack.remote_execution_ref,
-            ack.reason_code,
-            prepared.ack_json,
-            prepared.ack_digest,
-            ack.observed_at,
-            ack.received_at,
-            created_at,
-        ],
-    )?;
-    Ok(())
-}
-
-fn insert_application_on(
-    connection: &Connection,
-    ack: &ComputeAttemptAdapterAckEnvelope,
-    activation: &ComputeAttemptActivationReceipt,
-    prepared: &PreparedApplication,
-    created_at: &str,
-) -> Result<()> {
-    connection.execute(
-        "INSERT INTO compute_attempt_dispatch_applications (
-            application_id, command_id, ack_id, action, lease_id,
-            activation_request_digest, lease_digest, application_json,
-            application_digest, applied_at, created_at
-         ) VALUES (?1,?2,?3,'v185_activate',?4,?5,?6,?7,?8,?9,?10)",
-        params![
-            prepared.application_id,
-            ack.command_id,
-            ack.ack_id,
-            activation.lease.lease_id,
-            activation.request_digest,
-            activation.lease_digest,
-            prepared.application_json,
-            prepared.application_digest,
-            activation.activated_at,
-            created_at,
-        ],
-    )?;
-    Ok(())
-}
-
-fn application_created_at(activated_at: &str) -> Result<String> {
-    let activated_at = chrono::DateTime::parse_from_rfc3339(activated_at)?.with_timezone(&Utc);
-    Ok(std::cmp::max(activated_at, Utc::now()).to_rfc3339_opts(SecondsFormat::Nanos, true))
-}
-
-fn now_dispatch() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
-}
-
-fn activation_request(
-    command: &StoredDispatchCommand,
-    remote_execution_ref: &str,
-) -> ActivateComputeAttemptRequest {
-    let start = &command.command.command;
-    ActivateComputeAttemptRequest {
-        lease_id: start.identity.attempt_lease_id.clone(),
-        reservation_id: start.identity.reservation_id.clone(),
-        provider_id: start.provider.provider_id.clone(),
-        executor_id: start.executor_id.clone(),
-        shard_id: start.identity.shard_id.clone(),
-        attempt_no: start.identity.attempt_no,
-        fencing_generation: start.identity.fencing_generation,
-        executor_acceptance_ref: remote_execution_ref.to_string(),
-        lease_credential_ref: command.lease_credential_ref.clone(),
-        lease_credential_hint: command.lease_credential_hint.clone(),
-        expected_job_revision: start.job.job_revision,
-        expected_job_digest: start.job.job_digest.clone(),
-        expected_reservation_revision: start.reservation.reservation_revision,
-        expected_reservation_digest: start.reservation.reservation_digest.clone(),
-        expected_claim_revision: start.capacity_claim.claim_revision,
-        expected_claim_digest: start.capacity_claim.claim_digest.clone(),
-        expires_at: start.lease_expires_at.clone(),
-        hard_deadline_at: start.hard_deadline_at.clone(),
-        idempotency_key: command.activation_idempotency_key.clone(),
-        activated_by_user_id: command.activated_by_user_id.clone(),
+    command_id: &str,
+    checked_at: &str,
+    mode: AcceptedAckIngressMode<'_, '_, '_>,
+) -> Result<AcceptedStartCommitFreshness> {
+    match mode {
+        AcceptedAckIngressMode::Fresh => {
+            ensure_fresh_accepted_start_commit_on(connection, command_id, checked_at)
+        }
+        AcceptedAckIngressMode::HistoricalTerminal(authority) => {
+            ensure_historical_accepted_start_commit_on(
+                connection, command_id, checked_at, authority,
+            )
+        }
     }
 }
 
-fn ensure_ack_binds_command(
-    command: &StoredDispatchCommand,
-    verified: &VerifiedComputeAttemptAdapterAck,
-    prepared: &PreparedVerifiedAck,
+fn record_observation_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+    times: Option<&ComputeAttemptAdapterAckIngressTimes>,
 ) -> Result<()> {
-    let ack = verified.ack();
-    if ack.command_digest != command.command.command_digest
-        || ack.adapter_binding_digest != command.adapter_binding_digest
-        || prepared.adapter_digest != command.adapter_binding_digest
-        || verified.adapter() != &command.adapter
-        || ack.received_at.as_str() < command.created_at.as_str()
-    {
-        bail!("Adapter ACK does not bind the exact immutable dispatch command and route");
+    match times {
+        Some(times) => {
+            record_verified_observation_at_on(
+                connection,
+                verified.prepare_observation(),
+                times.observation_transitioned_at(),
+            )?;
+        }
+        None => {
+            record_verified_observation_on(connection, verified.prepare_observation())?;
+        }
+    }
+    Ok(())
+}
+
+fn record_rejected_no_start_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+    times: Option<&ComputeAttemptAdapterAckIngressTimes>,
+) -> Result<()> {
+    match times {
+        Some(times) => {
+            record_prepare_rejected_no_start_at_on(connection, verified, times.ingested_at())?;
+        }
+        None => {
+            record_prepare_rejected_no_start_on(connection, verified)?;
+        }
     }
     Ok(())
 }

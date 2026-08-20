@@ -1,21 +1,32 @@
-const WORKER: &str = include_str!("../external_pool_adapter_task_worker.rs");
+const WORKER_ROOT: &str = include_str!("../external_pool_adapter_task_worker.rs");
+const WORKER_LIFECYCLE: &str = include_str!("../external_pool_adapter_task_worker/lifecycle.rs");
+const WORKER_CYCLE: &str = include_str!("../external_pool_adapter_task_worker/cycle.rs");
+const WORKER_REPORT: &str = include_str!("../external_pool_adapter_task_worker/report.rs");
 const FEDERATION_ROOT: &str = include_str!("../mod.rs");
 const STARTUP: &str = include_str!("../../node_endpoint_session_startup.rs");
 const BACKGROUND: &str = include_str!("../../server_background_workers.rs");
 const RELEASE_API: &str = include_str!("../external_pool_adapter_release_api.rs");
-const STORE_RECOVERY: &str =
-    include_str!("../../store/compute_external_pool_adapter_task_delivery/recovery.rs");
 
 #[test]
 fn task_protocol_production_worker_is_default_off_and_requires_both_custodies() {
+    for module in ["cycle", "lifecycle", "report"] {
+        assert!(
+            WORKER_ROOT.contains(&format!("mod {module};")),
+            "worker root lost {module}"
+        );
+    }
     assert_eq!(
-        WORKER
+        WORKER_LIFECYCLE
             .matches("ELON_EXTERNAL_POOL_ADAPTER_ATTEMPT_DELIVERY_ENABLED")
             .count(),
         1
     );
     assert_ordered(
-        source_block(WORKER, "fn configured_enabled()", "#[cfg(all("),
+        source_block(
+            WORKER_LIFECYCLE,
+            "fn configured_enabled()",
+            "#[cfg(all(target_os",
+        ),
         &[
             "None => Ok(false)",
             "Some(\"true\") => Ok(true)",
@@ -24,7 +35,7 @@ fn task_protocol_production_worker_is_default_off_and_requires_both_custodies() 
         ],
     );
     assert_ordered(
-        WORKER,
+        WORKER_LIFECYCLE,
         &[
             "if enabled {",
             "require_production_runtime_custody()?",
@@ -32,9 +43,9 @@ fn task_protocol_production_worker_is_default_off_and_requires_both_custodies() 
         ],
     );
     let linux_custody = source_block(
-        WORKER,
-        "#[cfg(all(target_os = \"linux\", target_arch = \"x86_64\"))]",
-        "#[cfg(not(all(target_os = \"linux\", target_arch = \"x86_64\")))]",
+        WORKER_LIFECYCLE,
+        "#[cfg(all(target_os = \"linux\", target_arch = \"x86_64\"))]\nfn require_production_runtime_custody()",
+        "#[cfg(not(all(target_os",
     );
     assert_ordered(
         linux_custody,
@@ -43,11 +54,12 @@ fn task_protocol_production_worker_is_default_off_and_requires_both_custodies() 
             "external_pool_adapter_task_protocol_conformance_runtime()",
         ],
     );
-    assert!(WORKER.contains("task delivery requires Linux x86-64"));
+    assert!(WORKER_LIFECYCLE.contains("Duration::from_secs(60)"));
+    assert!(WORKER_LIFECYCLE.contains("task delivery requires Linux x86-64"));
 }
 
 #[test]
-fn task_protocol_production_worker_stays_dormant_and_wired_after_runtime_init() {
+fn task_protocol_worker_runs_preparation_before_the_honest_source_stage() {
     assert!(FEDERATION_ROOT.contains("pub(crate) mod external_pool_adapter_task_worker;"));
     assert_ordered(
         STARTUP,
@@ -58,35 +70,35 @@ fn task_protocol_production_worker_stays_dormant_and_wired_after_runtime_init() 
         ],
     );
     assert!(BACKGROUND.contains("external_pool_adapter_task_worker::spawn(state.clone())"));
-    assert!(WORKER.contains("Duration::from_secs(60)"));
-    assert!(WORKER.contains("ExternalPoolAdapterTaskWorkerCycleReport { eligible_rows: 0 }"));
     assert_ordered(
-        WORKER,
+        WORKER_CYCLE,
         &[
-            "recover_external_pool_adapter_task_delivery()",
-            "eligible_rows != DORMANT_CYCLE_REPORT.eligible_rows",
-            "continue;",
+            "run_external_pool_adapter_active_preparation_cycle(",
+            "run_external_pool_adapter_task_delivery_source_cycle(&checked_at)",
+            "if let Some(provider_id) = observed_provider",
+            "reprove_external_pool_adapter_task_delivery_source(",
+            "eligible_rows: 0",
+            "delivery_attempted: false",
         ],
     );
-    assert!(STORE_RECOVERY.contains("report.eligible_rows = 0;"));
-    assert!(!WORKER.contains("Store::"));
-    assert!(!WORKER.contains("begin_application_exchange"));
-    assert!(!WORKER.contains("exchange_external_pool_adapter_broker_task"));
+    assert!(WORKER_REPORT.contains("if report.eligible_rows == 0"));
+    assert!(WORKER_REPORT.contains("observed rows without a V278 producer"));
     for forbidden in [
-        "PreparedStartSendRequest",
-        "CommittedStartSendAuthority",
-        "VerifiedComputeStartOutboxRemoteObservation",
-        "persist_route_authority_on",
+        "record_external_pool_adapter_task_outbound_on",
+        "insert_external_pool_adapter_task_exchange_receipt_on",
+        "apply_external_pool_adapter_task_terminal_ack_on",
+        "exchange_external_pool_adapter_broker_task",
+        "relay_external_pool_adapter_task",
     ] {
         assert!(
-            !WORKER.contains(forbidden),
-            "dormant worker gained {forbidden}"
+            !WORKER_CYCLE.contains(forbidden),
+            "source-stage worker gained positive producer {forbidden}"
         );
     }
 }
 
 #[test]
-fn task_protocol_production_adds_no_public_http_surface_or_panic_path() {
+fn task_protocol_production_adds_no_public_http_or_panic_surface() {
     for forbidden in [
         "task-protocol-production",
         "task-delivery",
@@ -95,9 +107,10 @@ fn task_protocol_production_adds_no_public_http_surface_or_panic_path() {
     ] {
         assert!(
             !RELEASE_API.contains(forbidden),
-            "V273 gained public API marker {forbidden}"
+            "V278 gained public API marker {forbidden}"
         );
     }
+    let worker = format!("{WORKER_ROOT}{WORKER_LIFECYCLE}{WORKER_CYCLE}{WORKER_REPORT}");
     for forbidden in [
         ".unwrap(",
         ".expect(",
@@ -108,7 +121,7 @@ fn task_protocol_production_adds_no_public_http_surface_or_panic_path() {
         "debug_assert!",
         "assert!",
     ] {
-        assert!(!WORKER.contains(forbidden), "worker retained {forbidden}");
+        assert!(!worker.contains(forbidden), "worker retained {forbidden}");
     }
 }
 

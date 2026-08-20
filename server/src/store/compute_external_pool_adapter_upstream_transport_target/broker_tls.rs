@@ -13,6 +13,7 @@ use crate::compute_federation::{
         ExternalPoolAdapterInstallationBinding, ExternalPoolAdapterInstallationFsError,
         PreparedExternalPoolAdapterInstallation,
     },
+    external_pool_adapter_upstream_transport_target::ExternalPoolAdapterUpstreamTransportTargetReceipt,
 };
 use zeroize::Zeroizing;
 
@@ -88,6 +89,59 @@ impl CurrentExternalPoolAdapterBrokerTlsAuthority {
 }
 
 impl Store {
+    /// Active path #1/#2: re-proves a caller-selected renewed-route carrier on both sides of the
+    /// network await. The callback receives each fresh Prepared installation and cannot retain a
+    /// transaction. The returned channel retains neither callback authority nor a database handle.
+    pub(in crate::store) async fn prepare_projected_active_external_pool_adapter_broker_tls_channel(
+        &self,
+        target: &ExternalPoolAdapterUpstreamTransportTargetReceipt,
+        reopen_prepared: &mut ExternalPoolAdapterInstallationReopener<'_>,
+        mut reprove: impl FnMut(
+                &rusqlite::Transaction<'_>,
+                PreparedExternalPoolAdapterInstallation,
+                &str,
+            ) -> Result<bool>
+            + Send,
+    ) -> Result<Option<PreparedExternalPoolAdapterBrokerTlsChannel>> {
+        let preflight_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
+        let preflight_target = target.clone();
+        let broker_target = {
+            let mut connection = self.conn()?;
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let checked_at = canonical_now();
+            if !reprove(&transaction, preflight_prepared, &checked_at)? {
+                return Ok(None);
+            }
+            let broker_target = ExternalPoolAdapterBrokerTlsTarget::from_receipt(target)?;
+            transaction.commit()?;
+            broker_target
+        };
+
+        // No SQLite connection, transaction, Prepared installation, or authority crosses await.
+        let channel = connect_external_pool_adapter_broker_tls(broker_target).await?;
+
+        let postflight_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
+        let mut connection = self.conn()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let checked_at = canonical_now();
+        if !reprove(&transaction, postflight_prepared, &checked_at)? {
+            return Ok(None);
+        }
+        let postflight_target = ExternalPoolAdapterBrokerTlsTarget::from_receipt(target)?;
+        if target != &preflight_target
+            || channel.target() != &postflight_target
+            || !channel.is_current()
+        {
+            bail!("projected-active broker target changed across connect");
+        }
+        transaction.commit()?;
+        Ok(Some(PreparedExternalPoolAdapterBrokerTlsChannel {
+            channel,
+            checked_at,
+        }))
+    }
+
     /// Opens one authenticated channel outside SQLite locks, then re-proves the exact target and
     /// installation under an IMMEDIATE transaction before lending a metadata-only authority.
     pub(in crate::store) async fn with_current_external_pool_adapter_broker_tls(

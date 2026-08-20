@@ -104,6 +104,7 @@ mod compute_external_pool_adapter_provider_runtime_readiness;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+pub(crate) mod compute_external_pool_adapter_route_renewal;
 pub(crate) mod compute_external_pool_adapter_runtime_bundle;
 mod compute_external_pool_adapter_runtime_compatibility_verification;
 mod compute_external_pool_adapter_runtime_launch_profile;
@@ -590,6 +591,7 @@ pub(crate) use compute_external_pool_adapter_scanner_key::{
     RevokeExternalPoolAdapterScannerKey,
 };
 pub(crate) use compute_external_pool_adapter_supervisor_session_policy_companion::*;
+pub(crate) use compute_external_pool_adapter_task_delivery::register_external_pool_adapter_task_reachability_pending_plan_function;
 pub(crate) use compute_external_pool_adapter_task_protocol_conformance::api::*;
 pub(crate) use compute_external_pool_adapter_upstream_transport_target::api::*;
 pub(crate) use compute_external_pool_adapter_vulnerability_reattestation::{
@@ -793,8 +795,3 @@ impl Store {
     }
 }
 mod project_helpers;
-use self::project_helpers::{
-    apply_effective_project_summary_role, find_owner_project_by_name,
-    find_owner_project_by_workspace_path, find_project_by_id_for_user, project_summary_from_row,
-    update_external_project_binding,
-};

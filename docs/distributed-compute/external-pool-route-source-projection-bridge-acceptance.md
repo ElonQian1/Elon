@@ -1,7 +1,7 @@
 ---
 title: 外部矿池 Route source logical-to-projection bridge 验收
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-20
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
 verification_status: local_migration_and_source_bridge_verified
@@ -59,16 +59,20 @@ V271以上断言和6/6证据只覆盖historical pre-V277 trigger。V277 active b
 不再断言`logical_adapter_binding_digest=route_binding_digest=adapter_binding_digest`：logical digest只做lineage，
 route/adapter改用`ELON-COMPUTE-ATTEMPT-ADAPTER-BINDING-V1`的既有8字段projection-shaped digest，且不得向该shape
 添加Provider revision/digest/status或executor。active Provider pair与stable executor由V277 receipt另绑；该superseding
-branch当前为`source_review_only / implementation_uncompiled / implementation_unrun / passed=0 / failed=0`。
+branch当前为`source_review_only / implementation_uncompiled / implementation_unrun / passed=0 / failed=0`。它必须继续
+以V221为source且不得调用V277/V278 pending-plan UDF；source trigger消费plan或把V277/V278 receipt改成`source_id`
+均为失败。
 
 ## 4. 不属于 V271 的验收
 
 以下均保持未实现，不能记入 V271 passed：
 
 - 六能力 production producer/worker、authenticated ACK/event 与 prepare/commit/cancel/reconcile 网络协议；
-- V277已冻结但尚未实现/编译/运行的stable executor、active V253与fresh V274 successor/restart；
+- V277 stable executor、active V253与fresh V274 successor/restart private源码已写，但未编译/运行且无public orchestrator；
 - V270-equivalent/V272 freshness动态验收、atomic Provider activation、V254 #1/#5-#12 pending-plan permit guards；
-- V278 route renewal/reachability；V254 #2-#4/#13-#18仍必须absolute deny；
+- V278 route renewal/reachability当前为`design_frozen/source_written/source_review_only/implementation_uncompiled/
+  implementation_unrun/passed=0/failed=0`；route renewal不依赖current
+  V274/V268/V272，V254只允许#8-#12接受V277或V278 plan，#1/#5-#7仍V277-only，#2-#4/#13-#18 absolute deny；
 - Pool/Offer admission、真实派发、计量、market、settlement 或部署。
 
 ## 5. 正式结论

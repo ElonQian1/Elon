@@ -18,7 +18,7 @@ use super::{
     types::*,
 };
 
-struct RelationalCurrentness {
+pub(super) struct RelationalCurrentness {
     head_status: String,
     revocation_status: String,
     ttl_status: String,
@@ -33,7 +33,7 @@ struct RelationalCurrentness {
     receipt_integrity_status: String,
     process_custody_status: String,
     prepared_reproof_status: String,
-    current_status: String,
+    pub(super) current_status: String,
 }
 
 impl Store {
@@ -201,7 +201,7 @@ pub(in crate::store) fn current_external_pool_adapter_task_protocol_conformance_
     ))
 }
 
-fn relational_currentness_on(
+pub(super) fn relational_currentness_on(
     conn: &rusqlite::Connection,
     run_receipt_id: &str,
 ) -> Result<Option<RelationalCurrentness>> {

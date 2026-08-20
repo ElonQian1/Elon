@@ -16,16 +16,21 @@ use crate::compute_federation::external_pool_adapter_linux_supervisor::ExternalP
 use super::types::ExternalPoolAdapterRuntimeBundleRoot;
 
 pub(crate) use custody::register_external_pool_adapter_atomic_activation_pending_plan_udf;
+pub(crate) use custody::register_external_pool_adapter_provider_active_successor_refresh_pending_plan_udf;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use custody::ExternalPoolAdapterPostCleanupCommitmentInput;
 pub(in crate::store) use custody::{
     install_external_pool_adapter_atomic_activation_pending_plan_on,
+    install_external_pool_adapter_provider_active_successor_refresh_pending_plan_on,
     ExternalPoolAdapterAtomicActivationPendingPlan,
     ExternalPoolAdapterAtomicActivationPendingPlanGuard,
     ExternalPoolAdapterAtomicActivationPendingWrite,
     ExternalPoolAdapterAtomicActivationPendingWriteKind,
     ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
     ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,
+    ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlan,
+    ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanGuard,
+    ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanInput,
     ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
     ExternalPoolAdapterTaskProtocolConformanceSealInput, TaskProtocolConformanceProcessSeal,
 };

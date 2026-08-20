@@ -3,6 +3,7 @@ use rusqlite::Connection;
 
 mod event_lineage;
 mod projection;
+mod reachability;
 mod route_authority;
 mod source_lineage;
 
@@ -16,4 +17,8 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
     event_lineage::install(conn)?;
     conn.execute_batch(include_str!("guards/poll_claims.sql"))?;
     Ok(())
+}
+
+pub(super) fn install_v278_reachability(conn: &Connection) -> Result<()> {
+    reachability::install(conn)
 }

@@ -104,7 +104,10 @@ fn task_protocol_production_boundary_preserves_all_v254_fences_and_opens_none() 
 #[test]
 fn task_protocol_production_boundary_has_no_public_or_v213_authority_constructor() {
     assert!(STORE_ROOT.contains("mod compute_external_pool_adapter_task_delivery;"));
-    assert!(!STORE_ROOT.contains("use compute_external_pool_adapter_task_delivery::"));
+    assert!(STORE_ROOT.contains(
+        "pub(crate) use compute_external_pool_adapter_task_delivery::register_external_pool_adapter_task_reachability_pending_plan_function;"
+    ));
+    assert!(!STORE_ROOT.contains("compute_external_pool_adapter_task_delivery::*"));
     assert!(RUNTIME_BUNDLE.contains("mod task_delivery;"));
     assert!(!RUNTIME_BUNDLE.contains("use task_delivery::"));
     assert!(

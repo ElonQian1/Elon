@@ -18,12 +18,31 @@ pub(super) fn derive_closure(
     source: &AcceptedCommitSource,
     closure_at: &str,
 ) -> Result<DerivedAcceptedCommitClosure> {
+    derive_closure_on(source, closure_at, None)
+}
+
+pub(super) fn derive_historical_closure(
+    source: &AcceptedCommitSource,
+    closure_at: &str,
+    cleanup_expires_at: &str,
+) -> Result<DerivedAcceptedCommitClosure> {
+    derive_closure_on(source, closure_at, Some(cleanup_expires_at))
+}
+
+fn derive_closure_on(
+    source: &AcceptedCommitSource,
+    closure_at: &str,
+    historical_cleanup_expires_at: Option<&str>,
+) -> Result<DerivedAcceptedCommitClosure> {
     parse_canonical_time(closure_at, "accepted closure time")?;
     let base = &source.base;
     let route = &base.route.authorization;
     let actor_authority = &base.actor_authority.authorization;
     let application = &source.application.envelope;
-    let actor_valid_until = std::cmp::min(&route.expires_at, &actor_authority.valid_until).clone();
+    let actor_valid_until = match historical_cleanup_expires_at {
+        Some(cleanup_expires_at) => historical_actor_horizon(source, cleanup_expires_at)?,
+        None => std::cmp::min(&route.expires_at, &actor_authority.valid_until).clone(),
+    };
     ensure!(
         source.ack.received_at.as_str() <= closure_at && closure_at < actor_valid_until.as_str(),
         "accepted closure application actor is outside its authority window"
@@ -114,9 +133,10 @@ pub(super) fn derive_closure(
         "accepted lease authority digest drift"
     );
 
+    let route_horizon = historical_cleanup_expires_at.unwrap_or(route.expires_at.as_str());
     let not_after = [
         source.activation.lease.expires_at.as_str(),
-        route.expires_at.as_str(),
+        route_horizon,
         actor.valid_until.as_str(),
         authority.expires_at.as_str(),
     ]
@@ -176,6 +196,35 @@ pub(super) fn derive_closure(
         provider_id: base.adapter.provider_id.clone(),
         adapter_id: base.adapter.adapter_id.clone(),
     })
+}
+
+fn historical_actor_horizon(
+    source: &AcceptedCommitSource,
+    cleanup_expires_at: &str,
+) -> Result<String> {
+    parse_canonical_time(cleanup_expires_at, "historical cleanup horizon")?;
+    let base = &source.base;
+    let start = &base.command.command;
+    let plan = &base.plan.plan;
+    let mut horizons = vec![
+        cleanup_expires_at,
+        base.command.not_after.as_str(),
+        plan.not_after.as_str(),
+        plan.capability.expires_at.as_str(),
+        plan.lease_authority.valid_until.as_str(),
+        source.activation.lease.expires_at.as_str(),
+        start.hard_deadline_at.as_str(),
+    ];
+    horizons.extend(
+        plan.artifact_accesses
+            .iter()
+            .map(|access| access.expires_at.as_str()),
+    );
+    horizons
+        .into_iter()
+        .min()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("historical accepted terminal has no bounded closure horizon"))
 }
 
 fn parse_canonical_time(value: &str, label: &str) -> Result<DateTime<chrono::FixedOffset>> {

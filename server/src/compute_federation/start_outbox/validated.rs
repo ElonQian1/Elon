@@ -176,6 +176,13 @@ pub(crate) struct VerifiedComputeStartOutboxRemoteObservation {
     send_attempt: ValidatedComputeStartOutboxSendAttempt,
 }
 
+/// Read-only view shared by the legacy in-process verifier and the sealed V278 receipt bridge.
+/// It deliberately exposes only canonical envelopes, never constructors or raw verification keys.
+pub(crate) trait VerifiedComputeStartOutboxRemoteObservationView {
+    fn envelope(&self) -> &ComputeStartOutboxRemoteObservationEnvelope;
+    fn send_attempt_envelope(&self) -> &ComputeStartOutboxSendAttemptEnvelope;
+}
+
 impl VerifiedComputeStartOutboxRemoteObservation {
     pub(crate) fn envelope(&self) -> &ComputeStartOutboxRemoteObservationEnvelope {
         &self.envelope
@@ -183,6 +190,18 @@ impl VerifiedComputeStartOutboxRemoteObservation {
 
     pub(crate) fn send_attempt(&self) -> &ValidatedComputeStartOutboxSendAttempt {
         &self.send_attempt
+    }
+}
+
+impl VerifiedComputeStartOutboxRemoteObservationView
+    for VerifiedComputeStartOutboxRemoteObservation
+{
+    fn envelope(&self) -> &ComputeStartOutboxRemoteObservationEnvelope {
+        self.envelope()
+    }
+
+    fn send_attempt_envelope(&self) -> &ComputeStartOutboxSendAttemptEnvelope {
+        self.send_attempt().envelope()
     }
 }
 

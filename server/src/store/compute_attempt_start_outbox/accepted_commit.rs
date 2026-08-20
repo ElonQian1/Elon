@@ -24,6 +24,7 @@ use super::types::StoredStartOutboxOperation;
 
 mod currentness;
 mod derive;
+mod historical_plan;
 mod persist;
 mod readback;
 mod route_audit;
@@ -106,6 +107,15 @@ pub(in crate::store) fn ensure_fresh_accepted_start_commit_on(
     currentness::ensure_fresh_on(connection, command_id, checked_at)
 }
 
+pub(in crate::store) fn ensure_historical_accepted_start_commit_on(
+    connection: &Connection,
+    command_id: &str,
+    checked_at: &str,
+    authority: &crate::store::compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<AcceptedStartCommitFreshness> {
+    currentness::ensure_historical_on(connection, command_id, checked_at, authority)
+}
+
 /// Persists Store-derived application actor, lease authority, and pending Commit intent. The
 /// caller-supplied application is a locally prepared digest fact, never an authority DTO.
 pub(in crate::store) fn persist_accepted_start_commit_closure_on(
@@ -117,10 +127,28 @@ pub(in crate::store) fn persist_accepted_start_commit_closure_on(
     persist::persist_on(connection, command_id, application, closure_at)
 }
 
+pub(in crate::store) fn persist_historical_accepted_start_commit_closure_on(
+    connection: &Connection,
+    command_id: &str,
+    application: &PreparedApplication,
+    closure_at: &str,
+    authority: &crate::store::compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<AcceptedStartCommitClosureReceipt> {
+    persist::persist_historical_on(connection, command_id, application, closure_at, authority)
+}
+
 /// Historical replay audits only immutable closure. It intentionally ignores current liveness.
 pub(in crate::store) fn audit_accepted_start_commit_closure_on(
     connection: &Connection,
     command_id: &str,
 ) -> Result<AcceptedStartCommitClosureReceipt> {
     readback::audit_on(connection, command_id, true)
+}
+
+pub(in crate::store) fn audit_historical_accepted_start_commit_closure_on(
+    connection: &Connection,
+    command_id: &str,
+    authority: &crate::store::compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<AcceptedStartCommitClosureReceipt> {
+    readback::audit_historical_on(connection, command_id, true, authority)
 }

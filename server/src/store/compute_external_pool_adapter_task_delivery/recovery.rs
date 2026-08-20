@@ -4,6 +4,13 @@ use anyhow::{ensure, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
+    install_external_pool_adapter_task_reachability_pending_plan_on,
+    poll_plan::poll_cas_values,
+    reachability_pending_plan::{
+        ExternalPoolAdapterTaskReachabilityPendingPlan,
+        ExternalPoolAdapterTaskReachabilityPendingWrite,
+        ExternalPoolAdapterTaskReachabilityPendingWriteKind,
+    },
     read::{read_event_poll_on, read_reconcile_poll_on},
     types::{
         ExternalPoolAdapterTaskDeliveryRecoveryReport, PollClaimProjection, CLAIM_STATUS_CLAIMED,
@@ -203,6 +210,15 @@ fn transition_reconcile_on(
     digest: &str,
     target: &str,
 ) -> Result<()> {
+    let after = recovered_projection(claim, target)?;
+    let pending = install_recovery_plan_on(
+        conn,
+        ExternalPoolAdapterTaskReachabilityPendingWriteKind::ReconcilePollCas,
+        id,
+        digest,
+        claim,
+        &after,
+    )?;
     let changed = conn.execute(
         "UPDATE compute_external_pool_adapter_task_reconcile_polls
             SET claim_status=?1,claim_revision=claim_revision+1,
@@ -223,6 +239,7 @@ fn transition_reconcile_on(
         ],
     )?;
     ensure!(changed == 1, "V273 reconcile poll recovery CAS lost");
+    pending.ensure_fully_consumed()?;
     Ok(())
 }
 
@@ -233,6 +250,15 @@ fn transition_event_on(
     digest: &str,
     target: &str,
 ) -> Result<()> {
+    let after = recovered_projection(claim, target)?;
+    let pending = install_recovery_plan_on(
+        conn,
+        ExternalPoolAdapterTaskReachabilityPendingWriteKind::EventPollCas,
+        id,
+        digest,
+        claim,
+        &after,
+    )?;
     let changed = conn.execute(
         "UPDATE compute_external_pool_adapter_task_event_polls
             SET claim_status=?1,claim_revision=claim_revision+1,
@@ -253,7 +279,39 @@ fn transition_event_on(
         ],
     )?;
     ensure!(changed == 1, "V273 event poll recovery CAS lost");
+    pending.ensure_fully_consumed()?;
     Ok(())
+}
+
+fn recovered_projection(claim: &PollClaimProjection, target: &str) -> Result<PollClaimProjection> {
+    Ok(PollClaimProjection {
+        status: target.to_string(),
+        revision: claim
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| anyhow::anyhow!("V273 poll recovery revision overflow"))?,
+        generation: claim.generation,
+        owner_id: None,
+        token_digest: None,
+        expires_at: None,
+    })
+}
+
+fn install_recovery_plan_on(
+    conn: &Connection,
+    kind: ExternalPoolAdapterTaskReachabilityPendingWriteKind,
+    id: &str,
+    digest: &str,
+    before: &PollClaimProjection,
+    after: &PollClaimProjection,
+) -> Result<super::reachability_pending_plan::ExternalPoolAdapterTaskReachabilityPendingPlanGuard> {
+    let pending = ExternalPoolAdapterTaskReachabilityPendingPlan::new(vec![
+        ExternalPoolAdapterTaskReachabilityPendingWrite::new(
+            kind,
+            poll_cas_values(id, digest, before, after)?,
+        )?,
+    ])?;
+    install_external_pool_adapter_task_reachability_pending_plan_on(conn, pending)
 }
 
 fn ensure_recovered(

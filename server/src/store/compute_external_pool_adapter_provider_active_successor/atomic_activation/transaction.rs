@@ -58,7 +58,7 @@ use super::{
 
 /// Uncommitted V277/V274 pair plus the still-live, fully consumed connection-local plan.
 /// The caller must commit its outer transaction and immediately use the postcommit seam below.
-pub(super) struct PendingExternalPoolAdapterAtomicActivationCommit<'runtime> {
+pub(in crate::store) struct PendingExternalPoolAdapterAtomicActivationCommit<'runtime> {
     activation_receipt_id: String,
     activation_receipt_digest: String,
     activation_root_digest: String,
@@ -70,7 +70,11 @@ pub(super) struct PendingExternalPoolAdapterAtomicActivationCommit<'runtime> {
 /// The V274 purpose seal is minted before the pending V277 plan and every business write. The
 /// sealed append never leaves this private kernel, so it cannot be inserted on another connection.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn persist_external_pool_adapter_atomic_activation_closure_on<'tx, 'conn, 'runtime>(
+pub(in crate::store) fn persist_external_pool_adapter_atomic_activation_closure_on<
+    'tx,
+    'conn,
+    'runtime,
+>(
     transaction: &'tx Transaction<'conn>,
     runtime: &'runtime ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
     active_successor_receipt_id: String,
@@ -136,9 +140,8 @@ pub(super) fn persist_external_pool_adapter_atomic_activation_closure_on<'tx, 'c
     })
 }
 
-/// Same-connection postcommit readback, followed by V274 promotion and only then plan discard.
-/// A failed readback never promotes V274; every failure still clears the plan via RAII.
-pub(super) fn finalize_external_pool_adapter_atomic_activation_after_commit_on(
+/// Same-connection postcommit readback promotes V274 before discarding the guarded plan.
+pub(in crate::store) fn finalize_external_pool_adapter_atomic_activation_after_commit_on(
     connection: &Connection,
     pending: PendingExternalPoolAdapterAtomicActivationCommit<'_>,
 ) -> Result<(
@@ -189,6 +192,7 @@ fn validate_typed_sources(
     let observation = no_work.observation();
     let credential = transition.credential().receipt();
     let observed_credential = observation.credential();
+    let fresh_expires_at = task_protocol.fresh_expires_at_for(no_work)?;
     let planned = no_work.preflight();
     let root = &planned.activation_root().activation_root;
     let executor = &activation.stable_executor;
@@ -223,7 +227,7 @@ fn validate_typed_sources(
             != observation.post_cleanup_observation_commitment()
         || renewable.observation_started_at != observation.probe_checked_at()
         || renewable.observation_completed_at != observation.checked_at()
-        || renewable.observation_expires_at != observation.expires_at()
+        || renewable.observation_expires_at != fresh_expires_at
         || renewable.task_protocol_conformance_run_receipt_id
             != task_protocol.receipt().run_receipt_id
         || renewable.task_protocol_conformance_run_receipt_digest
@@ -249,6 +253,7 @@ fn build_genesis_successor(
     let target = &activation.provider_transition.target_active_provider;
     let observation = no_work.observation();
     let credential = transition.credential().receipt();
+    let fresh_expires_at = task_protocol.fresh_expires_at_for(no_work)?;
     let provider_evidence = |provider: &crate::compute_federation::external_pool_adapter_atomic_activation::ExternalPoolAdapterAtomicActivationProviderEvidence| {
         ExternalPoolAdapterProviderActiveSuccessorProviderEvidence {
             provider_id: provider.provider_id.clone(),
@@ -263,7 +268,7 @@ fn build_genesis_successor(
         observed_provider: provider_evidence(target),
         observation_started_at: observation.probe_checked_at().into(),
         observation_completed_at: observation.checked_at().into(),
-        observation_expires_at: observation.expires_at().into(),
+        observation_expires_at: fresh_expires_at,
     };
     runtime_observation.runtime_observation_digest =
         provider_active_successor_runtime_observation_digest(&runtime_observation)?;

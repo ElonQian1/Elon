@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashSet;
 
-use super::{new_id, project_summary_from_row, ProjectSummary};
+use super::{new_id, project_helpers::project_summary_from_row, ProjectSummary};
 
 pub(super) const IDENTITY_WORKSPACE_PATH: &str = "workspace_path";
 pub(super) const IDENTITY_GIT_REMOTE: &str = "git_remote";

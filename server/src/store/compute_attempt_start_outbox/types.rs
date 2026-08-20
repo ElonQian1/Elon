@@ -96,6 +96,40 @@ pub(crate) struct StartOutboxClaimHandle {
     pub(super) raw_claim_token: String,
 }
 
+impl StartOutboxClaimHandle {
+    pub(in crate::store) fn outbox_id(&self) -> &str {
+        &self.operation.envelope.outbox_id
+    }
+
+    pub(in crate::store) fn command_id(&self) -> &str {
+        &self.operation.envelope.command_id
+    }
+
+    pub(in crate::store) fn command_digest(&self) -> &str {
+        &self.operation.envelope.command_digest
+    }
+
+    pub(in crate::store) fn operation_kind(&self) -> &str {
+        &self.operation.envelope.operation_kind
+    }
+
+    pub(in crate::store) fn subject_outbox_id(&self) -> Option<&str> {
+        self.operation.envelope.subject_outbox_id.as_deref()
+    }
+
+    pub(in crate::store) fn provider_id(&self) -> &str {
+        &self.operation.provider_id
+    }
+
+    pub(in crate::store) fn route_authorization_id(&self) -> &str {
+        &self.operation.envelope.route_authorization_id
+    }
+
+    pub(in crate::store) fn route_authorization_digest(&self) -> &str {
+        &self.operation.envelope.route_authorization_digest
+    }
+}
+
 impl fmt::Debug for StartOutboxClaimHandle {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -110,6 +144,15 @@ impl fmt::Debug for StartOutboxClaimHandle {
 /// Future transport seal. No constructor exists until a concrete Adapter seals a request.
 pub(crate) struct PreparedStartSendRequest {
     pub(super) request_digest: String,
+}
+
+impl PreparedStartSendRequest {
+    /// Store-private bridge from one protocol-sealed request digest. It creates no send authority.
+    pub(in crate::store) fn from_external_pool_adapter_task_request_digest(
+        request_digest: String,
+    ) -> Self {
+        Self { request_digest }
+    }
 }
 
 impl fmt::Debug for PreparedStartSendRequest {
@@ -129,6 +172,12 @@ pub(crate) struct CommittedStartSendAuthority {
     pub(super) request: PreparedStartSendRequest,
 }
 
+pub(in crate::store) struct PreparedStartSendMutation {
+    pub(super) stored: StoredStartOutboxOperation,
+    pub(super) envelope: ComputeStartOutboxSendAttemptEnvelope,
+    pub(super) canonical_json: String,
+}
+
 impl fmt::Debug for CommittedStartSendAuthority {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -137,6 +186,20 @@ impl fmt::Debug for CommittedStartSendAuthority {
             .field("outbox_id", &self.attempt.outbox_id)
             .field("request", &"<sealed>")
             .finish()
+    }
+}
+
+impl CommittedStartSendAuthority {
+    pub(in crate::store) fn from_external_pool_adapter_task(
+        attempt: ComputeStartOutboxSendAttemptEnvelope,
+        claim: StartOutboxClaimHandle,
+        request: PreparedStartSendRequest,
+    ) -> Self {
+        Self {
+            attempt,
+            claim,
+            request,
+        }
     }
 }
 

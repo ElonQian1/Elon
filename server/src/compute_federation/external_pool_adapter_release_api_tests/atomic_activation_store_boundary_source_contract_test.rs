@@ -77,6 +77,7 @@ const V272_ACTIVE_ROOT: &str = include_str!(
     "../../store/compute_external_pool_adapter_task_protocol_conformance/active_carrier.rs"
 );
 const V272_ACTIVE_TYPES: &str = active_carrier_source!("types.rs");
+const V272_ACTIVE_REGISTERING: &str = active_carrier_source!("registering.rs");
 const V272_ACTIVE_ROOTS: &str = active_carrier_source!("roots.rs");
 const V272_ACTIVE_CURRENT: &str = active_carrier_source!("current.rs");
 const V272_ACTIVE_WRITE: &str = active_carrier_source!("write.rs");
@@ -96,23 +97,23 @@ fn atomic_activation_store_closure_is_private_exact_and_one_shot() {
         "persist_external_pool_adapter_atomic_activation_closure_on",
         "finalize_external_pool_adapter_atomic_activation_after_commit_on",
     ] {
-        let private_definition = format!("pub(super) fn {marker}");
+        let private_definition = format!("pub(in crate::store) fn {marker}");
         assert!(
             ATOMIC_TRANSACTION.contains(private_definition.as_str()),
-            "private atomic transaction leaf lost {marker}"
+            "Store-private atomic transaction leaf lost {marker}"
         );
         assert!(
-            !ATOMIC_ROOT.contains(marker),
-            "atomic root re-exported private transaction leaf {marker}"
+            ATOMIC_ROOT.contains(marker),
+            "atomic root lost narrow Store-private re-export {marker}"
         );
         assert!(
-            !STORE_ROOT.contains(marker),
-            "store root re-exported private transaction leaf {marker}"
+            STORE_ROOT.contains(marker),
+            "provider root lost narrow Store-private re-export {marker}"
         );
     }
     for marker in [
         "historical_external_pool_adapter_atomic_activation_authority_on",
-        "current_external_pool_adapter_projected_active_historical_carrier_on",
+        "current_external_pool_adapter_renewed_route_runtime_carrier_on",
     ] {
         assert!(ATOMIC_ROOT.contains(marker), "atomic root lost {marker}");
     }
@@ -149,7 +150,7 @@ fn atomic_activation_store_closure_is_private_exact_and_one_shot() {
     assert_ordered(
         ATOMIC_TRANSACTION,
         &[
-            "pub(super) fn finalize_external_pool_adapter_atomic_activation_after_commit_on(",
+            "pub(in crate::store) fn finalize_external_pool_adapter_atomic_activation_after_commit_on(",
             "connection.is_autocommit()",
             "plan_guard.ensure_same_connection(connection)?",
             "plan_guard.ensure_fully_consumed()?",
@@ -202,19 +203,15 @@ fn atomic_activation_store_closure_is_private_exact_and_one_shot() {
     ));
     assert!(ATOMIC_READ.contains("ProjectionAudit::Live(Some(&evidence_checked_at))"));
     assert!(!ATOMIC_READ.contains("ProjectionAudit::Live(None)"));
-    let atomic_sources = format!(
-        "{ATOMIC_ROOT}{ATOMIC_TRANSACTION}{ATOMIC_PENDING}{ATOMIC_RECEIPT}{ATOMIC_READ}{ATOMIC_ROUTE_AUDIT}{ATOMIC_CARRIER}"
-    );
     for marker in [
         "persist_external_pool_adapter_atomic_activation_closure_on",
         "finalize_external_pool_adapter_atomic_activation_after_commit_on",
     ] {
-        assert_eq!(
-            atomic_sources.matches(marker).count(),
-            1,
-            "private atomic transaction function gained a caller or re-export {marker}"
-        );
+        assert_eq!(ATOMIC_TRANSACTION.matches(marker).count(), 1);
     }
+    let atomic_sources = format!(
+        "{ATOMIC_ROOT}{ATOMIC_TRANSACTION}{ATOMIC_PENDING}{ATOMIC_RECEIPT}{ATOMIC_READ}{ATOMIC_ROUTE_AUDIT}{ATOMIC_CARRIER}"
+    );
     assert!(!atomic_sources.contains("impl Store"));
     assert!(!RELEASE_API.contains("atomic-activation"));
 }
@@ -274,9 +271,8 @@ fn atomic_activation_pending_plan_is_connection_local_bounded_and_non_determinis
 }
 
 #[test]
-fn planned_genesis_runs_real_no_work_io_while_durable_refresh_stays_fail_closed() {
+fn planned_genesis_and_durable_refresh_run_real_typed_no_work_io() {
     assert!(NO_WORK_ROOT.contains("mod execution;"));
-    assert!(NO_WORK_ROOT.contains("mod active;"));
     for marker in [
         "execute_external_pool_adapter_no_work_probe",
         ".exchange_no_work(",
@@ -320,9 +316,8 @@ fn planned_genesis_runs_real_no_work_io_while_durable_refresh_stays_fail_closed(
     }
     assert!(ACTIVE_NO_WORK_PREFLIGHT
         .contains("pub(super) fn durable_external_pool_adapter_active_no_work_probe_subject_on"));
-    assert!(ACTIVE_NO_WORK_REPROOF.contains(
-        "pub(super) fn with_reproved_durable_external_pool_adapter_active_no_work_subject"
-    ));
+    assert!(ACTIVE_NO_WORK_REPROOF
+        .contains("reprove_external_pool_adapter_provider_active_successor_target_on"));
     assert!(V274_APPEND_READBACK.contains(
         "pub(in crate::store::compute_external_pool_adapter_provider_active_successor) fn postcommit_external_pool_adapter_provider_active_successor_readback_on"
     ));
@@ -386,12 +381,8 @@ fn projected_active_evidence_is_witness_gated_without_current_v274_recursion() {
     for marker in [
         "PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier",
         "CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority",
-        "prepare_external_pool_adapter_task_protocol_planned_active_carrier_on",
-        "no_work: &ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject",
         "let target = no_work.preflight();",
-        "let evidence_checked_at = no_work.evidence_checked_at();",
-        "binding.provider_binding_id != root.provider_binding_id",
-        "binding.provider_binding_digest != root.provider_binding_digest",
+        "let root = &target.activation_root().activation_root;",
     ] {
         assert!(
             V272_ACTIVE_TYPES.contains(marker),
@@ -399,8 +390,17 @@ fn projected_active_evidence_is_witness_gated_without_current_v274_recursion() {
         );
     }
     for marker in [
-        "historical_external_pool_adapter_atomic_activation_for_binding_on",
-        "current_external_pool_adapter_projected_active_historical_carrier_on",
+        "prepare_external_pool_adapter_task_protocol_planned_active_carrier_on",
+        "no_work: &ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject",
+        "let observation = no_work.observation();",
+        "domain_roots_from_parts(",
+    ] {
+        assert!(V272_ACTIVE_REGISTERING.contains(marker));
+    }
+    for marker in [
+        "historical_external_pool_adapter_atomic_activation_history_for_binding_on",
+        "current_external_pool_adapter_renewed_route_runtime_carrier_on",
+        "require_current_external_pool_adapter_renewed_route_on",
     ] {
         assert!(
             V272_ACTIVE_ROOTS.contains(marker),

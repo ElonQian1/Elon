@@ -1,5 +1,4 @@
 use anyhow::{anyhow, bail, Result};
-use chrono::{Duration, Utc};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
@@ -7,25 +6,20 @@ use crate::compute_federation::{
     capacity::{ComputeCapacityClaimBinding, ComputeCapacityOfferBinding},
     execution::{
         ComputeAttemptLease, ComputeJobVersionBinding, ATTEMPT_STATUS_STAGING,
-        COMPUTE_ATTEMPT_LEASE_SCHEMA, JOB_STATUS_RESERVED, JOB_STATUS_RUNNING,
-        RESERVATION_STATUS_ACTIVE,
+        COMPUTE_ATTEMPT_LEASE_SCHEMA, JOB_STATUS_RUNNING,
     },
-    offer::{OFFER_STATUS_ACTIVE, OFFER_STATUS_DRAINING},
-    provider::{PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_DRAINING},
 };
 
 use super::{
     compute_attempt_leases::{
         compute_attempt_lease_digest, initialize_compute_attempt_lease_state_on,
     },
-    compute_broker_reservation::{broker_reserve_binding_on, BrokerReserveBinding},
+    compute_broker_reservation::broker_reserve_binding_on,
     compute_capacity_claim_activation::{
         activate_reservation_capacity_claim_on, ActivateReservationCapacityClaim,
     },
     compute_capacity_ledger::ComputeCapacityLedgerWriteReceipt,
     compute_job_registry::{current_registered_job_on, register_compute_job_on},
-    compute_offer_registry::current_registered_offer_on,
-    compute_provider_registry::current_registered_provider_on,
     compute_reservation_registry::{
         current_registered_reservation_on, register_compute_reservation_on,
     },
@@ -33,12 +27,17 @@ use super::{
 };
 
 mod candidates;
+mod preflight;
 mod rows;
 mod validation;
 
 use candidates::list_activation_candidates_on;
+use preflight::{
+    activation_timestamp, ensure_broker_binding, ensure_budget_reserved, ensure_job_matches,
+    ensure_lease_window, ensure_provider_and_offer_live, ensure_reservation_matches,
+};
 use rows::{attempt_activation_on, persist_attempt_activation_on};
-use validation::{normalize_activation, parse_utc, NormalizedAttemptActivation};
+use validation::normalize_activation;
 
 pub(crate) const ATTEMPT_ACTIVATION_EXECUTION_EFFECT: &str = "none";
 pub(crate) const ATTEMPT_ACTIVATION_MONEY_EFFECT: &str = "preauthorization_unchanged";
@@ -132,6 +131,22 @@ pub(super) fn activate_compute_attempt_on(
     conn: &Connection,
     request: &ActivateComputeAttemptRequest,
 ) -> Result<ComputeAttemptActivationReceipt> {
+    activate_compute_attempt_with_time_on(conn, request, None)
+}
+
+pub(in crate::store) fn activate_compute_attempt_at_on(
+    conn: &Connection,
+    request: &ActivateComputeAttemptRequest,
+    activated_at: &str,
+) -> Result<ComputeAttemptActivationReceipt> {
+    activate_compute_attempt_with_time_on(conn, request, Some(activated_at))
+}
+
+fn activate_compute_attempt_with_time_on(
+    conn: &Connection,
+    request: &ActivateComputeAttemptRequest,
+    supplied_activated_at: Option<&str>,
+) -> Result<ComputeAttemptActivationReceipt> {
     let request = normalize_activation(request)?;
     let idempotency_scope = format!("compute_attempt_activation:{}", request.provider_id);
     if let Some(receipt) = attempt_activation_on(
@@ -172,6 +187,7 @@ pub(super) fn activate_compute_attempt_on(
     let activated_at = activation_timestamp(
         &source_job.job.updated_at,
         &source_reservation.reservation.updated_at,
+        supplied_activated_at,
     )?;
     ensure_budget_reserved(
         conn,
@@ -279,138 +295,4 @@ pub(super) fn compute_attempt_activation_on(
     }
     attempt_activation_on(conn, "", lease_id, None)?
         .ok_or_else(|| anyhow!("Attempt 激活回执不存在"))
-}
-
-fn ensure_reservation_matches(
-    request: &NormalizedAttemptActivation,
-    source: &super::compute_reservation_registry::ComputeReservationRegistrationReceipt,
-) -> Result<()> {
-    if source.revision != request.expected_reservation_revision
-        || source.reservation_digest != request.expected_reservation_digest
-        || source.reservation.status != RESERVATION_STATUS_ACTIVE
-        || source.reservation.capacity_claim.claim_revision != request.expected_claim_revision
-        || source.reservation.capacity_claim.claim_digest != request.expected_claim_digest
-    {
-        bail!("Attempt 激活只能基于当前 active Reservation 与精确 Capacity Claim 版本");
-    }
-    Ok(())
-}
-
-fn ensure_job_matches(
-    request: &NormalizedAttemptActivation,
-    reservation: &super::compute_reservation_registry::ComputeReservationRegistrationReceipt,
-    job: &super::compute_job_registry::ComputeJobRegistrationReceipt,
-) -> Result<()> {
-    if job.revision != request.expected_job_revision
-        || job.job_digest != request.expected_job_digest
-        || job.job.status != JOB_STATUS_RESERVED
-        || reservation.reservation.job.job_revision != job.revision
-        || reservation.reservation.job.job_digest != job.job_digest
-    {
-        bail!("Attempt 激活只能基于 Reservation 绑定的当前 reserved Job 精确版本");
-    }
-    Ok(())
-}
-
-fn ensure_provider_and_offer_live(
-    conn: &rusqlite::Connection,
-    request: &NormalizedAttemptActivation,
-    reservation: &super::compute_reservation_registry::ComputeReservationRegistrationReceipt,
-) -> Result<()> {
-    let provider = current_registered_provider_on(conn, &request.provider_id)?
-        .ok_or_else(|| anyhow!("Attempt 激活的 Provider 不存在"))?;
-    if provider.provider.owner_account_id != request.activated_by_user_id
-        || !matches!(
-            provider.provider.status.as_str(),
-            PROVIDER_STATUS_ACTIVE | PROVIDER_STATUS_DRAINING
-        )
-    {
-        bail!("只有当前 Provider 所有者可在 active/draining 状态履行既有 Reservation");
-    }
-    let current_offer = current_registered_offer_on(conn, &reservation.reservation.offer.offer_id)?
-        .ok_or_else(|| anyhow!("Attempt 激活绑定的 Offer 不存在"))?;
-    if current_offer.offer.provider_id != request.provider_id
-        || !matches!(
-            current_offer.offer.status.as_str(),
-            OFFER_STATUS_ACTIVE | OFFER_STATUS_DRAINING
-        )
-    {
-        bail!("终态或身份变化的 Offer 不能再激活 Attempt");
-    }
-    Ok(())
-}
-
-fn ensure_broker_binding(
-    broker: &BrokerReserveBinding,
-    reservation: &super::compute_reservation_registry::ComputeReservationRegistrationReceipt,
-    job: &super::compute_job_registry::ComputeJobRegistrationReceipt,
-) -> Result<()> {
-    if broker.reservation_revision != reservation.revision
-        || broker.reservation_digest != reservation.reservation_digest
-        || broker.reserved_job.job_id != job.job.job_id
-        || broker.reserved_job.job_revision != job.revision
-        || broker.reserved_job.job_digest != job.job_digest
-        || broker.capacity_claim != reservation.reservation.capacity_claim
-    {
-        bail!("Attempt 激活前 Broker 预留回执与当前合同不一致");
-    }
-    Ok(())
-}
-
-fn ensure_budget_reserved(
-    conn: &rusqlite::Connection,
-    broker: &BrokerReserveBinding,
-    consumer_account_id: &str,
-    activated_at: &str,
-) -> Result<()> {
-    let current_expiry = conn
-        .query_row(
-            "SELECT expires_at FROM billing_reservations
-              WHERE id=?1 AND user_id=?2 AND reserved_fen=?3
-                AND status='reserved'",
-            params![
-                broker.budget_reservation_id,
-                consumer_account_id,
-                broker.budget_reserved_fen,
-            ],
-            |row| row.get::<_, Option<String>>(0),
-        )
-        .optional()?;
-    let valid = match current_expiry {
-        Some(Some(expires_at)) => parse_utc(&expires_at)? >= parse_utc(activated_at)?,
-        Some(None) => true,
-        None => false,
-    };
-    if !valid {
-        bail!("Attempt 激活要求原 Broker 平台余额预授权仍有效且未发生资金变化");
-    }
-    Ok(())
-}
-
-fn ensure_lease_window(
-    request: &NormalizedAttemptActivation,
-    reservation_expires_at: &str,
-    activated_at: &str,
-) -> Result<()> {
-    let activated = parse_utc(activated_at)?;
-    let lease_expires = parse_utc(&request.expires_at)?;
-    let hard_deadline = parse_utc(&request.hard_deadline_at)?;
-    let reservation_expires = parse_utc(reservation_expires_at)?;
-    if lease_expires <= activated
-        || hard_deadline <= lease_expires
-        || hard_deadline > reservation_expires
-    {
-        bail!("Attempt Lease 时间窗必须位于未过期 Reservation 内");
-    }
-    Ok(())
-}
-
-fn activation_timestamp(job_updated_at: &str, reservation_updated_at: &str) -> Result<String> {
-    let floor = std::cmp::max(
-        parse_utc(job_updated_at)?,
-        parse_utc(reservation_updated_at)?,
-    )
-    .checked_add_signed(Duration::nanoseconds(1))
-    .ok_or_else(|| anyhow!("Attempt 激活时间溢出"))?;
-    Ok(std::cmp::max(Utc::now(), floor).to_rfc3339())
 }

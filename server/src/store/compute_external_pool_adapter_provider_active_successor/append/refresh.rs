@@ -12,7 +12,11 @@ use crate::{
         provider::ComputeProvider,
     },
     store::{
-        compute_external_pool_adapter_runtime_bundle::ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
+        compute_external_pool_adapter_runtime_bundle::{
+            install_external_pool_adapter_provider_active_successor_refresh_pending_plan_on,
+            ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanGuard,
+            ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
+        },
         compute_external_pool_adapter_task_protocol_conformance::CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority,
     },
 };
@@ -21,9 +25,16 @@ use super::super::read::head_by_binding_and_root_on;
 use super::{
     material::{prepare_pending_append, PendingExternalPoolAdapterProviderActiveSuccessorAppend},
     readback::insert_and_readback_pending_append_on,
+    refresh_pending_plan::pending_plan_for_external_pool_adapter_provider_active_successor_refresh,
 };
 
-pub(super) fn append_external_pool_adapter_provider_active_successor_refresh_on<
+/// Uncommitted refresh append plus its dedicated, fully consumed connection-local plan.
+pub(in crate::store) struct PendingExternalPoolAdapterProviderActiveSuccessorRefresh<'runtime> {
+    pub(super) append: PendingExternalPoolAdapterProviderActiveSuccessorAppend<'runtime>,
+    pub(super) plan_guard: ExternalPoolAdapterProviderActiveSuccessorRefreshPendingPlanGuard,
+}
+
+pub(in crate::store) fn append_external_pool_adapter_provider_active_successor_refresh_on<
     'tx,
     'conn,
     'runtime,
@@ -33,7 +44,7 @@ pub(super) fn append_external_pool_adapter_provider_active_successor_refresh_on<
     active_successor_receipt_id: String,
     task_protocol: &CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority<'tx, 'conn>,
     successor: ExternalPoolAdapterProviderActiveSuccessorMaterial,
-) -> Result<PendingExternalPoolAdapterProviderActiveSuccessorAppend<'runtime>> {
+) -> Result<PendingExternalPoolAdapterProviderActiveSuccessorRefresh<'runtime>> {
     if successor.lineage.successor_sequence <= 1 {
         bail!("V274 refresh must have a successor sequence greater than one");
     }
@@ -69,8 +80,18 @@ pub(super) fn append_external_pool_adapter_provider_active_successor_refresh_on<
     }
     require_exact_refresh_sources(&successor, task_protocol)?;
     let pending = prepare_pending_append(runtime, active_successor_receipt_id, successor)?;
+    let plan = pending_plan_for_external_pool_adapter_provider_active_successor_refresh(&pending)?;
+    let plan_guard =
+        install_external_pool_adapter_provider_active_successor_refresh_pending_plan_on(
+            transaction,
+            plan,
+        )?;
     insert_and_readback_pending_append_on(transaction, &pending)?;
-    Ok(pending)
+    plan_guard.ensure_fully_consumed()?;
+    Ok(PendingExternalPoolAdapterProviderActiveSuccessorRefresh {
+        append: pending,
+        plan_guard,
+    })
 }
 
 fn require_exact_refresh_sources(

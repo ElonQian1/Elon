@@ -1,22 +1,25 @@
 use anyhow::{anyhow, bail, Result};
-use elon_external_pool_adapter_session_core::{
-    ExternalPoolAdapterTaskProtocolHostExchange, ExternalPoolAdapterTaskProtocolHostReceipt,
-};
+use elon_external_pool_adapter_session_core::ExternalPoolAdapterTaskProtocolHostExchange;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use zeroize::Zeroizing;
 
-use super::ExternalPoolAdapterBrokerTlsChannel;
+use super::{
+    ExternalPoolAdapterBrokerTaskObservationValidator, ExternalPoolAdapterBrokerTlsChannel,
+    VerifiedExternalPoolAdapterBrokerTaskExchange,
+};
 
 const MAX_REQUEST_BYTES: usize = 65_536;
 const MAX_RESPONSE_BYTES: usize = 262_144;
 
 /// Relays one exact child-produced request over one current TLS channel, then consumes the exact
 /// response inside the ELTP exchange. No stream or raw request/response authority escapes.
-pub(crate) async fn exchange_external_pool_adapter_broker_task(
+pub(crate) async fn exchange_external_pool_adapter_broker_task<
+    Validator: ExternalPoolAdapterBrokerTaskObservationValidator,
+>(
     mut channel: ExternalPoolAdapterBrokerTlsChannel,
     exchange: ExternalPoolAdapterTaskProtocolHostExchange<'_>,
-    validate_observation: impl FnOnce(&[u8]) -> Result<()> + Send,
-) -> Result<ExternalPoolAdapterTaskProtocolHostReceipt> {
+    validator: Validator,
+) -> Result<VerifiedExternalPoolAdapterBrokerTaskExchange<Validator::Output>> {
     let request = exchange.request();
     let expected_response_bytes = exchange.expected_response_bytes();
     if request.is_empty()
@@ -39,6 +42,9 @@ pub(crate) async fn exchange_external_pool_adapter_broker_task(
     .await
     .map_err(|_| anyhow!("broker task exchange timed out"))??;
 
-    let (receipt, ()) = exchange.complete(&response, validate_observation)?;
-    Ok(receipt)
+    let (receipt, observation) = exchange.complete(&response, |raw| validator.validate(raw))?;
+    Ok(VerifiedExternalPoolAdapterBrokerTaskExchange::new(
+        receipt,
+        observation,
+    ))
 }

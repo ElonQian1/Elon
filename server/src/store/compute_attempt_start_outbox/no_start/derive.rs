@@ -1,18 +1,21 @@
 use anyhow::{anyhow, bail, ensure, Result};
 use chrono::{SecondsFormat, Utc};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection};
 
 use crate::{
     compute_federation::{
-        attempt_gateway::{VerifiedComputeAttemptAdapterAck, COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED},
+        attempt_gateway::{
+            VerifiedComputeAttemptAdapterAckView, COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED,
+        },
         start_outbox::{
             canonical_start_no_start_proof_json_and_digest, ComputeStartNoStartProofEnvelope,
-            VerifiedComputeStartOutboxRemoteObservation, COMPUTE_NO_START_PROOF_LOCAL_NEVER_SENT,
-            COMPUTE_NO_START_PROOF_PREPARE_REJECTED, COMPUTE_NO_START_PROOF_REMOTE_NEVER_COMMITTED,
-            COMPUTE_OBSERVATION_PREPARE_RESPONSE, COMPUTE_OBSERVATION_RECONCILE_ATTESTATION,
-            COMPUTE_REMOTE_EXECUTION_REJECTED, COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START,
-            COMPUTE_REMOTE_TERMINALITY_FINAL, COMPUTE_START_NO_START_PROOF_SCHEMA,
-            COMPUTE_START_OUTBOX_CANONICALIZATION, COMPUTE_START_OUTBOX_DIGEST_ALGORITHM,
+            VerifiedComputeStartOutboxRemoteObservationView,
+            COMPUTE_NO_START_PROOF_LOCAL_NEVER_SENT, COMPUTE_NO_START_PROOF_PREPARE_REJECTED,
+            COMPUTE_NO_START_PROOF_REMOTE_NEVER_COMMITTED, COMPUTE_OBSERVATION_PREPARE_RESPONSE,
+            COMPUTE_OBSERVATION_RECONCILE_ATTESTATION, COMPUTE_REMOTE_EXECUTION_REJECTED,
+            COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START, COMPUTE_REMOTE_TERMINALITY_FINAL,
+            COMPUTE_START_NO_START_PROOF_SCHEMA, COMPUTE_START_OUTBOX_CANONICALIZATION,
+            COMPUTE_START_OUTBOX_DIGEST_ALGORITHM,
         },
     },
     store::new_id,
@@ -24,6 +27,12 @@ use super::super::{
     types::{NoStartProofSource, StartNoStartRecoveryReceipt, StartOutboxNoStartProofReceipt},
 };
 use super::{persist_proof_on, proof_by_command_on, proof_receipt};
+
+mod evidence;
+
+use evidence::{
+    exact_observation_on, final_reconcile_observation_id_on, rejected_observation_id_on,
+};
 
 #[derive(Clone, Copy)]
 enum DurableNoStartCause<'a> {
@@ -76,7 +85,16 @@ struct DurableObservationEvidence {
 
 pub(in crate::store) fn record_prepare_rejected_no_start_on(
     connection: &Connection,
-    verified: &VerifiedComputeAttemptAdapterAck,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+) -> Result<StartOutboxNoStartProofReceipt> {
+    let recorded_at = now_nanos();
+    record_prepare_rejected_no_start_at_on(connection, verified, &recorded_at)
+}
+
+pub(in crate::store) fn record_prepare_rejected_no_start_at_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeAttemptAdapterAckView,
+    recorded_at: &str,
 ) -> Result<StartOutboxNoStartProofReceipt> {
     let ack = verified.ack();
     let observation = verified.prepare_observation().envelope();
@@ -89,18 +107,28 @@ pub(in crate::store) fn record_prepare_rejected_no_start_on(
             && observation.terminality == COMPUTE_REMOTE_TERMINALITY_FINAL,
         "prepare-rejected proof requires the exact final authenticated rejection"
     );
-    derive_and_record_on(
+    derive_and_record_at_on(
         connection,
         DurableNoStartCause::PrepareRejected {
             command_id: &ack.command_id,
             observation_id: &observation.observation_id,
         },
+        recorded_at,
     )
 }
 
 pub(in crate::store::compute_attempt_start_outbox) fn record_remote_never_committed_no_start_on(
     connection: &Connection,
-    verified: &VerifiedComputeStartOutboxRemoteObservation,
+    verified: &dyn VerifiedComputeStartOutboxRemoteObservationView,
+) -> Result<Option<StartOutboxNoStartProofReceipt>> {
+    let recorded_at = now_nanos();
+    record_remote_never_committed_no_start_at_on(connection, verified, &recorded_at)
+}
+
+pub(in crate::store::compute_attempt_start_outbox) fn record_remote_never_committed_no_start_at_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeStartOutboxRemoteObservationView,
+    recorded_at: &str,
 ) -> Result<Option<StartOutboxNoStartProofReceipt>> {
     let observation = verified.envelope();
     if observation.observation_kind != COMPUTE_OBSERVATION_RECONCILE_ATTESTATION
@@ -115,12 +143,13 @@ pub(in crate::store::compute_attempt_start_outbox) fn record_remote_never_commit
             && observation.no_commit_tombstone_digest.is_some(),
         "remote-never-committed proof requires a final observed tombstone"
     );
-    derive_and_record_on(
+    derive_and_record_at_on(
         connection,
         DurableNoStartCause::RemoteNeverCommitted {
             command_id: &observation.command_id,
             observation_id: &observation.observation_id,
         },
+        recorded_at,
     )
     .map(Some)
 }
@@ -342,121 +371,6 @@ fn abandon_local_never_sent_on(
         "local-never-sent abandonment lost its exact CAS"
     );
     Ok(())
-}
-
-fn exact_observation_on(
-    connection: &Connection,
-    source: &NoStartProofSource,
-    observation_id: &str,
-    proof_kind: &str,
-) -> Result<DurableObservationEvidence> {
-    let row = match proof_kind {
-        COMPUTE_NO_START_PROOF_PREPARE_REJECTED => connection
-            .query_row(
-                "SELECT observation.observation_id, observation.observation_digest,
-                        observation.no_commit_tombstone_id,
-                        observation.no_commit_tombstone_digest, ack.created_at
-                   FROM compute_attempt_start_remote_observations observation
-                   JOIN compute_attempt_dispatch_acks ack
-                     ON ack.command_id=observation.command_id
-                  WHERE observation.observation_id=?1 AND observation.command_id=?2
-                    AND observation.outbox_id=?3
-                    AND observation.observation_kind='prepare_response'
-                    AND observation.response_outcome='rejected'
-                    AND observation.remote_execution_state='rejected'
-                    AND observation.terminality='final'
-                    AND ack.outcome='rejected' AND ack.disposition='rejected'
-                    AND ack.adapter_ack_id=observation.adapter_observation_id",
-                params![observation_id, source.command_id, source.outbox_id],
-                evidence_row,
-            )
-            .optional()?,
-        COMPUTE_NO_START_PROOF_REMOTE_NEVER_COMMITTED => connection
-            .query_row(
-                "SELECT observation.observation_id, observation.observation_digest,
-                        observation.no_commit_tombstone_id,
-                        observation.no_commit_tombstone_digest, observation.recorded_at
-                   FROM compute_attempt_start_remote_observations observation
-                   JOIN compute_attempt_start_outbox reconcile
-                     ON reconcile.outbox_id=observation.outbox_id
-                   JOIN compute_attempt_start_outbox cancel
-                     ON cancel.outbox_id=reconcile.subject_outbox_id
-                  WHERE observation.observation_id=?1 AND observation.command_id=?2
-                    AND observation.observation_kind='reconcile_attestation'
-                    AND observation.response_outcome='observed'
-                    AND observation.remote_execution_state='terminal_no_start'
-                    AND observation.terminality='final'
-                    AND observation.no_commit_tombstone_id IS NOT NULL
-                    AND observation.no_commit_tombstone_digest IS NOT NULL
-                    AND reconcile.operation_kind='reconcile'
-                    AND reconcile.state='delivery_observed'
-                    AND reconcile.outbox_digest=observation.outbox_digest
-                    AND reconcile.command_digest=observation.command_digest
-                    AND cancel.operation_kind='cancel'
-                    AND cancel.state='delivery_observed'
-                    AND cancel.subject_outbox_id=?3
-                    AND cancel.ack_id IS reconcile.ack_id
-                    AND cancel.ack_digest IS reconcile.ack_digest",
-                params![observation_id, source.command_id, source.outbox_id],
-                evidence_row,
-            )
-            .optional()?,
-        _ => bail!("unsupported observation-backed no-start proof"),
-    };
-    row.ok_or_else(|| anyhow!("no-start derivation lacks exact authenticated observation"))
-}
-
-fn evidence_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DurableObservationEvidence> {
-    Ok(DurableObservationEvidence {
-        observation_id: row.get(0)?,
-        observation_digest: row.get(1)?,
-        no_commit_tombstone_id: row.get(2)?,
-        no_commit_tombstone_digest: row.get(3)?,
-        proven_at: row.get(4)?,
-    })
-}
-
-fn rejected_observation_id_on(connection: &Connection, command_id: &str) -> Result<Option<String>> {
-    connection
-        .query_row(
-            "SELECT observation.observation_id
-               FROM compute_attempt_start_remote_observations observation
-               JOIN compute_attempt_dispatch_acks ack
-                 ON ack.command_id=observation.command_id
-              WHERE observation.command_id=?1
-                AND observation.observation_kind='prepare_response'
-                AND observation.response_outcome='rejected'
-                AND observation.remote_execution_state='rejected'
-                AND observation.terminality='final'
-                AND ack.outcome='rejected' AND ack.disposition='rejected'
-                AND ack.adapter_ack_id=observation.adapter_observation_id",
-            params![command_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(Into::into)
-}
-
-fn final_reconcile_observation_id_on(
-    connection: &Connection,
-    command_id: &str,
-) -> Result<Option<String>> {
-    connection
-        .query_row(
-            "SELECT observation.observation_id
-               FROM compute_attempt_start_remote_observations observation
-              WHERE observation.command_id=?1
-                AND observation.observation_kind='reconcile_attestation'
-                AND observation.response_outcome='observed'
-                AND observation.remote_execution_state='terminal_no_start'
-                AND observation.terminality='final'
-                AND observation.no_commit_tombstone_id IS NOT NULL
-                AND observation.no_commit_tombstone_digest IS NOT NULL",
-            params![command_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(Into::into)
 }
 
 fn ensure_cause_matches(

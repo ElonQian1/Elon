@@ -22,6 +22,48 @@ use super::super::{
     types::StoredExternalPoolAdapterProviderActiveSuccessor,
 };
 
+pub(in crate::store) fn external_pool_adapter_provider_active_successor_refresh_needed_on(
+    transaction: &Transaction<'_>,
+    provider_binding_id: &str,
+    activation_root_digest: &str,
+    runtime: &ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
+    checked_at: &str,
+) -> Result<bool> {
+    let stored =
+        head_by_binding_and_root_on(transaction, provider_binding_id, activation_root_digest)?
+            .ok_or_else(|| {
+                anyhow::anyhow!("V274 refresh decision lacks durable genesis history")
+            })?;
+    if revocation_by_target_on(transaction, &stored.receipt.active_successor_receipt_id)?.is_some()
+    {
+        bail!("V274 durable head is revoked and cannot be refreshed");
+    }
+    let successor = &stored.receipt.successor;
+    if successor.evidence_checked_at.as_str() > checked_at {
+        bail!("V274 durable head postdates the refresh decision anchor");
+    }
+    if checked_at
+        >= successor
+            .runtime_observation
+            .observation_expires_at
+            .as_str()
+    {
+        return Ok(true);
+    }
+    Ok(
+        !runtime.attests_committed_provider_active_successor_process_seal(
+            PROVIDER_ACTIVE_SUCCESSOR_RECEIPT_PROCESS_KIND,
+            &stored.receipt.active_successor_receipt_id,
+            &stored.receipt.receipt_digest,
+            &stored.process_custody.process_custody_epoch_digest,
+            &stored.process_custody.process_custody_nonce_digest,
+            &stored.process_custody.process_custody_seal_digest,
+            &stored.receipt_integrity_digest,
+            &successor.runtime_observation.observation_expires_at,
+        )?,
+    )
+}
+
 /// Transaction-bound current head. It retains fresh projected-active V272 (and its layer-two
 /// carrier) plus the committed process seal; neither a diagnostic view nor an old row constructs it.
 pub(in crate::store) struct CurrentExternalPoolAdapterProviderActiveSuccessorAuthority<'tx, 'conn> {

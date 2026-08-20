@@ -106,7 +106,10 @@ fn task_protocol_production_store_audits_every_durable_column_in_order() {
 #[test]
 fn task_protocol_production_store_recovers_only_exact_poll_claim_projection() {
     assert!(STORE_ROOT.contains("mod compute_external_pool_adapter_task_delivery;"));
-    assert!(!STORE_ROOT.contains("use compute_external_pool_adapter_task_delivery::"));
+    assert!(STORE_ROOT.contains(
+        "pub(crate) use compute_external_pool_adapter_task_delivery::register_external_pool_adapter_task_reachability_pending_plan_function;"
+    ));
+    assert!(!STORE_ROOT.contains("compute_external_pool_adapter_task_delivery::*"));
     assert_ordered(
         STORE,
         &[

@@ -2,11 +2,13 @@ use anyhow::{bail, ensure, Result};
 use rusqlite::{params, Connection};
 
 use crate::store::compute_attempt_dispatches::PreparedApplication;
+use crate::store::compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority;
 
 use super::source::load_source_for_persist_on;
 use super::{
-    derive::derive_closure, readback, AcceptedStartCommitClosureReceipt,
-    AcceptedStartCommitFreshness, DerivedAcceptedCommitClosure,
+    derive::{derive_closure, derive_historical_closure},
+    historical_plan, readback, AcceptedStartCommitClosureReceipt, AcceptedStartCommitFreshness,
+    DerivedAcceptedCommitClosure,
 };
 
 pub(super) fn persist_on(
@@ -15,9 +17,52 @@ pub(super) fn persist_on(
     application: &PreparedApplication,
     closure_at: &str,
 ) -> Result<AcceptedStartCommitClosureReceipt> {
+    persist_with_mode(
+        connection,
+        command_id,
+        application,
+        closure_at,
+        PersistMode::Fresh,
+    )
+}
+
+pub(super) fn persist_historical_on(
+    connection: &Connection,
+    command_id: &str,
+    application: &PreparedApplication,
+    closure_at: &str,
+    authority: &HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<AcceptedStartCommitClosureReceipt> {
+    persist_with_mode(
+        connection,
+        command_id,
+        application,
+        closure_at,
+        PersistMode::HistoricalTerminal(authority),
+    )
+}
+
+#[derive(Clone, Copy)]
+enum PersistMode<'a, 'tx, 'conn> {
+    Fresh,
+    HistoricalTerminal(&'a HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'tx, 'conn>),
+}
+
+fn persist_with_mode(
+    connection: &Connection,
+    command_id: &str,
+    application: &PreparedApplication,
+    closure_at: &str,
+    mode: PersistMode<'_, '_, '_>,
+) -> Result<AcceptedStartCommitClosureReceipt> {
     if super::super::read::operation_by_command_kind_on(connection, command_id, "commit")?.is_some()
     {
-        let replayed = readback::audit_on(connection, command_id, true)?;
+        let replayed = match mode {
+            PersistMode::Fresh => readback::audit_on(connection, command_id, true)?,
+            PersistMode::HistoricalTerminal(authority) => {
+                readback::audit_historical_on(connection, command_id, true, authority)?
+            }
+        };
         let application_digest = &application.application_digest;
         ensure!(
             replayed.application_actor_receipt_id
@@ -30,19 +75,75 @@ pub(super) fn persist_on(
         );
         return Ok(replayed);
     }
-    match super::currentness::ensure_fresh_on(connection, command_id, closure_at)? {
+    let currentness = match mode {
+        PersistMode::Fresh => {
+            super::currentness::ensure_fresh_on(connection, command_id, closure_at)?
+        }
+        PersistMode::HistoricalTerminal(authority) => {
+            super::currentness::ensure_historical_on(connection, command_id, closure_at, authority)?
+        }
+    };
+    match currentness {
         AcceptedStartCommitFreshness::Current => {}
         AcceptedStartCommitFreshness::Quarantine { reason_code } => {
             bail!("accepted closure lost fresh currentness: {reason_code}")
         }
     }
     let source = load_source_for_persist_on(connection, command_id, application)?;
-    let expected = derive_closure(&source, closure_at)?;
+    let expected = match mode {
+        PersistMode::Fresh => derive_closure(&source, closure_at)?,
+        PersistMode::HistoricalTerminal(authority) => {
+            derive_historical_closure(&source, closure_at, authority.cleanup_expires_at())?
+        }
+    };
+    let pending = match mode {
+        PersistMode::Fresh => None,
+        PersistMode::HistoricalTerminal(_) => Some(historical_plan::install_on(
+            connection,
+            &expected,
+            application,
+            closure_at,
+        )?),
+    };
     persist_actor_on(connection, &expected)?;
     persist_authority_on(connection, &expected)?;
     persist_commit_on(connection, &expected, closure_at)?;
+    persist_application_on(connection, application, closure_at)?;
+    if let Some(pending) = pending {
+        pending.ensure_fully_consumed()?;
+    }
     readback::audit_expected_rows_on(connection, &expected)?;
     Ok(expected.receipt(false))
+}
+
+fn persist_application_on(
+    connection: &Connection,
+    application: &PreparedApplication,
+    created_at: &str,
+) -> Result<()> {
+    let envelope = application.envelope();
+    let changed = connection.execute(
+        "INSERT INTO compute_attempt_dispatch_applications (
+            application_id, command_id, ack_id, action, lease_id,
+            activation_request_digest, lease_digest, application_json,
+            application_digest, applied_at, created_at
+         ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+        params![
+            envelope.application_id,
+            envelope.command_id,
+            envelope.ack_id,
+            envelope.action,
+            envelope.lease_id,
+            envelope.activation_request_digest,
+            envelope.lease_digest,
+            application.application_json,
+            application.application_digest,
+            envelope.applied_at,
+            created_at,
+        ],
+    )?;
+    ensure!(changed == 1, "accepted application insert was not exact");
+    Ok(())
 }
 
 fn persist_actor_on(

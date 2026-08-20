@@ -10,6 +10,7 @@ mod reproof;
 pub(in crate::store) use active::{
     planned_external_pool_adapter_active_no_work_probe_subject_on,
     with_reproved_planned_external_pool_adapter_active_no_work_subject,
+    CurrentExternalPoolAdapterProjectedActiveNoWorkObservationAuthority,
     PlannedExternalPoolAdapterActiveNoWorkProbeSubject,
     ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject,
 };

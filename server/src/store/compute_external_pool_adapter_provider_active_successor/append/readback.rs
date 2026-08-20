@@ -14,12 +14,15 @@ use super::material::PendingExternalPoolAdapterProviderActiveSuccessorAppend;
 
 /// Process-authorized durable receipt. Construction requires postcommit exact readback followed by
 /// successful promotion of the exact pending purpose seal.
-pub(in crate::store::compute_external_pool_adapter_provider_active_successor) struct CommittedExternalPoolAdapterProviderActiveSuccessorAppend
-{
+pub(in crate::store) struct CommittedExternalPoolAdapterProviderActiveSuccessorAppend {
     receipt: ExternalPoolAdapterProviderActiveSuccessorReceipt,
 }
 
 impl CommittedExternalPoolAdapterProviderActiveSuccessorAppend {
+    pub(super) fn new(receipt: ExternalPoolAdapterProviderActiveSuccessorReceipt) -> Self {
+        Self { receipt }
+    }
+
     pub(super) fn receipt(&self) -> &ExternalPoolAdapterProviderActiveSuccessorReceipt {
         &self.receipt
     }
@@ -76,7 +79,7 @@ pub(in crate::store::compute_external_pool_adapter_provider_active_successor) fn
     })
 }
 
-fn require_exact_readback_on(
+pub(super) fn require_exact_readback_on(
     connection: &Connection,
     pending: &PendingExternalPoolAdapterProviderActiveSuccessorAppend<'_>,
 ) -> Result<()> {

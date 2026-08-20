@@ -106,6 +106,9 @@ caller token、临时DROP trigger或#2 active INSERT放行都是P0。
 append只接受独立V274 pending purpose-seal UDF。二者绑定同root/witness/dual time但互不替代；交叉代用、只注册一份
 authority或任一direct-SQL路径均失败且零写入。
 
+V278替换矩阵必须另证：#8-#12同名trigger显式V277-then-V278，#1/#5-#7仍V277-only，#2-#4/#13-#18
+absolute deny；不得依赖`OR`求值顺序、双消费plan或把V278扩到Provider/projection/market writes。
+
 ## 6. 原子事务与 fault matrix
 
 时序必须逐步证明：external observation完成时只有non-authorizing evidence；final`BEGIN IMMEDIATE`取得writer lock后
@@ -147,11 +150,17 @@ exchange-attempt、send-attempt、network、ACK/event或outbox claim。
 current V274 wrapper，都应在源码/运行矩阵失败。V271 logical digest只可作为lineage。cleanup只能清除进程内pending
 plan/seal；不得删除activation历史或既有authenticated attempt事实。
 
+V278 historical recovery必须exact引用V277 receipt/root与V274 sequence-1历史pair，不要求current V274/V268/V272，
+且只能进入renew/cleanup；任何historical authority进入fresh dispatch为P0。Route current之后才可重取fresh
+V253/V268/V272、active preparation与V274 refresh。
+
 ## 8. V278 与绝对零效果
 
-V278才验收route renewal、worker reachability、per-attempt current reproof、V273正向ledger、ELTP send/ACK/event与
-`eligible_rows>0`。V277矩阵不得包含Pool/Offer/market fence permit、Job/Reservation/Attempt/Lease、usage、settlement、
-公网、生产Secret、部署、MCP/PC或production readiness。
+V278当前已写入route renewal/refresh/default-off worker/ingress private源码，严格
+`design_frozen/source_written/source_review_only/implementation_uncompiled/implementation_unrun/passed=0/failed=0`。
+V277 private kernel已由V278 default-off source显式串起，但#13-#18仍absolute deny，故normal Offer→Job→v213 source不可达且`eligible_rows=0`。真实ledger、
+ELTP/ACK、Lease/Runner与positive eligibility后移service-managed admission+Runner bridge；fixture/seed/direct SQL无效。
+V277矩阵不得包含Pool/Offer/market permit、usage、settlement、公网、生产Secret、部署、MCP/PC或production readiness。
 
 在compile、fresh/repeat/reopen migration、direct-SQL、restart、并发/crash、逐写点rollback与生产运行全部完成前，
 正式结论保持：`design_frozen / source_written / source_review_only / implementation_uncompiled /

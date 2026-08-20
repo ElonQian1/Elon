@@ -86,6 +86,7 @@ fn require_exact_genesis_sources(
     let runtime = &successor.runtime_observation;
     let task = &successor.task_protocol_evidence;
     let observation = no_work.observation();
+    let fresh_expires_at = task_protocol.fresh_expires_at_for(no_work)?;
     let planned = no_work.preflight();
     let final_target = planned.target();
     let final_target_json = serde_json::to_string(final_target)?;
@@ -141,7 +142,7 @@ fn require_exact_genesis_sources(
         || runtime.observation_expires_at != renewable.observation_expires_at
         || runtime.observation_started_at != observation.probe_checked_at()
         || runtime.observation_completed_at != observation.checked_at()
-        || runtime.observation_expires_at != observation.expires_at()
+        || runtime.observation_expires_at != fresh_expires_at
         || task.task_protocol_conformance_run_receipt_id != task_protocol.receipt().run_receipt_id
         || task.task_protocol_conformance_run_receipt_digest
             != task_protocol.receipt().run_receipt_digest

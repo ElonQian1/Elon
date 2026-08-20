@@ -10,8 +10,13 @@ use super::types::StartOutboxNoStartProofReceipt;
 mod derive;
 mod finish_gate;
 
-pub(in crate::store) use derive::record_prepare_rejected_no_start_on;
-pub(super) use derive::{record_remote_never_committed_no_start_on, recover_no_start_on};
+pub(in crate::store) use derive::{
+    record_prepare_rejected_no_start_at_on, record_prepare_rejected_no_start_on,
+};
+pub(super) use derive::{
+    record_remote_never_committed_no_start_at_on, record_remote_never_committed_no_start_on,
+    recover_no_start_on,
+};
 pub(in crate::store) use finish_gate::{
     ensure_start_resolved_for_broker_finish_on, BrokerFinishStartUnresolved,
 };

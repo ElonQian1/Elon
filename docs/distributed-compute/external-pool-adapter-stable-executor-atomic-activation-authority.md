@@ -249,6 +249,10 @@ connection、wrong row、部分 replay、manual UDF 注册或 direct SQL 都不�
 pending purpose-seal UDF覆盖。两份process authority exact绑定同root/witness/dual time但互不替代；绕开kernel、用V277
 plan授权V274或用V274 seal授权九类业务写的direct SQL永远失败。
 
+V278只对这份inventory做窄替换：#8-#12的同名trigger以显式`CASE`先匹配V277、未命中才匹配V278 route-renewal
+plan；#1/#5-#7继续V277-only；#2-#4/#13-#18继续absolute deny且不调用V278。故V277历史描述仍是9/9，V278
+运行合同则是5项dual-plan、4项V277-only、9项absolute deny；不得用SQL布尔求值顺序双消费plan。
+
 ## 8. Final atomic transaction
 
 流程 exact 分五步：
@@ -288,9 +292,10 @@ carrier、live Provider/root reproof与process custody。V277历史receipt不能
 V274 seal、epoch、HMAC及currentness全部失效；V277必须允许从durable V277 witness+historical root+live projected-active
 Provider出发，重新取得fresh observation/carrier并append V274 successor，而不能要求旧 V274 receipt仍current。
 
-V277 只复用仍 live/current 的 exact genesis route；它不续签、替换或重建过期/撤销 route。route renewal、worker
-reachability及重新接通 V273 `eligible_rows` 全部属于 V278。若 restart 时 route 已不 current，V277路径失败关闭并等待
-V278；不得用永久 activation receipt 续命。
+V277只复用仍live/current的exact genesis route；它不续签、替换或重建过期/撤销route。V278 renewal从durable V277
+witness/historical activation root、live projected-active Provider与exact V274 sequence-1 genesis历史pair重建
+historical-route recovery authority，再取fresh V253并续签；它不要求current V274/V268/V272，也绝不能让historical型
+dispatch。若restart时route不current，V277路径失败并等待V278；不得用永久activation receipt续命。
 
 ## 10. 无 activation revocation 与 cleanup
 
@@ -302,11 +307,18 @@ authorization撤销、capability/seal失效或V274过期/撤销会阻止future w
 authenticated Attempt、ACK/event、no-start/reconcile/settlement cleanup继续由各自immutable root决定，不能因route或
 Provider停止而抹去，也不能从V277 receipt推断任务曾被派发。
 
-## 11. V278 reachability 与零经济效果
+## 11. V278 FORMAL boundary 与零经济效果
 
-V278 才负责 route renewal、per-candidate/per-attempt same-connection current reproof、V273 worker/ingress reachability、
-ELTP send/ACK/event与 `eligible_rows>0` 的正向动态验收。V277 不开放 HTTP/MCP/WebSocket/PC入口，不读取生产Secret，
-不启动 child/network，不领取 outbox，也不创建 Pool/Offer/Job/Reservation/Attempt/Lease/usage/market/settlement。
+V278已按冻结合同写入一张77列immutable renewal receipt表、0 view/0 revocation、四UDF、renewal 11 INSERT+1 CAS、
+outbound 2 INSERT+1 CAS及default-off private source接线；当前严格`source_written/source_review_only/
+implementation_uncompiled/implementation_unrun`、`passed=0/failed=0`。
+顺序为V253 recovery→route renewal/current route→fresh V253/V268/V272→active preparation→V274 refresh/promote→
+same-time route+V274→V273。V277 private kernel已由V278 default-off source显式串起且未开放public API；production
+validator/Runner与admitted Offer→Job caller仍不存在。
+
+V254 #13-#18仍absolute deny，因此normal Offer→Job→v213 producer本批不可达，V278也必须保持`eligible_rows=0`；
+`eligible_rows>0`、真实ELTP/ACK、Lease/Runner后移独立service-managed admission+Runner bridge。V277/V278均不创建
+Pool/Offer/Job/Reservation/Attempt/Lease/usage/market/settlement经济效果，fixture/seed/direct SQL不算正向证据。
 
 正式状态为 `design_frozen / source_written / source_review_only / implementation_uncompiled / implementation_unrun`，
 `passed=0 / failed=0`。planned genesis 的真实 no-work I/O 调用链与原子闭包已在源码连接，但没有执行；durable

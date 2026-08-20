@@ -28,6 +28,7 @@ mod compute_external_pool_adapter_provider_runtime_readiness;
 mod compute_external_pool_adapter_registry;
 mod compute_external_pool_adapter_release;
 mod compute_external_pool_adapter_release_lifecycle;
+mod compute_external_pool_adapter_route_renewal;
 mod compute_external_pool_adapter_route_source_projection;
 mod compute_external_pool_adapter_runtime_compatibility_verification;
 mod compute_external_pool_adapter_runtime_launch_profile;
@@ -63,23 +64,19 @@ pub(crate) fn register_v259_receipt_integrity_functions(conn: &Connection) -> Re
         conn,
     )
 }
-
 pub(crate) fn register_v268_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_runtime_compatibility_verification::register_receipt_integrity_functions(conn)
 }
-
 pub(crate) fn register_v270_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_provider_runtime_readiness::register_receipt_integrity_functions(
         conn,
     )
 }
-
 pub(crate) fn register_v272_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_task_protocol_conformance::register_receipt_integrity_functions(
         conn,
     )
 }
-
 pub(crate) fn register_v273_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_task_delivery::register_receipt_integrity_functions(conn)
 }
@@ -92,6 +89,10 @@ pub(crate) fn register_v274_receipt_integrity_functions(conn: &Connection) -> Re
 
 pub(crate) fn register_v277_receipt_integrity_functions(conn: &Connection) -> Result<()> {
     compute_external_pool_adapter_atomic_activation::register_receipt_integrity_functions(conn)
+}
+
+pub(crate) fn register_v278_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_route_renewal::register_receipt_integrity_functions(conn)
 }
 
 #[rustfmt::skip]
@@ -377,6 +378,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (275, "Rust 缓存 Fleet 脱敏报告有界历史", rust_cache_fleet::migration_v275),
     (276, "Rust 缓存 GC 摘要绑定审批与节点执行状态机", rust_cache_gc_approval::migration_v276),
     (277, "外部矿池 Adapter stable executor 与原子激活历史回执", compute_external_pool_adapter_atomic_activation::migration_v277),
+    (278, "外部矿池 Adapter immutable route renewal authority", compute_external_pool_adapter_route_renewal::migration_v278),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
@@ -405,8 +407,6 @@ pub(crate) fn migration_v107(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
-
-// ── 内部工具 ───────────────────────────────────────────────────────────────────
 
 pub(crate) fn add_column_if_missing(
     conn: &Connection,

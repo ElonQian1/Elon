@@ -9,6 +9,7 @@ use super::{
     execution::{ComputeJobVersionBinding, ComputeOfferBinding},
     start_outbox::{
         ValidatedComputeStartOutboxOperation, VerifiedComputeStartOutboxRemoteObservation,
+        VerifiedComputeStartOutboxRemoteObservationView,
     },
 };
 
@@ -211,6 +212,27 @@ impl VerifiedComputeAttemptAdapterAck {
 
     pub(crate) fn prepare_observation(&self) -> &VerifiedComputeStartOutboxRemoteObservation {
         &self.prepare_observation
+    }
+}
+
+/// Read-only semantic view shared by legacy Adapter verification and the V278 HostReceipt bridge.
+pub(crate) trait VerifiedComputeAttemptAdapterAckView {
+    fn adapter(&self) -> &ComputeAttemptAdapterBinding;
+    fn ack(&self) -> &ComputeAttemptAdapterAckEnvelope;
+    fn prepare_observation(&self) -> &dyn VerifiedComputeStartOutboxRemoteObservationView;
+}
+
+impl VerifiedComputeAttemptAdapterAckView for VerifiedComputeAttemptAdapterAck {
+    fn adapter(&self) -> &ComputeAttemptAdapterBinding {
+        self.adapter()
+    }
+
+    fn ack(&self) -> &ComputeAttemptAdapterAckEnvelope {
+        self.ack()
+    }
+
+    fn prepare_observation(&self) -> &dyn VerifiedComputeStartOutboxRemoteObservationView {
+        self.prepare_observation()
     }
 }
 

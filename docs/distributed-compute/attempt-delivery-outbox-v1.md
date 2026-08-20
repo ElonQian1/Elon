@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Delivery Outbox V1
 status: current
-reviewed_at: 2026-08-15
+reviewed_at: 2026-08-20
 owners: backend, node, ai-economy
 implementation_status: implementation_unwired
 ---
@@ -119,20 +119,30 @@ v221 源码已让 `external_pool_onboarding` 精确引用专用 application，�
 
 V273 default-off dormant production transport/ingress已通过完整WSL2 GNU目标编译与21/21源码/迁移合同，但production
 runtime仍`passed=0/failed=0`。它只消费已耐久化的v213 outbox/route/executor/fence，不提供v213 constructor；首个
-v213 send-attempt与V273 exchange-attempt仍须同一transaction/commit后才可出网。
+v213 send-attempt、V273 exchange-attempt与outbox claimed→unknown CAS须同一transaction/commit后才可出网。
 
-V277 docs-first冻结stable executor与Provider/route原子激活：exact `16 INSERT + 1 CAS UPDATE`同时闭合active
-Provider、v213 route、V277 historical receipt及V274 genesis；V277 receipt永不单独current，V254矩阵只把#1/#5-#12
-九项改为pending-plan permit，#2-#4/#13-#18九项继续absolute deny。该设计尚未实现/编译/运行，当前Provider仍
-`registering`、route/executor不存在、`eligible_rows=0`。即使V277成功，仍不允许网络发送；V278才负责route renewal、
-per-attempt current reproof与production reachability。见
+V277 private source已冻结stable executor与`16 INSERT + 1 CAS UPDATE`原子激活，但未编译/运行且没有production caller。
+V278已按冻结合同写入historical/current/runtime route分型、一张77列immutable renewal表、四UDF与default-off private接线：
+route renewal exact `11 INSERT + 1 credential-root CAS`；V254仅#8-#12接受V277或V278，#1/#5-#7仍V277-only，
+#2-#4/#13-#18 absolute deny。Route renewal不要求current V274/V268/V272；之后才fresh V253/V268/V272、active
+preparation、V274 refresh/promote并形成same-time runtime carrier。
+
+Start-outbox-sourced outbound每次同一transaction只允许INSERT既有send-attempt、INSERT V273 exchange-attempt与CAS outbox
+`claimed→in_flight_unknown`（revision/attempt+1），即`2 INSERT + 1 CAS`；commit后才出网。V273仍exact六表、无第七表。
+首次direct reconcile只能在send durable后建ordinal 1。Terminal ingress同事务append authenticated V273 receipt并接
+既有v211 ACK/v185 activation/v215 closure。旧sent route只走historical cleanup authority，不因rotation改写。
+
+当前V278严格`design_frozen/source_written/source_review_only/implementation_uncompiled/implementation_unrun`、0/0；#13-#18关闭使normal Offer→Job→v213 source
+不可达，Provider=`registering`、`eligible_rows=0`。真实ACK/Lease/Runner后移service-managed admission+Runner bridge。见
 [`V273 authority`](external-pool-adapter-task-protocol-production-authority.md)与
-[`V277 authority`](external-pool-adapter-stable-executor-atomic-activation-authority.md)。
+[`V277 authority`](external-pool-adapter-stable-executor-atomic-activation-authority.md)、
+[`V278 authority`](external-pool-adapter-route-renewal-reachability-authority.md)。
 
 ## 11. 仍未实现
 
 - Adapter resolver、真实 credential verifier/KMS 与 bearer 解析；
-- user-node、managed-cluster transport/worker，以及 external-pool V273 dormant kernel 的动态验证与 V278 production reachability；
+- user-node、managed-cluster transport/worker，以及external-pool V278源码、V273 dormant kernel动态验证；
+- service-managed external-pool admission+Runner bridge及真实positive eligible/ELTP/ACK/Lease/Runner；
 - authenticated ACK/event 公网入口、reconcile/cancel 网络协议与 crash injection；
 - accepted closure 的可信生产入口、commit transport 与 Lease authority 带外交付；
 - Lease authority 带外交付、Runner event、Renew 与可信零用量补偿；

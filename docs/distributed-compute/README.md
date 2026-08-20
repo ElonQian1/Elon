@@ -66,7 +66,7 @@ owners: backend, node, ai-economy
 | Provider 提款申请与内部冻结 | v200 把 Provider 本人 CNY available 原子转入 withdrawn；与 v201 共用 Store/Service 专项 `3 passed / 0 failed`，PC 静态构建通过。只冻结内部余额，不执行外部付款；真实 TCP、浏览器和生产库未验证。见 [`当前状态`](current-implementation-status.md) 与 [`v200 合同`](settlement-withdrawal-request-api.md) |
 | Provider 提款唯一终态 | v201 允许取消、拒绝或登记外部已付款声明；同组专项覆盖返还幂等、重开和声明零资金移动，PC 静态构建通过。它不发起或验证外部付款。见 [`当前状态`](current-implementation-status.md) 与 [`v201 合同`](settlement-withdrawal-terminal-api.md) |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户并读取全局队列。PC 本人收益与管理员结算页面已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。视图不提供平台提款、不移动资金 |
-| 外部算力池适配器与统一报价 | V273源码/迁移21/21但production runtime未运行。V274/V277 private源码已写入：V277 exact 1 immutable receipt table/0 view/0 revocation、V274→V277 immediate witness、16 INSERT+1 CAS UPDATE、V254 9 pending permits+9 absolute denies；当前均为`source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0`。无public Store orchestrator，planned genesis未运行，durable refresh失败关闭。Provider=`registering`、`eligible_rows=0`；V278才接route renewal/reachability。见[`V277`](external-pool-adapter-stable-executor-atomic-activation-authority.md)与[`当前状态`](current-implementation-status.md) |
+| 外部算力池适配器与统一报价 | V273源码/迁移21/21但production runtime未运行；V274/V277/V278 private源码均为`source_written/source_review_only/implementation_uncompiled/implementation_unrun`、0/0。V278含1张77列immutable renewal表/0 view/0 revocation、4 UDF、renewal 11 INSERT+1 CAS与outbound 2 INSERT+1 CAS。#13-#18仍deny，正常Offer→Job source不可达，Provider=`registering`、`eligible_rows=0`；sealed ingress无production validator/Runner caller，正向ACK/Lease/Runner后移service-managed admission+Runner bridge。见[`V278`](external-pool-adapter-route-renewal-reachability-authority.md)、[`V277`](external-pool-adapter-stable-executor-atomic-activation-authority.md)与[`当前状态`](current-implementation-status.md) |
 | 平台参考回退曲线、真实价格源与多源验证 | reference fallback 的四眼 batch→review→atomic application 已通过 v223/v224 Store、管理员 Service/HTTP/MCP、旧库升级与文件重开专项，限定 `fallback_curve/sample_count=0` 且直接复用 v171。PC、真实 TCP 和生产部署未验证；index/mark/trade、真实市场样本、多源验证和自动撮合仍未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
@@ -134,6 +134,7 @@ owners: backend, node, ai-economy
 45. `docs/distributed-compute/external-pool-adapter-task-protocol-production-authority.md` 与对应 acceptance：V273 默认关闭 dormant production transport/ingress、8项 production roots、ELTP wire复用、exact 6表、无公开 API与 `eligible_rows=0` 边界。
 46. `docs/distributed-compute/external-pool-adapter-provider-active-successor-authority.md` 与对应 acceptance：V274 stable activation root、exact projected-active Provider、2张immutable表+1个非权威view、renewable active evidence与V277前零行边界。
 47. `docs/distributed-compute/external-pool-adapter-stable-executor-atomic-activation-authority.md` 与对应 acceptance：V277 stable executor、双时间、1表/0view/0revocation、16+1原子闭包、9/9 fence与V278后置边界。
+48. `docs/distributed-compute/external-pool-adapter-route-renewal-reachability-authority.md` 与对应 acceptance：V278 historical/current/runtime分型、1张77列immutable表/0view/0revocation、四UDF、renewal 11+1、outbound 2+1与market fences关闭下`eligible_rows=0`边界。
 
 ## 分阶段落地
 

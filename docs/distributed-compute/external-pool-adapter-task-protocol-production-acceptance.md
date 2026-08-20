@@ -1,7 +1,7 @@
 ---
 title: 外部矿池 Adapter task-protocol production transport 验收
 status: current
-reviewed_at: 2026-08-16
+reviewed_at: 2026-08-20
 owners: backend, security, ai-economy
 implementation_status: implementation_partially_verified
 verification_status: targeted_local_source_contracts_and_migration_verified
@@ -42,15 +42,17 @@ targeted_local_source_contracts_and_migration_verified / production_runtime_unru
 - ELTP v1 kind/op、request/exchange domains、big-endian、reserved、ordinal、timeout、size与 exact-length合同原样
   复用；production exchange exact绑定 command/outbox/send-attempt/route/stable-executor/attempt-fence；
 - V254 deny-fence inventory只做独立负向审计，不得冒充 per-exchange Attempt/Lease fence；
-- worker只消费既有 v213 outbox；首个 v213 send-attempt与对应V273 exchange-attempt必须在同一
-  `BEGIN IMMEDIATE`/同一commit完成，之后才可出网；任何 transaction/connection/authority不跨 await；
+- worker只消费既有 v213 outbox；首个v213 send-attempt、V273 exchange-attempt与outbox
+  `claimed→in_flight_unknown` revision/attempt CAS必须同一`BEGIN IMMEDIATE`/同commit，之后才可出网；
+  exact为`2 INSERT + 1 CAS`，任何transaction/connection/authority不跨await；
   当前无 v213 constructor、stable executor或route时固定 `eligible_rows=0`；
 - durable schema exact只有 attempts、receipts、reconcile polls、event polls、batches、events六表；attempt/receipt/
   batch/event完全immutable，两个poll只有immutable intent+narrow CAS claim projection；没有第七张table/view、
   generic mutable head/queue、secret、signature、executor、route或public-ingress表；
 - receipt一对一关闭 attempt；reconcile只恢复 remote-unknown，event cursor/batch/event root连续，duplicate replay可
   证明，gap/fork/conflict失败关闭；
-- authenticated material只形成 Store-private V278 handoff，不开放 v211/v213/v215/Lease/Runner constructor；
+- authenticated material只形成Store-private V278 handoff；terminal ingress同事务append V273 receipt并调用既有
+  v211 ACK/v185 activation/v215 accepted closure，不开放public constructor或新增下游表；
 - 没有 HTTP、MCP、WebSocket、callback、owner/admin、`/api/me`、loopback listener或通用上传 API；
 - Provider=`registering`、V254 18 deny逐字在位、打开 fence=`0`，所有 Provider/route/executor/activation/market/
   settlement effect=`none`。
@@ -86,16 +88,16 @@ targeted_local_source_contracts_and_migration_verified / production_runtime_unru
 | 验收面 | 必须证明 |
 |---|---|
 | fresh/repeat/reopen migration | **局部通过**：exact六张空表、零view、schema稳定、六个UDF畸形输入失败关闭、恢复入口 `eligible_rows=0`、V254 18 trigger SQL不变。PK/FK/UNIQUE正向行、projection/no-delete/no-replace、四表no-update、两poll narrow CAS与trigger语义仍待动态验证。 |
-| attempt-before-network | 首个v213 send-attempt与V273 exchange-attempt同一BEGIN IMMEDIATE、同commit；任一失败两者rollback，commit后才允许socket，无receipt一律remote-unknown。 |
+| attempt-before-network | 首个v213 send-attempt+V273 exchange-attempt+outbox CAS同一BEGIN IMMEDIATE、同commit；任一失败三者rollback，commit后才允许socket，无receipt一律remote-unknown。 |
 | receipt replay | exact replay返回同row；同attempt不同digest、第二receipt、不同session/nonce/ordinal拒绝。 |
-| reconcile | unknown prepare/commit只能reconcile，不盲重发；cancel ACK无tombstone时不形成no-start。 |
+| reconcile | unknown prepare/commit只能reconcile，不盲重发；首次direct source只能在send durable后建ordinal 1；cancel ACK无tombstone时不形成no-start。 |
 | event poll | poll→batch→events FK完整、cursor/root连续、事件唯一；单batch权威上限为256并由Domain、DDL与Store全量审计一致执行，257条及以上失败关闭；`empty` 零事件批保持cursor不变仍可完成poll；partial batch或冲突重开不能推进head；exact duplicate只exact readback既有 `new|empty` batch/event rows，不插第二批或再次推进cursor。 |
-| concurrency | poll claim以narrow revision/generation CAS选winner；send-attempt/exchange-attempt原子pair以UNIQUE只允许一个winner，loser只exact replay或重新读currentness。 |
+| concurrency | poll claim以narrow revision/generation CAS选winner；send/exchange/outbox原子triple只允许一个winner，loser只exact replay或重新读currentness。 |
 | crash/restart | DB commit/session custody gap、process restart、expired V270/V272均失败关闭；route/Adapter/V253/actor currentness漂移阻止新的prepare/commit，但已认证的同一历史根在cleanup horizon内仍可cancel/reconcile/event poll；历史行只保留审计且不授权新的send。 |
 | direct SQL | 伪造attempt/receipt/poll/batch/event、绕过source/root/currentness、删除历史、更新四张immutable表、修改poll intent或绕过narrow CAS claim projection全部被DDL拒绝。 |
 
-任何 positive fixture 都不得通过删除、关闭、缩窄或改名 V254 fence获得 external-pool route；V273 动态测试在
-V277/V278 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制造真实 production send。
+任何positive fixture都不得通过删除、关闭、缩窄或改名V254 fence获得external-pool route。V278也保持#13-#18
+absolute deny，因此本批动态只允许disabled/unavailable/`eligible_rows=0`，不能制造真实production send。
 
 ## 6. 不属于 V273 的验收
 
@@ -106,15 +108,15 @@ V277/V278 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制�
 - V274 stable activation root、exact projected-active Provider、最长15秒V270-equivalent observation、fresh V272
   carrier、两张immutable表+一个诊断view，及V277事务内首个successor；
 - V254 18-fence replacement、atomic Provider/route activation；
-- V278 worker/ingress到v213 ACK/observation/accepted closure/Lease/Runner event的production reachability；
+- V278 source-stage renewal/refresh/worker/ingress可完整接线，但#13-#18关闭下的真实eligible row、ACK、Lease、Runner
+  后移独立service-managed admission+Runner bridge；
 - Pool/Offer admission、usage、market、settlement、部署或跨进程可携带外签 authority。
 
 ## 7. 后继门与正式结论
 
-后继顺序固定为 V274 Store-private contract（V277前零行）→ V277 stable executor + exact projected-active
-Provider/route/18-fence atomic activation并append V274 genesis → V278 production reachability。V278 必须重新执行本页
-startup、root/wire、六表、crash/concurrency与 ingress矩阵；不能把 V273/V274 source review、V272 conformance passed
-或V277 migration success当作 transport已验收。
+后继顺序固定为V277+V274 sequence-1 historical base → V278 route renewal（不要求current V274/V268/V272）→
+current route → fresh V253/V268/V272+active preparation → dedicated V274 refresh/promote → same-time route+V274 →
+本页scoped transport。V278 source contract仍须重验本页矩阵；#13-#18关闭时不得声明真实transport passed。
 
 V273 当前只能声明“default-off dormant production transport/ingress kernel 合同已冻结，迁移边界已局部动态验证”。
 它不能声明 worker已运行、ACK/event已接入、Provider可激活或任务可派发。正式状态保持

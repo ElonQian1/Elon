@@ -15,6 +15,10 @@ mod types;
 mod validation;
 mod write;
 
+pub(in crate::store) use ack_write::{
+    ingest_verified_ack_at_on, ingest_verified_historical_external_pool_adapter_ack_at_on,
+    ComputeAttemptAdapterAckIngressTimes,
+};
 pub(crate) use types::{ComputeAttemptDispatchAckCommit, ComputeAttemptDispatchCommandReceipt};
 pub(in crate::store) use validation::PreparedApplication;
 

@@ -20,7 +20,8 @@ use crate::compute_federation::{
 };
 
 use super::{
-    read::{persist_prepare_operation_on, prepare_by_command_on},
+    prepare_write::persist_prepare_operation_on,
+    read::prepare_by_command_on,
     replay::{
         ensure_actor_receipt_replay_on, ensure_operation_replay_matches, persist_actor_receipt_on,
     },

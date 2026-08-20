@@ -3,7 +3,10 @@ use rusqlite::Connection;
 
 use crate::store::{
     compute_attempt_activations::compute_attempt_activation_on,
-    compute_attempt_start_outbox::audit_accepted_start_commit_closure_on,
+    compute_attempt_start_outbox::{
+        audit_accepted_start_commit_closure_on, audit_historical_accepted_start_commit_closure_on,
+    },
+    compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority,
     ComputeAttemptActivationReceipt,
 };
 
@@ -19,6 +22,7 @@ pub(super) fn replay_ack_commit(
     connection: &Connection,
     command: &StoredDispatchCommand,
     stored: StoredDispatchAck,
+    historical: Option<&HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>>,
 ) -> Result<ComputeAttemptDispatchAckCommit> {
     match stored.disposition.as_str() {
         "rejected" => Ok(ComputeAttemptDispatchAckCommit::Rejected {
@@ -52,8 +56,14 @@ pub(super) fn replay_ack_commit(
             if application.application_id != expected_application_id {
                 bail!("Accepted Adapter ACK application ID conflicts with its application");
             }
-            let accepted_closure =
-                audit_accepted_start_commit_closure_on(connection, &stored_ack.command_id)?;
+            let accepted_closure = match historical {
+                Some(authority) => audit_historical_accepted_start_commit_closure_on(
+                    connection,
+                    &stored_ack.command_id,
+                    authority,
+                )?,
+                None => audit_accepted_start_commit_closure_on(connection, &stored_ack.command_id)?,
+            };
             activation.replayed = true;
             activation.capacity_ledger.replayed = true;
             Ok(ComputeAttemptDispatchAckCommit::Activated {

@@ -6,7 +6,7 @@ use crate::compute_federation::start_outbox::{
     canonical_start_outbox_remote_observation_json_and_digest,
     canonical_start_outbox_send_attempt_json_and_digest,
     ComputeStartOutboxRemoteObservationEnvelope, ComputeStartOutboxSendAttemptEnvelope,
-    VerifiedComputeStartOutboxRemoteObservation, COMPUTE_OBSERVATION_CANCEL_RESPONSE,
+    VerifiedComputeStartOutboxRemoteObservationView, COMPUTE_OBSERVATION_CANCEL_RESPONSE,
     COMPUTE_OBSERVATION_RECONCILE_ATTESTATION, COMPUTE_OUTBOX_STATE_DELIVERY_OBSERVED,
     COMPUTE_OUTBOX_STATE_IN_FLIGHT_UNKNOWN, COMPUTE_REMOTE_EXECUTION_TERMINAL_NO_START,
     COMPUTE_REMOTE_TERMINALITY_FINAL,
@@ -14,24 +14,43 @@ use crate::compute_federation::start_outbox::{
 
 use super::{
     cleanup::unlock_reconcile_after_cancel_on,
-    no_start::record_remote_never_committed_no_start_on,
+    no_start::record_remote_never_committed_no_start_at_on,
     read::outbox_by_id_on,
     types::{StartOutboxObservationReceipt, StoredVerifiedObservation},
 };
 
 pub(in crate::store) fn record_verified_observation_on(
     connection: &Connection,
-    verified: &VerifiedComputeStartOutboxRemoteObservation,
+    verified: &dyn VerifiedComputeStartOutboxRemoteObservationView,
+) -> Result<StartOutboxObservationReceipt> {
+    record_verified_observation_with_time_on(connection, verified, None)
+}
+
+pub(in crate::store) fn record_verified_observation_at_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeStartOutboxRemoteObservationView,
+    transitioned_at: &str,
+) -> Result<StartOutboxObservationReceipt> {
+    record_verified_observation_with_time_on(connection, verified, Some(transitioned_at))
+}
+
+fn record_verified_observation_with_time_on(
+    connection: &Connection,
+    verified: &dyn VerifiedComputeStartOutboxRemoteObservationView,
+    supplied_transitioned_at: Option<&str>,
 ) -> Result<StartOutboxObservationReceipt> {
     let envelope = verified.envelope();
-    let send = verified.send_attempt().envelope();
+    let send = verified.send_attempt_envelope();
     ensure_observation_shape(connection, envelope, send)?;
     if let Some(stored) = observation_replay_on(connection, envelope)? {
         ensure!(
             stored.envelope == *envelope,
             "authenticated Start observation conflicts with immutable replay"
         );
-        apply_observation_effects_on(connection, verified)?;
+        let effects_recorded_at = supplied_transitioned_at
+            .map(str::to_string)
+            .unwrap_or_else(now_nanos);
+        apply_observation_effects_at_on(connection, verified, &effects_recorded_at)?;
         return Ok(receipt(envelope, true));
     }
     let (json, digest) = canonical_start_outbox_remote_observation_json_and_digest(envelope)?;
@@ -96,7 +115,19 @@ pub(in crate::store) fn record_verified_observation_on(
         before.projection.state == COMPUTE_OUTBOX_STATE_IN_FLIGHT_UNKNOWN,
         "fresh Start observation does not follow unknown delivery"
     );
-    let transitioned_at = next_store_time_after(&before.projection.updated_at)?;
+    let transitioned_at = match supplied_transitioned_at {
+        Some(value) => {
+            let parsed = DateTime::parse_from_rfc3339(value)?;
+            ensure!(
+                parsed.offset().local_minus_utc() == 0
+                    && parsed.to_rfc3339_opts(SecondsFormat::Nanos, true) == value
+                    && before.projection.updated_at.as_str() < value,
+                "explicit Start observation transition time is not current UTC nanoseconds"
+            );
+            value.to_string()
+        }
+        None => next_store_time_after(&before.projection.updated_at)?,
+    };
     ensure!(
         envelope.recorded_at.as_str() <= transitioned_at.as_str(),
         "authenticated Start observation is recorded after Store ingestion"
@@ -104,10 +135,20 @@ pub(in crate::store) fn record_verified_observation_on(
     // A reconcile poll may report a durable but non-terminal state. Preserve that evidence
     // without consuming the one-shot reconcile operation so a later final attestation from the
     // same send-attempt can still close the recovery chain.
+    let receipt_verified_accepted_prepare_reconcile = envelope.operation_kind == "prepare"
+        && envelope.observation_kind == COMPUTE_OBSERVATION_RECONCILE_ATTESTATION
+        && envelope.verification_kind == "external_pool_adapter_task_receipt.v1"
+        && envelope.response_outcome == "accepted"
+        && matches!(
+            envelope.remote_execution_state.as_str(),
+            "prepared" | "committed" | "running"
+        )
+        && envelope.terminality != COMPUTE_REMOTE_TERMINALITY_FINAL;
     if envelope.observation_kind == COMPUTE_OBSERVATION_RECONCILE_ATTESTATION
         && envelope.terminality != COMPUTE_REMOTE_TERMINALITY_FINAL
+        && !receipt_verified_accepted_prepare_reconcile
     {
-        apply_observation_effects_on(connection, verified)?;
+        apply_observation_effects_at_on(connection, verified, &transitioned_at)?;
         return Ok(receipt(envelope, false));
     }
     let changed = connection.execute(
@@ -142,7 +183,7 @@ pub(in crate::store) fn record_verified_observation_on(
             && after.projection.claim_expires_at.is_none(),
         "Start observation durable readback failed exact audit"
     );
-    apply_observation_effects_on(connection, verified)?;
+    apply_observation_effects_at_on(connection, verified, &transitioned_at)?;
     Ok(receipt(envelope, false))
 }
 
@@ -213,15 +254,16 @@ fn ensure_observation_shape(
     Ok(())
 }
 
-fn apply_observation_effects_on(
+fn apply_observation_effects_at_on(
     connection: &Connection,
-    verified: &VerifiedComputeStartOutboxRemoteObservation,
+    verified: &dyn VerifiedComputeStartOutboxRemoteObservationView,
+    recorded_at: &str,
 ) -> Result<()> {
     let envelope = verified.envelope();
     if envelope.observation_kind == COMPUTE_OBSERVATION_CANCEL_RESPONSE {
         unlock_reconcile_after_cancel_on(connection, envelope)?;
     }
-    let _ = record_remote_never_committed_no_start_on(connection, verified)?;
+    let _ = record_remote_never_committed_no_start_at_on(connection, verified, recorded_at)?;
     Ok(())
 }
 
@@ -281,4 +323,8 @@ fn receipt(
 fn next_store_time_after(value: &str) -> Result<String> {
     let floor = DateTime::parse_from_rfc3339(value)?.with_timezone(&Utc) + Duration::nanoseconds(1);
     Ok(std::cmp::max(Utc::now(), floor).to_rfc3339_opts(SecondsFormat::Nanos, true))
+}
+
+fn now_nanos() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
 }

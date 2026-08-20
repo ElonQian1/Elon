@@ -4,14 +4,12 @@ use anyhow::{bail, Result};
 use rusqlite::Transaction;
 
 use crate::store::{
-    compute_external_pool_adapter_provider_active_successor::{
-        CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority,
-        PreparedExternalPoolAdapterProviderActiveSuccessorTarget,
-    },
+    compute_external_pool_adapter_provider_active_successor::PreparedExternalPoolAdapterProviderActiveSuccessorTarget,
     compute_external_pool_adapter_runtime_bundle::{
         CurrentExternalPoolAdapterNoWorkProbeObservationAuthority,
         ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     },
+    compute_external_pool_adapter_task_protocol_conformance::CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority,
     compute_external_pool_adapter_upstream_transport_target::ExternalPoolAdapterInstallationReopener,
     Store,
 };
@@ -128,14 +126,18 @@ impl Store {
 }
 
 pub(super) fn durable_external_pool_adapter_active_no_work_probe_subject_on(
-    carrier: &CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<'_, '_>,
+    task_protocol: &CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority<'_, '_>,
 ) -> Result<DurableExternalPoolAdapterActiveNoWorkProbeSubject> {
+    let carrier = task_protocol.carrier();
     let historical = carrier.historical_activation();
     let receipt = historical.receipt();
     let activation = historical.activation_root();
     let root = &activation.activation_root;
     let target = carrier.target();
     let companion = carrier.companion();
+    let renewed_route = carrier.renewed_route();
+    let credential = carrier.credential().receipt();
+    let compatibility = carrier.runtime_compatibility().verification();
     if receipt.activation.identity.provider_binding_id != root.provider_binding_id
         || receipt.activation.identity.provider_binding_digest != root.provider_binding_digest
         || receipt.activation.identity.activation_root_digest != activation.activation_root_digest
@@ -153,6 +155,15 @@ pub(super) fn durable_external_pool_adapter_active_no_work_probe_subject_on(
         historical.active_provider().clone(),
         target.clone(),
         companion.clone(),
+        renewed_route.receipt().route_renewal_receipt_id.clone(),
+        renewed_route.receipt().route_renewal_receipt_digest.clone(),
+        renewed_route.effective_expires_at().into(),
+        credential.reattestation_receipt_id.clone(),
+        credential.reattestation_receipt_digest.clone(),
+        compatibility.verification_receipt_id.clone(),
+        compatibility.verification_receipt_digest.clone(),
+        task_protocol.receipt().run_receipt_id.clone(),
+        task_protocol.receipt().run_receipt_digest.clone(),
         carrier.checked_at().into(),
     ))
 }

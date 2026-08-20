@@ -28,6 +28,7 @@ use crate::{
             HistoricalExternalPoolAdapterRegistryReleaseAuthority,
         },
         compute_external_pool_adapter_release_lifecycle::CurrentExternalPoolAdapterReleaseAdmissionAuthority,
+        compute_external_pool_adapter_route_renewal::CurrentExternalPoolAdapterRenewedRouteAuthority,
         compute_external_pool_adapter_runtime_compatibility_verification::CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority,
         compute_external_pool_provider_activation_candidate::HistoricalExternalPoolProviderActivationCandidateAuthority,
     },
@@ -81,11 +82,12 @@ impl HistoricalExternalPoolAdapterAtomicActivationAuthority {
 
 /// Purpose-specific active execution carrier. Historical roots remain immutable while release,
 /// policy, V253/V268 and prepared-content authority are re-proved at one transaction timestamp.
-pub(in crate::store) struct CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<
+pub(in crate::store) struct CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<
     'tx,
     'conn,
 > {
     historical_activation: HistoricalExternalPoolAdapterAtomicActivationAuthority,
+    renewed_route: CurrentExternalPoolAdapterRenewedRouteAuthority<'tx, 'conn>,
     registry_binding: HistoricalExternalPoolAdapterRegistryProviderBindingAuthority,
     registry_release: HistoricalExternalPoolAdapterRegistryReleaseAuthority,
     current_release: CurrentExternalPoolAdapterRegistryReleaseAuthority,
@@ -104,11 +106,12 @@ pub(in crate::store) struct CurrentExternalPoolAdapterProjectedActiveHistoricalC
     transaction: PhantomData<&'tx Transaction<'conn>>,
 }
 
-impl<'tx, 'conn> CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<'tx, 'conn> {
+impl<'tx, 'conn> CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         _transaction: &'tx Transaction<'conn>,
         historical_activation: HistoricalExternalPoolAdapterAtomicActivationAuthority,
+        renewed_route: CurrentExternalPoolAdapterRenewedRouteAuthority<'tx, 'conn>,
         registry_binding: HistoricalExternalPoolAdapterRegistryProviderBindingAuthority,
         registry_release: HistoricalExternalPoolAdapterRegistryReleaseAuthority,
         current_release: CurrentExternalPoolAdapterRegistryReleaseAuthority,
@@ -129,6 +132,7 @@ impl<'tx, 'conn> CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAutho
     ) -> Self {
         Self {
             historical_activation,
+            renewed_route,
             registry_binding,
             registry_release,
             current_release,
@@ -151,6 +155,11 @@ impl<'tx, 'conn> CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAutho
         &self,
     ) -> &HistoricalExternalPoolAdapterAtomicActivationAuthority {
         &self.historical_activation
+    }
+    pub(in crate::store) fn renewed_route(
+        &self,
+    ) -> &CurrentExternalPoolAdapterRenewedRouteAuthority<'tx, 'conn> {
+        &self.renewed_route
     }
     pub(in crate::store) fn registry_binding(
         &self,

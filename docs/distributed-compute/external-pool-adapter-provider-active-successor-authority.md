@@ -198,6 +198,16 @@ pending plan或seal。17项mutation与same-tx readback后commit；same connectio
 任何 SQLite transaction、connection、Prepared/Store authority都不得跨 filesystem、network、child 或 async await；
 final reproof消费typed current authority，不接受raw-result wrapping。
 
+V278 refresh在既有`v274_provider_active_successor_receipt_pending_seal` BEFORE INSERT上追加第二个独立guard：
+non-deterministic/INNOCUOUS arity-17
+`elon_v278_external_pool_adapter_provider_active_successor_refresh_pending_plan_matches`。注册symbol exact为
+`register_external_pool_adapter_provider_active_successor_refresh_pending_plan_udf`；args依次为purpose
+`provider_active_successor_refresh`及NEW的receipt id/digest/json、provider binding、activation root、sequence、
+predecessor pair、双时间、created/expires、custody epoch/nonce/seal与integrity digest。Trigger exact WHEN为
+`NEW.successor_sequence > 1 AND udf(17 args) IS NOT 1`；逐值保存SQLite type/length/bytes且one-shot。Sequence 1完全
+不调用/消费refresh registry，仍只受V277 activation plan与本页canonical/process-seal门；UDF也拒绝sequence<=1或
+NULL predecessor pair。
+
 ## 7. Narrow currentness bridges；禁止 broad reinterpretation
 
 V274 只允许 activation-root-gated 窄分支，不重写 V249-V270 历史语义：
@@ -220,8 +230,9 @@ V274 只允许 activation-root-gated 窄分支，不重写 V249-V270 历史语�
 每个 `provider_binding_id + activation_root_digest` 只有一条全局线性 lineage：genesis sequence=1且 predecessor
 为空；successor必须引用 exact unrevoked head；相同 actor-bound idempotency只允许 exact replay。live Provider 的
 任何 active `policy_revision`变化，包括 settlement-only变化，都会令旧 successor historical；恢复 current 必须 fresh V253、
-fresh active runtime observation、fresh V272与新 successor。V277负责实现该active successor/restart path；V278只负责
-route renewal/reachability。V274 自身没有独立可运行 producer。`draining|quarantined|disabled` 一律失败关闭。
+fresh active runtime observation、fresh V272与新 successor。V277保留historical activation recovery base；V278冻结
+独立ordered plan以实现active successor refresh与route renewal/reachability。Route renewal不要求current V274/V268/V272，
+refresh也不要求旧V274 current。V274自身没有独立可运行producer。`draining|quarantined|disabled`一律失败关闭。
 
 Revocation只终止 future prepare/commit/refresh消费，不修改 Provider、route、market、settlement或历史 task facts。
 revoked/expired head可以作为 fully re-proven successor的结构 predecessor，但本身永远不 current；cleanup horizon内
@@ -245,10 +256,11 @@ executor或route中的任意子集，也不能在 transaction 内出网。V277 c
 `(activation_witness_id, activation_witness_digest, activation_root_digest)`以immediate FK引用它，所以同事务先写
 V277、后写V274即可闭合，不形成摘要环。只有Adapter/credential内部既有cycle保留deferred FK。
 
-V274 不提供上述 V277 constructors。V277 也不连接 V273 dormant worker。V277实现active V253与fresh V274
-successor/restart，但不续签route；只有 V278 可在每个 candidate/attempt
-同connection按其独立currentness time重验current V274/V277 authority后，让 V273消费真实v213 eligible rows并执行production
-reachability验收。
+V274 不提供上述V277 constructors。V278每张route receipt只引用exact sequence-1 genesis历史pair，字段名固定为
+`activation_genesis_successor_receipt_id/digest`；该pair不加UNIQUE且不要求row current/process-sealed，普通refresh
+identity不写入V278 receipt。顺序只能是historical V277+genesis → fresh V253 route renewal → current route → fresh
+V253/V268/V272与active preparation → 本节dedicated refresh append/readback/promote → same-time route+V274 carrier →
+V273。#13-#18仍deny，故source接线不等于真实eligible/ACK/Lease/Runner；当前`eligible_rows=0`。
 
 ## 10. Zero effect 与当前证据
 

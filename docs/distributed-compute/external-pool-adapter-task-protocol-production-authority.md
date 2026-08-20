@@ -1,7 +1,7 @@
 ---
 title: 外部矿池 Adapter task-protocol production transport 权威
 status: current
-reviewed_at: 2026-08-16
+reviewed_at: 2026-08-20
 owners: backend, security, ai-economy
 design_status: design_frozen
 implementation_status: implementation_partially_verified
@@ -18,8 +18,8 @@ conformance receipt 提升为 production route 或 executor authority。
 
 本批只有默认关闭的生产 kernel 合同。它不创建 v213 command、outbox、route、credential、service actor、
 authorization、capability、seal、Lease 或 executor，也不新增这些对象的 constructor；未来只消费已经耐久化的
-exact v213 command/outbox/route authority，并通过既有 v213 Store gate把首个 send-attempt与V273 exchange-attempt
-原子成对记录。当前 Provider 仍为 `registering`，没有 stable executor binding，也没有可消费的 external-pool route，
+exact v213 command/outbox/route authority；V278会在既有Store gate上把首个send-attempt、V273 exchange-attempt与
+outbox claimed→unknown CAS原子记录为2 INSERT+1 CAS。当前Provider仍为`registering`，没有stable executor binding或route，
 因此 production eligibility 的固定观测值是 `eligible_rows=0`，worker 只能 dormant，不能外呼或接纳 ingress。
 
 ## 2. 唯一 startup gate 与 fail-closed 平台边界
@@ -158,20 +158,22 @@ Store 查询必须同时证明：
   不得因 head 正常轮换或 V253 业务有效期结束而丢失清理能力；
 - command、Plan、Lease/reservation、outbox operation、executor 与 fencing generation exact；
 - outbox 状态与 claim generation 允许本次 operation，且没有冲突的 send/exchange attempt；
-- 对该 candidate/attempt 在同 connection、同 `checked_at` 取得 V270/V272 Store-private current authority，并
-  证明第 4 节八项 roots exact；
+- 对fresh send在同connection、同`checked_at`取得V278 current renewed route，再取得fresh V253/V268/V272、
+  active broker/Secret/no-work、promoted current V274与same-time route+V274 runtime carrier，并证明第4节八roots；
 - operation-specific deadline、credential TTL 与 cleanup horizon 未越界。
 
-V273 不提供上述 v213 sealed 类型的 constructor，因此当前查询结果必须是 `eligible_rows=0`。未来达到可达性后，
-唯一顺序是：claim existing outbox → 在同一个 `BEGIN IMMEDIATE`、同一 `checked_at` 内重验全部 current authority，
-同时 append 首个 v213 send-attempt 与对应 V273 exchange-attempt，exact readback后一次 commit → 事务外执行 ELTP →
-fresh transaction 验证 authenticated receipt → append receipt/poll/event facts → 交给未来 V278 Store-private ingress
-consumer。send-attempt 或 exchange-attempt 任一写入/回读失败必须让二者同时 rollback；二者之间不能出现 commit。
-任何 SQLite transaction、connection 或 sealed Store authority 都不得跨 network/child await。
+V273 不提供上述 v213 sealed 类型的 constructor，因此当前查询结果必须是 `eligible_rows=0`。V278 source stage虽可
+接线，但#13-#18仍absolute deny，normal Offer→Job→v213 producer仍不可达。未来已有normal candidate时，唯一outbound
+transaction是：claim existing outbox → 同一`BEGIN IMMEDIATE`重验runtime carrier → INSERT首个v213 send-attempt →
+INSERT V273 exchange-attempt → CAS outbox `claimed→in_flight_unknown`并使`state_revision+1/attempt_count+1` → exact
+readback/commit → 事务外ELTP。即exact `2 INSERT + 1 outbox CAS`；任一失败三项rollback，任何SQLite transaction、
+connection或sealed authority不得跨network/child await。
 
 `prepare` 或 `commit` 的结果未知只能进入 reconcile；不能盲重发产生新的 remote execution。event polling 只允许
 在 exact committed/running remote identity 上推进 cursor。cancel ACK只证明请求被接收，仍需 reconcile 的
 `terminal_no_start + no_commit_tombstone` 才能形成 no-start 候选。
+首次direct reconcile source只能在send/exchange/outbox三项已durable且物理结果unknown后创建，固定
+`reconcile_ordinal=1`；send前预造或用第二次prepare/commit send代替reconcile均拒绝。
 
 ## 7. Exact 六表 durable shape
 
@@ -191,7 +193,7 @@ signature、public-ingress、currentness view 或通用 observation 表：
 六表都必须有 exact JSON/scalar projection、domain-separated digest、no-delete/no-replace、FK/UNIQUE、lineage 与
 source/currentness guard。attempt/receipt/batch/event必须 no-update；poll 的 immutable intent列必须 no-update，只有
 列举的 claim projection能以 exact revision/generation CAS改变，禁止任意状态、payload、root、cursor或remote identity
-更新。attempt 与首个 v213 send-attempt同事务先于网络耐久；receipt只能一对一关闭一个 attempt。poll/batch/event
+更新。attempt、首个v213 send-attempt与outbox CAS同事务先于网络耐久；receipt只能一对一关闭一个attempt。poll/batch/event
 只能引用 authenticated receipt lineage，不能接受本地 timeout、HTTP status、日志或 caller JSON冒充。
 
 表中只保存长度、摘要、有限状态与远端 opaque ID；raw request/response/event body、credential locator、Secret、
@@ -207,9 +209,10 @@ exact duplicate replay；gap、fork、conflicting replay、cursor rollback或同
 cursor before/after exact相同；exact duplicate 只能 exact readback 已存在的同一 `new|empty` batch/event rows，
 不插入第二份 `exact_replay` batch，也不再次推进 cursor。
 
-V273 可以定义 non-Clone、non-Debug、non-Serde 的 Store-private authenticated exchange/event material，但不能为
-v211 ACK、v213 remote observation、v215 accepted closure、Lease authority或 Runner event开放 constructor。六表
-receipt只是未来 V278 consumer 的输入证据，不是这些对象本身。
+V273 可以定义 non-Clone、non-Debug、non-Serde 的 Store-private authenticated exchange/event material，但不能开放
+public constructor。V278 terminal ingress必须在一个transaction中append authenticated V273 receipt，并调用既有
+v211 ACK、v185 activation与v215 accepted closure Store状态机；任一子步骤失败全部rollback，不新增ACK、Lease、
+application、commit、Runner或accepted表。六表receipt本身仍不是这些下游对象。
 
 本批不新增 HTTP、MCP、WebSocket、callback、owner/admin collection、`/api/me`、通用上传或 polling API。网络 ingress
 仅存在于受管 child 与 server 的 authenticated ELTP session 内；loopback/public listener 都不属于 V273。
@@ -222,8 +225,9 @@ remote outcome unknown并进入 reconcile；不得删除 attempt、回到 local-
 event root或同 cursor fork必须失败关闭。
 
 startup/reopen 必须从六表与既有 v213 outbox派生工作，不保存明文 claim token或可恢复 session key。server 重启后
-旧 process custody失效；只有 fresh V270/V272 authority、fresh session与 exact durable lineage才能继续 reconcile/
-event poll。cleanup、credential expiry或 route revocation不能抹去历史，但会阻止新的 prepare/commit。
+旧process custody失效；new send必须fresh current renewed route、V253/V268/V272、active preparation与promoted V274。
+已durable旧send的reconcile/event/terminal ingress可用V278 historical task-exchange cleanup authority与exact历史roots，
+不要求route或V274仍current。cleanup、credential expiry或route revocation不能抹去历史，但会阻止新的prepare/commit。
 
 ## 10. Zero authority expansion 与后继顺序
 
@@ -233,15 +237,15 @@ outbox。Provider 必须保持 `registering`，V254 18 个 temporary absolute de
 
 后继顺序固定为：
 
-1. V274 冻结 Store-private activation-rooted active successor：exact两张immutable表+一个非权威诊断view，stable
-   root排除Secret/session/executor/route，renewable evidence消费最长15秒V270-equivalent observation与fresh V272
-   carrier；V277前零行、无public producer，Provider仍`registering`；
-2. V277 在同一个原子事务内消费V274 pending overlay，签发stable executor、写exact projected-active Provider/route
-   closure、append首个V274 successor并替换18 fences；
-3. V278 才把本页 dormant worker/ingress handoff接到真实 v213 eligible rows并做 production reachability验收。
+1. V277 durable receipt与exact V274 sequence-1 genesis历史见证形成historical route recovery base；
+2. V278以fresh V253续签route，不依赖current V274/V268/V272，并取得current renewed route；
+3. current route之后才取得fresh V253/V268/V272并执行active broker/Secret/no-work；
+4. dedicated V274 refresh ordered plan append/readback/promote，再在同一checked-at组合route+V274 runtime carrier；
+5. carrier进入本页scoped fresh claim/send/ingress；已durable send后续只用historical cleanup型做reconcile/poll/event。
 
-V274 docs/DDL、V277 executor/route 或 migration success都不能倒推 V273 transport已动态通过；V278 也不能跳过
-V270-equivalent/V272/V274 current Store-private reproof。
+V274/V277成功或V278 source wiring都不能倒推transport动态通过。由于V254 #13-#18不开放，normal
+Offer→Job→Reservation/Lease→v211/v213 source仍不可达，V278保持`eligible_rows=0`；真实ACK/Lease/Runner与
+`eligible_rows>0`后移独立service-managed admission+Runner bridge。Fixture、seed或直接SQL不算。
 
 ## 11. 当前实现与验证现实
 

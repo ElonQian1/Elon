@@ -24,6 +24,12 @@ use crate::{
             historical_external_pool_adapter_registry_release_authority_on,
         },
         compute_external_pool_adapter_release_lifecycle::current_external_pool_adapter_release_admission_authority_on,
+        compute_external_pool_adapter_route_renewal::{
+            external_pool_adapter_route_renewal_decision_on,
+            require_current_external_pool_adapter_renewed_route_on,
+            CurrentExternalPoolAdapterRenewedRouteAuthority,
+            ExternalPoolAdapterRouteRenewalDecision,
+        },
         compute_external_pool_adapter_runtime_compatibility_verification::current_external_pool_adapter_runtime_compatibility_verification_authority_on,
         compute_external_pool_adapter_runtime_launch_profile::historical_external_pool_adapter_runtime_launch_profile_authority_on,
         compute_external_pool_adapter_upstream_transport_target::historical_external_pool_adapter_upstream_transport_target_authority_on,
@@ -32,25 +38,100 @@ use crate::{
 };
 
 use super::types::{
-    CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority,
+    CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority,
     HistoricalExternalPoolAdapterAtomicActivationAuthority,
 };
 
-pub(in crate::store) fn current_external_pool_adapter_projected_active_historical_carrier_on<
+/// Normal active entry: a historical activation is reconstructed without route currentness, then
+/// only a fresh renewed-route authority can enter the runtime carrier.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::store) fn current_external_pool_adapter_renewed_route_runtime_carrier_for_binding_on<
+    'tx,
+    'conn,
+>(
+    transaction: &'tx Transaction<'conn>,
+    provider_binding_id: &str,
+    expected_activation_receipt_id: &str,
+    expected_activation_receipt_digest: &str,
+    prepared: PreparedExternalPoolAdapterInstallation,
+    checked_at: &str,
+) -> Result<Option<CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn>>> {
+    let Some(historical_activation) =
+        super::read::historical_external_pool_adapter_atomic_activation_history_for_binding_on(
+            transaction,
+            provider_binding_id,
+        )?
+    else {
+        return Ok(None);
+    };
+    let activation_receipt = historical_activation.receipt();
+    if activation_receipt.activation_receipt_id != expected_activation_receipt_id
+        || activation_receipt.activation_receipt_digest != expected_activation_receipt_digest
+    {
+        bail!("renewed-route runtime carrier activation candidate drifted");
+    }
+    let decision = external_pool_adapter_route_renewal_decision_on(
+        transaction,
+        provider_binding_id,
+        expected_activation_receipt_id,
+        expected_activation_receipt_digest,
+        checked_at,
+    )?;
+    let (route_receipt_id, route_receipt_digest) = match decision {
+        ExternalPoolAdapterRouteRenewalDecision::Current {
+            route_renewal_receipt_id,
+            route_renewal_receipt_digest,
+        } => (route_renewal_receipt_id, route_renewal_receipt_digest),
+        ExternalPoolAdapterRouteRenewalDecision::RenewalRequired { .. } => return Ok(None),
+    };
+    let route = require_current_external_pool_adapter_renewed_route_on(
+        transaction,
+        &route_receipt_id,
+        &route_receipt_digest,
+        checked_at,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("renewed-route receipt disappeared during carrier reproof"))?;
+    current_external_pool_adapter_renewed_route_runtime_carrier_on(
+        transaction,
+        historical_activation,
+        route,
+        prepared,
+        checked_at,
+    )
+}
+
+pub(in crate::store) fn current_external_pool_adapter_renewed_route_runtime_carrier_on<
     'tx,
     'conn,
 >(
     transaction: &'tx Transaction<'conn>,
     historical_activation: HistoricalExternalPoolAdapterAtomicActivationAuthority,
+    renewed_route: CurrentExternalPoolAdapterRenewedRouteAuthority<'tx, 'conn>,
     prepared: PreparedExternalPoolAdapterInstallation,
     checked_at: &str,
-) -> Result<Option<CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority<'tx, 'conn>>>
-{
+) -> Result<Option<CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority<'tx, 'conn>>> {
     let root = &historical_activation.activation_root().activation_root;
     let receipt = historical_activation.receipt();
     ensure!(
         checked_at >= receipt.activation.evidence_checked_at.as_str(),
         "active historical carrier predates its V277 evidence"
+    );
+    ensure!(
+        renewed_route.checked_at() == checked_at
+            && renewed_route.provider_binding_id() == root.provider_binding_id
+            && renewed_route.provider_binding_digest() == root.provider_binding_digest
+            && renewed_route.activation_receipt_id() == receipt.activation_receipt_id
+            && renewed_route.activation_receipt_digest() == receipt.activation_receipt_digest
+            && renewed_route.activation_genesis_successor_receipt_id()
+                == historical_activation.genesis().active_successor_receipt_id
+            && renewed_route.activation_genesis_successor_receipt_digest()
+                == historical_activation.genesis().receipt_digest
+            && renewed_route.activation_root_digest()
+                == historical_activation
+                    .activation_root()
+                    .activation_root_digest
+            && renewed_route.route_adapter_projection_id() == root.route_adapter_projection_id,
+        "renewed route does not bind the exact V277/V274 genesis history"
     );
 
     let registry_binding = historical_external_pool_adapter_registry_provider_binding_authority_on(
@@ -198,9 +279,10 @@ pub(in crate::store) fn current_external_pool_adapter_projected_active_historica
     let package = package_authority.receipt().clone();
 
     Ok(Some(
-        CurrentExternalPoolAdapterProjectedActiveHistoricalCarrierAuthority::new(
+        CurrentExternalPoolAdapterRenewedRouteRuntimeCarrierAuthority::new(
             transaction,
             historical_activation,
+            renewed_route,
             registry_binding,
             registry_release,
             current_release,

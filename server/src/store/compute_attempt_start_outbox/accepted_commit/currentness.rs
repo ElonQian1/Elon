@@ -10,25 +10,26 @@ use crate::compute_federation::route_authority::{
     ComputeRouteCredentialEnvelope, COMPUTE_ACTOR_PHASE_APPLICATION,
     COMPUTE_ROUTE_ADAPTER_STATUS_ACTIVE, COMPUTE_ROUTE_CAPABILITY_IDEMPOTENT_COMMIT,
 };
+use crate::store::compute_external_pool_adapter_task_delivery::HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority;
 
 use super::{source::load_base_on, AcceptedStartCommitFreshness};
 
 struct RegistryRows {
     adapter_json: String,
     adapter_digest: String,
-    current_adapter_revision: i64,
-    current_adapter_digest: String,
-    current_adapter_status: String,
+    current_adapter_revision: Option<i64>,
+    current_adapter_digest: Option<String>,
+    current_adapter_status: Option<String>,
     credential_json: String,
     credential_digest: String,
-    current_credential_revision: i64,
-    current_credential_digest: String,
-    current_credential_status: String,
+    current_credential_revision: Option<i64>,
+    current_credential_digest: Option<String>,
+    current_credential_status: Option<String>,
     seal_json: String,
     seal_digest: String,
-    provider_kind: String,
-    provider_owner_account_id: String,
-    provider_status: String,
+    provider_kind: Option<String>,
+    provider_owner_account_id: Option<String>,
+    provider_status: Option<String>,
 }
 
 pub(super) fn ensure_fresh_on(
@@ -36,8 +37,40 @@ pub(super) fn ensure_fresh_on(
     command_id: &str,
     checked_at: &str,
 ) -> Result<AcceptedStartCommitFreshness> {
+    ensure_on(connection, command_id, checked_at, CurrentnessMode::Fresh)
+}
+
+pub(super) fn ensure_historical_on(
+    connection: &Connection,
+    command_id: &str,
+    checked_at: &str,
+    authority: &HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+) -> Result<AcceptedStartCommitFreshness> {
+    ensure_on(
+        connection,
+        command_id,
+        checked_at,
+        CurrentnessMode::HistoricalTerminal(authority),
+    )
+}
+
+#[derive(Clone, Copy)]
+enum CurrentnessMode<'a, 'tx, 'conn> {
+    Fresh,
+    HistoricalTerminal(&'a HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'tx, 'conn>),
+}
+
+fn ensure_on(
+    connection: &Connection,
+    command_id: &str,
+    checked_at: &str,
+    mode: CurrentnessMode<'_, '_, '_>,
+) -> Result<AcceptedStartCommitFreshness> {
     parse_canonical_time(checked_at)?;
     let base = load_base_on(connection, command_id)?;
+    if let CurrentnessMode::HistoricalTerminal(authority) = mode {
+        audit_historical_terminal(&base, authority, checked_at)?;
+    }
     let start = &base.command.command;
     let plan = &base.plan.plan;
     if checked_at >= base.command.not_after.as_str()
@@ -57,45 +90,53 @@ pub(super) fn ensure_fresh_on(
     audit_registry_rows(&base, &rows)?;
     let route = &base.route.authorization;
     let actor = &base.actor_authority.authorization;
-    if rows.provider_kind != route.provider.provider_kind
-        || rows.provider_owner_account_id != route.provider.provider_owner_account_id
-        || !matches!(rows.provider_status.as_str(), "active" | "draining")
+    if matches!(mode, CurrentnessMode::Fresh) {
+        if rows.provider_kind.as_deref() != Some(route.provider.provider_kind.as_str())
+            || rows.provider_owner_account_id.as_deref()
+                != Some(route.provider.provider_owner_account_id.as_str())
+            || !matches!(rows.provider_status.as_deref(), Some("active" | "draining"))
+        {
+            return Ok(blocked("ROUTE_PROVIDER_NOT_CURRENT"));
+        }
+        if rows.current_adapter_revision != Some(route.route.adapter.adapter_revision)
+            || rows.current_adapter_digest.as_deref()
+                != Some(route.route.adapter.adapter_registry_digest.as_str())
+            || rows.current_adapter_status.as_deref() != Some(COMPUTE_ROUTE_ADAPTER_STATUS_ACTIVE)
+        {
+            return Ok(blocked("ROUTE_ADAPTER_NOT_CURRENT"));
+        }
+        if rows.current_credential_revision != Some(route.credential.credential_revision)
+            || rows.current_credential_digest.as_deref()
+                != Some(route.credential.credential_digest.as_str())
+            || rows.current_credential_status.as_deref()
+                != Some(COMPUTE_ROUTE_ADAPTER_STATUS_ACTIVE)
+            || checked_at >= route.credential.expires_at.as_str()
+        {
+            return Ok(blocked("ROUTE_CREDENTIAL_NOT_CURRENT"));
+        }
+        let revoked = connection
+            .query_row(
+                "SELECT 1 FROM compute_route_credential_revocations
+                  WHERE credential_id=?1 AND credential_revision=?2 LIMIT 1",
+                params![
+                    route.credential.credential_id,
+                    route.credential.credential_revision
+                ],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if revoked {
+            return Ok(blocked("ROUTE_CREDENTIAL_REVOKED"));
+        }
+    }
+    if checked_at < route.recorded_at.as_str()
+        || (matches!(mode, CurrentnessMode::Fresh) && checked_at >= route.expires_at.as_str())
     {
-        return Ok(blocked("ROUTE_PROVIDER_NOT_CURRENT"));
-    }
-    if rows.current_adapter_revision != route.route.adapter.adapter_revision
-        || rows.current_adapter_digest != route.route.adapter.adapter_registry_digest
-        || rows.current_adapter_status != COMPUTE_ROUTE_ADAPTER_STATUS_ACTIVE
-    {
-        return Ok(blocked("ROUTE_ADAPTER_NOT_CURRENT"));
-    }
-    if rows.current_credential_revision != route.credential.credential_revision
-        || rows.current_credential_digest != route.credential.credential_digest
-        || rows.current_credential_status != COMPUTE_ROUTE_ADAPTER_STATUS_ACTIVE
-        || checked_at >= route.credential.expires_at.as_str()
-    {
-        return Ok(blocked("ROUTE_CREDENTIAL_NOT_CURRENT"));
-    }
-    let revoked = connection
-        .query_row(
-            "SELECT 1 FROM compute_route_credential_revocations
-              WHERE credential_id=?1 AND credential_revision=?2 LIMIT 1",
-            params![
-                route.credential.credential_id,
-                route.credential.credential_revision
-            ],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
-    if revoked {
-        return Ok(blocked("ROUTE_CREDENTIAL_REVOKED"));
-    }
-    if checked_at < route.recorded_at.as_str() || checked_at >= route.expires_at.as_str() {
         return Ok(blocked("ROUTE_NOT_CURRENT"));
     }
     if checked_at < actor.recorded_at.as_str()
-        || checked_at >= actor.valid_until.as_str()
+        || (matches!(mode, CurrentnessMode::Fresh) && checked_at >= actor.valid_until.as_str())
         || !actor
             .allowed_route_kinds
             .iter()
@@ -124,6 +165,43 @@ pub(super) fn ensure_fresh_on(
     Ok(AcceptedStartCommitFreshness::Current)
 }
 
+fn audit_historical_terminal(
+    base: &super::AcceptedCommitBase,
+    authority: &HistoricalExternalPoolAdapterTaskExchangeCleanupAuthority<'_, '_>,
+    checked_at: &str,
+) -> Result<()> {
+    let exchange = &authority.exchange_attempt().attempt.identity;
+    let command = &exchange.command;
+    let adapter = &exchange.adapter;
+    let exchange_route = &exchange.route;
+    let route = &base.route.authorization;
+    let start = &base.command.command;
+    ensure!(
+        authority.checked_at() <= checked_at
+            && checked_at < authority.cleanup_expires_at()
+            && authority.cleanup_expires_at() <= route.cleanup_expires_at.as_str()
+            && authority.cleanup_expires_at() <= route.credential.cleanup_expires_at.as_str()
+            && command.command_id == base.command.command_id
+            && command.command_digest == base.command.command_digest
+            && command.outbox_id == base.prepare.envelope.outbox_id
+            && command.outbox_digest == base.prepare.envelope.outbox_digest
+            && adapter.provider_id == base.adapter.provider_id
+            && adapter.adapter_id == route.route.adapter.adapter_id
+            && adapter.adapter_revision == u64::try_from(route.route.adapter.adapter_revision)?
+            && adapter.adapter_registry_digest == route.route.adapter.adapter_registry_digest
+            && adapter.adapter_implementation_digest == route.route.adapter.implementation_digest
+            && exchange_route.route_authorization_id == base.route.route_authorization_id
+            && exchange_route.route_authorization_digest == base.route.route_authorization_digest
+            && exchange_route.route_credential_id == route.credential.credential_id
+            && exchange_route.route_credential_revision
+                == u64::try_from(route.credential.credential_revision)?
+            && exchange_route.route_credential_digest == route.credential.credential_digest
+            && exchange.fencing_generation == u64::try_from(start.identity.fencing_generation)?,
+        "historical accepted terminal does not bind its exact command and cleanup route"
+    );
+    Ok(())
+}
+
 fn registry_rows_on(
     connection: &Connection,
     route: &crate::compute_federation::route_authority::ComputeRouteAuthorizationEnvelope,
@@ -140,17 +218,17 @@ fn registry_rows_on(
                     seal.seal_json, seal.seal_digest, provider.provider_kind,
                     provider.owner_account_id, provider.status
                FROM compute_route_adapter_versions adapter_version
-               JOIN compute_route_adapters adapter
-                 ON adapter.adapter_id=adapter_version.adapter_id
+               LEFT JOIN compute_route_adapters adapter
+                  ON adapter.adapter_id=adapter_version.adapter_id
                JOIN compute_route_credential_versions credential_version
-                 ON credential_version.credential_id=?4
-                AND credential_version.credential_revision=?5
-               JOIN compute_route_credentials credential
-                 ON credential.credential_id=credential_version.credential_id
+                  ON credential_version.credential_id=?4
+                 AND credential_version.credential_revision=?5
+               LEFT JOIN compute_route_credentials credential
+                  ON credential.credential_id=credential_version.credential_id
                JOIN compute_route_authorization_seals seal
                  ON seal.route_authorization_id=?7
                 AND seal.route_authorization_digest=?8
-               JOIN compute_providers provider ON provider.provider_id=?9
+               LEFT JOIN compute_providers provider ON provider.provider_id=?9
               WHERE adapter_version.adapter_id=?1
                 AND adapter_version.adapter_revision=?2
                 AND adapter_version.adapter_digest=?3

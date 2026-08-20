@@ -12,6 +12,10 @@ pub(super) fn register_receipt_integrity_functions(conn: &Connection) -> Result<
     receipt_integrity::register(conn)
 }
 
+pub(crate) fn install_v278_reachability_guards(conn: &Connection) -> Result<()> {
+    guards::install_v278_reachability(conn)
+}
+
 pub(crate) fn migration_v273(conn: &Connection) -> Result<()> {
     register_receipt_integrity_functions(conn)?;
     let transaction = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;

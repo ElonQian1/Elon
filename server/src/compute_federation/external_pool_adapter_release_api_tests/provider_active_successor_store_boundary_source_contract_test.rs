@@ -152,11 +152,12 @@ fn provider_active_successor_store_and_v253_are_witness_gated_after_v277() {
     assert!(!STORE_ROOT.contains("use compute_external_pool_adapter_provider_active_successor::"));
     assert!(STORE.contains("There is deliberately no public Store facade"));
     assert!(STORE.contains("mod append;"));
-    assert!(!STORE.contains("prepare_external_pool_adapter_provider_active_successor_target_on"));
-    assert!(STORE_PREPARATION
-        .contains("pub(super) struct PrepareExternalPoolAdapterProviderActiveSuccessorTarget"));
+    assert!(STORE.contains("prepare_external_pool_adapter_provider_active_successor_target_on"));
     assert!(STORE_PREPARATION.contains(
-        "pub(super) fn prepare_external_pool_adapter_provider_active_successor_target_on"
+        "pub(in crate::store) struct PrepareExternalPoolAdapterProviderActiveSuccessorTarget"
+    ));
+    assert!(STORE_PREPARATION.contains(
+        "pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_target_on"
     ));
     assert!(STORE_PREPARATION.contains("current_registered_provider_on"));
     assert!(STORE_PREPARATION.contains("source Provider is not exact V249 registering history"));
@@ -165,11 +166,10 @@ fn provider_active_successor_store_and_v253_are_witness_gated_after_v277() {
         "input.prepared_installation",
         "current_external_pool_adapter_runtime_compatibility_verification_authority_on",
         "server_task_protocol_conformance_profile_catalog",
-        "expected_task_protocol_profile_digest",
-        "expected_lane_subject_digest",
-        "expected_task_production_carrier_policy_digest",
-        "validate_task_production_carrier_policy_digest",
+        "&task_protocol.profile_digest",
         "audited_structural_input(",
+        "reprove_external_pool_adapter_provider_active_successor_target_on",
+        "final provider active-successor target/root differs from its pre-I/O plan",
     ] {
         assert!(
             STORE_PREPARATION.contains(marker),
@@ -180,8 +180,15 @@ fn provider_active_successor_store_and_v253_are_witness_gated_after_v277() {
         STORE_PREPARATION
             .matches(".checked_at() != authority_checked_at")
             .count(),
-        5
+        6
     );
+    for forbidden in [
+        "expected_task_protocol_profile_digest",
+        "expected_lane_subject_digest",
+        "expected_task_production_carrier_policy_digest",
+    ] {
+        assert!(!STORE_PREPARATION.contains(forbidden));
+    }
     assert!(STORE_TARGET.contains("pub(super) fn derive_target("));
     assert!(STORE_TARGET
         .contains("derive_external_pool_adapter_provider_active_successor_activation_root"));

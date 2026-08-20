@@ -290,7 +290,62 @@ fn replace_exact_source_trigger(conn: &Connection) -> Result<()> {
                              WHERE terminal.adoption_receipt_id=binding.adoption_receipt_id
                                AND terminal.adoption_receipt_digest=binding.adoption_receipt_digest
                        )
-                ))
+                )) OR (NEW.source_kind='external_pool_onboarding'
+                AND NEW.provider_kind='external_pool' AND NEW.route_kind='server_adapter'
+                AND EXISTS (
+                    SELECT 1
+                      FROM compute_external_pool_onboarding_applications source
+                      JOIN compute_external_pool_adapter_registry_provider_bindings binding
+                        ON binding.application_id=source.application_id
+                       AND binding.application_digest=source.application_digest
+                       AND binding.provider_id=source.provider_id
+                       AND binding.provider_owner_account_id=source.provider_owner_account_id
+                      JOIN compute_external_pool_provider_activation_candidates candidate
+                        ON candidate.provider_binding_id=binding.provider_binding_id
+                       AND candidate.provider_binding_digest=binding.provider_binding_digest
+                       AND candidate.provider_id=binding.provider_id
+                       AND candidate.provider_owner_account_id=binding.provider_owner_account_id
+                       AND candidate.route_adapter_projection_id=binding.route_adapter_projection_id
+                      JOIN compute_external_pool_provider_activation_delegations delegation
+                        ON delegation.delegation_id=candidate.delegation_id
+                       AND delegation.delegation_digest=candidate.delegation_digest
+                       AND delegation.provider_binding_id=binding.provider_binding_id
+                       AND delegation.provider_binding_digest=binding.provider_binding_digest
+                       AND delegation.service_actor_id=candidate.service_actor_id
+                      JOIN compute_external_pool_adapter_atomic_activation_receipts activation
+                        ON activation.provider_binding_id=binding.provider_binding_id
+                       AND activation.provider_binding_digest=binding.provider_binding_digest
+                       AND activation.source_registering_provider_id=binding.provider_id
+                       AND activation.source_registering_provider_policy_revision=binding.provider_policy_revision
+                       AND activation.source_registering_provider_digest=binding.provider_digest
+                       AND activation.route_adapter_projection_id=binding.route_adapter_projection_id
+                      JOIN compute_providers provider ON provider.provider_id=binding.provider_id
+                      JOIN compute_provider_versions provider_version
+                        ON provider_version.provider_id=provider.provider_id
+                       AND provider_version.policy_revision=provider.current_policy_revision
+                       AND provider_version.provider_digest=provider.current_provider_digest
+                     WHERE source.application_id=NEW.source_id
+                       AND source.application_digest=NEW.source_digest
+                       AND source.provider_id=NEW.provider_id
+                       AND source.provider_kind=NEW.provider_kind
+                       AND source.provider_owner_account_id=NEW.provider_owner_account_id
+                       AND source.approved_by_user_id=NEW.approved_by_user_id
+                       AND binding.route_adapter_projection_id=NEW.adapter_id
+                       AND activation.route_adapter_revision=NEW.adapter_revision
+                       AND activation.route_adapter_digest=NEW.adapter_registry_digest
+                       AND activation.projected_v211_adapter_binding_digest=NEW.adapter_binding_digest
+                       AND activation.executor_id=NEW.executor_id
+                       AND activation.service_actor_id=NEW.verified_by_service_actor_id
+                       AND activation.target_active_provider_id=provider.provider_id
+                       AND provider.provider_kind='external_pool' AND provider.status='active'
+                       AND provider.current_policy_revision>=activation.target_active_provider_policy_revision
+                       AND json_extract(provider_version.provider_json,'$.status')='active'
+                       AND candidate.service_actor_id=NEW.verified_by_service_actor_id
+                       AND delegation.issued_by_owner_user_id=NEW.approved_by_user_id
+                       AND NOT EXISTS (
+                           SELECT 1 FROM compute_external_pool_provider_activation_delegation_revocations revoked
+                            WHERE revoked.delegation_id=delegation.delegation_id
+                              AND revoked.delegation_digest=delegation.delegation_digest)))
         )
         BEGIN
             SELECT RAISE(ABORT, 'compute route authorization lacks exact source');
@@ -301,6 +356,10 @@ fn replace_exact_source_trigger(conn: &Connection) -> Result<()> {
 }
 
 pub(super) fn reinstall_exact_source_trigger_for_v277(conn: &Connection) -> Result<()> {
+    replace_exact_source_trigger(conn)
+}
+
+pub(super) fn reinstall_exact_source_trigger_for_v278(conn: &Connection) -> Result<()> {
     replace_exact_source_trigger(conn)
 }
 

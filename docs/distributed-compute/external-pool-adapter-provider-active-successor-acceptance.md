@@ -63,10 +63,11 @@ revision或 logical-active 一律失败关闭。双时间必须满足
 | V277 genesis prepare | registering source、planned adjacent active target、fresh V253 registering transition proof、pending V270-equivalent genesis observation与fresh V272 genesis carrier形成仅进程内non-authorizing overlay；数据库仍零V274 row。 |
 | V277 commit | 同一 `BEGIN IMMEDIATE` 原子闭合 exact active Provider/route/executor、V277 receipt、V274 genesis与`9 pending-plan permits / 9 absolute denies`；commit后same-connection readback才promote purpose seal。 |
 | genesis pair distinction | credential-observed registering Provider pair与runtime/task evidence planned-active pair不强等；transition由activation root+V277 transaction证明。 |
-| active refresh | V277实现transaction-bound active V253与fresh V274 successor/restart；live Provider必须active且adapter=projection，fresh V253、V270-equivalent observation、V272 carrier与stable root在`evidence_checked_at`重验；V278只负责route renewal/reachability。 |
+| active refresh | V278设计要求dedicated ordered plan追加sequence>1 successor；live Provider必须active且adapter=projection，fresh V253/V268/V272、active observation与stable root在`evidence_checked_at`重验；不要求旧V274 current。 |
 | runtime freshness | observation完成后最长15秒，且不晚于任何输入到期；历史V270 registering receipt不能冒充active observation。 |
 | V272 neutrality | public/canonical V272 receipt保持Provider-neutral；private digest用`ELON-EXTERNAL-POOL-ADAPTER-TASK-PROTOCOL-ACTIVE-CARRIER-V1` exact十字段material，genesis/refresh走不同typed constructors；refresh直接消费V277 witness+root，绝不依赖current V274。 |
 | one-way witness | V277 canonical/DDL不含V274 receipt identity或反向FK；V277自身receipt/root三元组为UNIQUE parent，V274 witness/root三元组以immediate FK引用它，先写V277、后写V274。 |
+| V278 genesis reference | 每张route receipt引用exact sequence-1 historical id/digest；字段为`activation_genesis_successor_*`，不加UNIQUE、不要求current/process V274，普通refresh pair不得写入。 |
 
 任何 SQLite transaction、connection、Prepared/Store authority跨 filesystem/network/child/await，或在外部观察后不做
 final same-connection `evidence_checked_at` reproof，均失败；raw-result wrapping不能替代typed current authority。
@@ -83,6 +84,11 @@ final same-connection `evidence_checked_at` reproof，均失败；raw-result wra
 | refresh | sequence单调、predecessor exact head；Provider任意active `policy_revision`变化都使旧receipt historical。 |
 | revoke | append-only revocation阻止future consumption但不改Provider/route/market/历史task facts；revoked/expired head本身永不current。 |
 | disabled status | `draining|quarantined|disabled` 均拒绝prepare/refresh；诊断view不能绕过。 |
+
+V278 refresh UDF必须以arity 17、non-deterministic/INNOCUOUS注册，只追加到既有receipt pending trigger；exact WHEN
+为`NEW.successor_sequence > 1 AND udf(17 args) IS NOT 1`，purpose与16个NEW字段逐值type/length/bytes exact。
+Sequence 1不得调用UDF/消费registry；缺注册、wrong connection/order/sequence/predecessor、replay或试图替代
+canonical/process-seal guard均失败关闭。
 
 ## 6. Narrow bridge 验收
 
@@ -107,10 +113,10 @@ V277 receipt、V274 genesis及18-fence exact九项pending permit/九项absolute 
 `BEGIN IMMEDIATE`/同commit，任一 fault全部 rollback。#2 active Provider INSERT与#3-#4/#13-#18不得放行。
 V274本批不得用 mock row提前证明该事务。
 
-V277另须实现active V253与restart后从durable witness/root/live Provider出发的fresh V274 successor；旧V274 current
-不得成为前置。V278才验收route renewal、V273 worker/ingress到真实v213 eligible rows、ELTP ACK/event与downstream closure；V274/V277成功都不能
-倒推 transport动态通过。Pool/Offer admission、usage、market、settlement、部署与跨进程可携带外签 authority也不属于
-V274 passed。
+V278顺序必须是V277+sequence-1 historical base → route renewal（不要求current V274/V268/V272）→ current route →
+fresh V253/V268/V272+active preparation → dedicated refresh/promote → same-time route+V274 → V273。#13-#18仍deny，
+所以本批不得动态声明真实eligible row、ELTP ACK、Lease或Runner；这些后移service-managed admission+Runner bridge。
+Pool/Offer、usage、market、settlement、部署与跨进程外签authority也不属于V274 passed。
 
 ## 8. 正式结论
 
