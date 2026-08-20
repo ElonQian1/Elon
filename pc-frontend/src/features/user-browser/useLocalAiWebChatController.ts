@@ -55,6 +55,8 @@ export default function useLocalAiWebChatController(
   const [message, setMessage] = useState('')
   const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
   const autoStartKey = useRef('')
+  const backgroundReconnectAttempts = useRef(0)
+  const backgroundReconnectInFlight = useRef(false)
   const responseRefreshGeneration = useRef(0)
   const responseRefreshTimer = useRef(0)
   const expectedResponsePrompt = useRef('')
@@ -131,6 +133,8 @@ export default function useLocalAiWebChatController(
     setMessage('')
     setNewConversationRecoveryStartedAtMs(0)
     autoStartKey.current = ''
+    backgroundReconnectAttempts.current = 0
+    backgroundReconnectInFlight.current = false
     cancelResponseRefresh()
   }, [ownerKey, providerId, requestedSessionIdentity])
 
@@ -168,6 +172,27 @@ export default function useLocalAiWebChatController(
       })
     return () => { active = false }
   }, [ownerKey, providerDisplayName, providerId, requestedSessionIdentity])
+
+  useEffect(() => {
+    if (!providerId || !ownerKey) return
+    if (visibleSessionState?.windowStatus !== 'closed') {
+      backgroundReconnectAttempts.current = 0
+      return
+    }
+    if (backgroundReconnectInFlight.current
+      || backgroundReconnectAttempts.current >= BACKGROUND_RECONNECT_MAX_ATTEMPTS) return
+    backgroundReconnectAttempts.current += 1
+    backgroundReconnectInFlight.current = true
+    let active = true
+    void openLocalAiWebSession(providerId, ownerKey, { showWindow: false })
+      .then(() => getLocalAiWebSessionState(providerId, ownerKey))
+      .then((next) => { if (active) setSessionState(next) })
+      .catch(() => {
+        // 下一次轮询若仍是 closed，会在次数用尽前再试一次。
+      })
+      .finally(() => { backgroundReconnectInFlight.current = false })
+    return () => { active = false }
+  }, [providerId, ownerKey, visibleSessionState?.windowStatus, visibleSessionState?.updatedAtMs])
 
   useEffect(() => {
     if (!draftTouched) {
@@ -394,13 +419,18 @@ export default function useLocalAiWebChatController(
       const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, listAction)
       await new Promise((resolve) => window.setTimeout(resolve, 180))
       let next = await getLocalAiWebSessionState(provider.id, ownerKey)
+      // 首轮 180ms 内常常还没等到 list 回执；second 命令是 collect，回执的 action 也是
+      // collect，必须换成它自己的 action/requestId 去等，否则会一直等一个不会出现的匹配。
+      let resultAction: LocalAiAdapterAction = listAction
+      let resultRequestId = requestId
       if (next.commandResult?.requestId !== requestId) {
-        await runLocalAiWebAdapterCommand(provider.id, ownerKey, collectAction)
-        next = await waitForLocalAiAdapterResult(provider.id, ownerKey, listAction, requestId) ?? next
+        resultAction = collectAction
+        resultRequestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, collectAction)
+        next = await waitForLocalAiAdapterResult(provider.id, ownerKey, resultAction, resultRequestId) ?? next
       }
       setSessionState(next)
       const result = next.commandResult
-      if (result?.requestId !== requestId) {
+      if (result?.action !== resultAction || result?.requestId !== resultRequestId) {
         setMessage('官网菜单没有返回匹配回执；已保留现有选项，不会把旧菜单当成当前结果。')
       } else if (!result.ok) {
         setMessage(result.detail || '官网菜单尚未返回可用选项。')
@@ -443,6 +473,9 @@ export default function useLocalAiWebChatController(
 }
 
 const RESPONSE_REFRESH_DELAYS_MS = [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000, 10_000] as const
+// 后台会话轮询本身已经按 15 秒节奏检查一次是否仍然 closed，这里只再限一个总次数上限，
+// 避免真正打不开时无休止地重建 WebView2。
+const BACKGROUND_RECONNECT_MAX_ATTEMPTS = 3
 
 function normalizePrompt(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
