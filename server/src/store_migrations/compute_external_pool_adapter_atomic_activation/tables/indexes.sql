@@ -1,0 +1,7 @@
+CREATE INDEX IF NOT EXISTS idx_v277_atomic_activation_provider
+  ON compute_external_pool_adapter_atomic_activation_receipts(
+    target_active_provider_id,target_active_provider_policy_revision,activation_receipt_id);
+
+CREATE INDEX IF NOT EXISTS idx_v277_atomic_activation_route
+  ON compute_external_pool_adapter_atomic_activation_receipts(
+    route_authorization_id,route_credential_id,route_adapter_projection_id);

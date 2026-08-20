@@ -121,18 +121,18 @@ V273 default-off dormant production transport/ingress已通过完整WSL2 GNU目�
 runtime仍`passed=0/failed=0`。它只消费已耐久化的v213 outbox/route/executor/fence，不提供v213 constructor；首个
 v213 send-attempt与V273 exchange-attempt仍须同一transaction/commit后才可出网。
 
-V275 docs-first冻结stable executor与Provider/route原子激活：exact `16 INSERT + 1 CAS UPDATE`同时闭合active
-Provider、v213 route、V275 historical receipt及V274 genesis；V275 receipt永不单独current，V254矩阵只把#1/#5-#12
+V277 docs-first冻结stable executor与Provider/route原子激活：exact `16 INSERT + 1 CAS UPDATE`同时闭合active
+Provider、v213 route、V277 historical receipt及V274 genesis；V277 receipt永不单独current，V254矩阵只把#1/#5-#12
 九项改为pending-plan permit，#2-#4/#13-#18九项继续absolute deny。该设计尚未实现/编译/运行，当前Provider仍
-`registering`、route/executor不存在、`eligible_rows=0`。即使V275成功，仍不允许网络发送；V276才负责route renewal、
+`registering`、route/executor不存在、`eligible_rows=0`。即使V277成功，仍不允许网络发送；V278才负责route renewal、
 per-attempt current reproof与production reachability。见
 [`V273 authority`](external-pool-adapter-task-protocol-production-authority.md)与
-[`V275 authority`](external-pool-adapter-stable-executor-atomic-activation-authority.md)。
+[`V277 authority`](external-pool-adapter-stable-executor-atomic-activation-authority.md)。
 
 ## 11. 仍未实现
 
 - Adapter resolver、真实 credential verifier/KMS 与 bearer 解析；
-- user-node、managed-cluster transport/worker，以及 external-pool V273 dormant kernel 的动态验证与 V276 production reachability；
+- user-node、managed-cluster transport/worker，以及 external-pool V273 dormant kernel 的动态验证与 V278 production reachability；
 - authenticated ACK/event 公网入口、reconcile/cancel 网络协议与 crash injection；
 - accepted closure 的可信生产入口、commit transport 与 Lease authority 带外交付；
 - Lease authority 带外交付、Runner event、Renew 与可信零用量补偿；

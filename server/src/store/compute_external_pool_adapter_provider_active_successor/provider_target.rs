@@ -18,12 +18,16 @@ use crate::{
 pub(super) fn derive_target(
     source: &ComputeProviderRegistrationReceipt,
     structural: ExternalPoolAdapterProviderActiveSuccessorStructuralInput,
-    checked_at: &str,
+    activation_target_updated_at: &str,
 ) -> Result<(
     ComputeProvider,
     ExternalPoolAdapterProviderActiveSuccessorActivationRoot,
 )> {
-    canonical_checked_at(checked_at)?;
+    let target_updated_at = canonical_activation_target_updated_at(activation_target_updated_at)?;
+    let source_updated_at = canonical_provider_updated_at(&source.provider.updated_at)?;
+    if source_updated_at > target_updated_at {
+        bail!("provider active-successor target predates its registering source");
+    }
     let source_json = serde_json::to_string(&source.provider)?;
     if source.provider.status != PROVIDER_STATUS_REGISTERING
         || source.provider_digest != sha256_hex(source_json.as_bytes())
@@ -33,7 +37,7 @@ pub(super) fn derive_target(
     let root = derive_external_pool_adapter_provider_active_successor_activation_root(
         &source.provider,
         structural,
-        checked_at,
+        activation_target_updated_at,
     )?;
     let envelope = &root.activation_root;
     if envelope.source_registering_provider_json != source_json
@@ -48,7 +52,7 @@ pub(super) fn derive_target(
         || target.created_at != source.provider.created_at
         || target.status != PROVIDER_STATUS_ACTIVE
         || target.policy_revision != source.provider.policy_revision.checked_add(1).unwrap_or(0)
-        || target.updated_at != checked_at
+        || target.updated_at != activation_target_updated_at
         || serde_json::to_string(&target)? != envelope.initial_active_provider_json
         || sha256_hex(envelope.initial_active_provider_json.as_bytes())
             != envelope.initial_active_provider_digest
@@ -58,15 +62,27 @@ pub(super) fn derive_target(
     Ok((target, root))
 }
 
-fn canonical_checked_at(value: &str) -> Result<()> {
+fn canonical_activation_target_updated_at(value: &str) -> Result<DateTime<Utc>> {
     let parsed = DateTime::parse_from_rfc3339(value)?;
     if parsed.offset().local_minus_utc() != 0
         || parsed.to_rfc3339_opts(SecondsFormat::Nanos, true) != value
         || parsed > Utc::now()
     {
-        bail!("provider active-successor checked_at is not current canonical UTC nanoseconds");
+        bail!(
+            "provider active-successor activation_target_updated_at is not current canonical UTC nanoseconds"
+        );
     }
-    Ok(())
+    Ok(parsed.with_timezone(&Utc))
+}
+
+fn canonical_provider_updated_at(value: &str) -> Result<DateTime<Utc>> {
+    let parsed = DateTime::parse_from_rfc3339(value)?;
+    if parsed.offset().local_minus_utc() != 0
+        || parsed.to_rfc3339_opts(SecondsFormat::Nanos, true) != value
+    {
+        bail!("provider active-successor source updated_at is not canonical UTC nanoseconds");
+    }
+    Ok(parsed.with_timezone(&Utc))
 }
 
 fn sha256_hex(value: &[u8]) -> String {

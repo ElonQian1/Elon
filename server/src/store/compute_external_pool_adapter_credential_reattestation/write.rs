@@ -13,7 +13,9 @@ use sha2::{Digest, Sha256};
 use crate::{
     compute_federation::{
         external_pool_adapter_credential_reattestation::*,
-        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
+        provider::{
+            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
+        },
     },
     store::{
         compute_external_pool_adapter_adoption::external_pool_adapter_adoption_is_revoked_on,
@@ -32,8 +34,8 @@ use crate::{
 };
 
 use super::{
-    challenge::ensure_upstream_lineage, challenge_audit::challenge_by_id_on,
-    persistence::insert_receipt, read::*, types::*,
+    active_subject::historical_projected_active_subject_on, challenge::ensure_upstream_lineage,
+    challenge_audit::challenge_by_id_on, persistence::insert_receipt, read::*, types::*,
 };
 
 impl Store {
@@ -223,20 +225,25 @@ fn ensure_exact_observed_provider(
         .ok_or_else(|| anyhow::anyhow!("live Provider was not found"))?;
     let provider = &current.provider;
     let adapter = provider.adapter.as_ref();
+    let registering_exact = provider.status == PROVIDER_STATUS_REGISTERING
+        && adapter.map(|item| item.adapter_id.as_str()) == Some(b.adapter_id.as_str());
+    let projected_active_exact = provider.status == PROVIDER_STATUS_ACTIVE
+        && adapter.map(|item| item.adapter_id.as_str())
+            == Some(b.route_adapter_projection_id.as_str())
+        && historical_projected_active_subject_on(tx, b)?.is_some();
     if current.provider_digest != b.observed_provider_digest
         || provider.policy_revision != b.observed_provider_policy_revision
         || provider.status != b.observed_provider_status
-        || provider.status != PROVIDER_STATUS_REGISTERING
         || provider.provider_kind != PROVIDER_KIND_EXTERNAL_POOL
         || provider.provider_id != b.provider_id
         || provider.owner_account_id != b.provider_owner_account_id
         || provider.created_at != onboarding.provider().created_at
         || provider.settlement_account_id.as_deref()
             != Some(b.observed_settlement_account_id.as_str())
-        || adapter.map(|item| item.adapter_id.as_str()) != Some(b.adapter_id.as_str())
         || adapter.map(|item| item.adapter_version.as_str()) != Some(b.release_version.as_str())
         || adapter.map(|item| item.config_revision) != Some(b.adapter_config_revision)
         || adapter.map(|item| item.config_digest.as_str()) != Some(b.adapter_config_digest.as_str())
+        || !(registering_exact || projected_active_exact)
     {
         bail!("live Provider no longer matches the exact challenge observation");
     }

@@ -90,14 +90,22 @@ fn route_source_projection_preserves_generic_sources_and_replaces_logical_equali
         "candidate.adapter_config_revision=NEW.adapter_config_revision",
         "candidate.adapter_config_digest=NEW.adapter_config_digest",
         "candidate.service_actor_id=NEW.verified_by_service_actor_id",
-        "candidate.logical_adapter_binding_digest=NEW.route_binding_digest",
-        "candidate.logical_adapter_binding_digest=NEW.adapter_binding_digest",
+        "NEW.route_binding_digest=NEW.adapter_binding_digest",
         "$.candidate.logical_adapter_binding_digest",
         "$.candidate.logical_projection_compatibility_digest",
     ] {
         assert!(
             MIGRATION.contains(required),
             "V271 lost exact logical-to-projection mapping {required}"
+        );
+    }
+    for forbidden in [
+        "candidate.logical_adapter_binding_digest=NEW.route_binding_digest",
+        "candidate.logical_adapter_binding_digest=NEW.adapter_binding_digest",
+    ] {
+        assert!(
+            !MIGRATION.contains(forbidden),
+            "V271 restored forbidden logical/projected equality {forbidden}"
         );
     }
     assert!(!MIGRATION.contains("candidate.capability_set_digest=NEW.capability_set_digest"));
@@ -152,7 +160,7 @@ fn route_source_projection_requires_the_exact_current_candidate_lineage() {
         "candidate.provider_binding_digest=binding.provider_binding_digest",
         "candidate.registry_release_id=binding.registry_release_id",
         "candidate.registry_release_digest=binding.registry_release_digest",
-        "candidate.logical_adapter_binding_digest=NEW.route_binding_digest",
+        "NEW.route_binding_digest=NEW.adapter_binding_digest",
         "candidate.route_adapter_projection_id=NEW.adapter_id",
         "delegation.service_actor_kind='platform_dispatch_service'",
         "delegation.issued_at<=NEW.authenticated_at",

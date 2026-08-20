@@ -15,6 +15,7 @@ mod compute_external_pool_adapter_artifact_signed_provenance;
 mod compute_external_pool_adapter_artifact_signing_key;
 mod compute_external_pool_adapter_artifact_source;
 mod compute_external_pool_adapter_artifact_vulnerability_report;
+mod compute_external_pool_adapter_atomic_activation;
 mod compute_external_pool_adapter_credential_reattestation;
 mod compute_external_pool_adapter_credential_verification;
 mod compute_external_pool_adapter_credential_verification_hardening;
@@ -89,6 +90,10 @@ pub(crate) fn register_v274_receipt_integrity_functions(conn: &Connection) -> Re
     )
 }
 
+pub(crate) fn register_v277_receipt_integrity_functions(conn: &Connection) -> Result<()> {
+    compute_external_pool_adapter_atomic_activation::register_receipt_integrity_functions(conn)
+}
+
 #[rustfmt::skip]
 pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (1, "初始全量表结构（幂等）", migration_v1),
@@ -100,11 +105,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (7, "项目空间频道与共享频道消息", migration_v7),
     (8, "好友与群聊消息附件引用", migration_v8),
     (9, "同一用户禁止重名活跃项目", migration_v9),
-    (
-        10,
-        "tasks.codex_thread_id + conversation_timeline 视图",
-        migration_v10,
-    ),
+    (10, "tasks.codex_thread_id + conversation_timeline 视图", migration_v10),
     (
         11,
         "projects 构建缓存（last_build_sha / last_build_apk_url）",
@@ -373,16 +374,9 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (272, "外部矿池 Adapter Provider-neutral task-protocol 六能力实跑证明", compute_external_pool_adapter_task_protocol_conformance::migration_v272),
     (273, "外部矿池 Adapter dormant production task delivery 与 authenticated ingress ledger", compute_external_pool_adapter_task_delivery::migration_v273),
     (274, "外部矿池 Adapter activation-rooted Provider active successor", compute_external_pool_adapter_provider_active_successor::migration_v274),
-    (
-        275,
-        "Rust 缓存 Fleet 脱敏报告有界历史",
-        rust_cache_fleet::migration_v275,
-    ),
-    (
-        276,
-        "Rust 缓存 GC 摘要绑定审批与节点执行状态机",
-        rust_cache_gc_approval::migration_v276,
-    ),
+    (275, "Rust 缓存 Fleet 脱敏报告有界历史", rust_cache_fleet::migration_v275),
+    (276, "Rust 缓存 GC 摘要绑定审批与节点执行状态机", rust_cache_gc_approval::migration_v276),
+    (277, "外部矿池 Adapter stable executor 与原子激活历史回执", compute_external_pool_adapter_atomic_activation::migration_v277),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

@@ -50,7 +50,7 @@ use super::super::{
 
 impl Store {
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn with_reproved_external_pool_adapter_no_work_roots(
+    pub(super) fn with_reproved_external_pool_adapter_no_work_roots<Pending, Output>(
         &self,
         profile_id: &str,
         companion_id: &str,
@@ -66,8 +66,9 @@ impl Store {
         consume: impl FnOnce(
             &Transaction<'_>,
             &CurrentExternalPoolAdapterNoWorkProbeObservationAuthority<'_, '_, '_>,
-        ) -> Result<()>,
-    ) -> Result<bool> {
+        ) -> Result<Pending>,
+        postcommit: impl FnOnce(&rusqlite::Connection, Pending) -> Result<Output>,
+    ) -> Result<Option<Output>> {
         let mut connection = self.conn()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let checked_at = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
@@ -79,7 +80,7 @@ impl Store {
             &checked_at,
         )?
         else {
-            return Ok(false);
+            return Ok(None);
         };
         let Some(companion) =
             current_external_pool_adapter_supervisor_session_policy_companion_authority_on(
@@ -90,7 +91,7 @@ impl Store {
                 &checked_at,
             )?
         else {
-            return Ok(false);
+            return Ok(None);
         };
         audit_delivery_roots(&bundle, &companion, &checked_at)?;
         let selected =
@@ -118,6 +119,7 @@ impl Store {
 
         let expected = cleaned.binding();
         let roots = expected.session_root_arguments();
+        let mut pending = None;
         materialize_probe_preparation(&bundle, &selected, |preparation| {
             audit_runtime_compatibility_roots(preparation, &companion, &compatibility)?;
             let observed = delivery_binding(
@@ -174,10 +176,11 @@ impl Store {
             if !observation.no_work_observed() {
                 bail!("no-work post-cleanup observation was not authoritative");
             }
-            consume(&transaction, &observation)?;
+            let created = consume(&transaction, &observation)?;
             if Utc::now() >= expires {
                 bail!("no-work post-cleanup observation expired before transaction commit");
             }
+            pending = Some(created);
             Ok(())
         })?;
         drop(compatibility);
@@ -185,7 +188,9 @@ impl Store {
         drop(companion);
         drop(bundle);
         transaction.commit()?;
-        Ok(true)
+        let pending = pending
+            .ok_or_else(|| anyhow::anyhow!("no-work final callback returned no pending output"))?;
+        postcommit(&connection, pending).map(Some)
     }
 }
 

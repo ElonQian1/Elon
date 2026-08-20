@@ -87,7 +87,8 @@ const RECEIPT_COLUMNS: &str = concat!(
     "observation_expires_at,task_protocol_conformance_run_receipt_id,",
     "task_protocol_conformance_run_receipt_digest,task_protocol_conformance_expires_at,",
     "process_custody_epoch_digest,process_custody_nonce_digest,process_custody_seal_digest,",
-    "activation_witness_id,activation_witness_digest,checked_at,created_at,effects_json,",
+    "activation_witness_id,activation_witness_digest,activation_target_updated_at,",
+    "evidence_checked_at,created_at,effects_json,",
     "readiness_json,receipt_integrity_digest"
 );
 const REVOCATION_COLUMNS: &str = concat!(
@@ -119,7 +120,7 @@ fn provider_active_successor_domain_freezes_stable_root_and_projected_target() {
         "let source_json = serde_json::to_string(source)?;",
         "let initial_json = serde_json::to_string(&initial)?;",
         "initial.status = PROVIDER_STATUS_ACTIVE.into();",
-        "initial.updated_at = checked_at.into();",
+        "initial.updated_at = activation_target_updated_at.into();",
         ".adapter_id = structural.route_adapter_projection_id.clone();",
     ] {
         assert!(CANONICAL.contains(marker), "canonical root lost {marker}");
@@ -168,7 +169,7 @@ fn provider_active_successor_domain_freezes_stable_root_and_projected_target() {
     );
     for marker in [
         "non_authoritative_carrier_only",
-        "requires_v276_current_authority_reproof",
+        "requires_v278_current_authority_reproof",
         "effects: \"none\"",
     ] {
         assert!(CARRIER_POLICY.contains(marker));
@@ -191,7 +192,7 @@ fn provider_active_successor_migration_freezes_exact_tables_views_and_guards() {
         ),
         csv(REVOCATION_COLUMNS)
     );
-    assert_eq!(csv(RECEIPT_COLUMNS).len(), 84);
+    assert_eq!(csv(RECEIPT_COLUMNS).len(), 85);
     assert_eq!(csv(REVOCATION_COLUMNS).len(), 25);
     for table in [RECEIPTS, REVOCATIONS] {
         assert_eq!(table.matches(EFFECTS).count(), 1);

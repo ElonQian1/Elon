@@ -3,11 +3,19 @@ use std::marker::PhantomData;
 use anyhow::{bail, Result};
 use rusqlite::Transaction;
 
+mod active;
+mod execution;
 mod reproof;
+
+pub(in crate::store) use active::{
+    planned_external_pool_adapter_active_no_work_probe_subject_on,
+    with_reproved_planned_external_pool_adapter_active_no_work_subject,
+    PlannedExternalPoolAdapterActiveNoWorkProbeSubject,
+    ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject,
+};
 
 use super::{
     probe_preparation::{audit_credential_roots, audit_sandbox_roots, audit_vulnerability_roots},
-    runtime::ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     secret_delivery::{
         CleanedExternalPoolAdapterEphemeralSecretDeliveryAuthority,
         ExternalPoolAdapterEphemeralSecretDeliveryBinding,
@@ -15,7 +23,6 @@ use super::{
 };
 use crate::{
     compute_federation::{
-        external_pool_adapter_broker_tls::ExternalPoolAdapterBrokerTlsTarget,
         external_pool_adapter_credential_reattestation::ExternalPoolAdapterCredentialReattestationReceipt,
         external_pool_adapter_runtime_compatibility_verification::server_runtime_compatibility_v2_profile_catalog,
         external_pool_adapter_runtime_launch_profile::ExternalPoolAdapterRuntimeLaunchProfileReceipt,
@@ -36,15 +43,11 @@ use crate::{
             CurrentExternalPoolAdapterSandboxReattestationAuthority,
         },
         compute_external_pool_adapter_supervisor_session_policy_companion::CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
-        compute_external_pool_adapter_upstream_transport_target::{
-            CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
-            ExternalPoolAdapterInstallationReopener,
-        },
+        compute_external_pool_adapter_upstream_transport_target::CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
         compute_external_pool_adapter_vulnerability_reattestation::{
             current_external_pool_adapter_vulnerability_reattestation_head_authority_on,
             CurrentExternalPoolAdapterVulnerabilityReattestationAuthority,
         },
-        Store,
     },
 };
 use elon_external_pool_adapter_session_core::ExternalPoolAdapterNoWorkProbeHostReceipt;
@@ -148,10 +151,22 @@ impl<'authority, 'tx, 'conn>
         self.credential.receipt()
     }
 
+    pub(in crate::store) fn credential_authority(
+        &self,
+    ) -> &CurrentExternalPoolAdapterCredentialReattestationAuthority {
+        self.credential
+    }
+
     pub(in crate::store) fn companion(
         &self,
     ) -> &CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority {
         self.companion
+    }
+
+    pub(in crate::store) fn upstream_target(
+        &self,
+    ) -> &crate::compute_federation::external_pool_adapter_upstream_transport_target::ExternalPoolAdapterUpstreamTransportTargetReceipt{
+        self.binding.upstream_target()
     }
 
     pub(in crate::store) fn runtime_compatibility(
@@ -194,115 +209,6 @@ impl<'authority, 'tx, 'conn>
 
     pub(in crate::store) fn scratch_cleaned(&self) -> bool {
         self.cleaned.scratch_cleaned()
-    }
-}
-
-impl Store {
-    #[allow(clippy::too_many_arguments, dead_code)]
-    pub(in crate::store) async fn with_current_external_pool_adapter_no_work_probe_observation(
-        &self,
-        profile_id: &str,
-        companion_id: &str,
-        expected_companion_digest: &str,
-        target_id: &str,
-        expected_target_digest: &str,
-        runtime_compatibility_verification_receipt_id: &str,
-        expected_runtime_compatibility_verification_receipt_digest: &str,
-        reopen_prepared: &mut ExternalPoolAdapterInstallationReopener<'_>,
-        runtime: &ExternalPoolAdapterProviderRuntimeReadinessRuntime,
-        preflight_consume: impl FnOnce(
-                &Transaction<'_>,
-                &CurrentExternalPoolAdapterUpstreamTransportTargetAuthority,
-                &str,
-            ) -> Result<()>
-            + Send,
-        consume: impl FnOnce(
-                &Transaction<'_>,
-                &CurrentExternalPoolAdapterNoWorkProbeObservationAuthority<'_, '_, '_>,
-            ) -> Result<()>
-            + Send,
-    ) -> Result<bool> {
-        let Some(mut broker) = self
-            .prepare_current_external_pool_adapter_broker_tls_channel(
-                target_id,
-                expected_target_digest,
-                reopen_prepared,
-                |transaction, target, checked_at| {
-                    require_preflight_dynamic_and_compatibility_roots(
-                        transaction,
-                        target,
-                        runtime_compatibility_verification_receipt_id,
-                        expected_runtime_compatibility_verification_receipt_digest,
-                        checked_at,
-                    )?;
-                    preflight_consume(transaction, target, checked_at)
-                },
-            )
-            .await?
-        else {
-            return Ok(false);
-        };
-
-        // Successful execution uses exactly six independently reopened installation audits. These
-        // are #3 and #4; neither is opened before the broker network await completes.
-        let delivery_bundle_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
-        let delivery_session_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
-        let Some(mut delivery) = self
-            .prepare_current_external_pool_adapter_ephemeral_secret_delivery(
-                profile_id,
-                companion_id,
-                expected_companion_digest,
-                delivery_bundle_prepared,
-                delivery_session_prepared,
-                runtime.bundle_root(),
-                runtime.cgroup_parent(),
-                runtime.process_custody(),
-            )?
-        else {
-            return Ok(false);
-        };
-        let delivery_target =
-            ExternalPoolAdapterBrokerTlsTarget::from_receipt(delivery.binding().upstream_target())?;
-        if broker.target() != &delivery_target
-            || broker.target().target_id() != target_id
-            || broker.target().target_digest() != expected_target_digest
-        {
-            bail!("no-work probe broker and child roots diverged");
-        }
-
-        let request = delivery.receive_no_work_request()?;
-        let response = broker
-            .exchange_no_work(
-                request.request(),
-                request.expected_response_bytes(),
-                delivery.binding().probe_timeout(),
-            )
-            .await?;
-        let selected_address = broker.selected_address();
-        let receipt = delivery.complete_no_work_request(request, &response)?;
-        drop(response);
-        drop(broker);
-
-        // No final callback or durable write is reachable until this consuming transition returns.
-        let cleaned = delivery.shutdown_and_reap()?;
-
-        // These are successful-path reopens #5 and #6, deliberately obtained only after cleanup.
-        let reproof_bundle_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
-        let reproof_session_prepared = reopen_prepared().map_err(anyhow::Error::new)?;
-        self.with_reproved_external_pool_adapter_no_work_roots(
-            profile_id,
-            companion_id,
-            expected_companion_digest,
-            runtime_compatibility_verification_receipt_id,
-            expected_runtime_compatibility_verification_receipt_digest,
-            reproof_bundle_prepared,
-            reproof_session_prepared,
-            runtime,
-            receipt,
-            selected_address,
-            cleaned,
-            consume,
-        )
     }
 }
 

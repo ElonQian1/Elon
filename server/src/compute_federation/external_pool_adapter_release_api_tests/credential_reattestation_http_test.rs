@@ -252,7 +252,7 @@ async fn credential_reattestation_http_revokes_head_and_classifies_failures() {
 }
 
 #[tokio::test]
-async fn credential_reattestation_http_is_registering_only_before_v275() {
+async fn credential_reattestation_http_is_registering_only_before_v277() {
     let fixture = fixture();
     let roots =
         create_credential_reattestation_fixture(&fixture, "credential-active", "52.2.0").await;
@@ -304,7 +304,7 @@ async fn credential_reattestation_http_is_registering_only_before_v275() {
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .unwrap();
-    assert_eq!(receipt_count, 1, "pre-V275 must not mint an active receipt");
+    assert_eq!(receipt_count, 1, "pre-V277 must not mint an active receipt");
     assert_eq!(current_status, "historical_only");
     drop(connection);
     assert_no_effects(&fixture, &roots);

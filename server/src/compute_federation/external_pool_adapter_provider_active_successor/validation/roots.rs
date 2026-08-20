@@ -79,6 +79,8 @@ pub(crate) fn validate_external_pool_adapter_provider_active_successor_activatio
     if initial != expected
         || initial.provider_id != root.initial_active_provider_id
         || initial.policy_revision != root.initial_active_provider_policy_revision
+        || support::canonical_nanos(&source.updated_at)?
+            > support::canonical_nanos(&initial.updated_at)?
     {
         bail!("provider active successor target is not the adjacent projected Provider")
     }

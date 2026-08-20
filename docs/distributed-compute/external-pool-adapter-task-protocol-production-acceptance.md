@@ -50,7 +50,7 @@ targeted_local_source_contracts_and_migration_verified / production_runtime_unru
   generic mutable head/queue、secret、signature、executor、route或public-ingress表；
 - receipt一对一关闭 attempt；reconcile只恢复 remote-unknown，event cursor/batch/event root连续，duplicate replay可
   证明，gap/fork/conflict失败关闭；
-- authenticated material只形成 Store-private V276 handoff，不开放 v211/v213/v215/Lease/Runner constructor；
+- authenticated material只形成 Store-private V278 handoff，不开放 v211/v213/v215/Lease/Runner constructor；
 - 没有 HTTP、MCP、WebSocket、callback、owner/admin、`/api/me`、loopback listener或通用上传 API；
 - Provider=`registering`、V254 18 deny逐字在位、打开 fence=`0`，所有 Provider/route/executor/activation/market/
   settlement effect=`none`。
@@ -95,7 +95,7 @@ targeted_local_source_contracts_and_migration_verified / production_runtime_unru
 | direct SQL | 伪造attempt/receipt/poll/batch/event、绕过source/root/currentness、删除历史、更新四张immutable表、修改poll intent或绕过narrow CAS claim projection全部被DDL拒绝。 |
 
 任何 positive fixture 都不得通过删除、关闭、缩窄或改名 V254 fence获得 external-pool route；V273 动态测试在
-V275/V276 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制造真实 production send。
+V277/V278 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制造真实 production send。
 
 ## 6. 不属于 V273 的验收
 
@@ -104,17 +104,17 @@ V275/V276 前只允许验证 disabled/unavailable/`eligible_rows=0`，不能制�
 - v213 Adapter/version、credential、service actor、route authorization/capability/seal或其 constructor；
 - stable executor binding、Provider active version、Start outbox、真实 eligible row或生产任务执行；
 - V274 stable activation root、exact projected-active Provider、最长15秒V270-equivalent observation、fresh V272
-  carrier、两张immutable表+一个诊断view，及V275事务内首个successor；
+  carrier、两张immutable表+一个诊断view，及V277事务内首个successor；
 - V254 18-fence replacement、atomic Provider/route activation；
-- V276 worker/ingress到v213 ACK/observation/accepted closure/Lease/Runner event的production reachability；
+- V278 worker/ingress到v213 ACK/observation/accepted closure/Lease/Runner event的production reachability；
 - Pool/Offer admission、usage、market、settlement、部署或跨进程可携带外签 authority。
 
 ## 7. 后继门与正式结论
 
-后继顺序固定为 V274 Store-private contract（V275前零行）→ V275 stable executor + exact projected-active
-Provider/route/18-fence atomic activation并append V274 genesis → V276 production reachability。V276 必须重新执行本页
+后继顺序固定为 V274 Store-private contract（V277前零行）→ V277 stable executor + exact projected-active
+Provider/route/18-fence atomic activation并append V274 genesis → V278 production reachability。V278 必须重新执行本页
 startup、root/wire、六表、crash/concurrency与 ingress矩阵；不能把 V273/V274 source review、V272 conformance passed
-或V275 migration success当作 transport已验收。
+或V277 migration success当作 transport已验收。
 
 V273 当前只能声明“default-off dormant production transport/ingress kernel 合同已冻结，迁移边界已局部动态验证”。
 它不能声明 worker已运行、ACK/event已接入、Provider可激活或任务可派发。正式状态保持

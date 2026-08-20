@@ -1,5 +1,6 @@
 //! Locked HMAC custody and epoch-local durable receipt seals.
 
+mod atomic_activation_plan;
 mod provider_active_successor;
 mod support;
 mod task_protocol_conformance;
@@ -34,6 +35,14 @@ use elon_external_pool_adapter_session_core::ExternalPoolAdapterNoWorkProbeHostR
 
 const MAX_READINESS_SEAL_TTL_MS: i64 = 15_000;
 const MAX_LIVE_READINESS_SEALS: usize = 4_096;
+pub(crate) use atomic_activation_plan::register_external_pool_adapter_atomic_activation_pending_plan_udf;
+pub(in crate::store) use atomic_activation_plan::{
+    install_external_pool_adapter_atomic_activation_pending_plan_on,
+    ExternalPoolAdapterAtomicActivationPendingPlan,
+    ExternalPoolAdapterAtomicActivationPendingPlanGuard,
+    ExternalPoolAdapterAtomicActivationPendingWrite,
+    ExternalPoolAdapterAtomicActivationPendingWriteKind,
+};
 pub(in crate::store) use provider_active_successor::{
     ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
     ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,

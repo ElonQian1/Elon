@@ -55,10 +55,10 @@ capability/seal 写入矩阵、并发、崩溃恢复与停在 V270 的磁盘升�
 - V254 18 个 trigger 名及 SQL 均无 diff，本批打开 fence 数为 `0`；
 - 文档和状态页明确 Provider=`registering`、`activation_ready=false`、全部业务 effect=`none`。
 
-V271以上断言和6/6证据只覆盖historical pre-V275 trigger。V275 active branch必须保持同一V221 source bridge，但
+V271以上断言和6/6证据只覆盖historical pre-V277 trigger。V277 active branch必须保持同一V221 source bridge，但
 不再断言`logical_adapter_binding_digest=route_binding_digest=adapter_binding_digest`：logical digest只做lineage，
 route/adapter改用`ELON-COMPUTE-ATTEMPT-ADAPTER-BINDING-V1`的既有8字段projection-shaped digest，且不得向该shape
-添加Provider revision/digest/status或executor。active Provider pair与stable executor由V275 receipt另绑；该superseding
+添加Provider revision/digest/status或executor。active Provider pair与stable executor由V277 receipt另绑；该superseding
 branch当前为`source_review_only / implementation_uncompiled / implementation_unrun / passed=0 / failed=0`。
 
 ## 4. 不属于 V271 的验收
@@ -66,9 +66,9 @@ branch当前为`source_review_only / implementation_uncompiled / implementation_
 以下均保持未实现，不能记入 V271 passed：
 
 - 六能力 production producer/worker、authenticated ACK/event 与 prepare/commit/cancel/reconcile 网络协议；
-- V275已冻结但尚未实现/编译/运行的stable executor、active V253与fresh V274 successor/restart；
+- V277已冻结但尚未实现/编译/运行的stable executor、active V253与fresh V274 successor/restart；
 - V270-equivalent/V272 freshness动态验收、atomic Provider activation、V254 #1/#5-#12 pending-plan permit guards；
-- V276 route renewal/reachability；V254 #2-#4/#13-#18仍必须absolute deny；
+- V278 route renewal/reachability；V254 #2-#4/#13-#18仍必须absolute deny；
 - Pool/Offer admission、真实派发、计量、market、settlement 或部署。
 
 ## 5. 正式结论

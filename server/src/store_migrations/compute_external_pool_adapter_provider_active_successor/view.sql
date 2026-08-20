@@ -13,7 +13,7 @@ SELECT 'compute_federation.external_pool_adapter_provider_active_successor_curre
        receipt.evidence_provider_id,
        receipt.evidence_provider_policy_revision,
        receipt.evidence_provider_digest,
-       receipt.checked_at,
+       receipt.evidence_checked_at,
        receipt.observation_expires_at,
        CASE WHEN successor.active_successor_receipt_id IS NULL THEN 'head'
             ELSE 'historical' END AS head_status,
@@ -27,7 +27,7 @@ SELECT 'compute_federation.external_pool_adapter_provider_active_successor_curre
                   AND version.provider_json=receipt.evidence_provider_json
                   AND json_extract(version.provider_json,'$.adapter.adapter_id')=receipt.route_adapter_projection_id
             THEN 'projected_active_exact' ELSE 'provider_drifted' END AS provider_status,
-       CASE WHEN julianday(receipt.checked_at)<=julianday('now')
+       CASE WHEN julianday(receipt.evidence_checked_at)<=julianday('now')
                   AND julianday(receipt.observation_expires_at)>julianday('now')
             THEN 'unexpired' ELSE 'expired' END AS expiry_status,
        CASE WHEN successor.active_successor_receipt_id IS NULL
@@ -39,7 +39,7 @@ SELECT 'compute_federation.external_pool_adapter_provider_active_successor_curre
                   AND provider.current_provider_digest=receipt.evidence_provider_digest
                   AND version.provider_json=receipt.evidence_provider_json
                   AND json_extract(version.provider_json,'$.adapter.adapter_id')=receipt.route_adapter_projection_id
-                  AND julianday(receipt.checked_at)<=julianday('now')
+                  AND julianday(receipt.evidence_checked_at)<=julianday('now')
                   AND julianday(receipt.observation_expires_at)>julianday('now')
             THEN 'relationally_current_requires_process_custody_and_active_root_reproof'
             ELSE 'historical_only' END AS current_status

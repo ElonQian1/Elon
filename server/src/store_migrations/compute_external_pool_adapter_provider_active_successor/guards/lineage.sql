@@ -12,7 +12,7 @@ WHEN (NEW.successor_sequence=1 AND EXISTS (
            AND predecessor.activation_root_digest=NEW.activation_root_digest
            AND predecessor.successor_sequence+1=NEW.successor_sequence
            AND predecessor.evidence_provider_policy_revision<=NEW.evidence_provider_policy_revision
-           AND predecessor.checked_at<NEW.checked_at
+           AND predecessor.evidence_checked_at<NEW.evidence_checked_at
            AND NOT EXISTS (
              SELECT 1 FROM compute_external_pool_adapter_provider_active_successor_receipts successor
               WHERE successor.predecessor_active_successor_receipt_id=predecessor.active_successor_receipt_id)))

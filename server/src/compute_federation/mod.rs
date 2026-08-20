@@ -43,6 +43,7 @@ pub(crate) mod external_pool_adapter_artifact_source_service;
 pub(crate) mod external_pool_adapter_artifact_vulnerability_report;
 pub(crate) mod external_pool_adapter_artifact_vulnerability_report_api;
 pub(crate) mod external_pool_adapter_artifact_vulnerability_report_service;
+pub(crate) mod external_pool_adapter_atomic_activation;
 pub(crate) mod external_pool_adapter_broker_tls;
 #[cfg(test)]
 mod external_pool_adapter_broker_tls_source_contract_tests;

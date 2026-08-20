@@ -83,7 +83,7 @@ pub(crate) struct ExternalPoolAdapterProviderActiveSuccessorCurrentness {
     pub evidence_provider_id: String,
     pub evidence_provider_policy_revision: i64,
     pub evidence_provider_digest: String,
-    pub checked_at: String,
+    pub evidence_checked_at: String,
     pub observation_expires_at: String,
     pub current_status: String,
 }

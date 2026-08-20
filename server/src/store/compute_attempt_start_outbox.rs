@@ -17,6 +17,7 @@ mod no_start;
 mod observations;
 mod read;
 mod replay;
+mod route_persistence;
 mod send;
 mod types;
 
@@ -32,6 +33,10 @@ pub(super) use no_start::{
     ensure_start_resolved_for_broker_finish_on, record_prepare_rejected_no_start_on,
 };
 pub(super) use observations::record_verified_observation_on;
+pub(in crate::store) use route_persistence::{
+    audit_persisted_compute_route_authority_on, ensure_compute_route_registry_current_on,
+    persist_compute_route_authority_on,
+};
 pub(super) use types::{
     BrokerFinishStartResolutionBinding, StartOutboxEnqueueReceipt, StartOutboxObservationReceipt,
     StartResolutionProofReceipt,

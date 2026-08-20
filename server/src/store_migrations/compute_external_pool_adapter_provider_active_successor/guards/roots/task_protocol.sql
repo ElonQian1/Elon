@@ -10,8 +10,8 @@ WHEN NOT EXISTS (
      AND run.task_protocol_profile_digest=NEW.task_protocol_profile_digest
      AND run.launch_image_sha256=NEW.launch_image_sha256
      AND run.expires_at=NEW.task_protocol_conformance_expires_at
-     AND run.post_cleanup_checked_at<=NEW.checked_at
-     AND NEW.checked_at<run.expires_at
+     AND run.post_cleanup_checked_at<=NEW.evidence_checked_at
+     AND NEW.evidence_checked_at<run.expires_at
      AND NEW.observation_expires_at<=run.expires_at
      AND NOT EXISTS (
        SELECT 1 FROM compute_external_pool_adapter_task_protocol_conformance_run_receipts successor

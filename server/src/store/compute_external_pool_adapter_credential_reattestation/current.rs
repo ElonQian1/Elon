@@ -5,7 +5,9 @@ use rusqlite::Connection;
 use crate::{
     compute_federation::{
         external_pool_adapter_credential_reattestation::CREDENTIAL_REATTESTATION_CURRENTNESS_SCHEMA,
-        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
+        provider::{
+            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
+        },
     },
     store::{
         compute_external_pool_adapter_adoption::external_pool_adapter_adoption_is_revoked_on,
@@ -18,7 +20,7 @@ use crate::{
     },
 };
 
-use super::{read::*, types::*};
+use super::{active_subject::current_projected_active_subject_on, read::*, types::*};
 
 pub(super) fn currentness_on(
     conn: &Connection,
@@ -33,7 +35,7 @@ pub(super) fn currentness_on(
     let b = &receipt.reattestation.binding;
     let revocation = revocation_by_receipt_on(conn, &receipt.reattestation_receipt_id)?;
     let release_current = release_is_current(conn, b, checked_at)?;
-    let (subject_exact, revision_status) = provider_statuses(conn, b)?;
+    let (subject_exact, revision_status) = provider_statuses(conn, b, checked_at)?;
     let key_current = verifier_key_is_current(conn, b)?;
     let upstream_terminal =
         external_pool_adapter_installation_is_revoked_on(conn, &b.installation_receipt_id)?
@@ -41,7 +43,11 @@ pub(super) fn currentness_on(
     let verified = DateTime::parse_from_rfc3339(&receipt.reattestation.verified_at)?;
     let expires = DateTime::parse_from_rfc3339(&b.report_expires_at)?;
     let report_current = checked >= verified && checked < expires;
-    let provider_current = subject_exact && revision_status == "exact_registering";
+    let provider_current = subject_exact
+        && matches!(
+            revision_status,
+            "exact_registering" | "exact_projected_active"
+        );
     let verified_current = release_current
         && !upstream_terminal
         && provider_current
@@ -85,6 +91,15 @@ pub(in crate::store) fn current_external_pool_adapter_credential_reattestation_a
     }
     let stored = receipt_by_id_on(conn, expected_receipt_id)?
         .ok_or_else(|| anyhow::anyhow!("credential re-attestation disappeared"))?;
+    if stored
+        .receipt
+        .reattestation
+        .binding
+        .observed_provider_status
+        != PROVIDER_STATUS_REGISTERING
+    {
+        bail!("registering credential re-attestation authority cannot wrap active evidence");
+    }
     Ok(Some(
         CurrentExternalPoolAdapterCredentialReattestationAuthority::new(
             stored.receipt,
@@ -130,6 +145,7 @@ fn release_is_current(
 fn provider_statuses(
     conn: &Connection,
     b: &crate::compute_federation::external_pool_adapter_credential_reattestation::ExternalPoolAdapterCredentialReattestationBinding,
+    checked_at: &str,
 ) -> Result<(bool, &'static str)> {
     let onboarding = historical_external_pool_onboarding_application_authority_on(
         conn,
@@ -142,28 +158,37 @@ fn provider_statuses(
     };
     let provider = &current.provider;
     let adapter = provider.adapter.as_ref();
-    let subject_exact = provider.provider_id == b.provider_id
+    let common_exact = provider.provider_id == b.provider_id
         && provider.provider_kind == PROVIDER_KIND_EXTERNAL_POOL
         && provider.owner_account_id == b.provider_owner_account_id
         && provider.created_at == onboarding.provider().created_at
-        && adapter.map(|item| item.adapter_id.as_str()) == Some(b.adapter_id.as_str())
         && adapter.map(|item| item.adapter_version.as_str()) == Some(b.release_version.as_str())
         && adapter.map(|item| item.config_revision) == Some(b.adapter_config_revision)
         && adapter.map(|item| item.config_digest.as_str())
             == Some(b.adapter_config_digest.as_str());
-    if !subject_exact {
+    if !common_exact {
         return Ok((false, "historical_only"));
     }
     let revision = if b.observed_provider_status == PROVIDER_STATUS_REGISTERING
         && provider.status == PROVIDER_STATUS_REGISTERING
         && provider.policy_revision == b.observed_provider_policy_revision
         && current.provider_digest == b.observed_provider_digest
+        && adapter.map(|item| item.adapter_id.as_str()) == Some(b.adapter_id.as_str())
     {
         "exact_registering"
+    } else if b.observed_provider_status == PROVIDER_STATUS_ACTIVE
+        && provider.status == PROVIDER_STATUS_ACTIVE
+        && provider.policy_revision == b.observed_provider_policy_revision
+        && current.provider_digest == b.observed_provider_digest
+        && adapter.map(|item| item.adapter_id.as_str())
+            == Some(b.route_adapter_projection_id.as_str())
+        && current_projected_active_subject_on(conn, b, checked_at)?.is_some()
+    {
+        "exact_projected_active"
     } else {
         "historical_only"
     };
-    Ok((true, revision))
+    Ok((revision != "historical_only", revision))
 }
 
 fn verifier_key_is_current(

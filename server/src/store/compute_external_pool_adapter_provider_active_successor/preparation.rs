@@ -19,8 +19,8 @@ use super::{
     types::PreparedExternalPoolAdapterProviderActiveSuccessorTarget,
 };
 
-/// Exact CAS inputs for a non-authorizing structural target. It contains no V275 witness.
-pub(in crate::store) struct PrepareExternalPoolAdapterProviderActiveSuccessorTarget {
+/// Exact CAS inputs for a non-authorizing structural target. It contains no V277 witness.
+pub(super) struct PrepareExternalPoolAdapterProviderActiveSuccessorTarget {
     pub(in crate::store) prepared_installation: PreparedExternalPoolAdapterInstallation,
     pub(in crate::store) companion_id: String,
     pub(in crate::store) expected_companion_digest: String,
@@ -33,14 +33,15 @@ pub(in crate::store) struct PrepareExternalPoolAdapterProviderActiveSuccessorTar
 
 /// Builds only the registering source plus planned adjacent projected Provider target/root.
 /// It neither performs external I/O nor mints/remembers a process seal.
-pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_target_on<
-    'tx,
-    'conn,
->(
+pub(super) fn prepare_external_pool_adapter_provider_active_successor_target_on<'tx, 'conn>(
     transaction: &'tx Transaction<'conn>,
     input: PrepareExternalPoolAdapterProviderActiveSuccessorTarget,
-    checked_at: &str,
+    activation_target_updated_at: &str,
+    authority_checked_at: &str,
 ) -> Result<PreparedExternalPoolAdapterProviderActiveSuccessorTarget<'tx, 'conn>> {
+    if activation_target_updated_at > authority_checked_at {
+        bail!("provider active-successor target time is later than its authority reproof");
+    }
     validate_task_production_carrier_policy_digest(
         &input.expected_task_production_carrier_policy_digest,
     )?;
@@ -49,18 +50,18 @@ pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_
         &input.companion_id,
         &input.expected_companion_digest,
         input.prepared_installation,
-        checked_at,
+        authority_checked_at,
     )?
     .ok_or_else(|| anyhow::anyhow!("provider active-successor lost exact current V259"))?;
     let transport_target = companion.target();
     let profile = transport_target.profile();
     let candidate = profile.candidate();
     let binding = candidate.registry();
-    if companion.checked_at() != checked_at
-        || transport_target.checked_at() != checked_at
-        || profile.checked_at() != checked_at
-        || candidate.checked_at() != checked_at
-        || binding.checked_at() != checked_at
+    if companion.checked_at() != authority_checked_at
+        || transport_target.checked_at() != authority_checked_at
+        || profile.checked_at() != authority_checked_at
+        || candidate.checked_at() != authority_checked_at
+        || binding.checked_at() != authority_checked_at
     {
         bail!("provider active-successor structural roots were not checked at one instant");
     }
@@ -71,7 +72,7 @@ pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_
             transaction,
             &input.runtime_compatibility_verification_receipt_id,
             &input.expected_runtime_compatibility_verification_receipt_digest,
-            checked_at,
+            authority_checked_at,
         )?
         .ok_or_else(|| anyhow::anyhow!("provider active-successor lost exact current V268"))?;
     let task_protocol = server_task_protocol_conformance_profile_catalog()?;
@@ -89,7 +90,7 @@ pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_
         &task_protocol.profile_digest,
         &input.expected_lane_subject_digest,
         &input.expected_task_production_carrier_policy_digest,
-        checked_at,
+        authority_checked_at,
     )?;
     let source = current_registered_provider_on(transaction, &binding_material.provider_id)?
         .ok_or_else(|| anyhow::anyhow!("provider active-successor source Provider disappeared"))?;
@@ -98,7 +99,8 @@ pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_
     {
         bail!("provider active-successor source Provider is not exact V249 registering history");
     }
-    let (target, activation_root) = derive_target(&source, structural, checked_at)?;
+    let (target, activation_root) =
+        derive_target(&source, structural, activation_target_updated_at)?;
     Ok(
         PreparedExternalPoolAdapterProviderActiveSuccessorTarget::new(
             transaction,
@@ -107,7 +109,8 @@ pub(in crate::store) fn prepare_external_pool_adapter_provider_active_successor_
             activation_root,
             companion,
             compatibility,
-            checked_at.into(),
+            authority_checked_at.into(),
+            activation_target_updated_at.into(),
         ),
     )
 }

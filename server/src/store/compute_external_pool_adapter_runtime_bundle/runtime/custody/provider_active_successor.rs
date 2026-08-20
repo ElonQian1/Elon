@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use chrono::{DateTime, Utc};
+use rusqlite::Connection;
 use zeroize::Zeroize;
 
 use super::{
+    atomic_activation_plan::ExternalPoolAdapterAtomicActivationPendingPlanGuard,
     support::{constant_time_equal, is_lower_hex_sha256, update_field},
     ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,
 };
@@ -112,7 +114,7 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
         })
     }
 
-    /// Registers an exact pending tuple. This method intentionally has no V274 caller before V275.
+    /// Registers an exact pending tuple. This method intentionally has no V274 caller before V277.
     pub(in crate::store) fn remember_pending_provider_active_successor_process_seal(
         &self,
         receipt_integrity_digest: &str,
@@ -208,10 +210,18 @@ impl ExternalPoolAdapterProviderRuntimeReadinessProcessCustody {
 
     pub(in crate::store) fn promote_provider_active_successor_process_seal(
         &self,
+        connection: &Connection,
+        plan_guard: &ExternalPoolAdapterAtomicActivationPendingPlanGuard,
         kind: &str,
         entity_id: &str,
         receipt_integrity_digest: &str,
     ) -> Result<bool> {
+        ensure!(
+            connection.is_autocommit(),
+            "V274 process seal promotion requires a committed autocommit connection"
+        );
+        plan_guard.ensure_same_connection(connection)?;
+        plan_guard.ensure_fully_consumed()?;
         if !valid_kind(kind)
             || !valid_id(entity_id)
             || !is_lower_hex_sha256(receipt_integrity_digest)

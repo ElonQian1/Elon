@@ -23,8 +23,8 @@ use super::{
     types::*,
 };
 
-mod replay;
-mod validation;
+pub(super) mod replay;
+pub(super) mod validation;
 
 use replay::{
     ensure_create_replay, ensure_fresh_readback, promote_exact_pending_replay, replay_output,

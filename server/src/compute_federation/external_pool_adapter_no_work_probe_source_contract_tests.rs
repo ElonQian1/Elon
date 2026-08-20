@@ -23,8 +23,14 @@ const SUPERVISOR_LIFECYCLE: &str =
     include_str!("external_pool_adapter_linux_supervisor/lifecycle.rs");
 const PROBE_REPROOF: &str =
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/no_work_probe/reproof.rs");
+const PROBE_EXECUTION: &str = include_str!(
+    "../store/compute_external_pool_adapter_runtime_bundle/no_work_probe/execution.rs"
+);
 const PROBE_STORE: &str = concat!(
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/no_work_probe.rs"),
+    include_str!(
+        "../store/compute_external_pool_adapter_runtime_bundle/no_work_probe/execution.rs"
+    ),
     include_str!("../store/compute_external_pool_adapter_runtime_bundle/no_work_probe/reproof.rs")
 );
 const V258_POLICY: &str =
@@ -126,34 +132,61 @@ fn v265_store_commits_before_network_and_reproves_exact_roots_after_exchange() {
         );
     }
     assert!(!PROBE_STORE.contains("final_bundle_commitment !="));
-    let connect = PROBE_STORE
-        .find("prepare_current_external_pool_adapter_broker_tls_channel")
+    let physical = PROBE_EXECUTION
+        .split_once("pub(super) async fn execute_external_pool_adapter_no_work_probe(")
+        .unwrap()
+        .1
+        .split_once("impl Store {")
+        .unwrap()
+        .0;
+    let request = physical
+        .find("delivery.receive_no_work_request()?")
         .unwrap();
-    let delivery = PROBE_STORE
-        .find("prepare_current_external_pool_adapter_ephemeral_secret_delivery")
+    let exchange = physical.find(".exchange_no_work(").unwrap();
+    let completion = physical
+        .find("delivery.complete_no_work_request(request, &response)?")
         .unwrap();
-    let exchange = PROBE_STORE.find(".exchange_no_work(").unwrap();
-    let cleanup = PROBE_STORE
+    let response_drop = physical.find("drop(response)").unwrap();
+    let broker_drop = physical.find("drop(broker)").unwrap();
+    let cleanup = physical
         .find("let cleaned = delivery.shutdown_and_reap()?")
         .unwrap();
-    let reproof = PROBE_STORE
+    assert!(
+        request < exchange
+            && exchange < completion
+            && completion < response_drop
+            && response_drop < broker_drop
+            && broker_drop < cleanup
+    );
+
+    let probe = PROBE_EXECUTION
+        .split_once(
+            "pub(in crate::store) async fn with_current_external_pool_adapter_no_work_probe_observation<",
+        )
+        .unwrap()
+        .1;
+    let connect = probe
+        .find("prepare_current_external_pool_adapter_broker_tls_channel")
+        .unwrap();
+    let delivery = probe
+        .find("prepare_current_external_pool_adapter_ephemeral_secret_delivery")
+        .unwrap();
+    let execution = probe
+        .find("execute_external_pool_adapter_no_work_probe(")
+        .unwrap();
+    let reproof = probe
         .find("with_reproved_external_pool_adapter_no_work_roots")
         .unwrap();
-    let final_bundle_reopen = PROBE_STORE.find("let reproof_bundle_prepared").unwrap();
-    let final_session_reopen = PROBE_STORE.find("let reproof_session_prepared").unwrap();
-    let final_callback = PROBE_STORE
-        .find("consume(&transaction, &observation)?")
-        .unwrap();
+    let final_bundle_reopen = probe.find("let reproof_bundle_prepared").unwrap();
+    let final_session_reopen = probe.find("let reproof_session_prepared").unwrap();
     assert!(
         connect < delivery
-            && delivery < exchange
-            && exchange < cleanup
-            && cleanup < final_bundle_reopen
+            && delivery < execution
+            && execution < final_bundle_reopen
             && final_bundle_reopen < final_session_reopen
             && final_session_reopen < reproof
-            && reproof < final_callback
     );
-    let probe_reopens = PROBE_STORE.matches("reopen_prepared()").count();
+    let probe_reopens = probe.matches("reopen_prepared()").count();
     assert_eq!(probe_reopens, 4);
     let channel_preparation = BROKER_STORE
         .split_once("pub(in crate::store) async fn prepare_current_external_pool_adapter_broker_tls_channel")

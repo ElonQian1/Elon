@@ -33,7 +33,7 @@ pub(super) struct StoredExternalPoolAdapterProviderActiveSuccessorRevocation {
     pub(super) receipt_integrity_digest: String,
 }
 
-/// A transaction-bound, non-authorizing source/target/root projection for future V275.
+/// A transaction-bound, non-authorizing source/target/root projection for future V277.
 ///
 /// It intentionally carries no active observation, V272 carrier, process seal, activation witness,
 /// route, executor, fence, effect, or readiness and implements neither Clone, Debug nor Serde.
@@ -44,7 +44,8 @@ pub(in crate::store) struct PreparedExternalPoolAdapterProviderActiveSuccessorTa
     companion: CurrentExternalPoolAdapterSupervisorSessionPolicyCompanionAuthority,
     runtime_compatibility:
         CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'tx, 'conn>,
-    checked_at: String,
+    authority_checked_at: String,
+    activation_target_updated_at: String,
     transaction: PhantomData<&'tx Transaction<'conn>>,
 }
 
@@ -60,7 +61,8 @@ impl<'tx, 'conn> PreparedExternalPoolAdapterProviderActiveSuccessorTarget<'tx, '
             'tx,
             'conn,
         >,
-        checked_at: String,
+        authority_checked_at: String,
+        activation_target_updated_at: String,
     ) -> Self {
         Self {
             source,
@@ -68,7 +70,8 @@ impl<'tx, 'conn> PreparedExternalPoolAdapterProviderActiveSuccessorTarget<'tx, '
             activation_root,
             companion,
             runtime_compatibility,
-            checked_at,
+            authority_checked_at,
+            activation_target_updated_at,
             transaction: PhantomData,
         }
     }
@@ -93,11 +96,15 @@ impl<'tx, 'conn> PreparedExternalPoolAdapterProviderActiveSuccessorTarget<'tx, '
         &self.companion
     }
 
-    pub(in crate::store) fn checked_at(&self) -> &str {
-        &self.checked_at
+    pub(in crate::store) fn activation_target_updated_at(&self) -> &str {
+        &self.activation_target_updated_at
     }
 
-    pub(super) fn runtime_compatibility(
+    pub(in crate::store) fn authority_checked_at(&self) -> &str {
+        &self.authority_checked_at
+    }
+
+    pub(in crate::store) fn runtime_compatibility(
         &self,
     ) -> &CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<'tx, 'conn> {
         &self.runtime_compatibility

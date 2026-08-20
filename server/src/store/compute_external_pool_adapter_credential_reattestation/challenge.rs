@@ -12,7 +12,9 @@ use crate::{
             credential_locator_commitment, credential_ref_scheme,
             validate_credential_verification_draft,
         },
-        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
+        provider::{
+            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
+        },
     },
     store::{
         compute_external_pool_adapter_adoption::external_pool_adapter_adoption_is_revoked_on,
@@ -30,7 +32,10 @@ use crate::{
     },
 };
 
-use super::{persistence::insert_challenge, read::head_by_provider_binding_on, types::*};
+use super::{
+    active_subject::current_projected_active_registry_subject_on, persistence::insert_challenge,
+    read::head_by_provider_binding_on, types::*,
+};
 
 impl Store {
     pub(crate) fn issue_external_pool_adapter_credential_reattestation_challenge(
@@ -124,7 +129,13 @@ fn build(
     }
     let current_provider = current_registered_provider_on(tx, &provider_binding_item.provider_id)?
         .ok_or_else(|| anyhow::anyhow!("live Provider was not found"))?;
-    ensure_observed_provider(provider_binding_item, &onboarding, &current_provider)?;
+    ensure_observed_provider(
+        tx,
+        provider_binding_item,
+        &onboarding,
+        &current_provider,
+        &checked_at,
+    )?;
     let current = &current_provider.provider;
     let settlement_account_id = current
         .settlement_account_id
@@ -282,27 +293,32 @@ pub(super) fn ensure_upstream_lineage(
 }
 
 fn ensure_observed_provider(
+    tx: &Transaction<'_>,
     binding: &crate::compute_federation::external_pool_adapter_registry::ExternalPoolAdapterRegistryProviderBindingMaterial,
     onboarding: &crate::store::compute_external_pool_onboarding::HistoricalExternalPoolOnboardingApplicationAuthority,
     current: &crate::store::compute_provider_registry::ComputeProviderRegistrationReceipt,
+    checked_at: &str,
 ) -> Result<()> {
     let provider = &current.provider;
     let historical = onboarding.provider();
     let adapter = provider.adapter.as_ref();
     let registering_exact = provider.status == PROVIDER_STATUS_REGISTERING
         && provider.policy_revision == binding.provider_policy_revision
-        && current.provider_digest == binding.provider_digest;
+        && current.provider_digest == binding.provider_digest
+        && adapter.map(|item| item.adapter_id.as_str()) == Some(binding.adapter_id.as_str());
+    let projected_active_exact = provider.status == PROVIDER_STATUS_ACTIVE
+        && current_projected_active_registry_subject_on(tx, binding, current, checked_at)?
+            .is_some();
     if provider.provider_kind != PROVIDER_KIND_EXTERNAL_POOL
         || provider.provider_id != historical.provider_id
         || provider.owner_account_id != historical.owner_account_id
         || provider.created_at != historical.created_at
-        || adapter.map(|item| item.adapter_id.as_str()) != Some(binding.adapter_id.as_str())
         || adapter.map(|item| item.adapter_version.as_str())
             != Some(binding.release_version.as_str())
         || adapter.map(|item| item.config_revision) != Some(binding.adapter_config_revision)
         || adapter.map(|item| item.config_digest.as_str())
             != Some(binding.adapter_config_digest.as_str())
-        || !registering_exact
+        || !(registering_exact || projected_active_exact)
     {
         bail!("live Provider is not the exact registering observation");
     }

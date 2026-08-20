@@ -1,5 +1,6 @@
 //! Store-owned V272 task-protocol conformance orchestration and current authority.
 
+mod active_carrier;
 mod audit;
 mod current;
 #[path = "../compute_federation/external_pool_adapter_entrypoint_capsule.rs"]
@@ -16,6 +17,17 @@ mod types;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod write;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in crate::store) use active_carrier::create_external_pool_adapter_task_protocol_conformance_run_for_projected_active;
+pub(in crate::store) use active_carrier::{
+    current_external_pool_adapter_task_protocol_conformance_projected_active_authority_on,
+    CurrentExternalPoolAdapterTaskProtocolProjectedActiveAuthority,
+};
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in crate::store) use active_carrier::{
+    prepare_external_pool_adapter_task_protocol_planned_active_carrier_on,
+    PreparedExternalPoolAdapterTaskProtocolPlannedActiveCarrier,
+};
 pub(in crate::store) use current::current_external_pool_adapter_task_protocol_conformance_authority_on;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use run::{

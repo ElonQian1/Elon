@@ -32,7 +32,7 @@ const RECEIPT_INTEGRITY_DOMAIN: &[u8] =
 pub(crate) fn derive_external_pool_adapter_provider_active_successor_activation_root(
     source: &ComputeProvider,
     structural: ExternalPoolAdapterProviderActiveSuccessorStructuralInput,
-    checked_at: &str,
+    activation_target_updated_at: &str,
 ) -> Result<ExternalPoolAdapterProviderActiveSuccessorActivationRoot> {
     if source.provider_kind != PROVIDER_KIND_EXTERNAL_POOL
         || source.status != PROVIDER_STATUS_REGISTERING
@@ -53,7 +53,7 @@ pub(crate) fn derive_external_pool_adapter_provider_active_successor_activation_
         .checked_add(1)
         .ok_or_else(|| anyhow::anyhow!("provider policy revision overflow"))?;
     initial.status = PROVIDER_STATUS_ACTIVE.into();
-    initial.updated_at = checked_at.into();
+    initial.updated_at = activation_target_updated_at.into();
     initial
         .adapter
         .as_mut()

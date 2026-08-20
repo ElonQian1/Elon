@@ -127,7 +127,7 @@ fn validate_provider_evidence(
     if successor.evidence_provider != successor.runtime_observation.observed_provider
         || live != runtime
         || support::canonical_nanos(&live.updated_at)?
-            > support::canonical_nanos(&successor.checked_at)?
+            > support::canonical_nanos(&successor.evidence_checked_at)?
     {
         bail!("provider active successor runtime observation subject is not live Provider")
     }
@@ -138,7 +138,7 @@ fn validate_provider_evidence(
         )?;
         if successor.evidence_provider.provider_json != root.initial_active_provider_json
             || successor.evidence_provider.provider_digest != root.initial_active_provider_digest
-            || live.updated_at != successor.checked_at
+            || live.updated_at != successor.activation_target_updated_at
         {
             bail!("provider active successor genesis is not the adjacent active Provider")
         }
@@ -162,9 +162,11 @@ fn validate_timestamps(value: &ExternalPoolAdapterProviderActiveSuccessorReceipt
             .task_protocol_evidence
             .task_protocol_conformance_expires_at,
     )?;
-    let checked = support::canonical_nanos(&successor.checked_at)?;
+    let target_updated = support::canonical_nanos(&successor.activation_target_updated_at)?;
+    let checked = support::canonical_nanos(&successor.evidence_checked_at)?;
     let created = support::canonical_nanos(&successor.created_at)?;
-    if started > completed
+    if target_updated > started
+        || started > completed
         || completed > checked
         || checked >= expires
         || expires

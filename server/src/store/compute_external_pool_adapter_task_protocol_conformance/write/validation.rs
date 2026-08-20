@@ -13,7 +13,7 @@ use super::super::{
     },
 };
 
-pub(super) fn validate_create_input(
+pub(in super::super) fn validate_create_input(
     input: &CreateExternalPoolAdapterTaskProtocolConformanceRun,
 ) -> Result<()> {
     for value in [
@@ -61,7 +61,7 @@ pub(super) fn validate_create_input(
     Ok(())
 }
 
-pub(super) fn ensure_predecessor(
+pub(in super::super) fn ensure_predecessor(
     input: &CreateExternalPoolAdapterTaskProtocolConformanceRun,
     head: Option<&StoredTaskProtocolConformanceRun>,
 ) -> Result<()> {
@@ -80,7 +80,7 @@ pub(super) fn ensure_predecessor(
     }
 }
 
-pub(super) fn classify_installation_error(
+pub(in super::super) fn classify_installation_error(
     error: ExternalPoolAdapterInstallationFsError,
 ) -> StoreError {
     if matches!(&error, ExternalPoolAdapterInstallationFsError::Storage(_)) {
@@ -90,7 +90,7 @@ pub(super) fn classify_installation_error(
     }
 }
 
-pub(super) fn classify_execution_error(error: anyhow::Error) -> StoreError {
+pub(in super::super) fn classify_execution_error(error: anyhow::Error) -> StoreError {
     if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ExternalPoolAdapterInstallationFsError>(),

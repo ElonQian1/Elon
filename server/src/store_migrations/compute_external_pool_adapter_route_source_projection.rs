@@ -217,8 +217,7 @@ fn replace_exact_source_trigger(conn: &Connection) -> Result<()> {
                        AND candidate.adapter_config_revision=NEW.adapter_config_revision
                        AND candidate.adapter_config_digest=NEW.adapter_config_digest
                        AND candidate.service_actor_id=NEW.verified_by_service_actor_id
-                       AND candidate.logical_adapter_binding_digest=NEW.route_binding_digest
-                       AND candidate.logical_adapter_binding_digest=NEW.adapter_binding_digest
+                       AND NEW.route_binding_digest=NEW.adapter_binding_digest
                        AND candidate.provider_status='registering'
                        AND candidate.candidate_status='candidate_current_not_activation_ready'
                        AND candidate.activation_closure_status='activation_closure_not_implemented'
@@ -299,6 +298,10 @@ fn replace_exact_source_trigger(conn: &Connection) -> Result<()> {
         "#,
     )?;
     Ok(())
+}
+
+pub(super) fn reinstall_exact_source_trigger_for_v277(conn: &Connection) -> Result<()> {
+    replace_exact_source_trigger(conn)
 }
 
 #[cfg(test)]

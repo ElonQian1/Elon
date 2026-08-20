@@ -12,7 +12,7 @@ use super::super::{
     },
 };
 
-pub(super) fn ensure_create_replay(
+pub(in super::super) fn ensure_create_replay(
     input: &CreateExternalPoolAdapterTaskProtocolConformanceRun,
     stored: &StoredTaskProtocolConformanceRun,
 ) -> Result<()> {
@@ -41,7 +41,7 @@ pub(super) fn ensure_create_replay(
     Ok(())
 }
 
-pub(super) fn ensure_fresh_readback(
+pub(in super::super) fn ensure_fresh_readback(
     input: &CreateExternalPoolAdapterTaskProtocolConformanceRun,
     receipt: &ExternalPoolAdapterTaskProtocolConformanceRunReceipt,
     stored: &StoredTaskProtocolConformanceRun,
@@ -60,7 +60,7 @@ pub(super) fn ensure_fresh_readback(
     Ok(())
 }
 
-pub(super) fn replay_output(
+pub(in super::super) fn replay_output(
     stored: &StoredTaskProtocolConformanceRun,
 ) -> ExternalPoolAdapterTaskProtocolConformanceRunWriteReceipt {
     ExternalPoolAdapterTaskProtocolConformanceRunWriteReceipt {
@@ -71,7 +71,7 @@ pub(super) fn replay_output(
 
 /// A replay may complete an already remembered exact pending tuple. This operation never mints a
 /// seal or inserts registry state; false means the durable receipt remains historical.
-pub(super) fn promote_exact_pending_replay(
+pub(in super::super) fn promote_exact_pending_replay(
     runtime: &ExternalPoolAdapterTaskProtocolConformanceRuntime,
     receipt_id: &str,
     receipt_integrity_digest: &str,

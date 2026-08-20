@@ -70,7 +70,7 @@ lane_subject_digest = SHA256(domain || 0x00 || subject)
 `executor_id()`、`Into<String>` 或写入 v213 executor 字段的转换。它只能让 dormant worker 确认“若未来闭合，
 这些 Provider/binding/projection roots 属于同一生产 lane”。
 
-每次 ELTP production exchange 仍必须绑定来自 future V275/V276 current authority 的真实 executor/fence roots。
+每次 ELTP production exchange 仍必须绑定来自 future V277/V278 current authority 的真实 executor/fence roots。
 lane subject 不得填充这两个位置，所以当前没有 stable executor 时 exchange constructor 必须返回 ineligible，而
 不是临时生成 executor 字符串。
 
@@ -165,7 +165,7 @@ Store 查询必须同时证明：
 V273 不提供上述 v213 sealed 类型的 constructor，因此当前查询结果必须是 `eligible_rows=0`。未来达到可达性后，
 唯一顺序是：claim existing outbox → 在同一个 `BEGIN IMMEDIATE`、同一 `checked_at` 内重验全部 current authority，
 同时 append 首个 v213 send-attempt 与对应 V273 exchange-attempt，exact readback后一次 commit → 事务外执行 ELTP →
-fresh transaction 验证 authenticated receipt → append receipt/poll/event facts → 交给未来 V276 Store-private ingress
+fresh transaction 验证 authenticated receipt → append receipt/poll/event facts → 交给未来 V278 Store-private ingress
 consumer。send-attempt 或 exchange-attempt 任一写入/回读失败必须让二者同时 rollback；二者之间不能出现 commit。
 任何 SQLite transaction、connection 或 sealed Store authority 都不得跨 network/child await。
 
@@ -209,7 +209,7 @@ cursor before/after exact相同；exact duplicate 只能 exact readback 已存�
 
 V273 可以定义 non-Clone、non-Debug、non-Serde 的 Store-private authenticated exchange/event material，但不能为
 v211 ACK、v213 remote observation、v215 accepted closure、Lease authority或 Runner event开放 constructor。六表
-receipt只是未来 V276 consumer 的输入证据，不是这些对象本身。
+receipt只是未来 V278 consumer 的输入证据，不是这些对象本身。
 
 本批不新增 HTTP、MCP、WebSocket、callback、owner/admin collection、`/api/me`、通用上传或 polling API。网络 ingress
 仅存在于受管 child 与 server 的 authenticated ELTP session 内；loopback/public listener 都不属于 V273。
@@ -235,12 +235,12 @@ outbox。Provider 必须保持 `registering`，V254 18 个 temporary absolute de
 
 1. V274 冻结 Store-private activation-rooted active successor：exact两张immutable表+一个非权威诊断view，stable
    root排除Secret/session/executor/route，renewable evidence消费最长15秒V270-equivalent observation与fresh V272
-   carrier；V275前零行、无public producer，Provider仍`registering`；
-2. V275 在同一个原子事务内消费V274 pending overlay，签发stable executor、写exact projected-active Provider/route
+   carrier；V277前零行、无public producer，Provider仍`registering`；
+2. V277 在同一个原子事务内消费V274 pending overlay，签发stable executor、写exact projected-active Provider/route
    closure、append首个V274 successor并替换18 fences；
-3. V276 才把本页 dormant worker/ingress handoff接到真实 v213 eligible rows并做 production reachability验收。
+3. V278 才把本页 dormant worker/ingress handoff接到真实 v213 eligible rows并做 production reachability验收。
 
-V274 docs/DDL、V275 executor/route 或 migration success都不能倒推 V273 transport已动态通过；V276 也不能跳过
+V274 docs/DDL、V277 executor/route 或 migration success都不能倒推 V273 transport已动态通过；V278 也不能跳过
 V270-equivalent/V272/V274 current Store-private reproof。
 
 ## 11. 当前实现与验证现实

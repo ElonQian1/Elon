@@ -23,15 +23,27 @@ mod types;
 
 pub(in crate::store) use current::current_external_pool_adapter_runtime_bundle_authority_on;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-pub(in crate::store) use no_work_probe::CurrentExternalPoolAdapterNoWorkProbeObservationAuthority;
+pub(in crate::store) use no_work_probe::{
+    planned_external_pool_adapter_active_no_work_probe_subject_on,
+    with_reproved_planned_external_pool_adapter_active_no_work_subject,
+    CurrentExternalPoolAdapterNoWorkProbeObservationAuthority,
+    PlannedExternalPoolAdapterActiveNoWorkProbeSubject,
+    ReprovedPlannedExternalPoolAdapterActiveNoWorkProbeSubject,
+};
 pub(crate) use runtime::{
     external_pool_adapter_provider_runtime_readiness_runtime,
     initialize_external_pool_adapter_provider_runtime_readiness_runtime,
+    register_external_pool_adapter_atomic_activation_pending_plan_udf,
     verify_pending_external_pool_adapter_provider_active_successor_process_seal,
     ExternalPoolAdapterProviderRuntimeReadinessRuntime,
     ExternalPoolAdapterProviderRuntimeReadinessUnavailable,
 };
 pub(in crate::store) use runtime::{
+    install_external_pool_adapter_atomic_activation_pending_plan_on,
+    ExternalPoolAdapterAtomicActivationPendingPlan,
+    ExternalPoolAdapterAtomicActivationPendingPlanGuard,
+    ExternalPoolAdapterAtomicActivationPendingWrite,
+    ExternalPoolAdapterAtomicActivationPendingWriteKind,
     ExternalPoolAdapterProviderActiveSuccessorProcessSeal,
     ExternalPoolAdapterProviderActiveSuccessorProcessSealInput,
     ExternalPoolAdapterProviderRuntimeReadinessProcessCustody,

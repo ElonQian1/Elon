@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::Transaction;
@@ -42,8 +40,7 @@ impl Store {
         if let Some(replay) = self.exact_readiness_replay(&input)? {
             return Ok(replay);
         }
-        let output = Mutex::new(None);
-        let completed = self
+        let output = self
             .with_current_external_pool_adapter_no_work_probe_observation(
                 &input.profile_id,
                 &input.companion_id,
@@ -58,31 +55,17 @@ impl Store {
                     preflight_create(transaction, &input, target, checked_at)
                 },
                 |transaction, observation| {
-                    let receipt = finalize_create(transaction, &input, observation, runtime)?;
-                    *output
-                        .lock()
-                        .map_err(|_| anyhow::anyhow!("readiness output lock was poisoned"))? =
-                        Some(receipt);
-                    Ok(())
+                    finalize_create(transaction, &input, observation, runtime)
                 },
+                |_connection, receipt| Ok(receipt),
             )
             .await
             .map_err(classify_create_error)?;
-        if !completed {
-            return Err(StoreError::conflict(anyhow::anyhow!(
+        let output = output.ok_or_else(|| {
+            StoreError::conflict(anyhow::anyhow!(
                 "provider runtime readiness current roots were not found"
-            )));
-        }
-        let output = output
-            .into_inner()
-            .map_err(|_| {
-                StoreError::storage(anyhow::anyhow!("readiness output lock was poisoned"))
-            })?
-            .ok_or_else(|| {
-                StoreError::storage(anyhow::anyhow!(
-                    "provider runtime readiness completed without a durable receipt"
-                ))
-            })?;
+            ))
+        })?;
         if !output.replayed {
             let committed_seal = runtime
                 .process_custody()

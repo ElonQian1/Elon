@@ -32,8 +32,8 @@ WHEN NOT EXISTS (
      AND json_extract(evidence_version.provider_json,'$.owner_account_id')=NEW.provider_owner_account_id
      AND json_extract(evidence_version.provider_json,'$.status')='active'
      AND json_extract(evidence_version.provider_json,'$.adapter.adapter_id')=NEW.route_adapter_projection_id
-     AND json_extract(evidence_version.provider_json,'$.updated_at')<=NEW.checked_at
-     AND (NEW.successor_sequence>1 OR json_extract(evidence_version.provider_json,'$.updated_at')=NEW.checked_at)
+     AND json_extract(evidence_version.provider_json,'$.updated_at')<=NEW.evidence_checked_at
+     AND (NEW.successor_sequence>1 OR json_extract(evidence_version.provider_json,'$.updated_at')=NEW.activation_target_updated_at)
      AND NEW.runtime_observed_provider_id=NEW.evidence_provider_id
      AND NEW.runtime_observed_provider_policy_revision=NEW.evidence_provider_policy_revision
      AND NEW.runtime_observed_provider_json=NEW.evidence_provider_json
@@ -54,7 +54,7 @@ WHEN NOT EXISTS (
      AND reattestation.observed_provider_policy_revision=NEW.credential_observed_provider_policy_revision
      AND reattestation.observed_provider_digest=NEW.credential_observed_provider_digest
      AND reattestation.observed_provider_status=json_extract(credential_version.provider_json,'$.status')
-     AND reattestation.verified_at<=NEW.checked_at
+     AND reattestation.verified_at<=NEW.evidence_checked_at
      AND NEW.observation_expires_at<=reattestation.report_expires_at
      AND NOT EXISTS (SELECT 1 FROM compute_external_pool_adapter_credential_reattestation_receipts successor WHERE successor.predecessor_receipt_id=reattestation.reattestation_receipt_id)
      AND NOT EXISTS (SELECT 1 FROM compute_external_pool_adapter_credential_reattestation_revocations revoked WHERE revoked.reattestation_receipt_id=reattestation.reattestation_receipt_id)

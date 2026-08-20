@@ -15,7 +15,9 @@ use crate::{
         external_pool_adapter_credential_verification::{
             credential_locator_commitment, credential_ref_scheme,
         },
-        provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_REGISTERING},
+        provider::{
+            PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
+        },
     },
     store::{
         compute_external_pool_adapter_credential_verification::external_pool_adapter_credential_verification_receipt_authority_on,
@@ -28,6 +30,7 @@ use crate::{
 };
 
 use super::{
+    active_subject::historical_projected_active_subject_on,
     challenge_audit::challenge_by_id_on,
     receipt_projection_audit::exact_receipt_projection,
     roots::{
@@ -138,9 +141,13 @@ fn audit_lineage(
     let vr = &verifier.registration;
     let adapter = observed.adapter.as_ref();
     let locator = onboarding.non_bearer_credential_ref();
-    let observed_allowed = observed.status == PROVIDER_STATUS_REGISTERING
+    let registering_allowed = observed.status == PROVIDER_STATUS_REGISTERING
         && observed.policy_revision == pb.provider_policy_revision
-        && b.observed_provider_digest == pb.provider_digest;
+        && b.observed_provider_digest == pb.provider_digest
+        && adapter.map(|x| x.adapter_id.as_str()) == Some(b.adapter_id.as_str());
+    let projected_active_allowed = observed.status == PROVIDER_STATUS_ACTIVE
+        && adapter.map(|x| x.adapter_id.as_str()) == Some(b.route_adapter_projection_id.as_str())
+        && historical_projected_active_subject_on(conn, b)?.is_some();
     if provider_binding.provider_binding_id != b.provider_binding_id
         || provider_binding.provider_binding_digest != b.provider_binding_digest
         || provider_binding.provider_binding_material_digest != b.provider_binding_material_digest
@@ -198,11 +205,10 @@ fn audit_lineage(
             != Some(b.observed_settlement_account_id.as_str())
         || observed.policy_revision != b.observed_provider_policy_revision
         || observed.status != b.observed_provider_status
-        || adapter.map(|x| x.adapter_id.as_str()) != Some(b.adapter_id.as_str())
         || adapter.map(|x| x.adapter_version.as_str()) != Some(b.release_version.as_str())
         || adapter.map(|x| x.config_revision) != Some(b.adapter_config_revision)
         || adapter.map(|x| x.config_digest.as_str()) != Some(b.adapter_config_digest.as_str())
-        || !observed_allowed
+        || !(registering_allowed || projected_active_allowed)
         || !predecessor_is_exact(conn, stored)?
     {
         bail!("credential re-attestation root lineage is not exact");

@@ -8,8 +8,9 @@ const RUNTIME: &str =
     include_str!("../../store/compute_external_pool_adapter_runtime_bundle/runtime.rs");
 const CUSTODY: &str =
     include_str!("../../store/compute_external_pool_adapter_runtime_bundle/runtime/custody.rs");
-const NO_WORK_ORCHESTRATION: &str =
-    include_str!("../../store/compute_external_pool_adapter_runtime_bundle/no_work_probe.rs");
+const NO_WORK_EXECUTION: &str = include_str!(
+    "../../store/compute_external_pool_adapter_runtime_bundle/no_work_probe/execution.rs"
+);
 const NO_WORK_REPROOF: &str = include_str!(
     "../../store/compute_external_pool_adapter_runtime_bundle/no_work_probe/reproof.rs"
 );
@@ -81,8 +82,8 @@ fn provider_runtime_readiness_runtime_source_freezes_two_phase_fresh_seals() {
             "return Ok(replay)",
             "with_current_external_pool_adapter_no_work_probe_observation(",
             ".await",
-            "if !completed",
-            "let output = output",
+            ".map_err(classify_create_error)?",
+            "let output = output.ok_or_else(",
             "if !output.replayed",
             ".commit_readiness_seal(",
             "if !committed_seal",
@@ -91,11 +92,7 @@ fn provider_runtime_readiness_runtime_source_freezes_two_phase_fresh_seals() {
     );
     let fresh_publish = source_block(create, "if !output.replayed {", "Ok(output)");
     assert!(fresh_publish.contains(".commit_readiness_seal("));
-    let outer_replay = source_block(
-        create,
-        "if let Some(replay)",
-        "let output = Mutex::new(None)",
-    );
+    let outer_replay = source_block(create, "if let Some(replay)", "let output = self");
     assert!(!outer_replay.contains("remember_readiness_seal"));
     assert!(!outer_replay.contains("commit_readiness_seal"));
     let replay = source_block(
@@ -138,7 +135,6 @@ fn provider_runtime_readiness_runtime_source_freezes_two_phase_fresh_seals() {
             "return Ok(false)",
             "constant_time_equal(&seal.receipt_digest, readiness_receipt_digest)",
             "seal.committed = true",
-            "Ok(true)",
         ],
     );
     let attests = source_block(
@@ -190,11 +186,32 @@ fn provider_runtime_readiness_runtime_source_freezes_six_late_reopens_and_cleanu
         "pub(in crate::store) async fn prepare_current_external_pool_adapter_broker_tls_channel(",
         "fn current_installation_binding(",
     );
-    let probe = source_block(
-        NO_WORK_ORCHESTRATION,
-        "pub(in crate::store) async fn with_current_external_pool_adapter_no_work_probe_observation(",
-        "fn require_preflight_dynamic_and_compatibility_roots(",
+    let physical = source_block(
+        NO_WORK_EXECUTION,
+        "pub(super) async fn execute_external_pool_adapter_no_work_probe(",
+        "impl Store {",
     );
+    assert_ordered(
+        physical,
+        &[".exchange_no_work(", ".await?", "shutdown_and_reap()?"],
+    );
+    let probe = NO_WORK_EXECUTION
+        .split_once(
+            "pub(in crate::store) async fn with_current_external_pool_adapter_no_work_probe_observation<",
+        )
+        .unwrap()
+        .1;
+    for marker in [
+        "Pending,",
+        "Output,",
+        "postcommit: impl FnOnce(&Connection, Pending) -> Result<Output> + Send",
+        ") -> Result<Option<Output>>",
+    ] {
+        assert!(
+            NO_WORK_EXECUTION.contains(marker),
+            "generic no-work execution lost {marker}"
+        );
+    }
     let reopen = "reopen_prepared().map_err(anyhow::Error::new)?";
     assert_eq!(broker.matches(reopen).count(), 2);
     assert_eq!(probe.matches(reopen).count(), 4);
@@ -205,9 +222,8 @@ fn provider_runtime_readiness_runtime_source_freezes_six_late_reopens_and_cleanu
             ".await?",
             "delivery_bundle_prepared = reopen_prepared()",
             "delivery_session_prepared = reopen_prepared()",
-            ".exchange_no_work(",
+            "execute_external_pool_adapter_no_work_probe(",
             ".await?",
-            "shutdown_and_reap()?",
             "reproof_bundle_prepared = reopen_prepared()",
             "reproof_session_prepared = reopen_prepared()",
             "with_reproved_external_pool_adapter_no_work_roots(",
@@ -228,7 +244,7 @@ fn provider_runtime_readiness_runtime_source_freezes_six_late_reopens_and_cleanu
     }
     let final_tx = source_block(
         NO_WORK_REPROOF,
-        "pub(super) fn with_reproved_external_pool_adapter_no_work_roots(",
+        "pub(super) fn with_reproved_external_pool_adapter_no_work_roots<",
         "fn audit_runtime_compatibility_roots(",
     );
     assert_ordered(
@@ -241,11 +257,15 @@ fn provider_runtime_readiness_runtime_source_freezes_six_late_reopens_and_cleanu
             "select_current_probe_preparation_roots_on(",
             "current_external_pool_adapter_runtime_compatibility_verification_authority_on(",
             "post_cleanup_observation_commitment(",
-            "consume(&transaction, &observation)?",
+            "let created = consume(&transaction, &observation)?",
+            "pending = Some(created)",
             "transaction.commit()?",
-            "Ok(true)",
+            "let pending = pending",
+            "postcommit(&connection, pending).map(Some)",
         ],
     );
+    assert!(final_tx
+        .contains("postcommit: impl FnOnce(&rusqlite::Connection, Pending) -> Result<Output>"));
 }
 
 fn source_block<'a>(source: &'a str, start: &str, end: &str) -> &'a str {

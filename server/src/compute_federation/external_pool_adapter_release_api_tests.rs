@@ -50,6 +50,10 @@ mod artifact_signed_provenance_http_test;
 mod artifact_signing_key_http_test;
 #[path = "external_pool_adapter_release_api_tests/artifact_vulnerability_report_http_test.rs"]
 mod artifact_vulnerability_report_http_test;
+#[path = "external_pool_adapter_release_api_tests/atomic_activation_domain_migration_source_contract_test.rs"]
+mod atomic_activation_domain_migration_source_contract_test;
+#[path = "external_pool_adapter_release_api_tests/atomic_activation_store_boundary_source_contract_test.rs"]
+mod atomic_activation_store_boundary_source_contract_test;
 #[path = "external_pool_adapter_release_api_tests/credential_reattestation_http_test.rs"]
 mod credential_reattestation_http_test;
 #[path = "external_pool_adapter_release_api_tests/credential_reattestation_test_support.rs"]

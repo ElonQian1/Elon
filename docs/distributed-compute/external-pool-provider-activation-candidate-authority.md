@@ -49,11 +49,11 @@ admin 只有 currentness/preflight GET，位于同形 `/api/admin/compute/extern
 
 所有成功响应递归移除 service actor ID、route projection ID、owner/actor 字段、幂等 scope/key、confirmation、credential locator/ref、receipt JSON 与本机路径。公开 candidate ID/digest 只是调用 currentness/preflight/revoke 所需的不透明历史坐标，不是 route、actor 或 execution authority。
 
-## 5. V275 atomic activation 的最小门卫
+## 5. V277 atomic activation 的最小门卫
 
-V254 runtime之后仍是NO-GO。V275 docs-first已冻结：在同一`BEGIN IMMEDIATE`内重新消费V249 Prepared、同次current V250/V252/registering V253 transition、未撤销candidate/delegation、精确owner-issued service actor、V274 planned target/root与fresh V270-equivalent/V272 evidence，原子UPDATE既有Provider为adjacent active并闭合projection Adapter、stable executor、Provider-specific v213 route与V275/V274 receipts。该设计尚未实现/编译/运行；secret resolver、sidecar/transport或Start send/ACK没有current proof时仍不得激活。
+V254 runtime之后仍是NO-GO。V277 docs-first已冻结：在同一`BEGIN IMMEDIATE`内重新消费V249 Prepared、同次current V250/V252/registering V253 transition、未撤销candidate/delegation、精确owner-issued service actor、V274 planned target/root与fresh V270-equivalent/V272 evidence，原子UPDATE既有Provider为adjacent active并闭合projection Adapter、stable executor、Provider-specific v213 route与V277/V274 receipts。该设计尚未实现/编译/运行；secret resolver、sidecar/transport或Start send/ACK没有current proof时仍不得激活。
 
-V254 已安装18个temporary absolute deny并覆盖direct SQL。V275不删除trigger集合：仅#1 Provider adjacent-active UPDATE与#5-#12 Provider version、projection Adapter/version、service actor、route credential/authorization、六capability、seal改为exact pending-plan permit；#2 active Provider INSERT、#3-#4 identity/kind UPDATE与#13-#18 CapacityPool/Offer market写继续absolute deny。permit必须调用non-deterministic variable-arity `elon_v275_external_pool_adapter_atomic_activation_pending_plan_matches(...)`，flags exact为`SQLITE_UTF8 | SQLITE_INNOCUOUS`且绝无`SQLITE_DETERMINISTIC`；无同connection进程registry plan的direct SQL/restart/replay一律拒绝。Pool/Offer admission不属于V275，V276 reachability也不放开market fence。
+V254 已安装18个temporary absolute deny并覆盖direct SQL。V277不删除trigger集合：仅#1 Provider adjacent-active UPDATE与#5-#12 Provider version、projection Adapter/version、service actor、route credential/authorization、六capability、seal改为exact pending-plan permit；#2 active Provider INSERT、#3-#4 identity/kind UPDATE与#13-#18 CapacityPool/Offer market写继续absolute deny。permit必须调用non-deterministic variable-arity `elon_v277_external_pool_adapter_atomic_activation_pending_plan_matches(...)`，flags exact为`SQLITE_UTF8 | SQLITE_INNOCUOUS`且绝无`SQLITE_DETERMINISTIC`；无同connection进程registry plan的direct SQL/restart/replay一律拒绝。Pool/Offer admission不属于V277，V278 reachability也不放开market fence。
 
 ## 6. 当前验证证据
 

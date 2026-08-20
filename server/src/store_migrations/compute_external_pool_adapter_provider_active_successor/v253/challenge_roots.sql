@@ -105,4 +105,4 @@ WHEN NOT EXISTS (
       ON terminal.adoption_receipt_id=binding.adoption_receipt_id
      AND terminal.adoption_receipt_digest=binding.adoption_receipt_digest
    WHERE binding.provider_binding_id=NEW.provider_binding_id)
-BEGIN SELECT RAISE(ABORT,'V253 challenge is registering-only until V275 activation witness'); END;
+BEGIN SELECT RAISE(ABORT,'V253 challenge is registering-only until V277 activation witness'); END;

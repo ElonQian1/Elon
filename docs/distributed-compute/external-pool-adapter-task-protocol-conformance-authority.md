@@ -243,7 +243,7 @@ absolute deny 逐字保留，打开 fence 数为 `0`；process/session/secret-de
 runtime-launch/route/execution/activation readiness全部为 false，全部业务 effect=`none`。
 
 后继顺序固定为：V272 controlled task-protocol conformance → V273 actual v213 producer/worker 与 authenticated
-ACK/event ingress → V274 activation-rooted active refresh/successor → V275 stable executor binding 与 atomic
+ACK/event ingress → V274 activation-rooted active refresh/successor → V277 stable executor binding 与 atomic
 Provider/route activation。V272 足以作为同进程 Store-private release conformance 输入，但单独不足以创建 route
 或 activation；若未来需要跨进程、离线或第三方可携带的证明，必须新增独立外签协议，不能把 process HMAC
 receipt 升格。V237 challenge 外签在 V272 没有新增安全事实，因为 runner、oracle 与 observation 都由同一

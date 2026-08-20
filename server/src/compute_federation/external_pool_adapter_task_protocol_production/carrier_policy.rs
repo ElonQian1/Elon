@@ -25,7 +25,7 @@ pub(crate) fn validate_task_production_carrier_policy_digest(value: &str) -> Res
         startup: "default_off",
         protocol: "eltp_v1",
         authority: "non_authoritative_carrier_only",
-        dispatch_gate: "requires_v276_current_authority_reproof",
+        dispatch_gate: "requires_v278_current_authority_reproof",
         effects: "none",
     };
     if value != TASK_PRODUCTION_CARRIER_POLICY_DIGEST

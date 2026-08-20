@@ -36,7 +36,7 @@ pub(crate) struct ExternalPoolAdapterProviderActiveSuccessorTaskProtocolEvidence
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-/// V275 binds this witness to the stable activation root and activation closure only. It must
+/// V277 binds this witness to the stable activation root and activation closure only. It must
 /// never bind the enclosing V274 receipt identity/digest, which would create a digest cycle.
 pub(crate) struct ExternalPoolAdapterProviderActiveSuccessorActivationWitness {
     pub activation_witness_id: String,
@@ -62,7 +62,8 @@ pub(crate) struct ExternalPoolAdapterProviderActiveSuccessorMaterial {
     pub runtime_observation: ExternalPoolAdapterProviderActiveSuccessorRuntimeObservation,
     pub task_protocol_evidence: ExternalPoolAdapterProviderActiveSuccessorTaskProtocolEvidence,
     pub activation_witness: ExternalPoolAdapterProviderActiveSuccessorActivationWitness,
-    pub checked_at: String,
+    pub activation_target_updated_at: String,
+    pub evidence_checked_at: String,
     pub created_at: String,
     pub effects: ExternalPoolAdapterProviderActiveSuccessorEffects,
     pub readiness: ExternalPoolAdapterProviderActiveSuccessorReadiness,

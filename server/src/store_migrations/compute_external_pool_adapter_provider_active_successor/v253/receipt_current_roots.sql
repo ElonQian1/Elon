@@ -44,4 +44,4 @@ WHEN NOT EXISTS (
     SELECT 1 FROM compute_external_pool_adapter_adoption_terminal_receipts terminal
      WHERE terminal.adoption_receipt_id=NEW.adoption_receipt_id
        AND terminal.adoption_receipt_digest=NEW.adoption_receipt_digest)
-BEGIN SELECT RAISE(ABORT,'V253 receipt is registering-only until V275 activation witness'); END;
+BEGIN SELECT RAISE(ABORT,'V253 receipt is registering-only until V277 activation witness'); END;

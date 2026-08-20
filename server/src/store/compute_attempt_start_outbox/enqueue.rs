@@ -22,9 +22,11 @@ use crate::compute_federation::{
 use super::{
     read::{persist_prepare_operation_on, prepare_by_command_on},
     replay::{
-        ensure_actor_receipt_replay_on, ensure_operation_replay_matches,
-        ensure_route_authority_replay_on, ensure_route_registry_current_on,
-        persist_actor_receipt_on, persist_adapter_on, persist_service_actor_on,
+        ensure_actor_receipt_replay_on, ensure_operation_replay_matches, persist_actor_receipt_on,
+    },
+    route_persistence::{
+        audit_persisted_compute_route_authority_on, ensure_compute_route_registry_current_on,
+        persist_compute_route_authority_on, INSERT_ROUTE_CREDENTIAL_VERSION,
     },
     types::StartOutboxEnqueueReceipt,
 };
@@ -49,7 +51,7 @@ pub(in crate::store) fn enqueue_prepare_on(
             .ok_or_else(|| {
                 anyhow!("historical command lacks prepare outbox; backfill is required")
             })?;
-        ensure_route_authority_replay_on(connection, operation.route_authorization())?;
+        audit_persisted_compute_route_authority_on(connection, operation.route_authorization())?;
         ensure_actor_receipt_replay_on(
             connection,
             operation
@@ -60,9 +62,13 @@ pub(in crate::store) fn enqueue_prepare_on(
         return Ok(receipt(operation, true));
     }
 
-    persist_route_authority_on(connection, operation.route_authorization())?;
+    persist_compute_route_authority_on(connection, operation.route_authorization())?;
     let created_at = now_nanos();
-    ensure_route_registry_current_on(connection, operation.route_authorization(), &created_at)?;
+    ensure_compute_route_registry_current_on(
+        connection,
+        operation.route_authorization(),
+        &created_at,
+    )?;
     let actor = operation
         .actor_receipt()
         .ok_or_else(|| anyhow!("prepare operation lacks dispatch actor custody"))?;
@@ -70,7 +76,7 @@ pub(in crate::store) fn enqueue_prepare_on(
     persist_prepare_operation_on(connection, operation, &created_at)?;
     let stored = prepare_by_command_on(connection, &dispatch.command().command_id)?
         .ok_or_else(|| anyhow!("prepare outbox is not visible after insert"))?;
-    ensure_route_authority_replay_on(connection, operation.route_authorization())?;
+    audit_persisted_compute_route_authority_on(connection, operation.route_authorization())?;
     ensure_actor_receipt_replay_on(connection, actor)?;
     ensure_operation_replay_matches(&stored, operation)?;
     Ok(receipt(operation, false))
@@ -163,19 +169,7 @@ fn ensure_prepare_shape(
     Ok(())
 }
 
-fn persist_route_authority_on(
-    connection: &Connection,
-    sealed: &AuthorizedComputeRouteAuthorization,
-) -> Result<()> {
-    let inputs = sealed.inputs();
-    persist_service_actor_on(connection, inputs.actor().envelope())?;
-    persist_adapter_on(connection, inputs.adapter().envelope())?;
-    persist_credential_on(connection, inputs.credential().envelope())?;
-    persist_authorization_on(connection, sealed)?;
-    Ok(())
-}
-
-fn persist_credential_on(
+pub(super) fn persist_credential_on(
     connection: &Connection,
     envelope: &crate::compute_federation::route_authority::ComputeRouteCredentialEnvelope,
 ) -> Result<()> {
@@ -193,32 +187,7 @@ fn persist_credential_on(
     // The version FK back to its current root is deferred. Insert the immutable version first;
     // the current-root AFTER trigger immediately requires that version to be visible.
     connection.execute(
-        "INSERT INTO compute_route_credential_versions (
-            credential_id, credential_revision, credential_schema, credential_digest,
-            credential_json, canonicalization, digest_algorithm,
-            provider_id, provider_kind, provider_owner_account_id,
-            route_kind, route_binding_digest, adapter_binding_digest,
-            endpoint_id, endpoint_transport, adapter_id, adapter_revision,
-            adapter_registry_digest, adapter_release_version, implementation_digest,
-            adapter_config_revision, adapter_config_digest, non_bearer_credential_ref,
-            credential_hint, verification_kind, verifier_id, verifier_revision,
-            verifier_digest, verification_receipt_id, verification_receipt_digest,
-            verified_by_service_actor_id, actor_authorization_id,
-            actor_authorization_digest, authenticated_at, expires_at,
-            cleanup_expires_at, recorded_at
-         ) SELECT
-             :id, :revision, :schema, :digest, :json, :canonicalization, :algorithm,
-            :provider_id, :provider_kind, :owner_id, :route_kind, :route_digest,
-            :adapter_digest, :endpoint_id, :endpoint_transport, :adapter_id,
-            :adapter_revision, :registry_digest, :release, :implementation,
-            :config_revision, :config_digest, :credential_ref, :hint,
-            :verification_kind, :verifier_id, :verifier_revision, :verifier_digest,
-             :receipt_id, :receipt_digest, :verified_by, :actor_id, :actor_digest,
-             :authenticated_at, :expires_at, :cleanup_expires_at, :recorded_at
-          WHERE NOT EXISTS (
-                SELECT 1 FROM compute_route_credential_versions
-                 WHERE credential_id=:id AND credential_revision=:revision
-          )",
+        INSERT_ROUTE_CREDENTIAL_VERSION,
         named_params! {
             ":id": envelope.credential_id,
             ":revision": envelope.credential_revision,
@@ -277,7 +246,7 @@ fn persist_credential_on(
     Ok(())
 }
 
-fn persist_authorization_on(
+pub(super) fn persist_authorization_on(
     connection: &Connection,
     sealed: &AuthorizedComputeRouteAuthorization,
 ) -> Result<()> {

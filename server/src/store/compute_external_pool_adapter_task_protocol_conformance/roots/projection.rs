@@ -2,9 +2,17 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 
 use crate::compute_federation::{
-    external_pool_adapter_runtime_compatibility_verification::server_runtime_compatibility_v2_profile_catalog,
+    external_pool_adapter_installation::PreparedExternalPoolAdapterInstallation,
+    external_pool_adapter_registry::ExternalPoolAdapterRegistryReleaseReceipt,
+    external_pool_adapter_runtime_compatibility_verification::{
+        server_runtime_compatibility_v2_profile_catalog,
+        ExternalPoolAdapterRuntimeCompatibilityRunObservationReceipt,
+    },
+    external_pool_adapter_sandbox_reattestation::ExternalPoolAdapterSandboxReattestationReceipt,
     external_pool_adapter_task_protocol_conformance::*,
+    external_pool_adapter_vulnerability_reattestation::ExternalPoolAdapterVulnerabilityReattestationReceipt,
 };
+use crate::store::compute_external_pool_adapter_runtime_compatibility_verification::CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use super::super::run::{
@@ -15,7 +23,23 @@ use super::CurrentTaskProtocolConformanceRoots;
 pub(in super::super) fn domain_roots(
     roots: &CurrentTaskProtocolConformanceRoots<'_, '_>,
 ) -> Result<ExternalPoolAdapterTaskProtocolConformanceRunRoots> {
-    let release_receipt = roots.carrier.release();
+    domain_roots_from_parts(
+        roots.carrier.release(),
+        roots.vulnerability.receipt(),
+        roots.sandbox.receipt(),
+        &roots.runtime_compatibility,
+    )
+}
+
+pub(in super::super) fn domain_roots_from_parts(
+    release_receipt: &ExternalPoolAdapterRegistryReleaseReceipt,
+    vulnerability_receipt: &ExternalPoolAdapterVulnerabilityReattestationReceipt,
+    sandbox_receipt: &ExternalPoolAdapterSandboxReattestationReceipt,
+    runtime_compatibility: &CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<
+        '_,
+        '_,
+    >,
+) -> Result<ExternalPoolAdapterTaskProtocolConformanceRunRoots> {
     let release = &release_receipt.release;
     let entrypoint = release
         .manifest
@@ -23,13 +47,11 @@ pub(in super::super) fn domain_roots(
         .iter()
         .find(|file| file.path == release.manifest.runtime.entrypoint)
         .ok_or_else(|| anyhow::anyhow!("task-protocol conformance V249 entrypoint disappeared"))?;
-    let vulnerability_receipt = roots.vulnerability.receipt();
     let vulnerability = &vulnerability_receipt.reattestation.binding;
-    let sandbox_receipt = roots.sandbox.receipt();
     let sandbox = &sandbox_receipt.reattestation.binding;
-    let verification_receipt = roots.runtime_compatibility.verification();
+    let verification_receipt = runtime_compatibility.verification();
     let verification = &verification_receipt.verification;
-    let observation_receipt = roots.runtime_compatibility.run_observation();
+    let observation_receipt = runtime_compatibility.run_observation();
     let observation = &observation_receipt.observation;
     let runtime_profile = server_runtime_compatibility_v2_profile_catalog()?;
     Ok(ExternalPoolAdapterTaskProtocolConformanceRunRoots {
@@ -127,7 +149,35 @@ pub(in super::super) fn into_execution_input(
     roots: CurrentTaskProtocolConformanceRoots<'_, '_>,
 ) -> Result<TaskProtocolConformanceExecutionInput> {
     let projected = domain_roots(&roots)?;
-    let compatibility = roots.runtime_compatibility.run_observation();
+    into_execution_input_from_parts(
+        projected,
+        &roots.runtime_compatibility,
+        roots.carrier.into_prepared(),
+    )
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in super::super) fn into_execution_input_from_parts(
+    projected: ExternalPoolAdapterTaskProtocolConformanceRunRoots,
+    runtime_compatibility: &CurrentExternalPoolAdapterRuntimeCompatibilityVerificationAuthority<
+        '_,
+        '_,
+    >,
+    prepared_installation: PreparedExternalPoolAdapterInstallation,
+) -> Result<TaskProtocolConformanceExecutionInput> {
+    into_execution_input_from_observation(
+        projected,
+        runtime_compatibility.run_observation(),
+        prepared_installation,
+    )
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in super::super) fn into_execution_input_from_observation(
+    projected: ExternalPoolAdapterTaskProtocolConformanceRunRoots,
+    compatibility: &ExternalPoolAdapterRuntimeCompatibilityRunObservationReceipt,
+    prepared_installation: PreparedExternalPoolAdapterInstallation,
+) -> Result<TaskProtocolConformanceExecutionInput> {
     let fixture_resources = compatibility
         .observation
         .fixture_resources
@@ -154,7 +204,7 @@ pub(in super::super) fn into_execution_input(
         launch_image_sha256: runtime.launch_image_sha256.clone(),
         launch_image_size_bytes: runtime.launch_image_size_bytes,
         fixture_resources,
-        prepared_installation: roots.carrier.into_prepared(),
+        prepared_installation,
     })
 }
 

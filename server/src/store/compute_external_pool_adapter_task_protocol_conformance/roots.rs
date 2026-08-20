@@ -32,8 +32,12 @@ mod projection;
 mod reproof;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-pub(super) use projection::into_execution_input;
-pub(super) use projection::{canonical_time, domain_roots, task_protocol_conformance_expires_at};
+pub(super) use projection::into_execution_input_from_observation;
+pub(super) use projection::{
+    canonical_time, domain_roots, domain_roots_from_parts, task_protocol_conformance_expires_at,
+};
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(super) use projection::{into_execution_input, into_execution_input_from_parts};
 use reproof::{audit_carrier, audit_current_roots, audit_domain_roots};
 
 pub(super) struct CurrentTaskProtocolConformanceRoots<'tx, 'conn> {

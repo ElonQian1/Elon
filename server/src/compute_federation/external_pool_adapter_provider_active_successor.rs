@@ -1,7 +1,7 @@
 //! Dormant, activation-rooted Provider active-successor contracts.
 //!
 //! This Domain does not activate a Provider or mint route, executor, dispatch, or market
-//! authority. Durable creation remains unreachable until V275 supplies its atomic activation
+//! authority. Durable creation remains unreachable until V277 supplies its atomic activation
 //! witness and process-custody producer.
 
 mod canonical;
