@@ -200,6 +200,16 @@ internal class ChatGptWebMcpActions(
                 }
                 dispatch("start_dictation", commands::startDictation)
             }
+            "chatgpt_prepare_realtime_voice" -> {
+                if (inputText().isNotEmpty()) return error(action, "native_draft_not_empty")
+                val expectedDraft = snapshot()?.draft?.take(MAX_INPUT_CHARS)
+                    ?: return error(action, "draft_unavailable")
+                if (expectedDraft.isNotEmpty()) {
+                    dispatch("set_draft") { requestId ->
+                        commands.setDraft("", expectedDraft, requestId)
+                    }
+                }
+            }
             "chatgpt_start_realtime_voice" -> {
                 val voiceControl = ChatGptRealtimeVoicePolicy.resolve(uiManifest())
                     ?: return error(action, "realtime_voice_unavailable")
@@ -756,6 +766,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_copy_last_response",
             "chatgpt_regenerate_response",
             "chatgpt_start_dictation",
+            "chatgpt_prepare_realtime_voice",
             "chatgpt_start_realtime_voice",
             "chatgpt_cancel_dictation",
             "chatgpt_submit_dictation",

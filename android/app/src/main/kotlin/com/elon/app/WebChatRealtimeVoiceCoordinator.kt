@@ -17,6 +17,8 @@ internal class WebChatRealtimeVoiceCoordinator(
 ) {
     private var generation = 0
     private var provider: WebChatProviderIdentity? = null
+    private var prepareRequestId: String? = null
+    private var preparedGeneration: Int? = null
     private var commandRequestId: String? = null
 
     fun start(candidate: WebChatProviderIdentity): Boolean {
@@ -29,6 +31,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         if (surface.isVisible() && provider?.id == candidate.id) return true
         generation += 1
         provider = candidate
+        prepareRequestId = null
+        preparedGeneration = null
         commandRequestId = null
         surface.show(::close, ::retry, ::openFallback)
         backControl.setEnabled(true)
@@ -48,6 +52,8 @@ internal class WebChatRealtimeVoiceCoordinator(
     fun close() {
         generation += 1
         provider = null
+        prepareRequestId = null
+        preparedGeneration = null
         commandRequestId = null
         backControl.setEnabled(false)
         surface.hide()
@@ -62,6 +68,8 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun retry() {
         val current = provider ?: return
         generation += 1
+        prepareRequestId = null
+        preparedGeneration = null
         commandRequestId = null
         surface.render(WebChatRealtimeVoiceStage.PREPARING, "正在重新连接后台网页会话")
         if (!beginWebBacking()) {
@@ -98,6 +106,10 @@ internal class WebChatRealtimeVoiceCoordinator(
             fail("本机网页会话接口未就绪")
             return
         }
+        if (preparedGeneration != expectedGeneration) {
+            prepareVoice(expectedGeneration, attempt, port)
+            return
+        }
         val voiceReady = port.state().controls.any { descriptor ->
             descriptor.control.semantic == REALTIME_VOICE_SEMANTIC && descriptor.control.enabled
         }
@@ -127,6 +139,69 @@ internal class WebChatRealtimeVoiceCoordinator(
         } else {
             pollCommand(expectedGeneration, result.requestId, attempt = 0)
         }
+    }
+
+    private fun prepareVoice(
+        expectedGeneration: Int,
+        attempt: Int,
+        port: WebChatConsumerPort,
+    ) {
+        if (prepareRequestId != null) return
+        surface.render(WebChatRealtimeVoiceStage.PREPARING, "正在同步输入状态并准备官方语音入口")
+        val result = port.executeSessionCommand(PREPARE_REALTIME_VOICE_ACTION)
+        if (!result.accepted) {
+            if (attempt < MAX_START_ATTEMPTS && result.error in RETRYABLE_ERRORS) {
+                requestSessionRecovery()
+                scheduleStart(expectedGeneration, attempt + 1, RETRY_DELAY_MS)
+            } else {
+                val detail = if (result.error == "native_draft_not_empty") {
+                    "请先发送或清空输入内容，再启动实时语音"
+                } else {
+                    "同步网页输入状态失败，可重试或打开官网语音"
+                }
+                fail(detail)
+            }
+            return
+        }
+        val requestId = result.requestId
+        if (requestId == null) {
+            finishPreparation(expectedGeneration, port)
+        } else {
+            prepareRequestId = requestId
+            pollPreparation(expectedGeneration, requestId, attempt = 0)
+        }
+    }
+
+    private fun pollPreparation(expectedGeneration: Int, requestId: String, attempt: Int) {
+        schedule(Runnable {
+            if (!isCurrent(expectedGeneration) || prepareRequestId != requestId) return@Runnable
+            val port = consumerPort() ?: run {
+                fail("本机网页会话接口未就绪")
+                return@Runnable
+            }
+            val request = port.state().commandRequests.lastOrNull { it.id == requestId }
+            when (request?.status) {
+                WebChatConsumerCommandStatus.SUCCEEDED -> finishPreparation(expectedGeneration, port)
+                WebChatConsumerCommandStatus.FAILED,
+                WebChatConsumerCommandStatus.TIMED_OUT ->
+                    fail("同步网页输入状态失败，可重试或打开官网语音")
+                WebChatConsumerCommandStatus.PENDING,
+                WebChatConsumerCommandStatus.UNKNOWN,
+                null -> if (attempt >= MAX_COMMAND_POLLS) {
+                    fail("等待网页输入状态同步超时，可重试或打开官网语音")
+                } else {
+                    pollPreparation(expectedGeneration, requestId, attempt + 1)
+                }
+            }
+        }, COMMAND_POLL_DELAY_MS)
+    }
+
+    private fun finishPreparation(expectedGeneration: Int, port: WebChatConsumerPort) {
+        if (!isCurrent(expectedGeneration)) return
+        prepareRequestId = null
+        preparedGeneration = expectedGeneration
+        port.requestControls()
+        scheduleStart(expectedGeneration, attempt = 0, delayMs = CONTROL_SETTLE_MS)
     }
 
     private fun pollCommand(expectedGeneration: Int, requestId: String, attempt: Int) {
@@ -159,6 +234,8 @@ internal class WebChatRealtimeVoiceCoordinator(
 
     private fun fail(detail: String) {
         generation += 1
+        prepareRequestId = null
+        preparedGeneration = null
         commandRequestId = null
         endWebBacking()
         surface.render(WebChatRealtimeVoiceStage.FAILED, detail)
@@ -168,6 +245,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         expectedGeneration == generation && provider != null && surface.isVisible()
 
     private companion object {
+        const val PREPARE_REALTIME_VOICE_ACTION = "chatgpt_prepare_realtime_voice"
         const val REALTIME_VOICE_ACTION = "chatgpt_start_realtime_voice"
         const val REALTIME_VOICE_SEMANTIC = "voice_mode"
         const val MAX_START_ATTEMPTS = 30
@@ -176,9 +254,11 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val RETRY_DELAY_MS = 400L
         const val COMMAND_POLL_DELAY_MS = 250L
         const val COMMAND_SETTLE_MS = 1_000L
+        const val CONTROL_SETTLE_MS = 400L
         val RETRYABLE_ERRORS = setOf(
             "bridge_not_ready",
             "adapter_generation_not_ready",
+            "draft_unavailable",
             "realtime_voice_unavailable",
         )
     }

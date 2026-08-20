@@ -193,6 +193,7 @@ internal class ChatGptWebConsumerPortAdapter(
         val SESSION_COMMANDS = setOf(
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",
+            "chatgpt_prepare_realtime_voice",
             "chatgpt_start_realtime_voice",
             "chatgpt_submit_dictation",
             "chatgpt_regenerate_response",

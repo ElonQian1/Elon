@@ -17,9 +17,15 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         fixture.scheduler.runNext()
         assertEquals(1, fixture.port.executeCount)
+        assertEquals(WebChatRealtimeVoiceStage.PREPARING, fixture.surface.stage)
+
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        assertEquals(2, fixture.port.executeCount)
         assertEquals(WebChatRealtimeVoiceStage.STARTING, fixture.surface.stage)
 
-        fixture.port.commandStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
         fixture.scheduler.runNext()
         assertEquals(WebChatRealtimeVoiceStage.ACTIVE, fixture.surface.stage)
         assertEquals(0, fixture.officialFallbackCount)
@@ -106,7 +112,8 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
     private class FakePort : WebChatConsumerPort {
         var executeCount = 0
-        var commandStatus = WebChatConsumerCommandStatus.PENDING
+        var prepareStatus = WebChatConsumerCommandStatus.PENDING
+        var voiceStatus = WebChatConsumerCommandStatus.PENDING
 
         override fun state() = WebChatConsumerState(
             streaming = false,
@@ -115,13 +122,20 @@ class WebChatRealtimeVoiceCoordinatorTest {
             pageKind = "conversation",
             pageUrl = "https://chatgpt.com/c/test",
             features = emptyList(),
-            controls = listOf(WebChatConsumerControlDescriptor(
-                control = VoiceControl,
-                requiresUserConfirmation = false,
-                presentation = WebChatConsumerControlPresentation.DIRECT,
-                nativeSelector = WebChatProductionSelectors.REALTIME_VOICE_SURFACE,
-            )),
-            commandRequests = listOf(WebChatConsumerCommandRequest("voice_1", commandStatus)),
+            controls = if (prepareStatus == WebChatConsumerCommandStatus.SUCCEEDED) {
+                listOf(WebChatConsumerControlDescriptor(
+                    control = VoiceControl,
+                    requiresUserConfirmation = false,
+                    presentation = WebChatConsumerControlPresentation.DIRECT,
+                    nativeSelector = WebChatProductionSelectors.REALTIME_VOICE_SURFACE,
+                ))
+            } else {
+                emptyList()
+            },
+            commandRequests = listOf(
+                WebChatConsumerCommandRequest("prepare_1", prepareStatus),
+                WebChatConsumerCommandRequest("voice_1", voiceStatus),
+            ),
         )
 
         override fun requestComposerOptions(section: String) = rejected()
@@ -135,7 +149,11 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         override fun executeSessionCommand(action: String): WebChatConsumerCommandResult {
             executeCount += 1
-            return accepted("voice_1")
+            return when (action) {
+                "chatgpt_prepare_realtime_voice" -> accepted("prepare_1")
+                "chatgpt_start_realtime_voice" -> accepted("voice_1")
+                else -> rejected()
+            }
         }
 
         private fun accepted(requestId: String? = null) =
