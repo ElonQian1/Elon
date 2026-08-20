@@ -5971,7 +5971,7 @@
       "id": "win-background-ai-webview-resize-parking-v1",
       "title": "Windows 后台 AI 官方 WebView 随窗口缩放重新停放",
       "summary": "修复原生 AI 聊天中后台 Google/ChatGPT 子 WebView 在主窗口最大化、还原或 DPI 变化后从右下角露出并覆盖输入区，同时保留完整视口、游客 Profile 与上下文同步。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-background-ai-webview-resize-parking-v1.md",
@@ -6012,15 +6012,101 @@
         "后台官方页保持完整视口和同一 WebView2 Profile，游客 Cookie 与上下文同步不丢失。",
         "Rust 定向测试、格式检查、生产发布构建和本机真实最大化工作流通过。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_5c569724e9a14fffb1ab790c3ead304c",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787227078541,
-        "expires_at_ms": 1787241478541
-      },
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+          "content_hash": "df4945179c5634b2054584dc169d4c8daf17a2fb10bc7978e97e76554a5cbf45",
+          "locator": "ADAPTER_VERSION and bundle parity",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "d1e6fb46af457d8f6d90bf31ba1a414b771725b2",
+            "worktree_blob_oid": "d1e6fb46af457d8f6d90bf31ba1a414b771725b2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+          "content_hash": "9b41ace7c7a13bfad4d1993842f6179efdaf754992f079b0ba674156833e026f",
+          "locator": "reflow_parked_sessions",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "398f329f60cc471595fb4472f092bf31fd9171f7",
+            "worktree_blob_oid": "398f329f60cc471595fb4472f092bf31fd9171f7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
+          "content_hash": "8b0c5513b8b81713c4796736c9a1089a0590ef858b90192c45989bbc163ce623",
+          "locator": "parked_session_labels",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "7548b1d996803032f8eb883eebaf11f8003eae80",
+            "worktree_blob_oid": "7548b1d996803032f8eb883eebaf11f8003eae80",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+          "content_hash": "1708a18b4a559c6f10ca0f16d12ec5878a2b4eed9397b0ff8cd3ef9e80d92696",
+          "locator": "parked session label tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "f1d6e0aa5d7f8733512bc47ddf3f267645b7122c",
+            "worktree_blob_oid": "f1d6e0aa5d7f8733512bc47ddf3f267645b7122c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/main.rs",
+          "content_hash": "891cd5bc04c5d6faa3b8b2ec4347e74d5f0f7367a232ceb4697714a429f110db",
+          "locator": "WindowEvent::Resized / ScaleFactorChanged",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "0522740d45b300433d32c58ba7cdc5b1cddf8063",
+            "worktree_blob_oid": "0522740d45b300433d32c58ba7cdc5b1cddf8063",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "838ca379af4e2ad2f7d7cccfc7750f33860f9f99e6520a5c901e71e8e2d751a5",
+          "locator": "窗口尺寸变化后的后台停放",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "49361f4c157258e1e63a17106d369c4b1cbba574",
+            "worktree_blob_oid": "49361f4c157258e1e63a17106d369c4b1cbba574",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "10eca9bff3c09e00445e87b17372a76add69079be1d0e65e9984e644c82b3626",
+          "locator": "ADAPTER_VERSION v139 contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f99e8c8273654b065d782fecbe8ea68a9c44ccdb",
+            "head_blob_oid": "59a5cc4c466c0ceb1f482622dad7b66f0fc8e2a0",
+            "worktree_blob_oid": "59a5cc4c466c0ceb1f482622dad7b66f0fc8e2a0",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787225006617,
-      "updated_at_ms": 1787227078567
+      "updated_at_ms": 1787227534468
     },
     {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -7774,36 +7860,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_cb1c232e0b1a4ace94a3818318a8c5a7",
-      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
-      "action": "transitioned",
-      "actor": "codex-cache-repair",
-      "reason": "Exclusive recovery filter and forced low-disk regression are implemented; live C-drive apply remains gated on dry-run review.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786781603308
-    },
-    {
-      "id": "feature_event_804965cd646e4de2867315db9d058dff",
-      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
-      "action": "transitioned",
-      "actor": "codex-cache-repair",
-      "reason": "Passed 138 cache-platform assertions. Live low-disk dry-runs selected only missing workspace partitions with Unsafe=0; C apply removed 5 partitions (11.28 GiB), shared deletions 0, postchecks selected 0.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786781999142
-    },
-    {
-      "id": "feature_event_398b731ac1e2468b9b802af336d25a66",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "registered",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "登记已在当前远程基线完成的 V267 编译、Linux 动态验收与文档纠偏。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786788437277
-    },
     {
       "id": "feature_event_0942c2bf0ad144c4ae003a6fadf4d0aa",
       "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
@@ -9773,6 +9829,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787227078567
+    },
+    {
+      "id": "feature_event_cc9847fc1bba4b3fbdba44b191d30860",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787227521335
+    },
+    {
+      "id": "feature_event_be278fc9a0da41349ab9e6cb1a070530",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "最新主分支窗口重排修复已复用，Win ChatGPT v139 bundle 与合同已补齐",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787227534443
+    },
+    {
+      "id": "feature_event_f556f598e9604b5fbd58b776999c499f",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "validate-win-web-ai 全量通过：用户浏览器合同、TypeScript/Vite、ESLint、66 项本地 AI Rust 测试",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787227534468
     }
   ]
 }
