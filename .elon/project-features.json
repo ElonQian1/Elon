@@ -6209,6 +6209,92 @@
       "updated_at_ms": 1786710654944
     },
     {
+      "id": "win-native-ai-send-surface-continuity-v1",
+      "title": "Win 原生 AI 发送界面连续性 V1",
+      "summary": "修复原生发送成功后被前端策略强制切换到 Google AI 或 ChatGPT 官方标签页的问题，保留后台回复同步与手动官网入口。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-native-ai-send-surface-continuity-v1.md",
+        "content_hash": "7dfa411206b13f6c6ee44fb0c4cbf9d50f2ded0a5b721afdd5210b490c747ff7",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "8bd40014fd68d32d66e1563e077cb0df525c8643",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "289c46adff9c44b85bc9188deb81faf77fd1332a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "pc",
+        "chat",
+        "google-ai",
+        "chatgpt",
+        "webview",
+        "ux"
+      ],
+      "task_paths": [
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+        "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "发送成功分支不派发打开官方 AI 标签页事件",
+        "乐观发送、回复刷新和失败回滚保持不变",
+        "用户主动官网完整内容入口继续可用",
+        "PC 合同与生产构建通过并发布到 Win"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "d1101675370ebe16cc3a4b847d9e3c6e06d60e826798f5237df3b0d6d8e739e0",
+          "locator": "发送动作本身不得切换当前标签",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8f3910413343b73f9af5e7cb35e62c6ad15495a",
+            "head_blob_oid": "c6a57dc8c8c752ff93d5061c3a3f8c08a2419eb7",
+            "worktree_blob_oid": "c6a57dc8c8c752ff93d5061c3a3f8c08a2419eb7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+          "content_hash": "598c5de885f168324bed74b111f7fb5e6aa431e129c0e7800fb59a3dbaf8ce78",
+          "locator": "sendSuccessBranch",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8f3910413343b73f9af5e7cb35e62c6ad15495a",
+            "head_blob_oid": "d7b39f3a4e2e1088d35418b99b9a924b989ffb9f",
+            "worktree_blob_oid": "d7b39f3a4e2e1088d35418b99b9a924b989ffb9f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts",
+          "content_hash": "ea39aa59cc8528c74ebd618e25ec28701bef7a8cc3c6691935edd527bc3f7726",
+          "locator": "send_prompt",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d8f3910413343b73f9af5e7cb35e62c6ad15495a",
+            "head_blob_oid": "24bcce3285cd5aa86d3b7710803c66f3d72048e0",
+            "worktree_blob_oid": "24bcce3285cd5aa86d3b7710803c66f3d72048e0",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1787217360989,
+      "updated_at_ms": 1787218056035
+    },
+    {
       "id": "win-native-multi-provider-web-ai-bridge-v1",
       "title": "Win 原生多厂商网页 AI 语义桥 V1",
       "summary": "让 Win ChatGPT 与 Google AI 官方网页通过版本化可见语义桥稳定驱动一龙统一原生聊天 UI，并保留官方页回退。",
@@ -7267,76 +7353,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_11f2203cda014bacaf64161358c9036a",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "registered",
-      "actor": "codex-goal-erp-readback",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786756720906
-    },
-    {
-      "id": "feature_event_feafc80ad96547febc772fb9af81eedc",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "claimed",
-      "actor": "codex-goal-erp-readback",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786756732528
-    },
-    {
-      "id": "feature_event_b14c7057d79a4a3dbc166f03f72e7f24",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-erp-readback",
-      "reason": "开始实现 SDK ERP 写入与独立回读验证纵向切片。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786756745793
-    },
-    {
-      "id": "feature_event_22ae3c19d2534431be624939fcd0a4f1",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-erp-readback",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786757976607
-    },
-    {
-      "id": "feature_event_73f1b8e871e6491abd5a8b7e7c678f74",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-erp-readback",
-      "reason": "SDK implementation, strict types, targeted and full Node tests, source size and document modularity gates passed.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786757991721
-    },
-    {
-      "id": "feature_event_861f7fbbc6224cadb2cc0715bf46db1c",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-erp-readback",
-      "reason": "Independent test evidence is hash-bound: targeted 23/23, SDK full 88/88, TypeScript strict noEmit, source and document gates passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786757991761
-    },
-    {
-      "id": "feature_event_834c953e950c44dc987d337d2cc452a0",
-      "feature_id": "open-commerce-verified-erp-handoff-handler-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-erp-readback",
-      "reason": "Implementation, tests, documents, and verified registry commit were pushed to origin/main at 6b913f058889dad3a5b0698dc251278718527ebc.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786758085963
-    },
     {
       "id": "feature_event_61673a722c544681bc3dd69a2771318b",
       "feature_id": "ai-task-managed-rust-cache-lifecycle-v1",
@@ -9266,6 +9282,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787215120290
+    },
+    {
+      "id": "feature_event_d52a661b07154579905d8bdb8dd20913",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "用户现场报告原生发送后立即跳到 Google AI 官方页；代码确认 showOfficialAfterSend 为确定根因。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787217360989
+    },
+    {
+      "id": "feature_event_1cdc58fff3f44cdcb7b694e3d02ac986",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787217380319
+    },
+    {
+      "id": "feature_event_c1094f49be3640d28857d3c0cd3ac36d",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始删除发送成功后的自动官方页切换，并补充原生界面连续性回归合同",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787217396882
+    },
+    {
+      "id": "feature_event_df2c96c7c7774d25b1e2aac7c4b1d9fe",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787217831680
+    },
+    {
+      "id": "feature_event_8e67b11b628743908b94aade49da9218",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "已移除发送成功后的官方标签自动切换，保留后台回复刷新与手动官网入口；PC 用户浏览器契约与生产构建通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787217849018
+    },
+    {
+      "id": "feature_event_2a27f30ebd2e4524ab7c762fb4938737",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1787218043454
+    },
+    {
+      "id": "feature_event_778d48980c084442a5fb720a8970b4d0",
+      "feature_id": "win-native-ai-send-surface-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "远端变基后重新通过 Win 用户浏览器契约测试与 PC 生产构建，当前源码、测试与文档证据均已重绑。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787218056035
     }
   ]
 }

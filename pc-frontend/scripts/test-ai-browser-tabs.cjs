@@ -19,6 +19,10 @@ const sourceLinks = read('pc-frontend/src/features/ai/AiSourceLinks.tsx')
 const topbar = read('pc-frontend/src/features/ai/AiChatTopbar.tsx')
 const chat = read('pc-frontend/src/features/ai/AiChatPage.tsx')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
+const sendSuccessBranch = controller.slice(
+  controller.indexOf("} else if (action === 'send_prompt')"),
+  controller.indexOf("} else if (result?.detail)"),
+)
 
 assert.match(host, /WebviewBuilder::new/)
 assert.match(host, /\.incognito\(true\)/)
@@ -82,7 +86,10 @@ assert.match(topbar, /onOpenOfficial/)
 assert.match(chat, /AiBrowserExperience/)
 assert.match(chat, /data-ai-chat-main/)
 assert.match(chat, /chatMode && web\.ready/)
-assert.match(controller, /showOfficialAfterSend/)
+assert.match(sendSuccessBranch, /startResponseRefresh/)
+assert.doesNotMatch(sendSuccessBranch, /requestOfficialAiTab|showOfficialAfterSend|openOfficial/)
+assert.doesNotMatch(controller, /showOfficialAfterSend/)
+assert.match(controller, /消息已交给官方网页发送；正在一龙聊天界面同步回复/)
 
 process.stdout.write('PASS Win AI internal browser tab contract\n')
 
