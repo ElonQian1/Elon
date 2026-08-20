@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 20;
+  const extractorVersion = 21;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -141,6 +141,21 @@
     return Math.min(length, 40000);
   }
 
+  function narrativeBlockCount(container) {
+    if (!container) return 0;
+    let count = 0;
+    for (const block of container.querySelectorAll('p, li, blockquote')) {
+      if (!isVisible(block)) continue;
+      const text = cleanText(block.innerText || block.textContent);
+      if (text.length < 80) continue;
+      const linkedLength = externalLinkTextLength(block);
+      if (linkedLength / text.length > 0.45) continue;
+      count += 1;
+      if (count >= 12) break;
+    }
+    return count;
+  }
+
   function containsComposer(node, composer) {
     return !!composer && (node === composer || node.contains(composer));
   }
@@ -190,12 +205,14 @@
     const controls = node.querySelectorAll('button, [role="button"], input, textarea').length;
     const links = node.querySelectorAll('a[href]').length;
     const linkedTextLength = externalLinkTextLength(node);
+    const narrativeBlocks = narrativeBlockCount(node);
     const citationTextRatio = text.length ? Math.min(linkedTextLength, text.length) / text.length : 0;
     const sourceCollection = candidatePolicy && typeof candidatePolicy.sourceCollection === 'function'
       ? candidatePolicy.sourceCollection({
           citations: citations.length,
           links,
           semanticBlocks,
+          narrativeBlocks,
           textLength: text.length,
           citationTextRatio
         })
@@ -209,6 +226,7 @@
       textLength: text.length,
       citations: citations.length,
       semanticBlocks,
+      narrativeBlocks,
       links,
       tabControls,
       liveRegion,
@@ -228,7 +246,8 @@
     if (candidatePolicy && !candidatePolicy.accepts(metrics)) return null;
     const depth = Math.min(12, node.closest('main, [role="main"]') ? 1 : 0);
     const score = Math.min(text.length, 8000) + Math.min(citations.length, 3) * 180 +
-      Math.min(semanticBlocks, 20) * 90 + (explicit ? 1400 : 0) + depth * 30 -
+      Math.min(semanticBlocks, 20) * 90 + Math.min(narrativeBlocks, 8) * 520 +
+      (explicit ? 1400 : 0) + depth * 30 -
       Math.min(controls, 20) * 120 -
       (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);
     return {
@@ -237,6 +256,7 @@
       citations,
       score,
       explicit,
+      narrativeBlocks,
       afterQuery: metrics.afterQuery,
       trustedAnswerContainer: metrics.trustedAnswerContainer
     };

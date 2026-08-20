@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 13)
+assert.equal(policy.version, 14)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -293,9 +293,19 @@ assert.equal(policy.sourceCollection({
   textLength: 180,
   citations: 3,
   semanticBlocks: 3,
+  narrativeBlocks: 0,
   links: 3,
   citationTextRatio: 0.62,
 }), true)
+
+assert.equal(policy.sourceCollection({
+  textLength: 1400,
+  citations: 6,
+  semanticBlocks: 6,
+  narrativeBlocks: 3,
+  links: 6,
+  citationTextRatio: 0.28,
+}), false, 'a multi-paragraph answer with citation chips is not a source-card collection')
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -327,6 +337,7 @@ assert.equal(policy.accepts({
   textLength: 240,
   citations: 1,
   semanticBlocks: 5,
+  narrativeBlocks: 3,
   controls: 0,
   links: 1,
   tabControls: 0,

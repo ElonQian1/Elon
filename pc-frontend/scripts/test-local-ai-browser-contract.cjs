@@ -28,6 +28,7 @@ const chatGptAuthenticationPolicy = read('android/app/src/main/assets/chatgpt_we
 const googleAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs')
 const sharedGoogleAdapterScript = read('android/app/src/main/assets/google_web_adapter.js')
 const sharedGoogleMessageExtractorScript = read('android/app/src/main/assets/google_web_message_extractor.js')
+const sharedGoogleAnswerCandidatePolicy = require(path.join(root, 'android/app/src/main/assets/google_web_answer_candidate_policy.js'))
 const sharedGoogleRichContentScript = read('android/app/src/main/assets/google_web_rich_content.js')
 const sharedGoogleComposerBridgeScript = read('android/app/src/main/assets/google_web_composer_bridge.js')
 const sharedGoogleComposerBridge = require(path.join(root, 'android/app/src/main/assets/google_web_composer_bridge.js'))
@@ -193,6 +194,23 @@ assert.match(googleAdapter, /Some\("google_web"\)/)
 assert.match(sharedGoogleAdapterScript, /window\.__elonGoogleWebBridge/)
 assert.match(sharedGoogleMessageExtractorScript, /window\.__elonGoogleWebMessageExtractor/)
 assert.match(sharedGoogleRichContentScript, /root\.__elonGoogleWebRichContent/)
+assert.match(sharedGoogleMessageExtractorScript, /narrativeBlocks/)
+assert.equal(sharedGoogleAnswerCandidatePolicy.sourceCollection({
+  citations: 6,
+  links: 6,
+  semanticBlocks: 6,
+  narrativeBlocks: 3,
+  textLength: 1_400,
+  citationTextRatio: 0.28,
+}), false)
+assert.equal(sharedGoogleAnswerCandidatePolicy.sourceCollection({
+  citations: 3,
+  links: 3,
+  semanticBlocks: 3,
+  narrativeBlocks: 0,
+  textLength: 600,
+  citationTextRatio: 0.7,
+}), true)
 assert.match(chatBackend, /content_format: contentFormat/)
 assert.equal(fs.existsSync(path.join(root, 'desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode_adapter.js')), false)
 assert.doesNotMatch(rust, /\.cookies\(\)|set_cookie|delete_cookie/)

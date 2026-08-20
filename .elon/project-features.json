@@ -6500,64 +6500,64 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/assets/google_web_answer_candidate_policy.js",
-          "content_hash": "de871a535462d32d24e0c92204ec388b25084301111dabae86e8076e09d028ce",
-          "locator": "sourceCollection",
+          "content_hash": "9e4b8dc88849306f6425f82ab248ca170d2b5ef8e92f37d0d416e85526d9db5d",
+          "locator": "narrative answer source-collection guard",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "e644ee435f63eda074a4250625ef3381e0f66be5",
-            "worktree_blob_oid": "e644ee435f63eda074a4250625ef3381e0f66be5",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "da8b6ce25b59960d332594d1d8fc272fab709081",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/main/assets/google_web_message_extractor.js",
-          "content_hash": "2ffb734b672ca7126e5b4c8b18462c8d607cc947915250b798dc75a825647a0b",
-          "locator": "candidateFrom",
+          "content_hash": "b32f7f069f69f87fa097a9493eed24e2dbeea357e763cd2887ef47ffc2b5fba6",
+          "locator": "narrativeBlockCount and answer scoring",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "99e3cdee0aa15634d4e43b158ffb242a6a7a4c05",
-            "worktree_blob_oid": "99e3cdee0aa15634d4e43b158ffb242a6a7a4c05",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "4d479c8bbf784a8ab72b8809d2ac3f48de769030",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "desktop-shell/src-tauri/src/local_ai_browser.rs",
           "content_hash": "fe7224aa5c64e59c4f0f0f74ccf159bb5887e9a436a2f32ef114b2413deb34f2",
-          "locator": "background navigation and adapter focus restoration",
+          "locator": "background navigation focus restoration",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
-            "head_blob_oid": "085d4f34d1d0f2ea1f103f959843e00ef54549bd",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
+            "head_blob_oid": "e3c3e237d5c91a0a8cc416b883d54c4094d590ff",
             "worktree_blob_oid": "e3c3e237d5c91a0a8cc416b883d54c4094d590ff",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
           "content_hash": "fdf2b5aebba380ec1cfb6f9aa5a5f948e37460c04f70bd098ce0ea566c5dc371",
-          "locator": "hide and park_if_background",
+          "locator": "park_if_background and main focus",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
-            "head_blob_oid": "398f329f60cc471595fb4472f092bf31fd9171f7",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
+            "head_blob_oid": "1313a1501e16e1b16f64897c84c10b741162f48c",
             "worktree_blob_oid": "1313a1501e16e1b16f64897c84c10b741162f48c",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/user-browser-module-integration.md",
           "content_hash": "0053775d01ba53fec7724206f6e559f1d8212469e63b7ab267d703a8a000f73f",
-          "locator": "official surface intent and primary answer rule",
+          "locator": "official surface and primary answer policy",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "e579c9277136a5d012d74470e71f32a7618c6c84",
             "worktree_blob_oid": "e579c9277136a5d012d74470e71f32a7618c6c84",
             "state": "tracked_clean"
@@ -6566,11 +6566,11 @@
         {
           "path": "pc-frontend/scripts/test-ai-browser-tabs.cjs",
           "content_hash": "8f2579d874c94020dd6f91b47dec345eefe887840d4737600d9ca6d6a10e0eff",
-          "locator": "background visibility contract",
+          "locator": "explicit official tab visibility contract",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "98b8fc40c3cff93f4148bd4717f0be347e9346df",
             "worktree_blob_oid": "98b8fc40c3cff93f4148bd4717f0be347e9346df",
             "state": "tracked_clean"
@@ -6578,38 +6578,38 @@
         },
         {
           "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
-          "content_hash": "d444bce7df30745eed2f523b10f7bb194f9771c5328e38893c76a6a0284d5328",
-          "locator": "background WebView focus contract",
+          "content_hash": "a5e136206bdcba4084c4e7c2b8cd5b8340ddf9aa52bfa0f2ee00dfc230eda583",
+          "locator": "narrative answer and background WebView contract",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
-            "head_blob_oid": "59a5cc4c466c0ceb1f482622dad7b66f0fc8e2a0",
-            "worktree_blob_oid": "ef2e4b0fe5ecdeab8a6e0a7dbab69a4ce3905c75",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
+            "head_blob_oid": "ef2e4b0fe5ecdeab8a6e0a7dbab69a4ce3905c75",
+            "worktree_blob_oid": "a64e01e046e1f934058b965570710c2b9794ce8a",
             "state": "tracked_modified"
           }
         },
         {
           "path": "pc-frontend/scripts/test-local-ai-new-conversation.cjs",
-          "content_hash": "283fdbcd2017d976f6b349cd61ff7e740576182910276115bda1c6dbf8ed6492",
-          "locator": "Google home recovery case",
+          "content_hash": "0c944a04db26c078a15722c672deee8bd02dfa522098ee557ca319fc4838975b",
+          "locator": "Google guest home recovery",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
-            "head_blob_oid": "1f19375b06de67b4bfc63f6dcf1fc68df2955239",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
+            "head_blob_oid": "bcc0414c8346b63ac15984b2f2cfccbd4ded6f1e",
             "worktree_blob_oid": "bcc0414c8346b63ac15984b2f2cfccbd4ded6f1e",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "pc-frontend/src/features/user-browser/AiWebChatSidebar.tsx",
           "content_hash": "0e34a4da674a49f4093bef6dc658a1ea8b022ce767d763d2bc5aa9f14a69641d",
-          "locator": "explicit official tab intent",
+          "locator": "manual official tab intent",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "2fd5d3b93dc600572e321d06c927d157e8e286f4",
             "worktree_blob_oid": "2fd5d3b93dc600572e321d06c927d157e8e286f4",
             "state": "tracked_clean"
@@ -6617,54 +6617,54 @@
         },
         {
           "path": "pc-frontend/src/features/user-browser/localAiNewConversation.ts",
-          "content_hash": "84608423a3d69b8a08e4927bc4d42e505a1699cb503d75da03e845ac11831536",
-          "locator": "selectLocalAiNewConversationPath",
+          "content_hash": "1ffd5bc5d86cf430a5655c69e40f04a8dcb8451e3e8378db48fb346881527ad3",
+          "locator": "Google home recovery selection",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
-            "head_blob_oid": "3f76cc7cdfb423e33f5e87466474994da5a79661",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
+            "head_blob_oid": "640b68abc998ff5bedd3bde1117770f0ef809570",
             "worktree_blob_oid": "640b68abc998ff5bedd3bde1117770f0ef809570",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts",
-          "content_hash": "6e4a16fe15fe2e724639e8922a0fed4f770d0d24de685ef360e1e7d7be8fca6c",
-          "locator": "new_conversation recovery routing",
+          "content_hash": "c87ea37e7f2930b94f306187c654095ea4df97f0b9eaa744428eed08afea422d",
+          "locator": "native send and new conversation routing",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
-            "head_blob_oid": "6f53c51b316827837ecf42f037b331f3a949796f",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
+            "head_blob_oid": "a9923be188722b889fe270d89c1ed6e71d7d5f20",
             "worktree_blob_oid": "a9923be188722b889fe270d89c1ed6e71d7d5f20",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-google-web-answer-candidate-policy.cjs",
-          "content_hash": "7175d3af1b7be6fde45bf12e78ad145fcd30c0addd479b8d6a1c2409d2763e55",
-          "locator": "source collection and primary prose cases",
+          "content_hash": "2389df53b802563f93960cbe2f692eb02e49fe4352573abf4ac822a5bf63a739",
+          "locator": "multi-paragraph answer regression",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "7b1912f419816f869a4e8c75931fc728ba3de760",
-            "worktree_blob_oid": "7b1912f419816f869a4e8c75931fc728ba3de760",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "42bbe9d5bc59d7d6d407ec99d771ecb10441fe42",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "scripts/test-google-web-message-extractor-contract.cjs",
-          "content_hash": "3edb3eab85f922986bf71ca521cb69df7b7233386a81515716832fd7dbc83827",
-          "locator": "source collection metrics contract",
+          "content_hash": "91087540c324a518ee7d09bd8716dafac8fdea462d351e1719008fd032cb1db5",
+          "locator": "narrative block extraction contract",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "8413e8d206ddef703475efddf6e1b81d8bea20c9",
-            "worktree_blob_oid": "8413e8d206ddef703475efddf6e1b81d8bea20c9",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "4af3f15ad191b359d394634589c3db9e7f3c0ac7",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6674,7 +6674,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "f3e9f0105e6d58f2a1a2b0c94c963323259748ae",
+            "head_commit": "ed264641b6973ea95a376862d809bbb4c91b9aeb",
             "head_blob_oid": "76770c8edf668b2c83cfddda74e3cade4e19409e",
             "worktree_blob_oid": "76770c8edf668b2c83cfddda74e3cade4e19409e",
             "state": "tracked_clean"
@@ -6682,7 +6682,7 @@
         }
       ],
       "created_at_ms": 1787230184845,
-      "updated_at_ms": 1787233611050
+      "updated_at_ms": 1787235794778
     },
     {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
@@ -8103,66 +8103,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_365eda6ebd1b40ccb8f3d29fb8fa89b3",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-rebase",
-      "reason": "rebase 后当前实现与文档证据已重新绑定",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786789690466
-    },
-    {
-      "id": "feature_event_e6893f78fed044bbbef4fc906cfbabee",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-rebase",
-      "reason": "保留既有 Windows/WSL2 实测边界并重新完成证据一致性检查",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786789690708
-    },
-    {
-      "id": "feature_event_ddd0ae211f6c4c9db7c25ee6c231b8ec",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-finalize",
-      "reason": "权威需求正文更新，显式关闭旧 verified 绑定后重新打开",
-      "from_status": "verified",
-      "to_status": "retired",
-      "at_ms": 1786791948400
-    },
-    {
-      "id": "feature_event_40273bdbb25348c7a0839a444b36ca81",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-finalize",
-      "reason": "以当前权威文档重新打开 V267 验收功能",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1786791948745
-    },
-    {
-      "id": "feature_event_d582b0bd62144e0daba7963a5e4e82e3",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "requirement_rebound",
-      "actor": "codex-v267-finalize",
-      "reason": "rebase 后补充最终编译指纹与 V270/V271 编译边界",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1786791949916
-    },
-    {
-      "id": "feature_event_60214847d6f046fa8142a134dcea7763",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "transitioned",
-      "actor": "codex-v267-finalize",
-      "reason": "重新评审的 V267 权威仅更新验证证据，不扩大生产权限",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786791950230
-    },
     {
       "id": "feature_event_65b75a834e7246ffbf6d5cd32bd84b55",
       "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
@@ -10102,6 +10042,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787233611050
+    },
+    {
+      "id": "feature_event_6c1f4a9400f54e52a6ca723cd2fd9e70",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "最新版真机复测发现 Google 多段正文仅同步首句，继续修复答案容器选择并重新验收。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1787235390302
+    },
+    {
+      "id": "feature_event_231845a93c9f4685ae540b05427b63da",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787235403530
+    },
+    {
+      "id": "feature_event_9fa45a3bfe2544869e232aa46e46ec26",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "修复多段叙述正文被短介绍句和来源卡片压过的候选评分。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787235415522
+    },
+    {
+      "id": "feature_event_61abf25334b24775b00b6cf97029c51e",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787235763072
+    },
+    {
+      "id": "feature_event_c7b33146d7f143049a12be3346660240",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "多段正文识别、来源卡片排除和 Win 全量验证完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787235794753
+    },
+    {
+      "id": "feature_event_b5028a64cc6149d38db996744c47dd3f",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "回归测试、构建、ESLint、Rust 定向测试和源码规模门禁全部通过；等待正式发布后真机复验。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787235794778
     }
   ]
 }

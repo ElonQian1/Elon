@@ -25,8 +25,10 @@
     const citations = nonNegative(metrics && metrics.citations);
     const links = nonNegative(metrics && metrics.links);
     const semanticBlocks = nonNegative(metrics && metrics.semanticBlocks);
+    const narrativeBlocks = nonNegative(metrics && metrics.narrativeBlocks);
     const textLength = nonNegative(metrics && metrics.textLength);
     const citationTextRatio = nonNegative(metrics && metrics.citationTextRatio);
+    if (narrativeBlocks >= 2) return false;
     return citations >= 2 && links >= 2 && (
       citationTextRatio >= 0.45 ||
       (semanticBlocks <= citations + 1 && textLength <= citations * 240)
@@ -177,7 +179,7 @@
   }
 
   return Object.freeze({
-    version: 13,
+    version: 14,
     accepts,
     penalty,
     select,
