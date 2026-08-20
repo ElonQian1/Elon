@@ -6445,7 +6445,7 @@
       "id": "win-google-ai-primary-answer-continuity-v1",
       "title": "Win Google AI 主回答与发送界面连续性 V1",
       "summary": "修复官方 WebView 自动跳页、后台焦点拦截与 Google 新会话假失败，并让 Google AI 主正文稳定优先于来源卡片集合，保留访客 Profile、富文本和引用组件。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-primary-answer-continuity-v1.md",
@@ -6669,7 +6669,7 @@
         }
       ],
       "created_at_ms": 1787230184845,
-      "updated_at_ms": 1787238230232
+      "updated_at_ms": 1787239415844
     },
     {
       "id": "win-google-ai-semantic-bootstrap-recovery-v1",
@@ -8090,16 +8090,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_06a5bce9caee49f2bdf9394a6482e0d7",
-      "feature_id": "rust-cache-portable-file-hash-v1",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "Live cross-PC portability validation exposed a missing Get-FileHash dependency.",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786869458457
-    },
     {
       "id": "feature_event_3f05c62c36a84d5a869cb19171591b4b",
       "feature_id": "rust-cache-portable-file-hash-v1",
@@ -10089,6 +10079,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787238230232
+    },
+    {
+      "id": "feature_event_4cd6ae4fce93475daa4e849376c19b19",
+      "feature_id": "win-google-ai-primary-answer-continuity-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Win 版本 0.3.69+a13567732 已发布并在本机更新重启；实机确认原生 UI 显示三段正文，新游客会话 composer/context live 且官方页保持后台。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787239415844
     }
   ]
 }
