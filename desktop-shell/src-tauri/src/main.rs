@@ -251,9 +251,9 @@ fn main() {
                             eprintln!("[elon-desktop] 系统通知发送失败: {error:#}");
                         }
                     }
-                } else if let WindowEvent::Resized(_) = event {
-                    // 主窗口尺寸变化后，之前按旧尺寸算出的停放坐标可能落回新的
-                    // 可见区域，必须重新停放，否则隐藏的官方 AI 网页会重新盖住原生界面。
+                } else if matches!(event, WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }) {
+                    // 主窗口尺寸或 DPI 缩放变化后，之前按旧尺寸/缩放算出的停放坐标可能
+                    // 落回新的可见区域，必须重新停放，否则隐藏的官方 AI 网页会重新盖住原生界面。
                     local_ai_browser::embedded_view::reflow_parked_sessions(&resize_app_handle);
                 }
             });
