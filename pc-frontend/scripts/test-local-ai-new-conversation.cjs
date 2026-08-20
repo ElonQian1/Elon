@@ -23,7 +23,10 @@ compiled.filename = filename
 compiled.paths = module.paths
 compiled._compile(output, filename)
 
-const { selectLocalAiNewConversationPath } = compiled.exports
+const {
+  googleNewConversationNeedsReload,
+  selectLocalAiNewConversationPath,
+} = compiled.exports
 
 const liveSession = {
   windowStatus: 'ready',
@@ -51,9 +54,21 @@ assert.equal(selectLocalAiNewConversationPath('chatgpt', {
 }, liveSnapshot), 'home')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, { composerReady: false }), 'home')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, liveSnapshot), 'adapter')
-assert.equal(selectLocalAiNewConversationPath('google-ai-mode', liveSession, liveSnapshot), 'home')
+assert.equal(selectLocalAiNewConversationPath('google-ai-mode', liveSession, liveSnapshot), 'adapter')
+assert.equal(selectLocalAiNewConversationPath('google-ai-mode', {
+  ...liveSession,
+  semanticCacheStatus: 'cached',
+  contextReady: false,
+}, { composerReady: false }), 'home')
+assert.equal(googleNewConversationNeedsReload(liveSession, liveSnapshot), false)
+assert.equal(googleNewConversationNeedsReload({
+  ...liveSession,
+  semanticCacheStatus: 'cached',
+}, liveSnapshot), true)
+assert.equal(googleNewConversationNeedsReload(liveSession, { composerReady: false }), true)
 assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
 assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
+assert.match(controllerSource, /googleNewConversationNeedsReload\(current, currentSnapshot\)/)
 assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, 'reload'\)/)
 
 process.stdout.write('PASS local AI new-conversation recovery policy\n')

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 22;
+  const extractorVersion = 23;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -189,6 +189,16 @@
     return !!(queryAnchor.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING);
   }
 
+  function alignedWithQuery(node, queryAnchor) {
+    if (!queryAnchor || !isVisible(queryAnchor)) return false;
+    const nodeRect = node.getBoundingClientRect();
+    const queryRect = queryAnchor.getBoundingClientRect();
+    const queryCenter = queryRect.left + queryRect.width / 2;
+    const maximumAnswerWidth = Math.max(queryRect.width * 4, 960);
+    return nodeRect.width <= maximumAnswerWidth &&
+      queryCenter >= nodeRect.left - 24 && queryCenter <= nodeRect.right + 24;
+  }
+
   function findQueryAnchor(query) {
     if (!query) return null;
     const nodes = uniqueNodes([
@@ -222,6 +232,7 @@
     const linkedTextLength = externalLinkTextLength(node);
     const narrativeBlocks = narrativeBlockCount(node);
     const sourceResultItems = sourceResultItemCount(node);
+    const queryAligned = alignedWithQuery(node, queryAnchor);
     const citationTextRatio = text.length ? Math.min(linkedTextLength, text.length) / text.length : 0;
     const sourceCollection = candidatePolicy && typeof candidatePolicy.sourceCollection === 'function'
       ? candidatePolicy.sourceCollection({
@@ -230,6 +241,7 @@
           semanticBlocks,
           narrativeBlocks,
           sourceResultItems,
+          queryAligned,
           textLength: text.length,
           citationTextRatio
         })
@@ -250,6 +262,7 @@
       liveRegion,
       controls,
       afterQuery: followsQuery(node, queryAnchor),
+      queryAligned,
       trustedAnswerContainer: node.matches(TRUSTED_ANSWER_SELECTOR),
       resultListItem: !!node.closest('li, [role="listitem"]'),
       sourceCollection: sourceCollection,
@@ -265,7 +278,7 @@
     const depth = Math.min(12, node.closest('main, [role="main"]') ? 1 : 0);
     const score = Math.min(text.length, 8000) + Math.min(citations.length, 3) * 180 +
       Math.min(semanticBlocks, 20) * 90 + Math.min(narrativeBlocks, 8) * 520 +
-      (explicit ? 1400 : 0) + depth * 30 -
+      (explicit ? 1400 : 0) + (queryAligned ? 2200 : 0) + depth * 30 -
       Math.min(controls, 20) * 120 -
       (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);
     return {
@@ -278,6 +291,7 @@
       sourceCollection,
       sourceResultItems,
       afterQuery: metrics.afterQuery,
+      queryAligned,
       trustedAnswerContainer: metrics.trustedAnswerContainer
     };
   }

@@ -5,7 +5,7 @@ use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, s
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 10;
+const ADAPTER_VERSION: u32 = 11;
 
 pub fn initialization_script() -> String {
     let answer_candidate_policy = include_str!(

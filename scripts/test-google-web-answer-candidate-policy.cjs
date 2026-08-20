@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 16)
+assert.equal(policy.version, 17)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -318,6 +318,17 @@ assert.equal(policy.sourceCollection({
   citationTextRatio: 0.24,
 }), true, 'three long linked result summaries are still a source-card collection')
 
+assert.equal(policy.sourceCollection({
+  textLength: 620,
+  citations: 3,
+  semanticBlocks: 5,
+  narrativeBlocks: 3,
+  sourceResultItems: 3,
+  links: 3,
+  citationTextRatio: 0.24,
+  queryAligned: true,
+}), false, 'inline citations in question-aligned answer bullets remain primary prose')
+
 assert.equal(policy.accepts({
   hasQuery: true,
   text: '来源一标题与摘要 来源二标题与摘要 来源三标题与摘要',
@@ -390,4 +401,8 @@ assert.equal(policy.select([
   { id: 'later-unrelated', domOrder: 9, score: 9000, textLength: 900 },
   { id: 'current-answer', afterQuery: true, domOrder: 4, score: 20, textLength: 2 },
 ]).id, 'current-answer')
+assert.equal(policy.select([
+  { id: 'full-answer', afterQuery: true, queryAligned: true, narrativeBlocks: 3, domOrder: 3, score: 2400, textLength: 620 },
+  { id: 'source-rail', afterQuery: true, queryAligned: false, narrativeBlocks: 3, domOrder: 7, score: 9200, textLength: 560 },
+]).id, 'full-answer', 'the answer column wins over a longer right-hand source rail')
 console.log('google web answer candidate policy passed')

@@ -31,7 +31,10 @@ import {
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
-import { selectLocalAiNewConversationPath } from './localAiNewConversation'
+import {
+  googleNewConversationNeedsReload,
+  selectLocalAiNewConversationPath,
+} from './localAiNewConversation'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -164,7 +167,10 @@ export default function useLocalAiWebChatController(
     const timer = window.setTimeout(() => {
       void getLocalAiWebSessionState(providerId, ownerKey)
         .then(async (current) => {
-          if (!active || current.rendererStatus === 'active' || !current.loading) return
+          const currentSnapshot = isLocalAiMessageSnapshot(current.semanticEvent)
+            ? current.semanticEvent
+            : null
+          if (!active || !googleNewConversationNeedsReload(current, currentSnapshot)) return
           const next = await controlLocalAiWebSession(providerId, ownerKey, 'reload')
           if (!active) return
           setSessionState(next)
@@ -518,7 +524,7 @@ const RESPONSE_REFRESH_DELAYS_MS = [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000,
 // 避免真正打不开时无休止地重建 WebView2。
 const BACKGROUND_RECONNECT_MAX_ATTEMPTS = 3
 // 新建会话后等待官网给出可信实时快照的上限；超过就不再无限期把输入框清空。
-const GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS = 8_000
+const GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS = 2_000
 const NEW_CONVERSATION_RECOVERY_TIMEOUT_MS = 24_000
 
 function normalizePrompt(value: string): string {

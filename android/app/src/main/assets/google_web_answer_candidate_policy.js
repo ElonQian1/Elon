@@ -29,7 +29,12 @@
     const sourceResultItems = nonNegative(metrics && metrics.sourceResultItems);
     const textLength = nonNegative(metrics && metrics.textLength);
     const citationTextRatio = nonNegative(metrics && metrics.citationTextRatio);
+    const queryAligned = metrics && metrics.queryAligned === true;
     if (citations < 2 || links < 2) return false;
+    // The primary answer is rendered in the same visual column as the user's
+    // question. Inline citation links inside long answer bullets must not turn
+    // that answer into a false source-card collection.
+    if (queryAligned && narrativeBlocks >= 2 && citationTextRatio < 0.38) return false;
     // Google renders the right-hand source rail as several long list items. Those
     // snippets look narrative, but each item is a compact externally-linked result.
     if (sourceResultItems >= 2 && textLength <= Math.min(1200, sourceResultItems * 400)) {
@@ -181,11 +186,15 @@
     const afterQuery = eligible.filter((candidate) => candidate.afterQuery === true);
     const trusted = eligible.filter((candidate) => candidate.trustedAnswerContainer === true);
     const pool = afterQuery.length ? afterQuery : (trusted.length ? trusted : eligible);
+    const alignedPool = pool.filter((candidate) => candidate.queryAligned === true);
+    const answerColumnPool = alignedPool.length ? alignedPool : pool;
     // Google AI Mode commonly nests the complete answer above short trusted leaf nodes.
     // Prefer a multi-block narrative before using the numeric score so that link/control
     // penalties cannot reduce the full numbered response to its introduction or last line.
-    const narrativePool = pool.filter((candidate) => nonNegative(candidate.narrativeBlocks) >= 2);
-    const preferredPool = narrativePool.length ? narrativePool : pool;
+    const narrativePool = answerColumnPool.filter(
+      (candidate) => nonNegative(candidate.narrativeBlocks) >= 2
+    );
+    const preferredPool = narrativePool.length ? narrativePool : answerColumnPool;
     return preferredPool.sort((left, right) =>
       Number(right.score || 0) - Number(left.score || 0) ||
       nonNegative(right.textLength) - nonNegative(left.textLength) ||
@@ -194,7 +203,7 @@
   }
 
   return Object.freeze({
-    version: 16,
+    version: 17,
     accepts,
     penalty,
     select,
