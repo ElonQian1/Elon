@@ -63,6 +63,7 @@ internal class ChatGptSocialChatController(
     private var latestStateDetail: String? = null
     private var modelPopup: WebChatModelControlPopupHandle? = null
     private var modelOptionById = emptyMap<String, WebChatConsumerOption>()
+    private var modelLiveOptionIds = emptySet<String>()
     private var modelPickerActive = false
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
@@ -106,6 +107,7 @@ internal class ChatGptSocialChatController(
         modelPopup?.dismiss()
         modelPopup = null
         modelOptionById = emptyMap()
+        modelLiveOptionIds = emptySet()
         modelPickerActive = false
         session.dismissComposerOptions()
         session.deactivate()
@@ -489,7 +491,10 @@ internal class ChatGptSocialChatController(
 
     private fun presentModelOptions(options: List<WebChatConsumerOption>) {
         val selectable = options.filter { it.id.isNotBlank() && it.label.isNotBlank() }
-        modelOptionById = selectable.associateBy(WebChatConsumerOption::id)
+        val presentation = WebChatModelControlPolicy.resolve(selectable, currentModel())
+        modelLiveOptionIds = selectable.mapTo(linkedSetOf(), WebChatConsumerOption::id)
+        modelOptionById = (selectable + listOfNotNull(presentation.advanced))
+            .associateBy(WebChatConsumerOption::id)
         modelPopup?.let {
             it.update(selectable, currentModel())
             return
@@ -500,13 +505,12 @@ internal class ChatGptSocialChatController(
             anchor = anchor,
             options = selectable,
             currentModel = currentModel(),
-            onOptionSelected = { option ->
-                modelOptionById[option.id]?.let { session.selectModel(it.id) }
-            },
+            onOptionSelected = ::selectModelOption,
             onProviderSwitch = openProviderPicker,
             onDismissed = {
                 modelPopup = null
                 modelOptionById = emptyMap()
+                modelLiveOptionIds = emptySet()
                 modelPickerActive = false
                 socialConsumerPort.dismissComposerOptions()
             },
@@ -514,7 +518,17 @@ internal class ChatGptSocialChatController(
         if (modelPopup == null) {
             modelPickerActive = false
             modelOptionById = emptyMap()
+            modelLiveOptionIds = emptySet()
         }
+    }
+
+    private fun selectModelOption(option: WebChatConsumerOption) {
+        if (option.opensSubmenu && option.id !in modelLiveOptionIds) {
+            socialConsumerPort.dismissComposerOptions()
+            session.requestModelOptions()
+            return
+        }
+        modelOptionById[option.id]?.let { session.selectModel(it.id) }
     }
 
     private fun consumerModelOption(option: ChatGptWebComposerOption): WebChatConsumerOption? {
@@ -529,6 +543,8 @@ internal class ChatGptSocialChatController(
             opensSubmenu = option.opensSubmenu,
             nativeSelector = "web-chat-model-option:" +
                 ChatGptNativeControlPresentation.stableContextId(id),
+            parentId = option.parentId,
+            parentLabel = option.parentLabel,
         )
     }
 

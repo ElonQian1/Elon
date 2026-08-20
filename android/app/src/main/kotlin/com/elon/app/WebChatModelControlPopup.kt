@@ -147,6 +147,11 @@ internal class WebChatModelControlPopupRenderer(
                 progressTintList = colorStateList(R.color.elon_accent_primary)
                 progressBackgroundTintList = colorStateList(R.color.elon_text_tertiary)
                 thumbTintList = colorStateList(R.color.elon_text_primary)
+                tickMark = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setSize(dp(4), dp(4))
+                    setColor(ContextCompat.getColor(activity, R.color.elon_text_secondary))
+                }
                 tickMarkTintList = colorStateList(R.color.elon_text_secondary)
                 contentDescription = LEVEL_SLIDER_SELECTOR
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

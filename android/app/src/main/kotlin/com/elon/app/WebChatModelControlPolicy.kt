@@ -25,6 +25,7 @@ internal object WebChatModelControlPolicy {
     ): WebChatModelControlPresentation {
         val selectable = options.filter { it.id.isNotBlank() && it.label.isNotBlank() }
         val advanced = selectable.firstOrNull { it.opensSubmenu }
+            ?: parentOption(selectable)
         val direct = selectable.filterNot(WebChatConsumerOption::opensSubmenu)
         val levels = direct.takeIf(::looksLikeLevelScale).orEmpty()
         val selectedIndex = levels.indexOfFirst(WebChatConsumerOption::selected)
@@ -62,6 +63,21 @@ internal object WebChatModelControlPolicy {
             val label = option.label.trim()
             label.length <= MAX_LEVEL_LABEL_LENGTH || levelToken.containsMatchIn(label)
         }
+    }
+
+    private fun parentOption(options: List<WebChatConsumerOption>): WebChatConsumerOption? {
+        val child = options.firstOrNull {
+            !it.parentId.isNullOrBlank() && !it.parentLabel.isNullOrBlank()
+        } ?: return null
+        val parentId = child.parentId ?: return null
+        return WebChatConsumerOption(
+            id = parentId,
+            label = child.parentLabel ?: return null,
+            selected = false,
+            semantic = "model",
+            opensSubmenu = true,
+            nativeSelector = "web-chat-model-parent:$parentId",
+        )
     }
 
     private const val MAX_COMPACT_LABEL_LENGTH = 8

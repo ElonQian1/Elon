@@ -41,6 +41,31 @@ class WebChatModelControlPolicyTest {
     }
 
     @Test
+    fun restoresTheParentModelRowFromNestedOfficialLevels() {
+        val presentation = WebChatModelControlPolicy.resolve(
+            options = listOf(
+                option("low", "轻度", parentId = "advanced", parentLabel = "高级"),
+                option("medium", "标准", parentId = "advanced", parentLabel = "高级"),
+                option(
+                    "high",
+                    "重度",
+                    selected = true,
+                    parentId = "advanced",
+                    parentLabel = "高级",
+                ),
+                option("maximum", "极高", parentId = "advanced", parentLabel = "高级"),
+            ),
+            currentModel = "5.6 Sol 重度",
+        )
+
+        assertEquals("advanced", presentation.advanced?.id)
+        assertEquals("高级", presentation.advanced?.label)
+        assertTrue(presentation.advanced?.opensSubmenu == true)
+        assertTrue(presentation.usesLevelSlider)
+        assertEquals(2, presentation.selectedLevelIndex)
+    }
+
+    @Test
     fun compactsObservedModelLabelsForTheComposerPill() {
         assertEquals("低", WebChatModelControlPolicy.compactLabel("5.6 Sol 轻度"))
         assertEquals("中", WebChatModelControlPolicy.compactLabel("5.6 Sol 标准"))
@@ -54,6 +79,8 @@ class WebChatModelControlPolicyTest {
         label: String,
         selected: Boolean = false,
         opensSubmenu: Boolean = false,
+        parentId: String? = null,
+        parentLabel: String? = null,
     ) = WebChatConsumerOption(
         id = id,
         label = label,
@@ -61,5 +88,7 @@ class WebChatModelControlPolicyTest {
         semantic = "model",
         opensSubmenu = opensSubmenu,
         nativeSelector = "web-chat-model-option:$id",
+        parentId = parentId,
+        parentLabel = parentLabel,
     )
 }
