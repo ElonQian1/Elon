@@ -21,6 +21,7 @@ mod credentials;
 mod legacy_currentness;
 mod owner_credential_mutation;
 mod owner_reauthentication;
+mod provider_binding;
 mod secret;
 mod session_permit;
 mod sessions;
@@ -31,6 +32,11 @@ pub(super) use legacy_currentness::{
 pub(crate) use owner_credential_mutation::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
     NodeEndpointOwnerCredentialMutationDelivery,
+};
+pub(in crate::store) use provider_binding::{
+    current_node_endpoint_credential_for_user_node_provider_binding_on,
+    current_node_endpoint_credential_source_for_user_node_provider_binding_on,
+    CurrentNodeEndpointCredentialForUserNodeProviderBinding,
 };
 pub(crate) use session_permit::NodeEndpointSessionPermit;
 pub(in crate::store) use sessions::require_current_node_endpoint_session_on;

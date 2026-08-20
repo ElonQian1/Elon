@@ -19,7 +19,9 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 ## 2. 申请流程
 
 1. 用户先登记本人 `registering/self_declared` Provider、`registering` CapacityPool、Bucket 和所需 self-declared Supply。
-2. 用户提交节点绑定引用、短期 ReadyCapability 摘要、路由证明摘要和硬件观测摘要，并显式确认申请。
+2. 用户提交节点绑定引用、短期 ReadyCapability 摘要、路由证明摘要和硬件观测摘要，并显式确认申请。对于
+   `user_node`，V279 未编译、未运行的 Store/migration 源码已要求 fresh 写事务把引用解释为 exact `binding_id`，
+   而不是继续接受任意字符串；在编译与真实 migration/runtime 验证前，仍不能宣称生产入口已完成收紧。
 3. 服务端确认 Provider/Pool 归属和 `registering` 状态，重新审计当前 Pool epoch，并锁定 Provider/Pool 精确版本及不含检查时间的稳定账本审计摘要。
 4. 管理员通过登录后的平台 HTTP 或管理员 MCP 审核。批准前，服务端再次核对所有权、状态、精确版本和稳定账本审计摘要。
 5. 审核通过后，管理员可显式准备一个 v179 激活计划。服务端在同一事务内再次核对申请、Provider、Pool 和稳定账本审计摘要，并生成下一 Provider revision 的不可变目标合同。
@@ -147,7 +149,9 @@ v203 回执绑定 `plan_id`、`request_id`、Provider/Pool、计划摘要、准�
 ## 11. 尚未实现
 
 - 并发压力、真实 TCP、浏览器、生产数据库副本升级和发布验证；当前接口证据为进程内 HTTP/MCP 与临时文件重开；
-- 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
+- V279 已写节点/Provider identity binding 的 Domain/canonical/validator、durable Store current reproof、37列表 migration
+  与 activation same-transaction gate 源码，但尚未编译、执行 migration/SQLite/runtime 或做生产验证；ReadyCapability、
+  路由证明和硬件观测的真实采集与密码学验证也仍缺；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
 - 第三名独立应用人、组织级多级审批、prepared 恢复计划废止/替换、重复隔离恢复周期和通用回滚控制面；
 - verified 硬件事实、路由凭据轮换、Price Snapshot、任务派发和真实结算；Offer 原子发布已由 `docs/distributed-compute/offer-api.md` 独立维护。

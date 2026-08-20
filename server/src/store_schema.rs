@@ -27,6 +27,7 @@ pub(crate) fn apply_migrations(conn: &Connection) -> Result<()> {
     register_v274_receipt_integrity_functions(conn)?;
     register_v277_receipt_integrity_functions(conn)?;
     register_v278_receipt_integrity_functions(conn)?;
+    crate::compute_user_node_provider_binding_migration::register_receipt_integrity_function(conn)?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
            version    INTEGER PRIMARY KEY,

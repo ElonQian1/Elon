@@ -143,6 +143,8 @@ mod compute_federation_settlement_withdrawal_request_api;
 mod compute_federation_settlement_withdrawal_request_service;
 mod compute_federation_settlement_withdrawal_terminal_api;
 mod compute_federation_settlement_withdrawal_terminal_service;
+mod compute_federation_user_node_binding_api;
+mod compute_federation_user_node_binding_service;
 mod compute_job_migration;
 mod compute_offer_lifecycle_migration;
 mod compute_offer_migration;
@@ -160,6 +162,7 @@ mod compute_settlement_release_migration;
 mod compute_settlement_withdrawal_request_migration;
 mod compute_settlement_withdrawal_terminal_migration;
 mod compute_usage;
+mod compute_user_node_provider_binding_migration;
 mod context_compiler;
 mod conversation_forks;
 mod conversation_router;
@@ -717,16 +720,13 @@ pub use types::AppState;
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> Result<()> {
     dotenv().ok();
-
     tracing_subscriber::fmt()
         .with_env_filter(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info,elon_server=debug".into()),
         )
         .init();
-
     let state = node_endpoint_session_startup::prepare(Arc::new(AppState::new()?))?;
     server_background_workers::spawn(state.clone());
-
     let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);
     if interrupted > 0 {
         info!("{} 个进行中的任务因服务器重启被标记为已中断", interrupted);

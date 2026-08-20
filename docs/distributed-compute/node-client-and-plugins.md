@@ -129,6 +129,13 @@ NodeRuntime 现额外挂载默认关闭的 `ComputePluginBootstrap`。它只派�
 
 endpoint 路径另以 v14 `planning_snapshot_bootstrap_only` profile重放 sharing→preparation→Planning 六消息链，每段 observation 与下一 intent 在同一 IMMEDIATE 事务重验 v216 session/credential并写 v219 provenance。v14 是永久 blocked-only 的兼容合同，不得扩展 ready 分支；credential epoch或session变化会撤销旧链。未来 ready 必须另建 v15 profile、capability、摘要/sequence、验证器、节点状态与 ledger 版本，不能原地升级 v14 witness 或 ACK。
 
+V279 另在服务端 Domain 冻结 `UserNodeProviderBindingReceiptV1`：它把既有 `user_node` Provider genesis、
+node、安装身份和 endpoint installation binding 固定成确定性、不可变的一对一 identity root，并记录首次明确 sharing
+consent/authorization 与 endpoint credential source。它不进入节点 wire，也不要求节点知道 `provider_id`；当前未编译的
+服务端 Store 源码已在 activation 写事务内从 authenticated node identity 映射 Provider。Receipt 只保存历史身份事实，
+每次消费仍须 fresh 重证 current credential 与 current consent。该源码尚未编译、迁移或运行，且不创建 v15、Ready、route、Offer、
+Attempt 或任何经济效果；精确边界见 [`V279 authority`](user-node-provider-binding-authority.md)。
+
 这一步刻意没有伪造签名计划：仓库仍没有生产 Control 私钥、Signer/KMS/HSM、云端目录发布器、coherent inventory/node-profile 事实或生产 Bootstrap root/trusted-time resolver。本机 authority 初始化固定为 sharing disabled，而 InstallPlan admission 又要求计划授权与 live authority 精确相等；源码用 v4 policy-binding Store 打破这一循环依赖的本机子条件，并由 v5 把旧 prepared 能力撤销纳入同一耐久事务。它只消费 Bootstrap 在状态锁内产生的不可复制本机意图、同一 `PinnedComputePluginRoot` 锁 lease、当前 process fence 与 authenticated trusted-time observation；每次新修订先封存规范 work-set 与 companion receipt，再由 base receipt 的同一 SQLite trigger 终结全部 prepared fetch/verification，精确回读后才 CAS 当前 policy/authorization、inventory 和 authority。每个非 replay 修订还会先使旧意图与 fetch source 失效，并把既有插件的 desired activation/admission 投影为 disabled/revoked，避免旧安装被新授权自动继承。
 
 这只是 PlanApply live-binding 的必要前置，不是可用 planning context。A1 已形成未编译的 sealed handle-bound、同一只读事务 projector 源码合同：它从同一个 already-opened connection 闭合 policy/revocation、catalog/keyring、inventory/profile、installed/promotion、可选 exact work-admission 与 rollback，输出不可复制的本机 custody；不使用 legacy path facade、测试 VFS、多事务缓存或裸标量。生产 open/VFS/process fence/root/trusted-time/rollback/node-profile 均不可达，没有 producer。严格依赖顺序与禁线见 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md)，VFS/目录细节见 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md)。当前继续保持零 PlanApply、零下载、零安装、零 Sidecar。

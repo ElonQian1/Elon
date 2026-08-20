@@ -5,7 +5,12 @@ use super::{clean_optional, now, Store};
 
 mod endpoint_authority;
 mod legacy_registration;
-pub(in crate::store) use endpoint_authority::require_current_node_endpoint_session_on;
+pub(in crate::store) use endpoint_authority::{
+    current_node_endpoint_credential_for_user_node_provider_binding_on,
+    current_node_endpoint_credential_source_for_user_node_provider_binding_on,
+    require_current_node_endpoint_session_on,
+    CurrentNodeEndpointCredentialForUserNodeProviderBinding,
+};
 pub(crate) use endpoint_authority::{
     CurrentOwnerAccountSource, NodeEndpointOwnerCredentialMutationCommit,
     NodeEndpointOwnerCredentialMutationDelivery, NodeEndpointSessionPermit,

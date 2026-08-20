@@ -78,10 +78,10 @@ impl Store {
                 activation_effect: "none",
             });
         }
+        super::compute_activation_user_node_binding::require_submission_binding_on(&tx, &input)?;
         let active_request = tx
             .query_row(
-                "SELECT request_id FROM compute_activation_evidence_requests
-                  WHERE provider_id=?1 AND pool_id=?2
+                "SELECT request_id FROM compute_activation_evidence_requests WHERE provider_id=?1 AND pool_id=?2
                     AND status IN ('submitted', 'approved')",
                 params![input.provider_id.trim(), input.pool_id.trim()],
                 |row| row.get::<_, String>(0),

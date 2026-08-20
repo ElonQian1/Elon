@@ -158,4 +158,7 @@ pub(crate) mod provider;
 pub(crate) mod receipts;
 pub(crate) mod route_authority;
 pub(crate) mod start_outbox;
+pub(crate) mod user_node_provider_binding;
+#[cfg(test)]
+mod user_node_provider_binding_source_contract_tests;
 pub(crate) mod workload;
