@@ -6296,6 +6296,94 @@
       "updated_at_ms": 1787219376752
     },
     {
+      "id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "title": "Win 活跃后台官方 AI WebView 输入命中隔离 V2",
+      "summary": "以父窗口可视边界外的 1×1 活跃控制器替代完全隐藏或大尺寸透明层，同时保留官网会话恢复和原生输入交互。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-live-parked-ai-webview-input-hit-test-v2.md",
+        "content_hash": "7d20e1d6607b82b5620cca483a8b91b825a9737ad0615ea43cd89428b98f1492",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "2c0c45c32d9d71a13e122a681475d0355d3e15a3",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a193b4a80fae9385e021cbf895b26af894b46cc7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "pc-ai-chat",
+      "tags": [
+        "windows",
+        "tauri",
+        "webview2",
+        "google-ai",
+        "chatgpt",
+        "input",
+        "background-session",
+        "ux"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "后台停放使用父窗口物理边界与1×1尺寸并保持脚本活跃",
+        "Win合同、Rust定向测试与PC构建通过",
+        "发布后原生输入框可点击和输入",
+        "真实发送停留原生UI且不回滚",
+        "Google回复同步回原生聊天UI"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+          "content_hash": "8173a774100b79e59a635332f39866b22b97a84fdd6c2c44d6994bd4a151aa86",
+          "locator": "park",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2c0c45c32d9d71a13e122a681475d0355d3e15a3",
+            "head_blob_oid": "a749cb13fadc0f11cf150ea5c86a1b48aa48558b",
+            "worktree_blob_oid": "a578b291268b115b0b908250274bc87112c0bbaa",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "f411f2dcfa77fa2deeb53b9f77757b92edaf89c1219baa9650bddfaa521dd75e",
+          "locator": "控制器缩为 1×1",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2c0c45c32d9d71a13e122a681475d0355d3e15a3",
+            "head_blob_oid": "975d5c01d3bf08527ee3fc991d6414cc9840d635",
+            "worktree_blob_oid": "bed723db9044e48967b7a7d2690c5f4c37f4c78b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "52f0f92d6a3462ecd4df483407337bdf06a1232853886d6d6e60eac2960f8765",
+          "locator": "parkOfficialWebview",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2c0c45c32d9d71a13e122a681475d0355d3e15a3",
+            "head_blob_oid": "c23e01af271d7408bdcf2f8db7d892293a186326",
+            "worktree_blob_oid": "ed1ce543ff0ea105ff2cc954f26d6556d622a724",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787220615062,
+      "updated_at_ms": 1787220731639
+    },
+    {
       "id": "win-native-ai-send-surface-continuity-v1",
       "title": "Win 原生 AI 发送界面连续性 V1",
       "summary": "修复原生发送成功后被前端策略强制切换到 Google AI 或 ChatGPT 官方标签页的问题，保留后台回复同步与手动官网入口。",
@@ -7440,76 +7528,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_4891102563294cddbc7fc8bde44927c9",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "claimed",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786764390320
-    },
-    {
-      "id": "feature_event_0eced78014234583a8bf7daf39699c8e",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-agent",
-      "reason": "开始补齐领域、HTTP、迁移、PC合同和兼容回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786764405409
-    },
-    {
-      "id": "feature_event_04daf56bd8ea418c853f1e94bc89683f",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "evidence_recorded",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786766545522
-    },
-    {
-      "id": "feature_event_945bc24e1b344d16a9778a73d94a10db",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "服务、HTTP、SQLite 迁移和 PC 验证代码已经形成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786766545545
-    },
-    {
-      "id": "feature_event_e121ecdc628945738d800f667617b6f8",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "Rust 8 项定向回归、完整开放商业 PC 契约和 TypeScript/Vite 生产构建全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786766545567
-    },
-    {
-      "id": "feature_event_91b6ccc3e6574c589f2feaaf2b4914d1",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "提交前格式门禁删除了需求文档末尾空白行，显式重开并重绑当前需求哈希。",
-      "from_status": "verified",
-      "to_status": "retired",
-      "at_ms": 1786766904443
-    },
-    {
-      "id": "feature_event_3ea3ef8b123640c9b86045f7d263ade9",
-      "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
-      "action": "transitioned",
-      "actor": "codex-task-40204-890e17df",
-      "reason": "重新评审格式修正后的同范围需求。",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1786766904462
-    },
     {
       "id": "feature_event_1fc6b9fdff2444a2966910acc2551f3c",
       "feature_id": "open-commerce-consumer-portability-multi-source-merge-v1-verification",
@@ -9439,6 +9457,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787219376752
+    },
+    {
+      "id": "feature_event_755c046a415b4c8695cbe938a2609e70",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "V1 真实发送证明完全隐藏会暂停官网会话恢复，需在不覆盖可见 UI 的前提下保持 WebView2 脚本活跃。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1787220615062
+    },
+    {
+      "id": "feature_event_212cbdc3c1974ee189ce72be45244bff",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "V2 需求和真实验收标准已接受。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787220630290
+    },
+    {
+      "id": "feature_event_8355e08a7f9b49ba8d7dda950734d002",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787220630320
+    },
+    {
+      "id": "feature_event_76d6ec76c2d44c77b496c2de486aea45",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现 1×1 可视区外活跃停放并重新发布验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787220630343
+    },
+    {
+      "id": "feature_event_094cbddf8b9949eeb57733986806240c",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787220731557
+    },
+    {
+      "id": "feature_event_a483cd27c79341f583c1883656a89e00",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "官方 WebView 后台改为父窗口可见边界外 1×1 活跃停放。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787220731615
+    },
+    {
+      "id": "feature_event_8bbaacb2d6334c018402e9060c9110c8",
+      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "静态合同、Win 用户浏览器套件、Rust 定向测试与 PC 生产构建通过；待发布后真实发送验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787220731639
     }
   ]
 }

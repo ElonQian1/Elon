@@ -1,12 +1,14 @@
 use serde::Deserialize;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Webview};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, State,
+    Webview,
+};
 
 use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
 use super::{
     ensure_runtime_session, ensure_session_webview, provider, resolve_owner_fingerprint,
-    window_label, LocalAiBrowserRuntime, LocalAiWebSessionState, DEFAULT_VIEWPORT_HEIGHT,
-    DEFAULT_VIEWPORT_WIDTH,
+    window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -88,10 +90,19 @@ pub(crate) async fn hide_local_ai_web_session_embedded(
 }
 
 pub(crate) fn park(webview: &Webview) -> Result<(), String> {
+    let parent_size = webview.window().inner_size().map_err(display_error)?;
+    let parked_x = i32::try_from(parent_size.width)
+        .map_err(|_| "一龙主窗口宽度超出安全范围。".to_string())?;
+    let parked_y = i32::try_from(parent_size.height)
+        .map_err(|_| "一龙主窗口高度超出安全范围。".to_string())?;
     webview.hide().map_err(display_error)?;
     webview
-        .set_position(LogicalPosition::new(-DEFAULT_VIEWPORT_WIDTH, -DEFAULT_VIEWPORT_HEIGHT))
-        .map_err(display_error)
+        .set_position(PhysicalPosition::new(parked_x, parked_y))
+        .map_err(display_error)?;
+    webview
+        .set_size(PhysicalSize::new(1, 1))
+        .map_err(display_error)?;
+    webview.show().map_err(display_error)
 }
 
 pub(crate) fn present(
