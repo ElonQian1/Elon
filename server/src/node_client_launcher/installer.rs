@@ -262,16 +262,15 @@ fn copy_if_needed(source: &Path, dest: &Path) -> Result<()> {
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let deadline = Instant::now() + Duration::from_secs(15);
+    let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         match std::fs::copy(source, dest) {
             Ok(_) => return Ok(()),
-            Err(error)
-                if error.kind() == ErrorKind::PermissionDenied && Instant::now() < deadline =>
-            {
+            Err(error) if is_transient_copy_lock_error(&error) && Instant::now() < deadline => {
                 // Windows can keep a just-terminated executable image mapped for a
-                // short time. Retry only that transient sharing/permission class;
-                // all other copy failures remain immediate and actionable.
+                // short time. ERROR_SHARING_VIOLATION (32) is Uncategorized on
+                // current Rust/Windows, so checking PermissionDenied alone misses
+                // the exact failure emitted by a mapped launcher image.
                 std::thread::sleep(Duration::from_millis(250));
             }
             Err(error) => {
@@ -281,6 +280,11 @@ fn copy_if_needed(source: &Path, dest: &Path) -> Result<()> {
             }
         }
     }
+}
+
+pub(super) fn is_transient_copy_lock_error(error: &std::io::Error) -> bool {
+    error.kind() == ErrorKind::PermissionDenied
+        || matches!(error.raw_os_error(), Some(32) | Some(33))
 }
 
 fn same_path(left: &Path, right: &Path) -> bool {

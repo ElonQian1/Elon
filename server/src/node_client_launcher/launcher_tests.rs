@@ -98,7 +98,20 @@ fn background_package_repair_checks_desktop_before_stopping_runtime() {
     assert!(guard < stop);
     assert!(source.contains("stop_installed_client_processes(&install_dir, stop_desktop_shell)?"));
     assert!(source.contains("ErrorKind::PermissionDenied"));
-    assert!(source.contains("Duration::from_secs(15)"));
+    assert!(source.contains("Duration::from_secs(30)"));
+}
+
+#[test]
+fn windows_sharing_violation_codes_are_retryable() {
+    assert!(super::installer::is_transient_copy_lock_error(
+        &std::io::Error::from_raw_os_error(32)
+    ));
+    assert!(super::installer::is_transient_copy_lock_error(
+        &std::io::Error::from_raw_os_error(33)
+    ));
+    assert!(!super::installer::is_transient_copy_lock_error(
+        &std::io::Error::from_raw_os_error(2)
+    ));
 }
 
 #[test]
