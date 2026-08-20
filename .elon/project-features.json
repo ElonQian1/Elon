@@ -5975,15 +5975,15 @@
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-background-ai-webview-resize-parking-v1.md",
-        "content_hash": "1bbe96100fb72ff9644f60ad412ce44bdb72c948726dae91cdec0c8a9752bb7a",
+        "content_hash": "d97f2e9bf9921a7bed65f0e060c1f168aa5722a3d5875eef2154429bf121cd48",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "7faad035fb568252c678ee9de293aafc34485552",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "34eabfd50eb79d296ed7dcb2699623e499f887a7",
-          "state": "untracked"
+          "head_commit": "d80237b3b8d92635c2b3f181b1818b88a477581c",
+          "head_blob_oid": "34eabfd50eb79d296ed7dcb2699623e499f887a7",
+          "worktree_blob_oid": "8933df3035cb4245d0f5bb9557f41ac95732ae32",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -6001,7 +6001,8 @@
         "desktop-shell/src-tauri/src/local_ai_browser/state.rs",
         "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
         "desktop-shell/src-tauri/src/main.rs",
-        "docs/user-browser-module-integration.md"
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
       ],
       "dependencies": [],
       "acceptance_criteria": [
@@ -6013,13 +6014,13 @@
       ],
       "implementation_evidence": [],
       "claim": {
-        "claim_id": "claim_c78bca694265409da246f302848a7123",
+        "claim_id": "claim_5c569724e9a14fffb1ab790c3ead304c",
         "agent_id": "codex-root",
-        "claimed_at_ms": 1787225544333,
-        "expires_at_ms": 1787239944333
+        "claimed_at_ms": 1787227078541,
+        "expires_at_ms": 1787241478541
       },
       "created_at_ms": 1787225006617,
-      "updated_at_ms": 1787225556558
+      "updated_at_ms": 1787227078567
     },
     {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -7773,76 +7774,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_e5a03f64ce3a40afa573dda5ed83c4ec",
-      "feature_id": "rust-cache-recovery-governance-v2",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786780355392
-    },
-    {
-      "id": "feature_event_baa82b31c82b4864b4990a03fef673bf",
-      "feature_id": "rust-cache-recovery-governance-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Source, docs, and focused regression evidence are recorded.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786780372727
-    },
-    {
-      "id": "feature_event_25e653c6c5404bcdbc8aebbe54b5a2d8",
-      "feature_id": "rust-cache-recovery-governance-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Focused cache, worktree finish, preflight workflow, prompt audit, source size, and document modularity gates passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786780384585
-    },
-    {
-      "id": "feature_event_2573032547d34f79b5a7e46b8ffbb0c7",
-      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
-      "action": "registered",
-      "actor": "codex-cache-repair",
-      "reason": "Live C-drive dry-run exposed a narrow ordering gap after V2 verification.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786781564000
-    },
-    {
-      "id": "feature_event_66a99eb33f81470ebb3d12846690ee77",
-      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
-      "action": "claimed",
-      "actor": "codex-cache-repair",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786781581813
-    },
-    {
-      "id": "feature_event_41e4082c064a40f39b32122e9b8ce840",
-      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
-      "action": "transitioned",
-      "actor": "codex-cache-repair",
-      "reason": "Implement strict recovery filtering and verify it under forced low-disk conditions.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786781582404
-    },
-    {
-      "id": "feature_event_328b09aaf3554ad88f888640e2d43b57",
-      "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
-      "action": "evidence_recorded",
-      "actor": "codex-cache-repair",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786781603021
-    },
     {
       "id": "feature_event_cb1c232e0b1a4ace94a3818318a8c5a7",
       "feature_id": "rust-cache-recovery-exclusive-filter-v2-1",
@@ -9772,6 +9703,76 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787225556558
+    },
+    {
+      "id": "feature_event_f88506c195f743d28acbef949ab9044a",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "同步 Win 适配器 v138 合同测试文件范围",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1787227024654
+    },
+    {
+      "id": "feature_event_9a3c61d72dea4f929372172469e0292e",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root",
+      "reason": "需求补充 PC 合同测试 v138 文件范围",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1787227037446
+    },
+    {
+      "id": "feature_event_13c27ac002024a34991d6d8e3b3d9436",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "metadata_updated",
+      "actor": "codex-root",
+      "reason": "纳入 Win ChatGPT v138 bootstrap 与 PC 合同测试",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1787227058026
+    },
+    {
+      "id": "feature_event_5aca38e5d8634b78969d4553262cb8b8",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "最新代码复核后确认范围与验收标准",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787227078503
+    },
+    {
+      "id": "feature_event_c424f344ac824031acde372a384619f2",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "最新代码复核后确认范围与验收标准",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787227078530
+    },
+    {
+      "id": "feature_event_c0f9d0024496471b95e2067c3b89b884",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787227078542
+    },
+    {
+      "id": "feature_event_512b4c390dea46d69297049d2e8ece95",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "复用主分支窗口重排修复并补齐 Win 适配器合同",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787227078567
     }
   ]
 }

@@ -44,4 +44,5 @@ reviewed_at: 2026-08-20
 - `desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs`
 - `desktop-shell/src-tauri/src/local_ai_browser/state.rs`
 - `desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs`
+- `pc-frontend/scripts/test-local-ai-browser-contract.cjs`
 - `docs/user-browser-module-integration.md`
