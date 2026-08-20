@@ -21,5 +21,11 @@
       /(^|\s)(?:轻度|标准|中度|重度|极高)($|\s)/.test(signal);
   }
 
-  return Object.freeze({ isModelLabel });
+  function isModelControl(candidate) {
+    if (typeof candidate === 'string') return isModelLabel(candidate);
+    return isModelLabel(candidate && candidate.label) ||
+      isModelLabel(candidate && candidate.signal);
+  }
+
+  return Object.freeze({ isModelControl, isModelLabel });
 });

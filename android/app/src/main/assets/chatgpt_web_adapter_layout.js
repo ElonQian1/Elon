@@ -206,11 +206,9 @@
       ? formAdapter.semantic(form)
       : '';
     if (formSemantic) return formSemantic;
-    if (
-      region === 'composer' && modelLabelPolicy &&
-      typeof modelLabelPolicy.isModelLabel === 'function' &&
-      modelLabelPolicy.isModelLabel(modelSignal)
-    ) return 'model';
+    if (region === 'composer' && modelLabelPolicy &&
+      typeof modelLabelPolicy.isModelControl === 'function' &&
+      modelLabelPolicy.isModelControl({ label: labelOf(node, ''), signal: modelSignal })) return 'model';
     if (/view.*files.*chat|在聊天中查看文件/.test(signal)) return 'conversation_files';
     if (/rename|重命名|重新命名/.test(signal)) return 'rename';
     if (/unpin|pin.chat|取消置顶|置顶聊天/.test(signal)) return 'pin';

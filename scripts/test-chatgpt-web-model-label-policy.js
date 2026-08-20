@@ -21,6 +21,16 @@ for (const label of [
   assert.equal(policy.isModelLabel(label), true, `expected model label: ${label}`);
 }
 
+assert.equal(policy.isModelControl({
+  label: '高',
+  signal: 'composer-disclosure-trigger unrelated-node-metadata 高 高'
+}), true, 'visible compact model label wins over noisy node metadata');
+
+assert.equal(policy.isModelControl({
+  label: '工具',
+  signal: 'composer-tool-trigger 工具'
+}), false, 'unrelated composer control remains non-model');
+
 for (const label of [
   '',
   'Workspace',
