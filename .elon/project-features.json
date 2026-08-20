@@ -5971,7 +5971,7 @@
       "id": "win-background-ai-webview-resize-parking-v1",
       "title": "Windows 后台 AI 官方 WebView 随窗口缩放重新停放",
       "summary": "修复原生 AI 聊天中后台 Google/ChatGPT 子 WebView 在主窗口最大化、还原或 DPI 变化后从右下角露出并覆盖输入区，同时保留完整视口、游客 Profile 与上下文同步。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-background-ai-webview-resize-parking-v1.md",
@@ -6106,7 +6106,7 @@
         }
       ],
       "created_at_ms": 1787225006617,
-      "updated_at_ms": 1787227534468
+      "updated_at_ms": 1787228653680
     },
     {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -7860,16 +7860,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_0942c2bf0ad144c4ae003a6fadf4d0aa",
-      "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
-      "action": "claimed",
-      "actor": "codex-v267-runtime-hardening",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786788448035
-    },
     {
       "id": "feature_event_f91840ff948344e5a8ce2fa12b7278ba",
       "feature_id": "external-pool-adapter-v267-runtime-hardening-verification",
@@ -9859,6 +9849,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787227534468
+    },
+    {
+      "id": "feature_event_89ec291178904ac7b1ab666a986a1ba6",
+      "feature_id": "win-background-ai-webview-resize-parking-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Win 0.3.69+9b60610e5 已发布安装；最大化、新聊天、输入发送、回复同步与官网页返回均通过真实验收",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787228653680
     }
   ]
 }
