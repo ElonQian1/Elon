@@ -106,9 +106,26 @@ internal class ChatGptBackgroundSession(
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
     private var reloadAfterPause = false
-    private val webExecution = chatGptBackgroundExecutionController({ webView }) {
-        surfaceMode.isSkin() || state == State.LOADING || latestSnapshot?.streaming == true ||
-            conversationNavigation.hasPending() || attachmentSendTracker != null
+    private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
+        lazy(LazyThreadSafetyMode.NONE) {
+            ChatGptRealtimeVoiceBackingController(
+                ::ensureInitialized, { webView }, surfaceMode, { webExecution.interactionRequested() },
+            )
+        }
+    private val webExecution: ChatGptBackgroundExecutionController =
+        chatGptBackgroundExecutionController({ webView }) {
+            surfaceMode.isSkin() || realtimeVoiceBacking.isActive() || state == State.LOADING ||
+                latestSnapshot?.streaming == true ||
+                conversationNavigation.hasPending() || attachmentSendTracker != null
+        }
+    private val touchRequestHandler by lazy(LazyThreadSafetyMode.NONE) {
+        ChatGptWebTouchRequestHandler(
+            { webView }, { pageAdapter }, { touchDispatcher }, webExecution::interactionRequested,
+            composerOptionRequests::dismiss,
+            { composerOptionRequests.scheduleCollection("model") },
+            { composerOptionRequests.scheduleCollection("tools") },
+            { onStateChanged(state, "官网控件操作未就绪") },
+        )
     }
     private val newConversationRecovery = ChatGptNewConversationRecoveryCoordinator(
         webView = { webView },
@@ -132,6 +149,7 @@ internal class ChatGptBackgroundSession(
         if (webView == null) return
         recovery.activate()
         webExecution.hostResumed()
+        realtimeVoiceBacking.restoreAfterHostResume()
         pageAdapter?.onHostResumed(webView?.url)
         resumeRecovery()
     }
@@ -323,7 +341,11 @@ internal class ChatGptBackgroundSession(
             executeControl = mcpPort::control,
         )
 
+    fun beginRealtimeVoiceBacking(): Boolean = realtimeVoiceBacking.begin()
+    fun endRealtimeVoiceBacking() = realtimeVoiceBacking.end()
+
     fun destroy() {
+        realtimeVoiceBacking.release()
         composerOptionInteraction.release()
         recovery.dispose()
         recoveryHandler.removeCallbacksAndMessages(null)
@@ -570,7 +592,7 @@ internal class ChatGptBackgroundSession(
             }
             is ChatGptWebEvent.AdapterReady,
             is ChatGptWebEvent.FeatureNavigation -> Unit
-            is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
+            is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)
         }
         webExecution.activitySettled()
     }
@@ -584,45 +606,6 @@ internal class ChatGptBackgroundSession(
             latestUiManifest = null
         }
         observedMcpState.updateDocument(document)
-    }
-
-    private fun handleWebTouchRequest(event: ChatGptWebEvent.WebTouchRequest) {
-        val view = webView ?: return
-        val adapter = pageAdapter ?: return
-        webExecution.interactionRequested()
-        touchDispatcher?.dispatch(event) { dispatched ->
-            if (!dispatched) {
-                chatGptComposerSectionForAction(event.purpose)?.let { composerOptionRequests.dismiss() }
-                onStateChanged(state, "官网控件操作未就绪")
-                return@dispatch
-            }
-            when (event.purpose) {
-                "list_model_options" -> composerOptionRequests.scheduleCollection("model")
-                "list_composer_tools" -> composerOptionRequests.scheduleCollection("tools")
-                "open_model_submenu" -> view.postDelayed(
-                    adapter::collectModelOptions,
-                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
-                )
-                "open_composer_tools_submenu" -> view.postDelayed(
-                    adapter::collectComposerTools,
-                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
-                )
-                "list_navigation" -> view.postDelayed(
-                    adapter::collectFeatures,
-                    ChatGptWebInteractionTimings.NAVIGATION_SETTLE_MS,
-                )
-                "select_model_option", "select_composer_tool", "remove_attachment",
-                "start_dictation", "cancel_dictation", "submit_dictation" -> view.postDelayed(
-                    adapter::requestSnapshot,
-                    ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
-                )
-                "select_navigation", "invoke_ui_control", "regenerate_open_menu", "regenerate_retry" ->
-                    view.postDelayed(
-                        adapter::requestSnapshot,
-                        ChatGptWebInteractionTimings.NAVIGATION_SETTLE_MS,
-                    )
-            }
-        }
     }
 
     private fun scheduleSessionContinuityRecheck(delayMs: Long?) {

@@ -46,6 +46,8 @@ internal interface WebChatSocialController {
     fun createLocalProject(title: String): Boolean = false
     fun assignConversationToLocalProject(path: String, projectId: String?): Boolean = false
     fun consumerPort(): WebChatConsumerPort? = null
+    fun beginRealtimeVoiceBacking(): Boolean = false
+    fun endRealtimeVoiceBacking() = Unit
     fun mcpPort(): WebChatSocialMcpPort? = null
     fun lastCommandStatus(): WebChatCommandStatus? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false

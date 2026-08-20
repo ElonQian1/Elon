@@ -77,7 +77,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("button.getAttribute('data-model-title')"))
         assertTrue(adapter.contains("modelLabelPolicy.isModelLabel"))
         assertTrue(layoutAdapter.contains("const modelSignal = cleanText(signal + ' ' + labelOf(node, ''))"))
-        assertTrue(layoutAdapter.contains("modelLabelPolicy.isModelLabel(modelSignal)"))
+        assertTrue(layoutAdapter.contains("modelLabelPolicy.isModelControl({ label: labelOf(node, ''), signal: modelSignal })"))
         assertTrue(modelLabelPolicy.contains("function isModelLabel"))
         assertTrue(adapter.contains("function emitVisibleNodeTouch(purpose, node, emitEvent)"))
         assertTrue(layoutAdapter.contains("function findSemanticNode(semantic, region)"))
@@ -296,6 +296,9 @@ class ChatGptWebComposerContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val handler = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchRequestHandler.kt",
+        )
 
         assertTrue(dispatcher.contains("request.purpose in ALLOWED_PURPOSES"))
         assertTrue(dispatcher.contains("supportsEnhancedMode(webView.url)"))
@@ -305,9 +308,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(dispatcher.contains("open_composer_tools_submenu"))
         assertFalse(dispatcher.contains("Instrumentation"))
         assertFalse(dispatcher.contains("AccessibilityService"))
-        assertTrue(background.contains("adapter::collectModelOptions"))
-        assertTrue(background.contains("adapter::collectComposerTools"))
-        assertTrue(background.contains("is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)"))
+        assertTrue(handler.contains("adapter::collectModelOptions"))
+        assertTrue(handler.contains("adapter::collectComposerTools"))
+        assertTrue(background.contains("is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

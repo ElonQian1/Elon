@@ -123,6 +123,35 @@ internal class MainSocialAiChatFeature(
         WebChatProductionSuggestionsCoordinator(activity)
     }
     private val productionSuggestions by productionSuggestionsDelegate
+    private val realtimeVoiceDelegate = lazy {
+        createWebChatRealtimeVoiceCoordinator(
+            activity = activity,
+            surface = WebChatRealtimeVoiceOverlay(activity, binding.root),
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            consumerPort = {
+                if (isChatModeActive()) activeController().consumerPort() else null
+            },
+            sessionReady = {
+                isChatModeActive() && activeController().stateWireValue() == "ready" &&
+                    activeController().composerReady()
+            },
+            beginWebBacking = {
+                isChatModeActive() && activeController().beginRealtimeVoiceBacking()
+            },
+            endWebBacking = {
+                if (chatGptControllerDelegate.isInitialized()) {
+                    chatGptController.endRealtimeVoiceBacking()
+                }
+            },
+            requestSessionRecovery = {
+                if (isChatModeActive()) activeController().onHostResumed()
+            },
+            openOfficialFallback = modeController::openOfficialRealtimeVoice,
+        )
+    }
+    private val realtimeVoice by realtimeVoiceDelegate
     private val productionComposerToolsDelegate = lazy {
         WebChatProductionComposerToolsCoordinator(
             activity = activity,
@@ -134,7 +163,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
-            openOfficialRealtimeVoice = modeController::openOfficialRealtimeVoice,
+            startNativeRealtimeVoice = realtimeVoice::start,
             onOperationFeedback = ::showComposerOperationFeedback,
             onQuickActionChanged = ::onQuickComposerActionChanged,
             interactionCache = webChatInteractionCache,
@@ -469,6 +498,7 @@ internal class MainSocialAiChatFeature(
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
         }
+        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.destroy()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
         if (googleControllerDelegate.isInitialized()) googleController.destroy()
         chatGptWebLifecycle.dispose()
@@ -498,6 +528,7 @@ internal class MainSocialAiChatFeature(
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
         }
+        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.close()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()

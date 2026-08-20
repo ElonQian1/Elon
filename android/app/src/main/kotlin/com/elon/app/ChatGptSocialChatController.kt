@@ -251,6 +251,10 @@ internal class ChatGptSocialChatController(
 
     override fun consumerPort(): WebChatConsumerPort = socialConsumerPort
 
+    override fun beginRealtimeVoiceBacking(): Boolean = session.beginRealtimeVoiceBacking()
+
+    override fun endRealtimeVoiceBacking() = session.endRealtimeVoiceBacking()
+
     override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
 
     override fun discardAcceptanceAttachmentSend(): Boolean {
