@@ -26,6 +26,19 @@ internal object WebChatComposerProviderPresentation {
         button.setCompoundDrawablesRelative(null, null, null, null)
     }
 
+    fun applyChatGptModelLevel(
+        button: TextView,
+        provider: WebChatProviderIdentity,
+        rawModelLabel: String,
+    ) {
+        val label = WebChatModelControlPolicy.compactLabel(rawModelLabel)
+        button.text = label
+        button.compoundDrawablePadding = 0
+        button.setCompoundDrawablesRelative(null, null, null, null)
+        button.contentDescription = description(provider, rawModelLabel.trim().ifBlank { label })
+        (button.parent as? android.view.View)?.contentDescription = button.contentDescription
+    }
+
     fun description(provider: WebChatProviderIdentity, modelLabel: String): String =
         "聊天模式；提供方：${provider.displayName}；模型：${modelLabel.trim()}"
 }

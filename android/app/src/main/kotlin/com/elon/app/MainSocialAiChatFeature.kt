@@ -53,6 +53,7 @@ internal class MainSocialAiChatFeature(
             showMessageActions = showMessageActions,
             clearPendingSendState = clearPendingSendState,
             collapseInputComposer = collapseInputComposer,
+            openProviderPicker = { providerPicker.show() },
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = ::handleConversationIndexChanged,
             onComposerStateChanged = ::refreshConsumerComposerUi,
@@ -542,7 +543,11 @@ internal class MainSocialAiChatFeature(
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
-                width = dp(MODEL_BUTTON_CHAT_WIDTH_DP)
+                width = dp(if (provider.id == WebChatProviderId.CHATGPT_WEB) {
+                    MODEL_BUTTON_CHATGPT_WIDTH_DP
+                } else {
+                    MODEL_BUTTON_CHAT_WIDTH_DP
+                })
             }
             views.planModeButton.visibility = View.GONE
             views.webToolsButton.contentDescription = WebChatProductionSelectors.composerTools(provider.id)
@@ -556,8 +561,16 @@ internal class MainSocialAiChatFeature(
                 productionComposerTools.show(provider)
             }
             views.attachmentButton.contentDescription = WebChatProductionSelectors.attachment(provider.id)
-            views.modelButtonShell.setOnClickListener { providerPicker.show() }
-            binding.modelButton.setOnClickListener { providerPicker.show() }
+            val showModelControl = {
+                prioritizeConsumerInteraction()
+                if (provider.id == WebChatProviderId.CHATGPT_WEB) {
+                    controller.requestModelOptions()
+                } else {
+                    providerPicker.show()
+                }
+            }
+            views.modelButtonShell.setOnClickListener { showModelControl() }
+            binding.modelButton.setOnClickListener { showModelControl() }
         }
         binding.root.post { controller.refreshComposerModel() }
         refreshConsumerComposerUi()
@@ -706,6 +719,7 @@ internal class MainSocialAiChatFeature(
 
     private companion object {
         const val MODEL_BUTTON_WORK_WIDTH_DP = 76
+        const val MODEL_BUTTON_CHATGPT_WIDTH_DP = 92
         const val MODEL_BUTTON_CHAT_WIDTH_DP = 144
         const val DRAFT_SAVE_DELAY_MS = 500L
         const val COMPOSER_FEEDBACK_DURATION_MS = 4_000L
