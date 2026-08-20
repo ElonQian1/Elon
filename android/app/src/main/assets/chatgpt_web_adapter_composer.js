@@ -493,8 +493,9 @@
       type: 'composer_controls_snapshot',
       section,
       currentModel: currentModel(composer),
-      options: options.map(({ id, label, selected, kind, semantic, opensSubmenu }) => ({
-        id, label, selected, kind, semantic, opensSubmenu
+      options: options.map(({ id, label, selected, kind, semantic, opensSubmenu, parentOption }) => ({
+        id, label, selected, kind, semantic, opensSubmenu,
+        parentOption: parentOption ? { id: parentOption.id, label: parentOption.label } : undefined
       }))
     });
   }

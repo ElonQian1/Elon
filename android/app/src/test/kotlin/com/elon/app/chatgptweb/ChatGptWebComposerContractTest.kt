@@ -121,6 +121,7 @@ class ChatGptWebComposerContractTest {
         assertFalse(adapter.contains("verify_composer_tool"))
         assertFalse(adapter.contains("select_composer_tool_retry"))
         assertTrue(adapter.contains("opensSubmenu: opensSubmenu(node)"))
+        assertTrue(adapter.contains("parentOption: parentOption ?"))
         assertTrue(adapter.contains("open_model_submenu"))
         assertFalse(adapter.contains("layout.setNodeExpanded(target.node, true"))
         assertTrue(adapter.contains("if (!emitVisibleNodeTouch(purpose, target.node, emitEvent))"))
