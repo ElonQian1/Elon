@@ -107,15 +107,14 @@ internal class WebChatModelControlPopupRenderer(
                 showChevron = true,
             ) {
                 onOptionSelected(advanced)
-                renderLoading(advanced.label)
             })
         }
         when {
             presentation.usesLevelSlider -> panel.addView(levelSlider(presentation))
             presentation.listOptions.isNotEmpty() -> presentation.listOptions.forEach { option ->
-                panel.addView(optionRow(option))
+                panel.addView(optionRow(option, currentModel))
             }
-            presentation.advanced == null -> panel.addView(loadingRow())
+            presentation.advanced == null -> panel.addView(presetRow())
         }
         panel.addView(divider())
         panel.addView(actionRow(
@@ -175,14 +174,16 @@ internal class WebChatModelControlPopupRenderer(
         }
     }
 
-    private fun optionRow(option: WebChatConsumerOption): View = actionRow(
+    private fun optionRow(option: WebChatConsumerOption, currentModel: String): View = actionRow(
         label = option.label,
         selector = option.nativeSelector.ifBlank { "web-chat-model-option:${option.id}" },
-        trailing = if (option.selected) "✓" else null,
+        trailing = if (
+            option.selected || WebChatModelControlPolicy.compactLabel(option.label) ==
+            WebChatModelControlPolicy.compactLabel(currentModel)
+        ) "✓" else null,
         showChevron = option.opensSubmenu,
     ) {
         onOptionSelected(option)
-        if (option.opensSubmenu) renderLoading(option.label)
     }
 
     private fun actionRow(
@@ -231,25 +232,7 @@ internal class WebChatModelControlPopupRenderer(
         }
     }
 
-    private fun renderLoading(title: String) {
-        panel.removeAllViews()
-        panel.addView(TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(72),
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), 0, dp(8), 0)
-            includeFontPadding = false
-            text = "$title · 正在同步"
-            textSize = 15f
-            setTextColor(ContextCompat.getColor(activity, R.color.elon_text_secondary))
-            contentDescription = LOADING_SELECTOR
-        })
-        popup.update()
-    }
-
-    private fun loadingRow() = TextView(activity).apply {
+    private fun presetRow() = TextView(activity).apply {
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(58),
@@ -257,10 +240,10 @@ internal class WebChatModelControlPopupRenderer(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(8), 0, dp(8), 0)
         includeFontPadding = false
-        text = "正在同步官网档位"
+        text = "自动"
         textSize = 15f
         setTextColor(ContextCompat.getColor(activity, R.color.elon_text_secondary))
-        contentDescription = LOADING_SELECTOR
+        contentDescription = "web-chat-model-preset:auto"
     }
 
     private fun divider() = View(activity).apply {
@@ -293,6 +276,5 @@ internal class WebChatModelControlPopupRenderer(
         const val ADVANCED_SELECTOR = "web-chat-model-advanced"
         const val LEVEL_SLIDER_SELECTOR = "web-chat-model-level-slider"
         const val PROVIDER_SWITCH_SELECTOR = "web-chat-provider-switch"
-        const val LOADING_SELECTOR = "web-chat-model-syncing"
     }
 }

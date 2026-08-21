@@ -17,15 +17,25 @@ class WebChatProductionInteractionLatencyContractTest {
         val model = read("ChatGptSocialChatController.kt")
         val conversationActions = read("WebChatProductionConversationActions.kt")
 
-        assertBefore(tools, "showToolDialog(provider, port", "port.requestComposerOptions")
-        assertBefore(features, "showFeatureDialog(provider, port", "port.requestFeatures()")
-        assertBefore(actions, "showActionDialog(provider, port", "port.requestControls()")
-        assertBefore(model, "presentModelOptions(readModelOptions())", "session.requestModelOptions()")
+        assertTrue(tools.contains("WebChatProductionQuickComposerActionCatalog.availableFor"))
+        assertBefore(features, "showFeatureDialog(", "port.requestFeatures()")
+        assertBefore(actions, "val actions = readActions(", "port.requestControls()")
+        assertBefore(model, "presentModelOptions(", "session.requestModelOptions()")
+        assertBefore(
+            features,
+            "if (!interactionCache.needsFeatureRefresh(provider.id)) return",
+            "port.requestFeatures()",
+        )
+        assertBefore(
+            model,
+            "interactionCache.needsComposerRefresh(provider.id, MODEL_SECTION)",
+            "session.requestModelOptions()",
+        )
 
         listOf(tools, features, actions).forEach { source ->
             assertTrue(source.contains("WebChatActionSheet.showUpdatable"))
         }
-        assertTrue(model.contains("WebChatActionSheet.showUpdatable"))
+        assertTrue(model.contains("WebChatModelControlPopup.show("))
         assertTrue(conversationActions.contains("WebChatActionSheet.showUpdatable"))
         assertFalse(conversationActions.contains("正在打开会话操作"))
     }
@@ -42,6 +52,7 @@ class WebChatProductionInteractionLatencyContractTest {
         assertFalse(combined.contains("正在读取网页工具"))
         assertFalse(combined.contains("正在读取官网功能"))
         assertFalse(combined.contains("正在读取当前网页操作"))
+        assertFalse(combined.contains("正在同步官网档位"))
         assertTrue(combined.contains("interactionCache"))
     }
 
@@ -57,9 +68,11 @@ class WebChatProductionInteractionLatencyContractTest {
         assertTrue(prewarmer.contains("WebChatProviderCapability.PAGE_ACTIONS"))
         assertTrue(prewarmer.contains("SUCCESS_COOLDOWN_MS"))
         assertTrue(prewarmer.contains("RETRY_DELAYS_MS"))
+        assertTrue(prewarmer.contains("needsComposerRefresh"))
+        assertTrue(prewarmer.contains("needsFeatureRefresh"))
         assertTrue(feature.contains("productionCapabilityPrewarmer.cancel()"))
         assertTrue(feature.contains("prioritizeConsumerInteraction()"))
-        assertTrue(prewarmer.contains("cache.hasComposerSnapshot"))
+        assertTrue(prewarmer.contains("cache.needsControlRefresh"))
     }
 
     private fun assertBefore(source: String, first: String, second: String) {

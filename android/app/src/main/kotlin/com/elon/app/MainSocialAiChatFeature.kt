@@ -29,7 +29,9 @@ internal class MainSocialAiChatFeature(
     private val chatGptWebLifecycle: MainChatGptWebLifecycle,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
-    private val webChatInteractionCache = WebChatProductionInteractionCache()
+    private val webChatInteractionCache = WebChatProductionInteractionCache(
+        storage = WebChatProductionInteractionSnapshotStore(activity),
+    )
     private val providerDraftStore = WebChatProviderDraftStore(activity)
     private val providerDrafts = providerDraftStore.restore()
     private val persistProviderDrafts = Runnable { providerDraftStore.save(providerDrafts) }

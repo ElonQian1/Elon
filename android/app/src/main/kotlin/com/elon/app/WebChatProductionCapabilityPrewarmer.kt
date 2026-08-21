@@ -139,12 +139,10 @@ internal class WebChatProductionCapabilityPrewarmer(
             state: WebChatConsumerState,
             cache: WebChatProductionInteractionCache,
         ): Boolean = when (this) {
-            MODELS -> state.composerSections[MODEL_SECTION].orEmpty().isNotEmpty() ||
-                cache.hasComposerSnapshot(providerId, MODEL_SECTION)
-            TOOLS -> state.composerSections[TOOLS_SECTION].orEmpty().isNotEmpty() ||
-                cache.hasComposerSnapshot(providerId, TOOLS_SECTION)
-            FEATURES -> state.features.isNotEmpty() || cache.hasFeatureSnapshot(providerId)
-            CONTROLS -> state.controls.isNotEmpty() || cache.hasControlSnapshot(providerId, state)
+            MODELS -> !cache.needsComposerRefresh(providerId, MODEL_SECTION)
+            TOOLS -> !cache.needsComposerRefresh(providerId, TOOLS_SECTION)
+            FEATURES -> !cache.needsFeatureRefresh(providerId)
+            CONTROLS -> !cache.needsControlRefresh(providerId, state)
         }
 
         fun request(port: WebChatConsumerPort): WebChatConsumerCommandResult = when (this) {

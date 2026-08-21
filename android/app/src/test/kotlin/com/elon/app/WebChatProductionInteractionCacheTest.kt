@@ -25,20 +25,68 @@ class WebChatProductionInteractionCacheTest {
     }
 
     @Test
-    fun authoritativeEmptyComposerSnapshotClearsAStaleSection() {
+    fun transientEmptyComposerSnapshotKeepsTheLastSuccessfulSection() {
         cache.composerOptions(WebChatProviderId.CHATGPT_WEB, "model", listOf(option("stale")))
 
-        assertTrue(cache.replaceComposerOptions(
+        assertEquals("stale", cache.replaceComposerOptions(
             WebChatProviderId.CHATGPT_WEB,
             "MODEL",
             emptyList(),
-        ).isEmpty())
-        assertTrue(cache.composerOptions(
+        ).single().id)
+        assertEquals("stale", cache.composerOptions(
             WebChatProviderId.CHATGPT_WEB,
             "model",
             emptyList(),
-        ).isEmpty())
+        ).single().id)
         assertTrue(cache.hasComposerSnapshot(WebChatProviderId.CHATGPT_WEB, "MODEL"))
+    }
+
+    @Test
+    fun builtInCatalogIsImmediateButStillRequiresARefresh() {
+        val clock = Clock()
+        val coldCache = WebChatProductionInteractionCache(nowMs = clock::now)
+
+        assertEquals(
+            listOf("高级", "自动"),
+            coldCache.composerOptions(
+                WebChatProviderId.CHATGPT_WEB,
+                "model",
+                emptyList(),
+            ).map(WebChatConsumerOption::label),
+        )
+        assertEquals(
+            listOf("图像"),
+            coldCache.features(WebChatProviderId.CHATGPT_WEB, emptyList())
+                .map(WebChatConsumerFeature::label),
+        )
+        assertTrue(coldCache.needsComposerRefresh(WebChatProviderId.CHATGPT_WEB, "model"))
+        assertTrue(coldCache.needsFeatureRefresh(WebChatProviderId.CHATGPT_WEB))
+    }
+
+    @Test
+    fun restoresLastSuccessfulSnapshotAndRefreshesOnlyAfterItExpires() {
+        val clock = Clock(1_000L)
+        val storage = MemoryStorage()
+        val first = WebChatProductionInteractionCache(storage, clock::now)
+        first.composerOptions(WebChatProviderId.CHATGPT_WEB, "model", listOf(option("fast")))
+        first.features(WebChatProviderId.CHATGPT_WEB, listOf(feature("images")))
+
+        val restored = WebChatProductionInteractionCache(storage, clock::now)
+        assertEquals("fast", restored.composerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "model",
+            emptyList(),
+        ).single().id)
+        assertTrue(!restored.needsComposerRefresh(WebChatProviderId.CHATGPT_WEB, "model"))
+        assertTrue(!restored.needsFeatureRefresh(WebChatProviderId.CHATGPT_WEB))
+
+        clock.advance(6L * 60L * 60L * 1_000L + 1L)
+        assertEquals("fast", restored.composerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "model",
+            emptyList(),
+        ).single().id)
+        assertTrue(restored.needsComposerRefresh(WebChatProviderId.CHATGPT_WEB, "model"))
     }
 
     @Test
@@ -100,7 +148,11 @@ class WebChatProductionInteractionCacheTest {
 
         cache.clear(WebChatProviderId.CHATGPT_WEB)
 
-        assertTrue(cache.composerOptions(WebChatProviderId.CHATGPT_WEB, "tools", emptyList()).isEmpty())
+        assertTrue(cache.composerOptions(
+            WebChatProviderId.CHATGPT_WEB,
+            "tools",
+            emptyList(),
+        ).all { WebChatProductionBuiltInCatalog.isPresetId(it.id) })
         assertEquals(
             "lens",
             cache.composerOptions(WebChatProviderId.GOOGLE_WEB, "tools", emptyList()).single().id,
@@ -189,4 +241,19 @@ class WebChatProductionInteractionCacheTest {
         controls = emptyList(),
         commandRequests = emptyList(),
     )
+
+    private class Clock(private var value: Long = 0L) {
+        fun now(): Long = value
+        fun advance(delta: Long) {
+            value += delta
+        }
+    }
+
+    private class MemoryStorage : WebChatProductionInteractionSnapshotStorage {
+        private var snapshot: WebChatProductionInteractionSnapshot? = null
+        override fun restore(): WebChatProductionInteractionSnapshot? = snapshot
+        override fun save(snapshot: WebChatProductionInteractionSnapshot) {
+            this.snapshot = snapshot
+        }
+    }
 }

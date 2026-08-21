@@ -77,6 +77,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
             features,
             observation(provider, state, features, request = null, pollingExhausted = false),
         )
+        if (!interactionCache.needsFeatureRefresh(provider.id)) return
         val requested = port.requestFeatures()
         if (requested.accepted) {
             pollFeatures(provider, port, requested, epoch, attempt = 0)

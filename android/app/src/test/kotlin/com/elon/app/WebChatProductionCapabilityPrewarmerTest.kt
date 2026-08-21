@@ -60,7 +60,11 @@ class WebChatProductionCapabilityPrewarmerTest {
         val scheduler = Scheduler()
         val port = FakePort()
         val cache = WebChatProductionInteractionCache().apply {
-            replaceComposerOptions(WebChatProviderId.CHATGPT_WEB, "model", emptyList())
+            replaceComposerOptions(
+                WebChatProviderId.CHATGPT_WEB,
+                "model",
+                listOf(option("auto")),
+            )
             composerOptions(WebChatProviderId.CHATGPT_WEB, "tools", listOf(option("search")))
             features(WebChatProviderId.CHATGPT_WEB, listOf(feature("projects")))
             controls(

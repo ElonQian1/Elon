@@ -155,7 +155,7 @@ internal class WebChatProductionHeaderActionsCoordinator(
             } ?: add(WebChatProductionInteractionPlaceholder.item(
                 provider.id,
                 surface = "temporary-chat",
-                title = "正在同步临时聊天状态",
+                title = "临时聊天",
                 state = observation,
             ))
             if (resolved.conversationSettingsAvailable) {
