@@ -5,7 +5,6 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
-import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -44,58 +43,63 @@ internal class HomeConversationHeaderView(
         selected: HomeListFilterMode,
         counts: HomeConversationCounts,
         onSelect: (HomeListFilterMode) -> Unit
-    ): View = HorizontalScrollView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52))
-        isHorizontalScrollBarEnabled = false
-        overScrollMode = View.OVER_SCROLL_NEVER
-        addView(LinearLayout(activity).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), dp(4), dp(16), dp(4))
-            val items = listOf(
-                HomeListFilterMode.All to ("全部" to counts.all),
-                HomeListFilterMode.Friends to ("好友" to counts.friends),
-                HomeListFilterMode.Projects to ("项目" to counts.projects),
-                HomeListFilterMode.Conversations to ("对话" to counts.conversations)
+    ): View = LinearLayout(activity).apply {
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(64))
+        gravity = Gravity.CENTER_VERTICAL
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(10), dp(3), dp(10), 0)
+        val items = listOf(
+            HomeListFilterMode.All to ("全部" to counts.all),
+            HomeListFilterMode.Friends to ("好友" to counts.friends),
+            HomeListFilterMode.Projects to ("项目" to counts.projects),
+            HomeListFilterMode.Conversations to ("对话" to counts.conversations)
+        )
+        items.forEach { (mode, label) ->
+            addView(
+                createFilterTab(label.first, label.second, mode == selected) { onSelect(mode) },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             )
-            items.forEachIndexed { index, (mode, label) ->
-                addView(createFilterPill(label.first, label.second, mode == selected) { onSelect(mode) },
-                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)).apply {
-                        if (index > 0) marginStart = dp(11)
-                    })
-            }
-        })
+        }
     }
 
-    private fun createFilterPill(label: String, count: Int, selected: Boolean, onClick: () -> Unit): View =
+    private fun createFilterTab(label: String, count: Int, selected: Boolean, onClick: () -> Unit): View =
         LinearLayout(activity).apply {
-            minimumWidth = dp(if (label.length > 2) 64 else 60)
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(11), 0, dp(9), 0)
-            background = pillBackground(selected)
+            gravity = Gravity.CENTER_HORIZONTAL
+            orientation = LinearLayout.VERTICAL
             isClickable = true
             isFocusable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                text = label
-                textSize = 15f
-                typeface = regular
-                setTextColor(Color.parseColor(if (selected) "#0B1118" else "#B3DDDBD5"))
-            })
-            addView(TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(20)).apply { marginStart = dp(4) }
-                background = rounded("#9CBAD5", 10)
+            contentDescription = "$label，${count.coerceAtMost(99)}"
+            addView(LinearLayout(activity).apply {
                 gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = count.coerceAtMost(99).toString()
-                textSize = 12f
-                typeface = medium
-                fontFeatureSettings = "tnum"
-                setTextColor(Color.parseColor("#111820"))
-            })
+                orientation = LinearLayout.HORIZONTAL
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = label
+                    textSize = 17f
+                    typeface = regular
+                    setTextColor(Color.parseColor("#DDDBD5"))
+                })
+                addView(TextView(activity).apply {
+                    minWidth = dp(28)
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(24)).apply {
+                        marginStart = dp(4)
+                    }
+                    background = rounded("#9CBAD5", 12)
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setPadding(dp(6), 0, dp(6), 0)
+                    text = count.coerceAtMost(99).toString()
+                    textSize = 13f
+                    typeface = medium
+                    fontFeatureSettings = "tnum"
+                    setTextColor(Color.parseColor("#111820"))
+                })
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(47)))
+            addView(View(activity).apply {
+                background = rounded(if (selected) "#9CBAD5" else "#00000000", 2)
+            }, LinearLayout.LayoutParams(dp(42), dp(3)))
         }
 
     private fun createSummaryCard(counts: HomeConversationCounts, onOpenSummary: () -> Unit): View = LinearLayout(activity).apply {
@@ -179,14 +183,6 @@ internal class HomeConversationHeaderView(
             includeFontPadding = false; text = "最近"; textSize = 14f; typeface = regular
             setTextColor(Color.parseColor("#B3DDDBD5"))
         })
-    }
-
-    private fun pillBackground(selected: Boolean): GradientDrawable = GradientDrawable().apply {
-        cornerRadius = dp(17).toFloat()
-        if (selected) setColor(Color.parseColor("#9CBAD5")) else {
-            setColor(Color.TRANSPARENT)
-            setStroke(dp(1), Color.parseColor("#526C7884"))
-        }
     }
 
     private fun rounded(color: String, radius: Int) = GradientDrawable().apply {

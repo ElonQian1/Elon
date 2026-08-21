@@ -338,6 +338,13 @@
       will-change: transform;
     }
     .conversation-list.pulling { transition: none; }
+    .home-filter-tabs { height: 64px; padding: 3px 10px 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); box-sizing: border-box; }
+    .home-filter-tab { min-width: 0; height: 64px; padding: 0; border: 0; background: transparent; color: #dddbd5; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; font: inherit; cursor: pointer; }
+    .home-filter-label { height: 47px; display: flex; align-items: center; justify-content: center; font-size: 17px; white-space: nowrap; }
+    .home-filter-count { min-width: 28px; height: 24px; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #9cbad5; color: #111820; display: inline-grid; place-items: center; box-sizing: border-box; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .home-filter-tab::after { content: ''; width: 42px; height: 3px; border-radius: 999px; background: transparent; }
+    .home-filter-tab.active::after { background: #9cbad5; }
+    .home-filter-tab:focus-visible { outline: 2px solid #9cbad5; outline-offset: -2px; border-radius: 8px; }
     .work-summary-entry { margin: 14px 16px 8px; padding: 18px; border: 0; border-radius: 18px; background: #171c22; color: #f8f7f4; width: calc(100% - 32px); text-align: left; display: flex; align-items: center; gap: 14px; }
     .work-summary-entry-copy { flex: 1; min-width: 0; display: grid; gap: 8px; }
     .work-summary-entry-title { font-size: 15px; }
@@ -7579,9 +7586,39 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
 
   function contactFilterTitle() {
-    if (contactFilterMode === 'projects') return '项目';
-    if (contactFilterMode === 'friends') return '好友';
-    return '全部';
+    return '消息';
+  }
+
+  function contactFilterCounts(items) {
+    return {
+      all: items.length,
+      friends: items.filter((item) => item.kind === 'friend').length,
+      projects: items.filter((item) => item.kind === 'project').length,
+      conversations: items.filter((item) => item.kind === 'group').length
+    };
+  }
+
+  function createContactFilterTabs(items) {
+    const counts = contactFilterCounts(items);
+    const tabs = document.createElement('nav');
+    tabs.className = 'home-filter-tabs';
+    tabs.setAttribute('aria-label', '消息分类');
+    [
+      ['all', '全部', counts.all],
+      ['friends', '好友', counts.friends],
+      ['projects', '项目', counts.projects],
+      ['conversations', '对话', counts.conversations]
+    ].forEach(([mode, label, count]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'home-filter-tab' + (contactFilterMode === mode ? ' active' : '');
+      button.setAttribute('aria-current', contactFilterMode === mode ? 'page' : 'false');
+      button.setAttribute('aria-label', `${label}，${Math.min(count, 99)}`);
+      button.innerHTML = `<span class="home-filter-label">${label}<span class="home-filter-count">${Math.min(count, 99)}</span></span>`;
+      button.addEventListener('click', () => setContactFilterMode(mode));
+      tabs.appendChild(button);
+    });
+    return tabs;
   }
 
   function filterContactHomeItems(items) {
@@ -7589,7 +7626,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       return items.filter((item) => item.kind === 'project');
     }
     if (contactFilterMode === 'friends') {
-      return items.filter((item) => item.kind === 'friend' || item.kind === 'group');
+      return items.filter((item) => item.kind === 'friend');
+    }
+    if (contactFilterMode === 'conversations') {
+      return items.filter((item) => item.kind === 'group');
     }
     return items;
   }
@@ -7616,21 +7656,28 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       ).localeCompare(String(
         contactTitle(b)
       ), 'zh-Hans-CN'));
+    conversationList.innerHTML = '';
+    conversationList.appendChild(createContactFilterTabs(baseItems));
     if (!allItems.length) {
       if (!searchQuery && contactFilterMode === 'projects') {
-        conversationList.innerHTML = '<div class="empty-tip">\u6682\u65e0\u9879\u76ee</div>';
+        conversationList.insertAdjacentHTML('beforeend', '<div class="empty-tip">\u6682\u65e0\u9879\u76ee</div>');
         updateChatTabBadge();
         return;
       }
       if (!searchQuery && contactFilterMode === 'friends') {
-        conversationList.innerHTML = '<div class="empty-tip">\u6682\u65e0\u597d\u53cb\u6216\u7fa4\u804a</div>';
+        conversationList.insertAdjacentHTML('beforeend', '<div class="empty-tip">\u6682\u65e0\u597d\u53cb\u6216\u7fa4\u804a</div>');
         updateChatTabBadge();
         return;
       }
-      conversationList.innerHTML = searchQuery
+      if (!searchQuery && contactFilterMode === 'conversations') {
+        conversationList.insertAdjacentHTML('beforeend', '<div class="empty-tip">\u6682\u65e0\u5bf9\u8bdd</div>');
+        updateChatTabBadge();
+        return;
+      }
+      conversationList.insertAdjacentHTML('beforeend', searchQuery
         ? '<div class="empty-tip">没有匹配的好友、群聊或项目</div>'
         : '<div class="empty-tip">还没有好友<br/>点击底部 ＋ 添加一位好友'
-          + '<br/><button id="emptyAddFriendBtn">添加好友</button></div>';
+          + '<br/><button id="emptyAddFriendBtn">添加好友</button></div>');
       if (!searchQuery) {
         const b = $('emptyAddFriendBtn');
         if (b) b.addEventListener('click', openAddFriendDialog);
@@ -7638,7 +7685,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       updateChatTabBadge();
       return;
     }
-    conversationList.innerHTML = '';
     const summaryEntry = document.createElement('button');
     summaryEntry.type = 'button';
     summaryEntry.className = 'work-summary-entry';

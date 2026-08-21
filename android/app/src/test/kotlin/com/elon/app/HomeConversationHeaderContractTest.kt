@@ -19,10 +19,17 @@ class HomeConversationHeaderContractTest {
         assertTrue(androidHeader.contains("HomeListFilterMode.Friends to"))
         assertTrue(androidHeader.contains("HomeListFilterMode.Projects to"))
         assertTrue(androidHeader.contains("HomeListFilterMode.Conversations to"))
+        assertTrue(androidHeader.contains("createFilterTab"))
+        assertTrue(androidHeader.contains("if (selected) \"#9CBAD5\" else \"#00000000\""))
+        assertFalse(androidHeader.contains("pillBackground"))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertFalse(web.contains("全部已读"))
         assertTrue(web.contains("free of standalone unread-filter and mark-all-read controls"))
+        assertTrue(web.contains("className = 'home-filter-tabs'"))
+        assertTrue(web.contains("['all', '全部', counts.all]"))
+        assertTrue(web.contains("['conversations', '对话', counts.conversations]"))
+        assertTrue(web.contains(".home-filter-tab.active::after { background: #9cbad5; }"))
     }
 
     private fun readRepositoryFile(relativePath: String): String {
