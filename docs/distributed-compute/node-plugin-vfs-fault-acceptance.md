@@ -18,10 +18,11 @@ verification_status: targeted_local_tests_partially_passed
 - `design_frozen / source_written / implementation_not_dynamically_accepted`；本批新增 registration runner 为 `source_review_only / implementation_uncompiled / implementation_unrun`；
 - `elon-pc-node` 完整测试目标在 2026-08-12 基线修复后可编译；
 - 与可见性修复直接相关的 targeted fault matrix 已运行并通过 5 项；
+- A2a/A2b1 map/lock 只有 candidate typed schema 与显式不完整的 branch-atom scaffold 已 source-written；quotient、exact key set、`Expected`、exclusion ledger 与 denominator 仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，复核 clean 前不得记 `StaticContract` 或开放 `WindowsDynamic`；
 - A2b2 的 117 项 source-exhaustive inventory 全部仍是 `StaticContract`，`WindowsDynamic=0/117`；
 - 宽范围 `sqlite_vfs_policy` 回归仍有失败，不能把 5 项局部通过写成 A2 完成。
 
-本批新增严格 test-only 的 RegistrationShutdown 8-selector actual/validator、进程隔离 runner 与线性 evidence envelope，并同步文档；没有编译或运行测试。历史编译和 5 项局部测试证据不得被重记为本批新证据，也不覆盖本批新增源码。
+本批只新增 map/lock candidate typed schema 与显式不完整的 branch-atom review scaffold；它不是 exact source inventory。严格 test-only 的 RegistrationShutdown 8-selector actual/validator、进程隔离 runner 与线性 evidence envelope 保持既有 source-review 状态。两部分都没有在本批编译或运行；历史编译和 5 项局部测试证据不得被重记为本批新证据，也不覆盖本批新增源码。
 
 ### 历史证据元组
 
@@ -41,7 +42,32 @@ verification_status: targeted_local_tests_partially_passed
 因此这组历史证据只支撑“完整目标曾编译、5 个 targeted 测试曾通过”，不满足第 3 节 evidence record，不能计入
 A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须从完整命令与平台元组重新建账。
 
-## 2. A2b2 Case 集合与完成条件
+## 2. Case 集合与完成条件
+
+### 2.1 A2a/A2b1 map/lock
+
+map/lock denominator 的唯一 quotient、scope、`CaseKey`、`SourceBranch`、`Expected` 与 legacy 28 非 denominator 边界由
+[`authority §5.1`](node-plugin-vfs-fault-authority.md) 维护。本验收以后只消费 source/red-team review clean 的 frozen typed set，
+不从 runner、历史 targeted 名称、intermediate candidate count 或实际可运行子集反推 denominator。
+
+当前 denominator 计数尚未冻结：
+
+| Case family | Source review | StaticContract | WindowsDynamic | 完成条件 |
+|---|---|---|---|---|
+| Map | exact-set review pending | not counted | not opened | 每个 frozen Map `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
+| Lock | exact-set review pending | not counted | not opened | 每个 frozen Lock `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
+| **A2a/A2b1 map/lock 总计** | **exact-set review pending** | **not counted** | **not opened** | static/dynamic 两次集合比较均与最终 frozen key set 精确相等。 |
+
+只有 authority frozen typed key、source-branch projection、expected record 与 exclusion ledger 在源码中存在并通过 exact-set review，
+才可写 `StaticContract=N/N`；即使如此，本批未编译、未运行，也不得写成 `passed=N`、`verified` 或动态接受。现有 18 map + 10 lock
+仅为 `static_subset/non_denominator`，不计入未来 N 的完成数，也不允许与新 inventory 相加成 `N+28`。
+
+static 集合验收必须同时满足：authority frozen `BTreeSet<CaseKey>` 与源码集合 exact equality；每个 in-scope source terminal
+leaf 恰好投影一个 key；每个 key 有非空 `SourceBranch` 集合和唯一 `Expected`；missing、extra、duplicate、unknown、无理由排除、
+同 key 不同 expected、只比较长度或手写 actual 全部失败关闭。dynamic 集合以后必须再与同一 key set exact equality，不能修改
+static expected 来迁就观察结果。
+
+### 2.2 A2b2
 
 动态验收必须与冻结 inventory 做集合相等比较，不能只挑选可运行子集：
 
@@ -56,8 +82,8 @@ A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须�
 
 RegistrationShutdown 的 8-case runner 源码现已铺设，但未编译、未运行且没有产出 record；该 family 仍为 `0/8`。它不能改变表中任何计数。
 
-这里的 117 只统计 A2b2 barrier/unmap/close/registry inventory，不包含 A2a/A2b1 的 SHM map/lock。
-map/lock 必须另建 source-exhaustive typed inventory，先冻结集合与数量，再逐项产生 Windows dynamic record；两套计数不得合并。
+这里的 117 只统计 A2b2 barrier/unmap/close/registry inventory，不包含 A2a/A2b1 的 SHM map/lock。map/lock 的最终 N 与
+A2b2 的 117 必须分栏记账；两套计数不得合并为一个 denominator，也不得互相补足缺失 dynamic record。
 
 任何缺 case、重复 case、未知 case、static/dynamic key 不同构、只比较数量或把 partial bridge 记成完整 Case 都失败关闭。
 
@@ -66,7 +92,7 @@ map/lock 必须另建 source-exhaustive typed inventory，先冻结集合与数�
 每个 Windows dynamic record 至少必须保存或在测试报告中逐字投影：
 
 - commit、测试目标、Windows build、架构、文件系统/卷类型、bundled SQLite 版本和隔离 child identity；
-- frozen case key、family、registration、route ordinal、runtime generation、SHM connection、role、callback、phase、
+- frozen case key、family、registration、route ordinal、runtime generation、SHM connection、role、callback、cause/terminal phase、
   occurrence、timing 与 unmap mode；
 - 预期和实际 failure class、mutation/lock uncertainty、SQLite result code 或 `VoidNoResultCode`；
 - fault selector 的 observed/triggered/pending 精确计数，以及 callback/action 的 attempted/succeeded 计数；
@@ -76,6 +102,10 @@ map/lock 必须另建 source-exhaustive typed inventory，先冻结集合与数�
 
 记录必须来自实际 callback/平台结果和受控 observer。静态 expected record、源码分支、Debug 输出、计数器默认值或测试手工
 拼装的 post-state 不能冒充 actual。
+
+`CaseKey` 本身不得携带真实 registration、route、runtime、Connection、PID、path、pointer 或 handle；这些只由 dynamic
+record 的 child-scoped opaque binding 和 actual 字段证明。cleanup 改写 terminal phase/custody 时，record 必须同时保留 cause
+phase 与 terminal phase，不能把 cleanup failure 归并回最初注入点或只报告最后一个通用 I/O 错误。
 
 当前 registration source path 额外要求：child 只贡献一条 allow-listed bounded report line，其中 semantic actual 是 canonical positional payload，PID/nonce 与 opaque root/registration commitment 只作绑定材料；libtest 的其他 bounded 输出不构成证据。parent 必须用本地 frozen inventory 重新验证 selector 与全部字段，把同一 payload 的 exact bytes 和 sealed commitment 同时绑定到它线性持有的真实 Child/wait/exit、canonical root 与真实 registration identity，并在 child 退出后才采集环境、删除同一 root。最终 parent report 必须逐字投影这份已验证的 canonical actual 并同时保留 commitment；不可逆 commitment 不能替代逐字段报告。registration-level quarantined custody 必须由 lifecycle owner 真正消费 table/name/context；route 仍须保持 frozen Active/nonterminal 语义。任一 token、payload、child identity、root/registration binding 或环境元组不一致都不得形成 record。
 
@@ -100,11 +130,16 @@ map/lock 必须另建 source-exhaustive typed inventory，先冻结集合与数�
 
 | Case | 必须结果 |
 |---|---|
+| ABI validation/output | 非法 region/size/extend、null output、非法 offset/count/flags 在 managed action 前失败；map output 保持 null，callback/platform/fault count 与 expected 一致。 |
+| map success | 分别证明 Extend cold-create、Extend warm-create、Extend reuse、Observe warm-create、Observe reuse、Observe not-present 六种语义；canonical region 值可 quotient，cold/warm、create/reuse 与 mapping prefix 不得互换。 |
 | map failure before mutation | 输出指针清零；返回冻结 SQLite code；node/mapping/file custody 与 route phase逐项匹配 expected。 |
 | map mutation known | 已完成 OS mutation 不得被描述为无副作用；本地 custody必须同步后终态化。 |
 | map outcome uncertain | FileId/domain 永久 tombstone；同 domain sibling 不得重建 runtime 或继续 SHM。 |
+| lock success | `LockShared/LockExclusive/UnlockShared/UnlockExclusive` 四动作分别覆盖 local success、shared coalescing、exact range/mask transition 与 OS acquire/release；不得用 exclusive shape代表 shared。 |
 | local lock contention | 合法 sibling 冲突只返回 `SQLITE_BUSY`，不触发脚本、不 poison、不篡改持锁 mask。 |
+| OS lock outcome | shared/exclusive sibling relation分别对账 success/contended/error；`SQLITE_BUSY` 与 I/O failure、known mutation及 uncertainty 不得合并。 |
 | lock release uncertainty | 不清本地 mask，不释放对应 custody；domain terminal 与后续 sibling 行为逐项匹配。 |
+| cleanup rewrite | DMS unlock/file close、mapping close或exact-open cleanup改写 terminal phase/custody时，保留 cause phase并命中独立 key；不得归并原失败 phase。 |
 | barrier no-return | 通过真实无结果码通道执行；失败清 raw state一次并保留 terminal custody，不伪造 `SQLITE_IOERR` 或正常 completion。 |
 
 map/lock foundation 的 targeted 通过只能证明对应局部路径，不得自动覆盖 Barrier、Unmap 或 JointClose case。
@@ -141,7 +176,7 @@ SQLite `xClose` 的第二次调用、Drop、panic recovery 或测试清理不得
 
 A2 完成必须同时满足：
 
-1. A2a/A2b1 的 SHM map/lock source-exhaustive inventory 已独立冻结，全部 Windows dynamic records通过，零缺失、额外或失败；
+1. A2a/A2b1 的 SHM map/lock `StaticContract=N/N` 已独立冻结且全部 `WindowsDynamic=N/N` 通过，static/dynamic 两次集合比较均零缺失、额外或失败；
 2. A2b2 的 117 项 Windows dynamic records 全部通过，集合与 static inventory 精确相等；
 3. 宽范围 `sqlite_vfs_policy` 回归通过，既有 69 项成功路径不得退化；
 4. source-contract 继续证明 fault script、fixture、pointer、observer 与 dynamic record只在测试边界可达；
@@ -154,11 +189,11 @@ A2 完成必须同时满足：
 
 ## 9. 计数、报告与状态升级
 
-- 每次执行报告必须分开列 `compiled`、targeted tests、map/lock inventory与dynamic、A2b2 StaticContract、A2b2 WindowsDynamic及wide regression；
+- 每次执行报告必须分开列 `compiled`、targeted tests、map/lock `StaticContract` 与 `WindowsDynamic`、A2b2 StaticContract、A2b2 WindowsDynamic及wide regression；
 - targeted tests 只能按真实测试数记账，不能映射为 `WindowsDynamic` case 数；
 - 一个 dynamic case 失败时保留其 case key、最小脱敏差异和失败阶段，其余已通过 case 不改写为失败或未运行；
 - 只有 map/lock 独立矩阵全部通过、A2b2 117/117、宽范围回归通过且 production isolation保持时，A2 才可从
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论仍是：历史完整目标可编译且 5 项 targeted fault matrix 曾通过；本批 registration runner 未编译未运行，Registration `WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117`，A2 未完成动态验收。
+当前正式结论仍是：历史完整目标可编译且 5 项 targeted fault matrix 曾通过；本批 map/lock exact inventory 为 `source_review_pending/implementation_uncompiled/implementation_unrun`，尚不能记 `StaticContract` 或开放 `WindowsDynamic`；registration runner 为 `source_review_only/implementation_uncompiled/implementation_unrun`。Registration `WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117`，A2 仍为 `implementation_not_dynamically_accepted`。生产 open、A1、v15、Runtime 与 Ready 均未改变。

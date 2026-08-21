@@ -11,9 +11,9 @@ owners: node, security
 
 本文是节点插件 A2 阶段的单一权威，只定义测试专用受管 SQLite VFS 的 SHM、联合关闭、同 namespace 多 Connection 和确定性故障注入合同。逐 case Windows 动态证据、计数与升级门槛由 [`node-plugin-vfs-fault-acceptance.md`](node-plugin-vfs-fault-acceptance.md) 维护；生产 SQLite 文件/目录、catalog 与 rollback 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；Planning Snapshot 的依赖顺序仍由 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 维护；本机 schema 与 Store 仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护。
 
-A2 总合同已经冻结。A2b2 的 117 项静态 inventory 已覆盖 `xShmBarrier`、非末/末 `xShmUnmap`、WAL-main 联合 `xClose`、route lifecycle 与 VFS unregister；A2a/A2b1 的 registration exact route、共享 runtime 多 Connection、exact route→live WAL-main 私有脚本桥与 map/lock 内部 phase 仍保留。2026-08-12 后续基线修复后，`elon-pc-node` 完整测试目标已可编译，与本次可见性修复直接相关的 fault matrix 已实际运行并通过 5 项测试。
+A2b2 的 117 项静态 inventory 合同已冻结，覆盖 `xShmBarrier`、非末/末 `xShmUnmap`、WAL-main 联合 `xClose`、route lifecycle 与 VFS unregister。A2a/A2b1 的 registration exact route、共享 runtime 多 Connection 与 exact route→live WAL-main 私有脚本桥继续沿用既有边界；本批只新增 source-written/source-review-pending 的 map/lock candidate typed schema 与显式不完整的 branch-atom scaffold，目前只证明该候选表自身能分区。map/lock quotient、raw source universe、terminal projection、`Expected`、exclusion ledger、exact key set 与 denominator 全部仍为 `source_review_pending`；`StaticContract` 不计数，`WindowsDynamic` 不开放。2026-08-12 后续基线修复后，`elon-pc-node` 完整测试目标已可编译，与当时可见性修复直接相关的 fault matrix 已实际运行并通过 5 项测试；该历史证据不能覆盖新 scaffold。
 
-A2c 严格 `cfg(all(test, windows))` 的源码在既有 route-exact map/lock、两个 unregister bridge 与四个 direct `xShmUnmap(false)` physical-subset runner 之外，现新增 `RegistrationShutdown` 八个 frozen selector 的进程隔离 runner、完整 actual codec/validator 与线性 evidence envelope。每个 child 只贡献一条 allow-listed bounded report line，其中 semantic actual 是 canonical 脱敏 payload，PID/nonce 与 root/registration 只作为绑定材料；libtest 的其他 bounded 输出不构成证据。parent 重新验证 exact selector/81 个字段，并把 payload、同一真实 child 的 wait/exit、spawn PID+nonce、canonical root、真实 registration commitment、commit/Windows/卷/SQLite 环境和同一测试根删除收据逐字绑定后，才可形成不可 Clone/Serde 的 record。quarantined-custody case 由 registration lifecycle owner 消费真实 table/name/context custody，不能冒充 route `TerminalQuarantine`。这些新增源码本批未编译、未运行，也没有生成或接受任何 record；`RegistrationShutdown WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117`、map/lock denominator 未冻结和宽范围回归失败均不变。2026-08-12 的完整目标编译与 5 项局部通过只属历史基线，不能覆盖本批新增源码或替代逐 case 动态证据。
+A2c 严格 `cfg(all(test, windows))` 的源码在既有 route-exact map/lock、两个 unregister bridge 与四个 direct `xShmUnmap(false)` physical-subset runner 之外，现新增 `RegistrationShutdown` 八个 frozen selector 的进程隔离 runner、完整 actual codec/validator 与线性 evidence envelope。每个 child 只贡献一条 allow-listed bounded report line，其中 semantic actual 是 canonical 脱敏 payload，PID/nonce 与 root/registration 只作为绑定材料；libtest 的其他 bounded 输出不构成证据。parent 重新验证 exact selector/81 个字段，并把 payload、同一真实 child 的 wait/exit、spawn PID+nonce、canonical root、真实 registration commitment、commit/Windows/卷/SQLite 环境和同一测试根删除收据逐字绑定后，才可形成不可 Clone/Serde 的 record。quarantined-custody case 由 registration lifecycle owner 消费真实 table/name/context custody，不能冒充 route `TerminalQuarantine`。map/lock candidate branch-atom scaffold 与 registration runner 本批均未编译、未运行，也没有生成或接受任何 map/lock record；map/lock 尚不存在可计数的 `StaticContract` 或可开放的 `WindowsDynamic`。Registration `WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117` 且宽范围回归失败。2026-08-12 的完整目标编译与 5 项局部通过只属历史基线，不能覆盖本批新增源码或替代逐 case 动态证据。
 
 生产 `ComputePluginHandleBoundAuthorityOpenIntent::open()` 必须继续固定返回 `COMPUTE_PLUGIN_HANDLE_BOUND_SQLITE_VFS_UNAVAILABLE`。A2 不提供生产 VFS 注册、process owner、live `sqlite3_file`、opened authority、A1 producer 或 v15 能力，也不改变 v14 blocked-only、Runtime stopped、`snapshot_ready=false` 与全部 side-effect false 的事实。
 
@@ -26,7 +26,7 @@ A2c 严格 `cfg(all(test, windows))` 的源码在既有 route-exact map/lock、�
 - registry/file-custody 已把 main、Journal/WAL sidecar、SHM lease、route 与 callback lease 不可拆持有；物理关闭失败会保留 exact custody，不能把 `Drop` 当作成功回执；
 - 测试受管 VFS 已让单个真实 SQLite Connection 经 main、Journal/WAL、SHM 和 `xClose` 进入 exact route，并在正常关闭后退休 route、注销 VFS 和删除测试根。
 
-A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 上的 plan 经刚提升的 live WAL-main 绑定到 runtime generation + SHM connection ID，map 初始化与 lock 平台动作也进入相邻 test-only hook。A2b2 静态源码继续把 barrier、unmap、联合 close、registry lifecycle 与 registration shutdown 分成独立 typed leaves；它已可编译，但尚未通过完整动态验收，仍未证明非末连接分离、末连接 teardown、domain terminal 后 sibling 行为、物理关闭一次性、注销结果或真实 Win32 custody。
+A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 上的 plan 经刚提升的 live WAL-main 绑定到 runtime generation + SHM connection ID，map 初始化与 lock 平台动作也进入相邻 test-only hook。本批 map/lock 源码只写入 candidate typed schema 与一份不完整的 branch-atom review scaffold；它没有冻结 quotient、raw source universe、terminal projection、`Expected`、exclusion ledger、`StaticContract` 或 dynamic actual/runner。A2b2 静态源码继续把 barrier、unmap、联合 close、registry lifecycle 与 registration shutdown 分成独立 typed leaves；它已可编译，但尚未通过完整动态验收，仍未证明非末连接分离、末连接 teardown、domain terminal 后 sibling 行为、物理关闭一次性、注销结果或真实 Win32 custody。
 
 既有 A2c partial bridge 不产生 `WindowsDynamic` evidence。它们仍只覆盖 route-exact callback-before、两个 unregister shape 和四个 direct SHM physical subset；不能观察完整 Case 的 Connection、indexed route、main、lease、callback/action counts、root-deletable 或独立 kernel receipt，历史编译/局部测试也不能外推其他 case。
 
@@ -70,9 +70,74 @@ A2 fixture 必须保持以下所有权拓扑：
 | WAL-main 联合 `xClose` | SHM unmap、main unlock、main file close、close callback completion、route observation/retirement | 顺序固定先 SHM 后 main；任一步失败都不继续伪造后继回执；raw state只消费一次；exact leases/custody 保留或隔离 |
 | registration shutdown | outstanding callback、live route、quarantined custody、VFS unregister | 任一未闭合对象阻止正常释放；注销失败保留 table/name/context；测试根只有完整成功证明后才可删除 |
 
-每个 case 必须静态声明预期 phase、class、SQLite code、route phase、domain terminal bit、剩余 Connection 数、是否保留 node/mapping/file/main/SHM lease、是否允许后续 callback，以及 raw state/route/custody 的精确一次性计数。只断言“返回非 OK”不足以验收。
+每个 case 必须静态声明预期 phase、class、SQLite code、route phase、domain terminal bit、剩余 Connection 数、是否保留 node/mapping/file/main/SHM lease、是否允许后续 callback，以及 raw state/route/custody 的精确一次性计数。map/lock typed record 必须进一步把 Connection 数拆成 `sqlite_connections/shm_connections/registry_routes/logical_names`，不得继续复用一个含混数字。只断言“返回非 OK”不足以验收。
 
-### 5.1 A2b2 typed case schema 与完整 inventory
+### 5.1 A2a/A2b1 map/lock quotient 与 typed inventory
+
+当前只有 candidate quotient/typed-key schema 与一份显式不完整的 branch-atom scaffold。raw source universe 和 terminal leaves 尚未冻结；候选表也不证明它已遍历 ABI malformed request、null map output、`Observe|Extend`、四种 lock action、local sibling relation、OS result 或 defensive branch。未来 source review 必须按 test-only exact VFS、受支持 Windows、非默认 exact registration、live WAL-main、exact route/callback owner 及 canonical region/range/pre-state 重建完整边界，但这些边界当前都不得冒充已审定 source universe。
+
+candidate quotient 拟只消去不改变权威可观察结果的 scalar instance：registration/route/runtime/Connection 的具体值、同一 range-shape 内等价 offset、同一 topology class 内等价 region index，以及产生相同终态/custody 的等价 OS errno。以下合并轴仍待 source/red-team review：
+
+- path、semantic source branch group 与 operation：Map 的 `Observe|Extend`，Lock 的
+  `LockShared|LockExclusive|UnlockShared|UnlockExclusive`；
+- request/range shape、cold/warm 与 mapped/unmapped prefix、完整 initialization path、目标 Connection pre-state、sibling shared/exclusive relation；
+- phase、occurrence、`native|before_call|after_success` timing，以及 after-success 的 known/uncertain class；
+- SQLite channel/result、map output 的 null/non-null 结果、mutation/lock uncertainty、physical domain 与 exact route terminal；
+- before/after topology、全部 custody/mask 和 platform/fault/callback/action 精确计数。
+
+当前 source-written 的只是 candidate `CaseKey` schema，可表达 path、branch group、operation/mode、request/range shape、topology/prefix-mutation class、initialization path、sibling relation、cause/terminal phase、timing/class 与 occurrence，且不保存真实 registration、route、runtime、Connection、PID、path、pointer 或 handle。该 schema 仍为 `source_review_pending`；源码没有已冻结的 `CaseKey` 实例集合，也没有完整 `SourceBranch`、`Expected` 或 `StaticContract`。未来这三类材料必须分开保存 source terminal identity、完整预期结果，以及 key→source→expected 的线性关联；runner、Debug、默认计数器或调用方布尔值不得在运行时拼装 expected。
+
+新 candidate branch-atom scaffold 只允许声称一个内部性质：对它自己已 materialize 的不完整 atom 列表，每个 atom 在该表内只出现一次并获得一个 candidate disposition。这不证明 atom 列表覆盖 production source，不证明 atom 是 terminal leaf，也不证明 disposition/reachability/exclusion 判定或 candidate axes 正确。当前已知 gaps 至少包括：
+
+- cold `xShmLock` 也穿过完整 node-initialization 图，尚未与 lock action 完成可达性交叉投影；
+- `Observe|Extend` 的 operation-specific reachability 尚未分清，single-Connection 与 multi-Connection/sibling topology 也尚未分开；
+- ABI validation/output、raw file-state owner、registry/callback owner、fault controller 与 inactive/terminal route 分支尚未完成端到端追踪；
+- 当前 atoms 同时含有 intermediate continuation 与候选 terminal 结果，二者尚未分类；一个 atom 不能被当成一个 Case 或 denominator 单元。
+
+| Artifact | 当前状态 |
+|---|---|
+| candidate quotient/key schema | source-written/source_review_pending |
+| candidate branch-atom scaffold | source-written/incomplete/self-partition-only |
+| raw source universe 与 terminal projection | source_review_pending/not counted |
+| `Expected` 与 exclusion ledger | source_review_pending/not counted |
+| exact key set 与 denominator | source_review_pending/not counted |
+| `StaticContract` | not counted |
+| `WindowsDynamic` | not opened |
+
+未来 inventory 至少必须显式包含 ABI 参数/输出拒绝，以及六个不可互换的 map success：Extend cold-create、Extend warm-create、
+Extend reuse、Observe warm-create、Observe reuse、Observe not-present；另须覆盖 cold initialization 与 warm mapping prefix，
+mapping/view 的 before/native/after 结果，以及 shared/exclusive acquire/release 的本地成功、同 Connection
+transition、shared coalescing、sibling shared/exclusive contention、OS acquire/release success/contended/error。normal contention 仍是
+`SQLITE_BUSY` 且 fault count 为零；map 任一失败都必须证明 output 为 null。`PlatformUnsupported`、defensive 与 inactive 分支只有在端到端可达性复核后才可进入 exclusion ledger；当前 scaffold 的 disposition 不是冻结排除结论。具体 family 数与 denominator 只可在 raw source trace、terminal projection、`Expected` 和 exclusion review 全部 clean 后，
+由本页和[`动态验收`](node-plugin-vfs-fault-acceptance.md)共同冻结；中间候选数不是 authority。
+
+错误后的 native cleanup 是独立 terminal leaf，不能按最初失败 phase 合并：DMS truncate 失败后的 unlock 若不确定，terminal
+phase 是 `DmsExclusiveRelease` 且 custody 为 `ExclusiveOutcomeUncertain`；DMS exclusive/shared acquire 失败后的 close 若失败，
+terminal phase 是 `FileClose` 并保留 quarantined handle；ViewMap before/native 失败后的 mapping close 若失败，terminal phase 是
+`MappingClose` 并保留 mapping；ExactSiblingOpen 失败后的 file close 若失败，terminal phase 同样是 `FileClose`。未来 terminal projection 必须保留这些 cleanup rewrite 及原始 cause phase；当前 scaffold 尚未完成该工作，不得据此宣称 map/lock denominator。
+
+现有 `a2b1_cases` 的 18 个 map + 10 个 lock 记录只允许标记为 `static_subset/non_denominator`。它们只覆盖 phase presence、
+部分 exclusive lock shape 与局部 custody，不能因数量 28、源码存在或历史 targeted 通过而升级为 frozen denominator、
+`StaticContract` 完成数或 `WindowsDynamic`。新 inventory 必须逐条吸收或显式取代这 28 条语义，不能保留第二套并行 case owner。
+
+未来经冻结的 `CaseKey` 是 dynamic actual 的 join key，但当前 candidate schema/projection 都不是 actual。真实 Windows child 仍须另行观察并绑定 exact
+registration/route/runtime/Connection、真实 pre/post state、平台结果、进程/环境和 cleanup receipt；静态 expected、source branch
+或 review 不能构造 `WindowsDynamic` record。
+
+当前 source review 已查看的输入包括 production ABI
+`server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/io_shm.rs`；callback admission/begin/completion 与 custody 的真实 owner
+`server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/abi.rs`、
+`server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs` 与
+`server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody.rs`；test-only exact route bridge
+`server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/route_file.rs`，以及 managed owner
+`server/src/node_agent_managed_fs/sqlite_namespace_shm/types.rs`、`mapping.rs`、`node_initialization.rs`、`locking.rs`、
+`test_faults.rs` 与 `test_faults/` 的 map/lock 路径。该列表只是继续 review 的输入，不是已冻结的 raw source universe。candidate scaffold 的 test-only source owner 是
+`server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases.rs` 与其
+`a2b1_cases/` 子模块；`managed_vfs.rs` 只允许保留 `cfg(test)` 模块 wiring。现有
+`a2_dynamic_evidence` 是 RegistrationShutdown-specific child/record，不得因命名通用而冒充 map/lock actual。除上述 test-only
+inventory 外，本批不修改 ABI、managed-fs、route bridge、production open 或任何 Host 调用边。
+
+### 5.2 A2b2 typed case schema 与完整 inventory
 
 A2b2 不复用 A2b1 含混的单一 `remaining_connections`。每条 record 必须分开保存 `sqlite_connections`、`shm_connections`、`registry_routes` 与 `logical_names`，并包含：
 
@@ -118,6 +183,6 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 ## 9. 静态验收与后续门槛
 
-A2b2 当前可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；barrier/unmap/joint close/registry/registration 具备 one-shot/fenced 静态形状；after-success 只在平台或 registry mutation 成功并同步 custody 后终态化；新增 registration runner/evidence envelope 仍是未编译、未运行的 source；生产 `open()`、A1 producer 与协议均保持不可达。历史完整目标编译和 5 项局部通过不得被重记为当前新增源码或 A2 动态验收。
+当前可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；map/lock candidate typed schema 与不完整 branch-atom scaffold 已 source-written，但 quotient、exact key set、`Expected`、exclusion ledger 和 denominator 仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，不能记 `StaticContract` 或 `WindowsDynamic`；barrier/unmap/joint close/registry/registration 具备 one-shot/fenced 静态形状；after-success 只在平台或 registry mutation 成功并同步 custody 后终态化；新增 registration runner/evidence envelope 仍是未编译、未运行的 source；生产 `open()`、A1 producer 与协议均保持不可达。历史完整目标编译和 5 项局部通过不得被重记为当前新增源码或 A2 动态验收。
 
-进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，仍必须按[`动态验收`](node-plugin-vfs-fault-acceptance.md)另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，并把每条动态观察与静态 case key 一一对应。当前新 registration runner 未编译未运行、Registration 仍为 0/8，A2b2 仍为 0/117，宽范围回归仍失败；静态源码和 Windows 动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。
+进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，仍必须按[`动态验收`](node-plugin-vfs-fault-acceptance.md)另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，并把每条动态观察与静态 case key 一一对应。当前 map/lock denominator 尚未 source-review clean，因此 dynamic 尚未开放；新 registration runner 未编译未运行、Registration 仍为 0/8，A2b2 仍为 0/117，宽范围回归仍失败；静态源码和 Windows 动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。
