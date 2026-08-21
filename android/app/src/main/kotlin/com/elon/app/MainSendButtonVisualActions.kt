@@ -86,7 +86,11 @@ internal class MainSendButtonVisualActions(
 
         inputRightControls()?.let { controls ->
             val controlsParams = controls.layoutParams
-            val targetWidth = dp(38)
+            // The initial voice action is a 48dp control. Keeping its host at the
+            // 38dp send-button width clips the leading edge of the circular icon.
+            val targetWidth = dp(
+                if (visualMode == WebChatProductionComposerVisualMode.INPUT_MODE) 48 else 38
+            )
             if (controlsParams.width != targetWidth) {
                 controlsParams.width = targetWidth
                 controls.layoutParams = controlsParams
