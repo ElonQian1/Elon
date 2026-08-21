@@ -33,6 +33,7 @@ import {
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
 import {
   googleNewConversationNeedsReload,
+  localAiNewConversationContextReady,
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
@@ -68,6 +69,7 @@ export default function useLocalAiWebChatController(
   const optimisticSendSequence = useRef(0)
   const queuedSendDispatching = useRef(false)
   const queuedSendRef = useRef<QueuedLocalAiSend | null>(null)
+  const newConversationBaselineId = useRef('')
   const draftRef = useRef('')
   const visibleSessionState = provider && ownerKey
     ? sessionEntry.identity === requestedSessionIdentity
@@ -148,6 +150,7 @@ export default function useLocalAiWebChatController(
     setQueuedSend(null)
     queuedSendRef.current = null
     queuedSendDispatching.current = false
+    newConversationBaselineId.current = ''
     setBusyAction('')
     setMessage('')
     setNewConversationRecoveryStartedAtMs(0)
@@ -161,21 +164,24 @@ export default function useLocalAiWebChatController(
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs) return
-    const contextReady = visibleSessionState?.rendererStatus === 'active'
-      && visibleSessionState.semanticCacheStatus === 'live'
-      && visibleSessionState.contextReady === true
-      && visibleSessionState.updatedAtMs >= newConversationRecoveryStartedAtMs
-      && Boolean(liveSnapshot)
+    const contextReady = localAiNewConversationContextReady(
+      visibleSessionState,
+      liveSnapshot,
+      newConversationRecoveryStartedAtMs,
+      newConversationBaselineId.current,
+    )
     const composerReady = Boolean(
       liveSnapshot?.composerReady
       && (liveSnapshot.authenticated || !liveSnapshot.loginRequired),
     )
     if (contextReady && !queuedSend) {
+      newConversationBaselineId.current = ''
       setNewConversationRecoveryStartedAtMs(0)
       return
     }
     if (contextReady && composerReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
       queuedSendDispatching.current = true
+      newConversationBaselineId.current = ''
       setNewConversationRecoveryStartedAtMs(0)
       setQueuedSend(null)
       queuedSendRef.current = null
@@ -186,6 +192,7 @@ export default function useLocalAiWebChatController(
     // 五个条件里任何一个（尤其是官网迟迟不给可信实时快照）迟迟凑不齐时，不能让
     // 输入框永远显示空白；排队消息只在新会话绑定成功后发送，超时则安全还原草稿。
     if (Date.now() - newConversationRecoveryStartedAtMs < NEW_CONVERSATION_RECOVERY_TIMEOUT_MS) return
+    newConversationBaselineId.current = ''
     setNewConversationRecoveryStartedAtMs(0)
     if (queuedSend) {
       restoreQueuedSend(queuedSend)
@@ -372,9 +379,8 @@ export default function useLocalAiWebChatController(
       return visibleSessionState
     }
     if (busyAction) return null
-    if (action === 'new_conversation'
-      && selectLocalAiNewConversationPath(provider.id, visibleSessionState, snapshot) === 'home') {
-      return recoverNewConversation()
+    if (action === 'new_conversation') {
+      return startNewConversation()
     }
     if (action === 'send_prompt') {
       const pending = preparePendingSend(value ?? '')
@@ -387,7 +393,7 @@ export default function useLocalAiWebChatController(
       })
     }
     setBusyAction(action)
-    if (['new_conversation', 'open_conversation', 'open_project'].includes(action)) {
+    if (['open_conversation', 'open_project'].includes(action)) {
       cancelResponseRefresh()
     }
     setMessage('')
@@ -486,36 +492,95 @@ export default function useLocalAiWebChatController(
     }
   }
 
-  async function recoverNewConversation(): Promise<LocalAiWebSessionState | null> {
-    if (!provider || !ownerKey) return null
-    setBusyAction('new_conversation')
+  function beginLocalNewConversation() {
+    const previousDraft = draftRef.current
+    newConversationBaselineId.current = visibleSessionState?.activeConversationId ?? ''
     setNewConversationRecoveryStartedAtMs(Date.now())
     setPendingSends([])
+    setQueuedSend(null)
+    queuedSendRef.current = null
+    queuedSendDispatching.current = false
     cancelResponseRefresh()
     draftRef.current = ''
     setDraft('')
     setDraftTouched(false)
-    setMessage(`已在本机进入 ${provider.displayName} 新会话；官网正在后台同步。`)
+    setMessage(`已在本机进入 ${provider?.displayName ?? '网页 AI'} 新会话；官网正在后台同步。`)
+    return previousDraft
+  }
+
+  async function startNewConversation(): Promise<LocalAiWebSessionState | null> {
+    if (!provider || !ownerKey) return null
+    const path = selectLocalAiNewConversationPath(provider.id, visibleSessionState, snapshot)
+    const previousDraft = beginLocalNewConversation()
+    setBusyAction('new_conversation')
     try {
-      const next = await controlLocalAiWebSession(provider.id, ownerKey, 'home')
-      setSessionState(next)
-      setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，提前发送的消息会在绑定确认后自动提交。`)
-      return next
-    } catch (error) {
-      setNewConversationRecoveryStartedAtMs(0)
-      const queued = queuedSendRef.current
-      if (queued) {
-        restoreQueuedSend(queued)
-        queuedSendRef.current = null
-        setQueuedSend(null)
+      if (path === 'adapter') {
+        try {
+          const requestId = await runLocalAiWebAdapterCommand(
+            provider.id,
+            ownerKey,
+            'new_conversation',
+          )
+          const next = await waitForLocalAiAdapterResult(
+            provider.id,
+            ownerKey,
+            'new_conversation',
+            requestId,
+          )
+          if (next) {
+            setSessionState(next)
+            const result = next.commandResult
+            if (result?.action !== 'new_conversation' || result.ok) {
+              setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，官网上下文正在后台确认。`)
+              return next
+            }
+          }
+        } catch {
+          // 活跃适配器偶发失效时复用同一个本地新会话边界，静默切到首页恢复。
+        }
+        return openNewConversationHome(previousDraft, '官网新会话动作未能确认，已在后台自动恢复。')
       }
-      setMessage(queued
-        ? `${localAiBrowserErrorMessage(error)} 消息没有误发，草稿已保留。`
-        : localAiBrowserErrorMessage(error))
-      return null
+      return openNewConversationHome(previousDraft)
     } finally {
       setBusyAction('')
     }
+  }
+
+  async function openNewConversationHome(
+    previousDraft: string,
+    recoveryMessage = '',
+  ): Promise<LocalAiWebSessionState | null> {
+    if (!provider || !ownerKey) return null
+    try {
+      const next = await controlLocalAiWebSession(provider.id, ownerKey, 'home')
+      setSessionState(next)
+      setMessage([
+        recoveryMessage,
+        `已进入 ${provider.displayName} 新会话；可以立即输入，提前发送的消息会在绑定确认后自动提交。`,
+      ].filter(Boolean).join(' '))
+      return next
+    } catch (error) {
+      failLocalNewConversation(previousDraft, error)
+      return null
+    }
+  }
+
+  function failLocalNewConversation(previousDraft: string, error: unknown) {
+    newConversationBaselineId.current = ''
+    setNewConversationRecoveryStartedAtMs(0)
+    const queued = queuedSendRef.current
+    if (queued) {
+      restoreQueuedSend(queued)
+      queuedSendRef.current = null
+      setQueuedSend(null)
+    } else if (!draftRef.current && previousDraft) {
+      draftRef.current = previousDraft
+      setDraft(previousDraft)
+      setDraftTouched(true)
+    }
+    setMessage(queued
+      ? `${localAiBrowserErrorMessage(error)} 消息没有误发，草稿已保留。`
+      : `${localAiBrowserErrorMessage(error)} 输入框仍可使用，原草稿已保留。`)
   }
 
   function rollbackPendingSend(pending: PendingLocalAiSend | null) {

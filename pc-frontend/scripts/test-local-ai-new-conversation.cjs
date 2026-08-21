@@ -25,6 +25,7 @@ compiled._compile(output, filename)
 
 const {
   googleNewConversationNeedsReload,
+  localAiNewConversationContextReady,
   selectLocalAiNewConversationPath,
 } = compiled.exports
 
@@ -75,10 +76,52 @@ assert.equal(googleNewConversationNeedsReload({
   semanticCacheStatus: 'cached',
 }, liveSnapshot), true)
 assert.equal(googleNewConversationNeedsReload(liveSession, { composerReady: false }), true)
+const bindingSession = {
+  ...liveSession,
+  activeConversationId: 'new-conversation',
+  updatedAtMs: 2_000,
+}
+assert.equal(localAiNewConversationContextReady(
+  bindingSession,
+  { messages: [] },
+  1_000,
+  'old-conversation',
+), true)
+assert.equal(localAiNewConversationContextReady(
+  { ...bindingSession, activeConversationId: 'old-conversation' },
+  { messages: [] },
+  1_000,
+  'old-conversation',
+), false)
+assert.equal(localAiNewConversationContextReady(
+  { ...bindingSession, updatedAtMs: 999 },
+  { messages: [] },
+  1_000,
+  'old-conversation',
+), false)
+assert.equal(localAiNewConversationContextReady(
+  bindingSession,
+  null,
+  1_000,
+  'old-conversation',
+), false)
 assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
 assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
 assert.match(controllerSource, /googleNewConversationNeedsReload\(current, currentSnapshot\)/)
 assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, 'reload'\)/)
+assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return startNewConversation\(\)/)
+assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
+assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)
+assert.match(controllerSource, /newConversationBaselineId\.current = visibleSessionState\?\.activeConversationId \?\? ''/)
+assert.match(controllerSource, /localAiNewConversationContextReady\(/)
+assert.match(controllerSource, /const path = selectLocalAiNewConversationPath\(/)
+assert.match(controllerSource, /if \(path === 'adapter'\)/)
+assert.match(controllerSource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)
+assert.match(controllerSource, /return openNewConversationHome\(/)
+assert.doesNotMatch(
+  controllerSource,
+  /action === 'new_conversation'[\s\S]{0,160}selectLocalAiNewConversationPath[\s\S]{0,80}recoverNewConversation/,
+)
 assert.match(controllerSource, /消息已保存在本机新会话队列/)
 assert.match(controllerSource, /dispatchPreparedPrompt\(queuedSend\)/)
 assert.match(controllerSource, /restoreQueuedSend\(queuedSend\)/)

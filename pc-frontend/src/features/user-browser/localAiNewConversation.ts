@@ -36,3 +36,28 @@ export function googleNewConversationNeedsReload(
     || session.contextReady !== true
     || snapshot?.composerReady !== true
 }
+
+export function localAiNewConversationContextReady(
+  session: Pick<
+    LocalAiWebSessionState,
+    | 'rendererStatus'
+    | 'semanticCacheStatus'
+    | 'contextReady'
+    | 'activeConversationId'
+    | 'updatedAtMs'
+  > | null,
+  snapshot: Pick<LocalAiMessageSnapshot, 'messages'> | null,
+  startedAtMs: number,
+  baselineConversationId: string,
+): boolean {
+  return Boolean(
+    startedAtMs
+    && session?.rendererStatus === 'active'
+    && session.semanticCacheStatus === 'live'
+    && session.contextReady === true
+    && session.updatedAtMs >= startedAtMs
+    && session.activeConversationId
+    && session.activeConversationId !== baselineConversationId
+    && snapshot,
+  )
+}
