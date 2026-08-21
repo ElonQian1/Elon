@@ -21,6 +21,8 @@ identity、legacy owner helper与checked-at映射。
 
 ```text
 market_profile_schema_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
+initial_profile_approval_evidence=unselected
 initial_profile_inventory=unselected
 current_profile_authority=unconstructible
 implementation=unwired/uncompiled/unrun
@@ -79,7 +81,9 @@ Runner 可达。
 | historical exact item | 只准pure audit，不恢复current authority。 |
 | successor | V1拒绝；不得静默替换相同revision/digest或删除历史item。 |
 
-第一项 enabled inventory 只有在 exact JSON/digest、产品审批和完整纵切实现同批后才能加入；仅提交一个 profile file、
+第一项 enabled inventory 只有在 exact JSON/digest、按
+[approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)产生的真实四眼证据和完整纵切实现同批后
+才能加入；仅提交一个 profile file、
 只实现validator或只把empty改成nonempty都不得晋级。
 
 ## 5. Consumer mapping 与 identity ABI
@@ -105,7 +109,7 @@ legacy digest与单一时钟已由projection identity ABI冻结设计，但仍�
 - owner module、planned symbols、private fields、deny-unknown DTO与non-Clone/non-Serde authority；
 - canonical constants/domain、empty-digest projection与pure historical validator；
 - compiled inventory exact-one selection、revocation set与typed Provider/V249 constructor；
-- checked-in first profile review-material digest、typed approval evidence及填入source digest后的final JSON/digest；
+- checked-in first profile review-material digest、purpose-specific approval evidence及填入source digest后的final JSON/digest；
 - source contract 反向禁止 raw profile/capacity/price/ceiling/bool；
 - legacy Pool resource-profile、SKU、v171 snapshot digest继续由各owner既有serde/helper验证，禁止改用本页JCS domain；
 - 按已冻结projection identity ABI实现resource scope、Pool/bucket/meter/window、Offer/publication、snapshot/quote/source的
@@ -129,6 +133,8 @@ worker `eligible_rows=0`。静态文档检查不计入实现 `passed/failed`。
 ```text
 vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
+initial_profile_approval_evidence=unselected
 initial_profile_inventory=unselected
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen

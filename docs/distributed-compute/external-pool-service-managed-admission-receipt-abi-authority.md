@@ -21,6 +21,8 @@ verification_status: design_review_only
 ```text
 admission_receipt_canonical_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
+initial_profile_approval_evidence=unselected
 market_projection_identity_abi=design_frozen
 gateway_builder/fence/task_session/validator_internal_abi=design_frozen
 external_adapter_semantic_wire_profile=unselected
@@ -33,7 +35,8 @@ passed=0
 failed=0
 ```
 
-Profile schema 由 [market profile authority](external-pool-service-managed-market-profile-authority.md) 维护；完整事务、Gateway、
+Profile schema 与审批证据分别由 [market profile authority](external-pool-service-managed-market-profile-authority.md) 和
+[approval evidence authority](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)维护；完整事务、Gateway、
 task session 与恢复见 [V280 父权威](external-pool-service-managed-admission-runner-authority.md)。本页的验收见
 [admission receipt ABI acceptance](external-pool-service-managed-admission-receipt-abi-acceptance.md)；receipt引用的legacy
 projection identity由 [market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)维护。

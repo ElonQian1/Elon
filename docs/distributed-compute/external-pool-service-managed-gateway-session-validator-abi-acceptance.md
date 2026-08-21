@@ -19,7 +19,7 @@ compile/test/migration/SQLite/child/runtime/network/Runner通过数。本批静�
 - migration最大值V279，V280 table/UDF/trigger/source为0；
 - Gateway final builder、production fence、8-root production child/session、5 concrete validator impl与worker caller为0；
 - V254 #13-#18打开数0，Provider仍不能由本文变成eligible；
-- initial market inventory与external semantic wire profile均`unselected`；
+- market-profile approval evidence ABI已design-frozen，但initial evidence、market inventory与external semantic wire profile均`unselected`；
 - `implementation_unwired/uncompiled/unrun`，`passed=0/failed=0`。
 
 ## 2. Fence canonical matrix
@@ -106,6 +106,10 @@ Runner caller都必须为0。
 
 若未来选择JSON，动态/静态负例必须覆盖duplicate/unknown/missing/trailing/whitespace、非I-JSON、float、unsafe integer、null漂移与
 parse→JCS bytes不等；若upstream response为opaque bytes，则只允许len/SHA进入canonical observation，禁止把raw bytes落库或交Store。
+还必须证明exact V249 release+implementation+operation在fresh first-send只选择一个current approved profile，durable send后只重建
+同一retained historical profile，并在application write前由one-shot authorizer审计profile/operation/exchange binding与actual bytes。
+0/多项、历史item删除/改写、latest fallback、同release语义轮换、response-only validation，或durable send后把authorizer失败误记
+local-never-sent均失败关闭。
 
 ## 7. Ownership、caller 与状态晋级
 

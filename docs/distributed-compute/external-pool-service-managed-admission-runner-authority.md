@@ -24,6 +24,8 @@ V254 #13-#18 继续 absolute deny；V278 worker 继续 default-off，Provider=`r
 ```text
 vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
+initial_profile_approval_evidence=unselected
 initial_profile_inventory=unselected
 admission_receipt_semantic_contract=design_frozen
 admission_receipt_canonical_abi=design_frozen
@@ -74,8 +76,9 @@ Profile 的 exact schema、JCS/SHA-256、字段集合、结构性约束、alloca
 [acceptance](external-pool-service-managed-market-profile-acceptance.md)唯一维护。父纵切只消费 sealed typed profile
 authority，不重复定义 canonical keys/domain。
 
-当前 `initial_profile_inventory=unselected`：仓库没有可合法升格的价格、容量、SKU/runtime、ceiling 或时限载荷，
-因此 current profile authority 正向不可构造。只有 byte-exact profile JSON/digest、产品/经济/安全审批和完整纵切源码
+当前 `initial_profile_approval_evidence/initial_profile_inventory=unselected`：仓库没有真实审批实例，也没有可合法升格的价格、容量、
+SKU/runtime、ceiling 或时限载荷，因此 current profile authority 正向不可构造。只有 byte-exact profile JSON/digest、
+purpose-specific 四眼审批证据和完整纵切源码
 同批落盘后才能加入第一项 enabled inventory；Profile 本身不直接铸造任何市场、执行或经济对象。
 
 ## 5. Immutable admission receipt
@@ -403,7 +406,8 @@ owner串行收口；worker ownership同时包含`external_pool_adapter_task_work
 包含`external_pool_adapter_broker_tls.rs`。每个 leaf ≤430 行；入口只做
 声明、re-export或编排。
 
-推荐实现顺序是profile子权威首项payload审批→按已冻结profile/admission/projection ABI实现policy/admission Domain/DDL/Store→
+推荐实现顺序是按[approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)完成首项
+purpose-specific四眼审批与payload选择→按已冻结profile/admission/projection ABI实现policy/admission Domain/DDL/Store→
 service-managed market transaction→Gateway A/B→task session+
 validator→Runner/ingress/recovery→source-contract→恢复后的 compile/migration/runtime acceptance。前一步未闭合时不得打开下一步
 生产 fence。

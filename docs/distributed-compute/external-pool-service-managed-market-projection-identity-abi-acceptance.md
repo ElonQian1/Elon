@@ -15,10 +15,13 @@ verification_status: design_review_only
 
 本页只验收 [projection identity authority](external-pool-service-managed-market-projection-identity-abi-authority.md) 的设计冻结。
 当前没有V280 Domain/table/UDF/trigger/writer/Gateway/validator/Runner源码，migration registry最高V279，V254 fence零开放，
-初始profile inventory未选择、current profile authority不可构造。因此正式状态只能是：
+初始profile approval evidence与inventory均未选择、current profile authority不可构造。因此正式状态只能是：
 
 ```text
 market_projection_identity_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
+initial_profile_approval_evidence=unselected
+initial_profile_inventory=unselected
 implementation=unwired/uncompiled/unrun
 passed=0
 failed=0
@@ -52,7 +55,8 @@ Wrong prefix/domain、missing/extra key、material顺序/类型漂移、随机UU
 - v171 snapshot。
 
 新domain只可用于authority明确列出的V280-only resource key、Pool/window/bucket/supply/leg/event/publication identity及activation
-request。Publication的service actor与真实approver user必须分离；profile审批未覆盖exact review-material digest、final digest
+request。Publication的service actor与真实approver user必须分离；purpose-specific approval evidence未覆盖exact review-material、
+distinct submitter/approver、source mapping，或final digest
 与approval digest形成环、缺少真实`approved_by_user_id`或把Provider owner/service actor硬塞进user字段都失败关闭。
 
 Tx-B `fence_digest`不属于本ABI，已由Gateway/session/validator内部ABI冻结为Plan+seal派生值。Fixture fence、random digest、
@@ -104,7 +108,7 @@ private `_on`没有standalone facade、HTTP/MCP/fixture/seed/admin caller。
 
 以下条件缺一不得登记物理migration、打开fence或声明source-written：
 
-1. 首个profile payload及其真实审批用户完成产品/经济/安全批准；
+1. 首个profile payload及其purpose-specific四眼evidence完成产品/经济/安全批准；
 2. authority中所有prefix/domain/material、legacy helper、time mapping、sealed planned token、full-column readback与immutable-column
    guards有owner-local实现和golden vectors；
 3. admission Domain/77列DDL/UDF/ordered guards/Store read-write与本ABI同批实现；
@@ -118,6 +122,6 @@ private `_on`没有standalone facade、HTTP/MCP/fixture/seed/admin caller。
 只允许执行Markdown frontmatter、authority↔acceptance互链、本地链接、状态入口一致性、line/byte size、`git diff --check`、
 source-zero与migration-max静态检查。不得编译、测试、运行migration、打开SQLite、启动runtime或联网。
 
-完成时各状态入口必须同时写明：profile/admission/projection与Gateway/fence/session/validator内部ABI分轴design-frozen、
-inventory及external semantic wire profile unselected、current profile unconstructible、table/migration/source absent、
+完成时各状态入口必须同时写明：profile/approval-evidence/admission/projection与Gateway/fence/session/validator内部ABI分轴
+design-frozen、initial evidence/inventory及external semantic wire profile unselected、current profile unconstructible、table/migration/source absent、
 implementation unwired/uncompiled/unrun、passed=0/failed=0；不得宣称fully frozen、implemented或production reachable。

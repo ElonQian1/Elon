@@ -23,11 +23,13 @@ validator 或 Runner。
 ```text
 vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
 gateway_builder/fence/task_session/validator_internal_abi=design_frozen
 external_adapter_semantic_wire_profile=unselected
 initial_profile_inventory=unselected
+initial_profile_approval_evidence=unselected
 current_profile_authority=unconstructible
 physical_migration_registration=absent
 migration_registry_max=279
@@ -67,7 +69,9 @@ market_admission_actor_id=external_pool_service_managed_market
 ```
 
 该 service actor只表示机械执行者与 deterministic namespace seed，不得写入 legacy `approved_by_user_id`。Profile
-`review_source`必须显式携带经产品/经济/安全审批的真实 `approved_by_user_id`；publication 只绑定该用户，且审批 evidence
+`review_source`必须显式携带经
+[approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)审计的真实
+`approved_by_user_id`；publication 只绑定该用户，且审批 evidence
 必须覆盖profile ABI定义的exact ID/revision/review-material digest，final profile digest再传递绑定source digest。首个 inventory
 尚未选择，所以当前没有可用approver或正向writer。
 
@@ -316,7 +320,7 @@ market actor常量都不能绕过source guards。
 Planned source owner继续沿父权威分配给capacity registry/ledger/posting/lifecycle、Offer registry/publication、v171 snapshot与
 `store/compute_external_pool_service_managed_admissions`集成模块。Source-written 前还必须：
 
-1. 审批并提交首个byte-exact profile inventory item，包括真实approver user与全部经济/资源载荷；
+1. 按approval evidence ABI审批并提交首个byte-exact profile/evidence pair，包括distinct真实submitter/approver与全部经济/资源载荷；
 2. 实现本页owner helpers、planned `_on` seams、orphan guards、golden vectors与source-contract；
 3. 按已冻结admission ABI实现Domain/DDL/Store/UDF/trigger、full-column readback及Pool/bucket immutable-column guards，并在届时
    next-free migration登记；

@@ -22,7 +22,8 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 - 没有正常 external-pool Offer→Job→Plan→Start→ACK→Lease→Runner 动态证据。
 
 本批只允许记录纵切架构`design_frozen/design_review_only`，并逐轴说明
-`market_profile_schema_abi=design_frozen`、`initial_profile_inventory=unselected`、
+`market_profile_schema_abi=design_frozen`、`market_profile_inventory_approval_evidence_abi=design_frozen`、
+`initial_profile_approval_evidence/initial_profile_inventory=unselected`、
 `admission_receipt_canonical/physical_schema_abi=design_frozen`、`market_projection_identity_abi=design_frozen`、
 `gateway_builder/fence/task_session/validator_internal_abi=design_frozen`、`external_adapter_semantic_wire_profile=unselected`与实现
 `unwired/uncompiled/unrun`。文档链接、source-size或静态零改动扫描
@@ -51,7 +52,8 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 [acceptance](external-pool-service-managed-market-projection-identity-abi-acceptance.md)只冻结legacy market identity/clock映射，
 不使profile或writer可构造。
 
-进入source-written前必须提交byte-exact profile JSON/digest与产品/经济/安全审批，并通过子验收的capacity、price、ceiling、
+进入source-written前必须提交byte-exact profile JSON/digest与
+[purpose-specific四眼approval evidence](external-pool-service-managed-market-profile-approval-evidence-abi-acceptance.md)，并通过子验收的capacity、price、ceiling、
 workload、transport、deadline、issuer与负向source矩阵。缺任一项时migration、fence replacement、Gateway和Runner都必须停止，
 不能以fixture、默认零值、最小值或无限上限继续。
 
@@ -227,7 +229,8 @@ semantic substitution与所有V254 fence负例。仅source-contract、fixture或
 
 - 父authority/acceptance完成：只证明`vertical_slice_architecture=design_frozen`；
 - profile子权威完成：只证明`market_profile_schema_abi=design_frozen`，初始inventory仍可保持unselected；
-- 首个profile payload或external Adapter semantic wire profile未选择时不得进入source-written；production fence与Gateway/session/
+- approval evidence子权威完成：只证明evidence ABI可实施；真实evidence与首个profile仍可保持unselected；
+- 首个profile approval/payload或external Adapter semantic wire profile未选择时不得进入source-written；production fence与Gateway/session/
   validator内部ABI虽已冻结，但没有五类wire profile与实现仍不可达；
 - Domain/DDL/Store/Gateway/validator/Runner全部落盘且静态合同通过：可记`source_written/source_review_only`；
 - compile+fresh/repeat/reopen migration通过：才可记`implementation_compiled`或对应局部验证；

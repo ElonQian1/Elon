@@ -22,6 +22,8 @@ production profile 的价格、容量、SKU、runtime 或时限载荷，也不�
 ```text
 vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
+market_profile_inventory_approval_evidence_abi=design_frozen
+initial_profile_approval_evidence=unselected
 initial_profile_inventory=unselected
 current_profile_authority=unconstructible
 admission_receipt_physical_schema_abi=design_frozen
@@ -100,8 +102,8 @@ profile
 
 审批链必须无环。先以完整7/17-key envelope为投影，保留所有key，只把top-level `profile_digest`和nested
 `review_source.source_digest`同时置为空串，使用`PROFILE_REVIEW_MATERIAL_DOMAIN`计算非持久化
-`profile_review_material_digest`。Typed approval evidence必须绑定exact
-`{profile_id,profile_revision,profile_review_material_digest,approved_by_user_id,approved_at}`；其owner digest再填入
+`profile_review_material_digest`。[Typed approval evidence](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)
+必须绑定exact review-material、distinct submitter/approver与时间；其owner digest再填入
 `review_source.source_digest`，最后才按上一段计算final `profile_digest`。禁止让approval evidence绑定final digest后又把自身digest
 放回final preimage，也禁止删除任一blank key或把material/evidence/final三种digest互换。
 
@@ -233,8 +235,9 @@ Enabled profile的current constructor还必须重证typed Provider capabilities�
 全部allowed data classes。`offer_policy.policy_revision`为正safe integer；`public=true`时account/project arrays必须空，
 `public=false`时两者至少一项非空，不能生成既不公开也无人可用的Offer。
 
-`review_source.approved_by_user_id`必须是对exact profile ID/revision/review-material完成产品、经济与安全审批的真实authenticated user，
-并由compiled catalog的typed review source audit；final profile digest通过填入的source digest传递绑定该evidence。该user不得等于
+`review_source.approved_by_user_id`必须是按[approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)
+对exact profile ID/revision/review-material完成产品、经济与安全审批的真实authenticated user，并由compiled catalog的typed review
+source audit；final profile digest通过填入的source digest传递绑定该evidence。该user不得等于
 market service actor，也不得从Provider owner或caller猜出。
 `review_source.approved_at<=profile.valid_from<=current constructor checked_at`。该字段进入profile digest，并由projection ABI逐字投影到legacy
 publication `approved_by_user_id`；publication时间仍是本次checked-at，不是历史approved-at。
@@ -354,13 +357,14 @@ Catalog owner 固定为计划中的
 `compute_federation/external_pool_service_managed_admission/policy.rs`。未来必须提供 private-field、non-Clone、non-Serde
 `CurrentExternalPoolServiceManagedMarketProfileAuthority`，只从编译进 server 的 immutable inventory、typed Provider/V249
 binding 与 server `checked_at` 构造。选择规则是 exact 一项 enabled、未 revoked，且
-`valid_from<=checked_at<new_plan_accept_until<=expires_at`；constructor还必须重算review-material并逐字审计typed approval
-evidence的source identity/digest/approver/time。0或多项或approval漂移均失败关闭。
+`valid_from<=checked_at<new_plan_accept_until<=expires_at`；constructor还必须重算review-material并逐字审计purpose-specific approval
+evidence的source identity/digest/distinct actors/time。0或多项或approval漂移均失败关闭。
 
 计划 inventory 在本阶段逻辑上为空且尚无源码，revocation set亦为空，因此 current authority 正向不可构造。添加第一项
 enabled profile 必须：
 
-1. 由产品/经济/安全 owner 对exact review-material digest审批全部未选择载荷，并提交typed approval evidence；
+1. 按[approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)由distinct authenticated
+   submitter/approver对exact review-material审批全部未选择载荷，并提交purpose-specific evidence；
 2. 填入该evidence source digest后提交byte-exact RFC8785-JCS profile JSON与final digest；
 3. 更新本权威和 acceptance 的 payload 指纹；
 4. 保留历史 item，且 V1 不允许 successor 或运行时可变配置；
