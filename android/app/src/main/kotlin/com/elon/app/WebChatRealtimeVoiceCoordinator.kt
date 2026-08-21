@@ -9,7 +9,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val sessionReady: () -> Boolean,
     private val beginWebBacking: () -> Boolean,
-    private val endWebBacking: () -> Unit,
+    private val endWebBacking: (Boolean) -> Unit,
     private val requestSessionRecovery: () -> Unit,
     private val openOfficialFallback: () -> Unit,
     private val schedule: (Runnable, Long) -> Unit,
@@ -20,6 +20,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var prepareRequestId: String? = null
     private var preparedGeneration: Int? = null
     private var commandRequestId: String? = null
+    private var closePending = false
 
     fun start(candidate: WebChatProviderIdentity): Boolean {
         if (
@@ -50,18 +51,35 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     fun close() {
+        if (closePending) return
+        val port = consumerPort()
+        val endControl = WebChatRealtimeVoiceEndPolicy.resolve(port?.state()?.controls.orEmpty())
+        if (endControl != null) {
+            val result = port?.invokeControl(endControl.id, userConfirmed = true)
+            if (result?.accepted == true) {
+                closePending = true
+                surface.render(WebChatRealtimeVoiceStage.STARTING, "正在结束语音并返回对话")
+                schedule(Runnable { finishClose(gracefulExit = true) }, END_VOICE_SETTLE_MS)
+                return
+            }
+        }
+        finishClose(gracefulExit = false)
+    }
+
+    private fun finishClose(gracefulExit: Boolean) {
         generation += 1
+        closePending = false
         provider = null
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
         backControl.setEnabled(false)
         surface.hide()
-        endWebBacking()
+        endWebBacking(gracefulExit)
     }
 
     fun destroy() {
-        close()
+        finishClose(gracefulExit = false)
         backControl.dispose()
     }
 
@@ -237,7 +255,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
-        endWebBacking()
+        endWebBacking(false)
         surface.render(WebChatRealtimeVoiceStage.FAILED, detail)
     }
 
@@ -255,6 +273,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val COMMAND_POLL_DELAY_MS = 250L
         const val COMMAND_SETTLE_MS = 1_000L
         const val CONTROL_SETTLE_MS = 400L
+        const val END_VOICE_SETTLE_MS = 350L
         val RETRYABLE_ERRORS = setOf(
             "bridge_not_ready",
             "adapter_generation_not_ready",
@@ -276,7 +295,7 @@ internal fun createWebChatRealtimeVoiceCoordinator(
     consumerPort: () -> WebChatConsumerPort?,
     sessionReady: () -> Boolean,
     beginWebBacking: () -> Boolean,
-    endWebBacking: () -> Unit,
+    endWebBacking: (Boolean) -> Unit,
     requestSessionRecovery: () -> Unit,
     openOfficialFallback: () -> Unit,
 ): WebChatRealtimeVoiceCoordinator {

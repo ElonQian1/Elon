@@ -60,6 +60,27 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertEquals(0, fixture.beginBackingCount)
     }
 
+    @Test
+    fun closesOfficialVoiceBeforeRevealingThePreservedNativeConversation() {
+        val fixture = Fixture()
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runNext()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+
+        assertTrue(fixture.surface.visible)
+        assertEquals("control_voice_end", fixture.port.invokedControlId)
+        fixture.scheduler.runNext()
+        assertFalse(fixture.surface.visible)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
     private class Fixture(sessionReady: Boolean = true) {
         val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
         val surface = FakeSurface()
@@ -67,7 +88,8 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val port = FakePort()
         val back = FakeBackControl()
         var beginBackingCount = 0
-        var endBackingCount = 0
+        val endBackingGraceful = mutableListOf<Boolean>()
+        val endBackingCount: Int get() = endBackingGraceful.size
         var officialFallbackCount = 0
         val coordinator = WebChatRealtimeVoiceCoordinator(
             surface = surface,
@@ -75,7 +97,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
             consumerPort = { port },
             sessionReady = { sessionReady },
             beginWebBacking = { beginBackingCount += 1; true },
-            endWebBacking = { endBackingCount += 1 },
+            endWebBacking = { graceful -> endBackingGraceful += graceful },
             requestSessionRecovery = {},
             openOfficialFallback = { officialFallbackCount += 1 },
             schedule = scheduler::schedule,
@@ -87,6 +109,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var visible = false
         var stage: WebChatRealtimeVoiceStage? = null
         private var fallback: () -> Unit = {}
+        private var close: () -> Unit = {}
 
         override fun show(
             onClose: () -> Unit,
@@ -94,6 +117,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
             onOfficialFallback: () -> Unit,
         ) {
             visible = true
+            close = onClose
             fallback = onOfficialFallback
         }
 
@@ -108,12 +132,15 @@ class WebChatRealtimeVoiceCoordinatorTest {
         override fun isVisible(): Boolean = visible
 
         fun openOfficialFallback() = fallback()
+        fun closeVoice() = close()
     }
 
     private class FakePort : WebChatConsumerPort {
         var executeCount = 0
         var prepareStatus = WebChatConsumerCommandStatus.PENDING
         var voiceStatus = WebChatConsumerCommandStatus.PENDING
+        var endControlAvailable = false
+        var invokedControlId: String? = null
 
         override fun state() = WebChatConsumerState(
             streaming = false,
@@ -122,7 +149,14 @@ class WebChatRealtimeVoiceCoordinatorTest {
             pageKind = "conversation",
             pageUrl = "https://chatgpt.com/c/test",
             features = emptyList(),
-            controls = if (prepareStatus == WebChatConsumerCommandStatus.SUCCEEDED) {
+            controls = if (endControlAvailable) {
+                listOf(WebChatConsumerControlDescriptor(
+                    control = VoiceEndControl,
+                    requiresUserConfirmation = true,
+                    presentation = WebChatConsumerControlPresentation.DIRECT,
+                    nativeSelector = WebChatProductionSelectors.REALTIME_VOICE_CLOSE,
+                ))
+            } else if (prepareStatus == WebChatConsumerCommandStatus.SUCCEEDED) {
                 listOf(WebChatConsumerControlDescriptor(
                     control = VoiceControl,
                     requiresUserConfirmation = false,
@@ -144,7 +178,10 @@ class WebChatRealtimeVoiceCoordinatorTest {
         override fun requestFeatures() = rejected()
         override fun selectFeature(featureId: String, userConfirmed: Boolean) = rejected()
         override fun requestControls() = accepted()
-        override fun invokeControl(controlId: String, userConfirmed: Boolean) = rejected()
+        override fun invokeControl(controlId: String, userConfirmed: Boolean): WebChatConsumerCommandResult {
+            invokedControlId = controlId
+            return if (controlId == VoiceEndControl.id && userConfirmed) accepted() else rejected()
+        }
         override fun updateControl(controlId: String, mutation: WebChatConsumerControlMutation) = rejected()
 
         override fun executeSessionCommand(action: String): WebChatConsumerCommandResult {
@@ -182,6 +219,12 @@ class WebChatRealtimeVoiceCoordinatorTest {
         override val inViewport = true
         override val webXRatio: Double? = 0.5
         override val webYRatio: Double? = 0.5
+    }
+
+    private object VoiceEndControl : WebChatConsumerControl by VoiceControl {
+        override val id = "control_voice_end"
+        override val semantic = "close"
+        override val label = "结束语音"
     }
 
     private class Scheduler {

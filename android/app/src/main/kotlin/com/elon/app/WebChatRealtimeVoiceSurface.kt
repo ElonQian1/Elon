@@ -117,7 +117,7 @@ internal class WebChatRealtimeVoiceOverlay(
 
     override fun render(stage: WebChatRealtimeVoiceStage, detail: String) {
         status.text = when (stage) {
-            WebChatRealtimeVoiceStage.PREPARING -> "正在连接 ChatGPT"
+            WebChatRealtimeVoiceStage.PREPARING -> "正在连接语音 AI"
             WebChatRealtimeVoiceStage.STARTING -> "正在启动实时语音"
             WebChatRealtimeVoiceStage.ACTIVE -> "实时语音已打开"
             WebChatRealtimeVoiceStage.FAILED -> "实时语音未能启动"
@@ -147,8 +147,9 @@ internal class WebChatRealtimeVoiceOverlay(
         }
         column.addView(
             textView(16f, Color.parseColor("#E8ECF4"), bold = true).apply {
-                text = "ChatGPT 网页 AI"
+                text = "语音 AI"
                 gravity = Gravity.CENTER
+                maxLines = 1
             },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)),
         )

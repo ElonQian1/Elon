@@ -9,6 +9,8 @@ internal class ChatGptRealtimeVoiceBackingController(
     private val webView: () -> WebView?,
     private val surfaceMode: ChatGptWebSurfaceModeController,
     private val requestExecution: () -> Unit,
+    private val schedule: (Runnable, Long) -> Unit,
+    private val conversationRecovered: () -> Boolean,
 ) {
     private var active = false
 
@@ -28,17 +30,25 @@ internal class ChatGptRealtimeVoiceBackingController(
         if (active) webView()?.beginWebChatBackgroundInteraction()
     }
 
-    fun end() {
+    fun end(gracefulExit: Boolean) {
         if (!active) return
         active = false
         val view = webView() ?: return
         view.showWebChatBackgroundSurface()
-        view.stopLoading()
-        view.reload()
+        if (!gracefulExit) view.reload()
         requestExecution()
+        if (gracefulExit) schedule(Runnable {
+            if (active || conversationRecovered()) return@Runnable
+            webView()?.reload()
+            requestExecution()
+        }, RECOVERY_TIMEOUT_MS)
     }
 
     fun release() {
         active = false
+    }
+
+    private companion object {
+        const val RECOVERY_TIMEOUT_MS = 2_500L
     }
 }

@@ -111,6 +111,8 @@ internal class ChatGptBackgroundSession(
         lazy(LazyThreadSafetyMode.NONE) {
             ChatGptRealtimeVoiceBackingController(
                 ::ensureInitialized, { webView }, surfaceMode, { webExecution.interactionRequested() },
+                { task, delay -> recoveryHandler.postDelayed(task, delay) },
+                { latestSnapshot?.pageKind == "conversation" && latestSnapshot?.composerReady == true },
             )
         }
     private val webExecution: ChatGptBackgroundExecutionController =
@@ -343,7 +345,7 @@ internal class ChatGptBackgroundSession(
         )
 
     fun beginRealtimeVoiceBacking(): Boolean = realtimeVoiceBacking.begin()
-    fun endRealtimeVoiceBacking() {
+    fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
         if (!realtimeVoiceBacking.isActive()) return
         if (latestSnapshot?.capabilities?.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) == true) {
             conversationCollection = conversationCollection.copy(
@@ -353,7 +355,7 @@ internal class ChatGptBackgroundSession(
             forceConversationRefreshAfterVoice = true
             onConversationIndexChanged(conversationIndex())
         }
-        realtimeVoiceBacking.end()
+        realtimeVoiceBacking.end(gracefulExit)
     }
 
     fun destroy() {

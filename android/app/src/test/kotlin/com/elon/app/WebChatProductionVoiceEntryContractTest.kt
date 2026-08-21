@@ -88,6 +88,27 @@ class WebChatProductionVoiceEntryContractTest {
         assertNull(google.realtimeVoice)
     }
 
+    @Test
+    fun nativeRealtimeVoiceUsesAStableTitleAndPreservesConversationDuringExit() {
+        val surface = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceSurface.kt",
+        )
+        val backing = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/" +
+                "ChatGptRealtimeVoiceBackingController.kt",
+        )
+        val controller = read(
+            "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
+        )
+
+        assertTrue(surface.contains("text = \"语音 AI\""))
+        assertFalse(surface.contains("text = \"ChatGPT 网页 AI\""))
+        assertTrue(backing.contains("if (!gracefulExit) view.reload()"))
+        assertFalse(backing.contains("view.stopLoading()"))
+        assertTrue(controller.contains("backingActive = realtimeVoiceBackingStarted"))
+        assertFalse(controller.contains("renderStatusMessage(\"正在同步语音会话…\")"))
+    }
+
     private fun read(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 

@@ -277,15 +277,12 @@ internal class ChatGptSocialChatController(
         return true
     }
 
-    override fun endRealtimeVoiceBacking() {
+    override fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
         if (realtimeVoiceBackingStarted) {
             realtimeVoiceBackingStarted = false
             realtimeVoiceExitRecoveryActive = true
-            if (!realtimeVoiceHadTranscript) {
-                renderStatusMessage("正在同步语音会话…")
-            }
         }
-        session.endRealtimeVoiceBacking()
+        session.endRealtimeVoiceBacking(gracefulExit)
     }
 
     override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
@@ -399,6 +396,7 @@ internal class ChatGptSocialChatController(
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
         if (WebChatRealtimeVoiceExitPresentationPolicy.shouldHoldCurrentTranscript(
+                backingActive = realtimeVoiceBackingStarted,
                 recoveryActive = realtimeVoiceExitRecoveryActive,
                 originConversationPath = realtimeVoiceOriginPath,
                 hadTranscriptBeforeVoice = realtimeVoiceHadTranscript,

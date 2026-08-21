@@ -9,6 +9,24 @@ import org.junit.Test
 
 class WebChatRealtimeVoiceExitPresentationPolicyTest {
     @Test
+    fun holdsTranscriptWhileVoiceBackingIsActiveEvenWhenMessagesArrive() {
+        assertTrue(
+            WebChatRealtimeVoiceExitPresentationPolicy.shouldHoldCurrentTranscript(
+                backingActive = true,
+                recoveryActive = false,
+                originConversationPath = "/c/origin",
+                hadTranscriptBeforeVoice = true,
+                incoming = snapshot(
+                    url = "https://chatgpt.com/c/origin",
+                    messages = listOf(
+                        ChatGptWebMessage("voice", "assistant", "ok", "completed", emptyList()),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun holdsExistingTranscriptAcrossTransientReloadSnapshot() {
         assertTrue(policy(snapshot(url = "https://chatgpt.com/", messages = emptyList())))
     }
@@ -27,14 +45,15 @@ class WebChatRealtimeVoiceExitPresentationPolicyTest {
     }
 
     @Test
-    fun emptyDifferentConversationCanReplaceThePreviousTranscript() {
-        assertFalse(policy(snapshot(url = "https://chatgpt.com/c/next", messages = emptyList())))
+    fun holdsExistingTranscriptWhenARefreshTemporarilyChangesTheConversationPath() {
+        assertTrue(policy(snapshot(url = "https://chatgpt.com/c/next", messages = emptyList())))
     }
 
     @Test
     fun validEmptyConversationCanReplaceTheSyncPlaceholderWhenVoiceStartedFromHome() {
         assertFalse(
             WebChatRealtimeVoiceExitPresentationPolicy.shouldHoldCurrentTranscript(
+                backingActive = false,
                 recoveryActive = true,
                 originConversationPath = null,
                 hadTranscriptBeforeVoice = false,
@@ -45,6 +64,7 @@ class WebChatRealtimeVoiceExitPresentationPolicyTest {
 
     private fun policy(incoming: ChatGptWebSnapshot) =
         WebChatRealtimeVoiceExitPresentationPolicy.shouldHoldCurrentTranscript(
+            backingActive = false,
             recoveryActive = true,
             originConversationPath = "/c/origin",
             hadTranscriptBeforeVoice = true,

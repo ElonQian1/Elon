@@ -142,9 +142,9 @@ internal class MainSocialAiChatFeature(
             beginWebBacking = {
                 isChatModeActive() && activeController().beginRealtimeVoiceBacking()
             },
-            endWebBacking = {
+            endWebBacking = { gracefulExit ->
                 if (chatGptControllerDelegate.isInitialized()) {
-                    chatGptController.endRealtimeVoiceBacking()
+                    chatGptController.endRealtimeVoiceBacking(gracefulExit)
                 }
             },
             requestSessionRecovery = {
