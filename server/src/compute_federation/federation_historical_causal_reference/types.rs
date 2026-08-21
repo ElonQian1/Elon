@@ -102,6 +102,83 @@ pub(crate) struct AttemptSettlementRef {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct SettlementReleaseRef {
+    pub(crate) settlement_release_id: String,
+    pub(crate) settlement_release_event_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementSourcePostingRef {
+    pub(crate) settlement_posting_id: String,
+    pub(crate) settlement_posting_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementReleasePostingRef {
+    pub(crate) settlement_release_posting_id: String,
+    pub(crate) settlement_release_posting_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementChallengeRef {
+    pub(crate) settlement_challenge_id: String,
+    pub(crate) settlement_challenge_event_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SettlementChallengeResolutionActionV1 {
+    Rejected,
+    Withdrawn,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementChallengeResolutionRef {
+    pub(crate) settlement_challenge_resolution_id: String,
+    pub(crate) settlement_challenge_resolution_event_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementCorrectionRef {
+    pub(crate) settlement_correction_id: String,
+    pub(crate) settlement_correction_event_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementCorrectionPostingRef {
+    pub(crate) settlement_correction_posting_id: String,
+    pub(crate) settlement_correction_posting_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "gate_kind", rename_all = "snake_case", deny_unknown_fields)]
+pub(crate) enum SettlementReleaseGateV1 {
+    NoChallenge {
+        challenge_gate_digest: String,
+    },
+    ResolvedChallenge {
+        challenge_gate_digest: String,
+        resolution_action: SettlementChallengeResolutionActionV1,
+        challenge: SettlementChallengeRef,
+        resolution: SettlementChallengeResolutionRef,
+    },
+    AcceptedCorrected {
+        challenge_gate_digest: String,
+        challenge: SettlementChallengeRef,
+        resolution: SettlementChallengeResolutionRef,
+        correction: SettlementCorrectionRef,
+        correction_posting: SettlementCorrectionPostingRef,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ExecutionSourceLineageV1 {
     pub(crate) execution_receipt: ExecutionReceiptRef,
     pub(crate) provider: ProviderVersionRef,
@@ -128,11 +205,23 @@ pub(crate) struct SettlementSourceLineageV1 {
     pub(crate) terminal_reservation: ReservationVersionRef,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettlementReleaseSourceLineageV1 {
+    pub(crate) attempt_settlement: AttemptSettlementRef,
+    pub(crate) settlement_lineage_digest: String,
+    pub(crate) source_settlement_posting: SettlementSourcePostingRef,
+    pub(crate) release_gate: SettlementReleaseGateV1,
+    pub(crate) settlement_release: SettlementReleaseRef,
+    pub(crate) release_posting: SettlementReleasePostingRef,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum FederationHistoricalLineageKindV1 {
     ExecutionSourceV1,
     SettlementSourceV1,
+    SettlementReleaseSourceV1,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -140,6 +229,7 @@ pub(crate) enum FederationHistoricalLineageKindV1 {
 pub(crate) enum FederationHistoricalLineageV1 {
     ExecutionSource(ExecutionSourceLineageV1),
     SettlementSource(SettlementSourceLineageV1),
+    SettlementReleaseSource(SettlementReleaseSourceLineageV1),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

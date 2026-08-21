@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{compute_attempt_settlement_challenges::ComputeSettlementChallengeGate, Store};
 
+mod historical;
 mod support;
 
 use support::{
@@ -132,5 +133,15 @@ pub(super) fn compute_settlement_release_optional_on(
     support::validate_exact("Attempt Lease ID", lease_id, 200)?;
     release_by_lease_on(conn, lease_id)?
         .map(|stored| stored.into_receipt(conn, false))
+        .transpose()
+}
+
+pub(in crate::store) fn compute_attempt_historical_settlement_release_by_lease_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeSettlementReleaseReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    release_by_lease_on(conn, lease_id)?
+        .map(|stored| stored.into_historical_receipt(conn))
         .transpose()
 }

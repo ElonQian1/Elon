@@ -5,12 +5,17 @@ import {
   type ValidatedFederationHistoricalLineageRead,
   validateFederationHistoricalLineagePair,
 } from '../compute-attempt/federationHistoricalLineageContracts'
+import {
+  type ValidatedSettlementReleaseLineageRead,
+  validateFederationHistoricalLineageTriple,
+} from '../compute-attempt/federationHistoricalReleaseLineageContracts'
 import { federationHistoricalLineageApi } from './federationHistoricalLineageApi'
 import styles from './FederationHistoricalLineageButton.module.css'
 
 interface Props {
   leaseId: string
   scope: FederationHistoricalLineageScope
+  releaseAvailable: boolean
 }
 
 type AuditState =
@@ -21,9 +26,10 @@ type AuditState =
       status: 'success'
       execution: ValidatedFederationHistoricalLineageRead
       settlement: ValidatedFederationHistoricalLineageRead
+      release: ValidatedSettlementReleaseLineageRead | null
     }
 
-export default function FederationHistoricalLineageButton({ leaseId, scope }: Props) {
+export default function FederationHistoricalLineageButton({ leaseId, scope, releaseAvailable }: Props) {
   const [state, setState] = useState<AuditState>({ status: 'idle' })
   const requestGeneration = useRef(0)
   const busy = useRef(false)
@@ -37,7 +43,7 @@ export default function FederationHistoricalLineageButton({ leaseId, scope }: Pr
       requestGeneration.current += 1
       busy.current = false
     }
-  }, [leaseId, scope])
+  }, [leaseId, releaseAvailable, scope])
 
   async function verify() {
     if (busy.current) return
@@ -45,13 +51,17 @@ export default function FederationHistoricalLineageButton({ leaseId, scope }: Pr
     const generation = ++requestGeneration.current
     setState({ status: 'loading' })
     try {
-      const [execution, settlement] = await Promise.all([
+      const [execution, settlement, release] = await Promise.all([
         federationHistoricalLineageApi.readExecution(scope, leaseId),
         federationHistoricalLineageApi.readSettlement(scope, leaseId),
+        releaseAvailable
+          ? federationHistoricalLineageApi.readRelease(scope, leaseId)
+          : Promise.resolve(null),
       ])
-      validateFederationHistoricalLineagePair(execution, settlement)
+      if (release) validateFederationHistoricalLineageTriple(execution, settlement, release)
+      else validateFederationHistoricalLineagePair(execution, settlement)
       if (generation !== requestGeneration.current) return
-      setState({ status: 'success', execution, settlement })
+      setState({ status: 'success', execution, settlement, release })
     } catch (reason) {
       if (generation !== requestGeneration.current) return
       setState({ status: 'error', message: messageOf(reason) })
@@ -81,18 +91,45 @@ export default function FederationHistoricalLineageButton({ leaseId, scope }: Pr
         {loading ? '并行核验因果链' : failed ? '重试因果链核验' : expanded ? '重新核验因果链' : '核验历史因果链'}
       </button>
 
-      {loading && <p className={styles.status} role="status">正在并行读取 execution 与 settlement 只读证据…</p>}
+      {loading && (
+        <p className={styles.status} role="status">
+          {releaseAvailable
+            ? '正在并行读取 execution、settlement 与 release 只读证据…'
+            : '正在并行读取 execution 与 settlement 只读证据…'}
+        </p>
+      )}
       {failed && <p className={styles.error} role="alert"><TriangleAlert size={14} />{state.message}</p>}
       {expanded && (
         <div id={panelId} className={styles.panel} aria-live="polite">
-          <div className={styles.verified}><ShieldCheck size={14} />双响应摘要与跨链等式已核验</div>
+          <div className={styles.verified}>
+            <ShieldCheck size={14} />
+            {state.release ? '三响应摘要与两级跨链等式已核验' : '双响应摘要与跨链等式已核验'}
+          </div>
           <div className={styles.profiles}>
             <LineageEvidence label="Execution source" record={state.execution} />
             <LineageEvidence label="Settlement source" record={state.settlement} />
+            {state.release && <ReleaseLineageEvidence record={state.release} />}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function ReleaseLineageEvidence({ record }: { record: ValidatedSettlementReleaseLineageRead }) {
+  return (
+    <section className={styles.profile}>
+      <div className={styles.profileHeader}>
+        <strong>Settlement release source</strong>
+        <span>{record.response.read_effect}</span>
+      </div>
+      <span className={styles.kind}>{record.response.lineage_kind}</span>
+      <code className={styles.digest}>{record.response.lineage_digest}</code>
+      <details className={styles.details}>
+        <summary>查看 canonical Carrier JSON</summary>
+        <pre>{record.response.canonical_carrier_json}</pre>
+      </details>
+    </section>
   )
 }
 

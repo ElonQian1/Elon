@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 待结算原子释放
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-22
 owners: ai-economy, backend
 implementation_status: implementation_partially_verified
 ---
@@ -14,6 +14,12 @@ v198 的追加式 Store、独立 Service 与 HTTP 路由已写入并随服务端
 
 v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，把该笔 Provider 与平台收益从 `pending` 原子转入 `available`。它保存独立 Release Receipt、Posting 和四条不可变账本腿，不改写 v195 Settlement Receipt、v196 Challenge、v197 Resolution 或 v199 Correction Receipt。
 
+另有严格只读的 `settlement_release_source_v1` 按历史 Lease重建 v195 Carrier并绑定 v198、原/释放 Posting与封存
+challenge gate；它不执行释放、不读取 current余额来授权动作，也不把 available提升为withdrawn或外部付款。该新增
+Domain/Store/Service/HTTP-MCP/PC源码本批未编译或运行，边界见
+[`release Carrier authority`](federation-settlement-release-causal-reference-abi-authority.md) 与
+[`acceptance`](federation-settlement-release-causal-reference-abi-acceptance.md)。
+
 ## 2. HTTP 路由
 
 | 方法 | 路径 | 调用者 | 作用 |
@@ -21,6 +27,8 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 | POST | `/api/admin/compute/attempt-leases/:lease_id/settlement-release` | 平台 `admin/owner` | 显式执行一次 pending 到 available 的释放 |
 | GET | `/api/admin/compute/attempt-leases/:lease_id/settlement-release` | 平台 `admin/owner` | 管理侧读取并重新审计释放回执 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/settlement-release` | 消费者或 Provider 所有者 | 参与方读取并重新审计释放回执 |
+| GET | `/api/me/compute/attempt-leases/:lease_id/settlement-release-source-lineage` | 消费者或 Provider 所有者 | 只读重建释放历史因果 Carrier |
+| GET | `/api/admin/compute/attempt-leases/:lease_id/settlement-release-source-lineage` | 平台 `admin/owner` | 管理侧只读重建同一 Carrier |
 
 写请求必须精确绑定 v195 Settlement Receipt ID、Settlement Event Digest、Posting ID 与 Posting Digest，提供稳定幂等键，并显式确认资金只在内部账本中从 `pending` 转入 `available`。
 

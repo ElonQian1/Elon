@@ -2,13 +2,16 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::Duration;
 use rusqlite::{params, Connection, OptionalExtension};
 
+use super::super::historical::{historical_release_amounts, rebuild_historical_release_gate_on};
 use super::{
     super::{
         super::{
             compute_attempt_settlement_challenges::{
                 settlement_challenge_gate_on, COMPUTE_SETTLEMENT_CHALLENGE_WINDOW_SECONDS,
             },
-            compute_attempt_settlements::compute_attempt_settlement_on,
+            compute_attempt_settlements::{
+                compute_attempt_historical_settlement_by_lease_on, compute_attempt_settlement_on,
+            },
         },
         ComputeSettlementReleaseReceipt, COMPUTE_SETTLEMENT_RELEASE_POLICY_ID,
         COMPUTE_SETTLEMENT_RELEASE_POLICY_VERSION, COMPUTE_SETTLEMENT_RELEASE_SCHEMA,
@@ -22,10 +25,29 @@ pub(super) fn audited_release_on(
     stored: &StoredRelease,
     replayed: bool,
 ) -> Result<ComputeSettlementReleaseReceipt> {
+    audited_release_with_head_policy_on(conn, stored, replayed, true)
+}
+
+pub(super) fn audited_historical_release_on(
+    conn: &Connection,
+    stored: &StoredRelease,
+) -> Result<ComputeSettlementReleaseReceipt> {
+    audited_release_with_head_policy_on(conn, stored, false, false)
+}
+
+fn audited_release_with_head_policy_on(
+    conn: &Connection,
+    stored: &StoredRelease,
+    replayed: bool,
+    require_current_heads: bool,
+) -> Result<ComputeSettlementReleaseReceipt> {
     let request = normalize_release_request(&serde_json::from_str(&stored.request_json)?)?;
     let stored_gate = serde_json::from_str(&stored.challenge_gate_json)?;
     let mut receipt: ComputeSettlementReleaseReceipt = serde_json::from_str(&stored.receipt_json)?;
-    if request.lease_id != stored.lease_id
+    if stored.request_json != serde_json::to_string(&request)?
+        || stored.challenge_gate_json != serde_json::to_string(&receipt.challenge_gate)?
+        || stored.receipt_json != serde_json::to_string(&receipt)?
+        || request.lease_id != stored.lease_id
         || request.expected_settlement_receipt_id != stored.settlement_receipt_id
         || request.expected_settlement_event_digest != stored.settlement_event_digest
         || request.expected_posting_id != stored.source_posting_id
@@ -67,7 +89,12 @@ pub(super) fn audited_release_on(
         bail!("待结算释放挑战门卫或事件摘要审计失败");
     }
 
-    let settlement = compute_attempt_settlement_on(conn, &stored.lease_id)?;
+    let settlement = if require_current_heads {
+        compute_attempt_settlement_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_historical_settlement_by_lease_on(conn, &stored.lease_id)?
+            .ok_or_else(|| anyhow!("待结算历史释放引用的 v195 回执不存在"))?
+    };
     if settlement.settlement.settlement_receipt_id != stored.settlement_receipt_id
         || settlement.event_digest != stored.settlement_event_digest
         || settlement.posting_id != stored.source_posting_id
@@ -91,32 +118,46 @@ pub(super) fn audited_release_on(
     {
         bail!("待结算释放窗口或策略版本审计失败");
     }
-    let current_gate = settlement_challenge_gate_on(conn, &stored.settlement_receipt_id)?;
-    if current_gate != receipt.challenge_gate
-        || current_gate.blocked
-        || current_gate.correction_required
+    let (audited_gate, expected_release_amounts) = if require_current_heads {
+        let gate = settlement_challenge_gate_on(conn, &stored.settlement_receipt_id)?;
+        let amounts = effective_release_amounts_on(conn, &settlement, &gate)?;
+        (gate, amounts)
+    } else {
+        let facts = rebuild_historical_release_gate_on(
+            conn,
+            &stored.lease_id,
+            &stored.settlement_receipt_id,
+            &stored.settlement_event_digest,
+        )?;
+        let amounts = historical_release_amounts(&settlement, &facts)?;
+        (facts.gate, amounts)
+    };
+    if audited_gate != receipt.challenge_gate
+        || audited_gate.blocked
+        || audited_gate.correction_required
     {
         bail!("待结算释放后的消费者挑战门卫状态不一致");
     }
-    let expected_release_amounts = effective_release_amounts_on(conn, &settlement, &current_gate)?;
     if expected_release_amounts.0 != receipt.provider_released_micros
         || expected_release_amounts.1 != receipt.platform_released_micros
     {
         bail!("待结算释放金额未采用原结算或 accepted 挑战纠正后的净额");
     }
     audit_posting(conn, &receipt)?;
-    audit_account_projection(
-        conn,
-        "provider",
-        &receipt.provider_account_id,
-        "provider_pending",
-    )?;
-    audit_account_projection(
-        conn,
-        "platform",
-        money::PLATFORM_ACCOUNT_ID,
-        "platform_pending",
-    )?;
+    if require_current_heads {
+        audit_account_projection(
+            conn,
+            "provider",
+            &receipt.provider_account_id,
+            "provider_pending",
+        )?;
+        audit_account_projection(
+            conn,
+            "platform",
+            money::PLATFORM_ACCOUNT_ID,
+            "platform_pending",
+        )?;
+    }
     if receipt.platform_account_id != money::PLATFORM_ACCOUNT_ID
         || receipt.currency != "CNY"
         || receipt.balance_effect != "provider_and_platform_pending_moved_to_available"

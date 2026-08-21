@@ -6,6 +6,8 @@ const STORE_FACADE: &str =
     include_str!("../../store/compute_federation_historical_causal_reference.rs");
 const EXECUTION_OWNER: &str = include_str!("../../store/compute_attempt_execution_receipts.rs");
 const SETTLEMENT_OWNER: &str = include_str!("../../store/compute_attempt_settlements.rs");
+const SETTLEMENT_RELEASE_OWNER: &str =
+    include_str!("../../store/compute_attempt_settlement_releases.rs");
 const AGGREGATOR: &str = include_str!("../../compute_federation_mcp.rs");
 const MCP_TRANSPORT: &str = include_str!("../../open_commerce_mcp.rs");
 const ROUTER: &str = include_str!("../../router.rs");
@@ -54,12 +56,14 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
     for route in [
         "/api/me/compute/attempt-leases/:lease_id/execution-source-lineage",
         "/api/me/compute/attempt-leases/:lease_id/settlement-source-lineage",
+        "/api/me/compute/attempt-leases/:lease_id/settlement-release-source-lineage",
         "/api/admin/compute/attempt-leases/:lease_id/execution-source-lineage",
         "/api/admin/compute/attempt-leases/:lease_id/settlement-source-lineage",
+        "/api/admin/compute/attempt-leases/:lease_id/settlement-release-source-lineage",
     ] {
         assert!(API.contains(route), "missing GET route {route}");
     }
-    assert_eq!(API.matches(".route(").count(), 4);
+    assert_eq!(API.matches(".route(").count(), 6);
     assert!(API.contains("routing::get"));
     for forbidden in [
         "routing::post",
@@ -78,11 +82,16 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
     for tool in [
         "compute_get_my_execution_source_lineage",
         "compute_get_my_settlement_source_lineage",
+        "compute_get_my_settlement_release_source_lineage",
         "compute_admin_get_execution_source_lineage",
         "compute_admin_get_settlement_source_lineage",
+        "compute_admin_get_settlement_release_source_lineage",
     ] {
         assert_eq!(MCP.matches(tool).count(), 1, "MCP tool ABI drift: {tool}");
     }
+    assert_eq!(MCP.matches("support::tool(").count(), 6);
+    assert_eq!(MCP.matches("GET_MY_SETTLEMENT_RELEASE").count(), 3);
+    assert_eq!(MCP.matches("ADMIN_GET_SETTLEMENT_RELEASE").count(), 3);
     let schema = MCP
         .split("fn lease_schema()")
         .nth(1)
@@ -94,6 +103,15 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
         assert!(!schema.contains(forbidden), "MCP input exposes {forbidden}");
     }
     assert!(MCP.contains("Some(project_id)"));
+    let participant_release_call =
+        between(MCP, "GET_MY_SETTLEMENT_RELEASE =>", "_ => return Ok(None)");
+    assert!(participant_release_call.contains("Some(project_id)"));
+    let admin_release_call = between(
+        MCP,
+        "ADMIN_GET_SETTLEMENT_RELEASE =>",
+        "_ => return Ok(None)",
+    );
+    assert!(admin_release_call.contains("ensure_platform_admin(platform_role)?"));
     assert!(SERVICE.contains("lineage.belongs_to_project(project_id)"));
     assert!(MCP_TRANSPORT.contains("project_access(state, &user.id, project_id)"));
     assert!(MCP_TRANSPORT.contains("definitions_for_platform_role(&caller.platform_role)"));
@@ -110,6 +128,9 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
 fn adoption_is_historical_read_only_typed_and_redacted() {
     assert!(SERVICE.contains("resolve_compute_execution_source_lineage_for_lease"));
     assert!(SERVICE.contains("resolve_compute_settlement_source_lineage_for_lease"));
+    assert!(SERVICE.contains("resolve_compute_settlement_release_source_lineage_for_lease"));
+    assert!(SERVICE.contains("FederationHistoricalLineageKindV1::SettlementReleaseSourceV1"));
+    assert!(STORE_FACADE.contains("resolve_compute_settlement_release_source_lineage_for_lease"));
     assert!(SERVICE.contains("FederationHistoricalLineageReadError::NotVisible"));
     assert!(SERVICE.contains("FederationHistoricalLineageReadError::IntegrityConflict"));
     for code in [
@@ -134,10 +155,44 @@ fn adoption_is_historical_read_only_typed_and_redacted() {
     assert!(
         STORE_FACADE.contains("compute_attempt_historical_settlement_by_lease_on(&tx, lease_id)")
     );
+    assert!(STORE_FACADE
+        .contains("compute_attempt_historical_settlement_release_by_lease_on(&tx, lease_id)"));
     assert!(
         EXECUTION_OWNER.contains("fn compute_attempt_historical_execution_receipt_by_lease_on(")
     );
     assert!(SETTLEMENT_OWNER.contains("fn compute_attempt_historical_settlement_by_lease_on("));
+    assert!(SETTLEMENT_RELEASE_OWNER
+        .contains("fn compute_attempt_historical_settlement_release_by_lease_on("));
+    assert!(!STORE_FACADE.contains("compute_settlement_release_on("));
+    assert!(!STORE_FACADE.contains("compute_settlement_release_optional_on("));
+
+    let participant_release = between(
+        SERVICE,
+        "pub(super) fn read_settlement_release_for_participant(",
+        "pub(super) fn read_execution_for_admin(",
+    );
+    assert_eq!(
+        participant_release
+            .matches("FederationHistoricalLineageReadError::NotVisible")
+            .count(),
+        2,
+        "missing and malformed release lineage must share the participant 404 code"
+    );
+    assert!(participant_release
+        .contains("FederationHistoricalLineageKindV1::SettlementReleaseSourceV1"));
+
+    let admin_release = between(
+        SERVICE,
+        "pub(super) fn read_settlement_release_for_admin(",
+        "fn participant_document(",
+    );
+    assert!(admin_release.contains("FederationHistoricalLineageReadError::IntegrityConflict"));
+    assert!(admin_release.contains("FederationHistoricalLineageReadError::NotFound"));
+    assert!(admin_release.contains("FederationHistoricalLineageKindV1::SettlementReleaseSourceV1"));
+    let http_errors = between(API, "fn lineage_response<", "fn coded_error(");
+    assert!(http_errors.contains("FederationHistoricalLineageReadError::NotVisible"));
+    assert!(http_errors.contains("FederationHistoricalLineageReadError::NotFound"));
+    assert!(http_errors.contains("StatusCode::NOT_FOUND"));
 
     let adoption = [API, MCP, SERVICE, TRANSPORT, STORE_FACADE].join("\n");
     let lower = adoption.to_ascii_lowercase();
@@ -198,5 +253,16 @@ fn declaration<'a>(source: &'a str, marker: &str) -> &'a str {
     let start = source.find(marker).expect("declaration marker must exist");
     let tail = &source[start..];
     let end = tail.find("\n}").expect("declaration must be bounded");
+    &tail[..end]
+}
+
+fn between<'a>(source: &'a str, start_marker: &str, end_marker: &str) -> &'a str {
+    let start = source
+        .find(start_marker)
+        .expect("source block start marker must exist");
+    let tail = &source[start..];
+    let end = tail
+        .find(end_marker)
+        .expect("source block end marker must exist");
     &tail[..end]
 }

@@ -47,6 +47,13 @@ impl StoredChallenge {
     ) -> Result<ComputeSettlementChallengeReceipt> {
         audit::audited_challenge_on(conn, self, replayed)
     }
+
+    pub(super) fn into_historical_receipt(
+        &self,
+        conn: &Connection,
+    ) -> Result<ComputeSettlementChallengeReceipt> {
+        audit::audited_historical_challenge_on(conn, self)
+    }
 }
 
 pub(super) fn normalize_challenge_request(

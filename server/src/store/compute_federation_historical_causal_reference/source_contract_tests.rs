@@ -4,12 +4,15 @@ use super::source_refs::{validate_execution_source_links, validate_settlement_so
 
 mod fixtures;
 mod owner_contracts;
+mod release;
 
 use fixtures::{audit_legacy_pool, execution_facts, legacy_pool_facts, settlement_facts};
 
 const STORE_FACADE: &str = include_str!("../compute_federation_historical_causal_reference.rs");
 const EXECUTION_RESOLVER: &str = include_str!("execution.rs");
 const SETTLEMENT_RESOLVER: &str = include_str!("settlement.rs");
+const RELEASE_RESOLVER: &str = include_str!("release.rs");
+const RELEASE_REFS: &str = include_str!("release_refs.rs");
 const SOURCE_REFS: &str = include_str!("source_refs.rs");
 const CAPACITY_POOL_QUERIES: &str = include_str!("../compute_capacity_pool_queries.rs");
 const ATTEMPT_EXECUTION_RECEIPTS: &str = include_str!("../compute_attempt_execution_receipts.rs");
@@ -37,7 +40,7 @@ fn resolver_source_uses_exact_owner_seams_inside_deferred_read_snapshots() {
         STORE_FACADE
             .matches("transaction_with_behavior(TransactionBehavior::Deferred)")
             .count(),
-        4
+        5
     );
 
     let resolver_source = resolver_source();
@@ -372,6 +375,8 @@ fn resolver_source() -> String {
         STORE_FACADE,
         EXECUTION_RESOLVER,
         SETTLEMENT_RESOLVER,
+        RELEASE_RESOLVER,
+        RELEASE_REFS,
         SOURCE_REFS,
     ]
     .join("\n")

@@ -1,9 +1,9 @@
-const READ_SCHEMA = 'compute_federation.core_historical_causal_reference.read.v1'
-const CARRIER_SCHEMA = 'compute_federation.core_historical_causal_reference.v1'
-const CARRIER_CANONICALIZATION = 'rfc8785_jcs'
-const CARRIER_DIGEST_ALGORITHM = 'sha256'
-const CARRIER_DIGEST_DOMAIN = 'ELON-COMPUTE-CORE-HISTORICAL-LINEAGE-V1'
-const CARRIER_MAX_JSON_BYTES = 262_144
+export const READ_SCHEMA = 'compute_federation.core_historical_causal_reference.read.v1'
+export const CARRIER_SCHEMA = 'compute_federation.core_historical_causal_reference.v1'
+export const CARRIER_CANONICALIZATION = 'rfc8785_jcs'
+export const CARRIER_DIGEST_ALGORITHM = 'sha256'
+export const CARRIER_DIGEST_DOMAIN = 'ELON-COMPUTE-CORE-HISTORICAL-LINEAGE-V1'
+export const CARRIER_MAX_JSON_BYTES = 262_144
 
 export type FederationHistoricalLineageKind = 'execution_source_v1' | 'settlement_source_v1'
 export type FederationHistoricalLineageScope = 'participant' | 'admin'
@@ -76,7 +76,7 @@ interface FinalizationRef {
   finalization_event_digest: string
 }
 
-interface AttemptSettlementRef {
+export interface AttemptSettlementRef {
   settlement_receipt_id: string
   settlement_receipt_digest: string
   settlement_event_digest: string
@@ -420,7 +420,7 @@ function attemptSettlementRef(value: unknown): AttemptSettlementRef {
   }
 }
 
-function exactObject<const Keys extends readonly string[]>(
+export function exactObject<const Keys extends readonly string[]>(
   value: unknown,
   keys: Keys,
   label: string,
@@ -436,19 +436,19 @@ function exactObject<const Keys extends readonly string[]>(
   return value as Record<Keys[number], unknown>
 }
 
-function expectString(value: unknown, label: string) {
+export function expectString(value: unknown, label: string) {
   if (typeof value !== 'string' || hasUnpairedSurrogate(value)) {
     throw new Error(`${label} 必须是 I-JSON string`)
   }
   return value
 }
 
-function expectSha256(value: unknown, label: string) {
+export function expectSha256(value: unknown, label: string) {
   const digest = expectString(value, label)
   if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error(`${label} 必须是 64 位 lowercase SHA-256`)
 }
 
-function expectLiteral(value: unknown, expected: string, label: string) {
+export function expectLiteral(value: unknown, expected: string, label: string) {
   if (value !== expected) throw new Error(`${label} 不符合冻结 ABI`)
 }
 
@@ -473,7 +473,7 @@ function hasUnpairedSurrogate(value: string) {
   return false
 }
 
-function canonicalizeJcs(value: unknown): string {
+export function canonicalizeJcs(value: unknown): string {
   if (value === null) return 'null'
   if (typeof value === 'string') {
     if (hasUnpairedSurrogate(value)) throw new Error('JCS string 包含未配对 surrogate')
@@ -494,7 +494,7 @@ function canonicalizeJcs(value: unknown): string {
   throw new Error('Carrier 含有不可 canonicalize 的 JSON 值')
 }
 
-async function sha256Hex(value: string) {
+export async function sha256Hex(value: string) {
   if (!globalThis.crypto?.subtle) throw new Error('当前浏览器不支持 Web Crypto SHA-256')
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')

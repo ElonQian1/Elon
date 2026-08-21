@@ -2,7 +2,9 @@ use anyhow::{bail, Context, Result};
 use chrono::Duration;
 use rusqlite::Connection;
 
-use super::super::super::compute_attempt_settlements::compute_attempt_settlement_on;
+use super::super::super::compute_attempt_settlements::{
+    compute_attempt_historical_settlement_by_lease_on, compute_attempt_settlement_on,
+};
 use super::super::{
     ComputeSettlementChallengeReceipt, COMPUTE_SETTLEMENT_CHALLENGE_POLICY_ID,
     COMPUTE_SETTLEMENT_CHALLENGE_POLICY_VERSION, COMPUTE_SETTLEMENT_CHALLENGE_SCHEMA,
@@ -18,11 +20,30 @@ pub(super) fn audited_challenge_on(
     stored: &StoredChallenge,
     replayed: bool,
 ) -> Result<ComputeSettlementChallengeReceipt> {
+    audited_challenge_with_head_policy_on(conn, stored, replayed, true)
+}
+
+pub(super) fn audited_historical_challenge_on(
+    conn: &Connection,
+    stored: &StoredChallenge,
+) -> Result<ComputeSettlementChallengeReceipt> {
+    audited_challenge_with_head_policy_on(conn, stored, false, false)
+}
+
+fn audited_challenge_with_head_policy_on(
+    conn: &Connection,
+    stored: &StoredChallenge,
+    replayed: bool,
+    require_current_heads: bool,
+) -> Result<ComputeSettlementChallengeReceipt> {
     let request = normalize_challenge_request(&serde_json::from_str(&stored.request_json)?)?;
     let evidence_refs: Vec<String> = serde_json::from_str(&stored.evidence_refs_json)?;
     let mut receipt: ComputeSettlementChallengeReceipt =
         serde_json::from_str(&stored.receipt_json)?;
-    if request.lease_id != stored.lease_id
+    if stored.request_json != serde_json::to_string(&request)?
+        || stored.evidence_refs_json != serde_json::to_string(&receipt.evidence_refs)?
+        || stored.receipt_json != serde_json::to_string(&receipt)?
+        || request.lease_id != stored.lease_id
         || request.expected_settlement_receipt_id != stored.settlement_receipt_id
         || request.expected_settlement_event_digest != stored.settlement_event_digest
         || request.expected_posting_id != stored.posting_id
@@ -64,7 +85,12 @@ pub(super) fn audited_challenge_on(
         bail!("算力结算挑战事件摘要审计失败");
     }
 
-    let settlement = compute_attempt_settlement_on(conn, &stored.lease_id)?;
+    let settlement = if require_current_heads {
+        compute_attempt_settlement_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_historical_settlement_by_lease_on(conn, &stored.lease_id)?
+            .ok_or_else(|| anyhow::anyhow!("算力结算挑战引用的 v195 历史回执不存在"))?
+    };
     if settlement.settlement.settlement_receipt_id != stored.settlement_receipt_id
         || settlement.event_digest != stored.settlement_event_digest
         || settlement.posting_id != stored.posting_id

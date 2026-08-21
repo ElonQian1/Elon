@@ -9,8 +9,10 @@ use crate::compute_federation::management_mcp_support as support;
 
 const GET_MY_EXECUTION: &str = "compute_get_my_execution_source_lineage";
 const GET_MY_SETTLEMENT: &str = "compute_get_my_settlement_source_lineage";
+const GET_MY_SETTLEMENT_RELEASE: &str = "compute_get_my_settlement_release_source_lineage";
 const ADMIN_GET_EXECUTION: &str = "compute_admin_get_execution_source_lineage";
 const ADMIN_GET_SETTLEMENT: &str = "compute_admin_get_settlement_source_lineage";
+const ADMIN_GET_SETTLEMENT_RELEASE: &str = "compute_admin_get_settlement_release_source_lineage";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,6 +36,13 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
             false,
         ),
+        support::tool(
+            GET_MY_SETTLEMENT_RELEASE,
+            "读取当前消费者或 Provider 所有者可见的历史 Settlement Release Source lineage；无状态、资金或调度副作用。",
+            lease_schema(),
+            true,
+            false,
+        ),
     ]
 }
 
@@ -49,6 +58,13 @@ pub(crate) fn admin_definitions() -> Vec<Value> {
         support::tool(
             ADMIN_GET_SETTLEMENT,
             "平台管理员按 Attempt Lease 读取历史 Settlement Source lineage；无副作用。",
+            lease_schema(),
+            true,
+            false,
+        ),
+        support::tool(
+            ADMIN_GET_SETTLEMENT_RELEASE,
+            "平台管理员按 Attempt Lease 读取历史 Settlement Release Source lineage；无副作用。",
             lease_schema(),
             true,
             false,
@@ -82,6 +98,15 @@ pub(crate) fn call_if_handled(
                 Some(project_id),
             )
         }
+        GET_MY_SETTLEMENT_RELEASE => {
+            let input = decode(arguments)?;
+            service::read_settlement_release_for_participant(
+                store,
+                user_id,
+                &input.lease_id,
+                Some(project_id),
+            )
+        }
         _ => return Ok(None),
     }
     .map_err(redacted_service_error)?;
@@ -106,6 +131,11 @@ pub(crate) fn call_admin_if_handled(
             ensure_platform_admin(platform_role)?;
             let input = decode(arguments)?;
             service::read_settlement_for_admin(store, &input.lease_id)
+        }
+        ADMIN_GET_SETTLEMENT_RELEASE => {
+            ensure_platform_admin(platform_role)?;
+            let input = decode(arguments)?;
+            service::read_settlement_release_for_admin(store, &input.lease_id)
         }
         _ => return Ok(None),
     }

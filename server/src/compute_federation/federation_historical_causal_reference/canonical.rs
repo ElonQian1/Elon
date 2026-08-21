@@ -6,7 +6,8 @@ use crate::compute_plugin_sharing_directive::canonical_compute_plugin_ijson_and_
 
 use super::types::{
     ExecutionSourceLineageV1, FederationHistoricalLineageKindV1, FederationHistoricalLineageV1,
-    SettlementSourceLineageV1, UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
+    SettlementReleaseSourceLineageV1, SettlementSourceLineageV1,
+    UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_CANONICALIZATION,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_DIGEST_ALGORITHM,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_DIGEST_DOMAIN,
@@ -30,6 +31,15 @@ pub(crate) fn build_settlement_source_carrier(
     build_carrier(
         FederationHistoricalLineageKindV1::SettlementSourceV1,
         FederationHistoricalLineageV1::SettlementSource(lineage),
+    )
+}
+
+pub(crate) fn build_settlement_release_source_carrier(
+    lineage: SettlementReleaseSourceLineageV1,
+) -> Result<UntrustedFederationHistoricalCausalReferenceEnvelopeV1> {
+    build_carrier(
+        FederationHistoricalLineageKindV1::SettlementReleaseSourceV1,
+        FederationHistoricalLineageV1::SettlementReleaseSource(lineage),
     )
 }
 

@@ -4,9 +4,13 @@ use rusqlite::{params, Connection, OptionalExtension};
 use super::{
     super::{
         super::{
-            compute_attempt_settlement_challenge_resolutions::compute_settlement_challenge_resolution_on,
+            compute_attempt_settlement_challenge_resolutions::{
+                compute_attempt_historical_settlement_challenge_resolution_by_challenge_on,
+                compute_settlement_challenge_resolution_on,
+            },
             compute_attempt_settlements::{
-                calculation::MICROS_PER_CNY_FEN, compute_attempt_settlement_on,
+                calculation::MICROS_PER_CNY_FEN, compute_attempt_historical_settlement_by_lease_on,
+                compute_attempt_settlement_on,
             },
         },
         ComputeSettlementCorrectionReceipt, COMPUTE_SETTLEMENT_CORRECTION_POLICY_ID,
@@ -21,11 +25,30 @@ pub(super) fn audited_correction_on(
     stored: &StoredCorrection,
     replayed: bool,
 ) -> Result<ComputeSettlementCorrectionReceipt> {
+    audited_correction_with_head_policy_on(conn, stored, replayed, true)
+}
+
+pub(super) fn audited_historical_correction_on(
+    conn: &Connection,
+    stored: &StoredCorrection,
+) -> Result<ComputeSettlementCorrectionReceipt> {
+    audited_correction_with_head_policy_on(conn, stored, false, false)
+}
+
+fn audited_correction_with_head_policy_on(
+    conn: &Connection,
+    stored: &StoredCorrection,
+    replayed: bool,
+    require_current_heads: bool,
+) -> Result<ComputeSettlementCorrectionReceipt> {
     let request = normalize_correction_request(&serde_json::from_str(&stored.request_json)?)?;
     let evidence_refs: Vec<String> = serde_json::from_str(&stored.evidence_refs_json)?;
     let mut receipt: ComputeSettlementCorrectionReceipt =
         serde_json::from_str(&stored.receipt_json)?;
-    if request.lease_id != stored.lease_id
+    if stored.request_json != serde_json::to_string(&request)?
+        || stored.evidence_refs_json != serde_json::to_string(&receipt.evidence_refs)?
+        || stored.receipt_json != serde_json::to_string(&receipt)?
+        || request.lease_id != stored.lease_id
         || request.expected_challenge_id != stored.challenge_id
         || request.expected_challenge_event_digest != stored.challenge_event_digest
         || request.expected_resolution_id != stored.resolution_id
@@ -81,8 +104,21 @@ pub(super) fn audited_correction_on(
         bail!("结算纠正证据或事件摘要审计失败");
     }
 
-    let settlement = compute_attempt_settlement_on(conn, &stored.lease_id)?;
-    let resolution = compute_settlement_challenge_resolution_on(conn, &stored.lease_id)?;
+    let settlement = if require_current_heads {
+        compute_attempt_settlement_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_historical_settlement_by_lease_on(conn, &stored.lease_id)?
+            .ok_or_else(|| anyhow!("结算纠正引用的 v195 历史回执不存在"))?
+    };
+    let resolution = if require_current_heads {
+        compute_settlement_challenge_resolution_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_historical_settlement_challenge_resolution_by_challenge_on(
+            conn,
+            &stored.challenge_id,
+        )?
+        .ok_or_else(|| anyhow!("结算纠正引用的 v197 历史回执不存在"))?
+    };
     if settlement.settlement.settlement_receipt_id != stored.settlement_receipt_id
         || settlement.event_digest != stored.settlement_event_digest
         || settlement.settlement.consumer_account_id != stored.consumer_account_id
@@ -100,18 +136,20 @@ pub(super) fn audited_correction_on(
     }
     audit_amounts(&settlement, &request, &receipt)?;
     audit_posting(conn, &receipt)?;
-    audit_pending_projection(
-        conn,
-        "provider",
-        &receipt.provider_account_id,
-        "provider_pending",
-    )?;
-    audit_pending_projection(
-        conn,
-        "platform",
-        money::PLATFORM_ACCOUNT_ID,
-        "platform_pending",
-    )?;
+    if require_current_heads {
+        audit_pending_projection(
+            conn,
+            "provider",
+            &receipt.provider_account_id,
+            "provider_pending",
+        )?;
+        audit_pending_projection(
+            conn,
+            "platform",
+            money::PLATFORM_ACCOUNT_ID,
+            "platform_pending",
+        )?;
+    }
     if receipt.platform_account_id != money::PLATFORM_ACCOUNT_ID
         || receipt.currency != "CNY"
         || receipt.policy_id != COMPUTE_SETTLEMENT_CORRECTION_POLICY_ID

@@ -93,6 +93,25 @@ pub(super) fn read_settlement_for_participant(
     )
 }
 
+pub(super) fn read_settlement_release_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+    caller_project_id: Option<&str>,
+) -> ReadResult {
+    validate_lease_id(lease_id)?;
+    let lineage = store
+        .resolve_compute_settlement_release_source_lineage_for_lease(lease_id)
+        .map_err(|_| FederationHistoricalLineageReadError::NotVisible)?
+        .ok_or(FederationHistoricalLineageReadError::NotVisible)?;
+    participant_document(
+        lineage,
+        user_id,
+        caller_project_id,
+        FederationHistoricalLineageKindV1::SettlementReleaseSourceV1,
+    )
+}
+
 pub(super) fn read_execution_for_admin(store: &Store, lease_id: &str) -> ReadResult {
     validate_lease_id(lease_id)?;
     let lineage = store
@@ -114,6 +133,18 @@ pub(super) fn read_settlement_for_admin(store: &Store, lease_id: &str) -> ReadRe
     admin_document(
         lineage,
         FederationHistoricalLineageKindV1::SettlementSourceV1,
+    )
+}
+
+pub(super) fn read_settlement_release_for_admin(store: &Store, lease_id: &str) -> ReadResult {
+    validate_lease_id(lease_id)?;
+    let lineage = store
+        .resolve_compute_settlement_release_source_lineage_for_lease(lease_id)
+        .map_err(|_| FederationHistoricalLineageReadError::IntegrityConflict)?
+        .ok_or(FederationHistoricalLineageReadError::NotFound)?;
+    admin_document(
+        lineage,
+        FederationHistoricalLineageKindV1::SettlementReleaseSourceV1,
     )
 }
 

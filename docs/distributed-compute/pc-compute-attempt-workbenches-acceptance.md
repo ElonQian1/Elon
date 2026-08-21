@@ -1,7 +1,7 @@
 ---
 title: 算力 Attempt 与结算 PC 工作台静态验收
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-22
 owners: pc, backend, ai-economy
 implementation_status: implementation_partially_verified
 ---
@@ -66,3 +66,11 @@ npm run check:bundle-budget
 - 没有可生产使用的 v213 route、credential verifier、Adapter/worker、认证 ACK/event、Runner 或 accepted Gateway producer；
 - 未执行真实银行、支付机构、钱包或 Sui 付款，也没有提现执行器；
 - 静态页面可构建不代表队列中已有真实业务数据，不能宣称完整算力交易已可生产运行。
+
+## 6. 本批未运行的 release Carrier adoption
+
+`/compute-challenge-resolution`、`/compute-challenges` 与 `/my-compute-settlement` 复用现有历史因果卡片：pending记录仍核验
+execution+settlement；已有 v198 的记录再读取 release exact-5 response，并验证 settlement→execution、
+release→settlement 两级digest与subject等式。任一失败整卡拒绝、保留重试；release不存在时不得把pending伪装成
+integrity failure。新增源码未执行本页 §4 命令、浏览器或视觉验收，当前只能记
+`source_written/source_review_only/uncompiled/unrun`，不能继承2026-08-11的历史前端通过证据。

@@ -9,10 +9,13 @@ use crate::compute_federation::federation_historical_causal_reference::{
 
 use super::{
     compute_attempt_execution_receipts::compute_attempt_historical_execution_receipt_by_lease_on,
+    compute_attempt_settlement_releases::compute_attempt_historical_settlement_release_by_lease_on,
     compute_attempt_settlements::compute_attempt_historical_settlement_by_lease_on, Store,
 };
 
 mod execution;
+mod release;
+mod release_refs;
 mod settlement;
 mod source_refs;
 
@@ -127,6 +130,12 @@ impl ValidatedFederationHistoricalLineage {
     fn access_scope(&self) -> &FederationHistoricalLineageAccessScope {
         &self.access_scope
     }
+
+    fn into_lineage_digest_and_access_scope(
+        self,
+    ) -> (String, FederationHistoricalLineageAccessScope) {
+        (self.lineage_digest, self.access_scope)
+    }
 }
 
 impl Store {
@@ -202,6 +211,23 @@ impl Store {
             &receipt.settlement.settlement_receipt_digest,
             &receipt.event_digest,
         )?;
+        tx.commit()?;
+        Ok(Some(resolved))
+    }
+
+    pub(crate) fn resolve_compute_settlement_release_source_lineage_for_lease(
+        &self,
+        lease_id: &str,
+    ) -> Result<Option<ValidatedFederationHistoricalLineage>> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let Some(release) =
+            compute_attempt_historical_settlement_release_by_lease_on(&tx, lease_id)?
+        else {
+            tx.commit()?;
+            return Ok(None);
+        };
+        let resolved = release::resolve_settlement_release_source_lineage_on(&tx, &release)?;
         tx.commit()?;
         Ok(Some(resolved))
     }

@@ -2,7 +2,9 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 
-use super::super::super::compute_attempt_settlement_challenges::compute_settlement_challenge_on;
+use super::super::super::compute_attempt_settlement_challenges::{
+    compute_attempt_historical_settlement_challenge_by_lease_on, compute_settlement_challenge_on,
+};
 use super::super::{
     ComputeSettlementChallengeResolutionReceipt, COMPUTE_SETTLEMENT_CHALLENGE_RESOLUTION_SCHEMA,
 };
@@ -16,10 +18,28 @@ pub(super) fn audited_resolution_on(
     stored: &StoredResolution,
     replayed: bool,
 ) -> Result<ComputeSettlementChallengeResolutionReceipt> {
+    audited_resolution_with_head_policy_on(conn, stored, replayed, true)
+}
+
+pub(super) fn audited_historical_resolution_on(
+    conn: &Connection,
+    stored: &StoredResolution,
+) -> Result<ComputeSettlementChallengeResolutionReceipt> {
+    audited_resolution_with_head_policy_on(conn, stored, false, false)
+}
+
+fn audited_resolution_with_head_policy_on(
+    conn: &Connection,
+    stored: &StoredResolution,
+    replayed: bool,
+    require_current_heads: bool,
+) -> Result<ComputeSettlementChallengeResolutionReceipt> {
     let request = normalize_resolution_request(&serde_json::from_str(&stored.request_json)?)?;
     let mut receipt: ComputeSettlementChallengeResolutionReceipt =
         serde_json::from_str(&stored.receipt_json)?;
-    if request.lease_id != stored.lease_id
+    if stored.request_json != serde_json::to_string(&request)?
+        || stored.receipt_json != serde_json::to_string(&receipt)?
+        || request.lease_id != stored.lease_id
         || request.expected_challenge_id != stored.challenge_id
         || request.expected_challenge_event_digest != stored.challenge_event_digest
         || request.action != stored.action
@@ -57,7 +77,12 @@ pub(super) fn audited_resolution_on(
         bail!("算力结算挑战决议事件摘要审计失败");
     }
 
-    let challenge = compute_settlement_challenge_on(conn, &stored.lease_id)?;
+    let challenge = if require_current_heads {
+        compute_settlement_challenge_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_historical_settlement_challenge_by_lease_on(conn, &stored.lease_id)?
+            .ok_or_else(|| anyhow::anyhow!("算力结算挑战决议引用的 v196 历史回执不存在"))?
+    };
     if challenge.challenge_id != stored.challenge_id
         || challenge.event_digest != stored.challenge_event_digest
         || challenge.settlement_receipt_id != stored.settlement_receipt_id

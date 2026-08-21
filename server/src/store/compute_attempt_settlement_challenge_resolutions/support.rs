@@ -42,6 +42,13 @@ impl StoredResolution {
     ) -> Result<ComputeSettlementChallengeResolutionReceipt> {
         audit::audited_resolution_on(conn, self, replayed)
     }
+
+    pub(super) fn into_historical_receipt(
+        &self,
+        conn: &Connection,
+    ) -> Result<ComputeSettlementChallengeResolutionReceipt> {
+        audit::audited_historical_resolution_on(conn, self)
+    }
 }
 
 pub(super) fn normalize_resolution_request(

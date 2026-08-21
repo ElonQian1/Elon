@@ -1,6 +1,6 @@
 ---
 title: 联邦核心历史因果引用 Carrier ABI 权威
-reviewed_at: 2026-08-21
+reviewed_at: 2026-08-22
 status: current
 owners: backend, node, ai-economy, pc
 design_status: design_frozen
@@ -13,7 +13,7 @@ verification_status: source_review_only
 
 ## 1. 唯一结论与状态边界
 
-本页冻结 Provider-neutral 的历史引用 primitive、Execution Receipt 与 Settlement Receipt 两种只读因果 Carrier，
+本页冻结 Provider-neutral 的历史引用 primitive、Execution Receipt 与 Settlement Receipt 两种基础只读因果 Carrier，
 以及它们的 additive read adoption。Domain、Store 只读 resolver、Service、HTTP/MCP 与 PC 客户端源码现已落盘；
 这些入口只按历史 Lease 读取既有 owner 事实，不统一重算任何既有对象摘要，也不新增 current authority、writer、
 账本、状态机、表、migration 或经济效果。
@@ -82,7 +82,10 @@ digest_algorithm
 lineage
 ```
 
-`lineage_kind` 必须是 `execution_source_v1` 或 `settlement_source_v1`；不得为 null、unknown 或 caller-defined。
+本页两个基础入口的 `lineage_kind` 必须是 `execution_source_v1` 或 `settlement_source_v1`；不得为 null、unknown
+或 caller-defined。复用同一 envelope/domain 的 endpoint-only additive `settlement_release_source_v1` 只由独立
+[release authority](federation-settlement-release-causal-reference-abi-authority.md) 冻结；基础入口永不返回该 kind，
+旧 Carrier bytes/digest零变化。
 `lineage` 的 exact shape 由 kind 决定，禁止用 null、空对象、extra key 或 generic `causes[]` 表示另一 profile。
 顶层 `schema/lineage_kind/lineage_digest/canonicalization/digest_algorithm` 必须是 JSON string，`lineage` 必须是
 object；primitive 内全部 `*_id/*_digest` 是 non-null JSON string，revision/version/epoch/fencing 是 JSON integer，
@@ -238,7 +241,8 @@ Store resolver必须逐字证明：
    Carrier不重新计算金额。
 
 `pending` internal settlement不能从本 Carrier推导成 available、withdrawn、external paid或链上 finality。挑战、纠正、
-释放、提现和外部付款各自仍需独立 receipt/authority。
+释放、提现和外部付款各自仍需独立 receipt/authority；v198释放后的独立只读组合见
+[`settlement_release_source_v1`](federation-settlement-release-causal-reference-abi-authority.md)。
 
 ## 7. Current 与 historical 必须分离
 

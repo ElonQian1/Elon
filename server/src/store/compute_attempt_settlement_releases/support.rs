@@ -58,6 +58,13 @@ impl StoredRelease {
     ) -> Result<ComputeSettlementReleaseReceipt> {
         audit::audited_release_on(conn, self, replayed)
     }
+
+    pub(super) fn into_historical_receipt(
+        &self,
+        conn: &Connection,
+    ) -> Result<ComputeSettlementReleaseReceipt> {
+        audit::audited_historical_release_on(conn, self)
+    }
 }
 
 pub(super) fn normalize_release_request(

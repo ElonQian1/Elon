@@ -187,6 +187,16 @@ pub(super) fn compute_settlement_correction_by_resolution_on(
         .transpose()
 }
 
+pub(in crate::store) fn compute_attempt_historical_settlement_correction_by_resolution_on(
+    conn: &Connection,
+    resolution_id: &str,
+) -> Result<Option<ComputeSettlementCorrectionReceipt>> {
+    support::validate_exact("挑战决议 ID", resolution_id, 240)?;
+    correction_by_resolution_on(conn, resolution_id)?
+        .map(|stored| stored.into_historical_receipt(conn))
+        .transpose()
+}
+
 pub(super) fn compute_settlement_correction_by_id_on(
     conn: &Connection,
     correction_id: &str,

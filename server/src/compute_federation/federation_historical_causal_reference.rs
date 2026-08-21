@@ -8,10 +8,13 @@ mod types;
 mod validation;
 
 #[cfg(test)]
+mod release_tests;
+#[cfg(test)]
 mod tests;
 
 pub(crate) use canonical::{
-    build_execution_source_carrier, build_settlement_source_carrier,
+    build_execution_source_carrier, build_settlement_release_source_carrier,
+    build_settlement_source_carrier,
     canonical_federation_historical_causal_reference_json_and_digest,
     federation_historical_causal_reference_from_json,
     federation_historical_causal_reference_from_json_bytes,
@@ -20,7 +23,11 @@ pub(crate) use types::{
     AttemptLeaseSourceRef, AttemptSettlementRef, CapacityClaimVersionRef, CapacityPoolVersionRef,
     ExecutionReceiptRef, ExecutionSourceLineageV1, FederationHistoricalLineageKindV1,
     FederationHistoricalLineageV1, FinalizationRef, JobVersionRef, OfferVersionRef,
-    PriceSnapshotRef, ProviderVersionRef, ReservationVersionRef, SettlementSourceLineageV1,
+    PriceSnapshotRef, ProviderVersionRef, ReservationVersionRef, SettlementChallengeRef,
+    SettlementChallengeResolutionActionV1, SettlementChallengeResolutionRef,
+    SettlementCorrectionPostingRef, SettlementCorrectionRef, SettlementReleaseGateV1,
+    SettlementReleasePostingRef, SettlementReleaseRef, SettlementReleaseSourceLineageV1,
+    SettlementSourceLineageV1, SettlementSourcePostingRef,
     UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_CANONICALIZATION,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_DIGEST_ALGORITHM,

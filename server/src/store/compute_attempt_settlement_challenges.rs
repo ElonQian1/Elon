@@ -188,6 +188,16 @@ pub(super) fn compute_settlement_challenge_optional_on(
         .transpose()
 }
 
+pub(in crate::store) fn compute_attempt_historical_settlement_challenge_by_lease_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeSettlementChallengeReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    challenge_by_lease_on(conn, lease_id)?
+        .map(|stored| stored.into_historical_receipt(conn))
+        .transpose()
+}
+
 pub(super) fn settlement_has_open_challenge_on(
     conn: &Connection,
     settlement_receipt_id: &str,

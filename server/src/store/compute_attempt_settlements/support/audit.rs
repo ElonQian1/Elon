@@ -226,7 +226,7 @@ fn audited_settlement_with_head_policy_on(
         bail!("Attempt 结算价格、账户、用量或 Settlement Receipt 审计失败");
     }
     audit_billing(conn, &receipt, computed.consumer_charge_fen)?;
-    audit_posting(conn, &receipt)?;
+    audit_posting(conn, &receipt, require_current_heads)?;
     if receipt.money_effect != "consumer_preauthorization_captured_and_unused_refunded"
         || receipt.provider_balance_effect != "provider_and_platform_credited_pending"
     {
@@ -283,7 +283,11 @@ fn audit_billing(
     Ok(())
 }
 
-fn audit_posting(conn: &Connection, receipt: &ComputeAttemptSettlementReceipt) -> Result<()> {
+fn audit_posting(
+    conn: &Connection,
+    receipt: &ComputeAttemptSettlementReceipt,
+    require_current_heads: bool,
+) -> Result<()> {
     let row = posting_row_on(conn, &receipt.posting_id)?
         .ok_or_else(|| anyhow!("Attempt 结算 posting 不存在"))?;
     let expected_digest = settlement_posting_digest(
@@ -369,18 +373,20 @@ fn audit_posting(conn: &Connection, receipt: &ComputeAttemptSettlementReceipt) -
     {
         bail!("Attempt 结算双价格腿或余额快照审计失败");
     }
-    audit_pending_projection(
-        conn,
-        "provider",
-        &receipt.settlement.provider_account_id,
-        "provider_pending",
-    )?;
-    audit_pending_projection(
-        conn,
-        "platform",
-        "platform:compute_market",
-        "platform_pending",
-    )?;
+    if require_current_heads {
+        audit_pending_projection(
+            conn,
+            "provider",
+            &receipt.settlement.provider_account_id,
+            "provider_pending",
+        )?;
+        audit_pending_projection(
+            conn,
+            "platform",
+            "platform:compute_market",
+            "platform_pending",
+        )?;
+    }
     Ok(())
 }
 

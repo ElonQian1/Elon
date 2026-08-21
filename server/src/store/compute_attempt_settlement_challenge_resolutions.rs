@@ -215,3 +215,13 @@ pub(super) fn settlement_challenge_resolution_by_challenge_on(
         .map(|stored| stored.into_receipt(conn, false))
         .transpose()
 }
+
+pub(in crate::store) fn compute_attempt_historical_settlement_challenge_resolution_by_challenge_on(
+    conn: &Connection,
+    challenge_id: &str,
+) -> Result<Option<ComputeSettlementChallengeResolutionReceipt>> {
+    support::validate_exact("结算挑战 ID", challenge_id, 240)?;
+    resolution_by_challenge_on(conn, challenge_id)?
+        .map(|stored| stored.into_historical_receipt(conn))
+        .transpose()
+}

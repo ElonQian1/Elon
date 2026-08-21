@@ -65,6 +65,13 @@ impl StoredCorrection {
     ) -> Result<ComputeSettlementCorrectionReceipt> {
         audit::audited_correction_on(conn, self, replayed)
     }
+
+    pub(super) fn into_historical_receipt(
+        &self,
+        conn: &Connection,
+    ) -> Result<ComputeSettlementCorrectionReceipt> {
+        audit::audited_historical_correction_on(conn, self)
+    }
 }
 
 pub(super) fn normalize_correction_request(

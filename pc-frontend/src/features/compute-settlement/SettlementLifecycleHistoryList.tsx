@@ -49,7 +49,11 @@ export default function SettlementLifecycleHistoryList({ items, loading, scope }
             </div>
             <p className={styles.summary}>{historySummary(item)}</p>
             <code className={styles.digest}>{latestDigest(item)}</code>
-            <FederationHistoricalLineageButton leaseId={item.settlement.lease_id} scope={scope} />
+            <FederationHistoricalLineageButton
+              leaseId={item.settlement.lease_id}
+              scope={scope}
+              releaseAvailable={Boolean(item.release)}
+            />
           </article>
         ))}
       </div>

@@ -1,6 +1,6 @@
 ---
 title: 联邦核心历史因果引用 Carrier ABI 验收
-reviewed_at: 2026-08-21
+reviewed_at: 2026-08-22
 status: current
 owners: backend, node, ai-economy, pc
 design_status: design_frozen
@@ -42,7 +42,7 @@ F0 的 read adoption 源码已落盘，但 compile、runtime 与已运行合同�
 | case | 必须结果 |
 |---|---|
 | envelope | exact 6 keys；schema/kind/JCS/SHA常量逐字相等 |
-| kind | 仅 `execution_source_v1\|settlement_source_v1`；null/unknown拒绝 |
+| kind | 两个基础入口仅 `execution_source_v1\|settlement_source_v1`；null/unknown拒绝；release additive入口另按独立authority验收 |
 | self digest | 保留 `lineage_digest=""` 后 domain+NUL+JCS；删除key、普通serde SHA或native digest代入拒绝 |
 | bytes | UTF-8 I-JSON、parse→JCS byte-equal、≤262144；duplicate/unknown/missing/float/trailing拒绝 |
 | numbers | revision/version/epoch/fencing为 `1..=2^53-1` integer；0、负数、float、超界拒绝 |
@@ -50,7 +50,7 @@ F0 的 read adoption 源码已落盘，但 compile、runtime 与已运行合同�
 | strings | 不trim、不Unicode normalize、不case fold；source exact byte漂移拒绝 |
 | forbidden | id/status/time/actor/current/replayed/effects/null/extra profile字段拒绝 |
 
-source-written golden为两种 profile各固定至少一份完整 literal bytes/digest，并以未运行测试源码覆盖同一 native refs在
+source-written golden为两种基础 profile各固定至少一份完整 literal bytes/digest，并以未运行测试源码覆盖同一 native refs在
 kind、role或 source/terminal位置变化时得到不同 Carrier digest；当前没有通过计数。
 
 ## 3. Reference shape acceptance
