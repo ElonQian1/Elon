@@ -12,8 +12,10 @@ pub(super) struct StoredFinalization {
     pub lease_id: String,
     pub execution_receipt_id: String,
     pub execution_receipt_digest: String,
+    pub request_json: String,
     pub request: FinalizeComputeAttemptRequest,
     pub request_digest: String,
+    pub receipt_json: String,
     pub receipt: ComputeAttemptFinalizationReceipt,
     pub event_digest: String,
     pub idempotency_scope: String,
@@ -214,6 +216,7 @@ fn stored_finalization_from_row(row: &Row<'_>) -> rusqlite::Result<StoredFinaliz
         lease_id: row.get(1)?,
         execution_receipt_id: row.get(2)?,
         execution_receipt_digest: row.get(3)?,
+        request_json: request_json.clone(),
         request: serde_json::from_str(&request_json).map_err(|error| {
             rusqlite::Error::FromSqlConversionFailure(
                 request_json.len(),
@@ -222,6 +225,7 @@ fn stored_finalization_from_row(row: &Row<'_>) -> rusqlite::Result<StoredFinaliz
             )
         })?,
         request_digest: row.get(5)?,
+        receipt_json: receipt_json.clone(),
         receipt: serde_json::from_str(&receipt_json).map_err(|error| {
             rusqlite::Error::FromSqlConversionFailure(
                 receipt_json.len(),

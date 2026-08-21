@@ -13,6 +13,98 @@ pub(super) struct StoredComputeCapacityBucket {
     pub ends_at: String,
 }
 
+pub(super) struct StoredComputeCapacityBucketReference {
+    pub binding: ComputeCapacityBucketBinding,
+    pub starts_at: String,
+    pub ends_at: String,
+}
+
+pub(super) fn stored_bucket_reference_on(
+    conn: &Connection,
+    bucket_id: &str,
+) -> Result<Option<StoredComputeCapacityBucketReference>> {
+    let row = conn
+        .query_row(
+            "SELECT b.bucket_id, b.bucket_digest, b.pool_id, b.capacity_epoch,
+                    b.pool_revision, pv.pool_digest, b.delivery_window_id,
+                    b.delivery_window_digest, b.delivery_window_starts_at,
+                    b.delivery_window_ends_at, b.meter, b.meter_mode,
+                    b.quantum_units, b.meter_policy_digest
+               FROM compute_capacity_buckets b
+               JOIN compute_capacity_pool_versions pv
+                 ON pv.pool_id=b.pool_id
+                AND pv.capacity_epoch=b.capacity_epoch
+                AND pv.pool_revision=b.pool_revision
+              WHERE b.bucket_id=?1",
+            params![bucket_id.trim()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, String>(9)?,
+                    row.get::<_, String>(10)?,
+                    row.get::<_, String>(11)?,
+                    row.get::<_, i64>(12)?,
+                    row.get::<_, String>(13)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((
+        bucket_id,
+        bucket_digest,
+        pool_id,
+        capacity_epoch,
+        pool_revision,
+        pool_digest,
+        window_id,
+        window_digest,
+        starts_at,
+        ends_at,
+        meter,
+        meter_mode,
+        quantum_units,
+        meter_policy_digest,
+    )) = row
+    else {
+        return Ok(None);
+    };
+    let meter_mode = match meter_mode.as_str() {
+        "consumable" => ComputeCapacityMeterMode::Consumable,
+        "reusable" => ComputeCapacityMeterMode::Reusable,
+        _ => bail!("容量 bucket meter_mode 无效"),
+    };
+    Ok(Some(StoredComputeCapacityBucketReference {
+        binding: ComputeCapacityBucketBinding {
+            bucket_id,
+            bucket_digest,
+            pool: ComputeCapacityPoolBinding {
+                pool_id,
+                capacity_epoch,
+                pool_revision,
+                pool_digest,
+            },
+            delivery_window: ComputeDeliveryWindowBinding {
+                window_id,
+                window_digest,
+            },
+            meter,
+            meter_mode,
+            quantum_units,
+            meter_policy_digest,
+        },
+        starts_at,
+        ends_at,
+    }))
+}
+
 pub(super) fn stored_bucket_on(
     conn: &Connection,
     bucket_id: &str,

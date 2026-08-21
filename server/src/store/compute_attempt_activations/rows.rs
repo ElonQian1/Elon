@@ -14,13 +14,18 @@ use super::{
         compute_capacity_claim_rows::stored_claim_version_on,
         compute_capacity_ledger::ComputeCapacityLedgerWriteReceipt,
         compute_capacity_posting::balances_for_transaction_on,
-        compute_job_registry::{registered_job_version_on, ComputeJobRegistrationReceipt},
+        compute_job_registry::{
+            registered_historical_job_version_on, registered_job_version_on,
+            ComputeJobRegistrationReceipt,
+        },
         compute_reservation_registry::{
-            registered_reservation_version_on, ComputeReservationRegistrationReceipt,
+            registered_historical_reservation_version_on, registered_reservation_version_on,
+            ComputeReservationRegistrationReceipt,
         },
     },
-    ComputeAttemptActivationReceipt, NormalizedAttemptActivation,
-    ATTEMPT_ACTIVATION_EXECUTION_EFFECT, ATTEMPT_ACTIVATION_MONEY_EFFECT,
+    ComputeAttemptActivationReceipt, HistoricalComputeAttemptActivationSources,
+    NormalizedAttemptActivation, ATTEMPT_ACTIVATION_EXECUTION_EFFECT,
+    ATTEMPT_ACTIVATION_MONEY_EFFECT,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -125,6 +130,17 @@ pub(super) fn attempt_activation_on(
     Ok(Some(
         stored.into_receipt(conn, expected_request_digest.is_some())?,
     ))
+}
+
+pub(super) fn historical_attempt_activation_sources_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<Option<HistoricalComputeAttemptActivationSources>> {
+    let Some(stored) = stored_activation_on(conn, "WHERE a.lease_id=?1", params![lease_id])? else {
+        return Ok(None);
+    };
+    audit_stored_activation_with_source_policy_on(conn, &stored, true)?;
+    stored.into_historical_sources().map(Some)
 }
 
 struct StoredAttemptActivation {
@@ -235,9 +251,37 @@ impl StoredAttemptActivation {
             replayed,
         })
     }
+
+    fn into_historical_sources(self) -> Result<HistoricalComputeAttemptActivationSources> {
+        Ok(HistoricalComputeAttemptActivationSources {
+            lease: self.lease()?,
+            lease_digest: self.lease_digest,
+            running_job: ComputeJobVersionBinding {
+                job_id: self.job_id,
+                job_revision: self.running_job_revision,
+                job_digest: self.running_job_digest,
+            },
+            active_reservation_revision: self.active_reservation_revision,
+            active_reservation_digest: self.active_reservation_digest,
+            active_claim: ComputeCapacityClaimBinding {
+                claim_id: self.capacity_claim_id,
+                claim_revision: self.active_claim_revision,
+                claim_digest: self.active_claim_digest,
+            },
+            activated_at: self.activated_at,
+        })
+    }
 }
 
 fn audit_stored_activation_on(conn: &Connection, stored: &StoredAttemptActivation) -> Result<()> {
+    audit_stored_activation_with_source_policy_on(conn, stored, false)
+}
+
+fn audit_stored_activation_with_source_policy_on(
+    conn: &Connection,
+    stored: &StoredAttemptActivation,
+    use_historical_sources: bool,
+) -> Result<()> {
     let lease = stored.lease()?;
     let recomputed_lease_digest = hex::encode(Sha256::digest(stored.lease_json.as_bytes()));
     if recomputed_lease_digest != stored.lease_digest
@@ -269,13 +313,17 @@ fn audit_stored_activation_on(conn: &Connection, stored: &StoredAttemptActivatio
     {
         bail!("Attempt 激活回执引用了错误的容量账本事件");
     }
-    audit_job_versions(conn, stored)?;
-    audit_reservation_versions(conn, stored)?;
+    audit_job_versions(conn, stored, use_historical_sources)?;
+    audit_reservation_versions(conn, stored, use_historical_sources)?;
     audit_claim_versions(conn, stored)?;
     Ok(())
 }
 
-fn audit_job_versions(conn: &Connection, stored: &StoredAttemptActivation) -> Result<()> {
+fn audit_job_versions(
+    conn: &Connection,
+    stored: &StoredAttemptActivation,
+    use_historical_sources: bool,
+) -> Result<()> {
     for (revision, digest) in [
         (
             stored.source_job_revision,
@@ -286,8 +334,12 @@ fn audit_job_versions(conn: &Connection, stored: &StoredAttemptActivation) -> Re
             stored.running_job_digest.as_str(),
         ),
     ] {
-        let job = registered_job_version_on(conn, &stored.job_id, revision)?
-            .ok_or_else(|| anyhow!("Attempt 激活绑定的 Job 历史版本不存在"))?;
+        let job = if use_historical_sources {
+            registered_historical_job_version_on(conn, &stored.job_id, revision)?
+        } else {
+            registered_job_version_on(conn, &stored.job_id, revision)?
+        }
+        .ok_or_else(|| anyhow!("Attempt 激活绑定的 Job 历史版本不存在"))?;
         if job.job_digest != digest || job.job.consumer_account_id != stored.consumer_account_id {
             bail!("Attempt 激活绑定的 Job 历史版本审计失败");
         }
@@ -295,7 +347,11 @@ fn audit_job_versions(conn: &Connection, stored: &StoredAttemptActivation) -> Re
     Ok(())
 }
 
-fn audit_reservation_versions(conn: &Connection, stored: &StoredAttemptActivation) -> Result<()> {
+fn audit_reservation_versions(
+    conn: &Connection,
+    stored: &StoredAttemptActivation,
+    use_historical_sources: bool,
+) -> Result<()> {
     for (revision, digest) in [
         (
             stored.source_reservation_revision,
@@ -306,9 +362,12 @@ fn audit_reservation_versions(conn: &Connection, stored: &StoredAttemptActivatio
             stored.active_reservation_digest.as_str(),
         ),
     ] {
-        let reservation =
+        let reservation = if use_historical_sources {
+            registered_historical_reservation_version_on(conn, &stored.reservation_id, revision)?
+        } else {
             registered_reservation_version_on(conn, &stored.reservation_id, revision)?
-                .ok_or_else(|| anyhow!("Attempt 激活绑定的 Reservation 历史版本不存在"))?;
+        }
+        .ok_or_else(|| anyhow!("Attempt 激活绑定的 Reservation 历史版本不存在"))?;
         if reservation.reservation_digest != digest {
             bail!("Attempt 激活绑定的 Reservation 历史版本审计失败");
         }

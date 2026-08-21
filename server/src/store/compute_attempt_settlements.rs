@@ -27,7 +27,7 @@ use pending_candidate::build_pending_settlement_candidate_on;
 use pending_queue::list_pending_settlement_lease_ids_on;
 use support::{
     normalize_settlement_request, persist_settlement_on, settlement_by_idempotency_on,
-    settlement_by_lease_on, settlement_request_digest,
+    settlement_by_lease_on, settlement_by_receipt_id_on, settlement_request_digest,
 };
 
 pub(crate) const COMPUTE_ATTEMPT_SETTLEMENT_SCHEMA: &str =
@@ -212,4 +212,14 @@ pub(super) fn compute_attempt_settlement_on(
     let stored = settlement_by_lease_on(conn, lease_id)?
         .ok_or_else(|| anyhow::anyhow!("Attempt 尚无结算回执"))?;
     stored.into_receipt(conn, false)
+}
+
+pub(in crate::store) fn compute_attempt_settlement_by_receipt_id_on(
+    conn: &Connection,
+    settlement_receipt_id: &str,
+) -> Result<Option<ComputeAttemptSettlementReceipt>> {
+    support::validate_exact("Settlement Receipt ID", settlement_receipt_id, 240)?;
+    settlement_by_receipt_id_on(conn, settlement_receipt_id)?
+        .map(|stored| stored.into_historical_receipt(conn))
+        .transpose()
 }

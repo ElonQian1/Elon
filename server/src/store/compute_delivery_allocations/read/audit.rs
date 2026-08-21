@@ -16,8 +16,10 @@ use super::super::{
     super::{
         compute_broker_reservation::broker_reserve_binding_on,
         compute_capacity_claim_rows::{stored_claim_on, stored_claim_version_on},
-        compute_capacity_commitments::audited_capacity_commitment_source_on,
-        compute_job_registry::registered_job_version_on,
+        compute_capacity_commitments::{
+            audited_capacity_commitment_source_on, audited_historical_capacity_commitment_source_on,
+        },
+        compute_job_registry::{registered_historical_job_version_on, registered_job_version_on},
         compute_reservation_registry::registered_reservation_version_on,
     },
     types::{DeliveryAllocationClaimTransferAuthority, DeliveryAllocationReservationAuthority},
@@ -74,9 +76,28 @@ pub(super) fn audit_grant_dependencies_on(
     conn: &Connection,
     grant: &ComputeDeliveryAllocationGrant,
 ) -> Result<()> {
-    let (commitment, _) =
+    audit_grant_dependencies_with_policy_on(conn, grant, false)
+}
+
+pub(super) fn audit_historical_grant_dependencies_on(
+    conn: &Connection,
+    grant: &ComputeDeliveryAllocationGrant,
+) -> Result<()> {
+    audit_grant_dependencies_with_policy_on(conn, grant, true)
+}
+
+fn audit_grant_dependencies_with_policy_on(
+    conn: &Connection,
+    grant: &ComputeDeliveryAllocationGrant,
+    use_historical_dependencies: bool,
+) -> Result<()> {
+    let source = if use_historical_dependencies {
+        audited_historical_capacity_commitment_source_on(conn, &grant.commitment.commitment_id)?
+    } else {
         audited_capacity_commitment_source_on(conn, &grant.commitment.commitment_id)?
-            .ok_or_else(|| anyhow!("DeliveryAllocation Grant 来源 Commitment 缺失"))?;
+    };
+    let (commitment, _) =
+        source.ok_or_else(|| anyhow!("DeliveryAllocation Grant 来源 Commitment 缺失"))?;
     let root = commitment.commitment;
     if root.commitment_revision != grant.commitment.commitment_revision
         || root.commitment_digest != grant.commitment.commitment_digest
@@ -85,8 +106,12 @@ pub(super) fn audit_grant_dependencies_on(
     {
         bail!("DeliveryAllocation Grant 来源 Commitment 摘要或窗口不一致");
     }
-    let job = registered_job_version_on(conn, &grant.job.job_id, grant.job.job_revision)?
-        .ok_or_else(|| anyhow!("DeliveryAllocation Grant Job 历史版本缺失"))?;
+    let job = if use_historical_dependencies {
+        registered_historical_job_version_on(conn, &grant.job.job_id, grant.job.job_revision)?
+    } else {
+        registered_job_version_on(conn, &grant.job.job_id, grant.job.job_revision)?
+    }
+    .ok_or_else(|| anyhow!("DeliveryAllocation Grant Job 历史版本缺失"))?;
     if job.job_digest != grant.job.job_digest
         || job.job.consumer_account_id != grant.consumer_account_id
         || job.job.project_id != grant.project_id
@@ -199,6 +224,23 @@ pub(super) fn reservation_authority_from_terminal_on(
     grant: &ComputeDeliveryAllocationGrant,
     terminal: &ComputeDeliveryAllocationTerminalReceipt,
 ) -> Result<DeliveryAllocationReservationAuthority> {
+    reservation_authority_from_terminal_with_parent_policy_on(conn, grant, terminal, true)
+}
+
+pub(super) fn historical_reservation_authority_from_terminal_on(
+    conn: &Connection,
+    grant: &ComputeDeliveryAllocationGrant,
+    terminal: &ComputeDeliveryAllocationTerminalReceipt,
+) -> Result<DeliveryAllocationReservationAuthority> {
+    reservation_authority_from_terminal_with_parent_policy_on(conn, grant, terminal, false)
+}
+
+fn reservation_authority_from_terminal_with_parent_policy_on(
+    conn: &Connection,
+    grant: &ComputeDeliveryAllocationGrant,
+    terminal: &ComputeDeliveryAllocationTerminalReceipt,
+    require_current_parent: bool,
+) -> Result<DeliveryAllocationReservationAuthority> {
     let evidence = terminal
         .exercise
         .as_ref()
@@ -222,9 +264,13 @@ pub(super) fn reservation_authority_from_terminal_on(
     {
         bail!("DeliveryAllocation exercised actor/evidence shape 不一致");
     }
-    let (commitment, old_terminal) =
+    let source = if require_current_parent {
         audited_capacity_commitment_source_on(conn, &grant.commitment.commitment_id)?
-            .ok_or_else(|| anyhow!("DeliveryAllocation exercised Commitment 缺失"))?;
+    } else {
+        audited_historical_capacity_commitment_source_on(conn, &grant.commitment.commitment_id)?
+    };
+    let (commitment, old_terminal) =
+        source.ok_or_else(|| anyhow!("DeliveryAllocation exercised Commitment 缺失"))?;
     if old_terminal.is_some()
         || commitment.commitment.commitment_digest != grant.commitment.commitment_digest
     {
@@ -248,8 +294,14 @@ pub(super) fn reservation_authority_from_terminal_on(
         evidence.reservation_claim.claim_revision,
     )?
     .ok_or_else(|| anyhow!("DeliveryAllocation child Reservation Claim 缺失"))?;
-    let current_parent = stored_claim_on(conn, &evidence.parent_claim_id)?
-        .ok_or_else(|| anyhow!("DeliveryAllocation current parent Claim 缺失"))?;
+    let current_parent = if require_current_parent {
+        Some(
+            stored_claim_on(conn, &evidence.parent_claim_id)?
+                .ok_or_else(|| anyhow!("DeliveryAllocation current parent Claim 缺失"))?,
+        )
+    } else {
+        None
+    };
     if evidence.parent_claim_id != commitment.commitment.claim.claim_id
         || evidence.parent_prior_claim_revision != 1
         || evidence.parent_prior_claim_digest != commitment.commitment.claim.claim_digest
@@ -272,7 +324,9 @@ pub(super) fn reservation_authority_from_terminal_on(
         || parent_result.subject_kind != "compute_capacity_commitment"
         || parent_result.subject_id != commitment.commitment.commitment_id
         || parent_result.parent_claim_id.is_some()
-        || current_parent != parent_result
+        || current_parent
+            .as_ref()
+            .is_some_and(|current| current != &parent_result)
         || child_claim.claim_digest != evidence.reservation_claim.claim_digest
         || child_claim.state != ComputeCapacityClaimState::Held
         || child_claim.claim_kind != ComputeCapacityClaimKind::Reservation
@@ -300,8 +354,12 @@ pub(super) fn reservation_authority_from_terminal_on(
         &evidence.reservation.reservation_id,
         &evidence.parent_release_ledger.transaction_id,
     )?;
-    let source_job = registered_job_version_on(conn, &grant.job.job_id, grant.job.job_revision)?
-        .ok_or_else(|| anyhow!("DeliveryAllocation source Job 缺失"))?;
+    let source_job = if require_current_parent {
+        registered_job_version_on(conn, &grant.job.job_id, grant.job.job_revision)?
+    } else {
+        registered_historical_job_version_on(conn, &grant.job.job_id, grant.job.job_revision)?
+    }
+    .ok_or_else(|| anyhow!("DeliveryAllocation source Job 缺失"))?;
     let transfer = DeliveryAllocationClaimTransferAuthority::new(
         grant.clone(),
         commitment.commitment,
@@ -309,7 +367,12 @@ pub(super) fn reservation_authority_from_terminal_on(
         source_job,
         evidence.reservation.reservation_id.clone(),
         terminal.idempotency_key.clone(),
-        source_job_deadline_on(conn, &grant.job.job_id, grant.job.job_revision)?,
+        source_job_deadline_with_policy_on(
+            conn,
+            &grant.job.job_id,
+            grant.job.job_revision,
+            !require_current_parent,
+        )?,
         terminal.occurred_at.clone(),
     );
     Ok(DeliveryAllocationReservationAuthority::new(
@@ -400,8 +463,18 @@ pub(super) fn validate_non_exercise_terminal(
     Ok(())
 }
 
-fn source_job_deadline_on(conn: &Connection, job_id: &str, revision: i64) -> Result<String> {
-    Ok(registered_job_version_on(conn, job_id, revision)?
+fn source_job_deadline_with_policy_on(
+    conn: &Connection,
+    job_id: &str,
+    revision: i64,
+    use_historical_dependencies: bool,
+) -> Result<String> {
+    let job = if use_historical_dependencies {
+        registered_historical_job_version_on(conn, job_id, revision)?
+    } else {
+        registered_job_version_on(conn, job_id, revision)?
+    };
+    Ok(job
         .ok_or_else(|| anyhow!("DeliveryAllocation source Job deadline 缺失"))?
         .job
         .workload

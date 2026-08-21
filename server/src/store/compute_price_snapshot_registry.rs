@@ -7,7 +7,10 @@ use crate::compute_federation::market::{ComputePriceSnapshot, PRICE_SOURCE_FALLB
 
 use super::{
     compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
-    compute_offer_registry::{current_registered_offer_on, registered_offer_version_on},
+    compute_offer_registry::{
+        current_registered_offer_on, registered_historical_offer_version_on,
+        registered_offer_version_on,
+    },
     compute_price_snapshot_validation::validate_price_snapshot_contract,
     now, Store,
 };
@@ -243,16 +246,39 @@ pub(super) fn registered_price_snapshot_on(
     audited_price_snapshot_on(conn, &stored).map(Some)
 }
 
+pub(in crate::store) fn registered_historical_price_snapshot_on(
+    conn: &Connection,
+    snapshot_id: &str,
+) -> Result<Option<ComputePriceSnapshot>> {
+    let Some(stored) = price_snapshot_on(conn, snapshot_id.trim())? else {
+        return Ok(None);
+    };
+    audited_price_snapshot_with_offer_policy_on(conn, &stored, true).map(Some)
+}
+
 fn audited_price_snapshot_on(
     conn: &Connection,
     stored: &StoredPriceSnapshot,
 ) -> Result<ComputePriceSnapshot> {
-    let offer = registered_offer_version_on(conn, &stored.offer_id, stored.offer_version)?
-        .ok_or_else(|| anyhow!("算力价格快照绑定的 Offer 历史版本不存在"))?;
+    audited_price_snapshot_with_offer_policy_on(conn, stored, false)
+}
+
+fn audited_price_snapshot_with_offer_policy_on(
+    conn: &Connection,
+    stored: &StoredPriceSnapshot,
+    use_historical_offer: bool,
+) -> Result<ComputePriceSnapshot> {
+    let offer = if use_historical_offer {
+        registered_historical_offer_version_on(conn, &stored.offer_id, stored.offer_version)?
+    } else {
+        registered_offer_version_on(conn, &stored.offer_id, stored.offer_version)?
+    }
+    .ok_or_else(|| anyhow!("算力价格快照绑定的 Offer 历史版本不存在"))?;
     let snapshot: ComputePriceSnapshot =
         serde_json::from_str(&stored.snapshot_json).context("算力价格快照历史 JSON 无效")?;
     let computed_digest = validate_price_snapshot_contract(&snapshot, &offer.offer)?;
-    if computed_digest != stored.snapshot_digest
+    if stored.snapshot_json != serde_json::to_string(&snapshot)?
+        || computed_digest != stored.snapshot_digest
         || snapshot.snapshot_id != stored.snapshot_id
         || snapshot.quote_id != stored.quote_id
         || snapshot.pricing_mode != stored.pricing_mode

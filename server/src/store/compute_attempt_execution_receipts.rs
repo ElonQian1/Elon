@@ -6,18 +6,28 @@ use serde::Serialize;
 use crate::compute_federation::receipts::ComputeExecutionReceipt;
 
 use super::{
-    compute_attempt_activations::compute_attempt_activation_on,
-    compute_attempt_consumer_reviews::compute_attempt_consumer_review_on,
-    compute_attempt_platform_observations::compute_attempt_platform_observation_on,
+    compute_attempt_activations::{
+        compute_attempt_activation_on, compute_attempt_historical_activation_sources_on,
+    },
+    compute_attempt_consumer_reviews::{
+        compute_attempt_consumer_review_on, compute_attempt_historical_consumer_review_on,
+    },
+    compute_attempt_platform_observations::{
+        compute_attempt_historical_platform_observation_on, compute_attempt_platform_observation_on,
+    },
     compute_attempt_terminals::{
-        compute_attempt_terminal_candidate_on, ComputeAttemptTerminalCandidateReceipt,
+        compute_attempt_historical_terminal_candidate_on, compute_attempt_terminal_candidate_on,
+        ComputeAttemptTerminalCandidateReceipt,
     },
     compute_attempt_usage::compute_attempt_usage_declaration_on,
     compute_attempt_verifications::{
+        compute_attempt_historical_verification_decision_on,
         compute_attempt_verification_decision_on, ComputeAttemptVerificationDecisionReceipt,
     },
-    compute_job_registry::registered_job_version_on,
-    compute_reservation_registry::registered_reservation_version_on,
+    compute_job_registry::{registered_historical_job_version_on, registered_job_version_on},
+    compute_reservation_registry::{
+        registered_historical_reservation_version_on, registered_reservation_version_on,
+    },
     new_id, Store,
 };
 
@@ -28,7 +38,7 @@ use pending_queue::list_pending_execution_receipt_lease_ids_on;
 
 use support::{
     build_execution_receipt, ensure_expected_verification, ensure_receipt_sources,
-    execution_receipt_by_idempotency_on, execution_receipt_by_lease_on,
+    execution_receipt_by_id_on, execution_receipt_by_idempotency_on, execution_receipt_by_lease_on,
     execution_receipt_by_verification_on, execution_receipt_request_digest,
     normalize_execution_receipt_request, StoredExecutionReceipt,
 };
@@ -132,7 +142,8 @@ impl Store {
             &consumer_review,
             &platform_observation,
             &provider_usage,
-            &activation,
+            &activation.lease,
+            &activation.activated_at,
             &job,
             &reservation,
         )?;
@@ -146,7 +157,8 @@ impl Store {
             &consumer_review,
             &platform_observation,
             &provider_usage,
-            &activation,
+            &activation.lease,
+            &activation.activated_at,
             &job.job,
             &reservation.reservation,
             &issued_at,
@@ -230,7 +242,8 @@ impl Store {
                     &consumer_review,
                     &platform_observation,
                     &provider_usage,
-                    &activation,
+                    &activation.lease,
+                    &activation.activated_at,
                     &job,
                     &reservation,
                 )?;
@@ -253,33 +266,93 @@ pub(super) fn compute_attempt_execution_receipt_on(
     execution_receipt_envelope_on(conn, stored, false)
 }
 
+pub(in crate::store) fn compute_attempt_execution_receipt_by_id_on(
+    conn: &rusqlite::Connection,
+    execution_receipt_id: &str,
+) -> Result<Option<ComputeAttemptExecutionReceiptEnvelope>> {
+    support::validate_exact("Execution Receipt ID", execution_receipt_id, 200)?;
+    execution_receipt_by_id_on(conn, execution_receipt_id)?
+        .map(|stored| execution_receipt_historical_envelope_on(conn, stored))
+        .transpose()
+}
+
 fn execution_receipt_envelope_on(
     conn: &rusqlite::Connection,
     stored: StoredExecutionReceipt,
     replayed: bool,
 ) -> Result<ComputeAttemptExecutionReceiptEnvelope> {
-    let verification = compute_attempt_verification_decision_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Execution Receipt 引用的 Verification 决定不存在"))?;
-    let candidate = compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Execution Receipt 引用的 Provider 候选不存在"))?;
-    let consumer_review = compute_attempt_consumer_review_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Execution Receipt 引用的消费者审核不存在"))?;
-    let platform_observation = compute_attempt_platform_observation_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Execution Receipt 引用的平台观测不存在"))?;
+    execution_receipt_envelope_with_source_policy_on(conn, stored, replayed, false)
+}
+
+fn execution_receipt_historical_envelope_on(
+    conn: &rusqlite::Connection,
+    stored: StoredExecutionReceipt,
+) -> Result<ComputeAttemptExecutionReceiptEnvelope> {
+    execution_receipt_envelope_with_source_policy_on(conn, stored, false, true)
+}
+
+fn execution_receipt_envelope_with_source_policy_on(
+    conn: &rusqlite::Connection,
+    stored: StoredExecutionReceipt,
+    replayed: bool,
+    use_historical_sources: bool,
+) -> Result<ComputeAttemptExecutionReceiptEnvelope> {
+    let verification = if use_historical_sources {
+        compute_attempt_historical_verification_decision_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_verification_decision_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Execution Receipt 引用的 Verification 决定不存在"))?;
+    let candidate = if use_historical_sources {
+        compute_attempt_historical_terminal_candidate_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Execution Receipt 引用的 Provider 候选不存在"))?;
+    let consumer_review = if use_historical_sources {
+        compute_attempt_historical_consumer_review_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_consumer_review_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Execution Receipt 引用的消费者审核不存在"))?;
+    let platform_observation = if use_historical_sources {
+        compute_attempt_historical_platform_observation_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_platform_observation_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Execution Receipt 引用的平台观测不存在"))?;
     let provider_usage = compute_attempt_usage_declaration_on(
         conn,
         &stored.lease_id,
         candidate.final_usage_sequence_no,
     )?
     .ok_or_else(|| anyhow!("Execution Receipt 引用的 Provider 用量不存在"))?;
-    let activation = compute_attempt_activation_on(conn, &stored.lease_id)?;
-    let job = registered_job_version_on(conn, &candidate.job_id, candidate.job_revision)?
-        .ok_or_else(|| anyhow!("Execution Receipt 引用的 Job 版本不存在"))?;
-    let reservation = registered_reservation_version_on(
-        conn,
-        &candidate.reservation_id,
-        candidate.reservation_revision,
-    )?
+    let (activation_lease, activated_at) = if use_historical_sources {
+        let activation = compute_attempt_historical_activation_sources_on(conn, &stored.lease_id)?;
+        (activation.lease, activation.activated_at)
+    } else {
+        let activation = compute_attempt_activation_on(conn, &stored.lease_id)?;
+        (activation.lease, activation.activated_at)
+    };
+    let job = if use_historical_sources {
+        registered_historical_job_version_on(conn, &candidate.job_id, candidate.job_revision)?
+    } else {
+        registered_job_version_on(conn, &candidate.job_id, candidate.job_revision)?
+    }
+    .ok_or_else(|| anyhow!("Execution Receipt 引用的 Job 版本不存在"))?;
+    let reservation = if use_historical_sources {
+        registered_historical_reservation_version_on(
+            conn,
+            &candidate.reservation_id,
+            candidate.reservation_revision,
+        )?
+    } else {
+        registered_reservation_version_on(
+            conn,
+            &candidate.reservation_id,
+            candidate.reservation_revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Execution Receipt 引用的 Reservation 版本不存在"))?;
     ensure_receipt_sources(
         &verification,
@@ -287,7 +360,8 @@ fn execution_receipt_envelope_on(
         &consumer_review,
         &platform_observation,
         &provider_usage,
-        &activation,
+        &activation_lease,
+        &activated_at,
         &job,
         &reservation,
     )?;
@@ -297,7 +371,8 @@ fn execution_receipt_envelope_on(
         &consumer_review,
         &platform_observation,
         &provider_usage,
-        &activation,
+        &activation_lease,
+        &activated_at,
         &job.job,
         &reservation.reservation,
         replayed,

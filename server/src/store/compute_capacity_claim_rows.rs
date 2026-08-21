@@ -252,7 +252,8 @@ pub(super) fn stored_claim_version_on(
         .map_err(|error| anyhow!("容量 Claim 历史版本合同无效: {error:?}"))?;
     let mut recomputed = claim.clone();
     finalize_claim_digest(&mut recomputed)?;
-    if claim.claim_id != normalized_claim_id
+    if claim_json != serde_json::to_string(&claim)?
+        || claim.claim_id != normalized_claim_id
         || claim.revision != revision
         || claim.claim_digest != claim_digest
         || recomputed.claim_digest != claim_digest

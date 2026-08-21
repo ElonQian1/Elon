@@ -36,11 +36,24 @@ use preflight::{
     activation_timestamp, ensure_broker_binding, ensure_budget_reserved, ensure_job_matches,
     ensure_lease_window, ensure_provider_and_offer_live, ensure_reservation_matches,
 };
-use rows::{attempt_activation_on, persist_attempt_activation_on};
+use rows::{
+    attempt_activation_on, historical_attempt_activation_sources_on, persist_attempt_activation_on,
+};
 use validation::normalize_activation;
 
 pub(crate) const ATTEMPT_ACTIVATION_EXECUTION_EFFECT: &str = "none";
 pub(crate) const ATTEMPT_ACTIVATION_MONEY_EFFECT: &str = "preauthorization_unchanged";
+
+#[derive(Debug)]
+pub(in crate::store) struct HistoricalComputeAttemptActivationSources {
+    pub(in crate::store) lease: ComputeAttemptLease,
+    pub(in crate::store) lease_digest: String,
+    pub(in crate::store) running_job: ComputeJobVersionBinding,
+    pub(in crate::store) active_reservation_revision: i64,
+    pub(in crate::store) active_reservation_digest: String,
+    pub(in crate::store) active_claim: ComputeCapacityClaimBinding,
+    pub(in crate::store) activated_at: String,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct ActivateComputeAttemptRequest {
@@ -294,5 +307,16 @@ pub(super) fn compute_attempt_activation_on(
         bail!("Attempt Lease ID 无效");
     }
     attempt_activation_on(conn, "", lease_id, None)?
+        .ok_or_else(|| anyhow!("Attempt 激活回执不存在"))
+}
+
+pub(in crate::store) fn compute_attempt_historical_activation_sources_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<HistoricalComputeAttemptActivationSources> {
+    if lease_id.is_empty() || lease_id.trim() != lease_id {
+        bail!("Attempt Lease ID 无效");
+    }
+    historical_attempt_activation_sources_on(conn, lease_id)?
         .ok_or_else(|| anyhow!("Attempt 激活回执不存在"))
 }

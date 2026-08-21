@@ -5,6 +5,22 @@ use crate::compute_federation::receipts::ComputeExecutionReceipt;
 
 use super::StoredExecutionReceipt;
 
+pub(in crate::store::compute_attempt_execution_receipts) fn execution_receipt_by_id_on(
+    conn: &Connection,
+    execution_receipt_id: &str,
+) -> Result<Option<StoredExecutionReceipt>> {
+    query_one(
+        conn,
+        "SELECT execution_receipt_id, verification_decision_id,
+                verification_event_digest, lease_id, receipt_digest,
+                receipt_json, request_digest, idempotency_scope,
+                idempotency_key, issued_by_user_id, issued_at, created_at
+           FROM compute_attempt_execution_receipts
+          WHERE execution_receipt_id=?1",
+        params![execution_receipt_id],
+    )
+}
+
 pub(in crate::store::compute_attempt_execution_receipts) fn execution_receipt_by_idempotency_on(
     conn: &Connection,
     idempotency_scope: &str,
@@ -72,6 +88,7 @@ fn stored_from_row(row: &Row<'_>) -> rusqlite::Result<StoredExecutionReceipt> {
         verification_event_digest: row.get(2)?,
         lease_id: row.get(3)?,
         receipt_digest: row.get(4)?,
+        receipt_json: receipt_json.clone(),
         receipt: serde_json::from_str::<ComputeExecutionReceipt>(&receipt_json)
             .map_err(json_error)?,
         request_digest: row.get(6)?,

@@ -42,6 +42,13 @@ impl StoredSettlement {
     ) -> Result<ComputeAttemptSettlementReceipt> {
         audit::audited_settlement_on(conn, self, replayed)
     }
+
+    pub(super) fn into_historical_receipt(
+        &self,
+        conn: &Connection,
+    ) -> Result<ComputeAttemptSettlementReceipt> {
+        audit::audited_historical_settlement_on(conn, self)
+    }
 }
 
 pub(super) fn normalize_settlement_request(
@@ -174,6 +181,17 @@ pub(super) fn settlement_by_lease_on(
     lease_id: &str,
 ) -> Result<Option<StoredSettlement>> {
     settlement_query(conn, "WHERE lease_id=?1", params![lease_id])
+}
+
+pub(super) fn settlement_by_receipt_id_on(
+    conn: &Connection,
+    settlement_receipt_id: &str,
+) -> Result<Option<StoredSettlement>> {
+    settlement_query(
+        conn,
+        "WHERE settlement_receipt_id=?1",
+        params![settlement_receipt_id],
+    )
 }
 
 fn settlement_query<P>(

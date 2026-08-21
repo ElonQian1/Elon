@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     compute_federation::{
-        execution::{ComputeJob, ComputeReservation},
+        execution::{ComputeAttemptLease, ComputeJob, ComputeReservation},
         receipts::{
             ComputeAttestationEvidence, ComputeExecutionReceipt, ComputeExecutionUsage,
             ComputeVerificationDecision, COMPUTE_EXECUTION_RECEIPT_SCHEMA,
@@ -14,10 +14,10 @@ use crate::{
         },
     },
     store::{
-        ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
-        ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
-        ComputeAttemptUsageDeclarationReceipt, ComputeAttemptVerificationDecisionReceipt,
-        ComputeJobRegistrationReceipt, ComputeReservationRegistrationReceipt,
+        ComputeAttemptConsumerReviewReceipt, ComputeAttemptPlatformObservationReceipt,
+        ComputeAttemptTerminalCandidateReceipt, ComputeAttemptUsageDeclarationReceipt,
+        ComputeAttemptVerificationDecisionReceipt, ComputeJobRegistrationReceipt,
+        ComputeReservationRegistrationReceipt,
     },
 };
 
@@ -27,7 +27,7 @@ mod audit;
 mod persistence;
 
 pub(super) use persistence::{
-    execution_receipt_by_idempotency_on, execution_receipt_by_lease_on,
+    execution_receipt_by_id_on, execution_receipt_by_idempotency_on, execution_receipt_by_lease_on,
     execution_receipt_by_verification_on,
 };
 
@@ -38,6 +38,7 @@ pub(super) struct StoredExecutionReceipt {
     pub verification_event_digest: String,
     pub lease_id: String,
     pub receipt_digest: String,
+    pub receipt_json: String,
     pub receipt: ComputeExecutionReceipt,
     pub request_digest: String,
     pub idempotency_scope: String,
@@ -112,7 +113,8 @@ pub(super) fn ensure_receipt_sources(
     consumer_review: &ComputeAttemptConsumerReviewReceipt,
     platform_observation: &ComputeAttemptPlatformObservationReceipt,
     provider_usage: &ComputeAttemptUsageDeclarationReceipt,
-    activation: &ComputeAttemptActivationReceipt,
+    activation_lease: &ComputeAttemptLease,
+    activated_at: &str,
     job: &ComputeJobRegistrationReceipt,
     reservation: &ComputeReservationRegistrationReceipt,
 ) -> Result<()> {
@@ -129,11 +131,11 @@ pub(super) fn ensure_receipt_sources(
     {
         bail!("Execution Receipt 的 v188-v192 证据链不一致");
     }
-    if activation.lease.lease_id != verification.lease_id
-        || activation.lease.job_id != verification.job_id
-        || activation.lease.reservation_id != verification.reservation_id
-        || activation.lease.provider_id != verification.provider_id
-        || activation.lease.fencing_generation != verification.fencing_generation
+    if activation_lease.lease_id != verification.lease_id
+        || activation_lease.job_id != verification.job_id
+        || activation_lease.reservation_id != verification.reservation_id
+        || activation_lease.provider_id != verification.provider_id
+        || activation_lease.fencing_generation != verification.fencing_generation
         || job.revision != verification.job_revision
         || job.job_digest != verification.job_digest
         || job.job.job_id != verification.job_id
@@ -151,7 +153,7 @@ pub(super) fn ensure_receipt_sources(
     if job.job.workload.runtime.is_none() {
         bail!("Execution Receipt 要求 Workload 固定 runtime/runner 摘要");
     }
-    let started = DateTime::parse_from_rfc3339(&activation.activated_at)?;
+    let started = DateTime::parse_from_rfc3339(activated_at)?;
     let finished = DateTime::parse_from_rfc3339(&candidate.declared_at)?;
     if finished < started {
         bail!("Execution Receipt 终态时间不能早于 Attempt 激活时间");
@@ -167,7 +169,8 @@ pub(super) fn build_execution_receipt(
     consumer_review: &ComputeAttemptConsumerReviewReceipt,
     platform_observation: &ComputeAttemptPlatformObservationReceipt,
     provider_usage: &ComputeAttemptUsageDeclarationReceipt,
-    activation: &ComputeAttemptActivationReceipt,
+    activation_lease: &ComputeAttemptLease,
+    activated_at: &str,
     job: &ComputeJob,
     reservation: &ComputeReservation,
     issued_at: &str,
@@ -211,10 +214,10 @@ pub(super) fn build_execution_receipt(
         job_id: verification.job_id.clone(),
         reservation_id: verification.reservation_id.clone(),
         attempt_lease_id: verification.lease_id.clone(),
-        attempt_no: activation.lease.attempt_no,
+        attempt_no: activation_lease.attempt_no,
         fencing_generation: verification.fencing_generation,
         provider_id: verification.provider_id.clone(),
-        executor_id: activation.lease.executor_id.clone(),
+        executor_id: activation_lease.executor_id.clone(),
         offer_id: reservation.offer.offer_id.clone(),
         offer_version: reservation.offer.offer_version,
         offer_digest: reservation.offer.offer_digest.clone(),
@@ -251,7 +254,7 @@ pub(super) fn build_execution_receipt(
             decision_digest: verification.event_digest.clone(),
             decided_at: Some(verification.decided_at.clone()),
         },
-        started_at: activation.activated_at.clone(),
+        started_at: activated_at.to_string(),
         finished_at: candidate.declared_at.clone(),
         created_at: issued_at.to_string(),
     };

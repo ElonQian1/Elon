@@ -26,7 +26,7 @@ mod support;
 
 pub(super) use final_usage::terminal_candidate_exists_on;
 
-use final_usage::terminal_candidate_receipt_on;
+use final_usage::{historical_terminal_candidate_receipt_on, terminal_candidate_receipt_on};
 use support::{
     artifacts_digest, candidate_by_idempotency_on, candidate_by_lease_on,
     list_pending_consumer_review_candidates_on, normalize_terminal_request, terminal_event_digest,
@@ -284,6 +284,17 @@ pub(crate) fn compute_attempt_terminal_candidate_on(
         return Ok(None);
     };
     Ok(Some(terminal_candidate_receipt_on(conn, stored, false)?))
+}
+
+pub(in crate::store) fn compute_attempt_historical_terminal_candidate_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptTerminalCandidateReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    let Some(stored) = candidate_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    historical_terminal_candidate_receipt_on(conn, stored).map(Some)
 }
 
 fn ensure_live_running_lease(

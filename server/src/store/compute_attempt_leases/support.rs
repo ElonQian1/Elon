@@ -23,6 +23,7 @@ pub(crate) struct StoredLeaseState {
     pub(in crate::store) lease_revision: i64,
     pub(in crate::store) lease_digest: String,
     pub(in crate::store) lease: ComputeAttemptLease,
+    lease_json: String,
     status: String,
     fencing_generation: i64,
     expires_at: String,
@@ -48,17 +49,30 @@ impl StoredLeaseState {
 
 #[derive(Debug, Clone)]
 pub(super) struct StoredRenewal {
-    renewal_id: String,
+    pub(super) renewal_id: String,
+    pub(super) lease_id: String,
+    pub(super) provider_id: String,
+    pub(super) consumer_account_id: String,
     pub(super) previous_lease_revision: i64,
-    previous_lease_digest: String,
+    pub(super) previous_lease_digest: String,
     pub(super) target_lease_revision: i64,
     pub(super) target_lease_digest: String,
     pub(super) target_lease: ComputeAttemptLease,
-    executor_heartbeat_ref: String,
+    pub(super) target_lease_json: String,
+    pub(super) previous_status: String,
+    pub(super) target_status: String,
+    pub(super) fencing_generation: i64,
+    pub(super) previous_expires_at: String,
+    pub(super) target_expires_at: String,
+    pub(super) hard_deadline_at: String,
+    pub(super) executor_heartbeat_ref: String,
     pub(super) request_digest: String,
-    event_digest: String,
-    renewed_by_user_id: String,
-    renewed_at: String,
+    pub(super) event_digest: String,
+    pub(super) idempotency_scope: String,
+    pub(super) idempotency_key: String,
+    pub(super) renewed_by_user_id: String,
+    pub(super) renewed_at: String,
+    pub(super) created_at: String,
 }
 
 impl StoredRenewal {
@@ -138,6 +152,7 @@ fn stored_state_from_row(row: &Row<'_>) -> rusqlite::Result<StoredLeaseState> {
         lease_revision: row.get(2)?,
         lease_digest: row.get(3)?,
         lease,
+        lease_json,
         status: row.get(5)?,
         fencing_generation: row.get(6)?,
         expires_at: row.get(7)?,
@@ -154,39 +169,81 @@ pub(super) fn renewal_by_idempotency_on(
     key: &str,
 ) -> Result<Option<StoredRenewal>> {
     conn.query_row(
-        "SELECT renewal_id, previous_lease_revision, previous_lease_digest,
+        "SELECT renewal_id, lease_id, provider_id, consumer_account_id,
+                previous_lease_revision, previous_lease_digest,
                 target_lease_revision, target_lease_digest, target_lease_json,
+                previous_status, target_status, fencing_generation,
+                previous_expires_at, target_expires_at, hard_deadline_at,
                 executor_heartbeat_ref, request_digest, event_digest,
-                renewed_by_user_id, renewed_at
+                idempotency_scope, idempotency_key, renewed_by_user_id,
+                renewed_at, created_at
            FROM compute_attempt_lease_renewals
           WHERE idempotency_scope=?1 AND idempotency_key=?2",
         params![scope, key],
-        |row| {
-            let target_json: String = row.get(5)?;
-            let target_lease = serde_json::from_str(&target_json).map_err(|error| {
-                rusqlite::Error::FromSqlConversionFailure(
-                    5,
-                    rusqlite::types::Type::Text,
-                    Box::new(error),
-                )
-            })?;
-            Ok(StoredRenewal {
-                renewal_id: row.get(0)?,
-                previous_lease_revision: row.get(1)?,
-                previous_lease_digest: row.get(2)?,
-                target_lease_revision: row.get(3)?,
-                target_lease_digest: row.get(4)?,
-                target_lease,
-                executor_heartbeat_ref: row.get(6)?,
-                request_digest: row.get(7)?,
-                event_digest: row.get(8)?,
-                renewed_by_user_id: row.get(9)?,
-                renewed_at: row.get(10)?,
-            })
-        },
+        stored_renewal_from_row,
     )
     .optional()
     .map_err(Into::into)
+}
+
+pub(super) fn renewals_for_lease_through_revision_on(
+    conn: &Connection,
+    lease_id: &str,
+    target_lease_revision: i64,
+) -> Result<Vec<StoredRenewal>> {
+    let mut statement = conn.prepare(
+        "SELECT renewal_id, lease_id, provider_id, consumer_account_id,
+                previous_lease_revision, previous_lease_digest,
+                target_lease_revision, target_lease_digest, target_lease_json,
+                previous_status, target_status, fencing_generation,
+                previous_expires_at, target_expires_at, hard_deadline_at,
+                executor_heartbeat_ref, request_digest, event_digest,
+                idempotency_scope, idempotency_key, renewed_by_user_id,
+                renewed_at, created_at
+           FROM compute_attempt_lease_renewals
+          WHERE lease_id=?1 AND target_lease_revision<=?2
+          ORDER BY target_lease_revision ASC",
+    )?;
+    statement
+        .query_map(
+            params![lease_id, target_lease_revision],
+            stored_renewal_from_row,
+        )?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
+fn stored_renewal_from_row(row: &Row<'_>) -> rusqlite::Result<StoredRenewal> {
+    let target_json: String = row.get(8)?;
+    let target_lease = serde_json::from_str(&target_json).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(error))
+    })?;
+    Ok(StoredRenewal {
+        renewal_id: row.get(0)?,
+        lease_id: row.get(1)?,
+        provider_id: row.get(2)?,
+        consumer_account_id: row.get(3)?,
+        previous_lease_revision: row.get(4)?,
+        previous_lease_digest: row.get(5)?,
+        target_lease_revision: row.get(6)?,
+        target_lease_digest: row.get(7)?,
+        target_lease,
+        target_lease_json: target_json,
+        previous_status: row.get(9)?,
+        target_status: row.get(10)?,
+        fencing_generation: row.get(11)?,
+        previous_expires_at: row.get(12)?,
+        target_expires_at: row.get(13)?,
+        hard_deadline_at: row.get(14)?,
+        executor_heartbeat_ref: row.get(15)?,
+        request_digest: row.get(16)?,
+        event_digest: row.get(17)?,
+        idempotency_scope: row.get(18)?,
+        idempotency_key: row.get(19)?,
+        renewed_by_user_id: row.get(20)?,
+        renewed_at: row.get(21)?,
+        created_at: row.get(22)?,
+    })
 }
 
 pub(super) fn ensure_renewal_owner(
@@ -251,6 +308,7 @@ fn audit_state(state: &StoredLeaseState) -> Result<()> {
         || state.expires_at != state.lease.expires_at
         || state.hard_deadline_at != state.lease.hard_deadline_at
         || state.last_heartbeat_at != state.lease.last_heartbeat_at
+        || state.lease_json != serde_json::to_string(&state.lease)?
         || state.lease_digest != compute_attempt_lease_digest(&state.lease)?
     {
         bail!("Attempt Lease 当前状态投影审计失败");
@@ -259,8 +317,43 @@ fn audit_state(state: &StoredLeaseState) -> Result<()> {
 }
 
 pub(super) fn audit_renewal(stored: &StoredRenewal) -> Result<()> {
-    if stored.target_lease_revision != stored.previous_lease_revision + 1
+    let request = RenewComputeAttemptLeaseRequest {
+        lease_id: stored.lease_id.clone(),
+        provider_id: stored.provider_id.clone(),
+        expected_lease_revision: stored.previous_lease_revision,
+        expected_lease_digest: stored.previous_lease_digest.clone(),
+        expected_fencing_generation: stored.fencing_generation,
+        executor_heartbeat_ref: stored.executor_heartbeat_ref.clone(),
+        expires_at: stored.target_expires_at.clone(),
+        idempotency_key: stored.idempotency_key.clone(),
+        renewed_by_user_id: stored.renewed_by_user_id.clone(),
+    };
+    validate_renewal_input(&request)?;
+    if stored.target_lease_revision
+        != stored
+            .previous_lease_revision
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("Attempt Lease 续租修订号溢出"))?
+        || stored.lease_id != stored.target_lease.lease_id
+        || stored.provider_id != stored.target_lease.provider_id
+        || stored.consumer_account_id.trim().is_empty()
+        || stored.previous_status
+            != if stored.previous_lease_revision == 1 {
+                ATTEMPT_STATUS_STAGING
+            } else {
+                ATTEMPT_STATUS_RUNNING
+            }
+        || stored.target_status != ATTEMPT_STATUS_RUNNING
         || stored.target_lease.status != ATTEMPT_STATUS_RUNNING
+        || stored.target_status != stored.target_lease.status
+        || stored.target_lease_json != serde_json::to_string(&stored.target_lease)?
+        || stored.fencing_generation != stored.target_lease.fencing_generation
+        || stored.target_expires_at != stored.target_lease.expires_at
+        || stored.hard_deadline_at != stored.target_lease.hard_deadline_at
+        || stored.created_at != stored.renewed_at
+        || stored.idempotency_scope
+            != format!("compute_attempt_lease_renewal:{}", stored.provider_id)
+        || renewal_request_digest(&request)? != stored.request_digest
         || stored.target_lease_digest != compute_attempt_lease_digest(&stored.target_lease)?
         || stored.target_lease.last_heartbeat_at.as_deref() != Some(stored.renewed_at.as_str())
         || stored.event_digest
