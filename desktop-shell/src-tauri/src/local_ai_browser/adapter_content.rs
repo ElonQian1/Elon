@@ -62,6 +62,10 @@ fn sanitize_part(value: &Value) -> Option<Value> {
     if !public_url.is_empty() {
         sanitized.insert("url".into(), Value::String(public_url));
     }
+    let icon_url = sanitize_public_url(part.get("iconUrl"));
+    if part_type == "citation" && !icon_url.is_empty() {
+        sanitized.insert("iconUrl".into(), Value::String(icon_url));
+    }
     Some(Value::Object(sanitized))
 }
 
@@ -158,7 +162,7 @@ mod tests {
         let parts = json!([
             {"type":"markdown","text":"**answer**"},
             {"type":"code","text":"Rust code","kind":"code_block","language":"rust","lineCount":12},
-            {"type":"citation","text":"Docs","url":"https://example.com/docs?token=secret","targetHost":"example.com"},
+            {"type":"citation","text":"Docs","url":"https://example.com/docs?token=secret","iconUrl":"https://cdn.example.com/icons/docs.png?signature=secret","targetHost":"example.com"},
             {"type":"credential","text":"secret"}
         ]);
         let sanitized = sanitize_parts(Some(&parts));
@@ -166,6 +170,7 @@ mod tests {
         assert_eq!(sanitized[0]["type"], "markdown");
         assert_eq!(sanitized[1]["lineCount"], 12);
         assert_eq!(sanitized[2]["url"], "https://example.com/docs");
+        assert_eq!(sanitized[2]["iconUrl"], "https://cdn.example.com/icons/docs.png");
         assert!(!Value::Array(sanitized).to_string().contains("token"));
     }
 }

@@ -29,9 +29,7 @@ export default function AiSourceLinks({ sources }: { sources?: AiSource[] }) {
           const title = source.title?.trim() || identity.host || source.url
           const content = (
             <>
-              <span className={styles.siteMark} data-tone={identity.tone} aria-hidden="true">
-                {identity.initial}
-              </span>
+              <SourceMark source={source} identity={identity} />
               <span className={styles.copy}>
                 <small>{identity.host || '公开网页'}</small>
                 <strong>{title}</strong>
@@ -80,13 +78,50 @@ export default function AiSourceLinks({ sources }: { sources?: AiSource[] }) {
 }
 
 function uniqueSourcesFor(sources?: AiSource[]) {
-  const seen = new Set<string>()
-  return (sources ?? []).filter((source) => {
+  const unique: AiSource[] = []
+  const indexes = new Map<string, number>()
+  for (const source of sources ?? []) {
     const key = normalizedUrl(source.url)
-    if (!key || seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+    if (!key) continue
+    const existingIndex = indexes.get(key)
+    if (existingIndex === undefined) {
+      indexes.set(key, unique.length)
+      unique.push(source)
+      continue
+    }
+    if (!unique[existingIndex].icon_url && source.icon_url) {
+      unique[existingIndex] = { ...unique[existingIndex], icon_url: source.icon_url }
+    }
+  }
+  return unique
+}
+
+function SourceMark({
+  source,
+  identity,
+}: {
+  source: AiSource
+  identity: ReturnType<typeof siteIdentity>
+}) {
+  const iconUrl = safeIconUrl(source.icon_url)
+  const [failedUrl, setFailedUrl] = useState('')
+  const showIcon = Boolean(iconUrl && failedUrl !== iconUrl)
+  return (
+    <span className={styles.siteMark} data-tone={identity.tone} aria-hidden="true">
+      <span>{identity.initial}</span>
+      {showIcon && (
+        <img
+          className={styles.siteLogo}
+          src={iconUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(iconUrl)}
+        />
+      )}
+    </span>
+  )
 }
 
 function normalizedUrl(url: string) {
@@ -96,6 +131,17 @@ function normalizedUrl(url: string) {
     return parsed.toString()
   } catch {
     return url.trim()
+  }
+}
+
+function safeIconUrl(value?: string) {
+  if (!value) return ''
+  try {
+    const parsed = new URL(value)
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return ''
+    return parsed.toString()
+  } catch {
+    return ''
   }
 }
 

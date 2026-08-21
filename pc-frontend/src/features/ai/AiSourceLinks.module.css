@@ -92,16 +92,28 @@
 }
 
 .siteMark {
+  position: relative;
   width: 34px;
   height: 34px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border-radius: 9px;
   color: #f8fbff;
   background: #536d89;
   font-size: 14px;
   font-weight: 750;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+
+.siteLogo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  object-fit: contain;
+  background: #f7f8fa;
 }
 
 .siteMark[data-tone='1'] { background: #496b55; }

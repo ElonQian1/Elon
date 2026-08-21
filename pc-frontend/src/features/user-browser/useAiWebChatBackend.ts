@@ -38,7 +38,11 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     controller.visibleMessages.flatMap((item): AiMessage[] => {
       const sources = item.content
         .filter((part): part is Extract<typeof part, { type: 'citation' }> => part.type === 'citation' && Boolean(part.url))
-        .map<AiSource>((part) => ({ title: part.text || publicHost(part.url!), url: part.url! }))
+        .map<AiSource>((part) => ({
+          title: part.text || publicHost(part.url!),
+          url: part.url!,
+          icon_url: part.iconUrl,
+        }))
       const content = item.content
         .filter((part): part is Extract<typeof part, { type: 'text' | 'markdown' }> => (
           part.type === 'text' || part.type === 'markdown'

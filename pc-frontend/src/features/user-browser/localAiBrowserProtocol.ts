@@ -15,6 +15,7 @@ export type LocalAiStructuredPartType =
 interface LocalAiStructuredContentMetadata {
   text: string
   url?: string
+  iconUrl?: string
   kind?: string
   language?: string
   mediaType?: string

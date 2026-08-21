@@ -32,6 +32,7 @@ export interface AiMessage {
 export interface AiSource {
   title: string
   url: string
+  icon_url?: string
 }
 
 export interface AiProjectCandidate {

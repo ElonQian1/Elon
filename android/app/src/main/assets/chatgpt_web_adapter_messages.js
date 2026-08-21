@@ -137,6 +137,7 @@
     if (tag === 'P') return childrenMarkdown(node, context).trim() + '\n\n';
     if (tag === 'LI' && !context.inList) return '- ' + childrenMarkdown(node, { inList: true }).trim() + '\n';
     if (tag === 'IMG') {
+      if (node.closest('a[href]')) return '';
       const alt = cleanText(node.getAttribute('alt'));
       return alt ? '[图片：' + escapeMarkdown(alt) + ']' : '[图片]';
     }
@@ -175,12 +176,32 @@
     try {
       const url = new URL(node.getAttribute('href') || '', location.origin);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return {};
-      return {
+      const metadata = {
+        url: safeMarkdownHref(node),
         targetKind: url.origin === location.origin ? 'same_origin' : 'external',
         targetHost: url.hostname.toLowerCase().slice(0, 253)
       };
+      const icon = node.querySelector('img');
+      const iconUrl = safeImageUrl(icon);
+      if (iconUrl) metadata.iconUrl = iconUrl;
+      return metadata;
     } catch {
       return {};
+    }
+  }
+
+  function safeImageUrl(node) {
+    if (!node) return '';
+    try {
+      const url = new URL(node.currentSrc || node.getAttribute('src') || '', location.origin);
+      if (url.protocol !== 'https:') return '';
+      url.username = '';
+      url.password = '';
+      url.search = '';
+      url.hash = '';
+      return url.href;
+    } catch {
+      return '';
     }
   }
 
@@ -241,12 +262,13 @@
       lastStructuredTypes.add(type);
       if (COMPLEX_PART_TYPES.has(type)) lastComplexOutput = true;
     }
-    Array.from(content.querySelectorAll('img')).forEach((node) => {
-      add('image', structuredLabel(node, '图片'), node, { kind: 'image', mediaType: mediaType(node) });
-    });
     Array.from(content.querySelectorAll('a[href]')).forEach((node) => {
       const part = linkPart(node);
       if (part) add(part.type, part.text, node, part.metadata);
+    });
+    Array.from(content.querySelectorAll('img')).forEach((node) => {
+      if (node.closest('a[href]')) return;
+      add('image', structuredLabel(node, '图片'), node, { kind: 'image', mediaType: mediaType(node) });
     });
     Array.from(content.querySelectorAll('pre')).forEach((node) => {
       const metadata = codeMetadata(node);
