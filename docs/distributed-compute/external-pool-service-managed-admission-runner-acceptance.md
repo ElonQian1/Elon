@@ -25,7 +25,12 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 `market_profile_schema_abi=design_frozen`、`market_profile_inventory_approval_evidence_abi=design_frozen`、
 `initial_profile_approval_evidence/initial_profile_inventory=unselected`、
 `admission_receipt_canonical/physical_schema_abi=design_frozen`、`market_projection_identity_abi=design_frozen`、
-`gateway_builder/fence/task_session/validator_internal_abi=design_frozen`、`external_adapter_semantic_wire_profile=unselected`与实现
+`gateway_builder/fence/task_session/validator_internal_abi=design_frozen`、
+`external_adapter_semantic_wire_profile_registry_abi=design_frozen`、
+`external_adapter_semantic_wire_profile_approval_evidence_abi=design_frozen`、
+`initial_external_adapter_semantic_wire_profile_approval_evidence_set=unselected`、
+`initial_external_adapter_semantic_wire_profile_inventory=unselected`、
+`external_adapter_semantic_wire_profile=unselected`与实现
 `unwired/uncompiled/unrun`。文档链接、source-size或静态零改动扫描
 不是实现证据，任何 V273/V274/V277/V278 历史 passed 也不能计入 V280。
 
@@ -230,7 +235,9 @@ semantic substitution与所有V254 fence负例。仅source-contract、fixture或
 - 父authority/acceptance完成：只证明`vertical_slice_architecture=design_frozen`；
 - profile子权威完成：只证明`market_profile_schema_abi=design_frozen`，初始inventory仍可保持unselected；
 - approval evidence子权威完成：只证明evidence ABI可实施；真实evidence与首个profile仍可保持unselected；
-- 首个profile approval/payload或external Adapter semantic wire profile未选择时不得进入source-written；production fence与Gateway/session/
+- [semantic wire registry子权威](external-pool-adapter-production-semantic-wire-profile-registry-abi-authority.md)完成：只证明registry、
+  purpose-specific evidence、current/historical selection与两道pre-send元ABI可实施；actual五operation set仍可保持unselected；
+- 首个market profile approval/payload或external Adapter semantic wire profile set未选择时不得进入source-written；production fence与Gateway/session/
   validator内部ABI虽已冻结，但没有五类wire profile与实现仍不可达；
 - Domain/DDL/Store/Gateway/validator/Runner全部落盘且静态合同通过：可记`source_written/source_review_only`；
 - compile+fresh/repeat/reopen migration通过：才可记`implementation_compiled`或对应局部验证；

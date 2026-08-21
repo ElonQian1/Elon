@@ -29,6 +29,10 @@ current_profile_authority=unconstructible
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
 gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile_registry_abi=design_frozen
+external_adapter_semantic_wire_profile_approval_evidence_abi=design_frozen
+initial_external_adapter_semantic_wire_profile_approval_evidence_set=unselected
+initial_external_adapter_semantic_wire_profile_inventory=unselected
 external_adapter_semantic_wire_profile=unselected
 implementation=unwired/uncompiled/unrun
 passed=0
@@ -42,7 +46,8 @@ legacy owner helper与单一checked-at映射见
 [market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)。
 Production fence、Gateway final builders、task-session custody与validator内部类型见
 [Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)；外部semantic wire
-profile仍未选择。
+profile的registry/selection/evidence元ABI见
+[semantic wire registry authority](external-pool-adapter-production-semantic-wire-profile-registry-abi-authority.md)，actual五operation set仍未选择。
 
 ## 2. 来源边界与禁止默认值
 

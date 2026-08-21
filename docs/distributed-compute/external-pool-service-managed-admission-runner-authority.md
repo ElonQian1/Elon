@@ -32,6 +32,10 @@ admission_receipt_canonical_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
 gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile_registry_abi=design_frozen
+external_adapter_semantic_wire_profile_approval_evidence_abi=design_frozen
+initial_external_adapter_semantic_wire_profile_approval_evidence_set=unselected
+initial_external_adapter_semantic_wire_profile_inventory=unselected
 external_adapter_semantic_wire_profile=unselected
 admission_receipt_table/migration/source=absent
 implementation=unwired/uncompiled/unrun
@@ -406,11 +410,11 @@ owner串行收口；worker ownership同时包含`external_pool_adapter_task_work
 包含`external_pool_adapter_broker_tls.rs`。每个 leaf ≤430 行；入口只做
 声明、re-export或编排。
 
-推荐实现顺序是按[approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)完成首项
-purpose-specific四眼审批与payload选择→按已冻结profile/admission/projection ABI实现policy/admission Domain/DDL/Store→
-service-managed market transaction→Gateway A/B→task session+
-validator→Runner/ingress/recovery→source-contract→恢复后的 compile/migration/runtime acceptance。前一步未闭合时不得打开下一步
-生产 fence。
+推荐实现顺序是按[market approval evidence ABI](external-pool-service-managed-market-profile-approval-evidence-abi-authority.md)完成首项
+market payload审批与选择→按[semantic wire registry ABI](external-pool-adapter-production-semantic-wire-profile-registry-abi-authority.md)
+选择首个exact五operation profile/evidence set→按已冻结profile/admission/projection ABI实现policy/admission Domain/DDL/Store→
+service-managed market transaction→Gateway A/B→task session+validator→Runner/ingress/recovery→source-contract→恢复后的
+compile/migration/runtime acceptance。前一步未闭合时不得打开下一步生产 fence。
 
 ## 11. 明确非目标
 

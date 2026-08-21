@@ -35,6 +35,10 @@ gateway_builder_internal_abi=design_frozen
 attempt_production_fence_abi=design_frozen
 task_session_custody_abi=design_frozen
 production_validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile_registry_abi=design_frozen
+external_adapter_semantic_wire_profile_approval_evidence_abi=design_frozen
+initial_external_adapter_semantic_wire_profile_approval_evidence_set=unselected
+initial_external_adapter_semantic_wire_profile_inventory=unselected
 external_adapter_semantic_wire_profile=unselected
 initial_profile_inventory=unselected
 implementation=unwired/uncompiled/unrun
@@ -336,30 +340,21 @@ size ceiling沿V273/V272不变：ELTP request material 262144 bytes、实际upst
 262144、semantic observation 262144；exchange ordinal 1..64，单次总exchange不超过15秒。operation code逐字仍是
 `prepare=1,idempotent_commit=2,cancel_no_start=3,reconcile=4,authenticated_events=5`。
 
-## 7. 尚未冻结的 external semantic wire profile
+## 7. External semantic wire registry 已冻结，actual profile仍未选择
 
-仓库当前没有production Adapter的request body、actual upstream response与child semantic observation的获批schema/domain/key
-set；唯一具体JSON来自V272 synthetic fixture，禁止升格。故本页不发明统一4-key envelope，也不声称五类外部DTO已冻结。
+[Semantic wire registry authority](external-pool-adapter-production-semantic-wire-profile-registry-abi-authority.md)已独立冻结 exact V249
+release+implementation+operation selector、purpose-specific evidence、retained historical replay、五operation current set与两道pre-send
+authorization元ABI。本页不再复制其canonical真源。
 
-未来registry-owned `ExternalPoolAdapterProductionSemanticWireProfile`至少必须绑定 exact V249 release ID/digest/material digest、
-implementation digest、operation、request encoder、pre-send request authorizer、upstream response parser或opaque policy、child observation schema/canonical domain、大小/
-时间界限与版本兼容。若使用JSON，必须UTF-8 I-JSON、deny duplicate/unknown/omitted/trailing、显式null、safe integer、
-parse→RFC8785-JCS后byte-equal；若vendor response非JSON，只允许opaque bytes+length/SHA并由canonical child observation证明
-其解析结果。五类exact key set与approved payload只能由该profile提供。
-
-在不修改V273 carrier的前提下，现有durable lineage最多允许 exact
-`(release ID,digest,material digest,implementation digest,operation)` 映射唯一 semantic profile。Fresh first-send只选current
-approved profile；durable send后只按同一key重建retained historical profile，catalog item不得删除、改bytes或重绑release。
-Semantic变化必须发布新V249 release，禁止同一release轮换或latest fallback。Server必须在application socket write前消费one-shot
-authorizer，逐字绑定profile ID/revision/digest、operation、command/outbox/route/executor/fence/request digest、actual request len/SHA与
-expected-response policy并产出typed authorized request；仅在response后验证child observation不足以证明已发送bytes受command/profile授权。
-若durable send-attempt已提交后authorizer失败，只能保持unknown→reconcile；没有另冻write-not-started proof时不得冒充local-never-sent。
+仓库仍没有production Adapter request/response/observation的获批exact keys、contract refs、vendor mode、bounds、evidence instance或
+compiled profile。V272 synthetic JSON继续禁止升格；registry ABI design-frozen不等于actual profile selected、validator/source可写，
+也不修改V273 carrier、八根或Tx-A/Tx-B row count。
 
 当前prepare rejected还缺V278同事务receipt→observation→delivery-observed→rejected ACK→prepare-rejected no-start closure，因此本
 ABI只接受accepted prepare；rejected bytes必须失败关闭/进入既有unknown→reconcile，不能直接activation、Lease、commit或释放。
 未来若开放rejected分支，必须先另冻并实现该原子closure。
 
-在这个semantic wire profile与首个market profile inventory都未选择前：五个validator impl、production child protocol loop、
+在actual semantic wire五件套与首个market profile inventory都未选择前：五个validator impl、production child protocol loop、
 eight-root task session authority、Gateway/worker caller与positive ELTP均不可实现；这不是用fixture、source-contract或手写JSON可绕过的门。
 
 ## 8. Ownership、唯一caller与晋级门
