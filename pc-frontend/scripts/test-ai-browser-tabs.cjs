@@ -20,8 +20,8 @@ const topbar = read('pc-frontend/src/features/ai/AiChatTopbar.tsx')
 const chat = read('pc-frontend/src/features/ai/AiChatPage.tsx')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
 const sendSuccessBranch = controller.slice(
-  controller.indexOf("} else if (action === 'send_prompt')"),
-  controller.indexOf("} else if (result?.detail)"),
+  controller.indexOf('async function dispatchPreparedPrompt'),
+  controller.indexOf('function restoreQueuedSend'),
 )
 
 assert.match(host, /WebviewBuilder::new/)

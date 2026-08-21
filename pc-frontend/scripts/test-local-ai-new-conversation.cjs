@@ -47,19 +47,24 @@ assert.equal(selectLocalAiNewConversationPath('chatgpt', {
 assert.equal(selectLocalAiNewConversationPath('chatgpt', {
   ...liveSession,
   contextReady: false,
-}, liveSnapshot), 'home')
+}, liveSnapshot), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', {
   ...liveSession,
   semanticCacheStatus: 'cached',
-}, liveSnapshot), 'home')
-assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, { composerReady: false }), 'home')
+}, liveSnapshot), 'adapter')
+assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, { composerReady: false }), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, liveSnapshot), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('google-ai-mode', liveSession, liveSnapshot), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('google-ai-mode', {
   ...liveSession,
   semanticCacheStatus: 'cached',
   contextReady: false,
-}, { composerReady: false }), 'home')
+}, { composerReady: false }), 'adapter')
+assert.equal(selectLocalAiNewConversationPath('google-ai-mode', {
+  ...liveSession,
+  semanticCacheStatus: 'cached',
+  contextReady: false,
+}, liveSnapshot), 'adapter')
 assert.equal(googleNewConversationNeedsReload(liveSession, liveSnapshot), false)
 assert.equal(googleNewConversationNeedsReload({
   ...liveSession,
@@ -70,5 +75,8 @@ assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
 assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
 assert.match(controllerSource, /googleNewConversationNeedsReload\(current, currentSnapshot\)/)
 assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, 'reload'\)/)
+assert.match(controllerSource, /消息已保存在本机新会话队列/)
+assert.match(controllerSource, /dispatchPreparedPrompt\(queuedSend\)/)
+assert.match(controllerSource, /restoreQueuedSend\(queuedSend\)/)
 
 process.stdout.write('PASS local AI new-conversation recovery policy\n')

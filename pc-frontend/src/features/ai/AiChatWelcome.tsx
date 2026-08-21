@@ -36,7 +36,8 @@ export default function AiChatWelcome({
           <span>也可以稍候使用本机访客身份；登录后还可同步项目、好友和电脑节点。</span>
         </div>
       )}
-      {identityReady && chatMode && !web.canCompose && (
+      {identityReady && chatMode && !web.canCompose
+        && !['official_loading', 'adapter_waiting', 'context_restoring'].includes(web.userState.phase) && (
         <div className={styles.loginPrompt}>
           <button
             className={styles.startBtn}

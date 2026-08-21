@@ -35,6 +35,7 @@ import {
   googleNewConversationNeedsReload,
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
+import { localAiComposerAvailability } from './localAiComposerAvailability'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -54,6 +55,7 @@ export default function useLocalAiWebChatController(
   const [draft, setDraft] = useState('')
   const [draftTouched, setDraftTouched] = useState(false)
   const [pendingSends, setPendingSends] = useState<PendingLocalAiSend[]>([])
+  const [queuedSend, setQueuedSend] = useState<QueuedLocalAiSend | null>(null)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
@@ -64,6 +66,8 @@ export default function useLocalAiWebChatController(
   const responseRefreshTimer = useRef(0)
   const expectedResponsePrompt = useRef('')
   const optimisticSendSequence = useRef(0)
+  const queuedSendDispatching = useRef(false)
+  const queuedSendRef = useRef<QueuedLocalAiSend | null>(null)
   const draftRef = useRef('')
   const visibleSessionState = provider && ownerKey
     ? sessionEntry.identity === requestedSessionIdentity
@@ -111,6 +115,15 @@ export default function useLocalAiWebChatController(
     () => deriveLocalAiUserState(clientState, provider, visibleSessionState, snapshot),
     [clientState, provider, snapshot, visibleSessionState],
   )
+  const composerAvailability = localAiComposerAvailability({
+    clientReady: clientState === 'ready',
+    providerAvailable: Boolean(provider && ownerKey),
+    sendSupported: Boolean(provider?.adapterActions.includes('send_prompt')),
+    directSendReady: userState.canSend,
+    newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
+    queuedSendActive: Boolean(queuedSend),
+    busyAction,
+  })
 
   function setSessionState(state: LocalAiWebSessionState | null) {
     setSessionEntry({ identity: requestedSessionIdentity, state })
@@ -132,6 +145,9 @@ export default function useLocalAiWebChatController(
     draftRef.current = ''
     setDraftTouched(false)
     setPendingSends([])
+    setQueuedSend(null)
+    queuedSendRef.current = null
+    queuedSendDispatching.current = false
     setBusyAction('')
     setMessage('')
     setNewConversationRecoveryStartedAtMs(0)
@@ -145,21 +161,41 @@ export default function useLocalAiWebChatController(
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs) return
-    const ready = visibleSessionState?.rendererStatus === 'active'
+    const contextReady = visibleSessionState?.rendererStatus === 'active'
       && visibleSessionState.semanticCacheStatus === 'live'
       && visibleSessionState.contextReady === true
       && visibleSessionState.updatedAtMs >= newConversationRecoveryStartedAtMs
       && Boolean(liveSnapshot)
-    if (ready) {
+    const composerReady = Boolean(
+      liveSnapshot?.composerReady
+      && (liveSnapshot.authenticated || !liveSnapshot.loginRequired),
+    )
+    if (contextReady && !queuedSend) {
       setNewConversationRecoveryStartedAtMs(0)
       return
     }
+    if (contextReady && composerReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
+      queuedSendDispatching.current = true
+      setNewConversationRecoveryStartedAtMs(0)
+      setQueuedSend(null)
+      queuedSendRef.current = null
+      void dispatchPreparedPrompt(queuedSend)
+        .finally(() => { queuedSendDispatching.current = false })
+      return
+    }
     // 五个条件里任何一个（尤其是官网迟迟不给可信实时快照）迟迟凑不齐时，不能让
-    // 输入框永远显示空白；超时后放行当前已知状态，让用户可以重新发送或手动刷新。
+    // 输入框永远显示空白；排队消息只在新会话绑定成功后发送，超时则安全还原草稿。
     if (Date.now() - newConversationRecoveryStartedAtMs < NEW_CONVERSATION_RECOVERY_TIMEOUT_MS) return
     setNewConversationRecoveryStartedAtMs(0)
-    setMessage('新会话连接超时，已恢复输入；如页面仍显示旧内容，请显示官方页确认。')
-  }, [liveSnapshot, newConversationRecoveryStartedAtMs, visibleSessionState])
+    if (queuedSend) {
+      restoreQueuedSend(queuedSend)
+      setQueuedSend(null)
+      queuedSendRef.current = null
+      setMessage('新会话后台连接超时，消息没有误发；草稿已保留，可显示官方页确认后重试。')
+    } else {
+      setMessage('新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
+    }
+  }, [busyAction, liveSnapshot, newConversationRecoveryStartedAtMs, queuedSend, visibleSessionState])
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs || providerId !== 'google-ai-mode' || !ownerKey) return
@@ -316,67 +352,133 @@ export default function useLocalAiWebChatController(
   }
 
   async function run(action: LocalAiAdapterAction, value?: string, expectedDraft?: string) {
-    if (!provider || !ownerKey || busyAction) return null
+    if (!provider || !ownerKey) return null
     if (!provider.adapterActions.includes(action)) {
       setMessage(`${provider.displayName} 当前不支持这个原生动作；可以显示官方窗口继续使用。`)
       return null
     }
+    if (action === 'send_prompt' && composerAvailability.shouldQueue) {
+      const pending = preparePendingSend(value ?? '')
+      if (!pending) return null
+      const queued = {
+        prompt: pending.prompt,
+        expectedDraft: expectedDraft ?? '',
+        pending,
+        sessionIdentity: requestedSessionIdentity,
+      }
+      queuedSendRef.current = queued
+      setQueuedSend(queued)
+      setMessage('消息已保存在本机新会话队列；官网在后台完成绑定后会自动发送。')
+      return visibleSessionState
+    }
+    if (busyAction) return null
     if (action === 'new_conversation'
       && selectLocalAiNewConversationPath(provider.id, visibleSessionState, snapshot) === 'home') {
       return recoverNewConversation()
     }
-    setBusyAction(action)
-    const pendingSend = action === 'send_prompt'
-      ? beginOptimisticLocalAiSend(
-          snapshot?.messages ?? [],
-          pendingSends,
-          value ?? '',
-          `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
-        )
-      : null
-    if (pendingSend) {
-      setPendingSends((current) => current.concat(pendingSend))
-      draftRef.current = ''
-      setDraft('')
-      setDraftTouched(true)
+    if (action === 'send_prompt') {
+      const pending = preparePendingSend(value ?? '')
+      if (!pending) return null
+      return dispatchPreparedPrompt({
+        prompt: pending.prompt,
+        expectedDraft: expectedDraft ?? '',
+        pending,
+        sessionIdentity: requestedSessionIdentity,
+      })
     }
+    setBusyAction(action)
     if (['new_conversation', 'open_conversation', 'open_project'].includes(action)) {
       cancelResponseRefresh()
     }
     setMessage('')
     try {
-      if (action === 'send_prompt') {
-        // Sending belongs to the production native surface. Explicitly cancel any
-        // in-flight official-tab presentation and park the child WebView before its
-        // page command can navigate or focus itself.
-        requestReturnToAiChat({
-          providerId: provider.id,
-          providerName: provider.displayName,
-          ownerKey,
-        })
-        setSessionState(await controlLocalAiWebSession(provider.id, ownerKey, 'background'))
-      }
       const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
       const next = await waitForLocalAiAdapterResult(provider.id, ownerKey, action, requestId)
       if (!next) {
-        rollbackPendingSend(pendingSend)
         setMessage('没有收到当前命令的匹配回执；为避免误判，一龙没有把这次操作标记为成功。请显示官方页检查后重试。')
         return null
       }
       if (next) setSessionState(next)
       const result = next?.commandResult
       if (result?.action === action && !result.ok) {
-        rollbackPendingSend(pendingSend)
         setMessage(result.detail || '官方网页没有完成这个动作，请显示官方窗口后重试。')
-      } else if (action === 'send_prompt') {
-        setMessage(result?.detail || '消息已交给官方网页发送；正在一龙聊天界面同步回复。')
-        startResponseRefresh(value ?? '')
       } else if (result?.detail) {
         setMessage(result.detail)
       }
       return next
     } catch (error) {
-      rollbackPendingSend(pendingSend)
+      setMessage(localAiBrowserErrorMessage(error))
+      return null
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  function preparePendingSend(prompt: string): PendingLocalAiSend | null {
+    if (!provider) return null
+    const pending = beginOptimisticLocalAiSend(
+      snapshot?.messages ?? [],
+      pendingSends,
+      prompt,
+      `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
+    )
+    if (!pending) return null
+    setPendingSends((current) => current.concat(pending))
+    draftRef.current = ''
+    setDraft('')
+    setDraftTouched(true)
+    return pending
+  }
+
+  async function dispatchPreparedPrompt(
+    prepared: QueuedLocalAiSend,
+  ): Promise<LocalAiWebSessionState | null> {
+    if (!provider || !ownerKey || prepared.sessionIdentity !== requestedSessionIdentity) {
+      restoreQueuedSend(prepared)
+      return null
+    }
+    setBusyAction('send_prompt')
+    setMessage('')
+    try {
+      // Sending belongs to the production native surface. Explicitly cancel any
+      // in-flight official-tab presentation and park the child WebView before its
+      // page command can navigate or focus itself.
+      requestReturnToAiChat({
+        providerId: provider.id,
+        providerName: provider.displayName,
+        ownerKey,
+      })
+      setSessionState(await controlLocalAiWebSession(provider.id, ownerKey, 'background'))
+      const requestId = await runLocalAiWebAdapterCommand(
+        provider.id,
+        ownerKey,
+        'send_prompt',
+        prepared.prompt,
+        prepared.expectedDraft,
+      )
+      const next = await waitForLocalAiAdapterResult(
+        provider.id,
+        ownerKey,
+        'send_prompt',
+        requestId,
+      )
+      if (!next) {
+        restoreQueuedSend(prepared)
+        setMessage('没有收到当前发送的匹配回执；消息没有标记为成功，草稿已保留。')
+        return null
+      }
+      setSessionState(next)
+      const result = next.commandResult
+      if (result?.action === 'send_prompt' && !result.ok) {
+        restoreQueuedSend(prepared)
+        setMessage(result.detail || '官方网页没有完成发送，草稿已保留；可显示官方窗口后重试。')
+      } else {
+        setMessage(result?.detail || '消息已交给官方网页发送；正在一龙聊天界面同步回复。')
+        startResponseRefresh(prepared.prompt)
+      }
+      return next
+    } catch (error) {
+      restoreQueuedSend(prepared)
       setMessage(localAiBrowserErrorMessage(error))
       return null
     } finally {
@@ -393,15 +495,23 @@ export default function useLocalAiWebChatController(
     draftRef.current = ''
     setDraft('')
     setDraftTouched(false)
-    setMessage(`正在为 ${provider.displayName} 建立全新的官方会话…`)
+    setMessage(`已在本机进入 ${provider.displayName} 新会话；官网正在后台同步。`)
     try {
       const next = await controlLocalAiWebSession(provider.id, ownerKey, 'home')
       setSessionState(next)
-      setMessage(`已进入 ${provider.displayName} 新会话；正在连接访客输入框，连接完成前不会把旧缓存误发出去。`)
+      setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，提前发送的消息会在绑定确认后自动提交。`)
       return next
     } catch (error) {
       setNewConversationRecoveryStartedAtMs(0)
-      setMessage(localAiBrowserErrorMessage(error))
+      const queued = queuedSendRef.current
+      if (queued) {
+        restoreQueuedSend(queued)
+        queuedSendRef.current = null
+        setQueuedSend(null)
+      }
+      setMessage(queued
+        ? `${localAiBrowserErrorMessage(error)} 消息没有误发，草稿已保留。`
+        : localAiBrowserErrorMessage(error))
       return null
     } finally {
       setBusyAction('')
@@ -416,6 +526,10 @@ export default function useLocalAiWebChatController(
       setDraft(pending.prompt)
       setDraftTouched(true)
     }
+  }
+
+  function restoreQueuedSend(queued: QueuedLocalAiSend) {
+    rollbackPendingSend(queued.pending)
   }
 
   function startResponseRefresh(prompt: string) {
@@ -509,6 +623,9 @@ export default function useLocalAiWebChatController(
     },
     busyAction,
     message,
+    canEditDraft: composerAvailability.canEdit,
+    canSubmitDraft: composerAvailability.canSubmit,
+    queuedSendActive: Boolean(queuedSend),
     newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
     openOfficial,
     control,
@@ -517,6 +634,13 @@ export default function useLocalAiWebChatController(
     refreshComposerControls,
     refreshFeatureNavigation,
   }
+}
+
+interface QueuedLocalAiSend {
+  prompt: string
+  expectedDraft: string
+  pending: PendingLocalAiSend
+  sessionIdentity: string
 }
 
 const RESPONSE_REFRESH_DELAYS_MS = [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000, 10_000] as const

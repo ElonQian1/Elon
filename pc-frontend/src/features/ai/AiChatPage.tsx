@@ -620,10 +620,9 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
         setError(web.userState.detail)
         return
       }
-      if (text && !web.controller.busyAction) {
-        setError('')
-        await web.controller.run('send_prompt', text, web.controller.snapshot?.draft ?? '')
-      }
+      if (!text) return
+      setError('')
+      await web.controller.run('send_prompt', text, web.controller.snapshot?.draft ?? '')
       return
     }
     const text = input.trim()
@@ -951,15 +950,16 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               }}
               onKeyDown={handleKeyDown}
               placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-              disabled={visibleSending || (chatMode && !web.canCompose)}
+              disabled={chatMode ? !web.canEdit : visibleSending}
               rows={1}
             />
             <button
               className={styles.sendBtn}
               type="submit"
-              disabled={visibleSending || (chatMode
-                ? !web.controller.snapshot?.streaming && (!visibleInput.trim() || !web.canCompose)
-                : !visibleInput.trim())}
+              disabled={chatMode
+                ? !web.controller.snapshot?.streaming && (!visibleInput.trim() || !web.canCompose
+                  || Boolean(web.controller.busyAction && web.controller.busyAction !== 'new_conversation'))
+                : visibleSending || !visibleInput.trim()}
             >
               {visibleSending ? '…' : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
             </button>

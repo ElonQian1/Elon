@@ -79,7 +79,8 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     })
   ), [controller.visibleMessages, provider?.id])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
-  const canCompose = ready && controller.userState.canSend
+  const canEdit = ready && controller.canEditDraft
+  const canCompose = ready && controller.canSubmitDraft
   const streamingMessageId = [...(controller.snapshot?.messages ?? [])]
     .reverse()
     .find((item) => item.state === 'streaming')?.id
@@ -112,6 +113,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     userState: controller.userState,
     messages,
     ready,
+    canEdit,
     canCompose,
     title: controller.snapshot?.title || '新对话',
     streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
@@ -119,7 +121,11 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     contextStatus,
     contextTurnCount,
     historyWindow,
-    contextSummary: !contextReady
+    contextSummary: controller.newConversationRecoveryActive
+      ? controller.queuedSendActive
+        ? '消息已保存在本机新会话队列；官网绑定确认后会自动发送。'
+        : '新会话已在本机就绪，可以立即输入；官网页面正在后台异步同步。'
+      : !contextReady
       ? contextStatus === 'cached'
         ? '已立即显示本地缓存；官方网页尚未恢复到对应会话，发送已暂停。'
         : contextStatus === 'unbound'
