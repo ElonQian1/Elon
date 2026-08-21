@@ -6,6 +6,8 @@ use std::{
 use ring::rand::{SecureRandom, SystemRandom};
 
 #[cfg(test)]
+use super::state::ManagedSqliteRegistrySessionTestSnapshot;
+#[cfg(test)]
 use super::types::{
     ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryConnectionClosedReceipt,
 };
@@ -178,6 +180,17 @@ where
     ) -> Result<ManagedSqliteRegistrySessionPhase, ManagedSqliteRegistryProcessRouteRejection> {
         self.lock_routes()?
             .phase(route)
+            .map_err(ManagedSqliteRegistryProcessRouteRejection::Route)
+    }
+
+    #[cfg(test)]
+    pub(super) fn registration_shutdown_test_snapshot(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<ManagedSqliteRegistrySessionTestSnapshot, ManagedSqliteRegistryProcessRouteRejection>
+    {
+        self.lock_routes()?
+            .registration_shutdown_test_snapshot(route)
             .map_err(ManagedSqliteRegistryProcessRouteRejection::Route)
     }
 

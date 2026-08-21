@@ -12,7 +12,7 @@ use std::{
     ptr,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc, Mutex,
+        Arc,
     },
 };
 
@@ -24,12 +24,16 @@ use crate::{
     node_agent_compute_plugin_host::local_authority::{
         sqlite_vfs_abi::test_vfs_file_size,
         sqlite_vfs_policy::registry::{
-            ManagedSqliteRegistryProcessOwner, ManagedSqliteTestVfsFile, ManagedSqliteTestVfsRoute,
+            ManagedSqliteRegistryProcessOwner, ManagedSqliteTestVfsCallback,
+            ManagedSqliteTestVfsFile, ManagedSqliteTestVfsRoute,
+            ManagedSqliteTestVfsRouteCustodySnapshot, ManagedSqliteTestVfsRoutePhase,
         },
     },
     node_agent_managed_fs::PinnedManagedSqliteWalRuntime,
 };
 
+#[cfg(all(test, windows))]
+mod a2_dynamic_evidence;
 #[cfg(test)]
 mod a2b1_cases;
 #[cfg(test)]
@@ -53,6 +57,10 @@ mod fault_matrix;
 mod fault_script;
 mod lifecycle_faults;
 mod multi_connection;
+#[cfg(all(test, windows))]
+mod registration_shutdown_custody;
+#[cfg(all(test, windows))]
+mod registration_shutdown_harness;
 mod route_file;
 mod shared_namespace;
 mod shm_fault_script;
@@ -71,6 +79,12 @@ use lifecycle_faults::{
     ManagedTestLifecycleFaultStep, ManagedTestLifecycleFaultTiming,
 };
 use multi_connection::ManagedSqliteMultiConnectionFixture;
+#[cfg(all(test, windows))]
+use registration_shutdown_custody::{
+    ManagedTestRegistrationShutdownTargetWitness, ManagedTestVfsRegistrationCustody,
+    ManagedTestVfsRegistrationDisposition, ManagedTestVfsRetainedPartsSnapshot,
+    ManagedTestVfsRetainedPartsWitness,
+};
 use route_file::ManagedTestRouteFile;
 use shared_namespace::{
     ManagedTestNonceSource, ManagedTestVfsRouteCollection, ManagedTestVfsRouteEntry,
@@ -81,6 +95,7 @@ use shm_fault_script::{
 
 type TestProcessOwner = ManagedSqliteRegistryProcessOwner<TestCustody, ManagedTestNonceSource>;
 type TestRoute = ManagedSqliteTestVfsRoute<TestCustody, ManagedTestNonceSource>;
+type TestCallback = ManagedSqliteTestVfsCallback<TestCustody, ManagedTestNonceSource>;
 
 static NEXT_VFS_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -107,38 +122,13 @@ struct ManagedTestVfsCounts {
 }
 
 struct ManagedTestVfsRegistration {
+    id: ManagedTestRegistrationId,
+    registration_shutdown_attempts: u32,
     table: Option<Box<ffi::sqlite3_vfs>>,
     name: Option<CString>,
     context: Option<Box<ManagedTestVfsContext>>,
     registered: bool,
     retained_parts_witness: Arc<ManagedTestVfsRetainedPartsWitness>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ManagedTestVfsRegistrationDisposition {
-    Registered,
-    Unregistered,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ManagedTestVfsRetainedPartsSnapshot {
-    disposition: ManagedTestVfsRegistrationDisposition,
-    table_present: bool,
-    name_present: bool,
-    context_present: bool,
-}
-
-#[derive(Debug, Default)]
-struct ManagedTestVfsRetainedPartsWitness {
-    snapshot: Mutex<Option<ManagedTestVfsRetainedPartsSnapshot>>,
-}
-
-struct ManagedTestVfsRegistrationCustody {
-    _table: Option<Box<ffi::sqlite3_vfs>>,
-    _name: Option<CString>,
-    _context: Option<Box<ManagedTestVfsContext>>,
-    _disposition: ManagedTestVfsRegistrationDisposition,
-    _witness: Arc<ManagedTestVfsRetainedPartsWitness>,
 }
 
 impl ManagedTestVfsRegistration {
@@ -212,6 +202,8 @@ impl ManagedTestVfsRegistration {
             ));
         }
         Ok(Self {
+            id,
+            registration_shutdown_attempts: 0,
             table: Some(table),
             name: Some(name),
             context: Some(context),
@@ -226,6 +218,10 @@ impl ManagedTestVfsRegistration {
             .expect("registered VFS name")
             .to_str()
             .context("managed test VFS name is UTF-8")
+    }
+
+    fn registration_id(&self) -> ManagedTestRegistrationId {
+        self.id
     }
 
     fn counts(&self) -> ManagedTestVfsCounts {
@@ -273,10 +269,6 @@ impl ManagedTestVfsRegistration {
         )
     }
 
-    fn retained_parts_witness(&self) -> Arc<ManagedTestVfsRetainedPartsWitness> {
-        Arc::clone(&self.retained_parts_witness)
-    }
-
     fn live_route_count(&self) -> anyhow::Result<usize> {
         self.context
             .as_ref()
@@ -290,9 +282,28 @@ impl ManagedTestVfsRegistration {
     }
 
     fn unregister_in_place(&mut self) -> anyhow::Result<()> {
+        self.unregister_in_place_with(ManagedTestVfsRouteCollection::live_route_count, |table| {
+            // SAFETY: the empty-route proof is checked before this closure is invoked.
+            unsafe { ffi::sqlite3_vfs_unregister(table) }
+        })
+    }
+
+    fn unregister_in_place_with<ObserveRouteIndex, UnregisterNative>(
+        &mut self,
+        observe_route_index: ObserveRouteIndex,
+        unregister_native: UnregisterNative,
+    ) -> anyhow::Result<()>
+    where
+        ObserveRouteIndex: FnOnce(&ManagedTestVfsRouteCollection) -> anyhow::Result<usize>,
+        UnregisterNative: FnOnce(*mut ffi::sqlite3_vfs) -> std::os::raw::c_int,
+    {
         if !self.registered {
             return Ok(());
         }
+        self.registration_shutdown_attempts = self
+            .registration_shutdown_attempts
+            .checked_add(1)
+            .context("managed test VFS registration shutdown occurrence overflow")?;
         let lifecycle = Arc::clone(
             &self
                 .context
@@ -300,11 +311,33 @@ impl ManagedTestVfsRegistration {
                 .expect("registered VFS context")
                 .lifecycle,
         );
+        #[cfg(all(test, windows))]
+        match lifecycle.claim_registration_shutdown_quarantine() {
+            Ok(Some(claim)) => {
+                let retained = self.take_registered_parts();
+                lifecycle
+                    .retain_registration_shutdown_quarantine(claim, retained)
+                    .map_err(anyhow::Error::msg)?;
+                return Err(anyhow!(
+                    "registration shutdown quarantined table/name/context custody"
+                ));
+            }
+            Ok(None) => {}
+            Err(error) => {
+                self.retain_registered_parts();
+                return Err(anyhow!(error));
+            }
+        }
         if lifecycle.is_terminal() {
             self.retain_registered_parts();
             return Err(anyhow!("managed test VFS lifecycle is terminal"));
         }
-        let live_routes = match self.live_route_count() {
+        let routes = &self
+            .context
+            .as_ref()
+            .expect("registered VFS context")
+            .routes;
+        let live_routes = match observe_route_index(routes) {
             Ok(live_routes) => live_routes,
             Err(error) => {
                 self.retain_registered_parts();
@@ -326,9 +359,9 @@ impl ManagedTestVfsRegistration {
             return Err(anyhow!("injected before managed test VFS unregister"));
         }
         let table = self.table.as_mut().expect("registered VFS table");
-        // SAFETY: an empty route collection proves that every SQLite connection closed and its
-        // exact route custody retired before the shared callback context is released.
-        let code = unsafe { ffi::sqlite3_vfs_unregister(&mut **table) };
+        // The default closure calls SQLite directly. The registration-shutdown harness may only
+        // replace this call with its sealed deterministic native-result observer.
+        let code = unregister_native(&mut **table);
         if code == ffi::SQLITE_OK {
             self.registered = false;
             if lifecycle
@@ -349,47 +382,6 @@ impl ManagedTestVfsRegistration {
                 "unregister managed test VFS failed with SQLite code {code}"
             ))
         }
-    }
-
-    fn retain_registered_parts(&mut self) {
-        let disposition = if self.registered {
-            ManagedTestVfsRegistrationDisposition::Registered
-        } else {
-            ManagedTestVfsRegistrationDisposition::Unregistered
-        };
-        self.registered = false;
-        let table = self.table.take();
-        let name = self.name.take();
-        let context = self.context.take();
-        let snapshot = ManagedTestVfsRetainedPartsSnapshot {
-            disposition,
-            table_present: table.is_some(),
-            name_present: name.is_some(),
-            context_present: context.is_some(),
-        };
-        let witness = Arc::clone(&self.retained_parts_witness);
-        let _custody = Box::leak(Box::new(ManagedTestVfsRegistrationCustody {
-            _table: table,
-            _name: name,
-            _context: context,
-            _disposition: disposition,
-            _witness: Arc::clone(&witness),
-        }));
-        witness.record(snapshot);
-    }
-}
-
-impl ManagedTestVfsRetainedPartsWitness {
-    fn snapshot(&self) -> Option<ManagedTestVfsRetainedPartsSnapshot> {
-        *self.snapshot.lock().expect("retained VFS witness lock")
-    }
-
-    fn record(&self, snapshot: ManagedTestVfsRetainedPartsSnapshot) {
-        let mut current = self.snapshot.lock().expect("retained VFS witness lock");
-        assert!(
-            current.replace(snapshot).is_none(),
-            "retained VFS parts may be witnessed only once"
-        );
     }
 }
 

@@ -1,7 +1,7 @@
 ---
 title: 分布式算力当前实现状态
 status: current
-reviewed_at: 2026-08-21
+reviewed_at: 2026-08-22
 owners: backend, pc, node-agent, ai-economy
 implementation_status: mixed
 ---
@@ -58,5 +58,5 @@ implementation_status: mixed
 
 ## 节点插件与端点会话
 
-- 节点插件已有 V1 policy、v5/v6 catalog/rollback、sealed SQLite/VFS 与线性 custody；69 项 SQLite 专项及 v216 的 11 项版本链测试已有历史证据。A1 与 v8 work-admission 已随完整测试目标编译，但无专项、迁移、runtime 或 producer/caller 验证。A2b2/A2c 所在完整测试目标已编译，相关 fault matrix 5 项通过；但 partial bridge 不是完整 Case，宽范围回归仍失败，状态只能是 `implementation_not_dynamically_accepted`、A2b2 `WindowsDynamic=0/117`。native failure、完整 custody、竞争和逐 case 动态验证仍缺；生产 VFS/open、A1 producer、v15、Runtime/Ready/派发继续不可达，v14 永久 blocked-only。见 `node-plugin-planning-snapshot-authority.md`、`node-plugin-vfs-fault-authority.md` 与 `node-plugin-vfs-fault-acceptance.md`。
+- 节点插件已有 V1 policy、v5/v6 catalog/rollback、sealed SQLite/VFS 与线性 custody；69 项 SQLite 专项及 v216 的 11 项版本链测试已有历史证据。A1、v8 work-admission 及 A2 基线曾随完整测试目标编译，相关 fault matrix 5 项曾通过，但无本批专项、迁移、runtime 或 producer/caller 验证。A2 现新增严格 test-only 的 RegistrationShutdown 8-selector actual/validator、独立 child runner 与 child/root/registration/environment/cleanup 线性 evidence envelope；native-retryable 仅是明确标记的 injected pre-native 观察，不冒充 SQLite failure。该源码仅 `source_review_only/implementation_uncompiled/implementation_unrun`，未生成 record，Registration 仍 `WindowsDynamic=0/8`、A2b2 仍 `0/117`。partial bridge 不是完整 Case，map/lock denominator 未冻结且宽范围回归仍失败；生产 VFS/open、A1 producer、v15、Runtime/Ready/派发继续不可达，v14 永久 blocked-only。见 `node-plugin-planning-snapshot-authority.md`、`node-plugin-vfs-fault-authority.md` 与 `node-plugin-vfs-fault-acceptance.md`。
 - 服务端 v216-v218 已铺 endpoint credential/session、目标绑定 owner 重认证与单次消费账本；默认关闭的 direct-TLS owner API、Windows DPAPI bootstrap、legacy no-downgrade 与独立 v13 auth-only WSS 也已写入。v14 固定为 `planning_snapshot_bootstrap_only`，终点仍为 `snapshot_ready=false`；连接不进入 `AgentEntry`/`NodeRegistry`，不产生 signed Plan、work-admission、Runtime、Ready、route、outbox、Lease 或派发。新增仍未编译、测试、运行或执行迁移。见 `node-endpoint-session-authority.md`。

@@ -16,7 +16,10 @@ use super::{
         ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessOwner,
         ManagedSqliteRegistryRoutedCallbackLease,
     },
-    types::{ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryTerminalReason},
+    types::{
+        ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistrySessionPhase,
+        ManagedSqliteRegistryTerminalReason,
+    },
 };
 use crate::{
     node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::{
@@ -33,6 +36,62 @@ use crate::{
 mod file;
 
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) use file::ManagedSqliteTestVfsFile;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) enum ManagedSqliteTestVfsRoutePhase
+{
+    PendingMain,
+    Opening,
+    Active,
+    Closing,
+    AwaitingRouteRetirement,
+    Retired,
+    TerminalQuarantine,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteTestVfsRouteCustodySnapshot
+{
+    phase: ManagedSqliteTestVfsRoutePhase,
+    connection_owner: bool,
+    main_file_lock_owner_lease: bool,
+    shm_lease: bool,
+    callbacks_in_flight: u32,
+    access_callback_allowed: bool,
+}
+
+impl ManagedSqliteTestVfsRouteCustodySnapshot {
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn phase(
+        self,
+    ) -> ManagedSqliteTestVfsRoutePhase {
+        self.phase
+    }
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn connection_owner(
+        self,
+    ) -> bool {
+        self.connection_owner
+    }
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn main_file_lock_owner_lease(
+        self,
+    ) -> bool {
+        self.main_file_lock_owner_lease
+    }
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn shm_lease(
+        self,
+    ) -> bool {
+        self.shm_lease
+    }
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn callbacks_in_flight(
+        self,
+    ) -> u32 {
+        self.callbacks_in_flight
+    }
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn access_callback_allowed(
+        self,
+    ) -> bool {
+        self.access_callback_allowed
+    }
+}
 
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteTestVfsRoute<
     Custody,
@@ -63,6 +122,43 @@ where
         &self,
     ) -> Result<CString, ()> {
         self.owner.main_logical_name_owned(self.route).map_err(drop)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn registration_shutdown_custody_snapshot(
+        &self,
+    ) -> Result<ManagedSqliteTestVfsRouteCustodySnapshot, ()> {
+        let snapshot = self
+            .owner
+            .registration_shutdown_test_snapshot(self.route)
+            .map_err(drop)?;
+        Ok(ManagedSqliteTestVfsRouteCustodySnapshot {
+            phase: match snapshot.phase() {
+                ManagedSqliteRegistrySessionPhase::PendingMain => {
+                    ManagedSqliteTestVfsRoutePhase::PendingMain
+                }
+                ManagedSqliteRegistrySessionPhase::Opening => {
+                    ManagedSqliteTestVfsRoutePhase::Opening
+                }
+                ManagedSqliteRegistrySessionPhase::Active => ManagedSqliteTestVfsRoutePhase::Active,
+                ManagedSqliteRegistrySessionPhase::Closing => {
+                    ManagedSqliteTestVfsRoutePhase::Closing
+                }
+                ManagedSqliteRegistrySessionPhase::AwaitingRouteRetirement => {
+                    ManagedSqliteTestVfsRoutePhase::AwaitingRouteRetirement
+                }
+                ManagedSqliteRegistrySessionPhase::Retired => {
+                    ManagedSqliteTestVfsRoutePhase::Retired
+                }
+                ManagedSqliteRegistrySessionPhase::TerminalQuarantine => {
+                    ManagedSqliteTestVfsRoutePhase::TerminalQuarantine
+                }
+            },
+            connection_owner: snapshot.connection_owner(),
+            main_file_lock_owner_lease: snapshot.main_file_lock_owner_lease(),
+            shm_lease: snapshot.shm_lease(),
+            callbacks_in_flight: snapshot.callbacks_in_flight(),
+            access_callback_allowed: snapshot.access_callback_allowed(),
+        })
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn begin_open_callback(

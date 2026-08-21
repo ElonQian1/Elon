@@ -20,6 +20,16 @@ use crate::node_agent_managed_fs::{
 
 const MAX_LIFECYCLE_FAULT_STEPS: usize = 32;
 
+#[cfg(all(test, windows))]
+mod registration_shutdown;
+#[cfg(all(test, windows))]
+use registration_shutdown::ManagedTestRegistrationShutdownQuarantineState;
+#[cfg(all(test, windows))]
+pub(super) use registration_shutdown::{
+    ManagedTestRegistrationShutdownQuarantineClaim,
+    ManagedTestRegistrationShutdownQuarantineWitness,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum ManagedTestLifecycleFaultPhase {
     BarrierCallbackCompletion,
@@ -106,6 +116,8 @@ struct ManagedTestLifecycleFaultState {
     observations: Vec<ManagedTestLifecycleFaultObservation>,
     retirements: HashMap<ManagedTestRouteOrdinal, ManagedSqliteRegistryRetirementReceipt>,
     installed: bool,
+    #[cfg(all(test, windows))]
+    registration_shutdown_quarantine: ManagedTestRegistrationShutdownQuarantineState,
 }
 
 pub(super) struct ManagedTestLifecycleFaultController {
@@ -122,6 +134,9 @@ impl ManagedTestLifecycleFaultController {
                 observations: Vec::new(),
                 retirements: HashMap::new(),
                 installed: false,
+                #[cfg(all(test, windows))]
+                registration_shutdown_quarantine:
+                    ManagedTestRegistrationShutdownQuarantineState::Vacant,
             }),
             terminal: AtomicBool::new(false),
         })

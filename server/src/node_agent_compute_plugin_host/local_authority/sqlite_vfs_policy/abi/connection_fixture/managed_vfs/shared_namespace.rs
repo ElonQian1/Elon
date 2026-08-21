@@ -23,6 +23,11 @@ use crate::{
     },
 };
 
+#[cfg(all(test, windows))]
+mod registration_shutdown;
+#[cfg(all(test, windows))]
+pub(super) use registration_shutdown::ManagedTestRegistrationShutdownRouteSnapshot;
+
 pub(super) struct ManagedTestNonceSource {
     prefix: [u8; 8],
     next: AtomicU64,

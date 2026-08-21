@@ -4,6 +4,7 @@
 //! is not case execution, and no inventory entry currently has Windows dynamic evidence.
 
 mod barrier;
+mod case_key;
 mod close_physical;
 mod close_registry;
 #[cfg(windows)]
@@ -25,6 +26,8 @@ mod unmap_nonfinal;
 mod unmap_teardown;
 
 #[cfg(windows)]
+pub(super) use case_key::CaseKey;
+#[cfg(windows)]
 pub(super) use dynamic_dms_shared_release::{
     validate_dms_shared_release_after_success_physical_subset, DmsSharedReleasePhysicalSubsetActual,
 };
@@ -34,8 +37,15 @@ pub(super) use dynamic_mapping_close::{
 };
 #[cfg(windows)]
 pub(super) use dynamic_registration::{
-    validate_dynamic_registration, DynamicRegistrationActual,
-    DynamicRegistrationRetainedDisposition, DynamicRegistrationTiming,
+    validate_registration_shutdown_report_payload, RegistrationShutdownActual,
+    RegistrationShutdownActualCounts, RegistrationShutdownActualCustody,
+    RegistrationShutdownActualIdentity, RegistrationShutdownActualTarget,
+    RegistrationShutdownActualTopology, RegistrationShutdownDmsCustody,
+    RegistrationShutdownFailureClass, RegistrationShutdownLogicalRoutePhase,
+    RegistrationShutdownPhase, RegistrationShutdownRegistrationPhase,
+    RegistrationShutdownRegistryRoutePhase, RegistrationShutdownSelector,
+    RegistrationShutdownTiming, ValidatedRegistrationShutdownObservation,
+    ValidatedRegistrationShutdownReportPayload,
 };
 #[cfg(windows)]
 pub(super) use dynamic_shm_file_close::{

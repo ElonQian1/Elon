@@ -14,7 +14,11 @@ mod owner;
 #[cfg(test)]
 mod test_lifecycle;
 #[cfg(test)]
+mod test_snapshot;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(super) use test_snapshot::ManagedSqliteRegistrySessionTestSnapshot;
 /// Pure lifecycle state constructed only while its owning route entry is atomically inserted.
 /// A future owner must quarantine complete custody whenever a session is abandoned before retire.
 #[must_use = "a non-retired session must remain under routing or terminal custody"]

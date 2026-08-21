@@ -6,6 +6,8 @@ use std::{
 };
 
 #[cfg(test)]
+use super::state::ManagedSqliteRegistrySessionTestSnapshot;
+#[cfg(test)]
 use super::types::{
     ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryConnectionClosedReceipt,
 };
@@ -219,6 +221,21 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
         handle: ManagedSqliteRegistryRouteHandle,
     ) -> Result<ManagedSqliteRegistrySessionPhase, ManagedSqliteRegistryRouteRejection> {
         Ok(self.exact_entry(handle)?.state.phase())
+    }
+
+    #[cfg(test)]
+    pub(super) fn registration_shutdown_test_snapshot(
+        &self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<ManagedSqliteRegistrySessionTestSnapshot, ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry(handle)?
+            .state
+            .registration_shutdown_test_snapshot()
+            .map_err(|_| {
+                ManagedSqliteRegistryRouteRejection::State(
+                    ManagedSqliteRegistryTransitionRejection::StateInvariantViolated,
+                )
+            })
     }
 
     pub(super) fn authorize_sql(
