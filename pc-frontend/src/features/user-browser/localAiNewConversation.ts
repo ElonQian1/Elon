@@ -61,3 +61,35 @@ export function localAiNewConversationContextReady(
     && snapshot,
   )
 }
+
+export function localAiNewConversationNativeReady(
+  session: Pick<
+    LocalAiWebSessionState,
+    | 'windowStatus'
+    | 'loading'
+    | 'rendererStatus'
+    | 'semanticCacheStatus'
+    | 'contextReady'
+    | 'activeConversationId'
+    | 'updatedAtMs'
+  > | null,
+  snapshot: Pick<
+    LocalAiMessageSnapshot,
+    'messages' | 'composerReady' | 'authenticated' | 'loginRequired'
+  > | null,
+  startedAtMs: number,
+  baselineConversationId: string,
+): boolean {
+  return Boolean(
+    localAiNewConversationContextReady(
+      session,
+      snapshot,
+      startedAtMs,
+      baselineConversationId,
+    )
+    && !session?.loading
+    && !['closed', 'opening', 'loading', 'blocked', 'error'].includes(session?.windowStatus || '')
+    && snapshot?.composerReady
+    && (snapshot.authenticated || !snapshot.loginRequired),
+  )
+}

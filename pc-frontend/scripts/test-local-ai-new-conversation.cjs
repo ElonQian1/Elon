@@ -10,6 +10,10 @@ const controllerSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useLocalAiWebChatController.ts'),
   'utf8',
 )
+const welcomeSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/ai/AiChatWelcome.tsx'),
+  'utf8',
+)
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -26,6 +30,7 @@ compiled._compile(output, filename)
 const {
   googleNewConversationNeedsReload,
   localAiNewConversationContextReady,
+  localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
 } = compiled.exports
 
@@ -105,6 +110,30 @@ assert.equal(localAiNewConversationContextReady(
   1_000,
   'old-conversation',
 ), false)
+assert.equal(localAiNewConversationNativeReady(
+  bindingSession,
+  { messages: [], composerReady: false, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+), false)
+assert.equal(localAiNewConversationNativeReady(
+  bindingSession,
+  { messages: [], composerReady: true, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+), true)
+assert.equal(localAiNewConversationNativeReady(
+  { ...bindingSession, loading: true },
+  { messages: [], composerReady: true, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+), false)
+assert.equal(localAiNewConversationNativeReady(
+  bindingSession,
+  { messages: [], composerReady: true, authenticated: false, loginRequired: true },
+  1_000,
+  'old-conversation',
+), false)
 assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
 assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
 assert.match(controllerSource, /googleNewConversationNeedsReload\(current, currentSnapshot\)/)
@@ -113,7 +142,7 @@ assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
 assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)
 assert.match(controllerSource, /newConversationBaselineId\.current = visibleSessionState\?\.activeConversationId \?\? ''/)
-assert.match(controllerSource, /localAiNewConversationContextReady\(/)
+assert.match(controllerSource, /localAiNewConversationNativeReady\(/)
 assert.match(controllerSource, /const path = selectLocalAiNewConversationPath\(/)
 assert.match(controllerSource, /if \(path === 'adapter'\)/)
 assert.match(controllerSource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)
@@ -125,5 +154,6 @@ assert.doesNotMatch(
 assert.match(controllerSource, /消息已保存在本机新会话队列/)
 assert.match(controllerSource, /dispatchPreparedPrompt\(queuedSend\)/)
 assert.match(controllerSource, /restoreQueuedSend\(queuedSend\)/)
+assert.match(welcomeSource, /!web\.controller\.newConversationRecoveryActive/)
 
 process.stdout.write('PASS local AI new-conversation recovery policy\n')

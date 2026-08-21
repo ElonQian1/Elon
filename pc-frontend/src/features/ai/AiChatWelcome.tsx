@@ -37,6 +37,7 @@ export default function AiChatWelcome({
         </div>
       )}
       {identityReady && chatMode && !web.canCompose
+        && !web.controller.newConversationRecoveryActive
         && !['official_loading', 'adapter_waiting', 'context_restoring'].includes(web.userState.phase) && (
         <div className={styles.loginPrompt}>
           <button

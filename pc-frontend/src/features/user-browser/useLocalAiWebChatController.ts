@@ -33,7 +33,7 @@ import {
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
 import {
   googleNewConversationNeedsReload,
-  localAiNewConversationContextReady,
+  localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
@@ -164,22 +164,18 @@ export default function useLocalAiWebChatController(
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs) return
-    const contextReady = localAiNewConversationContextReady(
+    const nativeReady = localAiNewConversationNativeReady(
       visibleSessionState,
       liveSnapshot,
       newConversationRecoveryStartedAtMs,
       newConversationBaselineId.current,
     )
-    const composerReady = Boolean(
-      liveSnapshot?.composerReady
-      && (liveSnapshot.authenticated || !liveSnapshot.loginRequired),
-    )
-    if (contextReady && !queuedSend) {
+    if (nativeReady && !queuedSend) {
       newConversationBaselineId.current = ''
       setNewConversationRecoveryStartedAtMs(0)
       return
     }
-    if (contextReady && composerReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
+    if (nativeReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
       queuedSendDispatching.current = true
       newConversationBaselineId.current = ''
       setNewConversationRecoveryStartedAtMs(0)
