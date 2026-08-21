@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/erp/managed-merchant-instance-v1.schema.json",
+  "title": "Yilong managed merchant ERP instance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "instance_id",
+    "service_user",
+    "merchant_id",
+    "store_id",
+    "profile_source",
+    "secrets_source",
+    "listen_port",
+    "runtime_key_id",
+    "public_base_path"
+  ],
+  "properties": {
+    "schema": {
+      "const": "yilong.managed-merchant-instance.v1"
+    },
+    "instance_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,47}$"
+    },
+    "service_user": {
+      "type": "string",
+      "pattern": "^ym-[a-z0-9][a-z0-9-]{1,27}$"
+    },
+    "merchant_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{3,120}$"
+    },
+    "store_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "profile_source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "secrets_source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "listen_port": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 65535
+    },
+    "runtime_key_id": {
+      "type": "string",
+      "pattern": "^OPEN_COMMERCE_RUNTIME_SECRET_[A-Z0-9_]{3,96}$"
+    },
+    "public_base_path": {
+      "type": "string",
+      "pattern": "^/merchants/[a-z][a-z0-9-]{2,47}$"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

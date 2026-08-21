@@ -2917,6 +2917,107 @@
       "updated_at_ms": 1786647275788
     },
     {
+      "id": "erp-managed-hosting-node-v1",
+      "title": "ERP 商户托管节点 V1",
+      "summary": "将 cofficethinking 抽象为通用商户 ERP 参考实现，在同一电商子服务器共享发布版本，并以独立进程、数据库、系统用户、端口、配置、密钥和状态目录隔离不同商户。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/erp-managed-hosting-node-v1.md",
+        "content_hash": "efce4b5e9a8416591e13c6cd4fa9460f2df7006234c9f54d9f54efa7d4d45176",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9104979321e94cb15e1c4ac7f95d3cc0f1e823c7",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "7144a07c85e2f8fd1bfbe69f3d3517408d35a0b1",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "commerce-platform",
+      "tags": [
+        "erp",
+        "commerce",
+        "hosting",
+        "multi-merchant"
+      ],
+      "task_paths": [
+        "contracts/erp/managed-merchant-instance-v1.schema.json",
+        "docs/erp/managed-hosting-node-v1-acceptance.md",
+        "docs/requirements/erp-managed-hosting-node-v1.md"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "两仓共享相同的 managed merchant instance v1 JSON Schema。",
+        "合同拒绝未知字段、无效 UUID、越界端口、路径不匹配和秘密内联字段。",
+        "节点工具校验配置和秘密文件但不回显秘密值。",
+        "默认只预演，只有显式 apply 且 root 才修改系统。",
+        "两个商户派生不同系统用户、端口、状态目录、秘密目标和 systemd 单元。",
+        "systemd 实例只能写本商户状态目录。",
+        "托管配置拒绝尚未完成商户隔离的平台诊断浏览器。",
+        "现有咖啡单实例保持兼容且本批不改线上数据。",
+        "文档明确托管节点基础和完整生产自助闭环的边界。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/erp/managed-merchant-instance-v1.schema.json",
+          "content_hash": "1c984563a5c0c1c4f9f57c37a2dca84eb525d6d73e0c53ee4dce60e4394b868a",
+          "locator": "$",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9104979321e94cb15e1c4ac7f95d3cc0f1e823c7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "20263a4c8c966383ad84cb66db6cd33fd629af52",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/erp/README.md",
+          "content_hash": "a45d2c9972ae23e40b0b988c288365319a31ea8201790efb81634275e346bda3",
+          "locator": "# 相关文档",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9104979321e94cb15e1c4ac7f95d3cc0f1e823c7",
+            "head_blob_oid": "15c76aec6ea683489bb053943f2f2c1d8ed66b01",
+            "worktree_blob_oid": "9e9bd85713606b1a916aee806ed0e67e63060665",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/erp/managed-hosting-node-v1-acceptance.md",
+          "content_hash": "e2e9796a056d046e4a7318d0ac2f210f119c9ae7d7890a31394fdd8f81ac420d",
+          "locator": "# 验证证据",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9104979321e94cb15e1c4ac7f95d3cc0f1e823c7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a5839ad1d1a4c0dc73f7b595af757d20fc9afbc2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/requirements/erp-managed-hosting-node-v1.md",
+          "content_hash": "efce4b5e9a8416591e13c6cd4fa9460f2df7006234c9f54d9f54efa7d4d45176",
+          "locator": "# ERP 商户托管节点 V1",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9104979321e94cb15e1c4ac7f95d3cc0f1e823c7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7144a07c85e2f8fd1bfbe69f3d3517408d35a0b1",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1787285096573,
+      "updated_at_ms": 1787285617481
+    },
+    {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
@@ -8513,126 +8614,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5cf7de0600ab479c94cb8c13eb2023d3",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786871116095
-    },
-    {
-      "id": "feature_event_ecc11854291741f493df3f520ab3a02e",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "恢复已完成实现的正式生命周期登记。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786871116376
-    },
-    {
-      "id": "feature_event_6d2373091fd242219548fb082f5a0458",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786871119439
-    },
-    {
-      "id": "feature_event_af64b4f5ebd84d33ad3a4ece33e30919",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "SQLite 适配器、类型、文档和自动化测试均已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786871119656
-    },
-    {
-      "id": "feature_event_2c48cb82e882475c8ae8b447fd6e64ae",
-      "feature_id": "merchant-erp-sqlite-store-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "内存与 SQLite 测试共 11 项全部通过，打包与治理检查通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786871119891
-    },
-    {
-      "id": "feature_event_f9cacaade24340ad84c643bbd2228deb",
-      "feature_id": "win-web-ai-context-continuity-hardening-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Windows release 0.3.69+49825af1e63811d5675244c59ed994cd8cd5baee was published, self-updated, restarted, and the installed release identity was read back exactly.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786871598283
-    },
-    {
-      "id": "feature_event_7d85ed5688b04518958ad865e695ae29",
-      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
-      "action": "registered",
-      "actor": "codex-goal-019f3b86",
-      "reason": "在最新远端注册表真源上登记已完成验证的 ERP 运行时桥",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786872595424
-    },
-    {
-      "id": "feature_event_eaa18449424f464fb72e246af0644be5",
-      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "需求范围、非目标和七项验收标准已审查",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786872608647
-    },
-    {
-      "id": "feature_event_dfd8d031fc834147a2cdea6b1263ff76",
-      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "依赖已 verified，任务路径与验收入口齐全",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786872623029
-    },
-    {
-      "id": "feature_event_4f3fee0cb8474a79a870e67d2f40c723",
-      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786872635114
-    },
-    {
-      "id": "feature_event_d61f1af81ec141f884a0c5d79218ac80",
-      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019f3b86",
-      "reason": "在已验证提交上绑定当前证据",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786872645568
-    },
-    {
-      "id": "feature_event_f86ae9791e20492a978f55eeca97c243",
-      "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019f3b86",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786872671004
-    },
-    {
       "id": "feature_event_9fdb181ff4c84d6892b28a2be90e7aa7",
       "feature_id": "merchant-erp-open-commerce-runtime-bridge-v1",
       "action": "transitioned",
@@ -10511,6 +10492,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787256740088
+    },
+    {
+      "id": "feature_event_4bf3669826e04f2b8ca7734fbdd2f0a6",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "用户确认优先把咖啡店项目演进为所有商户可安装的电商子服务器能力。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787285096574
+    },
+    {
+      "id": "feature_event_9a44d12a11e742ba96acf7a0798539cf",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "claimed",
+      "actor": "codex-current-task",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787285106830
+    },
+    {
+      "id": "feature_event_928ae7407d274b6399d787ddcf1b1daa",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始实现跨仓合同、隔离实例工具和验收文档。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787285117489
+    },
+    {
+      "id": "feature_event_9fe0f42d5ce04ac0b11e43185d812455",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "claim_released",
+      "actor": "codex-current-task",
+      "reason": "需求在实现中补充平台浏览器隔离验收项，先释放认领后显式重绑。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1787285523063
+    },
+    {
+      "id": "feature_event_cfc24a64ab884efd96cc7c3b20a0fc6a",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "requirement_rebound",
+      "actor": "codex",
+      "reason": "确认当前需求页新增隔离验收项有效，重新绑定当前内容。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1787285535416
+    },
+    {
+      "id": "feature_event_bca2b18118864b8b96294ea380758fe4",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "当前需求与已实现安全边界一致，验收标准已复核。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787285545109
+    },
+    {
+      "id": "feature_event_048946b731e64a368ea5ba73f2799b76",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "需求已接受且无依赖阻塞，准备重新绑定实现证据。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787285554362
+    },
+    {
+      "id": "feature_event_c1fc87f085b048ea8bd51addbe718f8f",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "claimed",
+      "actor": "codex-current-task",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787285564216
+    },
+    {
+      "id": "feature_event_0c41f16b9e394ded82831fb6c27d8f73",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "重新认领后绑定当前实现和测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787285577468
+    },
+    {
+      "id": "feature_event_e02a01ed72e74ca9833962f1ba1ca095",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787285592883
+    },
+    {
+      "id": "feature_event_2b85b43c822e4070ab30409fb3b2c824",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "跨仓合同、商户实例工具、示例、隔离门禁和验收文档已完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787285603663
+    },
+    {
+      "id": "feature_event_e583688d4a414ed4a71052d52da53423",
+      "feature_id": "erp-managed-hosting-node-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "10 项合同与隔离测试通过，Bash 语法、跨仓 Schema 一致性、源码和文档门禁通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787285617481
     }
   ]
 }
