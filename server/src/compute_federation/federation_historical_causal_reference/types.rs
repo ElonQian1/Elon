@@ -87,6 +87,46 @@ pub(crate) struct ExecutionReceiptRef {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct ProviderDeclaredUsageRef {
+    pub(crate) usage_snapshot_id: String,
+    pub(crate) usage_sequence_no: u64,
+    pub(crate) cumulative_usage_digest: String,
+    pub(crate) usage_event_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TerminalCandidateRef {
+    pub(crate) terminal_candidate_id: String,
+    pub(crate) terminal_candidate_event_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConsumerReviewRef {
+    pub(crate) consumer_review_id: String,
+    pub(crate) consumer_review_event_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PlatformObservationRef {
+    pub(crate) platform_observation_id: String,
+    pub(crate) platform_observation_event_digest: String,
+    pub(crate) cumulative_observed_usage_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct VerificationDecisionRef {
+    pub(crate) verification_decision_id: String,
+    pub(crate) verification_event_digest: String,
+    pub(crate) verified_usage_digest: String,
+    pub(crate) compensable_usage_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct FinalizationRef {
     pub(crate) finalization_id: String,
     pub(crate) finalization_event_digest: String,
@@ -193,6 +233,18 @@ pub(crate) struct ExecutionSourceLineageV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct ExecutionVerificationSourceLineageV1 {
+    pub(crate) execution_receipt: ExecutionReceiptRef,
+    pub(crate) execution_lineage_digest: String,
+    pub(crate) provider_declared_usage: ProviderDeclaredUsageRef,
+    pub(crate) terminal_candidate: TerminalCandidateRef,
+    pub(crate) consumer_review: ConsumerReviewRef,
+    pub(crate) platform_observation: PlatformObservationRef,
+    pub(crate) verification_decision: VerificationDecisionRef,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SettlementSourceLineageV1 {
     pub(crate) attempt_settlement: AttemptSettlementRef,
     pub(crate) execution_receipt: ExecutionReceiptRef,
@@ -220,6 +272,7 @@ pub(crate) struct SettlementReleaseSourceLineageV1 {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum FederationHistoricalLineageKindV1 {
     ExecutionSourceV1,
+    ExecutionVerificationSourceV1,
     SettlementSourceV1,
     SettlementReleaseSourceV1,
 }
@@ -228,6 +281,7 @@ pub(crate) enum FederationHistoricalLineageKindV1 {
 #[serde(untagged)]
 pub(crate) enum FederationHistoricalLineageV1 {
     ExecutionSource(ExecutionSourceLineageV1),
+    ExecutionVerificationSource(ExecutionVerificationSourceLineageV1),
     SettlementSource(SettlementSourceLineageV1),
     SettlementReleaseSource(SettlementReleaseSourceLineageV1),
 }

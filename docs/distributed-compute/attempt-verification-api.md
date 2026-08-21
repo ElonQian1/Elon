@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Verification 决定
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-22
 owners: ai-economy, backend, pc
 implementation_status: implementation_partially_verified
 ---
@@ -13,6 +13,12 @@ implementation_status: implementation_partially_verified
 v192 的追加式 Store、Service、HTTP 路由与管理员待验证队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-verification` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。平台 `admin/owner` 可把 v189-v191 证据链绑定为第一份不可变 Verification 决定，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 v192 只记录 `accepted/rejected/disputed` 及其确定性 `verified_usage`、`compensable_usage`。它本身不会生成 Execution Receipt，不会推进 Lease、Job、Reservation 或 Claim，不会消费容量，也不会扣除预授权或释放 Provider 收益；v193 可另行基于 accepted 决定签发回执。
+
+另有 endpoint-only additive 的只读 `execution_verification_source_v1`，只在 v193 已存在时从 historical Lease root重审
+v188-v193并返回最小因果 refs；它不替代本页 Verification owner，也不表示 rejected/disputed。该 Carrier 的 Domain、
+Store、Service、HTTP/MCP 与 PC 源码为 `source_written/source_review_only/uncompiled/unrun`，见
+[authority](federation-execution-verification-causal-reference-abi-authority.md) 与
+[acceptance](federation-execution-verification-causal-reference-abi-acceptance.md)。
 
 ## 2. HTTP 路由
 

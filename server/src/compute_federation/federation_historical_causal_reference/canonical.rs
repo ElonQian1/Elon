@@ -5,7 +5,8 @@ use sha2::{Digest, Sha256};
 use crate::compute_plugin_sharing_directive::canonical_compute_plugin_ijson_and_sha256;
 
 use super::types::{
-    ExecutionSourceLineageV1, FederationHistoricalLineageKindV1, FederationHistoricalLineageV1,
+    ExecutionSourceLineageV1, ExecutionVerificationSourceLineageV1,
+    FederationHistoricalLineageKindV1, FederationHistoricalLineageV1,
     SettlementReleaseSourceLineageV1, SettlementSourceLineageV1,
     UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_CANONICALIZATION,
@@ -22,6 +23,15 @@ pub(crate) fn build_execution_source_carrier(
     build_carrier(
         FederationHistoricalLineageKindV1::ExecutionSourceV1,
         FederationHistoricalLineageV1::ExecutionSource(lineage),
+    )
+}
+
+pub(crate) fn build_execution_verification_source_carrier(
+    lineage: ExecutionVerificationSourceLineageV1,
+) -> Result<UntrustedFederationHistoricalCausalReferenceEnvelopeV1> {
+    build_carrier(
+        FederationHistoricalLineageKindV1::ExecutionVerificationSourceV1,
+        FederationHistoricalLineageV1::ExecutionVerificationSource(lineage),
     )
 }
 

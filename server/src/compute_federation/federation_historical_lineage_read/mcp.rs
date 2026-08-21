@@ -8,9 +8,12 @@ use super::service::{self, FederationHistoricalLineageReadError, ADMIN_FORBIDDEN
 use crate::compute_federation::management_mcp_support as support;
 
 const GET_MY_EXECUTION: &str = "compute_get_my_execution_source_lineage";
+const GET_MY_EXECUTION_VERIFICATION: &str = "compute_get_my_execution_verification_source_lineage";
 const GET_MY_SETTLEMENT: &str = "compute_get_my_settlement_source_lineage";
 const GET_MY_SETTLEMENT_RELEASE: &str = "compute_get_my_settlement_release_source_lineage";
 const ADMIN_GET_EXECUTION: &str = "compute_admin_get_execution_source_lineage";
+const ADMIN_GET_EXECUTION_VERIFICATION: &str =
+    "compute_admin_get_execution_verification_source_lineage";
 const ADMIN_GET_SETTLEMENT: &str = "compute_admin_get_settlement_source_lineage";
 const ADMIN_GET_SETTLEMENT_RELEASE: &str = "compute_admin_get_settlement_release_source_lineage";
 
@@ -25,6 +28,13 @@ pub(crate) fn definitions() -> Vec<Value> {
         support::tool(
             GET_MY_EXECUTION,
             "读取当前消费者或 Provider 所有者可见的历史 Execution Source lineage；无状态、资金或调度副作用。",
+            lease_schema(),
+            true,
+            false,
+        ),
+        support::tool(
+            GET_MY_EXECUTION_VERIFICATION,
+            "读取当前消费者或 Provider 所有者可见的历史 Execution Verification Source lineage；无状态、资金或调度副作用。",
             lease_schema(),
             true,
             false,
@@ -51,6 +61,13 @@ pub(crate) fn admin_definitions() -> Vec<Value> {
         support::tool(
             ADMIN_GET_EXECUTION,
             "平台管理员按 Attempt Lease 读取历史 Execution Source lineage；无副作用。",
+            lease_schema(),
+            true,
+            false,
+        ),
+        support::tool(
+            ADMIN_GET_EXECUTION_VERIFICATION,
+            "平台管理员按 Attempt Lease 读取历史 Execution Verification Source lineage；无副作用。",
             lease_schema(),
             true,
             false,
@@ -83,6 +100,15 @@ pub(crate) fn call_if_handled(
         GET_MY_EXECUTION => {
             let input = decode(arguments)?;
             service::read_execution_for_participant(
+                store,
+                user_id,
+                &input.lease_id,
+                Some(project_id),
+            )
+        }
+        GET_MY_EXECUTION_VERIFICATION => {
+            let input = decode(arguments)?;
+            service::read_execution_verification_for_participant(
                 store,
                 user_id,
                 &input.lease_id,
@@ -126,6 +152,11 @@ pub(crate) fn call_admin_if_handled(
             ensure_platform_admin(platform_role)?;
             let input = decode(arguments)?;
             service::read_execution_for_admin(store, &input.lease_id)
+        }
+        ADMIN_GET_EXECUTION_VERIFICATION => {
+            ensure_platform_admin(platform_role)?;
+            let input = decode(arguments)?;
+            service::read_execution_verification_for_admin(store, &input.lease_id)
         }
         ADMIN_GET_SETTLEMENT => {
             ensure_platform_admin(platform_role)?;

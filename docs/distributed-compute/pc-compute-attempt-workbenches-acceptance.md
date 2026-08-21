@@ -67,10 +67,13 @@ npm run check:bundle-budget
 - 未执行真实银行、支付机构、钱包或 Sui 付款，也没有提现执行器；
 - 静态页面可构建不代表队列中已有真实业务数据，不能宣称完整算力交易已可生产运行。
 
-## 6. 本批未运行的 release Carrier adoption
+## 6. 本批未运行的 execution-verification 与 release Carrier adoption
 
-`/compute-challenge-resolution`、`/compute-challenges` 与 `/my-compute-settlement` 复用现有历史因果卡片：pending记录仍核验
-execution+settlement；已有 v198 的记录再读取 release exact-5 response，并验证 settlement→execution、
-release→settlement 两级digest与subject等式。任一失败整卡拒绝、保留重试；release不存在时不得把pending伪装成
-integrity failure。新增源码未执行本页 §4 命令、浏览器或视觉验收，当前只能记
-`source_written/source_review_only/uncompiled/unrun`，不能继承2026-08-11的历史前端通过证据。
+`/compute-challenge-resolution`、`/compute-challenges` 与 `/my-compute-settlement` 复用现有历史因果卡片：所有可读
+Execution Receipt先同时读取 execution与execution-verification exact-5 response，分别验证 JCS/domain 后证明 rebuilt
+execution digest及Execution Receipt pair逐字相等；pending记录继续核验settlement，已有 v198 的记录再读取release并验证
+execution→settlement→release。任一失败整卡拒绝、保留重试与stale guard；release不存在时不得把pending伪装成integrity
+failure。新增源码未执行本页 §4 命令、浏览器或视觉验收，当前只能记
+`source_written/source_review_only/uncompiled/unrun`，不能继承2026-08-11的历史前端通过证据。权威边界见
+[execution verification acceptance](federation-execution-verification-causal-reference-abi-acceptance.md) 与
+[release acceptance](federation-settlement-release-causal-reference-abi-acceptance.md)。

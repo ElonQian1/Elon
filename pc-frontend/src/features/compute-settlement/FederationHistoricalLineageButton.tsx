@@ -9,6 +9,10 @@ import {
   type ValidatedSettlementReleaseLineageRead,
   validateFederationHistoricalLineageTriple,
 } from '../compute-attempt/federationHistoricalReleaseLineageContracts'
+import {
+  type ValidatedExecutionVerificationLineageRead,
+  validateExecutionVerificationLineagePair,
+} from '../compute-attempt/federationHistoricalVerificationLineageContracts'
 import { federationHistoricalLineageApi } from './federationHistoricalLineageApi'
 import styles from './FederationHistoricalLineageButton.module.css'
 
@@ -25,6 +29,7 @@ type AuditState =
   | {
       status: 'success'
       execution: ValidatedFederationHistoricalLineageRead
+      verification: ValidatedExecutionVerificationLineageRead
       settlement: ValidatedFederationHistoricalLineageRead
       release: ValidatedSettlementReleaseLineageRead | null
     }
@@ -51,17 +56,19 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
     const generation = ++requestGeneration.current
     setState({ status: 'loading' })
     try {
-      const [execution, settlement, release] = await Promise.all([
+      const [execution, verification, settlement, release] = await Promise.all([
         federationHistoricalLineageApi.readExecution(scope, leaseId),
+        federationHistoricalLineageApi.readVerification(scope, leaseId),
         federationHistoricalLineageApi.readSettlement(scope, leaseId),
         releaseAvailable
           ? federationHistoricalLineageApi.readRelease(scope, leaseId)
           : Promise.resolve(null),
       ])
+      validateExecutionVerificationLineagePair(execution, verification)
       if (release) validateFederationHistoricalLineageTriple(execution, settlement, release)
       else validateFederationHistoricalLineagePair(execution, settlement)
       if (generation !== requestGeneration.current) return
-      setState({ status: 'success', execution, settlement, release })
+      setState({ status: 'success', execution, verification, settlement, release })
     } catch (reason) {
       if (generation !== requestGeneration.current) return
       setState({ status: 'error', message: messageOf(reason) })
@@ -94,8 +101,8 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
       {loading && (
         <p className={styles.status} role="status">
           {releaseAvailable
-            ? '正在并行读取 execution、settlement 与 release 只读证据…'
-            : '正在并行读取 execution 与 settlement 只读证据…'}
+            ? '正在并行读取 execution、verification、settlement 与 release 只读证据…'
+            : '正在并行读取 execution、verification 与 settlement 只读证据…'}
         </p>
       )}
       {failed && <p className={styles.error} role="alert"><TriangleAlert size={14} />{state.message}</p>}
@@ -103,16 +110,34 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
         <div id={panelId} className={styles.panel} aria-live="polite">
           <div className={styles.verified}>
             <ShieldCheck size={14} />
-            {state.release ? '三响应摘要与两级跨链等式已核验' : '双响应摘要与跨链等式已核验'}
+            {state.release ? '四响应摘要与三级跨链等式已核验' : '三响应摘要与两级跨链等式已核验'}
           </div>
           <div className={styles.profiles}>
             <LineageEvidence label="Execution source" record={state.execution} />
+            <VerificationLineageEvidence record={state.verification} />
             <LineageEvidence label="Settlement source" record={state.settlement} />
             {state.release && <ReleaseLineageEvidence record={state.release} />}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function VerificationLineageEvidence({ record }: { record: ValidatedExecutionVerificationLineageRead }) {
+  return (
+    <section className={styles.profile}>
+      <div className={styles.profileHeader}>
+        <strong>Execution verification source</strong>
+        <span>{record.response.read_effect}</span>
+      </div>
+      <span className={styles.kind}>{record.response.lineage_kind}</span>
+      <code className={styles.digest}>{record.response.lineage_digest}</code>
+      <details className={styles.details}>
+        <summary>查看 canonical Carrier JSON</summary>
+        <pre>{record.response.canonical_carrier_json}</pre>
+      </details>
+    </section>
   )
 }
 

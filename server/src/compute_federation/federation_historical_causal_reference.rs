@@ -11,25 +11,28 @@ mod validation;
 mod release_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod verification_tests;
 
 pub(crate) use canonical::{
-    build_execution_source_carrier, build_settlement_release_source_carrier,
-    build_settlement_source_carrier,
+    build_execution_source_carrier, build_execution_verification_source_carrier,
+    build_settlement_release_source_carrier, build_settlement_source_carrier,
     canonical_federation_historical_causal_reference_json_and_digest,
     federation_historical_causal_reference_from_json,
     federation_historical_causal_reference_from_json_bytes,
 };
 pub(crate) use types::{
     AttemptLeaseSourceRef, AttemptSettlementRef, CapacityClaimVersionRef, CapacityPoolVersionRef,
-    ExecutionReceiptRef, ExecutionSourceLineageV1, FederationHistoricalLineageKindV1,
+    ConsumerReviewRef, ExecutionReceiptRef, ExecutionSourceLineageV1,
+    ExecutionVerificationSourceLineageV1, FederationHistoricalLineageKindV1,
     FederationHistoricalLineageV1, FinalizationRef, JobVersionRef, OfferVersionRef,
-    PriceSnapshotRef, ProviderVersionRef, ReservationVersionRef, SettlementChallengeRef,
-    SettlementChallengeResolutionActionV1, SettlementChallengeResolutionRef,
-    SettlementCorrectionPostingRef, SettlementCorrectionRef, SettlementReleaseGateV1,
-    SettlementReleasePostingRef, SettlementReleaseRef, SettlementReleaseSourceLineageV1,
-    SettlementSourceLineageV1, SettlementSourcePostingRef,
-    UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
-    FEDERATION_HISTORICAL_CAUSAL_REFERENCE_CANONICALIZATION,
+    PlatformObservationRef, PriceSnapshotRef, ProviderDeclaredUsageRef, ProviderVersionRef,
+    ReservationVersionRef, SettlementChallengeRef, SettlementChallengeResolutionActionV1,
+    SettlementChallengeResolutionRef, SettlementCorrectionPostingRef, SettlementCorrectionRef,
+    SettlementReleaseGateV1, SettlementReleasePostingRef, SettlementReleaseRef,
+    SettlementReleaseSourceLineageV1, SettlementSourceLineageV1, SettlementSourcePostingRef,
+    TerminalCandidateRef, UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
+    VerificationDecisionRef, FEDERATION_HISTORICAL_CAUSAL_REFERENCE_CANONICALIZATION,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_DIGEST_ALGORITHM,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_DIGEST_DOMAIN,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_MAX_JSON_BYTES,

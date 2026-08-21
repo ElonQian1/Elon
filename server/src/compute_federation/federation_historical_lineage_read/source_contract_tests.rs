@@ -55,15 +55,17 @@ fn transport_is_exact_five_key_serialize_only_redacted_view() {
 fn http_and_mcp_publish_only_the_frozen_read_abi() {
     for route in [
         "/api/me/compute/attempt-leases/:lease_id/execution-source-lineage",
+        "/api/me/compute/attempt-leases/:lease_id/execution-verification-source-lineage",
         "/api/me/compute/attempt-leases/:lease_id/settlement-source-lineage",
         "/api/me/compute/attempt-leases/:lease_id/settlement-release-source-lineage",
         "/api/admin/compute/attempt-leases/:lease_id/execution-source-lineage",
+        "/api/admin/compute/attempt-leases/:lease_id/execution-verification-source-lineage",
         "/api/admin/compute/attempt-leases/:lease_id/settlement-source-lineage",
         "/api/admin/compute/attempt-leases/:lease_id/settlement-release-source-lineage",
     ] {
         assert!(API.contains(route), "missing GET route {route}");
     }
-    assert_eq!(API.matches(".route(").count(), 6);
+    assert_eq!(API.matches(".route(").count(), 8);
     assert!(API.contains("routing::get"));
     for forbidden in [
         "routing::post",
@@ -81,15 +83,19 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
 
     for tool in [
         "compute_get_my_execution_source_lineage",
+        "compute_get_my_execution_verification_source_lineage",
         "compute_get_my_settlement_source_lineage",
         "compute_get_my_settlement_release_source_lineage",
         "compute_admin_get_execution_source_lineage",
+        "compute_admin_get_execution_verification_source_lineage",
         "compute_admin_get_settlement_source_lineage",
         "compute_admin_get_settlement_release_source_lineage",
     ] {
         assert_eq!(MCP.matches(tool).count(), 1, "MCP tool ABI drift: {tool}");
     }
-    assert_eq!(MCP.matches("support::tool(").count(), 6);
+    assert_eq!(MCP.matches("support::tool(").count(), 8);
+    assert_eq!(MCP.matches("GET_MY_EXECUTION_VERIFICATION").count(), 3);
+    assert_eq!(MCP.matches("ADMIN_GET_EXECUTION_VERIFICATION").count(), 3);
     assert_eq!(MCP.matches("GET_MY_SETTLEMENT_RELEASE").count(), 3);
     assert_eq!(MCP.matches("ADMIN_GET_SETTLEMENT_RELEASE").count(), 3);
     let schema = MCP
@@ -106,6 +112,18 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
     let participant_release_call =
         between(MCP, "GET_MY_SETTLEMENT_RELEASE =>", "_ => return Ok(None)");
     assert!(participant_release_call.contains("Some(project_id)"));
+    let participant_verification_call = between(
+        MCP,
+        "GET_MY_EXECUTION_VERIFICATION =>",
+        "GET_MY_SETTLEMENT =>",
+    );
+    assert!(participant_verification_call.contains("Some(project_id)"));
+    let admin_verification_call = between(
+        MCP,
+        "ADMIN_GET_EXECUTION_VERIFICATION =>",
+        "ADMIN_GET_SETTLEMENT =>",
+    );
+    assert!(admin_verification_call.contains("ensure_platform_admin(platform_role)?"));
     let admin_release_call = between(
         MCP,
         "ADMIN_GET_SETTLEMENT_RELEASE =>",
@@ -127,10 +145,15 @@ fn http_and_mcp_publish_only_the_frozen_read_abi() {
 #[test]
 fn adoption_is_historical_read_only_typed_and_redacted() {
     assert!(SERVICE.contains("resolve_compute_execution_source_lineage_for_lease"));
+    assert!(SERVICE.contains("resolve_compute_execution_verification_source_lineage_for_lease"));
     assert!(SERVICE.contains("resolve_compute_settlement_source_lineage_for_lease"));
     assert!(SERVICE.contains("resolve_compute_settlement_release_source_lineage_for_lease"));
     assert!(SERVICE.contains("FederationHistoricalLineageKindV1::SettlementReleaseSourceV1"));
+    assert!(SERVICE.contains("FederationHistoricalLineageKindV1::ExecutionVerificationSourceV1"));
     assert!(STORE_FACADE.contains("resolve_compute_settlement_release_source_lineage_for_lease"));
+    assert!(
+        STORE_FACADE.contains("resolve_compute_execution_verification_source_lineage_for_lease")
+    );
     assert!(SERVICE.contains("FederationHistoricalLineageReadError::NotVisible"));
     assert!(SERVICE.contains("FederationHistoricalLineageReadError::IntegrityConflict"));
     for code in [
@@ -165,6 +188,51 @@ fn adoption_is_historical_read_only_typed_and_redacted() {
         .contains("fn compute_attempt_historical_settlement_release_by_lease_on("));
     assert!(!STORE_FACADE.contains("compute_settlement_release_on("));
     assert!(!STORE_FACADE.contains("compute_settlement_release_optional_on("));
+
+    let participant_verification = between(
+        SERVICE,
+        "pub(super) fn read_execution_verification_for_participant(",
+        "pub(super) fn read_settlement_for_participant(",
+    );
+    assert_eq!(
+        participant_verification
+            .matches("FederationHistoricalLineageReadError::NotVisible")
+            .count(),
+        2,
+        "missing and malformed execution-verification lineage must share the participant 404 code"
+    );
+    assert!(participant_verification
+        .contains("FederationHistoricalLineageKindV1::ExecutionVerificationSourceV1"));
+
+    let admin_verification = between(
+        SERVICE,
+        "pub(super) fn read_execution_verification_for_admin(",
+        "pub(super) fn read_settlement_for_admin(",
+    );
+    assert!(admin_verification.contains("FederationHistoricalLineageReadError::IntegrityConflict"));
+    assert!(admin_verification.contains("FederationHistoricalLineageReadError::NotFound"));
+    assert!(admin_verification
+        .contains("FederationHistoricalLineageKindV1::ExecutionVerificationSourceV1"));
+
+    let participant_verification_http = between(
+        API,
+        "async fn get_my_execution_verification_source_lineage(",
+        "async fn get_my_settlement_source_lineage(",
+    );
+    assert!(participant_verification_http.contains("authenticated_user("));
+    assert!(participant_verification_http.contains("require_path_only_input("));
+    assert!(participant_verification_http
+        .contains("service::read_execution_verification_for_participant("));
+    assert!(participant_verification_http.contains("None,"));
+
+    let admin_verification_http = between(
+        API,
+        "async fn get_admin_execution_verification_source_lineage(",
+        "async fn get_admin_settlement_source_lineage(",
+    );
+    assert!(admin_verification_http.contains("platform_admin("));
+    assert!(admin_verification_http.contains("require_path_only_input("));
+    assert!(admin_verification_http.contains("service::read_execution_verification_for_admin("));
 
     let participant_release = between(
         SERVICE,

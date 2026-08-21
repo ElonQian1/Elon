@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Execution Receipt
 status: current
-reviewed_at: 2026-08-11
+reviewed_at: 2026-08-22
 owners: ai-economy, backend, pc
 implementation_status: implementation_partially_verified
 ---
@@ -13,6 +13,12 @@ implementation_status: implementation_partially_verified
 v193 的追加式 Store、独立 Service、HTTP 路由与管理员待签发队列已写入并随服务端组合编译/迁移；操作级正向专项仍未运行。PC `/compute-receipts` 已通过跨层合同、严格类型、lint 和生产构建，状态为 `implementation_partially_verified`。平台 `admin/owner` 可基于精确的 accepted v192 决定签发第一份不可变 Execution Receipt，PC 证据见 `pc-compute-attempt-workbenches-acceptance.md`。
 
 Execution Receipt 固化执行事实，不负责修改业务状态或移动资金。v193 不推进 Lease、Job、Reservation、Capacity Claim，不消费容量，不扣除预授权，也不释放 Provider 收益。
+
+`execution_verification_source_v1` 另以只读 Carrier 暴露 v188-v193 六个 owner 的最小 ref，并通过 rebuilt
+`execution_source_v1` digest证明同一 Execution Receipt；它不复制本页 meter、attestation、policy或receipt正文，也不
+新增状态/资金效果。新 Carrier 当前仅 `source_written/source_review_only/uncompiled/unrun`，见
+[authority](federation-execution-verification-causal-reference-abi-authority.md) 与
+[acceptance](federation-execution-verification-causal-reference-abi-acceptance.md)。
 
 ## 2. HTTP 路由
 

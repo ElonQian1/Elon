@@ -5,6 +5,7 @@ use super::source_refs::{validate_execution_source_links, validate_settlement_so
 mod fixtures;
 mod owner_contracts;
 mod release;
+mod verification;
 
 use fixtures::{audit_legacy_pool, execution_facts, legacy_pool_facts, settlement_facts};
 
@@ -14,6 +15,8 @@ const SETTLEMENT_RESOLVER: &str = include_str!("settlement.rs");
 const RELEASE_RESOLVER: &str = include_str!("release.rs");
 const RELEASE_REFS: &str = include_str!("release_refs.rs");
 const SOURCE_REFS: &str = include_str!("source_refs.rs");
+const VERIFICATION_RESOLVER: &str = include_str!("verification.rs");
+const VERIFICATION_REFS: &str = include_str!("verification_refs.rs");
 const CAPACITY_POOL_QUERIES: &str = include_str!("../compute_capacity_pool_queries.rs");
 const ATTEMPT_EXECUTION_RECEIPTS: &str = include_str!("../compute_attempt_execution_receipts.rs");
 const ATTEMPT_SETTLEMENTS: &str = include_str!("../compute_attempt_settlements.rs");
@@ -35,12 +38,15 @@ const MAIN: &str = include_str!("../../main.rs");
 #[test]
 fn resolver_source_uses_exact_owner_seams_inside_deferred_read_snapshots() {
     assert!(STORE_FACADE.contains("resolve_compute_execution_source_lineage"));
+    assert!(
+        STORE_FACADE.contains("resolve_compute_execution_verification_source_lineage_for_lease")
+    );
     assert!(STORE_FACADE.contains("resolve_compute_settlement_source_lineage"));
     assert_eq!(
         STORE_FACADE
             .matches("transaction_with_behavior(TransactionBehavior::Deferred)")
             .count(),
-        5
+        6
     );
 
     let resolver_source = resolver_source();
@@ -49,6 +55,9 @@ fn resolver_source_uses_exact_owner_seams_inside_deferred_read_snapshots() {
         "compute_attempt_execution_receipt_by_id_on",
         "audited_compute_attempt_lease_version_on",
         "compute_attempt_historical_terminal_candidate_on",
+        "compute_attempt_usage_declaration_on",
+        "compute_attempt_historical_consumer_review_on",
+        "compute_attempt_historical_platform_observation_on",
         "compute_attempt_historical_verification_decision_on",
         "stored_claim_version_on",
         "audited_compute_capacity_pool_version_on",
@@ -378,6 +387,8 @@ fn resolver_source() -> String {
         RELEASE_RESOLVER,
         RELEASE_REFS,
         SOURCE_REFS,
+        VERIFICATION_RESOLVER,
+        VERIFICATION_REFS,
     ]
     .join("\n")
 }

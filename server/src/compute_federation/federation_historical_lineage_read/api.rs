@@ -24,6 +24,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             get(get_my_execution_source_lineage),
         )
         .route(
+            "/api/me/compute/attempt-leases/:lease_id/execution-verification-source-lineage",
+            get(get_my_execution_verification_source_lineage),
+        )
+        .route(
             "/api/me/compute/attempt-leases/:lease_id/settlement-source-lineage",
             get(get_my_settlement_source_lineage),
         )
@@ -34,6 +38,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/attempt-leases/:lease_id/execution-source-lineage",
             get(get_admin_execution_source_lineage),
+        )
+        .route(
+            "/api/admin/compute/attempt-leases/:lease_id/execution-verification-source-lineage",
+            get(get_admin_execution_verification_source_lineage),
         )
         .route(
             "/api/admin/compute/attempt-leases/:lease_id/settlement-source-lineage",
@@ -62,6 +70,30 @@ async fn get_my_execution_source_lineage(
         Err(response) => return response,
     };
     lineage_response(service::read_execution_for_participant(
+        &state.store,
+        &user_id,
+        &lease_id,
+        None,
+    ))
+}
+
+async fn get_my_execution_verification_source_lineage(
+    State(state): State<Arc<AppState>>,
+    request: Request,
+) -> Response {
+    let (mut parts, body) = request.into_parts();
+    let user_id = match authenticated_user(&state, &parts.headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    if let Err(response) = require_path_only_input(&parts.uri, body).await {
+        return response;
+    }
+    let lease_id = match lease_id_from_parts(&mut parts, &state).await {
+        Ok(lease_id) => lease_id,
+        Err(response) => return response,
+    };
+    lineage_response(service::read_execution_verification_for_participant(
         &state.store,
         &user_id,
         &lease_id,
@@ -133,6 +165,27 @@ async fn get_admin_execution_source_lineage(
         Err(response) => return response,
     };
     lineage_response(service::read_execution_for_admin(&state.store, &lease_id))
+}
+
+async fn get_admin_execution_verification_source_lineage(
+    State(state): State<Arc<AppState>>,
+    request: Request,
+) -> Response {
+    let (mut parts, body) = request.into_parts();
+    if let Err(response) = platform_admin(&state, &parts.headers) {
+        return response;
+    }
+    if let Err(response) = require_path_only_input(&parts.uri, body).await {
+        return response;
+    }
+    let lease_id = match lease_id_from_parts(&mut parts, &state).await {
+        Ok(lease_id) => lease_id,
+        Err(response) => return response,
+    };
+    lineage_response(service::read_execution_verification_for_admin(
+        &state.store,
+        &lease_id,
+    ))
 }
 
 async fn get_admin_settlement_source_lineage(

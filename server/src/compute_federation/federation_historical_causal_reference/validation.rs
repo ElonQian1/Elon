@@ -2,9 +2,10 @@ use anyhow::{ensure, Result};
 
 use super::canonical::canonical_federation_historical_causal_reference_json_and_digest;
 use super::types::{
-    ExecutionSourceLineageV1, FederationHistoricalLineageKindV1, FederationHistoricalLineageV1,
-    SettlementChallengeRef, SettlementChallengeResolutionRef, SettlementCorrectionRef,
-    SettlementReleaseGateV1, SettlementReleaseSourceLineageV1, SettlementSourceLineageV1,
+    ExecutionSourceLineageV1, ExecutionVerificationSourceLineageV1,
+    FederationHistoricalLineageKindV1, FederationHistoricalLineageV1, SettlementChallengeRef,
+    SettlementChallengeResolutionRef, SettlementCorrectionRef, SettlementReleaseGateV1,
+    SettlementReleaseSourceLineageV1, SettlementSourceLineageV1,
     UntrustedFederationHistoricalCausalReferenceEnvelopeV1,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_CANONICALIZATION,
     FEDERATION_HISTORICAL_CAUSAL_REFERENCE_DIGEST_ALGORITHM,
@@ -39,6 +40,10 @@ pub(crate) fn validate_federation_historical_causal_reference(
             FederationHistoricalLineageV1::ExecutionSource(lineage),
         ) => validate_execution_lineage(lineage)?,
         (
+            FederationHistoricalLineageKindV1::ExecutionVerificationSourceV1,
+            FederationHistoricalLineageV1::ExecutionVerificationSource(lineage),
+        ) => validate_execution_verification_lineage(lineage)?,
+        (
             FederationHistoricalLineageKindV1::SettlementSourceV1,
             FederationHistoricalLineageV1::SettlementSource(lineage),
         ) => validate_settlement_lineage(lineage)?,
@@ -60,6 +65,109 @@ pub(crate) fn validate_federation_historical_causal_reference(
         envelope.lineage_digest == computed_digest,
         "federation historical causal reference lineage digest does not match its canonical projection"
     );
+    Ok(())
+}
+
+fn validate_execution_verification_lineage(
+    lineage: &ExecutionVerificationSourceLineageV1,
+) -> Result<()> {
+    validate_reference_id(
+        &lineage.execution_receipt.execution_receipt_id,
+        "execution receipt ID",
+    )?;
+    validate_reference_id(
+        &lineage.provider_declared_usage.usage_snapshot_id,
+        "provider declared usage snapshot ID",
+    )?;
+    safe_positive(
+        lineage.provider_declared_usage.usage_sequence_no,
+        "provider declared usage sequence number",
+    )?;
+    validate_reference_id(
+        &lineage.terminal_candidate.terminal_candidate_id,
+        "terminal candidate ID",
+    )?;
+    validate_reference_id(
+        &lineage.consumer_review.consumer_review_id,
+        "consumer review ID",
+    )?;
+    validate_reference_id(
+        &lineage.platform_observation.platform_observation_id,
+        "platform observation ID",
+    )?;
+    validate_reference_id(
+        &lineage.verification_decision.verification_decision_id,
+        "verification decision ID",
+    )?;
+    for (digest, field) in [
+        (
+            lineage.execution_receipt.execution_receipt_digest.as_str(),
+            "execution receipt digest",
+        ),
+        (
+            lineage.execution_lineage_digest.as_str(),
+            "execution lineage digest",
+        ),
+        (
+            lineage
+                .provider_declared_usage
+                .cumulative_usage_digest
+                .as_str(),
+            "provider declared cumulative usage digest",
+        ),
+        (
+            lineage.provider_declared_usage.usage_event_digest.as_str(),
+            "provider declared usage event digest",
+        ),
+        (
+            lineage
+                .terminal_candidate
+                .terminal_candidate_event_digest
+                .as_str(),
+            "terminal candidate event digest",
+        ),
+        (
+            lineage
+                .consumer_review
+                .consumer_review_event_digest
+                .as_str(),
+            "consumer review event digest",
+        ),
+        (
+            lineage
+                .platform_observation
+                .platform_observation_event_digest
+                .as_str(),
+            "platform observation event digest",
+        ),
+        (
+            lineage
+                .platform_observation
+                .cumulative_observed_usage_digest
+                .as_str(),
+            "platform cumulative observed usage digest",
+        ),
+        (
+            lineage
+                .verification_decision
+                .verification_event_digest
+                .as_str(),
+            "verification event digest",
+        ),
+        (
+            lineage.verification_decision.verified_usage_digest.as_str(),
+            "verified usage digest",
+        ),
+        (
+            lineage
+                .verification_decision
+                .compensable_usage_digest
+                .as_str(),
+            "compensable usage digest",
+        ),
+    ] {
+        validate_reference_digest(digest, field)?;
+    }
     Ok(())
 }
 

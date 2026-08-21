@@ -18,6 +18,8 @@ mod release;
 mod release_refs;
 mod settlement;
 mod source_refs;
+mod verification;
+mod verification_refs;
 
 #[cfg(test)]
 mod source_contract_tests;
@@ -190,6 +192,24 @@ impl Store {
             &receipt.receipt.receipt_id,
             &receipt.receipt.receipt_digest,
         )?;
+        tx.commit()?;
+        Ok(Some(resolved))
+    }
+
+    pub(crate) fn resolve_compute_execution_verification_source_lineage_for_lease(
+        &self,
+        lease_id: &str,
+    ) -> Result<Option<ValidatedFederationHistoricalLineage>> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let Some(receipt) =
+            compute_attempt_historical_execution_receipt_by_lease_on(&tx, lease_id)?
+        else {
+            tx.commit()?;
+            return Ok(None);
+        };
+        let resolved =
+            verification::resolve_execution_verification_source_lineage_on(&tx, &receipt)?;
         tx.commit()?;
         Ok(Some(resolved))
     }

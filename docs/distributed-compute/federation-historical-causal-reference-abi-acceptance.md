@@ -42,7 +42,7 @@ F0 的 read adoption 源码已落盘，但 compile、runtime 与已运行合同�
 | case | 必须结果 |
 |---|---|
 | envelope | exact 6 keys；schema/kind/JCS/SHA常量逐字相等 |
-| kind | 两个基础入口仅 `execution_source_v1\|settlement_source_v1`；null/unknown拒绝；release additive入口另按独立authority验收 |
+| kind | 两个基础入口仅 `execution_source_v1\|settlement_source_v1`；null/unknown拒绝；release与execution-verification additive入口各按独立authority验收 |
 | self digest | 保留 `lineage_digest=""` 后 domain+NUL+JCS；删除key、普通serde SHA或native digest代入拒绝 |
 | bytes | UTF-8 I-JSON、parse→JCS byte-equal、≤262144；duplicate/unknown/missing/float/trailing拒绝 |
 | numbers | revision/version/epoch/fencing为 `1..=2^53-1` integer；0、负数、float、超界拒绝 |
@@ -52,6 +52,11 @@ F0 的 read adoption 源码已落盘，但 compile、runtime 与已运行合同�
 
 source-written golden为两种基础 profile各固定至少一份完整 literal bytes/digest，并以未运行测试源码覆盖同一 native refs在
 kind、role或 source/terminal位置变化时得到不同 Carrier digest；当前没有通过计数。
+
+两个 endpoint-only additive profile 分别按
+[release acceptance](federation-settlement-release-causal-reference-abi-acceptance.md) 与
+[execution verification acceptance](federation-execution-verification-causal-reference-abi-acceptance.md) 验收；其新增
+kind、refs、golden、Store/read/PC源码不能改变本页两份基础 golden。
 
 ## 3. Reference shape acceptance
 

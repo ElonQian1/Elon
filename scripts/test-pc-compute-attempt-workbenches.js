@@ -11,6 +11,7 @@ const leasePanel = source('pc-frontend/src/features/compute-execution/AttemptLea
 const executionApi = source('pc-frontend/src/features/compute-execution/computeExecutionApi.ts')
 const lineageContracts = source('pc-frontend/src/features/compute-attempt/federationHistoricalLineageContracts.ts')
 const releaseLineageContracts = source('pc-frontend/src/features/compute-attempt/federationHistoricalReleaseLineageContracts.ts')
+const verificationLineageContracts = source('pc-frontend/src/features/compute-attempt/federationHistoricalVerificationLineageContracts.ts')
 const lineageApi = source('pc-frontend/src/features/compute-settlement/federationHistoricalLineageApi.ts')
 const lineageButton = source('pc-frontend/src/features/compute-settlement/FederationHistoricalLineageButton.tsx')
 const lineageStyles = source('pc-frontend/src/features/compute-settlement/FederationHistoricalLineageButton.module.css')
@@ -138,32 +139,74 @@ assert.match(releaseLineageContracts, /release\.carrier\.lineage\.settlement_lin
 assert.ok(releaseLineageContracts.includes('actual.settlement_receipt_id'), 'release must bind the settlement receipt ID')
 assert.ok(releaseLineageContracts.includes('actual.settlement_receipt_digest'), 'release must bind the settlement receipt digest')
 assert.ok(releaseLineageContracts.includes('actual.settlement_event_digest'), 'release must bind the settlement event digest')
+assert.deepEqual(quotedConstKeys(verificationLineageContracts, 'READ_KEYS'), [
+  'schema', 'lineage_kind', 'lineage_digest', 'canonical_carrier_json', 'read_effect',
+], 'execution verification read response must retain the exact five-key ABI')
+assert.deepEqual(quotedConstKeys(verificationLineageContracts, 'CARRIER_KEYS'), [
+  'schema', 'lineage_kind', 'lineage_digest', 'canonicalization', 'digest_algorithm', 'lineage',
+], 'execution verification Carrier must retain the exact six-key envelope')
+assert.deepEqual(quotedConstKeys(verificationLineageContracts, 'LINEAGE_KEYS'), [
+  'execution_receipt', 'execution_lineage_digest', 'provider_declared_usage',
+  'terminal_candidate', 'consumer_review', 'platform_observation', 'verification_decision',
+], 'execution verification Carrier lineage keys must stay exact')
+const verificationPrimitiveKeySets = [
+  ['ExecutionReceiptRef', ['execution_receipt_id', 'execution_receipt_digest']],
+  ['ProviderDeclaredUsageRef', ['usage_snapshot_id', 'usage_sequence_no', 'cumulative_usage_digest', 'usage_event_digest']],
+  ['TerminalCandidateRef', ['terminal_candidate_id', 'terminal_candidate_event_digest']],
+  ['ConsumerReviewRef', ['consumer_review_id', 'consumer_review_event_digest']],
+  ['PlatformObservationRef', ['platform_observation_id', 'platform_observation_event_digest', 'cumulative_observed_usage_digest']],
+  ['VerificationDecisionRef', ['verification_decision_id', 'verification_event_digest', 'verified_usage_digest', 'compensable_usage_digest']],
+]
+for (const [label, keys] of verificationPrimitiveKeySets) assertExactKeyList(verificationLineageContracts, label, keys)
+assert.match(verificationLineageContracts, /expectLiteral\(response\.read_effect, ["']none["']/, 'verification read_effect must be none')
+assert.match(verificationLineageContracts, /expectLiteral\(\s*response\.lineage_kind,\s*["']execution_verification_source_v1["']/, 'verification response must retain the frozen lineage kind')
+assert.match(verificationLineageContracts, /expectLiteral\(\s*carrier\.lineage_kind,\s*["']execution_verification_source_v1["']/, 'verification Carrier must retain the frozen lineage kind')
+assert.match(verificationLineageContracts, /carrier\.lineage_kind,\s*response\.lineage_kind/, 'verification outer and inner kinds must match')
+assert.match(verificationLineageContracts, /expectLiteral\(carrier\.lineage_digest, responseDigest/, 'verification outer and inner digests must match')
+assert.match(verificationLineageContracts, /canonicalBytes\.byteLength !== inputBytes\.byteLength/, 'verification canonical Carrier byte lengths must match')
+assert.match(verificationLineageContracts, /canonicalBytes\.some\(\(byte, index\) => byte !== inputBytes\[index\]\)/, 'verification canonical Carrier bytes must match exactly')
+assert.match(verificationLineageContracts, /canonicalizeJcs\(\{ \.\.\.carrier, lineage_digest: ["']["'] \}\)/, 'verification self digest projection must blank only lineage_digest')
+assert.ok(verificationLineageContracts.includes('`${CARRIER_DIGEST_DOMAIN}\\u0000${material}`'), 'verification digest material must include the frozen domain NUL separator')
+assert.match(verificationLineageContracts, /await sha256Hex\(/, 'verification Carrier digest must use SHA-256')
+assert.match(verificationLineageContracts, /verification\.carrier\.lineage\.execution_lineage_digest,\s*execution\.response\.lineage_digest/, 'verification must close over the fetched execution digest')
+assert.match(verificationLineageContracts, /verification\.carrier\.lineage\.execution_receipt\.execution_receipt_id,\s*execution\.carrier\.lineage\.execution_receipt\.execution_receipt_id/, 'verification must bind the execution receipt ID')
+assert.match(verificationLineageContracts, /verification\.carrier\.lineage\.execution_receipt\.execution_receipt_digest,\s*execution\.carrier\.lineage\.execution_receipt\.execution_receipt_digest/, 'verification must bind the execution receipt digest')
 
 assert.ok(lineageApi.includes("participant: '/api/me/compute/attempt-leases'"), 'participant reads must use the /api/me scope')
 assert.ok(lineageApi.includes("admin: '/api/admin/compute/attempt-leases'"), 'admin reads must use the /api/admin scope')
-assert.ok(lineageApi.includes("'execution-source-lineage'"), 'execution lineage GET suffix must stay frozen')
-assert.ok(lineageApi.includes("'settlement-source-lineage'"), 'settlement lineage GET suffix must stay frozen')
-assert.ok(lineageApi.includes("'settlement-release-source-lineage'"), 'release lineage GET suffix must stay frozen')
+assert.ok(lineageApi.includes('execution-source-lineage'), 'execution lineage GET suffix must stay frozen')
+assert.ok(lineageApi.includes('settlement-source-lineage'), 'settlement lineage GET suffix must stay frozen')
+assert.ok(lineageApi.includes('settlement-release-source-lineage'), 'release lineage GET suffix must stay frozen')
+assert.ok(lineageApi.includes('execution-verification-source-lineage'), 'verification lineage GET suffix must stay frozen')
 assert.match(lineageApi, /api\.get<unknown>/, 'lineage HTTP payloads must remain untrusted until runtime validation')
 assert.doesNotMatch(lineageApi, /api\.(?:post|patch|put|delete)/, 'historical lineage adoption must remain read-only')
 assert.match(lineageButton, /await Promise\.all\(\[\s*federationHistoricalLineageApi\.readExecution[\s\S]*federationHistoricalLineageApi\.readSettlement/, 'execution and settlement lineage must be fetched in parallel')
+assert.match(lineageButton, /federationHistoricalLineageApi\.readExecution[\s\S]*federationHistoricalLineageApi\.readVerification[\s\S]*federationHistoricalLineageApi\.readSettlement/, 'execution, verification, and settlement lineage must be fetched in one parallel batch')
 assert.match(lineageButton, /releaseAvailable\s*\? federationHistoricalLineageApi\.readRelease[\s\S]*: Promise\.resolve\(null\)/, 'pending rows must not turn an absent release into integrity failure')
 assert.match(lineageButton, /useLayoutEffect\(\(\) => \{[\s\S]*requestGeneration\.current \+= 1[\s\S]*setState\(\{ status: 'idle' \}\)[\s\S]*\}, \[leaseId, releaseAvailable, scope\]\)/, 'Lease, release, or scope changes must invalidate and clear historical lineage evidence before paint')
+assert.equal((lineageButton.match(/if \(generation !== requestGeneration\.current\) return/g) ?? []).length, 2, 'stale lineage requests must be rejected before both success and error updates')
+assert.match(lineageButton, /finally \{\s*if \(generation === requestGeneration\.current\) busy\.current = false\s*\}/, 'only the current lineage request may release the busy guard')
 const pairValidationIndex = lineageButton.indexOf('validateFederationHistoricalLineagePair(execution, settlement)')
 const tripleValidationIndex = lineageButton.indexOf('validateFederationHistoricalLineageTriple(execution, settlement, release)')
+const verificationValidationIndex = lineageButton.indexOf('validateExecutionVerificationLineagePair(execution, verification)')
 const lineageSuccessIndex = lineageButton.indexOf("setState({ status: 'success'")
 assert.ok(pairValidationIndex >= 0 && lineageSuccessIndex > pairValidationIndex, 'the pair equation must pass before any evidence is displayed')
 assert.ok(tripleValidationIndex >= 0 && lineageSuccessIndex > tripleValidationIndex, 'the triple equation must pass before released evidence is displayed')
-for (const phrase of ['并行核验因果链', '重试因果链核验', '双响应摘要与跨链等式已核验', '三响应摘要与两级跨链等式已核验']) {
+assert.ok(verificationValidationIndex >= 0 && lineageSuccessIndex > verificationValidationIndex, 'the verification equation must pass before any evidence is displayed')
+for (const phrase of ['并行核验因果链', '重试因果链核验', '三响应摘要与两级跨链等式已核验', '四响应摘要与三级跨链等式已核验']) {
   assert.ok(lineageButton.includes(phrase), `lineage button must expose ${phrase}`)
 }
 assert.match(lineageButton, /^function LineageEvidence/m, 'evidence rendering must use a module-scope component')
 assert.doesNotMatch(lineageButton, /import\(/, 'lineage adoption must use direct imports')
 assert.doesNotMatch(lineageButton, /localStorage|sessionStorage|download|href=/, 'lineage evidence must not be persisted or exported')
 assert.doesNotMatch(releaseLineageContracts, /localStorage|sessionStorage|download|href=/, 'release lineage evidence must not be persisted or exported')
+assert.doesNotMatch(verificationLineageContracts, /localStorage|sessionStorage|download|href=/, 'verification lineage evidence must not be persisted or exported')
 assert.match(releaseLineageContracts, /\\u007f-\\u009f/, 'release lineage IDs must reject the full C0, DEL, and C1 control ranges')
 assert.match(releaseLineageContracts, /const RUST_TRIM_EDGE/, 'release lineage IDs must mirror Rust Unicode trim semantics without rejecting U+FEFF')
 assert.doesNotMatch(releaseLineageContracts, /result !== result\.trim\(\)/, 'JavaScript-only FEFF trim semantics must not narrow the frozen Rust ABI')
+assert.match(verificationLineageContracts, /\\u007f-\\u009f/, 'verification lineage IDs must reject the full C0, DEL, and C1 control ranges')
+assert.match(verificationLineageContracts, /const RUST_TRIM_EDGE/, 'verification lineage IDs must mirror Rust Unicode trim semantics without rejecting U+FEFF')
+assert.doesNotMatch(verificationLineageContracts, /result !== result\.trim\(\)/, 'verification lineage must not apply JavaScript-only FEFF trimming')
 assert.match(lineageStyles, /overflow-wrap:\s*anywhere/, 'long historical digests must stay readable')
 assert.match(lifecycleHistory, /FederationHistoricalLineageButton[\s\S]*leaseId=\{item\.settlement\.lease_id\}[\s\S]*scope=\{scope\}[\s\S]*releaseAvailable=\{Boolean\(item\.release\)\}/, 'each settlement history row must pass its Lease, scope, and release presence')
 assert.match(challengePage, /SettlementLifecycleHistoryList items=\{history\} loading=\{loading\} scope="participant"/, 'consumer challenge history must use participant scope')
@@ -182,11 +225,11 @@ function source(relativePath) { return fs.readFileSync(path.join(root, relativeP
 function quotedConstKeys(content, name) {
   const match = content.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\] as const`))
   assert.ok(match, `${name} must remain an as-const key list`)
-  return [...match[1].matchAll(/'([^']+)'/g)].map((entry) => entry[1])
+  return [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map((entry) => entry[1])
 }
 
 function assertExactKeyList(content, label, keys) {
-  const pattern = keys.map((key) => `'${escapeRegex(key)}'`).join('\\s*,\\s*')
+  const pattern = keys.map((key) => `['"]${escapeRegex(key)}['"]`).join('\\s*,\\s*')
   assert.match(content, new RegExp(`\\[\\s*${pattern}\\s*\\]`), `${label} must retain its exact key shape`)
 }
 

@@ -83,9 +83,10 @@ lineage
 ```
 
 本页两个基础入口的 `lineage_kind` 必须是 `execution_source_v1` 或 `settlement_source_v1`；不得为 null、unknown
-或 caller-defined。复用同一 envelope/domain 的 endpoint-only additive `settlement_release_source_v1` 只由独立
-[release authority](federation-settlement-release-causal-reference-abi-authority.md) 冻结；基础入口永不返回该 kind，
-旧 Carrier bytes/digest零变化。
+或 caller-defined。复用同一 envelope/domain 的 endpoint-only additive `settlement_release_source_v1` 与
+`execution_verification_source_v1` 分别由独立 [release authority](federation-settlement-release-causal-reference-abi-authority.md)
+和 [execution verification authority](federation-execution-verification-causal-reference-abi-authority.md) 冻结；基础入口永不
+返回这些 kind，旧 Carrier bytes/digest零变化。
 `lineage` 的 exact shape 由 kind 决定，禁止用 null、空对象、extra key 或 generic `causes[]` 表示另一 profile。
 顶层 `schema/lineage_kind/lineage_digest/canonicalization/digest_algorithm` 必须是 JSON string，`lineage` 必须是
 object；primitive 内全部 `*_id/*_digest` 是 non-null JSON string，revision/version/epoch/fencing 是 JSON integer，
@@ -270,6 +271,9 @@ DTO；它不能产生 `ValidatedFederationHistoricalLineage`，也不能进入�
 - [v212 Plan](attempt-execution-plan-v1.md)、[v193 Execution Receipt](attempt-execution-receipt-api.md)、
   [v194 finalization](attempt-finalization-api.md) 和 [v195 Settlement Receipt](attempt-settlement-api.md) 仍是原业务
   权威；Carrier不替代 Plan seal、Verification、fencing、账本 posting或 receipt digest。
+- v188-v193 最小验证计量因果引用只由
+  [`execution_verification_source_v1`](federation-execution-verification-causal-reference-abi-authority.md) 组合；它不修改
+  本页两种基础 profile，也不复制 meter、Verification 或 Execution Receipt owner正文。
 - [V279 UserNode binding](user-node-provider-binding-authority.md) 与
   [V280 service-managed admission/Runner](external-pool-service-managed-admission-runner-authority.md) 继续由各自
   owner证明 kind-specific roots；本 Carrier不吸收其 current authority。
