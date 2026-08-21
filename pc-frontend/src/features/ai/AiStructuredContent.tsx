@@ -24,10 +24,13 @@ export interface AiStructuredPart {
 }
 
 export default function AiStructuredContent({ parts }: { parts?: AiStructuredPart[] }) {
-  if (!parts?.length) return null
+  const visibleParts = parts?.filter((part) => (
+    part.type !== 'image' && Boolean(part.label.trim() || metadataFor(part))
+  )) ?? []
+  if (!visibleParts.length) return null
   return (
     <div className={styles.grid} aria-label="官方回复中的结构化内容">
-      {parts.map((part, index) => {
+      {visibleParts.map((part, index) => {
         const presentation = presentationFor(part.type)
         const Icon = presentation.icon
         const metadata = metadataFor(part)

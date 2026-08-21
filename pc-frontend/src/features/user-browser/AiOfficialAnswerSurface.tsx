@@ -21,7 +21,6 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
   const generationRef = useRef(0)
   const [browserSurface, setBrowserSurface] = useState<AiBrowserSurface>('chat')
   const [failedKey, setFailedKey] = useState('')
-  const [presentationAttempt, setPresentationAttempt] = useState(0)
   const snapshot = web.controller.snapshot
   const answerKey = useMemo(
     () => localAiAnswerSurfaceKey(web.provider?.id, snapshot),
@@ -34,9 +33,14 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
     session: web.controller.sessionState,
     snapshot,
   })
+  const presentationKey = [
+    answerKey,
+    web.controller.sessionState?.semanticCacheStatus || 'none',
+    web.controller.sessionState?.windowStatus || 'none',
+  ].join(':')
   const shouldPresent = renderMode === 'official_live'
     && Boolean(answerKey && web.officialRequest)
-    && failedKey !== answerKey
+    && failedKey !== presentationKey
 
   useEffect(() => {
     const surfaceChanged = (event: Event) => {
@@ -44,7 +48,6 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
       if (next === 'chat' || next === 'official' || next === 'source') {
         if (next === 'chat') {
           setFailedKey('')
-          setPresentationAttempt(0)
         }
         setBrowserSurface(next)
       }
@@ -57,8 +60,7 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
 
   useEffect(() => {
     setFailedKey('')
-    setPresentationAttempt(0)
-  }, [answerKey])
+  }, [presentationKey])
 
   useLayoutEffect(() => {
     const request = web.officialRequest
@@ -69,6 +71,7 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
     let observer: ResizeObserver | null = null
     let presented = false
     let synchronizing = false
+    let attempts = 0
     const synchronize = async () => {
       const viewport = viewportRef.current
       if (!viewport || generation !== generationRef.current || synchronizing || retryTimer) return
@@ -80,16 +83,18 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
           return
         }
         presented = true
+        attempts = 0
       } catch {
         if (generation === generationRef.current) {
-          if (presentationAttempt + 1 < MAX_PRESENT_ATTEMPTS) {
-            const delay = PRESENT_RETRY_BASE_MS * (presentationAttempt + 1)
+          attempts += 1
+          if (attempts < MAX_PRESENT_ATTEMPTS) {
+            const delay = PRESENT_RETRY_BASE_MS * attempts
             retryTimer = window.setTimeout(() => {
               retryTimer = 0
-              setPresentationAttempt(presentationAttempt + 1)
+              void synchronize()
             }, delay)
           } else {
-            setFailedKey(answerKey)
+            setFailedKey(presentationKey)
           }
         }
         await hideLocalAiWebSessionEmbedded(request).catch(() => null)
@@ -115,7 +120,7 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
       observer?.disconnect()
       if (presented) void hideLocalAiWebSessionEmbedded(request).catch(() => null)
     }
-  }, [answerKey, presentationAttempt, shouldPresent, web.officialRequest])
+  }, [presentationKey, shouldPresent, web.officialRequest])
 
   if (!shouldPresent) return null
   return (

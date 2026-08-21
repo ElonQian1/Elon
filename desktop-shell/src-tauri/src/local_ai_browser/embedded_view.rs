@@ -192,7 +192,6 @@ fn set_content_surface_mode(webview: &Webview, enabled: bool) -> Result<(), Stri
 fn answer_surface_ready(state: &LocalAiWebSessionState) -> bool {
     if state.loading
         || state.semantic_cache_status != "live"
-        || !state.context_ready
         || state.window_status == "blocked"
         || state.window_status == "error"
     {
