@@ -25,7 +25,7 @@ market_profile_schema_abi=design_frozen
 initial_profile_inventory=unselected
 current_profile_authority=unconstructible
 admission_receipt_physical_schema_abi=design_frozen
-market_projection_identity_abi=unfrozen
+market_projection_identity_abi=design_frozen
 implementation=unwired/uncompiled/unrun
 passed=0
 failed=0
@@ -33,7 +33,9 @@ failed=0
 
 完整纵切的编排、事务、Runner 与恢复仍由 [V280 父权威](external-pool-service-managed-admission-runner-authority.md)
 和 [父验收](external-pool-service-managed-admission-runner-acceptance.md)负责；本页的验收见
-[market profile acceptance](external-pool-service-managed-market-profile-acceptance.md)。
+[market profile acceptance](external-pool-service-managed-market-profile-acceptance.md)。Pool/Offer/Snapshot 的 deterministic identity、
+legacy owner helper与单一checked-at映射见
+[market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)。
 
 ## 2. 来源边界与禁止默认值
 
@@ -60,6 +62,7 @@ PROFILE_DIGEST_ALGORITHM=sha256
 PROFILE_MAX_JSON_BYTES=1048576
 PROFILE_ID_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-MARKET-PROFILE-ID-V1
 PROFILE_DIGEST_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-MARKET-PROFILE-V1
+PROFILE_REVIEW_MATERIAL_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-MARKET-PROFILE-REVIEW-MATERIAL-V1
 CAPACITY_ALLOCATION_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-CAPACITY-ALLOCATION-V1
 LEASE_ISSUER_POLICY_SCHEMA=compute_federation.external_pool_service_managed_lease_issuer_policy.v1
 LEASE_ISSUER_POLICY_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-LEASE-ISSUER-POLICY-V1
@@ -67,7 +70,7 @@ LEASE_REF_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-LEASE-DELIVERY-REF-V1
 LEASE_HINT_DOMAIN=ELON-EXTERNAL-POOL-SERVICE-MANAGED-LEASE-DELIVERY-HINT-V1
 ```
 
-本页新定义的 profile ID/digest、allocation digest与lease policy/ref/hint digest都使用：
+本页新定义的 profile ID/review-material/final digest、allocation digest与lease policy/ref/hint digest都使用：
 
 ```text
 SHA256(domain UTF-8 || 0x00 || RFC8785-JCS(value) UTF-8)
@@ -89,6 +92,13 @@ profile
 `external_pool_market_profile_v1_` 加上 `PROFILE_ID_DOMAIN` 对 exact
 `{"profile_revision": revision}` 投影的 64-hex。`profile_digest` 使用 `PROFILE_DIGEST_DOMAIN` 对完整 envelope 计算，
 计算时保留 `profile_digest` key 并把值置为空串；不得删除字段、改用普通 serde JSON、双重编码或无 domain SHA-256。
+
+审批链必须无环。先以完整7/17-key envelope为投影，保留所有key，只把top-level `profile_digest`和nested
+`review_source.source_digest`同时置为空串，使用`PROFILE_REVIEW_MATERIAL_DOMAIN`计算非持久化
+`profile_review_material_digest`。Typed approval evidence必须绑定exact
+`{profile_id,profile_revision,profile_review_material_digest,approved_by_user_id,approved_at}`；其owner digest再填入
+`review_source.source_digest`，最后才按上一段计算final `profile_digest`。禁止让approval evidence绑定final digest后又把自身digest
+放回final preimage，也禁止删除任一blank key或把material/evidence/final三种digest互换。
 
 `profile` exact key set：
 
@@ -125,7 +135,7 @@ validation、重算全部派生 digest，再逐字比较输入与重新生成的
 | 对象 | exact keys |
 |---|---|
 | `owner` | `owner_kind,owner_id` |
-| `review_source` | `source_kind,source_id,source_revision,source_digest,approved_at` |
+| `review_source` | `source_kind,source_id,source_revision,source_digest,approved_by_user_id,approved_at` |
 | `capacity` | `capacity_scope,capacity_unit,allocation_total_units,buckets` |
 | `capacity.buckets[]` | `ordinal,meter,meter_mode,quantum_units,issued_units` |
 | `sku` | `sku_id,task_kind,model_family,model_digest,tokenizer_digest,runtime_family,precision,context_or_shape_bucket,verification_tier,sla_tier,region_or_data_zone,delivery_window_class,metering_units` |
@@ -171,6 +181,8 @@ Resource ceiling 九个整数均在 `1..=9007199254740991`，`allow_network_egre
 capability 中逐字保持；V1 `model_allowed=false`、`plugin_release_allowed=false`、
 `sku.metering_units=[attempt_slot]`。Profile不保存legacy `sku_digest`；Store投影时使用既有owner helper按legacy
 canonical规则生成，不能把它重解释为本页JCS domain。
+`sku.region_or_data_zone`除本页1..160-byte identifier规则外，还必须满足legacy CapacityPool owner的trim/nonempty与
+`chars().count()<=80`；81个Unicode scalar或更长值在inventory审批前即失败关闭。
 
 `resource_profile_digest`不是caller字段，也不使用本页新domain。为兼容既有Pool current read，V280必须构造 exact
 `resource_profile_json.profile={"runtime_policy":...,"resource_profile":...,"resource_ceiling":...}` value，并沿
@@ -202,6 +214,9 @@ consumer_max_amount_micros=consumer_unit_price_micros
 Price/Snapshot是单Job、单Reservation、单Claim的预算上限；Provider级`max_concurrent_attempts`只控制Pool/Offer可同时保留的
 slot总量，不能把每个Job的`max_units`放大N倍。零价格仍需显式产品审批，不能由 validator 补默认值。Quote TTL 必须
 在既有 v171/v223 合法范围 `30..=3600` 秒内；exact TTL、curve/source identity 和价格载荷仍未选择。
+Offer `price_terms.curve_id=profile.price.curve_id`、`curve_version=Some(profile.price.curve_revision)`、
+`instrument_id=profile.price.instrument_id=null`。Curve pair只属于Offer price terms；snapshot另投影
+`price_source.{source_id,source_version,source_digest}`，两组产品事实不得省略、互换或强制相等。
 
 Workload V1 要求非空、排序唯一的 `allowed_task_kinds` 与 `allowed_output_media_types`，并固定
 `input_artifacts_allowed=false`、`model_allowed=false`、`result_artifact_required=false`、`checkpoint_mode=disabled`。
@@ -212,6 +227,12 @@ media type必须分别属于profile允许集合；public/account/project/data-cl
 Enabled profile的current constructor还必须重证typed Provider capabilities包含所选task kind、accelerator kind、region和
 全部allowed data classes。`offer_policy.policy_revision`为正safe integer；`public=true`时account/project arrays必须空，
 `public=false`时两者至少一项非空，不能生成既不公开也无人可用的Offer。
+
+`review_source.approved_by_user_id`必须是对exact profile ID/revision/review-material完成产品、经济与安全审批的真实authenticated user，
+并由compiled catalog的typed review source audit；final profile digest通过填入的source digest传递绑定该evidence。该user不得等于
+market service actor，也不得从Provider owner或caller猜出。
+`review_source.approved_at<=profile.valid_from<=current constructor checked_at`。该字段进入profile digest，并由projection ABI逐字投影到legacy
+publication `approved_by_user_id`；publication时间仍是本次checked-at，不是历史approved-at。
 
 ## 6. Transport、时间与 lease issuer
 
@@ -301,7 +322,8 @@ expires_at
 
 `issued_at=Tx-B command.issued_at`，`expires_at=plan.start.hard_deadline_at`。结果是相应prefix加64-hex；ref必须
 `<=512` bytes、hint必须`<=160` bytes（当前固定shape分别96/97 bytes）。调用方不得提交或轮换 raw ref/hint，route
-credential也不得充当lease credential。
+credential也不得充当lease credential。Material中的`fence_digest`只消费未来Gateway/session/validator typed value；本页不定义
+production fence派生，也禁止升格conformance fixture domain。
 
 ## 7. Allocation 与 catalog selection
 
@@ -327,17 +349,18 @@ Catalog owner 固定为计划中的
 `compute_federation/external_pool_service_managed_admission/policy.rs`。未来必须提供 private-field、non-Clone、non-Serde
 `CurrentExternalPoolServiceManagedMarketProfileAuthority`，只从编译进 server 的 immutable inventory、typed Provider/V249
 binding 与 server `checked_at` 构造。选择规则是 exact 一项 enabled、未 revoked，且
-`valid_from<=checked_at<new_plan_accept_until<=expires_at`；0 或多项失败关闭。
+`valid_from<=checked_at<new_plan_accept_until<=expires_at`；constructor还必须重算review-material并逐字审计typed approval
+evidence的source identity/digest/approver/time。0或多项或approval漂移均失败关闭。
 
 计划 inventory 在本阶段逻辑上为空且尚无源码，revocation set亦为空，因此 current authority 正向不可构造。添加第一项
 enabled profile 必须：
 
-1. 由产品/经济/安全 owner 审批全部未选择载荷；
-2. 提交 byte-exact RFC8785-JCS profile JSON 与 digest；
+1. 由产品/经济/安全 owner 对exact review-material digest审批全部未选择载荷，并提交typed approval evidence；
+2. 填入该evidence source digest后提交byte-exact RFC8785-JCS profile JSON与final digest；
 3. 更新本权威和 acceptance 的 payload 指纹；
 4. 保留历史 item，且 V1 不允许 successor 或运行时可变配置；
 5. 逐字满足 [admission receipt ABI](external-pool-service-managed-admission-receipt-abi-authority.md)，并与仍待冻结的
-   market projection identity、完整 V280 纵切源码同批集成，不能单独打开 fence。
+   Gateway/session/validator ABI、完整 V280 纵切源码同批集成，不能单独打开 fence。
 
 ## 8. 计划中的 Rust 边界
 
@@ -351,6 +374,7 @@ validate_external_pool_service_managed_market_profile
 external_pool_service_managed_market_profile_from_json
 external_pool_service_managed_market_profile_json_is_canonical
 canonical_external_pool_service_managed_market_profile_json_and_digest
+canonical_external_pool_service_managed_market_profile_review_material_digest
 current_external_pool_service_managed_market_profile_authority
 ```
 
@@ -368,6 +392,6 @@ binding 与 checked-at，不接 raw profile/capacity/price/ceiling/bool。Profil
 - profile 四个绝对时间、deadline/retry/poll/session/cleanup 数值；
 - SKU/task kind/runtime family/version/precision、accelerator kind、region/SLA/verification/output media与Offer authorization；
 - consumer/provider unit price与max amount、quote TTL、curve/source identity；
-- owner/review source、workload allowlist 与正式 lease issuer policy 审批来源。
+- owner/review source（含真实approver user）、workload allowlist 与正式 lease issuer policy 审批来源。
 
 这些是产品、经济和安全决定，不是 canonical validator 的默认值。

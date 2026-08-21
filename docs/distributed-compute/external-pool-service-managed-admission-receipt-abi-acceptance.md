@@ -15,12 +15,13 @@ verification_status: design_review_only
 
 本页只验收 [admission receipt ABI authority](external-pool-service-managed-admission-receipt-abi-authority.md)。完整 V280
 纵切见 [父权威](external-pool-service-managed-admission-runner-authority.md)，Profile 见
-[market profile authority](external-pool-service-managed-market-profile-authority.md)。当前必须报告：
+[market profile authority](external-pool-service-managed-market-profile-authority.md)，legacy projection见
+[projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)。当前必须报告：
 
 ```text
 canonical_abi=design_frozen
 physical_schema_abi=design_frozen
-market_projection_identity_abi=unfrozen
+market_projection_identity_abi=design_frozen
 table/migration/source=absent
 physical_migration_registration=absent
 migration_registry_max=279
@@ -85,8 +86,9 @@ Authority 的 77 列是唯一顺序真源；验收不得复制另一份可漂移
 
 后续源码批还必须同时具备：
 
-- 独立 `market_projection_identity_abi`，冻结resource scope、Pool/bucket/meter/window、supply/event、Offer/publication
-  approver、snapshot/quote、`fence_digest`、legacy deterministic IDs/times与共享server checked-at，并落实fixed source observation window；
+- 实现已冻结 `market_projection_identity_abi` 的resource scope、Pool/bucket/meter/window、supply/event、Offer/publication
+  approver、snapshot/quote、legacy deterministic IDs/times与共享server checked-at，并落实fixed source observation window；
+- 冻结production `fence_digest`所属Gateway/session/validator ABI；fixture fence不得升格；
 - 首个产品/经济/安全审批的 byte-exact profile JSON/digest；
 - Domain/DDL/Store exact 77-column source-contract、10组required parent keys（9新增+1复用）与全部guard；
 - 完整 service-managed market transaction、Gateway A/B、task session、validator、Runner和recovery production caller；

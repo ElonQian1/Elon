@@ -16,6 +16,8 @@ verification_status: design_review_only
 本页只验收 [market profile authority](external-pool-service-managed-market-profile-authority.md) 的 schema/canonical ABI。
 完整 V280 纵切见 [父权威](external-pool-service-managed-admission-runner-authority.md) 与
 [父验收](external-pool-service-managed-admission-runner-acceptance.md)。
+[Projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)另行冻结Pool/Offer/Snapshot
+identity、legacy owner helper与checked-at映射。
 
 ```text
 market_profile_schema_abi=design_frozen
@@ -51,10 +53,14 @@ Runner 可达。
 | valid envelope | exact 7 top-level keys、17 profile keys、deny unknown、I-JSON与RFC8785-JCS byte equality。 |
 | profile ID | 只由revision projection与ID domain派生；caller ID、错误prefix、wrong revision拒绝。 |
 | profile digest | digest key保留为空串后domain-separated SHA-256；删除key、raw JSON SHA、uppercase拒绝。 |
+| review material | 完整7/17-key投影同时保留并清空`profile_digest`与`review_source.source_digest`，审批evidence绑定material digest后才填source digest并计算final；循环绑定final digest、删blank key或三类digest互换拒绝。 |
 | nested objects | key set、nullable、array排序/唯一与safe integer逐字匹配；extra/missing/null substitution拒绝。 |
-| times | UTC nanos且`valid<=checked<new-plan<=expires<inflight`；边界倒置拒绝。 |
+| review source | exact source tuple包含真实`approved_by_user_id`并覆盖profile ID/revision/review-material/approved-at；final digest传递绑定source digest，service actor、Provider owner或caller猜值拒绝。 |
+| times | UTC nanos且`approved<=valid<=checked<new-plan<=expires<inflight`；边界倒置拒绝。 |
 | capacity | exact一个attempt_slot/reusable/quantum1 bucket；issued/allocation/concurrency相等，0或multi拒绝。 |
+| region | `sku.region_or_data_zone`同时满足profile byte规则与legacy Pool trim/nonempty/最多80 Unicode scalar；81字符拒绝。 |
 | price | exact一个attempt_slot component且max_units=1；provider<=consumer、单Job max amount等于单价；half_even拒绝。 |
+| Offer curve | `curve_id`逐字投影且`curve_version=Some(curve_revision)`；None、revision/version漂移或与snapshot source tuple混用拒绝。 |
 | transport | outer/upstream request分离且所有常量exact；任一放大、缩小或塞进ceiling拒绝。 |
 | issuer policy | self-digest、fixed kind/mode/audience/sorted singleton scope、ref/hint exact material、96/97-byte fixed shape与512/160-byte上限均exact。 |
 | allocation | typed Provider/V249 pair+profile+scope/unit/total exact material；跨Provider同ID、raw pair或global余额解释拒绝。 |
@@ -76,7 +82,7 @@ Runner 可达。
 第一项 enabled inventory 只有在 exact JSON/digest、产品审批和完整纵切实现同批后才能加入；仅提交一个 profile file、
 只实现validator或只把empty改成nonempty都不得晋级。
 
-## 5. Consumer structural mapping 与 deferred identity ABI
+## 5. Consumer mapping 与 identity ABI
 
 | Consumer | Frozen structural mapping |
 |---|---|
@@ -88,9 +94,9 @@ Runner 可达。
 | replay | profile/snapshot new-plan expiry不回溯撤销已seal Plan；Plan仍受自身hard/inflight截止。 |
 
 Profile 本身直接写 Pool/Offer/Plan、把 V277 identity写死进profile、把price caller DTO当authority，均为失败。
-本页不宣称 `resource_scope`、Pool/bucket/meter/delivery-window、Offer/publication、v171 snapshot/quote/source、
-Tx-B `fence_digest` 等 deterministic ID/digest material 已冻结；这些属于仍未冻结的market projection identity、writer与
-Gateway ABI。在这些ABI完成前，"exact投影"只能表示字段语义与owner helper边界，不能据此实现或打开writer。
+`resource_scope`、Pool/bucket/meter/delivery-window、Offer/publication、v171 snapshot/quote/source的deterministic identity、
+legacy digest与单一时钟已由projection identity ABI冻结设计，但仍无writer源码。Tx-B `fence_digest`不属于market projection；
+它继续是未冻结Gateway/session/validator ABI输入，fixture domain不得升格。
 
 ## 6. Source-written 前的静态门
 
@@ -99,16 +105,15 @@ Gateway ABI。在这些ABI完成前，"exact投影"只能表示字段语义与ow
 - owner module、planned symbols、private fields、deny-unknown DTO与non-Clone/non-Serde authority；
 - canonical constants/domain、empty-digest projection与pure historical validator；
 - compiled inventory exact-one selection、revocation set与typed Provider/V249 constructor；
-- checked-in first profile JSON/digest和产品审批来源；
+- checked-in first profile review-material digest、typed approval evidence及填入source digest后的final JSON/digest；
 - source contract 反向禁止 raw profile/capacity/price/ceiling/bool；
 - legacy Pool resource-profile、SKU、v171 snapshot digest继续由各owner既有serde/helper验证，禁止改用本页JCS domain；
-- market projection逐字冻结resource scope、Pool/bucket/meter/delivery-window、Offer/publication、snapshot/quote/source与
-  `fence_digest` 的确定性material、owner helper、readback和replay；
+- 按已冻结projection identity ABI实现resource scope、Pool/bucket/meter/window、Offer/publication、snapshot/quote/source的
+  deterministic material、owner helper、single clock、readback与replay；
 - deadline consumer逐字段冻结Job retry、reconcile/event scheduler、pre-start cleanup/60秒lease margin与task-session effective
   deadline，不得把Job retry映射为ELTP exchange ordinal；
-- 按已冻结的 [admission receipt physical ABI](external-pool-service-managed-admission-receipt-abi-authority.md)实现，并在同批冻结
-  market projection identity（含publication approver、snapshot/quote identity与legacy kernels共享checked-at）、落实fixed source
-  observation window、集成完整V280 writer/Gateway/validator/Runner。
+- 按已冻结的 [admission receipt physical ABI](external-pool-service-managed-admission-receipt-abi-authority.md)实现，落实fixed
+  source observation window，并在同批冻结/实现production fence及完整V280 writer/Gateway/validator/Runner。
 
 未满足任一项时，V280 继续 `implementation_unwired/uncompiled/unrun`，migration最高保持V279，V254 fence保持关闭，
 worker `eligible_rows=0`。静态文档检查不计入实现 `passed/failed`。
@@ -125,7 +130,7 @@ vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
 initial_profile_inventory=unselected
 admission_receipt_physical_schema_abi=design_frozen
-market_projection_identity_abi=unfrozen
+market_projection_identity_abi=design_frozen
 implementation=unwired/uncompiled/unrun
 ```
 

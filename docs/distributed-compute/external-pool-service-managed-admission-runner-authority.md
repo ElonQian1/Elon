@@ -28,7 +28,7 @@ initial_profile_inventory=unselected
 admission_receipt_semantic_contract=design_frozen
 admission_receipt_canonical_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
-market_projection_identity_abi=unfrozen
+market_projection_identity_abi=design_frozen
 admission_receipt_table/migration/source=absent
 implementation=unwired/uncompiled/unrun
 passed=0
@@ -86,7 +86,9 @@ replay与readback全部由 [admission receipt ABI authority](external-pool-servi
 及其 [acceptance](external-pool-service-managed-admission-receipt-abi-acceptance.md)唯一维护。
 
 当前只完成设计冻结：table、migration、UDF、trigger、Domain与Store source均不存在；任何物理registration仍为0，阶段名不预占280。
-`market_projection_identity_abi`也仍未冻结，所以receipt ABI不能单独合并为source或打开任何writer/fence。
+Pool/ledger/Offer/publication/snapshot 的确定性身份、legacy owner mapping与single checked-at由
+[market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)及其
+[acceptance](external-pool-service-managed-market-projection-identity-abi-acceptance.md)维护；design freeze仍不能单独打开writer/fence。
 
 Currentness 只能只读派生：Provider只有唯一genesis receipt且未过期，server catalog中同一 market profile revision/digest仍
 current、未撤销且在有效窗内，Provider exact active且仍绑定同一V277 stable activation root/provider binding/executor/adapter
@@ -191,9 +193,10 @@ timestamp projection exact；它不能复用只在active CAS触发的V254 #14 pe
 
 Price snapshot 必须复用既有v171 Registry及其Store-private `register_compute_price_snapshot_on`，不得建平行表。snapshot/
 quote identity、components、max amounts、source、TTL与时间公式只取
-[profile子权威](external-pool-service-managed-market-profile-authority.md)和本次admission/Offer sealed material。Offer publication
-的approver以及snapshot/quote legacy IDs/times与共享checked-at仍属于未冻结的market projection identity；source observation
-window已固定为`[checked_at-1s,checked_at]`。实现不得让各既有facade分别调用`now()`或猜值。
+[profile子权威](external-pool-service-managed-market-profile-authority.md)和本次admission/Offer sealed material。Publication真实
+approver、snapshot/quote legacy IDs/times、shared checked-at及owner helper已由projection identity ABI冻结设计；source
+observation window固定为`[checked_at-1s,checked_at]`。Tx-B fence仍归未冻结Gateway/session/validator ABI。实现不得让各既有
+facade分别调用`now()`、随机ID或猜值。
 既有`price_snapshot_effect=none`保持不变；snapshot是其后的独立受管写入。所有既有snapshot writer，包括public
 Offer-owner facade与v223四眼admin curve application，都必须拒绝external_pool；只有持有本次ordered plan的V280
 Store-private `_on` writer可调用底层registry kernel，任何caller/admin都不能提交raw price。
@@ -393,8 +396,7 @@ owner串行收口；worker ownership同时包含`external_pool_adapter_task_work
 包含`external_pool_adapter_broker_tls.rs`。每个 leaf ≤430 行；入口只做
 声明、re-export或编排。
 
-推荐实现顺序是 market projection identity ABI冻结→profile子权威首项payload审批→按已冻结profile/admission ABI实现
-policy/admission Domain/DDL/Store→
+推荐实现顺序是profile子权威首项payload审批→按已冻结profile/admission/projection ABI实现policy/admission Domain/DDL/Store→
 service-managed market transaction→Gateway A/B→task session+
 validator→Runner/ingress/recovery→source-contract→恢复后的 compile/migration/runtime acceptance。前一步未闭合时不得打开下一步
 生产 fence。

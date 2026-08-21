@@ -21,7 +21,7 @@ verification_status: design_review_only
 ```text
 admission_receipt_canonical_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
-market_projection_identity_abi=unfrozen
+market_projection_identity_abi=design_frozen
 admission_receipt_table=absent
 physical_migration_registration=absent
 migration_registry_max=279
@@ -33,7 +33,8 @@ failed=0
 
 Profile schema 由 [market profile authority](external-pool-service-managed-market-profile-authority.md) 维护；完整事务、Gateway、
 task session 与恢复见 [V280 父权威](external-pool-service-managed-admission-runner-authority.md)。本页的验收见
-[admission receipt ABI acceptance](external-pool-service-managed-admission-receipt-abi-acceptance.md)。
+[admission receipt ABI acceptance](external-pool-service-managed-admission-receipt-abi-acceptance.md)；receipt引用的legacy
+projection identity由 [market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)维护。
 `V280`只是阶段名，不预留migration编号；未来实现必须重读registry并使用届时next free物理编号。
 
 ## 2. 固定常量与 domain
@@ -180,8 +181,8 @@ table 只把 count/digest 标量投影。Fresh INSERT trigger与precommit readba
 historical/replay只对真实bucket核immutable binding/config，并从immutable supply transaction+两条legs+sequence1重建准入时balance，
 不得要求mutable status/balance revision/available/held/active/updated-at仍等于receipt snapshot。
 `bucket_id/bucket_digest/resource_scope_digest/meter_policy_digest/delivery_window`、supply/event/Offer/publication/snapshot/quote
-identity，以及所有legacy writer共享同一canonical `checked_at`的派生仍属于`market_projection_identity_abi=unfrozen`。
-本页只冻结其receipt位置与历史readback，不授权writer猜值；price source observation window已由profile authority固定为
+identity及所有legacy writer共享同一canonical `checked_at`的派生已由projection identity ABI冻结设计，但仍无writer源码。
+本页只冻结其receipt位置与历史readback；price source observation window已由profile authority固定为
 `[checked_at-1s,checked_at]`并必须进入snapshot digest。
 
 时间固定：
@@ -406,7 +407,7 @@ store/compute_external_pool_service_managed_admissions/{read,write,currentness,p
 ```
 
 Domain DTO private fields、deny-unknown；canonical parser可用于readback，current authority必须non-Clone/non-Serde且只由
-Store transaction构造。Source-written 前还必须先冻结 `market_projection_identity_abi`（包括publication approver语义、
-所有legacy deterministic IDs/times及同一server checked-at），落实fixed source observation window，提交首个byte-exact profile payload，
-并与完整 V280 writer/Gateway/validator/Runner 同批落盘。本批不声明任何 symbol/table/UDF已存在，不执行编译、测试、migration、
+Store transaction构造。Source-written 前还必须实现已冻结projection identity ABI、落实fixed source observation window、提交首个
+byte-exact profile payload，并冻结production fence所在的Gateway/session/validator ABI，与完整 V280 writer/Runner 同批落盘。
+本批不声明任何 symbol/table/UDF已存在，不执行编译、测试、migration、
 SQLite、runtime 或 network；正式计数保持 `passed=0/failed=0`。
