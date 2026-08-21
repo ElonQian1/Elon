@@ -19,6 +19,10 @@ name = "elon-node-installer"
 path = "src/node_installer_main.rs"
 
 [[bin]]
+name = "yilong-commerce-edge"
+path = "src/commerce_edge_main.rs"
+
+[[bin]]
 name = "elon-external-pool-adapter-session-fixture"
 path = "src/external_pool_adapter_session_fixture_main.rs"
 required-features = ["external-pool-adapter-session-fixture"]

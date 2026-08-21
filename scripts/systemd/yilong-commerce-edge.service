@@ -1,0 +1,37 @@
+[Unit]
+Description=Yilong native open-commerce HTTPS edge
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=yilong-edge
+Group=yilong-edge
+EnvironmentFile=/etc/yilong-commerce-edge/edge.env
+ExecStart=/usr/local/bin/yilong-commerce-edge
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=20s
+
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
