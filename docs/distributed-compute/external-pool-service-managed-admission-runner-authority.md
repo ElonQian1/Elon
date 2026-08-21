@@ -26,7 +26,10 @@ vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
 initial_profile_inventory=unselected
 admission_receipt_semantic_contract=design_frozen
-admission_receipt_physical_abi=unfrozen
+admission_receipt_canonical_abi=design_frozen
+admission_receipt_physical_schema_abi=design_frozen
+market_projection_identity_abi=unfrozen
+admission_receipt_table/migration/source=absent
 implementation=unwired/uncompiled/unrun
 passed=0
 failed=0
@@ -75,24 +78,15 @@ authority，不重复定义 canonical keys/domain。
 
 ## 5. Immutable admission receipt
 
-计划中的唯一 durable V280 对象是
-`compute_external_pool_service_managed_admissions`，一张 immutable append-only table；不新增 mutable head、view、
-revocation、queue、session、Secret 或 payload 表。其 canonical receipt 必须覆盖以下语义组：
+计划中的唯一 durable V280 对象是 `compute_external_pool_service_managed_admissions`：一张77列 immutable
+`WITHOUT ROWID`表，0 mutable head/view/revocation/queue/session/Secret/payload表。Exact schema/domain、6-key envelope、
+7组/72个direct group keys及单元素25-key bucket、ID/request/integrity/receipt digest、列序、parent keys、FK/UNIQUE/CHECK、
+bucket inventory、
+replay与readback全部由 [admission receipt ABI authority](external-pool-service-managed-admission-receipt-abi-authority.md)
+及其 [acceptance](external-pool-service-managed-admission-receipt-abi-acceptance.md)唯一维护。
 
-| 组 | 必须绑定 |
-|---|---|
-| identity | admission receipt ID、Provider ID、V249 external-pool provider-binding ID/digest、market admission actor、fixed confirmation、idempotency scope/key/request digest；首批sequence固定1且predecessor pair固定NULL |
-| activation | V277 stable activation receipt ID/digest/root digest、准入当时的V274 successor historical witness pair |
-| route/runtime | 准入当时的V278 renewal/route authorization historical witness pair、stable executor pair |
-| policy | 子权威定义的 exact market profile JSON/digest与per-Provider allocation pair；当前inventory未选择 |
-| pool | pool ID/epoch/revision/digest、bucket inventory count/digest、supply transaction pair、activation event pair |
-| offer/price | 同一 Offer 的 draft revision/digest、active revision/digest、publication pair，以及既有v171 price snapshot ID/digest/source pair |
-| time | checked-at、valid-from、expires-at、created-at=checked-at，全部 UTC nanos |
-| receipt | canonical JSON、receipt digest、integrity digest与domain-separated JCS/SHA-256版本 |
-
-Admission receipt的物理列名、列序、canonical envelope 和 domain 字符串必须在第一批实现前由独立
-admission ABI authority、Domain、DDL、Store三方共同冻结并加入source-contract；当前
-`admission_receipt_physical_abi=unfrozen`，本页不把语义表格冒充为源码 ABI。
+当前只完成设计冻结：table、migration、UDF、trigger、Domain与Store source均不存在；任何物理registration仍为0，阶段名不预占280。
+`market_projection_identity_abi`也仍未冻结，所以receipt ABI不能单独合并为source或打开任何writer/fence。
 
 Currentness 只能只读派生：Provider只有唯一genesis receipt且未过期，server catalog中同一 market profile revision/digest仍
 current、未撤销且在有效窗内，Provider exact active且仍绑定同一V277 stable activation root/provider binding/executor/adapter
@@ -198,6 +192,8 @@ timestamp projection exact；它不能复用只在active CAS触发的V254 #14 pe
 Price snapshot 必须复用既有v171 Registry及其Store-private `register_compute_price_snapshot_on`，不得建平行表。snapshot/
 quote identity、components、max amounts、source、TTL与时间公式只取
 [profile子权威](external-pool-service-managed-market-profile-authority.md)和本次admission/Offer sealed material。Offer publication
+的approver以及snapshot/quote legacy IDs/times与共享checked-at仍属于未冻结的market projection identity；source observation
+window已固定为`[checked_at-1s,checked_at]`。实现不得让各既有facade分别调用`now()`或猜值。
 既有`price_snapshot_effect=none`保持不变；snapshot是其后的独立受管写入。所有既有snapshot writer，包括public
 Offer-owner facade与v223四眼admin curve application，都必须拒绝external_pool；只有持有本次ordered plan的V280
 Store-private `_on` writer可调用底层registry kernel，任何caller/admin都不能提交raw price。
@@ -397,7 +393,8 @@ owner串行收口；worker ownership同时包含`external_pool_adapter_task_work
 包含`external_pool_adapter_broker_tls.rs`。每个 leaf ≤430 行；入口只做
 声明、re-export或编排。
 
-推荐实现顺序是 profile子权威的首项payload审批→独立admission physical ABI冻结→policy/admission Domain/DDL/Store→
+推荐实现顺序是 market projection identity ABI冻结→profile子权威首项payload审批→按已冻结profile/admission ABI实现
+policy/admission Domain/DDL/Store→
 service-managed market transaction→Gateway A/B→task session+
 validator→Runner/ingress/recovery→source-contract→恢复后的 compile/migration/runtime acceptance。前一步未闭合时不得打开下一步
 生产 fence。

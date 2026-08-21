@@ -24,7 +24,8 @@ vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
 initial_profile_inventory=unselected
 current_profile_authority=unconstructible
-admission_receipt_physical_abi=unfrozen
+admission_receipt_physical_schema_abi=design_frozen
+market_projection_identity_abi=unfrozen
 implementation=unwired/uncompiled/unrun
 passed=0
 failed=0
@@ -235,6 +236,9 @@ Profile 时间必须满足：
 ```text
 valid_from <= checked_at < new_plan_accept_until
 new_plan_accept_until <= expires_at < inflight_execution_valid_until
+snapshot.quoted_at=checked_at
+snapshot.observation_window_start=checked_at-1s
+snapshot.observation_window_end=checked_at
 snapshot.expires_at=min(checked_at+quote_ttl,new_plan_accept_until,expires_at)
 offer.created_at=offer.valid_from=delivery_window.starts_at=checked_at
 delivery_window.ends_at=offer.valid_until=inflight_execution_valid_until
@@ -332,7 +336,8 @@ enabled profile 必须：
 2. 提交 byte-exact RFC8785-JCS profile JSON 与 digest；
 3. 更新本权威和 acceptance 的 payload 指纹；
 4. 保留历史 item，且 V1 不允许 successor 或运行时可变配置；
-5. 与独立 admission receipt physical ABI、完整 V280 纵切源码同批集成，不能单独打开 fence。
+5. 逐字满足 [admission receipt ABI](external-pool-service-managed-admission-receipt-abi-authority.md)，并与仍待冻结的
+   market projection identity、完整 V280 纵切源码同批集成，不能单独打开 fence。
 
 ## 8. 计划中的 Rust 边界
 
@@ -352,7 +357,7 @@ current_external_pool_service_managed_market_profile_authority
 DTO 可做 deny-unknown parse/readback，但 authority 不得 Clone/Serde；owner-local constructor只能接 typed Provider/V249
 binding 与 checked-at，不接 raw profile/capacity/price/ceiling/bool。Profile 纯 validator不得读 DB、时间、网络或环境变量。
 
-本批不写这些 symbols，不注册 V280 migration/UDF/table，不修改 V254 fence、worker、Store、API 或 runtime。静态审计不计入
+本批不写这些 symbols，不注册任何物理migration/UDF/table且不预占280，不修改 V254 fence、worker、Store、API 或 runtime。静态审计不计入
 实现 `passed/failed`。
 
 ## 9. 明确待产品选择的 payload

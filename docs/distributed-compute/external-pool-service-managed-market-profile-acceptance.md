@@ -89,8 +89,8 @@ Runner 可达。
 
 Profile 本身直接写 Pool/Offer/Plan、把 V277 identity写死进profile、把price caller DTO当authority，均为失败。
 本页不宣称 `resource_scope`、Pool/bucket/meter/delivery-window、Offer/publication、v171 snapshot/quote/source、
-Tx-B `fence_digest` 等 deterministic ID/digest material 已冻结；这些属于独立 admission physical/writer/Gateway projection ABI。
-在该 ABI 完成前，"exact投影"只能表示字段语义与owner helper边界，不能据此实现或打开writer。
+Tx-B `fence_digest` 等 deterministic ID/digest material 已冻结；这些属于仍未冻结的market projection identity、writer与
+Gateway ABI。在这些ABI完成前，"exact投影"只能表示字段语义与owner helper边界，不能据此实现或打开writer。
 
 ## 6. Source-written 前的静态门
 
@@ -106,14 +106,16 @@ Tx-B `fence_digest` 等 deterministic ID/digest material 已冻结；这些属�
   `fence_digest` 的确定性material、owner helper、readback和replay；
 - deadline consumer逐字段冻结Job retry、reconcile/event scheduler、pre-start cleanup/60秒lease margin与task-session effective
   deadline，不得把Job retry映射为ELTP exchange ordinal；
-- 独立 admission receipt physical ABI、完整 V280 writer/Gateway/validator/Runner 同批集成。
+- 按已冻结的 [admission receipt physical ABI](external-pool-service-managed-admission-receipt-abi-authority.md)实现，并在同批冻结
+  market projection identity（含publication approver、snapshot/quote identity与legacy kernels共享checked-at）、落实fixed source
+  observation window、集成完整V280 writer/Gateway/validator/Runner。
 
 未满足任一项时，V280 继续 `implementation_unwired/uncompiled/unrun`，migration最高保持V279，V254 fence保持关闭，
 worker `eligible_rows=0`。静态文档检查不计入实现 `passed/failed`。
 
 ## 7. 本批静态验收
 
-本批只允许：文档链接、frontmatter状态、文档尺寸、canonical单一真源、server零diff、V280 migration/UDF/table/worker零注册
+本批只允许：文档链接、frontmatter状态、文档尺寸、canonical单一真源、server零diff、任何物理migration/UDF/table/worker零注册且不预占280
 等静态审查。禁止编译、测试、执行migration/SQLite/runtime/network；正式计数保持 `passed=0/failed=0`。
 
 最终报告必须分别写：
@@ -122,7 +124,8 @@ worker `eligible_rows=0`。静态文档检查不计入实现 `passed/failed`。
 vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
 initial_profile_inventory=unselected
-admission_receipt_physical_abi=unfrozen
+admission_receipt_physical_schema_abi=design_frozen
+market_projection_identity_abi=unfrozen
 implementation=unwired/uncompiled/unrun
 ```
 

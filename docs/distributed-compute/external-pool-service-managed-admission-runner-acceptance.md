@@ -23,7 +23,8 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 
 本批只允许记录纵切架构`design_frozen/design_review_only`，并逐轴说明
 `market_profile_schema_abi=design_frozen`、`initial_profile_inventory=unselected`、
-`admission_receipt_physical_abi=unfrozen`与实现`unwired/uncompiled/unrun`。文档链接、source-size或静态零改动扫描
+`admission_receipt_canonical/physical_schema_abi=design_frozen`、`market_projection_identity_abi=unfrozen`与实现
+`unwired/uncompiled/unrun`。文档链接、source-size或静态零改动扫描
 不是实现证据，任何 V273/V274/V277/V278 历史 passed 也不能计入 V280。
 
 ## 2. 本次文档冻结验收
@@ -57,7 +58,7 @@ workload、transport、deadline、issuer与负向source矩阵。缺任一项时m
 | durable shape | exact 1张immutable admission receipt表；0 mutable head、0 view、0 revocation、0 session/Secret/payload表。 |
 | semantic projection | identity、V277 stable root、admission-time V274/V278 historical witnesses、profile+per-provider allocation、Pool/ledger、Offer/publication、v171 price snapshot、time、canonical receipt全部逐列投影。 |
 | idempotency | market admission actor/confirmation/scope/key/request digest逐字投影；replay在current-source read前，caller不能选择这些字段。 |
-| ABI freeze | 当前仍是未来门；独立admission ABI authority须让Domain/DDL/Store exact列名、列序、类型、canonical keys与domain string一致并由source-contract锁定。 |
+| ABI freeze | [子权威](external-pool-service-managed-admission-receipt-abi-authority.md)已冻结77列、canonical keys/domain、parent exact keys与replay；table/migration/source仍absent。 |
 | genesis | sequence固定1、predecessor固定NULL；同Provider只有一份genesis，不接受第二个不同请求。 |
 | capacity scope | 同Provider重复或改量拒绝；两个Provider的allocation ID/digest必须不同，各自只铸一次profile授权量；不得出现global余额或跨Provider重复消费的隐式解释。 |
 | concurrency | Tx-A同事务重证同Provider ledger与exact Reservation/held Claim各占1 slot，held+active总量不得超过profile；跨cycle或并发writer也不能超售。 |
@@ -222,7 +223,7 @@ semantic substitution与所有V254 fence负例。仅source-contract、fixture或
 
 - 父authority/acceptance完成：只证明`vertical_slice_architecture=design_frozen`；
 - profile子权威完成：只证明`market_profile_schema_abi=design_frozen`，初始inventory仍可保持unselected；
-- admission physical ABI、首个profile payload、Gateway/session/validator ABI任一未冻结时不得进入source-written；
+- market projection identity ABI、首个profile payload、Gateway/session/validator ABI任一未冻结时不得进入source-written；
 - Domain/DDL/Store/Gateway/validator/Runner全部落盘且静态合同通过：可记`source_written/source_review_only`；
 - compile+fresh/repeat/reopen migration通过：才可记`implementation_compiled`或对应局部验证；
 - 正向纵切、timeout/reconcile/cancel/restart动态矩阵通过：才可记production reachability已验证；
