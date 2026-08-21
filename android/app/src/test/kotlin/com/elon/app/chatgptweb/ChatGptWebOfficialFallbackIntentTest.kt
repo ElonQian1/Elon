@@ -17,6 +17,12 @@ class ChatGptWebOfficialFallbackIntentTest {
                 "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
             ),
         )
+        assertEquals(
+            "https://chatgpt.com/auth/login",
+            ChatGptWebOfficialFallbackIntent.sanitizeStartUrl(
+                ChatGptWebOfficialFallbackIntent.LOGIN_URL,
+            ),
+        )
     }
 
     @Test

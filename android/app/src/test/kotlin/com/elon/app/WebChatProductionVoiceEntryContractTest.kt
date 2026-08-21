@@ -109,6 +109,26 @@ class WebChatProductionVoiceEntryContractTest {
         assertFalse(controller.contains("renderStatusMessage(\"正在同步语音会话…\")"))
     }
 
+    @Test
+    fun productionVoiceGatesOnlyConfirmedGuestsAndDelegatesCredentialsToTheOfficialPage() {
+        val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val coordinator = read("android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceCoordinator.kt")
+        val gate = read("android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceLoginGate.kt")
+        val mode = read("android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt")
+        val strings = read("android/app/src/main/res/values/strings.xml")
+
+        assertTrue(feature.contains("authenticated = { isChatModeActive() && activeController().authenticated() }"))
+        assertTrue(feature.contains("sessionState ="))
+        assertTrue(feature.contains("openOfficialLogin = modeController::openOfficialLogin"))
+        assertTrue(coordinator.contains("WebChatRealtimeVoiceAuthenticationState.GUEST"))
+        assertTrue(coordinator.contains("WebChatRealtimeVoiceAuthenticationState.AUTHENTICATED"))
+        assertTrue(mode.contains("ChatGptWebOfficialFallbackIntent.createLogin(activity)"))
+        assertTrue(gate.contains("web_chat_realtime_voice_login_methods"))
+        assertTrue(strings.contains("官方可能提供的登录方式"))
+        assertFalse(gate.contains("EditText"))
+        assertFalse(gate.contains("password"))
+    }
+
     private fun read(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
 

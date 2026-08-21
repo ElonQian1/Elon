@@ -80,6 +80,11 @@ internal class SocialAiChatModeController(
         return true
     }
 
+    fun openOfficialLogin() {
+        if (providerId != WebChatProviderId.CHATGPT_WEB) return
+        activity.startActivity(ChatGptWebOfficialFallbackIntent.createLogin(activity))
+    }
+
     fun openSocialAiChat(): Boolean {
         val friend = findSocialAiFriend() ?: return false
         closeGroupChat()

@@ -8,9 +8,12 @@ internal class WebChatRealtimeVoiceCoordinator(
     private val activeProvider: () -> WebChatProviderId?,
     private val consumerPort: () -> WebChatConsumerPort?,
     private val sessionReady: () -> Boolean,
+    private val authenticationState: () -> WebChatRealtimeVoiceAuthenticationState,
     private val beginWebBacking: () -> Boolean,
     private val endWebBacking: (Boolean) -> Unit,
     private val requestSessionRecovery: () -> Unit,
+    private val loginGate: WebChatRealtimeVoiceLoginGate,
+    private val openOfficialLogin: () -> Unit,
     private val openOfficialFallback: () -> Unit,
     private val schedule: (Runnable, Long) -> Unit,
     private val backControl: WebChatRealtimeVoiceBackControl,
@@ -21,6 +24,8 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var preparedGeneration: Int? = null
     private var commandRequestId: String? = null
     private var closePending = false
+    private var pendingLoginProvider: WebChatProviderIdentity? = null
+    private var waitingForLoginReturn = false
 
     fun start(candidate: WebChatProviderIdentity): Boolean {
         if (
@@ -28,6 +33,10 @@ internal class WebChatRealtimeVoiceCoordinator(
             activeProvider() != candidate.id
         ) {
             return false
+        }
+        if (authenticationState() == WebChatRealtimeVoiceAuthenticationState.GUEST) {
+            requireLogin(candidate, stopBacking = false)
+            return true
         }
         if (surface.isVisible() && provider?.id == candidate.id) return true
         generation += 1
@@ -79,8 +88,18 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     fun destroy() {
+        clearPendingLogin()
+        loginGate.dismiss()
         finishClose(gracefulExit = false)
         backControl.dispose()
+    }
+
+    fun onHostResumed() {
+        val candidate = pendingLoginProvider ?: return
+        if (!waitingForLoginReturn) return
+        generation += 1
+        requestSessionRecovery()
+        pollAuthentication(generation, candidate, attempt = 0)
     }
 
     private fun retry() {
@@ -110,6 +129,10 @@ internal class WebChatRealtimeVoiceCoordinator(
 
     private fun attemptStart(expectedGeneration: Int, attempt: Int) {
         if (!isCurrent(expectedGeneration)) return
+        if (authenticationState() == WebChatRealtimeVoiceAuthenticationState.GUEST) {
+            requireLogin(provider ?: return, stopBacking = true)
+            return
+        }
         if (!sessionReady()) {
             if (attempt >= MAX_START_ATTEMPTS) {
                 fail("连接网页会话超时，可重试或打开官网语音")
@@ -259,6 +282,60 @@ internal class WebChatRealtimeVoiceCoordinator(
         surface.render(WebChatRealtimeVoiceStage.FAILED, detail)
     }
 
+    private fun requireLogin(candidate: WebChatProviderIdentity, stopBacking: Boolean) {
+        generation += 1
+        provider = null
+        prepareRequestId = null
+        preparedGeneration = null
+        commandRequestId = null
+        closePending = false
+        backControl.setEnabled(false)
+        if (surface.isVisible()) surface.hide()
+        if (stopBacking) endWebBacking(false)
+        pendingLoginProvider = candidate
+        waitingForLoginReturn = false
+        loginGate.show(
+            onOfficialLogin = {
+                waitingForLoginReturn = true
+                loginGate.dismiss()
+                openOfficialLogin()
+            },
+            onCancel = ::clearPendingLogin,
+        )
+    }
+
+    private fun pollAuthentication(
+        expectedGeneration: Int,
+        candidate: WebChatProviderIdentity,
+        attempt: Int,
+    ) {
+        schedule(Runnable {
+            if (
+                expectedGeneration != generation ||
+                !waitingForLoginReturn ||
+                pendingLoginProvider?.id != candidate.id
+            ) {
+                return@Runnable
+            }
+            if (authenticationState() == WebChatRealtimeVoiceAuthenticationState.AUTHENTICATED) {
+                clearPendingLogin()
+                start(candidate)
+                return@Runnable
+            }
+            if (attempt >= MAX_AUTHENTICATION_POLLS) {
+                requireLogin(candidate, stopBacking = false)
+                return@Runnable
+            }
+            requestSessionRecovery()
+            pollAuthentication(expectedGeneration, candidate, attempt + 1)
+        }, AUTHENTICATION_POLL_DELAY_MS)
+    }
+
+    private fun clearPendingLogin() {
+        pendingLoginProvider = null
+        waitingForLoginReturn = false
+    }
+
     private fun isCurrent(expectedGeneration: Int): Boolean =
         expectedGeneration == generation && provider != null && surface.isVisible()
 
@@ -274,6 +351,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val COMMAND_SETTLE_MS = 1_000L
         const val CONTROL_SETTLE_MS = 400L
         const val END_VOICE_SETTLE_MS = 350L
+        const val AUTHENTICATION_POLL_DELAY_MS = 400L
+        const val MAX_AUTHENTICATION_POLLS = 30
         val RETRYABLE_ERRORS = setOf(
             "bridge_not_ready",
             "adapter_generation_not_ready",
@@ -294,9 +373,12 @@ internal fun createWebChatRealtimeVoiceCoordinator(
     activeProvider: () -> WebChatProviderId?,
     consumerPort: () -> WebChatConsumerPort?,
     sessionReady: () -> Boolean,
+    authenticated: () -> Boolean,
+    sessionState: () -> String,
     beginWebBacking: () -> Boolean,
     endWebBacking: (Boolean) -> Unit,
     requestSessionRecovery: () -> Unit,
+    openOfficialLogin: () -> Unit,
     openOfficialFallback: () -> Unit,
 ): WebChatRealtimeVoiceCoordinator {
     lateinit var coordinator: WebChatRealtimeVoiceCoordinator
@@ -309,9 +391,14 @@ internal fun createWebChatRealtimeVoiceCoordinator(
         activeProvider = activeProvider,
         consumerPort = consumerPort,
         sessionReady = sessionReady,
+        authenticationState = {
+            WebChatRealtimeVoiceAuthenticationPolicy.resolve(authenticated(), sessionState())
+        },
         beginWebBacking = beginWebBacking,
         endWebBacking = endWebBacking,
         requestSessionRecovery = requestSessionRecovery,
+        loginGate = WebChatRealtimeVoiceLoginDialog(activity),
+        openOfficialLogin = openOfficialLogin,
         openOfficialFallback = openOfficialFallback,
         schedule = { task, delayMs -> activity.window.decorView.postDelayed(task, delayMs) },
         backControl = object : WebChatRealtimeVoiceBackControl {

@@ -142,6 +142,11 @@
     <string name="web_chat_attachment_fallback">当前附件类型暂需在官网页面完成</string>
     <string name="web_chat_attachment_upload_failed">附件未能交给 ChatGPT 网页 AI，请重试</string>
     <string name="web_chat_attachment_uploading">附件正在上传，请稍候</string>
+    <string name="web_chat_realtime_voice_login_title">使用实时语音需要登录 ChatGPT</string>
+    <string name="web_chat_realtime_voice_login_message">免费账号也可以使用实时语音。登录、注册和身份验证都在 ChatGPT 官方网页中完成。</string>
+    <string name="web_chat_realtime_voice_login_methods">官方可能提供的登录方式</string>
+    <string name="web_chat_realtime_voice_login_privacy">实际方式以官方页面显示为准。一龙不会读取或保存账号、密码和验证码。</string>
+    <string name="web_chat_realtime_voice_login_open">打开官方登录 / 注册</string>
     <string name="web_chat_model_picker_title">ChatGPT 模型</string>
     <string name="web_chat_model_options_empty">官网暂未返回可选模型</string>
     <string name="chatgpt_side_menu_projects">项目</string>

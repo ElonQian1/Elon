@@ -11,6 +11,10 @@ internal object WebChatProductionSelectors {
     const val REALTIME_VOICE_CLOSE = "web-chat-realtime-voice:close"
     const val REALTIME_VOICE_RETRY = "web-chat-realtime-voice:retry"
     const val REALTIME_VOICE_OFFICIAL_FALLBACK = "web-chat-realtime-voice:official-fallback"
+    const val REALTIME_VOICE_LOGIN_SURFACE = "web-chat-realtime-voice-login:surface"
+    const val REALTIME_VOICE_LOGIN_METHOD = "web-chat-realtime-voice-login:method"
+    const val REALTIME_VOICE_LOGIN_OFFICIAL = "web-chat-realtime-voice-login:official"
+    const val REALTIME_VOICE_LOGIN_CANCEL = "web-chat-realtime-voice-login:cancel"
 
     fun composerInput(provider: WebChatProviderId): String =
         "web-chat-composer-input:${provider.wireValue}"

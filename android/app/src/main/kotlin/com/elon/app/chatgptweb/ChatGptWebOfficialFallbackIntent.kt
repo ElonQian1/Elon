@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 
 internal object ChatGptWebOfficialFallbackIntent {
+    internal const val LOGIN_URL = "https://chatgpt.com/auth/login"
     private const val EXTRA_START_URL = "chatgpt_product_start_url"
     private const val EXTRA_STARTUP_ACTION = "chatgpt_product_startup_action"
 
@@ -17,6 +18,8 @@ internal object ChatGptWebOfficialFallbackIntent {
                 sanitizeStartUrl(currentUrl)?.let { putExtra(EXTRA_START_URL, it) }
                 startupAction?.let { putExtra(EXTRA_STARTUP_ACTION, it.wireValue) }
             }
+
+    fun createLogin(context: Context): Intent = create(context, LOGIN_URL)
 
     fun startUrl(intent: Intent): String? =
         sanitizeStartUrl(intent.getStringExtra(EXTRA_START_URL))

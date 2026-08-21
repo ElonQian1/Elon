@@ -61,6 +61,54 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun guestVoiceShowsOfficialLoginMethodsWithoutBlockingAnonymousTextChat() {
+        val fixture = Fixture(authenticated = false)
+
+        assertTrue(fixture.coordinator.start(fixture.provider))
+
+        assertTrue(fixture.loginGate.visible)
+        assertFalse(fixture.surface.visible)
+        assertEquals(0, fixture.beginBackingCount)
+        assertEquals(0, fixture.officialLoginCount)
+    }
+
+    @Test
+    fun loginReturnRefreshesTheSharedSessionAndRetriesVoiceOnceAuthenticated() {
+        val fixture = Fixture(authenticated = false)
+        fixture.coordinator.start(fixture.provider)
+
+        fixture.loginGate.openOfficialLogin()
+        assertEquals(1, fixture.officialLoginCount)
+        assertFalse(fixture.loginGate.visible)
+
+        fixture.authenticated = true
+        fixture.coordinator.onHostResumed()
+        fixture.scheduler.runNext()
+
+        assertTrue(fixture.surface.visible)
+        assertEquals(WebChatRealtimeVoiceStage.PREPARING, fixture.surface.stage)
+        assertEquals(1, fixture.beginBackingCount)
+    }
+
+    @Test
+    fun unknownAuthenticationWaitsForTheSessionInsteadOfClaimingLoginIsRequired() {
+        val fixture = Fixture(authenticated = false, sessionState = "loading", sessionReady = false)
+
+        assertTrue(fixture.coordinator.start(fixture.provider))
+
+        assertTrue(fixture.surface.visible)
+        assertFalse(fixture.loginGate.visible)
+        assertEquals(1, fixture.beginBackingCount)
+
+        fixture.sessionState = "login_required"
+        fixture.scheduler.runNext()
+
+        assertFalse(fixture.surface.visible)
+        assertTrue(fixture.loginGate.visible)
+        assertEquals(1, fixture.endBackingCount)
+    }
+
+    @Test
     fun closesOfficialVoiceBeforeRevealingThePreservedNativeConversation() {
         val fixture = Fixture()
         fixture.coordinator.start(fixture.provider)
@@ -81,28 +129,64 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertEquals(listOf(true), fixture.endBackingGraceful)
     }
 
-    private class Fixture(sessionReady: Boolean = true) {
+    private class Fixture(
+        sessionReady: Boolean = true,
+        authenticated: Boolean = true,
+        sessionState: String = "ready",
+    ) {
         val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
         val surface = FakeSurface()
+        val loginGate = FakeLoginGate()
         val scheduler = Scheduler()
         val port = FakePort()
         val back = FakeBackControl()
+        var authenticated = authenticated
+        var sessionState = sessionState
         var beginBackingCount = 0
         val endBackingGraceful = mutableListOf<Boolean>()
         val endBackingCount: Int get() = endBackingGraceful.size
         var officialFallbackCount = 0
+        var officialLoginCount = 0
         val coordinator = WebChatRealtimeVoiceCoordinator(
             surface = surface,
             activeProvider = { WebChatProviderId.CHATGPT_WEB },
             consumerPort = { port },
             sessionReady = { sessionReady },
+            authenticationState = {
+                WebChatRealtimeVoiceAuthenticationPolicy.resolve(
+                    this.authenticated,
+                    this.sessionState,
+                )
+            },
             beginWebBacking = { beginBackingCount += 1; true },
             endWebBacking = { graceful -> endBackingGraceful += graceful },
             requestSessionRecovery = {},
+            loginGate = loginGate,
+            openOfficialLogin = { officialLoginCount += 1 },
             openOfficialFallback = { officialFallbackCount += 1 },
             schedule = scheduler::schedule,
             backControl = back,
         )
+    }
+
+    private class FakeLoginGate : WebChatRealtimeVoiceLoginGate {
+        var visible = false
+        private var officialLogin: () -> Unit = {}
+
+        override fun show(onOfficialLogin: () -> Unit, onCancel: () -> Unit) {
+            visible = true
+            officialLogin = onOfficialLogin
+        }
+
+        override fun dismiss() {
+            visible = false
+        }
+
+        override fun isVisible(): Boolean = visible
+
+        fun openOfficialLogin() {
+            officialLogin()
+        }
     }
 
     private class FakeSurface : WebChatRealtimeVoiceSurface {

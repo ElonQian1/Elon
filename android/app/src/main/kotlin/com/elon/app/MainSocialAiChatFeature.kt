@@ -139,6 +139,8 @@ internal class MainSocialAiChatFeature(
                 isChatModeActive() && activeController().stateWireValue() == "ready" &&
                     activeController().composerReady()
             },
+            authenticated = { isChatModeActive() && activeController().authenticated() },
+            sessionState = { if (isChatModeActive()) activeController().stateWireValue() else "idle" },
             beginWebBacking = {
                 isChatModeActive() && activeController().beginRealtimeVoiceBacking()
             },
@@ -150,6 +152,7 @@ internal class MainSocialAiChatFeature(
             requestSessionRecovery = {
                 if (isChatModeActive()) activeController().onHostResumed()
             },
+            openOfficialLogin = modeController::openOfficialLogin,
             openOfficialFallback = modeController::openOfficialRealtimeVoice,
         )
     }
@@ -478,6 +481,7 @@ internal class MainSocialAiChatFeature(
     fun onHostResumed(resumeWorkChat: () -> Unit) {
         if (isChatModeActive()) {
             activeController().onHostResumed()
+            if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onHostResumed()
             productionCapabilityPrewarmer.schedule(WebChatProviderRegistry.get(providerId()))
         } else {
             resumeWorkChat()
