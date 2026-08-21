@@ -48,7 +48,12 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         ? 'markdown' as const
         : 'plain' as const
       const structuredParts = item.content
-        .filter((part) => !['text', 'markdown', 'citation'].includes(part.type))
+        .filter((part) => {
+          if (['text', 'markdown', 'citation'].includes(part.type)) return false
+          if (part.type !== 'image') return true
+          const label = part.text.trim()
+          return Boolean(part.url || part.mediaType || (label && label !== '图片'))
+        })
         .map<AiStructuredPart>((part) => ({
           type: part.type as AiStructuredPart['type'],
           label: part.text,

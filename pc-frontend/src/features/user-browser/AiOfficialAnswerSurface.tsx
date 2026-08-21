@@ -5,7 +5,6 @@ import {
   boundsFor,
   hideLocalAiWebSessionEmbedded,
   presentLocalAiWebSessionEmbedded,
-  REQUEST_RETURN_TO_AI_CHAT_EVENT,
   type AiBrowserSurface,
 } from './internalBrowserApi'
 import {
@@ -18,7 +17,6 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
   const viewportRef = useRef<HTMLDivElement>(null)
   const generationRef = useRef(0)
   const [browserSurface, setBrowserSurface] = useState<AiBrowserSurface>('chat')
-  const [dismissedKey, setDismissedKey] = useState('')
   const [failedKey, setFailedKey] = useState('')
   const snapshot = web.controller.snapshot
   const answerKey = useMemo(
@@ -34,24 +32,21 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
   })
   const shouldPresent = renderMode === 'official_live'
     && Boolean(answerKey && web.officialRequest)
-    && dismissedKey !== answerKey
     && failedKey !== answerKey
 
   useEffect(() => {
     const surfaceChanged = (event: Event) => {
       const next = (event as CustomEvent<AiBrowserSurface>).detail
-      if (next === 'chat' || next === 'official' || next === 'source') setBrowserSurface(next)
-    }
-    const returnToNative = () => {
-      if (answerKey) setDismissedKey(answerKey)
+      if (next === 'chat' || next === 'official' || next === 'source') {
+        if (next === 'chat') setFailedKey('')
+        setBrowserSurface(next)
+      }
     }
     window.addEventListener(AI_BROWSER_SURFACE_CHANGED_EVENT, surfaceChanged)
-    window.addEventListener(REQUEST_RETURN_TO_AI_CHAT_EVENT, returnToNative)
     return () => {
       window.removeEventListener(AI_BROWSER_SURFACE_CHANGED_EVENT, surfaceChanged)
-      window.removeEventListener(REQUEST_RETURN_TO_AI_CHAT_EVENT, returnToNative)
     }
-  }, [answerKey])
+  }, [])
 
   useLayoutEffect(() => {
     const request = web.officialRequest

@@ -229,7 +229,9 @@ fn answer_surface_script() -> &'static str {
   'use strict';
   var styleId = 'elon-official-answer-surface-style';
   var backdropId = 'elon-official-answer-surface-backdrop';
+  var providerAttribute = 'data-elon-official-answer-provider';
   document.documentElement.removeAttribute('data-elon-official-answer-surface');
+  document.documentElement.removeAttribute(providerAttribute);
   document.querySelectorAll('[data-elon-official-answer-root]').forEach(function (node) {
     node.removeAttribute('data-elon-official-answer-root');
   });
@@ -241,13 +243,22 @@ fn answer_surface_script() -> &'static str {
   var root = document.querySelector('main, [role="main"]');
   if (!(root instanceof HTMLElement)) return;
 
+  var provider = /(^|\.)chatgpt\.com$/i.test(window.location.hostname)
+    ? 'chatgpt'
+    : 'google-ai-mode';
+
   var style = document.createElement('style');
   style.id = styleId;
   style.textContent = [
-    'html[data-elon-official-answer-surface],',
-    'html[data-elon-official-answer-surface] body { overflow: hidden !important; background: #202124 !important; }',
+    'html[data-elon-official-answer-surface], html[data-elon-official-answer-surface] body { overflow: hidden !important; }',
+    'html[data-elon-official-answer-provider="google-ai-mode"], html[data-elon-official-answer-provider="google-ai-mode"] body { background: #202124 !important; }',
+    'html[data-elon-official-answer-provider="chatgpt"], html[data-elon-official-answer-provider="chatgpt"] body { background: var(--main-surface-primary, #212121) !important; }',
     '#elon-official-answer-surface-backdrop { position: fixed !important; inset: 0 !important; z-index: 2147483000 !important; background: #202124 !important; }',
-    '[data-elon-official-answer-root] { position: fixed !important; inset: 0 !important; z-index: 2147483001 !important; box-sizing: border-box !important; width: 100vw !important; max-width: none !important; height: 100vh !important; max-height: none !important; margin: 0 !important; overflow: auto !important; overscroll-behavior: contain !important; border-radius: 0 !important; background: #202124 !important; }',
+    'html[data-elon-official-answer-provider="chatgpt"] #elon-official-answer-surface-backdrop { background: var(--main-surface-primary, #212121) !important; }',
+    '[data-elon-official-answer-root] { position: fixed !important; inset: 0 !important; z-index: 2147483001 !important; box-sizing: border-box !important; width: 100vw !important; max-width: none !important; height: 100vh !important; max-height: none !important; margin: 0 !important; overflow: auto !important; overscroll-behavior: contain !important; border-radius: 0 !important; }',
+    'html[data-elon-official-answer-provider="google-ai-mode"] [data-elon-official-answer-root] { background: #202124 !important; }',
+    'html[data-elon-official-answer-provider="chatgpt"] [data-elon-official-answer-root] { background: var(--main-surface-primary, #212121) !important; scrollbar-gutter: stable; }',
+    'html[data-elon-official-answer-provider="chatgpt"] [data-elon-official-answer-root] [data-message-author-role] { box-sizing: border-box !important; width: min(100%, 48rem) !important; max-width: 48rem !important; margin-inline: auto !important; }',
     '[data-elon-official-answer-root] form:has(textarea), [data-elon-official-answer-root] form:has([contenteditable]) { opacity: 0 !important; pointer-events: none !important; }',
     '[data-elon-official-answer-root] textarea, [data-elon-official-answer-root] [contenteditable="true"], [data-elon-official-answer-root] [contenteditable="plaintext-only"] { opacity: 0 !important; pointer-events: none !important; }'
   ].join('\n');
@@ -258,6 +269,7 @@ fn answer_surface_script() -> &'static str {
   backdrop.setAttribute('aria-hidden', 'true');
   document.body.appendChild(backdrop);
   root.setAttribute('data-elon-official-answer-root', 'true');
+  document.documentElement.setAttribute(providerAttribute, provider);
   document.documentElement.setAttribute('data-elon-official-answer-surface', 'true');
 
   window.requestAnimationFrame(function () {
@@ -281,6 +293,7 @@ fn restore_surface_script() -> &'static str {
 (function () {
   'use strict';
   document.documentElement.removeAttribute('data-elon-official-answer-surface');
+  document.documentElement.removeAttribute('data-elon-official-answer-provider');
   document.querySelectorAll('[data-elon-official-answer-root]').forEach(function (node) {
     node.removeAttribute('data-elon-official-answer-root');
   });
@@ -415,6 +428,9 @@ mod tests {
         let restore = restore_surface_script();
         assert!(apply.contains("main, [role=\"main\"]"));
         assert!(apply.contains("data-elon-official-answer-root"));
+        assert!(apply.contains("data-elon-official-answer-provider"));
+        assert!(apply.contains(r"chatgpt\.com"));
+        assert!(apply.contains("max-width: 48rem"));
         assert!(apply.contains("form:has(textarea)"));
         assert!(restore.contains("style.remove()"));
         assert!(restore.contains("backdrop.remove()"));
