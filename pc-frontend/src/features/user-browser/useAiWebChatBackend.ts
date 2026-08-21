@@ -9,6 +9,8 @@ import {
 import useLocalAiBrowserCapability from './useLocalAiBrowserCapability'
 import useLocalAiWebChatController from './useLocalAiWebChatController'
 import { localAiHistoryWindow } from './localAiHistoryWindow'
+import { shouldRenderNativeStructuredPart } from './localAiStructuredPartPolicy'
+import type { LocalAiStructuredContentPart } from './localAiBrowserProtocol'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -48,12 +50,10 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         ? 'markdown' as const
         : 'plain' as const
       const structuredParts = item.content
-        .filter((part) => {
-          if (['text', 'markdown', 'citation'].includes(part.type)) return false
-          if (part.type !== 'image') return true
-          const label = part.text.trim()
-          return Boolean(part.url || part.mediaType || (label && label !== '图片'))
-        })
+        .filter((part): part is LocalAiStructuredContentPart => (
+          !['text', 'markdown', 'citation'].includes(part.type)
+        ))
+        .filter(shouldRenderNativeStructuredPart)
         .map<AiStructuredPart>((part) => ({
           type: part.type as AiStructuredPart['type'],
           label: part.text,

@@ -13,11 +13,15 @@ import {
 } from './localAiAnswerSurfacePolicy'
 import styles from './AiOfficialAnswerSurface.module.css'
 
+const MAX_PRESENT_ATTEMPTS = 4
+const PRESENT_RETRY_BASE_MS = 450
+
 export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const generationRef = useRef(0)
   const [browserSurface, setBrowserSurface] = useState<AiBrowserSurface>('chat')
   const [failedKey, setFailedKey] = useState('')
+  const [presentationAttempt, setPresentationAttempt] = useState(0)
   const snapshot = web.controller.snapshot
   const answerKey = useMemo(
     () => localAiAnswerSurfaceKey(web.provider?.id, snapshot),
@@ -38,7 +42,10 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
     const surfaceChanged = (event: Event) => {
       const next = (event as CustomEvent<AiBrowserSurface>).detail
       if (next === 'chat' || next === 'official' || next === 'source') {
-        if (next === 'chat') setFailedKey('')
+        if (next === 'chat') {
+          setFailedKey('')
+          setPresentationAttempt(0)
+        }
         setBrowserSurface(next)
       }
     }
@@ -48,16 +55,24 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
     }
   }, [])
 
+  useEffect(() => {
+    setFailedKey('')
+    setPresentationAttempt(0)
+  }, [answerKey])
+
   useLayoutEffect(() => {
     const request = web.officialRequest
     if (!shouldPresent || !request) return
     const generation = ++generationRef.current
     let frame = 0
+    let retryTimer = 0
     let observer: ResizeObserver | null = null
     let presented = false
+    let synchronizing = false
     const synchronize = async () => {
       const viewport = viewportRef.current
-      if (!viewport || generation !== generationRef.current) return
+      if (!viewport || generation !== generationRef.current || synchronizing || retryTimer) return
+      synchronizing = true
       try {
         await presentLocalAiWebSessionEmbedded(request, boundsFor(viewport), { contentOnly: true })
         if (generation !== generationRef.current) {
@@ -66,8 +81,20 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
         }
         presented = true
       } catch {
-        if (generation === generationRef.current) setFailedKey(answerKey)
+        if (generation === generationRef.current) {
+          if (presentationAttempt + 1 < MAX_PRESENT_ATTEMPTS) {
+            const delay = PRESENT_RETRY_BASE_MS * (presentationAttempt + 1)
+            retryTimer = window.setTimeout(() => {
+              retryTimer = 0
+              setPresentationAttempt(presentationAttempt + 1)
+            }, delay)
+          } else {
+            setFailedKey(answerKey)
+          }
+        }
         await hideLocalAiWebSessionEmbedded(request).catch(() => null)
+      } finally {
+        synchronizing = false
       }
     }
     frame = window.requestAnimationFrame(() => {
@@ -84,10 +111,11 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
     return () => {
       if (generationRef.current === generation) generationRef.current += 1
       window.cancelAnimationFrame(frame)
+      window.clearTimeout(retryTimer)
       observer?.disconnect()
       if (presented) void hideLocalAiWebSessionEmbedded(request).catch(() => null)
     }
-  }, [answerKey, shouldPresent, web.officialRequest])
+  }, [answerKey, presentationAttempt, shouldPresent, web.officialRequest])
 
   if (!shouldPresent) return null
   return (

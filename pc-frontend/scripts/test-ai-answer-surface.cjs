@@ -12,6 +12,7 @@ const pageStyles = read('pc-frontend/src/features/ai/AiChatPage.module.css')
 const policy = read('pc-frontend/src/features/user-browser/localAiAnswerSurfacePolicy.ts')
 const surface = read('pc-frontend/src/features/user-browser/AiOfficialAnswerSurface.tsx')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
+const structuredPolicy = read('pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts')
 const api = read('pc-frontend/src/features/user-browser/internalBrowserApi.ts')
 const fullPage = read('pc-frontend/src/features/user-browser/AiBrowserExperience.tsx')
 const embedded = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
@@ -58,6 +59,10 @@ assert.equal(selectLocalAiAnswerRenderMode({
   session: { ...liveSession, contextReady: undefined }, snapshot: liveSnapshot,
 }), 'native')
 assert.equal(selectLocalAiAnswerRenderMode({
+  ready: true, browserSurface: 'chat', busy: false,
+  session: { ...liveSession, lastError: '上一次展示区域的瞬时错误' }, snapshot: liveSnapshot,
+}), 'official_live')
+assert.equal(selectLocalAiAnswerRenderMode({
   ready: true, browserSurface: 'chat', busy: false, session: liveSession,
   snapshot: { ...liveSnapshot, streaming: true },
 }), 'native')
@@ -65,12 +70,29 @@ assert.equal(selectLocalAiAnswerRenderMode({
 assert.match(surface, /\{ contentOnly: true \}/)
 assert.match(surface, /ResizeObserver/)
 assert.match(surface, /setFailedKey\(answerKey\)/)
+assert.match(surface, /MAX_PRESENT_ATTEMPTS\s*=\s*4/)
+assert.match(surface, /setPresentationAttempt\(presentationAttempt \+ 1\)/)
+assert.match(surface, /window\.clearTimeout\(retryTimer\)/)
 assert.match(surface, /hideLocalAiWebSessionEmbedded/)
 assert.match(surface, /AI_BROWSER_SURFACE_CHANGED_EVENT/)
 assert.doesNotMatch(surface, /dismissedKey|REQUEST_RETURN_TO_AI_CHAT_EVENT/)
-assert.match(surface, /if \(next === 'chat'\) setFailedKey\(''\)/)
-assert.match(backend, /if \(part\.type !== 'image'\) return true/)
-assert.match(backend, /part\.url \|\| part\.mediaType \|\| \(label && label !== '图片'\)/)
+assert.match(surface, /if \(next === 'chat'\) \{[\s\S]*setFailedKey\(''\)/)
+assert.match(backend, /\.filter\(shouldRenderNativeStructuredPart\)/)
+
+const structuredPolicyFilename = path.join(root, 'pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts')
+const structuredPolicyOutput = ts.transpileModule(structuredPolicy, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: structuredPolicyFilename,
+}).outputText
+const compiledStructuredPolicy = new Module(structuredPolicyFilename, module)
+compiledStructuredPolicy.filename = structuredPolicyFilename
+compiledStructuredPolicy.paths = module.paths
+compiledStructuredPolicy._compile(structuredPolicyOutput, structuredPolicyFilename)
+const { shouldRenderNativeStructuredPart } = compiledStructuredPolicy.exports
+assert.equal(shouldRenderNativeStructuredPart({ type: 'image', text: '图片', mediaType: 'image/webp' }), false)
+assert.equal(shouldRenderNativeStructuredPart({ type: 'image', text: ' 图片\u200b图片 ', url: 'https://example.com/a.png' }), false)
+assert.equal(shouldRenderNativeStructuredPart({ type: 'image', text: 'NVIDIA 盘前走势图' }), true)
+assert.equal(shouldRenderNativeStructuredPart({ type: 'table', text: '行情表格' }), true)
 
 const contentOnlyBranch = api.slice(
   api.indexOf('export async function presentLocalAiWebSessionEmbedded'),

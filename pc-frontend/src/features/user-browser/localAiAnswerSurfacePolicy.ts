@@ -16,7 +16,6 @@ export function selectLocalAiAnswerRenderMode(input: {
   if (session.semanticCacheStatus !== 'live'
     || session.contextReady !== true
     || session.loading
-    || session.lastError
     || ['opening', 'loading', 'blocked', 'error', 'closed'].includes(session.windowStatus)
     || snapshot.streaming) return 'native'
   const completedAssistant = snapshot.messages.some(
