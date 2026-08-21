@@ -15,7 +15,7 @@ verification_status: design_review_only
 
 V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`。仓库不得出现以下当前事实之外的声明：
 
-- 全局 migration 最高为 V279，V280 尚未注册；
+- 全局migration最高为V280且物理280已由ERP占用；service-managed admission物理migration仍absent，未来next-free当前至少V281；
 - V254 #13-#18 全部维持原 deny 行为，opened=`0`；
 - 没有 V280 table、UDF、trigger、Domain、Store、production validator或Runner源码；
 - V278 worker仍default-off，Provider=`registering`、`eligible_rows=0`、`delivery_attempted=false`；
@@ -39,7 +39,7 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 | Case | 必须结果 |
 |---|---|
 | authority | authority与acceptance互链，并从分布式算力README、当前状态、AI入口可达。 |
-| version truth | `MIGRATIONS` max/last仍为279；无`migration_v280`、V280 schema或UDF注册。 |
+| version truth | `MIGRATIONS` max/last为280且owner是ERP managed rollout；service-managed admission无物理migration/schema/UDF注册，未来实现须重读next-free（当前至少281）。 |
 | fence truth | V254六个market fence源码零修改；#13/#15继续绝对deny。 |
 | worker truth | 不改worker report，不制造`eligible_rows>0`或production validator caller。 |
 | worktree | 除文档外零Rust/SQL/schema/API改动；`git diff --check`、文档模块化和本地链接通过。 |

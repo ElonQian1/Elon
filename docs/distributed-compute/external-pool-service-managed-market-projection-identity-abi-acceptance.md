@@ -14,7 +14,7 @@ verification_status: design_review_only
 ## 1. 当前证据边界
 
 本页只验收 [projection identity authority](external-pool-service-managed-market-projection-identity-abi-authority.md) 的设计冻结。
-当前没有V280 Domain/table/UDF/trigger/writer/Gateway/validator/Runner源码，migration registry最高V279，V254 fence零开放，
+当前没有service-managed admission Domain/table/UDF/trigger/writer/Gateway/validator/Runner源码；migration registry最高V280且物理280已由ERP占用，未来next-free当前至少V281；V254 fence零开放，
 初始profile approval evidence与inventory均未选择、current profile authority不可构造。因此正式状态只能是：
 
 ```text

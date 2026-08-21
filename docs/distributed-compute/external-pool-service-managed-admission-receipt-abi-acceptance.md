@@ -26,7 +26,9 @@ initial_profile_approval_evidence=unselected
 market_projection_identity_abi=design_frozen
 table/migration/source=absent
 physical_migration_registration=absent
-migration_registry_max=279
+migration_registry_max=280
+migration_registry_last_owner=erp_managed_rollout
+planned_physical_migration=unassigned
 implementation=unwired/uncompiled/unrun
 passed=0
 failed=0
@@ -102,7 +104,7 @@ Authority 的 77 列是唯一顺序真源；验收不得复制另一份可漂移
 ## 7. 本批静态验收
 
 本批只允许 Markdown。必须证明父子双向链接、frontmatter、文档尺寸、本地链接、`git diff --check`、`server/src`零diff、
-V280 source/table/UDF/migration注册为0、migration最高V279。禁止编译、测试、执行migration/SQLite/runtime/network；最终报告
+service-managed admission source/table/UDF/物理migration注册为0；全局migration最高V280且物理280已由ERP占用，未来next-free当前至少V281。禁止编译、测试、执行migration/SQLite/runtime/network；最终报告
 继续分轴写`market_profile_inventory_approval_evidence_abi=design_frozen`、`initial_profile_approval_evidence=unselected`、
 `gateway_builder/fence/task_session/validator_internal_abi=design_frozen`、
 `external_adapter_semantic_wire_profile=unselected`、`implementation_unwired/uncompiled/unrun`与`passed=0/failed=0`。

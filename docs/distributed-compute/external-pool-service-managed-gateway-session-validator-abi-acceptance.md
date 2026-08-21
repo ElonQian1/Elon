@@ -16,7 +16,7 @@ verification_status: design_review_only
 唯一权威是 [authority](external-pool-service-managed-gateway-session-validator-abi-authority.md)。当前只验内部设计；不得登记
 compile/test/migration/SQLite/child/runtime/network/Runner通过数。本批静态真值必须同时为：
 
-- migration最大值V279，V280 table/UDF/trigger/source为0；
+- 全局migration最大值V280且物理280已由ERP占用；service-managed admission物理migration与table/UDF/trigger/source为0，未来next-free当前至少V281；
 - Gateway final builder、production fence、8-root production child/session、5 concrete validator impl与worker caller为0；
 - V254 #13-#18打开数0，Provider仍不能由本文变成eligible；
 - market-profile approval evidence ABI已design-frozen，但initial evidence、market inventory与external semantic wire profile均`unselected`；

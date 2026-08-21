@@ -14,8 +14,8 @@ verification_status: design_review_only
 ## 1. 唯一结论与当前事实
 
 V280 冻结 external-pool 从受管市场准入到单个 artifactless Attempt 正向执行的最小完整纵切架构。它不是一批已写
-源码，也不是 migration 280 已注册：当前全局 migration 最高仍为 V279，仓库没有 V280 table、UDF、trigger、
-Domain、Store、production validator 或 Runner 实现。
+源码，也不是物理 migration 280 已注册给本阶段：当前全局 migration 最高为V280，物理280已由ERP占用；仓库没有
+service-managed admission table、UDF、trigger、Domain、Store、production validator 或 Runner 实现。
 
 V254 #13-#18 继续 absolute deny；V278 worker 继续 default-off，Provider=`registering`、
 `eligible_rows=0`、`delivery_attempted=false`。现有 V273/V274/V277/V278 私有内核、fixture、历史 migration
@@ -66,9 +66,9 @@ projector 与独立 v15；现有 v14 是 blocked-only。计量与结算又必须
 
 ## 3. 版本与交付规则
 
-“V280”是当前架构阶段名。未来开始实现时必须重新读取全局 migration 最大值；只有 280 仍为空且完整纵切可以
-同批落盘时，才注册物理 migration 280。若编号已被占用，物理 migration 必须顺延并同步所有代码合同，不能覆盖、
-重排或借文档保留旧编号。
+“V280”是当前架构阶段名，不是物理migration编号。全局物理280现已由ERP占用，因此service-managed admission未来
+实现时必须重新读取migration最大值并使用届时next-free；以当前registry为基线至少是V281。物理migration必须与完整
+纵切同批落盘并同步所有代码合同，不能覆盖、重排或借阶段名保留旧编号。
 
 第一批实现不得只注册空表或先打开 fence。migration、pending-plan UDF、替换 trigger、Store writer、Gateway、
 validator、Runner 与 source-contract 必须在同一 feature branch 内可静态审计；编译和动态验收恢复后再决定是否合并。

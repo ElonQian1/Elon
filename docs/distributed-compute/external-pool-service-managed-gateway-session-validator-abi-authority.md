@@ -46,7 +46,7 @@ passed=0 failed=0
 ```
 
 `design_frozen`只修饰本页列出的内部 ABI，不表示外部 Adapter semantic wire schema、首个经济 profile 或完整
-V280 纵切已经冻结。当前 migration 最大值仍为 V279，V280 table/UDF/trigger/Domain/Store/Gateway builder、五个
+V280 纵切已经冻结。当前全局migration最大值为V280且物理280已由ERP占用；service-managed admission物理migration仍absent，未来next-free当前至少V281。其table/UDF/trigger/Domain/Store/Gateway builder、五个
 production validator impl、八根 production child、worker caller 与 Runner 均不存在；V254 #13-#18 打开数仍为 0。
 
 本页不改写 V273 的 ELTP v1 framing、五个 operation code、八根 transcript/KDF、六表或 recovery 状态机；不改

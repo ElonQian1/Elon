@@ -125,7 +125,7 @@ legacy digest与单一时钟已由projection identity ABI冻结设计，但仍�
   [Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)实现，落实fixed
   source observation window，选择external semantic wire profile，并同批实现完整V280 writer/Gateway/validator/Runner。
 
-未满足任一项时，V280 继续 `implementation_unwired/uncompiled/unrun`，migration最高保持V279，V254 fence保持关闭，
+未满足任一项时，V280继续`implementation_unwired/uncompiled/unrun`；全局migration最高V280且物理280已由ERP占用，service-managed admission物理migration仍absent、未来next-free当前至少V281；V254 fence保持关闭，
 worker `eligible_rows=0`。静态文档检查不计入实现 `passed/failed`。
 
 ## 7. 本批静态验收
