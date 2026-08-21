@@ -4344,6 +4344,177 @@
       "updated_at_ms": 1786766985323
     },
     {
+      "id": "open-commerce-native-edge-acme-v2",
+      "title": "开放商业 Rust 原生入口 ACME V2",
+      "summary": "在保持 V1 PEM 与严格代理边界的同时，以 Rust 原生 TLS-ALPN-01、持久化缓存、受限 systemd 状态目录和显式安装预演补齐证书自动申请续期及生产停机边界。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/open-commerce-native-edge-acme-v2.md",
+        "content_hash": "d7dcb7f0c01077d33bfaa6ec4223efbde4991a0dbd78f73cdc2ec8f35990c345",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "cfc4f77c5203419b843ad1c56031ebe444181d0c",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend",
+      "tags": [
+        "open-commerce",
+        "rust",
+        "tls",
+        "acme",
+        "operations"
+      ],
+      "task_paths": [
+        "contracts/open-commerce/native-edge-v2.schema.json",
+        "docs/open-commerce/native-rust-edge.md",
+        "scripts/install-commerce-edge.sh",
+        "scripts/systemd/yilong-commerce-edge.service",
+        "server/src/commerce_edge",
+        "server/src/commerce_edge_main.rs"
+      ],
+      "dependencies": [
+        "open-commerce-native-edge-v1"
+      ],
+      "acceptance_criteria": [
+        "V1 PEM 配置保持兼容并通过既有 TLS 冒烟。",
+        "V2 严格拒绝不安全 ACME 域名、监听、联系人和缓存配置。",
+        "TLS-ALPN-01 使用持久缓存并明确 staging/production。",
+        "挑战连接不进入业务 Router，普通连接保持 V1 代理边界。",
+        "SIGINT/SIGTERM 触发有界连接排空。",
+        "systemd 仅授予低端口能力并隔离可写状态目录。",
+        "安装工具默认预演且应用前执行配置检查。",
+        "Rust、构建、Shell 和本机 TLS 证据齐备。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/open-commerce/native-edge-v2.schema.json",
+          "content_hash": "d1a2dd33931925a872883184e45ed80df59b7294192a7bdb038f9bb71c42a73d",
+          "locator": "certificate_provider",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4cfe003b39fbe8f97391a03fc1cf7a8efa610915",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/open-commerce/native-rust-edge-v2-acceptance.md",
+          "content_hash": "815a898c86aaae318155e9f6399f43321933c5d5e3e328df97bfb33835645f68",
+          "locator": "自动化证据",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c6f975e03bc47e44c09981f2dd682e12e420f1d5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/open-commerce/native-rust-edge.md",
+          "content_hash": "b7f3d044ec7fd0538f0fe23d6a62c3e7af8813b9931f6a0479ab0130736ef070",
+          "locator": "配置版本; 安装和启动",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "4713581075ff994c8e4b6c005077f56f8afcbacd",
+            "worktree_blob_oid": "c6d96155a8672da7f4b0b151f898997b8e66d04a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/install-commerce-edge.sh",
+          "content_hash": "fd498e2c5e6edab81df74697a1ce4bd56d141e0625c0f97b26bc099219a8daa3",
+          "locator": "preview; candidate check; rollback",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c0e4c0a7cfb4a0428f1350490f617d2771ba934f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/systemd/yilong-commerce-edge.service",
+          "content_hash": "1ebebee7ae8912bd637f8974a54f6151406a290f647d302db9287e0ac969ed32",
+          "locator": "StateDirectory; KillSignal",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "2281b3c1a3d7efd89033a4ffad696e3c09ad89f0",
+            "worktree_blob_oid": "81bd23e64a671877a9bb4ed57007f15c16095b16",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/commerce_edge/acme.rs",
+          "content_hash": "4d3017023fb6c8b52b4d9e3a2e4be9d028cd6e53545885ca2bf13112c3cf7bd3",
+          "locator": "serve; serve_acme_connection; classify_connection",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3f2bd1d331eb5dc1a16656caa5abde514ebea488",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/commerce_edge/certificate_config.rs",
+          "content_hash": "8c2fc4a8f29bbbafb60eac2db743dd048dfed9862f000803bd836843a91e78d1",
+          "locator": "resolve_certificate_provider",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9c457f289d0df1972cfc2bea85c1e75f196c1192",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/commerce_edge/tls.rs",
+          "content_hash": "191eab1dab1664314ac2eec92b8aec1e23d525ffd2e5fa50e8ef683e9eb009c7",
+          "locator": "serve; drain_connections",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "49237eab2e09a7cc43bc16ca0c720ec9cb99bbf6",
+            "worktree_blob_oid": "243b486259cce7cbeb37466b21b343d7783495af",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/commerce_edge_main.rs",
+          "content_hash": "b0c9404451b871b1c6a7a68988e53af2ee0bc5fbd885cbfd52bcb7ae94debe10",
+          "locator": "--check-config; shutdown_signal",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "358295c5329ea979d894f27cb6670ccec06556be",
+            "head_blob_oid": "67d5fcbb7fabc793ff3cde8ee1ad19a0e4c06be7",
+            "worktree_blob_oid": "b2ce555bcd7fad371b4b98d2fe8a13bd5af7db86",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787303828137,
+      "updated_at_ms": 1787306995997
+    },
+    {
       "id": "open-commerce-native-edge-v1",
       "title": "开放商业 Rust 原生入口 V1",
       "summary": "在电商托管节点提供独立 Rust TLS 入口，仅将固定公开商户端点安全路由到同机隔离 ERP 实例，并以健康预检和整表替换实现失败关闭的热更新。",
@@ -8778,136 +8949,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b5611771ecf1445280639a7d2be229ea",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "需求已作为当前正式文档提交并确认实现范围。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786875286357
-    },
-    {
-      "id": "feature_event_6164efe1b79042f4b66038e89133efb6",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "需求已作为当前正式文档提交并确认实现范围。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786875286399
-    },
-    {
-      "id": "feature_event_f2c6c2659ab3499588f0f99b98d6f4c0",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786875286430
-    },
-    {
-      "id": "feature_event_c5b6425bde8d4504aca91249919f0e3c",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始实现项目接入命令、薄启动器、Skill 与回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786875286493
-    },
-    {
-      "id": "feature_event_b145966434d84cbbb8e9d075084886da",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786875687567
-    },
-    {
-      "id": "feature_event_3e928d2da0e64c52bd6c6f4f36feb637",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "便携性 90 项、平台 173 项、Skill 校验和 Prompt 资产审计均通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786875687603
-    },
-    {
-      "id": "feature_event_caf401db1eba421ba30f8d766bcda663",
-      "feature_id": "rust-cache-project-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "便携性 90 项、平台 173 项、Skill 校验和 Prompt 资产审计均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786875687630
-    },
-    {
-      "id": "feature_event_fc9444381c6a4fb2b6a66882906928fc",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "registered",
-      "actor": "codex-win-web-ai",
-      "reason": "Re-register verified feature metadata after preserving concurrent upstream registry changes during rebase.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786875988368
-    },
-    {
-      "id": "feature_event_d9eb78cb9ea044258b608bbf2ccf52a8",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "claimed",
-      "actor": "codex-win-web-ai",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786876013546
-    },
-    {
-      "id": "feature_event_63d229348fdd424889f9e333e6e59323",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Rebased implementation is ready for evidence binding.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786876013774
-    },
-    {
-      "id": "feature_event_3f236cf4c0f2473eb294ce2817e1c892",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-win-web-ai",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786876015813
-    },
-    {
-      "id": "feature_event_26398da591bf45dfa42cdba1d020dffb",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Production-session structural projection and double sanitizer are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786876015935
-    },
-    {
-      "id": "feature_event_01cf7e313cba4241badb7eed75b3265f",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Focused Rust and full Win Web AI validation passed before rebase; implementation hashes are unchanged after rebase.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786876016089
-    },
-    {
       "id": "feature_event_4da2f2975bf64fcc952ffd015cbda2e1",
       "feature_id": "win-web-ai-production-session-diagnostics-v1",
       "action": "transitioned",
@@ -10776,6 +10817,136 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787300493584
+    },
+    {
+      "id": "feature_event_f1f8b68500284368a9112a55060e8615",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "registered",
+      "actor": "codex-commerce-edge",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1787303828137
+    },
+    {
+      "id": "feature_event_b897666237fe43ddb56caaaade830549",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "需求范围、安全边界和验收标准已明确，依赖 V1 已验证。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787303847623
+    },
+    {
+      "id": "feature_event_f97e13e37d494a62ac8923514ff69dc8",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "claimed",
+      "actor": "codex-commerce-edge",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787303864160
+    },
+    {
+      "id": "feature_event_7af87caaaf824d018c6cdc12b603e520",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "开始实现 V2 ACME、安装和优雅停机纵向切片。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787303878830
+    },
+    {
+      "id": "feature_event_4ed7d51a166c448a90343f2c5c515037",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-commerce-edge",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787306558130
+    },
+    {
+      "id": "feature_event_d9523170b9ad495e9bb44f46fef45946",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "V1-compatible PEM, native ACME TLS-ALPN-01, bounded drain, V2 contract, hardened systemd, preview installer and rollback path are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787306577496
+    },
+    {
+      "id": "feature_event_6aea803083c844d9b76761a84f7a961f",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "12 focused tests, independent build, schema and shell checks, real local TLS 1.3 smoke, offline V2 check and installer preview passed; production deployment remains explicitly deferred.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787306591044
+    },
+    {
+      "id": "feature_event_1f393b441df14286a3a5660e64584b5f",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "Refresh implementation evidence after final ACME SNI normalization.",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1787306992683
+    },
+    {
+      "id": "feature_event_66687e614a734a31a8e9544757f1fe04",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "claimed",
+      "actor": "codex-commerce-edge",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787306992711
+    },
+    {
+      "id": "feature_event_924a973635af46cab451b097c83f93fe",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "Bind final implementation evidence.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787306992741
+    },
+    {
+      "id": "feature_event_e6e20fc3e13b4a209e1eb280cf1e7bcd",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-commerce-edge",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787306995931
+    },
+    {
+      "id": "feature_event_78f8fa60b455421d859ab6766055e67f",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "Native ACME edge implementation and operations artifacts are complete.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787306995968
+    },
+    {
+      "id": "feature_event_ff6c5e10819f4ffc8487d9e4ac3eba08",
+      "feature_id": "open-commerce-native-edge-acme-v2",
+      "action": "transitioned",
+      "actor": "codex-commerce-edge",
+      "reason": "Focused Rust tests, independent build, configuration checks, TLS smoke, script syntax and repository guards passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787306995997
     }
   ]
 }

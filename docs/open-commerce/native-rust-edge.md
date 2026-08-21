@@ -31,9 +31,9 @@ https://commerce.example.com/merchants/coffee-a
 
 其他路径、查询参数和方法均失败关闭。尤其不能通过该入口访问 `/api/admin/*`、数据库、上传目录、诊断浏览器或商户后台。
 
-## 配置
+## 配置版本
 
-配置遵循 `contracts/open-commerce/native-edge-v1.schema.json`。配置文件不包含证书正文、私钥、运行密钥或数据库凭据。
+V1 遵循 `contracts/open-commerce/native-edge-v1.schema.json`，继续支持运维提供的 PEM 文件。配置文件只引用证书路径，不包含证书正文、私钥、运行密钥或数据库凭据。
 
 ```json
 {
@@ -60,6 +60,33 @@ https://commerce.example.com/merchants/coffee-a
 }
 ```
 
+V2 遵循 `contracts/open-commerce/native-edge-v2.schema.json`。它把证书来源改成显式 provider；以下配置使用 Rust 原生 ACME TLS-ALPN-01，公网只需开放 443：
+
+```json
+{
+  "schema": "yilong.commerce-edge.v2",
+  "listen_addr": "0.0.0.0:443",
+  "certificate_provider": {
+    "mode": "acme_tls_alpn_01",
+    "domains": ["commerce.example.com"],
+    "contact": "mailto:ops@example.com",
+    "cache_dir": "/var/lib/yilong-commerce-edge/acme",
+    "environment": "staging"
+  },
+  "public_hosts": ["commerce.example.com"],
+  "routes": [
+    {
+      "instance_id": "coffee-a",
+      "public_base_path": "/merchants/coffee-a",
+      "upstream_addr": "127.0.0.1:18081",
+      "enabled": true
+    }
+  ]
+}
+```
+
+ACME 的 `domains` 必须与 `public_hosts` 完全一致，监听端口必须是 443，缓存目录必须是绝对路径且最终路径不能是符号链接。先用 `staging` 验证 DNS、防火墙和续签流程；只有受控切换配置并重启后才使用 `production`。V2 也允许 `mode: pem`，便于先升级配置合同、后切换证书来源。
+
 `upstream_addr` 只接受回环 IP，且端口必须不小于 1024。`public_base_path` 必须由 `instance_id` 唯一派生，不能写通配符或任意路径。
 
 环境文件只需要指向配置：
@@ -71,26 +98,40 @@ RUST_LOG=yilong_commerce_edge=info
 
 ## 安装和启动
 
-1. 将发布构建的 `yilong-commerce-edge` 安装到 `/usr/local/bin/`。
-2. 创建不可登录的 `yilong-edge` 用户和 `/etc/yilong-commerce-edge/tls` 目录。
-3. 将配置设为 root 所有、入口服务组只读；私钥权限应比普通配置更严格。
-4. 把 `scripts/systemd/yilong-commerce-edge.service` 安装到 `/etc/systemd/system/`。
-5. 让各商户 ERP 仅监听 `127.0.0.1:<独立端口>`，先确认每个 `/health` 返回成功。
-6. 启动入口。启动前会探测全部启用路由；任一商户不健康时入口拒绝启动。
+安装器默认只预演，不修改目标机：
 
-入口只需要绑定 443 的系统能力，不需要 root 身份持续运行。systemd 模板通过 `CAP_NET_BIND_SERVICE` 提供最小能力，并启用只读文件系统、私有临时目录和受限地址族。
+```bash
+bash scripts/install-commerce-edge.sh \
+  --binary ./target/release/yilong-commerce-edge \
+  --config ./edge.json
+```
+
+核对输出后，以 root 显式应用：
+
+```bash
+sudo bash scripts/install-commerce-edge.sh \
+  --binary ./target/release/yilong-commerce-edge \
+  --config ./edge.json \
+  --apply
+```
+
+安装器创建不可登录的 `yilong-edge` 用户、受限配置目录和唯一可写状态目录，先以服务用户运行候选二进制 `--check-config`，再安装 systemd 单元并启动。已有文件会复制到 `/var/backups/yilong-commerce-edge/<时间戳>/`；新服务未能进入 active 时自动恢复旧文件和原启用状态。输出不包含配置正文或密钥。
+
+各商户 ERP 必须先只监听 `127.0.0.1:<独立端口>`，且 `/health` 返回成功。真正启动入口时会探测全部启用路由；任一商户不健康时入口拒绝启动。`--check-config` 只解析合同并验证 PEM 材料，不探测上游、不绑定端口、不访问 ACME，也不会创建 ACME 缓存。
+
+入口只需要绑定 443 的系统能力，不需要 root 身份持续运行。systemd 模板通过 `CAP_NET_BIND_SERVICE` 提供最小能力，并启用只读文件系统、私有临时目录、受限地址族和 `/var/lib/yilong-commerce-edge` 独立状态目录。SIGINT 或 systemd 的 SIGTERM 会停止接收新连接，现有连接最多排空 15 秒；systemd 在 20 秒后执行最终终止。
 
 ## 热更新和回滚
 
 入口按 `reload_interval_seconds` 读取配置摘要。内容变化后依次执行：
 
 1. 解析并严格校验新配置；
-2. 确认监听地址、证书路径、超时和资源上限未改变；
+2. 确认监听地址、证书 provider、超时和资源上限未改变；
 3. 构建一张新的不可变路由表；
 4. 探测所有启用上游的 `/health`；
 5. 一次性替换当前路由表。
 
-任一步失败都会保留旧路由表。回滚时恢复上一份配置；它通过健康检查后会自动重新生效。监听地址、证书路径、证书文件内容或资源上限变化需要受控重启。
+任一步失败都会保留旧路由表。回滚时恢复上一份配置；它通过健康检查后会自动重新生效。监听地址、证书 provider、证书文件内容、ACME 环境或资源上限变化需要受控重启。
 
 ## 平台绑定
 
@@ -122,4 +163,4 @@ curl -i https://commerce.example.com/merchants/coffee-a/api/admin/stores
 
 ## 当前边界
 
-V1 的证书由受控运维提供 PEM 文件，Rust 进程负责 TLS 握手和路由，但尚未自动向 CA 申请或续签证书。后续 ACME 模块只替换证书提供器，不应扩大代理路径、上游范围或商户数据权限。
+V2 已提供 Rust 原生 ACME TLS-ALPN-01、持久缓存、配置预检、systemd 模板和安装工具；ACME 只替换证书提供器，不扩大代理路径、上游范围或商户数据权限。代码和本机测试通过不代表生产 DNS 已解析、443 已放行、Linux 服务已安装或真实 CA 已签发。生产启用仍需目标服务器、域名、联系人和变更窗口。

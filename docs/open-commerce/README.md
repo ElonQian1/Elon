@@ -186,6 +186,9 @@
 175. `docs/requirements/open-commerce-native-edge-v1.md`：查看 Rust 原生 HTTPS 商户入口的目标、安全边界和非目标。
 176. `docs/open-commerce/native-rust-edge.md`：查看多商户回环路由、配置、systemd、热更新和回滚方法。
 177. `docs/open-commerce/native-rust-edge-v1-acceptance.md`：查看原生入口的 Rust 测试、真实 TLS 纵向检查和生产未完成边界。
+178. `docs/requirements/open-commerce-native-edge-acme-v2.md`：查看 Rust 原生 ACME、兼容、安全和运维目标。
+179. `contracts/open-commerce/native-edge-v2.schema.json`：查看 V2 PEM/ACME 配置机器合同。
+180. `docs/open-commerce/native-rust-edge-v2-acceptance.md`：查看 V2 定向验证和生产未完成边界。
 
 ## 专题地图
 
@@ -195,7 +198,7 @@
 | 多人、多 AI 协同开发 | 已有实现，持续收口 | `docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
 | 商户自有 ERP 受控运行时 | 参考实现已完成，生产配置依赖环境 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
-| Rust 原生商户 HTTPS 入口 | V1 代码和本机 TLS 纵向已验证；生产证书、DNS、Linux systemd 安装和 ACME 尚未完成 | `docs/open-commerce/native-rust-edge.md`、`docs/open-commerce/native-rust-edge-v1-acceptance.md` |
+| Rust 原生商户 HTTPS 入口 | V2 已加入原生 ACME TLS-ALPN-01、V1 PEM 兼容、离线配置检查、SIGTERM 排空和默认预演安装器；本机验证完成后仍需真实 Linux、DNS、443 和 CA 签发验收 | `docs/open-commerce/native-rust-edge.md`、`docs/open-commerce/native-rust-edge-v2-acceptance.md` |
 | 商户调用证据与 ERP/CRM 衔接 | V1 证据层、人工回执、派生待办队列、限时机器凭据及显式扩权的单任务租约已落位；全新 SQLite、V137 磁盘升级、8 个独立连接竞争、进程内 HTTP 和本机真实 TCP 子集已验证。升级库可创建当前租约并领取订单；并发专项证明同一订单恰好一个工作者获得租约；真实 TCP 已覆盖提交脱敏 ERP 回执、幂等重放和 owner 查询。Node SDK 另提供稳定来源信封、幂等写入和强制独立回读处理器，回读不匹配不会提交 `applied`。生产入库适配器、真实生产备份恢复、高规模压力、受控生产凭据、官方授权、目标环境回读和签名证明待逐项实现 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md`、`docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md`、`docs/decisions/open-commerce-adapter-machine-credentials-v1.md`、`docs/decisions/open-commerce-adapter-credential-expiration-v1.md`、`docs/decisions/open-commerce-adapter-handoff-claims-v1.md`、`docs/open-commerce-verified-erp-handoff-handler-v1-acceptance.md` |
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现；能力与合格内部回执的显式绑定已通过定向 Rust/SQLite、集成上下文、管理 HTTP、消费者发现 MCP 和进程内发现 HTTP 回归。本机真实 TCP 纵向测试已通过生产 Router 验证来源绑定、消费者按厂商/数据域发现和解绑后不再命中；PC 浏览器、历史迁移、生产部署、具体平台适配器和外部核验仍待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/decisions/open-commerce-capability-source-link-v1.md`、`docs/open-commerce-integration-control-plane-acceptance.md`、`docs/open-commerce-capability-source-link-v1-acceptance.md` |

@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/open-commerce/native-edge-v2.schema.json",
+  "title": "Yilong native open-commerce edge V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "listen_addr",
+    "certificate_provider",
+    "public_hosts",
+    "routes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "yilong.commerce-edge.v2"
+    },
+    "listen_addr": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "certificate_provider": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "certificate_chain_path", "private_key_path"],
+          "properties": {
+            "mode": { "const": "pem" },
+            "certificate_chain_path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "private_key_path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "domains", "contact", "cache_dir", "environment"],
+          "properties": {
+            "mode": { "const": "acme_tls_alpn_01" },
+            "domains": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253
+              }
+            },
+            "contact": {
+              "type": "string",
+              "minLength": 9,
+              "maxLength": 320,
+              "pattern": "^mailto:[^\\s]+@[^\\s]+$"
+            },
+            "cache_dir": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "environment": {
+              "enum": ["staging", "production"]
+            }
+          }
+        }
+      ]
+    },
+    "public_hosts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 253
+      }
+    },
+    "connect_timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 10000,
+      "default": 2000
+    },
+    "request_timeout_ms": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 60000,
+      "default": 15000
+    },
+    "tls_handshake_timeout_ms": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 30000,
+      "default": 10000
+    },
+    "connection_timeout_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 120000,
+      "default": 30000
+    },
+    "reload_interval_seconds": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 300,
+      "default": 5
+    },
+    "max_request_body_bytes": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 4194304,
+      "default": 1048576
+    },
+    "max_response_body_bytes": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 8388608,
+      "default": 4194304
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instance_id", "public_base_path", "upstream_addr"],
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{2,47}$"
+          },
+          "public_base_path": {
+            "type": "string",
+            "pattern": "^/merchants/[a-z][a-z0-9-]{2,47}$"
+          },
+          "upstream_addr": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  }
+}

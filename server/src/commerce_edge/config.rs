@@ -9,15 +9,23 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-const CONFIG_SCHEMA: &str = "yilong.commerce-edge.v1";
+use super::certificate_config::{
+    normalize_dns_name, resolve_certificate_provider, CertificateProviderConfig,
+};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EdgeConfig {
     schema: String,
     listen_addr: SocketAddr,
-    certificate_chain_path: PathBuf,
-    private_key_path: PathBuf,
+    #[serde(default)]
+    certificate_chain_path: Option<PathBuf>,
+    #[serde(default)]
+    private_key_path: Option<PathBuf>,
+    #[serde(default)]
+    certificate_provider: Option<CertificateProviderConfig>,
+    #[serde(skip)]
+    effective_certificate_provider: Option<CertificateProviderConfig>,
     public_hosts: Vec<String>,
     #[serde(default = "default_connect_timeout_ms")]
     connect_timeout_ms: u64,
@@ -49,8 +57,7 @@ pub(crate) struct MerchantRouteConfig {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ImmutableConfigIdentity {
     listen_addr: SocketAddr,
-    certificate_chain_path: PathBuf,
-    private_key_path: PathBuf,
+    certificate_provider: CertificateProviderConfig,
     connect_timeout_ms: u64,
     request_timeout_ms: u64,
     tls_handshake_timeout_ms: u64,
@@ -84,14 +91,9 @@ impl EdgeConfig {
     }
 
     fn validate_and_normalize(&mut self) -> Result<()> {
-        if self.schema != CONFIG_SCHEMA {
-            bail!("COMMERCE_EDGE_CONFIG_SCHEMA_UNSUPPORTED");
-        }
         if self.listen_addr.port() == 0 {
             bail!("COMMERCE_EDGE_LISTEN_PORT_INVALID");
         }
-        validate_absolute_path(&self.certificate_chain_path, "CERTIFICATE_CHAIN")?;
-        validate_absolute_path(&self.private_key_path, "PRIVATE_KEY")?;
         validate_range(self.connect_timeout_ms, 100, 10_000, "CONNECT_TIMEOUT")?;
         validate_range(self.request_timeout_ms, 500, 60_000, "REQUEST_TIMEOUT")?;
         validate_range(
@@ -125,11 +127,19 @@ impl EdgeConfig {
         }
         let mut hosts = HashSet::new();
         for host in &mut self.public_hosts {
-            *host = normalize_public_host(host)?;
+            *host = normalize_dns_name(host)?;
             if !hosts.insert(host.clone()) {
                 bail!("COMMERCE_EDGE_PUBLIC_HOST_DUPLICATE");
             }
         }
+        self.effective_certificate_provider = Some(resolve_certificate_provider(
+            &self.schema,
+            self.certificate_chain_path.as_deref(),
+            self.private_key_path.as_deref(),
+            self.certificate_provider.as_ref(),
+            &self.public_hosts,
+            self.listen_addr,
+        )?);
 
         if self.routes.is_empty() || self.routes.len() > 1_024 {
             bail!("COMMERCE_EDGE_ROUTE_COUNT_INVALID");
@@ -164,12 +174,14 @@ impl EdgeConfig {
         self.listen_addr
     }
 
-    pub(crate) fn certificate_chain_path(&self) -> &Path {
-        &self.certificate_chain_path
+    pub(crate) fn schema(&self) -> &str {
+        &self.schema
     }
 
-    pub(crate) fn private_key_path(&self) -> &Path {
-        &self.private_key_path
+    pub(crate) fn certificate_provider(&self) -> &CertificateProviderConfig {
+        self.effective_certificate_provider
+            .as_ref()
+            .expect("validated edge config has a certificate provider")
     }
 
     pub(crate) fn public_hosts(&self) -> &[String] {
@@ -211,8 +223,7 @@ impl EdgeConfig {
     pub(crate) fn immutable_identity(&self) -> ImmutableConfigIdentity {
         ImmutableConfigIdentity {
             listen_addr: self.listen_addr,
-            certificate_chain_path: self.certificate_chain_path.clone(),
-            private_key_path: self.private_key_path.clone(),
+            certificate_provider: self.certificate_provider().clone(),
             connect_timeout_ms: self.connect_timeout_ms,
             request_timeout_ms: self.request_timeout_ms,
             tls_handshake_timeout_ms: self.tls_handshake_timeout_ms,
@@ -242,13 +253,6 @@ impl MerchantRouteConfig {
     }
 }
 
-fn validate_absolute_path(path: &Path, label: &str) -> Result<()> {
-    if !path.is_absolute() || path.as_os_str().is_empty() {
-        bail!("COMMERCE_EDGE_{label}_PATH_NOT_ABSOLUTE");
-    }
-    Ok(())
-}
-
 fn validate_range(value: u64, minimum: u64, maximum: u64, label: &str) -> Result<()> {
     if !(minimum..=maximum).contains(&value) {
         bail!("COMMERCE_EDGE_{label}_OUT_OF_RANGE");
@@ -267,32 +271,6 @@ fn validate_instance_id(value: &str) -> Result<()> {
         bail!("COMMERCE_EDGE_INSTANCE_ID_INVALID");
     }
     Ok(())
-}
-
-fn normalize_public_host(value: &str) -> Result<String> {
-    let host = value.trim().to_ascii_lowercase();
-    if host.is_empty()
-        || host.len() > 253
-        || host.contains(':')
-        || host.contains('/')
-        || host.starts_with('.')
-        || host.ends_with('.')
-    {
-        bail!("COMMERCE_EDGE_PUBLIC_HOST_INVALID");
-    }
-    for label in host.split('.') {
-        if label.is_empty()
-            || label.len() > 63
-            || label.starts_with('-')
-            || label.ends_with('-')
-            || label
-                .bytes()
-                .any(|value| !value.is_ascii_alphanumeric() && value != b'-')
-        {
-            bail!("COMMERCE_EDGE_PUBLIC_HOST_INVALID");
-        }
-    }
-    Ok(host)
 }
 
 const fn default_connect_timeout_ms() -> u64 {
@@ -344,6 +322,30 @@ mod tests {
         .into_bytes()
     }
 
+    fn sample_acme_config() -> Vec<u8> {
+        format!(
+            r#"{{
+              "schema":"yilong.commerce-edge.v2",
+              "listen_addr":"0.0.0.0:443",
+              "certificate_provider":{{
+                "mode":"acme_tls_alpn_01",
+                "domains":["Commerce.Example.com"],
+                "contact":"mailto:ops@example.com",
+                "cache_dir":"{}",
+                "environment":"staging"
+              }},
+              "public_hosts":["commerce.example.com"],
+              "routes":[{{
+                "instance_id":"coffee-a",
+                "public_base_path":"/merchants/coffee-a",
+                "upstream_addr":"127.0.0.1:18081"
+              }}]
+            }}"#,
+            absolute_fixture_path("edge-acme-cache")
+        )
+        .into_bytes()
+    }
+
     fn absolute_fixture_path(name: &str) -> String {
         std::env::temp_dir()
             .join(name)
@@ -390,5 +392,64 @@ mod tests {
             .unwrap()
             .push(route);
         assert!(EdgeConfig::parse(&serde_json::to_vec(&duplicate_route).unwrap()).is_err());
+    }
+
+    #[test]
+    fn acme_config_normalizes_domains_and_requires_exact_public_hosts() {
+        let config = EdgeConfig::parse(&sample_acme_config()).unwrap();
+        let acme = config.certificate_provider().acme().unwrap();
+        assert_eq!(acme.domains, &["commerce.example.com"]);
+        assert!(!acme.environment.is_production());
+
+        let wrong_host = String::from_utf8(sample_acme_config()).unwrap().replace(
+            "\"public_hosts\":[\"commerce.example.com\"]",
+            "\"public_hosts\":[\"other.example.com\"]",
+        );
+        assert!(EdgeConfig::parse(wrong_host.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn acme_config_rejects_non_standard_port_relative_cache_and_bad_contact() {
+        let non_standard_port = String::from_utf8(sample_acme_config())
+            .unwrap()
+            .replace("0.0.0.0:443", "0.0.0.0:8443");
+        assert!(EdgeConfig::parse(non_standard_port.as_bytes()).is_err());
+
+        let relative_cache = String::from_utf8(sample_acme_config())
+            .unwrap()
+            .replace(&absolute_fixture_path("edge-acme-cache"), "relative-cache");
+        assert!(EdgeConfig::parse(relative_cache.as_bytes()).is_err());
+
+        let bad_contact = String::from_utf8(sample_acme_config())
+            .unwrap()
+            .replace("mailto:ops@example.com", "ops@example.com");
+        assert!(EdgeConfig::parse(bad_contact.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn acme_config_rejects_duplicate_domains_and_unknown_provider_fields() {
+        let mut duplicate_domains: serde_json::Value =
+            serde_json::from_slice(&sample_acme_config()).unwrap();
+        duplicate_domains["certificate_provider"]["domains"] =
+            serde_json::json!(["commerce.example.com", "COMMERCE.EXAMPLE.COM"]);
+        assert!(EdgeConfig::parse(&serde_json::to_vec(&duplicate_domains).unwrap()).is_err());
+
+        let mut unknown_field: serde_json::Value =
+            serde_json::from_slice(&sample_acme_config()).unwrap();
+        unknown_field["certificate_provider"]["account_key"] = serde_json::json!("forbidden");
+        assert!(EdgeConfig::parse(&serde_json::to_vec(&unknown_field).unwrap()).is_err());
+    }
+
+    #[test]
+    fn v2_pem_provider_is_supported_without_legacy_fields() {
+        let mut config: serde_json::Value = serde_json::from_slice(&sample_acme_config()).unwrap();
+        config["listen_addr"] = serde_json::json!("127.0.0.1:18443");
+        config["certificate_provider"] = serde_json::json!({
+            "mode": "pem",
+            "certificate_chain_path": absolute_fixture_path("fullchain.pem"),
+            "private_key_path": absolute_fixture_path("privkey.pem")
+        });
+        let parsed = EdgeConfig::parse(&serde_json::to_vec(&config).unwrap()).unwrap();
+        assert!(parsed.certificate_provider().pem_paths().is_some());
     }
 }

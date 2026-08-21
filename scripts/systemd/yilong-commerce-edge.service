@@ -11,7 +11,12 @@ EnvironmentFile=/etc/yilong-commerce-edge/edge.env
 ExecStart=/usr/local/bin/yilong-commerce-edge
 Restart=on-failure
 RestartSec=3s
+KillSignal=SIGTERM
 TimeoutStopSec=20s
+LimitNOFILE=65536
+
+StateDirectory=yilong-commerce-edge
+StateDirectoryMode=0700
 
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
@@ -26,6 +31,7 @@ ProtectKernelLogs=true
 ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectSystem=strict
+ReadWritePaths=/var/lib/yilong-commerce-edge
 RestrictAddressFamilies=AF_INET AF_INET6
 RestrictRealtime=true
 LockPersonality=true
