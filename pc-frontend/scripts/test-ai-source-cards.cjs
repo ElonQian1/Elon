@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const component = fs.readFileSync(path.join(root, 'src/features/ai/AiSourceLinks.tsx'), 'utf8')
+const styles = fs.readFileSync(path.join(root, 'src/features/ai/AiSourceLinks.module.css'), 'utf8')
+
+assert.match(component, /MAX_VISIBLE_SOURCES\s*=\s*3/, 'source cards must start with a bounded summary')
+assert.match(component, /uniqueSources/, 'duplicate source links must not create duplicate cards')
+assert.match(component, /siteIdentity/, 'source cards must expose a stable site identity without waiting for remote CSS')
+assert.match(component, /全部显示/, 'long source collections need an explicit expand action')
+assert.match(component, /openInternalBrowserLink\(source\)/, 'the primary source action must keep the internal tab flow')
+assert.match(component, /target="_blank"/, 'the system-browser fallback must remain available')
+assert.match(component, /aria-label=\{`回答来源，共 \$\{uniqueSources\.length\} 个`\}/, 'source count must be announced accessibly')
+assert.match(styles, /\.panel\s*\{/, 'source collection needs a distinct panel')
+assert.match(styles, /\.card\s*\{/, 'each source needs a card surface')
+assert.match(styles, /@media \(max-width: 560px\)/, 'source cards need a narrow-layout contract')
+assert.doesNotMatch(component, /google\.com\/s2\/favicons|stylesheet|dangerouslySetInnerHTML/i, 'native cards must not depend on Google styles or remote favicon services')
+
+console.log('PASS: AI source links render as responsive native cards while preserving both browser-opening paths')
