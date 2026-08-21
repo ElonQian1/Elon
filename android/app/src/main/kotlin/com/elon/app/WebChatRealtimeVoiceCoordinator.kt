@@ -68,11 +68,44 @@ internal class WebChatRealtimeVoiceCoordinator(
             if (result?.accepted == true) {
                 closePending = true
                 surface.render(WebChatRealtimeVoiceStage.STARTING, "正在结束语音并返回对话")
-                schedule(Runnable { finishClose(gracefulExit = true) }, END_VOICE_SETTLE_MS)
+                port.requestControls()
+                scheduleCloseSettlement(generation, attempt = 0)
                 return
             }
         }
         finishClose(gracefulExit = false)
+    }
+
+    private fun scheduleCloseSettlement(expectedGeneration: Int, attempt: Int) {
+        schedule(
+            Runnable { pollCloseSettlement(expectedGeneration, attempt) },
+            CLOSE_POLL_DELAY_MS,
+        )
+    }
+
+    private fun pollCloseSettlement(expectedGeneration: Int, attempt: Int) {
+        if (!closePending || expectedGeneration != generation) return
+        val port = consumerPort()
+        val state = port?.state()
+        val controls = state?.controls.orEmpty()
+        val endControlVisible = WebChatRealtimeVoiceEndPolicy.resolve(controls) != null
+        val voiceEntryReady = controls.any { descriptor ->
+            descriptor.control.semantic == REALTIME_VOICE_SEMANTIC &&
+                descriptor.control.enabled && descriptor.control.inViewport
+        }
+        if (
+            state?.adapterCurrent == true && state.pageKind == "conversation" &&
+            !endControlVisible && voiceEntryReady
+        ) {
+            finishClose(gracefulExit = true)
+            return
+        }
+        if (attempt >= MAX_CLOSE_SETTLE_POLLS) {
+            finishClose(gracefulExit = false)
+            return
+        }
+        if (attempt > 0 && attempt % CONTROL_REFRESH_INTERVAL == 0) port?.requestControls()
+        scheduleCloseSettlement(expectedGeneration, attempt + 1)
     }
 
     private fun finishClose(gracefulExit: Boolean) {
@@ -350,7 +383,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val COMMAND_POLL_DELAY_MS = 250L
         const val COMMAND_SETTLE_MS = 1_000L
         const val CONTROL_SETTLE_MS = 400L
-        const val END_VOICE_SETTLE_MS = 350L
+        const val CLOSE_POLL_DELAY_MS = 250L
+        const val MAX_CLOSE_SETTLE_POLLS = 40
         const val AUTHENTICATION_POLL_DELAY_MS = 400L
         const val MAX_AUTHENTICATION_POLLS = 30
         val RETRYABLE_ERRORS = setOf(

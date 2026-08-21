@@ -111,13 +111,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
     @Test
     fun closesOfficialVoiceBeforeRevealingThePreservedNativeConversation() {
         val fixture = Fixture()
-        fixture.coordinator.start(fixture.provider)
-        fixture.scheduler.runNext()
-        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
-        fixture.scheduler.runNext()
-        fixture.scheduler.runNext()
-        fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
-        fixture.scheduler.runNext()
+        fixture.completeVoiceStart()
         fixture.port.endControlAvailable = true
 
         fixture.surface.closeVoice()
@@ -125,8 +119,45 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertTrue(fixture.surface.visible)
         assertEquals("control_voice_end", fixture.port.invokedControlId)
         fixture.scheduler.runNext()
+        assertTrue(fixture.surface.visible)
+
+        fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext()
         assertFalse(fixture.surface.visible)
         assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
+    fun startsAgainAfterTheOfficialVoicePageHasFinishedClosing() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+        fixture.scheduler.runNext()
+        fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext()
+
+        fixture.completeVoiceStart()
+
+        assertTrue(fixture.surface.visible)
+        assertEquals(WebChatRealtimeVoiceStage.ACTIVE, fixture.surface.stage)
+        assertEquals(2, fixture.beginBackingCount)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
+    fun fallsBackOnceWhenTheOfficialVoicePageNeverFinishesClosing() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+        fixture.scheduler.runAll()
+
+        assertFalse(fixture.surface.visible)
+        assertEquals(listOf(false), fixture.endBackingGraceful)
+        assertFalse(fixture.scheduler.hasPendingTasks())
     }
 
     private class Fixture(
@@ -167,6 +198,16 @@ class WebChatRealtimeVoiceCoordinatorTest {
             schedule = scheduler::schedule,
             backControl = back,
         )
+
+        fun completeVoiceStart() {
+            coordinator.start(provider)
+            scheduler.runNext()
+            port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+            scheduler.runNext()
+            scheduler.runNext()
+            port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
+            scheduler.runNext()
+        }
     }
 
     private class FakeLoginGate : WebChatRealtimeVoiceLoginGate {
@@ -329,6 +370,8 @@ class WebChatRealtimeVoiceCoordinatorTest {
             }
             error("Realtime voice scheduler did not settle")
         }
+
+        fun hasPendingTasks(): Boolean = tasks.isNotEmpty()
     }
 
     private class FakeBackControl : WebChatRealtimeVoiceBackControl {
