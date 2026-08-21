@@ -434,6 +434,13 @@
   font-size: 13px; font-weight: 800; color: white;
   flex-shrink: 0;
 }
+.providerAvatar {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dadce0;
+  color: #101010;
+}
+.providerAvatar svg { display: block; }
 .msgBody {
   display: flex;
   flex-direction: column;

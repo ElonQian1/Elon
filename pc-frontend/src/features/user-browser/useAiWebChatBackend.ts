@@ -66,6 +66,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         role: item.role,
         content: content || '相关来源',
         content_format: contentFormat,
+        assistant_provider_id: provider?.id,
         tool_used: item.role === 'assistant' && provider?.id === 'google-ai-mode' ? 'web_search' : null,
         sources,
         structured_parts: structuredParts,
