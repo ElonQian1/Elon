@@ -223,3 +223,13 @@ pub(in crate::store) fn compute_attempt_settlement_by_receipt_id_on(
         .map(|stored| stored.into_historical_receipt(conn))
         .transpose()
 }
+
+pub(in crate::store) fn compute_attempt_historical_settlement_by_lease_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptSettlementReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    settlement_by_lease_on(conn, lease_id)?
+        .map(|stored| stored.into_historical_receipt(conn))
+        .transpose()
+}

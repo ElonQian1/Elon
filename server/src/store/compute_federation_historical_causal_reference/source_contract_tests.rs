@@ -12,6 +12,7 @@ const EXECUTION_RESOLVER: &str = include_str!("execution.rs");
 const SETTLEMENT_RESOLVER: &str = include_str!("settlement.rs");
 const SOURCE_REFS: &str = include_str!("source_refs.rs");
 const CAPACITY_POOL_QUERIES: &str = include_str!("../compute_capacity_pool_queries.rs");
+const ATTEMPT_EXECUTION_RECEIPTS: &str = include_str!("../compute_attempt_execution_receipts.rs");
 const ATTEMPT_SETTLEMENTS: &str = include_str!("../compute_attempt_settlements.rs");
 const ATTEMPT_SETTLEMENT_SUPPORT: &str = include_str!("../compute_attempt_settlements/support.rs");
 const ATTEMPT_SETTLEMENT_AUDIT: &str =
@@ -36,7 +37,7 @@ fn resolver_source_uses_exact_owner_seams_inside_deferred_read_snapshots() {
         STORE_FACADE
             .matches("transaction_with_behavior(TransactionBehavior::Deferred)")
             .count(),
-        2
+        4
     );
 
     let resolver_source = resolver_source();
@@ -122,6 +123,44 @@ fn resolver_source_uses_exact_owner_seams_inside_deferred_read_snapshots() {
         .contains("self.into_receipt_with_head_policy(conn, false, false)"));
     assert!(ATTEMPT_FINALIZATION_AUDIT
         .contains("self.into_receipt_with_head_policy(conn, replayed, true)"));
+}
+
+#[test]
+fn by_lease_adoption_uses_historical_owners_and_private_access_scope() {
+    assert!(ATTEMPT_EXECUTION_RECEIPTS
+        .contains("fn compute_attempt_historical_execution_receipt_by_lease_on("));
+    assert!(ATTEMPT_EXECUTION_RECEIPTS
+        .contains("execution_receipt_historical_envelope_on(conn, stored)"));
+    assert!(ATTEMPT_SETTLEMENTS.contains("fn compute_attempt_historical_settlement_by_lease_on("));
+    assert!(ATTEMPT_SETTLEMENTS.contains("stored.into_historical_receipt(conn)"));
+    assert!(STORE_FACADE.contains("resolve_compute_execution_source_lineage_for_lease"));
+    assert!(STORE_FACADE.contains("resolve_compute_settlement_source_lineage_for_lease"));
+    assert!(STORE_FACADE
+        .contains("compute_attempt_historical_execution_receipt_by_lease_on(&tx, lease_id)"));
+    assert!(
+        STORE_FACADE.contains("compute_attempt_historical_settlement_by_lease_on(&tx, lease_id)")
+    );
+
+    let marker = "struct FederationHistoricalLineageAccessScope";
+    let start = STORE_FACADE
+        .find(marker)
+        .expect("Store must own the private historical access scope");
+    let prefix = STORE_FACADE[..start]
+        .lines()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(!prefix.contains("#[derive"));
+    assert!(!STORE_FACADE.contains("Serialize for FederationHistoricalLineageAccessScope"));
+    assert!(!STORE_FACADE.contains("Deserialize for FederationHistoricalLineageAccessScope"));
+    assert!(!STORE_FACADE.contains("Clone for FederationHistoricalLineageAccessScope"));
+    assert!(EXECUTION_RESOLVER.contains("&job.job.consumer_account_id"));
+    assert!(EXECUTION_RESOLVER.contains("job.job.project_id.as_deref()"));
+    assert!(EXECUTION_RESOLVER.contains("&provider.provider.owner_account_id"));
+    assert!(SETTLEMENT_RESOLVER.contains("access_scope.ensure_job_matches("));
+    assert!(SETTLEMENT_RESOLVER
+        .contains("access_scope.ensure_same_as(rebuilt_execution.access_scope())?"));
 }
 
 #[test]
@@ -298,6 +337,10 @@ fn settlement_v193_v194_v195_splices_are_constructible_and_fail_closed() {
     finalization_provider_drift.finalization_provider_id = "provider-b".to_string();
     let mut audited_provider_drift = settlement_facts();
     audited_provider_drift.audited_provider.provider_digest = "provider-digest-b".to_string();
+    let mut execution_lease_splice = settlement_facts();
+    execution_lease_splice.execution_lease_id = "lease-b".to_string();
+    let mut finalization_lease_splice = settlement_facts();
+    finalization_lease_splice.finalization_lease_id = "lease-b".to_string();
     let mut released_balance = settlement_facts();
     released_balance.settlement_balance_state = "available".to_string();
 
@@ -313,6 +356,8 @@ fn settlement_v193_v194_v195_splices_are_constructible_and_fail_closed() {
         ("execution_provider", execution_provider_drift),
         ("finalization_provider", finalization_provider_drift),
         ("audited_provider", audited_provider_drift),
+        ("execution_lease", execution_lease_splice),
+        ("finalization_lease", finalization_lease_splice),
         ("non_pending_balance", released_balance),
     ] {
         assert!(

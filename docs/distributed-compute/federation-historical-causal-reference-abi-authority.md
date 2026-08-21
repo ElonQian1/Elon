@@ -2,7 +2,7 @@
 title: 联邦核心历史因果引用 Carrier ABI 权威
 reviewed_at: 2026-08-21
 status: current
-owners: backend, node, ai-economy
+owners: backend, node, ai-economy, pc
 design_status: design_frozen
 design_scope: federation_core_historical_causal_reference_carrier_abi_v1
 implementation_status: implementation_uncompiled
@@ -13,9 +13,10 @@ verification_status: source_review_only
 
 ## 1. 唯一结论与状态边界
 
-本页只冻结 Provider-neutral 的历史引用 primitive，以及 Execution Receipt 与 Settlement Receipt 两种只读因果
-Carrier。Domain 与 Store 只读 resolver 源码现已落盘；Service、HTTP/MCP 和客户端仍未采用。它不统一重算任何
-既有对象摘要，不新增 current authority、writer、账本、状态机、表、migration、API 或经济效果。
+本页冻结 Provider-neutral 的历史引用 primitive、Execution Receipt 与 Settlement Receipt 两种只读因果 Carrier，
+以及它们的 additive read adoption。Domain、Store 只读 resolver、Service、HTTP/MCP 与 PC 客户端源码现已落盘；
+这些入口只按历史 Lease 读取既有 owner 事实，不统一重算任何既有对象摘要，也不新增 current authority、writer、
+账本、状态机、表、migration 或经济效果。
 
 当前状态逐字为：
 
@@ -24,7 +25,9 @@ federation_core_historical_causal_reference_carrier_abi=design_frozen
 carrier_profiles=execution_source_v1/settlement_source_v1
 domain_implementation=source_written
 store_resolver=source_written
-service_http_mcp_client_adoption=absent
+service=source_written
+http_mcp=source_written
+pc_client=source_written
 migration/table=none
 verification=source_review_only
 compiled=0 run=0
@@ -268,15 +271,174 @@ DTO；它不能产生 `ValidatedFederationHistoricalLineage`，也不能进入�
   owner证明 kind-specific roots；本 Carrier不吸收其 current authority。
 - 不预留 migration编号，不新建 unified current-head table、universal resolver table、第二本账或通用 causal graph。
 
-## 9. 计划 ownership 与 source-written 门
+## 9. Additive read adoption
+
+### 9.1 Historical by-Lease root 与私有 scope
+
+公开读入只接受 `lease_id`，且必须先通过 Lease ID shape gate；禁止让 caller 另传
+`attempt_id/provider_id/project_id/consumer_account_id/execution_receipt_id/settlement_receipt_id`、revision、digest、
+kind 或 currentness 提示。Store 的两个唯一 by-Lease facade 固定为：
+
+```text
+resolve_compute_execution_source_lineage_for_lease(lease_id)
+resolve_compute_settlement_source_lineage_for_lease(lease_id)
+```
+
+execution resolver 必须从该 Lease 的 retained v189 terminal candidate 出发，闭合 v189-v193 并返回 exact
+`execution_source_v1`；settlement resolver 必须从同一 source Lease 追溯唯一 v193→v194→v195 根，重建
+execution carrier 后再返回 exact `settlement_source_v1`。必须逐字证明
+`rebuilt_v193.attempt_lease_id == v194.lease_id == v195.lease_id`；0、multi、任一 owner/native digest/JSON/column
+drift 或 source Lease 不同均失败关闭；不存在 attempt/current/latest 或 receipt-ID fallback。
+
+resolver 成功后才可从已重审的 owner 对象封存 private-field、non-Clone、non-Serde access scope，
+唯一等式为：
+
+```text
+scope.consumer_account_id
+  = historical execution-source Job.job.consumer_account_id
+scope.project_id
+  = historical execution-source Job.job.project_id
+scope.provider_owner_account_id
+  = historical Provider.provider.owner_account_id
+
+settlement.scope = rebuilt execution.scope
+settlement.source_job.consumer_account_id = settlement.terminal_job.consumer_account_id
+settlement.source_job.project_id = settlement.terminal_job.project_id
+```
+
+settlement 还必须证明上述 source/terminal Job 的 consumer/project 与 rebuilt execution scope 全部相等。
+scope 不进入 Carrier、response、Debug、serde 或 client，也不跨 transaction/await 保留 authorization。
+
+### 9.2 Read response exact-5 ABI
+
+成功响应必须 exact 5 keys，无 null、extra key、嵌套 scope 或摊平 Carrier：
+
+```text
+schema
+lineage_kind
+lineage_digest
+canonical_carrier_json
+read_effect
+```
+
+常量和等式逐字固定：
+
+```text
+READ_SCHEMA=compute_federation.core_historical_causal_reference.read.v1
+READ_EFFECT=none
+response.lineage_kind = parsed canonical_carrier_json.lineage_kind
+response.lineage_digest = parsed canonical_carrier_json.lineage_digest
+```
+
+5 个值全部是 JSON string。`canonical_carrier_json` 必须是 Store sealed view 返回的完整规范 JCS
+字符串，不得 parse 后重排、摘录、替换 digest 或把 `lineage` 展开到 response。响应不得增加
+scope、actor、identity、time、current、replay、status、authorization、owner 或 effect 字段；唯一效果声明是
+`read_effect="none"`。
+
+### 9.3 Service、HTTP 与 MCP
+
+Service 只暴露四个 read facade：
+
+```text
+read_execution_for_participant
+read_settlement_for_participant
+read_execution_for_admin
+read_settlement_for_admin
+```
+
+participant 成功 predicate 精确为：
+
+```text
+user_id == scope.consumer_account_id
+  || user_id == scope.provider_owner_account_id
+```
+
+HTTP 只新增四个 `GET`，路径参数只有 `lease_id`，不接受 query/body：
+
+```text
+/api/me/compute/attempt-leases/:lease_id/execution-source-lineage
+/api/me/compute/attempt-leases/:lease_id/settlement-source-lineage
+/api/admin/compute/attempt-leases/:lease_id/execution-source-lineage
+/api/admin/compute/attempt-leases/:lease_id/settlement-source-lineage
+```
+
+MCP 只新增四个工具；input schema 必须是 properties 只有 string `lease_id` 的 exact object，
+`required=["lease_id"]`、`additionalProperties=false`：
+
+```text
+compute_get_my_execution_source_lineage
+compute_get_my_settlement_source_lineage
+compute_admin_get_execution_source_lineage
+compute_admin_get_settlement_source_lineage
+```
+
+普通 MCP 在 participant predicate 成功后还必须满足
+`scope.project_id == Some(caller_project_id)`；无 current project 或 project 不等都拒绝。HTTP `/api/me`
+不从 header/query 伪造 project scope。Admin HTTP 依赖已有 platform-admin role gate；admin MCP 先继承现有
+project-scoped MCP transport 的 membership gate，再执行 platform-admin role gate。Project membership只授予到达
+该 MCP transport 的资格，不能单独授予 admin lineage authority。这些入口都只读，不调用 Carrier parser 来构造权限，不审计成
+replay，不更新 last-seen/current head。
+
+### 9.4 Participant/admin 失败与脱敏
+
+错误顺序和对外结果固定为：
+
+| caller / condition | code | HTTP | 对外边界 |
+|---|---|---:|---|
+| unauthenticated / any request | `FEDERATION_LINEAGE_UNAUTHENTICATED` | 401 | 不解析 Lease 或 owner |
+| authenticated HTTP caller after route role gate / query 或非空 body | `FEDERATION_LINEAGE_INVALID_REQUEST_INPUT` | 400 | 不查 owner |
+| authenticated caller after route role gate / invalid Lease ID shape | `FEDERATION_LINEAGE_INVALID_LEASE_ID` | 400 | 不查 owner |
+| participant / missing、owner drift、scope 未形成 | `FEDERATION_LINEAGE_NOT_VISIBLE` | 404 | 不区分缺失与 integrity |
+| participant / scope 成功但用户非 consumer/provider owner | `FEDERATION_LINEAGE_NOT_VISIBLE` | 404 | 防枚举 |
+| ordinary MCP / participant 成功但 project 缺失或不等 | `FEDERATION_LINEAGE_PROJECT_FORBIDDEN` | —（JSON-RPC tool error） | 不返回期待 project |
+| admin MCP / project membership gate失败 | 既有 MCP project-access error | 403 | lineage tool/Service 未执行 |
+| admin / role 非 platform admin | `FEDERATION_LINEAGE_ADMIN_FORBIDDEN` | 403 | 不解析成功 payload |
+| admin / historical root missing | `FEDERATION_LINEAGE_NOT_FOUND` | 404 | 不返回 scope/owner |
+| admin / owner/native digest/JSON/column drift | `FEDERATION_LINEAGE_INTEGRITY_CONFLICT` | 409 | 只返回稳定 code |
+
+除 ordinary MCP 在 participant predicate 成功后的 project tool error 外，participant 路径不得通过不同
+status/code/detail 暴露 Lease 是否存在、归属哪个 Provider/project、哪个 owner 发生 drift 或哪层 receipt 失配。
+Admin 的 409 也不回显 row、native JSON、digest期望/实际值、account/project/provider/receipt ID 或 SQL。
+所有成功路径都只返回 exact-5 response。表中数字 HTTP status 只适用于四个 GET 或 MCP transport 的认证/project
+前置拒绝；进入 `tools/call` 后的 MCP failure以 JSON-RPC tool error承载同一稳定 lineage code，不伪装成 HTTP
+403/404/409。
+
+### 9.5 PC runtime validation 与双响应闭合
+
+PC 不信任 HTTP/MCP adapter 已正确处理 Carrier。每个响应在显示前必须在 runtime：
+
+1. 验 exact-5 keys、全 string type、`READ_SCHEMA`、`READ_EFFECT`与 kind 白名单；
+2. 将 `canonical_carrier_json` 按 UTF-8 字节执行 strict parse，再做 RFC 8785 JCS byte-equal；
+3. 按 §3 把 inner `lineage_digest` 置空，重算 `DIGEST_DOMAIN || 0x00 || JCS` SHA-256，并证明重算值等于
+   inner `lineage_digest`；
+4. 证明 inner schema/canonicalization/digest-algorithm 常量正确，inner kind/digest 与 response 的
+   `lineage_kind/lineage_digest` 逐字相等，且 inner shape 精确命中对应 profile；任一失配整个卡片失败关闭，
+   不展示部分链。
+
+同一笔 settlement 历史展示必须并行读取该 Lease 的 execution 与 settlement response，分别证明
+`execution_source_v1` 与 `settlement_source_v1` exact kind，再证明
+`settlement carrier.lineage.execution_lineage_digest == execution response.lineage_digest`。任一 endpoint 缺失、
+kind 错误、JCS/domain digest 失配或跨响应等式不成立，client adoption 就不成立。PC 不持久 Carrier、
+不刷新 authority、不生成链接/下载或结算动作。Lease、scope 或 Provider 选择变化必须立即使在途 generation 失效并
+清空旧证据；旧响应不得写回新的 subject/scope 页面。
+
+### 9.6 零 writer、migration 与 effect
+
+本 adoption 只组装 read response：Store 只使用 Deferred/read transaction，Service/HTTP/MCP/PC 都没有
+create/update/delete/CAS/replay/audit/last-seen writer。不新增或修改 migration、table、view、index、trigger、UDF，
+不回填 Carrier，不更改 v169-v195 owner JSON/digest。`read_effect="none"` 是响应合同而不是一条
+持久 effect row。结果不产生 current authority、Ready、route、Offer、Job、Lease、Receipt、posting、balance、
+release、withdrawal、external payment 或链上效果。
+
+## 10. 计划 ownership 与 source-written 门
 
 source实现独占在新的 Provider-neutral Domain owner：
 `server/src/compute_federation/federation_historical_causal_reference/`，只拥有 exact DTO、JCS与 Carrier digest。
 各 native digest/helper继续属于现有 Provider/Pool/Offer/Snapshot/Job/Reservation/Claim/Attempt/Receipt owner。
 
 Store integration只新增只读 historical resolver；不复制 SQL/digest公式或提供 public raw builder。本批已写入 Domain、
-Store resolver、source-contract、golden与negative test源码；没有创建 Service、HTTP/MCP、客户端 caller、表或 migration，
-也未编译、测试或执行 SQLite/runtime/network。
+Store resolver、source-contract、golden与negative test，以及本页冻结的 Service、四 HTTP、四 MCP 与 PC client
+采用源码；没有创建表或 migration，也未编译、测试或执行 SQLite/runtime/network。
 
 本次 `source_written` 静态审查中以下五类源码同时存在，但均未编译或运行，不能写成 verified：
 
@@ -284,9 +446,10 @@ Store resolver、source-contract、golden与negative test源码；没有创建 S
 2. owner-by-owner full audit与 source Lease retained resolver；
 3. v193/v195 deterministic reconstruction及跨对象 splice negatives；
 4. raw DTO不能进入 writer的source contract；
-5. resolver无 writer/migration入口，legacy digest bytes、既有表与既有 receipt JSON/digest合同零改写，且本批状态或资金效果为零。
+5. resolver、Service、HTTP/MCP、PC 无 writer/migration入口，legacy digest bytes、既有表与既有 receipt
+   JSON/digest合同零改写，且本批状态或资金效果为零。
 
-## 10. 明确禁止
+## 11. 明确禁止
 
 - 禁止把 Carrier digest写成 Provider/Offer/Job/Lease/Receipt native digest；
 - 禁止用 carrier canonical通过代替 historical row、签名、currentness或 actor authorization；

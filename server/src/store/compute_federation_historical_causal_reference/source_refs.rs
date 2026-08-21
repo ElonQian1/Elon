@@ -145,6 +145,9 @@ pub(super) struct SettlementSourceLinkFacts {
     pub(super) settlement_terminal_job: JobVersionRef,
     pub(super) settlement_reservation_id: String,
     pub(super) execution_reservation_id: String,
+    pub(super) settlement_lease_id: String,
+    pub(super) execution_lease_id: String,
+    pub(super) finalization_lease_id: String,
     pub(super) source_job_status: String,
     pub(super) terminal_job_status: String,
     pub(super) settlement_balance_state: String,
@@ -169,6 +172,8 @@ pub(super) fn validate_settlement_source_links(facts: &SettlementSourceLinkFacts
         || facts.execution_provider_id != lineage.provider.provider_id
         || lineage.terminal_reservation.reservation_id != facts.settlement_reservation_id
         || facts.settlement_reservation_id != facts.execution_reservation_id
+        || facts.settlement_lease_id != facts.execution_lease_id
+        || facts.settlement_lease_id != facts.finalization_lease_id
         || facts.finalization_source_job.job_id != lineage.source_job.job_id
         || facts.finalization_source_job.job_revision.checked_add(1)
             != Some(lineage.source_job.job_revision)

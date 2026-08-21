@@ -92,7 +92,7 @@ export default function ComputeSettlementChallengeResolutionPage() {
           ))}
         </div>
       </section>
-      <SettlementLifecycleHistoryList items={history} loading={loading} />
+      <SettlementLifecycleHistoryList items={history} loading={loading} scope="admin" />
       {selected && <ResolveSettlementChallengeDialog challenge={selected} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelected(null) }} onSubmit={resolve} />}
     </main>
   )

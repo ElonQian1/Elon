@@ -1,0 +1,50 @@
+.root {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.trigger {
+  min-height: 32px;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(117, 157, 209, .42);
+  border-radius: 5px;
+  padding: 0 9px;
+  color: #d9e9ff;
+  background: rgba(65, 102, 151, .14);
+  font-size: 8px;
+  font-weight: 720;
+}
+
+.trigger:hover:not(:disabled) { background: rgba(65, 102, 151, .24); }
+.trigger:disabled { cursor: wait; opacity: .72; }
+.status, .error { margin: 0; font-size: 8px; line-height: 1.5; }
+.status { color: var(--text-muted); }
+.error { display: flex; align-items: flex-start; gap: 6px; color: #ffcaca; overflow-wrap: anywhere; }
+.error svg { flex: 0 0 auto; margin-top: 1px; }
+.panel { display: grid; gap: 8px; min-width: 0; }
+.verified { display: flex; align-items: center; gap: 6px; color: #d8f5e2; font-size: 8px; }
+.profiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.profile { min-width: 0; border: 1px solid rgba(117, 157, 209, .24); border-radius: 5px; padding: 8px; background: rgba(65, 102, 151, .07); }
+.profileHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profileHeader strong { color: var(--text-primary); font-size: 8px; }
+.profileHeader span { color: #a9dab8; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 7px; }
+.kind { display: block; margin-top: 7px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 7px; overflow-wrap: anywhere; }
+.digest { display: block; margin-top: 5px; color: #9fc4f4; font-size: 7px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }
+.details { margin-top: 7px; color: var(--text-muted); font-size: 7px; }
+.details summary { width: fit-content; cursor: pointer; }
+.details pre { max-height: 220px; margin: 7px 0 0; overflow: auto; border: 1px solid var(--border); border-radius: 4px; padding: 7px; color: #c9d9ed; background: var(--bg-base); font-size: 7px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.spinning { animation: lineage-spin .8s linear infinite; }
+
+@keyframes lineage-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+  .trigger { width: 100%; }
+  .profiles { grid-template-columns: 1fr; }
+}

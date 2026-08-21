@@ -276,6 +276,16 @@ pub(in crate::store) fn compute_attempt_execution_receipt_by_id_on(
         .transpose()
 }
 
+pub(in crate::store) fn compute_attempt_historical_execution_receipt_by_lease_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptExecutionReceiptEnvelope>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    execution_receipt_by_lease_on(conn, lease_id)?
+        .map(|stored| execution_receipt_historical_envelope_on(conn, stored))
+        .transpose()
+}
+
 fn execution_receipt_envelope_on(
     conn: &rusqlite::Connection,
     stored: StoredExecutionReceipt,

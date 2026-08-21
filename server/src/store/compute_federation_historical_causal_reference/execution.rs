@@ -31,7 +31,7 @@ use super::{
         price_snapshot_ref, provider_ref, reservation_ref, validate_execution_source_links,
         ExecutionSourceLinkFacts,
     },
-    ValidatedFederationHistoricalLineage,
+    FederationHistoricalLineageAccessScope, ValidatedFederationHistoricalLineage,
 };
 
 pub(super) fn resolve_execution_source_lineage_on(
@@ -112,6 +112,11 @@ pub(super) fn resolve_execution_source_lineage_on(
         candidate.source_lease_revision,
     )?
     .ok_or_else(|| anyhow!("Execution source historical Attempt Lease does not exist"))?;
+    let access_scope = FederationHistoricalLineageAccessScope::from_historical_job_and_provider(
+        &job.job.consumer_account_id,
+        job.job.project_id.as_deref(),
+        &provider.provider.owner_account_id,
+    )?;
 
     let selected_offer = job
         .job
@@ -328,9 +333,10 @@ pub(super) fn resolve_execution_source_lineage_on(
         lineage,
     };
     validate_execution_source_links(&facts)?;
-    ValidatedFederationHistoricalLineage::from_carrier(build_execution_source_carrier(
-        facts.lineage,
-    )?)
+    ValidatedFederationHistoricalLineage::from_carrier(
+        build_execution_source_carrier(facts.lineage)?,
+        access_scope,
+    )
 }
 
 fn validate_root_pair(id_label: &str, id: &str, digest_label: &str, digest: &str) -> Result<()> {

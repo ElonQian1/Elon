@@ -1,11 +1,14 @@
 import { History } from 'lucide-react'
+import { type FederationHistoricalLineageScope } from '../compute-attempt/federationHistoricalLineageContracts'
 import { type ComputeSettlementLifecycleHistoryItem } from './computeSettlementLifecycleApi'
+import FederationHistoricalLineageButton from './FederationHistoricalLineageButton'
 import { formatFen, formatMicros } from './settlementFormatting'
 import styles from './ComputeSettlementChallengePage.module.css'
 
 interface Props {
   items: ComputeSettlementLifecycleHistoryItem[]
   loading: boolean
+  scope: FederationHistoricalLineageScope
 }
 
 const STATUS_LABELS: Record<ComputeSettlementLifecycleHistoryItem['lifecycle_status'], string> = {
@@ -21,7 +24,7 @@ const STATUS_LABELS: Record<ComputeSettlementLifecycleHistoryItem['lifecycle_sta
   accepted_corrected_released: '纠正后已释放',
 }
 
-export default function SettlementLifecycleHistoryList({ items, loading }: Props) {
+export default function SettlementLifecycleHistoryList({ items, loading, scope }: Props) {
   return (
     <section className={styles.queue} aria-label="结算历史">
       <header><div><History size={17} /><h2>结算历史</h2></div><span>{items.length}</span></header>
@@ -46,6 +49,7 @@ export default function SettlementLifecycleHistoryList({ items, loading }: Props
             </div>
             <p className={styles.summary}>{historySummary(item)}</p>
             <code className={styles.digest}>{latestDigest(item)}</code>
+            <FederationHistoricalLineageButton leaseId={item.settlement.lease_id} scope={scope} />
           </article>
         ))}
       </div>

@@ -37,6 +37,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     tools.extend(crate::compute_federation_price_snapshot_mcp::definitions());
     tools.extend(crate::compute_federation_broker_mcp::definitions());
     tools.extend(crate::compute_federation::external_pool_onboarding_mcp::definitions());
+    tools.extend(crate::compute_federation::federation_historical_lineage_read::definitions());
     tools
 }
 
@@ -55,6 +56,8 @@ fn admin_definitions() -> Vec<Value> {
     tools.extend(crate::compute_federation::offer_admin_mcp::admin_definitions());
     tools
         .extend(crate::compute_federation::platform_reference_price_curve_mcp::admin_definitions());
+    tools
+        .extend(crate::compute_federation::federation_historical_lineage_read::admin_definitions());
     tools
 }
 
@@ -129,6 +132,17 @@ pub(crate) fn call_if_handled(
     )? {
         return Ok(Some(value));
     }
+    if let Some(value) =
+        crate::compute_federation::federation_historical_lineage_read::call_if_handled(
+            store,
+            project_id,
+            user_id,
+            name,
+            arguments.clone(),
+        )?
+    {
+        return Ok(Some(value));
+    }
     crate::compute_federation_broker_mcp::call_if_handled(
         store, project_id, user_id, name, arguments,
     )
@@ -179,6 +193,16 @@ pub(crate) fn call_admin_if_handled(
         name,
         arguments.clone(),
     )? {
+        return Ok(Some(value));
+    }
+    if let Some(value) =
+        crate::compute_federation::federation_historical_lineage_read::call_admin_if_handled(
+            store,
+            platform_role,
+            name,
+            arguments.clone(),
+        )?
+    {
         return Ok(Some(value));
     }
     crate::compute_federation::platform_reference_price_curve_mcp::call_admin_if_handled(

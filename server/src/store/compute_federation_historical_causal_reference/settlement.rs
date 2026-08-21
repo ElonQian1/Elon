@@ -27,7 +27,7 @@ use super::{
         reservation_ref, settlement_ref, validate_settlement_source_links,
         SettlementSourceLinkFacts,
     },
-    ValidatedFederationHistoricalLineage,
+    FederationHistoricalLineageAccessScope, ValidatedFederationHistoricalLineage,
 };
 
 pub(super) fn resolve_settlement_source_lineage_on(
@@ -91,11 +91,23 @@ pub(super) fn resolve_settlement_source_lineage_on(
         offer.provider_policy_revision,
     )?
     .ok_or_else(|| anyhow!("Settlement source historical Provider does not exist"))?;
+    let access_scope = FederationHistoricalLineageAccessScope::from_historical_job_and_provider(
+        &source_job.job.consumer_account_id,
+        source_job.job.project_id.as_deref(),
+        &provider.provider.owner_account_id,
+    )?;
+    access_scope.ensure_job_matches(
+        &terminal_job.job.consumer_account_id,
+        terminal_job.job.project_id.as_deref(),
+    )?;
+    access_scope.ensure_same_as(rebuilt_execution.access_scope())?;
 
     if finalization.finalization_id != settlement.finalization_id
         || finalization.event_digest != settlement.finalization_event_digest
         || finalization.execution_receipt_id != execution.receipt.receipt_id
         || finalization.execution_receipt_digest != execution.receipt.receipt_digest
+        || finalization.lease_id != settlement.lease_id
+        || execution.receipt.attempt_lease_id != settlement.lease_id
         || source_job.job_digest != settlement.source_job.job_digest
         || terminal_job.job_digest != settlement.terminal_job.job_digest
         || terminal_reservation.reservation_digest != finalization.terminal_reservation.digest
@@ -194,15 +206,19 @@ pub(super) fn resolve_settlement_source_lineage_on(
         settlement_terminal_job: job_ref(&settlement.terminal_job)?,
         settlement_reservation_id: settlement.settlement.reservation_id.clone(),
         execution_reservation_id: execution.receipt.reservation_id.clone(),
+        settlement_lease_id: settlement.lease_id.clone(),
+        execution_lease_id: execution.receipt.attempt_lease_id.clone(),
+        finalization_lease_id: finalization.lease_id.clone(),
         source_job_status: source_job.job.status,
         terminal_job_status: terminal_job.job.status,
         settlement_balance_state: settlement.settlement.balance_state.clone(),
         lineage,
     };
     validate_settlement_source_links(&facts)?;
-    ValidatedFederationHistoricalLineage::from_carrier(build_settlement_source_carrier(
-        facts.lineage,
-    )?)
+    ValidatedFederationHistoricalLineage::from_carrier(
+        build_settlement_source_carrier(facts.lineage)?,
+        access_scope,
+    )
 }
 
 fn validate_root_triple(

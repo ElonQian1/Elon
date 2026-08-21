@@ -149,7 +149,7 @@ export default function ComputeSettlementChallengePage() {
         </div>
       </section>
 
-      <SettlementLifecycleHistoryList items={history} loading={loading} />
+      <SettlementLifecycleHistoryList items={history} loading={loading} scope="participant" />
 
       {selected && <OpenSettlementChallengeDialog candidate={selected} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelected(null) }} onSubmit={openChallenge} />}
       {selectedWithdrawal && <WithdrawSettlementChallengeDialog challenge={selectedWithdrawal} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelectedWithdrawal(null) }} onSubmit={withdrawChallenge} />}

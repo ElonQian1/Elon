@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   CircleCheck,
   CircleDollarSign,
@@ -55,6 +55,9 @@ export default function MyComputeSettlementPage() {
   const [cancellingId, setCancellingId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const accountRequestGeneration = useRef(0)
+  const accountRequestKey = useRef({ providerId, status })
+  accountRequestKey.current = { providerId, status }
 
   const selectedProvider = useMemo(
     () => providers.find((provider) => provider.provider_id === providerId) ?? null,
@@ -80,32 +83,48 @@ export default function MyComputeSettlementPage() {
   }, [])
 
   const loadAccount = useCallback(async () => {
+    const requestProviderId = providerId
+    const requestStatus = status
+    if (accountRequestKey.current.providerId !== requestProviderId
+      || accountRequestKey.current.status !== requestStatus) return
+    const generation = ++accountRequestGeneration.current
+    const isCurrentRequest = () => (
+      generation === accountRequestGeneration.current
+      && accountRequestKey.current.providerId === requestProviderId
+      && accountRequestKey.current.status === requestStatus
+    )
     if (!providerId) {
       setAccount(null)
       setQueue(null)
       setSettlementHistory([])
+      setLoadingAccount(false)
       return
     }
     setLoadingAccount(true)
     setError('')
+    setAccount(null)
+    setQueue(null)
+    setSettlementHistory([])
     try {
       const [nextAccount, nextQueue, nextSettlementHistory] = await Promise.all([
-        myComputeSettlementApi.account(providerId),
-        myComputeSettlementApi.withdrawals(providerId, status),
-        computeSettlementLifecycleApi.listProvider(providerId),
+        myComputeSettlementApi.account(requestProviderId),
+        myComputeSettlementApi.withdrawals(requestProviderId, requestStatus),
+        computeSettlementLifecycleApi.listProvider(requestProviderId),
       ])
+      if (!isCurrentRequest()) return
       setAccount(nextAccount)
       setQueue(nextQueue)
       setSettlementHistory(nextSettlementHistory)
     } catch (reason) {
+      if (!isCurrentRequest()) return
       setError(messageOf(reason, '算力收益读取失败'))
     } finally {
-      setLoadingAccount(false)
+      if (isCurrentRequest()) setLoadingAccount(false)
     }
   }, [providerId, status])
 
   useEffect(() => { void loadProviders() }, [loadProviders])
-  useEffect(() => { void loadAccount() }, [loadAccount])
+  useLayoutEffect(() => { void loadAccount() }, [loadAccount])
 
   async function createWithdrawal(body: CreateMyWithdrawalBody) {
     if (!providerId || submitting) return
@@ -228,7 +247,7 @@ export default function MyComputeSettlementPage() {
             <Balance label="已退回" value={account?.returned_to_available_micros} detail="取消或拒绝" tone="returned" />
           </section>
 
-          <SettlementLifecycleHistoryList items={settlementHistory} loading={loadingAccount} />
+          <SettlementLifecycleHistoryList items={settlementHistory} loading={loadingAccount} scope="participant" />
 
           <section className={styles.section}>
             <header className={styles.sectionHeader}>
