@@ -274,16 +274,6 @@ impl Store {
         Ok(receipt)
     }
 
-    pub(crate) fn compute_attempt_verification_decision(
-        &self,
-        lease_id: &str,
-    ) -> Result<ComputeAttemptVerificationDecisionReceipt> {
-        support::validate_exact("Attempt Lease ID", lease_id, 200)?;
-        let conn = self.conn()?;
-        compute_attempt_verification_decision_on(&*conn, lease_id)?
-            .ok_or_else(|| anyhow!("Attempt 尚无 Verification 决定"))
-    }
-
     pub(crate) fn list_pending_compute_attempt_verifications(
         &self,
         limit: usize,

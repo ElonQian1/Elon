@@ -20,6 +20,12 @@ Store、Service、HTTP/MCP 与 PC 源码为 `source_written/source_review_only/u
 [authority](federation-execution-verification-causal-reference-abi-authority.md) 与
 [acceptance](federation-execution-verification-causal-reference-abi-acceptance.md)。
 
+本批另把 v192 原生读取冻结为 lease-only retained read：participant/admin GET 与新增两条 MCP 都在历史 snapshot 内重审
+v188-v192，成功仍返回 native exact-52，并允许 accepted/rejected/disputed；它不依赖 v193。该增量严格为
+`design_frozen/source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0 failed=0`、
+F0=`not_met`，不得继承旧 v192 的编译或 PC 证据。见 [retained read authority](attempt-verification-retained-read-authority.md)
+与 [acceptance](attempt-verification-retained-read-acceptance.md)。
+
 ## 2. HTTP 路由
 
 | 方法 | 路径 | 调用者 | 作用 |
@@ -27,8 +33,13 @@ Store、Service、HTTP/MCP 与 PC 源码为 `source_written/source_review_only/u
 | GET | `/api/admin/compute/attempt-terminal-candidates/pending-verification` | 平台 `admin/owner` | 读取尚无 v192 决定的完整 v189-v191 证据链 |
 | POST | `/api/admin/compute/attempt-leases/:lease_id/verification-decision` | 平台 `admin/owner` | 写入第一份 Verification 决定 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/verification-decision` | Job 消费者或 Provider 所有者 | 读取并重新审计 Verification 回执 |
+| GET | `/api/admin/compute/attempt-leases/:lease_id/verification-decision` | 平台 `admin/owner` | 按 Lease retained 读取并重新审计 Verification 回执 |
 
 POST 必须提供 v189-v191 三份证据的精确 ID 和事件摘要、policy ID/version、决定、至少一个 reason code、外部决定引用、稳定幂等键，并显式设置 `confirm_no_state_or_settlement_effect=true`。
+
+两条 retained MCP 分别为 `compute_get_my_attempt_verification_decision` 与
+`compute_admin_get_attempt_verification_decision`，input exact `{lease_id}`。普通 MCP 继续 historical project isolation；
+两条 GET 无 query/body。participant 对 missing、integrity drift 和非本人统一脱敏 404，admin 分别返回 404/409。
 
 待验证队列只选择消费者审核和平台观测均已存在、且尚无 Verification 决定的候选。Store 在同一连接内重新读取候选、最终 Provider 用量、消费者审核、平台观测和 Reservation 历史版本，并复用 v192 证据绑定审计；队列只读且可能随并发写入过期，因此 POST 仍会在 `BEGIN IMMEDIATE` 事务中重新验证全部 ID、摘要、meter 和唯一性条件。
 

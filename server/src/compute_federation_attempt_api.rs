@@ -11,6 +11,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
+    compute_federation::attempt_verification_retained_read,
     compute_federation_attempt_receipt_service::{self, IssueComputeAttemptExecutionReceiptBody},
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
@@ -94,7 +95,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         )
         .route(
             "/api/admin/compute/attempt-leases/:lease_id/verification-decision",
-            post(decide_verification),
+            get(attempt_verification_retained_read::get_for_admin).post(decide_verification),
         )
         .route(
             "/api/admin/compute/attempt-terminal-candidates/pending-verification",
@@ -102,7 +103,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         )
         .route(
             "/api/me/compute/attempt-leases/:lease_id/verification-decision",
-            get(get_verification),
+            get(attempt_verification_retained_read::get_for_participant),
         )
         .route(
             "/api/admin/compute/attempt-leases/:lease_id/execution-receipt",
@@ -546,24 +547,6 @@ async fn list_pending_verification_candidates(
             query.limit,
         )
         .map(|candidates| json!({"verification_candidates":candidates})),
-    )
-}
-
-async fn get_verification(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Path(lease_id): Path<String>,
-) -> Response {
-    let user_id = match authenticated_user(&state, &headers) {
-        Ok(user_id) => user_id,
-        Err(response) => return response,
-    };
-    attempt_response(
-        compute_federation_attempt_service::get_verification_for_participant(
-            &state.store,
-            &user_id,
-            &lease_id,
-        ),
     )
 }
 

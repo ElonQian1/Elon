@@ -29,6 +29,7 @@ pub(in crate::store) struct AuditedComputeAttemptLeaseVersion {
     pub(in crate::store) lease: ComputeAttemptLease,
     pub(in crate::store) lease_revision: i64,
     pub(in crate::store) lease_digest: String,
+    pub(in crate::store) consumer_account_id: String,
 }
 
 #[derive(Debug, Clone)]
@@ -288,6 +289,7 @@ pub(in crate::store) fn audited_compute_attempt_lease_version_on(
             lease: activation.lease,
             lease_revision,
             lease_digest: activation.lease_digest,
+            consumer_account_id: running_job.job.consumer_account_id.clone(),
         }));
     }
 
@@ -325,6 +327,7 @@ pub(in crate::store) fn audited_compute_attempt_lease_version_on(
         lease: current_lease,
         lease_revision: current_revision,
         lease_digest: current_digest,
+        consumer_account_id: running_job.job.consumer_account_id.clone(),
     }))
 }
 

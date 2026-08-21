@@ -4,6 +4,10 @@ import {
   type ComputePendingAttemptVerificationCandidate,
   type DecideComputeAttemptVerificationBody,
 } from '../compute-attempt/verificationContracts'
+import {
+  type ValidatedVerificationDecisionRead,
+  validateVerificationDecisionReadForLease,
+} from '../compute-attempt/verificationDecisionReadContracts'
 
 export type {
   ComputeAttemptVerificationDecisionReceipt,
@@ -11,6 +15,7 @@ export type {
   ComputeVerificationDecision,
   DecideComputeAttemptVerificationBody,
 } from '../compute-attempt/verificationContracts'
+export type { ValidatedVerificationDecisionRead } from '../compute-attempt/verificationDecisionReadContracts'
 
 interface PendingVerificationResponse {
   verification_candidates: ComputePendingAttemptVerificationCandidate[]
@@ -32,4 +37,8 @@ export const computeVerificationApi = {
     verificationBase(candidate.terminal_candidate.lease_id),
     body,
   ),
+  readRetained: async (leaseId: string): Promise<ValidatedVerificationDecisionRead> => {
+    const value = await api.get<unknown>(verificationBase(leaseId))
+    return validateVerificationDecisionReadForLease(value, leaseId)
+  },
 }

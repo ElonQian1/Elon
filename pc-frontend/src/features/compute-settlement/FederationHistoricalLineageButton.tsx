@@ -13,6 +13,10 @@ import {
   type ValidatedExecutionVerificationLineageRead,
   validateExecutionVerificationLineagePair,
 } from '../compute-attempt/federationHistoricalVerificationLineageContracts'
+import {
+  type ValidatedVerificationDecisionRead,
+  validateVerificationDecisionLineage,
+} from '../compute-attempt/verificationDecisionReadContracts'
 import { federationHistoricalLineageApi } from './federationHistoricalLineageApi'
 import styles from './FederationHistoricalLineageButton.module.css'
 
@@ -29,6 +33,7 @@ type AuditState =
   | {
       status: 'success'
       execution: ValidatedFederationHistoricalLineageRead
+      verificationDecision: ValidatedVerificationDecisionRead
       verification: ValidatedExecutionVerificationLineageRead
       settlement: ValidatedFederationHistoricalLineageRead
       release: ValidatedSettlementReleaseLineageRead | null
@@ -56,8 +61,9 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
     const generation = ++requestGeneration.current
     setState({ status: 'loading' })
     try {
-      const [execution, verification, settlement, release] = await Promise.all([
+      const [execution, verificationDecision, verification, settlement, release] = await Promise.all([
         federationHistoricalLineageApi.readExecution(scope, leaseId),
+        federationHistoricalLineageApi.readVerificationDecision(scope, leaseId),
         federationHistoricalLineageApi.readVerification(scope, leaseId),
         federationHistoricalLineageApi.readSettlement(scope, leaseId),
         releaseAvailable
@@ -65,10 +71,11 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
           : Promise.resolve(null),
       ])
       validateExecutionVerificationLineagePair(execution, verification)
+      validateVerificationDecisionLineage(verificationDecision, verification)
       if (release) validateFederationHistoricalLineageTriple(execution, settlement, release)
       else validateFederationHistoricalLineagePair(execution, settlement)
       if (generation !== requestGeneration.current) return
-      setState({ status: 'success', execution, verification, settlement, release })
+      setState({ status: 'success', execution, verificationDecision, verification, settlement, release })
     } catch (reason) {
       if (generation !== requestGeneration.current) return
       setState({ status: 'error', message: messageOf(reason) })
@@ -101,8 +108,8 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
       {loading && (
         <p className={styles.status} role="status">
           {releaseAvailable
-            ? '正在并行读取 execution、verification、settlement 与 release 只读证据…'
-            : '正在并行读取 execution、verification 与 settlement 只读证据…'}
+            ? '正在并行读取 execution、native v192、verification、settlement 与 release 只读证据…'
+            : '正在并行读取 execution、native v192、verification 与 settlement 只读证据…'}
         </p>
       )}
       {failed && <p className={styles.error} role="alert"><TriangleAlert size={14} />{state.message}</p>}
@@ -110,10 +117,11 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
         <div id={panelId} className={styles.panel} aria-live="polite">
           <div className={styles.verified}>
             <ShieldCheck size={14} />
-            {state.release ? '四响应摘要与三级跨链等式已核验' : '三响应摘要与两级跨链等式已核验'}
+            {state.release ? '五响应摘要与 native v192 十四项闭合等式已核验' : '四响应摘要与 native v192 十四项闭合等式已核验'}
           </div>
           <div className={styles.profiles}>
             <LineageEvidence label="Execution source" record={state.execution} />
+            <VerificationDecisionEvidence record={state.verificationDecision} />
             <VerificationLineageEvidence record={state.verification} />
             <LineageEvidence label="Settlement source" record={state.settlement} />
             {state.release && <ReleaseLineageEvidence record={state.release} />}
@@ -121,6 +129,24 @@ export default function FederationHistoricalLineageButton({ leaseId, scope, rele
         </div>
       )}
     </div>
+  )
+}
+
+function VerificationDecisionEvidence({ record }: { record: ValidatedVerificationDecisionRead }) {
+  return (
+    <section className={styles.profile}>
+      <div className={styles.profileHeader}>
+        <strong>Retained v192 Verification</strong>
+        <span>{record.decision}</span>
+      </div>
+      <span className={styles.kind}>{record.schema}</span>
+      <code className={styles.digest}>{record.event_digest}</code>
+      <div className={styles.nativeRefs}>
+        <span>verification_id</span><code>{record.verification_decision_id}</code>
+        <span>verified_usage</span><code>{record.verified_usage_digest}</code>
+        <span>compensable_usage</span><code>{record.compensable_usage_digest}</code>
+      </div>
+    </section>
   )
 }
 
@@ -181,10 +207,6 @@ function LineageEvidence({
   )
 }
 
-function messageOf(reason: unknown) {
-  if (reason instanceof Error && reason.message) return reason.message
-  if (reason && typeof reason === 'object' && 'message' in reason && typeof reason.message === 'string') {
-    return reason.message
-  }
+function messageOf(_reason: unknown) {
   return '历史因果链读取或核验失败，请重试。'
 }

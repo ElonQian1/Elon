@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CircleCheck, LoaderCircle, RefreshCw, Scale, ShieldCheck, TriangleAlert } from 'lucide-react'
 import DecideVerificationDialog from './DecideVerificationDialog'
+import VerificationDecisionLookup from './VerificationDecisionLookup'
 import {
   computeVerificationApi,
   type ComputeAttemptVerificationDecisionReceipt,
@@ -57,6 +58,8 @@ export default function ComputeVerificationPage() {
 
       {error && <div className={styles.alert} data-tone="error"><TriangleAlert size={15} />{error}</div>}
       {latest && <div className={styles.alert} data-tone="success"><CircleCheck size={15} />已保存 {decisionLabel(latest.decision)} 决定 · {shortId(latest.verification_decision_id)}</div>}
+
+      <VerificationDecisionLookup />
 
       <section className={styles.queue}>
         <header><div><ShieldCheck size={17} /><h2>待验证证据链</h2></div><span>{candidates.length}</span></header>

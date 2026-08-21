@@ -459,12 +459,3 @@ pub(crate) fn list_pending_verifications_for_platform_admin(
 ) -> Result<Vec<ComputePendingAttemptVerificationCandidate>> {
     store.list_pending_compute_attempt_verifications(limit)
 }
-
-pub(crate) fn get_verification_for_participant(
-    store: &Store,
-    user_id: &str,
-    lease_id: &str,
-) -> Result<ComputeAttemptVerificationDecisionReceipt> {
-    get_for_participant(store, user_id, lease_id)?;
-    store.compute_attempt_verification_decision(lease_id)
-}

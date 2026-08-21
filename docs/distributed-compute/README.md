@@ -55,7 +55,7 @@ owners: backend, node, ai-economy
 | Attempt Provider 终态候选 | v189、追加式 Store、Provider HTTP 与 PC `/compute-execution` 已写；第一份候选必须绑定当前 running Lease、最新 v188 快照和服务端返回的 Workload 输出合同。v226 已通过 5 项 Rust/SQLite 动态测试，线性化“当前流头→唯一候选→声明流封口”，拒绝 legacy 漂移并令下游审核失败关闭。PC 已通过静态生产构建；真实 Gateway/Adapter、HTTP/TCP、浏览器和生产库仍未验证。候选不推进状态、不消费容量、不移动资金，也不等于 Execution Receipt |
 | Attempt 消费者终态审核 | v190、追加式 Store、消费者 HTTP 与 PC `/compute-reviews` 已写；本人待审核队列按消费者过滤并排除已有审核，第一份 `accepted/rejected/disputed` 必须绑定精确 v189 候选。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。审核只登记消费者证据，不等于平台验证或结算 |
 | Attempt 平台终态观测 | v191、追加式 Store、管理员 HTTP 与 PC `/compute-observations` 已写；待观测队列返回已审计候选和最终 Provider meter，管理员可登记完整平台 meter、结果与证据引用并保存差异。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。观测不等于 verified usage、可信终态或结算 |
-| Attempt Verification 决定 | v192、追加式 Store、管理员 HTTP 与 PC `/compute-verification` 已写；待验证队列返回重新审计的 v189-v191 证据链，管理员按保守策略登记 verified/compensable usage。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。决定不生成 Execution Receipt、不改状态和资金 |
+| Attempt Verification 决定 | v192、追加式 Store、管理员 HTTP 与 PC `/compute-verification` 已写；待验证队列返回重新审计的 v189-v191 证据链，管理员按保守策略登记 verified/compensable usage。新增 native retained read 以 Lease-only 重审 v188-v192、返回 exact-52并允许三种决定，另有两条MCP与条件14等式；该增量仅source-review且不依赖v193。旧 PC 已通过静态生产构建，但不能外推给新增量；决定/read都不生成 Execution Receipt、不改状态和资金 |
 | Attempt Execution Receipt | v193、追加式 Store、管理员 HTTP 与 PC `/compute-receipts` 已写；待签发队列只返回重新审计的 accepted Verification 与候选，管理员确认后固定执行身份、工件、用量和证明。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器和生产库仍未验证。回执不改状态、容量和资金 |
 | Attempt 可信终态与容量收口 | v194、追加式 Store、管理员 HTTP 与 PC `/compute-finalization` 已写；待收口队列重新审计 v193 及当前状态并返回精确提交模板。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器、生产库和发布仍未验证。应用终态会推进状态和容量，但预授权和 Provider 收益不变 |
 | Attempt 待结算回执 | v195、追加式 Store、独立 pending 账本、管理员 HTTP 与 PC `/compute-settlement-issuance` 已写；待办队列重审计资金来源并返回金额预览。PC 已通过静态生产构建；操作级后端回归、真实 TCP、浏览器、生产库和发布仍未验证。应用只结清平台内预授权并登记 pending，不是外部资金转移 |
@@ -113,7 +113,7 @@ owners: backend, node, ai-economy
     - `docs/distributed-compute/attempt-final-usage-fence-authority.md`：v188 流头、v189 原子封口、精确重放和 v190-v195 currentness 继承。
 24. `docs/distributed-compute/attempt-consumer-review-api.md`：消费者首次终态审核、证据引用、不可覆盖与非验证/非结算边界。
 25. `docs/distributed-compute/attempt-platform-observation-api.md`：平台首次终态观测、累计 meter 差异、不可覆盖与非验证/非结算边界。
-26. `docs/distributed-compute/attempt-verification-api.md`：保守 Verification policy、verified/compensable usage、不可覆盖与非状态/非结算边界。
+26. `docs/distributed-compute/attempt-verification-api.md`、`docs/distributed-compute/attempt-verification-retained-read-authority.md` 与对应 acceptance：保守 Verification policy、native exact-52 retained read、historical v188-v192、条件14等式与非状态/非结算边界。
 27. `docs/distributed-compute/attempt-execution-receipt-api.md`：accepted Verification 的执行回执、完整源证据重审计与非状态/非结算边界。
 28. `docs/distributed-compute/attempt-finalization-api.md`：精确 Execution Receipt 的可信终态、容量消费/归还与资金不变边界。
 29. `docs/distributed-compute/attempt-settlement-api.md`：CNY 双价格腿、消费者预授权结清与 Provider pending 收益边界。

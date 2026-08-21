@@ -40,6 +40,9 @@
 .details { margin-top: 7px; color: var(--text-muted); font-size: 7px; }
 .details summary { width: fit-content; cursor: pointer; }
 .details pre { max-height: 220px; margin: 7px 0 0; overflow: auto; border: 1px solid var(--border); border-radius: 4px; padding: 7px; color: #c9d9ed; background: var(--bg-base); font-size: 7px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.nativeRefs { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 8px; margin-top: 7px; border-top: 1px solid var(--border); padding-top: 7px; }
+.nativeRefs span { color: var(--text-muted); font-size: 7px; }
+.nativeRefs code { color: #c9d9ed; font-size: 7px; overflow-wrap: anywhere; word-break: break-word; }
 .spinning { animation: lineage-spin .8s linear infinite; }
 
 @keyframes lineage-spin { to { transform: rotate(360deg); } }

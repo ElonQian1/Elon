@@ -6,6 +6,7 @@
 pub(crate) mod activation_admin_mcp;
 pub(crate) mod attempt;
 pub(crate) mod attempt_gateway;
+pub(crate) mod attempt_verification_retained_read;
 pub(crate) mod capacity;
 pub(crate) mod capacity_commitment;
 pub(crate) mod capacity_commitment_api;

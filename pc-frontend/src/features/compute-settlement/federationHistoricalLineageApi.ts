@@ -7,6 +7,7 @@ import {
 } from '../compute-attempt/federationHistoricalLineageContracts'
 import { validateSettlementReleaseLineageReadResponse } from '../compute-attempt/federationHistoricalReleaseLineageContracts'
 import { validateExecutionVerificationLineageReadResponse } from '../compute-attempt/federationHistoricalVerificationLineageContracts'
+import { validateVerificationDecisionReadForLease } from '../compute-attempt/verificationDecisionReadContracts'
 
 const SCOPE_ROOTS: Record<FederationHistoricalLineageScope, string> = {
   participant: '/api/me/compute/attempt-leases',
@@ -28,6 +29,12 @@ export const federationHistoricalLineageApi = {
     readLineage(scope, leaseId, 'execution_source_v1', 'execution-source-lineage'),
   readSettlement: (scope: FederationHistoricalLineageScope, leaseId: string) =>
     readLineage(scope, leaseId, 'settlement_source_v1', 'settlement-source-lineage'),
+  readVerificationDecision: async (scope: FederationHistoricalLineageScope, leaseId: string) => {
+    const value = await api.get<unknown>(
+      `${SCOPE_ROOTS[scope]}/${encodeURIComponent(leaseId)}/verification-decision`,
+    )
+    return validateVerificationDecisionReadForLease(value, leaseId)
+  },
   readVerification: async (scope: FederationHistoricalLineageScope, leaseId: string) => {
     const value = await api.get<unknown>(
       `${SCOPE_ROOTS[scope]}/${encodeURIComponent(leaseId)}/execution-verification-source-lineage`,

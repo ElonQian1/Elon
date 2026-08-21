@@ -77,3 +77,14 @@ failure。新增源码未执行本页 §4 命令、浏览器或视觉验收，�
 `source_written/source_review_only/uncompiled/unrun`，不能继承2026-08-11的历史前端通过证据。权威边界见
 [execution verification acceptance](federation-execution-verification-causal-reference-abi-acceptance.md) 与
 [release acceptance](federation-settlement-release-causal-reference-abi-acceptance.md)。
+
+## 7. 本批未运行的 v192 native retained read
+
+`/compute-verification` 现在以 exact-key parser 读取 native exact-52 retained response，accepted/rejected/disputed 均不依赖
+v193。仅在某张因果卡已有 `execution_verification_source_v1` 时，PC 才把 native v192 的 final snapshot三字段、candidate
+两字段、consumer review两字段、platform observation三字段和verification四字段与Carrier refs做exact 14逐字等式；
+无v193/Carrier不是native read失败。任一真实shape/digest/equality drift整卡失败并保留retry/stale guard。
+
+该增量没有运行本页 §4 的历史命令，也未运行浏览器、服务或网络，严格为
+`design_frozen/source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0 failed=0`、
+F0=`not_met`；旧 PC 构建证据不能外推。见 [retained read acceptance](attempt-verification-retained-read-acceptance.md)。

@@ -1,7 +1,7 @@
 ---
 title: 分布式算力联邦架构
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-22
 owners: backend, node
 ---
 
@@ -112,6 +112,11 @@ v190 的消费者审核把 `accepted/rejected/disputed` 与精确 v189 候选绑
 v191 的平台观测把 control plane、transport gateway 或 server metering 的累计 meter 与同一候选绑定，并显式保存差异 meter。该证据仍需 Verification policy 评估来源、签名、重复执行和争议状态，不能直接写入 `verified_usage`。
 
 v192 的 `conservative_min_v1` 首次把精确 v189-v191 证据裁决为 accepted/rejected/disputed，并确定 verified/compensable usage。它仍是独立验证回执，不是 Execution Receipt；来源可信、挑战与争议、任务终态、容量消费和资金结算仍需后续阶段完成。
+
+v192 native retained read 只按 Lease 在同一历史 snapshot 内重审 v188-v192，返回原生 exact-52，并用 private scope限制
+consumer、Provider owner、admin 与 MCP project。它不依赖 v193，所以 rejected/disputed 与尚无 Execution Receipt 的
+accepted 仍可读；PC 仅在 v193 Carrier 已存在时再强制 14 条 ref 等式。该 read 不提升人工计量可信度，也没有状态或经济
+效果，边界见 `attempt-verification-retained-read-authority.md`。
 
 v193 仅把 accepted v192 与 Attempt 激活、Job/Reservation 历史、运行工件和用量组合为不可变 Execution Receipt。回执读取时重建并重算摘要，但它仍只是后续状态机和 Settlement 的输入，不直接更新任何状态或账本。
 

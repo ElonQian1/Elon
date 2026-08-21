@@ -1,4 +1,6 @@
-use anyhow::{bail, Result};
+use std::fmt;
+
+use anyhow::{bail, Error as AnyhowError, Result};
 use rusqlite::TransactionBehavior;
 
 use crate::compute_federation::federation_historical_causal_reference::{
@@ -10,7 +12,12 @@ use crate::compute_federation::federation_historical_causal_reference::{
 use super::{
     compute_attempt_execution_receipts::compute_attempt_historical_execution_receipt_by_lease_on,
     compute_attempt_settlement_releases::compute_attempt_historical_settlement_release_by_lease_on,
-    compute_attempt_settlements::compute_attempt_historical_settlement_by_lease_on, Store,
+    compute_attempt_settlements::compute_attempt_historical_settlement_by_lease_on,
+    compute_attempt_verifications::{
+        compute_attempt_historical_verification_decision_on,
+        ComputeAttemptVerificationDecisionReceipt,
+    },
+    Store,
 };
 
 mod execution;
@@ -19,6 +26,7 @@ mod release_refs;
 mod settlement;
 mod source_refs;
 mod verification;
+mod verification_read;
 mod verification_refs;
 
 #[cfg(test)]
@@ -29,6 +37,118 @@ pub(crate) struct ValidatedFederationHistoricalLineage {
     lineage_digest: String,
     kind: FederationHistoricalLineageKindV1,
     access_scope: FederationHistoricalLineageAccessScope,
+}
+
+pub(crate) struct ValidatedComputeAttemptRetainedVerification {
+    receipt: ComputeAttemptVerificationDecisionReceipt,
+    access_scope: ComputeAttemptRetainedVerificationAccessScope,
+}
+
+pub(crate) enum ComputeAttemptRetainedVerificationResolveError {
+    Integrity { source: AnyhowError },
+    Operational { source: AnyhowError },
+}
+
+impl ComputeAttemptRetainedVerificationResolveError {
+    fn integrity(source: impl Into<AnyhowError>) -> Self {
+        Self::Integrity {
+            source: source.into(),
+        }
+    }
+
+    fn operational(source: impl Into<AnyhowError>) -> Self {
+        Self::Operational {
+            source: source.into(),
+        }
+    }
+}
+
+impl fmt::Display for ComputeAttemptRetainedVerificationResolveError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Integrity { source } => {
+                write!(
+                    formatter,
+                    "retained Verification integrity failure: {source:#}"
+                )
+            }
+            Self::Operational { source } => {
+                write!(
+                    formatter,
+                    "retained Verification operational failure: {source:#}"
+                )
+            }
+        }
+    }
+}
+
+impl fmt::Debug for ComputeAttemptRetainedVerificationResolveError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, formatter)
+    }
+}
+
+struct ComputeAttemptRetainedVerificationAccessScope {
+    consumer_account_id: String,
+    project_id: Option<String>,
+    provider_owner_account_id: String,
+}
+
+impl ComputeAttemptRetainedVerificationAccessScope {
+    fn from_historical_job_and_provider(
+        consumer_account_id: &str,
+        project_id: Option<&str>,
+        provider_owner_account_id: &str,
+    ) -> Result<Self> {
+        validate_scope_id(
+            "retained Verification consumer account ID",
+            consumer_account_id,
+        )?;
+        if let Some(project_id) = project_id {
+            validate_scope_id("retained Verification project ID", project_id)?;
+        }
+        validate_scope_id(
+            "retained Verification Provider owner account ID",
+            provider_owner_account_id,
+        )?;
+        Ok(Self {
+            consumer_account_id: consumer_account_id.to_string(),
+            project_id: project_id.map(str::to_string),
+            provider_owner_account_id: provider_owner_account_id.to_string(),
+        })
+    }
+
+    fn permits_user(&self, user_id: &str) -> bool {
+        user_id == self.consumer_account_id || user_id == self.provider_owner_account_id
+    }
+
+    fn belongs_to_project(&self, project_id: &str) -> bool {
+        self.project_id.as_deref() == Some(project_id)
+    }
+}
+
+impl ValidatedComputeAttemptRetainedVerification {
+    fn from_historical_receipt(
+        receipt: ComputeAttemptVerificationDecisionReceipt,
+        access_scope: ComputeAttemptRetainedVerificationAccessScope,
+    ) -> Self {
+        Self {
+            receipt,
+            access_scope,
+        }
+    }
+
+    pub(crate) fn permits_user(&self, user_id: &str) -> bool {
+        self.access_scope.permits_user(user_id)
+    }
+
+    pub(crate) fn belongs_to_project(&self, project_id: &str) -> bool {
+        self.access_scope.belongs_to_project(project_id)
+    }
+
+    pub(crate) fn into_receipt(self) -> ComputeAttemptVerificationDecisionReceipt {
+        self.receipt
+    }
 }
 
 struct FederationHistoricalLineageAccessScope {
@@ -141,6 +261,34 @@ impl ValidatedFederationHistoricalLineage {
 }
 
 impl Store {
+    pub(crate) fn resolve_compute_attempt_retained_verification(
+        &self,
+        lease_id: &str,
+    ) -> std::result::Result<
+        Option<ValidatedComputeAttemptRetainedVerification>,
+        ComputeAttemptRetainedVerificationResolveError,
+    > {
+        let mut conn = self
+            .conn()
+            .map_err(ComputeAttemptRetainedVerificationResolveError::operational)?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(ComputeAttemptRetainedVerificationResolveError::operational)?;
+        let Some(receipt) = compute_attempt_historical_verification_decision_on(&tx, lease_id)
+            .map_err(classify_retained_verification_owner_error)?
+        else {
+            tx.commit()
+                .map_err(ComputeAttemptRetainedVerificationResolveError::operational)?;
+            return Ok(None);
+        };
+        let validated =
+            verification_read::validate_retained_verification_on(&tx, lease_id, receipt)
+                .map_err(classify_retained_verification_owner_error)?;
+        tx.commit()
+            .map_err(ComputeAttemptRetainedVerificationResolveError::operational)?;
+        Ok(Some(validated))
+    }
+
     pub(crate) fn resolve_compute_execution_source_lineage(
         &self,
         execution_receipt_id: &str,
@@ -262,4 +410,26 @@ fn validate_scope_id(label: &str, value: &str) -> Result<()> {
         bail!("{label} is invalid");
     }
     Ok(())
+}
+
+fn classify_retained_verification_owner_error(
+    source: AnyhowError,
+) -> ComputeAttemptRetainedVerificationResolveError {
+    let contains_operational_query_error = source.chain().any(|cause| {
+        cause
+            .downcast_ref::<rusqlite::Error>()
+            .is_some_and(|error| match error {
+                rusqlite::Error::QueryReturnedNoRows
+                | rusqlite::Error::FromSqlConversionFailure(..)
+                | rusqlite::Error::IntegralValueOutOfRange(..)
+                | rusqlite::Error::Utf8Error(..)
+                | rusqlite::Error::InvalidColumnType(..) => false,
+                _ => true,
+            })
+    });
+    if contains_operational_query_error {
+        ComputeAttemptRetainedVerificationResolveError::operational(source)
+    } else {
+        ComputeAttemptRetainedVerificationResolveError::integrity(source)
+    }
 }

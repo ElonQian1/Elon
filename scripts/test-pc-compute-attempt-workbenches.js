@@ -12,6 +12,11 @@ const executionApi = source('pc-frontend/src/features/compute-execution/computeE
 const lineageContracts = source('pc-frontend/src/features/compute-attempt/federationHistoricalLineageContracts.ts')
 const releaseLineageContracts = source('pc-frontend/src/features/compute-attempt/federationHistoricalReleaseLineageContracts.ts')
 const verificationLineageContracts = source('pc-frontend/src/features/compute-attempt/federationHistoricalVerificationLineageContracts.ts')
+const verificationDecisionContracts = source('pc-frontend/src/features/compute-attempt/verificationDecisionReadContracts.ts')
+const verificationApi = source('pc-frontend/src/features/compute-verification/computeVerificationApi.ts')
+const verificationPage = source('pc-frontend/src/features/compute-verification/ComputeVerificationPage.tsx')
+const verificationLookup = source('pc-frontend/src/features/compute-verification/VerificationDecisionLookup.tsx')
+const verificationStyles = source('pc-frontend/src/features/compute-verification/ComputeVerificationPage.module.css')
 const lineageApi = source('pc-frontend/src/features/compute-settlement/federationHistoricalLineageApi.ts')
 const lineageButton = source('pc-frontend/src/features/compute-settlement/FederationHistoricalLineageButton.tsx')
 const lineageStyles = source('pc-frontend/src/features/compute-settlement/FederationHistoricalLineageButton.module.css')
@@ -172,16 +177,78 @@ assert.match(verificationLineageContracts, /verification\.carrier\.lineage\.exec
 assert.match(verificationLineageContracts, /verification\.carrier\.lineage\.execution_receipt\.execution_receipt_id,\s*execution\.carrier\.lineage\.execution_receipt\.execution_receipt_id/, 'verification must bind the execution receipt ID')
 assert.match(verificationLineageContracts, /verification\.carrier\.lineage\.execution_receipt\.execution_receipt_digest,\s*execution\.carrier\.lineage\.execution_receipt\.execution_receipt_digest/, 'verification must bind the execution receipt digest')
 
+assert.deepEqual(quotedConstKeys(verificationDecisionContracts, 'VERIFICATION_DECISION_READ_KEYS'), [
+  'schema', 'verification_decision_id', 'terminal_candidate_id', 'terminal_candidate_event_digest',
+  'consumer_review_id', 'consumer_review_event_digest', 'platform_observation_id',
+  'platform_observation_event_digest', 'lease_id', 'provider_id', 'consumer_account_id',
+  'source_lease_revision', 'source_lease_digest', 'fencing_generation', 'job_id', 'job_revision',
+  'job_digest', 'reservation_id', 'reservation_revision', 'reservation_digest', 'capacity_claim_id',
+  'capacity_claim_revision', 'capacity_claim_digest', 'final_usage_snapshot_id',
+  'final_usage_sequence_no', 'final_provider_usage_digest', 'platform_observed_usage_digest',
+  'candidate_outcome', 'consumer_decision', 'observed_outcome', 'policy_id', 'policy_version',
+  'decision', 'reason_codes', 'reason_codes_digest', 'decision_ref', 'verified_usage',
+  'verified_usage_digest', 'compensable_usage', 'compensable_usage_digest', 'request_digest',
+  'event_digest', 'decided_by_user_id', 'decided_at', 'verification_effect',
+  'execution_receipt_effect', 'lease_effect', 'job_effect', 'capacity_effect', 'reservation_effect',
+  'money_effect', 'replayed',
+], 'native v192 retained read must reject any extra or missing key outside the exact 52-key ABI')
+assert.deepEqual(quotedConstKeys(verificationDecisionContracts, 'METER_READING_KEYS'), [
+  'meter', 'quantity', 'source_kind', 'source_id', 'reading_digest', 'observed_at',
+], 'native v192 meter readings must retain their exact six-key ABI')
+assert.ok(verificationDecisionContracts.includes("'compute_federation.attempt_verification_decision.v1'"), 'native v192 schema must stay literal')
+for (const literal of [
+  'succeeded', 'failed', 'canceled', 'indeterminate', 'accepted', 'rejected', 'disputed',
+  'conservative_min_v1', 'conservative_min_v1@1', 'verification_policy', 'compensation_policy',
+  'verified_usage_recorded', 'rejection_recorded', 'dispute_recorded', 'none', 'unchanged',
+  'preauthorization_unchanged',
+]) assert.ok(verificationDecisionContracts.includes(`'${literal}'`), `native v192 parser must freeze ${literal}`)
+for (const field of [
+  'source_lease_revision', 'fencing_generation', 'job_revision', 'reservation_revision',
+  'capacity_claim_revision', 'final_usage_sequence_no',
+]) assert.match(verificationDecisionContracts, new RegExp(`positiveSafeInteger\\(\\s*receipt\\.${field}`), `${field} must be a positive JSON safe integer`)
+for (const field of [
+  'terminal_candidate_event_digest', 'consumer_review_event_digest',
+  'platform_observation_event_digest', 'source_lease_digest', 'job_digest', 'reservation_digest',
+  'capacity_claim_digest', 'final_provider_usage_digest', 'platform_observed_usage_digest',
+  'reason_codes_digest', 'verified_usage_digest', 'compensable_usage_digest', 'request_digest',
+  'event_digest',
+]) assert.match(verificationDecisionContracts, new RegExp(`digest\\([\\s\\S]{0,90}receipt\\.${field}|digest\\(receipt\\.${field}`), `${field} must be lowercase SHA-256 validated`)
+assert.match(verificationDecisionContracts, /receipt\.replayed !== false/, 'historical v192 reads must reject replayed=true')
+assert.match(verificationDecisionContracts, /expectSame\(receipt\.lease_id, id\(expectedLeaseId, 'expected lease_id'\), 'requested Lease→v192 lease_id'\)/, 'native v192 reads must bind the response to the requested Lease root')
+assert.match(verificationDecisionContracts, /reason_codes 必须包含 1 至 16 项/, 'reason codes must retain their v192 bound')
+assert.match(verificationDecisionContracts, /value\.length < 1 \|\| value\.length > 64/, 'meter readings must retain their v192 bound')
+assert.match(verificationDecisionContracts, /rejected\/disputed v192 的 policy usage 必须为零/, 'negative decisions must retain zero policy usage')
+assert.match(verificationDecisionContracts, /\\u007f-\\u009f/, 'native v192 strings must reject the full C0, DEL, and C1 control ranges')
+assert.match(verificationDecisionContracts, /function id\([\s\S]*CONTROL_CHARACTER\.test\(result\)[\s\S]*return result/, 'native v192 ID fields and requested Lease roots must reject control characters')
+assert.match(verificationDecisionContracts, /const RUST_TRIM_EDGE/, 'native v192 strings must mirror Rust Unicode trim semantics without rejecting U+FEFF')
+assert.doesNotMatch(verificationDecisionContracts, /result !== result\.trim\(\)/, 'JavaScript-only FEFF trim semantics must not narrow native v192')
+assert.doesNotMatch(verificationDecisionContracts, /crypto\.subtle|sha256Hex|createHash|verification_event_digest\s*=/, 'PC must not copy any native v192 digest algorithm')
+assert.equal((verificationDecisionContracts.match(/expectSame\(decision\./g) ?? []).length, 14, 'native v192 and execution_verification_source_v1 must close exactly fourteen retained equations')
+assert.match(verificationDecisionContracts, /expectLiteral\(decision\.decision, 'accepted'/, 'a paired execution verification Carrier must require accepted native v192')
+const v192CarrierFields = [
+  'provider_declared_usage.usage_snapshot_id', 'provider_declared_usage.usage_sequence_no',
+  'provider_declared_usage.cumulative_usage_digest', 'terminal_candidate.terminal_candidate_id',
+  'terminal_candidate.terminal_candidate_event_digest', 'consumer_review.consumer_review_id',
+  'consumer_review.consumer_review_event_digest', 'platform_observation.platform_observation_id',
+  'platform_observation.platform_observation_event_digest',
+  'platform_observation.cumulative_observed_usage_digest',
+  'verification_decision.verification_decision_id', 'verification_decision.verification_event_digest',
+  'verification_decision.verified_usage_digest', 'verification_decision.compensable_usage_digest',
+]
+for (const field of v192CarrierFields) assert.ok(verificationDecisionContracts.includes(`lineage.${field}`), `${field} must participate in the native v192 closure`)
+
 assert.ok(lineageApi.includes("participant: '/api/me/compute/attempt-leases'"), 'participant reads must use the /api/me scope')
 assert.ok(lineageApi.includes("admin: '/api/admin/compute/attempt-leases'"), 'admin reads must use the /api/admin scope')
 assert.ok(lineageApi.includes('execution-source-lineage'), 'execution lineage GET suffix must stay frozen')
 assert.ok(lineageApi.includes('settlement-source-lineage'), 'settlement lineage GET suffix must stay frozen')
 assert.ok(lineageApi.includes('settlement-release-source-lineage'), 'release lineage GET suffix must stay frozen')
 assert.ok(lineageApi.includes('execution-verification-source-lineage'), 'verification lineage GET suffix must stay frozen')
+assert.ok(lineageApi.includes('/verification-decision'), 'lineage audit must read the native v192 retained owner')
 assert.match(lineageApi, /api\.get<unknown>/, 'lineage HTTP payloads must remain untrusted until runtime validation')
 assert.doesNotMatch(lineageApi, /api\.(?:post|patch|put|delete)/, 'historical lineage adoption must remain read-only')
 assert.match(lineageButton, /await Promise\.all\(\[\s*federationHistoricalLineageApi\.readExecution[\s\S]*federationHistoricalLineageApi\.readSettlement/, 'execution and settlement lineage must be fetched in parallel')
 assert.match(lineageButton, /federationHistoricalLineageApi\.readExecution[\s\S]*federationHistoricalLineageApi\.readVerification[\s\S]*federationHistoricalLineageApi\.readSettlement/, 'execution, verification, and settlement lineage must be fetched in one parallel batch')
+assert.match(lineageButton, /federationHistoricalLineageApi\.readExecution[\s\S]*readVerificationDecision[\s\S]*readVerification[\s\S]*readSettlement/, 'execution, native v192, verification Carrier, and settlement must share one parallel batch')
 assert.match(lineageButton, /releaseAvailable\s*\? federationHistoricalLineageApi\.readRelease[\s\S]*: Promise\.resolve\(null\)/, 'pending rows must not turn an absent release into integrity failure')
 assert.match(lineageButton, /useLayoutEffect\(\(\) => \{[\s\S]*requestGeneration\.current \+= 1[\s\S]*setState\(\{ status: 'idle' \}\)[\s\S]*\}, \[leaseId, releaseAvailable, scope\]\)/, 'Lease, release, or scope changes must invalidate and clear historical lineage evidence before paint')
 assert.equal((lineageButton.match(/if \(generation !== requestGeneration\.current\) return/g) ?? []).length, 2, 'stale lineage requests must be rejected before both success and error updates')
@@ -189,11 +256,13 @@ assert.match(lineageButton, /finally \{\s*if \(generation === requestGeneration\
 const pairValidationIndex = lineageButton.indexOf('validateFederationHistoricalLineagePair(execution, settlement)')
 const tripleValidationIndex = lineageButton.indexOf('validateFederationHistoricalLineageTriple(execution, settlement, release)')
 const verificationValidationIndex = lineageButton.indexOf('validateExecutionVerificationLineagePair(execution, verification)')
+const retainedVerificationValidationIndex = lineageButton.indexOf('validateVerificationDecisionLineage(verificationDecision, verification)')
 const lineageSuccessIndex = lineageButton.indexOf("setState({ status: 'success'")
 assert.ok(pairValidationIndex >= 0 && lineageSuccessIndex > pairValidationIndex, 'the pair equation must pass before any evidence is displayed')
 assert.ok(tripleValidationIndex >= 0 && lineageSuccessIndex > tripleValidationIndex, 'the triple equation must pass before released evidence is displayed')
 assert.ok(verificationValidationIndex >= 0 && lineageSuccessIndex > verificationValidationIndex, 'the verification equation must pass before any evidence is displayed')
-for (const phrase of ['并行核验因果链', '重试因果链核验', '三响应摘要与两级跨链等式已核验', '四响应摘要与三级跨链等式已核验']) {
+assert.ok(retainedVerificationValidationIndex >= 0 && lineageSuccessIndex > retainedVerificationValidationIndex, 'the fourteen native v192 equations must pass before any evidence is displayed')
+for (const phrase of ['并行核验因果链', '重试因果链核验', '四响应摘要与 native v192 十四项闭合等式已核验', '五响应摘要与 native v192 十四项闭合等式已核验']) {
   assert.ok(lineageButton.includes(phrase), `lineage button must expose ${phrase}`)
 }
 assert.match(lineageButton, /^function LineageEvidence/m, 'evidence rendering must use a module-scope component')
@@ -201,6 +270,7 @@ assert.doesNotMatch(lineageButton, /import\(/, 'lineage adoption must use direct
 assert.doesNotMatch(lineageButton, /localStorage|sessionStorage|download|href=/, 'lineage evidence must not be persisted or exported')
 assert.doesNotMatch(releaseLineageContracts, /localStorage|sessionStorage|download|href=/, 'release lineage evidence must not be persisted or exported')
 assert.doesNotMatch(verificationLineageContracts, /localStorage|sessionStorage|download|href=/, 'verification lineage evidence must not be persisted or exported')
+assert.doesNotMatch(verificationDecisionContracts + verificationLookup + lineageButton, /localStorage|sessionStorage|download|href=|console\./, 'native v192 evidence must not be persisted, exported, or logged')
 assert.match(releaseLineageContracts, /\\u007f-\\u009f/, 'release lineage IDs must reject the full C0, DEL, and C1 control ranges')
 assert.match(releaseLineageContracts, /const RUST_TRIM_EDGE/, 'release lineage IDs must mirror Rust Unicode trim semantics without rejecting U+FEFF')
 assert.doesNotMatch(releaseLineageContracts, /result !== result\.trim\(\)/, 'JavaScript-only FEFF trim semantics must not narrow the frozen Rust ABI')
@@ -208,6 +278,22 @@ assert.match(verificationLineageContracts, /\\u007f-\\u009f/, 'verification line
 assert.match(verificationLineageContracts, /const RUST_TRIM_EDGE/, 'verification lineage IDs must mirror Rust Unicode trim semantics without rejecting U+FEFF')
 assert.doesNotMatch(verificationLineageContracts, /result !== result\.trim\(\)/, 'verification lineage must not apply JavaScript-only FEFF trimming')
 assert.match(lineageStyles, /overflow-wrap:\s*anywhere/, 'long historical digests must stay readable')
+assert.match(verificationPage, /<VerificationDecisionLookup \/>/, '/compute-verification must expose the independent Lease lookup')
+assert.match(verificationApi, /api\.get<unknown>\(verificationBase\(leaseId\)\)/, 'admin Lease lookup must treat native v192 as untrusted input')
+assert.match(verificationApi, /validateVerificationDecisionReadForLease\(value, leaseId\)/, 'admin Lease lookup must validate shape and requested Lease root before display')
+assert.match(lineageApi, /validateVerificationDecisionReadForLease\(value, leaseId\)/, 'lineage audit must reject a native v192 response spliced from another Lease')
+for (const phrase of ['accepted、rejected、disputed', '读取中', '读取失败', '重试', '没有可读的历史 Verification 决定']) {
+  assert.ok(verificationLookup.includes(phrase), `Lease lookup must expose ${phrase}`)
+}
+assert.match(verificationLookup, /if \(!requestedLeaseId \|\| busy\.current\) return/, 'Lease lookup must suppress duplicate requests')
+assert.doesNotMatch(verificationLookup, /leaseInput\.trim\(\)/, 'Lease lookup must not narrow Rust trim semantics by stripping U+FEFF')
+assert.match(verificationLookup, /useLayoutEffect\(\(\) => \{[\s\S]*requestGeneration\.current \+= 1[\s\S]*setState\(\{ status: 'idle' \}\)[\s\S]*\}, \[leaseInput\]\)/, 'Lease edits and unmount must invalidate stale lookup responses')
+assert.equal((verificationLookup.match(/if \(generation !== requestGeneration\.current\) return/g) ?? []).length, 2, 'lookup success and error must both reject stale responses')
+assert.match(verificationLookup, /finally \{\s*if \(generation === requestGeneration\.current\) busy\.current = false\s*\}/, 'only the current lookup may release its busy guard')
+assert.match(verificationLookup, /statusOf\(reason\) === 404[\s\S]*status: 'empty'/, 'a missing retained decision must become an empty state')
+assert.doesNotMatch(verificationLookup, /reason\.message|JSON\.stringify|responseText/, 'lookup errors must not reveal retained integrity details or raw payloads')
+assert.doesNotMatch(lineageButton, /reason\.message|JSON\.stringify|responseText/, 'lineage card errors must not reveal retained integrity details or raw payloads')
+assert.match(verificationStyles, /\.lookupFacts code[^{]*\{[^}]*overflow-wrap:\s*anywhere/, 'long retained IDs must wrap without breaking the page')
 assert.match(lifecycleHistory, /FederationHistoricalLineageButton[\s\S]*leaseId=\{item\.settlement\.lease_id\}[\s\S]*scope=\{scope\}[\s\S]*releaseAvailable=\{Boolean\(item\.release\)\}/, 'each settlement history row must pass its Lease, scope, and release presence')
 assert.match(challengePage, /SettlementLifecycleHistoryList items=\{history\} loading=\{loading\} scope="participant"/, 'consumer challenge history must use participant scope')
 assert.match(resolutionPage, /SettlementLifecycleHistoryList items=\{history\} loading=\{loading\} scope="admin"/, 'resolution history must use admin scope')

@@ -215,7 +215,7 @@ v190 再补齐消费者侧的第一份终态审核证据：只有候选绑定的
 
 v191 再补齐平台侧的第一份终态观测：`admin/owner` 可把 control plane、transport gateway 或 server metering 的完整累计 meter 与精确 v189/v188 绑定，保存与 Provider 声明不同的 meter。平台观测仍是待验证证据，差异或一致都不自动形成责任、可信终态、verified usage 或结算。边界见 `docs/distributed-compute/attempt-platform-observation-api.md`。
 
-v192 首次形成独立 Verification 决定：平台 `admin/owner` 必须精确绑定 v189-v191 三份证据，首版 `conservative_min_v1` 只有在消费者接受且 Provider/平台 outcome 一致时才允许 accepted；verified usage 取双方较小值，compensable usage 再受 Reservation 上限约束。拒绝或争议记录零用量。该决定不可覆盖，但仍不生成 Execution Receipt、不推进状态、不消费容量、不移动资金。边界见 `docs/distributed-compute/attempt-verification-api.md`。
+v192 首次形成独立 Verification 决定：平台 `admin/owner` 必须精确绑定 v189-v191 三份证据，首版 `conservative_min_v1` 只有在消费者接受且 Provider/平台 outcome 一致时才允许 accepted；verified usage 取双方较小值，compensable usage 再受 Reservation 上限约束。拒绝或争议记录零用量。该决定不可覆盖，但仍不生成 Execution Receipt、不推进状态、不消费容量、不移动资金；native v188-v192 retained read 边界另见 `docs/distributed-compute/attempt-verification-retained-read-authority.md`。
 
 v193 允许平台 `admin/owner` 仅基于 accepted v192 决定签发不可变 Execution Receipt。回执重新审计 Attempt 激活、Job/Reservation 历史和 v188-v192，固定 executor、Offer、runner/plugin/model、输入输出、四类用量、三方证明与 Verification；缺少 runtime/runner 或证据不一致时失败关闭。它仍不推进状态、不消费容量、不移动资金。边界见 `docs/distributed-compute/attempt-execution-receipt-api.md`。
 
