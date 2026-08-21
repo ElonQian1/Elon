@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, ExternalLink, Globe2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, Globe2, PanelTopOpen } from 'lucide-react'
 import { useState } from 'react'
 import { isLocalAiBrowserAvailable } from '../user-browser/localAiBrowserApi'
 import { openInternalBrowserLink } from '../user-browser/internalBrowserApi'
@@ -41,40 +41,28 @@ export default function AiSourceLinks({ sources }: { sources?: AiSource[] }) {
 
           return (
             <article className={styles.card} key={source.url}>
-              {internalTabs ? (
+              <a
+                className={[styles.main, !internalTabs ? styles.mainOnly : ''].join(' ')}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                title={`使用系统浏览器打开：${title}`}
+                aria-label={`使用系统浏览器打开 ${title}`}
+              >
+                {content}
+                {!internalTabs && <ExternalLink size={14} aria-hidden="true" />}
+              </a>
+
+              {internalTabs && (
                 <button
-                  className={styles.main}
+                  className={styles.internal}
                   type="button"
-                  title={`在一龙标签页打开：${title}`}
+                  title="在一龙内部标签页打开"
                   aria-label={`在一龙标签页打开 ${title}`}
                   onClick={() => openInternalBrowserLink(source)}
                 >
-                  {content}
+                  <PanelTopOpen size={15} aria-hidden="true" />
                 </button>
-              ) : (
-                <a
-                  className={[styles.main, styles.mainExternal].join(' ')}
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={`打开来源：${title}`}
-                >
-                  {content}
-                  <ExternalLink size={14} aria-hidden="true" />
-                </a>
-              )}
-
-              {internalTabs && (
-                <a
-                  className={styles.external}
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="使用系统浏览器打开"
-                  aria-label={`使用系统浏览器打开 ${title}`}
-                >
-                  <ExternalLink size={15} aria-hidden="true" />
-                </a>
               )}
             </article>
           )
