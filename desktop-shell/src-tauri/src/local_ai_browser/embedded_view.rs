@@ -54,13 +54,23 @@ pub(crate) async fn present_local_ai_web_session_embedded(
     provider_id: String,
     owner_key: String,
     bounds: EmbeddedWebviewBounds,
+    content_only: Option<bool>,
 ) -> Result<LocalAiWebSessionState, String> {
     let provider = provider(&provider_id)?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
-    present(&app, &label, bounds)?;
+    let content_only = content_only.unwrap_or(false);
+    if content_only {
+        let state = runtime
+            .snapshot(&label)
+            .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))?;
+        if !answer_surface_ready(&state) {
+            return Err("官网回答区域尚未就绪，已继续显示本机缓存。".to_string());
+        }
+    }
+    present(&app, &label, bounds, content_only)?;
     runtime.mark_window_status(&label, "ready");
     runtime.mark_window_visible(&label, true);
     runtime
@@ -124,6 +134,7 @@ pub(crate) fn present(
     app: &AppHandle,
     webview_label: &str,
     bounds: EmbeddedWebviewBounds,
+    content_only: bool,
 ) -> Result<(), String> {
     let bounds = bounds.validate()?;
     let webview = app
@@ -139,17 +150,23 @@ pub(crate) fn present(
     if let Some(popout) = app.get_window(webview_label) {
         popout.hide().map_err(display_error)?;
     }
+    set_content_surface_mode(&webview, content_only)?;
     webview
         .set_position(bounds.position())
         .map_err(display_error)?;
     webview.set_size(bounds.size()).map_err(display_error)?;
     webview.show().map_err(display_error)?;
     raise_webview(&webview)?;
-    webview.set_focus().map_err(display_error)
+    if content_only {
+        Ok(())
+    } else {
+        webview.set_focus().map_err(display_error)
+    }
 }
 
 pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     if let Some(webview) = app.get_webview(webview_label) {
+        set_content_surface_mode(&webview, false)?;
         park(&webview)?;
     }
     if let Some(popout) = app.get_window(webview_label) {
@@ -161,6 +178,118 @@ pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     main_webview.show().map_err(display_error)?;
     raise_webview(&main_webview)?;
     main_webview.set_focus().map_err(display_error)
+}
+
+fn set_content_surface_mode(webview: &Webview, enabled: bool) -> Result<(), String> {
+    let script = if enabled {
+        answer_surface_script()
+    } else {
+        restore_surface_script()
+    };
+    webview.eval(script).map_err(display_error)
+}
+
+fn answer_surface_ready(state: &LocalAiWebSessionState) -> bool {
+    if state.loading
+        || state.semantic_cache_status != "live"
+        || !state.context_ready
+        || state.window_status == "blocked"
+        || state.window_status == "error"
+    {
+        return false;
+    }
+    let Some(event) = state.semantic_event.as_ref() else {
+        return false;
+    };
+    if event
+        .get("streaming")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+    {
+        return false;
+    }
+    semantic_event_has_completed_assistant(event)
+}
+
+fn semantic_event_has_completed_assistant(event: &serde_json::Value) -> bool {
+    event
+        .get("messages")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|messages| {
+            messages.iter().any(|message| {
+                message.get("role").and_then(serde_json::Value::as_str) == Some("assistant")
+                    && message.get("state").and_then(serde_json::Value::as_str) != Some("streaming")
+            })
+        })
+}
+
+fn answer_surface_script() -> &'static str {
+    r#"
+(function () {
+  'use strict';
+  var styleId = 'elon-official-answer-surface-style';
+  var backdropId = 'elon-official-answer-surface-backdrop';
+  document.documentElement.removeAttribute('data-elon-official-answer-surface');
+  document.querySelectorAll('[data-elon-official-answer-root]').forEach(function (node) {
+    node.removeAttribute('data-elon-official-answer-root');
+  });
+  var oldStyle = document.getElementById(styleId);
+  if (oldStyle) oldStyle.remove();
+  var oldBackdrop = document.getElementById(backdropId);
+  if (oldBackdrop) oldBackdrop.remove();
+
+  var root = document.querySelector('main, [role="main"]');
+  if (!(root instanceof HTMLElement)) return;
+
+  var style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = [
+    'html[data-elon-official-answer-surface],',
+    'html[data-elon-official-answer-surface] body { overflow: hidden !important; background: #202124 !important; }',
+    '#elon-official-answer-surface-backdrop { position: fixed !important; inset: 0 !important; z-index: 2147483000 !important; background: #202124 !important; }',
+    '[data-elon-official-answer-root] { position: fixed !important; inset: 0 !important; z-index: 2147483001 !important; box-sizing: border-box !important; width: 100vw !important; max-width: none !important; height: 100vh !important; max-height: none !important; margin: 0 !important; overflow: auto !important; overscroll-behavior: contain !important; border-radius: 0 !important; background: #202124 !important; }',
+    '[data-elon-official-answer-root] form:has(textarea), [data-elon-official-answer-root] form:has([contenteditable]) { opacity: 0 !important; pointer-events: none !important; }',
+    '[data-elon-official-answer-root] textarea, [data-elon-official-answer-root] [contenteditable="true"], [data-elon-official-answer-root] [contenteditable="plaintext-only"] { opacity: 0 !important; pointer-events: none !important; }'
+  ].join('\n');
+  document.head.appendChild(style);
+
+  var backdrop = document.createElement('div');
+  backdrop.id = backdropId;
+  backdrop.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(backdrop);
+  root.setAttribute('data-elon-official-answer-root', 'true');
+  document.documentElement.setAttribute('data-elon-official-answer-surface', 'true');
+
+  window.requestAnimationFrame(function () {
+    var candidates = Array.from(root.querySelectorAll(
+      '[data-testid^="conversation-turn-"][data-message-author-role="assistant"], [data-message-author-role="assistant"], [data-sfc-cp][data-hveid], article, [role="article"]'
+    ));
+    var target = candidates.reverse().find(function (node) {
+      var rect = node.getBoundingClientRect();
+      return rect.width > 240 && rect.height > 40;
+    });
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
+  });
+})();
+"#
+}
+
+fn restore_surface_script() -> &'static str {
+    r#"
+(function () {
+  'use strict';
+  document.documentElement.removeAttribute('data-elon-official-answer-surface');
+  document.querySelectorAll('[data-elon-official-answer-root]').forEach(function (node) {
+    node.removeAttribute('data-elon-official-answer-root');
+  });
+  var style = document.getElementById('elon-official-answer-surface-style');
+  if (style) style.remove();
+  var backdrop = document.getElementById('elon-official-answer-surface-backdrop');
+  if (backdrop) backdrop.remove();
+})();
+"#
 }
 
 pub(crate) fn park_if_background(
@@ -216,6 +345,7 @@ fn display_error(error: impl std::fmt::Display) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn parked_position_uses_measured_size_with_a_safety_margin() {
@@ -261,5 +391,32 @@ mod tests {
         }
         .validate()
         .is_err());
+    }
+
+    #[test]
+    fn answer_surface_requires_a_completed_assistant_message() {
+        assert!(semantic_event_has_completed_assistant(&json!({
+            "messages": [
+                {"role":"user","state":"completed"},
+                {"role":"assistant","state":"completed"}
+            ]
+        })));
+        assert!(!semantic_event_has_completed_assistant(&json!({
+            "messages": [{"role":"assistant","state":"streaming"}]
+        })));
+        assert!(!semantic_event_has_completed_assistant(&json!({
+            "messages": [{"role":"user","state":"completed"}]
+        })));
+    }
+
+    #[test]
+    fn answer_surface_script_is_pc_scoped_and_reversible() {
+        let apply = answer_surface_script();
+        let restore = restore_surface_script();
+        assert!(apply.contains("main, [role=\"main\"]"));
+        assert!(apply.contains("data-elon-official-answer-root"));
+        assert!(apply.contains("form:has(textarea)"));
+        assert!(restore.contains("style.remove()"));
+        assert!(restore.contains("backdrop.remove()"));
     }
 }

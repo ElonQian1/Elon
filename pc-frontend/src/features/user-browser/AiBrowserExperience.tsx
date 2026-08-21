@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, ArrowRight, ExternalLink, House, LockKeyhole, RefreshCw, X } from 'lucide-react'
 import {
   boundsFor,
+  announceAiBrowserSurface,
   controlInternalBrowserTab,
   controlOfficialAiTab,
   getInternalBrowserTabState,
@@ -15,14 +16,13 @@ import {
   REQUEST_RETURN_TO_AI_CHAT_EVENT,
   type InternalBrowserLinkRequest,
   type InternalBrowserTabState,
+  type AiBrowserSurface,
   type OfficialAiTabRequest,
 } from './internalBrowserApi'
 import styles from './AiBrowserExperience.module.css'
 
-type Surface = 'chat' | 'official' | 'source'
-
 export default function AiBrowserExperience() {
-  const [surface, setSurface] = useState<Surface>('chat')
+  const [surface, setSurface] = useState<AiBrowserSurface>('chat')
   const [official, setOfficial] = useState<OfficialAiTabRequest | null>(null)
   const [source, setSource] = useState<InternalBrowserLinkRequest | null>(null)
   const [sourceState, setSourceState] = useState<InternalBrowserTabState | null>(null)
@@ -37,6 +37,11 @@ export default function AiBrowserExperience() {
   const sourceOpenedAtRef = useRef(0)
   const sourceFallbackOpenedRef = useRef(false)
   officialRef.current = official
+
+  const activateSurface = useCallback((next: AiBrowserSurface) => {
+    announceAiBrowserSurface(next)
+    setSurface(next)
+  }, [])
 
   const runTransition = useCallback(async (work: () => Promise<void>) => {
     if (transitionRef.current) return
@@ -53,14 +58,14 @@ export default function AiBrowserExperience() {
     }
   }, [])
 
-  const switchSurface = useCallback(async (next: Surface) => {
+  const switchSurface = useCallback(async (next: AiBrowserSurface) => {
     if (next === surface) return
     if (next === 'chat') {
       // Chat is a foreground intent, not merely another queued transition. Invalidate
       // an older async `present` immediately and hide both child surfaces even when a
       // previous transition has not finished yet.
       generationRef.current += 1
-      setSurface('chat')
+      activateSurface('chat')
       const activeOfficial = officialRef.current
       try {
         if (openedSourceUrlRef.current) {
@@ -78,9 +83,9 @@ export default function AiBrowserExperience() {
         const hidden = await controlInternalBrowserTab('hide')
         if (hidden?.visible) throw new Error('来源网页未能收起，请重试。')
       }
-      setSurface(next)
+      activateSurface(next)
     })
-  }, [official, runTransition, surface])
+  }, [activateSurface, official, runTransition, surface])
 
   useEffect(() => {
     const openOfficial = (event: Event) => {
@@ -135,7 +140,7 @@ export default function AiBrowserExperience() {
       try {
         const bounds = boundsFor(viewport)
         if (surface === 'official' && official) {
-          await presentLocalAiWebSessionEmbedded(official, bounds)
+          await presentLocalAiWebSessionEmbedded(official, bounds, { contentOnly: false })
           if (generation !== generationRef.current) {
             await hideOfficialSurface(official)
             return
@@ -241,12 +246,12 @@ export default function AiBrowserExperience() {
         openedSourceUrlRef.current = ''
         setSource(null)
         setSourceState(null)
-        setSurface(official ? 'official' : 'chat')
+        activateSurface(official ? 'official' : 'chat')
         return
       }
       if (official) await hideOfficialSurface(official)
       setOfficial(null)
-      setSurface(source ? 'source' : 'chat')
+      activateSurface(source ? 'source' : 'chat')
     })
   }
 

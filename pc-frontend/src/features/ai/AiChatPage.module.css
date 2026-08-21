@@ -298,6 +298,7 @@
 }
 
 .feed {
+  position: relative;
   overflow-y: auto;
   padding: 20px 22px;
   display: flex;

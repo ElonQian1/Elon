@@ -9,6 +9,11 @@ import {
 export const OPEN_OFFICIAL_AI_TAB_EVENT = 'elon:open-official-ai-tab'
 export const OPEN_INTERNAL_BROWSER_LINK_EVENT = 'elon:open-internal-browser-link'
 export const REQUEST_RETURN_TO_AI_CHAT_EVENT = 'elon:request-return-to-ai-chat'
+export const AI_BROWSER_SURFACE_CHANGED_EVENT = 'elon:ai-browser-surface-changed'
+
+export type AiBrowserSurface = 'chat' | 'official' | 'source'
+
+let officialSurfaceQueue: Promise<void> = Promise.resolve()
 
 export interface EmbeddedWebviewBounds {
   x: number
@@ -61,14 +66,26 @@ export function openInternalBrowserLink(request: InternalBrowserLinkRequest) {
 export async function presentLocalAiWebSessionEmbedded(
   request: OfficialAiTabRequest,
   bounds: EmbeddedWebviewBounds,
+  options: { contentOnly?: boolean } = {},
 ): Promise<LocalAiWebSessionState> {
-  await openLocalAiWebSession(request.providerId, request.ownerKey, { showWindow: false })
-  await waitForOfficialPage(request)
-  return invoke<LocalAiWebSessionState>('present_local_ai_web_session_embedded', {
-    providerId: request.providerId,
-    ownerKey: request.ownerKey,
-    bounds: safeBounds(bounds),
+  return queueOfficialSurface(async () => {
+    if (!options.contentOnly) {
+      await openLocalAiWebSession(request.providerId, request.ownerKey, { showWindow: false })
+      await waitForOfficialPage(request)
+    }
+    return invoke<LocalAiWebSessionState>('present_local_ai_web_session_embedded', {
+      providerId: request.providerId,
+      ownerKey: request.ownerKey,
+      bounds: safeBounds(bounds),
+      contentOnly: options.contentOnly === true,
+    })
   })
+}
+
+export function announceAiBrowserSurface(surface: AiBrowserSurface) {
+  window.dispatchEvent(new CustomEvent<AiBrowserSurface>(AI_BROWSER_SURFACE_CHANGED_EVENT, {
+    detail: surface,
+  }))
 }
 
 async function waitForOfficialPage(request: OfficialAiTabRequest) {
@@ -91,10 +108,16 @@ async function waitForOfficialPage(request: OfficialAiTabRequest) {
 export async function hideLocalAiWebSessionEmbedded(
   request: OfficialAiTabRequest,
 ): Promise<LocalAiWebSessionState> {
-  return invoke<LocalAiWebSessionState>('hide_local_ai_web_session_embedded', {
+  return queueOfficialSurface(() => invoke<LocalAiWebSessionState>('hide_local_ai_web_session_embedded', {
     providerId: request.providerId,
     ownerKey: request.ownerKey,
-  })
+  }))
+}
+
+function queueOfficialSurface<T>(work: () => Promise<T>): Promise<T> {
+  const result = officialSurfaceQueue.then(work, work)
+  officialSurfaceQueue = result.then(() => undefined, () => undefined)
+  return result
 }
 
 export async function openInternalBrowserTab(

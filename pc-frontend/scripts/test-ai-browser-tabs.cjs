@@ -73,9 +73,10 @@ assert.match(experienceStyles, /grid-template-rows:\s*38px 40px minmax\(0, 1fr\)
 assert.match(experience, /await hideLocalAiWebSessionEmbedded/)
 assert.match(
   experience,
-  /await presentLocalAiWebSessionEmbedded\(official, bounds\)[\s\S]*?if \(generation !== generationRef\.current\) \{[\s\S]*?await hideOfficialSurface\(official\)/,
+  /await presentLocalAiWebSessionEmbedded\(official, bounds, \{ contentOnly: false \}\)[\s\S]*?if \(generation !== generationRef\.current\) \{[\s\S]*?await hideOfficialSurface\(official\)/,
 )
-assert.match(experience, /if \(next === 'chat'\) \{[\s\S]*?generationRef\.current \+= 1[\s\S]*?setSurface\('chat'\)/)
+assert.match(experience, /if \(next === 'chat'\) \{[\s\S]*?generationRef\.current \+= 1[\s\S]*?activateSurface\('chat'\)/)
+assert.match(experience, /announceAiBrowserSurface\(next\)[\s\S]*?setSurface\(next\)/)
 assert.match(experience, /windowVisible/)
 assert.match(experience, /event\.key === 'Escape'/)
 assert.match(api, /REQUEST_RETURN_TO_AI_CHAT_EVENT/)
