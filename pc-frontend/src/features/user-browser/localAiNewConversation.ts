@@ -44,6 +44,7 @@ export function localAiNewConversationContextReady(
     | 'semanticCacheStatus'
     | 'contextReady'
     | 'activeConversationId'
+    | 'cacheUpdatedAtMs'
     | 'updatedAtMs'
   > | null,
   snapshot: Pick<LocalAiMessageSnapshot, 'messages'> | null,
@@ -55,6 +56,7 @@ export function localAiNewConversationContextReady(
     && session?.rendererStatus === 'active'
     && session.semanticCacheStatus === 'live'
     && session.contextReady === true
+    && session.cacheUpdatedAtMs >= startedAtMs
     && session.updatedAtMs >= startedAtMs
     && session.activeConversationId
     && session.activeConversationId !== baselineConversationId
@@ -71,6 +73,7 @@ export function localAiNewConversationNativeReady(
     | 'semanticCacheStatus'
     | 'contextReady'
     | 'activeConversationId'
+    | 'cacheUpdatedAtMs'
     | 'updatedAtMs'
   > | null,
   snapshot: Pick<

@@ -84,6 +84,7 @@ assert.equal(googleNewConversationNeedsReload(liveSession, { composerReady: fals
 const bindingSession = {
   ...liveSession,
   activeConversationId: 'new-conversation',
+  cacheUpdatedAtMs: 2_000,
   updatedAtMs: 2_000,
 }
 assert.equal(localAiNewConversationContextReady(
@@ -100,6 +101,12 @@ assert.equal(localAiNewConversationContextReady(
 ), false)
 assert.equal(localAiNewConversationContextReady(
   { ...bindingSession, updatedAtMs: 999 },
+  { messages: [] },
+  1_000,
+  'old-conversation',
+), false)
+assert.equal(localAiNewConversationContextReady(
+  { ...bindingSession, cacheUpdatedAtMs: 999, updatedAtMs: 2_000 },
   { messages: [] },
   1_000,
   'old-conversation',
