@@ -1,4 +1,6 @@
-//! Unrun source matrix for exact, fixture-owned callback faults.
+//! Targeted source matrix for exact, fixture-owned callback faults.
+//!
+//! Five unit tests have historical pass evidence; they are not A2b2 Windows dynamic cases.
 
 use std::{
     fs,

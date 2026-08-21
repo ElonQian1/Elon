@@ -1,7 +1,7 @@
 ---
 title: 节点插件测试 VFS 故障合同权威
 status: current
-reviewed_at: 2026-08-12
+reviewed_at: 2026-08-21
 owners: node, security
 ---
 
@@ -9,7 +9,7 @@ owners: node, security
 
 ## 1. 权威范围与当前状态
 
-本文是节点插件 A2 阶段的单一权威，只定义测试专用受管 SQLite VFS 的 SHM、联合关闭、同 namespace 多 Connection 和确定性故障注入合同。生产 SQLite 文件/目录、catalog 与 rollback 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；Planning Snapshot 的依赖顺序仍由 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 维护；本机 schema 与 Store 仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护。
+本文是节点插件 A2 阶段的单一权威，只定义测试专用受管 SQLite VFS 的 SHM、联合关闭、同 namespace 多 Connection 和确定性故障注入合同。逐 case Windows 动态证据、计数与升级门槛由 [`node-plugin-vfs-fault-acceptance.md`](node-plugin-vfs-fault-acceptance.md) 维护；生产 SQLite 文件/目录、catalog 与 rollback 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；Planning Snapshot 的依赖顺序仍由 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 维护；本机 schema 与 Store 仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护。
 
 A2 总合同已经冻结。A2b2 的 117 项静态 inventory 已覆盖 `xShmBarrier`、非末/末 `xShmUnmap`、WAL-main 联合 `xClose`、route lifecycle 与 VFS unregister；A2a/A2b1 的 registration exact route、共享 runtime 多 Connection、exact route→live WAL-main 私有脚本桥与 map/lock 内部 phase 仍保留。2026-08-12 后续基线修复后，`elon-pc-node` 完整测试目标已可编译，与本次可见性修复直接相关的 fault matrix 已实际运行并通过 5 项测试。
 
@@ -28,9 +28,7 @@ A2c 严格 `cfg(all(test, windows))` 的源码现含八类 foundation 路径：r
 
 A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 上的 plan 经刚提升的 live WAL-main 绑定到 runtime generation + SHM connection ID，map 初始化与 lock 平台动作也进入相邻 test-only hook。A2b2 静态源码继续把 barrier、unmap、联合 close、registry lifecycle 与 registration shutdown 分成独立 typed leaves；它已可编译，但尚未通过完整动态验收，仍未证明非末连接分离、末连接 teardown、domain terminal 后 sibling 行为、物理关闭一次性、注销结果或真实 Win32 custody。
 
-A2c runner foundation 不产生 `WindowsDynamic` evidence。既有四条执行源码路径只接通 route-exact callback-before 与 registration unregister 的进程隔离形状；registration bridge 仅把后两条的可直接观察字段对账到两个 frozen expected record。physical SHM observer 现另接四条进程隔离源码路径：真实 WAL 建立 exact installed probe 后，由 sealed test helper 通过 `SQLITE_FCNTL_FILE_POINTER` 瞬时取得 main file 并直接调用 `xShmUnmap(file, 0)`；pointer 不离开 helper，actual 只携带 SQLite result code、fault pending/trigger 与 observer 前后快照。四个 partial bridge 都先重审完整 117 项 inventory，再分别唯一选择 `Unmap/FinalConnection/Keep` 下 `ViewUnmap`、`MappingClose`、`DmsSharedRelease` 与 `ShmFileClose` 的 `AfterSuccessKnown` key。第一条对账成功 view unmap 后 mapping、Shared DMS 与 SHM file 仍受 coordinator 持有；第二条进一步对账 view 与 mapping custody 均已释放，而 exact target、node、Shared DMS 与 SHM file 仍保留；第三条再对账 DMS coordinator custody已同步为 `Released`、lock uncertainty 为 false，而 exact target、node 与 SHM file 仍保留；第四条对账 exact target 仍附着、node/view/mapping/DMS/SHM-file coordinator custody 已消失且 managed-fs native file-close quarantine count (`quarantined_file_closes`) 为零。该计数不观察或否定 registry terminal quarantine/custody；`mutation=true` 的 unsafe SHM failure 仍会让 registry 保留 terminal marker/custody。第四条的 exact one-shot trigger 只会在 `file.close()` 返回 `Ok(receipt)` 后激活，所以它证明的是控制流到达成功关闭后的 seam；redacted observer 不独立读取 receipt，也不盘点 Windows handle table。这里的 `Released` 只表示 Windows `UnlockFileEx` 成功返回后 coordinator 同步的状态，不是独立 kernel lock-table 盘点或 lock receipt 证明。四条 child 都在 direct callback 返回后立即永久保留 poisoned fixture，parent 仅在 child 退出后清理根目录，避免同一进程重试终态 custody。桥不构造完整 dynamic `Case`，不观察 SQLite connection、indexed route、main、lease、callback/action counts 或 root-deletable；mapping count 只表示 coordinator 持有的 mapping custody，不是 OS 全局 handle 盘点，coordinator 与 domain registry 仍是顺序观察而非跨层原子快照。因此它们仍是 `implementation_uncompiled/implementation_unrun`、`passed=0`、`WindowsDynamic=0`，不能计作任一 117 项动态通过，也不能外推 native failure、barrier、joint close、route lifecycle、独立 DMS kernel lock receipt、独立 SHM file close receipt 或其余 case。
-
-> 2026-08-12 状态更正：上段历史描述中的 `implementation_uncompiled/implementation_unrun` 已不再适用。当前状态为 `implementation_not_dynamically_accepted`；测试目标已可编译，fault matrix 5 项已运行通过，但 117 项 `WindowsDynamic` 仍为 0。
+A2c runner foundation 不产生 `WindowsDynamic` evidence。既有四条执行源码路径只接通 route-exact callback-before 与 registration unregister 的进程隔离形状；registration bridge 仅把后两条的可直接观察字段对账到两个 frozen expected record。physical SHM observer 现另接四条进程隔离源码路径：真实 WAL 建立 exact installed probe 后，由 sealed test helper 通过 `SQLITE_FCNTL_FILE_POINTER` 瞬时取得 main file 并直接调用 `xShmUnmap(file, 0)`；pointer 不离开 helper，actual 只携带 SQLite result code、fault pending/trigger 与 observer 前后快照。四个 partial bridge 都先重审完整 117 项 inventory，再分别唯一选择 `Unmap/FinalConnection/Keep` 下 `ViewUnmap`、`MappingClose`、`DmsSharedRelease` 与 `ShmFileClose` 的 `AfterSuccessKnown` key。第一条对账成功 view unmap 后 mapping、Shared DMS 与 SHM file 仍受 coordinator 持有；第二条进一步对账 view 与 mapping custody 均已释放，而 exact target、node、Shared DMS 与 SHM file 仍保留；第三条再对账 DMS coordinator custody已同步为 `Released`、lock uncertainty 为 false，而 exact target、node 与 SHM file 仍保留；第四条对账 exact target 仍附着、node/view/mapping/DMS/SHM-file coordinator custody 已消失且 managed-fs native file-close quarantine count (`quarantined_file_closes`) 为零。该计数不观察或否定 registry terminal quarantine/custody；`mutation=true` 的 unsafe SHM failure 仍会让 registry 保留 terminal marker/custody。第四条的 exact one-shot trigger 只会在 `file.close()` 返回 `Ok(receipt)` 后激活，所以它证明的是控制流到达成功关闭后的 seam；redacted observer 不独立读取 receipt，也不盘点 Windows handle table。这里的 `Released` 只表示 Windows `UnlockFileEx` 成功返回后 coordinator 同步的状态，不是独立 kernel lock-table 盘点或 lock receipt 证明。四条 child 都在 direct callback 返回后立即永久保留 poisoned fixture，parent 仅在 child 退出后清理根目录，避免同一进程重试终态 custody。桥不构造完整 dynamic `Case`，不观察 SQLite connection、indexed route、main、lease、callback/action counts 或 root-deletable；mapping count 只表示 coordinator 持有的 mapping custody，不是 OS 全局 handle 盘点，coordinator 与 domain registry 仍是顺序观察而非跨层原子快照。这些 foundation 已随完整测试目标编译，且 targeted fault matrix 已运行通过 5 项；但它们仍不构造完整 dynamic `Case`，所以状态只能是 `implementation_not_dynamically_accepted`、`WindowsDynamic=0/117`。它们不能计作任一 117 项动态通过，也不能外推 native failure、barrier、joint close、route lifecycle、独立 DMS kernel lock receipt、独立 SHM file close receipt 或其余 case。
 
 ## 3. Test-only 拓扑与寿命
 
@@ -59,7 +57,7 @@ A2 fixture 必须保持以下所有权拓扑：
 
 ## 5. A2 静态矩阵
 
-完整 A2 源码合同至少逐项表达下表。当前 A2b2 已为表中 barrier/unmap/close/registration 建立 typed static inventory；即使这些记录在源码中全部“表达”，也只表示静态 case/fixture 形状存在，不表示它们已经编译或执行：
+完整 A2 源码合同至少逐项表达下表。当前 A2b2 已为表中 barrier/unmap/close/registration 建立 typed static inventory；这些记录在源码中全部“表达”只表示静态 case/fixture 形状存在。测试目标可编译和 5 项 targeted 通过属于独立证据，仍不表示任一记录已经形成 Windows dynamic evidence：
 
 | 路径 | 必须覆盖的阶段 | 静态不变量 |
 |---|---|---|
@@ -120,4 +118,4 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 A2b2 当前可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；barrier/unmap/joint close/registry/registration 具备 one-shot/fenced 静态形状；after-success 只在平台或 registry mutation 成功并同步 custody 后终态化；typed records 是固定拓扑的静态 source evidence；生产 `open()`、A1 producer 与协议均保持不可达。整个测试目标可编译，fault matrix 5 项通过，但不得宣称 A2 已完成动态验收。
 
-进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，仍必须另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，并把每条动态观察与静态 case key 一一对应，逐项证明 SQLite code或无返回码通道、custody、route、domain tombstone 与资源释放。当前 A2b2 已可编译且有局部运行证据，但宽范围回归仍失败，117 项 Windows 动态验收仍为 0；静态源码和 Windows 动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。
+进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，仍必须按[`动态验收`](node-plugin-vfs-fault-acceptance.md)另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，并把每条动态观察与静态 case key 一一对应，逐项证明 SQLite code或无返回码通道、custody、route、domain tombstone 与资源释放。当前 A2b2 已可编译且有局部运行证据，但宽范围回归仍失败，117 项 Windows 动态验收仍为 0；静态源码和 Windows 动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。

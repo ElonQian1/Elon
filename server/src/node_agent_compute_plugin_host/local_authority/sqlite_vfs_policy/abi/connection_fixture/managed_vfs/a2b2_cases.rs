@@ -1,7 +1,7 @@
-//! Unrun A2b2 source inventory for the full managed-VFS close authority boundary.
+//! Static A2b2 source inventory for the full managed-VFS close authority boundary.
 //!
-//! The inventory is wired through `managed_vfs.rs` only as an unrun `cfg(test)` static contract;
-//! it is not compiled/run evidence and is not Windows dynamic evidence.
+//! The inventory is wired through `managed_vfs.rs` as a `cfg(test)` static contract. Compilation
+//! is not case execution, and no inventory entry currently has Windows dynamic evidence.
 
 mod barrier;
 mod close_physical;
