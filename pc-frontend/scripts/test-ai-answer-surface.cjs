@@ -21,7 +21,7 @@ assert.match(pageStyles, /\.feed\s*\{[^}]*position:\s*relative;/s)
 assert.match(policy, /semanticCacheStatus === 'cached'/)
 assert.match(policy, /semanticCacheStatus !== 'live'/)
 assert.match(policy, /browserSurface !== 'chat'/)
-assert.match(policy, /contextReady === false/)
+assert.match(policy, /contextReady !== true/)
 assert.match(policy, /snapshot\.streaming/)
 assert.match(policy, /message\.role === 'assistant' && message\.state === 'completed'/)
 
@@ -51,6 +51,10 @@ assert.equal(selectLocalAiAnswerRenderMode({
 }), 'native_cache')
 assert.equal(selectLocalAiAnswerRenderMode({
   ready: true, browserSurface: 'official', busy: false, session: liveSession, snapshot: liveSnapshot,
+}), 'native')
+assert.equal(selectLocalAiAnswerRenderMode({
+  ready: true, browserSurface: 'chat', busy: false,
+  session: { ...liveSession, contextReady: undefined }, snapshot: liveSnapshot,
 }), 'native')
 assert.equal(selectLocalAiAnswerRenderMode({
   ready: true, browserSurface: 'chat', busy: false, session: liveSession,

@@ -14,7 +14,7 @@ export function selectLocalAiAnswerRenderMode(input: {
   if (session?.semanticCacheStatus === 'cached') return 'native_cache'
   if (!ready || browserSurface !== 'chat' || busy || !session || !snapshot) return 'native'
   if (session.semanticCacheStatus !== 'live'
-    || session.contextReady === false
+    || session.contextReady !== true
     || session.loading
     || session.lastError
     || ['opening', 'loading', 'blocked', 'error', 'closed'].includes(session.windowStatus)
