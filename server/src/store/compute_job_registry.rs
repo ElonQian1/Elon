@@ -14,9 +14,12 @@ use super::{
     compute_capacity_instruments::require_current_capacity_instrument_adoption_on,
     compute_job_contract_validation::validate_job_contract,
     compute_offer_registry::{
-        current_registered_offer_on, registered_offer_version_on, ComputeOfferRegistrationReceipt,
+        current_registered_offer_on, registered_historical_offer_version_on,
+        registered_offer_version_on, ComputeOfferRegistrationReceipt,
     },
-    compute_price_snapshot_registry::registered_price_snapshot_on,
+    compute_price_snapshot_registry::{
+        registered_historical_price_snapshot_on, registered_price_snapshot_on,
+    },
     compute_provider_registry::{
         current_registered_provider_on, registered_provider_version_on,
         ComputeProviderRegistrationReceipt,
@@ -24,15 +27,14 @@ use super::{
     now, Store,
 };
 
+mod audit;
 mod queries;
 mod rows;
 mod transitions;
 
+use audit::{audited_historical_job_on, audited_job_on};
 use queries::list_current_jobs_on;
-use rows::{
-    current_job_projection_on, job_id_for_idempotency_on, job_version_on, CurrentJobProjection,
-    StoredJobVersion,
-};
+use rows::{current_job_projection_on, job_id_for_idempotency_on, job_version_on};
 use transitions::{ensure_job_update, ensure_new_job, selected_contract_changed};
 
 #[derive(Debug, Clone, Serialize)]
@@ -43,10 +45,10 @@ pub(crate) struct ComputeJobRegistrationReceipt {
     pub replayed: bool,
 }
 
-struct RegisteredJobSelection {
-    offer: ComputeOfferRegistrationReceipt,
-    snapshot: ComputePriceSnapshot,
-    provider: ComputeProviderRegistrationReceipt,
+pub(super) struct RegisteredJobSelection {
+    pub(super) offer: ComputeOfferRegistrationReceipt,
+    pub(super) snapshot: ComputePriceSnapshot,
+    pub(super) provider: ComputeProviderRegistrationReceipt,
 }
 
 impl Store {
@@ -284,9 +286,34 @@ pub(super) fn registered_job_version_on(
     }))
 }
 
+pub(in crate::store) fn registered_historical_job_version_on(
+    conn: &Connection,
+    job_id: &str,
+    revision: i64,
+) -> Result<Option<ComputeJobRegistrationReceipt>> {
+    let Some(stored) = job_version_on(conn, job_id, revision)? else {
+        return Ok(None);
+    };
+    let job = audited_historical_job_on(conn, &stored)?;
+    Ok(Some(ComputeJobRegistrationReceipt {
+        job,
+        revision: stored.revision,
+        job_digest: stored.job_digest,
+        replayed: false,
+    }))
+}
+
 fn registered_selection_on(
     conn: &Connection,
     job: &ComputeJob,
+) -> Result<Option<RegisteredJobSelection>> {
+    registered_selection_with_dependency_policy_on(conn, job, false)
+}
+
+pub(super) fn registered_selection_with_dependency_policy_on(
+    conn: &Connection,
+    job: &ComputeJob,
+    use_historical_dependencies: bool,
 ) -> Result<Option<RegisteredJobSelection>> {
     let (Some(selected), Some(snapshot_id)) = (
         job.selected_offer.as_ref(),
@@ -297,13 +324,21 @@ fn registered_selection_on(
         }
         return Ok(None);
     };
-    let offer = registered_offer_version_on(conn, &selected.offer_id, selected.offer_version)?
-        .ok_or_else(|| anyhow!("算力 Job 绑定的 Offer 历史版本不存在"))?;
+    let offer = if use_historical_dependencies {
+        registered_historical_offer_version_on(conn, &selected.offer_id, selected.offer_version)?
+    } else {
+        registered_offer_version_on(conn, &selected.offer_id, selected.offer_version)?
+    }
+    .ok_or_else(|| anyhow!("算力 Job 绑定的 Offer 历史版本不存在"))?;
     if offer.offer.offer_digest != selected.offer_digest {
         bail!("算力 Job 绑定的 Offer 摘要与历史版本不一致");
     }
-    let snapshot = registered_price_snapshot_on(conn, snapshot_id)?
-        .ok_or_else(|| anyhow!("算力 Job 绑定的 Price Snapshot 不存在"))?;
+    let snapshot = if use_historical_dependencies {
+        registered_historical_price_snapshot_on(conn, snapshot_id)?
+    } else {
+        registered_price_snapshot_on(conn, snapshot_id)?
+    }
+    .ok_or_else(|| anyhow!("算力 Job 绑定的 Price Snapshot 不存在"))?;
     let provider = registered_provider_version_on(
         conn,
         &offer.offer.provider_id,
@@ -320,7 +355,7 @@ fn registered_selection_on(
     }))
 }
 
-fn validate_with_selection(
+pub(super) fn validate_with_selection(
     job: &ComputeJob,
     selection: Option<&RegisteredJobSelection>,
 ) -> Result<String> {
@@ -420,65 +455,5 @@ fn insert_job_version(
             now(),
         ],
     )?;
-    Ok(())
-}
-
-fn audited_job_on(
-    conn: &Connection,
-    projection: Option<&CurrentJobProjection>,
-    stored: &StoredJobVersion,
-) -> Result<ComputeJob> {
-    let job: ComputeJob =
-        serde_json::from_str(&stored.job_json).context("算力 Job 历史版本 JSON 无效")?;
-    let selection = registered_selection_on(conn, &job)?;
-    let computed_digest = validate_with_selection(&job, selection.as_ref())?;
-    let selected = job.selected_offer.as_ref();
-    if computed_digest != stored.job_digest
-        || job.job_id != stored.job_id
-        || job.status != stored.status
-        || selected.map(|value| value.provider_id.as_str())
-            != stored.selected_provider_id.as_deref()
-        || selected.map(|value| value.offer_id.as_str()) != stored.selected_offer_id.as_deref()
-        || selected.map(|value| value.offer_version) != stored.selected_offer_version
-        || selected.map(|value| value.offer_digest.as_str())
-            != stored.selected_offer_digest.as_deref()
-        || job.price_snapshot_id != stored.price_snapshot_id
-    {
-        bail!("算力 Job 历史版本身份、摘要或索引字段审计失败");
-    }
-    if let Some(projection) = projection {
-        ensure_current_job_projection(&job, stored, projection)?;
-    }
-    Ok(job)
-}
-
-fn ensure_current_job_projection(
-    job: &ComputeJob,
-    stored: &StoredJobVersion,
-    projection: &CurrentJobProjection,
-) -> Result<()> {
-    let selected = job.selected_offer.as_ref();
-    if job.job_id != projection.job_id
-        || job.consumer_account_id != projection.consumer_account_id
-        || job.project_id != projection.project_id
-        || job.merchant_id != projection.merchant_id
-        || job.idempotency_key != projection.idempotency_key
-        || stored.revision != projection.current_revision
-        || stored.job_digest != projection.current_job_digest
-        || job.status != projection.status
-        || selected.map(|value| value.provider_id.as_str())
-            != projection.selected_provider_id.as_deref()
-        || selected.map(|value| value.offer_id.as_str()) != projection.selected_offer_id.as_deref()
-        || selected.map(|value| value.offer_version) != projection.selected_offer_version
-        || selected.map(|value| value.offer_digest.as_str())
-            != projection.selected_offer_digest.as_deref()
-        || job.price_snapshot_id != projection.price_snapshot_id
-        || job.max_consumer_charge_micros != projection.max_consumer_charge_micros
-        || job.currency != projection.currency
-        || job.submitted_at != projection.submitted_at
-        || job.updated_at != projection.updated_at
-    {
-        bail!("算力 Job 当前投影与不可变版本不一致");
-    }
     Ok(())
 }

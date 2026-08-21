@@ -4,14 +4,24 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::compute_federation::execution::{JOB_STATUS_SETTLED, JOB_STATUS_VERIFICATION_PENDING};
 
 use crate::store::{
-    compute_attempt_execution_receipts::compute_attempt_execution_receipt_on,
-    compute_attempt_finalizations::compute_attempt_finalization_on,
+    compute_attempt_execution_receipts::{
+        compute_attempt_execution_receipt_by_id_on, compute_attempt_execution_receipt_on,
+    },
+    compute_attempt_finalizations::{
+        compute_attempt_finalization_on, compute_attempt_historical_finalization_on,
+    },
     compute_broker_reservation::broker_reserve_binding_on,
-    compute_job_registry::{current_registered_job_on, registered_job_version_on},
-    compute_offer_registry::registered_offer_version_on,
-    compute_price_snapshot_registry::registered_price_snapshot_on,
+    compute_job_registry::{
+        current_registered_job_on, registered_historical_job_version_on, registered_job_version_on,
+    },
+    compute_offer_registry::{registered_historical_offer_version_on, registered_offer_version_on},
+    compute_price_snapshot_registry::{
+        registered_historical_price_snapshot_on, registered_price_snapshot_on,
+    },
     compute_provider_registry::registered_provider_version_on,
-    compute_reservation_registry::registered_reservation_version_on,
+    compute_reservation_registry::{
+        registered_historical_reservation_version_on, registered_reservation_version_on,
+    },
 };
 
 use super::super::{
@@ -30,9 +40,28 @@ pub(super) fn audited_settlement_on(
     stored: &StoredSettlement,
     replayed: bool,
 ) -> Result<ComputeAttemptSettlementReceipt> {
-    let request = normalize_settlement_request(&serde_json::from_str(&stored.request_json)?)?;
+    audited_settlement_with_head_policy_on(conn, stored, replayed, true)
+}
+
+pub(super) fn audited_historical_settlement_on(
+    conn: &Connection,
+    stored: &StoredSettlement,
+) -> Result<ComputeAttemptSettlementReceipt> {
+    audited_settlement_with_head_policy_on(conn, stored, false, false)
+}
+
+fn audited_settlement_with_head_policy_on(
+    conn: &Connection,
+    stored: &StoredSettlement,
+    replayed: bool,
+    require_current_heads: bool,
+) -> Result<ComputeAttemptSettlementReceipt> {
+    let parsed_request = serde_json::from_str(&stored.request_json)?;
+    let request = normalize_settlement_request(&parsed_request)?;
     let mut receipt: ComputeAttemptSettlementReceipt = serde_json::from_str(&stored.receipt_json)?;
-    if request.lease_id != stored.lease_id
+    if stored.request_json != serde_json::to_string(&request)?
+        || stored.receipt_json != serde_json::to_string(&receipt)?
+        || request.lease_id != stored.lease_id
         || request.expected_finalization_id != stored.finalization_id
         || request.expected_finalization_event_digest != stored.finalization_event_digest
         || request.expected_execution_receipt_id != stored.execution_receipt_id
@@ -78,8 +107,17 @@ pub(super) fn audited_settlement_on(
         bail!("Attempt 结算回执摘要审计失败");
     }
 
-    let finalization = compute_attempt_finalization_on(conn, &stored.lease_id)?;
-    let execution = compute_attempt_execution_receipt_on(conn, &stored.lease_id)?;
+    let finalization = if require_current_heads {
+        compute_attempt_finalization_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_historical_finalization_on(conn, &stored.lease_id)?
+    };
+    let execution = if require_current_heads {
+        compute_attempt_execution_receipt_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_execution_receipt_by_id_on(conn, &stored.execution_receipt_id)?
+            .ok_or_else(|| anyhow!("Attempt 结算引用的 v193 历史回执不存在"))?
+    };
     if finalization.finalization_id != stored.finalization_id
         || finalization.event_digest != stored.finalization_event_digest
         || execution.receipt.receipt_id != stored.execution_receipt_id
@@ -88,31 +126,55 @@ pub(super) fn audited_settlement_on(
     {
         bail!("Attempt 结算上游可信终态或执行回执发生不一致");
     }
-    let source_job = registered_job_version_on(conn, &stored.job_id, stored.source_job_revision)?
-        .ok_or_else(|| anyhow!("Attempt 结算源 Job 历史版本不存在"))?;
-    let terminal_job =
+    let source_job = if require_current_heads {
+        registered_job_version_on(conn, &stored.job_id, stored.source_job_revision)?
+    } else {
+        registered_historical_job_version_on(conn, &stored.job_id, stored.source_job_revision)?
+    }
+    .ok_or_else(|| anyhow!("Attempt 结算源 Job 历史版本不存在"))?;
+    let terminal_job = if require_current_heads {
         registered_job_version_on(conn, &stored.job_id, stored.terminal_job_revision)?
-            .ok_or_else(|| anyhow!("Attempt 结算目标 Job 历史版本不存在"))?;
-    let current_job = current_registered_job_on(conn, &stored.job_id)?
-        .ok_or_else(|| anyhow!("Attempt 结算当前 Job 不存在"))?;
+    } else {
+        registered_historical_job_version_on(conn, &stored.job_id, stored.terminal_job_revision)?
+    }
+    .ok_or_else(|| anyhow!("Attempt 结算目标 Job 历史版本不存在"))?;
     if source_job.job_digest != stored.source_job_digest
         || source_job.job.status != JOB_STATUS_VERIFICATION_PENDING
         || terminal_job.job_digest != stored.terminal_job_digest
         || terminal_job.job.status != JOB_STATUS_SETTLED
         || terminal_job.job.updated_at != stored.settled_at
-        || current_job.revision != terminal_job.revision
-        || current_job.job_digest != terminal_job.job_digest
     {
-        bail!("Attempt 结算 Job 历史或当前投影审计失败");
+        bail!("Attempt 结算 Job 历史版本审计失败");
     }
-    let reservation = registered_reservation_version_on(
-        conn,
-        &execution.receipt.reservation_id,
-        finalization.terminal_reservation.revision,
-    )?
+    if require_current_heads {
+        let current_job = current_registered_job_on(conn, &stored.job_id)?
+            .ok_or_else(|| anyhow!("Attempt 结算当前 Job 不存在"))?;
+        if current_job.revision != terminal_job.revision
+            || current_job.job_digest != terminal_job.job_digest
+        {
+            bail!("Attempt 结算 Job 当前投影审计失败");
+        }
+    }
+    let reservation = if require_current_heads {
+        registered_reservation_version_on(
+            conn,
+            &execution.receipt.reservation_id,
+            finalization.terminal_reservation.revision,
+        )?
+    } else {
+        registered_historical_reservation_version_on(
+            conn,
+            &execution.receipt.reservation_id,
+            finalization.terminal_reservation.revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Attempt 结算 Reservation 历史版本不存在"))?;
-    let snapshot = registered_price_snapshot_on(conn, &stored.price_snapshot_id)?
-        .ok_or_else(|| anyhow!("Attempt 结算价格快照不存在"))?;
+    let snapshot = if require_current_heads {
+        registered_price_snapshot_on(conn, &stored.price_snapshot_id)?
+    } else {
+        registered_historical_price_snapshot_on(conn, &stored.price_snapshot_id)?
+    }
+    .ok_or_else(|| anyhow!("Attempt 结算价格快照不存在"))?;
     if reservation.reservation_digest != finalization.terminal_reservation.digest
         || reservation.reservation.price_snapshot != snapshot
         || snapshot.snapshot_digest != stored.price_snapshot_digest
@@ -127,8 +189,12 @@ pub(super) fn audited_settlement_on(
     if broker.budget_reservation_id != stored.budget_reservation_id {
         bail!("Attempt 结算预授权绑定审计失败");
     }
-    let offer = registered_offer_version_on(conn, &snapshot.offer_id, snapshot.offer_version)?
-        .ok_or_else(|| anyhow!("Attempt 结算 Offer 历史版本不存在"))?;
+    let offer = if require_current_heads {
+        registered_offer_version_on(conn, &snapshot.offer_id, snapshot.offer_version)?
+    } else {
+        registered_historical_offer_version_on(conn, &snapshot.offer_id, snapshot.offer_version)?
+    }
+    .ok_or_else(|| anyhow!("Attempt 结算 Offer 历史版本不存在"))?;
     let provider = registered_provider_version_on(
         conn,
         &offer.offer.provider_id,

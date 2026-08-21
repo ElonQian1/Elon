@@ -23,7 +23,8 @@ mod ledger;
 
 use audit::{
     audit_exercise_consumers_on, audit_grant_dependencies_on, audit_grant_indexes_on,
-    audit_terminal_indexes_on, reservation_authority_from_terminal_on,
+    audit_historical_grant_dependencies_on, audit_terminal_indexes_on,
+    historical_reservation_authority_from_terminal_on, reservation_authority_from_terminal_on,
     validate_non_exercise_terminal,
 };
 
@@ -127,6 +128,21 @@ pub(super) fn grant_by_id_on(
     conn: &Connection,
     grant_id: &str,
 ) -> Result<Option<ComputeDeliveryAllocationGrant>> {
+    grant_by_id_with_dependency_policy_on(conn, grant_id, false)
+}
+
+fn historical_grant_by_id_on(
+    conn: &Connection,
+    grant_id: &str,
+) -> Result<Option<ComputeDeliveryAllocationGrant>> {
+    grant_by_id_with_dependency_policy_on(conn, grant_id, true)
+}
+
+fn grant_by_id_with_dependency_policy_on(
+    conn: &Connection,
+    grant_id: &str,
+    use_historical_dependencies: bool,
+) -> Result<Option<ComputeDeliveryAllocationGrant>> {
     let stored = conn
         .query_row(
             "SELECT grant_json, grant_digest FROM compute_delivery_allocation_grants
@@ -149,7 +165,11 @@ pub(super) fn grant_by_id_on(
         bail!("DeliveryAllocation Grant JSON、身份或摘要审计失败");
     }
     audit_grant_indexes_on(conn, &grant)?;
-    audit_grant_dependencies_on(conn, &grant)?;
+    if use_historical_dependencies {
+        audit_historical_grant_dependencies_on(conn, &grant)?;
+    } else {
+        audit_grant_dependencies_on(conn, &grant)?;
+    }
     Ok(Some(grant))
 }
 
@@ -382,6 +402,30 @@ pub(in crate::store) fn persisted_delivery_allocation_reservation_authority_on(
     let terminal = raw_terminal_by_grant_on(conn, &grant)?
         .ok_or_else(|| anyhow!("persisted DeliveryAllocation authority 缺少 terminal"))?;
     reservation_authority_from_terminal_on(conn, &grant, &terminal).map(Some)
+}
+
+pub(in crate::store) fn persisted_historical_delivery_allocation_reservation_authority_on(
+    conn: &Connection,
+    reservation_id: &str,
+    claim_id: &str,
+) -> Result<Option<DeliveryAllocationReservationAuthority>> {
+    let grant_id = conn
+        .query_row(
+            "SELECT grant_id FROM compute_delivery_allocation_terminal_receipts
+              WHERE terminal_status='exercised' AND reservation_id=?1 AND reservation_claim_id=?2",
+            params![reservation_id, claim_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    let Some(grant_id) = grant_id else {
+        return Ok(None);
+    };
+    let grant = historical_grant_by_id_on(conn, &grant_id)?
+        .ok_or_else(|| anyhow!("persisted historical DeliveryAllocation authority 缺少 Grant"))?;
+    let terminal = raw_terminal_by_grant_on(conn, &grant)?.ok_or_else(|| {
+        anyhow!("persisted historical DeliveryAllocation authority 缺少 terminal")
+    })?;
+    historical_reservation_authority_from_terminal_on(conn, &grant, &terminal).map(Some)
 }
 
 fn grant_id_for_query_on(

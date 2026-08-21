@@ -20,7 +20,8 @@ use super::{
             delivery_allocation_commitment_status_on, DeliveryAllocationCommitmentState,
         },
     },
-    audit_immutable_dependencies_on, audit_ledger_binding_on,
+    audit_historical_immutable_dependencies_on, audit_immutable_dependencies_on,
+    audit_ledger_binding_on,
     canonical::{canonical_commitment_json_and_digest, canonical_terminal_json_and_digest},
     claim_state_name,
     types::{ComputeCapacityCommitmentCreateReceipt, ComputeCapacityCommitmentDetail},
@@ -29,6 +30,21 @@ use super::{
 pub(super) fn commitment_by_id_on(
     conn: &Connection,
     commitment_id: &str,
+) -> Result<Option<ComputeCapacityCommitment>> {
+    commitment_by_id_with_dependency_policy_on(conn, commitment_id, false)
+}
+
+pub(super) fn historical_commitment_by_id_on(
+    conn: &Connection,
+    commitment_id: &str,
+) -> Result<Option<ComputeCapacityCommitment>> {
+    commitment_by_id_with_dependency_policy_on(conn, commitment_id, true)
+}
+
+fn commitment_by_id_with_dependency_policy_on(
+    conn: &Connection,
+    commitment_id: &str,
+    use_historical_dependencies: bool,
 ) -> Result<Option<ComputeCapacityCommitment>> {
     let stored = conn
         .query_row(
@@ -52,7 +68,11 @@ pub(super) fn commitment_by_id_on(
         bail!("容量承诺 JSON、身份或摘要审计失败");
     }
     audit_commitment_indexes_on(conn, &commitment)?;
-    audit_immutable_dependencies_on(conn, &commitment)?;
+    if use_historical_dependencies {
+        audit_historical_immutable_dependencies_on(conn, &commitment)?;
+    } else {
+        audit_immutable_dependencies_on(conn, &commitment)?;
+    }
     Ok(Some(commitment))
 }
 

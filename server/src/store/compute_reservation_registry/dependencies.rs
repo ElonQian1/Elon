@@ -14,15 +14,20 @@ use super::super::{
     compute_capacity_claim_rows::{stored_claim_on, stored_claim_version_on},
     compute_delivery_allocations::{
         persisted_delivery_allocation_reservation_authority_on,
+        persisted_historical_delivery_allocation_reservation_authority_on,
         DeliveryAllocationReservationAuthority,
     },
     compute_job_registry::{
-        current_registered_job_on, registered_job_version_on, ComputeJobRegistrationReceipt,
+        current_registered_job_on, registered_historical_job_version_on, registered_job_version_on,
+        ComputeJobRegistrationReceipt,
     },
     compute_offer_registry::{
-        current_registered_offer_on, registered_offer_version_on, ComputeOfferRegistrationReceipt,
+        current_registered_offer_on, registered_historical_offer_version_on,
+        registered_offer_version_on, ComputeOfferRegistrationReceipt,
     },
-    compute_price_snapshot_registry::registered_price_snapshot_on,
+    compute_price_snapshot_registry::{
+        registered_historical_price_snapshot_on, registered_price_snapshot_on,
+    },
     compute_provider_registry::{
         current_registered_provider_on, registered_provider_version_on,
         ComputeProviderRegistrationReceipt,
@@ -45,23 +50,57 @@ pub(super) fn registered_dependencies_on(
     conn: &Connection,
     reservation: &ComputeReservation,
 ) -> Result<RegisteredReservationDependencies> {
-    let job =
+    registered_dependencies_with_authority_policy_on(conn, reservation, false)
+}
+
+pub(super) fn registered_historical_dependencies_on(
+    conn: &Connection,
+    reservation: &ComputeReservation,
+) -> Result<RegisteredReservationDependencies> {
+    registered_dependencies_with_authority_policy_on(conn, reservation, true)
+}
+
+fn registered_dependencies_with_authority_policy_on(
+    conn: &Connection,
+    reservation: &ComputeReservation,
+    use_historical_authority: bool,
+) -> Result<RegisteredReservationDependencies> {
+    let job = if use_historical_authority {
+        registered_historical_job_version_on(
+            conn,
+            &reservation.job.job_id,
+            reservation.job.job_revision,
+        )?
+    } else {
         registered_job_version_on(conn, &reservation.job.job_id, reservation.job.job_revision)?
-            .ok_or_else(|| anyhow!("Reservation 绑定的 Job 历史版本不存在"))?;
+    }
+    .ok_or_else(|| anyhow!("Reservation 绑定的 Job 历史版本不存在"))?;
     if job.job_digest != reservation.job.job_digest {
         bail!("Reservation 绑定的 Job 摘要与历史版本不一致");
     }
-    let offer = registered_offer_version_on(
-        conn,
-        &reservation.offer.offer_id,
-        reservation.offer.offer_version,
-    )?
+    let offer = if use_historical_authority {
+        registered_historical_offer_version_on(
+            conn,
+            &reservation.offer.offer_id,
+            reservation.offer.offer_version,
+        )?
+    } else {
+        registered_offer_version_on(
+            conn,
+            &reservation.offer.offer_id,
+            reservation.offer.offer_version,
+        )?
+    }
     .ok_or_else(|| anyhow!("Reservation 绑定的 Offer 历史版本不存在"))?;
     if offer.offer.offer_digest != reservation.offer.offer_digest {
         bail!("Reservation 绑定的 Offer 摘要与历史版本不一致");
     }
-    let snapshot = registered_price_snapshot_on(conn, &reservation.price_snapshot.snapshot_id)?
-        .ok_or_else(|| anyhow!("Reservation 绑定的 Price Snapshot 不存在"))?;
+    let snapshot = if use_historical_authority {
+        registered_historical_price_snapshot_on(conn, &reservation.price_snapshot.snapshot_id)?
+    } else {
+        registered_price_snapshot_on(conn, &reservation.price_snapshot.snapshot_id)?
+    }
+    .ok_or_else(|| anyhow!("Reservation 绑定的 Price Snapshot 不存在"))?;
     let provider = registered_provider_version_on(
         conn,
         &offer.offer.provider_id,
@@ -80,11 +119,19 @@ pub(super) fn registered_dependencies_on(
     if claim.claim_digest != reservation.capacity_claim.claim_digest {
         bail!("Reservation 绑定的 Capacity Claim 摘要与历史版本不一致");
     }
-    let delivery_allocation_authority = persisted_delivery_allocation_reservation_authority_on(
-        conn,
-        &reservation.reservation_id,
-        &claim.claim_id,
-    )?;
+    let delivery_allocation_authority = if use_historical_authority {
+        persisted_historical_delivery_allocation_reservation_authority_on(
+            conn,
+            &reservation.reservation_id,
+            &claim.claim_id,
+        )?
+    } else {
+        persisted_delivery_allocation_reservation_authority_on(
+            conn,
+            &reservation.reservation_id,
+            &claim.claim_id,
+        )?
+    };
     Ok(RegisteredReservationDependencies {
         job,
         offer,

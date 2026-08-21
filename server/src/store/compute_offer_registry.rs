@@ -4,7 +4,6 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
 use crate::compute_federation::{
-    capacity::ComputeCapacityBucketStatus,
     offer::{
         ComputeOffer, OFFER_STATUS_ACTIVE, OFFER_STATUS_DRAFT, OFFER_STATUS_DRAINING,
         OFFER_STATUS_EXPIRED, OFFER_STATUS_REVOKED,
@@ -16,11 +15,14 @@ use crate::compute_federation::{
 };
 
 use super::{
-    compute_capacity_rows::stored_bucket_on,
     compute_offer_contract_validation::validate_offer_contract,
     compute_provider_registry::{current_registered_provider_on, registered_provider_version_on},
     now, Store,
 };
+
+mod capacity;
+
+use capacity::{audit_offer_capacity_references_on, ensure_offer_capacity_references_on};
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ComputeOfferRegistrationReceipt {
@@ -272,6 +274,23 @@ pub(super) fn registered_offer_version_on(
     }))
 }
 
+pub(in crate::store) fn registered_historical_offer_version_on(
+    conn: &Connection,
+    offer_id: &str,
+    offer_version: i64,
+) -> Result<Option<ComputeOfferRegistrationReceipt>> {
+    let Some(stored) = offer_version_on(conn, offer_id, offer_version)? else {
+        return Ok(None);
+    };
+    let offer = audited_offer_with_capacity_policy_on(conn, None, &stored, false)?;
+    Ok(Some(ComputeOfferRegistrationReceipt {
+        offer,
+        provider_policy_revision: stored.provider_policy_revision,
+        provider_digest: stored.provider_digest,
+        replayed: false,
+    }))
+}
+
 fn insert_offer_version(
     conn: &Connection,
     offer: &ComputeOffer,
@@ -316,6 +335,15 @@ fn audited_offer_on(
     projection: Option<&CurrentOfferProjection>,
     stored: &StoredOfferVersion,
 ) -> Result<ComputeOffer> {
+    audited_offer_with_capacity_policy_on(conn, projection, stored, true)
+}
+
+fn audited_offer_with_capacity_policy_on(
+    conn: &Connection,
+    projection: Option<&CurrentOfferProjection>,
+    stored: &StoredOfferVersion,
+    require_bucket_heads: bool,
+) -> Result<ComputeOffer> {
     let provider =
         registered_provider_version_on(conn, &stored.provider_id, stored.provider_policy_revision)?
             .ok_or_else(|| anyhow!("算力 Offer 绑定的 Provider 历史版本不存在"))?;
@@ -325,7 +353,8 @@ fn audited_offer_on(
     let offer: ComputeOffer =
         serde_json::from_str(&stored.offer_json).context("算力 Offer 历史版本 JSON 无效")?;
     let computed_digest = validate_offer_contract(&offer, &provider.provider)?;
-    if computed_digest != stored.offer_digest
+    if stored.offer_json != serde_json::to_string(&offer)?
+        || computed_digest != stored.offer_digest
         || offer.offer_id != stored.offer_id
         || offer.offer_version != stored.offer_version
         || offer.provider_id != stored.provider_id
@@ -341,7 +370,7 @@ fn audited_offer_on(
     {
         bail!("算力 Offer 历史版本身份、摘要或投影字段审计失败");
     }
-    ensure_offer_capacity_references_on(conn, &offer, false)?;
+    audit_offer_capacity_references_on(conn, &offer, require_bucket_heads)?;
     if let Some(projection) = projection {
         if stored.offer_version == 1 {
             if offer.created_at != projection.first_created_at {
@@ -465,102 +494,6 @@ fn ensure_version_time_monotonic(previous: &str, next: &str) -> Result<()> {
         bail!("算力 Offer 新版本创建时间不能早于当前版本");
     }
     Ok(())
-}
-
-fn ensure_offer_capacity_references_on(
-    conn: &Connection,
-    offer: &ComputeOffer,
-    publishing: bool,
-) -> Result<()> {
-    let pool = conn
-        .query_row(
-            "SELECT p.provider_id, p.status, p.current_capacity_epoch,
-                    pv.pool_digest, pv.resource_profile_json, COALESCE(pv.region, '')
-               FROM compute_capacity_pools p
-               JOIN compute_capacity_pool_versions pv ON pv.pool_id=p.pool_id
-              WHERE pv.pool_id=?1 AND pv.capacity_epoch=?2 AND pv.pool_revision=?3",
-            params![
-                offer.capacity_pool.pool_id,
-                offer.capacity_pool.capacity_epoch,
-                offer.capacity_pool.pool_revision,
-            ],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                    row.get::<_, String>(5)?,
-                ))
-            },
-        )
-        .optional()?
-        .ok_or_else(|| anyhow!("算力 Offer 容量池版本不存在"))?;
-    let resource_profile: serde_json::Value =
-        serde_json::from_str(&pool.4).context("容量池资源档案 JSON 无效")?;
-    let profile_digest = resource_profile
-        .get("digest")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| anyhow!("容量池资源档案缺少摘要"))?;
-    if pool.0 != offer.provider_id
-        || pool.3 != offer.capacity_pool.pool_digest
-        || pool.5 != offer.sku.region_or_data_zone
-        || profile_digest != offer.resource_profile.declared_profile_digest
-    {
-        bail!("算力 Offer 与容量池 Provider、摘要、区域或资源档案不一致");
-    }
-    if publishing && !pool_state_allows_offer(&pool.1, pool.2, offer) {
-        bail!("容量池当前状态或 epoch 不允许发布该状态的 Offer");
-    }
-
-    for capacity in &offer.capacity {
-        let stored = stored_bucket_on(conn, &capacity.bucket.bucket_id)?
-            .ok_or_else(|| anyhow!("算力 Offer 容量 bucket 不存在"))?;
-        if stored.balance.binding != capacity.bucket {
-            bail!("算力 Offer 容量 bucket 绑定与账本不一致");
-        }
-        let window = offer
-            .delivery_windows
-            .iter()
-            .find(|window| window.binding == capacity.bucket.delivery_window)
-            .ok_or_else(|| anyhow!("算力 Offer 容量 bucket 缺少对应交付窗口"))?;
-        if stored.starts_at != window.starts_at_utc || stored.ends_at != window.ends_at_utc {
-            bail!("算力 Offer 交付窗口与容量 bucket 时间不一致");
-        }
-        if publishing
-            && matches!(
-                offer.status.as_str(),
-                OFFER_STATUS_DRAFT | OFFER_STATUS_ACTIVE
-            )
-            && stored.balance.status != ComputeCapacityBucketStatus::Open
-        {
-            bail!("draft 或 active Offer 只能引用 open 容量 bucket");
-        }
-        if publishing
-            && offer.status == OFFER_STATUS_ACTIVE
-            && stored.balance.issued_units < capacity.total_units
-        {
-            bail!("active Offer 的静态容量上限不能超过 bucket 已发行容量");
-        }
-    }
-    Ok(())
-}
-
-fn pool_state_allows_offer(status: &str, current_epoch: i64, offer: &ComputeOffer) -> bool {
-    if current_epoch != offer.capacity_pool.capacity_epoch {
-        return matches!(
-            offer.status.as_str(),
-            OFFER_STATUS_EXPIRED | OFFER_STATUS_REVOKED
-        );
-    }
-    match offer.status.as_str() {
-        OFFER_STATUS_DRAFT => matches!(status, "registering" | "active"),
-        OFFER_STATUS_ACTIVE => status == "active",
-        OFFER_STATUS_DRAINING => matches!(status, "active" | "draining" | "quarantined"),
-        OFFER_STATUS_EXPIRED | OFFER_STATUS_REVOKED => true,
-        _ => false,
-    }
 }
 
 fn current_offer_projection_on(

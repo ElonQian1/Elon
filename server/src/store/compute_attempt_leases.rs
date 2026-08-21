@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
 use crate::compute_federation::execution::{
@@ -14,7 +14,8 @@ mod support;
 use support::{
     audit_renewal, ensure_expected_state, ensure_renewal_owner, ensure_renewal_window,
     list_current_lease_states_on, renewal_by_idempotency_on, renewal_event_digest,
-    renewal_request_digest, validate_exact, validate_renewal_input,
+    renewal_request_digest, renewals_for_lease_through_revision_on, validate_exact,
+    validate_renewal_input,
 };
 pub(super) use support::{compute_attempt_lease_digest, current_lease_state_on, StoredLeaseState};
 
@@ -22,6 +23,13 @@ pub(crate) const COMPUTE_ATTEMPT_LEASE_STATE_SCHEMA: &str =
     "compute_federation.attempt_lease_state.v1";
 pub(crate) const COMPUTE_ATTEMPT_LEASE_RENEWAL_SCHEMA: &str =
     "compute_federation.attempt_lease_renewal.v1";
+
+#[derive(Debug)]
+pub(in crate::store) struct AuditedComputeAttemptLeaseVersion {
+    pub(in crate::store) lease: ComputeAttemptLease,
+    pub(in crate::store) lease_revision: i64,
+    pub(in crate::store) lease_digest: String,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct RenewComputeAttemptLeaseRequest {
@@ -234,6 +242,90 @@ pub(super) fn compute_attempt_lease_state_on(
         .map(StoredLeaseState::into_receipt)
         .transpose()?
         .ok_or_else(|| anyhow!("Attempt Lease 当前状态不存在"))
+}
+
+pub(in crate::store) fn audited_compute_attempt_lease_version_on(
+    conn: &Connection,
+    lease_id: &str,
+    lease_revision: i64,
+) -> Result<Option<AuditedComputeAttemptLeaseVersion>> {
+    validate_exact("Attempt Lease ID", lease_id, 200)?;
+    if lease_revision <= 0 {
+        bail!("Attempt Lease 历史修订号必须为正数");
+    }
+    let activation_exists = conn
+        .query_row(
+            "SELECT 1 FROM compute_attempt_activations WHERE lease_id=?1",
+            params![lease_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !activation_exists {
+        return Ok(None);
+    }
+    let activation =
+        super::compute_attempt_activations::compute_attempt_historical_activation_sources_on(
+            conn, lease_id,
+        )?;
+    let running_job = super::compute_job_registry::registered_historical_job_version_on(
+        conn,
+        &activation.running_job.job_id,
+        activation.running_job.job_revision,
+    )?
+    .ok_or_else(|| anyhow!("Attempt Lease 激活引用的 running Job 历史版本不存在"))?;
+    if activation.lease.lease_id != lease_id
+        || activation.lease.job_id != activation.running_job.job_id
+        || activation.running_job.job_digest != running_job.job_digest
+        || activation.lease.status != ATTEMPT_STATUS_STAGING
+        || activation.lease.last_heartbeat_at.is_some()
+        || activation.lease_digest != compute_attempt_lease_digest(&activation.lease)?
+    {
+        bail!("Attempt Lease 激活源版本审计失败");
+    }
+    if lease_revision == 1 {
+        return Ok(Some(AuditedComputeAttemptLeaseVersion {
+            lease: activation.lease,
+            lease_revision,
+            lease_digest: activation.lease_digest,
+        }));
+    }
+
+    let renewals = renewals_for_lease_through_revision_on(conn, lease_id, lease_revision)?;
+    if renewals.last().map(|renewal| renewal.target_lease_revision) != Some(lease_revision) {
+        return Ok(None);
+    }
+    let mut current_lease = activation.lease;
+    let mut current_revision = 1_i64;
+    let mut current_digest = activation.lease_digest;
+    for renewal in renewals {
+        audit_renewal(&renewal)?;
+        let mut expected_target = current_lease.clone();
+        expected_target.status = ATTEMPT_STATUS_RUNNING.to_string();
+        expected_target.last_heartbeat_at = Some(renewal.renewed_at.clone());
+        expected_target.expires_at = renewal.target_expires_at.clone();
+        if renewal.previous_lease_revision != current_revision
+            || renewal.previous_lease_digest != current_digest
+            || renewal.previous_status != current_lease.status
+            || renewal.previous_expires_at != current_lease.expires_at
+            || renewal.lease_id != current_lease.lease_id
+            || renewal.provider_id != current_lease.provider_id
+            || renewal.consumer_account_id != running_job.job.consumer_account_id
+            || renewal.fencing_generation != current_lease.fencing_generation
+            || renewal.hard_deadline_at != current_lease.hard_deadline_at
+            || renewal.target_lease != expected_target
+        {
+            bail!("Attempt Lease 历史续租链前后版本不连续");
+        }
+        current_lease = renewal.target_lease;
+        current_revision = renewal.target_lease_revision;
+        current_digest = renewal.target_lease_digest;
+    }
+    Ok(Some(AuditedComputeAttemptLeaseVersion {
+        lease: current_lease,
+        lease_revision: current_revision,
+        lease_digest: current_digest,
+    }))
 }
 
 pub(super) fn terminate_staging_attempt_lease_on(

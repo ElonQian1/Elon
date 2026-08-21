@@ -145,6 +145,7 @@ pub(crate) mod external_pool_provider_activation_candidate;
 pub(crate) mod external_pool_provider_activation_candidate_api;
 pub(crate) mod external_pool_provider_activation_candidate_service;
 mod external_pool_provider_activation_candidate_service_redaction;
+pub(crate) mod federation_historical_causal_reference;
 pub(crate) mod legacy;
 pub(crate) mod management_mcp_support;
 pub(crate) mod market;

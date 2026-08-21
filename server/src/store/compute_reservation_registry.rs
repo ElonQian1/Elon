@@ -12,7 +12,10 @@ mod queries;
 mod rows;
 mod transitions;
 
-use audit::{audited_reservation_on, audited_reservation_with_delivery_authority_on};
+use audit::{
+    audited_historical_reservation_on, audited_reservation_on,
+    audited_reservation_with_delivery_authority_on,
+};
 use dependencies::{
     ensure_current_job_and_claim_on, ensure_delivery_allocation_creation_dependencies_on,
     ensure_live_creation_dependencies_on, registered_dependencies_on,
@@ -304,6 +307,23 @@ pub(super) fn registered_reservation_version_on(
         return Ok(None);
     };
     let reservation = audited_reservation_on(conn, None, &stored)?;
+    Ok(Some(ComputeReservationRegistrationReceipt {
+        reservation,
+        revision: stored.revision,
+        reservation_digest: stored.reservation_digest,
+        replayed: false,
+    }))
+}
+
+pub(in crate::store) fn registered_historical_reservation_version_on(
+    conn: &Connection,
+    reservation_id: &str,
+    revision: i64,
+) -> Result<Option<ComputeReservationRegistrationReceipt>> {
+    let Some(stored) = reservation_version_on(conn, reservation_id, revision)? else {
+        return Ok(None);
+    };
+    let reservation = audited_historical_reservation_on(conn, &stored)?;
     Ok(Some(ComputeReservationRegistrationReceipt {
         reservation,
         revision: stored.revision,

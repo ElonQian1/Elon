@@ -3,7 +3,12 @@ use chrono::Utc;
 use rusqlite::{params, TransactionBehavior};
 use serde::Serialize;
 
-use super::{compute_attempt_terminals::compute_attempt_terminal_candidate_on, new_id, Store};
+use super::{
+    compute_attempt_terminals::{
+        compute_attempt_historical_terminal_candidate_on, compute_attempt_terminal_candidate_on,
+    },
+    new_id, Store,
+};
 
 mod support;
 
@@ -220,13 +225,36 @@ pub(crate) fn compute_attempt_consumer_review_on(
     Ok(Some(consumer_review_receipt_on(conn, stored, false)?))
 }
 
+pub(in crate::store) fn compute_attempt_historical_consumer_review_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptConsumerReviewReceipt>> {
+    let Some(stored) = consumer_review_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    consumer_review_receipt_with_candidate_policy_on(conn, stored, false, true).map(Some)
+}
+
 fn consumer_review_receipt_on(
     conn: &rusqlite::Connection,
     stored: StoredConsumerReview,
     replayed: bool,
 ) -> Result<ComputeAttemptConsumerReviewReceipt> {
-    let candidate = compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("消费者终态审核引用的 Provider 候选不存在"))?;
+    consumer_review_receipt_with_candidate_policy_on(conn, stored, replayed, false)
+}
+
+fn consumer_review_receipt_with_candidate_policy_on(
+    conn: &rusqlite::Connection,
+    stored: StoredConsumerReview,
+    replayed: bool,
+    use_historical_candidate: bool,
+) -> Result<ComputeAttemptConsumerReviewReceipt> {
+    let candidate = if use_historical_candidate {
+        compute_attempt_historical_terminal_candidate_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("消费者终态审核引用的 Provider 候选不存在"))?;
     ensure_candidate_binding(&stored, &candidate)?;
     stored.into_receipt(replayed)
 }

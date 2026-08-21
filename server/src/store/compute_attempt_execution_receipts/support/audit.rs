@@ -1,11 +1,11 @@
 use anyhow::{bail, Result};
 
 use crate::{
-    compute_federation::{execution::ComputeJob, execution::ComputeReservation},
+    compute_federation::execution::{ComputeAttemptLease, ComputeJob, ComputeReservation},
     store::{
-        ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
-        ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
-        ComputeAttemptUsageDeclarationReceipt, ComputeAttemptVerificationDecisionReceipt,
+        ComputeAttemptConsumerReviewReceipt, ComputeAttemptPlatformObservationReceipt,
+        ComputeAttemptTerminalCandidateReceipt, ComputeAttemptUsageDeclarationReceipt,
+        ComputeAttemptVerificationDecisionReceipt,
     },
 };
 
@@ -26,7 +26,8 @@ impl StoredExecutionReceipt {
         consumer_review: &ComputeAttemptConsumerReviewReceipt,
         platform_observation: &ComputeAttemptPlatformObservationReceipt,
         provider_usage: &ComputeAttemptUsageDeclarationReceipt,
-        activation: &ComputeAttemptActivationReceipt,
+        activation_lease: &ComputeAttemptLease,
+        activated_at: &str,
         job: &ComputeJob,
         reservation: &ComputeReservation,
         replayed: bool,
@@ -47,7 +48,8 @@ impl StoredExecutionReceipt {
             consumer_review,
             platform_observation,
             provider_usage,
-            activation,
+            activation_lease,
+            activated_at,
             job,
             reservation,
             &self.issued_at,
@@ -56,6 +58,7 @@ impl StoredExecutionReceipt {
             || self.verification_event_digest != verification.event_digest
             || self.receipt.receipt_id != self.execution_receipt_id
             || self.receipt.receipt_digest != self.receipt_digest
+            || self.receipt_json != serde_json::to_string(&self.receipt)?
             || self.receipt != expected_receipt
             || self.request_digest != expected_request_digest
             || self.idempotency_scope

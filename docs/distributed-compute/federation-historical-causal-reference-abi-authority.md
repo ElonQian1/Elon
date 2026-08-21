@@ -5,8 +5,8 @@ status: current
 owners: backend, node, ai-economy
 design_status: design_frozen
 design_scope: federation_core_historical_causal_reference_carrier_abi_v1
-implementation_status: implementation_unwired
-verification_status: design_review_only
+implementation_status: implementation_uncompiled
+verification_status: source_review_only
 ---
 
 # 联邦核心历史因果引用 Carrier ABI 权威
@@ -14,19 +14,24 @@ verification_status: design_review_only
 ## 1. 唯一结论与状态边界
 
 本页只冻结 Provider-neutral 的历史引用 primitive，以及 Execution Receipt 与 Settlement Receipt 两种只读因果
-Carrier。它让 Store、Service、HTTP/MCP 和客户端未来可以传递同一组 owner-audited identity/version/digest，
-但不统一重算任何既有对象摘要，不新增 current authority、writer、账本、状态机、表、migration、API 或经济效果。
+Carrier。Domain 与 Store 只读 resolver 源码现已落盘；Service、HTTP/MCP 和客户端仍未采用。它不统一重算任何
+既有对象摘要，不新增 current authority、writer、账本、状态机、表、migration、API 或经济效果。
 
 当前状态逐字为：
 
 ```text
 federation_core_historical_causal_reference_carrier_abi=design_frozen
 carrier_profiles=execution_source_v1/settlement_source_v1
-domain_implementation=absent
-store_resolver=absent
+domain_implementation=source_written
+store_resolver=source_written
 service_http_mcp_client_adoption=absent
-implementation=unwired/uncompiled/unrun
+migration/table=none
+verification=source_review_only
+compiled=0 run=0
 passed=0 failed=0
+native_digest_rewrites=0
+state_or_money_effects=0
+f0_exit_gate=not_met
 ```
 
 本页不表示 F0 退出门槛已经完成。F0 顺序和退出条件仍见
@@ -265,21 +270,21 @@ DTO；它不能产生 `ValidatedFederationHistoricalLineage`，也不能进入�
 
 ## 9. 计划 ownership 与 source-written 门
 
-未来 source实现须独占在新的 Provider-neutral Domain owner，例如
+source实现独占在新的 Provider-neutral Domain owner：
 `server/src/compute_federation/federation_historical_causal_reference/`，只拥有 exact DTO、JCS与 Carrier digest。
 各 native digest/helper继续属于现有 Provider/Pool/Offer/Snapshot/Job/Reservation/Claim/Attempt/Receipt owner。
 
-Store integration只能新增只读 historical resolver；不得复制 SQL/digest公式或提供 public raw builder。聚合模块、Service、
-HTTP/MCP/client adoption、source-contract、golden与negative tests须在后续独立 implementation batch登记。本批没有创建这些
-目录、符号或 caller，也未编译、测试、执行 migration/SQLite/runtime/network。
+Store integration只新增只读 historical resolver；不复制 SQL/digest公式或提供 public raw builder。本批已写入 Domain、
+Store resolver、source-contract、golden与negative test源码；没有创建 Service、HTTP/MCP、客户端 caller、表或 migration，
+也未编译、测试或执行 SQLite/runtime/network。
 
-任何 source-written 声明前至少必须同时具备：
+本次 `source_written` 静态审查中以下五类源码同时存在，但均未编译或运行，不能写成 verified：
 
 1. 两种 profile exact DTO/canonical/from-json golden；
 2. owner-by-owner full audit与 source Lease retained resolver；
 3. v193/v195 deterministic reconstruction及跨对象 splice negatives；
 4. raw DTO不能进入 writer的source contract；
-5. legacy digest bytes与既有表/receipt零 diff，且全部经济效果为零。
+5. resolver无 writer/migration入口，legacy digest bytes、既有表与既有 receipt JSON/digest合同零改写，且本批状态或资金效果为零。
 
 ## 10. 明确禁止
 

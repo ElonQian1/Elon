@@ -33,6 +33,7 @@ pub(crate) use types::{
 pub(in crate::store) use read::{
     delivery_allocation_commitment_status_on,
     persisted_delivery_allocation_reservation_authority_on,
+    persisted_historical_delivery_allocation_reservation_authority_on,
 };
 pub(in crate::store) use types::{
     DeliveryAllocationClaimTransferAuthority, DeliveryAllocationCommitmentState,

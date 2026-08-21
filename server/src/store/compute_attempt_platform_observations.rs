@@ -7,7 +7,8 @@ use crate::compute_federation::receipts::ComputeMeterReading;
 
 use super::{
     compute_attempt_terminals::{
-        compute_attempt_terminal_candidate_on, ComputeAttemptTerminalCandidateReceipt,
+        compute_attempt_historical_terminal_candidate_on, compute_attempt_terminal_candidate_on,
+        ComputeAttemptTerminalCandidateReceipt,
     },
     compute_attempt_usage::{
         compute_attempt_usage_declaration_on, ComputeAttemptUsageDeclarationReceipt,
@@ -309,13 +310,36 @@ pub(crate) fn compute_attempt_platform_observation_on(
     Ok(Some(platform_observation_receipt_on(conn, stored, false)?))
 }
 
+pub(in crate::store) fn compute_attempt_historical_platform_observation_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptPlatformObservationReceipt>> {
+    let Some(stored) = platform_observation_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    platform_observation_receipt_with_candidate_policy_on(conn, stored, false, true).map(Some)
+}
+
 fn platform_observation_receipt_on(
     conn: &rusqlite::Connection,
     stored: StoredPlatformObservation,
     replayed: bool,
 ) -> Result<ComputeAttemptPlatformObservationReceipt> {
-    let candidate = compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("平台观测引用的 Provider 候选不存在"))?;
+    platform_observation_receipt_with_candidate_policy_on(conn, stored, replayed, false)
+}
+
+fn platform_observation_receipt_with_candidate_policy_on(
+    conn: &rusqlite::Connection,
+    stored: StoredPlatformObservation,
+    replayed: bool,
+    use_historical_candidate: bool,
+) -> Result<ComputeAttemptPlatformObservationReceipt> {
+    let candidate = if use_historical_candidate {
+        compute_attempt_historical_terminal_candidate_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("平台观测引用的 Provider 候选不存在"))?;
     let provider_usage = compute_attempt_usage_declaration_on(
         conn,
         &stored.lease_id,

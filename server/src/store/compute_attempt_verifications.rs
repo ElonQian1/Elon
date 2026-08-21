@@ -7,18 +7,23 @@ use crate::compute_federation::receipts::ComputeMeterReading;
 
 use super::{
     compute_attempt_consumer_reviews::{
-        compute_attempt_consumer_review_on, ComputeAttemptConsumerReviewReceipt,
+        compute_attempt_consumer_review_on, compute_attempt_historical_consumer_review_on,
+        ComputeAttemptConsumerReviewReceipt,
     },
     compute_attempt_platform_observations::{
+        compute_attempt_historical_platform_observation_on,
         compute_attempt_platform_observation_on, ComputeAttemptPlatformObservationReceipt,
     },
     compute_attempt_terminals::{
-        compute_attempt_terminal_candidate_on, ComputeAttemptTerminalCandidateReceipt,
+        compute_attempt_historical_terminal_candidate_on, compute_attempt_terminal_candidate_on,
+        ComputeAttemptTerminalCandidateReceipt,
     },
     compute_attempt_usage::{
         compute_attempt_usage_declaration_on, ComputeAttemptUsageDeclarationReceipt,
     },
-    compute_reservation_registry::registered_reservation_version_on,
+    compute_reservation_registry::{
+        registered_historical_reservation_version_on, registered_reservation_version_on,
+    },
     new_id, Store,
 };
 
@@ -334,28 +339,67 @@ pub(crate) fn compute_attempt_verification_decision_on(
     Ok(Some(verification_decision_receipt_on(conn, stored, false)?))
 }
 
+pub(in crate::store) fn compute_attempt_historical_verification_decision_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptVerificationDecisionReceipt>> {
+    let Some(stored) = verification_decision_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    verification_decision_receipt_with_source_policy_on(conn, stored, false, true).map(Some)
+}
+
 fn verification_decision_receipt_on(
     conn: &rusqlite::Connection,
     stored: StoredVerificationDecision,
     replayed: bool,
 ) -> Result<ComputeAttemptVerificationDecisionReceipt> {
-    let candidate = compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Verification 决定引用的 Provider 候选不存在"))?;
-    let consumer_review = compute_attempt_consumer_review_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Verification 决定引用的消费者审核不存在"))?;
-    let platform_observation = compute_attempt_platform_observation_on(conn, &stored.lease_id)?
-        .ok_or_else(|| anyhow!("Verification 决定引用的平台观测不存在"))?;
+    verification_decision_receipt_with_source_policy_on(conn, stored, replayed, false)
+}
+
+fn verification_decision_receipt_with_source_policy_on(
+    conn: &rusqlite::Connection,
+    stored: StoredVerificationDecision,
+    replayed: bool,
+    use_historical_sources: bool,
+) -> Result<ComputeAttemptVerificationDecisionReceipt> {
+    let candidate = if use_historical_sources {
+        compute_attempt_historical_terminal_candidate_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_terminal_candidate_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Verification 决定引用的 Provider 候选不存在"))?;
+    let consumer_review = if use_historical_sources {
+        compute_attempt_historical_consumer_review_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_consumer_review_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Verification 决定引用的消费者审核不存在"))?;
+    let platform_observation = if use_historical_sources {
+        compute_attempt_historical_platform_observation_on(conn, &stored.lease_id)?
+    } else {
+        compute_attempt_platform_observation_on(conn, &stored.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Verification 决定引用的平台观测不存在"))?;
     let provider_usage = compute_attempt_usage_declaration_on(
         conn,
         &stored.lease_id,
         candidate.final_usage_sequence_no,
     )?
     .ok_or_else(|| anyhow!("Verification 决定引用的 Provider 用量不存在"))?;
-    let reservation = registered_reservation_version_on(
-        conn,
-        &candidate.reservation_id,
-        candidate.reservation_revision,
-    )?
+    let reservation = if use_historical_sources {
+        registered_historical_reservation_version_on(
+            conn,
+            &candidate.reservation_id,
+            candidate.reservation_revision,
+        )?
+    } else {
+        registered_reservation_version_on(
+            conn,
+            &candidate.reservation_id,
+            candidate.reservation_revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Verification 决定引用的 Reservation 版本不存在"))?;
     ensure_evidence_binding(
         &candidate,

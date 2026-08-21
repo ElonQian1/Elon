@@ -5,7 +5,8 @@ use crate::compute_federation::execution::ComputeReservation;
 
 use super::{
     dependencies::{
-        registered_dependencies_on, validate_with_delivery_authority, validate_with_dependencies,
+        registered_dependencies_on, registered_historical_dependencies_on,
+        validate_with_delivery_authority, validate_with_dependencies,
         RegisteredReservationDependencies,
     },
     rows::{CurrentReservationProjection, StoredReservationVersion},
@@ -16,7 +17,14 @@ pub(super) fn audited_reservation_on(
     projection: Option<&CurrentReservationProjection>,
     stored: &StoredReservationVersion,
 ) -> Result<ComputeReservation> {
-    audited_reservation_with_delivery_authority_on(conn, projection, stored, None)
+    audited_reservation_with_dependency_policy_on(conn, projection, stored, None, false)
+}
+
+pub(super) fn audited_historical_reservation_on(
+    conn: &Connection,
+    stored: &StoredReservationVersion,
+) -> Result<ComputeReservation> {
+    audited_reservation_with_dependency_policy_on(conn, None, stored, None, true)
 }
 
 pub(super) fn audited_reservation_with_delivery_authority_on(
@@ -27,14 +35,37 @@ pub(super) fn audited_reservation_with_delivery_authority_on(
         &crate::store::compute_delivery_allocations::DeliveryAllocationReservationAuthority,
     >,
 ) -> Result<ComputeReservation> {
+    audited_reservation_with_dependency_policy_on(
+        conn,
+        projection,
+        stored,
+        delivery_authority,
+        false,
+    )
+}
+
+fn audited_reservation_with_dependency_policy_on(
+    conn: &Connection,
+    projection: Option<&CurrentReservationProjection>,
+    stored: &StoredReservationVersion,
+    delivery_authority: Option<
+        &crate::store::compute_delivery_allocations::DeliveryAllocationReservationAuthority,
+    >,
+    use_historical_dependencies: bool,
+) -> Result<ComputeReservation> {
     let reservation: ComputeReservation = serde_json::from_str(&stored.reservation_json)
         .context("算力 Reservation 历史版本 JSON 无效")?;
-    let dependencies = registered_dependencies_on(conn, &reservation)?;
+    let dependencies = if use_historical_dependencies {
+        registered_historical_dependencies_on(conn, &reservation)?
+    } else {
+        registered_dependencies_on(conn, &reservation)?
+    };
     let computed_digest = match delivery_authority {
         Some(authority) => validate_with_delivery_authority(&reservation, &dependencies, authority),
         None => validate_with_dependencies(&reservation, &dependencies),
     }?;
-    if computed_digest != stored.reservation_digest
+    if stored.reservation_json != serde_json::to_string(&reservation)?
+        || computed_digest != stored.reservation_digest
         || reservation.reservation_id != stored.reservation_id
         || reservation.status != stored.status
         || reservation.job.job_id != stored.job_id

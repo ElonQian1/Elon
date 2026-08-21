@@ -302,3 +302,13 @@ pub(super) fn compute_attempt_finalization_on(
         .ok_or_else(|| anyhow::anyhow!("Attempt 尚无可信终态回执"))?;
     stored.into_receipt(conn, false)
 }
+
+pub(in crate::store) fn compute_attempt_historical_finalization_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<ComputeAttemptFinalizationReceipt> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    let stored = finalization_by_lease_on(conn, lease_id)?
+        .ok_or_else(|| anyhow::anyhow!("Attempt 尚无可信终态回执"))?;
+    stored.into_historical_receipt(conn)
+}

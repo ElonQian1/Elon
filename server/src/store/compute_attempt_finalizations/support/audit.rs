@@ -17,19 +17,31 @@ use super::{
     StoredFinalization,
 };
 use crate::store::{
-    compute_attempt_execution_receipts::compute_attempt_execution_receipt_on,
+    compute_attempt_execution_receipts::{
+        compute_attempt_execution_receipt_by_id_on, compute_attempt_execution_receipt_on,
+    },
     compute_attempt_finalizations::{
         capacity::receipt_capacity_is_consistent, ComputeAttemptFinalizationReceipt,
         COMPUTE_ATTEMPT_FINALIZATION_SCHEMA,
     },
-    compute_attempt_leases::current_lease_state_on,
-    compute_attempt_terminals::compute_attempt_terminal_candidate_on,
+    compute_attempt_leases::{
+        audited_compute_attempt_lease_version_on, compute_attempt_lease_digest,
+        compute_attempt_lease_state_on,
+    },
+    compute_attempt_terminals::{
+        compute_attempt_historical_terminal_candidate_on, compute_attempt_terminal_candidate_on,
+    },
     compute_capacity_claim_rows::{stored_claim_on, stored_claim_version_on},
-    compute_job_registry::registered_job_version_on,
+    compute_job_registry::{registered_historical_job_version_on, registered_job_version_on},
     compute_reservation_registry::{
-        current_registered_reservation_on, registered_reservation_version_on,
+        current_registered_reservation_on, registered_historical_reservation_version_on,
+        registered_reservation_version_on,
     },
 };
+
+mod bindings;
+
+use bindings::ensure_request_bindings;
 
 impl StoredFinalization {
     pub(in crate::store::compute_attempt_finalizations) fn into_receipt(
@@ -37,8 +49,26 @@ impl StoredFinalization {
         conn: &Connection,
         replayed: bool,
     ) -> Result<ComputeAttemptFinalizationReceipt> {
+        self.into_receipt_with_head_policy(conn, replayed, true)
+    }
+
+    pub(in crate::store::compute_attempt_finalizations) fn into_historical_receipt(
+        self,
+        conn: &Connection,
+    ) -> Result<ComputeAttemptFinalizationReceipt> {
+        self.into_receipt_with_head_policy(conn, false, false)
+    }
+
+    fn into_receipt_with_head_policy(
+        self,
+        conn: &Connection,
+        replayed: bool,
+        require_terminal_heads: bool,
+    ) -> Result<ComputeAttemptFinalizationReceipt> {
         let normalized = normalize_finalization_request(&self.request)?;
         if normalized != self.request
+            || self.request_json != serde_json::to_string(&normalized)?
+            || self.receipt_json != serde_json::to_string(&self.receipt)?
             || finalization_request_digest(&normalized)? != self.request_digest
             || self.receipt.request_digest != self.request_digest
             || self.receipt.schema != COMPUTE_ATTEMPT_FINALIZATION_SCHEMA
@@ -63,7 +93,7 @@ impl StoredFinalization {
             bail!("Attempt 可信终态持久化字段或摘要审计失败");
         }
         ensure_request_bindings(&self.request, &self.receipt)?;
-        audit_source_and_target(conn, &self.receipt)?;
+        audit_source_and_target(conn, &self.request, &self.receipt, require_terminal_heads)?;
         audit_capacity_transactions(conn, &self.receipt)?;
         audit_times(&self.receipt)?;
 
@@ -73,40 +103,24 @@ impl StoredFinalization {
     }
 }
 
-fn ensure_request_bindings(
-    request: &super::super::FinalizeComputeAttemptRequest,
-    receipt: &ComputeAttemptFinalizationReceipt,
-) -> Result<()> {
-    if request.lease_id != receipt.lease_id
-        || request.expected_execution_receipt_id != receipt.execution_receipt_id
-        || request.expected_execution_receipt_digest != receipt.execution_receipt_digest
-        || request.expected_lease_revision != receipt.source_lease.revision
-        || request.expected_lease_digest != receipt.source_lease.digest
-        || request.expected_job_revision != receipt.source_job.job_revision
-        || request.expected_job_digest != receipt.source_job.job_digest
-        || request.expected_reservation_revision != receipt.source_reservation.revision
-        || request.expected_reservation_digest != receipt.source_reservation.digest
-        || request.expected_claim_revision != receipt.source_claim.claim_revision
-        || request.expected_claim_digest != receipt.source_claim.claim_digest
-        || request.finalized_by_user_id != receipt.finalized_by_user_id
-        || request.expected_fencing_generation <= 0
-        || receipt.terminal_lease.revision != receipt.source_lease.revision + 1
-        || receipt.terminal_job.job_revision != receipt.source_job.job_revision + 1
-        || receipt.terminal_reservation.revision != receipt.source_reservation.revision + 1
-        || receipt.terminal_claim.claim_revision != receipt.source_claim.claim_revision + 1
-    {
-        bail!("Attempt 可信终态请求与源/目标版本绑定不一致");
-    }
-    Ok(())
-}
-
 fn audit_source_and_target(
     conn: &Connection,
+    request: &super::super::FinalizeComputeAttemptRequest,
     receipt: &ComputeAttemptFinalizationReceipt,
+    require_terminal_heads: bool,
 ) -> Result<()> {
-    let execution = compute_attempt_execution_receipt_on(conn, &receipt.lease_id)?;
-    let candidate = compute_attempt_terminal_candidate_on(conn, &receipt.lease_id)?
-        .ok_or_else(|| anyhow!("Attempt 可信终态引用的 Provider 候选不存在"))?;
+    let execution = if require_terminal_heads {
+        compute_attempt_execution_receipt_on(conn, &receipt.lease_id)?
+    } else {
+        compute_attempt_execution_receipt_by_id_on(conn, &receipt.execution_receipt_id)?
+            .ok_or_else(|| anyhow!("Attempt 可信终态引用的 v193 回执不存在"))?
+    };
+    let candidate = if require_terminal_heads {
+        compute_attempt_terminal_candidate_on(conn, &receipt.lease_id)?
+    } else {
+        compute_attempt_historical_terminal_candidate_on(conn, &receipt.lease_id)?
+    }
+    .ok_or_else(|| anyhow!("Attempt 可信终态引用的 Provider 候选不存在"))?;
     if execution.receipt.receipt_id != receipt.execution_receipt_id
         || execution.receipt.receipt_digest != receipt.execution_receipt_digest
         || execution.receipt.execution_status != receipt.outcome
@@ -122,28 +136,70 @@ fn audit_source_and_target(
         bail!("Attempt 可信终态与 v193 回执或终态候选不一致");
     }
 
-    let lease = current_lease_state_on(conn, &receipt.lease_id)?
-        .ok_or_else(|| anyhow!("Attempt 可信终态对应 Lease 不存在"))?;
-    if lease.lease_revision != receipt.terminal_lease.revision
-        || lease.lease_digest != receipt.terminal_lease.digest
-        || lease.lease.status != ATTEMPT_STATUS_TERMINAL
-        || lease.lease.terminal_reason_code.as_deref() != Some(receipt.reason_code.as_str())
-        || lease.updated_at != receipt.effective_at
+    let source_lease = audited_compute_attempt_lease_version_on(
+        conn,
+        &receipt.lease_id,
+        receipt.source_lease.revision,
+    )?
+    .ok_or_else(|| anyhow!("Attempt 可信终态源 Lease 历史版本不存在"))?;
+    let mut expected_terminal_lease = source_lease.lease.clone();
+    expected_terminal_lease.status = ATTEMPT_STATUS_TERMINAL.to_string();
+    expected_terminal_lease.terminal_reason_code = Some(receipt.reason_code.clone());
+    let expected_terminal_revision = source_lease
+        .lease_revision
+        .checked_add(1)
+        .ok_or_else(|| anyhow!("Attempt Lease 历史修订号溢出"))?;
+    let expected_terminal_digest = compute_attempt_lease_digest(&expected_terminal_lease)?;
+    if source_lease.lease_revision != receipt.source_lease.revision
+        || source_lease.lease_digest != receipt.source_lease.digest
+        || source_lease.lease.status != crate::compute_federation::execution::ATTEMPT_STATUS_RUNNING
+        || source_lease.lease.last_heartbeat_at.is_none()
+        || source_lease.lease.fencing_generation != request.expected_fencing_generation
+        || candidate.fencing_generation != request.expected_fencing_generation
+        || execution.receipt.fencing_generation != request.expected_fencing_generation
+        || expected_terminal_revision != receipt.terminal_lease.revision
+        || expected_terminal_digest != receipt.terminal_lease.digest
     {
-        bail!("Attempt Lease 当前可信终态与回执不一致");
+        bail!("Attempt Lease 历史源/终态与回执不一致");
+    }
+    if require_terminal_heads {
+        let lease = compute_attempt_lease_state_on(conn, &receipt.lease_id)?;
+        if lease.lease_revision != receipt.terminal_lease.revision
+            || lease.lease_digest != receipt.terminal_lease.digest
+            || lease.lease != expected_terminal_lease
+            || lease.updated_at != receipt.effective_at
+        {
+            bail!("Attempt Lease 当前可信终态与回执不一致");
+        }
     }
 
-    let source_job = registered_job_version_on(
-        conn,
-        &receipt.source_job.job_id,
-        receipt.source_job.job_revision,
-    )?
+    let source_job = if require_terminal_heads {
+        registered_job_version_on(
+            conn,
+            &receipt.source_job.job_id,
+            receipt.source_job.job_revision,
+        )?
+    } else {
+        registered_historical_job_version_on(
+            conn,
+            &receipt.source_job.job_id,
+            receipt.source_job.job_revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Attempt 可信终态源 Job 历史版本不存在"))?;
-    let terminal_job = registered_job_version_on(
-        conn,
-        &receipt.terminal_job.job_id,
-        receipt.terminal_job.job_revision,
-    )?
+    let terminal_job = if require_terminal_heads {
+        registered_job_version_on(
+            conn,
+            &receipt.terminal_job.job_id,
+            receipt.terminal_job.job_revision,
+        )?
+    } else {
+        registered_historical_job_version_on(
+            conn,
+            &receipt.terminal_job.job_id,
+            receipt.terminal_job.job_revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Attempt 可信终态目标 Job 历史版本不存在"))?;
     if source_job.job_digest != receipt.source_job.job_digest
         || source_job.job.status != JOB_STATUS_RUNNING
@@ -154,21 +210,34 @@ fn audit_source_and_target(
         bail!("Attempt 可信终态 Job 历史版本审计失败");
     }
 
-    let source_reservation = registered_reservation_version_on(
-        conn,
-        &execution.receipt.reservation_id,
-        receipt.source_reservation.revision,
-    )?
+    let source_reservation = if require_terminal_heads {
+        registered_reservation_version_on(
+            conn,
+            &execution.receipt.reservation_id,
+            receipt.source_reservation.revision,
+        )?
+    } else {
+        registered_historical_reservation_version_on(
+            conn,
+            &execution.receipt.reservation_id,
+            receipt.source_reservation.revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Attempt 可信终态源 Reservation 历史版本不存在"))?;
-    let terminal_reservation = registered_reservation_version_on(
-        conn,
-        &source_reservation.reservation.reservation_id,
-        receipt.terminal_reservation.revision,
-    )?
+    let terminal_reservation = if require_terminal_heads {
+        registered_reservation_version_on(
+            conn,
+            &source_reservation.reservation.reservation_id,
+            receipt.terminal_reservation.revision,
+        )?
+    } else {
+        registered_historical_reservation_version_on(
+            conn,
+            &source_reservation.reservation.reservation_id,
+            receipt.terminal_reservation.revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("Attempt 可信终态目标 Reservation 历史版本不存在"))?;
-    let current_reservation =
-        current_registered_reservation_on(conn, &source_reservation.reservation.reservation_id)?
-            .ok_or_else(|| anyhow!("Attempt 可信终态当前 Reservation 不存在"))?;
     if source_reservation.reservation_digest != receipt.source_reservation.digest
         || source_reservation.reservation.status != RESERVATION_STATUS_ACTIVE
         || terminal_reservation.reservation_digest != receipt.terminal_reservation.digest
@@ -178,10 +247,20 @@ fn audit_source_and_target(
             != Some(receipt.effective_at.as_str())
         || terminal_reservation.reservation.job != receipt.terminal_job
         || terminal_reservation.reservation.capacity_claim != receipt.terminal_claim
-        || current_reservation.revision != receipt.terminal_reservation.revision
-        || current_reservation.reservation_digest != receipt.terminal_reservation.digest
     {
-        bail!("Attempt 可信终态 Reservation 历史或当前版本审计失败");
+        bail!("Attempt 可信终态 Reservation 历史版本审计失败");
+    }
+    if require_terminal_heads {
+        let current_reservation = current_registered_reservation_on(
+            conn,
+            &source_reservation.reservation.reservation_id,
+        )?
+        .ok_or_else(|| anyhow!("Attempt 可信终态当前 Reservation 不存在"))?;
+        if current_reservation.revision != receipt.terminal_reservation.revision
+            || current_reservation.reservation_digest != receipt.terminal_reservation.digest
+        {
+            bail!("Attempt 可信终态 Reservation 当前版本审计失败");
+        }
     }
 
     let source_claim = stored_claim_version_on(
@@ -196,18 +275,23 @@ fn audit_source_and_target(
         receipt.terminal_claim.claim_revision,
     )?
     .ok_or_else(|| anyhow!("Attempt 可信终态目标 Capacity Claim 历史版本不存在"))?;
-    let current_claim = stored_claim_on(conn, &receipt.terminal_claim.claim_id)?
-        .ok_or_else(|| anyhow!("Attempt 可信终态当前 Capacity Claim 不存在"))?;
     if source_claim.claim_digest != receipt.source_claim.claim_digest
         || source_claim.state != ComputeCapacityClaimState::Active
         || terminal_claim.claim_digest != receipt.terminal_claim.claim_digest
         || terminal_claim.state != ComputeCapacityClaimState::Consumed
         || terminal_claim.updated_at != receipt.effective_at
         || terminal_claim.terminal_at.as_deref() != Some(receipt.effective_at.as_str())
-        || current_claim.revision != receipt.terminal_claim.claim_revision
-        || current_claim.claim_digest != receipt.terminal_claim.claim_digest
     {
-        bail!("Attempt 可信终态 Capacity Claim 历史或当前版本审计失败");
+        bail!("Attempt 可信终态 Capacity Claim 历史版本审计失败");
+    }
+    if require_terminal_heads {
+        let current_claim = stored_claim_on(conn, &receipt.terminal_claim.claim_id)?
+            .ok_or_else(|| anyhow!("Attempt 可信终态当前 Capacity Claim 不存在"))?;
+        if current_claim.revision != receipt.terminal_claim.claim_revision
+            || current_claim.claim_digest != receipt.terminal_claim.claim_digest
+        {
+            bail!("Attempt 可信终态 Capacity Claim 当前版本审计失败");
+        }
     }
     audit_capacity_shape(
         &execution.receipt.usage.compensable_usage,

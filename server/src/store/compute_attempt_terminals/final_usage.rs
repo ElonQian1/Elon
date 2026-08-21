@@ -2,7 +2,8 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, Connection};
 
 use crate::store::compute_attempt_usage::{
-    latest_compute_attempt_usage_declaration_on, ComputeAttemptUsageDeclarationReceipt,
+    compute_attempt_usage_declaration_on, latest_compute_attempt_usage_declaration_on,
+    ComputeAttemptUsageDeclarationReceipt,
 };
 
 use super::{support::StoredTerminalCandidate, ComputeAttemptTerminalCandidateReceipt};
@@ -31,11 +32,26 @@ pub(super) fn terminal_candidate_receipt_on(
     let receipt = stored.into_receipt(replayed)?;
     let usage = latest_compute_attempt_usage_declaration_on(conn, &receipt.lease_id)?
         .ok_or_else(|| anyhow!("Attempt 终态候选绑定的最终用量快照不存在"))?;
-    ensure_final_usage_head(&receipt, &usage)?;
+    ensure_final_usage_binding(&receipt, &usage)?;
     Ok(receipt)
 }
 
-fn ensure_final_usage_head(
+pub(super) fn historical_terminal_candidate_receipt_on(
+    conn: &Connection,
+    stored: StoredTerminalCandidate,
+) -> Result<ComputeAttemptTerminalCandidateReceipt> {
+    let receipt = stored.into_receipt(false)?;
+    let usage = compute_attempt_usage_declaration_on(
+        conn,
+        &receipt.lease_id,
+        receipt.final_usage_sequence_no,
+    )?
+    .ok_or_else(|| anyhow!("Attempt 终态候选绑定的精确用量快照不存在"))?;
+    ensure_final_usage_binding(&receipt, &usage)?;
+    Ok(receipt)
+}
+
+fn ensure_final_usage_binding(
     candidate: &ComputeAttemptTerminalCandidateReceipt,
     usage: &ComputeAttemptUsageDeclarationReceipt,
 ) -> Result<()> {
@@ -58,7 +74,7 @@ fn ensure_final_usage_head(
         || candidate.capacity_claim_revision != usage.capacity_claim_revision
         || candidate.capacity_claim_digest != usage.capacity_claim_digest
     {
-        bail!("Attempt 终态候选绑定的最终用量已不是当前声明流头");
+        bail!("Attempt 终态候选绑定的最终用量快照不一致");
     }
     Ok(())
 }

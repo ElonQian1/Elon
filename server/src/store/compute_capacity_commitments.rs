@@ -32,9 +32,11 @@ pub(crate) use types::{
 
 use super::Store;
 use super::{
-    compute_offer_registry::registered_offer_version_on,
+    compute_offer_registry::{registered_historical_offer_version_on, registered_offer_version_on},
     compute_platform_reference_price_curve::audited_platform_reference_snapshot_binding_on,
-    compute_price_snapshot_registry::registered_price_snapshot_on,
+    compute_price_snapshot_registry::{
+        registered_historical_price_snapshot_on, registered_price_snapshot_on,
+    },
     compute_provider_registry::registered_provider_version_on,
 };
 
@@ -148,6 +150,23 @@ pub(in crate::store) fn audited_capacity_commitment_source_on(
     Ok(Some((receipt, terminal)))
 }
 
+pub(in crate::store) fn audited_historical_capacity_commitment_source_on(
+    conn: &Connection,
+    commitment_id: &str,
+) -> Result<
+    Option<(
+        ComputeCapacityCommitmentCreateReceipt,
+        Option<crate::compute_federation::capacity_commitment::ComputeCapacityCommitmentTerminalReceipt>,
+    )>,
+>{
+    let Some(commitment) = read::historical_commitment_by_id_on(conn, commitment_id)? else {
+        return Ok(None);
+    };
+    let terminal = read::terminal_by_commitment_on(conn, &commitment)?;
+    let receipt = read::create_receipt_on(conn, commitment, false)?;
+    Ok(Some((receipt, terminal)))
+}
+
 pub(super) fn audit_ledger_binding_on(
     conn: &Connection,
     binding: &ComputeCapacityCommitmentLedgerBinding,
@@ -179,6 +198,21 @@ pub(super) fn audit_immutable_dependencies_on(
     conn: &Connection,
     value: &ComputeCapacityCommitment,
 ) -> Result<()> {
+    audit_immutable_dependencies_with_policy_on(conn, value, false)
+}
+
+pub(super) fn audit_historical_immutable_dependencies_on(
+    conn: &Connection,
+    value: &ComputeCapacityCommitment,
+) -> Result<()> {
+    audit_immutable_dependencies_with_policy_on(conn, value, true)
+}
+
+fn audit_immutable_dependencies_with_policy_on(
+    conn: &Connection,
+    value: &ComputeCapacityCommitment,
+    use_historical_dependencies: bool,
+) -> Result<()> {
     let provider = registered_provider_version_on(
         conn,
         &value.provider.provider_id,
@@ -191,9 +225,16 @@ pub(super) fn audit_immutable_dependencies_on(
     {
         bail!("容量承诺 Provider 历史摘要不一致");
     }
-    let offer =
+    let offer = if use_historical_dependencies {
+        registered_historical_offer_version_on(
+            conn,
+            &value.offer.offer_id,
+            value.offer.offer_version,
+        )?
+    } else {
         registered_offer_version_on(conn, &value.offer.offer_id, value.offer.offer_version)?
-            .ok_or_else(|| anyhow::anyhow!("容量承诺 Offer 历史版本缺失"))?;
+    }
+    .ok_or_else(|| anyhow::anyhow!("容量承诺 Offer 历史版本缺失"))?;
     if offer.offer.offer_digest != value.offer.offer_digest
         || offer.offer.provider_id != value.provider.provider_id
         || offer.provider_policy_revision != value.provider.policy_revision
@@ -202,8 +243,12 @@ pub(super) fn audit_immutable_dependencies_on(
     {
         bail!("容量承诺 Offer 历史版本绑定不一致");
     }
-    let snapshot = registered_price_snapshot_on(conn, &value.price_snapshot_id)?
-        .ok_or_else(|| anyhow::anyhow!("容量承诺 Price Snapshot 缺失"))?;
+    let snapshot = if use_historical_dependencies {
+        registered_historical_price_snapshot_on(conn, &value.price_snapshot_id)?
+    } else {
+        registered_price_snapshot_on(conn, &value.price_snapshot_id)?
+    }
+    .ok_or_else(|| anyhow::anyhow!("容量承诺 Price Snapshot 缺失"))?;
     if snapshot.snapshot_digest != value.price_snapshot_digest
         || snapshot.offer_id != value.offer.offer_id
         || snapshot.offer_version != value.offer.offer_version
