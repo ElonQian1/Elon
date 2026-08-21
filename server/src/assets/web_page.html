@@ -346,7 +346,8 @@
     .work-summary-page { position: absolute; inset: 0; overflow-y: auto; z-index: 20; padding: 0 19px max(40px, env(safe-area-inset-bottom)) 15px; background: #07090d; color: #f8f7f4; box-sizing: border-box; }
     .work-summary-page.hidden { display: none; }
     .work-summary-date { position: relative; display: grid; place-items: center; height: 38px; font-size: 15px; }
-    .work-summary-date > span { width: 96px; text-align: center; cursor: pointer; }
+    .work-summary-date-picker { width: 96px; height: 48px; border: 0; padding: 0; background: transparent; color: #e7eceb; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; cursor: pointer; }
+    .work-summary-date-picker svg { width: 14px; height: 14px; flex: none; }
     .work-summary-calendar { position: absolute; right: 0; width: 24px; height: 24px; padding: 12px; object-fit: contain; cursor: pointer; }
     .work-summary-greeting { position: relative; height: 94px; margin: 11px 0 13px; }
     .work-summary-avatar { position: absolute; left: 16px; top: 4px; width: 86px; height: 86px; object-fit: contain; }
@@ -357,29 +358,33 @@
     .work-summary-metric { padding: 13px 4px; border-radius: 12px; background: #353a42; text-align: center; font-size: 13px; }
     .work-summary-metric b { display: block; color: #8eaed0; font-size: 16px; font-weight: 400; margin-bottom: 6px; }
     .work-summary-heading { display: flex; align-items: center; gap: 9px; height: 34px; font-size: 16px; }
-    .work-summary-heading span { min-width: 30px; padding: 2px 7px; border-radius: 999px; background: #1a1f27; text-align: center; font-size: 12px; }
-    .work-summary-card { display: flex; flex-direction: column; height: 258px; margin-bottom: 16px; padding: 21px 30px; border-radius: 18px; background: #181d25; box-sizing: border-box; }
+    .work-summary-heading span { width: 20px; height: 21px; padding: 0; border-radius: 999px; background: #1a1f27; display:grid; place-items:center; text-align: center; font-size: 12px; }
+    .work-summary-card { display: flex; flex-direction: column; min-height: 258px; height: auto; margin-bottom: 16px; padding: 21px 30px; border-radius: 18px; background: #181d25; box-sizing: border-box; }
     .work-summary-card:last-of-type { margin-bottom: 0; }
-    .work-summary-card.high { height: 268px; }
+    .work-summary-card.high { min-height: 268px; }
     .work-summary-card-head { display: grid; grid-template-columns: 48px 1fr auto; gap: 17px; align-items: center; }
     .work-summary-project-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: #e8e8e7; color: #312c2b; font-size: 21px; }
     .work-summary-card h3 { margin: 0 0 7px; font-size: 14px; font-weight: 400; }
     .work-summary-card p { margin: 0; color: #737877; line-height: 1.5; font-size: 13px; white-space: pre-line; }
     .work-summary-card-head p { color: #e2e6e5; font-size: 14px; }
     .work-summary-card .reason { margin-top: 15px; padding-left: 4px; }
-    .work-summary-card .summary-spacer { flex: 1; }
+    .work-summary-card .summary-spacer { flex: 1; min-height: 16px; }
     .work-summary-card .advice { padding-left: 4px; color: #8faec5; font-size: 14px; }
     .work-summary-card .suggestion { margin-top: 7px; padding-left: 4px; }
     .work-summary-priority { width: 60px; height: 20px; margin-bottom: 7px; border-radius: 5px; background: #40201e; color: #de5a4a; display: grid; place-items: center; font-size: 11px; }
     .work-summary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 42px; margin-top: 8px; align-items: center; }
     .work-summary-actions button { min-height: 36px; border: 0; border-radius: 11px; background: #353a42; color: #e8eceb; font-size: 13px; }
     .work-summary-actions button.primary { background: #3d83ed; color: #f2f5f4; }
+    .work-summary-chevron-right { width:18px; height:18px; flex:none; }
     .work-summary-fold { border: 0; width: 100%; height: 55px; margin-top: 5px; padding: 0 9px 0 13px; display: flex; justify-content: space-between; align-items: center; background: transparent; color: #f8f7f4; font-size: 16px; }
-    .work-summary-update { height: 76px; padding: 0 4px 0 29px; color: #818786; display: grid; grid-template-columns: 48px minmax(0, 1fr) 68px; gap: 16px; align-items: center; box-sizing: border-box; }
+    .work-summary-fold-chevron { width:14px; height:14px; transition:transform 160ms ease; transform:rotate(180deg); }
+    .work-summary-fold[aria-expanded="false"] .work-summary-fold-chevron { transform:rotate(0deg); }
+    .work-summary-update { min-height: 76px; height:auto; padding: 14px 4px 14px 29px; color: #818786; display: grid; grid-template-columns: 48px minmax(0, 1fr) 68px; gap: 16px; align-items: center; box-sizing: border-box; }
     .work-summary-update-copy strong { display:block; color:#e8eceb; font-size:16px; font-weight:400; margin-bottom:8px; }
-    .work-summary-update-copy span { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:14px; }
-    .work-summary-update-date { align-self:start; padding-top:14px; text-align:right; color:#707574; font-size:13px; }
-    .work-summary-view-all { width:100%; height:48px; border:0; background:transparent; display:flex; justify-content:flex-end; align-items:center; padding-right:28px; color:#8faec5; font-size:15px; }
+    .work-summary-update-copy span { display:block; overflow-wrap:anywhere; font-size:14px; line-height:1.45; }
+    .work-summary-update-date { align-self:start; text-align:right; color:#707574; font-size:13px; }
+    .work-summary-view-all { width:100%; height:48px; border:0; background:transparent; display:flex; justify-content:flex-end; gap:8px; align-items:center; padding-right:22px; color:#8faec5; font-size:15px; }
+    .work-summary-view-all svg { width:18px; height:18px; }
     .conversation-filter-pull {
       position: absolute;
       top: 8px;
@@ -4458,15 +4463,15 @@
       </div>
       <div id="conversationList" class="conversation-list"></div>
       <div id="workSummaryPage" class="work-summary-page hidden" aria-label="AI 工作摘要详情">
-        <div class="work-summary-date"><span>今天⌄</span><img class="work-summary-calendar" src="data:image/png;base64,__WORK_SUMMARY_CALENDAR_PNG_B64__" alt="选择摘要日期" /></div>
+        <div class="work-summary-date"><button class="work-summary-date-picker" type="button"><span>今天</span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3.2 5.3 7 9.1l3.8-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button><img class="work-summary-calendar" src="data:image/png;base64,__WORK_SUMMARY_CALENDAR_PNG_B64__" alt="选择摘要日期" /></div>
         <div class="work-summary-greeting"><img class="work-summary-avatar" src="data:image/png;base64,__HOME_AI_AVATAR_PNG_B64__" alt="" /><div><strong>早上好</strong><span>AI 已分析你的 21 个项目</span></div></div>
         <div class="work-summary-metrics"><div class="work-summary-metric"><b>3</b>需要你关注</div><div class="work-summary-metric"><b style="color:#70bb7e">2</b>有新进展</div><div class="work-summary-metric"><b style="color:#f08a3c">1</b>待确认</div></div>
         <div class="work-summary-heading">需要你关注 <span>3</span></div>
-        <article class="work-summary-card high"><div class="work-summary-priority">高优先级</div><div class="work-summary-card-head" data-summary-project="一龙网游加速器"><span class="work-summary-project-icon">一</span><div><h3>一龙网游加速器</h3><p>Windows 端末检测出新问题</p></div><span>›</span></div><p class="reason">大卫提出了2个兼容性问题<br />目前还没有负责人确认</p><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">建议先确认系统兼容性问题</p><div class="work-summary-actions"><button type="button" data-summary-project="一龙网游加速器">进入项目</button><button class="primary" type="button" data-summary-prompt="请处理一龙网游加速器的事项：Windows 端末检测出新问题。建议先确认系统兼容性问题。">交给 AI 处理</button></div></article>
-        <article class="work-summary-card"><div class="work-summary-card-head" data-summary-project="新项目4"><span class="work-summary-project-icon">新</span><div><h3>新项目4</h3><p>APK 构建已完成</p></div><span>›</span></div><p class="reason">等待你是否进入测试阶段。</p><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">建议先进入测试相关内容</p><div class="work-summary-actions"><button type="button" data-summary-prompt="请为新项目4进入测试阶段，并先检查 APK 构建结果。">进入测试</button><button type="button" data-summary-project="新项目4">查看项目</button></div></article>
-        <article class="work-summary-card"><div class="work-summary-card-head" data-summary-project="牛宝"><span class="work-summary-project-icon">牛</span><div><h3>牛宝</h3><p>主页 UI 修改已完成但未发布</p></div><span>›</span></div><p class="reason">等待你的发布确认</p><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">建议发布新版本</p><div class="work-summary-actions"><button type="button" data-summary-project="牛宝">查看详情</button><button class="primary" type="button" data-summary-prompt="请处理牛宝的事项：主页 UI 修改已完成但未发布。建议发布新版本。">交给 AI 处理</button></div></article>
-        <button class="work-summary-fold" type="button" data-summary-fold="progress"><span>有新进展　2</span><span>⌃</span></button><div id="summaryProgress"><div class="work-summary-update"><span class="work-summary-project-icon">杀</span><span class="work-summary-update-copy"><strong>杀蟑螂</strong><span>• 完成了个人页面中心优化</span></span><span class="work-summary-update-date">8月17号</span></div><div class="work-summary-update"><span class="work-summary-project-icon">牛</span><span class="work-summary-update-copy"><strong>牛宝</strong><span>• 修复了交易界面上下自动弹回问题</span></span><span class="work-summary-update-date">8月18号</span></div><button class="work-summary-view-all" type="button">查看全部　›</button></div>
-        <button class="work-summary-fold" type="button" data-summary-fold="confirm"><span>待确认　1</span><span>⌃</span></button><div id="summaryConfirm"><div class="work-summary-update"><span class="work-summary-project-icon">大</span><span class="work-summary-update-copy"><strong>大卫</strong><span>• 大卫提交发布了新版本。</span></span><span class="work-summary-update-date">8月17号</span></div><button class="work-summary-view-all" type="button">查看全部　›</button></div>
+        <article class="work-summary-card high"><div class="work-summary-priority">高优先级</div><div class="work-summary-card-head" data-summary-project="一龙网游加速器"><span class="work-summary-project-icon">一</span><div><h3>一龙网游加速器</h3><p>Windows 端末检测出新问题</p></div><svg class="work-summary-chevron-right" viewBox="0 0 18 18" aria-hidden="true"><path d="m6.75 4.5 4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></div><p class="reason">大卫提出了2个兼容性问题<br />目前还没有负责人确认</p><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">建议先确认系统兼容性问题</p><div class="work-summary-actions"><button type="button" data-summary-project="一龙网游加速器">进入项目</button><button class="primary" type="button" data-summary-prompt="请处理一龙网游加速器的事项：Windows 端末检测出新问题。建议先确认系统兼容性问题。">交给 AI 处理</button></div></article>
+        <article class="work-summary-card"><div class="work-summary-card-head" data-summary-project="新项目4"><span class="work-summary-project-icon">新</span><div><h3>新项目4</h3><p>APK 构建已完成</p></div><svg class="work-summary-chevron-right" viewBox="0 0 18 18" aria-hidden="true"><path d="m6.75 4.5 4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></div><p class="reason">等待你是否进入测试阶段。</p><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">建议先进入测试相关内容</p><div class="work-summary-actions"><button type="button" data-summary-prompt="请为新项目4进入测试阶段，并先检查 APK 构建结果。">进入测试</button><button type="button" data-summary-project="新项目4">查看项目</button></div></article>
+        <article class="work-summary-card"><div class="work-summary-card-head" data-summary-project="牛宝"><span class="work-summary-project-icon">牛</span><div><h3>牛宝</h3><p>主页 UI 修改已完成但未发布</p></div><svg class="work-summary-chevron-right" viewBox="0 0 18 18" aria-hidden="true"><path d="m6.75 4.5 4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></div><p class="reason">等待你的发布确认</p><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">建议发布新版本</p><div class="work-summary-actions"><button type="button" data-summary-project="牛宝">查看详情</button><button class="primary" type="button" data-summary-prompt="请处理牛宝的事项：主页 UI 修改已完成但未发布。建议发布新版本。">交给 AI 处理</button></div></article>
+        <button class="work-summary-fold" type="button" data-summary-fold="progress" aria-expanded="true"><span>有新进展　2</span><svg class="work-summary-fold-chevron" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.2 5.3 7 9.1l3.8-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button><div id="summaryProgress"><div class="work-summary-update"><span class="work-summary-project-icon">杀</span><span class="work-summary-update-copy"><strong>杀蟑螂</strong><span>• 完成了个人页面中心优化</span></span><span class="work-summary-update-date">8月17号</span></div><div class="work-summary-update"><span class="work-summary-project-icon">牛</span><span class="work-summary-update-copy"><strong>牛宝</strong><span>• 修复了交易界面上下自动弹回问题</span></span><span class="work-summary-update-date">8月18号</span></div><button class="work-summary-view-all" type="button">查看全部<svg viewBox="0 0 18 18" aria-hidden="true"><path d="m6.75 4.5 4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button></div>
+        <button class="work-summary-fold" type="button" data-summary-fold="confirm" aria-expanded="true"><span>待确认　1</span><svg class="work-summary-fold-chevron" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.2 5.3 7 9.1l3.8-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button><div id="summaryConfirm"><div class="work-summary-update"><span class="work-summary-project-icon">大</span><span class="work-summary-update-copy"><strong>大卫</strong><span>• 大卫提交发布了新版本。</span></span><span class="work-summary-update-date">8月17号</span></div><button class="work-summary-view-all" type="button">查看全部<svg viewBox="0 0 18 18" aria-hidden="true"><path d="m6.75 4.5 4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button></div>
       </div>
       <!-- 项目内聊天视图 -->
       <div id="chatView" class="chat-view hidden">
@@ -7221,7 +7226,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     button.addEventListener('click', () => {
       const target = button.dataset.summaryFold === 'progress' ? $('summaryProgress') : $('summaryConfirm');
       target.classList.toggle('hidden');
-      button.lastElementChild.textContent = target.classList.contains('hidden') ? '⌄' : '⌃';
+      button.setAttribute('aria-expanded', String(!target.classList.contains('hidden')));
     });
   });
 
@@ -7251,9 +7256,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   });
 
   const summaryCalendar = document.querySelector('.work-summary-calendar');
-  const summaryDateLabel = document.querySelector('.work-summary-date span');
-  if (summaryCalendar && summaryDateLabel) {
-    summaryCalendar.addEventListener('click', () => {
+  const summaryDatePicker = document.querySelector('.work-summary-date-picker');
+  const summaryDateLabel = document.querySelector('.work-summary-date-picker span');
+  if (summaryCalendar && summaryDatePicker && summaryDateLabel) {
+    const openSummaryDatePicker = () => {
       const picker = document.createElement('input');
       picker.type = 'date';
       picker.valueAsDate = new Date();
@@ -7261,12 +7267,14 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       picker.style.opacity = '0';
       picker.addEventListener('change', () => {
         const selected = picker.valueAsDate;
-        if (selected) summaryDateLabel.textContent = `${selected.getMonth() + 1}月${selected.getDate()}日  ⌄`;
+        if (selected) summaryDateLabel.textContent = `${selected.getMonth() + 1}月${selected.getDate()}日`;
         picker.remove();
       }, { once: true });
       document.body.appendChild(picker);
       picker.showPicker ? picker.showPicker() : picker.click();
-    });
+    };
+    summaryCalendar.addEventListener('click', openSummaryDatePicker);
+    summaryDatePicker.addEventListener('click', openSummaryDatePicker);
   }
 
   backBtn.addEventListener('click', () => {
