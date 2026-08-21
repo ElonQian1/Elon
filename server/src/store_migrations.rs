@@ -380,6 +380,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (277, "外部矿池 Adapter stable executor 与原子激活历史回执", compute_external_pool_adapter_atomic_activation::migration_v277),
     (278, "外部矿池 Adapter immutable route renewal authority", compute_external_pool_adapter_route_renewal::migration_v278),
     (279, "user_node Provider 不可变节点安装绑定权威", crate::compute_user_node_provider_binding_migration::migration_v279),
+    (280, "ERP 商户托管不可变发布计划", crate::erp_blueprint::managed_rollout::migration::migration_v280),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

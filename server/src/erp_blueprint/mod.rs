@@ -1,6 +1,7 @@
 pub(crate) mod catalog_service;
 pub(crate) mod compatibility;
 pub(crate) mod instance_service;
+pub(crate) mod managed_rollout;
 pub(crate) mod materialization;
 pub(crate) mod matter_bridge;
 pub(crate) mod model;

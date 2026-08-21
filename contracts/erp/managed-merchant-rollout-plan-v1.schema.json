@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/erp/managed-merchant-rollout-plan-v1.schema.json",
+  "title": "Yilong managed merchant ERP rollout plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "source",
+    "target_node_id",
+    "deployment_contract",
+    "edge_route",
+    "runtime_candidate",
+    "boundaries"
+  ],
+  "properties": {
+    "schema": {
+      "const": "yilong.erp.managed_rollout_plan.v1"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instance_id",
+        "instance_key",
+        "configuration_revision",
+        "blueprint_version_id",
+        "blueprint_version",
+        "release_manifest_sha256",
+        "merchant_id"
+      ],
+      "properties": {
+        "instance_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "instance_key": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,47}$" },
+        "configuration_revision": { "type": "integer", "minimum": 1 },
+        "blueprint_version_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "blueprint_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "release_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "merchant_id": { "type": "string", "minLength": 3, "maxLength": 120 }
+      }
+    },
+    "target_node_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{3,120}$"
+    },
+    "deployment_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "instance_id",
+        "service_user",
+        "merchant_id",
+        "store_id",
+        "profile_source",
+        "secrets_source",
+        "listen_port",
+        "runtime_key_id",
+        "public_base_path",
+        "enabled"
+      ],
+      "properties": {
+        "schema": { "const": "yilong.managed-merchant-instance.v1" },
+        "instance_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,47}$" },
+        "service_user": { "type": "string", "pattern": "^ym-[a-z0-9][a-z0-9-]{1,27}$" },
+        "merchant_id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{3,120}$" },
+        "store_id": { "type": "string", "format": "uuid" },
+        "profile_source": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "secrets_source": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "listen_port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "runtime_key_id": { "type": "string", "pattern": "^OPEN_COMMERCE_RUNTIME_SECRET_[A-Z0-9_]{3,96}$" },
+        "public_base_path": { "type": "string", "pattern": "^/merchants/[a-z][a-z0-9-]{2,47}$" },
+        "enabled": { "const": true }
+      }
+    },
+    "edge_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "instance_id", "public_base_path", "upstream_addr", "enabled"],
+      "properties": {
+        "schema": { "const": "yilong.commerce-edge.route.v1" },
+        "instance_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,47}$" },
+        "public_base_path": { "type": "string", "pattern": "^/merchants/[a-z][a-z0-9-]{2,47}$" },
+        "upstream_addr": { "type": "string", "pattern": "^127\\.0\\.0\\.1:[0-9]{4,5}$" },
+        "enabled": { "const": true }
+      }
+    },
+    "runtime_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint_base_url", "credential_ref", "manifest_sha256", "timeout_ms"],
+      "properties": {
+        "endpoint_base_url": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "credential_ref": { "type": "string", "pattern": "^OPEN_COMMERCE_RUNTIME_SECRET_[A-Z0-9_]{3,96}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "timeout_ms": { "type": "integer", "minimum": 500, "maximum": 15000 }
+      }
+    },
+    "boundaries": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "plan_only_no_remote_execution",
+          "target_node_identity_not_verified",
+          "secret_values_not_included",
+          "runtime_binding_not_activated",
+          "payment_and_external_platforms_not_covered"
+        ]
+      }
+    }
+  }
+}

@@ -63,4 +63,5 @@
 - [开放商业商户运行时桥验收](open-commerce-runtime-bridge-v1-acceptance.md)
 - [`cofficethinking` 参考实例](cofficethinking-reference-instance.md)
 - [商户托管节点 V1 验收](managed-hosting-node-v1-acceptance.md)
+- [商户托管发布计划 V1 验收](managed-rollout-plan-v1-acceptance.md)
 - [开放商业能力基线](../open-commerce/capability-baseline.md)

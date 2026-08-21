@@ -66,4 +66,4 @@ bash -n scripts/hosting/provision-merchant-instance.sh
 
 ## 下一阶段
 
-主项目下一步应把已存在的 Rust 原生入口接入托管控制面：生成合同、远程预演、受控建库迁移、候选版本健康验证、Runtime Binding 原子切换和单商户回滚。随后再接商户自助入口和正式账号/RBAC，不应把商户数据隔离寄托在前端传入的 `store_id` 上。
+主项目已经补齐不可变、无秘密值的托管发布计划，详见 [商户托管发布计划 V1 验收](managed-rollout-plan-v1-acceptance.md)。下一步是把计划交给经过机器认证的目标节点执行远程预演，再依次补受控建库迁移、候选版本健康验证、Runtime Binding 原子切换和单商户回滚。随后再接商户自助入口和正式账号/RBAC，不应把商户数据隔离寄托在前端传入的 `store_id` 上。

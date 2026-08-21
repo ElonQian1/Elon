@@ -3018,6 +3018,202 @@
       "updated_at_ms": 1787285617481
     },
     {
+      "id": "erp-managed-rollout-plan-v1",
+      "title": "ERP 商户托管发布计划 V1",
+      "summary": "从当前 ERP 实例、固定蓝图版本和开放商业商户身份编译不可变无秘密的托管部署合同、边缘路由与 Runtime 候选，为后续节点预演和安全激活提供摘要绑定输入。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/erp-managed-rollout-plan-v1.md",
+        "content_hash": "b74d09622d555a1860fab19fe5565fe19845c091f999a05197d5339e10f020b8",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f0f631be86aae0fc31b490293876437f92c433ba",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "commerce-platform",
+      "tags": [
+        "erp",
+        "commerce",
+        "hosting",
+        "rollout"
+      ],
+      "task_paths": [
+        "contracts/erp/managed-merchant-rollout-plan-v1.schema.json",
+        "docs/erp/README.md",
+        "docs/erp/managed-hosting-node-v1-acceptance.md",
+        "docs/erp/managed-rollout-plan-v1-acceptance.md",
+        "server/src/erp_blueprint/managed_rollout",
+        "server/src/erp_blueprint/mod.rs",
+        "server/src/erp_blueprint_api.rs",
+        "server/src/store_migrations.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "提供版本化托管发布计划 JSON Schema。",
+        "从 ERP、蓝图版本和商户真源编译，拒绝跨项目和修订漂移。",
+        "严格校验身份、路径、端口、运行密钥引用、目标节点标识、受控候选地址和摘要。",
+        "稳定序列化并绑定计划 SHA-256，回读核对来源列与正文。",
+        "相同输入幂等，不同输入保留不可变历史。",
+        "HTTP 创建、列表和详情沿用项目访问控制且不返回秘密值。",
+        "全新 SQLite 测试覆盖正常、重放、篡改、漂移、错配和跨项目失败。",
+        "明确目标节点身份未核验，且不执行远程部署、激活或回滚。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/erp/managed-merchant-rollout-plan-v1.schema.json",
+          "content_hash": "7e7760cb0854230aa454f467b9aaa64c8f4581b374f060a88a243c6dc027c286",
+          "locator": "yilong.erp.managed_rollout_plan.v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8437c2f23b4ff9074bb65656ee26f97d8f70dca4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/erp/managed-rollout-plan-v1-acceptance.md",
+          "content_hash": "78e4fa0199b24dd63adf611bd0b1f3505b5b51c9150f72bc0c043fdbe8853b43",
+          "locator": "ERP 商户托管发布计划 V1 验收",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "26e58ab8d876399ea8044970d27627dc4d1a539e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/api.rs",
+          "content_hash": "308fa5c0e7f015486e2c4f0f89c27a072e653d1b0b1f1761c0acae4785b95b6f",
+          "locator": "routes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2bc921c4cc26c8f99776fc4e8cae3259b2ab80ec",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/migration.rs",
+          "content_hash": "c45c642a6ba8f4375d2d1e62b89c85da7f9e6f9eae3a3a8b84c89b614db67374",
+          "locator": "migration_v280",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9bed324a6e2dd12d35f246f1de8a392ae698547b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/model.rs",
+          "content_hash": "2dae6776f587560ab78d61509fb6f309259053476e9e3b9001181a06ebbee381",
+          "locator": "ManagedRolloutPayload",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4938e890385bc8e16c6d3f9aad33322c88ac5da0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/service.rs",
+          "content_hash": "eb2eeff2f4c249d56428d47615fe1ee9bdbf1d95d42d7b5067e54cc9f4a10d97",
+          "locator": "create_plan",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "70d28b5d3c71f1934740501f583458512c859007",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/store.rs",
+          "content_hash": "4f90a6f7cecfb1d4ea345d8ae4e2ed22319bc9277bfeaf0e05f7f4de42bce77a",
+          "locator": "create_managed_rollout_plan",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1ce2231663f78907ee58ced47f748f264c0640ca",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/tests.rs",
+          "content_hash": "7fdd541fb8a821c2e881bb818d70c13b76df6e4803be689d008b42a5d3b357a3",
+          "locator": "rollout_plan",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7c433bc284470239dab9b8c9e65129036ca74b49",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint/managed_rollout/validation.rs",
+          "content_hash": "02e6ffb61c8938f6844dca1b10c8d1c62b04f2e21ba8b28ad5433fa34e8d1b26",
+          "locator": "compile_payload",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "04a5f9539249540a468e4d7b9c9ffe94e6412ac7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/erp_blueprint_api.rs",
+          "content_hash": "f8a720a294d6a3fdcc9aec7250ecd54d4116a67664c7e0510f682b737ba919cb",
+          "locator": "managed_rollout::api::routes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "49b4bc3ecf43700f030f1cfcba4aaf09e7bf5de5",
+            "worktree_blob_oid": "586f13d1ca245abf1114e4ea37b379cc5705daa9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store_migrations.rs",
+          "content_hash": "d27823e7637edf29ef65b822d6a3d11726815682bb1bb31d0dc923f5ff32b781",
+          "locator": "migration 280",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f1281ded40d27e4a85fdaa73fc6bf2b75827b6e8",
+            "head_blob_oid": "89a5367bd1ee34b8ea77f4753ac06b6a61c912bb",
+            "worktree_blob_oid": "14f66d55b547265fc8b2fb818598a42805eceba1",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787307928782,
+      "updated_at_ms": 1787310311513
+    },
+    {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
@@ -8949,126 +9145,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_4da2f2975bf64fcc952ffd015cbda2e1",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Explicitly reopen the verified metadata to bind exact installed acceptance evidence after intentional requirement update.",
-      "from_status": "verified",
-      "to_status": "retired",
-      "at_ms": 1786876793682
-    },
-    {
-      "id": "feature_event_d06054e4ecca409e80759c5067abedb2",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Reopen metadata for the intentional installed-acceptance requirement update.",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1786876821286
-    },
-    {
-      "id": "feature_event_9ec16662768e4c8b8df04c8383d7e77c",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-win-web-ai",
-      "reason": "Bind exact Win release identity and read-only production /pc/ai acceptance evidence.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1786876821885
-    },
-    {
-      "id": "feature_event_d465592868bc4466ac7725556c15a640",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Reviewed installed acceptance update; structural scope and no-third-party-send boundary are unchanged.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786876822008
-    },
-    {
-      "id": "feature_event_cf773b4aae864fad825d016f64644979",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Reviewed installed acceptance update; structural scope and no-third-party-send boundary are unchanged.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786876822153
-    },
-    {
-      "id": "feature_event_43d3cccb23754bae99a899ed9aa4dfc2",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "claimed",
-      "actor": "codex-win-web-ai",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786876822303
-    },
-    {
-      "id": "feature_event_7edfc6f2348949feb5c43cbc8e5b9039",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Record current code, tests, contract and installed acceptance evidence.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786876822443
-    },
-    {
-      "id": "feature_event_6b4c7b34248b45bcbed14ccf8a61038f",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-win-web-ai",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786876824487
-    },
-    {
-      "id": "feature_event_e42dea4fdee64d95a3d7fa7f5b6fd997",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Production diagnostic implementation and safe projection are current.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786876824604
-    },
-    {
-      "id": "feature_event_dd6604b05a57438593d8f2c5df131ea6",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Focused Rust and full Win Web AI validation passed; installed read-only timeline has zero warnings/errors.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786876824750
-    },
-    {
-      "id": "feature_event_9f8f47725ba44da182f8f6f9ff8de500",
-      "feature_id": "win-web-ai-production-session-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "codex-win-web-ai",
-      "reason": "Exact Win identity 0.3.69+aaac049520d1368c343579178affdf552b20f565 reconnected with production ChatGPT official_session ready; real third-party sends remain deferred.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1786876824902
-    },
-    {
-      "id": "feature_event_b6aa7d406d4443abbb4a1d83d48d2fb3",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "rebase 后按当前主线重新生成注册表记录。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786877696400
-    },
-    {
       "id": "feature_event_af86ed92a8564591b73113af90f84486",
       "feature_id": "sqlite-safe-snapshot-v1",
       "action": "transitioned",
@@ -10947,6 +11023,126 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787306995997
+    },
+    {
+      "id": "feature_event_13081236262e45c999c89a288b1761e3",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "registered",
+      "actor": "codex-erp-rollout",
+      "reason": "Create the next independent managed hosting control-plane slice.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787307928782
+    },
+    {
+      "id": "feature_event_4bc64bb3e29242f996d2ca9182affa66",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "claimed",
+      "actor": "codex-erp-rollout",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787307928810
+    },
+    {
+      "id": "feature_event_c28cacf92e474a31bc34f64eaee04edf",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "transitioned",
+      "actor": "codex-erp-rollout",
+      "reason": "Begin modular implementation.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787307928838
+    },
+    {
+      "id": "feature_event_b5a445f55cd0405e9e14c63802f1d94d",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "claim_released",
+      "actor": "codex-erp-rollout",
+      "reason": "需求文档增加节点身份未核验边界，先释放后重新绑定",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1787310146955
+    },
+    {
+      "id": "feature_event_f307faeb5b70421ba08d555b69b35db1",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-erp-rollout",
+      "reason": "明确目标节点身份尚未核验，并校正文档中的候选地址边界",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1787310208244
+    },
+    {
+      "id": "feature_event_f2c9e272c6c3470dbee93e89e9e02715",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "metadata_updated",
+      "actor": "codex-erp-rollout",
+      "reason": "让登记范围与已评审 V1 边界及实际模块一致",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1787310233393
+    },
+    {
+      "id": "feature_event_a8c276660eb74448968ddbfb45869007",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "transitioned",
+      "actor": "codex-erp-rollout",
+      "reason": "已复核新需求，计划生成与远程执行边界清晰",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787310233473
+    },
+    {
+      "id": "feature_event_27a160b0758e4c0e9f39e0589a909656",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "transitioned",
+      "actor": "codex-erp-rollout",
+      "reason": "范围、验收标准和依赖已明确，可以重新认领",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787310233504
+    },
+    {
+      "id": "feature_event_c73fe62242b747199d9d67e0aaa01d9b",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "claimed",
+      "actor": "codex-erp-rollout",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787310233535
+    },
+    {
+      "id": "feature_event_f2814662b95447ea976e67d3533f1967",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "transitioned",
+      "actor": "codex-erp-rollout",
+      "reason": "继续完成实现证据和静态验收",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787310233577
+    },
+    {
+      "id": "feature_event_e809b033c33c4b529081b2c71fd22563",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-erp-rollout",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787310311464
+    },
+    {
+      "id": "feature_event_82792a7a16654535becc19e94cd58e10",
+      "feature_id": "erp-managed-rollout-plan-v1",
+      "action": "transitioned",
+      "actor": "codex-erp-rollout",
+      "reason": "合同编译、校验、不可变存储、API、测试源码和验收文档已完成；全目标测试被无关基线编译错误阻断，暂不标 verified",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787310311513
     }
   ]
 }
