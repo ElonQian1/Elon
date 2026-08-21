@@ -52,6 +52,10 @@ assert.equal(selectLocalAiNewConversationPath('chatgpt', {
   ...liveSession,
   semanticCacheStatus: 'cached',
 }, liveSnapshot), 'adapter')
+assert.equal(selectLocalAiNewConversationPath('chatgpt', {
+  ...liveSession,
+  loading: true,
+}, null), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, { composerReady: false }), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('chatgpt', liveSession, liveSnapshot), 'adapter')
 assert.equal(selectLocalAiNewConversationPath('google-ai-mode', liveSession, liveSnapshot), 'adapter')

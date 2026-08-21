@@ -6,7 +6,7 @@ export function selectLocalAiNewConversationPath(
   _providerId: string,
   session: Pick<
     LocalAiWebSessionState,
-    'windowStatus' | 'loading' | 'rendererStatus' | 'semanticCacheStatus' | 'contextReady'
+    'windowStatus' | 'rendererStatus' | 'semanticCacheStatus' | 'contextReady'
   > | null,
   _snapshot: Pick<LocalAiMessageSnapshot, 'composerReady'> | null,
 ): LocalAiNewConversationPath {
@@ -18,7 +18,6 @@ export function selectLocalAiNewConversationPath(
   // 适配器仍处于 active，就直接复用，避免因为快照尚未同步而整页重连。
   if (!session
     || session.windowStatus === 'closed'
-    || session.loading
     || session.rendererStatus !== 'active') {
     return 'home'
   }
