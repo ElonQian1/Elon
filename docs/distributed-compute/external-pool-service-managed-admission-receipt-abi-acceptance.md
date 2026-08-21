@@ -88,7 +88,7 @@ Authority 的 77 列是唯一顺序真源；验收不得复制另一份可漂移
 
 - 实现已冻结 `market_projection_identity_abi` 的resource scope、Pool/bucket/meter/window、supply/event、Offer/publication
   approver、snapshot/quote、legacy deterministic IDs/times与共享server checked-at，并落实fixed source observation window；
-- 冻结production `fence_digest`所属Gateway/session/validator ABI；fixture fence不得升格；
+- 实现已冻结的production `fence_digest`与Gateway/session/validator内部ABI，并选择external semantic wire profile；fixture fence不得升格；
 - 首个产品/经济/安全审批的 byte-exact profile JSON/digest；
 - Domain/DDL/Store exact 77-column source-contract、10组required parent keys（9新增+1复用）与全部guard；
 - 完整 service-managed market transaction、Gateway A/B、task session、validator、Runner和recovery production caller；
@@ -100,4 +100,5 @@ Authority 的 77 列是唯一顺序真源；验收不得复制另一份可漂移
 
 本批只允许 Markdown。必须证明父子双向链接、frontmatter、文档尺寸、本地链接、`git diff --check`、`server/src`零diff、
 V280 source/table/UDF/migration注册为0、migration最高V279。禁止编译、测试、执行migration/SQLite/runtime/network；最终报告
-继续写 `implementation_unwired/uncompiled/unrun` 与 `passed=0/failed=0`。
+继续分轴写`gateway_builder/fence/task_session/validator_internal_abi=design_frozen`、
+`external_adapter_semantic_wire_profile=unselected`、`implementation_unwired/uncompiled/unrun`与`passed=0/failed=0`。

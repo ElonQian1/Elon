@@ -22,6 +22,8 @@ verification_status: design_review_only
 admission_receipt_canonical_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
+gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile=unselected
 admission_receipt_table=absent
 physical_migration_registration=absent
 migration_registry_max=279
@@ -35,6 +37,8 @@ Profile schema 由 [market profile authority](external-pool-service-managed-mark
 task session 与恢复见 [V280 父权威](external-pool-service-managed-admission-runner-authority.md)。本页的验收见
 [admission receipt ABI acceptance](external-pool-service-managed-admission-receipt-abi-acceptance.md)；receipt引用的legacy
 projection identity由 [market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)维护。
+Production fence、Gateway final builders、task-session custody与validator内部类型见
+[Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)。
 `V280`只是阶段名，不预留migration编号；未来实现必须重读registry并使用届时next free物理编号。
 
 ## 2. 固定常量与 domain
@@ -407,7 +411,7 @@ store/compute_external_pool_service_managed_admissions/{read,write,currentness,p
 ```
 
 Domain DTO private fields、deny-unknown；canonical parser可用于readback，current authority必须non-Clone/non-Serde且只由
-Store transaction构造。Source-written 前还必须实现已冻结projection identity ABI、落实fixed source observation window、提交首个
-byte-exact profile payload，并冻结production fence所在的Gateway/session/validator ABI，与完整 V280 writer/Runner 同批落盘。
+Store transaction构造。Source-written 前还必须实现已冻结projection identity与Gateway/session/validator内部ABI、落实fixed
+source observation window、提交首个byte-exact profile payload、选择external semantic wire profile，并与完整V280 writer/Runner同批落盘。
 本批不声明任何 symbol/table/UDF已存在，不执行编译、测试、migration、
 SQLite、runtime 或 network；正式计数保持 `passed=0/failed=0`。

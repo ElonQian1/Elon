@@ -96,7 +96,7 @@ Runner 可达。
 Profile 本身直接写 Pool/Offer/Plan、把 V277 identity写死进profile、把price caller DTO当authority，均为失败。
 `resource_scope`、Pool/bucket/meter/delivery-window、Offer/publication、v171 snapshot/quote/source的deterministic identity、
 legacy digest与单一时钟已由projection identity ABI冻结设计，但仍无writer源码。Tx-B `fence_digest`不属于market projection；
-它继续是未冻结Gateway/session/validator ABI输入，fixture domain不得升格。
+它由Gateway/session/validator内部ABI冻结为Plan+seal派生值，fixture domain不得升格，external semantic wire profile仍未选择。
 
 ## 6. Source-written 前的静态门
 
@@ -112,8 +112,9 @@ legacy digest与单一时钟已由projection identity ABI冻结设计，但仍�
   deterministic material、owner helper、single clock、readback与replay；
 - deadline consumer逐字段冻结Job retry、reconcile/event scheduler、pre-start cleanup/60秒lease margin与task-session effective
   deadline，不得把Job retry映射为ELTP exchange ordinal；
-- 按已冻结的 [admission receipt physical ABI](external-pool-service-managed-admission-receipt-abi-authority.md)实现，落实fixed
-  source observation window，并在同批冻结/实现production fence及完整V280 writer/Gateway/validator/Runner。
+- 按已冻结的 [admission receipt physical ABI](external-pool-service-managed-admission-receipt-abi-authority.md)与
+  [Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)实现，落实fixed
+  source observation window，选择external semantic wire profile，并同批实现完整V280 writer/Gateway/validator/Runner。
 
 未满足任一项时，V280 继续 `implementation_unwired/uncompiled/unrun`，migration最高保持V279，V254 fence保持关闭，
 worker `eligible_rows=0`。静态文档检查不计入实现 `passed/failed`。
@@ -131,6 +132,8 @@ market_profile_schema_abi=design_frozen
 initial_profile_inventory=unselected
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
+gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile=unselected
 implementation=unwired/uncompiled/unrun
 ```
 

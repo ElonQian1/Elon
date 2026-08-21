@@ -55,8 +55,8 @@ Wrong prefix/domain、missing/extra key、material顺序/类型漂移、随机UU
 request。Publication的service actor与真实approver user必须分离；profile审批未覆盖exact review-material digest、final digest
 与approval digest形成环、缺少真实`approved_by_user_id`或把Provider owner/service actor硬塞进user字段都失败关闭。
 
-Tx-B `fence_digest`不属于本ABI。Fixture fence、random digest、route credential、Pool/admission digest都不能升格；该项继续阻断
-Gateway/session/validator source-written。
+Tx-B `fence_digest`不属于本ABI，已由Gateway/session/validator内部ABI冻结为Plan+seal派生值。Fixture fence、random digest、
+route credential、Pool/admission digest都不能升格；external semantic wire profile未选择仍阻断source-written。
 
 ## 4. 单时钟、事务与 private seam
 
@@ -108,7 +108,7 @@ private `_on`没有standalone facade、HTTP/MCP/fixture/seed/admin caller。
 2. authority中所有prefix/domain/material、legacy helper、time mapping、sealed planned token、full-column readback与immutable-column
    guards有owner-local实现和golden vectors；
 3. admission Domain/77列DDL/UDF/ordered guards/Store read-write与本ABI同批实现；
-4. Gateway/session/validator ABI补齐production fence、task DTO与Runner caller；
+4. Gateway/session/validator内部ABI按已冻结production fence落盘，并选择external semantic wire profile、接通Runner caller；
 5. source-contract证明public/admin/fixture/direct-SQL无旁路，且full vertical positive/recovery矩阵可运行。
 
 物理版本必须在实施时重读max并取next-free；不得因为阶段名V280预占migration 280。
@@ -118,6 +118,6 @@ private `_on`没有standalone facade、HTTP/MCP/fixture/seed/admin caller。
 只允许执行Markdown frontmatter、authority↔acceptance互链、本地链接、状态入口一致性、line/byte size、`git diff --check`、
 source-zero与migration-max静态检查。不得编译、测试、运行migration、打开SQLite、启动runtime或联网。
 
-完成时各状态入口必须同时写明：三个V280 ABI均为design-frozen、inventory unselected、current profile unconstructible、
-table/migration/source absent、implementation unwired/uncompiled/unrun、passed=0/failed=0，并不得宣称fully frozen、implemented或
-production reachable。
+完成时各状态入口必须同时写明：profile/admission/projection与Gateway/fence/session/validator内部ABI分轴design-frozen、
+inventory及external semantic wire profile unselected、current profile unconstructible、table/migration/source absent、
+implementation unwired/uncompiled/unrun、passed=0/failed=0；不得宣称fully frozen、implemented或production reachable。

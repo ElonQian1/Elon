@@ -25,6 +25,8 @@ vertical_slice_architecture=design_frozen
 market_profile_schema_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
+gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile=unselected
 initial_profile_inventory=unselected
 current_profile_authority=unconstructible
 physical_migration_registration=absent
@@ -52,8 +54,10 @@ failed=0
 输出是 non-authorizing、non-Serde、non-Clone 的 planned market projection material；它只允许 owner-local `_on` kernels按父权威
 固定顺序消费，不授予 direct SQL、HTTP、Provider owner、fixture 或其他 Store caller 写权限。
 
-`Tx-B fence_digest`明确排除在本页之外。它属于仍未冻结的 Gateway/session/validator ABI；production 不能复用 conformance
-fixture 的 fence domain，也不能用 Pool、route credential、admission digest 或随机值代替。
+`Tx-B fence_digest`明确排除在本页之外；它已由
+[Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)冻结为Plan+seal
+派生值。Production不能复用conformance fixture、Pool、route credential、admission digest或随机值；external semantic wire
+profile仍未选择。
 
 Market admission actor继续逐字使用 admission ABI 的：
 
@@ -316,7 +320,7 @@ Planned source owner继续沿父权威分配给capacity registry/ledger/posting/
 2. 实现本页owner helpers、planned `_on` seams、orphan guards、golden vectors与source-contract；
 3. 按已冻结admission ABI实现Domain/DDL/Store/UDF/trigger、full-column readback及Pool/bucket immutable-column guards，并在届时
    next-free migration登记；
-4. 冻结并实现Gateway/session/validator ABI（包括production fence digest），与完整Runner纵切同批集成；
+4. 实现已冻结的Gateway/session/validator内部ABI，选择external semantic wire profile，并与完整Runner纵切同批集成；
 5. 保持V254 #13/#15 absolute deny，只按父权威开放四个trigger的五次ordered命中。
 
 本批不新增Rust/SQL/schema/API，不编译、不测试、不执行migration/SQLite/runtime/network。静态审计不计入正式

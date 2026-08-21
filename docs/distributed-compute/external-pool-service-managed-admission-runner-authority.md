@@ -29,6 +29,8 @@ admission_receipt_semantic_contract=design_frozen
 admission_receipt_canonical_abi=design_frozen
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
+gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile=unselected
 admission_receipt_table/migration/source=absent
 implementation=unwired/uncompiled/unrun
 passed=0
@@ -89,6 +91,9 @@ replay与readback全部由 [admission receipt ABI authority](external-pool-servi
 Pool/ledger/Offer/publication/snapshot 的确定性身份、legacy owner mapping与single checked-at由
 [market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)及其
 [acceptance](external-pool-service-managed-market-projection-identity-abi-acceptance.md)维护；design freeze仍不能单独打开writer/fence。
+Gateway final builders、production fence、task-session custody与validator内部类型由
+[Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)及其
+[acceptance](external-pool-service-managed-gateway-session-validator-abi-acceptance.md)维护；外部Adapter semantic wire profile仍未选择。
 
 Currentness 只能只读派生：Provider只有唯一genesis receipt且未过期，server catalog中同一 market profile revision/digest仍
 current、未撤销且在有效窗内，Provider exact active且仍绑定同一V277 stable activation root/provider binding/executor/adapter
@@ -195,7 +200,8 @@ Price snapshot 必须复用既有v171 Registry及其Store-private `register_comp
 quote identity、components、max amounts、source、TTL与时间公式只取
 [profile子权威](external-pool-service-managed-market-profile-authority.md)和本次admission/Offer sealed material。Publication真实
 approver、snapshot/quote legacy IDs/times、shared checked-at及owner helper已由projection identity ABI冻结设计；source
-observation window固定为`[checked_at-1s,checked_at]`。Tx-B fence仍归未冻结Gateway/session/validator ABI。实现不得让各既有
+observation window固定为`[checked_at-1s,checked_at]`。Tx-B fence已由Gateway/session/validator子ABI冻结为Plan+seal派生值，
+但外部semantic wire profile仍未选择。实现不得让各既有
 facade分别调用`now()`、随机ID或猜值。
 既有`price_snapshot_effect=none`保持不变；snapshot是其后的独立受管写入。所有既有snapshot writer，包括public
 Offer-owner facade与v223四眼admin curve application，都必须拒绝external_pool；只有持有本次ordered plan的V280
@@ -281,12 +287,12 @@ Transaction A 的 transaction-bound authority不得跨 commit。
 
 Tx-B不能只在`attempt_gateway.rs`补最外层constructor。`ValidatedComputeStartOutboxOperation`拥有
 `AuthorizedComputeRouteAuthorization`和dispatch actor receipt，后者再拥有`AuthorizedComputeServiceActor`；而fresh V278
-composite只提供同一transaction内的borrowed route/actor view。Route owner复用现有pub(crate)
-`validated_compute_route_authorization_from_canonical_envelopes`做完整deep audit（不改变其既有callers）；`start_outbox/validated.rs`
-新增pub(crate) `validated_external_pool_service_managed_start_outbox_operation`，只接fresh canonical route envelopes、同源actor与sealed
-dispatch/outbox material并一次性返回owned operation。该V280 wrapper再交给attempt gateway，source-contract锁唯一Store orchestrator caller。只有Store侧selector/orchestrator与
-transaction-aware `_on` kernel使用`pub(in crate::store)`。禁止为此给authority增加`Clone`、`Serde`、public/raw/unchecked
-constructor，或让caller分别选择route与actor。
+composite只提供同一transaction内的borrowed route/actor view。Route owner保留现有通用deep-audit helper，并新增pub(crate)
+`validated_compute_route_dispatch_sources_from_canonical_envelopes`：同一五份fresh canonical envelopes一次审计后返回field-private、
+non-Clone `AuthorizedComputeRouteDispatchSources`，内含owned route与同源owned actor。`start_outbox/validated.rs`新增pub(crate)
+`validated_external_pool_service_managed_start_outbox_operation`，只整体消费该组合token与sealed dispatch/outbox material并返回owned
+operation；禁止通用`into_parts`、raw getter或caller分别选择route/actor。V280 wrappers由source-contract锁唯一Store orchestrator；
+只有Store selector/orchestrator与transaction-aware `_on` kernel使用`pub(in crate::store)`，不新增Clone/Serde/raw/unchecked ctor。
 
 `attempt_gateway` Domain owner还必须提供唯一`pub(crate)` sealed builder
 `validated_external_pool_service_managed_start_dispatch`，消费上述owned start-outbox operation与server-derived activation material，
@@ -336,17 +342,18 @@ task session 不得复用 V278 no-work child、六根 Secret binding或已消费
 `plan.not_after`、command/outbox operation deadline、reservation/lease/hard deadline、profile
 `inflight_execution_valid_until`、fresh V253 credential、V278 route authorization/actor/seal，以及historical poll/cancel的cleanup
 horizon。Offer/snapshot的quote/new-plan expiry只约束Tx-A，sealed Plan之后不重新加入exchange cutoff。Final reproof、ELTP request write
-前的本地deadline check、semantic validator与receipt timestamps都必须落在同一effective deadline内；任一已过期则零network或
-把durable send留作reconcile，不能延长窗口。
+前的本地deadline check、semantic validator与receipt timestamps都必须落在同一effective deadline内；若准备期间过期则关闭
+已建child/channel且application request为0，durable send只留作reconcile，不能延长窗口。
 
-SQLite transaction、rusqlite authority、Prepared installation、Secret与borrowed current carrier都不得跨 await。Owned child
-handle必须先移交独立async supervisor custody，再由该supervisor跨ELTP await持有并负责shutdown/reap/cleanup；它不能与DB
-transaction或borrowed authority同栈跨await，也不能丢弃后仅凭PID重建authority。
+SQLite transaction、rusqlite authority、Prepared installation、Secret与borrowed current carrier都不得跨 await。Owned child/
+authenticated session/TLS必须先移交独立async supervisor；阻塞Host/session只在dedicated blocking worker内lexical借用，supervisor
+跨ELTP await持有join/cancel custody并负责shutdown/reap/cleanup，不能丢handle后仅凭PID重建authority。
 
-Production validator 只能在 broker TLS owner 内实现 sealed traits。它必须为`prepare`、`idempotent_commit`、
-`cancel_no_start`、`reconcile`、`authenticated_events`五种 exact operation token使用 deny-unknown canonical DTO，绑定 command/outbox/
-route/executor/fence/request/session roots与大小上限。Raw response bytes只在 Zeroizing buffer内存在；Store 只接收不可拆分的
-verified host receipt+typed semantic wrapper，不能接收独立 receipt与caller-supplied semantic。
+Production validator只能在broker TLS owner内实现五种concrete sealed semantic view，绑定command/outbox/route/executor/fence/
+request/session roots与大小上限；exact内部ABI见
+[Gateway/session/validator子权威](external-pool-service-managed-gateway-session-validator-abi-authority.md)。External Adapter semantic
+wire schema仍未选择；若未来profile使用JSON才强制deny-unknown canonical DTO，fixture不能代替。Raw bytes只在Zeroizing buffer，
+Store只接收不可拆verified host receipt+typed semantic view，不能接收独立receipt与caller-supplied semantic。
 
 ## 9. Terminal、Runner 与 recovery
 

@@ -26,6 +26,8 @@ initial_profile_inventory=unselected
 current_profile_authority=unconstructible
 admission_receipt_physical_schema_abi=design_frozen
 market_projection_identity_abi=design_frozen
+gateway_builder/fence/task_session/validator_internal_abi=design_frozen
+external_adapter_semantic_wire_profile=unselected
 implementation=unwired/uncompiled/unrun
 passed=0
 failed=0
@@ -36,6 +38,9 @@ failed=0
 [market profile acceptance](external-pool-service-managed-market-profile-acceptance.md)。Pool/Offer/Snapshot 的 deterministic identity、
 legacy owner helper与单一checked-at映射见
 [market projection identity ABI](external-pool-service-managed-market-projection-identity-abi-authority.md)。
+Production fence、Gateway final builders、task-session custody与validator内部类型见
+[Gateway/session/validator internal ABI](external-pool-service-managed-gateway-session-validator-abi-authority.md)；外部semantic wire
+profile仍未选择。
 
 ## 2. 来源边界与禁止默认值
 
@@ -322,8 +327,8 @@ expires_at
 
 `issued_at=Tx-B command.issued_at`，`expires_at=plan.start.hard_deadline_at`。结果是相应prefix加64-hex；ref必须
 `<=512` bytes、hint必须`<=160` bytes（当前固定shape分别96/97 bytes）。调用方不得提交或轮换 raw ref/hint，route
-credential也不得充当lease credential。Material中的`fence_digest`只消费未来Gateway/session/validator typed value；本页不定义
-production fence派生，也禁止升格conformance fixture domain。
+credential也不得充当lease credential。Material中的`fence_digest`只消费Gateway/session/validator子ABI冻结的typed Plan+seal
+派生值；本页不重复定义production fence，也禁止升格conformance fixture domain。
 
 ## 7. Allocation 与 catalog selection
 
@@ -359,8 +364,8 @@ enabled profile 必须：
 2. 填入该evidence source digest后提交byte-exact RFC8785-JCS profile JSON与final digest；
 3. 更新本权威和 acceptance 的 payload 指纹；
 4. 保留历史 item，且 V1 不允许 successor 或运行时可变配置；
-5. 逐字满足 [admission receipt ABI](external-pool-service-managed-admission-receipt-abi-authority.md)，并与仍待冻结的
-   Gateway/session/validator ABI、完整 V280 纵切源码同批集成，不能单独打开 fence。
+5. 逐字满足 [admission receipt ABI](external-pool-service-managed-admission-receipt-abi-authority.md)与已冻结的
+   Gateway/session/validator内部ABI；首个profile、external semantic wire profile及完整V280源码仍须同批集成，不能单独打开 fence。
 
 ## 8. 计划中的 Rust 边界
 

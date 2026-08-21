@@ -23,7 +23,8 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 
 本批只允许记录纵切架构`design_frozen/design_review_only`，并逐轴说明
 `market_profile_schema_abi=design_frozen`、`initial_profile_inventory=unselected`、
-`admission_receipt_canonical/physical_schema_abi=design_frozen`、`market_projection_identity_abi=design_frozen`与实现
+`admission_receipt_canonical/physical_schema_abi=design_frozen`、`market_projection_identity_abi=design_frozen`、
+`gateway_builder/fence/task_session/validator_internal_abi=design_frozen`、`external_adapter_semantic_wire_profile=unselected`与实现
 `unwired/uncompiled/unrun`。文档链接、source-size或静态零改动扫描
 不是实现证据，任何 V273/V274/V277/V278 历史 passed 也不能计入 V280。
 
@@ -172,15 +173,15 @@ gate=false时上述call count全0、Plan-without-command重启可恢复、fresh 
 | Case | 必须结果 |
 |---|---|
 | session isolation | task-specific八根、fresh child/Secret/TLS；不复用V278 no-work六根、child或channel。 |
-| no authority across await | DB tx、borrowed current authority、Prepared installation与raw Secret在await前释放；只携owned non-authorizing plan、task-session/child custody与fresh TLS channel。 |
-| child custody | owned child handle在await前移交async supervisor；supervisor跨exchange持有并负责shutdown/reap/cleanup，不能丢handle后用PID重建。 |
+| no authority across await | DB tx、borrowed current authority、Prepared installation与raw Secret在await前释放；只携owned plan、child/session/TLS/deadline/join custody。 |
+| child custody | Host/Exchange只在dedicated blocking worker lexical借用owned session；async supervisor持join/cancel并负责shutdown/reap/cleanup。 |
 | outbound | final reproof后同tx先pending→claimed CAS，再执行2 INSERT+claimed→unknown CAS；总计2 INSERT+2 CAS，outbound leaf为2+1；commit前ELTP request计数=0。 |
-| validator | 五operation sealed concrete validator、deny unknown、canonical bytes、root/size/time exact；raw bytes不逃逸。 |
+| validator | 五operation concrete semantic view、root/size/time exact；external wire profile未选，未来JSON才强制deny-unknown/JCS。 |
 | wrapper | Store只收不可拆verified receipt+semantic wrapper；独立receipt+semantic或generic raw callback在类型边界不可达。 |
 | timeout | effective deadline=min(15s、claim、session/Secret、plan/command/outbox、reservation/lease/hard、profile inflight、fresh credential/route/actor/seal、historical cleanup适用窗)；失败不回滚durable send。 |
 
 Offer/snapshot的quote/new-plan expiry只约束Tx-A，不得在sealed Plan恢复时重新加入timeout。Final reproof、socket write前
-local check、validator与receipt times都必须在同一effective deadline内；过期后request计数为0，durable unknown send只走
+local check、validator与receipt times都必须在同一effective deadline内；准备期间过期后application request计数为0，durable unknown send只走
 reconcile。
 
 至少覆盖 framing/HMAC错误、operation substitution、unknown field、digest/root/session漂移、oversize、timeout、child退出、
@@ -226,7 +227,8 @@ semantic substitution与所有V254 fence负例。仅source-contract、fixture或
 
 - 父authority/acceptance完成：只证明`vertical_slice_architecture=design_frozen`；
 - profile子权威完成：只证明`market_profile_schema_abi=design_frozen`，初始inventory仍可保持unselected；
-- 首个profile payload或Gateway/session/validator ABI（含production fence）未冻结时不得进入source-written；
+- 首个profile payload或external Adapter semantic wire profile未选择时不得进入source-written；production fence与Gateway/session/
+  validator内部ABI虽已冻结，但没有五类wire profile与实现仍不可达；
 - Domain/DDL/Store/Gateway/validator/Runner全部落盘且静态合同通过：可记`source_written/source_review_only`；
 - compile+fresh/repeat/reopen migration通过：才可记`implementation_compiled`或对应局部验证；
 - 正向纵切、timeout/reconcile/cancel/restart动态矩阵通过：才可记production reachability已验证；
