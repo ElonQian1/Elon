@@ -104,6 +104,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
             addView(dateLabel, LinearLayout.LayoutParams(WRAP, MATCH))
             addView(ImageView(this@AiWorkSummaryActivity).apply {
                 setImageResource(R.drawable.ic_input_model_chevron)
+                setColorFilter(Color.parseColor("#E1E5E4"))
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(14), dp(14)).apply { marginStart = dp(6) })
         }, FrameLayout.LayoutParams(dp(96), dp(48), Gravity.CENTER))
@@ -121,7 +122,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(94)).apply { topMargin = dp(11) }
         addView(ImageView(this@AiWorkSummaryActivity).apply {
             setImageResource(R.drawable.ic_home_ai_avatar)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            scaleType = ImageView.ScaleType.FIT_CENTER
         }, FrameLayout.LayoutParams(dp(86), dp(86), Gravity.CENTER_VERTICAL).apply { marginStart = dp(16) })
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -147,8 +148,11 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         background = rounded("#353A42", 12)
         gravity = Gravity.CENTER
         orientation = LinearLayout.VERTICAL
-        addView(label(number, 16f, color, regular))
-        addView(label(caption, 13f, "#E5E8E7", regular).apply { setPadding(0, dp(6), 0, 0) })
+        addView(label(number, 16f, color, regular).apply { gravity = Gravity.CENTER })
+        addView(label(caption, 13f, "#E5E8E7", regular).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, 0)
+        })
     }
 
     private fun sectionTitle(title: String, count: Int): View = LinearLayout(this).apply {
@@ -256,6 +260,8 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         }
         val chevron = ImageView(this@AiWorkSummaryActivity).apply {
             setImageResource(R.drawable.ic_input_model_chevron)
+            scaleType = ImageView.ScaleType.CENTER
+            setColorFilter(Color.parseColor("#E1E5E4"))
             rotation = 180f
             contentDescription = null
         }
