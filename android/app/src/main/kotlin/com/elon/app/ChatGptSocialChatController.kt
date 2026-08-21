@@ -70,10 +70,7 @@ internal class ChatGptSocialChatController(
     private var modelRangeSelectionById = emptyMap<String, WebChatModelRangeSelection>()
     private var modelPickerActive = false
     private var pendingPresetModelLabel: String? = null
-    private var realtimeVoiceBackingStarted = false
-    private var realtimeVoiceExitRecoveryActive = false
-    private var realtimeVoiceOriginPath: String? = null
-    private var realtimeVoiceHadTranscript = false
+    private val realtimeVoiceTranscript = WebChatRealtimeVoiceTranscriptContinuity()
     private val socialMcpPort: WebChatSocialMcpPort by lazy {
         session.createMcpPort(
             inputText = { binding.inputEdit.text?.toString().orEmpty() },
@@ -113,7 +110,7 @@ internal class ChatGptSocialChatController(
     override fun deactivate() {
         active = false
         cancelPendingSendWatchdog()
-        resetRealtimeVoiceExitPresentation()
+        realtimeVoiceTranscript.reset()
         skinPresentation.exit()
         modelPopup?.dismiss()
         modelPopup = null
@@ -242,7 +239,7 @@ internal class ChatGptSocialChatController(
     override fun stopGeneration() = session.stopGeneration()
 
     override fun startNewConversation() {
-        resetRealtimeVoiceExitPresentation()
+        realtimeVoiceTranscript.reset()
         clearPendingSend()
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
@@ -267,7 +264,7 @@ internal class ChatGptSocialChatController(
     override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
 
     override fun openConversation(path: String): Boolean {
-        resetRealtimeVoiceExitPresentation()
+        realtimeVoiceTranscript.reset()
         clearPendingSend()
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
@@ -278,7 +275,7 @@ internal class ChatGptSocialChatController(
     }
 
     override fun openProject(path: String): Boolean {
-        resetRealtimeVoiceExitPresentation()
+        realtimeVoiceTranscript.reset()
         clearPendingSend()
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
@@ -292,17 +289,15 @@ internal class ChatGptSocialChatController(
     override fun beginRealtimeVoiceBacking(): Boolean {
         val started = session.beginRealtimeVoiceBacking()
         if (!started) return false
-        realtimeVoiceBackingStarted = true
-        realtimeVoiceExitRecoveryActive = false
-        realtimeVoiceOriginPath = session.currentConversationPath()
-        realtimeVoiceHadTranscript = transcript.hasMessages()
+        realtimeVoiceTranscript.begin(session.currentSnapshot())
         return true
     }
 
     override fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
-        if (realtimeVoiceBackingStarted) {
-            realtimeVoiceBackingStarted = false
-            realtimeVoiceExitRecoveryActive = true
+        val immediate = realtimeVoiceTranscript.end(session.currentSnapshot())
+        immediate?.let(::renderSnapshot)
+        if (immediate == null && !transcript.hasMessages()) {
+            renderStatusMessage("正在整理语音记录…")
         }
         session.endRealtimeVoiceBacking(gracefulExit)
     }
@@ -418,23 +413,17 @@ internal class ChatGptSocialChatController(
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
-        if (WebChatRealtimeVoiceExitPresentationPolicy.shouldHoldCurrentTranscript(
-                backingActive = realtimeVoiceBackingStarted,
-                recoveryActive = realtimeVoiceExitRecoveryActive,
-                originConversationPath = realtimeVoiceOriginPath,
-                hadTranscriptBeforeVoice = realtimeVoiceHadTranscript,
-                incoming = snapshot,
-            )) {
+        val voicePresentation = realtimeVoiceTranscript.resolve(snapshot)
+        if (voicePresentation == null) {
             if (active) {
                 updateComposerModel(snapshot.currentModel)
                 onComposerStateChanged()
             }
             return
         }
-        resetRealtimeVoiceExitPresentation()
-        val lastUserIndex = snapshot.messages.indexOfLast { it.role == "user" }
-        val latestUserPrompt = snapshot.messages.getOrNull(lastUserIndex)?.content
-        val assistantObserved = lastUserIndex >= 0 && snapshot.messages
+        val lastUserIndex = voicePresentation.messages.indexOfLast { it.role == "user" }
+        val latestUserPrompt = voicePresentation.messages.getOrNull(lastUserIndex)?.content
+        val assistantObserved = lastUserIndex >= 0 && voicePresentation.messages
             .drop(lastUserIndex + 1)
             .any { it.role == "assistant" }
         if (pendingSend.observeCompletedTurn(latestUserPrompt, assistantObserved)) {
@@ -445,10 +434,10 @@ internal class ChatGptSocialChatController(
         val pendingTextPrompt = pendingSend.prompt()
         val presentationSnapshot = WebChatPendingSendSnapshotPresentation.resolve(
             previous = lastMessageSnapshot,
-            incoming = snapshot,
+            incoming = voicePresentation,
             pending = pendingTextPrompt != null,
         )
-        if (snapshot.messages.isNotEmpty()) lastMessageSnapshot = snapshot
+        if (voicePresentation.messages.isNotEmpty()) lastMessageSnapshot = voicePresentation
         val pendingStatus = if (pendingAttachments.isNotEmpty()) {
             when (session.attachmentSendPhase()) {
                 "uploading" -> "上传中…"
@@ -484,15 +473,8 @@ internal class ChatGptSocialChatController(
         )
         transcript.submit(presented, active)
         if (!active) return
-        updateComposerModel(snapshot.currentModel)
+        updateComposerModel(voicePresentation.currentModel)
         onComposerStateChanged()
-    }
-
-    private fun resetRealtimeVoiceExitPresentation() {
-        realtimeVoiceBackingStarted = false
-        realtimeVoiceExitRecoveryActive = false
-        realtimeVoiceOriginPath = null
-        realtimeVoiceHadTranscript = false
     }
 
     private fun renderState(state: ChatGptBackgroundSession.State, detail: String?) {
