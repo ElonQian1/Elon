@@ -181,7 +181,8 @@ export async function validateFederationHistoricalLineageReadResponse(
   const response = exactObject(value, READ_RESPONSE_KEYS, '历史因果读取响应')
   expectLiteral(response.schema, READ_SCHEMA, '响应 schema')
   expectLiteral(response.lineage_kind, expectedKind, '响应 lineage_kind')
-  expectSha256(response.lineage_digest, '响应 lineage_digest')
+  const responseLineageDigest = expectString(response.lineage_digest, '响应 lineage_digest')
+  expectSha256(responseLineageDigest, '响应 lineage_digest')
   expectLiteral(response.read_effect, 'none', '响应 read_effect')
   const canonicalCarrierJson = expectString(
     response.canonical_carrier_json,
@@ -194,8 +195,8 @@ export async function validateFederationHistoricalLineageReadResponse(
 
   const parsed = parseCarrier(canonicalCarrierJson)
   const carrier = validateCarrierShape(parsed, expectedKind)
-  expectLiteral(carrier.lineage_kind, response.lineage_kind, '内外 lineage_kind')
-  expectLiteral(carrier.lineage_digest, response.lineage_digest, '内外 lineage_digest')
+  expectLiteral(carrier.lineage_kind, response.lineage_kind as string, '内外 lineage_kind')
+  expectLiteral(carrier.lineage_digest, response.lineage_digest as string, '内外 lineage_digest')
 
   const canonicalBytes = new TextEncoder().encode(canonicalizeJcs(carrier))
   if (canonicalBytes.byteLength !== canonicalCarrierBytes.byteLength
@@ -210,7 +211,7 @@ export async function validateFederationHistoricalLineageReadResponse(
     response: {
       schema: READ_SCHEMA,
       lineage_kind: expectedKind,
-      lineage_digest: response.lineage_digest as string,
+      lineage_digest: responseLineageDigest,
       canonical_carrier_json: canonicalCarrierJson,
       read_effect: 'none',
     },
