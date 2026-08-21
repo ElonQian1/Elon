@@ -1,5 +1,7 @@
 package com.elon.app.googleweb
 
+import com.elon.app.WebChatPendingSendPresentation
+import com.elon.app.WebChatPendingSendState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -9,67 +11,67 @@ import org.junit.Test
 class GoogleWebPendingSendStateTest {
     @Test
     fun visibleOfficialQueryConfirmsNavigationBasedSubmission() {
-        val state = GoogleWebPendingSendState()
+        val state = WebChatPendingSendState()
         val generation = state.begin("hello   world")
 
         assertTrue(state.observeSubmission(" hello world "))
         assertFalse(state.observeSubmission("hello world"))
-        assertEquals(GoogleWebPendingSendState.Phase.AWAITING_RESPONSE, state.phase())
+        assertEquals(WebChatPendingSendState.Phase.AWAITING_RESPONSE, state.phase())
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING,
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
             state.onConfirmationTimeout(generation).action,
         )
     }
 
     @Test
     fun unrelatedOfficialQueryDoesNotConfirmPendingSubmission() {
-        val state = GoogleWebPendingSendState()
+        val state = WebChatPendingSendState()
         state.begin("expected")
 
         assertFalse(state.observeSubmission("different"))
-        assertEquals(GoogleWebPendingSendState.Phase.SUBMITTING, state.phase())
+        assertEquals(WebChatPendingSendState.Phase.SUBMITTING, state.phase())
     }
 
     @Test
     fun unconfirmedSubmissionRestoresPromptAfterTimeout() {
-        val state = GoogleWebPendingSendState()
-        assertEquals(GoogleWebPendingSendState.Phase.IDLE, state.phase())
+        val state = WebChatPendingSendState()
+        assertEquals(WebChatPendingSendState.Phase.IDLE, state.phase())
         val generation = state.begin("hello")
-        assertEquals(GoogleWebPendingSendState.Phase.SUBMITTING, state.phase())
+        assertEquals(WebChatPendingSendState.Phase.SUBMITTING, state.phase())
 
         val result = state.onConfirmationTimeout(generation)
 
-        assertEquals(GoogleWebPendingSendState.TimeoutAction.RESTORE, result.action)
+        assertEquals(WebChatPendingSendState.TimeoutAction.RESTORE, result.action)
         assertEquals("hello", result.prompt)
         assertNull(state.prompt())
-        assertEquals(GoogleWebPendingSendState.Phase.IDLE, state.phase())
+        assertEquals(WebChatPendingSendState.Phase.IDLE, state.phase())
     }
 
     @Test
     fun confirmedSubmissionKeepsWaitingWithoutRestoringPrompt() {
-        val state = GoogleWebPendingSendState()
+        val state = WebChatPendingSendState()
         val generation = state.begin("hello")
 
         assertTrue(state.confirmSubmission())
-        assertEquals(GoogleWebPendingSendState.Phase.AWAITING_RESPONSE, state.phase())
+        assertEquals(WebChatPendingSendState.Phase.AWAITING_RESPONSE, state.phase())
         val result = state.onConfirmationTimeout(generation)
 
-        assertEquals(GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING, result.action)
+        assertEquals(WebChatPendingSendState.TimeoutAction.KEEP_WAITING, result.action)
         assertNull(result.prompt)
         assertEquals("hello", state.prompt())
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING,
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
             state.onConfirmationTimeout(generation).action,
         )
         assertEquals("hello", state.prompt())
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION,
+            WebChatPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION,
             state.onConfirmationTimeout(generation).action,
         )
         assertTrue(state.requiresOfficialConfirmation())
-        assertEquals(GoogleWebPendingSendState.Phase.OFFICIAL_CONFIRMATION, state.phase())
+        assertEquals(WebChatPendingSendState.Phase.OFFICIAL_CONFIRMATION, state.phase())
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.IGNORE,
+            WebChatPendingSendState.TimeoutAction.IGNORE,
             state.onConfirmationTimeout(generation).action,
         )
         assertEquals("hello", state.prompt())
@@ -77,7 +79,7 @@ class GoogleWebPendingSendStateTest {
 
     @Test
     fun observedUserMessageWaitsForItsAssistantBeforeCompleting() {
-        val state = GoogleWebPendingSendState()
+        val state = WebChatPendingSendState()
         val generation = state.begin("hello")
         state.confirmSubmission()
 
@@ -88,31 +90,31 @@ class GoogleWebPendingSendStateTest {
         assertNull(state.prompt())
         assertFalse(state.requiresOfficialConfirmation())
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.IGNORE,
+            WebChatPendingSendState.TimeoutAction.IGNORE,
             state.onConfirmationTimeout(generation).action,
         )
     }
 
     @Test
     fun staleTimeoutCannotRestoreNewerPrompt() {
-        val state = GoogleWebPendingSendState()
+        val state = WebChatPendingSendState()
         val oldGeneration = state.begin("old")
         val newGeneration = state.begin("new")
 
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.IGNORE,
+            WebChatPendingSendState.TimeoutAction.IGNORE,
             state.onConfirmationTimeout(oldGeneration).action,
         )
         assertEquals("new", state.prompt())
         assertEquals(
-            GoogleWebPendingSendState.TimeoutAction.RESTORE,
+            WebChatPendingSendState.TimeoutAction.RESTORE,
             state.onConfirmationTimeout(newGeneration).action,
         )
     }
 
     @Test
     fun failedSubmissionReturnsPromptOnce() {
-        val state = GoogleWebPendingSendState()
+        val state = WebChatPendingSendState()
         state.begin("retry me")
 
         assertEquals("retry me", state.failSubmission())
@@ -122,19 +124,19 @@ class GoogleWebPendingSendStateTest {
 
     @Test
     fun consumerStatusExplainsEachPendingSendPhase() {
-        assertNull(GoogleWebPendingSendPresentation.status(GoogleWebPendingSendState.Phase.IDLE))
+        assertNull(WebChatPendingSendPresentation.status(WebChatPendingSendState.Phase.IDLE))
         assertEquals(
             "发送中…",
-            GoogleWebPendingSendPresentation.status(GoogleWebPendingSendState.Phase.SUBMITTING),
+            WebChatPendingSendPresentation.status(WebChatPendingSendState.Phase.SUBMITTING),
         )
         assertEquals(
             "已发送 · 等待回复",
-            GoogleWebPendingSendPresentation.status(GoogleWebPendingSendState.Phase.AWAITING_RESPONSE),
+            WebChatPendingSendPresentation.status(WebChatPendingSendState.Phase.AWAITING_RESPONSE),
         )
         assertEquals(
             "已发送 · 回答同步较慢",
-            GoogleWebPendingSendPresentation.status(
-                GoogleWebPendingSendState.Phase.OFFICIAL_CONFIRMATION,
+            WebChatPendingSendPresentation.status(
+                WebChatPendingSendState.Phase.OFFICIAL_CONFIRMATION,
             ),
         )
     }

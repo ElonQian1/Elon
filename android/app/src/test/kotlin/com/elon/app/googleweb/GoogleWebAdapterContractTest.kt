@@ -32,7 +32,7 @@ class GoogleWebAdapterContractTest {
             "android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt",
         )
         val pendingSendState = read(
-            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPendingSendState.kt",
+            "android/app/src/main/kotlin/com/elon/app/WebChatPendingSendState.kt",
         )
 
         assertTrue(adapter.contains("providerId: 'google_web'"))
@@ -127,7 +127,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(controller.contains("pendingSend.observeSubmission(latestUserPrompt)"))
         assertTrue(controller.contains("session.onSubmissionObserved()"))
         assertTrue(session.contains("fun onSubmissionObserved() = responseRefresh.onSendConfirmed()"))
-        assertTrue(controller.contains("GoogleWebPendingSendPresentation.status(pendingSend.phase())"))
+        assertTrue(controller.contains("WebChatPendingSendPresentation.status(pendingSend.phase())"))
         assertTrue(controller.contains("?.sendStatus = pendingStatus"))
         assertTrue(Regex(
             """pendingSend\.confirmSubmission\(\).*?renderSnapshot""",

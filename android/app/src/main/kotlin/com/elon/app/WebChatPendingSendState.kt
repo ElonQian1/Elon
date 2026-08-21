@@ -1,6 +1,8 @@
-package com.elon.app.googleweb
+package com.elon.app
 
-internal class GoogleWebPendingSendState {
+import com.elon.app.chatgptweb.ChatGptWebSnapshot
+
+internal class WebChatPendingSendState {
     enum class Phase {
         IDLE,
         SUBMITTING,
@@ -78,8 +80,7 @@ internal class GoogleWebPendingSendState {
     }
 
     fun onConfirmationTimeout(expectedGeneration: Long): TimeoutResult {
-        val current = pending
-            ?: return TimeoutResult(TimeoutAction.IGNORE)
+        val current = pending ?: return TimeoutResult(TimeoutAction.IGNORE)
         if (current.generation != expectedGeneration) {
             return TimeoutResult(TimeoutAction.IGNORE)
         }
@@ -116,11 +117,29 @@ internal class GoogleWebPendingSendState {
     }
 }
 
-internal object GoogleWebPendingSendPresentation {
-    fun status(phase: GoogleWebPendingSendState.Phase): String? = when (phase) {
-        GoogleWebPendingSendState.Phase.IDLE -> null
-        GoogleWebPendingSendState.Phase.SUBMITTING -> "发送中…"
-        GoogleWebPendingSendState.Phase.AWAITING_RESPONSE -> "已发送 · 等待回复"
-        GoogleWebPendingSendState.Phase.OFFICIAL_CONFIRMATION -> "已发送 · 回答同步较慢"
+internal object WebChatPendingSendPresentation {
+    fun status(phase: WebChatPendingSendState.Phase): String? = when (phase) {
+        WebChatPendingSendState.Phase.IDLE -> null
+        WebChatPendingSendState.Phase.SUBMITTING -> "发送中…"
+        WebChatPendingSendState.Phase.AWAITING_RESPONSE -> "已发送 · 等待回复"
+        WebChatPendingSendState.Phase.OFFICIAL_CONFIRMATION -> "已发送 · 回答同步较慢"
+    }
+}
+
+internal object WebChatPendingSendSnapshotPresentation {
+    fun resolve(
+        previous: ChatGptWebSnapshot?,
+        incoming: ChatGptWebSnapshot,
+        pending: Boolean,
+    ): ChatGptWebSnapshot {
+        if (!pending || incoming.messages.isNotEmpty()) {
+            return incoming
+        }
+        val retained = previous?.takeIf { it.messages.isNotEmpty() } ?: return incoming
+        return incoming.copy(
+            messages = retained.messages,
+            messageWindowStart = retained.messageWindowStart,
+            observedMessageCount = retained.observedMessageCount,
+        )
     }
 }

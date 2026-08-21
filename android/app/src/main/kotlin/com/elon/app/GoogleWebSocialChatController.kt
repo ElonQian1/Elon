@@ -10,8 +10,6 @@ import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.googleweb.GoogleWebBackgroundSession
 import com.elon.app.googleweb.GoogleWebPageAdapter
-import com.elon.app.googleweb.GoogleWebPendingSendState
-import com.elon.app.googleweb.GoogleWebPendingSendPresentation
 
 internal class GoogleWebSocialChatController(
     private val activity: AppCompatActivity,
@@ -49,7 +47,7 @@ internal class GoogleWebSocialChatController(
         )
     }
     private var active = false
-    private val pendingSend = GoogleWebPendingSendState()
+    private val pendingSend = WebChatPendingSendState()
     private var pendingSendWatchdog: Runnable? = null
     private var latestCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
@@ -209,7 +207,7 @@ internal class GoogleWebSocialChatController(
         } else if (pendingSend.observeSubmission(latestUserPrompt)) {
             session.onSubmissionObserved()
         }
-        val pendingStatus = GoogleWebPendingSendPresentation.status(pendingSend.phase())
+        val pendingStatus = WebChatPendingSendPresentation.status(pendingSend.phase())
         val pendingPrompt = pendingSend.prompt()
         val mapped = ChatGptFriendMessageMapper.map(
             snapshot = snapshot,
@@ -279,12 +277,12 @@ internal class GoogleWebSocialChatController(
             pendingSendWatchdog = null
             val result = pendingSend.onConfirmationTimeout(generation)
             when (result.action) {
-                GoogleWebPendingSendState.TimeoutAction.IGNORE -> Unit
-                GoogleWebPendingSendState.TimeoutAction.KEEP_WAITING -> {
+                WebChatPendingSendState.TimeoutAction.IGNORE -> Unit
+                WebChatPendingSendState.TimeoutAction.KEEP_WAITING -> {
                     session.requestConversationIndex()
                     scheduleSubmissionConfirmationWatchdog(generation)
                 }
-                GoogleWebPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
+                WebChatPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
                     session.requestConversationIndex()
                     session.currentSnapshot()?.let(::renderSnapshot)
                     if (active) Toast.makeText(
@@ -293,7 +291,7 @@ internal class GoogleWebSocialChatController(
                         Toast.LENGTH_LONG,
                     ).show()
                 }
-                GoogleWebPendingSendState.TimeoutAction.RESTORE -> {
+                WebChatPendingSendState.TimeoutAction.RESTORE -> {
                     session.currentSnapshot()?.let(::renderSnapshot)
                     restorePrompt(result.prompt)
                     if (active) Toast.makeText(
