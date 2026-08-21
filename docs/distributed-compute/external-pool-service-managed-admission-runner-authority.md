@@ -4,6 +4,7 @@ status: current
 reviewed_at: 2026-08-21
 owners: backend, security, ai-economy
 design_status: design_frozen
+design_scope: end_to_end_vertical_slice_architecture_only
 implementation_status: implementation_unwired
 verification_status: design_review_only
 ---
@@ -12,15 +13,24 @@ verification_status: design_review_only
 
 ## 1. 唯一结论与当前事实
 
-V280 冻结 external-pool 从受管市场准入到单个 artifactless Attempt 正向执行的最小完整纵切。它不是一批已写
+V280 冻结 external-pool 从受管市场准入到单个 artifactless Attempt 正向执行的最小完整纵切架构。它不是一批已写
 源码，也不是 migration 280 已注册：当前全局 migration 最高仍为 V279，仓库没有 V280 table、UDF、trigger、
 Domain、Store、production validator 或 Runner 实现。
 
 V254 #13-#18 继续 absolute deny；V278 worker 继续 default-off，Provider=`registering`、
 `eligible_rows=0`、`delivery_attempted=false`。现有 V273/V274/V277/V278 私有内核、fixture、历史 migration
-证据或 source review 都不能证明正常 Offer、Job、ACK、Lease 或 Runner 可达。本页状态严格为
-`design_frozen / design_review_only / implementation_unwired / implementation_uncompiled / implementation_unrun /
-passed=0 / failed=0`。
+证据或 source review 都不能证明正常 Offer、Job、ACK、Lease 或 Runner 可达。本页状态必须分轴读取：
+
+```text
+vertical_slice_architecture=design_frozen
+market_profile_schema_abi=design_frozen
+initial_profile_inventory=unselected
+admission_receipt_semantic_contract=design_frozen
+admission_receipt_physical_abi=unfrozen
+implementation=unwired/uncompiled/unrun
+passed=0
+failed=0
+```
 
 V280 只有在下列边界同批闭合后才允许进入 source-written 阶段：
 
@@ -54,41 +64,14 @@ validator、Runner 与 source-contract 必须在同一 feature branch 内可静�
 
 ## 4. Server-owned market profile
 
-仓库当前没有可信的 external-pool capacity、price 或 numeric execution ceiling source。V270 readiness、Provider
-declaration、Offer 自报、fixture 与历史 receipt 均不得充当该来源。V280 必须先引入 server-owned、版本化、canonical、
-可审计的 market profile catalog，并至少冻结：
+Profile 的 exact schema、JCS/SHA-256、字段集合、结构性约束、allocation/ref/hint 派生和 empty-inventory 失败关闭规则
+由 [market profile authority](external-pool-service-managed-market-profile-authority.md) 与
+[acceptance](external-pool-service-managed-market-profile-acceptance.md)唯一维护。父纵切只消费 sealed typed profile
+authority，不重复定义 canonical keys/domain。
 
-- profile schema、revision、canonical JSON、digest、valid-from 与 expiry；
-- 可售 capacity unit、每个Provider genesis的分配总量、单 Attempt 数值上限和最大并发；首批固定
-  `capacity_scope=per_provider_genesis`、`capacity_unit=attempt_slot`、allocation total=`max_concurrent_attempts`，每个
-  Reservation/Claim exact占1 slot，不得把同一数值解释成跨Provider共享余额或仅作未执行声明；
-- bucket数量固定`1 <= N <= catalog MAX_BUCKETS`，所有`N/2N`写集先checked计算并受SQLite变量上限约束；
-- CNY 价格单位、整数精度、计价窗口、fallback curve ID/revision与不可回溯修改规则；
-- execution ceiling精确覆盖`accelerator_count/max_cpu_millicores/max_memory_bytes/max_vram_bytes/max_disk_bytes/
-  max_processes/max_runtime_seconds/max_output_bytes/max_concurrent_attempts/allow_network_egress`十项；
-- task request/response/observation transport byte limits另由session/validator消费；除`max_output_bytes`外不得把transport limit
-  塞进capability或发明不存在的resource-ceiling字段；
-- workload allowlist，首批只能 artifactless、`result_artifact_required=false`、checkpoint disabled；
-- Runner、retry、poll、cleanup 与 task-session 的硬截止；
-- per-Attempt lease delivery issuer policy revision/digest、固定`authority_kind=external_pool_adapter_task_lease`、
-  `delivery_mode=eltp_commit`、sorted scopes=`[compute_attempt.execute]`、ref/hint shape与non-bearer约束；
-- 分离`new_plan_accept_until`与更长的`inflight_execution_valid_until`，锁价/准入过期不回溯撤销已seal Plan；
-- profile owner、审核来源与 successor/revocation 语义。
-
-首个纵切使用 server-shipped、non-DB 的固定 catalog root，并把 exact profile JSON/digest复制进 admission receipt；
-它不是运行时可变配置，也不新增第二张 V280 durable 表。未来真实价格源或在线 profile 管理须另立 authority，不得
-静默改变既存 receipt。
-
-实现时catalog owner固定在`compute_federation/external_pool_service_managed_admission/policy.rs`。私有
-`CurrentExternalPoolServiceManagedMarketProfileAuthority`只能从编译进server的immutable profile inventory、server
-`checked_at`与typed selected Provider/V249 binding产生：exact一项enabled、revision/digest匹配、
-`valid_from <= checked_at < expires_at`，且不在同一编译单元的revocation set中；0或多项都失败关闭。Authority按
-`ELON-EXTERNAL-POOL-SERVICE-MANAGED-CAPACITY-ALLOCATION-V1`对Provider ID、V249 binding pair、profile revision/digest及
-capacity unit/total做JCS/SHA-256，派生唯一allocation ID/digest。历史profile必须保留供receipt audit，类型不得Clone/Serde或由Store caller构造。
-首批禁止发布profile successor；profile到期或被撤销后admission只会失去currentness，直到后续successor authority落地。
-
-Profile 只授权构造准入计划，不直接铸造 Pool、Offer、Plan、Start、Lease 或 execution receipt。调用方不能提交 raw
-capacity、price、ceiling、profile JSON 或“verified”布尔值。
+当前 `initial_profile_inventory=unselected`：仓库没有可合法升格的价格、容量、SKU/runtime、ceiling 或时限载荷，
+因此 current profile authority 正向不可构造。只有 byte-exact profile JSON/digest、产品/经济/安全审批和完整纵切源码
+同批落盘后才能加入第一项 enabled inventory；Profile 本身不直接铸造任何市场、执行或经济对象。
 
 ## 5. Immutable admission receipt
 
@@ -101,14 +84,15 @@ revocation、queue、session、Secret 或 payload 表。其 canonical receipt �
 | identity | admission receipt ID、Provider ID、V249 external-pool provider-binding ID/digest、market admission actor、fixed confirmation、idempotency scope/key/request digest；首批sequence固定1且predecessor pair固定NULL |
 | activation | V277 stable activation receipt ID/digest/root digest、准入当时的V274 successor historical witness pair |
 | route/runtime | 准入当时的V278 renewal/route authorization historical witness pair、stable executor pair |
-| policy | market profile schema/revision/canonical JSON/digest、`capacity_scope=per_provider_genesis`、server-derived allocation ID/digest |
+| policy | 子权威定义的 exact market profile JSON/digest与per-Provider allocation pair；当前inventory未选择 |
 | pool | pool ID/epoch/revision/digest、bucket inventory count/digest、supply transaction pair、activation event pair |
 | offer/price | 同一 Offer 的 draft revision/digest、active revision/digest、publication pair，以及既有v171 price snapshot ID/digest/source pair |
 | time | checked-at、valid-from、expires-at、created-at=checked-at，全部 UTC nanos |
 | receipt | canonical JSON、receipt digest、integrity digest与domain-separated JCS/SHA-256版本 |
 
-物理列名、列序、canonical envelope 和 domain 字符串必须在第一批实现前由 Domain/DDL/Store 三方共同冻结并加入
-source-contract；本页不把尚不存在的列序冒充为源码 ABI。
+Admission receipt的物理列名、列序、canonical envelope 和 domain 字符串必须在第一批实现前由独立
+admission ABI authority、Domain、DDL、Store三方共同冻结并加入source-contract；当前
+`admission_receipt_physical_abi=unfrozen`，本页不把语义表格冒充为源码 ABI。
 
 Currentness 只能只读派生：Provider只有唯一genesis receipt且未过期，server catalog中同一 market profile revision/digest仍
 current、未撤销且在有效窗内，Provider exact active且仍绑定同一V277 stable activation root/provider binding/executor/adapter
@@ -212,13 +196,11 @@ timestamp projection exact；它不能复用只在active CAS触发的V254 #14 pe
 跨connection、未完全消费或rollback都不得留下permit。
 
 Price snapshot 必须复用既有v171 Registry及其Store-private `register_compute_price_snapshot_on`，不得建平行表。snapshot/
-quote ID由admission request+profile+Offer确定性派生；price components、max amounts、source digest与TTL只取server profile，
-首批`pricing_mode=spot`、`source_kind=fallback_curve`、`sample_count=0`、`trade_id=None`、`instrument_id=None`，不冒充
-index/mark/trade或capacity future；`currency=CNY`、`fee_rules=[]`、`rounding_mode=half_up`，Offer price terms的
-curve ID/revision与snapshot source ID/version/digest精确取profile，观察窗固定`[quoted_at-1s, quoted_at]`。Offer publication的既有
-`price_snapshot_effect=none`保持不变；snapshot是其后的独立受管写入。所有既有snapshot writer，包括public Offer-owner facade与
-v223四眼admin curve application，都必须拒绝external_pool；只有持有本次ordered plan的V280 Store-private `_on` writer可调用
-底层registry kernel，任何caller/admin都不能提交raw price。
+quote identity、components、max amounts、source、TTL与时间公式只取
+[profile子权威](external-pool-service-managed-market-profile-authority.md)和本次admission/Offer sealed material。Offer publication
+既有`price_snapshot_effect=none`保持不变；snapshot是其后的独立受管写入。所有既有snapshot writer，包括public
+Offer-owner facade与v223四眼admin curve application，都必须拒绝external_pool；只有持有本次ordered plan的V280
+Store-private `_on` writer可调用底层registry kernel，任何caller/admin都不能提交raw price。
 首批每份genesis admission只生成这一份initial snapshot，不实现snapshot refresh；其过期会停止新Job/Plan admission。
 后续持续spot报价必须另立profile/snapshot successor authority，不能覆盖v171历史行或借同一quote ID换价。
 Admission table必须对price snapshot ID/digest建立唯一exact binding，使任何sealed Plan都能从自身snapshot pair反查唯一
@@ -415,7 +397,8 @@ owner串行收口；worker ownership同时包含`external_pool_adapter_task_work
 包含`external_pool_adapter_broker_tls.rs`。每个 leaf ≤430 行；入口只做
 声明、re-export或编排。
 
-推荐实现顺序是 policy Domain→admission Domain/DDL/Store→service-managed market transaction→Gateway A/B→task session+
+推荐实现顺序是 profile子权威的首项payload审批→独立admission physical ABI冻结→policy/admission Domain/DDL/Store→
+service-managed market transaction→Gateway A/B→task session+
 validator→Runner/ingress/recovery→source-contract→恢复后的 compile/migration/runtime acceptance。前一步未闭合时不得打开下一步
 生产 fence。
 

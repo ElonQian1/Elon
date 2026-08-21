@@ -4,6 +4,7 @@ status: current
 reviewed_at: 2026-08-21
 owners: backend, security, ai-economy
 design_status: design_frozen
+design_scope: end_to_end_vertical_slice_architecture_only
 implementation_status: implementation_unwired
 verification_status: design_review_only
 ---
@@ -20,8 +21,9 @@ V280 当前只有权威与验收设计，正式计数为 `passed=0 / failed=0`�
 - V278 worker仍default-off，Provider=`registering`、`eligible_rows=0`、`delivery_attempted=false`；
 - 没有正常 external-pool Offer→Job→Plan→Start→ACK→Lease→Runner 动态证据。
 
-本批只允许记录`design_frozen/design_review_only/implementation_unwired/implementation_uncompiled/
-implementation_unrun`。文档链接、source-size或静态零改动扫描
+本批只允许记录纵切架构`design_frozen/design_review_only`，并逐轴说明
+`market_profile_schema_abi=design_frozen`、`initial_profile_inventory=unselected`、
+`admission_receipt_physical_abi=unfrozen`与实现`unwired/uncompiled/unrun`。文档链接、source-size或静态零改动扫描
 不是实现证据，任何 V273/V274/V277/V278 历史 passed 也不能计入 V280。
 
 ## 2. 本次文档冻结验收
@@ -35,31 +37,18 @@ implementation_unrun`。文档链接、source-size或静态零改动扫描
 | worktree | 除文档外零Rust/SQL/schema/API改动；`git diff --check`、文档模块化和本地链接通过。 |
 | status | 所有入口都明确0/0、unwired、uncompiled、unrun，不使用implemented/reachable/ready。 |
 
-只有这些静态检查通过时，本批可称“V280 design freeze complete”；不得称“V280 implemented”。
+只有这些静态检查通过时，本批可称“V280 end-to-end vertical-slice architecture frozen”；不得称“V280 fully frozen”或
+“V280 implemented”。
 
-## 3. 第一实现批的 policy gate
+## 3. Market profile gate
 
-进入 source-written 前必须先交付 server-owned market profile authority。验收至少覆盖：
+[Market profile authority](external-pool-service-managed-market-profile-authority.md) 与
+[acceptance](external-pool-service-managed-market-profile-acceptance.md)已冻结schema/canonical ABI、结构约束与empty-inventory
+失败关闭；初始产品载荷仍`unselected`，所以current profile authority不可构造。
 
-1. schema/revision/JCS/SHA-256、valid-from/expiry与successor/revocation；
-2. `capacity_scope=per_provider_genesis`、`capacity_unit=attempt_slot`、allocation total=`max_concurrent_attempts`、每个
-   Reservation/Claim exact 1 slot、Provider+V249 binding+profile派生的allocation ID/digest、整数价格，以及exact
-   `accelerator_count/max_cpu_millicores/max_memory_bytes/max_vram_bytes/max_disk_bytes/max_processes/max_runtime_seconds/
-   max_output_bytes/max_concurrent_attempts/allow_network_egress`十项capability ceiling；request/response/observation transport
-   limit另属session/validator，除`max_output_bytes`外不得映射为不存在的ceiling字段；
-   bucket数量1..MAX_BUCKETS且N/2N/write-count全部checked并低于SQLite限制；
-3. 首批固定spot/CNY、fallback_curve/sample_count=0、trade/instrument NULL、fee_rules=[]、half_up，以及exact
-   SKU/window/components/curve ID+revision/source digest；
-4. artifactless、no-result-artifact、checkpoint-disabled workload allowlist；
-5. caller不能提交raw profile、price、capacity、ceiling或verified bool；
-6. V270 readiness、Provider/Offer自报、fixture和receipt不能替代policy catalog；
-7. lease delivery issuer policy与non-bearer ref/hint shape由profile固定，不能借V278 route credential；
-8. policy exact replay与unknown-field/digest/time/revision/revocation/expiry负例。
-
-首批catalog必须是server-shipped non-DB immutable inventory：exact一个enabled current profile，历史项保留，0/multi、
-过期或revoked均失败关闭；无private typed authority不得读取。Profile successor在本阶段必须拒绝。
-
-Policy source缺失时，migration、fence replacement、Gateway和Runner都必须停止，不能以默认零值或无限上限继续。
+进入source-written前必须提交byte-exact profile JSON/digest与产品/经济/安全审批，并通过子验收的capacity、price、ceiling、
+workload、transport、deadline、issuer与负向source矩阵。缺任一项时migration、fence replacement、Gateway和Runner都必须停止，
+不能以fixture、默认零值、最小值或无限上限继续。
 
 ## 4. Admission schema 与 migration matrix
 
@@ -68,7 +57,7 @@ Policy source缺失时，migration、fence replacement、Gateway和Runner都必�
 | durable shape | exact 1张immutable admission receipt表；0 mutable head、0 view、0 revocation、0 session/Secret/payload表。 |
 | semantic projection | identity、V277 stable root、admission-time V274/V278 historical witnesses、profile+per-provider allocation、Pool/ledger、Offer/publication、v171 price snapshot、time、canonical receipt全部逐列投影。 |
 | idempotency | market admission actor/confirmation/scope/key/request digest逐字投影；replay在current-source read前，caller不能选择这些字段。 |
-| ABI freeze | Domain/DDL/Store exact列名、列序、类型、canonical keys与domain string一致，source-contract锁定。 |
+| ABI freeze | 当前仍是未来门；独立admission ABI authority须让Domain/DDL/Store exact列名、列序、类型、canonical keys与domain string一致并由source-contract锁定。 |
 | genesis | sequence固定1、predecessor固定NULL；同Provider只有一份genesis，不接受第二个不同请求。 |
 | capacity scope | 同Provider重复或改量拒绝；两个Provider的allocation ID/digest必须不同，各自只铸一次profile授权量；不得出现global余额或跨Provider重复消费的隐式解释。 |
 | concurrency | Tx-A同事务重证同Provider ledger与exact Reservation/held Claim各占1 slot，held+active总量不得超过profile；跨cycle或并发writer也不能超售。 |
@@ -231,7 +220,9 @@ semantic substitution与所有V254 fence负例。仅source-contract、fixture或
 
 ## 10. 状态晋级规则
 
-- authority/acceptance完成：只能`design_frozen/design_review_only`；
+- 父authority/acceptance完成：只证明`vertical_slice_architecture=design_frozen`；
+- profile子权威完成：只证明`market_profile_schema_abi=design_frozen`，初始inventory仍可保持unselected；
+- admission physical ABI、首个profile payload、Gateway/session/validator ABI任一未冻结时不得进入source-written；
 - Domain/DDL/Store/Gateway/validator/Runner全部落盘且静态合同通过：可记`source_written/source_review_only`；
 - compile+fresh/repeat/reopen migration通过：才可记`implementation_compiled`或对应局部验证；
 - 正向纵切、timeout/reconcile/cancel/restart动态矩阵通过：才可记production reachability已验证；
