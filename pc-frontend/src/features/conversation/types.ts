@@ -293,6 +293,7 @@ export interface SendMessageResponse {
 
 export interface StartAiTaskPayload {
   content: string
+  trace_id?: string
   agent?: string | null
   runtimeRoute?: RuntimeRoute
   conversation_id?: string

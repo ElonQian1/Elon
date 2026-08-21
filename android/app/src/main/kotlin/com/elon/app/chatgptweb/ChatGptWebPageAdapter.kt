@@ -27,7 +27,15 @@ internal class ChatGptWebPageAdapter(
         UNSUPPORTED,
     }
 
-    private val adapterScript = ADAPTER_ASSETS.joinToString("\n") { asset ->
+    private val adapterScript = """
+        (function () {
+            window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
+            if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
+                window.__elonChatGptDocumentToken =
+                    "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+            }
+        })();
+    """.trimIndent() + "\n" + ADAPTER_ASSETS.joinToString("\n") { asset ->
         context.assets.open(asset).use { input ->
             input.reader(StandardCharsets.UTF_8).readText()
         }
@@ -369,7 +377,10 @@ internal class ChatGptWebPageAdapter(
             .toString()
         val encoded = JSONObject.quote(command)
         webView.evaluateJavascript(
-            "window.__elonChatGptBridge && window.__elonChatGptBridge.command($encoded);",
+            "window.__elonChatGptBridge && window.__elonChatGptBridge.command(" +
+                "(function(raw){var command=JSON.parse(raw);" +
+                "command.documentToken=window.__elonChatGptDocumentToken||'';" +
+                "return JSON.stringify(command);})($encoded));",
             null,
         )
     }

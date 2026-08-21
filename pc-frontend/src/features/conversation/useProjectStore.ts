@@ -1,9 +1,11 @@
 import { create } from 'zustand'
+import { v4 as uuidv4 } from 'uuid'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse, SendMessageResponse, ProjectAttachmentRef } from './types'
 import { DEFAULT_RUNTIME_ROUTE } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
+import { loadAiDevelopmentTaskMessages } from './conversationPageHelpers'
 
 interface ChannelMessageCacheEntry {
   messages: Message[]
@@ -316,14 +318,18 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const isActiveRequest = startState.activeProjectId === projectId && startState.activeChannelId === channelId
     const requestSeq = isActiveRequest ? startState.messageRequestSeq + 1 : startState.messageRequestSeq
     const key = channelMessageCacheKey(projectId, channelId)
+    const isAiDevelopmentChannel = startState.channels.some(
+      (channel) => channel.id === channelId && channel.kind === 'ai_development',
+    )
     if (isActiveRequest) {
       set({ messagesLoading: true, messageRequestSeq: requestSeq })
     }
     try {
-      const data = await api.get<ChannelMessagesResponse>(
-        `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=120`,
-      )
-      const nextMessages = data.messages ?? []
+      const nextMessages = isAiDevelopmentChannel
+        ? await loadAiDevelopmentTaskMessages(projectId, channelId)
+        : (await api.get<ChannelMessagesResponse>(
+            `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=120`,
+          )).messages ?? []
       set((state) => {
         const nextCache = {
           ...state.messageCache,
@@ -380,10 +386,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     if (!activeProjectId || !channelId || !content.trim()) return null
     set({ sendingMessage: true })
     try {
+      const traceId = `pc_web_${uuidv4()}`
       const response = await api.post<SendMessageResponse>(
         `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(channelId)}/ai-tasks`,
         {
           content,
+          trace_id: traceId,
           agent: agent ?? null,
           runtimeRoute,
           conversation_id: conversationId || undefined,

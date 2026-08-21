@@ -17,6 +17,7 @@ import LocalAiAccountSessionCard from './LocalAiAccountSessionCard'
 import LocalAiBrowserPanel from './LocalAiBrowserPanel'
 import useLocalAiOwnerIdentity from './useLocalAiOwnerIdentity'
 import useLocalAiBrowserCapability, { type LocalAiBrowserCapabilityState } from './useLocalAiBrowserCapability'
+import { CAPABILITY_PARITY, capabilityParityStatusLabel } from '../capabilityParity'
 import styles from './UserBrowserLauncherPage.module.css'
 
 type Availability = 'checking' | 'ready' | 'unavailable' | 'error'
@@ -108,6 +109,31 @@ export default function UserBrowserLauncherPage() {
         ownerSource={localOwner.source}
         capability={localBrowser}
       />
+
+      <section className={styles.parityPanel} aria-labelledby="capability-parity-title">
+        <div className={styles.parityHeader}>
+          <div>
+            <span className={styles.eyebrow}>能力来源清单</span>
+            <h2 id="capability-parity-title">以 APP 为基准的网页版边界</h2>
+          </div>
+          <span className={styles.parityHint}>先标明来源，再决定是否拆除</span>
+        </div>
+        <div className={styles.parityList}>
+          {CAPABILITY_PARITY.map((entry) => (
+            <article className={styles.parityItem} key={entry.id}>
+              <div className={styles.parityItemTopline}>
+                <strong>{entry.label}</strong>
+                <span className={styles.parityStatus} data-status={entry.status}>
+                  {capabilityParityStatusLabel[entry.status]}
+                </span>
+              </div>
+              <span className={styles.parityAppSurface}>APP：{entry.appSurface}</span>
+              <p>{entry.detail}</p>
+              {entry.webRoute && <code>{entry.webRoute}</code>}
+            </article>
+          ))}
+        </div>
+      </section>
 
       {!localBrowserAvailable && <main className={styles.workspace}>
         <div className={styles.sessionSummary}>

@@ -20,13 +20,13 @@ interface RailItem {
 const OFFICIAL_AI_ITEM: RailItem = {
   path: '/user-browser',
   Icon: Globe2,
-  label: '官方 AI',
+  label: '官方 AI（APP同源）',
   color: '#26342f',
   hoverColor: '#315046',
 }
 
 const RAIL_ITEMS: RailItem[] = [
-  { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/ai',      Icon: Bot,          label: '平台 AI（待接 APP 主链）',   color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/projects', Icon: Boxes,       label: '项目中心',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/git-worktrees', Icon: GitBranch, label: 'Git 现场', color: '#2a2b2f', hoverColor: '#34363b' },
@@ -40,9 +40,9 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/compute-execution', Icon: Activity, label: '算力执行', color: '#28343a', hoverColor: '#34464f' },
   { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
   { path: '/compute-challenges', Icon: Scale, label: '结算申诉', color: '#362d29', hoverColor: '#493a33' },
-  { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/voice',   Icon: Mic2,         label: 'TTS 声音控制台（网页专属）',  color: '#2a2b2f', hoverColor: '#34363b' },
   OFFICIAL_AI_ITEM,
-  { path: '/chatkit', Icon: MessageCircleMore, label: 'OpenAI ChatKit', color: '#26342f', hoverColor: '#315046' },
+  { path: '/chatkit', Icon: MessageCircleMore, label: 'OpenAI ChatKit（APP同源）', color: '#26342f', hoverColor: '#315046' },
 ]
 
 const LOCAL_TASK_ITEM: RailItem = {

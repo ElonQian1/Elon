@@ -76,6 +76,100 @@
   background: var(--border);
 }
 
+.parityPanel {
+  width: min(880px, 100%);
+  margin: 24px auto 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+}
+
+.parityHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.parityHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.parityHint {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.parityList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.parityItem {
+  min-width: 0;
+  padding: 14px;
+  background: var(--bg-elevated);
+}
+
+.parityItemTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.parityItemTopline strong {
+  font-size: 13px;
+}
+
+.parityStatus {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.parityStatus[data-status="app_shared"] { border-color: rgba(84, 199, 161, .45); color: #84e2c2; }
+.parityStatus[data-status="web_specialized"] { border-color: rgba(224, 178, 112, .45); color: #e6bd86; }
+.parityStatus[data-status="needs_contract"] { border-color: rgba(224, 112, 112, .45); color: #e7a0a0; }
+
+.parityAppSurface {
+  display: block;
+  margin-top: 9px;
+  color: var(--text-secondary);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.parityItem p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.parityItem code {
+  display: inline-block;
+  margin-top: 9px;
+  color: #84e2c2;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+}
+
 .workspace {
   width: min(880px, 100%);
   display: grid;
@@ -208,6 +302,10 @@
   .identityMark { width: 42px; height: 58px; }
   .header h1 { font-size: 23px; }
   .status { grid-column: 2; width: max-content; }
+  .parityPanel { padding: 14px; }
+  .parityHeader { align-items: start; flex-direction: column; gap: 8px; }
+  .parityHint { white-space: normal; }
+  .parityList { grid-template-columns: 1fr; }
   .workspace { grid-template-columns: 1fr; margin-top: 22px; }
   .sessionSummary { min-height: 128px; border-right: 0; border-bottom: 1px solid var(--border); }
   .actionPanel { padding: 22px; }
