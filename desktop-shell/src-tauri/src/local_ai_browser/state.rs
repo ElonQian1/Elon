@@ -60,6 +60,7 @@ struct SessionRecord {
     preserve_conversation_on_navigation: bool,
     cache_path: Option<PathBuf>,
     cache_updated_at_ms: u64,
+    semantic_updated_at_ms: u64,
     updated_at_ms: u64,
 }
 
@@ -91,6 +92,7 @@ pub struct LocalAiWebSessionState {
     pub context_ready: bool,
     pub context_status: String,
     pub cache_updated_at_ms: u64,
+    pub semantic_updated_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
@@ -180,6 +182,11 @@ impl LocalAiBrowserRuntime {
                         )
                     })
                     .unwrap_or_default();
+            let semantic_updated_at_ms = if semantic_event.is_some() {
+                cache_updated_at_ms
+            } else {
+                0
+            };
             let active_restorable_url = conversation_snapshots
                 .first()
                 .map(|entry| entry.restorable_url.clone());
@@ -226,6 +233,7 @@ impl LocalAiBrowserRuntime {
                 preserve_conversation_on_navigation: false,
                 cache_path,
                 cache_updated_at_ms,
+                semantic_updated_at_ms,
                 updated_at_ms: now_ms(),
             }
         });
@@ -418,7 +426,9 @@ impl LocalAiBrowserRuntime {
                         .and_then(Value::as_bool)
                         .unwrap_or(false);
                     record.semantic_live = true;
-                    record.cache_updated_at_ms = now_ms();
+                    let updated_at_ms = now_ms();
+                    record.cache_updated_at_ms = updated_at_ms;
+                    record.semantic_updated_at_ms = updated_at_ms;
                     record.last_error = None;
                     record.last_error_code = None;
                     record.remember_current_conversation();
@@ -495,6 +505,7 @@ impl LocalAiBrowserRuntime {
             record.active_restorable_url = None;
             record.reset_context();
             record.cache_updated_at_ms = 0;
+            record.semantic_updated_at_ms = 0;
             record.updated_at_ms = now_ms();
             record.cache_path.clone()
         };
@@ -686,6 +697,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             context_ready,
             context_status,
             cache_updated_at_ms: record.cache_updated_at_ms,
+            semantic_updated_at_ms: record.semantic_updated_at_ms,
             updated_at_ms: record.updated_at_ms,
         }
     }
@@ -700,6 +712,7 @@ fn diagnostic_summary(record: &SessionRecord) -> Value {
         "messageCount": record.message_count,
         "assistantMessageCount": record.assistant_message_count,
         "streaming": record.streaming,
+        "semanticUpdatedAtMs": record.semantic_updated_at_ms,
         "updatedAtMs": record.updated_at_ms,
     })
 }

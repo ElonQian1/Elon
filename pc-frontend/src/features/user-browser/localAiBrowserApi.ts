@@ -170,6 +170,7 @@ export interface LocalAiWebSessionState {
   contextReady?: boolean
   contextStatus?: 'empty' | 'cached' | 'restoring' | 'bound' | 'unbound'
   cacheUpdatedAtMs: number
+  semanticUpdatedAtMs: number
   updatedAtMs: number
 }
 
@@ -499,6 +500,9 @@ function rememberSessionState(
   state.navigationCacheStatus = normalizeCacheStatus(state.navigationCacheStatus, cacheStatus)
   state.cacheUpdatedAtMs = Number.isFinite(state.cacheUpdatedAtMs)
     ? Math.max(0, state.cacheUpdatedAtMs)
+    : 0
+  state.semanticUpdatedAtMs = Number.isFinite(state.semanticUpdatedAtMs)
+    ? Math.max(0, state.semanticUpdatedAtMs)
     : 0
   localAiSnapshotCache.remember(providerId, ownerKey, state)
   return state

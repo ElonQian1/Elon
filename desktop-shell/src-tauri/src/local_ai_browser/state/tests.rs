@@ -29,6 +29,9 @@ fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
         "message_snapshot",
         json!({"type": "message_snapshot", "messages": [{"id": "answer"}]}),
     );
+    let semantic_updated_at_ms = runtime.snapshot("session").unwrap().semantic_updated_at_ms;
+    assert!(semantic_updated_at_ms > 0);
+    std::thread::sleep(std::time::Duration::from_millis(2));
     runtime.record_adapter_event(
         "session",
         "conversation_snapshot",
@@ -41,6 +44,8 @@ fn message_and_navigation_snapshots_do_not_overwrite_each_other() {
         snapshot.navigation_event.unwrap()["type"],
         "conversation_snapshot"
     );
+    assert_eq!(snapshot.semantic_updated_at_ms, semantic_updated_at_ms);
+    assert!(snapshot.cache_updated_at_ms > snapshot.semantic_updated_at_ms);
 }
 
 #[test]

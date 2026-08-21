@@ -2,6 +2,8 @@ import type { LocalAiMessageSnapshot, LocalAiWebSessionState } from './localAiBr
 
 export type LocalAiNewConversationPath = 'adapter' | 'home'
 
+const NEW_CONVERSATION_NATIVE_SETTLE_MS = 750
+
 export function selectLocalAiNewConversationPath(
   _providerId: string,
   session: Pick<
@@ -45,6 +47,7 @@ export function localAiNewConversationContextReady(
     | 'contextReady'
     | 'activeConversationId'
     | 'cacheUpdatedAtMs'
+    | 'semanticUpdatedAtMs'
     | 'updatedAtMs'
   > | null,
   snapshot: Pick<LocalAiMessageSnapshot, 'messages'> | null,
@@ -57,6 +60,7 @@ export function localAiNewConversationContextReady(
     && session.semanticCacheStatus === 'live'
     && session.contextReady === true
     && session.cacheUpdatedAtMs >= startedAtMs
+    && session.semanticUpdatedAtMs >= startedAtMs
     && session.updatedAtMs >= startedAtMs
     && session.activeConversationId
     && session.activeConversationId !== baselineConversationId
@@ -74,6 +78,7 @@ export function localAiNewConversationNativeReady(
     | 'contextReady'
     | 'activeConversationId'
     | 'cacheUpdatedAtMs'
+    | 'semanticUpdatedAtMs'
     | 'updatedAtMs'
   > | null,
   snapshot: Pick<
@@ -82,6 +87,7 @@ export function localAiNewConversationNativeReady(
   > | null,
   startedAtMs: number,
   baselineConversationId: string,
+  observedAtMs: number = Date.now(),
 ): boolean {
   return Boolean(
     localAiNewConversationContextReady(
@@ -92,6 +98,7 @@ export function localAiNewConversationNativeReady(
     )
     && !session?.loading
     && !['closed', 'opening', 'loading', 'blocked', 'error'].includes(session?.windowStatus || '')
+    && observedAtMs >= (session?.semanticUpdatedAtMs || 0) + NEW_CONVERSATION_NATIVE_SETTLE_MS
     && snapshot?.composerReady
     && (snapshot.authenticated || !snapshot.loginRequired),
   )

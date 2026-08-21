@@ -85,6 +85,7 @@ const bindingSession = {
   ...liveSession,
   activeConversationId: 'new-conversation',
   cacheUpdatedAtMs: 2_000,
+  semanticUpdatedAtMs: 2_000,
   updatedAtMs: 2_000,
 }
 assert.equal(localAiNewConversationContextReady(
@@ -112,6 +113,12 @@ assert.equal(localAiNewConversationContextReady(
   'old-conversation',
 ), false)
 assert.equal(localAiNewConversationContextReady(
+  { ...bindingSession, cacheUpdatedAtMs: 2_000, semanticUpdatedAtMs: 999, updatedAtMs: 2_000 },
+  { messages: [] },
+  1_000,
+  'old-conversation',
+), false)
+assert.equal(localAiNewConversationContextReady(
   bindingSession,
   null,
   1_000,
@@ -128,6 +135,14 @@ assert.equal(localAiNewConversationNativeReady(
   { messages: [], composerReady: true, authenticated: false, loginRequired: false },
   1_000,
   'old-conversation',
+  2_500,
+), false)
+assert.equal(localAiNewConversationNativeReady(
+  bindingSession,
+  { messages: [], composerReady: true, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+  2_800,
 ), true)
 assert.equal(localAiNewConversationNativeReady(
   { ...bindingSession, loading: true },
