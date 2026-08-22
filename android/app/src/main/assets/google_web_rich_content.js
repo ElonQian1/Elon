@@ -275,21 +275,40 @@
 
   function sourceResultRailBoundary(container) {
     if (!container) return false;
+    const boundaryControl = (control) => {
+      const label = cleanInline(
+        control && (control.innerText || control.textContent ||
+          (typeof control.getAttribute === 'function' &&
+            (control.getAttribute('aria-label') || control.getAttribute('title'))))
+      );
+      return /(?:显示|查看)(?:所有|全部)?(?:相关)?结果|show (?:all|more) (?:related )?results|more results/i.test(label);
+    };
     let sibling = container.nextElementSibling;
     for (let distance = 0; sibling && distance < 3; distance += 1) {
       const controls = [sibling];
       if (typeof sibling.querySelectorAll === 'function') {
         controls.push(...sibling.querySelectorAll('button, [role="button"], a'));
       }
-      if (controls.some((control) => {
-        const label = cleanInline(
-          control && (control.innerText || control.textContent ||
-            (typeof control.getAttribute === 'function' &&
-              (control.getAttribute('aria-label') || control.getAttribute('title'))))
-        );
-        return /(?:显示|查看)(?:所有|全部)?(?:相关)?结果|show (?:all|more) (?:related )?results|more results/i.test(label);
-      })) return true;
+      if (controls.some(boundaryControl)) return true;
       sibling = sibling.nextElementSibling;
+    }
+    let scope = container.parentElement;
+    for (let depth = 0; scope && depth < 4; depth += 1) {
+      if (typeof scope.querySelectorAll !== 'function' ||
+          typeof container.compareDocumentPosition !== 'function') {
+        scope = scope.parentElement;
+        continue;
+      }
+      const controls = Array.from(scope.querySelectorAll('button, [role="button"], a'))
+        .filter(boundaryControl);
+      for (const control of controls) {
+        if (!(container.compareDocumentPosition(control) & 4)) continue;
+        const precedingLists = Array.from(scope.querySelectorAll('ul, ol, [role="list"]'))
+          .filter((list) => typeof list.compareDocumentPosition === 'function' &&
+            (list.compareDocumentPosition(control) & 4));
+        if (precedingLists[precedingLists.length - 1] === container) return true;
+      }
+      scope = scope.parentElement;
     }
     return false;
   }
@@ -451,7 +470,7 @@
   }
 
   return Object.freeze({
-    version: 4,
+    version: 5,
     renderBlocks,
     partsFromBlocks,
     weatherPart,

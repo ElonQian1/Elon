@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const richContent = require('../android/app/src/main/assets/google_web_rich_content.js')
 
-assert.equal(richContent.version, 4)
+assert.equal(richContent.version, 5)
 
 const markdown = richContent.renderBlocks([
   { type: 'heading', level: 2, text: '天气概览' },
@@ -102,6 +102,30 @@ assert.equal(richContent.sourceResultRailBoundary({
     querySelectorAll: () => [],
   },
 }), false)
+const showAllResults = { innerText: '显示所有相关结果' }
+const narrativeList = {
+  compareDocumentPosition: (node) => node === showAllResults ? 4 : 0,
+}
+const wrappedSourceList = {
+  nextElementSibling: null,
+  compareDocumentPosition: (node) => node === showAllResults ? 4 : 0,
+}
+const answerScope = {
+  parentElement: null,
+  querySelectorAll: (selector) => selector.startsWith('button')
+    ? [showAllResults]
+    : [narrativeList, wrappedSourceList],
+}
+wrappedSourceList.parentElement = answerScope
+assert.equal(richContent.sourceResultRailBoundary(wrappedSourceList), true)
+assert.equal(richContent.sourceResultRailBoundary({
+  nextElementSibling: null,
+  parentElement: {
+    parentElement: null,
+    querySelectorAll: answerScope.querySelectorAll,
+  },
+  compareDocumentPosition: narrativeList.compareDocumentPosition,
+}), false, 'only the nearest list before the source-rail boundary may be pruned')
 
 const weather = richContent.partsFromBlocks([
   { type: 'heading', level: 2, text: '彰化县今晚天气' },
