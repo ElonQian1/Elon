@@ -59,10 +59,10 @@ fn append_admission(
         return Ok(());
     }
     ensure!(
-        sql.contains("WHEN NOT EXISTS (") && sql.contains(legacy_marker) && sql.contains("BEGIN"),
+        sql.contains("NOT EXISTS (") && sql.contains(legacy_marker) && sql.contains("BEGIN"),
         "V278 historical Accepted predecessor guard drifted: {trigger}"
     );
-    let sql = sql.replacen("WHEN NOT EXISTS (", "WHEN NOT (EXISTS (", 1);
+    let sql = sql.replacen("NOT EXISTS (", "NOT (EXISTS (", 1);
     let begin = sql
         .rfind("BEGIN")
         .ok_or_else(|| anyhow::anyhow!("V278 historical Accepted guard lost BEGIN: {trigger}"))?;
@@ -172,4 +172,46 @@ fn application_pending() -> &'static str {
     "elon_v278_external_pool_adapter_task_reachability_pending_plan_matches(\
         'historical_accepted_application',NEW.application_id,NEW.application_digest,\
         NEW.command_id,NEW.ack_id,NEW.applied_at,NEW.created_at)"
+}
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use super::{append_admission, trigger_sql, MARKER};
+
+    #[test]
+    fn admission_accepts_a_live_guard_with_a_business_predicate_before_not_exists() {
+        let connection = Connection::open_in_memory().expect("open migration fixture");
+        connection
+            .execute_batch(
+                "CREATE TABLE guarded(id INTEGER, actor_phase TEXT NOT NULL);
+                 CREATE TRIGGER guarded_exact_source
+                 BEFORE INSERT ON guarded
+                 WHEN NEW.actor_phase='application' AND NOT EXISTS (SELECT 1 WHERE 0)
+                 BEGIN
+                   SELECT RAISE(ABORT, 'legacy guard rejected row');
+                 END;",
+            )
+            .expect("install live predecessor guard");
+
+        append_admission(
+            &connection,
+            "guarded_exact_source",
+            "NEW.actor_phase='application'",
+            "SELECT 1 WHERE 'external_pool_adapter_task_receipt.v1' IS NOT NULL",
+            None,
+        )
+        .expect("append historical admission after the business predicate");
+
+        let installed = trigger_sql(&connection, "guarded_exact_source").expect("read trigger");
+        assert!(installed.contains("AND NOT (EXISTS ("));
+        assert_eq!(installed.matches(MARKER).count(), 1);
+        connection
+            .execute(
+                "INSERT INTO guarded(id,actor_phase) VALUES(1,'application')",
+                [],
+            )
+            .expect("historical branch should admit the row");
+    }
 }
