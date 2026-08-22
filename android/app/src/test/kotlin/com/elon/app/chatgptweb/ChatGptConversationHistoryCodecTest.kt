@@ -71,6 +71,27 @@ class ChatGptConversationHistoryCodecTest {
     }
 
     @Test
+    fun keepsLargeAccountsAvailableForImmediateSidebarRestore() {
+        val conversations = (0 until 180).map { index ->
+            ChatGptWebConversation(
+                id = "conversation-$index",
+                title = "历史会话 $index",
+                path = "/c/conversation-$index",
+                active = false,
+            )
+        }
+
+        val decoded = ChatGptConversationHistoryCodec.decode(
+            ChatGptConversationHistoryCodec.encode(
+                ChatGptConversationHistoryCache(conversations, savedAtMs = 1L),
+            ),
+        )!!
+
+        assertEquals(180, decoded.conversations.size)
+        assertEquals("/c/conversation-179", decoded.conversations.last().path)
+    }
+
+    @Test
     fun rejectsUnknownSchemaAndUnsafeOrEmptyIndexes() {
         assertNull(ChatGptConversationHistoryCodec.decode("{}"))
         assertNull(ChatGptConversationHistoryCodec.decode(

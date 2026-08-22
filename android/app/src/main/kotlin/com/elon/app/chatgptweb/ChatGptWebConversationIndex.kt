@@ -227,7 +227,7 @@ internal object ChatGptWebConversationIndex {
         return value.copy(id = id, title = title, path = "/g/$id/project")
     }
 
-    private fun canonicalProjects(values: List<ChatGptWebProject>): List<ChatGptWebProject> {
+    internal fun canonicalProjects(values: List<ChatGptWebProject>): List<ChatGptWebProject> {
         val projects = linkedMapOf<String, Pair<Int, ChatGptWebProject>>()
         values.forEach { value ->
             val canonical = sanitizeProject(value) ?: return@forEach

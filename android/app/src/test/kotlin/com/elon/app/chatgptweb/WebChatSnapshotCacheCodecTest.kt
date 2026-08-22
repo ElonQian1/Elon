@@ -39,7 +39,7 @@ class WebChatSnapshotCacheCodecTest {
 
     @Test
     fun boundsTheCachedWindowAndDropsTransientStreamingState() {
-        val messages = (0 until 40).map { index ->
+        val messages = (0 until 96).map { index ->
             message("m$index", if (index % 2 == 0) "user" else "assistant", "内容$index", "streaming")
         }
 
@@ -47,9 +47,9 @@ class WebChatSnapshotCacheCodecTest {
             WebChatSnapshotCache(snapshot(messages, messageWindowStart = 10), savedAtMs = 1L),
         ))!!.snapshot
 
-        assertEquals(32, decoded.messages.size)
-        assertEquals("内容8", decoded.messages.first().content)
-        assertEquals(18, decoded.messageWindowStart)
+        assertEquals(80, decoded.messages.size)
+        assertEquals("内容16", decoded.messages.first().content)
+        assertEquals(26, decoded.messageWindowStart)
         assertTrue(decoded.messages.all { it.state == "completed" })
     }
 

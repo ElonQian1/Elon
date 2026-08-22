@@ -21,9 +21,9 @@ internal class WebChatSnapshotStore(
 
     fun restore(): ChatGptWebSnapshot? {
         val bytes = runCatching { file.readFully() }.getOrNull() ?: return null
-        if (bytes.size > MAX_BYTES) return null
+        if (bytes.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES) return null
         val cache = WebChatSnapshotCacheCodec.decode(bytes.toString(Charsets.UTF_8)) ?: return null
-        if (nowMs() - cache.savedAtMs !in 0..MAX_AGE_MS) return null
+        if (!WebChatSnapshotCachePolicy.isUsable(cache.savedAtMs, nowMs())) return null
         return cache.snapshot
     }
 
@@ -31,7 +31,7 @@ internal class WebChatSnapshotStore(
         val payload = WebChatSnapshotCacheCodec.encode(
             WebChatSnapshotCache(snapshot, nowMs()),
         ).toByteArray(Charsets.UTF_8)
-        if (payload.size > MAX_BYTES) return
+        if (payload.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES) return
         val output: FileOutputStream = runCatching { file.startWrite() }.getOrNull() ?: return
         try {
             output.write(payload)
@@ -50,14 +50,12 @@ internal class WebChatSnapshotStore(
         }
 
         private val PROVIDER_KEY = Regex("[a-z0-9_]{2,24}")
-        private const val MAX_BYTES = 512 * 1024
-        private const val MAX_AGE_MS = 7L * 24L * 60L * 60L * 1_000L
     }
 }
 
 internal object WebChatSnapshotCacheCodec {
     private const val SCHEMA = "elon.web_chat.snapshot_cache.v1"
-    private const val MAX_MESSAGES = 32
+    private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_CHARS = 12_000
     private const val MAX_PARTS = 8
     private const val MAX_PART_LABEL = 180

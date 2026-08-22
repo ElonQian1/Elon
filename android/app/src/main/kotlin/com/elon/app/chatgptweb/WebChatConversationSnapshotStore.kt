@@ -18,43 +18,90 @@ internal class WebChatConversationSnapshotStore(
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     private val directory = File(context.noBackupFilesDir, safeDirectoryName(directoryName))
+    private val memory = object : LinkedHashMap<String, WebChatSnapshotCache>(
+        WebChatSnapshotCachePolicy.MAX_MEMORY_ITEMS,
+        0.75f,
+        true,
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, WebChatSnapshotCache>?,
+        ): Boolean = size > WebChatSnapshotCachePolicy.MAX_MEMORY_ITEMS
+    }
 
     fun restore(path: String): ChatGptWebSnapshot? {
-        val file = atomicFile(path) ?: return null
+        val target = cacheFile(path) ?: return null
+        synchronized(memory) { memory[target.name] }?.let { cached ->
+            if (WebChatSnapshotCachePolicy.isUsable(cached.savedAtMs, nowMs())) {
+                return cached.snapshot
+            }
+            synchronized(memory) { memory.remove(target.name) }
+        }
+        val file = AtomicFile(target)
         val bytes = runCatching { file.readFully() }.getOrNull() ?: return null
-        if (bytes.size > MAX_BYTES) return null
-        val cache = WebChatSnapshotCacheCodec.decode(bytes.toString(Charsets.UTF_8)) ?: return null
-        if (nowMs() - cache.savedAtMs !in 0..MAX_AGE_MS) return null
+        if (bytes.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES) {
+            file.delete()
+            return null
+        }
+        val cache = WebChatSnapshotCacheCodec.decode(bytes.toString(Charsets.UTF_8))
+        if (cache == null || !WebChatSnapshotCachePolicy.isUsable(cache.savedAtMs, nowMs())) {
+            file.delete()
+            return null
+        }
+        remember(target.name, cache)
+        touchIfNeeded(target)
         return cache.snapshot
     }
 
     fun save(path: String, snapshot: ChatGptWebSnapshot) {
-        val file = atomicFile(path) ?: return
-        val payload = WebChatSnapshotCacheCodec.encode(
+        val target = cacheFile(path) ?: return
+        val encoded = WebChatSnapshotCacheCodec.encode(
             WebChatSnapshotCache(snapshot, nowMs()),
-        ).toByteArray(Charsets.UTF_8)
-        if (payload.size > MAX_BYTES || (!directory.exists() && !directory.mkdirs())) return
+        )
+        val payload = encoded.toByteArray(Charsets.UTF_8)
+        if (
+            payload.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES ||
+            (!directory.exists() && !directory.mkdirs())
+        ) return
+        val cached = WebChatSnapshotCacheCodec.decode(encoded) ?: return
+        val file = AtomicFile(target)
         val output: FileOutputStream = runCatching { file.startWrite() }.getOrNull() ?: return
         try {
             output.write(payload)
             file.finishWrite(output)
+            remember(target.name, cached)
             trimOldEntries()
         } catch (_: Exception) {
             file.failWrite(output)
         }
     }
 
-    private fun atomicFile(path: String): AtomicFile? {
+    private fun cacheFile(path: String): File? {
         val fileName = fileNameForPath(path)?.takeIf(acceptedFileName::matches) ?: return null
-        return AtomicFile(File(directory, fileName))
+        return File(directory, fileName)
+    }
+
+    private fun remember(name: String, cache: WebChatSnapshotCache) {
+        synchronized(memory) { memory[name] = cache }
+    }
+
+    private fun touchIfNeeded(file: File) {
+        val now = nowMs()
+        if (WebChatSnapshotCachePolicy.shouldTouch(file.lastModified(), now)) {
+            runCatching { file.setLastModified(now) }
+        }
     }
 
     private fun trimOldEntries() {
-        directory.listFiles { file -> file.isFile && acceptedFileName.matches(file.name) }
-            .orEmpty()
-            .sortedByDescending(File::lastModified)
-            .drop(MAX_ITEMS)
-            .forEach(File::delete)
+        val files = directory.listFiles { file ->
+            file.isFile && acceptedFileName.matches(file.name)
+        }.orEmpty()
+        val retained = WebChatSnapshotCachePolicy.retainedNames(files.map { file ->
+            WebChatSnapshotCacheEntry(file.name, file.lastModified(), file.length())
+        })
+        files.filterNot { retained.contains(it.name) }.forEach { file ->
+            file.delete()
+            synchronized(memory) { memory.remove(file.name) }
+        }
     }
 
     private companion object {
@@ -64,8 +111,5 @@ internal class WebChatConversationSnapshotStore(
         }
 
         private val DIRECTORY_NAME = Regex("[a-z0-9-]{4,64}")
-        private const val MAX_ITEMS = 48
-        private const val MAX_BYTES = 512 * 1024
-        private const val MAX_AGE_MS = 7L * 24L * 60L * 60L * 1_000L
     }
 }

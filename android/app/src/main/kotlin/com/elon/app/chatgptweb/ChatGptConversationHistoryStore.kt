@@ -22,10 +22,10 @@ internal class ChatGptConversationHistoryStore(
 
     fun restore(): ChatGptConversationHistoryCache? {
         val bytes = runCatching { file.readFully() }.getOrNull() ?: return null
-        if (bytes.size > MAX_BYTES) return null
+        if (bytes.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES) return null
         val cache = ChatGptConversationHistoryCodec.decode(bytes.toString(Charsets.UTF_8))
             ?: return null
-        if (nowMs() - cache.savedAtMs !in 0..MAX_AGE_MS) return null
+        if (!WebChatSnapshotCachePolicy.isUsable(cache.savedAtMs, nowMs())) return null
         return cache
     }
 
@@ -51,7 +51,7 @@ internal class ChatGptConversationHistoryStore(
                     .associate { it.toPair() },
             ),
         ).toByteArray(Charsets.UTF_8)
-        if (payload.size > MAX_BYTES) return
+        if (payload.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES) return
         val output: FileOutputStream = runCatching { file.startWrite() }.getOrNull() ?: return
         try {
             output.write(payload)
@@ -67,18 +67,16 @@ internal class ChatGptConversationHistoryStore(
 
     private companion object {
         const val FILE_NAME = "chatgpt-conversation-index-v1.json"
-        const val MAX_ITEMS = 100
-        const val MAX_PROJECTS = 40
-        const val MAX_BYTES = 64 * 1024
-        const val MAX_AGE_MS = 7L * 24L * 60L * 60L * 1_000L
+        const val MAX_ITEMS = 200
+        const val MAX_PROJECTS = 80
     }
 }
 
 internal object ChatGptConversationHistoryCodec {
     private const val SCHEMA = "elon.chatgpt_web.conversation_index.v2"
     private const val LEGACY_SCHEMA = "elon.chatgpt_web.conversation_index.v1"
-    private const val MAX_ITEMS = 100
-    private const val MAX_PROJECTS = 40
+    private const val MAX_ITEMS = 200
+    private const val MAX_PROJECTS = 80
     private const val MAX_ID_LENGTH = 160
     private const val MAX_TITLE_LENGTH = 160
 
@@ -158,7 +156,6 @@ internal object ChatGptConversationHistoryCodec {
         }.let { ChatGptWebConversationIndex.merge(emptyList(), it) }
         val decodedProjects = buildList {
             val projectValues = root.optJSONArray("projects") ?: return@buildList
-            val seen = mutableSetOf<String>()
             for (index in 0 until minOf(projectValues.length(), MAX_PROJECTS)) {
                 val value = projectValues.optJSONObject(index) ?: continue
                 val path = ChatGptWebConversationPath.normalizeProject(value.optString("path")) ?: continue
@@ -166,10 +163,10 @@ internal object ChatGptConversationHistoryCodec {
                     ?: ChatGptWebConversationPath.projectId(path)
                     ?: continue
                 val title = value.optString("title").trim().take(MAX_TITLE_LENGTH)
-                if (title.isBlank() || !seen.add(path)) continue
+                if (title.isBlank()) continue
                 add(ChatGptWebProject(id, title, path))
             }
-        }
+        }.let(ChatGptWebConversationIndex::canonicalProjects)
         val projects = ChatGptWebConversationIndex.projects(conversations, decodedProjects)
         val projectCachedAtMs = buildMap {
             val values = root.optJSONArray("project_cache") ?: return@buildMap
