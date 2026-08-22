@@ -94,6 +94,9 @@ class ChatGptWebConversationContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
 
         assertTrue(pageAdapter.contains("projectHints.take(MAX_PROJECT_HINTS)"))
         assertTrue(pageAdapter.contains("chatgpt_web_adapter_project_hints.js"))
