@@ -9146,7 +9146,7 @@
       "id": "win-web-ai-structured-rich-content-v1",
       "title": "Win 网页 AI 结构化富内容 V1",
       "summary": "以官网回答节点为在线视觉真值，并把可见富内容规范化为可清洗、缓存和跨端复现的统一 AST；生产结构化响应观察严格受逐厂商授权清单约束。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-structured-rich-content-v1.md",
@@ -9282,20 +9282,10 @@
         }
       ],
       "created_at_ms": 1787428343067,
-      "updated_at_ms": 1787430391270
+      "updated_at_ms": 1787431017596
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_d67130a65dc349f6bec62bb92b681aa0",
-      "feature_id": "win-web-ai-official-context-binding-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019fd85d",
-      "reason": "rebase 未触及相关业务源码，合同、类型、Rust 与预提交检查均已通过；真实第三方消息留待授权验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786878849243
-    },
     {
       "id": "feature_event_fdd3bf2194b6463cb94cc6e67cf5d71d",
       "feature_id": "merchant-runtime-http-host-v1",
@@ -11285,6 +11275,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787430391270
+    },
+    {
+      "id": "feature_event_0646929830244d009f04e7f31d77ea37",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "正式 Win 包 0.3.69+23210f9a 已激活；本机节点精确回读目标 SHA，Tauri 窗口可见、语义桥持续心跳且无错误。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787431017596
     }
   ]
 }
