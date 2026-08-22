@@ -82,6 +82,27 @@ class WebChatProductionCapabilityPrewarmerTest {
         assertTrue(port.requests.isEmpty())
     }
 
+    @Test
+    fun switchingConversationPrewarmsItsControlsDuringProviderCooldown() {
+        val scheduler = Scheduler()
+        val port = FakePort()
+        val prewarmer = prewarmer(port, scheduler) { WebChatProviderId.CHATGPT_WEB }
+        val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+
+        prewarmer.schedule(provider)
+        scheduler.drain()
+        assertEquals(listOf("model", "tools", "features", "controls"), port.requests)
+
+        port.openConversation("second")
+        prewarmer.schedule(provider)
+        scheduler.drain()
+
+        assertEquals(
+            listOf("model", "tools", "features", "controls", "controls"),
+            port.requests,
+        )
+    }
+
     private fun prewarmer(
         port: FakePort,
         scheduler: Scheduler,
@@ -150,6 +171,13 @@ class WebChatProductionCapabilityPrewarmerTest {
         override fun invokeControl(controlId: String, userConfirmed: Boolean) = accepted()
         override fun updateControl(controlId: String, mutation: WebChatConsumerControlMutation) = accepted()
         override fun executeSessionCommand(action: String) = accepted()
+
+        fun openConversation(id: String) {
+            current = current.copy(
+                pageUrl = "https://chatgpt.com/c/$id",
+                controls = emptyList(),
+            )
+        }
 
         private fun respond(label: String, update: () -> Unit): WebChatConsumerCommandResult {
             requests += label

@@ -33,6 +33,40 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun readyConversationSkipsFullSessionRecovery() {
+        val fixture = Fixture()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+
+        fixture.coordinator.start(fixture.provider)
+
+        assertEquals(0, fixture.sessionRecoveryCount)
+        fixture.scheduler.runNext()
+        assertEquals(1, fixture.port.executeCount)
+    }
+
+    @Test
+    fun coldConversationStillRequestsSessionRecovery() {
+        val fixture = Fixture(sessionReady = false)
+
+        fixture.coordinator.start(fixture.provider)
+
+        assertTrue(fixture.sessionRecoveryCount >= 1)
+    }
+
+    @Test
+    fun cachedConversationRefreshesOnlyControlsBeforeStarting() {
+        val fixture = Fixture()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.launchCache.observe(WebChatProviderId.CHATGPT_WEB, fixture.port.state())
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.PENDING
+
+        fixture.coordinator.start(fixture.provider)
+
+        assertEquals(0, fixture.sessionRecoveryCount)
+        assertEquals(1, fixture.port.requestControlsCount)
+    }
+
+    @Test
     fun failureStaysNativeUntilTheUserExplicitlyChoosesOfficialFallback() {
         val fixture = Fixture(sessionReady = false)
 
@@ -178,6 +212,8 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val endBackingCount: Int get() = endBackingGraceful.size
         var officialFallbackCount = 0
         var officialLoginCount = 0
+        var sessionRecoveryCount = 0
+        val launchCache = WebChatRealtimeVoiceLaunchCache()
         val coordinator = WebChatRealtimeVoiceCoordinator(
             surface = surface,
             activeProvider = { WebChatProviderId.CHATGPT_WEB },
@@ -191,12 +227,14 @@ class WebChatRealtimeVoiceCoordinatorTest {
             },
             beginWebBacking = { beginBackingCount += 1; true },
             endWebBacking = { graceful -> endBackingGraceful += graceful },
-            requestSessionRecovery = {},
+            requestSessionRecovery = { sessionRecoveryCount += 1 },
             loginGate = loginGate,
             openOfficialLogin = { officialLoginCount += 1 },
             openOfficialFallback = { officialFallbackCount += 1 },
             schedule = scheduler::schedule,
             backControl = back,
+            launchCache = launchCache,
+            log = {},
         )
 
         fun completeVoiceStart() {
@@ -266,6 +304,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var voiceStatus = WebChatConsumerCommandStatus.PENDING
         var endControlAvailable = false
         var invokedControlId: String? = null
+        var requestControlsCount = 0
 
         override fun state() = WebChatConsumerState(
             streaming = false,
@@ -302,7 +341,10 @@ class WebChatRealtimeVoiceCoordinatorTest {
         override fun selectComposerOption(section: String, optionId: String) = rejected()
         override fun requestFeatures() = rejected()
         override fun selectFeature(featureId: String, userConfirmed: Boolean) = rejected()
-        override fun requestControls() = accepted()
+        override fun requestControls(): WebChatConsumerCommandResult {
+            requestControlsCount += 1
+            return accepted()
+        }
         override fun invokeControl(controlId: String, userConfirmed: Boolean): WebChatConsumerCommandResult {
             invokedControlId = controlId
             return if (controlId == VoiceEndControl.id && userConfirmed) accepted() else rejected()
