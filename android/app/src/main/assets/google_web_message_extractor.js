@@ -460,6 +460,17 @@
     };
   }
 
+  function lastAnswerNode(composer) {
+    const queries = queryEntries();
+    for (let index = queries.length - 1; index >= 0; index -= 1) {
+      const entry = queries[index];
+      const next = queries[index + 1];
+      const answer = answerCandidate(composer || null, entry.text, entry.node, next && next.node);
+      if (answer && answer.node && answer.node.isConnected) return answer.node;
+    }
+    return null;
+  }
+
   function diagnostics(composer, extraction) {
     const mainCount = document.querySelectorAll('main, [role="main"]').length;
     const explicitCount = document.querySelectorAll(
@@ -495,6 +506,7 @@
     clearRememberedQuery,
     hasCurrentQuery,
     currentQueryMatches,
+    lastAnswerNode,
     extract,
     diagnostics
   });

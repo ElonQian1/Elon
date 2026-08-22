@@ -25,6 +25,9 @@ const visibility = read('pc-frontend/src/features/ai/aiMessageVisibility.ts')
 const api = read('pc-frontend/src/features/user-browser/internalBrowserApi.ts')
 const fullPage = read('pc-frontend/src/features/user-browser/AiBrowserExperience.tsx')
 const embedded = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
+const embeddedAnswerSurface = read(
+  'desktop-shell/src-tauri/src/local_ai_browser/embedded_view/answer_surface.rs',
+)
 
 assert.match(page, /<AiOfficialAnswerSurface web=\{web\} \/>/)
 assert.match(pageStyles, /\.feed\s*\{[^}]*position:\s*relative;/s)
@@ -162,12 +165,25 @@ const answerSurfaceGate = embedded.slice(
   embedded.indexOf('fn answer_surface_ready'),
   embedded.indexOf('fn semantic_event_has_completed_assistant'),
 )
-assert.doesNotMatch(answerSurfaceGate, /context_ready/)
-assert.match(embedded, /main, \[role="main"\]/)
-assert.match(embedded, /data-elon-official-answer-root/)
-assert.match(embedded, /data-elon-official-answer-provider/)
-assert.match(embedded, /chatgpt\\\.com/)
-assert.match(embedded, /max-width: 48rem/)
+assert.equal(answerSurfaceGate, '', 'answer surface policy moved into its own bounded module')
+assert.match(embeddedAnswerSurface, /fn answer_surface_ready/)
+assert.doesNotMatch(embeddedAnswerSurface.slice(
+  embeddedAnswerSurface.indexOf('fn answer_surface_ready'),
+  embeddedAnswerSurface.indexOf('fn answer_surface_script'),
+), /context_ready/)
+assert.match(embeddedAnswerSurface, /__elonChatGptMessagePortalPolicy/)
+assert.match(embeddedAnswerSurface, /__elonGoogleWebMessageExtractor/)
+assert.match(embeddedAnswerSurface, /lastAnswerNode/)
+assert.match(embeddedAnswerSurface, /data-elon-official-answer-root/)
+assert.match(embeddedAnswerSurface, /data-elon-official-answer-path/)
+assert.match(embeddedAnswerSurface, /data-elon-official-answer-provider/)
+assert.match(embeddedAnswerSurface, /chatgpt\\\.com/)
+assert.match(embeddedAnswerSurface, /max-width: 48rem/)
+const embeddedAnswerSurfaceApply = embeddedAnswerSurface.slice(
+  embeddedAnswerSurface.indexOf('fn answer_surface_script'),
+  embeddedAnswerSurface.indexOf('fn restore_surface_script'),
+)
+assert.doesNotMatch(embeddedAnswerSurfaceApply, /cloneNode/)
 assert.match(embedded, /set_content_surface_mode\(&webview, false\)/)
 assert.doesNotMatch(surface, /android|pwa/i)
 

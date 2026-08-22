@@ -51,37 +51,89 @@ fn answer_surface_script() -> &'static str {
   var styleId = 'elon-official-answer-surface-style';
   var backdropId = 'elon-official-answer-surface-backdrop';
   var providerAttribute = 'data-elon-official-answer-provider';
-  document.documentElement.removeAttribute('data-elon-official-answer-surface');
-  document.documentElement.removeAttribute(providerAttribute);
-  document.querySelectorAll('[data-elon-official-answer-root]').forEach(function (node) {
-    node.removeAttribute('data-elon-official-answer-root');
-  });
-  var oldStyle = document.getElementById(styleId);
-  if (oldStyle) oldStyle.remove();
-  var oldBackdrop = document.getElementById(backdropId);
-  if (oldBackdrop) oldBackdrop.remove();
+  var pathAttribute = 'data-elon-official-answer-path';
+  var rootAttribute = 'data-elon-official-answer-root';
 
-  var root = document.querySelector('main, [role="main"]');
-  if (!(root instanceof HTMLElement)) return;
+  function clearSurface() {
+    document.documentElement.removeAttribute('data-elon-official-answer-surface');
+    document.documentElement.removeAttribute(providerAttribute);
+    document.querySelectorAll('[' + rootAttribute + '], [' + pathAttribute + ']').forEach(function (node) {
+      node.removeAttribute(rootAttribute);
+      node.removeAttribute(pathAttribute);
+    });
+    var oldStyle = document.getElementById(styleId);
+    if (oldStyle) oldStyle.remove();
+    var oldBackdrop = document.getElementById(backdropId);
+    if (oldBackdrop) oldBackdrop.remove();
+  }
 
+  function visible(node) {
+    if (!(node instanceof HTMLElement) || !node.isConnected) return false;
+    var rect = node.getBoundingClientRect();
+    var style = window.getComputedStyle(node);
+    return rect.width > 240 && rect.height > 40 &&
+      style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
+  function messageRole(node) {
+    if (!(node instanceof HTMLElement)) return '';
+    var owner = node.matches('[data-message-author-role]')
+      ? node
+      : node.querySelector('[data-message-author-role]');
+    return owner ? String(owner.getAttribute('data-message-author-role') || '') : '';
+  }
+
+  function chatGptTarget() {
+    var portal = window.__elonChatGptMessagePortalPolicy;
+    var nodes = portal && typeof portal.findMessageNodes === 'function'
+      ? portal.findMessageNodes(document)
+      : Array.from(document.querySelectorAll(
+          '[data-testid^="conversation-turn-"], [data-message-author-role]'
+        ));
+    return Array.from(nodes || []).reverse().find(function (node) {
+      return messageRole(node) === 'assistant' && visible(node);
+    }) || null;
+  }
+
+  function googleTarget() {
+    var extractor = window.__elonGoogleWebMessageExtractor;
+    if (extractor && typeof extractor.lastAnswerNode === 'function') {
+      var extracted = extractor.lastAnswerNode();
+      if (visible(extracted)) return extracted;
+    }
+    return Array.from(document.querySelectorAll(
+      '[data-sfc-cp][data-hveid], [data-container-id][data-hveid], [role="main"] [data-hveid]'
+    )).reverse().find(visible) || null;
+  }
+
+  clearSurface();
   var provider = /(^|\.)chatgpt\.com$/i.test(window.location.hostname)
     ? 'chatgpt'
     : 'google-ai-mode';
+  var target = provider === 'chatgpt' ? chatGptTarget() : googleTarget();
+  if (!visible(target)) return;
+
+  var ancestor = target.parentElement;
+  while (ancestor && ancestor !== document.documentElement) {
+    ancestor.setAttribute(pathAttribute, 'true');
+    ancestor = ancestor.parentElement;
+  }
+  target.setAttribute(rootAttribute, 'true');
 
   var style = document.createElement('style');
   style.id = styleId;
   style.textContent = [
-    'html[data-elon-official-answer-surface], html[data-elon-official-answer-surface] body { overflow: hidden !important; }',
+    'html[data-elon-official-answer-surface], html[data-elon-official-answer-surface] body { box-sizing: border-box !important; min-height: 100% !important; overflow: auto !important; overscroll-behavior: contain !important; }',
+    'html[data-elon-official-answer-surface] body { margin: 0 !important; padding: 20px clamp(16px, 4vw, 48px) 32px !important; }',
     'html[data-elon-official-answer-provider="google-ai-mode"], html[data-elon-official-answer-provider="google-ai-mode"] body { background: #202124 !important; }',
     'html[data-elon-official-answer-provider="chatgpt"], html[data-elon-official-answer-provider="chatgpt"] body { background: var(--main-surface-primary, #212121) !important; }',
-    '#elon-official-answer-surface-backdrop { position: fixed !important; inset: 0 !important; z-index: 2147483000 !important; background: #202124 !important; }',
+    'html[data-elon-official-answer-surface] body > *:not([data-elon-official-answer-path]):not(#elon-official-answer-surface-backdrop) { display: none !important; }',
+    '[data-elon-official-answer-path] > *:not([data-elon-official-answer-path]):not([data-elon-official-answer-root]) { display: none !important; }',
+    '[data-elon-official-answer-path] { position: static !important; inset: auto !important; display: block !important; box-sizing: border-box !important; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; transform: none !important; contain: none !important; }',
+    '#elon-official-answer-surface-backdrop { position: fixed !important; inset: 0 !important; z-index: -1 !important; background: #202124 !important; }',
     'html[data-elon-official-answer-provider="chatgpt"] #elon-official-answer-surface-backdrop { background: var(--main-surface-primary, #212121) !important; }',
-    '[data-elon-official-answer-root] { position: fixed !important; inset: 0 !important; z-index: 2147483001 !important; box-sizing: border-box !important; width: 100vw !important; max-width: none !important; height: 100vh !important; max-height: none !important; margin: 0 !important; overflow: auto !important; overscroll-behavior: contain !important; border-radius: 0 !important; }',
-    'html[data-elon-official-answer-provider="google-ai-mode"] [data-elon-official-answer-root] { background: #202124 !important; }',
-    'html[data-elon-official-answer-provider="chatgpt"] [data-elon-official-answer-root] { background: var(--main-surface-primary, #212121) !important; scrollbar-gutter: stable; }',
-    'html[data-elon-official-answer-provider="chatgpt"] [data-elon-official-answer-root] [data-message-author-role] { box-sizing: border-box !important; width: min(100%, 48rem) !important; max-width: 48rem !important; margin-inline: auto !important; }',
-    '[data-elon-official-answer-root] form:has(textarea), [data-elon-official-answer-root] form:has([contenteditable]) { opacity: 0 !important; pointer-events: none !important; }',
-    '[data-elon-official-answer-root] textarea, [data-elon-official-answer-root] [contenteditable="true"], [data-elon-official-answer-root] [contenteditable="plaintext-only"] { opacity: 0 !important; pointer-events: none !important; }'
+    '[data-elon-official-answer-root] { position: relative !important; z-index: 1 !important; box-sizing: border-box !important; width: 100% !important; min-width: 0 !important; height: auto !important; min-height: 0 !important; margin-block: 0 !important; }',
+    'html[data-elon-official-answer-provider="chatgpt"] [data-elon-official-answer-root] { width: min(100%, 48rem) !important; max-width: 48rem !important; margin-inline: auto !important; }'
   ].join('\n');
   document.head.appendChild(style);
 
@@ -89,21 +141,10 @@ fn answer_surface_script() -> &'static str {
   backdrop.id = backdropId;
   backdrop.setAttribute('aria-hidden', 'true');
   document.body.appendChild(backdrop);
-  root.setAttribute('data-elon-official-answer-root', 'true');
   document.documentElement.setAttribute(providerAttribute, provider);
   document.documentElement.setAttribute('data-elon-official-answer-surface', 'true');
-
   window.requestAnimationFrame(function () {
-    var candidates = Array.from(root.querySelectorAll(
-      '[data-testid^="conversation-turn-"][data-message-author-role="assistant"], [data-message-author-role="assistant"], [data-sfc-cp][data-hveid], article, [role="article"]'
-    ));
-    var target = candidates.reverse().find(function (node) {
-      var rect = node.getBoundingClientRect();
-      return rect.width > 240 && rect.height > 40;
-    });
-    if (target && typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ block: 'center', inline: 'nearest' });
-    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   });
 })();
 "#
@@ -115,8 +156,9 @@ fn restore_surface_script() -> &'static str {
   'use strict';
   document.documentElement.removeAttribute('data-elon-official-answer-surface');
   document.documentElement.removeAttribute('data-elon-official-answer-provider');
-  document.querySelectorAll('[data-elon-official-answer-root]').forEach(function (node) {
+  document.querySelectorAll('[data-elon-official-answer-root], [data-elon-official-answer-path]').forEach(function (node) {
     node.removeAttribute('data-elon-official-answer-root');
+    node.removeAttribute('data-elon-official-answer-path');
   });
   var style = document.getElementById('elon-official-answer-surface-style');
   if (style) style.remove();
@@ -151,12 +193,15 @@ mod tests {
     fn answer_surface_script_is_pc_scoped_and_reversible() {
         let apply = answer_surface_script();
         let restore = restore_surface_script();
-        assert!(apply.contains("main, [role=\"main\"]"));
+        assert!(apply.contains("__elonChatGptMessagePortalPolicy"));
+        assert!(apply.contains("__elonGoogleWebMessageExtractor"));
+        assert!(apply.contains("lastAnswerNode"));
         assert!(apply.contains("data-elon-official-answer-root"));
+        assert!(apply.contains("data-elon-official-answer-path"));
         assert!(apply.contains("data-elon-official-answer-provider"));
         assert!(apply.contains(r"chatgpt\.com"));
         assert!(apply.contains("max-width: 48rem"));
-        assert!(apply.contains("form:has(textarea)"));
+        assert!(!apply.contains("cloneNode"));
         assert!(restore.contains("style.remove()"));
         assert!(restore.contains("backdrop.remove()"));
     }
