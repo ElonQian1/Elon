@@ -86,14 +86,16 @@ pub(super) fn select_external_pool_adapter_active_preparation_candidate_on(
         &root.target_digest,
     )?
     .ok_or_else(|| anyhow::anyhow!("active preparation candidate lost V258 target"))?;
+    let installation_binding = &installation.receipt().installation.binding;
     if target.target.provider_binding_id != root.provider_binding_id
         || target.target.provider_binding_digest != root.provider_binding_digest
-        || installation
-            .receipt()
-            .installation
-            .binding
-            .provider_binding_id
-            != root.provider_binding_id
+        || installation_binding.provider_id != root.provider_id
+        || installation_binding.provider_owner_account_id != root.provider_owner_account_id
+        || installation_binding.provider_policy_revision
+            != root.source_registering_provider_policy_revision
+        || installation_binding.provider_digest != root.source_registering_provider_digest
+        || installation_binding.installation_content_digest != root.installation_content_digest
+        || installation_binding.adapter_id != root.logical_adapter_id
     {
         bail!("active preparation candidate target or installation roots drifted");
     }

@@ -94,8 +94,8 @@ pub(super) fn settlement_challenge_resolution_action(
     action: &str,
 ) -> Result<SettlementChallengeResolutionActionV1> {
     match action {
-        "rejected" => SettlementChallengeResolutionActionV1::Rejected,
-        "withdrawn" => SettlementChallengeResolutionActionV1::Withdrawn,
+        "rejected" => Ok(SettlementChallengeResolutionActionV1::Rejected),
+        "withdrawn" => Ok(SettlementChallengeResolutionActionV1::Withdrawn),
         _ => bail!("settlement release source 引用了未知 v197 action"),
     }
 }

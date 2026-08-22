@@ -16,7 +16,7 @@ use crate::compute_federation::provider::{
 
 use super::{now, Store};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub(crate) struct ComputeProviderRegistrationReceipt {
     pub provider: ComputeProvider,
     pub provider_digest: String,

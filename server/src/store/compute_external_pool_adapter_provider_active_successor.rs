@@ -12,9 +12,10 @@ mod provider_target;
 mod read;
 mod types;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in crate::store) use append::build_external_pool_adapter_provider_active_successor_refresh_material_on;
 pub(in crate::store) use append::{
     append_external_pool_adapter_provider_active_successor_refresh_on,
-    build_external_pool_adapter_provider_active_successor_refresh_material_on,
     external_pool_adapter_provider_active_successor_refresh_needed_on,
     postcommit_external_pool_adapter_provider_active_successor_refresh_on,
     require_current_external_pool_adapter_provider_active_successor_on,

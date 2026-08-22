@@ -272,26 +272,30 @@ fn build_from_predecessor(
         .checked_add(1)
         .ok_or_else(|| anyhow::anyhow!("V278 credential revision exhausted"))?;
     route_credential.credential_digest.clear();
-    let renewed_credential = &mut route_credential.credential;
-    renewed_credential.verifier = ComputeRouteCredentialVerifierBinding {
-        verification_kind: v253.expected_credential_verifier.verification_kind.clone(),
-        verifier_id: v253.expected_credential_verifier.verifier_id.clone(),
-        verifier_revision: v253.expected_credential_verifier.verifier_revision,
-        verifier_digest: v253.expected_credential_verifier.verifier_digest.clone(),
-    };
-    renewed_credential.verification_receipt_id =
-        credential_evidence.reattestation_receipt_id.clone();
-    renewed_credential.verification_receipt_digest =
-        credential_evidence.reattestation_receipt_digest.clone();
-    renewed_credential.verified_by_service_actor_id = actor.authorization.service_actor_id.clone();
-    renewed_credential.actor_authorization_id = actor.actor_authorization_id.clone();
-    renewed_credential.actor_authorization_digest = actor.actor_authorization_digest.clone();
-    renewed_credential.authenticated_at = checked_at.to_owned();
-    renewed_credential.recorded_at = checked_at.to_owned();
-    renewed_credential.expires_at = expires_at.clone();
-    renewed_credential.cleanup_expires_at = cleanup_expires_at.clone();
+    {
+        let renewed_credential = &mut route_credential.credential;
+        renewed_credential.verifier = ComputeRouteCredentialVerifierBinding {
+            verification_kind: v253.expected_credential_verifier.verification_kind.clone(),
+            verifier_id: v253.expected_credential_verifier.verifier_id.clone(),
+            verifier_revision: v253.expected_credential_verifier.verifier_revision,
+            verifier_digest: v253.expected_credential_verifier.verifier_digest.clone(),
+        };
+        renewed_credential.verification_receipt_id =
+            credential_evidence.reattestation_receipt_id.clone();
+        renewed_credential.verification_receipt_digest =
+            credential_evidence.reattestation_receipt_digest.clone();
+        renewed_credential.verified_by_service_actor_id =
+            actor.authorization.service_actor_id.clone();
+        renewed_credential.actor_authorization_id = actor.actor_authorization_id.clone();
+        renewed_credential.actor_authorization_digest = actor.actor_authorization_digest.clone();
+        renewed_credential.authenticated_at = checked_at.to_owned();
+        renewed_credential.recorded_at = checked_at.to_owned();
+        renewed_credential.expires_at = expires_at.clone();
+        renewed_credential.cleanup_expires_at = cleanup_expires_at.clone();
+    }
     route_credential.credential_digest =
         canonical_route_credential_json_and_digest(&route_credential)?.1;
+    let renewed_credential = &route_credential.credential;
 
     let old_authorization = predecessor.envelope();
     let mut authorization = old_authorization.clone();

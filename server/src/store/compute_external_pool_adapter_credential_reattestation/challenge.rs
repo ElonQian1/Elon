@@ -131,7 +131,7 @@ fn build(
         .ok_or_else(|| anyhow::anyhow!("live Provider was not found"))?;
     ensure_observed_provider(
         tx,
-        provider_binding_item,
+        provider_binding_receipt,
         &onboarding,
         &current_provider,
         &checked_at,
@@ -294,11 +294,12 @@ pub(super) fn ensure_upstream_lineage(
 
 fn ensure_observed_provider(
     tx: &Transaction<'_>,
-    binding: &crate::compute_federation::external_pool_adapter_registry::ExternalPoolAdapterRegistryProviderBindingMaterial,
+    provider_binding: &crate::compute_federation::external_pool_adapter_registry::ExternalPoolAdapterRegistryProviderBindingReceipt,
     onboarding: &crate::store::compute_external_pool_onboarding::HistoricalExternalPoolOnboardingApplicationAuthority,
     current: &crate::store::compute_provider_registry::ComputeProviderRegistrationReceipt,
     checked_at: &str,
 ) -> Result<()> {
+    let binding = &provider_binding.binding;
     let provider = &current.provider;
     let historical = onboarding.provider();
     let adapter = provider.adapter.as_ref();
@@ -307,7 +308,7 @@ fn ensure_observed_provider(
         && current.provider_digest == binding.provider_digest
         && adapter.map(|item| item.adapter_id.as_str()) == Some(binding.adapter_id.as_str());
     let projected_active_exact = provider.status == PROVIDER_STATUS_ACTIVE
-        && current_projected_active_registry_subject_on(tx, binding, current, checked_at)?
+        && current_projected_active_registry_subject_on(tx, provider_binding, current, checked_at)?
             .is_some();
     if provider.provider_kind != PROVIDER_KIND_EXTERNAL_POOL
         || provider.provider_id != historical.provider_id

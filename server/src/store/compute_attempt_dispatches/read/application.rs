@@ -13,7 +13,7 @@ use super::{
     StoredDispatchApplication,
 };
 
-pub(super) fn application_by_command_on(
+pub(in crate::store) fn application_by_command_on(
     connection: &Connection,
     command_id: &str,
 ) -> Result<Option<StoredDispatchApplication>> {
@@ -81,7 +81,7 @@ pub(super) fn application_by_command_on(
     }))
 }
 
-pub(super) fn ensure_application_matches(
+pub(in crate::store) fn ensure_application_matches(
     stored: &StoredDispatchApplication,
     ack: &ComputeAttemptAdapterAckEnvelope,
     activation: &crate::store::ComputeAttemptActivationReceipt,
@@ -95,7 +95,7 @@ pub(super) fn ensure_application_matches(
     Ok(())
 }
 
-pub(super) fn require_application_for_accepted_replay(
+pub(in crate::store) fn require_application_for_accepted_replay(
     connection: &Connection,
     command_id: &str,
     ack: &ComputeAttemptAdapterAckEnvelope,

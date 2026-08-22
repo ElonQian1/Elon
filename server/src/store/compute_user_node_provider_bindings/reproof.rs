@@ -12,7 +12,7 @@ use crate::store::{
     node_credentials::current_node_endpoint_credential_for_user_node_provider_binding_on,
 };
 
-pub(super) fn current_user_node_provider_binding_on<'tx, 'conn>(
+pub(in crate::store) fn current_user_node_provider_binding_on<'tx, 'conn>(
     transaction: &'tx Transaction<'conn>,
     provider_id: &str,
     binding_id: &str,
@@ -95,7 +95,7 @@ pub(super) fn current_user_node_provider_binding_on<'tx, 'conn>(
     )))
 }
 
-pub(super) fn require_user_node_provider_activation_binding_on(
+pub(in crate::store) fn require_user_node_provider_activation_binding_on(
     transaction: &Transaction<'_>,
     provider_id: &str,
     binding_id: &str,

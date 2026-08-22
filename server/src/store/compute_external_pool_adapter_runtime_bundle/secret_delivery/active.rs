@@ -49,7 +49,7 @@ impl Store {
     /// installation and re-proves the renewed route plus session roots. Only then is the child
     /// launched, with no SQLite/Prepared/authority crossing the external interaction.
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn prepare_projected_active_external_pool_adapter_ephemeral_secret_delivery(
+    pub(in crate::store) fn prepare_projected_active_external_pool_adapter_ephemeral_secret_delivery(
         &self,
         provider_binding_id: &str,
         expected_activation_receipt_id: &str,

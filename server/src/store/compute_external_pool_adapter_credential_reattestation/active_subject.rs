@@ -4,7 +4,7 @@ use rusqlite::Connection;
 use crate::{
     compute_federation::{
         external_pool_adapter_credential_reattestation::ExternalPoolAdapterCredentialReattestationBinding,
-        external_pool_adapter_registry::ExternalPoolAdapterRegistryProviderBindingMaterial,
+        external_pool_adapter_registry::ExternalPoolAdapterRegistryProviderBindingReceipt,
         provider::{PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE},
     },
     store::compute_external_pool_adapter_provider_active_successor::{
@@ -21,13 +21,14 @@ use super::{
 
 pub(super) fn current_projected_active_registry_subject_on(
     conn: &Connection,
-    binding: &ExternalPoolAdapterRegistryProviderBindingMaterial,
+    provider_binding: &ExternalPoolAdapterRegistryProviderBindingReceipt,
     provider: &crate::store::compute_provider_registry::ComputeProviderRegistrationReceipt,
     checked_at: &str,
 ) -> Result<Option<HistoricalExternalPoolAdapterAtomicActivationAuthority>> {
+    let binding = &provider_binding.binding;
     let Some(activation) = historical_external_pool_adapter_atomic_activation_for_binding_on(
         conn,
-        &binding.provider_binding_id,
+        &provider_binding.provider_binding_id,
         checked_at,
     )?
     else {
@@ -36,7 +37,7 @@ pub(super) fn current_projected_active_registry_subject_on(
     let root = &activation.activation_root().activation_root;
     let active = activation.active_provider();
     let adapter = active.adapter.as_ref();
-    if binding.provider_binding_digest != root.provider_binding_digest
+    if provider_binding.provider_binding_digest != root.provider_binding_digest
         || binding.provider_id != root.provider_id
         || binding.provider_owner_account_id != root.provider_owner_account_id
         || binding.adapter_id != root.logical_adapter_id

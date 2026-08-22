@@ -24,9 +24,10 @@ use super::{
         },
     },
     ComputeAttemptActivationReceipt, HistoricalComputeAttemptActivationSources,
-    NormalizedAttemptActivation, ATTEMPT_ACTIVATION_EXECUTION_EFFECT,
-    ATTEMPT_ACTIVATION_MONEY_EFFECT,
+    ATTEMPT_ACTIVATION_EXECUTION_EFFECT, ATTEMPT_ACTIVATION_MONEY_EFFECT,
 };
+
+use super::validation::NormalizedAttemptActivation;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn persist_attempt_activation_on(

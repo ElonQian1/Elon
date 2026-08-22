@@ -6,6 +6,7 @@ mod genesis;
 mod material;
 mod readback;
 mod refresh;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod refresh_material;
 mod refresh_pending_plan;
 mod refresh_postcommit;
@@ -29,5 +30,6 @@ pub(in crate::store) use refresh::{
     append_external_pool_adapter_provider_active_successor_refresh_on,
     PendingExternalPoolAdapterProviderActiveSuccessorRefresh,
 };
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) use refresh_material::build_external_pool_adapter_provider_active_successor_refresh_material_on;
 pub(in crate::store) use refresh_postcommit::postcommit_external_pool_adapter_provider_active_successor_refresh_on;

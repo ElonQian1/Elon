@@ -9,7 +9,7 @@ use crate::compute_federation::{
     },
 };
 
-pub(super) fn sealed_route_for_receipt_on(
+pub(in crate::store) fn sealed_route_for_receipt_on(
     transaction: &Transaction<'_>,
     receipt: &ExternalPoolAdapterRouteRenewalReceipt,
 ) -> Result<AuthorizedComputeRouteAuthorization> {
@@ -32,7 +32,7 @@ pub(super) fn sealed_route_for_receipt_on(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn sealed_route_on(
+pub(in crate::store) fn sealed_route_on(
     transaction: &Transaction<'_>,
     adapter_id: &str,
     adapter_revision: i64,
@@ -92,7 +92,7 @@ pub(super) fn sealed_route_on(
     )
 }
 
-pub(super) fn route_leaf_is_current_on(
+pub(in crate::store) fn route_leaf_is_current_on(
     transaction: &Transaction<'_>,
     receipt: &ExternalPoolAdapterRouteRenewalReceipt,
     checked_at: &str,
@@ -176,7 +176,7 @@ pub(super) fn route_leaf_is_current_on(
         .map_err(Into::into)
 }
 
-pub(super) fn effective_expires_at(
+pub(in crate::store) fn effective_expires_at(
     route: &AuthorizedComputeRouteAuthorization,
     receipt: &ExternalPoolAdapterRouteRenewalReceipt,
 ) -> String {

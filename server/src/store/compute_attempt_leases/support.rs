@@ -204,13 +204,12 @@ pub(super) fn renewals_for_lease_through_revision_on(
           WHERE lease_id=?1 AND target_lease_revision<=?2
           ORDER BY target_lease_revision ASC",
     )?;
-    statement
-        .query_map(
-            params![lease_id, target_lease_revision],
-            stored_renewal_from_row,
-        )?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+    let rows = statement.query_map(
+        params![lease_id, target_lease_revision],
+        stored_renewal_from_row,
+    )?;
+    let renewals = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(renewals)
 }
 
 fn stored_renewal_from_row(row: &Row<'_>) -> rusqlite::Result<StoredRenewal> {

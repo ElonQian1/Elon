@@ -8,7 +8,7 @@ use crate::compute_federation::start_outbox::{
 
 use super::super::types::StoredStartOutboxOperation;
 
-pub(super) fn ensure_commit_source_current_on(
+pub(in crate::store) fn ensure_commit_source_current_on(
     connection: &Connection,
     stored: &StoredStartOutboxOperation,
     checked_at: &str,

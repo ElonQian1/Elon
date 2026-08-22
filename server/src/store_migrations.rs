@@ -396,7 +396,8 @@ pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
            ON realtime_close_events(created_at_unix, channel, close_reason);
          CREATE INDEX IF NOT EXISTS idx_realtime_close_events_channel_reason
            ON realtime_close_events(channel, close_reason);",
-    )
+    )?;
+    Ok(())
 }
 
 pub(crate) fn migration_v107(conn: &Connection) -> Result<()> {
