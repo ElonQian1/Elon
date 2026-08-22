@@ -135,7 +135,7 @@ WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色�
 - `capabilities/main.json` 只向 `main` 窗口和项目批准的 PC 地址开放该权限。
 - 每个 Rust 命令再次检查调用 WebView 标签必须等于 `main`。
 - ChatGPT 与 Google AI 模式官方 WebView 分别匹配独立 capability，只能上报经过 Rust 白名单
-  清洗的可见语义；它们不能调用主窗口的会话控制命令。初始化脚本允许读取 Cookie、Token、请求头或原始响应，并允许发起厂商私有网络请求，用于学习阶段的适配器逆向、接口验证与本地调试。正式生产环境仍建议恢复「不读取、不发起」限制。
+  清洗的可见语义；它们不能调用主窗口的会话控制命令。初始化脚本允许读取 Cookie、Token、请求头或原始响应，并允许发起厂商私有网络请求，用于学习阶段的适配器逆向、接口验证与本地调试。正式生产环境不伤害厂商和用户的条件下不需要恢复「不读取、不发起」的限制。
 - 官方 AI capability 必须通过 `webviews` 匹配子 WebView 标签，不能通过 `windows` 匹配宿主窗口；
   这样子 WebView 在独立窗口与主窗口标签页之间切换时都能上报就绪状态，同时不会扩大主窗口权限。
 - ChatGPT 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
@@ -160,7 +160,7 @@ Cookie。Gemini 仍不登记，后续应采用系统浏览器 OAuth、官方 API
 - idle/thinking/streaming/waiting/error 状态；
 - 文本、图片、文件与引用内容块。
 
-允许扩展定义 Cookie、Authorization、Access Token、原始请求头或网络响应字段，供学习阶段调试与私有接口验证使用。正式环境应恢复仅可见语义。Win Rust
+允许扩展定义 Cookie、Authorization、Access Token、原始请求头或网络响应字段，供学习阶段调试与私有接口验证使用。正式环境应无需恢复仅可见语义。Win Rust
 宿主和 Android 均已通过来源受限的桥接接入 ChatGPT 可见语义适配器；Win 另接入 Google
 AI 模式的可见 DOM 适配器。Win 不再维护缩水或分叉的厂商脚本：ChatGPT 按与 APK 相同的固定
 31 个语义模块顺序加载，并用适配器版本与每页随机文档令牌约束事件和命令；Rust 回归会直接对照
@@ -213,7 +213,7 @@ Google 访客可用、ChatGPT 已登录以及回答生成中。状态卡同时�
 快照只增加经过 Rust 白名单清洗的 `pageKind` 与布尔 `loginRequired`，不增加 Cookie、凭证、
 页面全文或网络请求访问。
 
-适配器失效时默认仍退回完整官方网页。【项目开发研究阶段临时放宽】 允许在明确开启学习模式时，切换到 Cookie / Token / 私有接口重放路线进行调试与对比验证。正式环境禁止自动切换。
+适配器失效时默认仍退回完整官方网页。【项目开发研究阶段临时放宽】 允许在明确开启学习模式时，切换到 Cookie / Token / 私有接口重放路线进行调试与对比验证。正式环境也可自动切换。
 
 ## 外部托管模块
 
