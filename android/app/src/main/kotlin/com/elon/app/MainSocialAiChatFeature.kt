@@ -32,6 +32,8 @@ internal class MainSocialAiChatFeature(
     private val webChatInteractionCache = WebChatProductionInteractionCache(
         storage = WebChatProductionInteractionSnapshotStore(activity),
     )
+    private val realtimeVoiceLaunchCache =
+        WebChatRealtimeVoiceLaunchCache(WebChatRealtimeVoiceLaunchSnapshotStore(activity))
     private val providerDraftStore = WebChatProviderDraftStore(activity)
     private val providerDrafts = providerDraftStore.restore()
     private val persistProviderDrafts = Runnable { providerDraftStore.save(providerDrafts) }
@@ -154,6 +156,7 @@ internal class MainSocialAiChatFeature(
             },
             openOfficialLogin = modeController::openOfficialLogin,
             openOfficialFallback = modeController::openOfficialRealtimeVoice,
+            launchCache = realtimeVoiceLaunchCache,
         )
     }
     private val realtimeVoice by realtimeVoiceDelegate
@@ -645,6 +648,7 @@ internal class MainSocialAiChatFeature(
         if (isChatModeActive()) {
             val provider = WebChatProviderRegistry.get(providerId())
             val controller = activeController()
+            controller.consumerPort()?.state()?.let { realtimeVoiceLaunchCache.observe(provider.id, it) }
             productionHeaderActions.render(binding.moreButton, provider, controller.stateWireValue())
             val state = WebChatConsumerComposerStateResolver.resolve(
                 provider = provider,
