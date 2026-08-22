@@ -282,6 +282,10 @@ internal class MainSocialAiChatFeature(
             officialFallbackUrl = { activeController().officialFallbackUrl() },
         )
     }
+    private val sessionPrewarmerDelegate = lazy {
+        createWebChatSessionPrewarmCoordinator(binding.root, modeController, ::controllerFor)
+    }
+    private val sessionPrewarmer by sessionPrewarmerDelegate
     private val webChatNavigationSessions: WebChatNavigationSessionRegistry by lazy {
         WebChatNavigationSessionRegistry(
             listOf(
@@ -486,6 +490,7 @@ internal class MainSocialAiChatFeature(
         } else {
             resumeWorkChat()
         }
+        sessionPrewarmer.onHostResumed()
     }
 
     fun onHostPaused() {
@@ -494,6 +499,7 @@ internal class MainSocialAiChatFeature(
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
         }
+        if (sessionPrewarmerDelegate.isInitialized()) sessionPrewarmer.cancel()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.onHostPaused()
         if (googleControllerDelegate.isInitialized()) googleController.onHostPaused()
     }
@@ -504,6 +510,7 @@ internal class MainSocialAiChatFeature(
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
         }
+        if (sessionPrewarmerDelegate.isInitialized()) sessionPrewarmer.cancel()
         if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.destroy()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
         if (googleControllerDelegate.isInitialized()) googleController.destroy()

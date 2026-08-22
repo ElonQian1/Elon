@@ -141,6 +141,12 @@ internal class ChatGptSocialChatController(
 
     override fun warmSessionAvailable(): Boolean = session.warmSessionAvailable()
 
+    override fun prewarm(): Boolean {
+        if (active || !session.warmSessionAvailable()) return false
+        session.activate()
+        return true
+    }
+
     override fun streaming(): Boolean = session.currentSnapshot()?.streaming == true
 
     override fun attachmentSupported(): Boolean = session.currentSnapshot()?.capabilities

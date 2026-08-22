@@ -4,7 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
 
-internal class ChatGptBackgroundExecutionController(
+internal class WebChatBackgroundExecutionController(
     private val resumeExecution: () -> Boolean,
     private val pauseExecution: () -> Unit,
     private val isBusy: () -> Boolean,
@@ -74,12 +74,12 @@ internal class ChatGptBackgroundExecutionController(
     }
 }
 
-internal fun chatGptBackgroundExecutionController(
+internal fun webChatBackgroundExecutionController(
     webView: () -> WebView?,
     isBusy: () -> Boolean,
-): ChatGptBackgroundExecutionController {
+): WebChatBackgroundExecutionController {
     val handler = Handler(Looper.getMainLooper())
-    return ChatGptBackgroundExecutionController(
+    return WebChatBackgroundExecutionController(
         resumeExecution = { webView()?.let { it.onResume(); true } ?: false },
         pauseExecution = { webView()?.onPause() },
         isBusy = isBusy,
@@ -87,3 +87,10 @@ internal fun chatGptBackgroundExecutionController(
         cancel = handler::removeCallbacks,
     )
 }
+
+internal typealias ChatGptBackgroundExecutionController = WebChatBackgroundExecutionController
+
+internal fun chatGptBackgroundExecutionController(
+    webView: () -> WebView?,
+    isBusy: () -> Boolean,
+): ChatGptBackgroundExecutionController = webChatBackgroundExecutionController(webView, isBusy)

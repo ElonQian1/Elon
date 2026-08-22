@@ -83,6 +83,14 @@ internal class GoogleWebSocialChatController(
 
     override fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
 
+    override fun warmSessionAvailable(): Boolean = session.warmSessionAvailable()
+
+    override fun prewarm(): Boolean {
+        if (active || !session.warmSessionAvailable()) return false
+        session.activate()
+        return true
+    }
+
     override fun streaming(): Boolean = session.currentSnapshot()?.streaming == true
 
     override fun attachmentSupported(): Boolean = false

@@ -19,6 +19,7 @@ import com.elon.app.chatgptweb.ChatGptWebProxyController
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import com.elon.app.chatgptweb.WebChatSendContextPolicy
 import com.elon.app.chatgptweb.WebChatSnapshotStore
+import com.elon.app.chatgptweb.webChatBackgroundExecutionController
 import java.time.LocalDate
 
 internal class GoogleWebBackgroundSession(
@@ -63,13 +64,17 @@ internal class GoogleWebBackgroundSession(
     private var awaitingNewConversationBoundary = false
     private var state = State.IDLE
     private var reloadAfterPause = false
+    private val webExecution = webChatBackgroundExecutionController({ webView }) {
+        state == State.LOADING || latestSnapshot?.streaming == true ||
+            conversationNavigation.hasPending() || responseRefresh.isActive
+    }
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
         onConversationIndexChanged(conversationIndex())
         recovery.activate()
         ensureInitialized()
-        webView?.onResume()
+        webExecution.hostResumed()
         pageAdapter?.onHostResumed(webView?.url)
         resumeRecovery()
     }
@@ -77,8 +82,9 @@ internal class GoogleWebBackgroundSession(
     fun deactivate() = pauseSession()
 
     fun onHostResumed() {
+        if (webView == null) return
         recovery.activate()
-        webView?.onResume()
+        webExecution.hostResumed()
         pageAdapter?.onHostResumed(webView?.url)
         resumeRecovery()
     }
@@ -88,6 +94,8 @@ internal class GoogleWebBackgroundSession(
     fun onHostPaused() = pauseSession()
 
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
+
+    fun warmSessionAvailable(): Boolean = latestSnapshot != null
 
     fun state(): State = state
 
@@ -100,6 +108,7 @@ internal class GoogleWebBackgroundSession(
     fun sendPrompt(prompt: String): Boolean {
         val snapshot = latestSnapshot ?: return false
         if (!canSend()) return false
+        webExecution.interactionRequested()
         responseRefresh.onSendStarted(prompt)
         pageAdapter?.sendPrompt(prompt, snapshot.draft) ?: return false
         return true
@@ -110,6 +119,7 @@ internal class GoogleWebBackgroundSession(
     fun stopGeneration() = pageAdapter?.stopGeneration()
 
     fun startNewConversation() {
+        webExecution.interactionRequested()
         responseRefresh.stop()
         conversationNavigation.cancel()
         activePath = null
@@ -135,6 +145,7 @@ internal class GoogleWebBackgroundSession(
         val url = conversationStore.restorableUrl(path) ?: return false
         if (!GoogleWebNavigationPolicy.supportsAiMode(url)) return false
         val view = webView ?: return false
+        webExecution.interactionRequested()
         responseRefresh.stop()
         awaitingNewConversationBoundary = false
         conversationNavigation.beginOpen(path, url)
@@ -166,6 +177,7 @@ internal class GoogleWebBackgroundSession(
     }
 
     fun destroy() {
+        webExecution.hostPaused()
         recovery.dispose()
         recoveryHandler.removeCallbacksAndMessages(null)
         responseRefresh.stop()
@@ -256,6 +268,7 @@ internal class GoogleWebBackgroundSession(
             FrameLayout.LayoutParams.MATCH_PARENT,
         ))
         webView = view
+        webExecution.webViewAttached()
         pageAdapter = adapter
         adapter.install()
         proxyController.prepare { status ->
@@ -273,6 +286,7 @@ internal class GoogleWebBackgroundSession(
                 preferences.getString(KEY_LAST_URL, null),
             ) ?: GoogleWebNavigationPolicy.START_URL
             updateState(State.LOADING)
+            webExecution.interactionRequested()
             view.loadUrl(restored)
         }
     }
@@ -332,6 +346,7 @@ internal class GoogleWebBackgroundSession(
                 if (nextSnapshot.composerReady) {
                     recovery.onReady()
                     updateState(State.READY)
+                    webExecution.activitySettled()
                 } else {
                     updateState(State.LOADING)
                 }
@@ -383,6 +398,7 @@ internal class GoogleWebBackgroundSession(
     }
 
     private fun pauseSession() {
+        webExecution.hostPaused()
         recovery.deactivate()
         responseRefresh.stop()
         handler.removeCallbacksAndMessages(null)
@@ -393,7 +409,6 @@ internal class GoogleWebBackgroundSession(
                 reloadAfterPause = true
             }
             cookieManager.flush()
-            view.onPause()
         }
     }
 
@@ -419,6 +434,7 @@ internal class GoogleWebBackgroundSession(
             ?: GoogleWebNavigationPolicy.START_URL
         view.stopLoading()
         updateState(State.LOADING)
+        webExecution.interactionRequested()
         view.loadUrl(restored)
         return true
     }

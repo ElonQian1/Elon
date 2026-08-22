@@ -23,6 +23,7 @@ internal interface WebChatSocialController {
     fun authenticated(): Boolean
     fun composerReady(): Boolean
     fun warmSessionAvailable(): Boolean = false
+    fun prewarm(): Boolean = false
     fun streaming(): Boolean
     fun attachmentSupported(): Boolean
     fun attachmentSendPhase(): String
