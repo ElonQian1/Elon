@@ -40,6 +40,7 @@ internal class ChatGptBackgroundSession(
     private val conversationNavigation = ChatGptConversationNavigationCoordinator(activity)
     private val snapshotStore = WebChatSnapshotStore(activity, "chatgpt")
     private val restoredConversationHistory = conversationHistoryStore.restore()
+    private val conversationDirectory = ChatGptConversationDirectory(restoredConversationHistory)
     private val restoredSnapshot = snapshotStore.restore()
     private val sessionContinuity = ChatGptWebSessionContinuity(
         initialAuthenticated = restoredSnapshot?.authenticated == true ||
@@ -100,11 +101,6 @@ internal class ChatGptBackgroundSession(
     private var queuedUploadUris = emptyList<Uri>()
     private var attachmentSendTracker: ChatGptWebAttachmentSendTracker? = null
     private var lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
-    private var conversations = restoredConversationHistory?.conversations.orEmpty()
-    private var projects = restoredConversationHistory?.projects.orEmpty()
-    private var conversationCollection = restoredConversationHistory?.let {
-        ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
-    } ?: ChatGptWebConversationCollection()
     private var forceConversationRefreshAfterVoice = false
     private var reloadAfterPause = false
     private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
@@ -169,11 +165,7 @@ internal class ChatGptBackgroundSession(
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
-    fun conversationIndex(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
-        conversations = conversations,
-        projects = ChatGptWebConversationIndex.projects(conversations, projects),
-        collection = conversationCollection,
-    )
+    fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
     fun requestConversationIndex(): Boolean {
         return conversationRefresh.requestNow()
     }
@@ -181,12 +173,9 @@ internal class ChatGptBackgroundSession(
     private fun dispatchConversationIndexRequest(): Boolean {
         val adapter = pageAdapter ?: return false
         if (state != State.READY) return false
-        conversationCollection = conversationCollection.copy(
-            stale = conversations.isNotEmpty(),
-            officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
-        )
+        val projectHints = conversationDirectory.beginRefresh()
         onConversationIndexChanged(conversationIndex())
-        adapter.listConversations(projects)
+        adapter.listConversations(projectHints)
         return true
     }
 
@@ -348,10 +337,7 @@ internal class ChatGptBackgroundSession(
     fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
         if (!realtimeVoiceBacking.isActive()) return
         if (latestSnapshot?.capabilities?.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) == true) {
-            conversationCollection = conversationCollection.copy(
-                stale = conversations.isNotEmpty(),
-                officialLoadState = ChatGptWebConversationCollection.LOAD_LOADING,
-            )
+            conversationDirectory.markRefreshing()
             forceConversationRefreshAfterVoice = true
             onConversationIndexChanged(conversationIndex())
         }
@@ -490,13 +476,8 @@ internal class ChatGptBackgroundSession(
                 if (reconciliation.clearConversationHistory) clearConversationHistory()
                 latestSnapshot = snapshot
                 ChatGptWebConversationPath.fromUrl(snapshot.url)?.let {
-                    conversations = ChatGptWebConversationIndex.observeCurrent(
-                        previous = conversations,
-                        snapshot = snapshot,
-                        activityDate = LocalDate.now(),
-                        knownProjects = projects,
-                    )
-                    conversationHistoryStore.save(conversations, projects)
+                    conversationDirectory.observeCurrent(snapshot, LocalDate.now())
+                    conversationDirectory.save(conversationHistoryStore)
                     onConversationIndexChanged(conversationIndex())
                 }
                 when {
@@ -530,8 +511,7 @@ internal class ChatGptBackgroundSession(
                             conversationRefresh.requestAfterCurrent()
                         } else if (
                             snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
-                            conversationCollection.officialLoadState !=
-                                ChatGptWebConversationCollection.LOAD_READY
+                            conversationDirectory.needsOfficialRefresh()
                         ) {
                             conversationRefresh.requestIfIdle()
                         }
@@ -570,10 +550,7 @@ internal class ChatGptBackgroundSession(
                         }
                     }
                     if (event.action == "list_conversations") {
-                        conversationCollection = conversationCollection.copy(
-                            stale = conversations.isNotEmpty(),
-                            officialLoadState = ChatGptWebConversationCollection.LOAD_FAILED,
-                        )
+                        conversationDirectory.failRefresh()
                         onConversationIndexChanged(conversationIndex())
                         conversationRefresh.onFailed()
                     }
@@ -582,23 +559,8 @@ internal class ChatGptBackgroundSession(
             }
             is ChatGptWebEvent.ConversationList -> {
                 conversationRefresh.onSucceeded()
-                conversations = ChatGptWebConversationIndex.mergeOfficialHistory(
-                    conversations,
-                    event.conversations,
-                    collectionComplete = event.collection.isComplete,
-                )
-                projects = ChatGptWebConversationIndex.mergeObservedProjects(
-                    conversations,
-                    previous = projects,
-                    observed = event.projects,
-                )
-                conversationCollection = event.collection.copy(
-                    source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
-                    stale = false,
-                    officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
-                    cachedAtMs = System.currentTimeMillis(),
-                )
-                conversationHistoryStore.save(conversations, projects)
+                conversationDirectory.accept(event)
+                conversationDirectory.save(conversationHistoryStore)
                 onConversationIndexChanged(conversationIndex())
             }
             is ChatGptWebEvent.UiManifest -> {
@@ -645,9 +607,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun clearConversationHistory() {
-        conversations = emptyList()
-        projects = emptyList()
-        conversationCollection = ChatGptWebConversationCollection()
+        conversationDirectory.clear()
         conversationHistoryStore.clear()
         observedMcpState.clearConversationHistory()
         onConversationIndexChanged(conversationIndex())
@@ -791,9 +751,3 @@ internal class ChatGptBackgroundSession(
         const val ATTACHMENT_TIMEOUT_MS = 120_000L
     }
 }
-
-internal data class ChatGptWebConversationIndexState(
-    val conversations: List<ChatGptWebConversation> = emptyList(),
-    val projects: List<ChatGptWebProject> = emptyList(),
-    val collection: ChatGptWebConversationCollection = ChatGptWebConversationCollection(),
-)
