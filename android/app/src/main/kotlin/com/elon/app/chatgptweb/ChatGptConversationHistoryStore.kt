@@ -44,7 +44,9 @@ internal class ChatGptConversationHistoryStore(
                 nowMs(),
                 projects.take(MAX_PROJECTS),
                 projectCachedAtMs.entries
-                    .filter { (id, savedAtMs) -> PROJECT_ID.matches(id) && savedAtMs >= 0L }
+                    .filter { (id, savedAtMs) ->
+                        ChatGptWebConversationPath.canonicalProjectId(id) != null && savedAtMs >= 0L
+                    }
                     .take(MAX_PROJECTS)
                     .associate { it.toPair() },
             ),
