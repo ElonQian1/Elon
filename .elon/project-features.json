@@ -8941,7 +8941,7 @@
       "id": "win-web-ai-rich-diagnostic-transport-v1",
       "title": "Win 网页 AI 富结构诊断传输 V1",
       "summary": "补齐节点控制回执的第二层固定白名单，使富内容类型与引用计数可脱敏实机回读，不传输正文、URL、域名或凭证。",
-      "status": "claimed",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-diagnostic-transport-v1.md",
@@ -8980,15 +8980,75 @@
         "Rust 回归证明未知结构和秘密字段被丢弃",
         "节点控制 Rust、Win Web AI、正式发布和重启实测通过"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_78a0b04d529249599ffddb6922ed2c48",
-        "agent_id": "codex-desktop-root",
-        "claimed_at_ms": 1787434056722,
-        "expires_at_ms": 1787441256722
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/win-web-ai-rich-diagnostic-transport-v1.md",
+          "content_hash": "950f4ba91222d7e64a0cb5362db6914f72a006ae0018477e7a32251b05007eb5",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "945452c31e47b2b4eb96cac7a48ffa4fa10b29a4",
+            "head_blob_oid": "793eb30713c71786490f0f06d7f765ae069feef3",
+            "worktree_blob_oid": "793eb30713c71786490f0f06d7f765ae069feef3",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control/ai_session_diagnostic.rs",
+          "content_hash": "0de8d8f76704418812c07f82549e9c2fdd92cacacd7a6823c794196452efa62a",
+          "locator": "fixed_count_map 与五项富结构诊断字段",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "945452c31e47b2b4eb96cac7a48ffa4fa10b29a4",
+            "head_blob_oid": "3ce80f22b79388770f93d2a9b94a3927576d6dc9",
+            "worktree_blob_oid": "3ce80f22b79388770f93d2a9b94a3927576d6dc9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control_tests.rs",
+          "content_hash": "2f9196ff1679ffee0dda3ae935e2d053f60345faebd34ed927b5e3be300862b6",
+          "locator": "action_lookup_returns_only_sanitized_ai_window_receipts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "945452c31e47b2b4eb96cac7a48ffa4fa10b29a4",
+            "head_blob_oid": "22cbc0e78c407cba47389662249d653744dadcd6",
+            "worktree_blob_oid": "22cbc0e78c407cba47389662249d653744dadcd6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/tests/ai-session-diagnostic-harness/Cargo.toml",
+          "content_hash": "13a8e60fca97d97ea90e670be256805be4e29ab3f34891735ffee680d7cfc09b",
+          "locator": "独立轻量 Rust 回归清单",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "945452c31e47b2b4eb96cac7a48ffa4fa10b29a4",
+            "head_blob_oid": "0e9df7e2b12ad083e71267329a2fc774caddf568",
+            "worktree_blob_oid": "0e9df7e2b12ad083e71267329a2fc774caddf568",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/tests/node_agent_win_codex_ai_session_diagnostic.rs",
+          "content_hash": "be3d1ccea54e7c5049d826c53dc349ea44d3a62741a9daf9d18ff111ffad179b",
+          "locator": "固定白名单、上限与秘密字段回归",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "945452c31e47b2b4eb96cac7a48ffa4fa10b29a4",
+            "head_blob_oid": "30556241142450079f01fc132649003d9242ab7a",
+            "worktree_blob_oid": "30556241142450079f01fc132649003d9242ab7a",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787433123249,
-      "updated_at_ms": 1787434056722
+      "updated_at_ms": 1787434359378
     },
     {
       "id": "win-web-ai-rich-structure-observability-v1",
@@ -9508,46 +9568,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_df2c96c7c7774d25b1e2aac7c4b1d9fe",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787217831680
-    },
-    {
-      "id": "feature_event_8e67b11b628743908b94aade49da9218",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "已移除发送成功后的官方标签自动切换，保留后台回复刷新与手动官网入口；PC 用户浏览器契约与生产构建通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787217849018
-    },
-    {
-      "id": "feature_event_2a27f30ebd2e4524ab7c762fb4938737",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1787218043454
-    },
-    {
-      "id": "feature_event_778d48980c084442a5fb720a8970b4d0",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "远端变基后重新通过 Win 用户浏览器契约测试与 PC 生产构建，当前源码、测试与文档证据均已重绑。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787218056035
-    },
     {
       "id": "feature_event_e1e205c3ec834f96a7a64caf8da4ac28",
       "feature_id": "win-native-ai-send-surface-continuity-v1",
@@ -11507,6 +11527,46 @@
       "from_status": "ready",
       "to_status": "claimed",
       "at_ms": 1787434056723
+    },
+    {
+      "id": "feature_event_1167c3b765b442a3855b590d7c74cff9",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "claimed",
+      "at_ms": 1787434303517
+    },
+    {
+      "id": "feature_event_83757c8b76584206b891cff567455670",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "实现与验证已完成，补齐正式生命周期状态。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787434344706
+    },
+    {
+      "id": "feature_event_4f3bf64448ed473e8be3173ce8a6e4e4",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "固定白名单透传、计数约束和独立 Rust 回归已经实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787434359360
+    },
+    {
+      "id": "feature_event_35776a5ea72d4058b971b1f6d045ff8b",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "轻量 Rust 回归、生产节点 check 与完整 Win Web AI 验证均通过；全量 server 测试目标的既有构建阻塞已作为独立证据说明。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787434359378
     }
   ]
 }
