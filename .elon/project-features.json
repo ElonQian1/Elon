@@ -8257,7 +8257,7 @@
       "id": "win-web-ai-citation-logo-resilience-v1",
       "title": "Win 网页 AI 引用 Logo 韧性 V1",
       "summary": "复用现有来源卡片，在官方图标缺失或远程 favicon 服务挂起时优先站点同源图标、有界超时并始终保留字母标识，同时补齐 ChatGPT/Google 可见引用图标提取。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-citation-logo-resilience-v1.md",
@@ -8419,7 +8419,7 @@
         }
       ],
       "created_at_ms": 1787438602172,
-      "updated_at_ms": 1787438978832
+      "updated_at_ms": 1787439860633
     },
     {
       "id": "win-web-ai-context-continuity-hardening-v1",
@@ -9848,16 +9848,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_a065f9e35b2b433686e5fa7ab9ec3eae",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787221716794
-    },
     {
       "id": "feature_event_181a5907efc94efa8d1028dfa1ff8a22",
       "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -11847,6 +11837,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787438978832
+    },
+    {
+      "id": "feature_event_55d2b203bf3745249963adbaec04cdd6",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Win 端已发布并激活 0.3.69+d5f2799857057e8cfe0c2b6cb08a39bc4ab3770e；真实 Google AI 历史会话显示彩色站点字母标识与来源 7 聚合入口，不再出现白色空圈；google-ai-mode phase=ready、page_ready=true、composer_ready=true、context_ready=true、citation_count=7。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787439860633
     }
   ]
 }
