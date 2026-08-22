@@ -9051,6 +9051,58 @@
       "updated_at_ms": 1787434895573
     },
     {
+      "id": "win-web-ai-rich-session-continuity-v2",
+      "title": "Win 网页 AI 富内容会话连续性 V2",
+      "summary": "消除 ChatGPT/Google AI 后台连接的同标签 WebView2 创建竞态，复用持久会话并保持官网回答节点与原生富内容缓存的连续切换。",
+      "status": "claimed",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-rich-session-continuity-v2.md",
+        "content_hash": "2bad3072bbf65f567768402ee5b29d5940cd3e4ae4e129a7f7640123d4d35297",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "a02eb5843660d74deeb3962ae5c679a3190eddb9",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "9f9269e91c02e43fca5fd8a2510586f61eac7dcd",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "webview2",
+        "rich-content",
+        "session",
+        "production-fix"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/session_identity.rs",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+        "pc-frontend/src/features/user-browser/localAiBrowserApi.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同一标签的并发后台打开只执行一次桌面创建调用，显示窗口与后台打开不错误合并。",
+        "Rust 在完整创建临界区内串行化并复用页面，不再返回同名 WebView 已存在。",
+        "复用页面不重新导航、不清 Cookie 或缓存，失败后可重试。",
+        "现有缓存首帧、官网回答节点和原生 AST 行为兼容，相关前端/Rust/Win 验证通过。",
+        "正式发布身份匹配目标提交，重启后实机切换 Google AI 不再出现重复 WebView2 错误。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_4e8e5a935d824c03a6069ec7969154a6",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787436512226,
+        "expires_at_ms": 1787450912226
+      },
+      "created_at_ms": 1787436124298,
+      "updated_at_ms": 1787436512226
+    },
+    {
       "id": "win-web-ai-rich-structure-observability-v1",
       "title": "Win 网页 AI 富结构观测与引用关联 V1",
       "summary": "为 ChatGPT/Google 官方 WebView 增加不含正文和 URL 的富结构覆盖诊断、确定性引用控件关联，以及受生产授权控制的 finance/weather 结构化响应映射，复用现有来源 UI，不改 PWA。",
@@ -9568,76 +9620,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_bda7e2f3ba484b43b6191fbce891765c",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "真实 Win 桌面验收确认后台 Google WebView RootWebArea 仍获得点击焦点，阻断原生输入。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1787219168634
-    },
-    {
-      "id": "feature_event_a5c14bd3b2be4ac4ba321648ce79db70",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "需求已接受，真实桌面焦点证据和精确实现路径已确认。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787219184182
-    },
-    {
-      "id": "feature_event_9c6a0a46e60a4762a1c3342e518a750e",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787219184207
-    },
-    {
-      "id": "feature_event_9f9225c5921d403b8207a29b48f77ad7",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始修复隐藏官方 WebView 的命中隔离并补回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787219184219
-    },
-    {
-      "id": "feature_event_8177c0f19cb447c0bd3d754617f3fe79",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787219376669
-    },
-    {
-      "id": "feature_event_294702adb0fd4668bdb8de16169c4d4f",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "隐藏态不再重新 show 官方 WebView；前台显示与聚焦路径保持。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787219376730
-    },
-    {
-      "id": "feature_event_9d872954a9a64a48b7e58e4785f0cb81",
-      "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "静态合同、Win 用户浏览器套件、Rust 定向测试与 PC 生产构建通过；待发布后真实桌面验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787219376752
-    },
     {
       "id": "feature_event_755c046a415b4c8695cbe938a2609e70",
       "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
@@ -11567,6 +11549,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787434895573
+    },
+    {
+      "id": "feature_event_4e3a7608149c4af990d30bea46ea04c8",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787436124298
+    },
+    {
+      "id": "feature_event_067fe25dfcc644a1a9e2ce2c707f005e",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787436134444
+    },
+    {
+      "id": "feature_event_97117af340954d429bce3569655e98e6",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "模块化拆分后补充精确任务路径，再重新认领。",
+      "from_status": "claimed",
+      "to_status": "ready",
+      "at_ms": 1787436457997
+    },
+    {
+      "id": "feature_event_a461a8617d9e41018f1c870e0d39c57c",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "metadata_updated",
+      "actor": "codex-root",
+      "reason": "模块化门禁要求把会话标识与创建门禁下沉到独立 sibling module。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787436469175
+    },
+    {
+      "id": "feature_event_9ae3ae040db64137bfa2e2047772e7c2",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "需求范围与模块化路径已复核。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787436480133
+    },
+    {
+      "id": "feature_event_c0321db428e54aa2a464d22f4162c8d7",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "验收标准和任务路径完整，可进入实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787436492224
+    },
+    {
+      "id": "feature_event_7db87d329e3c49a3bc8c451ac9c2c0df",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787436512227
     }
   ]
 }

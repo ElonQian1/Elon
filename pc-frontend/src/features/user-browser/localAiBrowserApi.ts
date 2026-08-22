@@ -270,11 +270,12 @@ export async function openLocalAiWebSession(
   options: { showWindow?: boolean } = {},
 ): Promise<LocalAiWebSession> {
   assertIdentity(providerId, ownerKey)
+  const showWindow = options.showWindow === true
   const session = await invokeDesktop<LocalAiWebSession>('open_local_ai_web_session', {
     providerId,
     ownerKey,
-    showWindow: options.showWindow,
-  }, LOCAL_AI_INVOKE_TIMEOUTS.window)
+    showWindow,
+  }, LOCAL_AI_INVOKE_TIMEOUTS.window, localAiOpenCoalesceKey(providerId, ownerKey, showWindow))
   if (session.providerId !== providerId
     || session.profileScope !== 'local_owner_provider'
     || session.cookieAccess !== 'webview_only'
@@ -282,6 +283,10 @@ export async function openLocalAiWebSession(
     throw new Error('桌面壳返回了不受支持的本地会话协议。')
   }
   return session
+}
+
+function localAiOpenCoalesceKey(providerId: string, ownerKey: string, showWindow: boolean) {
+  return `open:${providerId}:${ownerKey}:${showWindow ? 'visible' : 'background'}`
 }
 
 export async function clearLocalAiWebSession(

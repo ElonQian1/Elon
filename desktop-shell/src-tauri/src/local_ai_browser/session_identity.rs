@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::{Mutex, MutexGuard},
+};
 
 use tauri::{AppHandle, Manager};
 
@@ -6,6 +9,16 @@ use super::{
     display_error, initial_renderer_status, LocalAiBrowserRuntime, ProviderDefinition,
     LOCAL_AI_WINDOW_PREFIX, PROFILE_ROOT, SNAPSHOT_CACHE_FILE,
 };
+
+// React 的首次连接与 closed 状态恢复可能在同一帧同时打开同一厂商会话。
+// Tauri 的“查询标签”和“创建 WebView”不是原子操作，最终宿主边界必须串行化。
+static LOCAL_AI_WEBVIEW_CREATION: Mutex<()> = Mutex::new(());
+
+pub(super) fn lock_webview_creation() -> MutexGuard<'static, ()> {
+    LOCAL_AI_WEBVIEW_CREATION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 pub(super) fn window_label(provider: &ProviderDefinition, fingerprint: &str) -> String {
     format!("{LOCAL_AI_WINDOW_PREFIX}{}-{fingerprint}", provider.id)

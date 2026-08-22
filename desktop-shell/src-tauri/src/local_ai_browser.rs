@@ -50,7 +50,9 @@ use tauri::{
 pub use guest_identity::LocalAiGuestOwnerIdentity;
 use owner_profile::resolve as resolve_owner_fingerprint;
 use provider_adapter::ProviderAdapter;
-use session_identity::{ensure_runtime_session, profile_directory, window_label};
+use session_identity::{
+    ensure_runtime_session, lock_webview_creation, profile_directory, window_label,
+};
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
 
@@ -183,6 +185,8 @@ pub async fn open_local_ai_web_session(
         &owner_fingerprint,
         &window_label,
     )?;
+
+    let _creation_guard = lock_webview_creation();
 
     if let Some(page) = app.get_webview(&window_label) {
         if show_window {
