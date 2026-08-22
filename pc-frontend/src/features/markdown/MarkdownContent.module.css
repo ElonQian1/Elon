@@ -176,49 +176,44 @@
 
 .citationLink {
   display: inline-flex;
+  max-width: min(190px, 58vw);
+  height: 18px;
+  box-sizing: border-box;
   align-items: center;
-  gap: 4px;
-  min-height: 20px;
-  max-width: min(100%, 280px);
+  gap: 3px;
   margin: 0 2px;
-  padding: 1px 7px 1px 4px;
-  color: #c9dcff;
-  vertical-align: baseline;
-  text-decoration: none;
-  border: 1px solid rgba(138, 180, 248, .2);
+  padding: 1px 5px 1px 2px;
+  vertical-align: middle;
+  color: var(--text-soft, #d7d9df);
+  border: 1px solid rgba(255, 255, 255, .055);
   border-radius: 999px;
-  background: rgba(138, 180, 248, .1);
-  font-size: .86em;
-  font-weight: 600;
-  line-height: 1.25;
+  background: rgba(255, 255, 255, .09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+  font-size: 10px;
+  font-weight: 520;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transform: translateY(-1px);
+  transition: color .12s ease, background .12s ease, border-color .12s ease;
 }
 
 .citationLink > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .citationLink:hover {
-  color: #e6efff;
-  border-color: rgba(138, 180, 248, .38);
-  background: rgba(138, 180, 248, .16);
+  color: var(--text, #f5f6f8);
+  border-color: rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .14);
+  text-decoration: none;
 }
 
 .citationLink:focus-visible {
   outline: 2px solid #8ab4f8;
   outline-offset: 2px;
-}
-
-.citationIcon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  padding: 1px;
-  object-fit: contain;
-  border-radius: 50%;
-  background: #f7f8fa;
 }
 
 /* ── 图片 ── */

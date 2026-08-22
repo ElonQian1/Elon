@@ -459,10 +459,10 @@
 .msgMeta span   { font-size: 11px; color: var(--text-muted); }
 .msgContent {
   color: var(--text-soft);
-  line-height: 1.58;
+  line-height: 1.62;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 14px;
+  font-size: 15px;
 }
 .ownRow .msgContent {
   display: inline-block;

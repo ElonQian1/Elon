@@ -86,7 +86,6 @@ export default function AiChatMessageRow({
     ? (user?.nickname ?? user?.account ?? '我')
     : (isNode ? `${nodePrefix} · ${message.node_display_name ?? ''}` : webProviderName ?? 'AI')
   const canFork = !!activeConvId && !!message.id
-
   return (
     <div className={[styles.msgRow, messageActionsHostClassName, isUser ? styles.ownRow : ''].join(' ')}>
       {isUser

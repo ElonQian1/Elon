@@ -1,9 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 import { copyTextToClipboard } from '../../lib/clipboard'
+import AiSourceMark from '../ai/AiSourceMark'
+import { aiInlineCitationLabel, normalizedAiSourceUrl } from '../ai/aiSourcePresentation'
 import { MediaViewer, type MediaViewerImage } from './MediaViewer'
 import styles from './MarkdownContent.module.css'
 
@@ -85,18 +87,20 @@ function buildComponents(
     // 链接：强制新标签，防止 javascript: 等危险协议
     a({ href, children }) {
       const safe = safeMarkdownUrl(href, { image: false })
-      const citation = safe ? citationByUrl.get(normalizedCitationUrl(safe)) : undefined
+      const citation = safe ? citationByUrl.get(normalizedAiSourceUrl(safe)) : undefined
       if (safe && citation) {
+        const label = aiInlineCitationLabel(citation, inlineText(children))
         return (
           <a
             href={safe}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.citationLink}
-            title={citation.title || '打开引用来源'}
+            title={`打开来源：${label}`}
+            aria-label={`打开来源 ${label}`}
           >
-            <CitationIcon citation={citation} />
-            <span>{children}</span>
+            <AiSourceMark source={citation} variant="inline" />
+            <span>{label}</span>
           </a>
         )
       }
@@ -160,41 +164,19 @@ function buildComponents(
   }
 }
 
-function CitationIcon({ citation }: { citation: MarkdownCitation }) {
-  const [failed, setFailed] = useState(false)
-  const icon = safeMarkdownUrl(citation.icon_url, { image: true })
-  if (!icon || failed) return null
-  return (
-    <img
-      className={styles.citationIcon}
-      src={icon}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  )
-}
-
 function buildCitationMap(citations: MarkdownCitation[]) {
   const values = new Map<string, MarkdownCitation>()
   for (const citation of citations) {
-    const key = normalizedCitationUrl(citation.url)
+    const key = normalizedAiSourceUrl(citation.url)
     if (key && !values.has(key)) values.set(key, citation)
   }
   return values
 }
 
-function normalizedCitationUrl(value: string) {
-  try {
-    const url = new URL(value)
-    url.search = ''
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return value.trim()
-  }
+function inlineText(value: ReactNode): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(inlineText).join('')
+  return ''
 }
 
 function safeMarkdownUrl(value: string | undefined, options: { image: boolean }): string | undefined {
