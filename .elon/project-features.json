@@ -8941,7 +8941,7 @@
       "id": "win-web-ai-rich-structure-observability-v1",
       "title": "Win 网页 AI 富结构观测与引用关联 V1",
       "summary": "为 ChatGPT/Google 官方 WebView 增加不含正文和 URL 的富结构覆盖诊断、确定性引用控件关联，以及受生产授权控制的 finance/weather 结构化响应映射，复用现有来源 UI，不改 PWA。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-structure-observability-v1.md",
@@ -8984,15 +8984,127 @@
         "复用现有来源徽标与来源面板，不建立第二套 UI",
         "合成 fixture、Win Web AI 契约、PC 构建、lint 和 Rust 验证通过"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_61867097cdd54a99bc6eaa556b215be9",
-        "agent_id": "codex-desktop-root",
-        "claimed_at_ms": 1787431627368,
-        "expires_at_ms": 1787446027368
-      },
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_citation_adapter.js",
+          "content_hash": "dd47f36f398cdb03b9cee25053213f086a8db83cbc351219b1683a720939533b",
+          "locator": "Win deterministic citation bridge",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "8a827ee85c882f6124580a7647e0cc80956cb534",
+            "worktree_blob_oid": "8a827ee85c882f6124580a7647e0cc80956cb534",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+          "content_hash": "c05d6217d3cf8141d6c9f755a902b1e43aacf25be78971a601dd4ad0f83de609",
+          "locator": "authorized finance mapper",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "c90132daef4f406ac514fe8ee35ed62a6677a840",
+            "worktree_blob_oid": "c90132daef4f406ac514fe8ee35ed62a6677a840",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/google_rich_content_adapter.js",
+          "content_hash": "5a4e727c8bd4b454de60e2082c9e7915031c78f1de9c983f1b555503ed231f13",
+          "locator": "authorized weather mapper",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "7d87585ead7a7aaed9f75f7ebc5a2fa00e9cccba",
+            "worktree_blob_oid": "7d87585ead7a7aaed9f75f7ebc5a2fa00e9cccba",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state/diagnostics.rs",
+          "content_hash": "d7c231ea132ac7d314215ddcd07e61e55b4d5219d1bfb0bcc70b17ff1783577d",
+          "locator": "privacy-safe content coverage",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "896432be05f85c86c5e5e0f42f013de4b7ab2c08",
+            "worktree_blob_oid": "896432be05f85c86c5e5e0f42f013de4b7ab2c08",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/state/tests.rs",
+          "content_hash": "20dad0aa4bb340c3ef97fbe191be664761423c71324ef331498b93c0185d2586",
+          "locator": "diagnostic privacy regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "28268e7afabef708293358bcdd220cdf3fd48df5",
+            "worktree_blob_oid": "28268e7afabef708293358bcdd220cdf3fd48df5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/win-web-ai-rich-structure-observability-v1.md",
+          "content_hash": "c1f7e9af880fd9c910738ba31bed23db310e733bc75aba97978300d46a6e7d5c",
+          "locator": "accepted production boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "6c746dadde959fbc1dbbf370b5001461cf8b9b20",
+            "worktree_blob_oid": "6c746dadde959fbc1dbbf370b5001461cf8b9b20",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "f3dfebda121f1285d3581ebe42360a18117e170d08c907d697d6d91f4c2013e8",
+          "locator": "authorized envelope and citation contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "297135b274f19b92d9bb37e44cb748132af87d68",
+            "worktree_blob_oid": "297135b274f19b92d9bb37e44cb748132af87d68",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/aiSourcePresentation.ts",
+          "content_hash": "55828127800d10e37d10d7755ff87b0e0a8ce0b7887481f28b08b1aa86df46d4",
+          "locator": "structured inline citation label",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "d8da1531fcbbb31e4194bc42cd2f736375a0dd0b",
+            "worktree_blob_oid": "d8da1531fcbbb31e4194bc42cd2f736375a0dd0b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/fixtures/rich-content-authorized-envelope.json",
+          "content_hash": "d0ab94ce1487b8df9b2aed081e2a589580dd49327e276afd012b1d0c8ad7dc67",
+          "locator": "synthetic sanitized response fixture",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de697d9ac20a3ef2920efc6ff2228262025fc2b9",
+            "head_blob_oid": "e4840d357fa1a502e2d892b6191307f04aa763ab",
+            "worktree_blob_oid": "e4840d357fa1a502e2d892b6191307f04aa763ab",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787431617943,
-      "updated_at_ms": 1787432435030
+      "updated_at_ms": 1787432513738
     },
     {
       "id": "win-web-ai-snapshot-cache-v1",
@@ -9343,36 +9455,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_6108a025a303487faef7ad6ba5d3c5e9",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "claimed",
-      "actor": "codex-http-host-20260816",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786879543534
-    },
-    {
-      "id": "feature_event_c96599bcdcd241529f41f132750850ed",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "transitioned",
-      "actor": "codex-http-host-20260816",
-      "reason": "绑定已重放验证的当前实现。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786879543558
-    },
-    {
-      "id": "feature_event_21edfb6f186d4c0198f9d43e7ef39f21",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-http-host-20260816",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786879546973
-    },
     {
       "id": "feature_event_cc56bf4ada084ff9bfafd128f63e3796",
       "feature_id": "merchant-runtime-http-host-v1",
@@ -11342,6 +11424,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787432435030
+    },
+    {
+      "id": "feature_event_8d6683dce71240e8b1305269d89ae624",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787432488519
+    },
+    {
+      "id": "feature_event_964d7a58c2c64a5cb63cbd302bfb40a7",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "代码、协议、合成 fixture 与隐私诊断已经实现并提交。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787432513723
+    },
+    {
+      "id": "feature_event_739d0247b9a24fa8b8b1aa7a8ec0a483",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Win Web AI 总验收、PC build/lint 与定向 Rust 全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787432513738
     }
   ]
 }
