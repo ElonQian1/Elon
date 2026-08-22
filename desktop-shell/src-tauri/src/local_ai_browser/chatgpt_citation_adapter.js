@@ -31,7 +31,7 @@
     try {
       const url = new URL(String(value || ''), location.href);
       if (url.protocol !== 'https:' || url.username || url.password ||
-          (url.port && url.port !== '443') || url.search || url.hash) return '';
+          (url.port && url.port !== '443')) return '';
       return (url.origin + url.pathname).slice(0, 1200);
     } catch (_) {
       return '';
@@ -91,8 +91,8 @@
     const targets = referencedTargets(node);
     const anchor = targets.flatMap((target) => Array.from(target.querySelectorAll('a[href]')))
       .find((candidate) => safePublicUrl(candidate.href || candidate.getAttribute('href')));
-    const icon = anchor && (anchor.querySelector('img') || targets
-      .flatMap((target) => Array.from(target.querySelectorAll('img')))[0]);
+    const icon = node.querySelector('img') || (anchor && anchor.querySelector('img')) || targets
+      .flatMap((target) => Array.from(target.querySelectorAll('img')))[0];
     return normalizeCitationRecord({
       markerText,
       url: directUrl || (anchor && (anchor.href || anchor.getAttribute('href'))),

@@ -28,7 +28,14 @@ assert.match(sourceMark, /aiSourceIconCandidates/, 'source logos need a bounded 
 assert.match(presentation, /googleFaviconUrl\(sourceHost\)/, 'an incomplete official favicon URL must be rebuilt from the public source host')
 assert.match(presentation, /searchParams\.set\('domain', host\)/, 'favicon lookup must disclose only the hostname, never the article path')
 assert.match(presentation, /`\$\{origin\}\/favicon\.ico`/, 'source-origin favicon must remain available when the official cache fails')
+assert.ok(
+  presentation.indexOf('candidates.push(`${origin}/favicon.ico`)') < presentation.indexOf('candidates.push(googleFaviconUrl(sourceHost))'),
+  'the publisher origin icon must be attempted before the optional public resolver',
+)
 assert.match(sourceMark, /setFailedUrls/, 'broken logos must advance through the fallback chain')
+assert.match(sourceMark, /ICON_LOAD_TIMEOUT_MS\s*=\s*2_500/, 'a hanging logo request needs a bounded timeout')
+assert.match(sourceMark, /loadedUrl === iconUrl/, 'an unconfirmed remote image must not cover the stable monogram')
+assert.match(sourceMarkStyles, /\.logoReady\s*\{[\s\S]*opacity:\s*1/, 'a source logo becomes visible only after load succeeds')
 assert.match(presentation, /safeIconUrl/, 'source logos must be validated again at the presentation boundary')
 assert.match(component, /aiSourceDisplayTitle/, 'raw citation URLs must be reduced to a readable source title')
 assert.match(component, /aria-expanded=\{expanded\}/, 'the default source presentation must be a compact expandable entry')
@@ -96,14 +103,20 @@ assert.equal(
   'reuters.com',
   'source identity and favicon fallback must use the public publisher rather than the redirect host',
 )
-assert.match(
-  aiSourceIconCandidates({
+const incompleteReutersCandidates = aiSourceIconCandidates({
     title: 'Reuters+1',
     url: liveReutersMarkdownUrl,
     icon_url: 'https://www.google.com/s2/favicons',
-  })[0],
+  })
+assert.equal(
+  incompleteReutersCandidates[0],
+  'https://www.reuters.com/favicon.ico',
+  'the publisher origin must stay usable when the remote favicon resolver hangs',
+)
+assert.match(
+  incompleteReutersCandidates[1],
   /google\.com\/s2\/favicons\?domain=reuters\.com&sz=64/,
-  'a sanitized incomplete ChatGPT favicon must be reconstructed from the real source host',
+  'an incomplete ChatGPT favicon remains a last-resort lookup rebuilt from the public source host',
 )
 assert.equal(
   aiInlineCitationLabel({

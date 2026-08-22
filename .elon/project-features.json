@@ -8254,6 +8254,174 @@
       "updated_at_ms": 1787247073998
     },
     {
+      "id": "win-web-ai-citation-logo-resilience-v1",
+      "title": "Win 网页 AI 引用 Logo 韧性 V1",
+      "summary": "复用现有来源卡片，在官方图标缺失或远程 favicon 服务挂起时优先站点同源图标、有界超时并始终保留字母标识，同时补齐 ChatGPT/Google 可见引用图标提取。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-citation-logo-resilience-v1.md",
+        "content_hash": "2894b3e04c297b4ecaadf7416d6ed4460fbb69dc46e907da1ae815dddbbefaf8",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "488d49a6703a076965a2f96b668fac7a02d1ab01",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "webview2",
+        "citations",
+        "favicon",
+        "rich-content"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/google_web_message_extractor.js",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_citation_adapter.js",
+        "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+        "pc-frontend/scripts/test-ai-source-cards.cjs",
+        "pc-frontend/src/features/ai/AiSourceMark.module.css",
+        "pc-frontend/src/features/ai/AiSourceMark.tsx",
+        "pc-frontend/src/features/ai/aiSourcePresentation.ts",
+        "scripts/test-google-web-message-extractor-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "来源站点 /favicon.ico 排在远程 favicon 服务之前，服务不可达时不阻塞同源候选。",
+        "图标加载成功前、失败或超时时始终显示稳定字母底图，不出现空白白圆。",
+        "成功图标复用于来源摘要、来源卡片和正文内联引用。",
+        "ChatGPT 与 Google 可见引用节点公开 HTTPS 图标进入既有 iconUrl，query/hash 不进入持久 AST。",
+        "user-browser、typecheck、lint、build 与 Win 验证通过，PWA 无修改。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/google_web_message_extractor.js",
+          "content_hash": "5698226bb8502dd8a895a66cc46db1d30ea1999264786c5961a110826d9058e6",
+          "locator": "citationIconUrl",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "07b6bdfdc8d96114281dd87fec1ef7583a84ec1b",
+            "worktree_blob_oid": "9b6787a174100ee0d6fad50517f504285c3372d7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_citation_adapter.js",
+          "content_hash": "014bfcb8bfd266b2152447e2c5f7a48b1fd1c937ad934b61bffe7e28417e25d7",
+          "locator": "linkedRecord",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "8a827ee85c882f6124580a7647e0cc80956cb534",
+            "worktree_blob_oid": "457e7a0fc756770099cc7e3b44c301fede5afe60",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-web-ai-citation-logo-resilience-v1.md",
+          "content_hash": "2894b3e04c297b4ecaadf7416d6ed4460fbb69dc46e907da1ae815dddbbefaf8",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "488d49a6703a076965a2f96b668fac7a02d1ab01",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "dcb478487e2e37d588031a53cedbf1b41d0b97a925b4450d01d6d8964cddcfce",
+          "locator": "signedIconCitation",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "297135b274f19b92d9bb37e44cb748132af87d68",
+            "worktree_blob_oid": "38de05e422634328255034f6e62349ba57603e9f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-source-cards.cjs",
+          "content_hash": "01186944a24d1d5d9494e892926c813e198ed64d051facf536684b2f3b9197d6",
+          "locator": "publisher origin icon",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "1261ea47f90428ab416d96efd21f7d95734b1b72",
+            "worktree_blob_oid": "2ab8de755f8f2af89f5cd9ea85fd09d6bb2c0c4d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiSourceMark.module.css",
+          "content_hash": "ed7fabd60ff9a134cc7d97799247d4467c69f4691ace8607603396baee8d4a39",
+          "locator": "logoReady",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "36b15b60f4a1ed4e3c0bd7ab5a7d167198f0f8f7",
+            "worktree_blob_oid": "d9d81d93dfc9f852b89ac961ba3d82658170038d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiSourceMark.tsx",
+          "content_hash": "7038f50c81cf41be98f786ab0b2bfafcbbbff30f97f657a6a3bb3b8c6470c0d2",
+          "locator": "ICON_LOAD_TIMEOUT_MS",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "55cbb1033d74254b547420aea84592c90a189f47",
+            "worktree_blob_oid": "244a61abd7c33aaf9658ba8fb67c3124bbab1479",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/aiSourcePresentation.ts",
+          "content_hash": "613f75c0082ff0f96a538076d7b534d39671ca438400956f887fb614bebde63c",
+          "locator": "aiSourceIconCandidates",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "d8da1531fcbbb31e4194bc42cd2f736375a0dd0b",
+            "worktree_blob_oid": "0d22cb6af54085e9efab003f7cde3b48843bd82d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-message-extractor-contract.cjs",
+          "content_hash": "41d155e113eaf6c915742e5a7ac6f2da4dcdb7937a4383eda406b3ee43d9d23b",
+          "locator": "citationIconUrl",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "020098a9ee78b7b4b0e75ff2ed9aee6918adfb1b",
+            "head_blob_oid": "91017d7a19dceaecf9512287ca7c4f9605a8781b",
+            "worktree_blob_oid": "6b2850a0f64ea7b56ec98f568b702ad79d5edbed",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787438602172,
+      "updated_at_ms": 1787438978832
+    },
+    {
       "id": "win-web-ai-context-continuity-hardening-v1",
       "title": "Win 网页 AI 上下文连续性加固 V1",
       "summary": "以密码学 owner 指纹、旧 Profile 无损迁移、超长快照最近上下文保留和无 query 导航日志加固 Win 生产首页的账号隔离与上下文连续性。",
@@ -9680,66 +9848,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_a483cd27c79341f583c1883656a89e00",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "官方 WebView 后台改为父窗口可见边界外 1×1 活跃停放。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787220731615
-    },
-    {
-      "id": "feature_event_8bbaacb2d6334c018402e9060c9110c8",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "静态合同、Win 用户浏览器套件、Rust 定向测试与 PC 生产构建通过；待发布后真实发送验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787220731639
-    },
-    {
-      "id": "feature_event_4ac6b729c8414fdebf453640e8bbe3bf",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "V2 真实发送证明 1×1 会触发 Google 极窄响应式布局和错误控件，需要保留完整官网视口。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1787221517770
-    },
-    {
-      "id": "feature_event_f589377245b142bba2ade8b073e14922",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "V3 完整视口停放约束与真实验收标准已接受。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787221517800
-    },
-    {
-      "id": "feature_event_5f202ea473564bad99662ea221f92450",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787221517822
-    },
-    {
-      "id": "feature_event_9177a02acf5941d28066e58d150a2281",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "实现完整视口可视区外停放并重新发布验收。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787221517835
-    },
     {
       "id": "feature_event_a065f9e35b2b433686e5fa7ab9ec3eae",
       "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -11679,6 +11787,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787437913448
+    },
+    {
+      "id": "feature_event_6fe137f40dd84507bce4719e490f23a3",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "实机诊断显示 Google 回答已有 7 条结构化引用但 citation_logo_count=0；当前首选远程 favicon 服务在本机网络挂起并造成白圆。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787438602172
+    },
+    {
+      "id": "feature_event_370bcbd9b5bd456b9cd88f33bf91f00b",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787438613052
+    },
+    {
+      "id": "feature_event_cfa117c7ffc443858fa22bf42545780f",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已完成现有来源链审查并实现站点优先、有界超时、字母底图及双厂商可见图标提取；进入验证与证据绑定。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787438934381
+    },
+    {
+      "id": "feature_event_6bbd8230e009412095a28bb5b341bd08",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787438953861
+    },
+    {
+      "id": "feature_event_4177294a64fd4866b5415e18cd3cb0fe",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "来源候选顺序、有界超时、加载前字母底图、ChatGPT/Google 可见图标提取和持久 AST query/hash 清洗均已实现，相关证据已绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787438967552
+    },
+    {
+      "id": "feature_event_82b3b7e8683a48369f1cb5e61f9b604c",
+      "feature_id": "win-web-ai-citation-logo-resilience-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "npm run typecheck、lint、build、test:user-browser 及 scripts/validate-win-web-ai.ps1 全部通过；专项来源卡、富内容和 Google 提取器测试通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787438978832
     }
   ]
 }

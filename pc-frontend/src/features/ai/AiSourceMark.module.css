@@ -23,6 +23,12 @@
   object-fit: contain;
   box-sizing: border-box;
   background: #f7f8fa;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.logoReady {
+  opacity: 1;
 }
 
 .compact {

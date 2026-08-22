@@ -74,9 +74,11 @@ export function aiSourceIconCandidates(source: AiSourcePresentationInput, host?:
   const candidates: string[] = []
   const official = safeIconUrl(source.icon_url)
   if (official && !isIncompleteGoogleFavicon(official)) candidates.push(official)
-  if (sourceHost) candidates.push(googleFaviconUrl(sourceHost))
   const origin = publicAiSourceUrl(source.url)?.origin
   if (origin?.startsWith('https://')) candidates.push(`${origin}/favicon.ico`)
+  // The public resolver is intentionally last: it can be unavailable on some
+  // Windows networks and must never prevent the publisher's own icon fallback.
+  if (sourceHost) candidates.push(googleFaviconUrl(sourceHost))
   return [...new Set(candidates)]
 }
 

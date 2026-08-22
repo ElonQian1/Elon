@@ -43,6 +43,7 @@ assert.match(googleAdapter, /function normalizeWeatherPayload\(value\)/)
 assert.match(googleAdapter, /kind: 'weather'[\s\S]*source: 'private_response'/)
 assert.match(citationAdapter, /aria-controls/)
 assert.match(citationAdapter, /aria-describedby/)
+assert.match(citationAdapter, /node\.querySelector\('img'\)/)
 assert.match(citationAdapter, /literalCount\(markdown, marker\) !== 1/)
 assert.doesNotMatch(citationAdapter, /Reuters|Barron|MarketWatch/, 'citation association must not guess publishers from visible text')
 assert.match(messages, /__elonChatGptRichContent/)
@@ -146,6 +147,16 @@ assert.equal(citation.url, 'https://www.reuters.com/technology/example-article')
 assert.equal(citation.markerText, 'Reuters +2')
 assert.equal(citation.groupSize, 3)
 assert.equal(citation.citationId, 'citation_control_1')
+const signedIconCitation = context.window.__elonChatGptCitationAdapter.normalizeCitationRecord({
+  markerText: 'Reuters',
+  url: 'https://www.reuters.com/technology/example-article?utm_source=chatgpt.com',
+  iconUrl: 'https://cdn.example.com/icons/reuters.png?width=32&token=transient#fragment',
+}, 1)
+assert.equal(
+  signedIconCitation.iconUrl,
+  'https://cdn.example.com/icons/reuters.png',
+  'visible official icons keep only a public HTTPS path before entering persistent AST',
+)
 
 const googleContext = {
   window: {

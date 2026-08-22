@@ -113,18 +113,33 @@
         if (seen.has(safeUrl)) continue;
         seen.add(safeUrl);
         const title = cleanText(link.textContent || link.getAttribute('aria-label')) || url.hostname;
+        const iconUrl = citationIconUrl(link);
         parts.push({
           type: 'citation',
           text: title.slice(0, 160),
           title: title.slice(0, 160),
           url: safeUrl.slice(0, 1200),
           targetKind: 'external',
-          targetHost: url.hostname.slice(0, 253)
+          targetHost: url.hostname.slice(0, 253),
+          ...(iconUrl ? { iconUrl } : {})
         });
         if (parts.length >= 12) break;
       } catch (_) {}
     }
     return parts;
+  }
+
+  function citationIconUrl(link) {
+    const icon = link && link.querySelector && link.querySelector('img');
+    if (!icon) return '';
+    try {
+      const url = new URL(icon.currentSrc || icon.getAttribute('src') || '', location.href);
+      if (url.protocol !== 'https:' || url.username || url.password ||
+          (url.port && url.port !== '443')) return '';
+      return (url.origin + url.pathname).slice(0, 1200);
+    } catch (_) {
+      return '';
+    }
   }
 
   function externalLinkTextLength(container) {
