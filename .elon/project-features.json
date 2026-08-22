@@ -8941,7 +8941,7 @@
       "id": "win-web-ai-rich-diagnostic-transport-v1",
       "title": "Win 网页 AI 富结构诊断传输 V1",
       "summary": "补齐节点控制回执的第二层固定白名单，使富内容类型与引用计数可脱敏实机回读，不传输正文、URL、域名或凭证。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-diagnostic-transport-v1.md",
@@ -9048,7 +9048,7 @@
         }
       ],
       "created_at_ms": 1787433123249,
-      "updated_at_ms": 1787434359378
+      "updated_at_ms": 1787434895573
     },
     {
       "id": "win-web-ai-rich-structure-observability-v1",
@@ -9568,16 +9568,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_e1e205c3ec834f96a7a64caf8da4ac28",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Win 发布身份 0.3.69+a6cb7d852b13630377bdf0b16c154bd0e86be953 已同步，本机节点重启后精确版本匹配，前端与 Tauri 在线。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787218879911
-    },
     {
       "id": "feature_event_bda7e2f3ba484b43b6191fbce891765c",
       "feature_id": "win-hidden-ai-webview-input-hit-test-v1",
@@ -11567,6 +11557,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787434359378
+    },
+    {
+      "id": "feature_event_ca65c04466634e319989ca852ce6a40c",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "正式发布 0.3.69+c3e961875517a6ad557afc3dc0ceb2aad5b7422f 已激活重连，生产 list_ai_windows 已现场回读五项富结构计数且隐私字段保持 false。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787434895573
     }
   ]
 }
