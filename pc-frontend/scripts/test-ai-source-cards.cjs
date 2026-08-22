@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const Module = require('node:module')
 const path = require('node:path')
+const ts = require('typescript')
 
 const root = path.resolve(__dirname, '..')
 const component = fs.readFileSync(path.join(root, 'src/features/ai/AiSourceLinks.tsx'), 'utf8')
@@ -58,5 +60,30 @@ assert.match(adapter, /metadata\.iconUrl = iconUrl/, 'citation extraction must a
 assert.match(adapter, /if \(node\.closest\('a\[href\]'\)\) return '';/, 'citation logos must not leak into answer markdown as image placeholders')
 assert.match(adapter, /if \(node\.closest\('a\[href\]'\)\) return;[\s\S]*add\('image'/, 'citation logos must not be emitted as image attachments')
 assert.match(sanitizer, /part_type == "citation"[\s\S]*"iconUrl"/, 'the Rust boundary must keep only citation logo URLs')
+
+const compiledPresentation = ts.transpileModule(presentation, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText
+const presentationModule = new Module('aiSourcePresentation.fixture.cjs')
+presentationModule.filename = path.join(root, 'src/features/ai/aiSourcePresentation.fixture.cjs')
+presentationModule.paths = module.paths
+presentationModule._compile(compiledPresentation, presentationModule.filename)
+const { aiSourceIconCandidates, normalizedAiSourceUrl } = presentationModule.exports
+const liveReutersMarkdownUrl = 'https://www.reuters.com/business/us-stock-futures-rise-after-sharp-losses-prior-session-2026-08-21/'
+const liveReutersCitationUrl = 'https://www.reuters.com/business/us-stock-futures-rise-after-sharp-losses-prior-session-2026-08-21/?utm_source=chatgpt.com'
+assert.equal(
+  normalizedAiSourceUrl(liveReutersMarkdownUrl),
+  normalizedAiSourceUrl(liveReutersCitationUrl),
+  'the real ChatGPT Reuters citation shape must join after public query sanitization',
+)
+assert.match(
+  aiSourceIconCandidates({
+    title: 'Reuters+1',
+    url: liveReutersMarkdownUrl,
+    icon_url: 'https://www.google.com/s2/favicons',
+  })[0],
+  /google\.com\/s2\/favicons\?domain=reuters\.com&sz=64/,
+  'a sanitized incomplete ChatGPT favicon must be reconstructed from the real source host',
+)
 
 console.log('PASS: AI source links render as responsive native cards while preserving both browser-opening paths')

@@ -488,15 +488,34 @@ Assert-WindowsExecutableBrandIcon -ExecutablePath $WindowsInstallerStub `
 $WinSha256 = Get-NodeAgentFileSha256 -Path $WinBin
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
-# ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
-Write-Host "[2.2/5] 准备一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
+# ── 2.2 构建 PC 前端（Tauri 编译时会把 dist 嵌入桌面壳）───────────────────────
+Write-Host "[2.2/5] 准备 PC 前端资源..." -ForegroundColor Yellow
+$script:NodeReleaseActiveStage = 'pc_frontend_bundle'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
+$releaseArtifactCache = Join-Path $TargetDir 'release-input-cache'
+$pcFrontendEnvironmentValues = @(Get-NodeAgentReleaseEnvironmentValues -Prefix 'VITE_')
+$pcFrontendInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
+    -GitPaths @('pc-frontend') `
+    -ToolVersions @((& node --version | Out-String), (& npm --version | Out-String)) `
+    -EnvironmentValues $pcFrontendEnvironmentValues
+Invoke-NodeAgentCachedDirectoryBuild -Kind 'pc-frontend' -InputHash $pcFrontendInputHash `
+    -CacheRoot $releaseArtifactCache -OutputDirectory $PcDistDir -RequiredRelativePath 'index.html' `
+    -Build { Invoke-NodeAgentPcFrontendBuild } | Out-Host
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+
+# ── 2.3 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
+Write-Host "[2.3/5] 准备一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'desktop_shell_build'
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
 $DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
-$releaseArtifactCache = Join-Path $TargetDir 'release-input-cache'
+$desktopShellEnvironmentValues = @(
+    $pcFrontendEnvironmentValues
+    "PC_FRONTEND_INPUT_HASH=$pcFrontendInputHash"
+)
 $desktopInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
-    -GitPaths @('desktop-shell/src-tauri') `
-    -ToolVersions @((rustc -vV | Out-String), (cargo -V | Out-String), 'target-cpu=x86-64')
+    -GitPaths @('desktop-shell/src-tauri', 'pc-frontend') `
+    -ToolVersions @((rustc -vV | Out-String), (cargo -V | Out-String), 'target-cpu=x86-64') `
+    -EnvironmentValues $desktopShellEnvironmentValues
 Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHash `
     -CacheRoot $releaseArtifactCache -OutputPath $DesktopShellBin -Build {
         try {
@@ -513,17 +532,6 @@ Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHa
             Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
         }
     } | Out-Host
-Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
-
-$script:NodeReleaseActiveStage = 'pc_frontend_bundle'
-Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
-$pcFrontendInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
-    -GitPaths @('pc-frontend') `
-    -ToolVersions @((& node --version | Out-String), (& npm --version | Out-String)) `
-    -EnvironmentValues (Get-NodeAgentReleaseEnvironmentValues -Prefix 'VITE_')
-Invoke-NodeAgentCachedDirectoryBuild -Kind 'pc-frontend' -InputHash $pcFrontendInputHash `
-    -CacheRoot $releaseArtifactCache -OutputDirectory $PcDistDir -RequiredRelativePath 'index.html' `
-    -Build { Invoke-NodeAgentPcFrontendBuild } | Out-Host
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
