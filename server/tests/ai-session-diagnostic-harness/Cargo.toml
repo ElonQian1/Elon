@@ -1,0 +1,13 @@
+[package]
+name = "elon-ai-session-diagnostic-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+autotests = false
+
+[[test]]
+name = "node_agent_win_codex_ai_session_diagnostic"
+path = "../node_agent_win_codex_ai_session_diagnostic.rs"
+
+[dependencies]
+serde_json = "1"

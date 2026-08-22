@@ -8938,10 +8938,63 @@
       "updated_at_ms": 1786876824902
     },
     {
+      "id": "win-web-ai-rich-diagnostic-transport-v1",
+      "title": "Win 网页 AI 富结构诊断传输 V1",
+      "summary": "补齐节点控制回执的第二层固定白名单，使富内容类型与引用计数可脱敏实机回读，不传输正文、URL、域名或凭证。",
+      "status": "claimed",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-rich-diagnostic-transport-v1.md",
+        "content_hash": "950f4ba91222d7e64a0cb5362db6914f72a006ae0018477e7a32251b05007eb5",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "e1701a1b6b9872fcc0df99e3186c4df988a45d99",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "793eb30713c71786490f0f06d7f765ae069feef3",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "diagnostics",
+        "privacy",
+        "rich-content"
+      ],
+      "task_paths": [
+        "server/src/node_agent_win_codex_control/ai_session_diagnostic.rs",
+        "server/src/node_agent_win_codex_control_tests.rs",
+        "server/tests/ai-session-diagnostic-harness/Cargo.lock",
+        "server/tests/ai-session-diagnostic-harness/Cargo.toml",
+        "server/tests/node_agent_win_codex_ai_session_diagnostic.rs"
+      ],
+      "dependencies": [
+        "win-web-ai-rich-structure-observability-v1"
+      ],
+      "acceptance_criteria": [
+        "只允许固定富内容类型和 kind 的有界计数",
+        "五项富结构计数可从生产 list_ai_windows 回执读取",
+        "Rust 回归证明未知结构和秘密字段被丢弃",
+        "节点控制 Rust、Win Web AI、正式发布和重启实测通过"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_78a0b04d529249599ffddb6922ed2c48",
+        "agent_id": "codex-desktop-root",
+        "claimed_at_ms": 1787434056722,
+        "expires_at_ms": 1787441256722
+      },
+      "created_at_ms": 1787433123249,
+      "updated_at_ms": 1787434056722
+    },
+    {
       "id": "win-web-ai-rich-structure-observability-v1",
       "title": "Win 网页 AI 富结构观测与引用关联 V1",
       "summary": "为 ChatGPT/Google 官方 WebView 增加不含正文和 URL 的富结构覆盖诊断、确定性引用控件关联，以及受生产授权控制的 finance/weather 结构化响应映射，复用现有来源 UI，不改 PWA。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-structure-observability-v1.md",
@@ -9104,7 +9157,7 @@
         }
       ],
       "created_at_ms": 1787431617943,
-      "updated_at_ms": 1787432513738
+      "updated_at_ms": 1787433094225
     },
     {
       "id": "win-web-ai-snapshot-cache-v1",
@@ -9455,186 +9508,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_cc56bf4ada084ff9bfafd128f63e3796",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "transitioned",
-      "actor": "codex-http-host-20260816",
-      "reason": "HTTP/HTTPS 宿主、请求门禁、生命周期和文档已提交。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786879547009
-    },
-    {
-      "id": "feature_event_70990a5ec82942fea6db15dad285bd6c",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "transitioned",
-      "actor": "codex-http-host-20260816",
-      "reason": "专项 7/7、连接器 105/105、ERP 13/13 及 npm pack 清单通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786879547042
-    },
-    {
-      "id": "feature_event_cceaf7602d6c460d97e463f1a750bde1",
-      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "修复生产 Win Google 游客新对话无反馈和长等待",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787052321882
-    },
-    {
-      "id": "feature_event_40f9c111045c47499f7380bcd5a2ddd1",
-      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
-      "action": "claimed",
-      "actor": "codex-root-23272",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787052335037
-    },
-    {
-      "id": "feature_event_f79f06d4f7404efe85063bcdec89f0c9",
-      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已捕获生产运行时状态并开始测试优先修复",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787052345915
-    },
-    {
-      "id": "feature_event_0b680bc999bc47dabe0de51d4668d950",
-      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787052768906
-    },
-    {
-      "id": "feature_event_ef91ec91d2104569b624d1ec8c5345bb",
-      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "恢复策略、状态门控和可见反馈已实现并通过专项测试与构建",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787052768919
-    },
-    {
-      "id": "feature_event_c67ff99418014f1e8c9b063f13bcd38d",
-      "feature_id": "win-google-ai-guest-new-conversation-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "npm test:user-browser、npm build 与 bundle budget 均通过",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787052768930
-    },
-    {
-      "id": "feature_event_430f4379ee8d490ea2e7d23902988650",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "d5ad89d8 Win 现场证明官方页可加载但 adapter_connected 仍为 false，Tauri 多 WebView capability 目标范围错误。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787209947927
-    },
-    {
-      "id": "feature_event_e6fb353417494802931781d268d9adf9",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787212868408
-    },
-    {
-      "id": "feature_event_8a70d8302f294572aa7903107f2a64e7",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始修复官方 AI 子 WebView capability 标签匹配并添加回归测试",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787212888330
-    },
-    {
-      "id": "feature_event_c7f44edcb2b74588828f04ed3d18344e",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787213361492
-    },
-    {
-      "id": "feature_event_8df6fcf6e30149498a7e8e8998de3f98",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "两个官方 AI capability 已改为按 webviews 标签匹配；最小权限合同、PC 用户浏览器测试、前端生产构建、Tauri check 与相关 Rust 测试通过",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787213379795
-    },
-    {
-      "id": "feature_event_5613c70e845a4d10bb31674fbc670083",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "PC 用户浏览器合同、生产前端构建、Tauri check 与桌面 AI 定向 Rust 测试通过；发布后 ChatGPT 与 Google 均实测 adapter/composer/context ready，Google 新聊天成功并恢复空会话输入",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787215094359
-    },
-    {
-      "id": "feature_event_41e0cea1c66b44fc89000834efbc238f",
-      "feature_id": "win-ai-child-webview-capability-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Win 版本 0.3.69+e105758901f076034c45a7bec935652b11b54b40 已发布并通过正式 update_and_restart 安装；节点与 Tauri 以精确身份重连，现场验收通过",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787215120290
-    },
-    {
-      "id": "feature_event_d52a661b07154579905d8bdb8dd20913",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "用户现场报告原生发送后立即跳到 Google AI 官方页；代码确认 showOfficialAfterSend 为确定根因。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787217360989
-    },
-    {
-      "id": "feature_event_1cdc58fff3f44cdcb7b694e3d02ac986",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787217380319
-    },
-    {
-      "id": "feature_event_c1094f49be3640d28857d3c0cd3ac36d",
-      "feature_id": "win-native-ai-send-surface-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始删除发送成功后的自动官方页切换，并补充原生界面连续性回归合同",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787217396882
-    },
     {
       "id": "feature_event_df2c96c7c7774d25b1e2aac7c4b1d9fe",
       "feature_id": "win-native-ai-send-surface-continuity-v1",
@@ -11454,6 +11327,186 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787432513738
+    },
+    {
+      "id": "feature_event_5a2f6f37e0c249a284f4f3de7987ca1a",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "客户端 0.3.69+e1701a1b6 已激活，内部富结构计数、引用桥与授权映射均通过；节点控制回执传输白名单作为独立后续功能补齐。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787433094225
+    },
+    {
+      "id": "feature_event_30f59c8f8d7e48229b5050292f3e77a1",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787433123249
+    },
+    {
+      "id": "feature_event_55fa766b131a4144992c1ca051634ca7",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claimed",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787433123263
+    },
+    {
+      "id": "feature_event_09601673c72e40c1921f3dbafbcc0177",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claim_released",
+      "actor": "codex-desktop-root",
+      "reason": "增加独立可执行的诊断白名单集成测试，避免被仓库既有全量测试构建阻塞掩盖。",
+      "from_status": "claimed",
+      "to_status": "ready",
+      "at_ms": 1787433765150
+    },
+    {
+      "id": "feature_event_a7aaee0ffc5e463e98c14cd6174f2a9b",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "metadata_updated",
+      "actor": "codex-desktop-root",
+      "reason": "纳入独立集成测试目标，直接验证本模块的固定白名单、上限与秘密字段剥离。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787433765169
+    },
+    {
+      "id": "feature_event_38f19d7dc0414c88bd3dd50c3c300047",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "测试路径扩展已评审，范围仍仅限 Win 节点诊断传输。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787433765192
+    },
+    {
+      "id": "feature_event_03a0d152155745528fddfb5e7db7f36d",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "依赖已发布，需求、验收与测试路径明确，可继续实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787433765202
+    },
+    {
+      "id": "feature_event_bcd2cce791934d77bc5b2d1ca6de72d4",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claimed",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787433765213
+    },
+    {
+      "id": "feature_event_f71b2105482d40f2a1720dfb6e640ce8",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claim_released",
+      "actor": "codex-desktop-root",
+      "reason": "隔离测试仍触发主 package 全二进制链接，增加轻量 Rust harness 以避免无关构建与磁盘放大。",
+      "from_status": "claimed",
+      "to_status": "ready",
+      "at_ms": 1787434032875
+    },
+    {
+      "id": "feature_event_be1fdb8b6f83482ea6ae7a5610dca9ab",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "metadata_updated",
+      "actor": "codex-desktop-root",
+      "reason": "增加只依赖 serde_json 的轻量测试 manifest，精准运行诊断模块回归。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787434032896
+    },
+    {
+      "id": "feature_event_05fff9d9975746138c6de4c486f18fad",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "轻量 harness 仅用于隔离执行已登记的 Rust 回归。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787434032909
+    },
+    {
+      "id": "feature_event_329fda6d013446bdb282cd67d3aa8cbf",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "范围明确且依赖已满足。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787434032933
+    },
+    {
+      "id": "feature_event_e4e7accc3f18475ebc5d4be541b25ea8",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claimed",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787434032945
+    },
+    {
+      "id": "feature_event_a92ba6fd34ff4259876d2ffcae66a2db",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claim_released",
+      "actor": "codex-desktop-root",
+      "reason": "轻量 Rust harness 需要独立锁文件供项目 --locked 验证使用。",
+      "from_status": "claimed",
+      "to_status": "ready",
+      "at_ms": 1787434056656
+    },
+    {
+      "id": "feature_event_90cca947dab044bca0a4a07e8313c512",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "metadata_updated",
+      "actor": "codex-desktop-root",
+      "reason": "将轻量 harness 的可复现 Cargo.lock 纳入任务范围。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787434056675
+    },
+    {
+      "id": "feature_event_2b7ce424bb054aba9f410d0b5cf41bda",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "独立锁文件保证测试依赖可复现。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787434056700
+    },
+    {
+      "id": "feature_event_e252ce7f6ecd4352b15f87eaaf7b53f8",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "transitioned",
+      "actor": "codex-desktop-root",
+      "reason": "范围明确且依赖已满足。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787434056711
+    },
+    {
+      "id": "feature_event_7b8618602fb14c29bebf6e235832e408",
+      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
+      "action": "claimed",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787434056723
     }
   ]
 }

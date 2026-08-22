@@ -221,6 +221,18 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
                         "last_command_ok":true,
                         "message_count":6,
                         "assistant_message_count":3,
+                        "content_part_counts":{
+                            "markdown":3,
+                            "citation":2,
+                            "private_part":4
+                        },
+                        "rich_card_kind_counts":{
+                            "finance":1,
+                            "private_card":"private rich card"
+                        },
+                        "citation_count":2,
+                        "linked_citation_count":99,
+                        "citation_logo_count":1,
                         "streaming":false,
                         "updated_at_ms":41,
                         "draft":"private prompt",
@@ -260,6 +272,23 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
         state["windows"][0]["official_session"]["last_command_action"],
         "list_conversations"
     );
+    assert_eq!(
+        state["windows"][0]["official_session"]["content_part_counts"],
+        json!({"markdown":3,"citation":2})
+    );
+    assert_eq!(
+        state["windows"][0]["official_session"]["rich_card_kind_counts"],
+        json!({"finance":1})
+    );
+    assert_eq!(state["windows"][0]["official_session"]["citation_count"], 2);
+    assert_eq!(
+        state["windows"][0]["official_session"]["linked_citation_count"],
+        2
+    );
+    assert_eq!(
+        state["windows"][0]["official_session"]["citation_logo_count"],
+        1
+    );
     assert_eq!(state["privacy"]["cookies"], false);
     assert!(!serialized.contains("\"window_label\":"));
     assert!(!serialized.contains("chatgpt.com"));
@@ -268,6 +297,9 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
     assert!(!serialized.contains("cookie-secret"));
     assert!(!serialized.contains("token-secret"));
     assert!(!serialized.contains("private exception detail"));
+    assert!(!serialized.contains("private_part"));
+    assert!(!serialized.contains("private_card"));
+    assert!(!serialized.contains("private rich card"));
 }
 
 #[test]

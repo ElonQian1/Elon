@@ -1,10 +1,28 @@
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 const MAX_COUNT: u64 = 100_000;
 
 const WINDOW_STATUSES: &[&str] = &["opening", "loading", "blocked", "ready", "error", "closed"];
 const PAGE_KINDS: &[&str] = &["unknown", "auth", "conversation", "home", "feature"];
 const CACHE_STATUSES: &[&str] = &["empty", "live", "cached"];
+const CONTENT_PART_TYPES: &[&str] = &[
+    "text",
+    "markdown",
+    "citation",
+    "image",
+    "file",
+    "code",
+    "table",
+    "artifact",
+    "audio",
+    "video",
+    "math",
+    "chart",
+    "map",
+    "interactive",
+    "rich_card",
+];
+const RICH_CARD_KINDS: &[&str] = &["finance", "weather", "media_gallery", "map"];
 const EVENT_KINDS: &[&str] = &[
     "session_created",
     "adapter_ready",
@@ -63,6 +81,9 @@ pub(super) fn sanitize(value: Option<&Value>) -> Result<Option<Value>, String> {
     if !value.is_object() {
         return Err("生产官方会话诊断必须是对象或 null。".to_string());
     }
+    let citation_count = count(value, "citation_count");
+    let linked_citation_count = count(value, "linked_citation_count").min(citation_count);
+    let citation_logo_count = count(value, "citation_logo_count").min(citation_count);
     Ok(Some(json!({
         "present": bool_value(value, "present"),
         "window_status": fixed_or(value, "window_status", WINDOW_STATUSES, "unknown"),
@@ -93,6 +114,11 @@ pub(super) fn sanitize(value: Option<&Value>) -> Result<Option<Value>, String> {
         "last_command_ok": value.get("last_command_ok").and_then(Value::as_bool),
         "message_count": count(value, "message_count"),
         "assistant_message_count": count(value, "assistant_message_count"),
+        "content_part_counts": fixed_count_map(value, "content_part_counts", CONTENT_PART_TYPES),
+        "rich_card_kind_counts": fixed_count_map(value, "rich_card_kind_counts", RICH_CARD_KINDS),
+        "citation_count": citation_count,
+        "linked_citation_count": linked_citation_count,
+        "citation_logo_count": citation_logo_count,
         "streaming": bool_value(value, "streaming"),
         "updated_at_ms": value.get("updated_at_ms").and_then(Value::as_u64).unwrap_or(0),
     })))
@@ -108,6 +134,25 @@ fn count(value: &Value, key: &str) -> u64 {
         .and_then(Value::as_u64)
         .unwrap_or(0)
         .min(MAX_COUNT)
+}
+
+fn fixed_count_map(value: &Value, key: &str, allowed: &[&str]) -> Value {
+    let Some(source) = value.get(key).and_then(Value::as_object) else {
+        return Value::Object(Map::new());
+    };
+    let mut sanitized = Map::new();
+    for allowed_key in allowed {
+        let Some(count) = source.get(*allowed_key).and_then(Value::as_u64) else {
+            continue;
+        };
+        if count > 0 {
+            sanitized.insert(
+                (*allowed_key).to_string(),
+                Value::from(count.min(MAX_COUNT)),
+            );
+        }
+    }
+    Value::Object(sanitized)
 }
 
 fn fixed(value: &Value, key: &str, allowed: &[&str]) -> Option<String> {
@@ -148,6 +193,18 @@ mod tests {
             "last_command_ok":true,
             "message_count":4,
             "assistant_message_count":2,
+            "content_part_counts":{
+                "markdown":2,
+                "citation":999999,
+                "private_part":7
+            },
+            "rich_card_kind_counts":{
+                "finance":1,
+                "private_card":"private rich card"
+            },
+            "citation_count":3,
+            "linked_citation_count":999999,
+            "citation_logo_count":2,
             "draft":"private prompt",
             "url":"https://chatgpt.com/c/private",
             "owner":"private owner",
@@ -161,6 +218,20 @@ mod tests {
         assert_eq!(sanitized["conversation_count"], 12);
         assert_eq!(sanitized["last_error_code"], Value::Null);
         assert_eq!(sanitized["last_command_action"], "send_prompt");
+        assert_eq!(sanitized["content_part_counts"]["markdown"], 2);
+        assert_eq!(sanitized["content_part_counts"]["citation"], MAX_COUNT);
+        assert_eq!(
+            sanitized["content_part_counts"]["private_part"],
+            Value::Null
+        );
+        assert_eq!(sanitized["rich_card_kind_counts"]["finance"], 1);
+        assert_eq!(
+            sanitized["rich_card_kind_counts"]["private_card"],
+            Value::Null
+        );
+        assert_eq!(sanitized["citation_count"], 3);
+        assert_eq!(sanitized["linked_citation_count"], 3);
+        assert_eq!(sanitized["citation_logo_count"], 2);
         let encoded = sanitized.to_string();
         for secret in [
             "private prompt",
@@ -169,6 +240,7 @@ mod tests {
             "private cookie",
             "private token",
             "private exception",
+            "private rich card",
         ] {
             assert!(!encoded.contains(secret));
         }
@@ -191,5 +263,10 @@ mod tests {
         assert_eq!(sanitized["page_kind"], "unknown");
         assert_eq!(sanitized["cache_status"], "unknown");
         assert_eq!(sanitized["last_command_action"], Value::Null);
+        assert_eq!(sanitized["content_part_counts"], json!({}));
+        assert_eq!(sanitized["rich_card_kind_counts"], json!({}));
+        assert_eq!(sanitized["citation_count"], 0);
+        assert_eq!(sanitized["linked_citation_count"], 0);
+        assert_eq!(sanitized["citation_logo_count"], 0);
     }
 }
